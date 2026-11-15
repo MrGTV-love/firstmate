@@ -733,6 +733,82 @@ test_launch_proof_selector_refuses_missing_or_failed_reads() (
   pass 'the foreground selector refuses a listed process missing from the table and a failed or partial table read'
 )
 
+# Main 1777 (1): the refusal checks apply to every harness whose launch record
+# carries the matching token (launch_proof=env-v1), not only claude. A legacy
+# record (no launch_proof line) keeps its base outcome. Synthetic readers only.
+test_launch_proof_token_checks_every_harness() (
+  local T="$TMP/every-agent_name" H LANE META G=s42.1.1 agent_name verdict
+  H="$T/home" LANE="$T/lane"
+  mkdir -p "$H/state" "$LANE/state" "$T/w"
+  META="$H/state/lane.meta"
+  : > "$LANE/task.jsonl"
+  record() { # <agent_name> <launch_proof|''>
+    printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=%s\nkind=ship\nspawn_gen=%s\nworktree=%s\nhome=%s\n' \
+      "$1" "$G" "$LANE" "$LANE" > "$META"
+    [ -z "$2" ] || printf 'launch_proof=%s\n' "$2" >> "$META"
+    jq -nc --arg gen "$G" --arg task "$LANE/task.jsonl" \
+      '{version:1,spawn_gen:$gen,pid:7101,task_session_file:$task,current_session_file:$task}' > "$H/state/lane.omp-session.json"
+    rm -f "$T"/w/env-*
+    printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=%s\n' "$G" > "$T/w/env-7101"
+    printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-7102"
+  }
+  ps() {
+    case "$*" in
+      '-axo pid=,ppid=') printf '7101 1\n7102 7101\n' ;;
+      '-axo pid=,ppid=,pgid=') printf '7101 1 7101\n7102 7101 7101\n' ;;
+      '-p 7102 -o ppid=') printf '7101\n' ;;
+      '-p 7101 -o ppid=') printf '1\n' ;;
+      '-p 7101 -o comm='|'-p 7101 -o args=') printf '%s\n' "$agent_name" ;;
+      *) return 1 ;;
+    esac
+  }
+  fm_remote_herdr_process_env() { [ -f "$T/w/env-$1" ] || return 1; cat "$T/w/env-$1"; }
+  # shellcheck disable=SC2329 # the library's working-directory reader calls it
+  lsof() { printf 'p7101\0\nfcwd\0n%s\0\n' "$LANE"; }
+  fm_backend_herdr_cli() {
+    case "$*" in
+      'lab pane process-info --pane w1:p2')
+        jq -nc --arg name "$agent_name" '{result:{type:"pane_process_info",process_info:{pane_id:"w1:p2",foreground_process_group_id:7101,
+          foreground_processes:[{pid:7101,name:$name,argv0:$name},{pid:7102,name:"helper",argv0:"helper"}]}}}' ;;
+      *) return 1 ;;
+    esac
+  }
+  row() { [ -z "${FM_TEST_ROWS:-}" ] || printf 'ROW %-90s | %s\n' "$1" "$2"; }
+  for agent_name in codex omp; do
+    record "$agent_name" env-v1
+    verdict=$(fm_launch_proof_herdr "$META")
+    assert_equals managed "$verdict" "$agent_name control: a matching token with a clean group is managed"
+    fm_launch_proof_herdr_authorizes "$META" || fail "$agent_name control: a clean managed agent was refused"
+    row "$agent_name control: matching token, clean group" "verdict $verdict"
+    printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=s9.9.9\n' > "$T/w/env-7102"
+    verdict=$(fm_launch_proof_herdr "$META")
+    assert_equals pinned-elsewhere "$verdict" "$agent_name: a matching token with a member pinned to another generation"
+    fm_launch_proof_herdr_authorizes "$META" && fail "$agent_name: a foreign-pinned member was authorized"
+    row "$agent_name: matching token, member pinned elsewhere" "verdict $verdict; refused"
+    rm -f "$T/w/env-7102"
+    verdict=$(fm_launch_proof_herdr "$META")
+    assert_equals unknown "$verdict" "$agent_name: a matching token with an unreadable member"
+    fm_launch_proof_herdr_authorizes "$META" && fail "$agent_name: an unreadable member was authorized"
+    row "$agent_name: matching token, unreadable member" "verdict $verdict; refused"
+    printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-7102"
+    printf 'window=lab:w1:p2\n' > "$H/state/other.meta"
+    verdict=$(fm_launch_proof_herdr "$META")
+    assert_equals contested "$verdict" "$agent_name: a matching token while another record claims the pane"
+    fm_launch_proof_herdr_authorizes "$META" && fail "$agent_name: a claimed pane was authorized"
+    row "$agent_name: matching token, pane claimed by another record" "verdict $verdict; refused"
+    rm -f "$H/state/other.meta"
+  done
+  # Legacy control: no launch_proof line keeps the base outcome, checks unread.
+  agent_name=codex
+  record codex ''
+  printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=s9.9.9\n' > "$T/w/env-7102"
+  verdict=$(fm_launch_proof_herdr "$META")
+  assert_equals managed "$verdict" 'legacy control: a record with no launch_proof keeps its base managed outcome'
+  fm_launch_proof_herdr_authorizes "$META" || fail 'legacy control: a legacy record lost its authorization'
+  row 'legacy control: codex record with no launch_proof, member pinned elsewhere' "verdict $verdict (base outcome)"
+  pass 'every agent_name with a versioned record passes the refusal checks before a matching token is managed; a legacy record keeps its base outcome'
+)
+
 fm_test_only
 test_launch_proof_omp_executable_identity
 test_launch_proof_recorded_native_identity
@@ -740,3 +816,4 @@ test_launch_proof_pinned_personal_switch
 test_launch_proof_claude_verdict_and_refusal
 test_launch_proof_claude_refusal_checks
 test_launch_proof_selector_refuses_missing_or_failed_reads
+test_launch_proof_token_checks_every_harness

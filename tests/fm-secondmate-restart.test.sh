@@ -531,6 +531,8 @@ case "${rargs[1]:-}" in
       [ -z "$corr" ] || printf 'done [%s]: open records written down\n' "$corr" \
         >> "$FM_FAKE_ANSWER_STATUS"
     fi
+    # A barrier after the persistence request, before the relaunch.
+    [ -z "${FM_FAKE_AFTER_SEND:-}" ] || "$FM_FAKE_AFTER_SEND"
     ;;
   relaunch)
     if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ]; then
@@ -764,15 +766,51 @@ test_remote_delivery_uses_the_compared_route() {
       continue
     fi
     [ "$rc" -ne 0 ] || fail "$case: the restart went on after the route changed"$'\n'"$out"
+    assert_not_contains "$out" "restarted: sm2" "$case: the mate was reported restarted"
     assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "$case: the mate was relaunched"
-    [ -z "$(find "$dir/home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] \
-      || fail "$case: a pending-reply record remained"
     case "$case" in
       registry-after-ask|meta-after-ask)
-        assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "$case: a request crossed a changed route" ;;
+        assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "$case: a request crossed a changed route"
+        # Main 1777 (3): no pending-reply expectation is ever created on refusal.
+        [ ! -e "$dir/home/state/pending-replies" ] \
+          || fail "$case: a pending-reply expectation was created before the route was rechecked" ;;
+      endpoint-after-ask)
+        # The host endpoint is known only to the host send verb, after creation.
+        [ -z "$(find "$dir/home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] \
+          || fail "$case: a pending-reply record remained" ;;
     esac
   done
-  pass "a remote restart delivers only over the route it compared: a registry, record or endpoint change after the decision refuses"
+  pass "a remote restart delivers only over the route it compared: a registry, record or endpoint change after the decision refuses, with no expectation created for a route change"
+}
+
+# --- Main 1777 (2): the relaunch uses the same compared route ---------------
+# The registry row changes after the persistence request, before the relaunch.
+test_remote_relaunch_uses_the_compared_route() {
+  local dir out rc case
+  for case in control registry-after-request; do
+    dir=$(new_case remote-relaunch-route)
+    setup_remote_case "$dir" sm2 ok
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    if [ "$case" = registry-after-request ]; then
+      printf '#!/usr/bin/env bash\nsed -i.bak "s|home: /srv/sm2|home: /srv/moved|" %q\n' "$dir/home/data/secondmates.md" > "$dir/after-send"
+      chmod +x "$dir/after-send"
+      export FM_FAKE_AFTER_SEND="$dir/after-send"
+    fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_AFTER_SEND
+    if [ "$case" = control ]; then
+      expect_code 0 "$rc" "the compared route must relaunch"$'\n'"$out"
+      grep -q '^root=/srv/fm home=/srv/sm2 fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log.route" \
+        || fail "the relaunch did not cross the compared route"$'\n'"$(cat "$dir/ssh.log.route")"
+      continue
+    fi
+    grep -q '^fm-remote-secondmate-control.sh send' "$dir/ssh.log" \
+      || fail "the persistence request did not go out before the barrier"$'\n'"$(cat "$dir/ssh.log")"
+    [ "$rc" -ne 0 ] || fail "the restart reported success after the route changed"$'\n'"$out"
+    assert_not_contains "$out" "restarted: sm2" "a relaunch over a changed route was reported restarted"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "the relaunch crossed a changed route"
+  done
+  pass "a remote relaunch crosses only the route its decision compared"
 }
 
 test_remote_fleet_restart_obeys_initiating_policy() {
@@ -1198,6 +1236,7 @@ test_remote_backend_other_than_herdr_refuses_before_any_effect
 test_remote_omitted_backend_is_herdr_and_obeys_its_host
 test_remote_attribution_is_bound_to_the_recorded_route
 test_remote_delivery_uses_the_compared_route
+test_remote_relaunch_uses_the_compared_route
 test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown
