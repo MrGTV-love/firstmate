@@ -569,9 +569,7 @@ test_remote_printed_resend_carries_the_original_choice() {
 
 # The printed resend puts every option first, then a lone --, then the original message
 # words (Main 1866 G2), so a message that holds --resolve-key, or that starts with a word
-# like --answers-none after --, is re-delivered as the same message. Such a message is sent
-# after -- in the first place: without it a flag-like message word is refused (Main 1880
-# F2), and that refusal is checked here too.
+# like --answers-none after --, is re-delivered as the same message.
 test_remote_printed_resend_keeps_the_message_boundary() {
   local dir fb ssh_log home rhome rc
   dir="$TMP_ROOT/remote-resend-boundary"; mkdir -p "$dir"
@@ -579,11 +577,6 @@ test_remote_printed_resend_keeps_the_message_boundary() {
   rhome=$(setup_remote_secondmate_home remote-resend-boundary)
   home=$(setup_remote_parent_home remote-resend-boundary "$rhome")
   printf 'working: watching the remote domain\n' > "$home/state/rsm.status"
-  rc=0
-  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm Please inspect --resolve-key example >"$dir/bare.out" 2>"$dir/bare.err" || rc=$?
-  expect_code 1 "$rc" "a message holding --resolve-key without -- before it is refused"
-  assert_contains "$(cat "$dir/bare.err")" "a message word looks like a choice flag" "the refusal says why"
-  [ -z "$(remote_inbox_records "$rhome")" ] || fail "the refused send reached the remote inbox"
   lost_remote_request "$fb" "$home" "$ssh_log" "$dir" rsm -- Please inspect --resolve-key example
   case "$LOST_RESEND" in
     *" rsm --answers-none -- Please inspect --resolve-key example") : ;;

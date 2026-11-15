@@ -117,7 +117,9 @@ drain_out() {  # <home>
   FM_STATE_OVERRIDE="$1/state" "$DRAIN" 2>/dev/null
 }
 
-# A key that starts with - is a valid key of the fold; it is answered with the = form.
+# A key that starts with - is a valid key of the fold; it is answered with the = form,
+# and with the split form as on base. A message word that looks like a choice flag is
+# message text, as on base.
 test_dash_key_is_answered_with_the_equals_form() {
   local dir fb log home rc
   dir="$TMP_ROOT/dash-key"; mkdir -p "$dir"
@@ -130,7 +132,24 @@ test_dash_key_is_answered_with_the_equals_form() {
   grep -qF "go with the fix" "$home/state/t1.inbox/001.msg" || fail "the answer did not reach the inbox record"
   fm_test_fold "$home/state/t1.status"
   [ -z "$FM_TEST_FOLD" ] || fail "the -urgent key is still open after its = form answer: $FM_TEST_FOLD"
-  pass "fm-send --resolve-key: a key that starts with - is answered and closed with the = form"
+
+  home=$(setup_home dash-key-split)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'blocked [key=-urgent]: choose\n' > "$home/state/t1.status"
+  run_send "$fb" "$home" "$log" t1 --resolve-key -urgent "go with the fix"; rc=$?
+  expect_code 0 "$rc" "--resolve-key -urgent answers the open -urgent key, as on base"
+  grep -qF "go with the fix" "$home/state/t1.inbox/001.msg" || fail "the split-form answer did not reach the inbox record"
+  fm_test_fold "$home/state/t1.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the -urgent key is still open after its split-form answer: $FM_TEST_FOLD"
+
+  home=$(setup_home dash-key-word)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'working: busy\n' > "$home/state/t1.status"
+  run_send "$fb" "$home" "$log" t1 please run --resolve-key k1 later; rc=$?
+  expect_code 0 "$rc" "a message word that looks like a flag is text on a task with no open decision, as on base"
+  assert_equals "please run --resolve-key k1 later" "$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")" \
+    "the flag-like message word is delivered as text"
+  pass "fm-send --resolve-key: a key that starts with - is answered and closed with the = and split forms; a flag-like message word is text"
 }
 
 test_answer_send_closes_open_decision() {
@@ -1121,8 +1140,7 @@ test_held_lease_answers_6_before_an_option_error() {
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 --resolve-key k1 "answer"; rc=$?
   expect_code 6 "$rc" "a duplicate key under the live lease exits 6: $(cat "$err")"
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key -x "answer"; rc=$?
-  expect_code 6 "$rc" "a split-form key that starts with - is a held option error, so the live lease answers 6 first: $(cat "$err")"
-  assert_not_contains "$(cat "$err")" "split form takes no key" "the held dash-key error is not reported while the lease refuses"
+  expect_code 6 "$rc" "a split-form key that starts with - is a key, as on base, so the live lease answers 6: $(cat "$err")"
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "answer"; rc=$?
   expect_code 6 "$rc" "a valid key under the live lease exits 6 (control): $(cat "$err")"
   [ ! -e "$home/state/t1.inbox" ] || fail "a lease-refused send was delivered"
@@ -1133,8 +1151,8 @@ test_held_lease_answers_6_before_an_option_error() {
   assert_contains "$(cat "$err")" "not a valid decision key" "the option error names the bad key"
   [ ! -e "$home/state/t1.inbox" ] || fail "a malformed-key send was delivered"
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key -x "answer"; rc=$?
-  expect_code 1 "$rc" "with no live lease a split-form dash key is refused with 1 (control)"
-  assert_contains "$(cat "$err")" "split form takes no key that starts with -" "the held dash-key error is reported after the guards"
+  expect_code 1 "$rc" "with no live lease a split-form dash key that is not open is refused with 1, as on base"
+  assert_contains "$(cat "$err")" "--resolve-key '-x': no open decision or blocker with that key" "the not-open refusal names the -x key, as on base"
   [ ! -e "$home/state/t1.inbox" ] || fail "a split-form dash-key send was delivered"
   pass "fm-send: a held lease answers 6 before an option error, as on base; with no lease the option error answers 1"
 }
@@ -1199,17 +1217,6 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
     assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "pair with an option error ($pair)"
     assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the pair refusal ($pair)"
   done
-  # A message word before a lone -- that is exactly --answers-none or a --resolve-key form
-  # looks like a choice flag and is refused at the same point (Main 1880 F2).
-  for flagword in "--resolve-key k1 go --answers-none" "--resolve-key k1 go --resolve-key=k2" "--answers-none go --resolve-key k1"; do
-    # shellcheck disable=SC2086 # Word-split on purpose: each case is an argument list.
-    refusal_env_send "$fb" "$home" "$log" "$err" t1 $flagword; rc=$?
-    expect_code 1 "$rc" "a flag-like message word ($flagword) is refused with exit 1: $(cat "$err")"
-    assert_contains "$(cat "$err")" "a message word looks like a choice flag" "the flag-word refusal is the one reported ($flagword)"
-    assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the flag-word refusal ($flagword)"
-    assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "flag-word refusal ($flagword)"
-    assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the flag-word refusal ($flagword)"
-  done
 
   { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t1.status"
   before=$(full_state "$home")
@@ -1264,7 +1271,7 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   expect_code 3 "$rc" "a gate agent outside a lab home is refused by containment first"
   assert_contains "$(cat "$err")" "gate agent must not drive the fleet" "the containment refusal is the one shown"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "deny"' "denied gate agent"
-  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error), flag-like message word and unknown-open-set refusals; telemetry, banner and lease come after"
+  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error) and unknown-open-set refusals; telemetry, banner and lease come after"
 }
 
 # -- ends the options, so a literal body that starts with -- can be sent, and
