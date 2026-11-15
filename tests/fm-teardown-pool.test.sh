@@ -3794,6 +3794,55 @@ test_a_skipped_copy_with_an_ignored_file_at_a_reset_path_stays_leased() {
   pass "an ignored file at a path the reset target tracks keeps the skipped copy leased and recorded"
 }
 
+# R5-1: the reset target is the branch treehouse return resets to, by the rule treehouse owns: its configured base_branch,
+# else origin/HEAD, else the main checkout's branch, else init.defaultBranch. A project with no origin/HEAD whose main
+# checkout is on its default branch still has a readable target.
+# A git that fetches recreates origin/HEAD unless remote.origin.followRemoteHEAD is never, so the case sets it.
+drop_origin_head() {
+  git -C "$1" config remote.origin.followRemoteHEAD never
+  git -C "$1" symbolic-ref --delete refs/remotes/origin/HEAD
+}
+
+drop_origin_head_with_venv() {
+  drop_origin_head "$(dirname "$1")/project"
+  add_venv_only "$1"
+}
+
+test_a_skipped_copy_with_only_a_venv_is_released_without_origin_head() {
+  SKIPPED_CASE_PREP=drop_origin_head_with_venv skipped_unknown_custody_case no-origin-head-venv '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "no-origin-head-venv: a clean, landed copy holding only a .venv was kept although the main checkout names the reset branch"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "with no origin/HEAD, the main checkout's branch is the reset target and a copy holding only a .venv is released"
+}
+
+# R5-1 control: with no origin/HEAD, an ignored file at a path the reset branch tracks still keeps the copy.
+drop_origin_head_with_collision() {
+  put_ignored_at_reset_path "$1"
+  drop_origin_head "$(dirname "$1")/project"
+}
+
+test_a_skipped_copy_with_a_collision_stays_leased_without_origin_head() {
+  SKIPPED_CASE_PREP=drop_origin_head_with_collision skipped_unknown_custody_case no-origin-head-collide '[]'
+  assert_skipped_copy_kept no-origin-head-collide
+  grep -Fq 'private ignored bytes' "$CANON_X/notes.local" || fail "no-origin-head-collide: the ignored bytes changed"
+  pass "with no origin/HEAD, an ignored file at a path the reset branch tracks keeps the skipped copy leased"
+}
+
+# R5-1 control: a treehouse.toml that cannot be parsed hides the configured base_branch, so the reset target is unknown and
+# the copy stays leased, even with origin/HEAD absent and a main checkout that names a branch.
+make_reset_target_unreadable() {
+  local proj
+  proj="$(dirname "$1")/project"
+  drop_origin_head "$proj"
+  printf 'base_branch = [unterminated\n' > "$proj/treehouse.toml"
+  add_venv_only "$1"
+}
+
+test_a_skipped_copy_stays_leased_when_the_reset_target_is_unreadable() {
+  SKIPPED_CASE_PREP=make_reset_target_unreadable skipped_unknown_custody_case unreadable-reset-target '[]'
+  assert_skipped_copy_kept unreadable-reset-target
+  pass "a reset target that cannot be read keeps the skipped copy leased"
+}
+
 teardown_test_cases=(
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
@@ -3874,6 +3923,9 @@ test_a_skipped_copy_stays_leased_when_another_pool_row_path_holds_a_nul
 test_a_skipped_copy_whose_path_cannot_be_resolved_keeps_its_record
 test_a_skipped_copy_with_only_an_ignored_venv_is_released
 test_a_skipped_copy_with_an_ignored_file_at_a_reset_path_stays_leased
+test_a_skipped_copy_with_only_a_venv_is_released_without_origin_head
+test_a_skipped_copy_with_a_collision_stays_leased_without_origin_head
+test_a_skipped_copy_stays_leased_when_the_reset_target_is_unreadable
 )
 
 # In the combined tests/fm-teardown.test.sh run,

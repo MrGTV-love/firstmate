@@ -2908,17 +2908,65 @@ teardown_landed() {  # <dir> <ref> <branch>
   work_is_landed "$3"
 }
 
+# The branch `treehouse return` resets a copy to, by the rule treehouse owns: its configured base_branch (treehouse.toml
+# in the main checkout, else the user config), else refs/remotes/origin/HEAD, else the main checkout's current branch,
+# else init.defaultBranch (projects/treehouse internal/vcs/gitvcs/gitvcs.go:47-110 GetDefaultBranch,
+# internal/pool/pool.go:910-932 and :1078-1104, internal/config/config.go:157-229, cmd/init.go:45). Prints the branch;
+# nonzero when it cannot be read.
+teardown_return_base_branch() { # <copy>
+  local common main conf branch
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  main=$1
+  [ "$(basename "$common")" != .git ] || main=$(dirname "$common")
+  conf="$main/treehouse.toml"
+  [ -e "$conf" ] || conf="${HOME:-}/.config/treehouse/config.toml"
+  if [ -e "$conf" ]; then
+    branch=$(python3 -I -c 'import sys, tomllib
+v = tomllib.load(open(sys.argv[1], "rb")).get("base_branch", "")
+if not isinstance(v, str):
+    sys.exit(2)
+print(v)' "$conf" 2>/dev/null) || return 1
+    [ -z "$branch" ] || { printf '%s\n' "$branch"; return 0; }
+  fi
+  if git -C "$main" remote 2>/dev/null | grep -qx origin &&
+    branch=$(git -C "$main" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null) && [ -n "${branch#refs/remotes/origin/}" ] &&
+    [ "${branch#refs/remotes/origin/}" != "$branch" ]; then
+    printf '%s\n' "${branch#refs/remotes/origin/}"
+    return 0
+  fi
+  if branch=$(git -C "$main" symbolic-ref -q HEAD 2>/dev/null) && [ -n "${branch#refs/heads/}" ] && [ "${branch#refs/heads/}" != "$branch" ]; then
+    printf '%s\n' "${branch#refs/heads/}"
+    return 0
+  fi
+  branch=$(git -C "$main" config init.defaultBranch 2>/dev/null) && [ -n "$branch" ] || return 1
+  printf '%s\n' "$branch"
+}
+
+# Ignored entries of <copy> that a return to <branch> would overwrite. Treehouse resets to the local branch or its origin
+# tracking ref, whichever is ahead (gitvcs.go:146 branchRef), so both are compared; at least one must exist.
+teardown_return_collisions() { # <copy> <branch>
+  local ref sha out found='' seen=0
+  for ref in "refs/heads/$2" "refs/remotes/origin/$2"; do
+    sha=$(git -C "$1" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || continue
+    seen=1
+    out=$(fm_slot_ignored_collisions "$1" "$sha") || return 1
+    [ -z "$out" ] || found="${found:+$found, }$out"
+  done
+  [ "$seen" = 1 ] || return 1
+  printf '%s' "$found"
+}
+
 # Copies this task's spawn skipped and left leased in place (bin/fm-spawn.sh spawn_skip_copy writes one
 # $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch).
 # This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
 # sweep, and only when that copy passes the same landed-work test as any other copy: a clean worktree
 # root whose HEAD is anchored or landed (teardown_landed), with no process running in it, no ignored file where the
-# default branch a return resets it to tracks a path (fm_slot_ignored_collisions, the proof's own comparison), and its
+# branch a return resets it to tracks a path (teardown_return_collisions, the proof's own comparison), and its
 # lease still held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
 # whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
 teardown_skipped_copies() {
-  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok reset_tree
+  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok reset_branch
   local keep="$record.keep.${BASHPID:-$$}" changed=0
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
   : > "$keep" || return 0
@@ -2977,10 +3025,10 @@ teardown_skipped_copies() {
       echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2
     elif ! hidden_work=$(fm_slot_hidden_work "$canonical") || [ -n "$hidden_work" ]; then
       echo "warning: leaving $copy leased to $holder: a tracked edit is hidden by an index flag, or the flags cannot be read (skipped for: $reason)" >&2
-    elif ! reset_tree=$(git -C "$canonical" rev-parse --verify --quiet 'refs/remotes/origin/HEAD^{commit}' 2>/dev/null) || [ -z "$reset_tree" ]; then
-      echo "warning: leaving $copy leased to $holder: the default branch a return resets it to (origin/HEAD) cannot be read, so its ignored files cannot be compared with it (skipped for: $reason)" >&2
-    elif ! ignored_files=$(fm_slot_ignored_collisions "$canonical" "$reset_tree") || [ -n "$ignored_files" ]; then
-      echo "warning: leaving $copy leased to $holder: ignored files sit where the default branch a return resets it to tracks a path${ignored_files:+ ($ignored_files)}, or they cannot be compared with it (skipped for: $reason)" >&2
+    elif ! reset_branch=$(teardown_return_base_branch "$canonical") || [ -z "$reset_branch" ]; then
+      echo "warning: leaving $copy leased to $holder: the branch a return resets it to cannot be read, so its ignored files cannot be compared with it (skipped for: $reason)" >&2
+    elif ! ignored_files=$(teardown_return_collisions "$canonical" "$reset_branch") || [ -n "$ignored_files" ]; then
+      echo "warning: leaving $copy leased to $holder: ignored files sit where the branch a return resets it to tracks a path${ignored_files:+ ($ignored_files)}, or they cannot be compared with it (skipped for: $reason)" >&2
     else
       # Only the landed-work test releases a copy. An anchor makes a commit recoverable; it does not make it landed.
       TEARDOWN_BUNDLE_ACCEPTED=
