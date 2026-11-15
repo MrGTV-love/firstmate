@@ -1992,6 +1992,7 @@ MODE=$(grep '^mode=' "$META" | cut -d= -f2- || true)
 BASE_BRANCH=$(grep '^base_branch=' "$META" | cut -d= -f2- || true)
 TEARDOWN_ROUTE_DATA=$DATA
 TEARDOWN_ROUTE_BASE=$BASE_BRANCH
+TEARDOWN_ROUTE_PROJECT=$PROJ
 
 teardown_preserves_reassociated_copy() {
   local meta=$1 kind=$2 backend=$3 project=$4 worktree=$5 line

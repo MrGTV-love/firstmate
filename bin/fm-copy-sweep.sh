@@ -1467,6 +1467,14 @@ driver_plan_allows() {  # <clone> <copy>
     case "$TEARDOWN_CLOSEOUT_ROUTE" in
       pr | proving) PLAN_WHY="$PLAN_WHY (supersedence route --pr ${TEARDOWN_CLOSEOUT_ROUTE_PR:-?})" ;;
     esac
+    # The killed plan never made its read after the call. Read the checkout here against
+    # the window the plan opened: a switch meanwhile stops the run, and the timeout
+    # itself is only ever a refusal (the copy is kept), never a pass.
+    if [ "$TEARDOWN_CKO_OPEN" = 1 ] && [ "$PLAN_SWITCHED" != 1 ] \
+        && ! teardown_route_checkout_check "$1" "$TEARDOWN_ROUTE_HEADREF"; then
+      PLAN_SWITCHED=1
+      PLAN_WHY="$PLAN_WHY; the primary checkout of the slot was switched meanwhile: $TEARDOWN_CKO_WHY"
+    fi
     return 1
   fi
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')

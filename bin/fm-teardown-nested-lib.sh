@@ -103,9 +103,10 @@
 # guess. A recorded base_branch= (TEARDOWN_ROUTE_BASE) must name that same branch or
 # the copy is kept. A remote that cannot be read, names no branch, or names one the
 # clone has no ref for holds the copy. A forge read that
-# fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 by default; a value that is
-# not a whole number of seconds from 1 to 999999999, written without a leading zero,
-# refuses the route with the value named and is never read as 60) or cannot be
+# fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 when the setting is unset; a
+# value that is empty or not a whole number of seconds from 1 to 999999999, written
+# without a leading zero, refuses the route with the value named and is never read as
+# 60) or cannot be
 # parsed is unknown, never merged. The read is bounded by fm_timeout_perl_bound: gh
 # runs under a small perl wrapper that leads the bound's process group, waits for gh,
 # prints one trailer line with gh's status and kills the whole group, so a descendant
@@ -120,28 +121,21 @@
 #
 # Content proof. A copy may carry changes the merge commit M does not hold as the
 # same commits (a rebased or squashed twin). The copy's net change is its diff from
-# the merge base of its tip T and M, and the route needs exactly one merge base. A
-# path whose change is a mode or type change, a binary file, a removal of lines or a
-# deletion needs an entry in M identical to the copy's. A path that only adds text
-# lines is proved with git merge-tree --write-tree --merge-base: the merge must be
-# clean and its result's entry at the path must equal M's entry. That merge closes
-# every merge-driver channel (--attr-source=<empty tree>, merge.default=text, an empty
-# core.attributesFile, GIT_ATTR_NOSYSTEM, GIT_CONFIG_NOSYSTEM, GIT_CONFIG_GLOBAL=/dev/null),
-# writes only into a temporary object directory (the clone's objects are an alternate)
-# and needs git 2.40 (--attr-source); on an older git a copy that adds text is kept,
-# and a change with no added text line is still proved. The proof refuses first when
-# the repository's configuration defines a merge driver of any name (git config
-# --get-regexp '^merge\..*\.driver$' under the same settings: the repository's own and
-# worktree files, an included file, the command line and GIT_CONFIG_*), because
-# merge.default=text does not reach a driver that is itself named text; a
-# configuration it cannot read refuses too. git check-attr merge, under
-# the same settings, runs next for each such path: the clone's info/attributes is
-# not closed by --attr-source, so a path it gives a custom driver keeps the copy before
-# any merge runs. An empty net change is proved; it is not a claim that T is an
-# ancestor of M.
+# the merge base of its tip T and M, and the route needs exactly one merge base. The
+# proof runs no merge machinery: for every path in that diff, M must hold exactly the
+# copy's entry (the same mode and the same blob), or no entry where the copy deleted
+# the path. The entries are read with git diff-tree --raw and git ls-tree only, which
+# run no merge driver, textconv or external diff, so nothing configured in the
+# repository (a driver of any name, in any scope) can decide the proof: a copy whose
+# change a lying driver would have called landed is kept, and a legitimate twin routes
+# under the same configuration. A path that M changed further than the copy is kept,
+# and so is any git command that fails. A merge driver found in the configuration is
+# reported as a notice, never a refusal. An empty net change is proved; it is not a
+# claim that T is an ancestor of M.
 #
-# Project lock and checkout. The route holds the slot's project lock
-# (fm_treehouse_project_lock_path) from its first step to the end of the execute, so
+# Project lock and checkout. The route holds the project lock
+# (fm_treehouse_project_lock_path, called on the project that the caller names in
+# TEARDOWN_ROUTE_PROJECT, else on the slot clone) from its first step to the end of the execute, so
 # no Firstmate or pipeline code path that takes that lock changes the slot's primary
 # checkout meanwhile. The sweep takes it and releases it; teardown borrows its
 # caller's hold (TEARDOWN_ROUTE_LOCK_HELD, proved by the lock's pid file naming this
@@ -1489,12 +1483,18 @@ teardown_route_profile_ok() {  # <profile> <pr> <tip>
 TEARDOWN_ROUTE_LOCK_HELD=
 TEARDOWN_ROUTE_LOCK_OWN=0
 TEARDOWN_ROUTE_LOCK_PATH=
+# The lock key comes from the one owner function that every other actor uses
+# (fm_treehouse_project_lock_path), called on the project directory when the caller names
+# one in TEARDOWN_ROUTE_PROJECT (teardown does: its own hold is keyed the same way) and on
+# the slot clone otherwise (the sweep's pool slots, which carry no project path).
+TEARDOWN_ROUTE_PROJECT=
 teardown_route_lock_take() {  # <slot> <copy>
-  local slot=$1 lock cur pid
+  local slot=$1 lock cur pid keydir
   TEARDOWN_ROUTE_LOCK_OWN=0
   TEARDOWN_ROUTE_LOCK_PATH=
-  if ! lock=$(fm_treehouse_project_lock_path "$slot" 2>/dev/null); then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="the project lock of the slot $slot cannot be resolved, so the route cannot hold it"
+  keydir=${TEARDOWN_ROUTE_PROJECT:-$slot}
+  if ! lock=$(fm_treehouse_project_lock_path "$keydir" 2>/dev/null); then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the project lock of $keydir cannot be resolved, so the route cannot hold it"
     return 1
   fi
   if [ -n "${TEARDOWN_ROUTE_LOCK_HELD:-}" ] && [ "$TEARDOWN_ROUTE_LOCK_HELD" = "$lock" ]; then
@@ -1638,34 +1638,18 @@ teardown_route_checkout_pre_entry() {  # <slot> <prhead>
   teardown_route_checkout_check "$1" "$2"
 }
 
-# True when the installed git is at least <major>.<minor>.
-teardown_route_git_at_least() {  # <major> <minor>
-  local v major minor
-  v=$(git version 2>/dev/null) || return 1
-  v=${v#git version }
-  major=${v%%.*}
-  minor=${v#*.}
-  minor=${minor%%.*}
-  [[ $major =~ ^[0-9]+$ && $minor =~ ^[0-9]+$ ]] || return 1
-  [ "$((10#$major))" -gt "$1" ] || { [ "$((10#$major))" -eq "$1" ] && [ "$((10#$minor))" -ge "$2" ]; }
-}
-
 # The content proof: positive proof by read-only git that the merge commit <merge>
-# carries what the copy at <tip> adds, judged path by path against the merge base B
-# of the two (exactly one). A path whose mode or type changes, a binary path, and a
-# path that only removes lines or is deleted are proved only by M's entry at the path
-# equalling the copy's (or being absent where the copy has none); a text path that
-# adds lines is proved only when merging the copy into M changes nothing there
-# (git merge-tree --write-tree, clean, with M's entry at the path in the result).
-# That merge runs with every merge-driver channel closed (--attr-source=<empty tree>,
-# merge.default=text, no system or global configuration) and writes its objects only
-# to a temporary object directory that is removed. It needs git 2.40 (the first
-# release with --attr-source); on an older git a copy that adds text is kept. A git
-# command that fails proves nothing. Sets WHY naming the first unproven path.
+# carries what the copy at <tip> adds, judged path by path against the merge base B of
+# the two (exactly one). It runs no merge machinery: for every path the copy changed
+# against B, the merge commit must hold exactly the copy's entry (the same mode and the
+# same blob), or no entry where the copy deleted the path. The entries are read with
+# git diff-tree --raw and git ls-tree, which run no merge driver, textconv or external
+# diff, so nothing configured in the repository can decide the proof. A path that the
+# merge commit changed further, a mode or type change, and any git command that fails
+# prove nothing. Sets WHY naming the first unproven path.
 teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
-  local tmp=$1 slot=$2 tip=$3 merge=$4 base bases raw meta path om nm osha nsha st num added binary
-  local mentry mmode mtype msha special empty objdir res rc tree line
-  local -a textpaths=() mt
+  local tmp=$1 slot=$2 tip=$3 merge=$4 base bases raw meta path om nm osha nsha st
+  local mentry mmode msha line
   bases=$(git -C "$slot" merge-base --all "$tip" "$merge" 2>/dev/null) || bases=
   if [ -z "$bases" ] || [ "$(printf '%s\n' "$bases" | wc -l | tr -d ' ')" != 1 ]; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the copy's tip and the merge commit $merge of the PR do not have exactly one merge base, so the content of the copy cannot be proved landed"
@@ -1673,7 +1657,7 @@ teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
   fi
   base=$bases
   raw=$tmp/raw
-  git -C "$slot" diff-tree -r --no-renames -z --raw "$base" "$tip" > "$raw" 2>/dev/null || {
+  git -C "$slot" diff-tree -r --no-renames --no-ext-diff --no-textconv -z --raw "$base" "$tip" > "$raw" 2>/dev/null || {
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the changes of the copy cannot be read, so their content cannot be proved landed"
     return 1
   }
@@ -1682,29 +1666,7 @@ teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
     meta=${meta#:}
     read -r om nm osha nsha st <<< "$meta"
     st=${st:0:1}
-    special=0
-    case "$om $nm" in *120000* | *160000*) special=1 ;; esac
-    [ "$st" != T ] || special=1
-    if [ "$om" != 000000 ] && [ "$nm" != 000000 ] && [ "$om" != "$nm" ]; then special=1; fi
-    added=0
-    binary=0
-    if num=$(git -C "$slot" --literal-pathspecs diff --numstat --no-renames "$base" "$tip" -- "$path" 2>/dev/null); then
-      case "$num" in
-        '-'$'\t''-'$'\t'*) binary=1 ;;
-        *) added=${num%%$'\t'*} ;;
-      esac
-    else
-      exec 3<&-
-      TEARDOWN_CLOSEOUT_ROUTE_WHY="the change of $path cannot be read, so its content cannot be proved landed"
-      return 1
-    fi
-    [[ $added =~ ^[0-9]+$ ]] || added=0
-    if [ "$special" = 0 ] && [ "$binary" = 0 ] && [ "$st" != D ] && [ "$added" -gt 0 ]; then
-      textpaths+=("$path")
-      continue
-    fi
-    # Entry equality: M holds exactly the copy's entry at the path (or none where the copy has none).
-    git -C "$slot" ls-tree -z "$merge" -- "$path" > "$tmp/ls" 2>/dev/null || {
+    git -C "$slot" --literal-pathspecs ls-tree -z "$merge" -- "$path" > "$tmp/ls" 2>/dev/null || {
       exec 3<&-
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit's entry at $path cannot be read, so the content of the copy cannot be proved landed"
       return 1
@@ -1721,75 +1683,27 @@ teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
       fi
       continue
     fi
-    read -r mmode mtype msha <<< "$mentry"
+    read -r mmode _ msha <<< "$mentry"
     if [ -z "$mentry" ] || [ "$mmode" != "$nm" ] || [ "$msha" != "$nsha" ]; then
       exec 3<&-
-      TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit does not hold the copy's entry at $path (a mode or type change, a binary file or a change that removes lines needs an identical entry), so that change is not proved landed"
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit does not hold the copy's entry at $path (the same mode and the same blob), so that change is not proved landed"
       return 1
     fi
   done
   exec 3<&-
-  [ "${#textpaths[@]}" -gt 0 ] || return 0
-  if ! teardown_route_git_at_least 2 40; then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="the installed git is older than 2.40, the first release with --attr-source, so the text proof does not run and ${textpaths[0]} is not proved landed"
-    return 1
-  fi
-  : > "$tmp/empty"
-  mkdir -p "$tmp/objects"
-  empty=$(git -C "$slot" hash-object -t tree --stdin < /dev/null 2>/dev/null) || empty=
-  objdir=$(git -C "$slot" rev-parse --path-format=absolute --git-path objects 2>/dev/null) || objdir=
-  if [ -z "$empty" ] || [ -z "$objdir" ]; then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="the repository's object directory or empty tree cannot be resolved, so the text proof cannot run"
-    return 1
-  fi
-  mt=(env GIT_OBJECT_DIRECTORY="$tmp/objects" GIT_ALTERNATE_OBJECT_DIRECTORIES="$objdir" GIT_ATTR_NOSYSTEM=1 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-    git -C "$slot" "--attr-source=$empty" -c "core.attributesFile=$tmp/empty" -c merge.default=text)
-  # A merge driver defined in the repository's configuration (any name, any scope git
-  # reads here: the repository's own file, a worktree file, an included file, the
-  # command line and GIT_CONFIG_*) could decide the text merge in place of the built-in
-  # one, and -c merge.default=text does not reach a driver that is named text. The
-  # proof does not try to neutralise every such name: it refuses, and so does a
-  # configuration it cannot read.
-  rc=0
-  res=$("${mt[@]}" config --get-regexp '^merge\..*\.driver$' 2>/dev/null) || rc=$?
-  if [ "$rc" = 0 ]; then
-    res=$(printf '%s\n' "$res" | awk '{ print $1 }' | sort -u | tr '\n' ' ')
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="the repository's configuration defines the custom merge driver ${res% } (merge.<name>.driver), which could decide the text merge in place of the built-in one, so the text proof cannot be trusted and ${textpaths[0]} is not proved landed"
-    return 1
-  elif [ "$rc" != 1 ]; then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="the repository's configuration could not be read (git config exit $rc), so a custom merge driver is not ruled out and ${textpaths[0]} is not proved landed"
-    return 1
-  fi
-  for path in "${textpaths[@]}"; do
-    res=$("${mt[@]}" --literal-pathspecs check-attr merge -- "$path" 2>/dev/null) || res=
-    res=${res##*: }
-    case "$res" in
-      unspecified | set | unset | text | binary | union) ;;
-      *)
-        TEARDOWN_CLOSEOUT_ROUTE_WHY="the repository's info/attributes names the custom merge driver '$res' for $path, so the text proof cannot be trusted and the copy is kept"
-        return 1
-        ;;
-    esac
-  done
-  rc=0
-  res=$("${mt[@]}" merge-tree --write-tree "--merge-base=$base" "$merge" "$tip" 2>/dev/null) || rc=$?
-  tree=${res%%$'\n'*}
-  if [ "$rc" != 0 ] || [[ ! $tree =~ ^[0-9a-f]{40,64}$ ]]; then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="merging the copy into the merge commit $merge of the PR is not clean (${textpaths[0]} is not proved landed)"
-    return 1
-  fi
-  for path in "${textpaths[@]}"; do
-    "${mt[@]}" ls-tree -z "$merge" -- "$path" > "$tmp/lsm" 2>/dev/null || { TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit's entry at $path cannot be read"; return 1; }
-    "${mt[@]}" ls-tree -z "$tree" -- "$path" > "$tmp/lsr" 2>/dev/null || { TEARDOWN_CLOSEOUT_ROUTE_WHY="the merged result's entry at $path cannot be read"; return 1; }
-    mentry=
-    while IFS= read -r -d '' line; do [ "${line#*$'\t'}" = "$path" ] && mentry=${line%%$'\t'*}; done < "$tmp/lsm"
-    res=
-    while IFS= read -r -d '' line; do [ "${line#*$'\t'}" = "$path" ] && res=${line%%$'\t'*}; done < "$tmp/lsr"
-    if [ -z "$mentry" ] || [ "$mentry" != "$res" ]; then
-      TEARDOWN_CLOSEOUT_ROUTE_WHY="merging the copy into the merge commit $merge of the PR changes $path, so what the copy adds there is not proved landed"
-      return 1
-    fi
-  done
+  return 0
+}
+# A merge driver in the repository's configuration is reported, never a reason to refuse:
+# the content proof runs no merge, so a driver plays no part in it. The names are kept in
+# TEARDOWN_ROUTE_DRIVER_FACT and one notice line is printed when there are any.
+TEARDOWN_ROUTE_DRIVER_FACT=
+teardown_route_driver_fact() {  # <slot>
+  local out names
+  TEARDOWN_ROUTE_DRIVER_FACT=
+  out=$(git -C "$1" config --get-regexp '^merge\..*\.driver$' 2>/dev/null) || return 0
+  names=$(printf '%s\n' "$out" | awk '{ print $1 }' | sort -u | tr '\n' ' ')
+  TEARDOWN_ROUTE_DRIVER_FACT=${names% }
+  [ -z "$TEARDOWN_ROUTE_DRIVER_FACT" ] || printf 'note: the repository'"'"'s configuration defines the merge driver %s; the content proof runs no merge, so it plays no part\n' "$TEARDOWN_ROUTE_DRIVER_FACT" >&2
 }
 teardown_route_content_proven() {  # <slot> <tip> <merge>
   local tmp rc=0
@@ -1799,6 +1713,7 @@ teardown_route_content_proven() {  # <slot> <tip> <merge>
   fi
   teardown_route_content_prove_in "$tmp" "$@" || rc=$?
   rm -rf -- "$tmp"
+  teardown_route_driver_fact "$1"
   return "$rc"
 }
 
@@ -1899,7 +1814,7 @@ teardown_route_forge_read() {  # <seconds> <pr> <owner/repo>
 # clone's origin URL; a read that fails, times out or cannot be parsed is
 # unknown, never merged.
 teardown_route_pr_landed() {  # <slot> <pr>
-  local slot=$1 pr=$2 url path owner repo out limit rc=0 forge_state merge head current branch ref
+  local slot=$1 pr=$2 url path owner repo out limit rc=0 forge_state merge head current branch ref shown
   # fm_pr_url_parse writes these globals; keep them out of the calling script.
   local FM_PR_PROVIDER FM_PR_URL FM_PR_HOST FM_PR_PATH FM_PR_OWNER FM_PR_REPO FM_PR_NUMBER
   url=$(git -C "$slot" config --get-all remote.origin.url 2>/dev/null) || url=
@@ -1918,9 +1833,11 @@ teardown_route_pr_landed() {  # <slot> <pr>
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's origin URL does not name a GitHub repository, so PR $pr cannot be read on the forge"
     return 1
   fi
-  limit=${FM_TEARDOWN_FORGE_TIMEOUT:-60}
+  limit=${FM_TEARDOWN_FORGE_TIMEOUT-60}
   if [[ ! $limit =~ ^[1-9][0-9]{0,8}$ ]]; then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="FM_TEARDOWN_FORGE_TIMEOUT is '$limit', not a whole number of seconds from 1 to 999999999 written without a leading zero, so the forge read of PR $pr is not made and the copy is kept"
+    shown="'$limit'"
+    [ -n "$limit" ] || shown="'' (the setting is set but empty)"
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="FM_TEARDOWN_FORGE_TIMEOUT is $shown, not a whole number of seconds from 1 to 999999999 written without a leading zero, so the forge read of PR $pr is not made and the copy is kept"
     return 1
   fi
   if ! command -v gh >/dev/null 2>&1; then
