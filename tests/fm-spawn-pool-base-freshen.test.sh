@@ -1540,11 +1540,575 @@ PY
   pass 'legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it'
 }
 
+# --- --successor-of: a declared successor reaches the project's provisioner ---
+# The provisioner here is a stub: it logs its argv, lists --supersedes in
+# --help only when asked, and writes no successor record of its own.
+write_successor_slot_owner() { # <repository> <advertise|silent>
+  mkdir -p "$1/scripts/git-stability"
+  {
+    if [ "$2" = advertise ]; then printf 'ADVERTISE = True\n'; else printf 'ADVERTISE = False\n'; fi
+    cat <<'PY'
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ap = argparse.ArgumentParser(prog="provision_existing_slot.py")
+for flag in ("repo-root", "worktree-path", "owner-id", "branch", "base-sha"):
+    ap.add_argument("--" + flag, required=True)
+ap.add_argument("--owned-path", action="append", required=True)
+ap.add_argument("--base-source")
+if ADVERTISE:
+    ap.add_argument("--supersedes")
+calls = os.environ["FM_TEST_CALLS"]
+if "--help" in sys.argv[1:]:
+    with open(calls + ".help", "a", encoding="utf-8") as log:
+        log.write("help\n")
+    # FM_TEST_HELP_SWITCH=<n>::<repo>::<branch>: another actor moves a copy to a
+    # new branch during the n-th probe, after the caller's own branch check.
+    switch = os.environ.get("FM_TEST_HELP_SWITCH")
+    if switch:
+        at, repo, moved = switch.split("::")
+        with open(calls + ".help", encoding="utf-8") as log:
+            probes = len(log.read().splitlines())
+        if probes == int(at):
+            subprocess.run(["git", "-C", repo, "checkout", "-q", "-b", moved], check=True)
+    # FM_TEST_HELP_META=<n>::<meta file>::<branch>: another actor rewrites the
+    # recorded branch of a task during the n-th probe.
+    rewrite = os.environ.get("FM_TEST_HELP_META")
+    if rewrite:
+        at, meta_file, moved = rewrite.split("::")
+        with open(calls + ".help", encoding="utf-8") as log:
+            probes = len(log.read().splitlines())
+        if probes == int(at):
+            lines = Path(meta_file).read_text(encoding="utf-8").splitlines()
+            Path(meta_file).write_text("\n".join("branch=" + moved if l.startswith("branch=") else l for l in lines) + "\n", encoding="utf-8")
+    ap.parse_args()
+with open(calls, "a", encoding="utf-8") as log:
+    log.write(json.dumps(sys.argv[1:]) + "\n")
+a = ap.parse_args()
+mode = os.environ.get("FM_TEST_OWNER_MODE", "pass")
+if mode == "refuse" or (mode == "refuse-supersedes" and getattr(a, "supersedes", None)):
+    print(json.dumps({"state": "BLOCKED", "reason": "fixture_predecessor_not_live"}))
+    raise SystemExit(2)
+record = dict(worktree_path=os.path.realpath(a.worktree_path), owner_id=a.owner_id, branch=a.branch,
+              base_sha=a.base_sha, owned_paths=a.owned_path, lifecycle_state="worktree_active")
+manifest = Path(os.environ["FM_TEST_SLOT_RECORD"])
+manifest.write_text(json.dumps(record), encoding="utf-8")
+print(json.dumps(dict(state="PASS", manifest_path=str(manifest), **record)))
+PY
+  } > "$1/scripts/git-stability/provision_existing_slot.py"
+}
+
+# <name> <advertise|silent|none>: a project (governed or not), a pool copy, and
+# logging wrappers so each row can prove which resources it touched.
+make_successor_case() {
+  local rec
+  SUCC_SEQ=$((${SUCC_SEQ:-0} + 1))
+  SUCC_ID="succ-$1-$SUCC_SEQ-$$"
+  rec=$(make_case "$SUCC_ID" "$SUCC_ID")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
+  if [ "$2" != none ]; then
+    write_successor_slot_owner "$PROJECT_DIR" "$2"
+    git -C "$PROJECT_DIR" add scripts
+    git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'successor fixture owner'
+    git -C "$PROJECT_DIR" push --quiet origin main
+  fi
+  CALLS="$CASE_DIR/provisioner.calls"
+  LAUNCH_LOG="$CASE_DIR/launch.log"
+  TMUX_LOG="$CASE_DIR/tmux.log"
+  TREEHOUSE_LOG="$CASE_DIR/treehouse.log"
+  : > "$TMUX_LOG"; : > "$TREEHOUSE_LOG"; : > "$LAUNCH_LOG"
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux-real"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\nexec %q "$@"\n' "$TMUX_LOG" "$FAKEBIN_DIR/tmux-real" > "$FAKEBIN_DIR/tmux"
+  printf '#!/bin/sh\necho "$*" >> %s\n' "$TREEHOUSE_LOG" > "$FAKEBIN_DIR/treehouse"
+  chmod +x "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/treehouse"
+  preflight_task_temp "$SUCC_ID"
+}
+
+successor_pred() { # <pred-id>: a live predecessor copy on its recorded branch
+  local pid=$1 dir="$CASE_DIR/pred-$1"
+  git -C "$PROJECT_DIR" worktree add -q -b "fm/$pid" "$dir" main
+  {
+    echo "window=fm-$pid"
+    echo "endpoint_task_id=$pid"
+    echo "worktree=$dir"
+    echo "project=$PROJECT_DIR"
+    echo "kind=ship"
+    echo "branch=fm/$pid"
+    echo "mode=local-only"
+    echo "yolo=off"
+  } > "$HOME_DIR/state/$pid.meta"
+}
+
+successor_edit_meta() { # <pred-id> <sed-expression>
+  sed -i.bak "$2" "$HOME_DIR/state/$1.meta"
+  rm -f "$HOME_DIR/state/$1.meta.bak"
+}
+
+successor_real() { (cd -P -- "$1" && pwd -P); }
+
+run_successor_spawn() { # <arg>...: a fresh ship spawn of $SUCC_ID
+  FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE="${OWNER_MODE:-pass}" FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
+    FM_TEST_HELP_SWITCH="${HELP_SWITCH:-}" FM_TEST_HELP_META="${HELP_META:-}" \
+    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" run_spawn "$SUCC_ID" --mode local-only --yolo off --owned-path README.md "$@"
+}
+
+run_successor_relaunch() { # a relaunch of $SUCC_ID
+  FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE="${OWNER_MODE:-pass}" FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
+    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" run_relaunch "$SUCC_ID"
+}
+
+successor_snapshot() { (cd "$HOME_DIR" && find state data -print | sort); }
+
+# Names and contents, so a reclaimed or rewritten lock shows too.
+successor_snapshot_deep() { (cd "$HOME_DIR" && { find state data -print | sort; find state data -type f -exec cksum {} + | sort; }); }
+
+# The provisioner's recorded (non-help) calls, one argv JSON per line.
+successor_calls() {
+  if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; fi
+}
+
+# <call-number> <expected --supersedes value, or empty for none>
+successor_argv_ok() {
+  python3 - "$(sed -n "${1}p" "$CALLS")" "$2" "$SUCC_ID" <<'PY'
+import json, sys
+argv = json.loads(sys.argv[1])
+want = sys.argv[2]
+flags = [x for x in argv if x.startswith('--')]
+base = ['--repo-root', '--worktree-path', '--owner-id', '--branch', '--base-sha', '--owned-path']
+assert flags == base + (['--supersedes'] if want else []), flags
+assert argv[argv.index('--owner-id') + 1] == sys.argv[3], argv
+assert argv[argv.index('--branch') + 1] == 'fm/' + sys.argv[3], argv
+if want:
+    assert argv[-2:] == ['--supersedes', want], argv
+PY
+}
+
+successor_meta_count() { grep -c "^successor_of=$2\$" "$HOME_DIR/state/$1.meta"; }
+
+assert_successor_untouched() { # <label> <snapshot-before>
+  [ "$(successor_snapshot)" = "$2" ] || fail "$1: a refused declaration changed the state or data directory"
+  [ "$(successor_calls)" = 0 ] || fail "$1: a refused declaration reached the provisioner"
+  [ ! -s "$TREEHOUSE_LOG" ] || fail "$1: a refused declaration called the pool"
+  [ ! -s "$LAUNCH_LOG" ] || fail "$1: a refused declaration launched an agent"
+  ! grep -Eq '^(new-window|send-keys|kill-window|new-session|set-window-option)' "$TMUX_LOG" \
+    || fail "$1: a refused declaration touched a window: $(cat "$TMUX_LOG")"
+}
+
+# F1, F5: a live predecessor is resolved and handed to the provisioner once.
+test_successor_of_reaches_the_provisioner() {
+  local out rc=0 real
+  make_successor_case reaches advertise
+  successor_pred pred-live
+  real=$(successor_real "$CASE_DIR/pred-pred-live")
+  out=$(run_successor_spawn --successor-of pred-live) || rc=$?
+  expect_code 0 "$rc" "a declared successor of a live predecessor failed: $out"
+  assert_contains "$out" "spawned $SUCC_ID" 'the declared successor did not reach its normal success state'
+  [ "$(successor_calls)" = 1 ] || fail "the provisioner was called $(successor_calls) times, not once"
+  successor_argv_ok 1 "$real" || fail 'the provisioner argv does not carry exactly one resolved --supersedes after the existing arguments'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the admitted record lacks exactly one successor_of line'
+  assert_no_grep 'recovery=' "$HOME_DIR/state/$SUCC_ID.meta" 'an admitted successor kept a recovery marker'
+  grep -q 'send-keys' "$TMUX_LOG" || fail 'the wrapper saw no window action, so the untouched-resource rows would be vacuous'
+
+  # The same project without the flag: argv has no --supersedes and no record.
+  make_successor_case plain advertise
+  rc=0
+  out=$(run_successor_spawn) || rc=$?
+  expect_code 0 "$rc" "a spawn without the flag failed: $out"
+  [ "$(successor_calls)" = 1 ] || fail 'a spawn without the flag did not call the provisioner once'
+  successor_argv_ok 1 '' || fail 'a spawn without the flag changed the provisioner argv'
+  assert_no_grep 'successor_of=' "$HOME_DIR/state/$SUCC_ID.meta" 'a spawn without the flag recorded a successor'
+  [ ! -e "$CALLS.help" ] || fail 'a spawn without the flag probed the provisioner help'
+  pass '--successor-of hands one resolved --supersedes to the provisioner and records successor_of; no flag changes nothing'
+}
+
+# F2: each case that cannot yield a trustworthy record refuses first.
+run_successor_refusal_row() { # <label> <expected text> <arg>...
+  local label=$1 expect=$2 before out rc=0
+  shift 2
+  before=$(successor_snapshot)
+  out=$(run_successor_spawn "$@") || rc=$?
+  [ "$rc" -ne 0 ] || fail "$label: the declaration was admitted: $out"
+  assert_contains "$out" "$expect" "$label: refusal reason missing: $out"
+  [ "$(printf '%s\n' "$out" | grep -c '^error:')" -eq 1 ] || fail "$label: not exactly one error line: $out"
+  assert_successor_untouched "$label" "$before"
+}
+
+test_successor_of_refuses_untrustworthy_predecessors() {
+  local pid
+  make_successor_case refusals advertise
+  run_successor_refusal_row 'unsafe id' 'safe predecessor task id' --successor-of '../escape'
+  run_successor_refusal_row 'empty id' 'safe predecessor task id' --successor-of=
+  run_successor_refusal_row 'itself' 'names the task itself' --successor-of "$SUCC_ID"
+  run_successor_refusal_row 'no record' 'has no task record' --successor-of ghost
+  for pid in no-wt no-branch second remote gone sub primary foreign moved detached; do successor_pred "$pid"; done
+  successor_edit_meta no-wt '/^worktree=/d'
+  successor_edit_meta no-branch '/^branch=/d'
+  successor_edit_meta second 's/^kind=ship/kind=secondmate/'
+  echo 'remote_host=example.invalid' >> "$HOME_DIR/state/remote.meta"
+  run_successor_refusal_row 'no worktree' 'records no worktree or branch' --successor-of no-wt
+  run_successor_refusal_row 'no branch' 'records no worktree or branch' --successor-of no-branch
+  run_successor_refusal_row 'secondmate' 'secondmate or remote record' --successor-of second
+  run_successor_refusal_row 'remote' 'secondmate or remote record' --successor-of remote
+  successor_edit_meta gone "s#^worktree=.*#worktree=$CASE_DIR/not-there#"
+  run_successor_refusal_row 'copy gone' 'is gone' --successor-of gone
+  mkdir "$CASE_DIR/pred-sub/inner"
+  successor_edit_meta sub "s#^worktree=.*#worktree=$CASE_DIR/pred-sub/inner#"
+  run_successor_refusal_row 'subdirectory' 'not a git worktree root' --successor-of sub
+  successor_edit_meta primary "s#^worktree=.*#worktree=$PROJECT_DIR#; s#^branch=.*#branch=main#"
+  run_successor_refusal_row 'primary checkout' "project's primary checkout" --successor-of primary
+  git init --quiet -b main "$CASE_DIR/other"
+  git -C "$CASE_DIR/other" -c user.name=Tests -c user.email=tests@example.invalid commit -q --allow-empty -m other
+  git -C "$CASE_DIR/other" checkout -q -b fm/foreign
+  successor_edit_meta foreign "s#^worktree=.*#worktree=$CASE_DIR/other#"
+  run_successor_refusal_row 'other repository' 'different repository' --successor-of foreign
+  git -C "$CASE_DIR/pred-moved" checkout -q -b fm/moved-elsewhere
+  run_successor_refusal_row 'other branch' 'not its recorded branch fm/moved' --successor-of moved
+  git -C "$CASE_DIR/pred-detached" checkout -q --detach
+  run_successor_refusal_row 'detached HEAD' 'detached HEAD' --successor-of detached
+
+  make_successor_case silent silent
+  successor_pred pred-live
+  run_successor_refusal_row 'verb not advertised' "primary checkout $PROJECT_DIR to advertise --supersedes" --successor-of pred-live
+  [ -f "$CALLS.help" ] || fail 'the advertise check never asked the provisioner'
+  make_successor_case none none
+  successor_pred pred-live
+  run_successor_refusal_row 'no provisioner' 'update that checkout, since the successor record needs the Vernant verb' --successor-of pred-live
+  pass '--successor-of refuses every untrustworthy predecessor before any resource is used'
+}
+
+# F3: the flag means something only on a fresh ship spawn.
+test_successor_of_scope() {
+  local before out rc=0
+  make_successor_case scope advertise
+  successor_pred pred-live
+  before=$(successor_snapshot)
+  out=$(run_successor_spawn --successor-of pred-live --scout) || rc=$?
+  [ "$rc" -ne 0 ] || fail '--scout admitted --successor-of'
+  assert_contains "$out" 'only to a fresh ship spawn, not a scout' '--scout refusal reason missing'
+  rc=0
+  out=$(FM_TEST_CALLS="$CALLS" run_spawn "$SUCC_ID" --secondmate --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail '--secondmate admitted --successor-of'
+  assert_contains "$out" 'only to a fresh ship spawn, not a secondmate' '--secondmate refusal reason missing'
+  rc=0
+  out=$(FM_TEST_CALLS="$CALLS" run_relaunch "$SUCC_ID" --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail '--relaunch admitted --successor-of'
+  assert_contains "$out" 'only to a fresh ship spawn; a retained refusal keeps its declaration' '--relaunch refusal reason missing'
+  rc=0
+  out=$(run_successor_spawn --successor-of pred-live --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a second --successor-of was accepted'
+  assert_contains "$out" 'names one predecessor task' 'duplicate declaration refusal reason missing'
+  assert_successor_untouched 'scope' "$before"
+  pass '--successor-of refuses scouts, secondmates, relaunches and a second predecessor, changing nothing'
+}
+
+# F3, F4: a refusal keeps the declaration; the retry carries it; a later
+# relaunch of the admitted task attests as usual.
+test_successor_of_retained_retry() {
+  local out rc=0 real meta head branch
+  make_successor_case retry advertise
+  successor_pred pred-live
+  real=$(successor_real "$CASE_DIR/pred-pred-live")
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  branch=$(git -C "$POOL_DIR" branch --show-current)
+  out=$(OWNER_MODE=refuse-supersedes run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor'
+  assert_contains "$out" "slot provisioner refused task $SUCC_ID" 'the existing refusal error is missing'
+  assert_contains "$out" 'fixture_predecessor_not_live' 'the provisioner refusal was not preserved'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
+    || fail 'the refusal did not restore the assigned checkout'
+  assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
+  [ "$(successor_calls)" = 1 ] || fail 'the refused spawn did not call the provisioner once'
+  successor_argv_ok 1 "$real" || fail 'the refused spawn did not pass --supersedes'
+
+  # A predecessor that is no longer live refuses the retry and keeps the record.
+  make_stopped_tmux "$CASE_DIR/stopped"
+  git -C "$CASE_DIR/pred-pred-live" checkout -q --detach
+  cp "$meta" "$CASE_DIR/meta.refused"
+  rc=0
+  out=$(run_successor_relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a retry admitted a successor whose predecessor is no longer live'
+  assert_contains "$out" 'pred-live' 'the retry refusal does not name the predecessor'
+  assert_contains "$out" 'keeps its unfulfilled successor declaration' 'the retry refusal does not explain the kept declaration'
+  cmp -s "$meta" "$CASE_DIR/meta.refused" || fail 'the refused retry changed the recovery record'
+  [ "$(successor_calls)" = 1 ] || fail 'the retry reached the provisioner without a live predecessor'
+
+  # The provisioner refuses again: the retry still carries --supersedes.
+  git -C "$CASE_DIR/pred-pred-live" checkout -q fm/pred-live
+  rc=0
+  out=$(OWNER_MODE=refuse-supersedes run_successor_relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the retry'
+  [ "$(successor_calls)" = 2 ] || fail 'the second retry did not call the provisioner once'
+  successor_argv_ok 2 "$real" || fail 'a retry called the provisioner without the declaration'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'a refused retry dropped or duplicated the declaration'
+  assert_grep 'recovery=slot-provision-refused' "$meta" 'a refused retry lost the recovery record'
+
+  # The provisioner now accepts: the retry is admitted with the record.
+  rc=0
+  out=$(run_successor_relaunch) || rc=$?
+  expect_code 0 "$rc" "the recovery retry failed: $out"
+  [ "$(successor_calls)" = 3 ] || fail 'the accepted retry did not call the provisioner once'
+  successor_argv_ok 3 "$real" || fail 'the accepted retry did not pass the live predecessor copy'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the admitted retry lost or duplicated successor_of'
+  assert_no_grep 'recovery=slot-provision-refused' "$meta" 'the admitted retry kept the refusal marker'
+  assert_grep "slot_manifest=$CASE_DIR/manifest.json" "$meta" 'the admitted retry recorded no declaration'
+
+  # A later relaunch is an ordinary attestation: no flag, predecessor not required.
+  mv "$HOME_DIR/state/pred-live.meta" "$CASE_DIR/pred-live.meta.away"
+  rc=0
+  out=$(run_successor_relaunch) || rc=$?
+  expect_code 0 "$rc" "the relaunch of an admitted successor failed: $out"
+  [ "$(successor_calls)" = 4 ] || fail 'the relaunch of an admitted successor did not call the provisioner once'
+  successor_argv_ok 4 '' || fail 'the relaunch of an admitted successor passed --supersedes'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the relaunch lost or duplicated successor_of'
+
+  # An admitted successor whose attestation is refused refuses as for any task.
+  rc=0
+  out=$(OWNER_MODE=refuse run_successor_relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor relaunch'
+  successor_argv_ok 5 '' || fail 'the refused attestation passed --supersedes'
+  pass 'a refused declaration is kept and retried with --supersedes; an admitted successor relaunches ordinarily'
+}
+
+# S1: with the predecessor-branch check or the advertise check removed, the
+# matching refusal row stops refusing. The mutant is a copy of bin/, docs/ and .agents/ in the
+# scratch root; the unmutated copy first proves the row refuses there.
+test_successor_of_checks_are_load_bearing() {
+  local mut="$TMP_ROOT/mutant" pattern row out rc expect
+  for row in branch advertise; do
+    rm -rf "$mut"
+    mkdir -p "$mut"
+    cp -R "$ROOT/bin" "$ROOT/docs" "$ROOT/.agents" "$mut/"
+    case "$row" in
+      branch)
+        # shellcheck disable=SC2016 # sed text, not shell expansion
+        pattern='s#^  \[ "\$head" = "refs/heads/\$branch" \] || {#  true || {#'
+        expect='not its recorded branch' ;;
+      advertise)
+        # shellcheck disable=SC2016 # sed text, not shell expansion
+        pattern='s#^  fm_slot_advertises_supersedes "\$project" || {#  true || {#'
+        expect='to advertise --supersedes' ;;
+    esac
+    # Control: the unmutated copy refuses the row.
+    successor_mutation_case "$row"
+    out=$(ROOT="$mut" run_successor_spawn --successor-of moved) || true
+    assert_contains "$out" "$expect" "the $row control did not refuse"
+    sed -i.bak "$pattern" "$mut/bin/fm-slot-provision-lib.sh"
+    if [ "$row" = branch ]; then
+      # The handover re-check is a second guard on the same branch; remove it too.
+      # shellcheck disable=SC2016 # sed text, not shell expansion
+      sed -i.bak 's#^  if \[ -n "\$FM_SLOT_SUPERSEDES" \] && ! fm_slot_successor_still_bound; then#  if false; then#' "$mut/bin/fm-slot-provision-lib.sh"
+    fi
+    rm -f "$mut/bin/fm-slot-provision-lib.sh.bak"
+    ! cmp -s "$mut/bin/fm-slot-provision-lib.sh" "$ROOT/bin/fm-slot-provision-lib.sh" || fail "the $row mutation changed nothing"
+    # A fresh case of the same shape, now on the mutant.
+    successor_mutation_case "$row"
+    rc=0
+    out=$(ROOT="$mut" run_successor_spawn --successor-of moved) || rc=$?
+    ! printf '%s' "$out" | grep -q "$expect" || fail "the $row check is not what refuses: $out"
+    [ "$(successor_calls)" -ge 1 ] || fail "the mutated $row check never reached the provisioner, so the row does not discriminate: $out"
+  done
+  rm -rf "$mut"
+  pass 'removing the predecessor-branch check or the advertise check makes its refusal row stop refusing'
+}
+
+successor_mutation_case() { # <branch|advertise>
+  if [ "$1" = branch ]; then
+    make_successor_case "mut-$1" advertise
+    successor_pred moved
+    git -C "$CASE_DIR/pred-moved" checkout -q -b fm/moved-elsewhere
+  else
+    make_successor_case "mut-$1" silent
+    successor_pred moved
+  fi
+}
+
+# Review finding 1: the proof binds to the recorded branch of the declared
+# predecessor, checked again where the path is handed to the provisioner.
+test_successor_of_branch_is_rechecked_at_handover() {
+  local out rc=0 before meta head branch
+  make_successor_case handover advertise
+  successor_pred pred-live
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  branch=$(git -C "$POOL_DIR" branch --show-current)
+  # The copy moves during the second help probe, after the resolver's branch check.
+  out=$(HELP_SWITCH="2::$CASE_DIR/pred-pred-live::fm/elsewhere" run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a predecessor that moved after preflight was admitted'
+  assert_contains "$out" 'no longer on its recorded branch fm/pred-live' 'the moved predecessor refusal does not name the branch'
+  [ "$(git -C "$CASE_DIR/pred-pred-live" branch --show-current)" = fm/elsewhere ] || fail 'the probe did not move the predecessor, so the row is vacuous'
+  [ "$(wc -l < "$CALLS.help" | tr -d ' ')" = 2 ] || fail 'the stub was probed an unexpected number of times, so the switch point is wrong'
+  [ "$(successor_calls)" = 0 ] || fail 'the provisioner was called for a predecessor that had moved, so a proof could be minted'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
+    || fail 'the refusal did not restore the assigned checkout'
+  assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
+  # The retry re-resolves the predecessor and refuses it while it is on the wrong branch.
+  before=$(successor_snapshot_deep)
+  rc=0
+  out=$(run_successor_relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'the retry admitted a predecessor that is not on its recorded branch'
+  assert_contains "$out" 'not its recorded branch fm/pred-live' 'the retry refusal does not name the recorded branch'
+  [ "$(successor_snapshot_deep)" = "$before" ] || fail 'the refused retry changed the state directory'
+  [ "$(successor_calls)" = 0 ] || fail 'the refused retry reached the provisioner'
+  pass 'a predecessor that leaves its recorded branch after preflight is refused before the provisioner and mints nothing'
+}
+
+# Review finding 1, task half: the predecessor's task record is part of the proof.
+test_successor_of_task_record_is_rechecked_at_handover() {
+  local out rc=0 head branch
+  make_successor_case recordmoved advertise
+  successor_pred pred-live
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  branch=$(git -C "$POOL_DIR" branch --show-current)
+  # The task record names another branch during the second help probe.
+  out=$(HELP_META="2::$HOME_DIR/state/pred-live.meta::fm/other-task" run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a predecessor whose task record changed after preflight was admitted'
+  assert_contains "$out" 'changed its task record after it was checked' 'the changed task record refusal is not named'
+  assert_grep 'branch=fm/other-task' "$HOME_DIR/state/pred-live.meta" 'the probe did not change the record, so the row is vacuous'
+  [ "$(wc -l < "$CALLS.help" | tr -d ' ')" = 2 ] || fail 'the stub was probed an unexpected number of times, so the switch point is wrong'
+  [ "$(successor_calls)" = 0 ] || fail 'the provisioner was called for a predecessor whose record changed'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
+    || fail 'the refusal did not restore the assigned checkout'
+  pass 'a predecessor whose task record changes after preflight is refused before the provisioner'
+}
+
+# Review finding 2: an id=repo batch never drops the declaration silently.
+test_successor_of_batch_is_refused() {
+  local before out rc=0 pred
+  make_successor_case batch advertise
+  successor_pred pred-live
+  before=$(successor_snapshot_deep)
+  for pred in pred-live ghost; do
+    rc=0
+    out=$(FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE=pass FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+      fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$SUCC_ID=$PROJECT_DIR" --mode local-only --yolo off --owned-path README.md --successor-of "$pred") || rc=$?
+    [ "$rc" -ne 0 ] || fail "an id=repo batch admitted --successor-of $pred: $out"
+    assert_contains "$out" 'applies to one task' "the batch refusal for $pred does not say why"
+    [ "$(successor_snapshot_deep)" = "$before" ] || fail "the batch refusal for $pred changed the state or data directory"
+    assert_successor_untouched "batch $pred" "$(successor_snapshot)"
+  done
+  pass 'an id=repo batch refuses --successor-of instead of dropping it'
+}
+
+# Review finding 3: a refused declaration leaves existing state, including a stale
+# lifecycle lock, exactly as it found it.
+test_successor_of_refuses_before_any_lock() {
+  local before out rc=0 dead lock
+  make_successor_case prelock advertise
+  successor_pred pred-live
+  lock="$HOME_DIR/state/.control-$SUCC_ID.lock"
+  mkdir "$lock"
+  dead=$(bash -c 'echo $$')
+  printf '%s\n' "$dead" > "$lock/pid"
+  before=$(successor_snapshot_deep)
+  out=$(run_successor_spawn --successor-of ghost) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a missing predecessor was admitted'
+  assert_contains "$out" 'has no task record' 'the missing predecessor refusal reason is missing'
+  [ -d "$lock" ] || fail 'the refusal reclaimed a stale lock that belongs to an earlier action'
+  [ "$(successor_snapshot_deep)" = "$before" ] || fail 'the refusal changed the state or data directory'
+  assert_successor_untouched 'prelock' "$(successor_snapshot)"
+  # The same stale lock does not stop a valid declaration, which reclaims it as before.
+  rc=0
+  out=$(run_successor_spawn --successor-of pred-live) || rc=$?
+  expect_code 0 "$rc" "a valid declaration was blocked by a stale lock: $out"
+  pass 'a refused declaration leaves a pre-existing stale lock and every state file untouched'
+}
+
+# Review finding: a fresh spawn over a refused declaration cannot drop it.
+test_successor_of_fresh_respawn_keeps_declaration() {
+  local out rc=0 meta before row
+  make_successor_case respawn advertise
+  successor_pred pred-live
+  successor_pred pred-other
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
+  out=$(OWNER_MODE=refuse-supersedes run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor'
+  assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
+  "$FAKEBIN_DIR/tmux-real" kill-window -t "fm-$SUCC_ID" 2>/dev/null || true
+  : > "$LAUNCH_LOG"
+  before=$(successor_snapshot_deep)
+  for row in 'no flag' 'other predecessor'; do
+    rc=0
+    if [ "$row" = 'no flag' ]; then
+      out=$(run_successor_spawn) || rc=$?
+    else
+      out=$(run_successor_spawn --successor-of pred-other) || rc=$?
+    fi
+    [ "$rc" -ne 0 ] || fail "$row: a fresh spawn replaced an unfulfilled declaration: $out"
+    assert_contains "$out" "unfulfilled successor declaration of pred-live" "$row: the refusal does not name the kept declaration: $out"
+    assert_contains "$out" "fm-spawn.sh $SUCC_ID --relaunch" "$row: the refusal does not point to --relaunch: $out"
+    [ "$(successor_snapshot_deep)" = "$before" ] || fail "$row: the refusal changed the state or data directory"
+    [ "$(successor_calls)" = 1 ] || fail "$row: the fresh spawn reached the provisioner"
+    [ ! -s "$LAUNCH_LOG" ] || fail "$row: the fresh spawn started an agent"
+  done
+  pass 'a fresh spawn that does not name a kept successor declaration refuses and points to --relaunch'
+}
+
+# The refusal for a dropped declaration prints two retry routes. This follows the
+# printed fresh-spawn advice with its window gone and shows it recovers, while the
+# other route (--relaunch) refuses on the gone window.
+test_successor_of_gone_window_recovers_by_same_flag_spawn() {
+  local out rc=0 real meta advice_flag advice_pred
+  make_successor_case routes advertise
+  successor_pred pred-live
+  real=$(successor_real "$CASE_DIR/pred-pred-live")
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
+  out=$(OWNER_MODE=refuse-supersedes run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor'
+  [ "$(successor_calls)" = 1 ] || fail 'the refused spawn did not call the provisioner once'
+  "$FAKEBIN_DIR/tmux-real" kill-window -t "fm-$SUCC_ID" 2>/dev/null || true
+  : > "$LAUNCH_LOG"
+
+  # A fresh spawn with no flag refuses and prints the way out.
+  rc=0
+  out=$(run_successor_spawn) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a fresh spawn replaced an unfulfilled declaration: $out"
+  advice_flag=$(printf '%s\n' "$out" | sed -n 's/.*a fresh spawn naming the same \(--successor-of\) [^ ]* once it is gone.*/\1/p')
+  advice_pred=$(printf '%s\n' "$out" | sed -n 's/.*a fresh spawn naming the same --successor-of \([^ ]*\) once it is gone.*/\1/p')
+  [ -n "$advice_flag" ] && [ -n "$advice_pred" ] || fail "the refusal prints no same-flag respawn route: $out"
+  [ "$(successor_calls)" = 1 ] || fail 'the refused fresh spawn reached the provisioner'
+
+  # The other printed route, --relaunch, refuses once the window is gone.
+  rc=0
+  out=$(FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE=pass FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
+    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$SUCC_ID" --relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail "--relaunch replaced a proven-gone tmux endpoint: $out"
+  assert_contains "$out" 'proven-gone tmux endpoint' "--relaunch did not refuse as a proven-gone endpoint: $out"
+  [ "$(successor_calls)" = 1 ] || fail 'the refused --relaunch reached the provisioner'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'the refused --relaunch started an agent'
+
+  # The printed same-flag respawn recovers: the provisioner gets --supersedes and the declaration is fulfilled.
+  rc=0
+  out=$(run_successor_spawn "$advice_flag" "$advice_pred") || rc=$?
+  expect_code 0 "$rc" "the printed same-flag respawn failed: $out"
+  [ "$(successor_calls)" = 2 ] || fail 'the same-flag respawn did not call the provisioner once'
+  successor_argv_ok 2 "$real" || fail 'the same-flag respawn did not pass the live predecessor copy'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the same-flag respawn lost or duplicated successor_of'
+  assert_no_grep 'recovery=slot-provision-refused' "$meta" 'the same-flag respawn kept the refusal marker'
+  pass 'with the window gone, the printed same-flag respawn recovers and --relaunch refuses'
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock|test_successor_of_fresh_respawn_keeps_declaration|test_successor_of_gone_window_recovers_by_same_flag_spawn) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -1559,6 +2123,17 @@ test_local_only_equal_retry_divergence
 test_local_only_adopted_scope_retry
 test_local_only_equal_retry_invalid_ref
 test_legacy_relaunch_scope_adoption
+test_successor_of_reaches_the_provisioner
+test_successor_of_refuses_untrustworthy_predecessors
+test_successor_of_scope
+test_successor_of_retained_retry
+test_successor_of_checks_are_load_bearing
+test_successor_of_branch_is_rechecked_at_handover
+test_successor_of_task_record_is_rechecked_at_handover
+test_successor_of_batch_is_refused
+test_successor_of_refuses_before_any_lock
+test_successor_of_fresh_respawn_keeps_declaration
+test_successor_of_gone_window_recovers_by_same_flag_spawn
 test_local_only_origin_early
 test_local_only_origin_late
 test_local_only_origin_freshness
