@@ -1063,7 +1063,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
   local preserved=()
   for kind in ship scout secondmate; do
     for mode in direct sweep; do
-      for pin in missing mismatched unreadable; do
+      for pin in missing mismatched unreadable ambiguous-record; do
         id="reboot-claude-$kind-$mode-$pin"
         recovery_case_or_skip "$id" "$id" || return 0
         id=$HERDR_CASE_ID
@@ -1073,6 +1073,9 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
         printf claude > "$dir/fake/recovery-harness"
         [ "$pin" != mismatched ] || printf other > "$dir/fake/recovery-spawn-gen"
         [ "$pin" != unreadable ] || : > "$dir/fake/recovery-env-unreadable"
+        # Main 1709 ruling 2: a versioned proof followed by an empty duplicate is
+        # no record at all, never the legacy shortcut.
+        [ "$pin" != ambiguous-record ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
         gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") || fail "could not arm retained non-omp fixture"
         printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
         printf 'working: preserve the retained launch\n' > "$dir/home/state/$id.status"
@@ -1090,7 +1093,10 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           # environment that cannot be read is "unreadable". No input and no mutation are
           # still asserted below.
           # A pin for another generation is not an unpinned restore: it names its own cause.
-          if [ "$pin" = unreadable ]; then
+          if [ "$pin" = ambiguous-record ]; then
+            assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
+            assert_contains "$out" "its launch record is not one readable record" "$kind/$pin direct refusal must name the record"
+          elif [ "$pin" = unreadable ]; then
             assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
             assert_contains "$out" "live launch settings are unreadable" "$kind/$pin direct refusal must keep the unreadable cause"
           elif [ "$pin" = mismatched ]; then
@@ -1106,7 +1112,10 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           CONTROL="$ROOT/bin/fm-reboot-recover.sh"
           out=$(run_control "$dir" recover) || rc=$?
           CONTROL="$ROOT/bin/fm-control.sh"
-          if [ "$pin" = unreadable ]; then
+          if [ "$pin" = ambiguous-record ]; then
+            assert_contains "$out" "REBOOT_RECOVERY: $id: its launch record is not one readable record" \
+              "$kind/$pin sweep refusal must name the record"
+          elif [ "$pin" = unreadable ]; then
             assert_contains "$out" "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" \
               "$kind/$pin sweep refusal must name unknown proof"
           elif [ "$pin" = mismatched ]; then
@@ -1123,7 +1132,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
         if [ "$pin" = mismatched ]; then
           assert_contains "$out" "the process belongs to another launch; Main inspects the pane and decides the lane by hand" \
             "$kind/$mode/$pin must name its own next step"
-        elif [ "$pin" != unreadable ]; then
+        elif [ "$pin" = missing ]; then
           assert_contains "$out" "stop it by hand in its pane and then relaunch it with \"bin/fm-control.sh $id relaunch\"" \
             "$kind/$mode/$pin must name the stop-by-hand relaunch"
         fi
@@ -1145,7 +1154,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
       done
     done
   done
-  pass "direct and sweep recovery refuse missing or mismatched non-omp pins for ships, scouts and secondmates without mutation"
+  pass "direct and sweep recovery refuse missing or mismatched non-omp pins, and an ambiguous launch record, for ships, scouts and secondmates without mutation"
 }
 
 test_bootstrap_inspects_the_derived_home_when_fm_home_is_unset() {

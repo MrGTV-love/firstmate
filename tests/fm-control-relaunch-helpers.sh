@@ -158,6 +158,34 @@ if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
   printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
   exit 0
 fi
+# The kernel cwd a claude refusal check reads for a fake agent (Main 1709
+# ruling 1): agent-cwd-<pid> when a case stages one, else the recovery case's
+# recorded worktree, else the directory the fake Herdr opened the agent's pane in.
+if [ "${*: -1}" = pn0 ]; then
+  agent=
+  record=
+  prev=
+  for a in "$@"; do [ "$prev" != -p ] || agent=$a; prev=$a; done
+  cwd=
+  if [ -f "$D/agent-cwd-$agent" ]; then
+    cwd=$(cat "$D/agent-cwd-$agent")
+  elif [ -f "$D/recovery-case-id" ]; then
+    # The record sits in this home's state, or in a host verb's state override.
+    for record in "${FM_STATE_OVERRIDE:-$FM_HOME/state}" "$FM_HOME/state"; do
+      record="$record/$(cat "$D/recovery-case-id").meta"
+      [ -f "$record" ] || continue
+      cwd=$(grep '^worktree=' "$record" | tail -1 | cut -d= -f2-)
+      break
+    done
+  elif [ -n "$agent" ] && [ "$agent" -ge 2100000000 ] 2>/dev/null; then
+    for f in "$D"/herdr-cwd-*; do
+      [ -f "$f" ] && [ "${f##*[!0-9]}" = "$((agent - 2100000000))" ] && cwd=$(cat "$f")
+    done
+  fi
+  [ -n "$cwd" ] || exit 1
+  printf 'p%s\0\nfcwd\0n%s\0\n' "$agent" "$cwd"
+  exit 0
+fi
 encode_cwd() {
   local path=$1
   path=${path//\\/\\\\}

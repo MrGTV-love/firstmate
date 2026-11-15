@@ -539,7 +539,8 @@ test_launch_proof_claude_refusal_checks() (
     printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=claude\nkind=secondmate\nspawn_gen=%s\nworktree=%s\nhome=%s\nlaunch_proof=env-v1\n' \
       "$G" "$LANE" "$LANE" > "$META"
     find "$H/state" -name '*.meta' ! -name lane.meta -exec rm -f {} +
-    rm -rf "$T/A|$T" "$T/B" "$T/C" "$H/data"
+    rm -rf "$T/A|$T" "$T/B" "$T/C" "$H/data" "$LANE/state"
+    mkdir -p "$LANE/state"
   }
   ps() {
     case "$*" in
@@ -550,7 +551,7 @@ test_launch_proof_claude_refusal_checks() (
         [ ! -f "$T/w/pgid-fail" ] || { head -1 "$T/w/table"; return 1; }
         if [ -f "$T/w/no-agent" ]; then grep -v '^53539 ' "$T/w/table"; else cat "$T/w/table"; fi ;;
       '-p '*' -o ppid=')
-        local p=${*#-p }; p=${p%% *}
+        local p=$2
         if [ -f "$T/w/live-ppid-$p" ]; then cat "$T/w/live-ppid-$p"; else awk -v p="$p" '$1 == p {print $2}' "$T/w/table"; fi ;;
       *) return 1 ;;
     esac
@@ -591,8 +592,9 @@ test_launch_proof_claude_refusal_checks() (
   }
 
   world
-  rm -f "$T"/w/reads-*
   judged managed '(k) the recorded d1 shape with a matching token passes every refusal check'
+  rm -f "$T"/w/reads-*
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" '(k) one verdict'
   for p in 53539 53733 56557; do
     [ "$(cat "$T/w/reads-$p" 2>/dev/null)" = x ] || fail "(k) the environment of $p was not read exactly once"
   done
@@ -676,7 +678,7 @@ test_launch_proof_claude_refusal_checks() (
   mkdir -p "$LANE/state"; printf 'window=lab:w1:p2\n' > "$LANE/state/crew.meta"
   verdict=$(FM_LAUNCH_PROOF_VERB_PATH=1 fm_launch_proof_herdr "$META")
   assert_equals contested "$verdict" 'C2: the verb path reads the home the record names'
-  rm -rf "$LANE/state" "$H/data"
+  rm -rf "$H/data"
   world; sed "s|^home=.*|home=$T/gone|" "$META" > "$META.next"; mv "$META.next" "$META"
   verdict=$(FM_LAUNCH_PROOF_VERB_PATH=1 fm_launch_proof_herdr "$META")
   assert_not_equals managed "$verdict" 'C2: the verb path refuses when the named home cannot be read'
