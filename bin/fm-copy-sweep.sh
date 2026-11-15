@@ -178,7 +178,10 @@
 # and the reads of the slot's primary checkout, and a record that fails one, or any
 # other answer, holds the copy as above with the route and PR named; a plan that times
 # out names the route and PR too. A route execute that claims success uses a release
-# slot of the per-run cap even when the copy and its lock are untouched. A switch of
+# slot of the per-run cap even when the copy and its lock are untouched. A plan killed
+# at its timeout is followed by the sweep's own read of the slot's checkout against the
+# window the plan opened, whatever state it was in, and the plan's project lock is
+# released only when its record names the killed plan and that pid is gone. A switch of
 # the slot's primary checkout that the route sees, at a plan or an execute, stops the
 # run: the copy is reported FAILED (an execute) or held (a plan) with the route's
 # words, and every copy still pending is reported SKIPPED without a driver call.
@@ -1402,6 +1405,8 @@ plan_verdict_retains_tree() {  # <driver output>
 # the plan, and the sweep's own signal traps, go through stop_plan.
 PLAN_PID=
 PLAN_SWITCHED=0
+PLAN_LOCK_PATH=
+PLAN_LOCK_OWN=0
 stop_plan() {
   [ -z "$PLAN_PID" ] || kill -s KILL -- "-$PLAN_PID" 2>/dev/null
   PLAN_PID=
@@ -1418,6 +1423,8 @@ PLAN_WHY=
 driver_plan_allows() {  # <clone> <copy>
   local dir rc=0 limit ticks=0 timed_out=0 pid
   PLAN_SWITCHED=0
+  PLAN_LOCK_PATH=
+  PLAN_LOCK_OWN=0
   limit=${FM_COPY_SWEEP_PLAN_TIMEOUT:-120}
   case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
   limit=$((10#$limit))
@@ -1454,11 +1461,15 @@ driver_plan_allows() {  # <clone> <copy>
   if [ -f "$dir/route" ]; then
     # The window of the checkout observation opened at the plan's first step is kept
     # for the execute of this copy (TEARDOWN_CKO_*); a switch found by the plan stops the run.
-    { IFS= read -r TEARDOWN_CLOSEOUT_ROUTE; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_PR; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_WHY
-      IFS= read -r TEARDOWN_CKO_COPY; IFS= read -r TEARDOWN_CKO_BRANCH; IFS= read -r TEARDOWN_CKO_HEAD; IFS= read -r TEARDOWN_CKO_POS
-      IFS= read -r TEARDOWN_ROUTE_HEADREF; IFS= read -r PLAN_SWITCHED; IFS= read -r TEARDOWN_CKO_ANCHOR; } < "$dir/route" || true
-    [ "$PLAN_SWITCHED" = 1 ] || PLAN_SWITCHED=0
-    if [ -n "$TEARDOWN_CKO_COPY" ] && [ "$TEARDOWN_CLOSEOUT_ROUTE" = pr ]; then TEARDOWN_CKO_OPEN=1; else TEARDOWN_CKO_OPEN=0; fi
+    # The one reader of that file is the nested library's (bin/fm-teardown-nested-lib.sh).
+    teardown_closeout_route_file_load "$dir/route"
+    PLAN_SWITCHED=$TEARDOWN_ROUTE_FILE_SWITCHED
+    # The lock the plan took is the plan's, not this process's: keep it apart so that the
+    # execute's own route starts from no lock.
+    PLAN_LOCK_PATH=$TEARDOWN_ROUTE_LOCK_PATH
+    PLAN_LOCK_OWN=$TEARDOWN_ROUTE_LOCK_OWN
+    TEARDOWN_ROUTE_LOCK_PATH=
+    TEARDOWN_ROUTE_LOCK_OWN=0
   fi
   rm -f "$dir/out" "$dir/rc" "$dir/verdict" "$dir/route"
   rmdir "$dir" 2>/dev/null
@@ -1467,13 +1478,20 @@ driver_plan_allows() {  # <clone> <copy>
     case "$TEARDOWN_CLOSEOUT_ROUTE" in
       pr | proving) PLAN_WHY="$PLAN_WHY (supersedence route --pr ${TEARDOWN_CLOSEOUT_ROUTE_PR:-?})" ;;
     esac
-    # The killed plan never made its read after the call. Read the checkout here against
-    # the window the plan opened: a switch meanwhile stops the run, and the timeout
-    # itself is only ever a refusal (the copy is kept), never a pass.
-    if [ "$TEARDOWN_CKO_OPEN" = 1 ] && [ "$PLAN_SWITCHED" != 1 ] \
-        && ! teardown_route_checkout_check "$1" "$TEARDOWN_ROUTE_HEADREF"; then
+    # The killed plan never made its read after the call, in any state (a plan killed
+    # while still proving left its window too). Read the checkout here against the window
+    # it opened: a change meanwhile, a switch and restore included, stops the run, and the
+    # timeout itself is only ever a refusal (the copy is kept), never a pass.
+    if [ "$PLAN_SWITCHED" != 1 ] && ! teardown_route_plan_killed_check "$1"; then
       PLAN_SWITCHED=1
       PLAN_WHY="$PLAN_WHY; the primary checkout of the slot was switched meanwhile: $TEARDOWN_CKO_WHY"
+    fi
+    # The killed plan cannot release its own project lock. Release it only when the lock's
+    # record names that plan's pid and the pid is gone; otherwise leave it for the lock
+    # library's dead-owner recovery, and say so.
+    if [ "$PLAN_LOCK_OWN" = 1 ]; then
+      teardown_route_lock_reap_killed "$PLAN_LOCK_PATH" "$pid"
+      [ -z "$TEARDOWN_ROUTE_LOCK_NOTE" ] || PLAN_WHY="$PLAN_WHY; $TEARDOWN_ROUTE_LOCK_NOTE"
     fi
     return 1
   fi

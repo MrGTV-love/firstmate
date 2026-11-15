@@ -128,19 +128,24 @@
 # run no merge driver, textconv or external diff, so nothing configured in the
 # repository (a driver of any name, in any scope) can decide the proof: a copy whose
 # change a lying driver would have called landed is kept, and a legitimate twin routes
-# under the same configuration. A path that M changed further than the copy is kept,
-# and so is any git command that fails. A merge driver found in the configuration is
+# under the same configuration. A path that M changed further than the copy is kept
+# (Main 1887: so is the separated AUTH_DISABLED twin and a moved file whose blob
+# differs; keeping a copy discards nothing), and so is any git command that fails or
+# prints output that cannot be parsed. A merge driver found in the configuration is
 # reported as a notice, never a refusal. An empty net change is proved; it is not a
 # claim that T is an ancestor of M.
 #
 # Project lock and checkout. The route holds the project lock
-# (fm_treehouse_project_lock_path, called on the project that the caller names in
-# TEARDOWN_ROUTE_PROJECT, else on the slot clone) from its first step to the end of the execute, so
+# (fm_treehouse_project_lock_path, called on the slot's registered project: the one the
+# caller names in TEARDOWN_ROUTE_PROJECT, else the one derived from the slot's git common
+# directory; a slot whose own lock key differs from its project's refuses) from its first
+# step to the end of the execute, so
 # no Firstmate or pipeline code path that takes that lock changes the slot's primary
 # checkout meanwhile. The sweep takes it and releases it; teardown borrows its
 # caller's hold (TEARDOWN_ROUTE_LOCK_HELD, proved by the lock's pid file naming this
 # process), never takes it a second time and never releases it. A claim the pid file
-# does not prove, a busy lock or one that cannot be taken keeps the copy before any
+# does not prove, a claim at a path other than the computed lock (there is no fall-through
+# to taking that lock), a busy lock or one that cannot be taken keeps the copy before any
 # driver call. The checkout is read as its branch, HEAD and its HEAD reflog (one
 # read, so the count, the entries and the anchor come from one snapshot) at the
 # route's first step (the sweep's plan, teardown's call), immediately before the driver
@@ -149,9 +154,16 @@
 # PR's head branch or any change since the first read; after a call it refuses when the
 # branch or HEAD differs, when any reflog entry above the anchor names the PR's head,
 # when the anchor no longer stands where it stood (a rewritten or expired log), when
-# the anchor is missing, or when the reflog cannot be read or is disabled. In the sweep a switch it sees stops the run:
-# the copies still pending are not called or released and are reported SKIPPED
-# (teardown_driver_release exits 4). This detects and does not prevent a switch by an
+# the anchor is missing, or when the reflog cannot be read or is disabled. The window is
+# published in the route file as soon as it opens, so a plan killed while it is still
+# proving leaves it, and a proof that refuses still ends with the same read. In the sweep
+# a switch it sees stops the run: the copies still pending are not called or released and
+# are reported SKIPPED (teardown_driver_release exits 4). A plan killed at its timeout is
+# followed by the parent's own read against that window, in any state, with any new entry
+# in the HEAD reflog counting while the PR's head branch is not known yet, and by the
+# release of the plan's project lock only when its record names the killed plan's pid and
+# that pid is gone (teardown_route_lock_reap_killed); otherwise the lock is left for the
+# lock library's dead-owner recovery and the reason says so. This detects and does not prevent a switch by an
 # actor that does not take the lock (an agent's direct git switch, a person, the
 # pipeline's axi sync): a switch after the pre-entry read can reach the driver and is
 # reported after the fact, and a switch and restore that wholly precedes the first read
@@ -1484,20 +1496,43 @@ TEARDOWN_ROUTE_LOCK_HELD=
 TEARDOWN_ROUTE_LOCK_OWN=0
 TEARDOWN_ROUTE_LOCK_PATH=
 # The lock key comes from the one owner function that every other actor uses
-# (fm_treehouse_project_lock_path), called on the project directory when the caller names
-# one in TEARDOWN_ROUTE_PROJECT (teardown does: its own hold is keyed the same way) and on
-# the slot clone otherwise (the sweep's pool slots, which carry no project path).
+# (fm_treehouse_project_lock_path), called on the slot's registered project: the project
+# directory that the caller names in TEARDOWN_ROUTE_PROJECT (teardown does: its own hold
+# is keyed the same way), else the project derived from the slot's git common directory
+# (a Treehouse slot shares its project's; the sweep's pool slots carry no project path).
+# A slot whose own lock key differs from its project's (its origin differs) refuses.
 TEARDOWN_ROUTE_PROJECT=
+teardown_route_project_of() {  # <slot>: prints the project directory the slot belongs to
+  local common top
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  common=$(CDPATH='' cd -- "$common" 2>/dev/null && pwd -P) || return 1
+  case "$common" in */.git) top=${common%/.git} ;; *) return 1 ;; esac
+  [ -d "$top" ] || return 1
+  printf '%s\n' "$top"
+}
 teardown_route_lock_take() {  # <slot> <copy>
-  local slot=$1 lock cur pid keydir
+  local slot=$1 lock cur pid keydir slotlock
   TEARDOWN_ROUTE_LOCK_OWN=0
   TEARDOWN_ROUTE_LOCK_PATH=
-  keydir=${TEARDOWN_ROUTE_PROJECT:-$slot}
+  keydir=${TEARDOWN_ROUTE_PROJECT:-}
+  [ -n "$keydir" ] || keydir=$(teardown_route_project_of "$slot") || keydir=$slot
   if ! lock=$(fm_treehouse_project_lock_path "$keydir" 2>/dev/null); then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the project lock of $keydir cannot be resolved, so the route cannot hold it"
     return 1
   fi
-  if [ -n "${TEARDOWN_ROUTE_LOCK_HELD:-}" ] && [ "$TEARDOWN_ROUTE_LOCK_HELD" = "$lock" ]; then
+  if [ "$keydir" != "$slot" ]; then
+    if ! slotlock=$(fm_treehouse_project_lock_path "$slot" 2>/dev/null) || [ "$slotlock" != "$lock" ]; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the slot $slot has its own project lock key ${slotlock:-(unresolved)}, which differs from its project's $keydir ($lock): its origin differs from the registered project's, so the route cannot hold the project's lock for it"
+      return 1
+    fi
+  fi
+  if [ -n "${TEARDOWN_ROUTE_LOCK_HELD:-}" ]; then
+    # A claimed hold is the one named lock or it is refused: a claim at another path never
+    # falls through to taking the computed lock.
+    if [ "$TEARDOWN_ROUTE_LOCK_HELD" != "$lock" ]; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the caller claims to hold the project lock $TEARDOWN_ROUTE_LOCK_HELD, but the lock of the slot's project is $lock, so the claimed hold is not proved"
+      return 1
+    fi
     pid=$(cat -- "$lock/pid" 2>/dev/null) || pid=
     if ! fm_current_pid cur || [ -z "$pid" ] || [ "$pid" != "$cur" ]; then
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the caller claims to hold the project lock $lock but its pid file does not name this process (${pid:-no pid}), so the hold is not proved"
@@ -1512,6 +1547,31 @@ teardown_route_lock_take() {  # <slot> <copy>
   fi
   TEARDOWN_ROUTE_LOCK_OWN=1
   TEARDOWN_ROUTE_LOCK_PATH=$lock
+}
+# After a plan was killed at its timeout, the parent releases the plan's project lock only
+# when the lock's record names the killed plan's pid and that pid is gone. Any other record,
+# or a live owner, is left alone for the lock library's own dead-owner recovery. The note
+# says what happened and is kept in TEARDOWN_ROUTE_LOCK_NOTE.
+TEARDOWN_ROUTE_LOCK_NOTE=
+teardown_route_lock_reap_killed() {  # <lock> <killed-pid>
+  local lock=$1 pid=$2 recorded
+  TEARDOWN_ROUTE_LOCK_NOTE=
+  [ -n "$lock" ] && [ -n "$pid" ] || return 0
+  [ -e "$lock" ] || [ -L "$lock" ] || return 0
+  recorded=$(cat -- "$lock/pid" 2>/dev/null) || recorded=
+  if [ "$recorded" != "$pid" ]; then
+    TEARDOWN_ROUTE_LOCK_NOTE="the project lock $lock names ${recorded:-no pid}, not the killed plan $pid, so it was left alone"
+    return 0
+  fi
+  if fm_pid_alive "$pid"; then
+    TEARDOWN_ROUTE_LOCK_NOTE="the project lock $lock is owned by $pid, which is still alive, so it was left to its owner"
+    return 0
+  fi
+  if fm_lock_reap_dead_link "$lock" >/dev/null 2>&1; then
+    TEARDOWN_ROUTE_LOCK_NOTE="the killed plan's project lock $lock was released after its owner $pid was found gone"
+    return 0
+  fi
+  TEARDOWN_ROUTE_LOCK_NOTE="the killed plan's project lock $lock was left for the lock library's dead-owner recovery (its owner $pid is gone, but the reaper did not release it)"
 }
 teardown_route_lock_release() {
   if [ "$TEARDOWN_ROUTE_LOCK_OWN" = 1 ]; then
@@ -1608,6 +1668,12 @@ teardown_route_checkout_check() {  # <slot> <prhead>
     return 1
   fi
   [ "$delta" -gt 0 ] || return 0
+  if [ -z "$prhead" ]; then
+    # The PR's head branch is not known yet (the route is still proving): any new entry in
+    # the HEAD reflog is a change in the window, so it counts.
+    TEARDOWN_CKO_WHY="the HEAD reflog of the clone's primary checkout gained $delta entries since the route's first read and the PR's head branch is not known yet, so a switch could not be ruled out"
+    return 1
+  fi
   entries=$(sed -n "1,${delta}p" <<< "$TEARDOWN_CKO_NOW_LOG") || {
     TEARDOWN_CKO_WHY="the entries of the clone's HEAD reflog made since the route's first read cannot be read, so a switch could not be ruled out"
     return 1
@@ -1645,11 +1711,14 @@ teardown_route_checkout_pre_entry() {  # <slot> <prhead>
 # same blob), or no entry where the copy deleted the path. The entries are read with
 # git diff-tree --raw and git ls-tree, which run no merge driver, textconv or external
 # diff, so nothing configured in the repository can decide the proof. A path that the
-# merge commit changed further, a mode or type change, and any git command that fails
-# prove nothing. Sets WHY naming the first unproven path.
+# merge commit changed further, a mode or type change, any git command that fails and any
+# git output that cannot be parsed (a record with no path, one cut short, one without the
+# raw shape) prove nothing: only a clean end of the stream is the end of the changes. Sets
+# WHY naming the first unproven path.
 teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
   local tmp=$1 slot=$2 tip=$3 merge=$4 base bases raw meta path om nm osha nsha st
-  local mentry mmode msha line
+  local mentry mmode msha line unparsable
+  unparsable="git printed output for the copy's changes that cannot be parsed, so their content cannot be proved landed"
   bases=$(git -C "$slot" merge-base --all "$tip" "$merge" 2>/dev/null) || bases=
   if [ -z "$bases" ] || [ "$(printf '%s\n' "$bases" | wc -l | tr -d ' ')" != 1 ]; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the copy's tip and the merge commit $merge of the PR do not have exactly one merge base, so the content of the copy cannot be proved landed"
@@ -1662,19 +1731,53 @@ teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
     return 1
   }
   exec 3< "$raw"
-  while IFS= read -r -d '' meta <&3 && IFS= read -r -d '' path <&3; do
+  while :; do
+    # A record is a metadata word and a path, each ended by a NUL. A clean end of the
+    # stream is the end of the changes (a genuine empty change included); a record that
+    # is cut short, has no path or does not have the raw shape is unknown, never empty.
+    meta=
+    if ! IFS= read -r -d '' meta <&3; then
+      [ -z "$meta" ] && break
+      exec 3<&-
+      TEARDOWN_CLOSEOUT_ROUTE_WHY=$unparsable
+      return 1
+    fi
+    path=
+    if ! IFS= read -r -d '' path <&3 || [ -z "$path" ]; then
+      exec 3<&-
+      TEARDOWN_CLOSEOUT_ROUTE_WHY=$unparsable
+      return 1
+    fi
     meta=${meta#:}
+    if [[ ! $meta =~ ^[0-7]{6}\ [0-7]{6}\ [0-9a-f]{40,64}\ [0-9a-f]{40,64}\ [ADMT]$ ]]; then
+      exec 3<&-
+      TEARDOWN_CLOSEOUT_ROUTE_WHY=$unparsable
+      return 1
+    fi
     read -r om nm osha nsha st <<< "$meta"
-    st=${st:0:1}
     git -C "$slot" --literal-pathspecs ls-tree -z "$merge" -- "$path" > "$tmp/ls" 2>/dev/null || {
       exec 3<&-
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the merge commit's entry at $path cannot be read, so the content of the copy cannot be proved landed"
       return 1
     }
     mentry=
-    while IFS= read -r -d '' line; do
+    exec 4< "$tmp/ls"
+    while :; do
+      line=
+      if ! IFS= read -r -d '' line <&4; then
+        [ -z "$line" ] && break
+        exec 3<&- 4<&-
+        TEARDOWN_CLOSEOUT_ROUTE_WHY=$unparsable
+        return 1
+      fi
+      if [[ ! $line =~ ^[0-7]{6}\ [a-z]+\ [0-9a-f]{40,64}$'\t'.+$ ]]; then
+        exec 3<&- 4<&-
+        TEARDOWN_CLOSEOUT_ROUTE_WHY=$unparsable
+        return 1
+      fi
       [ "${line#*$'\t'}" = "$path" ] && mentry=${line%%$'\t'*}
-    done < "$tmp/ls"
+    done
+    exec 4<&-
     if [ "$st" = D ]; then
       if [ -n "$mentry" ]; then
         exec 3<&-
@@ -1693,6 +1796,7 @@ teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
   exec 3<&-
   return 0
 }
+
 # A merge driver in the repository's configuration is reported, never a reason to refuse:
 # the content proof runs no merge, so a driver plays no part in it. The names are kept in
 # TEARDOWN_ROUTE_DRIVER_FACT and one notice line is printed when there are any.
@@ -1940,6 +2044,7 @@ teardown_closeout_route() {  # <slot> <copy>
   local rc=0 pr profile tip
   TEARDOWN_CLOSEOUT_ROUTE=
   TEARDOWN_CLOSEOUT_ROUTE_WHY=
+  TEARDOWN_ROUTE_HEADREF=
   teardown_route_record "$2" || rc=$?
   [ "$rc" != 1 ] || return 0
   if [ "$rc" = 0 ]; then
@@ -1949,7 +2054,9 @@ teardown_closeout_route() {  # <slot> <copy>
     TEARDOWN_CLOSEOUT_ROUTE=proving
     teardown_closeout_route_publish
     if teardown_route_lock_take "$1" "$2" \
+      && { teardown_closeout_route_publish; true; } \
       && teardown_route_checkout_open "$1" "$2" \
+      && { teardown_closeout_route_publish; true; } \
       && teardown_route_profile_ok "$profile" "$pr" "$tip" \
       && teardown_route_pr_landed "$1" "$pr" \
       && teardown_route_content_proven "$1" "$tip" "$TEARDOWN_ROUTE_MERGE" \
@@ -1957,6 +2064,12 @@ teardown_closeout_route() {  # <slot> <copy>
       && teardown_route_profile_ok "$profile" "$pr" "$tip"; then
       TEARDOWN_CLOSEOUT_ROUTE='pr'
       return 0
+    fi
+    # A proof that refused still ends with a read of the checkout against the window it
+    # opened: a switch in that window is reported and stops the sweep, as after a call.
+    if [ "$TEARDOWN_CKO_OPEN" = 1 ] && ! teardown_route_checkout_check "$1" "${TEARDOWN_ROUTE_HEADREF:-}"; then
+      TEARDOWN_CLOSEOUT_SWITCHED=1
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="$TEARDOWN_CLOSEOUT_ROUTE_WHY; the primary checkout of the slot was switched during the proof: $TEARDOWN_CKO_WHY"
     fi
     teardown_route_lock_release
     teardown_route_checkout_close
@@ -1969,14 +2082,41 @@ teardown_closeout_route() {  # <slot> <copy>
 # TEARDOWN_CLOSEOUT_ROUTE_FILE to learn the route and its reason, even when the
 # bound kills the call before it returns. The file also carries the first read of the
 # checkout (copy, branch, HEAD, reflog position), the PR's head branch, whether a
-# switch was found and the newest reflog entry of the first read (the anchor), ten
-# lines in all, so the sweep's execute keeps the plan's window.
+# switch was found, the newest reflog entry of the first read (the anchor), and the
+# project lock the route took and whether it owns it, twelve lines in all, so the
+# sweep's execute keeps the plan's window. The route publishes it again at each step
+# (the lock taken, the window opened), so a plan killed while it is still proving
+# leaves the window and the lock behind.
 teardown_closeout_route_publish() {
   [ -n "${TEARDOWN_CLOSEOUT_ROUTE_FILE:-}" ] || return 0
-  printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$TEARDOWN_CLOSEOUT_ROUTE" "$TEARDOWN_CLOSEOUT_ROUTE_PR" \
+  printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$TEARDOWN_CLOSEOUT_ROUTE" "$TEARDOWN_CLOSEOUT_ROUTE_PR" \
     "$(printf '%s' "$TEARDOWN_CLOSEOUT_ROUTE_WHY" | tr '\n\t' '  ')" \
     "$TEARDOWN_CKO_COPY" "$TEARDOWN_CKO_BRANCH" "$TEARDOWN_CKO_HEAD" "$TEARDOWN_CKO_POS" "$TEARDOWN_ROUTE_HEADREF" \
-    "$TEARDOWN_CLOSEOUT_SWITCHED" "$TEARDOWN_CKO_ANCHOR" > "$TEARDOWN_CLOSEOUT_ROUTE_FILE" 2>/dev/null || true
+    "$TEARDOWN_CLOSEOUT_SWITCHED" "$TEARDOWN_CKO_ANCHOR" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN" \
+    > "$TEARDOWN_CLOSEOUT_ROUTE_FILE" 2>/dev/null || true
+}
+# The reader of that file, for a caller that bounds the call from outside (the sweep): the
+# window opens whatever the route's state (a plan killed while proving left it too), and
+# the lock the plan took and whether it owned it are known. The file's switch flag is
+# TEARDOWN_ROUTE_FILE_SWITCHED.
+TEARDOWN_ROUTE_FILE_SWITCHED=0
+teardown_closeout_route_file_load() {  # <file>
+  { IFS= read -r TEARDOWN_CLOSEOUT_ROUTE; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_PR; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_WHY
+    IFS= read -r TEARDOWN_CKO_COPY; IFS= read -r TEARDOWN_CKO_BRANCH; IFS= read -r TEARDOWN_CKO_HEAD; IFS= read -r TEARDOWN_CKO_POS
+    IFS= read -r TEARDOWN_ROUTE_HEADREF; IFS= read -r TEARDOWN_ROUTE_FILE_SWITCHED; IFS= read -r TEARDOWN_CKO_ANCHOR
+    IFS= read -r TEARDOWN_ROUTE_LOCK_PATH; IFS= read -r TEARDOWN_ROUTE_LOCK_OWN; } < "$1" || true
+  [ "$TEARDOWN_ROUTE_FILE_SWITCHED" = 1 ] || TEARDOWN_ROUTE_FILE_SWITCHED=0
+  [ "$TEARDOWN_ROUTE_LOCK_OWN" = 1 ] || TEARDOWN_ROUTE_LOCK_OWN=0
+  case "$TEARDOWN_CLOSEOUT_ROUTE" in
+    pr | proving) if [ -n "$TEARDOWN_CKO_COPY" ]; then TEARDOWN_CKO_OPEN=1; else TEARDOWN_CKO_OPEN=0; fi ;;
+    *) TEARDOWN_CKO_OPEN=0 ;;
+  esac
+}
+# The read the parent makes when the plan was killed at its timeout and so never made its
+# own: against the window it opened, with the PR's head branch if it was known by then.
+teardown_route_plan_killed_check() {  # <slot>
+  [ "$TEARDOWN_CKO_OPEN" = 1 ] || return 0
+  teardown_route_checkout_check "$1" "${TEARDOWN_ROUTE_HEADREF:-}"
 }
 
 # TEARDOWN_ROUTE_ENVELOPE_KEYS is the driver's fifteen-key compact envelope, the one
