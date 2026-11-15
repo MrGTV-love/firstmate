@@ -34,36 +34,6 @@ stop_probe() {
   PID=
 }
 
-# No real PID or endpoint is read: each ps query must match the synthetic PID.
-test_launch_proof_omp_executable_identity() (
-  local synthetic_comm synthetic_args
-  # shellcheck disable=SC2329 # the library under test calls this stand-in
-  ps() {
-    case "$*" in
-      '-p 2000000000 -o comm=') printf '%s\n' "$synthetic_comm" ;;
-      '-p 2000000000 -o args=') printf '%s\n' "$synthetic_args" ;;
-      *) fail "unexpected identity ps query: $*" ;;
-    esac
-  }
-  assert_identity() { # <expected> <comm> <args> <description>
-    local expected=$1 actual=refuse
-    synthetic_comm=$2 synthetic_args=$3
-    if fm_launch_proof_pid_is_omp 2000000000; then actual=accept; fi
-    assert_equals "$expected" "$actual" "$4"
-  }
-  assert_identity accept omp 'omp --resume=task' 'bare omp is accepted'
-  assert_identity accept omp 'bun --resume=task' 'readable omp name alone is sufficient'
-  assert_identity accept bun 'omp --resume=task' 'omp argv[0] alone is sufficient'
-  assert_identity accept /Users/operator/.bun/bin/omp 'bun --resume=task' 'Bun-installed omp executable name is accepted'
-  assert_identity accept bun '/Users/operator/.bun/bin/omp --resume=task' 'Bun-installed omp argv[0] is accepted'
-  assert_identity refuse python3 'python3 -c input()' 'unrelated executable is refused'
-  assert_identity refuse /opt/omp/bin/python3 'python3 -c input()' 'omp directory in executable path is refused'
-  assert_identity refuse python3 '/opt/omp/bin/python3 -c input()' 'omp directory in argv[0] is refused'
-  assert_identity refuse bun 'bun /opt/bin/omp' 'omp in a later argument is not argv[0]'
-  assert_identity refuse ompd 'ompd --resume=task' 'omp executable name must be exact'
-  pass 'omp identity uses only the executable basename or argv[0], including Bun-installed entry points'
-)
-
 test_launch_proof_pinned_personal_switch() {
   local meta task="$TMP/task.jsonl" personal="$TMP/personal.jsonl"
   local SWITCH_INFO actual PINNED_STATE="$TMP/pinned-home/state"
@@ -952,136 +922,6 @@ test_launch_proof_round8_reads() (
   pass 'records and peers are read as bytes, failed reads and short rows refuse, and a claude alias with the token gets the same checks'
 )
 
-# Main 1856 (a), Main 1874 findings 3 and 8: the omp adoption route is judged
-# through its caller, the verdict, on a record that really changes between
-# reads. The stable control is a genuinely successful adoption (managed), so a
-# refusal below is for the reason each case names, not for cwd or another
-# check. Every reader is a stand-in, except Python itself and a PATH lsof that
-# prints the synthetic process's cwd.
-test_launch_proof_omp_adoption_reads_the_callers_bytes() (
-  local T="$TMP/omp-aba" META A B PIN='' ON_IDENTITY='' ON_REF='' AFTER_PY='' got
-  mkdir -p "$T/home/state" "$T/wt" "$T/bin"
-  META="$T/home/state/om.meta"
-  A=$(printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=omp\nkind=ship\nspawn_gen=sA\nworktree=%s\nlaunch_proof=env-v1\n' "$T/wt")
-  B=$(printf '%s\nspawn_gen=sB' "$A")
-  : > "$T/session.jsonl"
-  printf '{"version":1,"spawn_gen":"sA","pid":4242,"task_session_file":"%s","current_session_file":"%s"}\n' \
-    "$T/session.jsonl" "$T/session.jsonl" > "$T/home/state/om.omp-session.json"
-  printf '#!/usr/bin/env bash\nprintf "p4242\\0n%%s\\0" %q\n' "$T/wt" > "$T/bin/lsof"
-  chmod +x "$T/bin/lsof"
-  write_a() { printf '%s\n' "$A" > "$META"; }
-  # shellcheck disable=SC2329 # called through the hook variables
-  write_b() { printf '%s\n' "$B" > "$META"; }
-  # shellcheck disable=SC2329 # the adoption proof calls these stand-ins
-  fm_backend_herdr_cli() { case "$*" in *'pane get'*) printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;; *) return 1 ;; esac; }
-  # shellcheck disable=SC2329
-  fm_launch_proof_herdr_pid() { printf 4242; }
-  # shellcheck disable=SC2329
-  ps() {
-    case "$*" in
-      '-p 4242 -o comm='|'-p 4242 -o args=') [ -z "$ON_IDENTITY" ] || "$ON_IDENTITY"; printf 'omp\n' ;;
-      *) return 1 ;;
-    esac
-  }
-  # shellcheck disable=SC2329
-  fm_remote_herdr_process_env() { printf 'PATH=/x\nHOME=/y\n'; [ -z "$PIN" ] || printf 'FM_SPAWN_GEN=%s\n' "$PIN"; }
-  # shellcheck disable=SC2329
-  fm_backend_herdr_pane_agent_session_ref() { [ -z "$ON_REF" ] || "$ON_REF"; printf 'omp\t%s' "$T/session.jsonl"; }
-  # shellcheck disable=SC2329
-  python3() {
-    local rc=0
-    : > "$T/py.ran"
-    command python3 "$@" 2>>"$T/py.err" || rc=$?
-    [ -z "$AFTER_PY" ] || "$AFTER_PY"
-    return "$rc"
-  }
-  # shellcheck disable=SC2030 # each case scopes PATH to its own subshell
-  local PATH="$T/bin:$PATH"
-  # The public verdict: the record read, the selector (a stand-in naming 4242)
-  # and fm_launch_proof_herdr_verdict_judge, which hands its bytes to the proof.
-  verdict() { rm -f "$T/py.ran" "$T/py.err"; fm_launch_proof_herdr "$META"; }
-
-  # Stable control: the record holds A throughout and the adoption succeeds.
-  write_a
-  got=$(verdict)
-  assert_equals managed "$got" 'control: a stable record and a provable unpinned omp process are adopted'$'\n'"$(cat "$T/py.err" 2>/dev/null)"
-  [ ! -s "$T/py.err" ] || fail "control: the adoption proof reported a refusal: $(cat "$T/py.err")"
-  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 || fail 'control: a stable adopted omp agent was not authorized'
-
-  # A-to-B-to-A at the caller: the verdict reads A; B is in the file when the
-  # Python proof reads it; A is back before the caller's final comparison.
-  write_a; ON_REF=write_b; AFTER_PY=write_a
-  got=$(verdict)
-  ON_REF=''; AFTER_PY=''
-  assert_equals unmanaged "$got" 'A-B-A: a record that was B for the proof is not adopted'
-  assert_contains "$(cat "$T/py.err" 2>/dev/null)" 'record proof needs the same record bytes the caller read' \
-    'A-B-A: the refusal is the record-bytes check, not another proof'
-  [ "$(cat "$META")" = "$A" ] || fail 'A-B-A: the record was not restored to A before the final comparison'
-  ON_REF=write_b; AFTER_PY=write_a
-  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 && fail 'A-B-A: the authorization owner accepted a record that was B for the proof'
-  ON_REF=''; AFTER_PY=''
-
-  # Main 1874 finding 3: the live process carries foreign pin B; the record is
-  # B only while the shell's identity checks run and A again before Python.
-  # The generation check uses the caller's A, so B is foreign and the proof
-  # refuses before Python runs.
-  write_a; PIN=sB; ON_IDENTITY=write_b; ON_REF=write_a
-  got=$(verdict)
-  PIN=''; ON_IDENTITY=''; ON_REF=''
-  assert_equals unmanaged "$got" 'finding 3: a foreign pin hidden by a transient B record is not adopted'
-  [ ! -e "$T/py.ran" ] || fail 'finding 3: the foreign-pin check passed and the Python proof ran'
-
-  # Control for the foreign-pin case: the same pin with no record change refuses
-  # the same way, and the stable record without a pin is adopted again.
-  write_a; PIN=sB
-  got=$(verdict)
-  PIN=''
-  assert_equals unmanaged "$got" 'finding 3 control: a process pinned to another generation is not adopted'
-  [ ! -e "$T/py.ran" ] || fail 'finding 3 control: a foreign pin reached the Python proof'
-  write_a
-  assert_equals managed "$(verdict)" 'control: the stable adoption still succeeds after the changed cases'
-  pass 'the omp adoption, judged through its verdict caller, rests on the bytes the caller read: A-B-A and a transient generation refuse for their named reasons, and a stable adoption succeeds'
-)
-
-# Main 1874 finding 5: the retained omp proof reads each peer record strictly:
-# a peer holding a NUL byte is unknown, never a peer without a claim. The
-# control peers keep their outcome.
-test_launch_proof_omp_adoption_refuses_a_nul_peer() (
-  local T="$TMP/omp-nul-peer" META out FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256
-  mkdir -p "$T/home/state" "$T/wt" "$T/bin"
-  META="$T/home/state/om.meta"
-  printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=omp\nkind=ship\nspawn_gen=sA\nworktree=%s\nlaunch_proof=env-v1\n' "$T/wt" > "$META"
-  : > "$T/session.jsonl"
-  printf '{"version":1,"spawn_gen":"sA","pid":4242,"task_session_file":"%s","current_session_file":"%s"}\n' \
-    "$T/session.jsonl" "$T/session.jsonl" > "$T/home/state/om.omp-session.json"
-  # The caller's one read of the session record (the proof requires its digest).
-  FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256=$(shasum -a 256 < "$T/home/state/om.omp-session.json" | cut -d' ' -f1)
-  export FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256
-  printf '#!/usr/bin/env bash\nprintf "p4242\\0n%%s\\0" %q\n' "$T/wt" > "$T/bin/lsof"
-  chmod +x "$T/bin/lsof"
-  # shellcheck disable=SC2329 # the adoption proof calls these stand-ins
-  fm_backend_herdr_cli() { case "$*" in *'pane get'*) printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;; *) return 1 ;; esac; }
-  # shellcheck disable=SC2329
-  fm_launch_proof_herdr_pid() { printf 4242; }
-  # shellcheck disable=SC2329
-  fm_launch_proof_pid_is_omp() { return 0; }
-  # shellcheck disable=SC2329
-  fm_launch_proof_pid_pinned_elsewhere() { return 1; }
-  # shellcheck disable=SC2329
-  fm_backend_herdr_pane_agent_session_ref() { printf 'omp\t%s' "$T/session.jsonl"; }
-  # shellcheck disable=SC2031 # each case scopes PATH to its own subshell
-  local PATH="$T/bin:$PATH"
-  printf 'window=lab:w9:p9\n' > "$T/home/state/peer.meta"
-  out=$(fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null) || fail "control: a peer naming another pane blocked adoption: $out"
-  printf 'window=lab:w1:p2\n' > "$T/home/state/peer.meta"
-  out=$(fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null) && fail 'control: a peer claiming this pane was adopted'
-  assert_contains "$out" 'claimed by peer' 'control: a claiming peer names itself'
-  printf 'window=lab:w1:p2\000\n' > "$T/home/state/peer.meta"
-  out=$(fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null) && fail 'a NUL-bearing peer claiming this pane was treated as no claim'
-  assert_contains "$out" 'without NUL bytes' 'a NUL-bearing peer is unknown, with its own cause'
-  pass 'the omp adoption proof treats a NUL-bearing peer as unknown and keeps both readable peer outcomes'
-)
-
 # Main 1874 finding 4: the claim inventory reads each peer once, and the homes
 # it follows come from that same read. The stable controls keep their outcome:
 # a ship peer's home is not followed, and a secondmate peer's home whose record
@@ -1156,7 +996,7 @@ test_launch_proof_binds_the_acting_endpoint() (
     printf 'window=lab:w1:%s\nendpoint_task_id=sm\nworktree=%s\nproject=%s\nherdr_session=lab\nherdr_workspace_id=w1\nherdr_tab_id=w1:t1\nherdr_pane_id=w1:%s\nbackend=herdr\nharness=claude\nkind=secondmate\nspawn_gen=s1\nhome=%s\nlaunch_proof=env-v1\n' \
       "$1" "$T/lane" "$T/lane" "$1" "$T/lane"
   }
-  # shellcheck disable=SC2031 # each case scopes this to its own subshell
+  # shellcheck disable=SC2030,SC2031 # each case scopes this to its own subshell
   local -x FM_LAUNCH_PROOF_VERB_PATH=1
   # shellcheck source=bin/fm-secondmate-restart-lib.sh
   . "$ROOT/bin/fm-secondmate-restart-lib.sh"
@@ -1216,8 +1056,48 @@ test_launch_proof_binds_the_acting_endpoint() (
   pass 'the proof is of the endpoint the caller acts on: no endpoint, another endpoint and a decision that kept p1 while p2 was proved all refuse; an unpinned claude alias is unknown'
 )
 
+# Main 1874, Main 1901: there is no omp adoption route. A live omp process
+# without its matching launch pin is unmanaged with its named cause, even when
+# its session record names it and its current session (the record the removed
+# route wrote), and the authorization owner refuses it with that cause. The
+# controls: a matching pin whose session record names it is managed, and a
+# matching pin whose session record names another process is unmanaged with
+# the session cause. Every reader is a stand-in.
+test_launch_proof_omp_has_no_adoption_route() (
+  local T="$TMP/omp-no-adoption" META PIN='' out
+  mkdir -p "$T/home/state" "$T/wt/state"
+  META="$T/home/state/om.meta"
+  printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=omp\nkind=ship\nspawn_gen=sA\nworktree=%s\nhome=%s\nlaunch_proof=env-v1\n' "$T/wt" "$T/wt" > "$META"
+  : > "$T/session.jsonl"
+  session_record() { # <pid>
+    printf '{"version":1,"spawn_gen":"sA","pid":%s,"task_session_file":"%s","current_session_file":"%s"}\n' \
+      "$1" "$T/session.jsonl" "$T/session.jsonl" > "$T/home/state/om.omp-session.json"
+  }
+  # shellcheck disable=SC2031 # each case scopes this to its own subshell
+  local -x FM_LAUNCH_PROOF_VERB_PATH=1
+  # shellcheck disable=SC2329 # the verdict calls these stand-ins
+  fm_launch_proof_herdr_pid() { printf 4242; }
+  # shellcheck disable=SC2329
+  fm_remote_herdr_process_env() { printf 'PATH=/x\nHOME=/y\n'; [ -z "$PIN" ] || printf 'FM_SPAWN_GEN=%s\n' "$PIN"; }
+  # shellcheck disable=SC2329
+  ps() { case "$*" in '-axo pid=,ppid=,pgid=') printf '4242 1 4242\n' ;; *) return 1 ;; esac; }
+  # shellcheck disable=SC2329
+  lsof() { printf 'p4242\0\nfcwd\0n%s\0\n' "$T/wt"; }
+  session_record 4242
+  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'an unpinned omp whose session record names it is unmanaged'
+  out=$(fm_launch_proof_herdr_refusal "$META" lab:w1:p2) && fail 'an unpinned omp with a once-adopted session record was authorized'
+  assert_contains "$out" 'carries no launch pin matching this record' 'the refusal names the omp cause'
+  assert_contains "$out" 'bin/fm-control.sh om relaunch' 'the refusal names the next action'
+  PIN=sA
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'control: a matching pin with its session record is managed'
+  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 || fail 'control: a pinned omp with its session record was refused'
+  session_record 4343
+  out=$(fm_launch_proof_herdr_refusal "$META" lab:w1:p2) && fail 'a pinned omp whose session record names another process was authorized'
+  assert_contains "$out" 'its omp session record does not name this live process' 'the refusal names the session cause'
+  pass 'omp has no adoption route: an unpinned omp refuses with its cause whatever its session record says, and a pinned omp keeps its session proof'
+)
+
 fm_test_only
-test_launch_proof_omp_executable_identity
 test_launch_proof_recorded_native_identity
 test_launch_proof_pinned_personal_switch
 test_launch_proof_claude_verdict_and_refusal
@@ -1225,8 +1105,7 @@ test_launch_proof_claude_refusal_checks
 test_launch_proof_selector_refuses_missing_or_failed_reads
 test_launch_proof_token_checks_every_harness
 test_launch_proof_round8_reads
-test_launch_proof_omp_adoption_reads_the_callers_bytes
-test_launch_proof_omp_adoption_refuses_a_nul_peer
+test_launch_proof_omp_has_no_adoption_route
 test_launch_proof_claims_follow_homes_from_one_read
 test_launch_proof_selector_refuses_a_short_parent_row
 test_launch_proof_binds_the_acting_endpoint
