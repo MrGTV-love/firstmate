@@ -16,6 +16,9 @@ TMP_ROOT=$(fm_test_tmproot fm-spawn-slot-move)
 SLOT_LIB=${FM_TEST_SLOT_LIB:-$ROOT/bin/fm-slot-provision-lib.sh}
 # shellcheck source=bin/fm-slot-provision-lib.sh
 . "$SLOT_LIB"
+# The holder rule judges a relaunch's recorded tree with the shared agent classifier, which the spawn's backend loads.
+# shellcheck source=bin/fm-agent-process-lib.sh
+. "$ROOT/bin/fm-agent-process-lib.sh"
 
 GITID=(-c user.name='Firstmate Tests' -c user.email='tests@example.invalid')
 HELD_PIDS=()
@@ -1657,58 +1660,89 @@ test_an_ignored_file_whose_identity_changes_during_the_move_fails_it() {
   pass "an ignored file whose identity changes during the move fails it"
 }
 
-# --- R7-1: the relaunch excuses its own recorded endpoint's shell, that one pid only -------------------------------------
+# --- R9-1: on a relaunch, the process tree rooted at the task's own recorded endpoint is this task's lineage ----------
 
-# start_endpoint_shell_with_child: a shell whose working directory is the slot, with one child also standing in it. Sets
-# ENDPOINT_PID (the shell) and CHILD_PID (its child).
-start_endpoint_shell_with_child() {
-  local file="$W_DIR/child.pid" _
-  (cd "$W_SLOT" && exec sh -c 'sleep 300 & echo $! > "$1"; wait' _ "$file") &
+# start_recorded_endpoint [<inner-name>]: the real treehouse shape. A pane shell standing in the project folder runs a
+# `treehouse` launcher, which opens a shell in the slot; that shell runs <inner-name> (a copy of sleep; default sleep).
+# The launcher started before the spawn (start_marker runs after), so only the recorded tree can excuse it.
+# Sets ENDPOINT_PID (the pane shell) and ENDPOINT_START (its start time, read by the probe).
+start_recorded_endpoint() {
+  local inner=${1:-sleep} dir="$W_DIR/launcher" bin
+  make_launcher "$dir" || return 1
+  bin=$(command -v sleep)
+  if [ "$inner" != sleep ]; then
+    cp "$bin" "$dir/$inner" || return 1
+    [ "$(uname)" != Darwin ] || codesign -f -s - "$dir/$inner" >/dev/null 2>&1 || true
+    bin="$dir/$inner"
+  fi
+  # shellcheck disable=SC2016 # The pane and launcher shells expand their own positional arguments.
+  (cd "$W_PROJ" && exec bash -c '"$1" -c "cd \"\$1\" && \"\$2\" 300 & wait" get "$2" "$3"; :' pane "$dir/treehouse" "$W_SLOT" "$bin") &
   ENDPOINT_PID=$!
   HELD_PIDS+=("$ENDPOINT_PID")
-  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$file" ] && break; sleep 0.1; done
-  CHILD_PID=$(cat "$file")
-  HELD_PIDS+=("$CHILD_PID")
+  sleep 0.5
+  ENDPOINT_START=$(fm_slot_probe start "$ENDPOINT_PID" 2>/dev/null) || ENDPOINT_START=
+  start_marker
 }
 
-test_the_recorded_endpoint_shell_alone_does_not_hold_the_slot() {
-  make_world r71-endpoint
+test_the_recorded_endpoint_tree_does_not_hold_the_slot() {
+  make_world r91-tree
   advance_origin advanced.txt
-  start_holder "$W_SLOT"
-  sleep 0.3
-  FM_SLOT_PANE_PID=$HOLDER_PID FM_SLOT_ENDPOINT_PID=$HOLDER_PID expect_moved "the recorded endpoint's own shell, alone in the slot, is not a holder"
+  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
+    expect_moved "the shell treehouse opened under the recorded endpoint, in the slot, is this task's own lineage"
   cleanup_held
 }
 
-test_a_child_of_the_recorded_endpoint_shell_holds_the_slot() {
-  make_world r71-child
+test_a_foreign_shell_beside_the_recorded_tree_holds_the_slot() {
+  make_world r91-foreign
   advance_origin advanced.txt
-  start_endpoint_shell_with_child
+  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_holder "$W_SLOT"
   sleep 0.3
-  [ -n "$CHILD_PID" ] || fail "the endpoint shell started no child, so the case proves nothing"
-  FM_SLOT_PANE_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID expect_skip "a child of the recorded endpoint's shell still holds the slot" live_holder
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
+    expect_skip "a foreign shell beside the recorded tree still holds the slot" live_holder
   cleanup_held
 }
 
-test_a_foreign_shell_holds_the_slot_beside_the_recorded_endpoint() {
-  make_world r71-foreign
+test_a_reparented_orphan_in_the_slot_holds_it() {
+  make_world r91-orphan
   advance_origin advanced.txt
-  local endpoint
-  start_holder "$W_SLOT"
-  endpoint=$HOLDER_PID
-  start_holder "$W_SLOT"
+  local file="$W_DIR/orphan.pid"
+  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  # shellcheck disable=SC2016 # The subshell expands its own $!.
+  (cd "$W_SLOT" && sleep 300 & echo $! >"$file")
   sleep 0.3
-  FM_SLOT_PANE_PID=$endpoint FM_SLOT_ENDPOINT_PID=$endpoint expect_skip "a foreign shell beside the recorded endpoint still holds the slot" live_holder
+  HELD_PIDS+=("$(cat "$file")")
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
+    expect_skip "an orphan reparented away from every tree still holds the slot" live_holder
   cleanup_held
 }
 
-# The recorded window cannot be read (spawn_pane_pid prints nothing): no pid is excused, and the shell holds the slot.
-test_an_unreadable_recorded_endpoint_excuses_nobody() {
-  make_world r71-unreadable
+test_an_agent_in_the_recorded_tree_holds_the_slot() {
+  make_world r91-agent
   advance_origin advanced.txt
-  start_holder "$W_SLOT"
-  sleep 0.3
-  FM_SLOT_PANE_PID='' FM_SLOT_ENDPOINT_PID='' expect_skip "with no readable recorded endpoint, the shell in the slot holds it" live_holder
+  start_recorded_endpoint claude || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
+    expect_skip "an agent inside the recorded tree still holds the slot" live_holder
+  cleanup_held
+}
+
+test_an_unreadable_recorded_window_excuses_nobody() {
+  make_world r91-unreadable
+  advance_origin advanced.txt
+  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID='' FM_SLOT_ENDPOINT_START='' \
+    expect_skip "with no readable recorded window, the recorded tree's shell holds the slot" live_holder
+  cleanup_held
+}
+
+test_a_recorded_endpoint_whose_start_time_does_not_match_refuses() {
+  make_world r91-start
+  advance_origin advanced.txt
+  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  [ -n "$ENDPOINT_START" ] || fail "the probe could not read the endpoint's start time"
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=1 \
+    expect_skip "a recorded endpoint whose start time does not match refuses" unknown_holders
   cleanup_held
 }
 
@@ -1818,10 +1852,12 @@ CASES=(
   test_a_refusal_records_other_ref_changes_as_context
   test_ignored_files_under_an_ignored_directory_are_not_read
   test_an_ignored_file_whose_identity_changes_during_the_move_fails_it
-  test_the_recorded_endpoint_shell_alone_does_not_hold_the_slot
-  test_a_child_of_the_recorded_endpoint_shell_holds_the_slot
-  test_a_foreign_shell_holds_the_slot_beside_the_recorded_endpoint
-  test_an_unreadable_recorded_endpoint_excuses_nobody
+  test_the_recorded_endpoint_tree_does_not_hold_the_slot
+  test_a_foreign_shell_beside_the_recorded_tree_holds_the_slot
+  test_a_reparented_orphan_in_the_slot_holds_it
+  test_an_agent_in_the_recorded_tree_holds_the_slot
+  test_an_unreadable_recorded_window_excuses_nobody
+  test_a_recorded_endpoint_whose_start_time_does_not_match_refuses
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

@@ -366,15 +366,17 @@ make_spawn_fakebin() {
 # fm_test_spawn_script: the fm-spawn.sh a test runs. With FM_TEST_STUB_SUMMARY_REFRESH=1 it is the same code in a
 # private copy of this checkout whose detached home-summary refresh does nothing: the real refresh reaches
 # fm_run_timed, which signals processes, and this host's rules keep tests from doing that. The copy keeps its git
-# history (spawn's own history gate reads it) and is named by the checkout's HEAD and diff, so it is built once per
-# distinct state of the code under test.
+# history (spawn's own history gate reads it) and is named by the checkout's HEAD, diff and untracked files (name and
+# content), so it is built once per distinct state of the code under test.
 fm_test_spawn_script() {
   local key tree
   if [ "${FM_TEST_STUB_SUMMARY_REFRESH:-0}" != 1 ]; then
     printf '%s\n' "$ROOT/bin/fm-spawn.sh"
     return
   fi
-  key=$( { git -C "$ROOT" rev-parse HEAD; git -C "$ROOT" diff HEAD; git -C "$ROOT" ls-files -o --exclude-standard | sort; } 2>/dev/null | shasum -a 256 | cut -c1-16)
+  key=$( { git -C "$ROOT" rev-parse HEAD; git -C "$ROOT" diff HEAD; git -C "$ROOT" ls-files -o --exclude-standard | sort |
+    while IFS= read -r untracked; do printf '%s %s\n' "$(git -C "$ROOT" hash-object -- "$untracked")" "$untracked"; done; } 2>/dev/null |
+    shasum -a 256 | cut -c1-16)
   tree="${TMPDIR:-/tmp}/fm-spawn-tree-$(id -u)-$key"
   if [ ! -x "$tree/bin/fm-spawn.sh" ]; then
     rm -rf "$tree.part"

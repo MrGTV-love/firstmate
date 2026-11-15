@@ -577,7 +577,27 @@ $found"
   pass "no test file reads FM_TEST_ONLY outside fm_test_only in tests/lib.sh"
 )
 
+# R9-2: the private spawn tree is named by the state of the code under test. Two checkouts that list the same untracked
+# file name with different content are two states, so they get two trees.
+test_spawn_tree_follows_untracked_content() (
+  local dir="$TMP_ROOT/spawn-tree-key" first second
+  mkdir -p "$dir/repo/bin" "$dir/tmp"
+  git init -q "$dir/repo"
+  printf '#!/bin/sh\n' >"$dir/repo/bin/fm-spawn.sh"
+  chmod +x "$dir/repo/bin/fm-spawn.sh"
+  git -C "$dir/repo" add bin
+  git -C "$dir/repo" -c user.name=t -c user.email=t@e.invalid commit -qm init
+  printf 'first\n' >"$dir/repo/bin/helper.sh"
+  first=$(ROOT="$dir/repo" TMPDIR="$dir/tmp" FM_TEST_STUB_SUMMARY_REFRESH=1 fm_test_spawn_script) || fail "the first tree could not be built"
+  printf 'second\n' >"$dir/repo/bin/helper.sh"
+  second=$(ROOT="$dir/repo" TMPDIR="$dir/tmp" FM_TEST_STUB_SUMMARY_REFRESH=1 fm_test_spawn_script) || fail "the second tree could not be built"
+  [ "$first" != "$second" ] || fail "an untracked file whose content changed reused the tree built for the old content: $first"
+  grep -q second "$(dirname "$second")/helper.sh" || fail "the new tree does not hold the new content"
+  pass "the private spawn tree changes when an untracked file's content changes"
+)
+
 test_duration_fixture_isolation || fail "Fixture duration isolation"
+test_spawn_tree_follows_untracked_content || fail "Spawn tree cache key"
 test_git_config_isolation || fail "Git fixture config isolation"
 test_inherited_git_location_isolation || fail "Git fixture location isolation"
 test_agent_standin_survives_a_multicall_sleep || fail "agent stand-in multicall case"

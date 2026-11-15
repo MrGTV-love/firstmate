@@ -545,7 +545,8 @@
 #   It is preceded by a read-only proof (fm_slot_prove_idle) that writes nothing to the
 #   copy, no ref and no file: one snapshot must show the tree clean, no process with its
 #   working directory in the copy (no age exemption; only the spawn's own pane or `treehouse`
-#   launcher is excused; on a relaunch, the recorded endpoint's own shell pid alone), no git worktree lock, no live project lease or recent or unreadable
+#   launcher is excused; on a relaunch, the tree rooted at the recorded endpoint's pane shell, but no agent in it),
+#   no git worktree lock, no live project lease or recent or unreadable
 #   contention row, no ignored file at a path the target tree tracks (git overwrites ignored
 #   files silently), no index flag (assume-unchanged, skip-worktree) on any tracked file or
 #   inside any initialized submodule, and HEAD an ancestor of the target. Any doubt, an
@@ -6500,10 +6501,12 @@ elif [ "$RELAUNCH" -eq 1 ]; then
     fi
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
-  # The recorded endpoint is agent-free and stands in the recorded worktree: its own shell, read live from the recorded
-  # window, is the one process the idle proof of this relaunch excuses (bin/fm-slot-provision-lib.sh holder rule).
-  FM_SLOT_PANE_PID=$(spawn_pane_pid)
-  FM_SLOT_ENDPOINT_PID=$FM_SLOT_PANE_PID
+  # The recorded endpoint is agent-free and stands in the recorded worktree: the process tree rooted at its pane shell,
+  # read live from the recorded window with its start time, is this relaunch's own lineage in the idle proof
+  # (bin/fm-slot-provision-lib.sh holder rule). An unreadable pane pid or start time excuses nobody.
+  FM_SLOT_ENDPOINT_PID=$(spawn_pane_pid)
+  FM_SLOT_ENDPOINT_START=
+  [ -z "$FM_SLOT_ENDPOINT_PID" ] || FM_SLOT_ENDPOINT_START=$(fm_slot_probe start "$FM_SLOT_ENDPOINT_PID" 2>/dev/null) || FM_SLOT_ENDPOINT_PID=
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # A base that could not be fetched or resolved is a fact about the project's origin, not about any copy, so
   # it refuses here, before a copy is acquired: there is nothing in a copy to put at risk, and no copy is leased.

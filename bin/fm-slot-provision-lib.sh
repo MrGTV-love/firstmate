@@ -289,7 +289,7 @@ fm_slot_skip_is_known() { # <reason-code>
   return 1
 }
 
-# One embedded program with seven read-only modes. It runs git and lsof through PATH, so a failing
+# One embedded program with eight read-only modes. It runs git and lsof through PATH, so a failing
 # tool fails closed (exit 3, the reason on stderr).
 FM_SLOT_PROBE_PY=$(cat <<'FMPROBEPY'
 import datetime, hashlib, json, os, stat as stat_mod, subprocess, sys, time, unicodedata
@@ -638,7 +638,7 @@ def is_own(pid, pane, began):
         cur = info[0]
     return False
 
-def holders(slot, real, spawn, common, governed, pane, endpoint=""):
+def holders(slot, real, spawn, common, governed, pane, endpoint="", endpoint_start=""):
     me = os.getpid()
     try:
         spawn = int(spawn)
@@ -649,6 +649,15 @@ def holders(slot, real, spawn, common, governed, pane, endpoint=""):
     began = (proc_info(spawn) or (0, "", None))[2]
     if began is None:
         fail("the spawn's own start time cannot be read")
+    # A relaunch names the root of its own lineage: the pane shell of the recorded endpoint, by pid and start time.
+    if endpoint:
+        info = proc_info(endpoint)
+        try:
+            want = float(endpoint_start)
+        except ValueError:
+            fail("the recorded endpoint (pid %d) has no readable start time" % endpoint)
+        if info is None or info[2] is None or abs(info[2] - want) > 0.001:
+            fail("the recorded endpoint (pid %d) is not the process that was recorded: its start time does not match" % endpoint)
     try:
         proc = subprocess.run(["lsof", "-n", "-P", "-w", "-d", "cwd", "-F", "pcn"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
     except OSError as exc:
@@ -681,9 +690,18 @@ def holders(slot, real, spawn, common, governed, pane, endpoint=""):
             continue
         if cwd is not None and not any(cwd == base or cwd.startswith(base + "/") for base in inside):
             continue
-        # The recorded endpoint of a relaunched task: that one pid, never a child or any other descendant.
-        if cwd is not None and endpoint and pid == endpoint:
-            continue
+        # Inside the tree rooted at the recorded endpoint: the own lineage of this task. Each name on the way up is printed
+        # (T rows) so the caller refuses an agent; a chain that cannot be read is unknown.
+        if cwd is not None and endpoint:
+            path, complete = chain(pid)
+            pids = [p for p, _ in path]
+            if endpoint in pids:
+                names = [info[1] for _, info in path[:pids.index(endpoint) + 1]]
+                print("T\t%d\t%s" % (pid, "\t".join(n.replace("\t", " ") for n in names)))
+                continue
+            if not complete:
+                print("U\tthe parent chain of a live process (pid %d, %s) in the slot cannot be read" % (pid, row["cmd"]))
+                return
         # An lsof row with no working directory proves nothing about where the process is: it is never excused.
         if cwd is not None and is_own(pid, pane, began):
             continue
@@ -779,6 +797,11 @@ elif mode == "hidden":
     # Tracked work hidden by an index flag, at the top level and inside every initialized submodule. One entry per line.
     found = hidden_changes(args[0]) + nested_flags(args[0])
     print("\n".join(found))
+elif mode == "start":
+    info = proc_info(int(args[0])) if args[0].isdigit() else None
+    if info is None or info[2] is None:
+        fail("the start time of pid %s cannot be read" % args[0])
+    print(repr(info[2]))
 elif mode == "field":
     value = load(args[0])[args[1]]
     print(value if isinstance(value, str) else "\n".join(value))
@@ -830,24 +853,38 @@ fm_slot_pool_rows_valid() {
 # The one holder rule. A process with its working directory in the slot, or an lsof row that names a
 # process and no working directory, is a holder unless it runs under this spawn's own pane
 # (FM_SLOT_PANE_PID) or, for a backend with no pane pid, under a `treehouse` launcher that started
-# after the spawn began (FM_SLOT_SPAWN_PID). On a relaunch, the shell of the task's own recorded endpoint
-# (FM_SLOT_ENDPOINT_PID, read from the recorded window) is excused too: that one pid, never its children.
+# after the spawn began (FM_SLOT_SPAWN_PID). On a relaunch, the process tree rooted at the task's own recorded
+# endpoint (FM_SLOT_ENDPOINT_PID, the pane shell read from the recorded window, with FM_SLOT_ENDPOINT_START its start
+# time) is this task's lineage too, except a process in it that fm_agent_process_classify_name (bin/fm-agent-process-lib.sh,
+# which the caller sources) names an agent. A start time that does not match, or a chain that cannot be read, is unknown.
 # There is no age exemption. A live lease, a contention row
 # (or one that cannot be read) and a git worktree lock count too. A holder list that cannot be read skips.
 fm_slot_holders_or_skip() { # <slot> [<project>]
-  local slot=$1 project=${2:-} real common governed=0 out locked path line
+  local slot=$1 project=${2:-} real common governed=0 out locked path line name tree
   real=$(CDPATH='' cd -- "$slot" 2>/dev/null && pwd -P) || { fm_slot_skip "$slot" unknown_holders "the slot directory cannot be entered"; return; }
   common=$(git -C "$slot" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     { fm_slot_skip "$slot" unknown_holders "the git common directory cannot be read"; return; }
   if [ -n "$project" ] && fm_slot_required "$project" "$slot"; then governed=1; fi
-  out=$(fm_slot_probe holders "$slot" "$real" "${FM_SLOT_SPAWN_PID:-$$}" "$common" "$governed" "${FM_SLOT_PANE_PID:-}" "${FM_SLOT_ENDPOINT_PID:-}" 2>&1) || {
+  out=$(fm_slot_probe holders "$slot" "$real" "${FM_SLOT_SPAWN_PID:-$$}" "$common" "$governed" "${FM_SLOT_PANE_PID:-}" \
+    "${FM_SLOT_ENDPOINT_PID:-}" "${FM_SLOT_ENDPOINT_START:-}" 2>&1) || {
     fm_slot_skip "$slot" unknown_holders "the holder list cannot be read (${out:-no detail})"
     return
   }
-  case "$out" in
-    H$'\t'*) fm_slot_skip "$slot" live_holder "${out#H$'\t'}"; return ;;
-    U$'\t'*) fm_slot_skip "$slot" unknown_holders "${out#U$'\t'}"; return ;;
-  esac
+  while IFS= read -r line; do
+    case "$line" in
+      H$'\t'*) fm_slot_skip "$slot" live_holder "${line#H$'\t'}"; return ;;
+      U$'\t'*) fm_slot_skip "$slot" unknown_holders "${line#U$'\t'}"; return ;;
+      T$'\t'*)
+        IFS=$'\t' read -r -a tree <<<"${line#T$'\t'}"
+        declare -F fm_agent_process_classify_name >/dev/null ||
+          { fm_slot_skip "$slot" unknown_holders "the agent classifier is not loaded, so the recorded endpoint's tree cannot be judged"; return; }
+        for name in "${tree[@]:1}"; do
+          [ "$(fm_agent_process_classify_name "$name")" != agent ] ||
+            { fm_slot_skip "$slot" live_holder "an agent ($name) in the recorded endpoint's tree has the slot (pid ${tree[0]})"; return; }
+        done
+        ;;
+    esac
+  done <<<"$out"
   locked=$(git -C "$slot" worktree list --porcelain 2>/dev/null) || { fm_slot_skip "$slot" unknown_holders "git worktree list failed"; return; }
   path=
   while IFS= read -r line; do

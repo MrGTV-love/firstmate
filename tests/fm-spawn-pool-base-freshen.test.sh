@@ -1312,13 +1312,16 @@ PY
 test_local_only_source_binding() { run_local_only_binding_case prepared; }
 test_local_only_unprepared_retry() { run_local_only_binding_case unprepared; }
 
-# make_stopped_tmux <dir>: an agent-free retained shell for the relaunch fixture. A real process stands in for that shell:
-# its working directory is the recorded copy, and the fake tmux answers its pid as the recorded window's pane pid.
+# make_stopped_tmux <dir>: an agent-free retained shell for the relaunch fixture, in the real treehouse shape. The pane's
+# own shell stands in the project folder; under it, the shell `treehouse get` opened stands in the recorded copy. The fake
+# tmux answers the pane shell's pid as the recorded window's pane pid.
 STOPPED_SHELL_PIDS=()
 stop_stopped_shells() {
   local pid
   for pid in ${STOPPED_SHELL_PIDS[@]+"${STOPPED_SHELL_PIDS[@]}"}; do
     kill "$pid" 2>/dev/null || true
+  done
+  for pid in ${STOPPED_SHELL_PIDS[@]+"${STOPPED_SHELL_PIDS[@]}"}; do
     wait "$pid" 2>/dev/null || true
   done
   STOPPED_SHELL_PIDS=()
@@ -1329,11 +1332,20 @@ trap 'stop_stopped_shells; fm_test_cleanup; exit 143' TERM
 trap 'stop_stopped_shells; fm_test_cleanup; exit 129' HUP
 trap 'stop_stopped_shells; fm_test_cleanup; exit 131' QUIT
 make_stopped_tmux() { # <dir>
-  local pid
+  local pid inner _
   mkdir "$1"
-  (cd "$POOL_DIR" && exec sleep 900) &
+  cat >"$1/pane.sh" <<'SH'
+#!/usr/bin/env bash
+bash -c 'cd "$1" && echo $$ >"$2" && exec sleep 900' copy "$1" "$2" &
+wait
+SH
+  chmod +x "$1/pane.sh"
+  (cd "$PROJECT_DIR" && exec "$1/pane.sh" "$POOL_DIR" "$1/inner.pid") &
   pid=$!
   STOPPED_SHELL_PIDS+=("$pid")
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$1/inner.pid" ] && break; sleep 0.1; done
+  inner=$(cat "$1/inner.pid" 2>/dev/null) || inner=
+  [ -z "$inner" ] || STOPPED_SHELL_PIDS+=("$inner")
   {
     cat <<'SH'
 #!/usr/bin/env bash
