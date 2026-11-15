@@ -7869,7 +7869,7 @@ class Round8Findings(InvariantScenario):
                 result = home.cli('check', action='retarget')
             rows = [r for r in home.refusals() if r['reason'] == 'decision_held_for_captain_reaction']
             self.assertEqual([(r.get('author'), r.get('withheld')) for r in rows], [(INV_SECOND, None)], (result.out, result.err))
-            self.assertNotIn(plane.AUTHOR_COLLISION_NOTICE, result.out + result.err)
+            self.assertNotIn('equals a protected value', result.out + result.err)    # no collision notice
 
     # ---- R3: arming B keeps A's unread window ----
 
