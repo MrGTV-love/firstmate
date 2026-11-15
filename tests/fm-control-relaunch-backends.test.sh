@@ -2678,6 +2678,33 @@ test_restart_attributes_before_a_raw_command_fallback_nudge() {
   pass "restart: a raw-command fallback nudge is withheld from an unattributed live pane and kept for a stopped mate"
 }
 
+# Main 1634 D3: a capability refusal that comes before the backend is known
+# (no kind, or a kind that is not a second mate's) still asks the verdict owner
+# before the fallback nudge.
+test_restart_attributes_when_capability_refuses_early() {
+  local CONTROL="$ROOT/bin/fm-control.sh" dir id kind out rc
+  for kind in none ship; do
+    prepare_claude_restore "early-capability-$kind"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    grep -v '^kind=' "$dir/home/state/$id.meta" > "$dir/meta.new" && mv "$dir/meta.new" "$dir/home/state/$id.meta"
+    [ "$kind" = none ] || printf 'kind=%s\n' "$kind" >> "$dir/home/state/$id.meta"
+    claude_restart_unreached "$dir" "$id" "$ROOT/bin/fm-secondmate-restart.sh" "" \
+      "a live unattributed pane whose record has kind '$kind'"
+    assert_contains "$CLAUDE_REFUSAL_OUT" "so no request or nudge was sent to it" \
+      "a record with kind '$kind' is refused for attribution, not for capability alone"
+  done
+  # A positively stopped mate keeps its capability outcome.
+  prepare_claude_restore early-capability-stopped
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  grep -v '^kind=' "$dir/home/state/$id.meta" > "$dir/meta.new" && mv "$dir/meta.new" "$dir/home/state/$id.meta"
+  rm -f "$dir/fake/herdr-agent-live"
+  rc=0
+  out=$(CONTROL="$ROOT/bin/fm-secondmate-restart.sh" run_control "$dir" "$id") || rc=$?
+  assert_not_contains "$out" "cannot be positively attributed" "a stopped mate with no kind is not refused for attribution"
+  assert_contains "$out" "is not a second mate's" "a stopped mate with no kind keeps its capability outcome"
+  pass "restart: an early capability refusal still decides attribution before any nudge, and a stopped mate keeps its outcome"
+}
+
 test_restart_refuses_an_unproven_agent_state() {
   local CONTROL="$ROOT/bin/fm-control.sh" dir id
   # The backend cannot load: a copy of bin/ without the Herdr adapter.
@@ -2720,6 +2747,7 @@ test_claude_restart_rechecks_attribution_before_its_fallback_nudge
 test_remote_attribution_verb_reads_the_host_verdict
 test_restart_refuses_an_unproven_agent_state
 test_restart_attributes_before_a_raw_command_fallback_nudge
+test_restart_attributes_when_capability_refuses_early
 test_claude_pinned_elsewhere_names_its_own_cause
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
 test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once
