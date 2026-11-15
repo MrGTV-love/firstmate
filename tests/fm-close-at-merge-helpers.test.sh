@@ -154,7 +154,9 @@ test_f4_a_call_with_no_arguments_is_not_a_typed_completion() {
   local out
   out=$(bash -u -c '. "$1"; ARGS=(); fm_typed_completion_resolve ${ARGS[@]+"${ARGS[@]}"}; echo "rc=$?"' _ "$ROOT/bin/fm-tasks-axi-lib.sh" 2>&1)
   [ "$out" = rc=1 ] && ok "f4: no arguments are no typed completion under set -u" || not_ok "f4: no arguments gave: $out"
-  if grep -n 'fm_typed_completion_resolve\|tasks-axi "\${ARGS\[@\]}"' "$ROOT/bin/fm-tasks-axi.sh" | grep -v '^[0-9]*: *#' | grep -q '"\${ARGS\[@\]}"'; then
+  # The guarded form ${ARGS[@]+"${ARGS[@]}"} holds the plain form after its `+`, so only a plain
+  # form with no `+` before it counts.
+  if grep -n 'fm_typed_completion_resolve\|tasks-axi .*ARGS.* > "\$pf_out"' "$ROOT/bin/fm-tasks-axi.sh" | grep -v '^[0-9]*: *#' | grep -qE '[^+]"\$\{ARGS\[@\]\}"'; then
     not_ok "f4: the wrapper passes an unguarded \"\${ARGS[@]}\" to the typed branch, which stops bash 3.2 on a bare call"
   else
     ok "f4: the wrapper passes its arguments to the typed branch in the guarded form"
@@ -166,8 +168,10 @@ test_the_callers_use_the_checked_helpers() {
   grep -q 'fm_pr_closes_load "\$1.parse"' "$ROOT/bin/fm-pr-close-items.sh" \
     && ! grep -q 'done < <(got "\$WORK/body" id)' "$ROOT/bin/fm-pr-close-items.sh" \
     && ok "f2: the close step loads each parse result whole" || not_ok "f2: the close step still reads ids through a process substitution"
-  if grep -nE '< <\(got |\$\(got [^)]*\) *\||got [^|]*\| *(grep|sed|paste)' "$ROOT/bin/fm-pr-close-items.sh" | grep -v '^[0-9]*: *#' | grep -q .; then
-    not_ok "f2: a report in the close step still reads the parse result with its status unchecked: $(grep -nE '< <\(got |got [^|]*\| *(grep|sed|paste)' "$ROOT/bin/fm-pr-close-items.sh" | cut -d: -f1 | tr '\n' ' ')"
+  # A pipe after a read (`got ... |`) or a process substitution loses the reader's status; `||`
+  # after a read checks it.
+  if grep -nE '< <\(got |got [^|]*\|[^|]' "$ROOT/bin/fm-pr-close-items.sh" | grep -v '^[0-9]*: *#' | grep -q .; then
+    not_ok "f2: a report in the close step still reads the parse result with its status unchecked: $(grep -nE '< <\(got |got [^|]*\|[^|]' "$ROOT/bin/fm-pr-close-items.sh" | grep -v '^[0-9]*: *#' | cut -d: -f1 | tr '\n' ' ')"
   else
     ok "f2: every report in the close step reads the parse result with its status checked"
   fi
