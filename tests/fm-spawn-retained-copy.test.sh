@@ -664,12 +664,10 @@ test_unproved_fresh_read_and_blank_version_are_refused() (
   . "$ROOT/bin/fm-task-copy-lib.sh"
   local label rc verdict STATE_JSON FAIL_SECOND=0 ANSWER=failing
   command -v jq >/dev/null 2>&1 || fail "the in-memory guard checks require jq"
-  [() {
-    if [[ ${1-} == -f && ${2-} == /virtual/*/'*.meta' ]]; then return 0; fi
-    if [[ ${1-} == -L && ${2-} == /virtual/*/'*.meta' ]]; then return 1; fi
-    builtin [ "$@"
-  }
-  fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=(/virtual/home/state); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
+  local meta_dir="$TMP_ROOT/in-memory-guard/home/state"
+  mkdir -p "$meta_dir"
+  : > "$meta_dir/holder.meta"
+  fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$meta_dir"); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
   fm_meta_get() { printf '%s\n' /virtual/pool/1/project/nested; }
   fm_task_copy_canonical_dir() { printf '%s\n' "$1"; }
   fm_task_copy_enclosing_pool_slot() { printf '%s\n' /virtual/pool/1/project; }
@@ -700,7 +698,7 @@ test_unproved_fresh_read_and_blank_version_are_refused() (
     STATE_JSON="{\"worktrees\":[$2]}"
     reset_probe
     rc=0
-    fm_task_copy_pool_slots_hold_no_current_copy /virtual/project /virtual/home/state >/dev/null 2>&1 || rc=$?
+    fm_task_copy_pool_slots_hold_no_current_copy /virtual/project "$meta_dir" >/dev/null 2>&1 || rc=$?
   }
   # control: an ordinary entry whose second read works is admitted
   ANSWER=failing FAIL_SECOND=0

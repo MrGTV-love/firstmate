@@ -3903,8 +3903,11 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
         recovered-successor-lease-id recovered-cleanup-successor-lease-id; do
       # The recovered modes run slot A as a recovered entry that carries a lease id:
       # a successor under the same protected holder with a new id must not be cleared.
-      akind=ordinary
-      case "$mode" in recovered-*) akind=recovered-id; mode_name=${mode#recovered-} ;; *) mode_name=$mode ;; esac
+      akind=ordinary mode_name=$mode
+      if [ "${mode#recovered-}" != "$mode" ]; then
+        akind=recovered-id
+        mode_name=${mode#recovered-}
+      fi
       unc_pool_case "unclaimed-interrupt-$mode" "$akind" "$provider" || fail "$provider $mode: cannot build the pool"
       a_holder=task-x1
       [ "$akind" = ordinary ] || a_holder=$UNC_PROTECTED_HOLDER
