@@ -129,6 +129,58 @@ test_unset_fm_home_fails() {
   pass "fm-send strict: unset FM_HOME fails before target resolution"
 }
 
+# The explicit-home guard records its allow for every send it admits, also one whose
+# target then does not resolve, as on base (where the allow was written right after the
+# FM_HOME check). So deny, allow, deny reads as a cleared refusal and one recurrence in
+# bin/fm-guard-metrics.sh, not as two denies in a row.
+test_home_guard_allow_is_recorded_for_an_unresolvable_target() {
+  local dir fb home err log events rc decisions out
+  dir="$TMP_ROOT/home-guard-seq"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home home-guard-seq); err="$dir/send.err"; log="$dir/tmux.log"; : > "$log"
+  events="$dir/guard-events.jsonl"; : > "$events"
+  env -u FM_HOME -u FM_TASK_ID PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_GUARD_EVENT_LOG="$events" "$SEND" lost-target "hello" >/dev/null 2>"$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "unset FM_HOME should fail"
+  env -u FM_TASK_ID PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_FAKE_TMUX_WINDOW=lost-target \
+    FM_SEND_SETTLE=0 FM_GUARD_EVENT_LOG="$events" "$SEND" lost-target "hello" >/dev/null 2>"$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "an unresolvable target should fail"
+  assert_contains "$(cat "$err")" "not resolvable" "the second send fails at target resolution"
+  env -u FM_HOME -u FM_TASK_ID PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_GUARD_EVENT_LOG="$events" "$SEND" lost-target "hello" >/dev/null 2>"$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "unset FM_HOME should fail again"
+  decisions=$(grep '"guard":"send-home-fail-closed"' "$events" | grep -o '"decision":"[a-z]*"' | tr '\n' ' ')
+  assert_equals '"decision":"deny" "decision":"allow" "decision":"deny" ' "$decisions" "the recorded sequence is deny, allow, deny"
+  out=$("$ROOT/bin/fm-guard-metrics.sh" --log "$events" --registry "$ROOT/docs/guards/registry.json" \
+    --guards send-home-fail-closed --min-opportunities 1 2>&1)
+  assert_contains "$out" "recurrences=1" "the metrics reader sees the allow clear the first deny: $out"
+  [ ! -s "$log" ] || fail "no send reached the transport"$'\n'"$(cat "$log")"
+
+  # The same sequence with no arguments at all: base recorded the allow before it
+  # read the target, so deny / no-argument send / deny is one recurrence too. With
+  # no task the event identity is the home plus the harness session
+  # (bin/fm-guard-event.sh): the denied sends name the same home through FM_ROOT,
+  # as a home whose firstmate checkout is the home itself does, and one session id
+  # is pinned for all three.
+  events="$dir/guard-events-noarg.jsonl"; : > "$events"
+  env -u FM_HOME -u FM_TASK_ID PATH="$fb:$PATH" FM_ROOT="$home" FM_ROOT_OVERRIDE="$home" FM_SESSION_ID=noarg-seq \
+    FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 FM_GUARD_EVENT_LOG="$events" "$SEND" >/dev/null 2>"$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "unset FM_HOME with no arguments should fail"
+  env -u FM_TASK_ID PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_SESSION_ID=noarg-seq FM_TMUX_LOG="$log" \
+    FM_SEND_SETTLE=0 FM_GUARD_EVENT_LOG="$events" "$SEND" >/dev/null 2>"$err"; rc=$?
+  expect_code 1 "$rc" "a send with no arguments exits 1, as on base"
+  assert_contains "$(cat "$err")" "usage: FM_HOME=<home> bin/fm-send.sh <task> <message>" "the no-argument send prints the usage"
+  env -u FM_HOME -u FM_TASK_ID PATH="$fb:$PATH" FM_ROOT="$home" FM_ROOT_OVERRIDE="$home" FM_SESSION_ID=noarg-seq \
+    FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 FM_GUARD_EVENT_LOG="$events" "$SEND" >/dev/null 2>"$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "unset FM_HOME with no arguments should fail again"
+  decisions=$(grep '"guard":"send-home-fail-closed"' "$events" | grep -o '"decision":"[a-z]*"' | tr '\n' ' ')
+  assert_equals '"decision":"deny" "decision":"allow" "decision":"deny" ' "$decisions" "the no-argument sequence is deny, allow, deny"
+  out=$("$ROOT/bin/fm-guard-metrics.sh" --log "$events" --registry "$ROOT/docs/guards/registry.json" \
+    --guards send-home-fail-closed --min-opportunities 1 2>&1)
+  assert_contains "$out" "recurrences=1" "the metrics reader sees the no-argument allow clear the first deny: $out"
+  [ ! -s "$log" ] || fail "no no-argument send reached the transport"$'\n'"$(cat "$log")"
+  pass "fm-send strict: the explicit-home allow is recorded for an unresolvable target and for a send with no arguments, so deny/allow/deny reads as one recurrence"
+}
+
 test_unresolvable_target_does_not_tmux_fallback() {
   local dir fb home err log rc
   dir="$TMP_ROOT/unresolved"; mkdir -p "$dir"
@@ -242,6 +294,7 @@ test_exact_lane_id_send_still_works
 test_key_send_exit_status_follows_delivery
 test_unset_fm_home_fails
 test_unresolvable_target_does_not_tmux_fallback
+test_home_guard_allow_is_recorded_for_an_unresolvable_target
 test_prefixless_herdr_pane_id_fails
 test_unmatched_single_colon_target_must_exist
 test_fm_prefixed_herdr_session_is_an_explicit_target

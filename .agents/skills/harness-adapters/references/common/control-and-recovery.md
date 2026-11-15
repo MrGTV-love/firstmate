@@ -6,6 +6,7 @@ Load this with the running or recorded tool reference for trust, skill invocatio
 
 The router owns lifecycle-only control and recorded-harness selection.
 Conversation and harness-native skill invocation use `../../../bin/fm-send.sh`.
+A text send to a task with open keyed decisions states its choice, `--resolve-key <key>` or `--answers-none` (rule: the `../../../bin/fm-send.sh` header, "Decision closure").
 `../../../docs/agent-control.md` owns the data-plane split, and `../../../bin/fm-control-lib.sh` owns executable capabilities.
 Tool-reference exit and interrupt values are empirical records, not keys to improvise; a new adapter remains uncontrollable until they land in that owner.
 Let the control plane verify postconditions.
@@ -25,6 +26,7 @@ Pi gates the fresh-worktree case too, but unlike Claude its dialog is answered w
 Codex shows a directory-trust dialog on the first run for a repository root.
 
 Use the tool's exact skill form, or natural language only when no separate command is verified or the form remains uncertain.
+A skill invocation sent as text follows the same choice rule (see above).
 A successful send or key return is not proof of submission; require the tool-specific postcondition.
 Popup, queued-input, and readiness handling belongs to `../../../bin/fm-composer-lib.sh` and the selected backend.
 
