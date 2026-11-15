@@ -4000,6 +4000,9 @@ xl_stop_watcher() {
 xl_supervise_until() {
   local deadline=$((SECONDS + ${XL_BOUND:-120}))
   while [ "$SECONDS" -lt "$deadline" ]; do
+    # Every wake line seen, kept across the interval even when a later step prunes
+    # it from the queue (Main 1871: the no-wake oracle reads this history).
+    [ ! -s "$STATE/.wake-queue" ] || cat "$STATE/.wake-queue" >> "$W/wake-history"
     if "$@"; then xl_stop_watcher; return 0; fi
     if [ -z "${XL_WATCH_PID:-}" ] || ! kill -0 "$XL_WATCH_PID" 2>/dev/null; then
       [ -z "${XL_WATCH_PID:-}" ] || wait "$XL_WATCH_PID" 2>/dev/null || true
@@ -4007,6 +4010,7 @@ xl_supervise_until() {
     fi
     sleep 0.1
   done
+  [ ! -s "$STATE/.wake-queue" ] || cat "$STATE/.wake-queue" >> "$W/wake-history"
   xl_stop_watcher
   return 1
 }
@@ -4058,7 +4062,7 @@ xl_plain_teardown() {  # <stderr file>
 # included (Main 1820 F9): only A's own merge report may name A.
 xl_assert_no_stray_wake_for_a() {  # <label>
   local stray
-  stray=$(grep -E 't1|pull/7' "$STATE/.wake-queue" 2>/dev/null | grep -v 'check: merge landed: t1 ' || true)
+  stray=$(cat "$W/wake-history" "$STATE/.wake-queue" 2>/dev/null | grep -E 't1|pull/7' | grep -v 'check: merge landed: t1 ' | sort -u || true)
   [ -z "$stray" ] || fail "$1: a wake or signal named A outside its own merge report: $stray"
 }
 
@@ -4111,16 +4115,23 @@ test_validators_reject_their_falsifiers_on_files() {
   ( xl_assert_no_stray_wake_for_a "unit merge report" ) || fail "A's own merge report was taken for a stray wake"
   printf '2\t2\tcheck\tcontributions\tcheck: contributions %s\n' "$XL_PR" >> "$STATE/.wake-queue"
   ! ( xl_assert_no_stray_wake_for_a "unit contributions" ) 2>/dev/null || fail "a contributions wake naming A passed as no wake"
+  # A signal for A seen during supervision and pruned from the queue before the check.
+  printf '1\t1\tcheck\tmerged-t1-x\tcheck: merge landed: t1 %s external\n' "$XL_PR" > "$STATE/.wake-queue"
+  printf '3\t3\tsignal\tt1\tsignal: t1 done [key=close-evidence]\n' > "$W/wake-history"
+  ! ( xl_assert_no_stray_wake_for_a "unit pruned signal" ) 2>/dev/null || fail "a signal for A pruned before the check passed as no wake"
+  : > "$W/wake-history"
   # v5_c_rows_ok: only C's inherited check-in may stand; a non-overdue failed_task row fails.
-  printf '{"rows":[{"category":"silent_report","subject":"t-c","owner":"firstmate","overdue":true,"informational":false,"next_action":"check in"}]}\n' > "$W/c.json"
+  printf '{"rows":[{"category":"silent_report","subject":"t-c","owner":"firstmate","overdue":true,"informational":false,"next_action":"check in: progress, blockers, cross-workstream dependencies"}]}\n' > "$W/c.json"
   v5_c_rows_ok "$W/c.json" || fail "C's inherited check-in was rejected"
   printf '{"rows":[]}\n' > "$W/c-none.json"
   v5_c_rows_ok "$W/c-none.json" || fail "C with no row was rejected"
   printf '{"rows":[{"category":"failed_task","subject":"t-c","owner":"firstmate","overdue":false,"informational":false,"next_action":"recover the failed work"}]}\n' > "$W/c-bad.json"
   ! v5_c_rows_ok "$W/c-bad.json" || fail "a non-overdue failed_task row for C passed the C oracle"
+  printf '{"rows":[{"category":"silent_report","subject":"t-c","owner":"firstmate","overdue":true,"informational":false,"next_action":"recover the worker now"}]}\n' > "$W/c-action.json"
+  ! v5_c_rows_ok "$W/c-action.json" || fail "a silent_report row for C with another action passed the C oracle"
   W=$saved_w
   STATE=$saved_state
-  pass "the validators reject an empty or forced teardown log, a contributions wake naming A and any C row but its check-in, on files alone"
+  pass "the validators reject an empty or forced teardown log, a contributions wake naming A, a signal for A pruned before the check, and any C row but its exact check-in, on files alone"
 }
 
 test_xlane_validators_reject_what_their_contracts_reject() {
@@ -4162,9 +4173,10 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
     xl_print_state "$variant before housekeeping"
     [ ! -e "$STATE/t1.check.sh" ] || fail "$variant: a poll existed before housekeeping"
     [ ! -e "$STATE/t1.merge-prune" ] || fail "$variant: a prune record existed before housekeeping"
-    # No wake or signal names A before discovery, and none is needed for it (Main 1686 F6):
-    # every wake the watcher queues stays in .wake-queue in this test, since nothing drains it.
-    ! grep -qsE 't1|pull/7' "$STATE/.wake-queue" || fail "$variant: a wake named A before discovery: $(cat "$STATE/.wake-queue")"
+    # No wake or signal at all is queued before discovery, and none is needed for it
+    # (Main 1686 F6, Main 1871): a wake of any kind could start the watcher's restart.
+    [ ! -s "$STATE/.wake-queue" ] || fail "$variant: a wake was queued before discovery: $(cat "$STATE/.wake-queue")"
+    : > "$W/wake-history"
     xl_supervise_until xl_closed \
       || { xl_observe_stranded "$variant after supervision"; fail "$variant: t1 stayed open after the other lane merged its PR: $(tail -5 "$W/watch.out")"; }
     xl_print_state "$variant after supervision"
@@ -4666,10 +4678,10 @@ v5_rows() {
 }
 
 # v5_c_rows_ok <ledger-json>: C's live declared wait has no row, or only its inherited
-# long-wait check-in (silent_report, Main 038 ruling (b)); any other category, overdue
-# or not, fails (Main 1820 F9).
+# long-wait check-in (silent_report with its check-in action, Main 038 ruling (b));
+# any other category or action, overdue or not, fails (Main 1820 F9, Main 1871).
 v5_c_rows_ok() {
-  ! v5_rows "$1" '^t-c' | awk -F'\t' '$1 != "silent_report" {bad=1} END {exit !bad}'
+  ! v5_rows "$1" '^t-c' | awk -F'\t' '$1 != "silent_report" || $6 != "check in: progress, blockers, cross-workstream dependencies" {bad=1} END {exit !bad}'
 }
 
 v5_table() {  # <ledger-json>: acceptance and cleanup per task, read from the records, copies, ledger and forge double
