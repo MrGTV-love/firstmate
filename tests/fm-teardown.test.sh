@@ -698,6 +698,55 @@ SH
   pass "a set-aside marker whose removal fails after the rename keeps the record for a retry, and the retry removes both"
 }
 
+# Main 1820 F8, Main 1827 Q2 (B): the marker is retired first, then the record. When
+# removing the record fails, the marker is written back, so the record never stays
+# without it; a retry then removes both. When even that write fails, teardown
+# refuses naming both paths. The unlink-only witness above keeps its own case.
+test_record_removal_failure_restores_the_marker() {
+  local case_dir rc marker bytes variant
+  for variant in restored unrestorable; do
+    case_dir=$(detached_copy_case "record-removal-fails-$variant" - no own)
+    marker="$case_dir/state/task-x1.pr-poll-merge-notified"
+    printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$marker"
+    chmod 600 "$marker"
+    bytes=$(shasum -a 256 < "$marker")
+    cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" $case_dir/state/task-x1.meta "*) echo "rm: cannot remove the task record (test)" >&2; exit 1 ;; esac
+exec /bin/rm "\$@"
+SH
+    if [ "$variant" = unrestorable ]; then
+      cat > "$case_dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+case "\${!#}" in "$marker") case "\$*" in *merge-notified-restore*) echo "mv: cannot restore the marker (test)" >&2; exit 1 ;; esac ;; esac
+exec /bin/mv "\$@"
+SH
+      chmod +x "$case_dir/fakebin/mv"
+    fi
+    chmod +x "$case_dir/fakebin/rm"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$variant: teardown reported success with the task record still in place"
+    assert_present "$case_dir/state/task-x1.meta" "$variant: the fixture's record removal did not fail"
+    if [ "$variant" = restored ]; then
+      assert_present "$marker" "restored: the record stayed without its merge-notified marker (stderr: $(tail -2 "$case_dir/stderr" | tr '\n' ' '))"
+      [ "$(shasum -a 256 < "$marker")" = "$bytes" ] || fail "restored: the marker came back with other bytes"
+      rm -f "$case_dir/fakebin/rm"
+      rc=0
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "restored: the retry did not complete: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "restored: the retry left the record"
+      assert_absent "$marker" "restored: the retry left the marker"
+      assert_absent "$marker.retiring" "restored: the retry left the set-aside marker"
+    else
+      assert_grep "could not be restored" "$case_dir/stderr" "unrestorable: the refusal does not say the marker could not be restored"
+      assert_grep "$case_dir/state/task-x1.meta" "$case_dir/stderr" "unrestorable: the refusal does not name the record"
+      assert_grep "$marker" "$case_dir/stderr" "unrestorable: the refusal does not name the marker"
+    fi
+  done
+  pass "a failed record removal writes the marker back so a retry removes both; if that write fails too, the refusal names both paths"
+}
+
 # A branch can have several PRs. A newer open PR returned first must not hide an
 # older merged PR that carries the detached copy's work; a merged PR that does not
 # carry it still leaves the copy refused.
@@ -4456,6 +4505,7 @@ test_named_branch_copy_without_pr_meta_behaves_as_before
 test_unsafe_merge_notified_marker_keeps_the_record
 test_unremovable_merge_notified_marker_leaves_a_retry
 test_marker_unlink_failure_after_the_rename_leaves_a_retry
+test_record_removal_failure_restores_the_marker
 test_detached_copy_finds_the_merged_pr_among_several
 test_empty_recorded_slot_nested_drop
 test_recorded_slot_lost_lease_still_refuses

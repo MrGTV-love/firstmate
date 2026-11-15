@@ -2309,12 +2309,30 @@ validate_pr_poll_cleanup() {
 # work: begin leaves it, finish removes it). bin/fm-pr-ready-reconcile.sh reads the
 # .retiring name as the marker, and it tries the metadata lock before it judges a
 # poll lost, so a pass in that window re-arms nothing. If removing the record itself
-# then fails, the marker is already gone, and a later pass may report the merge once
-# more; that repeats a notice and loses no work.
+# then fails, the marker is put back from the bytes kept when it was moved aside
+# (merge_marker_restore), so the record never stays without its marker; if even that
+# fails, teardown refuses and names both paths (Main 1820 F8, Main 1827 Q2 (B)).
+TEARDOWN_MARKER_PATH=
+TEARDOWN_MARKER_BYTES=
 merge_marker_retire_begin() {  # <state> <id>
-  local marker="$1/$2.pr-poll-merge-notified"
-  [ -e "$marker" ] || [ -L "$marker" ] || return 0
-  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+  local marker="$1/$2.pr-poll-merge-notified" source='' bytes
+  TEARDOWN_MARKER_PATH=
+  TEARDOWN_MARKER_BYTES=
+  if [ -e "$marker" ] || [ -L "$marker" ]; then
+    [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+    source=$marker
+  elif [ -f "$marker.retiring" ] && [ ! -L "$marker.retiring" ]; then
+    source="$marker.retiring"
+  fi
+  if [ -n "$source" ]; then
+    bytes=$(cat -- "$source" && printf x) || {
+      echo "error: the merge-notified marker $source could not be read; the task record stays, so a later teardown retries" >&2
+      return 1
+    }
+    TEARDOWN_MARKER_PATH=$marker
+    TEARDOWN_MARKER_BYTES=${bytes%x}
+  fi
+  [ "$source" = "$marker" ] || return 0
   mv -f -- "$marker" "$marker.retiring" || {
     echo "error: the merge-notified marker $marker could not be moved aside; the task record stays, so a later teardown retries" >&2
     return 1
@@ -2330,6 +2348,25 @@ merge_marker_retire_finish() {  # <state> <id>
     echo "error: the set-aside merge-notified marker $marker.retiring could not be removed after the task record" >&2
     return 1
   fi
+}
+
+# After a failed removal of <record>: while the record is still there, the
+# merge-notified marker that merge_marker_retire_begin read is written back, so a
+# retry starts from a record that still carries its marker. 1, naming both paths,
+# when it cannot be written back.
+merge_marker_restore() {  # <state> <id> <record>
+  local marker="$1/$2.pr-poll-merge-notified" tmp
+  [ -e "$3" ] || [ -L "$3" ] || return 0
+  [ "$TEARDOWN_MARKER_PATH" = "$marker" ] && [ -n "$TEARDOWN_MARKER_BYTES" ] || return 0
+  [ ! -e "$marker" ] && [ ! -L "$marker" ] || return 0
+  if tmp=$(umask 077; mktemp "$1/.$2.merge-notified-restore.XXXXXX") \
+    && printf '%s' "$TEARDOWN_MARKER_BYTES" > "$tmp" && chmod 600 "$tmp" && mv -f -- "$tmp" "$marker"; then
+    echo "notice: the task record $3 could not be removed; its merge-notified marker $marker is restored, so a later teardown retries from both" >&2
+    return 0
+  fi
+  [ -z "${tmp:-}" ] || rm -f -- "$tmp"
+  echo "REFUSED: the task record $3 could not be removed, and its merge-notified marker $marker could not be restored; a later pass may report that merge again until both are repaired" >&2
+  return 1
 }
 
 # Callers run this only after the busy-state and status retire steps succeed, so
@@ -6034,7 +6071,10 @@ cleanup_firstmate_home_children() {
     fi
     merge_marker_retire_begin "$sub_state" "$child_id" || return 1
     merge_marker_retire_finish "$sub_state" "$child_id" || return 1
-    fm_backlog_atomic_transition remove "$sub_state/$child_id.meta" "task record" "$sub_state" || return 1
+    fm_backlog_atomic_transition remove "$sub_state/$child_id.meta" "task record" "$sub_state" || {
+      merge_marker_restore "$sub_state" "$child_id" "$sub_state/$child_id.meta" || true
+      return 1
+    }
     [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks || return 1
     rm -f "$sub_state/$child_id.turn-ended" "$sub_state/$child_id.progress" \
       "$(fm_wake_signal_seen_path "$sub_state" "$sub_state/$child_id.turn-ended")" \
@@ -6718,7 +6758,10 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   fi
   merge_marker_retire_begin "$STATE" "$ID" || exit 1
   merge_marker_retire_finish "$STATE" "$ID" || exit 1
-  fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
+  fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || {
+    merge_marker_restore "$STATE" "$ID" "$META" || true
+    exit 1
+  }
   TEARDOWN_META_REMOVED=1
   teardown_release_project_lock || exit 1
 fi
@@ -6739,6 +6782,7 @@ TEARDOWN_CLOSE_META=$META
 if [ "$BACKLOG_CLOSED" = 1 ]; then
   if ! fm_backlog_atomic_transition "$BACKLOG_TRANSITION" "$TEARDOWN_CLOSE_META" "$BACKLOG_CLOSE_MARKER" \
       "$DATA" "$ID" "$STATE" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
+    [ "$TEARDOWN_META_REMOVED" = 1 ] || merge_marker_restore "$STATE" "$ID" "$STATE/$ID.meta" || true
     fm_lock_release "$META_LOCK"
     META_LOCK_HELD=0
     if [ "$BACKLOG_TRANSITION" = retain ]; then
@@ -6755,6 +6799,7 @@ elif [ "$KIND" = secondmate ] && [ ! -e "$STATE" ] && [ ! -L "$STATE" ]; then
   :
 else
   if ! fm_backlog_atomic_transition remove "$STATE/$ID.meta" "task record" "$STATE"; then
+    merge_marker_restore "$STATE" "$ID" "$STATE/$ID.meta" || true
     fm_lock_release "$META_LOCK"
     META_LOCK_HELD=0
     echo "error: $ID's endpoint and local copy are cleaned up, but its task record could not be removed ($FM_BACKLOG_TRANSITION_ERROR)" >&2

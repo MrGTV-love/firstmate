@@ -107,7 +107,8 @@ crew_state_ready_url() {  # <id>
 # without its check by a registrar that died between its final renames is not
 # one. The poll ended on purpose when a pending retirement or a pending slot
 # return exists, when the merge-notified marker names this PR (a marker naming
-# another PR does not count), or when an armed prune record names this PR or
+# another PR does not count), when a teardown's set-aside .retiring marker exists
+# at all (readable or not), or when an armed prune record names this PR or
 # cannot be read. A registration in progress holds the task's metadata lock from
 # writing pr= until it holds the poll publication lock, and that lock until its poll
 # is published (bin/fm-pr-check.sh); this pass tries both, in that order, and reads
@@ -122,9 +123,10 @@ pr_poll_lost() {  # <id> <recorded pr>
   fm_pr_url_parse "$pr" || return 1
   canonical=$FM_PR_URL
   ! fm_pr_poll_merge_already_notified "$STATE" "$id" "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
-  # The marker a teardown moved aside before removing the record (bin/fm-teardown.sh merge_marker_retire_begin).
-  ! fm_pr_poll_merge_marker_matches "$STATE/$id.pr-poll-merge-notified.retiring" "$(fm_pr_file_device "$STATE")" \
-    "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
+  # The marker a teardown moved aside before removing the record (bin/fm-teardown.sh
+  # merge_marker_retire_begin): its presence alone means a teardown of this task is
+  # under way, so it counts whatever it holds, unreadable or not (Main 1820 F8).
+  [ ! -e "$STATE/$id.pr-poll-merge-notified.retiring" ] && [ ! -L "$STATE/$id.pr-poll-merge-notified.retiring" ] || return 1
   if [ -e "$STATE/$id.merge-prune" ] || [ -L "$STATE/$id.merge-prune" ]; then
     [ -f "$STATE/$id.merge-prune" ] && [ ! -L "$STATE/$id.merge-prune" ] || return 1
     ! grep -qxF -e "pr=$pr" -e "pr=$canonical" "$STATE/$id.merge-prune" 2>/dev/null || return 1

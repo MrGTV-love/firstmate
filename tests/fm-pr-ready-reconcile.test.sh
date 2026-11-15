@@ -675,6 +675,28 @@ kill "$holder" 2>/dev/null || true; wait "$holder" 2>/dev/null || true
 [ ! -e "$CASE/home/state/partial.check.sh" ] || fail 'a poll a live registrar is publishing gained a second check'
 pass 'a lost poll is re-armed once with one pr_ready event; a valid published poll, or one a live registrar is publishing, is never registered again'
 
+# A teardown's set-aside merge marker (state/<id>.pr-poll-merge-notified.retiring)
+# means a teardown of the task is under way, so a lost poll is not re-armed while
+# it exists, whatever it holds: unreadable, malformed or not a file (Main 1820 F8).
+# The re-arm above is the control: without it, the same record is re-armed.
+for shape in unreadable malformed directory; do
+  make_case "retiring-$shape"
+  write_ship lost ship direct-PR
+  printf 'pr=%s\n' "$URL" >> "$CASE/home/state/lost.meta"
+  marker="$CASE/home/state/lost.pr-poll-merge-notified.retiring"
+  case "$shape" in
+    unreadable) printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$marker"; chmod 000 "$marker" ;;
+    malformed) printf 'not a marker\n' > "$marker"; chmod 600 "$marker" ;;
+    directory) mkdir "$marker" ;;
+  esac
+  out=$(run_pass)
+  [ "$shape" != unreadable ] || chmod 600 "$marker"
+  ! printf '%s\n' "$out" | grep -q 're-armed the merge poll' || fail "$shape: a lost poll was re-armed while a teardown's set-aside marker exists: $out"
+  ! grep -q -- '--json isDraft$' "$CASE/gh.calls" 2>/dev/null || fail "$shape: the registrar was asked while a set-aside marker exists"
+  [ ! -e "$CASE/home/state/lost.check.sh" ] || fail "$shape: a merge poll was published while a set-aside marker exists"
+done
+pass "a teardown's set-aside merge marker stops a re-arm whatever it holds, unreadable, malformed or a directory"
+
 # A registrar that dies after committing pr= and after each final rename of its
 # poll leaves no runnable poll: the next pass re-arms it for the recorded PR. A
 # registrar that dies only after its last rename left a valid poll, which stays.
