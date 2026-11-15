@@ -10,7 +10,9 @@ any engine that has these functions: the head and the earlier engines a failing-
 guards a case's harm raises "harm:<id>: ..."; a compliant twin's raises "control: ...", so a red can be told from an
 error. The perturbation group takes every base world that waits and changes one fact toward less evidence; each such
 world must still wait, and its projected demand must not fall. Usage: fm-cpu-pass-attribution.py REPO SCRATCH;
-prints JSON; exits 1 on any failure. Starts one short process (to hold a dead pid) and sends no signal.
+prints JSON; exits 1 on any failure. Starts no process, sends no signal and makes no process group (Main 1845): the
+kernel, the run database and the pool are the case's own facts, and one case runs the engine's launch gate in this
+process with its agent start replaced by a probe.
 """
 import ctypes
 import importlib.util
@@ -28,6 +30,7 @@ repo, scratch = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
 scratch.mkdir(parents=True, exist_ok=True)
 GIB = 2 ** 30
 R, S, A = 3 * GIB, 8 * GIB, GIB
+DEAD_PID = 999999  # above Darwin's largest pid (kern.maxproc's pid range ends at 99999): a pid no process has
 NOW = int(time.time())
 
 
@@ -42,6 +45,42 @@ def load(name, path):
 engine = load('fm_cpu_pass_under_test', repo / 'bin' / 'fm-cpu-pass.py')
 proc = load('fm_proc_info_under_test', repo / 'bin' / 'fm-proc-info.py')
 REAL_SYSCTL, REAL_LIBC = proc.sysctl, proc.libc
+
+
+class BarredProcessCall(BaseException):
+    """Raised by any attempt of the code under test to start, signal or kill a process (Main 1850): a guard, so
+    the file can never cross the host's test limit, whatever an engine under test tries."""
+
+
+def barred(name):
+    def call(*args, **kwargs):
+        raise BarredProcessCall('%s%r' % (name, args[:2]))
+    return call
+
+
+# No process is started, signalled or killed from here on: process starts fail in the engine's and the process
+# reader's own subprocess module and in os, signals fail in os, and the engine's liveness check reads a fact.
+_barred_subprocess = SimpleNamespace(run=barred('subprocess.run'), Popen=barred('subprocess.Popen'), call=barred('subprocess.call'),
+                                     check_output=barred('subprocess.check_output'), DEVNULL=-3, PIPE=-1, STDOUT=-2,
+                                     TimeoutExpired=__import__('subprocess').TimeoutExpired,
+                                     SubprocessError=__import__('subprocess').SubprocessError,
+                                     CalledProcessError=__import__('subprocess').CalledProcessError)
+engine.subprocess = proc.subprocess = _barred_subprocess
+for _name in ('fork', 'forkpty', 'kill', 'killpg', 'setsid', 'setpgid', 'execv', 'execve', 'execvp', 'posix_spawn', 'posix_spawnp',
+              'spawnv', 'spawnve', 'system'):
+    if hasattr(os, _name):
+        setattr(os, _name, barred('os.' + _name))
+DEAD_PIDS = set()
+
+
+def pid_fact(pid):
+    """The engine's pid_dead, from facts: a pid in DEAD_PIDS or at least DEAD_PID is gone; any other is alive."""
+    if type(pid) is not int or pid <= 0:
+        return None
+    return pid >= DEAD_PID or pid in DEAD_PIDS
+
+
+engine.pid_dead = pid_fact
 COALITION_FLAVOR = getattr(proc, 'PROC_PIDCOALITIONINFO', 20)
 
 
@@ -201,8 +240,10 @@ class World:
                       runs={'no-mistakes:repo/%s' % run: dict(rss_bytes=int(size * GIB), processes=1) for run, size in self.rss.items()})
         if getattr(self, 'decide_hook', None):
             self.decide_hook(report)
-        engine.host_observation = lambda fresh=False: dict(reasons=[], memory=None if fallback else report)
-        engine.measured_reservations = lambda report, running: (R, S, 2)
+        # The count fallback: the memory reading reads, but no qualifying run records give R and S (the engine's own
+        # fallback trigger), so the step table is still read.
+        engine.host_observation = lambda fresh=False: dict(reasons=[], memory=report)
+        engine.measured_reservations = lambda report, running: None if fallback else (R, S, 2)
         engine.active_term = lambda report: (A, 2)
         real_listdir, real_scandir, pool = os.listdir, os.scandir, str(self.pool)
 
@@ -274,6 +315,8 @@ def case(name, body):
         results[name] = 'pass'
     except HarmError as exc:
         results[name] = 'FAIL: HarmError: %s' % str(exc)[:900]
+    except BarredProcessCall as exc:  # the code under test tried to start or signal a process: an error, never run
+        results[name] = 'FAIL: BarredProcessCall: %s' % str(exc)[:600]
     except Exception as exc:  # noqa: BLE001 - every case is reported; only a HarmError is a red
         results[name] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:900])
     finally:
@@ -329,9 +372,10 @@ def f8_every_owner_kept():
 
 
 def item1_every_ci_state():
-    ended = __import__('subprocess').Popen(['true']); ended.wait()  # a recorded agent pid proven dead
-    for step in (('ci', 'running', None), ('ci', 'fixing', ended.pid)):
-        for queued in ((), ('x',)):
+    # A recorded agent pid proven dead: above Darwin's largest pid (99999), so no process has it. The world that
+    # admits at an engine without this rule (fixing, queued) comes first, so no earlier control hides its red.
+    for step in (('ci', 'fixing', DEAD_PID), ('ci', 'running', None)):
+        for queued in (('x',), ()):
             # R for the unproven launch beside S; a fixing step not queued also keeps R for its current state.
             expected = 14 if step[1] == 'fixing' and not queued else 11
             waits('i1-ci-state', World('i1').run('x', step=step).row('x', None), expected, waiting=queued)
@@ -574,7 +618,7 @@ def m1759_completed_first_run():
     # claim the admission. Control: with no run created since the admission, the unused reservation is claimed.
     args = ['axi', 'run', '--intent', 'reg-x']
     for label, completed in (('completed', True), ('none', False)):
-        w = World('m1759-completed-' + label)
+        w = pending_world('m1759-completed-' + label)
         w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9, client_nonce=None))
         if completed:
             w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('first', 'completed', 'repo', ?)", (NOW,))
@@ -670,6 +714,8 @@ def m1812_passive_under_lock():
             engine.cmd_launch_gate(argparse.Namespace(command=['--', 'agent']))
         except Stop:
             pass
+        except BarredProcessCall:
+            raise
         finally:
             os.chdir(saved[1])
             os.environ.clear()
@@ -727,6 +773,7 @@ def pending_world(name):
     engine.sibling = lambda module, filename: proc
     engine.HOST_STATE_DB = str(w.db)
     engine.process_argv = lambda pid: ['fake']
+    engine.start_binding = lambda cwd, args: None  # its git reads start processes; a claim's binding decides nothing
     return w
 
 
@@ -816,7 +863,7 @@ def m1812_unknown_claimant():
     # readable with another nonce: A's own row releases A.
     for label, b_nonce in (('malformed', 123), ('readable', 'M')):
         w = pending_world('m1812-unknown-' + label).run('row-B', step=('review', 'running', None), nonce='N')
-        dead = __import__('subprocess').Popen(['true']); dead.wait()
+        dead = SimpleNamespace(pid=DEAD_PID)  # no process has it
         w.pending(dict(holder=1, args=None, before=[], created_ns=1, client_nonce=None),
                   claim=dict(pid=os.getpid(), nonce='N', seen=[], direct=True, client=os.getpid(), provisional=False))
         w.pending(dict(holder=1, args=None, before=[], created_ns=2, client_nonce=None),
@@ -975,7 +1022,7 @@ def perturbation_group():
                     ok = rows == 0 and not recorded and (w.pool / 'gate-activation.json').exists()
                 harm_id = ident.replace(':', '/')  # a harm id carries no colon
                 results[ident] = 'pass' if ok else ('FAIL: HarmError: harm:%s: %r' % (harm_id, (reference['projected'], out)))[:900]
-            except Exception as exc:  # noqa: BLE001 - an error is reported, never counted red
+            except (Exception, BarredProcessCall) as exc:  # noqa: BLE001 - an error is reported, never counted red
                 results[ident] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:600])
             finally:
                 w.close()
