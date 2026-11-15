@@ -283,8 +283,9 @@ parse_body() {  # <body-file> <where>
   # result that is missing or cut short closes nothing.
   local reason ids
   fm_pr_closes_parse "$1" "$URL" > "$1.parse" && return 0
-  reason=$(got "$1" reason 2>/dev/null)
-  ids=$(got "$1" seenid 2>/dev/null | paste -sd ',' - | sed 's/,/, /g')
+  reason=$(got "$1" reason 2>/dev/null) || reason=''
+  ids=$(got "$1" seenid 2>/dev/null) || ids=''
+  ids=$(joined "$ids")
   LEFT=$((LEFT + 1))
   printf 'actionable: close-at-merge: could not parse %s, so nothing named by it was closed and no blocked-by edge changed: %s; it names item ids: %s; retry: %s %s %s\n' \
     "$2" "${reason:-the parse result could not be written}" "${ids:-none that could be read}" "$0" "$TASK_ID" "$URL" >&2
@@ -294,15 +295,31 @@ parse_body() {  # <body-file> <where>
 got() {  # <body-file> <record type>
   fm_pr_closes_get "$1.parse" "$2"
 }
+# report_read <body-file> <record type> <where> <what>: Main 1851: a report reads the parse
+# result whole, with the reader's status checked, so a failed read never drops a report without
+# a word. Sets REPORT_LINES. On a failed read it prints one actionable line that counts as left
+# open, sets REPORT_LINES empty and returns 1.
+report_read() {
+  if REPORT_LINES=$(got "$1" "$2"); then return 0; fi
+  REPORT_LINES=''
+  LEFT=$((LEFT + 1))
+  printf 'actionable: close-at-merge: could not read the %s of %s from its parse result, so they are not reported here; nothing they name was closed; retry: %s %s %s\n' \
+    "$4" "$3" "$0" "$TASK_ID" "$URL" >&2
+  return 1
+}
+joined() {  # <newline list>: the list on one line, comma separated
+  [ -n "$1" ] || return 0
+  printf '%s\n' "$1" | paste -sd ',' - | sed 's/,/, /g'
+}
 
 # report_refusal <body-file> <where>: a refused body closes nothing, reads no member and changes
 # no edge. One line names the reason and every item id and pull request link the body names.
 report_refusal() {
   local reason ids prs
   [ "$(got "$1" status)" = refused ] || return 0
-  reason=$(got "$1" reason)
-  ids=$(got "$1" seenid | paste -sd ',' - | sed 's/,/, /g')
-  prs=$(got "$1" seenpr | paste -sd ',' - | sed 's/,/, /g')
+  reason=$(got "$1" reason) || reason='(its reason could not be read)'
+  if report_read "$1" seenid "$2" "item ids"; then ids=$(joined "$REPORT_LINES"); else ids='(not readable)'; fi
+  if report_read "$1" seenpr "$2" "pull request links"; then prs=$(joined "$REPORT_LINES"); else prs='(not readable)'; fi
   LEFT=$((LEFT + 1))
   printf 'actionable: close-at-merge: refused to close anything named by %s: %s; it names item ids: %s; pull request links: %s; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is %s, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then %s, with the marker text nowhere else; fix it, then retry: %s %s %s\n' \
     "$2" "$reason" "${ids:-none}" "${prs:-none}" "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$0" "$TASK_ID" "$URL" >&2
@@ -311,20 +328,23 @@ report_refusal() {
 : > "$WORK/old-form"
 report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, report malformed and outside-block directive lines
   local old line outside=0
+  report_read "$1" legacy "$2" "old Closes: lines" || true
   while IFS= read -r old; do
     [ -z "$old" ] || printf '%s\t%s\n' "$old" "$2" >> "$WORK/old-form"
-  done < <(got "$1" legacy)
+  done <<< "$REPORT_LINES"
+  report_read "$1" malformed "$2" "malformed directive lines" || true
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     LEFT=$((LEFT + 1))
     printf 'actionable: close-at-merge: ignored a malformed directive line in %s: %s; the forms are one Closes-backlog-item: <item-id> or Train-member: <GitHub, GitLab or Forgejo pull request URL> per line, one space after the colon and nothing after the value\n' "$2" "$line" >&2
-  done < <(got "$1" malformed)
+  done <<< "$REPORT_LINES"
+  report_read "$1" outside "$2" "directive lines outside the block" || true
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     LEFT=$((LEFT + 1))
     outside=1
     printf 'actionable: close-at-merge: ignored a directive line outside a directive block in %s: %s\n' "$2" "$line" >&2
-  done < <(got "$1" outside)
+  done <<< "$REPORT_LINES"
   [ "$outside" = 0 ] || printf 'actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a %s line and end with a %s line; fix %s, then retry: %s %s %s\n' \
     "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$2" "$0" "$TASK_ID" "$URL" >&2
 }
@@ -425,7 +445,9 @@ done
 PROSE_AT=()
 k=0
 while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
-  [ -z "$(got "${MENTION_BODIES[$k]}" word | sed -n '1p')" ] || PROSE_AT+=("$k")
+  if report_read "${MENTION_BODIES[$k]}" word "${MENTION_WHERE[$k]}" "mentioned words"; then
+    [ -z "$REPORT_LINES" ] || PROSE_AT+=("$k")
+  fi
   k=$((k + 1))
 done
 if [ "${#PROSE_AT[@]}" -gt 0 ]; then
@@ -439,13 +461,21 @@ $states
 ROWS
     SEEN="$SEEN$TASK_ID"$'\n'
     for k in "${PROSE_AT[@]}"; do
+      report_read "${MENTION_BODIES[$k]}" word "${MENTION_WHERE[$k]}" "mentioned words" || continue
+      match_rc=0
+      matches=$(printf '%s\n' "$REPORT_LINES" | grep -Fxf "$WORK/active-ids") || match_rc=$?
+      if [ "$match_rc" -gt 1 ]; then
+        LEFT=$((LEFT + 1))
+        printf 'actionable: close-at-merge: could not check which ids %s mentions, so none were checked; nothing was closed for them\n' "${MENTION_WHERE[$k]}" >&2
+        continue
+      fi
       while IFS= read -r word; do
         [ -n "$word" ] || continue
         case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
         SEEN="$SEEN$word"$'\n'
         printf 'actionable: close-at-merge: mentioned %s in %s: nothing was closed for it; %s\n' \
           "$word" "${MENTION_WHERE[$k]}" "${MENTION_HOW[$k]//<id>/$word}" >&2
-      done < <(got "${MENTION_BODIES[$k]}" word | grep -Fxf "$WORK/active-ids")
+      done <<< "$matches"
     done
   else
     for k in "${PROSE_AT[@]}"; do
@@ -458,21 +488,24 @@ fi
 LINKED_SEEN=$MEMBER_SEEN
 k=0
 while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
+  report_read "${MENTION_BODIES[$k]}" link "${MENTION_WHERE[$k]}" "pull request links" || true
   while IFS= read -r linked; do
     fm_pr_url_parse "$linked" || continue
     [ "$FM_PR_URL" != "$URL" ] || continue
     case "$LINKED_SEEN" in *$'\n'"$FM_PR_URL"$'\n'*) continue ;; esac
     LINKED_SEEN="$LINKED_SEEN$FM_PR_URL"$'\n'
     printf 'actionable: close-at-merge: mentioned %s in %s: no item was closed for it; list it as a Train-member: line if it landed with this merge\n' "$FM_PR_URL" "${MENTION_WHERE[$k]}" >&2
-  done < <(got "${MENTION_BODIES[$k]}" link)
+  done <<< "$REPORT_LINES"
   # A member's own Train-member lines (in its block) list nothing: a member's members are not read.
   if [ "$k" -gt 0 ] && [ "$(got "${MENTION_BODIES[$k]}" status)" = block ]; then
+    report_read "${MENTION_BODIES[$k]}" member "${MENTION_WHERE[$k]}" "Train-member: lines" || true
     while IFS= read -r linked; do
+      [ -n "$linked" ] || continue
       case "$LINKED_SEEN" in *$'\n'"$linked"$'\n'*) continue ;; esac
       LINKED_SEEN="$LINKED_SEEN$linked"$'\n'
       printf 'actionable: close-at-merge: named %s with a Train-member: line in the body of %s: a member body lists no members, so no item was closed for it; list it as a Train-member: line in the train body if it landed with this merge\n' \
         "$linked" "${MENTION_WHERE[$k]#the prose of }" >&2
-    done < <(got "${MENTION_BODIES[$k]}" member)
+    done <<< "$REPORT_LINES"
   fi
   k=$((k + 1))
 done
