@@ -640,6 +640,41 @@ test_remote_backend_other_than_herdr_refuses_before_any_effect() {
   pass "F6 a remote mate whose backend is not Herdr refuses before any effect; an omitted backend asks its host"
 }
 
+# --- Main 1630: an omitted remote_backend is herdr, and its host decides --------
+test_remote_omitted_backend_is_herdr_and_obeys_its_host() {
+  local dir out rc meta verdict
+  for verdict in proceed refuse; do
+    dir=$(new_case remote-omitted)
+    setup_remote_case "$dir" sm2 ok
+    meta="$dir/home/state/sm2.meta"
+    grep -v '^remote_backend=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+    grep -q '^remote_backend=' "$meta" && fail "the fixture still names a remote_backend"
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    if [ "$verdict" = refuse ]; then
+      export FM_FAKE_REMOTE_ATTRIBUTION='attribution=refuse: its live Herdr agent cannot be positively attributed to this task'
+    fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_REMOTE_ATTRIBUTION
+    grep -q '^fm-remote-secondmate-control.sh attribution sm2$' "$dir/ssh.log" \
+      || fail "an omitted remote_backend ($verdict) was not asked of its host"$'\n'"$(cat "$dir/ssh.log")"
+    assert_not_contains "$out" "names remote_backend" "an omitted remote_backend ($verdict) must not be refused as another backend"
+    if [ "$verdict" = proceed ]; then
+      expect_code 0 "$rc" "an omitted remote_backend whose host proceeds must restart as herdr"$'\n'"$out"
+      grep -q 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
+        || fail "an omitted remote_backend whose host proceeds was not relaunched on its host"
+      continue
+    fi
+    expect_code 3 "$rc" "an omitted remote_backend whose host refuses must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2: its remote agent on remote-mac was not attributed to this task" \
+      "an omitted remote_backend whose host refuses must report the host's refusal"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "an omitted remote_backend whose host refuses must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "an omitted remote_backend whose host refuses must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "an omitted remote_backend whose host refuses created a pending-reply record"
+  done
+  pass "Main 1630 an omitted remote_backend is herdr: its host is asked, and its answer decides"
+}
+
 test_remote_fleet_restart_obeys_initiating_policy() {
   local dir out rc
   dir=$(new_case remote-policy)
@@ -1057,6 +1092,7 @@ test_native_ultra_restart_keeps_local_and_remote_profiles
 test_remote_mate_restarts_over_the_transport_hop
 test_remote_unproven_agent_gets_no_request_record_or_nudge
 test_remote_backend_other_than_herdr_refuses_before_any_effect
+test_remote_omitted_backend_is_herdr_and_obeys_its_host
 test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown
