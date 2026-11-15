@@ -238,7 +238,7 @@ PY
   pass "a multi-pass request keeps collected passes and runs once it holds all"
 }
 
-test_killed_owner_releases_reservation() {
+test_killed_owner_keeps_reservation_until_its_command_ends() {
   local pool dir holder child
   dir="$TMP_ROOT/crash"
   mkdir -p "$dir"
@@ -251,12 +251,15 @@ test_killed_owner_releases_reservation() {
   wait_held "$pool" 1 1 "crash holder"
   kill -KILL "$holder"
   wait "$holder" 2>/dev/null || true
-  wait_held "$pool" 1 0 "after the reservation owner exits"
   child=$(cat "$dir/child.pid")
+  # Killing only the owner must not free the pass while its command still runs: a second worker would share the CPU.
+  sleep 1.5
   kill -0 "$child" 2>/dev/null || fail "the isolated workload should still be alive for this observation"
+  assert_equals 1 "$(held_count "$pool" 1)" "the pass must stay held while the command of a killed owner runs"
   kill "$child" 2>/dev/null || true
+  wait_held "$pool" 1 0 "after the command of the killed owner ends"
   reap_bg
-  pass "owner death releases passes without inherited child lock copies"
+  pass "a killed owner keeps its pass until its command ends, then frees it with no stale state"
 }
 
 test_cleanup_terminates_running_work() {
@@ -614,7 +617,7 @@ test_run_passes_status_and_marks_child
 test_invalid_pass_counts_never_run_work
 test_passes_are_exclusive_and_waiters_queue
 test_multi_pass_request_collects_all
-test_killed_owner_releases_reservation
+test_killed_owner_keeps_reservation_until_its_command_ends
 test_cleanup_terminates_running_work
 test_term_to_holder_keeps_pass_with_running_work
 test_term_to_waiter_never_runs_command
