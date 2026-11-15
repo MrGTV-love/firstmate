@@ -1402,6 +1402,8 @@ class Collector:
         dirty = bool(worktree) and bool(self.source("copy status " + ident, self.git, worktree, "status", "--porcelain"))
         if not dirty and not (refusal and not self.source("finished deliverable " + ident, self.delivered, task)):
             return False
+        # A row that already covers the task keeps the refusal too.
+        self.attach_refusal(ident, task["pr"].get("url"), refusal, refused)
         action = refused or (f"the copy of {ident} holds uncommitted work after its PR merged: commit and land it, "
                              f"or obtain the captain's drop, then run plain bin/fm-teardown.sh {ident}; "
                              "the record stays open until it succeeds")

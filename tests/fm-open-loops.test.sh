@@ -2339,15 +2339,19 @@ assert 'run plain' not in moot['next_action'], ('plain teardown refuses this cop
 refused = cleanup['fin-refused']
 assert refused['owner'] == 'home:firstmate' and refusal in refused['next_action'], ('the refusal text must stay on the row', refused)
 assert 'bin/fm-teardown.sh fin-refused' in refused['next_action'], refused
-# A merged PR over a dirty copy is not landed; its row still carries the kept teardown refusal.
-dirty = by_cat('pending_acceptance').get('fin-dirty')
-assert dirty and dirty['owner'] == 'home:firstmate', ('a refused dirty copy needs its row', mine('fin-dirty'))
+# A merged PR over a dirty copy is not landed, and its cleanup is refused: it is an owned, overdue-eligible
+# pending_cleanup row carrying the kept teardown refusal, never informational (Main 1871 P-D).
+dirty = cleanup.get('fin-dirty')
+assert dirty and dirty['owner'] == 'home:firstmate' and not dirty.get('informational'), ('a refused dirty copy needs its cleanup row', mine('fin-dirty'))
 assert dirty_refusal in dirty['next_action'] and dirty_refusal in dirty['evidence'], ('the refusal text must stay on the row', dirty)
-assert 'fin-dirty' not in cleanup, cleanup.get('fin-dirty')
+assert 'fin-dirty' not in by_cat('pending_acceptance'), by_cat('pending_acceptance').get('fin-dirty')
 # When another row covers the task, the recorded refusal (here the idle reaper's memo) stays on that row.
 unl = by_cat('unlanded_commit').get('unl-refused')
 assert unl and reap_refusal in unl['next_action'] and reap_refusal in unl['evidence'], ('the covering row lost the refusal', mine('unl-refused'))
-assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine('unl-refused')), mine('unl-refused')
+# Its PR merged and its recorded refusal stands, so it also owes an owned cleanup row (Main 1871 P-D).
+unl_cleanup = cleanup.get('unl-refused')
+assert unl_cleanup and unl_cleanup['owner'] == 'home:firstmate' and reap_refusal in unl_cleanup['next_action'], ('a merged, refused task needs its cleanup row', mine('unl-refused'))
+assert 'unl-refused' not in by_cat('pending_acceptance'), mine('unl-refused')
 # A waiting task, a held task, unfinished work and an idle persistent secondmate are never stranded rows.
 for name in ('wait-paused', 'wait-held', 'unfin-dirty', 'v4-mate', 'pend-run'):
     assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine(name)), (name, mine(name))
