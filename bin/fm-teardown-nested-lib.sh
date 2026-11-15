@@ -173,9 +173,13 @@
 # safety property holds and the lock is left for dead-owner recovery: (a) a plan killed
 # after it took its project lock and before it published the lock path leaves the lock
 # for the lock library's dead-owner recovery, and the parent has no path to record it; (b)
-# a plan killed before it opened its own window may leave the parent holding the previous
-# copy's window, and a stale window is conservative (a different anchor or branch refuses,
-# a quiet one passes) with no driver called.
+# a plan killed before it published its first file, or before its window opened, leaves
+# the parent with no window for that copy, so the parent makes no read after the kill:
+# the sweep clears the window before each copy (TEARDOWN_CKO_OPEN=0 in bin/fm-copy-sweep.sh)
+# and loads the plan's file only when it exists, and teardown_closeout_route_file_load
+# closes the window for an empty copy or a route that is neither pr nor proving, so the
+# parent never holds the previous copy's window; and no driver was called, because the
+# route enters the driver only after its window opened and was published.
 #
 # The route's call is closeout_pr.py --cleanup-worktree <copy> [--execute-cleanup]
 # --pr <PR> --supersedence-profile <profile> --no-evidence-files, run from the
