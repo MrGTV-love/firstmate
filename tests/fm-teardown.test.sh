@@ -924,10 +924,11 @@ test_branch_pr_lookup_reads_every_pr() {
   pass "the branch PR lookup reads every PR (a merged PR behind twenty newer ones is found), and a list shown cut short records no PR"
 }
 
-# Main 1871 P-C: a PR is named as the completion PR only when its merged head is the
-# copy's HEAD. (a) The record's pr= names PR 7, merged at another head, while the
-# copy's change reached the default branch another way: the copy lands by its
-# content, and the close names no PR and says why. (b) The branch lists a newer
+# Main 1871 P-C: a PR found by the branch is named as the completion PR only when
+# its merged head is the copy's HEAD. (a) The record's pr= names PR 7, merged at
+# another head, while the copy's change reached the default branch another way:
+# the copy lands by its content, and the close names the recorded PR 7 (Main
+# 1907). (b) The branch lists a newer
 # PR 8 merged at another head before an older PR 7 merged at the copy's HEAD: the
 # scan does not stop at PR 8, and PR 7 is named.
 test_completion_pr_is_named_only_on_head_equality() {
@@ -945,8 +946,7 @@ test_completion_pr_is_named_only_on_head_equality() {
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "recorded mismatch: a copy whose change the default branch holds was refused: $(cat "$case_dir/stderr")"
-  assert_copy_returned "$case_dir" "recorded mismatch: the copy stayed" none
-  assert_grep 'is not recorded as its completion PR' "$case_dir/stderr" "recorded mismatch: the close did not say why no PR is named"
+  assert_copy_returned "$case_dir" "recorded mismatch: the copy stayed" https://github.com/example/repo/pull/7
   case_dir=$(make_case attribution-ordered)
   write_meta "$case_dir" direct-PR ship
   seed_backlog_in_flight "$case_dir" ship
@@ -982,7 +982,7 @@ SH
   expect_code 0 "$rc" "ordered: refused: $(cat "$case_dir/stderr")"
   assert_copy_returned "$case_dir" "ordered: the copy stayed" https://github.com/example/repo/pull/7
   ! grep -q 'https://github.com/example/repo/pull/8' "$case_dir/data/backlog.md" || fail "ordered: the newer PR at another head was named"
-  pass "a recorded PR at another head is not named and the close says why; a newer merged PR at another head does not hide the older one at the copy's HEAD"
+  pass "a copy landed by its content closes with its recorded PR; a newer merged PR at another head does not hide the older one at the copy's HEAD"
 }
 
 # Main 1820 F4(a): the lookup asks for one PR more than its bound and treats a full
@@ -1558,7 +1558,7 @@ test_true_merge_of_a_pipeline_head_that_dropped_the_change_lands_by_ancestry() {
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "a copy whose commit is in the default branch's history was refused: $(cat "$case_dir/stderr")"
   assert_absent "$case_dir/state/task-x1.meta" "the record stayed open"
-  assert_copy_returned "$case_dir" "the copy stayed" none
+  assert_copy_returned "$case_dir" "the copy stayed" https://github.com/example/repo/pull/7
   git -C "$case_dir/project" merge-base --is-ancestor "$copy_head" refs/remotes/origin/main \
     || fail "the copy's commit is no longer reachable from the default branch"
   pass "a copy whose commit a true merge put in the default branch's history lands, although a later pipeline commit dropped its change (Main 1820)"
@@ -1706,17 +1706,19 @@ test_squash_merged_rebased_branch_allows() {
 }
 
 # A Forgejo task whose default branch moved on after the squash merge, editing
-# the same lines the copy wrote, so merging the copy into the default branch is no
-# longer a no-op. This is the refuse-on-doubt rule of Main 1686 F1: a merged forge
-# record does not prove landed on its own, so teardown refuses whether the record
-# says merged or not, keeps the record and the copy, and still reads the pull
-# request through tea.
-test_squash_merged_forgejo_pr_refuses_when_main_moved_on() {
-  local case_dir rc pr_head tmp merged
-  for merged in true false; do
-    case_dir=$(make_case "forgejo-merged-$merged")
+# the same lines the copy wrote, so the content check cannot place the copy. The
+# copy's HEAD is the merged PR head, so the forge's merge commit decides (Main
+# 1907): merged with its merge commit in the default branch's history, teardown
+# proceeds; unmerged, or merged with a merge commit the default branch lacks, the
+# same history refuses and keeps the record and the copy. Every variant reads
+# the pull request through tea.
+test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
+  local case_dir rc pr_head tmp variant merged merge squash
+  for variant in merged unmerged off-default; do
+    case_dir=$(make_case "forgejo-$variant")
     write_meta "$case_dir" no-mistakes ship
     pr_head=$(setup_squash_rebased_history "$case_dir" rebased)
+    squash=$(git -C "$case_dir/project" rev-parse refs/remotes/origin/main)
     tmp="$case_dir/_main_later"
     git clone -q "$case_dir/origin.git" "$tmp"
     printf '%s\n' base main-edit feature-edit-reworded > "$tmp/shared.txt"
@@ -1728,19 +1730,29 @@ test_squash_merged_forgejo_pr_refuses_when_main_moved_on() {
       'pr=https://git.example.org/team/repo/pulls/7' \
       "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
     add_gh_axi_error "$case_dir"
-    add_tea_pull_for_head "$case_dir" "$merged" "$pr_head"
+    case "$variant" in
+      merged) merged=true merge=$squash ;;
+      unmerged) merged=false merge= ;;
+      off-default) merged=true merge=$pr_head ;;
+    esac
+    add_tea_pull_for_head "$case_dir" "$merged" "$pr_head" "$merge"
 
     rc=0
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-    [ "$rc" -ne 0 ] || fail "forgejo-merged-$merged: teardown let the copy go though the default branch rewrote its lines"
-    assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "forgejo-merged-$merged: the refusal does not say not landed"
-    assert_present "$case_dir/state/task-x1.meta" "forgejo-merged-$merged: the record was closed"
-    [ -d "$case_dir/wt" ] || fail "forgejo-merged-$merged: the copy was removed"
+    if [ "$variant" = merged ]; then
+      expect_code 0 "$rc" "forgejo-$variant: a merged PR whose merge commit is on the default branch was refused"$'\n'"$(cat "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "forgejo-$variant: the record stayed open"
+    else
+      [ "$rc" -ne 0 ] || fail "forgejo-$variant: teardown let the copy go though the default branch rewrote its lines"
+      assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "forgejo-$variant: the refusal does not say not landed"
+      assert_present "$case_dir/state/task-x1.meta" "forgejo-$variant: the record was closed"
+      [ -d "$case_dir/wt" ] || fail "forgejo-$variant: the copy was removed"
+    fi
     grep -qF -- 'api --login fj --repo team/repo /repos/{owner}/{repo}/pulls/7' "$case_dir/tea.log" \
-      || fail "forgejo-merged-$merged: teardown did not read the Forgejo pull request through tea"
+      || fail "forgejo-$variant: teardown did not read the Forgejo pull request through tea"
   done
-  pass "a Forgejo task whose default branch later rewrote its lines refuses, merged record or not, after reading the pull request through tea"
+  pass "a Forgejo task whose default branch later rewrote its lines lands by the merged PR's merge commit on the default branch; unmerged or off-default refuses"
 }
 
 test_squash_merged_same_file_different_content_refuses() {
@@ -1811,30 +1823,49 @@ test_squash_merged_stale_local_refuses_when_forge_unreachable() {
 
 # The task copy stayed on the pre-rebase commits after the pipeline pushed a
 # rebased copy as the PR head and the PR was squash-merged. The PR head adds a
-# review edit to a.txt, a line the copy's "add a" also wrote, so merging the copy
-# into the default branch conflicts on a.txt instead of changing nothing. This is
-# the refuse-on-doubt rule of Main 1686 F1: every patch matching somewhere in the
-# PR head is not landing proof, so teardown refuses and keeps the record and copy.
-test_squash_merged_pushed_prerebase_copy_refuses() {
-  local case_dir rc pr_head local_head
-  case_dir=$(make_case squash-pushed-prerebase)
-  write_meta "$case_dir" no-mistakes ship
-  pr_head=$(setup_pushed_prerebase_history "$case_dir" landed)
-  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  printf '%s\n' \
-    'pr=https://github.com/example/repo/pull/7' \
-    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
-  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+# review edit to a.txt, a line the copy's "add a" also wrote, so the content check
+# cannot place the copy. It lands by the run record (Main 1907): the no-mistakes
+# run that pushed the merged head started from this copy's HEAD. Without that
+# record, or with the PR still open, teardown refuses and keeps the record and copy.
+test_squash_merged_pushed_prerebase_copy_allows() {
+  local case_dir rc pr_head local_head variant
+  for variant in recorded unrecorded open; do
+    case_dir=$(make_case "squash-pushed-prerebase-$variant")
+    write_meta "$case_dir" no-mistakes ship
+    pr_head=$(setup_pushed_prerebase_history "$case_dir" landed)
+    local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    printf '%s\n' \
+      'pr=https://github.com/example/repo/pull/7' \
+      "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+    add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+    [ "$variant" = unrecorded ] \
+      || write_nm_run_record "$case_dir" 01RUNPRE "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+    if [ "$variant" = open ]; then
+      cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' OPEN '$pr_head' 'https://github.com/example/repo/pull/7'; exit 0 ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+      chmod +x "$case_dir/fakebin/gh"
+    fi
 
-  rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-  [ "$rc" -ne 0 ] || fail "squash-pushed-prerebase: teardown let a copy go whose a.txt the default branch rewrote"
-  assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "squash-pushed-prerebase: the refusal does not say not landed"
-  assert_present "$case_dir/state/task-x1.meta" "squash-pushed-prerebase: the record was closed"
-  [ -d "$case_dir/wt" ] || fail "squash-pushed-prerebase: the copy was removed"
-  assert_refusal_retained_task_state "$case_dir" squash-pushed-prerebase "$local_head"
-  pass "squash-merged PR refuses a pushed pre-rebase copy whose a.txt the PR's review edit changed on the default branch"
+    if [ "$variant" = recorded ]; then
+      expect_code 0 "$rc" "squash-pushed-prerebase-$variant: the input of the run that pushed the merged head was refused"$'\n'"$(cat "$case_dir/stderr")"
+      ! grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-prerebase-$variant: teardown printed a REFUSED line"
+      assert_absent "$case_dir/state/task-x1.meta" "squash-pushed-prerebase-$variant: the record stayed open"
+    else
+      [ "$rc" -ne 0 ] || fail "squash-pushed-prerebase-$variant: teardown let a copy go whose a.txt the default branch rewrote"
+      assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "squash-pushed-prerebase-$variant: the refusal does not say not landed"
+      assert_refusal_retained_task_state "$case_dir" "squash-pushed-prerebase-$variant" "$local_head"
+    fi
+  done
+  pass "squash-merged PR accepts a pushed pre-rebase copy that its merged run started from; unrecorded or unmerged refuses"
 }
 
 refusal_names_subject() {  # <stderr-file> <subject>
@@ -1962,16 +1993,286 @@ test_squash_merged_prerebase_copy_with_a_later_main_merge_refuses() {
   pass "squash-merged PR refuses a pre-rebase copy whose a.txt the PR's review edit changed on the default branch"
 }
 
-# The pipeline-input proof does not pass alone (Main's ruling): a merged pushed
-# head can still have lost the change later in the PR, so a copy that is exactly
-# a no-mistakes run's recorded input also needs its content in the current
-# origin/main, and refuses when it is not there. The copy's one commit adds a
-# feature; the run pushed that commit plus one pipeline commit, and that pushed
-# head is the PR head that was squash-merged onto origin's default branch.
+
+# PR 93 shape: the copy is an earlier iteration the pipeline rebuilt as different
+# commits, so the PR head shares nothing with it.
+test_pipeline_input_diverged_iteration_allows() {
+  local case_dir pr_head
+  pr_head=$(pipeline_input_case pipeline-input-diverged diverged-iteration)
+  case_dir="$TMP_ROOT/pipeline-input-diverged"
+  assert_pipeline_input_copy_allowed_by_record "$case_dir" pipeline-input-diverged "$pr_head"
+  pass "merged PR accepts a diverged earlier iteration that the recorded run started from"
+}
+
+# PR 103 shape: the copy is the input the pipeline replayed onto a moved main,
+# rewrote, and extended with its own review commits.
+test_pipeline_input_rewritten_by_pipeline_allows() {
+  local case_dir pr_head
+  pr_head=$(pipeline_input_case pipeline-input-rewritten rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-rewritten"
+  assert_pipeline_input_copy_allowed_by_record "$case_dir" pipeline-input-rewritten "$pr_head"
+  pass "merged PR accepts the local input that the recorded run rewrote and extended"
+}
+
+# The run-record read is a query against a database a busy daemon may hold. It is
+# stopped by silence, never by how long it takes: a read that burns CPU for longer
+# than the ten seconds it used to be allowed is slow, not hung, and must prove the
+# copy landed. A read that really is silent has proved nothing either way, so
+# teardown neither refuses nor fires the unlanded-work guard: it says the answer is
+# unknown and exits 75, the retry status the sweeps take without a refusal memo.
+install_quiet_record_reader() {  # <case-dir> <burn|hang>
+  local case_dir=$1 mode=$2 real_python
+  # The interpreter itself, not a version-manager shim: a shim puts its own bin
+  # first on PATH, so the reader that teardown starts would bypass this stand-in.
+  real_python=$(python3 -c 'import sys; print(sys.executable)')
+  printf '%s\n' "$mode" > "$case_dir/record-reader-mode"
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ] && [ -f "$case_dir/record-reader-mode" ]; then
+  case "\$(cat "$case_dir/record-reader-mode")" in
+    hang) exec sleep 60 ;;
+    burn)
+      rm -f "$case_dir/record-reader-mode"
+      end=\$((SECONDS + 13))
+      while [ "\$SECONDS" -lt "\$end" ]; do :; done ;;
+  esac
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+}
+
+test_pipeline_input_slow_record_read_still_proves_the_copy() {
+  local case_dir pr_head local_head rc
+  pr_head=$(pipeline_input_case pipeline-input-slow-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-slow-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNSLOW "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  install_quiet_record_reader "$case_dir" burn
+
+  rc=$(FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "pipeline-input-slow-read: a slow, working record read should still prove the copy"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-slow-read: teardown printed a REFUSED line"
+  pass "a slow but working run-record read still proves the copy was the pipeline's input"
+}
+
+test_pipeline_input_silent_record_read_is_unknown() {
+  local case_dir pr_head local_head rc events
+  pr_head=$(pipeline_input_case pipeline-input-silent-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-silent-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  events="$case_dir/guard-events.jsonl"
+  # The record answers "not landed" once it is read: its run started from the merged
+  # head, not from this copy.
+  write_nm_run_record "$case_dir" 01RUNSILENT "https://github.com/example/repo/pull/7" "$pr_head" "$pr_head"
+  install_quiet_record_reader "$case_dir" hang
+
+  rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$case_dir")
+  expect_code 75 "$rc" "pipeline-input-silent-read: a silent record read should exit for a retry"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "unknown: the no-mistakes run record did not answer; retry teardown" "$case_dir/stderr" \
+    "pipeline-input-silent-read: teardown did not say the record did not answer"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-silent-read: a silent read was reported as a refusal"
+  ! grep -q teardown-unlanded "$events" 2>/dev/null \
+    || fail "pipeline-input-silent-read: a silent read fired the unlanded-work guard: $(cat "$events")"
+  assert_refusal_retained_task_state "$case_dir" pipeline-input-silent-read "$local_head"
+
+  rm -f "$case_dir/record-reader-mode"
+  rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$case_dir")
+  expect_code 1 "$rc" "pipeline-input-silent-read: a record that answers 'not this copy' should still refuse"$'\n'"$(cat "$case_dir/stderr")"
+  grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-silent-read: the answered read did not refuse"
+  grep -q '"teardown-unlanded"' "$events" 2>/dev/null \
+    || fail "pipeline-input-silent-read: the answered refusal did not fire the unlanded-work guard"
+  assert_refusal_retained_task_state "$case_dir" pipeline-input-silent-read-answered "$local_head"
+  pass "a silent run-record read is unknown and retried, while an answered one still refuses"
+}
+
+# SQLite's own busy wait is the one wait the record reader cannot watch: a writer
+# that holds the database lock past it makes the read give up with "database is
+# locked". That is a read that ran out of time, not an answer, so it is unknown
+# and retried exactly like a silent read, never a refusal. The stand-in shortens
+# only that busy wait so the case does not sit out the real 30 s.
+test_pipeline_input_locked_record_read_is_unknown() {
+  local case_dir pr_head local_head rc events real_python holder
+  pr_head=$(pipeline_input_case pipeline-input-locked-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-locked-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  events="$case_dir/guard-events.jsonl"
+  write_nm_run_record "$case_dir" 01RUNLOCKED "https://github.com/example/repo/pull/7" "$pr_head" "$pr_head"
+  real_python=$(python3 -c 'import sys; print(sys.executable)')
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ]; then
+  exec "$real_python" -I -c 'import sqlite3, sys
+connect = sqlite3.connect
+sqlite3.connect = lambda *args, **kwargs: connect(*args, **dict(kwargs, timeout=0.2))
+exec(compile(sys.stdin.read(), "<stdin>", "exec"), {"__name__": "__main__"})' "\${@:3}"
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+  "$real_python" -I -c 'import sqlite3, sys, time
+db = sqlite3.connect(sys.argv[1], isolation_level=None)
+db.execute("BEGIN EXCLUSIVE")
+open(sys.argv[2], "w").close()
+time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked" &
+  holder=$!
+  fm_test_wait_until --while-alive "$holder" -- test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
+
+  rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=60 run_teardown_status "$case_dir")
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  expect_code 75 "$rc" "pipeline-input-locked-read: a lock-blocked record read should exit for a retry"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "unknown: the no-mistakes run record did not answer; retry teardown" "$case_dir/stderr" \
+    "pipeline-input-locked-read: teardown did not say the record did not answer"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-locked-read: a locked read was reported as a refusal"
+  ! grep -q teardown-unlanded "$events" 2>/dev/null \
+    || fail "pipeline-input-locked-read: a locked read fired the unlanded-work guard: $(cat "$events")"
+  assert_refusal_retained_task_state "$case_dir" pipeline-input-locked-read "$local_head"
+  pass "a run-record read that SQLite's busy wait gives up on is unknown and retried, not refused"
+}
+
+# A copy that lags the run's input head is not the input the run started from.
+test_pipeline_input_refuses_copy_behind_the_input_head() {
+  local case_dir pr_head input_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-behind rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-behind"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" extra.txt extra "input-only commit"
+  input_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/wt" reset -q --hard "$local_head"
+  write_nm_run_record "$case_dir" 01RUNBEHIND "https://github.com/example/repo/pull/7" "$input_head" "$pr_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-behind "$local_head" \
+    "01RUNBEHIND" "is not that head"
+  pass "merged PR still refuses a copy that is behind the recorded run's input head"
+}
+
+# A run that pushed the merged head is the only one that can prove anything, and
+# an unrelated earlier run for the same PR must not stand in the way of it.
+test_pipeline_input_ties_the_run_by_pushed_head_allows() {
+  local case_dir pr_head local_head rc
+  pr_head=$(pipeline_input_case pipeline-input-reruns rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-reruns"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNEARLY "https://github.com/example/repo/pull/7" "$pr_head" "$local_head"
+  write_nm_run_record "$case_dir" 01RUNFINAL "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+
+  rc=$(run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "pipeline-input-reruns: teardown should accept the run that pushed the merged head"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-reruns: teardown printed a REFUSED line"
+  pass "merged PR is proven by the run that pushed its head, not by an earlier run on the same PR"
+}
+
+# A commit made after the run started is unlanded work whatever the record says.
+test_pipeline_input_refuses_commit_made_after_the_run_started() {
+  local case_dir pr_head input_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-late rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-late"
+  input_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNLATE "https://github.com/example/repo/pull/7" "$input_head" "$pr_head"
+  wt_commit_file "$case_dir" later.txt later "work after the run started"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-late "$local_head" \
+    "01RUNLATE" "is not that head"
+  pass "merged PR still refuses a copy with a commit made after the recorded run started"
+}
+
+# A recorded run that did not start from this copy proves nothing about it.
+test_pipeline_input_refuses_copy_outside_the_run_input() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-outside rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-outside"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNOUTSIDE "https://github.com/example/repo/pull/7" "$pr_head" "$pr_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-outside "$local_head" \
+    "01RUNOUTSIDE" "started from"
+  pass "merged PR still refuses a copy that is not part of the recorded run's input"
+}
+
+# A run recorded for another PR does not tie to the merged PR.
+test_pipeline_input_refuses_run_recorded_for_another_pr() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-other-pr rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-other-pr"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNOTHERPR "https://github.com/example/repo/pull/8" "$local_head" "$pr_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-other-pr "$local_head" \
+    "no no-mistakes run record names the merged PR https://github.com/example/repo/pull/7"
+  pass "merged PR still refuses when the only recorded run belongs to another PR"
+}
+
+# A run for this PR that pushed some other head is not the run whose head merged.
+test_pipeline_input_refuses_run_that_pushed_another_head() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-other-head rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-other-head"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNOTHERHEAD "https://github.com/example/repo/pull/7" "$local_head" "$local_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-other-head "$local_head" \
+    "01RUNOTHERHEAD pushed" "not the merged PR head" "no recorded run pushed the merged PR head"
+  pass "merged PR still refuses when no recorded run pushed the merged PR head"
+}
+
+# Every missing record is named so the next step is to find it, not to guess.
+test_pipeline_input_refuses_when_the_state_database_is_missing() {
+  local case_dir local_head
+  pipeline_input_case pipeline-input-no-db rewritten-input >/dev/null
+  case_dir="$TMP_ROOT/pipeline-input-no-db"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-db "$local_head" \
+    "no no-mistakes state database at $case_dir/nm/state.sqlite"
+  pass "merged PR still refuses and names the state database when it is missing"
+}
+
+test_pipeline_input_refuses_when_the_input_head_is_not_recorded() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-no-input rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-no-input"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNNOINPUT "https://github.com/example/repo/pull/7" "" "$pr_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-input "$local_head" \
+    "01RUNNOINPUT" "submitted_head_sha"
+  pass "merged PR still refuses and names the input head when the run did not record it"
+}
+
+test_pipeline_input_refuses_when_the_pushed_head_is_not_recorded() {
+  local case_dir local_head
+  pipeline_input_case pipeline-input-no-pushed rewritten-input >/dev/null
+  case_dir="$TMP_ROOT/pipeline-input-no-pushed"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNNOPUSH "https://github.com/example/repo/pull/7" "$local_head" ""
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-pushed "$local_head" \
+    "01RUNNOPUSH" "last_pushed_sha"
+  pass "merged PR still refuses and names the pushed head when the run did not record it"
+}
+
+test_pipeline_input_refuses_when_the_run_table_lacks_the_input_column() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-no-column rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-no-column"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNNOCOL "https://github.com/example/repo/pull/7" "$local_head" "$pr_head" submitted_head_sha
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-column "$local_head" \
+    "missing column(s) submitted_head_sha"
+  pass "merged PR still refuses and names the column when the run table has no input head"
+}
+
+# The copy's one commit adds a feature; the run pushed that commit plus one
+# pipeline commit, and that pushed head is the PR head that was squash-merged onto
+# origin's default branch. With record=yes the no-mistakes run record names this
+# copy's HEAD as the input of the run that pushed the merged head.
 #   revert: the pipeline commit removes the feature, so the default branch lacks it.
-#   extend: control; the pipeline commit only adds a separate new file.
-pipeline_input_content_case() {  # <name> <revert|extend>
-  local name=$1 pipeline=$2 case_dir tmp local_head pr_head
+#   extend: the pipeline commit only adds a separate new file.
+pipeline_input_content_case() {  # <name> <revert|extend> <record yes|no>
+  local name=$1 pipeline=$2 record=$3 case_dir tmp local_head pr_head
   case_dir=$(make_case "$name")
   write_meta "$case_dir" no-mistakes ship
   wt_commit_file "$case_dir" feature.txt hello "add feature"
@@ -1998,17 +2299,28 @@ pipeline_input_content_case() {  # <name> <revert|extend>
   git -C "$tmp" push -q origin HEAD:main
   rm -rf "$tmp"
   git -C "$case_dir/project" fetch -q origin pr-head main
-  write_nm_run_record "$case_dir" 01RUNINPUT "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  [ "$record" = no ] || write_nm_run_record "$case_dir" 01RUNINPUT "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
   append_pr_meta_url "$case_dir"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
   printf '%s\n' "$case_dir"
 }
 
-test_pipeline_input_copy_needs_its_content_in_the_default_branch() {
+# The run record is a positive proof of its own (Main 1907): a copy that is
+# exactly the recorded input of the run that pushed the merged head lands even
+# when a later pipeline commit dropped its change. Without the record the same
+# copy refuses and names its commit; a copy whose content the default branch
+# holds lands by that content alone.
+test_pipeline_input_copy_lands_by_its_run_record_or_its_content() {
   local case_dir rc before
-  case_dir=$(pipeline_input_content_case pipeline-input-reverted revert)
+  case_dir=$(pipeline_input_content_case pipeline-input-reverted-recorded revert yes)
   git -C "$case_dir/project" show "refs/remotes/origin/main:feature.txt" >/dev/null 2>&1 \
-    && fail "pipeline-input-reverted: fixture bug: origin's default branch holds the dropped feature"
+    && fail "pipeline-input-reverted-recorded: fixture bug: origin's default branch holds the dropped feature"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "pipeline-input-reverted-recorded: the recorded input of the merged run was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "pipeline-input-reverted-recorded: the record stayed open"
+
+  case_dir=$(pipeline_input_content_case pipeline-input-reverted revert no)
   ! git -C "$case_dir/project" merge-base --is-ancestor "$(git -C "$case_dir/wt" rev-parse HEAD)" refs/remotes/origin/main \
     || fail "pipeline-input-reverted: fixture bug: the copy's commit is in origin's default branch"
   git -C "$case_dir/project" merge-base --is-ancestor "$(git -C "$case_dir/wt" rev-parse HEAD)" refs/remotes/origin/pr-head \
@@ -2016,7 +2328,7 @@ test_pipeline_input_copy_needs_its_content_in_the_default_branch() {
   before=$(git -C "$case_dir/wt" rev-parse HEAD)
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  [ "$rc" -ne 0 ] || fail "pipeline-input-reverted: a run input whose change the merged PR later dropped was torn down"
+  [ "$rc" -ne 0 ] || fail "pipeline-input-reverted: a copy with no run record whose change the default branch lacks was torn down"
   assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "pipeline-input-reverted: the refusal does not say not landed"
   refusal_names_subject "$case_dir/stderr" 'add feature' \
     || fail "pipeline-input-reverted: the refusal does not name the commit the default branch lacks: $(cat "$case_dir/stderr")"
@@ -2024,14 +2336,12 @@ test_pipeline_input_copy_needs_its_content_in_the_default_branch() {
   [ -d "$case_dir/wt" ] || fail "pipeline-input-reverted: the copy was removed"
   [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$before" ] || fail "pipeline-input-reverted: the copy's HEAD changed"
 
-  case_dir=$(pipeline_input_content_case pipeline-input-extended extend)
-  ! git -C "$case_dir/project" merge-base --is-ancestor "$(git -C "$case_dir/wt" rev-parse HEAD)" refs/remotes/origin/main \
-    || fail "pipeline-input-extended: fixture bug: the copy's commit is in origin's default branch"
+  case_dir=$(pipeline_input_content_case pipeline-input-extended extend no)
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "pipeline-input-extended control: a run input whose content the default branch holds was refused: $(cat "$case_dir/stderr")"
-  assert_absent "$case_dir/state/task-x1.meta" "pipeline-input-extended control: the record stayed open"
-  pass "a copy that was a merged run's input still needs its content in origin's default branch: a PR that later dropped the change refuses; one that only added a file is torn down"
+  expect_code 0 "$rc" "pipeline-input-extended: a copy whose content the default branch holds was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "pipeline-input-extended: the record stayed open"
+  pass "the recorded input of the merged run lands even when the PR later dropped its change; without the record it refuses, and landed content lands alone"
 }
 
 test_pr_check_does_not_refresh_stale_pr_head() {
@@ -4645,16 +4955,31 @@ test_squash_merged_replayed_patch_over_unlanded_parent_refuses
 test_landed_proof_ignores_unresolvable_git_directory_in_cwd
 test_merged_pr_with_later_local_commit_refuses
 test_squash_merged_rebased_branch_allows
-test_squash_merged_forgejo_pr_refuses_when_main_moved_on
+test_squash_merged_forgejo_pr_allows_when_main_moved_on
 test_squash_merged_same_file_different_content_refuses
 test_squash_merged_rebased_local_with_unlanded_commit_refuses
 test_squash_merged_stale_local_refuses_when_forge_unreachable
-test_squash_merged_pushed_prerebase_copy_refuses
+test_squash_merged_pushed_prerebase_copy_allows
 test_squash_pushed_missing_subject_match_ignores_hash_boundary
 test_squash_merged_pushed_prerebase_copy_missing_commit_refuses
 test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
 test_squash_merged_prerebase_copy_with_a_later_main_merge_refuses
-test_pipeline_input_copy_needs_its_content_in_the_default_branch
+test_pipeline_input_copy_lands_by_its_run_record_or_its_content
+test_pipeline_input_diverged_iteration_allows
+test_pipeline_input_rewritten_by_pipeline_allows
+test_pipeline_input_slow_record_read_still_proves_the_copy
+test_pipeline_input_silent_record_read_is_unknown
+test_pipeline_input_locked_record_read_is_unknown
+test_pipeline_input_refuses_copy_behind_the_input_head
+test_pipeline_input_ties_the_run_by_pushed_head_allows
+test_pipeline_input_refuses_commit_made_after_the_run_started
+test_pipeline_input_refuses_copy_outside_the_run_input
+test_pipeline_input_refuses_run_recorded_for_another_pr
+test_pipeline_input_refuses_run_that_pushed_another_head
+test_pipeline_input_refuses_when_the_state_database_is_missing
+test_pipeline_input_refuses_when_the_input_head_is_not_recorded
+test_pipeline_input_refuses_when_the_pushed_head_is_not_recorded
+test_pipeline_input_refuses_when_the_run_table_lacks_the_input_column
 test_pr_check_does_not_refresh_stale_pr_head
 test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows

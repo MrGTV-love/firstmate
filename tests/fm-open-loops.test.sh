@@ -2261,6 +2261,25 @@ for name, extra, number in (('merge-extra', True, 24), ('merge-clean', False, 25
     v4_prs[str(number)] = dict(number=number, html_url=V4_PR + str(number), state='closed', merged_at=iso(now - 3600),
                                head=dict(sha=pr_head))
     v4_task(name, copy=copy, pr=number, note=f'{V4_PR}{number} merged by another lane')
+# Main 1907 (R3): a ship whose branch merged a later main to resolve a conflict, under an open PR whose head is the
+# copy's HEAD. The open PR carries that merge, so it is the open_pr row's, never an unlanded_commit row.
+merge_open = v4_copy('merge-open')
+land_mo = world / 'v4-land-merge-open'
+git_('clone', '-q', v4_origin, land_mo)
+(land_mo / 'merge-open-main.txt').write_text('main moved\n')
+git_('-C', land_mo, 'add', '.'); git_('-C', land_mo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'main moves under merge-open')
+git_('-C', land_mo, 'push', '-q', 'origin', 'main')
+git_('-C', merge_open, 'fetch', '-q', 'origin')
+git_('-C', merge_open, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '-m', 'merge-open merges main', 'origin/main')
+v4_prs['27'] = dict(number=27, html_url=V4_PR + '27', state='open', merged_at=None,
+                    head=dict(sha=git_('-C', merge_open, 'rev-parse', 'HEAD')))
+v4_task('merge-open', copy=merge_open, pr=27, verb='working', note='PR open', state='working', live=True)
+# Main 1907 (R4): a merged PR alone put this task here (no done report, state unknown, backlog open). Its copy is the
+# PR head, whose content the default branch does not hold, so no other row covers it; its evidence names the PR.
+src_merged = v4_copy('src-merged')
+v4_prs['26'] = dict(number=26, html_url=V4_PR + '26', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=git_('-C', src_merged, 'rev-parse', 'HEAD')))
+v4_task('src-merged', copy=src_merged, pr=26, verb='working', note='building', state='unknown')
 mate_home = world / 'v4-mate'
 for name in ('state', 'data', 'config', 'projects'):
     (mate_home / name).mkdir(parents=True)
@@ -2403,6 +2422,9 @@ f4 = [
     ('merge-with-extra-change-not-landed', 'merge-extra' not in cleanup and 'merge-extra' in by_cat('unlanded_commit')
      and 'merge-extra local merge' in by_cat('unlanded_commit')['merge-extra']['evidence'], mine('merge-extra')),
     ('clean-local-merge-landed', 'merge-clean' in cleanup, mine('merge-clean')),
+    # Main 1907 (R3): a merge commit the open PR head carries is that PR's, not an unlanded commit.
+    ('merge-under-open-pr-head-covered', 'merge-open' not in by_cat('unlanded_commit')
+     and 'merge-open' not in cleanup and 'merge-open' not in by_cat('pending_acceptance'), mine('merge-open')),
     # Round-4 F5.3: the record published last wins, by publication, not by its file's write time.
     ('published-last-refusal', 'fin-publish' in cleanup and 'the memo renamed into place last' in cleanup['fin-publish']['next_action']
      and 'the prune record published before the memo' not in cleanup['fin-publish']['next_action'], mine('fin-publish')),
@@ -2424,13 +2446,16 @@ for name in ('pend-ship', 'pend-scout', 'src-state', 'src-report'):
 sources = {'last report was done': 'the last report was done', 'task state is done': 'the task state is done',
            'backlog item is closed': 'its backlog item is closed'}
 expected = {'src-backlog': {'backlog item is closed'},
-            'fin-dirty': {'last report was done', 'task state is done'}}
+            'fin-dirty': {'last report was done', 'task state is done'},
+            'src-merged': set()}
 for name, held in expected.items():
     row = acceptance.get(name)
     assert row and row['owner'] == 'home:firstmate', ('each source needs its own owned row', name, mine(name))
     named = {key for key, words in sources.items() if words in row['evidence']}
     assert named == held, ('the evidence must name exactly the sources that hold', name, held, row['evidence'])
     assert 'no accepted or landed deliverable is on record' in row['evidence'], row
+assert acceptance['src-merged']['evidence'].startswith(f'its PR merged: {V4_PR}26, and no accepted'), acceptance['src-merged']
+assert 'its PR merged' not in acceptance['src-backlog']['evidence'], acceptance['src-backlog']
 # A done claim the ship-done gate refused is firstmate's to resolve; one refused only because the no-mistakes daemon
 # is down is a wait and adds no row. A refusal because no run exists or the run is otherwise unreadable keeps its row,
 # also for a task whose PR another lane already merged.

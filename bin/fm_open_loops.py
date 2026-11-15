@@ -708,13 +708,24 @@ class Collector:
         return self.git(worktree, "rev-list", "--reverse", "--cherry-pick", "--right-only",
                         "--no-merges", base + "...HEAD").splitlines()
 
-    def unproven_merges(self, worktree, base):
-        """Every merge commit on HEAD beyond base: no merge machinery proves one (Main 1871 P-B).
+    def unproven_merges(self, worktree, base, cover=None):
+        """Every merge commit on HEAD beyond base that the PR head cover lacks (Main 1871 P-B, Main 1907).
 
-        unlanded() asks this only after the blob proof found the copy's content not in base, so a merge commit
-        whose change base holds never reaches here.
+        No merge machinery proves a merge commit. unlanded() asks this only after the blob proof found the copy's
+        content not in base, so a merge commit whose change base holds never reaches here; one the open or merged
+        PR head carries is that PR's row to own.
         """
-        return self.git(worktree, "rev-list", "--merges", base + "..HEAD").split()
+        return self.git(worktree, "rev-list", "--merges", base + "..HEAD", *(["^" + cover] if cover else [])).split()
+
+    def present_pr_head(self, worktree, pr):
+        """The open or merged PR's head commit when this copy holds it, else None."""
+        if not pr or not (pr.get("merged_at") or pr.get("state") == "open"):
+            return None
+        head = (pr.get("head") or {}).get("sha")
+        if not head or not self.run(["git", "-C", worktree, "rev-parse", "--verify", "--quiet", head + "^{commit}"],
+                                    missing_ok=True).strip():
+            return None
+        return head
 
     def pr_pending(self, worktree, pending, pr):
         head = pr["head"]["sha"]
@@ -827,8 +838,9 @@ class Collector:
             if covered is not None:
                 pending = covered
         # A merge commit is never covered by its parents: one that carries a change of its own, conflicts, or
-        # joins more than two parents stays pending.
-        pending = pending + [c for c in self.unproven_merges(worktree, base) if c not in pending]
+        # joins more than two parents stays pending unless the PR head in this copy carries it.
+        merges = self.unproven_merges(worktree, base, self.present_pr_head(worktree, pr))
+        pending = pending + [c for c in merges if c not in pending]
         if not pending:
             return
         oldest = min(int(self.git(worktree, "show", "-s", "--format=%ct", c)) for c in pending)
@@ -1382,10 +1394,12 @@ class Collector:
                   f"review and accept the delivered work of {ident}; its worker is still live")
         if refused:
             action = f"{action}; {refused}"
-        # The evidence names what put the task here: the last report, the task state, or the closed backlog item.
+        # The evidence names what put the task here: the last report, the task state, the closed backlog item, or
+        # the merged PR.
         holds = [words for words, held in (("the last report was done", verb == "done"),
                                            ("the task state is done", state == "done"),
-                                           ("its backlog item is closed", backlog_closed)) if held]
+                                           ("its backlog item is closed", backlog_closed),
+                                           (f"its PR merged: {pr_url}", merged)) if held]
         self.add("pending_acceptance", ident, action, since, owner,
                  evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
                           + " and ".join(holds) + ", and no accepted or landed deliverable is on record"
