@@ -232,6 +232,7 @@ Right before the request or nudge is written, the send re-checks the agent now a
 A send that refuses or fails is the mate's final outcome for that pass: it is reported unreached and sent nothing more, not even a fallback nudge, and a pending-reply expectation that cannot be discarded is reported with its path.
 After the write, the doorbell rings only while the record bytes and the attribution decision the send was checked on still hold; otherwise the ring is withheld and reported, and the steer stays in the inbox for the next agent that reads it.
 The host `send` verb reads its record's digest once, and its check before the write and its check before the doorbell must each rest on record bytes with that digest.
+The restart reports a withheld doorbell for that mate, on its persistence request and on its fallback nudge.
 The watcher's own re-ring ladder for an unhandled inbox record is unchanged and does not consult the launch proof.
 Unset, those expectations leave these scripts unchanged.
 It goes on only on the exact bytes `attribution=proceed` plus one newline with a zero transport status.
