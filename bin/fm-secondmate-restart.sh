@@ -149,13 +149,23 @@ first_reported_line() {  # <text>
 
 # Send the ordinary re-read steer to a mate this pass will not restart, and say
 # plainly which it was. A nudge is a partial reload and is never reported as more.
-fall_back_to_nudge() {  # <id> <reason>
-  local id=$1 reason=$2 out line
+fall_back_to_nudge() {  # <id> <reason> [<array-index>]
+  local id=$1 reason=$2 i=${3:-} out line
   local -a route_env=()
   # The pane may have changed hands since the first decision (the persistence
   # wait can last minutes): decide again on this mate's own record right now.
   if ! fm_secondmate_restart_attribution_now "$STATE/$id.meta"; then
     report_unreached "$id" "$reason; at the fallback nudge, $FM_SECONDMATE_RESTART_REASON"
+    return
+  fi
+  # One compared route per mate (Main 1777 (2)): when the first decision kept a
+  # route, the fresh decision must name that same route.
+  if [ -n "$i" ] && [ -n "${ROUTE_HOST[i]:-}" ] \
+    && { [ "$FM_SECONDMATE_RESTART_ROUTE_HOST" != "${ROUTE_HOST[i]}" ] \
+      || [ "$FM_SECONDMATE_RESTART_ROUTE_ROOT" != "${ROUTE_ROOT[i]}" ] \
+      || [ "$FM_SECONDMATE_RESTART_ROUTE_HOME" != "${ROUTE_HOME[i]}" ] \
+      || [ "$FM_SECONDMATE_RESTART_ROUTE_TARGET" != "${ROUTE_TARGET[i]}" ]; }; then
+    report_unreached "$id" "$reason; at the fallback nudge, its route is no longer the one its first decision compared"
     return
   fi
   # A remote nudge travels only over the route this decision compared.
@@ -180,7 +190,11 @@ restart_mate() {  # <array-index>
   local i=$1 id restart_out restart_rc restart_reason ran_on
   id=${IDS[$i]}
   if [ "${PLACEMENT[i]}" = remote ]; then
+    # The relaunch crosses only the route this mate's decision compared: fm-on
+    # refuses before ssh when its resolved route differs (Main 1777 (2)).
     restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      FM_ON_EXPECTED_HOST="${ROUTE_HOST[i]}" FM_ON_EXPECTED_ROOT="${ROUTE_ROOT[i]}" \
+      FM_ON_EXPECTED_HOME="${ROUTE_HOME[i]}" \
       "$SCRIPT_DIR/fm-remote-secondmate-relaunch.sh" \
       "$id" "${HARNESS[i]}" "${MODEL[i]:-default}" "${EFFORT[i]:-default}" < /dev/null 2>&1)
     restart_rc=$?
@@ -273,6 +287,7 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   HARNESS[i]=""
   MODEL[i]=""
   EFFORT[i]=""
+  ROUTE_HOST[i]="" ROUTE_ROOT[i]="" ROUTE_HOME[i]="" ROUTE_TARGET[i]=""
   if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
     if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
@@ -293,6 +308,9 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
+  # Keep the one route this decision compared for the request and the relaunch.
+  ROUTE_HOST[i]=$FM_SECONDMATE_RESTART_ROUTE_HOST ROUTE_ROOT[i]=$FM_SECONDMATE_RESTART_ROUTE_ROOT
+  ROUTE_HOME[i]=$FM_SECONDMATE_RESTART_ROUTE_HOME ROUTE_TARGET[i]=$FM_SECONDMATE_RESTART_ROUTE_TARGET
   if [ "${PLACEMENT[i]}" = remote ]; then
     # A local relaunch re-resolves this home's durable secondmate pin on its own,
     # which is the one owner of that resolution. A remote one cannot: it runs in
@@ -321,6 +339,15 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     fi
   fi
 
+  # No pending-reply expectation exists before the route is rechecked: one that
+  # changed after the host decided refuses first (Main 1777 (3)).
+  if [ -n "${ROUTE_HOST[i]}" ] && ! fm_secondmate_restart_route_unchanged "$STATE/$id.meta" \
+    "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}"; then
+    PLAN[i]="refused"
+    REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    i=$((i + 1))
+    continue
+  fi
   if ! corr=$(fm_pending_reply_create "$FM_HOME" "$STATE" "$id" \
     "$FM_SECONDMATE_PERSIST_REQUEST"); then
     REASON[i]="its answer about the open work cannot be tracked, so a clean reload could not be proven"
@@ -329,7 +356,8 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   fi
   # A remote request travels only over the route this mate's decision compared.
   route_env=()
-  while IFS= read -r route_line; do route_env+=("$route_line"); done < <(fm_secondmate_restart_route_env)
+  while IFS= read -r route_line; do route_env+=("$route_line"); done < <(fm_secondmate_restart_route_env \
+    "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}")
   if ! send_out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
@@ -361,7 +389,7 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     report_unreached "${IDS[$i]}" "${REASON[i]}"
     PLAN[i]="done"
   else
-    fall_back_to_nudge "${IDS[$i]}" "${REASON[i]}"
+    fall_back_to_nudge "${IDS[$i]}" "${REASON[i]}" "$i"
     PLAN[i]="done"
   fi
   i=$((i + 1))
@@ -396,7 +424,7 @@ while [ "$((pending_count + restart_active_count))" -gt 0 ]; do
         launch_restart "$i"
       else
         fall_back_to_nudge "${IDS[$i]}" \
-          "it did not confirm within ${PERSIST_WAIT}s that its open work is written down, so its conversation was not spent"
+          "it did not confirm within ${PERSIST_WAIT}s that its open work is written down, so its conversation was not spent" "$i"
         PLAN[i]="done"
         pending_count=$((pending_count - 1))
       fi

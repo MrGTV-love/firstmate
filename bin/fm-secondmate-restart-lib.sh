@@ -209,15 +209,37 @@ fm_secondmate_restart_attribution() {  # <meta-file>
   return 1
 }
 
-# The environment assignments that bind a delivery to the route the last
-# remote decision compared, one per line for `env`; none for a local mate.
-fm_secondmate_restart_route_env() {
-  [ -n "${FM_SECONDMATE_RESTART_ROUTE_HOST:-}" ] || return 0
-  printf '%s\n' "FM_ON_EXPECTED_HOST=$FM_SECONDMATE_RESTART_ROUTE_HOST" \
-    "FM_ON_EXPECTED_ROOT=$FM_SECONDMATE_RESTART_ROUTE_ROOT" \
-    "FM_ON_EXPECTED_HOME=$FM_SECONDMATE_RESTART_ROUTE_HOME" \
-    "FM_SEND_EXPECTED_REMOTE_HOST=$FM_SECONDMATE_RESTART_ROUTE_HOST" \
-    "FM_SEND_EXPECTED_REMOTE_TARGET=$FM_SECONDMATE_RESTART_ROUTE_TARGET"
+# The environment assignments that bind a delivery or relaunch to one compared
+# route, one per line for `env`; none for a local mate. With no arguments it
+# names the route the last remote decision compared; a caller that kept a
+# mate's route passes it as <host> <root> <home> <target> (Main 1777 (2)).
+fm_secondmate_restart_route_env() {  # [<host> <root> <home> <target>]
+  local host=${1-${FM_SECONDMATE_RESTART_ROUTE_HOST:-}} root=${2-${FM_SECONDMATE_RESTART_ROUTE_ROOT:-}}
+  local home=${3-${FM_SECONDMATE_RESTART_ROUTE_HOME:-}} target=${4-${FM_SECONDMATE_RESTART_ROUTE_TARGET:-}}
+  [ -n "$host" ] || return 0
+  printf '%s\n' "FM_ON_EXPECTED_HOST=$host" "FM_ON_EXPECTED_ROOT=$root" "FM_ON_EXPECTED_HOME=$home" \
+    "FM_SEND_EXPECTED_REMOTE_HOST=$host" "FM_SEND_EXPECTED_REMOTE_TARGET=$target"
+}
+
+# Whether <meta-file>'s registry row and record still name exactly the route
+# <host> <root> <home> <target> a decision compared. Checked right before a
+# pending-reply expectation is created, so a route that changed after the
+# decision refuses before any record exists (Main 1777 (3)). Returns 1 with
+# FM_SECONDMATE_RESTART_REASON set when anything differs or cannot be read.
+fm_secondmate_restart_route_unchanged() {  # <meta-file> <host> <root> <home> <target>
+  local meta=$1 id
+  id=${meta##*/}; id=${id%.meta}
+  if [ "$(fm_meta_get "$meta" remote_host 2>/dev/null)" = "$2" ] \
+    && [ "$(fm_meta_get "$meta" remote_root 2>/dev/null)" = "$3" ] \
+    && [ "$(fm_meta_get "$meta" home 2>/dev/null)" = "$4" ] \
+    && [ "$(fm_meta_get "$meta" remote_target 2>/dev/null)" = "$5" ] \
+    && secondmate_registry_line_for_id "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" \
+    && [ "$SECONDMATE_REGISTRY_REMOTE" = 1 ] && [ "$SECONDMATE_REGISTRY_HOST" = "$2" ] \
+    && [ "$SECONDMATE_REGISTRY_ROOT" = "$3" ] && [ "$SECONDMATE_REGISTRY_HOME" = "$4" ]; then
+    return 0
+  fi
+  FM_SECONDMATE_RESTART_REASON="its registry route or record changed after its host decided (now host '${SECONDMATE_REGISTRY_HOST:-none}', root '${SECONDMATE_REGISTRY_ROOT:-none}', home '${SECONDMATE_REGISTRY_HOME:-none}'; decided host '$2', root '$3', home '$4'), so no request, record or nudge was sent to it"
+  return 1
 }
 
 # The same decision, re-derived from <meta-file> alone at the moment of a later
