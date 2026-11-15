@@ -1360,6 +1360,73 @@ def m1892_atomic_record_write():
             and both['members'] == [[50, 100200000]], 'no update lost', fired, both)
 
 
+def start_in_process(w, read_host_db=None, db=None):
+    """cmd_pipeline_start of the engine, in this process, with COMMAND replaced (no process starts): (exit code, the
+    log lines, whether COMMAND ran). READ_HOST_DB replaces the engine's run-database reader; DB the database path."""
+    import argparse
+    lines, ran = [], []
+    real = dict(run_child=engine.run_child, start_binding=engine.start_binding, with_intercept=engine.with_intercept,
+                log=engine.log, read_host_db=engine.read_host_db, FIRST_NOTICE_SECS=engine.FIRST_NOTICE_SECS,
+                HOST_STATE_DB=engine.HOST_STATE_DB)
+
+    def child(command, environment, fd, on_poll=None, cancellable=False):
+        ran.append(True)
+        return 0
+    engine.run_child, engine.start_binding, engine.with_intercept = child, (lambda cwd, words: None), (lambda env, priority: None)
+    engine.log = lambda fd, message: lines.append(message)
+    engine.FIRST_NOTICE_SECS = 0.0  # the first wait is logged at once
+    if read_host_db is not None:
+        engine.read_host_db = read_host_db
+    if db is not None:
+        engine.HOST_STATE_DB = str(db)
+    saved = dict(os.environ)
+    os.environ['FM_CPU_POOL_DIR'] = str(w.pool)
+    try:
+        code = engine.cmd_pipeline_start(argparse.Namespace(command=['touch', str(w.pool / 'started')],
+                                                            only_fresh=False, priority='other'))
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+        for name, value in real.items():
+            setattr(engine, name, value)
+        proc.sysctl, proc.libc = REAL_SYSCTL, REAL_LIBC
+    return code, lines, bool(ran)
+
+
+def m1903_census_read_error():
+    # Main 1903 U-1: the start's own census read of the run rows fails ('database is locked') on a database that opens:
+    # unknown, so the start waits with a named reason and is admitted once the rows read; never 125. Through the
+    # engine's own cmd_pipeline_start. An engine that lets the error reach the entrypoint refuses with 125.
+    w = World('m1903-locked', available=40)
+    real, failures = engine.read_host_db, []
+
+    def read(sql, parameters=()):
+        if "FROM runs WHERE status = 'running'" in sql and len(failures) < 3:
+            failures.append(sql)
+            raise sqlite3.OperationalError('database is locked')
+        return real(sql, parameters)
+    code, lines, ran = start_in_process(w, read_host_db=read)
+    w.close()
+    harm('m1903-census-read-refuses-125', code != 125, code, lines)
+    control(code == 0 and ran and len(failures) == 3, 'admitted once the rows read', code, ran, failures, lines)
+    control(any('waiting: unknown:' in line and 'database is locked' in line for line in lines), 'the wait names the read', lines)
+
+
+def m1903_unopenable_database():
+    # Main 1903: P5.errors.db stays: a run database that cannot be opened at all (missing, or not an SQLite file)
+    # refuses with 125 and runs nothing, distinct from a failed read of a database that opens (m1903_census_read_error).
+    for label in ('missing', 'garbage'):
+        w = World('m1903-unopenable-' + label)
+        bad = w.pool.parent / (label + '.sqlite')
+        if label == 'garbage':
+            bad.write_text('not a database')
+        code, lines, ran = start_in_process(w, db=bad)
+        w.close()
+        control(code == 125 and not ran and any('refused' in line for line in lines), label, code, ran, lines)
+        if label == 'missing':
+            control(not bad.exists(), 'no database is created', bad)
+
+
 def m1876_oversized_confirmation():
     # Finding 6: the confirming read of a possible orphan of X (pid 42, its coalition read as foreign) is longer than
     # one record: unknown, so its coalition is not taken as its own: X holds and the decision waits. Truncated and taken
@@ -1546,6 +1613,8 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1876 a partial process table counts the entry', m1876_partial_process_table),
          ('Main 1876 a short argument record counts the entry', m1876_short_argv),
          ('Main 1892 a failed record write leaves the old record whole', m1892_atomic_record_write),
+         ('Main 1903 a failed census read waits, never 125', m1903_census_read_error),
+         ('Main 1903 an unopenable run database still refuses with 125', m1903_unopenable_database),
          ('Main 1876 an oversized confirmation is unknown', m1876_oversized_confirmation),
          ('Main 1876 a row read error waits', m1876_row_read_error),
          ('Main 1656 an escaped descendant holds its attempt (facts)', m1656_escaped_descendant),

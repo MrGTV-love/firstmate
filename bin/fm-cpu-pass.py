@@ -1173,11 +1173,40 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
                      waiting=waiting, pending=pending, held_runs=held_runs, history=history, queued_pids=queued)
 
 
+class CensusUnknown(Exception):
+    """The start's own census could not be read whole, though its database opens: the decision waits (Main 1876 U)."""
+
+
+def database_opens() -> bool:
+    """Whether the host run database can be opened at all: it exists, reads, and begins with SQLite's header.
+
+    A file fact, never an error message: a missing, unreadable or non-SQLite file cannot be opened (P5.errors.db,
+    exit 125 as before); any other failed read of an opened database is unknown (Main 1903 U-1).
+    """
+    try:
+        with open(Path(HOST_STATE_DB).expanduser().resolve(), "rb") as handle:
+            return handle.read(16) == b"SQLite format 3\x00"
+    except OSError:
+        return False
+
+
 def pipeline_observation() -> Tuple[dict, int]:
+    """(running runs, native cores) for one decision.
+
+    An unreadable core count, or a run database that cannot be opened at all, raises (exit 125, P5.errors.db); a
+    failed or partial read of the run rows of a database that opens, such as a locked one, is CensusUnknown: the
+    decision waits with a named reason, never 125 (Main 1876 U, Main 1903).
+    """
     cores = os.cpu_count()
     if not isinstance(cores, int) or cores < 1:
         raise ValueError("cannot read a positive native CPU count")
-    return running_runs(), cores
+    try:
+        runs = running_runs()
+    except sqlite3.Error as exc:
+        if not database_opens():
+            raise
+        raise CensusUnknown("run rows of %s unreadable: %s" % (HOST_STATE_DB, exc)) from exc
+    return runs, cores
 
 
 ATTEMPT_PREFIX = "attempt-"
@@ -2036,14 +2065,21 @@ def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = 
             reason = "another start is registering"
             if try_lock(admission_fd):
                 decided = True
-                before, cores = pipeline_observation()
-                counted = {run: repo for run, (repo, is_counted, _) in before.items() if is_counted}
+                first, waiting = None, frozenset()
                 try:
-                    first, waiting = first_pipeline_waiter(directory)
-                except (OSError, ValueError) as exc:
-                    first, waiting = None, frozenset()
-                    reason = "unknown: %s; counted=%d priority=%s (a decision waits until every fact reads)" % (
-                        exc, len(counted), priority)
+                    before, cores = pipeline_observation()
+                    census_read = True
+                except CensusUnknown as exc:
+                    before, cores, census_read = {}, 0, False
+                    reason = "unknown: %s; priority=%s (a decision waits until every fact reads)" % (exc, priority)
+                counted = {run: repo for run, (repo, is_counted, _) in before.items() if is_counted}
+                if census_read:
+                    try:
+                        first, waiting = first_pipeline_waiter(directory)
+                    except (OSError, ValueError) as exc:
+                        first, waiting = None, frozenset()
+                        reason = "unknown: %s; counted=%d priority=%s (a decision waits until every fact reads)" % (
+                            exc, len(counted), priority)
                 if first is None:
                     pass
                 elif first == waiter_path:
