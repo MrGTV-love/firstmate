@@ -149,8 +149,11 @@ Pipeline starts:
     also when it lands inside a Python callback that drops the
     KeyboardInterrupt: the signal is recorded and every round, and the grant
     itself, checks it.
-  - An unreadable run database or CPU count refuses with 125 instead of
-    guessing headroom. If a read fails after launch, keep the pending
+  - A run database that cannot be opened at all (missing, unreadable or not
+    SQLite) or an unreadable CPU count refuses with 125 instead of guessing
+    headroom; a failed read of the run rows of a database that opens, such as
+    a locked one, waits with a named reason (pipeline_observation). If a read
+    fails after launch, keep the pending
     reservation until COMMAND returns; never stop running work because the
     observer lost its source.
 

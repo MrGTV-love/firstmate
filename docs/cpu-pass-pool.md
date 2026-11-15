@@ -134,7 +134,7 @@ While either signal reports an actual overload, or cannot be read, no new start 
 
 Nothing running is stopped, paused or reprioritised.
 This backstop covers the tail the reservation does not: a run that grows past what it reserves, memory used outside the runs, and process pile-ups.
-It only delays a start; the unreadable run database or CPU count still refuses with 125.
+It only delays a start; a run database that cannot be opened at all, or an unreadable CPU count, still refuses with 125, and a failed read of a database that opens waits with a named reason.
 
 ### Launch gate
 
