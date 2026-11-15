@@ -1053,6 +1053,23 @@ def m1876_stopped_history():
     admits(w, 11)
 
 
+def m1908_stopped_run_without_attempt():
+    # Main 1908, the recorded narrowing of Main 1876 H: a stopped run is charged its history only while it holds a live
+    # attempt record (every gated launch writes its record before its agent runs, held until two censuses prove it
+    # ended). Stopped X with an incomplete (keyless) row and no attempt record holds nothing: 8 against 10 admits
+    # (the review's H-1 world). The same X holding a live attempt waits: its attempt R and its history R, 3 + 3 + 8 =
+    # 14 against 13 (the review's 28/26 in half-GiB units).
+    for label, attempt in (('no-attempt', False), ('live-attempt', True)):
+        w = World('m1908-stopped-' + label, available=10 if not attempt else 13).run('y').proved('y')
+        w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('x', 'completed', 'repo', ?)", (NOW - 500,))
+        w.row('x', None)
+        if attempt:
+            w.record('x', 'x').process(10, parent=200, start=100100000)
+            waits('m1908-stopped-live-attempt', w, 14)
+        else:
+            admits(w, 8)
+
+
 def m1876_unjoined_possible():
     # Finding 3: X's root (pid 10) joins at 1 GiB; a lineage-lost process in X's coalition (pid 42) that could be X's has
     # only an unstable 20 GiB figure. It is unknown memory: the decision waits. Treating the attempt as seen at 1 GiB
@@ -1613,6 +1630,7 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1876 a partial process table counts the entry', m1876_partial_process_table),
          ('Main 1876 a short argument record counts the entry', m1876_short_argv),
          ('Main 1892 a failed record write leaves the old record whole', m1892_atomic_record_write),
+         ('Main 1908 a stopped run is charged only while it holds an attempt', m1908_stopped_run_without_attempt),
          ('Main 1903 a failed census read waits, never 125', m1903_census_read_error),
          ('Main 1903 an unopenable run database still refuses with 125', m1903_unopenable_database),
          ('Main 1876 an oversized confirmation is unknown', m1876_oversized_confirmation),
