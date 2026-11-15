@@ -1523,7 +1523,7 @@ teardown_closeout_kept() {
 }
 
 # Writes the record of kept <copy>: the sweep receipt's first four lines, then the task, the
-# slot, the reason, the time, the state the driver answered for (TEARDOWN_RET_HEAD,
+# slot, the task's preserve directory, the reason, the time, the state the driver answered for (TEARDOWN_RET_HEAD,
 # TEARDOWN_RET_STATUS, TEARDOWN_RET_PAYLOAD, read before the driver was asked) and the
 # driver's whole answer, base64 so any byte survives. Sets TEARDOWN_RETAINED_RECORD.
 teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity>
@@ -1537,8 +1537,9 @@ teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity>
     printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$3" "$2" "$4"
     printf "the closeout driver kept this copy (exit 3, %s) for task %s; teardown changes nothing in it and closes the task only when the copy is landed and clean and the driver's verified archive and the task's preserve hold its unique ignored files; the driver's --execute-cleanup keeps the tree and writes another archive, so it is not run again for an unchanged copy; removing the copy depends on Vernant's driver\n" \
       "$TEARDOWN_RETAINED_REASON" "$ID"
-    printf 'task=%s\nslot=%s\nreason=%s\nrecorded-at=%s\nhead=%s\nstatus-sha256=%s\npayload-sha256=%s\nanswer-base64=%s\n' \
-      "$ID" "$1" "$TEARDOWN_RETAINED_REASON" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    printf 'task=%s\nslot=%s\npreserve=%s\nreason=%s\nrecorded-at=%s\nhead=%s\nstatus-sha256=%s\npayload-sha256=%s\nanswer-base64=%s\n' \
+      "$ID" "$1" "$DATA/$ID/nested-copy-preserved/$(printf '%s' "$2" | teardown_ignored_sha256)" \
+      "$TEARDOWN_RETAINED_REASON" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       "$TEARDOWN_RET_HEAD" "$TEARDOWN_RET_STATUS" "$TEARDOWN_RET_PAYLOAD" "$answer"
   } > "$tmp" || { rm -f "$tmp"; return 1; }
   mv -- "$tmp" "$rec" || { rm -f "$tmp"; return 1; }

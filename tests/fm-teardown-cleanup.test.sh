@@ -6558,7 +6558,7 @@ test_kept_copy_helper_a_valid_answer_is_recorded_once_and_judged_again_without_t
   rec=$(find "$kc/data/copy-sweep/retained" -type f | head -n 1)
   assert_present "$rec" "kept-helper-valid: no record was written"
   assert_equals "copy=$(cd "$kc/copy" && pwd -P)" "$(sed -n 2p "$rec")" "kept-helper-valid: the record does not name the copy"
-  assert_equals "task slot reason recorded-at head status-sha256 payload-sha256 answer-base64" "$(sed -n '5,$p' "$rec" | sed 's/=.*//' | paste -sd ' ' -)" "kept-helper-valid: the record does not hold exactly its fields"
+  assert_equals "task slot preserve reason recorded-at head status-sha256 payload-sha256 answer-base64" "$(sed -n '5,$p' "$rec" | sed 's/=.*//' | paste -sd ' ' -)" "kept-helper-valid: the record does not hold exactly its fields"
   assert_equals "$kc/tars/1.tar" "$(sed -n 's/^answer-base64=//p' "$rec" | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' | jq -r '.ignored_payload_preservation[-1].archive_path')" "kept-helper-valid: the record does not carry the driver's answer"
   after=$(cd "$kc/copy" && find . -path ./.git -prune -o -type f -print | LC_ALL=C sort | xargs shasum -a 256)
   assert_equals "$before" "$after" "kept-helper-valid: the kept copy changed"
@@ -6775,6 +6775,11 @@ retained_recorded_answer() {
   sed -n 's/^answer-base64=//p' "$(retained_record_path)" | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)'
 }
 
+# retained_physical <path>: <path> with its folder resolved (pwd -P).
+retained_physical() {
+  printf '%s/%s\n' "$(cd "$(dirname "$1")" 2>/dev/null && pwd -P)" "${1##*/}"
+}
+
 # retained_tar_listing: the path and SHA-256 of every tar the stand-in driver wrote, read here.
 retained_tar_listing() {
   find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" -name '*.tar' -type f -exec shasum -a 256 {} + 2>/dev/null | LC_ALL=C sort
@@ -6794,10 +6799,12 @@ test_a_landed_task_closes_around_an_own_copy_the_driver_keeps() {
     assert_equals cleanup_ignored_payload_archived_tree_retained "$(retained_field "$record" reason)" "retained-close-$shape: the record does not carry the driver's reason"
     case "$(retained_field "$record" recorded-at)" in 20*Z) ;; *) fail "retained-close-$shape: the record carries no time" ;; esac
     case "$(sed -n 3p "$record")" in identity=[0-9]*:[0-9]*) ;; *) fail "retained-close-$shape: the record carries no identity" ;; esac
-    assert_equals "task slot reason recorded-at head status-sha256 payload-sha256 answer-base64" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
+    assert_equals "task slot preserve reason recorded-at head status-sha256 payload-sha256 answer-base64" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
     answer=$(retained_recorded_answer)
     assert_equals '[".claude/channel-outbox/a.jsonl",".claude/channel-outbox/b.jsonl"]' "$(printf '%s' "$answer" | jq -c .unique_ignored_paths)" "retained-close-$shape: the record does not carry the driver's unique paths"
-    assert_equals "$(retained_tar_listing | awk '{print $2}')" "$(printf '%s' "$answer" | jq -r '.ignored_payload_preservation[-1].archive_path')" "retained-close-$shape: the recorded archive is not the tar the driver wrote"
+    # Both paths are compared physically (on macOS /tmp is /private/tmp).
+    assert_equals "$(retained_physical "$(retained_tar_listing | awk '{print $2}')")" "$(retained_physical "$(printf '%s' "$answer" | jq -r '.ignored_payload_preservation[-1].archive_path')")" "retained-close-$shape: the recorded archive is not the tar the driver wrote"
+    assert_equals "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')" "$(retained_field "$record" preserve)" "retained-close-$shape: the record does not name the preserve"
     assert_no_grep 'REFUSED' "$FOREIGN_CASE/stderr" "retained-close-$shape: a close that succeeded printed a refusal"
     assert_equals 1 "$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr" | grep -c "notice: own nested copy $FOREIGN_COPY was kept")" "retained-close-$shape: the kept copy was not reported exactly once"
     assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-close-$shape: a close saved a refusal output"

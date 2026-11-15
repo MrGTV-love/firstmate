@@ -4781,7 +4781,14 @@ teardown_remove_own_nested_copies() {  # <slot-label>
 # still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
-  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}
+  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED} lock_rc=0
+  # A copy Vernant's creation lock holds is released or kept only through
+  # teardown_own_copy_dispose, which preserves its ignored files before the driver
+  # is asked and, when the driver keeps the copy, checks that preserve against the
+  # copy; the bundle's ignored-file refusal is for a copy that would be removed
+  # with them unpreserved.
+  teardown_copy_lock_file "$1" || lock_rc=$?
+  [ "$lock_rc" != 0 ] || return 0
   if unique=$(teardown_preservable_ignored "$1"); then
     [ -n "$unique" ] || return 0
     echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
