@@ -14,6 +14,7 @@ import re
 import runpy
 import signal
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -101,6 +102,19 @@ def epoch(value):
         return None
     return int((parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)).timestamp())
 
+
+
+def read_with_ctime(path):
+    """(status-change time in nanoseconds, text) of one regular file, both read from the same open handle."""
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise OSError(f"{path} is not a regular file")
+        with os.fdopen(os.dup(fd), "r", encoding="utf-8", errors="replace") as handle:
+            return info.st_ctime_ns, handle.read()
+    finally:
+        os.close(fd)
 
 def mtime(path):
     try:
@@ -1184,21 +1198,25 @@ class Collector:
         time; neither orders publication. A rename sets the file's status-change time, so records are ordered
         by that, in nanoseconds. When two records were published at the same instant, both reasons are named,
         in a fixed order, rather than one chosen. The prune record's reason may come from the prune's own landed
-        proof before any teardown ran, so it is labeled as the prune's.
+        proof before any teardown ran, so it is labeled as the prune's. Each record's text and its time come from
+        one opened file (fstat on the handle that is read), so a rename between the two can never pair one
+        record's reason with another file's time (Main 1820 F7).
         """
         found = []
         prune = self.state / (task_id + ".merge-prune")
         try:
-            fields = dict(line.split("=", 1) for line in prune.read_text().splitlines() if "=" in line)
+            published, text = read_with_ctime(prune)
+            fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
             if fields.get("state") in ("retained", "pending") and fields.get("reason"):
-                found.append((prune.stat().st_ctime_ns, 0, fields["reason"], "recorded by bin/fm-merge-prune.sh"))
+                found.append((published, 0, fields["reason"], "recorded by bin/fm-merge-prune.sh"))
         except OSError:
             pass
         memo_path = self.state / ".idle-reap" / (task_id + ".refused")
         try:
-            memo = memo_path.read_text().splitlines()
+            published, text = read_with_ctime(memo_path)
+            memo = text.splitlines()
             if len(memo) >= 4 and memo[0] == "fm-idle-reap-refused-v1" and memo[3] and memo[1].isdigit():
-                found.append((memo_path.stat().st_ctime_ns, 1, memo[3],
+                found.append((published, 1, memo[3],
                               "a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh"))
         except OSError:
             pass
@@ -1353,10 +1371,17 @@ class Collector:
                           + ("; landing could not be read" if landed is None else ""))
 
     def attach_refusal(self, ident, pr_url, refusal, refused):
-        """A recorded teardown refusal stays on every row that already covers the task."""
+        """A recorded teardown refusal stays on every row that already covers the task.
+
+        When no other row covers it, the task's own report-silence row carries the refusal, so a working
+        ship with a dirty copy whose only row is its check-in still shows the last recorded refusal
+        (Main 1820 F7). That row is not a covering row: it never stands in for a completion row.
+        """
         if not refusal:
             return
-        for row in self.covering_rows(ident, pr_url):
+        rows = self.covering_rows(ident, pr_url) or [
+            r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident]
+        for row in rows:
             row["next_action"] = f"{row['next_action']}; {refused}"
             row["evidence"] = f"last recorded cleanup refusal: {refusal}; {row['evidence']}"[:400]
 
