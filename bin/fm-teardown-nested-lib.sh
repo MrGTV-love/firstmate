@@ -206,9 +206,11 @@ teardown_slot_registered_copies() {  # <slot>
 # TEARDOWN_FOREIGN_LOCK_FILE to the lock file's path. Returns 0 when locked,
 # 1 when not locked, and 2 when the lock state cannot be read (including a copy
 # whose .git file is gone).
+TEARDOWN_FOREIGN_LOCK_SHA=
 teardown_copy_lock_file() {  # <copy>
-  local copy=$1 admin
+  local copy=$1 admin size line
   TEARDOWN_FOREIGN_LOCK=
+  TEARDOWN_FOREIGN_LOCK_SHA=
   TEARDOWN_FOREIGN_LOCK_FILE=
   [ -f "$copy/.git" ] && [ ! -L "$copy/.git" ] || return 2
   admin=$(git -C "$copy" rev-parse --absolute-git-dir 2>/dev/null) || return 2
@@ -218,6 +220,16 @@ teardown_copy_lock_file() {  # <copy>
   fi
   [ -f "$admin/locked" ] && [ ! -L "$admin/locked" ] || return 2
   IFS= read -r TEARDOWN_FOREIGN_LOCK < "$admin/locked" || [ -n "$TEARDOWN_FOREIGN_LOCK" ] || true
+  TEARDOWN_FOREIGN_LOCK_SHA=$(teardown_ignored_sha256 "$admin/locked") || return 2
+  size=$(wc -c < "$admin/locked") || return 2
+  size=${size//[!0-9]/}
+  line=$(printf '%s' "$TEARDOWN_FOREIGN_LOCK" | wc -c) || return 2
+  line=${line//[!0-9]/}
+  # Git writes a reason as one line ended by a newline. A lock file holding any
+  # other bytes is not that reason, so it never reads as Vernant's lock.
+  if [ "${size:-0}" != 0 ] && [ "${size:-0}" != "$((${line:-0} + 1))" ]; then
+    TEARDOWN_FOREIGN_LOCK="$TEARDOWN_FOREIGN_LOCK (and further lock file content)"
+  fi
   TEARDOWN_FOREIGN_LOCK_FILE=$admin/locked
 }
 
@@ -372,44 +384,52 @@ EOF
 # still holds a copy WAITING.
 TEARDOWN_REGENERABLE_NAMES=(node_modules .venv venv __pycache__ .pytest_cache .mypy_cache .ruff_cache .next .turbo .cache)
 
-# Prints each outermost directory at or under <root> whose name is in the class.
-# A symlink is never one, and find does not follow one.
+# Prints each outermost directory at or under <root> whose name is in the class,
+# each ended by a NUL byte, and fails when find fails. A symlink is never one,
+# and find does not follow one.
 teardown_regenerable_dirs() {  # <root>
   local name args=()
   for name in "${TEARDOWN_REGENERABLE_NAMES[@]}"; do
     args+=(-o -name "$name")
   done
-  find "$1" -type d \( "${args[@]:1}" \) -print -prune 2>/dev/null
+  find "$1" -type d \( "${args[@]:1}" \) -print0 -prune 2>/dev/null
 }
 
 # Prints, relative to <copy>, the class's outermost directories inside its ignored
 # entries.
+# One per line, so it fails for a path that holds a newline.
 teardown_regenerable_ignored() {  # <copy>
-  local copy=$1 listing entry found dir rc=0
+  local copy=$1 listing found entry dir rc=0
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  found=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { rm -f "$listing"; return 1; }
   git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
   if [ "$rc" = 0 ]; then
     while IFS= read -r -d '' entry; do
-      found=$(teardown_regenerable_dirs "$copy/${entry%/}") || { rc=1; break; }
-      while IFS= read -r dir; do
-        [ -z "$dir" ] || printf '%s\n' "${dir#"$copy"/}"
-      done <<< "$found"
+      teardown_regenerable_dirs "$copy/${entry%/}" >"$found" || { rc=1; break; }
+      while IFS= read -r -d '' dir; do
+        case "$dir" in *$'\n'*) rc=1; break 2 ;; esac
+        printf '%s\n' "${dir#"$copy"/}"
+      done <"$found"
     done <"$listing"
   fi
-  rm -f "$listing"
+  rm -f "$listing" "$found"
   return "$rc"
 }
 
 # Prints ignored <entry> of <copy> without the class: whole when it holds none of
 # those directories, otherwise split only as far as needed to leave them out.
 teardown_entry_without_regenerable() {  # <copy> <entry>
-  local copy=$1 entry=$2 found child
-  found=$(teardown_regenerable_dirs "$copy/$entry") || return 1
-  if [ -z "$found" ]; then
-    printf '%s\n' "$entry"
+  local copy=$1 entry=$2 found first= rc=0 child
+  found=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  teardown_regenerable_dirs "$copy/$entry" >"$found" || rc=1
+  [ "$rc" != 0 ] || [ ! -s "$found" ] || IFS= read -r -d '' first <"$found" || rc=1
+  rm -f "$found"
+  [ "$rc" = 0 ] || return 1
+  if [ -z "$first" ]; then
+    printf '%s\0' "$entry"
     return 0
   fi
-  [ "$found" != "$copy/$entry" ] || return 0
+  [ "$first" != "$copy/$entry" ] || return 0
   for child in "$copy/$entry"/* "$copy/$entry"/.[!.]* "$copy/$entry"/..?*; do
     { [ -e "$child" ] || [ -L "$child" ]; } || continue
     teardown_entry_without_regenerable "$copy" "$entry/${child##*/}" || return 1
@@ -417,7 +437,7 @@ teardown_entry_without_regenerable() {  # <copy> <entry>
 }
 
 teardown_print_entry() {  # <copy> <entry>
-  printf '%s\n' "$2"
+  printf '%s\0' "$2"
 }
 
 # Ignored entries no commit holds that must be preserved before removal.
@@ -428,8 +448,9 @@ teardown_print_entry() {  # <copy> <entry>
 # and both modes leave out the regenerable class at any depth: releasable applies
 # that to the list above, and all mode starts from every ignored entry, so the
 # unlocked sweep can preserve the disposable bytes without widening this owner's
-# disposable classification.
-teardown_preservable_ignored() {  # <copy> [all|releasable]
+# disposable classification. Each entry is ended by a NUL byte, so any name Git
+# can list keeps its exact bytes; a failed listing or scan fails the call.
+teardown_preservable_ignored_z() {  # <copy> [all|releasable]
   local copy=$1 mode=${2:-} listing entry name child rc=0 emit=teardown_entry_without_regenerable
   case "$mode" in '') emit=teardown_print_entry ;; all|releasable) ;; *) return 1 ;; esac
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
@@ -467,14 +488,64 @@ teardown_preservable_ignored() {  # <copy> [all|releasable]
   return "$rc"
 }
 
+# The same entries one per line, for callers that read lines. A name that holds a
+# newline cannot be told apart from two names that way, so the call fails for it
+# and its caller keeps the copy; teardown's own preserve, readback and final
+# proof read teardown_preservable_ignored_z instead.
+teardown_preservable_ignored() {  # <copy> [all|releasable]
+  local list entry rc=0
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  teardown_preservable_ignored_z "$@" >"$list" || rc=1
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' entry; do
+      case "$entry" in *$'\n'*) rc=1; break ;; esac
+      printf '%s\n' "$entry"
+    done <"$list"
+  fi
+  rm -f "$list"
+  return "$rc"
+}
+
+# The NUL-ended names in <file> as one line of text, a newline in a name shown
+# as \n, for a refusal to print.
+teardown_nul_list_text() {  # <file>
+  local entry text=
+  while IFS= read -r -d '' entry; do
+    text+="${text:+ }${entry//$'\n'/\\n}"
+  done <"$1"
+  printf '%s' "$text"
+}
+
+# One SHA256SUMS line for <sum> and the relative path <rel>, in the escaped form
+# sha256sum uses for a name with a newline or a backslash, so every file has
+# exactly one line and no line can stand for another file's name.
+teardown_manifest_line() {  # <sum> <rel>
+  local rel=$2
+  case "$rel" in
+    *$'\n'*|*\\*)
+      rel=${rel//\\/\\\\}
+      rel=${rel//$'\n'/\\n}
+      printf '\\%s  %s\n' "$1" "$rel"
+      ;;
+    *) printf '%s  %s\n' "$1" "$rel" ;;
+  esac
+}
+
 # Prints the SHA-256 of file <path>, or of standard input when no path is given.
-# Fails when no hashing tool is available or it yields no digest.
+# Fails when no hashing tool is available, the file cannot be read, or the tool
+# yields no digest. The file is read on standard input, so its name never reaches
+# the tool's output (which escapes a name that holds a newline).
 teardown_ignored_sha256() {  # [<path>]
   local hash
+  if [ "$#" -gt 0 ]; then
+    [ -f "$1" ] && [ -r "$1" ] || return 1
+    teardown_ignored_sha256 < "$1"
+    return
+  fi
   if command -v shasum >/dev/null 2>&1; then
-    hash=$(shasum -a 256 ${1:+"$1"} 2>/dev/null | awk '{print $1}')
+    hash=$(shasum -a 256 2>/dev/null | awk '{print $1}')
   elif command -v sha256sum >/dev/null 2>&1; then
-    hash=$(sha256sum ${1:+"$1"} 2>/dev/null | awk '{print $1}')
+    hash=$(sha256sum 2>/dev/null | awk '{print $1}')
   else
     return 1
   fi
@@ -761,17 +832,42 @@ TEARDOWN_ADMIT_KINDS=()
 TEARDOWN_ADMIT_HEADS=()
 TEARDOWN_ADMIT_STORED=()
 TEARDOWN_ADMIT_RECORD=()
-teardown_admit() {  # <copy> <anchor|landed|bundle> <head> [<stored-bundle>]
-  local copy record=''
+# A landing admission records, in place of a stored bundle, the default-branch
+# ref and commit (teardown_default_ref_snapshot) its proof read: <snapshot> when
+# the caller took it right after the proof, else read now; an empty one means
+# that ref could not be read, and the final proof then refuses.
+teardown_admit() {  # <copy> <anchor|landed|bundle> <head> [<stored-bundle>|<snapshot>]
+  local copy record='' stored=${4:-}
   copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
   if [ "$2" = bundle ]; then
     record=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || record=''
   fi
+  if [ "$2" = landed ] && [ "$#" -lt 4 ]; then
+    stored=$(teardown_default_ref_snapshot "$1") || stored=''
+  fi
   TEARDOWN_ADMIT_DIRS+=("$copy")
   TEARDOWN_ADMIT_KINDS+=("$2")
   TEARDOWN_ADMIT_HEADS+=("$3")
-  TEARDOWN_ADMIT_STORED+=("${4:-}")
+  TEARDOWN_ADMIT_STORED+=("$stored")
   TEARDOWN_ADMIT_RECORD+=("$record")
+}
+
+# "<ref> <commit>" of the default branch <copy> reads landed history from: the
+# origin copy when <copy> has an origin remote, else the local branch, as
+# fm_task_copy_content_in_default and bin/fm-teardown.sh's landed_default_ref
+# resolve it, without fetching. Fails when that ref cannot be read.
+teardown_default_ref_snapshot() {  # <copy>
+  local copy=$1 name ref commit
+  name=${BASE_BRANCH:-}
+  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || return 1
+  if git -C "$copy" remote get-url origin >/dev/null 2>&1; then
+    ref="refs/remotes/origin/$name"
+  else
+    ref="refs/heads/$name"
+  fi
+  commit=$(git -C "$copy" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null) || return 1
+  [ -n "$commit" ] || return 1
+  printf '%s %s\n' "$ref" "$commit"
 }
 
 # The SHA-256 of the record file the proof read for the bundle that admitted
@@ -795,6 +891,10 @@ teardown_bundle_bytes_current() {  # <copy> <stored> <record-sha256>
     return 1
   fi
   teardown_bundle_file_ok "$copy" "$stored" "$TEARDOWN_BUNDLE_RECORD_HASH" \
+    || { TEARDOWN_BUNDLE_REASON="stored $TEARDOWN_BUNDLE_REASON"; return 1; }
+  # Where the stored bundle physically is now, not where it was at the proof: a
+  # directory moved into a removal root takes the bundle with it.
+  teardown_bundle_external "$copy" "$stored" \
     || { TEARDOWN_BUNDLE_REASON="stored $TEARDOWN_BUNDLE_REASON"; return 1; }
   source=$TEARDOWN_BUNDLE_RECORD_PATH
   if [ -e "$source" ] || [ -L "$source" ]; then
@@ -832,17 +932,19 @@ teardown_admitted_bundles_current() {  # <copy> <head>
   teardown_bundle_final_current "$1" "$2" "${TEARDOWN_ADMIT_STORED[$last]}" "${TEARDOWN_ADMIT_RECORD[$last]}"
 }
 
-# The removal dirt rule: every status line counts except the exact managed
-# files Firstmate writes into a copy (.claude/settings.local.json and the two
-# turn-end markers) and the exact untracked entry of each of the task's own
-# <nested-copy> paths inside <copy>, which are proved on their own. Unlike
-# fm_task_copy_dirty_status it never exempts the rest of the .claude tree.
+# The removal dirt rule matches what a plain git worktree remove refuses: every
+# status line counts, Firstmate's managed hook files and turn-end markers too
+# (bin/fm-spawn.sh excludes them, so they show only where that exclusion is
+# missing, and Git would then refuse the copy), except the exact untracked entry
+# of each of the task's own <nested-copy> paths inside <copy>, which are proved
+# and removed on their own first. Unlike fm_task_copy_dirty_status it never
+# exempts any part of the .claude tree.
 teardown_removal_dirty_status() {  # <porcelain-status> <copy> [<nested-copy>...]
   local status=$1 copy=$2 line nested
   shift 2
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
-      ''|'?? .claude/settings.local.json'|'?? .fm-grok-turnend'|'?? .fm-kimi-turnend') continue ;;
+      '') continue ;;
     esac
     for nested in "$@"; do
       case "$nested" in
@@ -854,28 +956,54 @@ teardown_removal_dirty_status() {  # <porcelain-status> <copy> [<nested-copy>...
 }
 
 # The preserve of <copy> holds its ignored files: for each regular file under
-# each preservable ignored entry, the copy's file, the preserved payload file
-# and its SHA256SUMS line agree by SHA-256, and the preserve lies outside every
-# removal root. Reads the preserved payload itself, never only the manifest.
-teardown_ignored_preserved_current() {  # <copy>
-  local copy=$1 entries entry dest file rel sum kept
-  entries=$(teardown_preservable_ignored "$copy") || { TEARDOWN_PRESERVE_WHY='the ignored files cannot be listed'; return 1; }
-  [ -n "$entries" ] || return 0
-  dest="$DATA/$ID/nested-copy-preserved/$(printf '%s' "$copy" | teardown_ignored_sha256)" \
-    || { TEARDOWN_PRESERVE_WHY='the preserve path cannot be named'; return 1; }
+# each preservable ignored entry (teardown_preservable_ignored_z, in <mode>), the
+# copy's file, the preserved payload file and its one SHA256SUMS line agree by
+# SHA-256; the manifest holds exactly as many lines as those files; the preserve
+# is a real directory outside every removal root and each payload file's real
+# directory lies inside it. Every listing and scan is checked, so one that fails
+# refuses. Reads the preserved payload itself, never only the manifest.
+teardown_ignored_preserved_current() {  # <copy> [all|releasable]
+  local copy=$1 mode=${2:-} list files rc=0
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
+  files=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { rm -f "$list"; TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
+  teardown_preserved_payload_check "$copy" "$mode" "$list" "$files" || rc=1
+  rm -f "$list" "$files"
+  return "$rc"
+}
+teardown_preserved_payload_check() {  # <copy> <mode> <list-file> <files-file>
+  local copy=$1 mode=$2 list=$3 files=$4 dest real entry file rel sum kept dir count=0 lines
+  teardown_preservable_ignored_z "$copy" "$mode" >"$list" || { TEARDOWN_PRESERVE_WHY='the ignored files cannot be listed'; return 1; }
+  [ -s "$list" ] || return 0
+  dest=$(printf '%s' "$copy" | teardown_ignored_sha256) || { TEARDOWN_PRESERVE_WHY='the preserve path cannot be named'; return 1; }
+  dest="$DATA/$ID/nested-copy-preserved/$dest"
   teardown_preserve_dest_outside "$copy" "$dest" || return 1
+  [ -d "$dest" ] && [ ! -L "$dest" ] || { TEARDOWN_PRESERVE_WHY='the preserve is not a real directory'; return 1; }
+  real=$(fm_task_copy_canonical_dir "$dest") || { TEARDOWN_PRESERVE_WHY='the preserve cannot be resolved'; return 1; }
+  teardown_path_outside_removal_roots "$copy" "$real" \
+    || { TEARDOWN_PRESERVE_WHY="the preserve resolves inside $TEARDOWN_ROOT_LABEL $TEARDOWN_ROOT_HIT"; return 1; }
   [ -f "$dest/SHA256SUMS" ] && [ ! -L "$dest/SHA256SUMS" ] || { TEARDOWN_PRESERVE_WHY='the preserve has no manifest'; return 1; }
-  while IFS= read -r entry; do
+  while IFS= read -r -d '' entry; do
     [ -n "$entry" ] || continue
+    find "$copy/$entry" -type f -print0 >"$files" 2>/dev/null \
+      || { TEARDOWN_PRESERVE_WHY="the files of $(teardown_nul_list_text <(printf '%s\0' "$entry")) cannot be listed"; return 1; }
     while IFS= read -r -d '' file; do
       rel=${file#"$copy/"}
-      sum=$(teardown_ignored_sha256 "$file") || { TEARDOWN_PRESERVE_WHY="$rel cannot be hashed"; return 1; }
-      grep -qxF "$sum  $rel" "$dest/SHA256SUMS" || { TEARDOWN_PRESERVE_WHY="the manifest does not hold $rel as it is in the copy"; return 1; }
-      [ -f "$dest/$rel" ] && [ ! -L "$dest/$rel" ] || { TEARDOWN_PRESERVE_WHY="the preserved payload of $rel is missing"; return 1; }
-      kept=$(teardown_ignored_sha256 "$dest/$rel") && [ "$kept" = "$sum" ] \
-        || { TEARDOWN_PRESERVE_WHY="the preserved payload of $rel does not match the copy"; return 1; }
-    done < <(find "$copy/$entry" -type f -print0 2>/dev/null)
-  done <<< "$entries"
+      sum=$(teardown_ignored_sha256 "$file") || { TEARDOWN_PRESERVE_WHY="${rel//$'\n'/\\n} cannot be hashed"; return 1; }
+      grep -qxF -- "$(teardown_manifest_line "$sum" "$rel")" "$dest/SHA256SUMS" \
+        || { TEARDOWN_PRESERVE_WHY="the manifest does not hold ${rel//$'\n'/\\n} as it is in the copy"; return 1; }
+      kept="$dest/$rel"
+      [ -f "$kept" ] && [ ! -L "$kept" ] || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} is missing"; return 1; }
+      dir=$(fm_task_copy_canonical_dir "${kept%/*}") \
+        || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} cannot be resolved"; return 1; }
+      case "$dir/" in "$real"/*) ;; *) TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} resolves outside the preserve"; return 1 ;; esac
+      [ "$(teardown_ignored_sha256 "$kept")" = "$sum" ] \
+        || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} does not match the copy"; return 1; }
+      count=$((count + 1))
+    done <"$files"
+  done <"$list"
+  lines=$(wc -l < "$dest/SHA256SUMS") || { TEARDOWN_PRESERVE_WHY='the manifest cannot be read'; return 1; }
+  lines=${lines//[!0-9]/}
+  [ "${lines:-x}" = "$count" ] || { TEARDOWN_PRESERVE_WHY="the manifest holds ${lines:-no} lines for the $count files the copy holds"; return 1; }
 }
 
 # Does the preserve directory <dest> resolve outside every removal root of
@@ -910,7 +1038,7 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 TEARDOWN_FINAL_WHY=
 TEARDOWN_FINAL_STABLE=
 teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [<launcher-pid> <lock-mtime>]
-  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} head status unique canonical i latest found=0 rc=0
+  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} head status unique canonical i latest found=0 rc=0 snap ref now
   TEARDOWN_FINAL_WHY=
   TEARDOWN_FINAL_STABLE=
   head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) \
@@ -946,7 +1074,21 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [
           return 1
         fi
         ;;
-      landed) ;;
+      landed)
+        # The default branch the landing proof read must be the one it read.
+        snap=${TEARDOWN_ADMIT_STORED[$i]}
+        ref=${snap%% *}
+        now=''
+        [ -z "$snap" ] || now=$(git -C "$copy" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null) || now=''
+        if [ -z "$snap" ] || [ -z "$now" ]; then
+          TEARDOWN_FINAL_WHY="the default branch its landing proof read${ref:+ ($ref)} cannot be read at the removal; re-run teardown for a fresh landing proof"
+          return 1
+        fi
+        if [ "$now" != "${snap##* }" ]; then
+          TEARDOWN_FINAL_WHY="the default branch its landing proof read moved ($ref ${snap##* }; now $now); re-run teardown for a fresh landing proof"
+          return 1
+        fi
+        ;;
       bundle)
         if ! teardown_bundle_final_current "$copy" "$head" "${TEARDOWN_ADMIT_STORED[$i]}" "${TEARDOWN_ADMIT_RECORD[$i]}"; then
           TEARDOWN_FINAL_WHY="the recorded bundle that admitted it no longer holds HEAD ${head:0:12} ($TEARDOWN_BUNDLE_REASON)"
@@ -964,12 +1106,19 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [
   fi
   case "$ignored" in
     refuse)
-      unique=$(teardown_preservable_ignored "$copy") || { TEARDOWN_FINAL_WHY='its ignored files cannot be listed at the removal'; return 1; }
-      if [ -n "$unique" ]; then
-        TEARDOWN_FINAL_STABLE=1
-        TEARDOWN_FINAL_WHY="it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)"
+      unique=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_FINAL_WHY='a scratch file cannot be made at the removal'; return 1; }
+      if ! teardown_preservable_ignored_z "$copy" >"$unique"; then
+        rm -f "$unique"
+        TEARDOWN_FINAL_WHY='its ignored files cannot be listed at the removal'
         return 1
       fi
+      if [ -s "$unique" ]; then
+        TEARDOWN_FINAL_STABLE=1
+        TEARDOWN_FINAL_WHY="it holds ignored files no hash record preserves: $(teardown_nul_list_text "$unique")"
+        rm -f "$unique"
+        return 1
+      fi
+      rm -f "$unique"
       ;;
     preserve)
       if ! teardown_preserve_ignored "$copy" || ! teardown_ignored_preserved_current "$copy"; then
@@ -1061,65 +1210,147 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   teardown_bundle_refuse "$bundle: $TEARDOWN_BUNDLE_REASON" "$hint"
 }
 
-# Copies every entry teardown_preservable_ignored prints for <copy> in the given
-# mode into $DATA/$ID/nested-copy-preserved/<copy-path-sha256> and records each file's
-# SHA-256 in its SHA256SUMS. The new copy is built in a staging directory and
-# replaces an earlier preserve of the same copy only after every entry is copied
-# and hashed, so a failed run never costs the earlier one. Returns 1 when
-# anything cannot be listed, copied or hashed, after removing the one staging
-# directory it built, and the caller then refuses the copy rather than removing
-# unpreserved content.
+# Copies every entry teardown_preservable_ignored_z prints for <copy> in the given
+# mode into $DATA/$ID/nested-copy-preserved/<copy-path-sha256> and records each
+# file's SHA-256 in its SHA256SUMS (teardown_manifest_line). The new preserve is
+# built in a staging directory, every listing and scan checked; it is published
+# by renaming the earlier preserve aside and the new one into place, and the
+# earlier one is deleted only after the published one verifies
+# (teardown_ignored_preserved_current). A failed publication or verification puts
+# the earlier preserve back, and an earlier preserve an interrupted run left set
+# aside is put back before anything else, so no failure, interruption or retry
+# costs an earlier preserve. Returns 1 with TEARDOWN_PRESERVE_WHY when anything
+# cannot be listed, copied, hashed, published or verified, and the caller then
+# refuses the copy rather than removing unpreserved content.
 TEARDOWN_PRESERVE_WHY=
 teardown_preserve_ignored() {  # <copy> [all|releasable]
-  local copy=$1 root dest stage aside entries entry file hash
-  entries=$(teardown_preservable_ignored "$copy" "${2:-}") || return 1
-  [ -n "$entries" ] || return 0
+  local copy=$1 mode=${2:-} root dest stage aside='' failed list hash why
   TEARDOWN_PRESERVE_WHY=
-  hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
+  if ! teardown_preservable_ignored_z "$copy" "$mode" >"$list"; then
+    rm -f "$list"
+    TEARDOWN_PRESERVE_WHY='the ignored files cannot be listed'
+    return 1
+  fi
+  if [ ! -s "$list" ]; then
+    rm -f "$list"
+    return 0
+  fi
+  hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || { rm -f "$list"; TEARDOWN_PRESERVE_WHY='the preserve path cannot be named'; return 1; }
   root="$DATA/$ID/nested-copy-preserved"
   dest="$root/$hash"
   stage="$root/.staging-$hash"
-  aside="$root/.aside-$hash"
-  mkdir -p "$root" || { TEARDOWN_PRESERVE_WHY='the preserve directory cannot be created'; return 1; }
-  teardown_preserve_dest_outside "$copy" "$dest" || return 1
-  rm -rf "$stage" || return 1
-  (
-    mkdir -p "$stage" || return 1
-    printf '%s\n' "$copy" > "$stage/copy-path" || return 1
-    : > "$stage/SHA256SUMS" || return 1
-    while IFS= read -r entry; do
-      [ -n "$entry" ] || continue
-      case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
-      rm -rf "${stage:?}/$entry" || return 1
-      mkdir -p "$(dirname "$stage/$entry")" || return 1
-      cp -RPp "$copy/$entry" "$stage/$entry" || return 1
-    done <<< "$entries"
-    while IFS= read -r -d '' file; do
-      hash=$(teardown_ignored_sha256 "$file") || return 1
-      printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
-    done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
-    # Publish by renaming: the earlier preserve is set aside, the new one is
-    # renamed into place, and only then is the earlier one deleted; a failed
-    # rename puts the earlier preserve back.
-    rm -rf "$aside" || return 1
-    if [ -e "$dest" ] || [ -L "$dest" ]; then
-      mv "$dest" "$aside" || return 1
-    fi
-    if ! mv "$stage" "$dest"; then
-      [ ! -e "$aside" ] || mv "$aside" "$dest"
-      return 1
-    fi
-    rm -rf "$aside" || return 1
-  ) || {
+  mkdir -p "$root" || { rm -f "$list"; TEARDOWN_PRESERVE_WHY='the preserve directory cannot be created'; return 1; }
+  teardown_preserve_dest_outside "$copy" "$dest" || { rm -f "$list"; return 1; }
+  teardown_preserve_recover_aside "$root" "$hash" || { rm -f "$list"; return 1; }
+  rm -rf "$stage" || { rm -f "$list"; TEARDOWN_PRESERVE_WHY='an earlier staging directory cannot be removed'; return 1; }
+  if ! teardown_preserve_stage "$copy" "$stage" "$list"; then
     rm -rf "$stage"
-    [ -n "$TEARDOWN_PRESERVE_WHY" ] || TEARDOWN_PRESERVE_WHY='the preserve could not be copied, hashed or published'
+    rm -f "$list"
+    TEARDOWN_PRESERVE_WHY='the preserve could not be copied, scanned or hashed'
     return 1
-  }
+  fi
+  rm -f "$list"
+  if [ -e "$dest" ] || [ -L "$dest" ]; then
+    aside=$(teardown_preserve_aside_name "$root" "$hash") && mv "$dest" "$aside" || {
+      rm -rf "$stage"
+      TEARDOWN_PRESERVE_WHY='the earlier preserve cannot be set aside'
+      return 1
+    }
+  fi
+  if ! mv "$stage" "$dest"; then
+    [ -z "$aside" ] || mv "$aside" "$dest" || true
+    rm -rf "$stage"
+    TEARDOWN_PRESERVE_WHY='the new preserve could not be published'
+    return 1
+  fi
+  if ! teardown_ignored_preserved_current "$copy" "$mode"; then
+    why=$TEARDOWN_PRESERVE_WHY
+    if [ -n "$aside" ]; then
+      # The failed preserve is moved beside the earlier one, which goes back.
+      failed=$(teardown_preserve_aside_name "$root" "$hash" failed) && mv "$dest" "$failed" && mv "$aside" "$dest" || true
+    fi
+    TEARDOWN_PRESERVE_WHY="the published preserve does not verify ($why)"
+    return 1
+  fi
+  # The new preserve is proved: every earlier one of this copy may go.
+  teardown_preserve_drop_asides "$root" "$hash" || true
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
 }
 
-# The lock reason first read for each copy in this run (canonical path), so a
-# later read can tell a changed lock from the one that was proved.
+# Builds staging directory <stage> from the NUL-ended entry list <list> of
+# <copy>: its copy-path, every entry copied, and SHA256SUMS over every regular
+# file. Fails when any entry, copy, scan or hash fails.
+teardown_preserve_stage() {  # <copy> <stage> <list>
+  local copy=$1 stage=$2 list=$3 files entry file sum rc=0
+  files=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  (
+    mkdir -p "$stage" || exit 1
+    printf '%s\n' "$copy" > "$stage/copy-path" || exit 1
+    : > "$stage/SHA256SUMS" || exit 1
+    while IFS= read -r -d '' entry; do
+      [ -n "$entry" ] || continue
+      case "$entry" in /*|..|../*|*/..|*/../*) exit 1 ;; esac
+      rm -rf "${stage:?}/$entry" || exit 1
+      mkdir -p "$(dirname "$stage/$entry")" || exit 1
+      cp -RPp "$copy/$entry" "$stage/$entry" || exit 1
+    done <"$list"
+    find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0 >"$files" 2>/dev/null || exit 1
+    while IFS= read -r -d '' file; do
+      sum=$(teardown_ignored_sha256 "$file") || exit 1
+      teardown_manifest_line "$sum" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || exit 1
+    done <"$files"
+  ) || rc=1
+  rm -f "$files"
+  return "$rc"
+}
+
+# A fresh name beside the preserves in <root> for an earlier (or a failed)
+# preserve of copy hash <hash>, ordered by time so the newest sorts last.
+teardown_preserve_aside_name() {  # <root> <hash> [failed]
+  local stamp name
+  stamp=$(date +%s) || return 1
+  name="$1/.${3:-aside}-$2.$stamp.$$"
+  while [ -e "$name" ] || [ -L "$name" ]; do
+    name="$name.1"
+  done
+  printf '%s\n' "$name"
+}
+
+# The earlier preserves of copy hash <hash> set aside in <root>, newest last:
+# the one an earlier run named .aside-<hash> and every timed one.
+teardown_preserve_asides() {  # <root> <hash>
+  local entry
+  for entry in "$1/.aside-$2" "$1/.aside-$2".*; do
+    { [ -e "$entry" ] || [ -L "$entry" ]; } && printf '%s\n' "$entry"
+  done | LC_ALL=C sort
+}
+
+# With no preserve of copy hash <hash> in place in <root>, an interrupted run left
+# the earlier one set aside: the newest set-aside one goes back into place.
+teardown_preserve_recover_aside() {  # <root> <hash>
+  local newest
+  [ ! -e "$1/$2" ] && [ ! -L "$1/$2" ] || return 0
+  newest=$(teardown_preserve_asides "$1" "$2" | tail -n 1)
+  [ -n "$newest" ] || return 0
+  mv "$newest" "$1/$2" || { TEARDOWN_PRESERVE_WHY="the earlier preserve set aside at $newest cannot be put back"; return 1; }
+}
+
+# Deletes every earlier preserve of copy hash <hash> set aside in <root>, once a
+# newer one has verified.
+teardown_preserve_drop_asides() {  # <root> <hash>
+  local entry rc=0
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    rm -rf "$entry" || rc=1
+  done < <(teardown_preserve_asides "$1" "$2")
+  return "$rc"
+}
+
+# The lock first read for each copy in this run (canonical path): its reason and
+# the SHA-256 of the whole lock file (TEARDOWN_FOREIGN_LOCK_SHA of the read that
+# gave <lock-reason>), so a later read can tell any changed lock byte from the
+# lock that was proved.
 TEARDOWN_LOCK_SEEN_DIRS=()
 TEARDOWN_LOCK_SEEN_TEXT=()
 teardown_lock_seen() {  # <copy> <lock-reason>
@@ -1129,14 +1360,15 @@ teardown_lock_seen() {  # <copy> <lock-reason>
     [ "${TEARDOWN_LOCK_SEEN_DIRS[$i]}" != "$copy" ] || return 0
   done
   TEARDOWN_LOCK_SEEN_DIRS+=("$copy")
-  TEARDOWN_LOCK_SEEN_TEXT+=("$2")
+  TEARDOWN_LOCK_SEEN_TEXT+=("$2"$'\n'"${TEARDOWN_FOREIGN_LOCK_SHA:-}")
 }
 teardown_lock_is_first_seen() {  # <copy> <lock-reason>
   local copy i
   copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  [ -n "${TEARDOWN_FOREIGN_LOCK_SHA:-}" ] || return 1
   for i in ${TEARDOWN_LOCK_SEEN_DIRS[@]+"${!TEARDOWN_LOCK_SEEN_DIRS[@]}"}; do
     [ "${TEARDOWN_LOCK_SEEN_DIRS[$i]}" = "$copy" ] || continue
-    [ "${TEARDOWN_LOCK_SEEN_TEXT[$i]}" = "$2" ]
+    [ "${TEARDOWN_LOCK_SEEN_TEXT[$i]}" = "$2"$'\n'"$TEARDOWN_FOREIGN_LOCK_SHA" ]
     return
   done
   return 1
@@ -1323,18 +1555,25 @@ teardown_foreign_copy_prove() {  # <copy>
     return 1
   fi
   teardown_foreign_copy_unowned "$copy" || return 1
-  if ! unique=$(teardown_preservable_ignored "$copy"); then
+  unique=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || {
+    TEARDOWN_FOREIGN_RULE=inspection-unavailable
+    TEARDOWN_FOREIGN_WHY="its ignored files could not be listed"
+    return 1
+  }
+  if ! teardown_preservable_ignored_z "$copy" >"$unique"; then
+    rm -f "$unique"
     TEARDOWN_FOREIGN_RULE=inspection-unavailable
     TEARDOWN_FOREIGN_WHY="its ignored files could not be listed"
     return 1
   fi
-  if [ -n "$unique" ] && teardown_foreign_copy_hold_applies "$copy"; then
+  if [ -s "$unique" ] && teardown_foreign_copy_hold_applies "$copy"; then
     TEARDOWN_FOREIGN_RULE='copy-ignored-files'
-    unique=$(printf '%s\n' "$unique" | LC_ALL=C sort -u | tr '\n' ' ')
-    TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(fm_refuse_text "${unique% }")"
+    TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(fm_refuse_text "$(teardown_nul_list_text "$unique")")"
+    rm -f "$unique"
     ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=ignored
     return 1
   fi
+  rm -f "$unique"
   # Under the project lock the landed-work rule asks no forge and fetches nothing,
   # and refuses a proof it has not cached. A copy it answered "not landed" for is
   # cached here by path and HEAD: an unchanged copy keeps that verdict, and one
@@ -1672,6 +1911,9 @@ teardown_credit_bundle() {  # <copy> <head>
     return 1
   fi
   TEARDOWN_CREDIT_RECORD=$record
+  # The credit is a proof the driver acts on, so the final proof before the
+  # driver rechecks it like any other bundle admission.
+  teardown_admit "$copy" bundle "$head" "$stored"
 }
 
 # Chooses the one credit for the driver from teardown's own proofs, once per
@@ -1870,6 +2112,11 @@ teardown_closeout_release() {  # <slot> <copy> <foreign|own nested>
     1) TEARDOWN_CLOSEOUT_NOT_RUN='its lock is gone since it was proved' ;;
     *) TEARDOWN_CLOSEOUT_NOT_RUN='its lock state cannot be read' ;;
   esac
+  # The retire phase has run, so no process may be in the copy or hold a file in
+  # it open now, this teardown's own included: one found here is never queued
+  # for a retire that will not run again, and nothing is signalled.
+  [ -n "$TEARDOWN_CLOSEOUT_NOT_RUN" ] || teardown_copy_holder_free "$copy" \
+    || TEARDOWN_CLOSEOUT_NOT_RUN=$TEARDOWN_HOLDER_WHY
   # The same final proof as every removal, just before the driver's execute call
   # (the driver then removes the copy itself).
   if [ -z "$TEARDOWN_CLOSEOUT_NOT_RUN" ] && ! teardown_removal_final_proof "$copy" preserve locked "$pid" "$mtime"; then
@@ -1891,6 +2138,27 @@ teardown_closeout_release() {  # <slot> <copy> <foreign|own nested>
     TEARDOWN_RELEASE_WHY="the driver's verdict is not one a direct release may take over"
   fi
   return "$rc"
+}
+
+# Does no process run in <copy> or hold a file in it open (the search indexer
+# exempt, as in every holder scan)? Returns 1 with TEARDOWN_HOLDER_WHY naming the
+# first holder, or the scan that failed.
+TEARDOWN_HOLDER_WHY=
+teardown_copy_holder_free() {  # <copy>
+  local copy=$1 procs
+  TEARDOWN_HOLDER_WHY=
+  procs=$(pids_with_cwd_under "$copy") || { TEARDOWN_HOLDER_WHY='a scan for processes running in it failed'; return 1; }
+  if [ -n "$procs" ]; then
+    procs=${procs%%$'\n'*}
+    TEARDOWN_HOLDER_WHY="process ${procs%%$'\t'*} runs in it after the retire phase"
+    return 1
+  fi
+  procs=$(pids_with_open_file_under "$copy") || { TEARDOWN_HOLDER_WHY='a scan for processes holding its files open failed'; return 1; }
+  if [ -n "$procs" ]; then
+    procs=${procs%%$'\n'*}
+    TEARDOWN_HOLDER_WHY="process ${procs%%$'\t'*} holds $(fm_refuse_text "${procs#*$'\t'}") open after the retire phase"
+    return 1
+  fi
 }
 
 # Is <copy> still on disk or registered in <slot>? Failure to list counts as yes.

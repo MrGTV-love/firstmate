@@ -2711,6 +2711,10 @@ pr_is_merged() {
 # refuses for a fresh proof on retry rather than doing network work under it.
 TEARDOWN_LANDED_DIRS=()
 TEARDOWN_LANDED_HEADS=()
+# The default-branch ref and commit each cached proof read, taken right after
+# the proof (teardown_default_ref_snapshot): a reuse admits with the snapshot of
+# the proof it reuses, so the final proof sees a default branch that moved since.
+TEARDOWN_LANDED_SNAPS=()
 # Why a failed proof could not ask the question (forge, fetch, HEAD or content
 # comparison), empty when it answered "not landed". A reader that types
 # refusals must not count an unasked proof as a policy refusal.
@@ -2732,7 +2736,7 @@ work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
 # work_is_landed exits for a retry instead of letting any caller refuse it.
 TEARDOWN_NM_RECORD_SILENT=0
 work_is_landed() {
-  local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
+  local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i snap
   TEARDOWN_LANDED_UNASKED=
   head=$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null) || {
     TEARDOWN_LANDED_UNASKED="HEAD of $dir cannot be resolved"
@@ -2742,7 +2746,7 @@ work_is_landed() {
   TEARDOWN_PIPELINE_INPUT_REASON=
   for i in "${!TEARDOWN_LANDED_DIRS[@]}"; do
     if [ "${TEARDOWN_LANDED_DIRS[$i]}" = "$dir" ] && [ "${TEARDOWN_LANDED_HEADS[$i]}" = "$head" ]; then
-      teardown_admit "$dir" landed "$head"
+      teardown_admit "$dir" landed "$head" "${TEARDOWN_LANDED_SNAPS[$i]-}"
       return 0
     fi
   done
@@ -2759,9 +2763,11 @@ work_is_landed() {
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
   TEARDOWN_NM_RECORD_SILENT=0
   if work_is_landed_proof "$branch"; then
+    snap=$(teardown_default_ref_snapshot "$dir") || snap=''
     TEARDOWN_LANDED_DIRS+=("$dir")
     TEARDOWN_LANDED_HEADS+=("$head")
-    teardown_admit "$dir" landed "$head"
+    TEARDOWN_LANDED_SNAPS+=("$snap")
+    teardown_admit "$dir" landed "$head" "$snap"
     return 0
   fi
   if [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ]; then
@@ -4882,12 +4888,14 @@ teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
 # hold, or its ignored files cannot be listed.
 teardown_admitted_ignored_kept() {  # <copy> <refusal-subject> <admission> [proof-outcome]
   local unique
-  if unique=$(teardown_preservable_ignored "$1"); then
-    [ -n "$unique" ] || return 0
-    echo "REFUSED: $2 $1, during cleanup admitted by $3, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${4:+; $4}." >&2
+  unique=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || unique=
+  if [ -n "$unique" ] && teardown_preservable_ignored_z "$1" >"$unique"; then
+    [ -s "$unique" ] || { rm -f "$unique"; return 0; }
+    echo "REFUSED: $2 $1, during cleanup admitted by $3, but it holds ignored files no hash record preserves: $(teardown_nul_list_text "$unique")${4:+; $4}." >&2
   else
     echo "REFUSED: $2 $1, during cleanup admitted by $3, but its ignored files cannot be listed${4:+; $4}." >&2
   fi
+  [ -z "$unique" ] || rm -f "$unique"
   echo "Land that commit, or move those ignored files out of the copy, then re-run teardown." >&2
   return 1
 }

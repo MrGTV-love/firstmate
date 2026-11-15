@@ -400,9 +400,10 @@ fm_task_copy_registered_nested() {  # <canonical-clone>
 
 # The local copies a task record names, one "<field> <path>" line each: the
 # last worktree= and home= values (the values every reader of those fields
-# uses) and every prior_worktree= line.
+# uses) and every prior_worktree= line. Fails when the record cannot be read.
 fm_task_copy_record_paths() {  # <meta>
   local meta=$1 value line
+  { : < "$meta"; } 2>/dev/null || return 1
   for value in worktree home; do
     line=$(fm_meta_get "$meta" "$value")
     [ -z "$line" ] || printf '%s %s\n' "$value" "$line"
@@ -411,7 +412,7 @@ fm_task_copy_record_paths() {  # <meta>
     case "$line" in
       prior_worktree=?*) printf 'prior_worktree %s\n' "${line#prior_worktree=}" ;;
     esac
-  done < "$meta" 2>/dev/null || true
+  done < "$meta" 2>/dev/null || return 1
 }
 
 fm_task_copy_ancestor_current() {
@@ -450,7 +451,8 @@ fm_task_copy_ancestor_current() {
 # re-points together in one call, and checks those against each other itself.
 # Returns 0 on overlap, setting FM_TASK_COPY_OTHER_ID and
 # FM_TASK_COPY_OTHER_FIELD;
-# 1 for no overlap or a missing path; 2 when the scan cannot be completed.
+# 1 for no overlap or a missing path; 2 when the scan cannot be completed,
+# including when a task record cannot be read.
 #
 # Identity, not spelling: the same record reached through a differently
 # resolved state dir (e.g. a symlinked $FM_HOME) is still <record-meta>. A
@@ -466,7 +468,7 @@ FM_TASK_COPY_OTHER_FIELD=
 FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
 fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
-  local target state_dir other_meta line field other_path other_real skip
+  local target state_dir other_meta line field other_path other_real skip paths
   shift 3
   FM_TASK_COPY_OTHER_ID=
   FM_TASK_COPY_OTHER_FIELD=
@@ -482,7 +484,14 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
       for skip in "$@"; do
         [ "${other_meta##*/}" = "${skip##*/}" ] && [ "$other_meta" -ef "$skip" ] && continue 2
       done
+      # A record that cannot be read leaves its owner unknown, never absent; one
+      # that vanished since the listing names nothing.
+      if ! paths=$(fm_task_copy_record_paths "$other_meta"); then
+        [ -e "$other_meta" ] || [ -L "$other_meta" ] || continue
+        return 2
+      fi
       while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] || continue
         field=${line%% *}
         other_path=${line#* }
         [ -n "$other_path" ] || continue
@@ -497,7 +506,7 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
         FM_TASK_COPY_OTHER_ID=$(basename "$other_meta" .meta)
         FM_TASK_COPY_OTHER_FIELD=$field
         return 0
-      done < <(fm_task_copy_record_paths "$other_meta")
+      done <<< "$paths"
     done
   done
   return 1
