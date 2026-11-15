@@ -724,9 +724,16 @@ teardown_bundle_store() {  # <copy> <source> <sha256>
       || { [ -e "$TEARDOWN_BUNDLE_STORED" ] && [ ! -f "$TEARDOWN_BUNDLE_STORED" ]; }; then
     TEARDOWN_BUNDLE_REASON='stored bundle is not a regular nonsymlink file'; return 1
   fi
-  stage=$(mktemp "$root/.bundle.XXXXXX") || {
-    TEARDOWN_BUNDLE_REASON='stored bundle staging file cannot be created'; return 1;
-  }
+  if [ -n "${TEARDOWN_RUN_DIR:-}" ]; then
+    stage="$TEARDOWN_RUN_DIR/bundle-$hash"
+    { [ ! -e "$stage" ] && [ ! -L "$stage" ]; } || {
+      TEARDOWN_BUNDLE_REASON='stored bundle staging file cannot be created'; return 1;
+    }
+  else
+    stage=$(mktemp "$root/.bundle.XXXXXX") || {
+      TEARDOWN_BUNDLE_REASON='stored bundle staging file cannot be created'; return 1;
+    }
+  fi
   if ! cp "$source" "$stage"; then
     TEARDOWN_BUNDLE_REASON='bundle cannot be copied into task data'
   elif ! teardown_bundle_external "$copy" "$stage"; then
@@ -844,7 +851,14 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
   root="$DATA/$ID/nested-copy-preserved"
   dest="$root/$hash"
-  stage="$root/.staging-$hash"
+  # A teardown stages in its private run directory (bin/fm-teardown.sh's
+  # teardown_run_dir_prepare); other callers, such as bin/fm-copy-sweep.sh,
+  # stage beside the preserved copies as before.
+  if [ -n "${TEARDOWN_RUN_DIR:-}" ]; then
+    stage="$TEARDOWN_RUN_DIR/ignored-$hash"
+  else
+    stage="$root/.staging-$hash"
+  fi
   rm -rf "$stage" || return 1
   (
     mkdir -p "$stage" || return 1
