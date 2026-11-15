@@ -836,14 +836,15 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <strict|own> [<laun
     || { TEARDOWN_FINAL_WHY='its HEAD cannot be resolved at the removal'; return 1; }
   status=$(git -C "$copy" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) \
     || { TEARDOWN_FINAL_WHY='its status cannot be read at the removal'; return 1; }
+  # The same dirt rule the copy's first proof used (fm_task_copy_dirty_status);
+  # content Git still protects is left to the non-forced remove that follows,
+  # which refuses it with its own typed refusal.
   if [ "$status_mode" = own ]; then
     status=$(fm_task_copy_dirty_status "$status" "$copy" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"})
+  else
+    status=$(fm_task_copy_dirty_status "$status" "$copy")
   fi
   [ -z "$status" ] || { TEARDOWN_FINAL_WHY="it has uncommitted or untracked changes at the removal: $(printf '%s' "$status" | head -n 3 | paste -sd ' ' -)"; return 1; }
-  if [ "$status_mode" = strict ] && teardown_copy_git_protects "$copy"; then
-    TEARDOWN_FINAL_WHY='it holds content Git would not remove without force at the removal'
-    return 1
-  fi
   if [ "$status_mode" = own ] && fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 \
       ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} && [ "$FM_TASK_COPY_HEAD" = "$head" ]; then
     :

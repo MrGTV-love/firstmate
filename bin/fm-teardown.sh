@@ -4820,7 +4820,9 @@ teardown_remove_own_nested_copies() {  # <slot-label>
       [ "$root" != "$copy" ] || known=1
     done
     [ "$known" = 0 ] || continue
-    if [ "$FORCE" != "--force" ]; then
+    # A scout's or secondmate's copy is declared scratch and skips the
+    # landed-work rule (validate_worktree_teardown_safety), so it skips this too.
+    if [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
       # The final proof, immediately before the removal: a copy admitted by a
       # bundle or by default-branch history keeps a unique ignored file (refuse);
       # any other copy's ignored files are preserved again first.
