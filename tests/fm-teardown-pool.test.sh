@@ -887,7 +887,7 @@ test_nested_slot_reproof_refusal_is_rerunnable() {
   : > "$lock"
   touch -t 200001010000 "$lock"
   rc=0
-  FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  FM_HOME="$case_dir/home" FM_TREEHOUSE_RETURN_LOCK_RETRIES=0 FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "$label: the first teardown must stop at the slot's late work: $(cat "$case_dir/stderr")"
   assert_absent "$NESTED_COPY" "$label: the first teardown had not yet removed the nested copy"
@@ -932,7 +932,7 @@ test_nested_rerun_local_only_ship_is_recorded_landed() {
   : > "$lock"
   touch -t 200001010000 "$lock"
   rc=0
-  FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  FM_HOME="$case_dir/home" FM_TREEHOUSE_RETURN_LOCK_RETRIES=0 FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "$label: the first teardown must stop at the slot's late work: $(cat "$case_dir/stderr")"
   assert_absent "$NESTED_COPY" "$label: the nested copy was not removed by the first teardown"

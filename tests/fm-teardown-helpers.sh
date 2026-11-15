@@ -2474,6 +2474,8 @@ SH
 # stale_lock_late_work_treehouse <case-dir>: a fake treehouse whose return
 # fails on the slot's index.lock after writing late.txt into the slot, as a
 # process still running there would, and otherwise logs the return.
+# Callers set FM_TREEHOUSE_RETURN_LOCK_RETRIES=0: the safety proof before each
+# retry would stop at late.txt first, so the stale-lock cleanup would not run.
 stale_lock_late_work_treehouse() {  # <case-dir>
   local case_dir=$1
   cat > "$case_dir/fakebin/treehouse" <<SH
