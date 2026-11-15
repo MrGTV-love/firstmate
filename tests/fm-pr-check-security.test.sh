@@ -1593,6 +1593,52 @@ test_postrename_poll_validation_revokes_and_retries() {
   pass "post-rename poll validation faults revoke both names and allow a clean retry"
 }
 
+# A custom check registered while a publication is under way, after the
+# publisher's first check and before its own check rename, is another check:
+# the publisher stands down, its rollback removes only the sidecar and the
+# registration it renamed, and the custom check and its trust stay byte for
+# byte (fm-check-register.sh takes no lock, so this order is reachable).
+test_custom_check_registered_mid_publication_is_left_in_place() {
+  local dir state before
+  dir=$(make_case poll-custom-mid-publication)
+  state="$dir/home/state"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "could not prepare prior poll"
+  fm_pr_poll_publish_prepared || fail "could not publish prior poll"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/2
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/2 github.com o/r 2 "$POLL" \
+    || fail "could not stage replacement poll"
+  cat > "$dir/fakebin/mv" <<'SH'
+#!/usr/bin/env bash
+last=${!#}
+"${FM_TEST_REAL_MV:?}" "$@" || exit $?
+[ "$last" = "${FM_TEST_REGISTER_AFTER:?}" ] || exit 0
+printf '#!/usr/bin/env bash\necho custom check output\n' > "${FM_TEST_CHECK_NAME:?}"
+chmod 700 "$FM_TEST_CHECK_NAME"
+PATH="${FM_TEST_OUTER_PATH:?}" FM_STATE_OVERRIDE="${FM_TEST_STATE:?}" \
+  bash "${FM_TEST_REGISTER:?}" task-a > "${FM_TEST_STATE}/../register.out" 2>&1
+SH
+  chmod +x "$dir/fakebin/mv"
+  if FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REGISTER_AFTER="$state/task-a.pr-poll-registration" \
+    FM_TEST_CHECK_NAME="$state/task-a.check.sh" FM_TEST_OUTER_PATH="$PATH" FM_TEST_STATE="$state" \
+    FM_TEST_REGISTER="$REGISTER" PATH="$dir/fakebin:$BASE_PATH" fm_pr_poll_publish_prepared; then
+    fail "a publication over a custom check registered mid-way was reported as success"
+  fi
+  [ -f "$state/task-a.check-trust" ] || fail "the custom check was not registered mid-publication: $(cat "$dir/home/register.out" 2>/dev/null)"
+  [ "$FM_PR_POLL_CHECK_CONFLICT" = 1 ] || fail "the publisher did not report the custom check as a conflict"
+  before=$(printf '#!/usr/bin/env bash\necho custom check output\n' | shasum -a 256 | cut -d' ' -f1)
+  [ "$(shasum -a 256 < "$state/task-a.check.sh" | cut -d' ' -f1)" = "$before" ] \
+    || fail "the rollback removed or changed a custom check it never published"
+  [ -f "$state/task-a.check-trust" ] || fail "the rollback removed the custom check's trust record"
+  [ ! -e "$state/task-a.pr-poll" ] && [ ! -L "$state/task-a.pr-poll" ] \
+    || fail "the rollback left the sidecar it renamed"
+  [ ! -e "$state/task-a.pr-poll-registration" ] && [ ! -L "$state/task-a.pr-poll-registration" ] \
+    || fail "the rollback left the registration it renamed"
+  fm_pr_poll_cleanup
+  pass "a custom check registered mid-publication is left in place; the rollback removes only what this publication renamed"
+}
+
 test_bootstrap_leaves_unauthenticated_checks() {
   local dir state
   dir=$(make_case bootstrap-no-legacy-rewrite)
@@ -3981,6 +4027,7 @@ test_device_rerecord_refuses_tampered_artifacts
 test_device_rerecord_serializes_direct_rearm
 test_device_rerecord_serializes_rerecord
 test_postrename_poll_validation_revokes_and_retries
+test_custom_check_registered_mid_publication_is_left_in_place
 test_bootstrap_leaves_unauthenticated_checks
 test_custom_snapshot_cleanup_on_signal
 test_custom_snapshot_cleanup_with_stopped_launcher
