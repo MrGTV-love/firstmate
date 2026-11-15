@@ -5,7 +5,7 @@
 #   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--captain-model-pin=<model-id>] [--compact-adviser-disable]
 #   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--captain-model-pin=<model-id>] [--compact-adviser-disable]
 #   fm-remote-secondmate-control.sh state <id>
-#   fm-remote-secondmate-control.sh attribution <id>
+#   fm-remote-secondmate-control.sh attribution <id> <recorded-target>
 #   fm-remote-secondmate-control.sh route <id>
 #   fm-remote-secondmate-control.sh stay <id>
 #   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
@@ -44,7 +44,9 @@
 # the endpoint's agent is positively dead or missing, or alive and attributed to
 # this task by the one launch-proof owner (bin/fm-launch-proof-lib.sh), read in
 # the same environment the host-local fm-control uses; otherwise
-# attribution=refuse: <cause>. The parent restart reads it before its first
+# attribution=refuse: <cause>. It refuses unless this host's endpoint target is
+# exactly the <recorded-target> the parent recorded at launch, so the decision is
+# bound to the parent's route. The parent restart reads it before its first
 # effect and treats anything but the exact proceed line as a refusal.
 #
 # Relaunch is not a second lifecycle implementation: it runs the ORDINARY local
@@ -163,9 +165,10 @@ state_value() { # <id>; prints recovery-grade state
   fm_backend_agent_state "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" 2>/dev/null || printf 'unreadable\n'
 }
 
-cmd_attribution() { # <id>
-  local id=$1 meta state cause
+cmd_attribution() { # <id> <recorded-target>
+  local id=$1 target=$2 meta state cause
   validate_id "$id"
+  case "$target" in ''|*[![:print:]]*) printf 'attribution=refuse: the recorded target is empty or not printable\n'; return 0 ;; esac
   validate_home "$id"
   meta=$(meta_path "$id")
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
@@ -174,6 +177,10 @@ cmd_attribution() { # <id>
   fi
   if ! remote_endpoint_load "$id"; then
     printf 'attribution=refuse: %s\n' "$REMOTE_ENDPOINT_ERROR"
+    return 0
+  fi
+  if [ "$REMOTE_ENDPOINT_TARGET" != "$target" ]; then
+    printf "attribution=refuse: this host's endpoint for %s is '%s', not the recorded route's '%s'\n" "$id" "$REMOTE_ENDPOINT_TARGET" "$target"
     return 0
   fi
   state=$(fm_backend_agent_state "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" 2>/dev/null) || state=unreadable
@@ -545,7 +552,7 @@ case "${1:-}" in
   launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 8 ] || usage; cmd_launch "$@" ;;
   relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 6 ] || usage; cmd_relaunch "$@" ;;
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
-  attribution) shift; [ "$#" -eq 1 ] || usage; cmd_attribution "$1" ;;
+  attribution) shift; [ "$#" -eq 2 ] || usage; cmd_attribution "$1" "$2" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;
   stay) shift; [ "$#" -eq 1 ] || usage; cmd_stay "$1" ;;
   send) shift; [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage; cmd_send "$@" ;;

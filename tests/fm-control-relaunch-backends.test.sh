@@ -2436,7 +2436,7 @@ test_remote_attribution_verb_reads_the_host_verdict() {
   # shellcheck disable=SC2031 # PATH is read here, not modified
   REMOTE_ATTRIBUTION_OUT=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     PATH="$dir/fakebin:$PATH" FM_HOME="$bare" FM_FAKE_DIR="$dir/fake" HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
-    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" 2>/dev/null) || fail "the verb failed on a bare home"
+    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" "fm-remote:w1:p1" 2>/dev/null) || fail "the verb failed on a bare home"
   assert_equals "attribution=refuse: no endpoint record for $id on this host" "$REMOTE_ATTRIBUTION_OUT" "a bare home refuses"
   after=$(find "$bare" -print | sort)
   [ "$before" = "$after" ] || fail "the attribution verb created a directory in a bare home: $(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"

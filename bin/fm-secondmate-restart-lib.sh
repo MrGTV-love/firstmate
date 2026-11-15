@@ -27,6 +27,8 @@ _FM_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-control-lib.sh disable=SC1091
 . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-secondmate-registry-lib.sh disable=SC1091
+. "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-secondmate-registry-lib.sh"
 
 # The persist request the primary sends before it restarts anything. It is the
 # open-record half of /stow and nothing more: a restart needs the state of work
@@ -117,7 +119,7 @@ fm_secondmate_restart_capable() {  # <meta-file>
 # failure, any other or extra output, or a host whose code lacks the verb refuses.
 # Returns 1 with FM_SECONDMATE_RESTART_REASON set when the agent is unproven.
 fm_secondmate_restart_attribution() {  # <meta-file>
-  local meta=$1 id cause state out rc remote_host remote_backend
+  local meta=$1 id cause state out rc remote_host remote_backend remote_target
   id=${meta##*/}; id=${id%.meta}
   remote_host=$(fm_meta_get "$meta" remote_host 2>/dev/null)
   if [ -n "$remote_host" ]; then
@@ -129,12 +131,26 @@ fm_secondmate_restart_attribution() {  # <meta-file>
         return 1
         ;;
     esac
+    # The decision is bound to the route the parent recorded (Main 1634 D4):
+    # bin/fm-on.sh selects the host from the registry by id, so the registry
+    # route must name the recorded host, and the host compares its own endpoint
+    # with the recorded target.
+    remote_target=$(fm_meta_get "$meta" remote_target 2>/dev/null)
+    if [ -z "$remote_target" ]; then
+      FM_SECONDMATE_RESTART_REASON="its record names no remote_target, so its host decision cannot be bound to its recorded route; its host was not asked and no request, record or nudge was sent to it"
+      return 1
+    fi
+    if ! secondmate_registry_line_for_id "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" \
+      || [ "$SECONDMATE_REGISTRY_REMOTE" != 1 ] || [ "$SECONDMATE_REGISTRY_HOST" != "$remote_host" ]; then
+      FM_SECONDMATE_RESTART_REASON="its registry route (host '${SECONDMATE_REGISTRY_HOST:-none}') is not its recorded route (host '$remote_host'); its host was not asked and no request, record or nudge was sent to it"
+      return 1
+    fi
     # The trailing marker keeps every byte of the reply, trailing newlines too,
     # and carries the transport status. Bash drops NUL bytes from a command
     # substitution, so each is turned into another byte first: a reply with a NUL
     # can then never equal the exact token.
     out=$(FM_HOME="$FM_HOME" "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-on.sh" "$id" \
-      fm-remote-secondmate-control.sh attribution "$id" < /dev/null 2>/dev/null | LC_ALL=C tr '\000' '\001'
+      fm-remote-secondmate-control.sh attribution "$id" "$remote_target" < /dev/null 2>/dev/null | LC_ALL=C tr '\000' '\001'
       printf 'x%d' "${PIPESTATUS[0]}")
     rc=${out##*x}; out=${out%x*}
     [ "$rc" != 0 ] || [ "$out" != $'attribution=proceed\n' ] || return 0
