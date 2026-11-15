@@ -552,16 +552,17 @@ status_daemon_seen_marker_path() {  # <state> <task-id>
 # refuse before its own first mutation: absent, or a readable regular file that
 # is not a link and whose rows all parse. When the retirement will rewrite the
 # manifest (the task has a status record or a manifest row), the state
-# directory must also be writable, and the temporary file the retirement writes
-# beside the manifest (named for this shell's pid, as there) must be absent or
-# a writable regular file that is not a link. Sets STATUS_RETIRE_REWRITES to 1
-# when the manifest itself will be replaced, so the caller can check that it can
-# be.
+# directory must also be writable, and, unless the caller passes the private
+# directory the retirement will use instead, the temporary file the retirement
+# writes beside the manifest (named for this shell's pid, as there) must be
+# absent or a writable regular file that is not a link. Sets
+# STATUS_RETIRE_REWRITES to 1 when the manifest itself will be replaced, so the
+# caller can check that it can be.
 # shellcheck disable=SC2034 # STATUS_RETIRE_REWRITES is read by callers.
 STATUS_RETIRE_REWRITES=0
 # shellcheck disable=SC2034 # STATUS_RETIRE_REWRITES is read by callers.
-status_retire_presentation_task_ready() {  # <state> <task-id>
-  local state=$1 task=$2 manifest data row_task ident offset backstop extra found=0 path
+status_retire_presentation_task_ready() {  # <state> <task-id> [private-dir]
+  local state=$1 task=$2 private=${3:-} manifest data row_task ident offset backstop extra found=0 path
   manifest="$state/.status-presentation-cursor"
   STATUS_RETIRE_REWRITES=0
   for path in "$state/$task.status" "$state/.$task.open-decisions-cursor" "$state/.$task.home-appends" \
@@ -586,18 +587,21 @@ EOF
   if [ "$found" = 1 ]; then
     [ -d "$state" ] && [ -w "$state" ] && [ -x "$state" ] || return 1
   fi
-  if [ "$STATUS_RETIRE_REWRITES" = 1 ] && { [ -e "$manifest.tmp.$$" ] || [ -L "$manifest.tmp.$$" ]; }; then
+  if [ -z "$private" ] && [ "$STATUS_RETIRE_REWRITES" = 1 ] && { [ -e "$manifest.tmp.$$" ] || [ -L "$manifest.tmp.$$" ]; }; then
     [ -f "$manifest.tmp.$$" ] && [ ! -L "$manifest.tmp.$$" ] && [ -w "$manifest.tmp.$$" ] || return 1
   fi
   return 0
 }
 
-status_retire_presentation_task() {  # <state> <task-id>
-  local state=$1 task=$2 lock manifest tmp data row_task ident offset backstop extra rc=0 found=0
+# A caller that passes a private directory of its own (on the state's
+# filesystem) has the new manifest written there first instead of at the
+# shared, pid-named path beside it.
+status_retire_presentation_task() {  # <state> <task-id> [private-dir]
+  local state=$1 task=$2 private=${3:-} lock manifest tmp data row_task ident offset backstop extra rc=0 found=0
   local signal_marker heartbeat_marker daemon_marker home_appends home_appends_lock
   lock="$state/.status-presentation-lock"
   manifest="$state/.status-presentation-cursor"
-  tmp="$manifest.tmp.$$"
+  if [ -n "$private" ]; then tmp="$private/status-presentation-cursor"; else tmp="$manifest.tmp.$$"; fi
   signal_marker=$(status_signal_seen_marker_path "$state" "$task")
   heartbeat_marker=$(status_heartbeat_seen_marker_path "$state" "$task")
   daemon_marker=$(status_daemon_seen_marker_path "$state" "$task")

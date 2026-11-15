@@ -2103,8 +2103,11 @@ fm_treehouse_slot_owner_marker() {  # <worktree>
 
 # Claim a pool slot for a task, replacing whatever the previous holder left.
 # The rename is atomic, so a reader either sees the old claim or the new one.
-fm_treehouse_slot_owner_claim() {  # <worktree> <task-id> <home>
-  local worktree=$1 id=$2 home=$3 marker tmp
+# A caller that passes a private directory of its own (on the claim's
+# filesystem) has the new claim written there first instead of at the shared,
+# pid-named path beside the claim.
+fm_treehouse_slot_owner_claim() {  # <worktree> <task-id> <home> [private-dir]
+  local worktree=$1 id=$2 home=$3 private=${4:-} marker tmp
   [ -n "$id" ] || return 1
   marker=$(fm_treehouse_slot_owner_marker "$worktree") || return 1
   # Only a plain claim file may be replaced: renaming onto a directory would
@@ -2113,7 +2116,11 @@ fm_treehouse_slot_owner_claim() {  # <worktree> <task-id> <home>
      && { [ ! -f "$marker" ] || [ -L "$marker" ]; }; then
     return 1
   fi
-  tmp="$marker.tmp.${BASHPID:-$$}"
+  if [ -n "$private" ]; then
+    tmp="$private/slot-owner-claim"
+  else
+    tmp="$marker.tmp.${BASHPID:-$$}"
+  fi
   rm -f "$tmp" || return 1
   {
     printf 'task=%s\n' "$id"

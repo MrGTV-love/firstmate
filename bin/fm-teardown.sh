@@ -1252,6 +1252,11 @@ teardown_return_pending_target_ok() {
   return 1
 }
 
+# The private, per-run directory the entry preflight creates (teardown_run_dir_prepare)
+# for every temporary file the protected mutations write before renaming it
+# into place; empty until then, and removed by the EXIT trap.
+TEARDOWN_RUN_DIR=
+
 # Record, once this task's slot is reserved (or, for a slot shared with another
 # task, once this task's claim beside it awaits release) and before any
 # cleanup that can fail, that the slot is still held for it
@@ -1260,6 +1265,7 @@ teardown_return_pending_target_ok() {
 teardown_mark_return_pending() {  # <slot> [child-id]
   local marker="$STATE/$ID.teardown-return-pending" tmp gen
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
+  [ -z "$TEARDOWN_RUN_DIR" ] || tmp="$TEARDOWN_RUN_DIR/teardown-return-pending"
   if teardown_return_pending_target_ok && gen=$(fm_teardown_return_pending_gen "$META") \
       && { printf 'spawn_gen=%s\n' "$gen" && printf 'slot=%s\n' "$1" \
            && { [ -z "${2:-}" ] || printf 'child=%s\n' "$2"; }; } > "$tmp" \
@@ -1275,6 +1281,7 @@ teardown_refresh_return_pending() {
   local marker="$STATE/$ID.teardown-return-pending" tmp gen line
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 0
   tmp="$STATE/.$ID.teardown-return-pending.refresh.${BASHPID:-$$}"
+  [ -z "$TEARDOWN_RUN_DIR" ] || tmp="$TEARDOWN_RUN_DIR/teardown-return-pending.refresh"
   if gen=$(fm_teardown_return_pending_gen "$META") \
       && { printf 'spawn_gen=%s\n' "$gen" \
            && while IFS= read -r line || [ -n "$line" ]; do
@@ -1316,6 +1323,7 @@ teardown_release_locks() {
   if [ -n "$BACKLOG_CLOSE_STAGE" ]; then
     fm_backlog_record_remove "$BACKLOG_CLOSE_STAGE" "pending-close staged record" "$STATE" || true
   fi
+  [ -z "${TEARDOWN_RUN_DIR:-}" ] || rm -rf "${TEARDOWN_RUN_DIR:?}"
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
     teardown_release_herdr_locks || true
   fi
@@ -2459,20 +2467,6 @@ teardown_task_runtime_paths() {
     "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity")
 }
 
-# A temporary path a later write in this process names by its pid, checked now:
-# absent, or a regular file that is not a link, that this user can write and
-# that the write's rename can replace. Anything else there would make that write
-# fail after the slot lease or another mutation. Sets TEARDOWN_PREFLIGHT_ERROR on
-# a refusal.
-teardown_preflight_temp_path() {  # <path> <label>
-  { [ -e "$1" ] || [ -L "$1" ]; } || return 0
-  if [ -f "$1" ] && [ ! -L "$1" ] && [ -w "$1" ] && fm_backlog_path_deletable "$1"; then
-    return 0
-  fi
-  TEARDOWN_PREFLIGHT_ERROR="task $ID's $2 temporary path $1 is occupied by something its write cannot replace"
-  return 1
-}
-
 # One state record teardown removes later with rm -f, checked now: absent, or an
 # entry that is not a directory and that fm_backlog_path_deletable says can be
 # deleted. Sets TEARDOWN_PREFLIGHT_ERROR on a refusal.
@@ -2500,21 +2494,59 @@ teardown_preflight_removable() {  # <path> <label>
 # reports its own refusal leaves it empty.
 TEARDOWN_PREFLIGHT_ERROR=
 teardown_entry_preflight() {
+  TEARDOWN_PREFLIGHT_ERROR=
+  teardown_run_dir_prepare || return 1
+  teardown_entry_checks && return 0
+  rm -rf "${TEARDOWN_RUN_DIR:?}"
+  TEARDOWN_RUN_DIR=
+  return 1
+}
+
+# The device number of <path>, or of its nearest existing ancestor.
+teardown_device_of() {  # <path>
+  local path=$1
+  while [ -n "$path" ] && [ ! -e "$path" ]; do path=${path%/*}; done
+  [ -n "$path" ] || path=/
+  case "$(uname -s)" in
+    Darwin|*BSD) stat -f %d "$path" 2>/dev/null ;;
+    *) stat -c %d "$path" 2>/dev/null ;;
+  esac
+}
+
+# Creates the private per-run directory every protected mutation stages its
+# temporary files in (mode 700, a unique name under the state directory), and
+# proves it can be written and that each rename out of it stays on one
+# filesystem: to the state directory (the return-pending, pending-close and
+# status records), to the data directory (the captain's drop record) and to the
+# peer slot's claim (its handoff). Refuses, writing nothing that stays, on doubt.
+teardown_run_dir_prepare() {
+  local dir device target
+  if ! dir=$(umask 077; mktemp -d "$STATE/.teardown-run.$ID.XXXXXX" 2>/dev/null) \
+     || [ ! -d "$dir" ] || [ -L "$dir" ] || [ ! -w "$dir" ] || [ ! -x "$dir" ] \
+     || ! : > "$dir/.write-check" 2>/dev/null || ! rm -f "$dir/.write-check"; then
+    [ -z "${dir:-}" ] || rm -rf "${dir:?}"
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's private teardown directory could not be created and written under $STATE"
+    return 1
+  fi
+  device=$(teardown_device_of "$dir")
+  for target in "$STATE" "$DATA/$ID" \
+      ${TEARDOWN_PEER_SLOT:+"$(dirname "$(fm_task_copy_canonical_dir "$TEARDOWN_PEER_SLOT" 2>/dev/null || printf '%s' "$TEARDOWN_PEER_SLOT")")"}; do
+    if [ -z "$device" ] || [ "$(teardown_device_of "$target")" != "$device" ]; then
+      rm -rf "${dir:?}"
+      TEARDOWN_PREFLIGHT_ERROR="task $ID's private teardown directory and $target are not on one filesystem, so a rename between them would not be atomic"
+      return 1
+    fi
+  done
+  TEARDOWN_RUN_DIR=$dir
+}
+
+# The checks of the entry preflight, run once the private directory exists.
+teardown_entry_checks() {
   local path harness token_path token owed
   TEARDOWN_PREFLIGHT_ERROR=
   path=$(fm_backlog_close_marker_path "$STATE" "$ID") || return 1
   if ! fm_backlog_record_removable "$path" "pending-close record" "$STATE"; then
     TEARDOWN_PREFLIGHT_ERROR="the previous pending backlog $TEARDOWN_BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR)"
-    return 1
-  fi
-  # The fixed, pid-named temporary paths the later writes use: the return-pending
-  # record's write and refresh, and the new pending-close record's stage, which
-  # must not exist at all (fm_backlog_close_marker_stage).
-  teardown_preflight_temp_path "$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}" "return-pending record" || return 1
-  teardown_preflight_temp_path "$STATE/.$ID.teardown-return-pending.refresh.${BASHPID:-$$}" "return-pending refresh" || return 1
-  path="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
-  if [ -e "$path" ] || [ -L "$path" ]; then
-    TEARDOWN_PREFLIGHT_ERROR="task $ID's pending-close staging path $path is already occupied"
     return 1
   fi
   if [ "$KIND" != secondmate ] && { [ -e "$META" ] || [ -L "$META" ]; } \
@@ -2572,7 +2604,7 @@ teardown_entry_preflight() {
   for path in "${TEARDOWN_RUNTIME_PATHS[@]}"; do
     teardown_preflight_removable "$path" "runtime record" || return 1
   done
-  if ! status_retire_presentation_task_ready "$STATE" "$ID"; then
+  if ! status_retire_presentation_task_ready "$STATE" "$ID" "$TEARDOWN_RUN_DIR"; then
     TEARDOWN_PREFLIGHT_ERROR="the shared status manifest $STATE/.status-presentation-cursor cannot be retired for task $ID (not a readable regular file, a row that does not parse, or a state directory that cannot be written)"
     return 1
   fi
@@ -3781,9 +3813,11 @@ require_worktree_teardown_safety() {
 # moved after its landing proof. Restage the pending backlog close whenever its
 # completion links change, so the row records the proof that admitted removal.
 teardown_restage_backlog_close() {
-  local stage="$STATE/.$ID.backlog-close.${BASHPID:-$$}" staged
+  local stage staged
   [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ] || return 0
   [ -n "$BACKLOG_CLOSE_STAGE" ] || [ "${BACKLOG_CLOSED:-0}" = 1 ] || return 0
+  # Both are set only after the entry preflight created the private directory.
+  stage="${TEARDOWN_RUN_DIR:?}/backlog-close"
   staged=$(printf '%s\n' "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}")
   if ! backlog_done_args; then
     echo "error: the pending backlog $BACKLOG_TRANSITION for $ID is not replayable; retaining every durable task record" >&2
@@ -5135,7 +5169,7 @@ teardown_slot_peer_named() {  # <task-id>
 teardown_peer_claim_handoff() {
   fm_treehouse_slot_owner_state "$TEARDOWN_PEER_SLOT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || return 0
-  fm_treehouse_slot_owner_claim "$TEARDOWN_PEER_SLOT" "${TEARDOWN_PEER_IDS[0]}" "${TEARDOWN_PEER_HOMES[0]}" || {
+  fm_treehouse_slot_owner_claim "$TEARDOWN_PEER_SLOT" "${TEARDOWN_PEER_IDS[0]}" "${TEARDOWN_PEER_HOMES[0]}" "$TEARDOWN_RUN_DIR" || {
     echo "error: could not pass pool slot $TEARDOWN_PEER_SLOT's claim to task ${TEARDOWN_PEER_IDS[0]}; retaining task $ID's record for a retry" >&2
     exit 1
   }
@@ -5372,9 +5406,12 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
         teardown_reprove_same_route || exit 1
         [ ! -d "$WT" ] || require_worktree_teardown_safety
+        # The claim moves before any copy goes, so a handoff that refuses
+        # leaves every copy in place; a rerun after a later refusal still sees
+        # the peer it was handed to as working in the slot.
+        [ -z "$TEARDOWN_PEER_SLOT" ] || teardown_peer_claim_handoff
         teardown_own_locked_copies_release || exit 1
         teardown_remove_own_nested_copies "from pool slot ${TEARDOWN_PEER_SLOT:-$TEARDOWN_HELD_SLOT}, which keeps copies that are not this task's"
-        [ -z "$TEARDOWN_PEER_SLOT" ] || teardown_peer_claim_handoff
         return 0
       fi
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then
@@ -6769,14 +6806,14 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
     exit 1
   }
   BACKLOG_CLOSE_MARKER=$(fm_backlog_close_marker_path "$STATE" "$ID") || exit 1
-  if ! fm_backlog_close_marker_stage "$STATE/.$ID.backlog-close.${BASHPID:-$$}" \
+  if ! fm_backlog_close_marker_stage "$TEARDOWN_RUN_DIR/backlog-close" \
       "$ID" "$DATA" "$TEARDOWN_META_SPAWN_GEN" "$STATE" 0 \
       "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
       "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
     echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
     exit 1
   fi
-  BACKLOG_CLOSE_STAGE="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
+  BACKLOG_CLOSE_STAGE="$TEARDOWN_RUN_DIR/backlog-close"
 else
   if [ "$CLEANUP_RECOVERY" = orca ]; then
     BACKLOG_SKIP_REASON="Orca cleanup recovery is not a launched backlog worker"
@@ -6845,7 +6882,7 @@ fi
 # The captain's words are retained only now: after the preflight and the
 # reservation's refusals, and before the first step that discards anything.
 if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
-  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
+  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" "$TEARDOWN_RUN_DIR" || {
     echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
     exit 1
   }
@@ -7146,7 +7183,7 @@ retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 # Opt-in fleet activity ledger (docs/fleet-ledger.md), before the status log is
 # retired so its last lines are captured; off costs one file test.
 [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" cleaned_up "$ID" || true
-status_retire_presentation_task "$STATE" "$ID" || exit 1
+status_retire_presentation_task "$STATE" "$ID" "$TEARDOWN_RUN_DIR" || exit 1
 fm_wake_queue_prune_task "$STATE" "$ID" "$T" 2>/dev/null || true
 teardown_task_runtime_paths
 rm -f "${TEARDOWN_RUNTIME_PATHS[@]}"

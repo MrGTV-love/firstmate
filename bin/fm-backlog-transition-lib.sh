@@ -161,13 +161,21 @@ fm_backlog_drop_record_writable() {  # <data> <id> <words-file>
   fm_backlog_path_deletable "$target"
 }
 
-fm_backlog_drop_record() {  # <data> <id> <words-file>
-  local dir="$1/$2" target="$1/$2/captain-drop.md" tmp
+# A caller that passes a private directory of its own (on the data
+# directory's filesystem) has the words staged there first instead of in a new
+# temporary file beside the record.
+fm_backlog_drop_record() {  # <data> <id> <words-file> [private-dir]
+  local dir="$1/$2" target="$1/$2/captain-drop.md" private=${4:-} tmp
   case "$2" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
   fm_backlog_drop_words_file_valid "$3" || return 1
   [ ! -L "$dir" ] && [ ! -L "$target" ] && { [ ! -e "$target" ] || [ -f "$target" ]; } || return 1
   (umask 077; mkdir -p "$dir") || return 1
-  tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
+  if [ -n "$private" ]; then
+    tmp="$private/captain-drop"
+    [ ! -e "$tmp" ] && [ ! -L "$tmp" ] || return 1
+  else
+    tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
+  fi
   cp -- "$3" "$tmp" && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
     || { rm -f -- "$tmp"; return 1; }
 }
