@@ -1645,6 +1645,23 @@ def case_proof_own_interval():
         case.check(code == [0], '%s: the proof failed: %s' % (mode, world.text('proof')[-300:]))
         case.check(artifact.get('concurrency') == expected, '%s: recorded concurrency %s, expected %d' % (mode, artifact.get('concurrency'), expected))
         case.check(artifact.get('fm_test_run_jobs_enabled') is (expected == 2), '%s: jobs enabled = %s' % (mode, artifact.get('fm_test_run_jobs_enabled')))
+    # Item 2, shell launcher: a bash on PATH that is itself a bash script and holds candidate 1 back until candidate 0 has ended.
+    world = World('r6-interval-shell-launcher', cores=2)
+    family = round6_proof_repo(world, [': > "$R6_SHARED/first-ready"; sleep .35; : > "$R6_SHARED/first-done"\n', 'sleep .35\n'])
+    bindir = world.folder / 'launcher'
+    bindir.mkdir()
+    (bindir / 'bash').write_text('#!/bin/bash\nif [ "${1:-}" = tests/fm-fam-1.test.sh ]; then\n'
+                                 '  while [ ! -e "$R6_SHARED/first-done" ]; do /bin/sleep .01; done; /bin/sleep .1\nfi\nexec /bin/bash "$@"\n')
+    (bindir / 'bash').chmod(0o755)
+    shared = world.folder / 'shared'
+    shared.mkdir()
+    proof = world.launch('proof', ['/bin/bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--jobs', '2', '--json', str(world.folder / 'proof.json')],
+                         extra=dict(PATH=str(bindir) + os.pathsep + world.env['PATH'], R6_SHARED=str(shared)))
+    code = wait_all([proof], timeout=120)
+    artifact = json.loads((world.folder / 'proof.json').read_text()) if (world.folder / 'proof.json').exists() else {}
+    case.measure(shell_launcher_exit=code, shell_launcher_recorded=artifact.get('concurrency'), shell_launcher_jobs_enabled=artifact.get('fm_test_run_jobs_enabled'))
+    case.check(code == [0], 'shell launcher: the proof failed: %s' % world.text('proof')[-300:])
+    case.check(artifact.get('concurrency') == 1 and artifact.get('fm_test_run_jobs_enabled') is False, 'shell launcher: a serial run behind a waiting bash launcher script was recorded as concurrency %s, jobs enabled %s' % (artifact.get('concurrency'), artifact.get('fm_test_run_jobs_enabled')))
     # Item 2, inherited descriptor: candidate 0 leaves a background child and exits; candidate 1 can lease only after candidate 0
     # has exited (one of two tokens is held by a blocker for the whole proof), so the candidates never ran together.
     outer_bg = ('set -u\npass=$1 family=$2 shared=$3\n'
@@ -1729,6 +1746,29 @@ def case_gate_chain_cycle():
     codes = wait_all([gate_a, gate_b], timeout=90)
     case.measure(exit_codes=codes, seconds=round(time.monotonic() - began, 1))
     case.check(codes == [0, 0] and a_done.exists() and b_done.exists(), 'the two gate chains did not both finish: %s %s %s' % (codes, world.text('a')[-200:], world.text('b')[-200:]))
+    return case
+
+
+def case_cycle_tail():
+    """Main 1750 item 5, control: a waiter that only waits on a proven cycle (a tail) is never the one admitted; the cycle's own earliest member is."""
+    case = Case('A-4 cycle tail', 'election over registered records: W3 holds test.C and waits for test.A while gates of test.A and test.B wait on each other; W3 (and a second tail behind it) queued first: only the A/B member is elected')
+    script = (r"""import importlib.util, sys
+spec = importlib.util.spec_from_file_location('d', sys.argv[1]); d = importlib.util.module_from_spec(spec)
+sys.dont_write_bytecode = True; spec.loader.exec_module(d)
+holders = {'test.A': {100}, 'test.B': {200}, 'test.C': {300}, 'test.D': {400}}
+d.key_holders = lambda key, limit: holders[key]
+base = [dict(pid=1300, key='test.A', limit=1, chain=[300], queued_ns=1), dict(pid=1100, key='test.B', limit=1, chain=[100], queued_ns=2),
+        dict(pid=1200, key='test.A', limit=1, chain=[200], queued_ns=3)]
+for label, records in (('tail', base), ('two-level-tail', base + [dict(pid=1400, key='test.C', limit=1, chain=[400], queued_ns=0)]),
+                       ('cycle-only', base[1:])):
+    print(label, [r['pid'] for r in records if d.cycle_victim(records, r)])
+""")
+    result = subprocess.run([python, '-c', script, tool('fm-duration.py')], capture_output=True, text=True, timeout=60)
+    rows = dict(line.split(' ', 1) for line in result.stdout.splitlines() if ' ' in line)
+    case.measure(exit=result.returncode, elected=rows)
+    case.check(result.returncode == 0, 'the election model failed: %s' % result.stderr[-300:])
+    for label in ('tail', 'two-level-tail', 'cycle-only'):
+        case.check(rows.get(label) == '[1100]', '%s: elected %s, expected only the cycle member 1100' % (label, rows.get(label)))
     return case
 
 
@@ -1837,7 +1877,7 @@ def case_proof_contention():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_missing_helper_counts, case_proof_contention, case_proof_own_interval, case_async_cycle, case_gate_chain_cycle, case_multiholder_cycle, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_missing_helper_counts, case_proof_contention, case_proof_own_interval, case_async_cycle, case_gate_chain_cycle, case_multiholder_cycle, case_cycle_tail, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():

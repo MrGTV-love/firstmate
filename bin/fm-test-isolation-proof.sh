@@ -39,14 +39,16 @@
 # pool (docs/cpu-pass-pool.md) for its whole run and runs that many workers; a proof
 # already inside a pass takes none and runs at most that many. The concurrency it
 # prints and records as concurrency is the peak it OBSERVED: the most candidates that were running
-# together, measured over each candidate's OWN run: its start is stamped from inside the candidate's
-# own bash process (after any launcher or lease wait, through BASH_ENV, which is then restored), and
-# its end is the last moment a watcher saw that process itself still holding a POSIX record lock it
-# took before it started (such a lock survives exec, is never inherited by a child, and goes when
-# the process exits or closes the file), so neither stamp falls outside the candidate's own run and
-# a child it leaves behind extends nothing; a candidate with no such interval counts toward no
-# overlap (the plan, which is never more than the candidates,
-# passes and --jobs, is printed as planned=). Without python3 nothing is watched and the proof
+# together, measured over each candidate's OWN run. A watcher samples, about every millisecond, two
+# facts: the candidate's own bash process has started its script (a mark made through BASH_ENV,
+# which is then restored, so after any launcher or lease wait) and that process itself still holds
+# a POSIX record lock it took before exec (such a lock survives exec, is never inherited by a child,
+# and goes when the process exits or closes the file). The first and last samples where both hold
+# bound a stretch inside the candidate's own run, so a child it leaves behind extends nothing; two
+# candidates count as together only when one's first sample falls inside the other's stretch, and
+# a candidate never sampled counts toward no overlap (the plan, which is never more than the candidates,
+# passes and --jobs, is printed as planned=). Without python3 nothing is watched, and when the bash
+# found on PATH is itself a shell script (a launcher that may wait) nothing is marked; then the proof
 # claims no concurrency above one. A one-candidate
 # proof records one, a contended reservation records what really overlapped, and --jobs of any
 # length is clamped to the plan. When
@@ -612,8 +614,8 @@ wait_one_completed_slot() {
 # Each candidate's own run interval (F3, Main 1750 item 2). The stamp shell execs a small python3 step that
 # takes a POSIX record lock (lockf) on the candidate's alive.lock and then execs the candidate's bash in the
 # same process: the lock survives exec, belongs to that process alone (a forked child never inherits it), and
-# goes when the process exits or closes the file. BASH_ENV, read by the candidate's own bash process before its
-# script, marks the start (only in that process, then restores the caller's BASH_ENV). One watcher per proof
+# goes when the process exits or closes the file. BASH_ENV, set by that step only for the candidate's real bash, marks
+# the start in that process (then restores the caller's BASH_ENV). One watcher per proof
 # records the start after it sees that mark, and as the end the last moment at which it read the clock and then
 # found the lock still held. Both stamps therefore lie inside the candidate process's own run; a candidate the
 # watcher never saw running gets no interval and no overlap, and a candidate that drops the lock early only
@@ -624,8 +626,10 @@ if command -v python3 >/dev/null 2>&1; then
 fi
 STAMP_ENV="$PROOF_ROOT/stamp-env.sh"
 cat >"$STAMP_ENV" <<'ENV'
-if [ "$$" = "${FM_ISOLATION_STAMP_PID:-}" ] && [ -n "${FM_ISOLATION_STAMP_DIR:-}" ] && [ ! -e "$FM_ISOLATION_STAMP_DIR/started" ]; then
-  : >"$FM_ISOLATION_STAMP_DIR/started"
+# Read by the candidate's own bash before its script (STAMP_LOCK sets BASH_ENV only for that exec). It marks the start in
+# that process only (the same pid as the stamp shell, through exec), then restores the caller's BASH_ENV.
+if [ "$$" = "${FM_ISOLATION_STAMP_PID:-}" ] && [ -n "${FM_ISOLATION_STAMP_DIR:-}" ]; then
+  [ -e "$FM_ISOLATION_STAMP_DIR/started" ] || : >"$FM_ISOLATION_STAMP_DIR/started"
 fi
 if [ -n "${FM_ISOLATION_PRIOR_BASH_ENV+x}" ]; then
   BASH_ENV=$FM_ISOLATION_PRIOR_BASH_ENV
@@ -638,17 +642,40 @@ if [ -n "${BASH_ENV:-}" ]; then
   . "$BASH_ENV"
 fi
 ENV
-# $1 candidate, $2 its out directory, $3 the BASH_ENV stamp file, $4 1 when the run is watched.
+STAMP_LOCK="$PROOF_ROOT/stamp-lock.py"
+cat >"$STAMP_LOCK" <<'PY'
+"""Take the candidate's liveness lock, then exec its bash in this same process: argv = lock path, script, BASH_ENV file."""
+import fcntl, os, shutil, sys
+lock_path, script, stamp_env = sys.argv[1:4]
+low = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+fd = os.dup2(low, 203)  # a high descriptor a test script does not reuse; the low one closes BEFORE the lock is taken,
+os.close(low)           # because closing any descriptor of the file would release a POSIX record lock
+fcntl.lockf(fd, fcntl.LOCK_EX)
+os.set_inheritable(fd, True)
+# The start is marked only when the bash found on PATH is a real bash: a launcher script run by a shell would read
+# BASH_ENV in this same process before it hands over (perhaps after a wait), so then nothing is marked and the
+# candidate counts toward no overlap. BASH_ENV is set only here, so a shell that runs python3 (a shim) never reads it.
+mark = False
+found = shutil.which('bash')
+if found:
+    try:
+        with open(found, 'rb') as handle:
+            head = handle.readline(256)
+        shells = (b'bash', b'sh')
+        mark = not head.startswith(b'#!') or not any(os.path.basename(word) in shells for word in head[2:].split())
+    except OSError:
+        mark = False
+if mark:
+    os.environ['BASH_ENV'] = stamp_env
+os.execvp('bash', ['bash', script])
+PY
+# $1 candidate, $2 its out directory, $3 the BASH_ENV stamp file, $4 1 when the run is watched, $5 the lock step.
 # shellcheck disable=SC2016 # The stamp shell is single-quoted on purpose: the inner bash, not this script, expands it.
 STAMP_SHELL='exec 3>&-
 if [ "$4" != 1 ]; then exec bash "$1"; fi
 if [ -n "${BASH_ENV+x}" ]; then export FM_ISOLATION_PRIOR_BASH_ENV="$BASH_ENV"; else unset FM_ISOLATION_PRIOR_BASH_ENV; fi
-export FM_ISOLATION_STAMP_DIR="$2" FM_ISOLATION_STAMP_PID=$$ BASH_ENV="$3"
-exec python3 -c "import fcntl, os, sys
-fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o600)
-fcntl.lockf(fd, fcntl.LOCK_EX)
-os.set_inheritable(fd, True)
-os.execvp(\"bash\", [\"bash\", sys.argv[2]])" "$2/alive.lock" "$1"'
+export FM_ISOLATION_STAMP_DIR="$2" FM_ISOLATION_STAMP_PID=$$
+exec python3 "$5" "$2/alive.lock" "$1" "$3"'
 
 WATCHER_PID=
 start_watcher() {
@@ -678,7 +705,7 @@ def held(path):
         os.close(fd)
 def finish(idx, st):
     st['done'] = True
-    if st.get('start') is not None and st.get('alive') is not None and st['alive'] > st['start']:
+    if st.get('start') is not None and st.get('alive') is not None and st['alive'] >= st['start']:
         out = os.path.join(root, 'w%d' % idx, 'out')
         for name, value in (('start_ms', st['start']), ('end_ms', st['alive'])):
             tmp = os.path.join(out, name + '.tmp')
@@ -696,14 +723,16 @@ while True:
         if st.get('done'):
             continue
         out = os.path.join(root, 'w%d' % idx, 'out')
-        if st.get('start') is None:
-            if os.path.exists(os.path.join(out, 'started')):
-                st['start'] = now_ms()  # taken after the mark exists, so never before the candidate began
-            elif os.path.exists(os.path.join(out, 'exit')) or stopping:
+        sampled = now_ms()  # the clock first, then the proof: the start mark exists and the candidate process holds its lock
+        if not os.path.exists(os.path.join(out, 'started')):
+            if os.path.exists(os.path.join(out, 'exit')) or stopping:
                 finish(idx, st)
             continue
-        sampled = now_ms()  # the clock first, then the proof that the candidate process still holds its lock
         if held(os.path.join(out, 'alive.lock')):
+            # Every recorded time is one at which the candidate process was seen running its script, so the first and
+            # the last of them bound a stretch inside its own run; a single sample is one such instant.
+            if st.get('start') is None:
+                st['start'] = sampled
             st['alive'] = sampled
             if stopping:
                 finish(idx, st)
@@ -711,7 +740,7 @@ while True:
             finish(idx, st)
     if all(state.get(i, {}).get('done') for i in range(1, total + 1)):
         break
-    time.sleep(0.003)
+    time.sleep(0.001)
 PY
   WATCHER_PID=$!
 }
@@ -770,9 +799,9 @@ for script in "${CANDIDATES[@]}"; do
     # --log-fd, never into the candidate's output, so a wait notice cannot hide a skip: line.
     if [ "$LEASE_CANDIDATES" -eq 1 ]; then
       "$ROOT/bin/fm-cpu-pass.sh" run --log-fd 3 --passes "$CANDIDATE_MARKER" --label "fm-test-isolation-proof $POOL candidate $idx" -- \
-        bash -c "$STAMP_SHELL" _ "$script" "$work/out" "$STAMP_ENV" "$WATCH" >"$work/out/output" 2>&1 3>"$work/out/lease"
+        bash -c "$STAMP_SHELL" _ "$script" "$work/out" "$STAMP_ENV" "$WATCH" "$STAMP_LOCK" >"$work/out/output" 2>&1 3>"$work/out/lease"
     else
-      bash -c "$STAMP_SHELL" _ "$script" "$work/out" "$STAMP_ENV" "$WATCH" >"$work/out/output" 2>&1
+      bash -c "$STAMP_SHELL" _ "$script" "$work/out" "$STAMP_ENV" "$WATCH" "$STAMP_LOCK" >"$work/out/output" 2>&1
     fi
     rc=$?
     end_ms=$(now_ms)
@@ -827,8 +856,9 @@ if [ "$RUN_DURATION" -lt 0 ]; then
   RUN_DURATION=0
 fi
 
-# The peak the candidates actually reached: the most of their own run intervals [start, end) that contain one
-# candidate's start. A candidate with no interval adds none; a proof that ran a candidate claims at least one.
+# The peak the candidates actually reached: the most of their own observed run stretches [start, end] that contain
+# one candidate's start. Both ends of a stretch are instants at which that candidate was seen running, so a closed
+# containment is a moment when both ran. A candidate with no stretch adds none; a proof that ran one claims at least one.
 PEAK=$(
   for idx in $(seq 1 "$TOTAL"); do
     if [ -s "$PROOF_ROOT/w$idx/out/start_ms" ] && [ -s "$PROOF_ROOT/w$idx/out/end_ms" ]; then
@@ -836,7 +866,7 @@ PEAK=$(
     fi
   done | awk '{ s[NR] = $1; e[NR] = $2 }
     END { peak = 0
-      for (i = 1; i <= NR; i++) { c = 0; for (j = 1; j <= NR; j++) if (s[j] <= s[i] && s[i] < e[j]) c++; if (c > peak) peak = c }
+      for (i = 1; i <= NR; i++) { c = 0; for (j = 1; j <= NR; j++) if (s[j] <= s[i] && s[i] <= e[j]) c++; if (c > peak) peak = c }
       print peak }'
 )
 case "$PEAK" in ''|*[!0-9]*) PEAK=0 ;; esac

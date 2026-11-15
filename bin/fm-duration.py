@@ -195,9 +195,11 @@ until that command ends. A waiter's chain is proven when every gate in it is a g
 run, whose progress rule can stop its command) whose slot record names, as its command, the
 next gate in the chain, and for the last gate the waiter itself (the same process when the
 command exec'd into the nested gate). A set of proven waiters is a closed wait cycle when
-every holder of every member's key is a gate in some member's chain, so none of them can end
-(with several slots per key, every holder counts: two keys whose holders all wait on each
-other are one cycle, and one holder that runs free leaves nobody in it). A waiter that sees,
+every holder of every member's key is a gate in some member's chain, so none of them can end,
+and every member's chain holds a key some member waits for, so a waiter that only waits on
+the cycle is a tail, not a member. With several slots per key every holder counts: two keys
+whose holders all wait on each other are one cycle, and one holder that runs free leaves
+nobody in it. A waiter that sees,
 on two polls in a row, that it belongs to the largest such set has closed a proven wait
 cycle; the earliest queued member runs beside the limit, says so and takes no slot,
 so gates that each hold a key and reach each other's key through gates alone (directly or
@@ -1419,25 +1421,31 @@ def cycle_victim(waiters, me):
     on the next gate or on the waiter itself, so none of them can end while the waiter waits. The cycle is the largest set of
     such waiters in which every holder of each member's key is a gate in some member's chain: start from all of them and drop,
     until nothing changes, every waiter with a holder outside the chains of those left (that holder can still end, so its
-    waiter can still start). That covers several holders per key (FM_TEST_KEY_SLOTS above 1): two keys whose holders all wait
+    waiter can still start) and every waiter none of whose chain's gates holds a key a waiter left waits for (a tail that
+    waits on the cycle without being part of it, whose admission would not break it). That covers several holders per key (FM_TEST_KEY_SLOTS above 1): two keys whose holders all wait
     on each other are one cycle, while one holder of the key running free leaves nobody in it. Of the members, the earliest
     queued is the victim, and only it starts beside the limit; once it has, the rest are no longer a cycle and wait for a
     holder to end. Any other shape is not a proven cycle and its waiter starts only when a holder ends.
     """
     members = list(waiters)
     holders = {}
+
+    def held(record):
+        ident = (record['key'], record['limit'])
+        if ident not in holders:
+            holders[ident] = key_holders(*ident)
+        return holders[ident]
+
     changed = True
     while changed:
         stuck = set()
+        needed = set()
         for record in members:
             stuck |= set(record['chain'])
-        kept = []
-        for record in members:
-            ident = (record['key'], record['limit'])
-            if ident not in holders:
-                holders[ident] = key_holders(*ident)
-            if holders[ident] and holders[ident] <= stuck:
-                kept.append(record)
+            needed |= held(record) or set()
+        # Keep a waiter only while every holder of its key is stuck in the set (it cannot start) AND one of its own
+        # chain's gates holds a key some member waits for (it is on the cycle, not a tail that merely waits on it).
+        kept = [record for record in members if held(record) and held(record) <= stuck and set(record['chain']) & needed]
         changed = len(kept) != len(members)
         members = kept
     if not any(record['pid'] == me['pid'] and record['queued_ns'] == me['queued_ns'] for record in members):
