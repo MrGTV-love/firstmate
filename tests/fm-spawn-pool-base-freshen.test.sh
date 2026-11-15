@@ -1715,6 +1715,7 @@ test_no_other_copy_refuses_and_names_the_skipped_one() {
   assert_no_launch "$CASE_DIR/launch.log"
   assert_contains "$out" "copies skipped by this spawn: $POOL_DIR" "the refusal did not name the skipped copy"
   assert_contains "$out" "(dirty_tree)" "the refusal did not carry the skip reason"
+  [ "$(grep -c '^lease --path' "$SKIP_LOG")" = 1 ] || fail "the skipped copy was taken up again and was leased more than once"
   [ ! -f "$HOME_DIR/state/$id.meta" ] || fail "a refused spawn published task metadata"
   assert_digest_unchanged "$POOL_DIR" "$before" "the only copy changed"
   pass "with no other copy the spawn refuses, names the skipped copy and its reason, and launches nothing"
