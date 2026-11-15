@@ -524,6 +524,35 @@ test_known_section_with_any_qualifier_is_that_section() {
   pass "a known section name with any qualifier is that section and is listed; an unknown name with a qualifier stays out"
 }
 
+test_skill_template_dod_subsections_build() {
+  local src="$TMP_ROOT/st.md" pack m
+  # Main 1951 item 1: the installed define-done-and-grading template's Definition Of Done
+  # sub-sections are known, inside the Definition Of Done only.
+  printf '## Definition Of Done\n\n### User Outcome Achieved\n\nZZ-ST-OUTCOME-ZZ the user gets the thing.\n\n### Workflow Complete\n\nZZ-ST-WORKFLOW-ZZ the process ran.\n\n### Verification Complete\n\nZZ-ST-VERIFY-ZZ every criterion has evidence.\n\n## How You'"'"'re Graded\n\ng\n' >"$src"
+  build_pack pack --contract "$src" || fail "a contract with the skill's template sub-sections was refused: $(cat "$TMP_ROOT/build.err")"
+  for m in ZZ-ST-OUTCOME-ZZ ZZ-ST-WORKFLOW-ZZ ZZ-ST-VERIFY-ZZ; do
+    assert_grep "$m" "$pack/target.md" "a template sub-section's text was dropped: $m"
+  done
+  # Control: an unknown sub-heading in the Definition Of Done still refuses.
+  printf '## Definition Of Done\n\n### User Outcome Achieved\n\nx.\n\n### Safety and Existing Behavior\n\ny.\n' >"$src"
+  build_rc "$TMP_ROOT/st-unknown" --contract "$src"
+  assert_equals 3 "$BUILD_RC" "an unknown Definition Of Done sub-heading was accepted: $BUILD_ERR"
+  # The template names are Definition Of Done sub-sections only.
+  printf '## Definition Of Done\n\n- **A1** (mandatory): x.\n\n## Assumptions\n\n### Verification Complete\n\nz.\n' >"$src"
+  build_rc "$TMP_ROOT/st-outside" --contract "$src"
+  assert_equals 3 "$BUILD_RC" "a template sub-section outside the Definition Of Done was accepted: $BUILD_ERR"
+  pass "the skill template's Definition Of Done sub-sections build inside the Definition Of Done only"
+}
+
+test_plural_known_name_is_known() {
+  local src="$TMP_ROOT/pl.md" pack
+  # Main 1951 item 2: a known name the home's contracts use in the plural.
+  printf '## Definition Of Done\n\n- **A1** (mandatory): x.\n\n## Amendments\n\nZZ-AMENDMENTS-ZZ amendment text.\n' >"$src"
+  build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-AMENDMENTS-ZZ" "$pack/target.md" "the Amendments section was dropped"
+  pass "Amendments, the plural the home's contracts use, is a known section"
+}
+
 test_home_contract_title_form_is_the_title() {
   local src="$TMP_ROOT/hc.md" pack
   # Main 1942 M2: every contract in this home opens with "# Definition of done: <key>".
@@ -667,4 +696,6 @@ fm_test_run_cases \
   test_home_contract_title_form_is_the_title \
   test_work_folder_follows_the_entrypoint_rule \
   test_known_section_with_any_qualifier_is_that_section \
+  test_skill_template_dod_subsections_build \
+  test_plural_known_name_is_known \
   -- "$@"

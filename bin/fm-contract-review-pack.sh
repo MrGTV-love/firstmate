@@ -29,9 +29,11 @@
 #   known section too (Main 1947), and the excluded record lists it as qualified; a known
 #   name followed by free words is not. Inside a known section a
 #   sub-heading must be on CONTRACT_SUBSECTIONS or, inside the Definition Of Done, have the
-#   one owned criterion-title form "<title> - mandatory" or "<title> - supporting" (any dash)
-#   with no CRITERION_TITLE_TERMS word in <title>; a known section name nested deeper starts
-#   that section.
+#   one owned criterion-title form "<title> - mandatory" or "<title> - supporting" (any dash).
+#   DOD_ONLY_SUBSECTIONS, the installed define-done-and-grading skill's template names
+#   (~/.agents/skills/define-done-and-grading/SKILL.md lines 630-642), are known only inside
+#   the Definition Of Done. A criterion title must hold no CRITERION_TITLE_TERMS word in
+#   <title>. A known section name nested deeper starts that section.
 #   Headings are ATX (# to ######), setext (a line over === or ---) and bold-only lines
 #   (**Name** or __Name__), which count as the deepest sub-heading; text in a code fence is
 #   never a heading.
@@ -122,8 +124,12 @@ BLOCK_BEGIN='<!-- reviewer-block:begin -->'
 BLOCK_END='<!-- reviewer-block:end -->'
 
 # The allow-list of known contract sections. A change here changes what every reviewer sees.
-CONTRACT_SECTIONS="request|context|captain's intent|captain intent|rulings|rulings on this contract|terms|amendment|definition of done|how you're graded|how you are graded|assumptions|decisive scenario|out of scope|known limits|hard gates|execution constraints|honesty rule|mandatory items|supporting items"
-CONTRACT_SUBSECTIONS="mandatory|mandatory items|supporting|supporting items|hard gates|honesty rule|out of scope"
+CONTRACT_SECTIONS="request|context|captain's intent|captain intent|rulings|rulings on this contract|terms|amendment|amendments|definition of done|how you're graded|how you are graded|assumptions|decisive scenario|out of scope|known limits|hard gates|execution constraints|honesty rule|mandatory items|supporting items"
+CONTRACT_SUBSECTIONS="mandatory|mandatory items|supporting|supporting items|hard gates|honesty rule|out of scope|user outcome achieved|workflow complete|verification complete"
+# The Definition Of Done sub-sections of the installed define-done-and-grading skill's template
+# (~/.agents/skills/define-done-and-grading/SKILL.md, "Output structure", lines 630-642). They
+# are on CONTRACT_SUBSECTIONS and are known only inside the Definition Of Done.
+DOD_ONLY_SUBSECTIONS="user outcome achieved|workflow complete|verification complete"
 QUALIFIER_WORDS="verbatim from main steer task neutral facts with sources disclosed not criteria execution constraints withdrawn and revision"
 # Words that, anywhere in a criterion title, mark it as author material rather than a criterion
 # (Main 1904 F1); such a title is an unknown sub-heading.
@@ -269,7 +275,9 @@ END {
     if (dropto && lv <= dropto) dropto = 0
     if (dropto) { if (two) i++; continue }
     if (insec && lv > seclv) {
-      if ((sb = known_q(t, SUBS)) != "" || (secname == "definition of done" && criterion(t))) {
+      sb = known_q(t, SUBS)
+      if (sb != "" && secname != "definition of done" && index("|" DODONLY "|", "|" sb "|")) sb = ""
+      if (sb != "" || (secname == "definition of done" && criterion(t))) {
         if (sb != "") note_qualified(t, sb)
         print head > KEEP_OUT
         if (two) i++
@@ -313,7 +321,7 @@ END {
 filter_sections() { # <file> <keep> <drop> <refuse> <names>
   : >"$2"; : >"$3"; : >"$4"; : >"$5"
   LC_ALL=C awk -v KEEP_OUT="$2" -v DROP_OUT="$3" -v REFUSE_OUT="$4" -v NAMES_OUT="$5" \
-    -v SECTIONS="$CONTRACT_SECTIONS" -v SUBS="$CONTRACT_SUBSECTIONS" -v QW="$QUALIFIER_WORDS" -v CT="$CRITERION_TITLE_TERMS" \
+    -v SECTIONS="$CONTRACT_SECTIONS" -v SUBS="$CONTRACT_SUBSECTIONS" -v QW="$QUALIFIER_WORDS" -v CT="$CRITERION_TITLE_TERMS" -v DODONLY="$DOD_ONLY_SUBSECTIONS" \
     "$SECTION_AWK" <"$1"
 }
 
