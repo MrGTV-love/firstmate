@@ -148,6 +148,7 @@
     "open-loops-one-deferral",
     "pipeline-start-unreadable-source",
     "launch-gate-capacity-before-agent",
+    "gate-activation-once",
     "merge-required-reported",
     "merge-landing-tree-tested",
     "merge-auto-not-armed",
