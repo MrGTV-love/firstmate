@@ -365,7 +365,15 @@
 # driver route instead of a forced removal, before the final project-lock wait
 # like a foreign copy, after the clean and landed proof and the same ignored-file,
 # record, process and launcher proofs; an own copy that is not locked is removed
-# as before.
+# with git worktree remove --force after the same final removal proof
+# (teardown_removal_final_proof): its HEAD held by a proof of this run, its
+# status clean under the first proof's dirt rule, and its ignored files preserved
+# again (or, for a copy only a bundle or default-branch history admitted, none
+# outside the allow-list). A scout's or secondmate's copy, declared scratch,
+# skips that proof as it skips the landed-work rule. The removal still needs
+# --force for an untracked file the dirt rule exempts (under .claude) and for
+# a checked-out submodule of the copy's own repository, not only for ignored
+# files.
 # Apart from the held-copy rule below, every other case, including a half-removed
 # copy, refuses as before; --force never waives these proofs. The by-hand route
 # for the facts that remain is in docs/agent-control.md.
