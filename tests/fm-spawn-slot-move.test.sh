@@ -481,18 +481,21 @@ test_a_refusal_revert_does_not_check_out_a_branch_that_moved() {
   out=$(fm_slot_provision moving_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts 2>&1) || rc=$?
   [ "$rc" != 0 ] || fail "the refused provisioning reported success: $out"
   grep -q 'private bytes' "$W_SLOT/notes.local" || fail "the revert overwrote the ignored bytes: $out"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/fm/tid ] || fail "the revert changed HEAD although the owner branch moved: $out"
   pass "a revert after a refusal does not check out an owner branch a writer moved onto ignored work"
 }
 
-# Main 1823 D-A: a refusal does nothing. The provision step put the copy on the task branch; a refusal leaves it
-# there, with the owner branch where it was, and nothing is switched back.
-test_a_quiet_promotion_refusal_switches_nothing_back() {
+# Main 1829: a refusal undoes this code's own step by ref only, and only when HEAD, the branch and the commit are exactly
+# what it left. Nothing moved here, so the copy returns to the owner branch and no file is touched.
+test_a_refusal_revert_returns_to_an_unchanged_owner_branch() {
   make_branch_slot f2-unchanged
+  printf 'private bytes\n' >"$W_SLOT/notes.local"
   local rc=0 out
   out=$(fm_slot_provision quiet_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts 2>&1) || rc=$?
   [ "$rc" != 0 ] || fail "the refused provisioning reported success: $out"
-  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/fm/tid ] || fail "a refusal switched the copy off the branch the provision step set: $out"
-  pass "a refused provisioning leaves the copy on the branch the provision step set"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/old-owner ] || fail "the control revert did not return to the owner branch: $out"
+  grep -q 'private bytes' "$W_SLOT/notes.local" || fail "the ignored bytes changed"
+  pass "a revert after a refusal returns to the owner branch when nothing moved it"
 }
 
 test_a_quiet_promotion_refusal_orphans_no_commit() {
@@ -910,6 +913,17 @@ held_commit_runner() {
   return 3
 }
 
+# Main 1829: the late commit is HEAD when the refusal ends. The undo ran only on proof, and the proof failed.
+test_a_promotion_refusal_after_a_late_commit_leaves_head_on_it() {
+  make_branch_slot m1-promotion-head
+  local late
+  fm_slot_provision late_commit_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || true
+  late=$(cat "$W_DIR/late-sha")
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$late" ] || fail "a refusal moved HEAD off a commit made after the provision step"
+  ! git -C "$W_SLOT" symbolic-ref -q HEAD >/dev/null || fail "a refusal attached a HEAD that another actor had detached"
+  pass "a refusal leaves HEAD on a commit made after the provision step, as it found it"
+}
+
 test_a_promotion_refusal_after_a_late_commit_keeps_the_commit() {
   make_branch_slot m1-promotion
   local rc=0 late
@@ -922,8 +936,8 @@ test_a_promotion_refusal_after_a_late_commit_keeps_the_commit() {
 }
 
 # 2. A move refused after the preparation detached a governed copy never calls the changed copy untouched.
-# refuse_after_preparation: the copy is proven, prepared (detached from its branch), and git then refuses the move.
-# Sets REFUSE_OUT and REFUSE_RC.
+# refuse_after_preparation <name> [break-undo]: the copy is proven, prepared (detached from its branch), and git then
+# refuses the move. With break-undo the ref write that would put the branch back also fails. Sets REFUSE_OUT, REFUSE_RC.
 refuse_after_preparation() {
   make_branch_slot "$1"
   advance_origin advanced.txt
@@ -932,29 +946,129 @@ refuse_after_preparation() {
   fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
   fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
   mkdir -p "$bin"
-  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
+  {
+    printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\n'
+    [ "${2:-}" != break-undo ] || printf 'case " $* " in *" symbolic-ref HEAD "*) exit 1 ;; esac\n'
+    printf 'exec %s "$@"\n' "'$real_git'"
+  } >"$bin/git"
   chmod +x "$bin/git"
   REFUSE_RC=0
   REFUSE_OUT=$(PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || REFUSE_RC=$?
+  [ "$REFUSE_RC" != 0 ] || fail "git refused the move but the apply step reported success: $REFUSE_OUT"
 }
 
-# Main 1823 D-A: a refusal runs no recovery checkout and switches no HEAD. The copy stays as the preparation left it.
-test_a_refused_move_after_preparation_leaves_the_copy_as_found() {
+# Main 1829: the preparation's detach is undone by ref (no file is touched) when the proof holds.
+test_a_refused_move_after_preparation_puts_the_branch_back() {
   refuse_after_preparation m2-refused
-  ! git -C "$W_SLOT" symbolic-ref -q HEAD >/dev/null || fail "a refusal switched HEAD back onto a branch: $REFUSE_OUT"
-  pass "a refused move after preparation leaves the copy detached, as the preparation left it"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/old-owner ] || fail "the branch was not put back: $REFUSE_OUT"
+  pass "a refused move after preparation puts the branch back by ref"
 }
 
+# When the undo cannot be done, the copy stays as found (detached) and the output says so; it is never called untouched.
 test_a_refused_move_after_preparation_says_the_copy_stays_detached() {
-  refuse_after_preparation m2-refused-says
+  refuse_after_preparation m2-refused-says break-undo
   assert_contains "$REFUSE_OUT" "stays detached" "the output did not say the copy stays detached"
-  pass "a refused move after preparation says the copy stays detached"
+  pass "a refused move whose undo failed says the copy stays detached"
 }
 
 test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched() {
-  refuse_after_preparation m2-refused-untouched
+  refuse_after_preparation m2-refused-untouched break-undo
   assert_not_contains "$REFUSE_OUT" "left untouched" "a copy the preparation detached was called untouched"
-  pass "a copy the preparation detached is never called untouched"
+  pass "a copy the preparation detached and could not put back is never called untouched"
+}
+
+test_a_refused_move_after_preparation_leaves_a_detached_copy_where_it_is_when_the_undo_fails() {
+  refuse_after_preparation m2-refused-stays break-undo
+  ! git -C "$W_SLOT" symbolic-ref -q HEAD >/dev/null || fail "the copy was switched although the undo failed"
+  pass "a failed undo leaves the copy detached, as the preparation left it"
+}
+
+# The undo of a promotion refusal runs no checkout, even to detach: a detached copy is detached again by ref.
+test_a_refusal_undo_runs_no_checkout() {
+  make_world a3-nocheckout 1
+  local bin="$W_DIR/rec" real_git calls
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>%s\nexec %s "$@"\n' "'$W_DIR/calls'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  # shellcheck disable=SC2329 # Called by name from fm_slot_provision.
+  recording_runner() { printf 'RUNNER\n' >>"$W_DIR/calls"; printf '{}\n' >"$2"; return 3; }
+  : >"$W_DIR/calls"
+  PATH="$bin:$PATH" fm_slot_provision recording_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || true
+  calls=$(sed -n '/^RUNNER$/,$p' "$W_DIR/calls")
+  case "$calls" in *' checkout '*|checkout\ *) fail "the undo ran a checkout: $(printf '%s' "$calls" | tr '\n' ';')" ;; esac
+  pass "the undo of a promotion refusal runs no checkout"
+}
+
+# After a move that SUCCEEDED, the copy is at the target and the branch it came from is at the old commit. Switching back
+# to that branch by ref would leave the files of the target under a HEAD that is the old commit; only a checkout could
+# change the files, and no refusal runs one. So the undo is refused and the copy stays on the target, detached.
+test_a_refusal_undo_never_returns_to_a_commit_with_other_files() {
+  make_branch_slot m4-undo-other
+  advance_origin advanced.txt
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+  fm_slot_apply_move "$W_SLOT" "$W_TARGET" >/dev/null 2>&1 || fail "the move did not succeed"
+  local out rc=0
+  out=$(fm_slot_restore_base "$W_SLOT" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "an undo that would change files reported success: $out"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$W_TARGET" ] || fail "an undo that would change files was done: HEAD is not the target"
+  ! git -C "$W_SLOT" symbolic-ref -q HEAD >/dev/null || fail "an undo that would change files was done: the copy was attached"
+  [ -f "$W_SLOT/advanced.txt" ] || fail "a file of the target is gone"
+  pass "a refusal never switches a moved copy back to a commit whose files differ"
+}
+
+# Main 1842: the provisioner commits on the task branch and refuses. The undo by ref is allowed only when HEAD is the
+# task branch's tip AND the tree of that tip equals the tree of the commit the copy returns to.
+empty_commit_runner() { [ -z "${CALLS_LOG:-}" ] || printf 'RUNNER\n' >>"$CALLS_LOG"; git -C "$W_SLOT" "${GITID[@]}" commit -q --allow-empty -m 'provisioner work'; printf '{}\n' >"$2"; return 3; }
+file_commit_runner() { printf 'provisioner file\n' >"$W_SLOT/prov.txt"; git -C "$W_SLOT" add prov.txt; git -C "$W_SLOT" "${GITID[@]}" commit -qm 'provisioner file'; printf '{}\n' >"$2"; return 3; }
+
+test_a_commit_on_the_task_branch_with_an_equal_tree_is_undone_by_ref() {
+  make_branch_slot m5-equal-tree
+  local h m bin="$W_DIR/rec" real_git calls
+  h=$(git -C "$W_SLOT" rev-parse HEAD)
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>%s\nexec %s "$@"\n' "'$W_DIR/calls'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  : >"$W_DIR/calls"
+  CALLS_LOG="$W_DIR/calls" PATH="$bin:$PATH" fm_slot_provision empty_commit_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || true
+  m=$(git -C "$W_SLOT" rev-parse refs/heads/fm/tid)
+  [ "$m" != "$h" ] || fail "the provisioner's commit is missing"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/old-owner ] || fail "an equal tree was not undone by ref"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$h" ] || fail "HEAD is not the scout head after the undo"
+  calls=$(sed -n '/^RUNNER$/,$p' "$W_DIR/calls")
+  case "$calls" in *' checkout '*|checkout\ *) fail "the undo ran a checkout: $(printf '%s' "$calls" | tr '\n' ';')" ;; esac
+  pass "an equal tree is undone by ref, with no checkout, and the task branch keeps the provisioner's commit"
+}
+
+test_a_commit_on_the_task_branch_with_an_equal_tree_keeps_the_task_branch() {
+  make_branch_slot m5-equal-keeps
+  local m
+  fm_slot_provision empty_commit_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || true
+  m=$(git -C "$W_SLOT" rev-parse --verify --quiet refs/heads/fm/tid) || fail "the task branch was deleted"
+  [ "$(git -C "$W_SLOT" rev-parse "$m^")" = "$(git -C "$W_SLOT" rev-parse refs/heads/old-owner)" ] || fail "the provisioner's commit is not on the task branch"
+  pass "the task branch is kept with the provisioner's commit"
+}
+
+test_a_commit_on_the_task_branch_that_changes_a_file_is_not_undone_and_is_reported() {
+  make_branch_slot m5-file-differs
+  local out rc=0
+  out=$(fm_slot_provision file_commit_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts 2>&1) || rc=$?
+  [ "$rc" = 3 ] || fail "the refusal did not return the provisioner's code ($rc)"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/fm/tid ] || fail "a tree that differs by one file was undone: $out"
+  [ -f "$W_SLOT/prov.txt" ] || fail "the provisioner's file is gone"
+  assert_contains "$out" "would change files" "the refusal did not report why it left the copy as found"
+  pass "a tree that differs by one file is not undone, and the refusal says why"
+}
+
+test_a_refusal_returns_a_detached_copy_to_detached() {
+  make_world a3-detached 1
+  local rc=0
+  fm_slot_provision quiet_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the refused provisioning reported success"
+  ! git -C "$W_SLOT" symbolic-ref -q HEAD >/dev/null || fail "a detached copy was left on a branch"
+  pass "a refused provisioning returns a detached copy to detached"
 }
 
 # 3. Tracked work hidden by an index flag, and a late edit inside a submodule, are work.
@@ -1066,7 +1180,7 @@ test_the_changed_bytes_witness_fails_when_a_snapshot_cannot_be_taken() {
   mkdir -p "$bin"
   printf '#!/bin/sh\nexit 1\n' >"$bin/shasum"
   chmod +x "$bin/shasum"
-  out=$( (PATH="$bin:$PATH"; test_changed_bytes_under_equal_status_are_seen_by_the_comparison) 2>&1) || rc=$?
+  out=$(PATH="$bin:$PATH" test_changed_bytes_under_equal_status_are_seen_by_the_comparison 2>&1) || rc=$?
   [ "$rc" != 0 ] || fail "the changed-bytes witness passed with no snapshot to compare: $out"
   assert_not_contains "$out" "ok - the before/after comparison" "the witness printed its pass line"
   pass "the changed-bytes witness fails when a snapshot cannot be taken"
@@ -1311,7 +1425,7 @@ CASES=(
   test_an_ignored_directory_keeps_its_classifier_context
   test_an_archive_that_is_an_alias_of_the_ignored_file_does_not_excuse_the_collision
   test_a_refusal_revert_does_not_check_out_a_branch_that_moved
-  test_a_quiet_promotion_refusal_switches_nothing_back
+  test_a_refusal_revert_returns_to_an_unchanged_owner_branch
   test_a_quiet_promotion_refusal_orphans_no_commit
   test_restore_does_not_orphan_a_commit_made_after_preparation
   test_a_checkout_hook_cannot_change_a_slot_during_preparation
@@ -1334,12 +1448,20 @@ CASES=(
   test_the_snapshot_fails_when_git_cannot_be_read
   test_no_destroying_git_command_runs_on_any_move_path
   test_a_promotion_refusal_after_a_late_commit_keeps_the_commit
+  test_a_promotion_refusal_after_a_late_commit_leaves_head_on_it
   test_a_refusal_revert_with_no_recorded_left_commit_keeps_a_detached_commit
   test_a_refusal_revert_leaves_head_alone_when_the_branch_moved
   test_a_promotion_refusal_ignores_a_stale_left_commit
-  test_a_refused_move_after_preparation_leaves_the_copy_as_found
+  test_a_refused_move_after_preparation_puts_the_branch_back
   test_a_refused_move_after_preparation_says_the_copy_stays_detached
   test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched
+  test_a_refused_move_after_preparation_leaves_a_detached_copy_where_it_is_when_the_undo_fails
+  test_a_refusal_undo_runs_no_checkout
+  test_a_refusal_returns_a_detached_copy_to_detached
+  test_a_commit_on_the_task_branch_with_an_equal_tree_is_undone_by_ref
+  test_a_commit_on_the_task_branch_with_an_equal_tree_keeps_the_task_branch
+  test_a_commit_on_the_task_branch_that_changes_a_file_is_not_undone_and_is_reported
+  test_a_refusal_undo_never_returns_to_a_commit_with_other_files
   test_tracked_work_hidden_by_an_index_flag_skips_the_copy
   test_a_late_edit_inside_a_submodule_fails_the_move
   test_a_move_that_changes_a_submodule_pin_is_not_called_dirty

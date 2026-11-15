@@ -2923,12 +2923,24 @@ teardown_skipped_copies() {
     rm -f "$keep"
     return 0
   fi
+  # Unknown is never "none" (Main 1823 D-C). One row that cannot be read means the holder of any copy is unknown, so every
+  # record stays; a row that does not say who holds the lease, or whose processes field is not a list, keeps its copy.
+  if ! jq -e 'type == "array" and all(.[]; type == "object" and ((.path // null | type) == "string") and (.path | length > 0))' \
+    <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" >/dev/null 2>&1; then
+    echo "warning: the pool listing from $PROJ has a row that cannot be read, so every copy this task's spawn skipped (listed in $record) stays leased; release one with: (cd '$PROJ' && treehouse return '<copy>' --if-lease-holder 'firstmate-skipped:$ID' </dev/null) once it is landed or unwanted" >&2
+    rm -f "$keep"
+    return 0
+  fi
   while IFS=$'\t' read -r copy reason holder when || [ -n "$copy" ]; do
     [ -n "$copy" ] || continue
     canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=
     row=
-    [ -z "$canonical" ] || row=$(jq -r --arg p "$canonical" '.[] | select((.path // "" | tostring) == $p)
-      | [(.lease_holder // "" | tostring), ((.processes // []) | length | tostring)] | @tsv' <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" 2>/dev/null | sed -n 1p)
+    [ -z "$canonical" ] || row=$(jq -r --arg p "$canonical" '[.[] | select(.path == $p)] as $m
+      | if ($m | length) == 0 then empty
+        elif ($m | length) > 1 then ["", "?", "0"]
+        else $m[0] | [(if (.lease_holder | type) == "string" then .lease_holder else "" end),
+          (if (.processes | type) == "array" then (.processes | length | tostring) else "?" end),
+          (if (.lease_holder | type) == "string" then "1" else "0" end)] end | @tsv' <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" 2>/dev/null | sed -n 1p)
     if [ -z "$row" ]; then
       echo "notice: skipped copy $copy is no longer a leased slot of this pool; its record is dropped" >&2
       changed=1
@@ -2936,13 +2948,22 @@ teardown_skipped_copies() {
     fi
     lease_holder=${row%%$'\t'*}
     procs=${row#*$'\t'}
+    holder_known=${procs#*$'\t'}
+    procs=${procs%%$'\t'*}
+    if [ "$holder_known" != 1 ]; then
+      echo "warning: leaving $copy leased to $holder: its pool row does not say who holds the lease, or the pool lists it more than once (skipped for: $reason)" >&2
+      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      continue
+    fi
     if [ "$lease_holder" != "$holder" ]; then
       echo "notice: skipped copy $copy is now leased to '${lease_holder:-nobody}', not $holder; it is not this task's to release, and its record is dropped" >&2
       changed=1
       continue
     fi
     ok=0
-    if [ "${procs:-1}" != 0 ]; then
+    if [ "$procs" = '?' ]; then
+      echo "warning: leaving $copy leased to $holder: its pool row has no list of the processes running in it, so nobody is not proved (skipped for: $reason)" >&2
+    elif [ "${procs:-1}" != 0 ]; then
       echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it (skipped for: $reason)" >&2
     elif ! dirt=$(git -C "$canonical" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) || [ -n "$dirt" ]; then
       echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2

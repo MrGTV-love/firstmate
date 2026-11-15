@@ -547,14 +547,21 @@
 #   working directory in the copy (no age exemption; only the spawn's own pane or `treehouse`
 #   launcher is excused), no git worktree lock, no live project lease or recent or unreadable
 #   contention row, no ignored file at a path the target tree tracks (git overwrites ignored
-#   files silently), and HEAD an ancestor of the target. Any doubt, an unreadable input
-#   included, skips the copy: it is left exactly as found (no checkout, ref, fetch ref or
-#   detach), leased durably in place to this home (`treehouse lease --path`, holder
+#   files silently), no index flag (assume-unchanged, skip-worktree) on any tracked file or
+#   inside any initialized submodule, and HEAD an ancestor of the target. Any doubt, an
+#   unreadable input included, skips the copy: this spawn writes nothing to it (no checkout,
+#   ref, fetch ref or detach), and it is leased durably in place to this home (`treehouse lease --path`, holder
 #   firstmate-skipped:<task>, because Treehouse resets a slot when its shell exits), recorded in
 #   $DATA/<task>/skipped-copies.tsv, listed in the spawn output, and a second `treehouse get`
 #   in the same pane takes another copy. One absolute thirty-minute bound covers every get.
-#   After the move a second snapshot is compared with the first: any difference beyond the
-#   expected HEAD/branch move fails the spawn, never reports success. A lease is released only
+#   After the move a second snapshot is compared with the first, ref for ref: any difference
+#   beyond the expected HEAD/branch move and the one anchor ref this task's own preparation
+#   creates fails the spawn, never reports success. Origin's tracking refs are recorded only
+#   after a move that succeeded. A refusal does nothing to a file: it never writes, overwrites
+#   or deletes one and never runs a checkout that rewrites files; it undoes its own step by ref
+#   only, and only when HEAD, the branch and the commit are exactly what it left. No claim is
+#   made that a late ignored file is detected: one created after the proof and before the merge
+#   is in neither inventory, so it is not reported. A lease is released only
 #   by bin/fm-teardown.sh, after the copy passes its landed-work test. A relaunch keeps the
 #   copy its work lives in and so refuses instead of skipping. A fresh local-only ship instead compares that
 #   immutable tip with the qualified named local default and selects the descendant
@@ -5042,7 +5049,7 @@ spawn_resolve_move_target() { # <worktree> [<base-branch>]
   if [ -n "$status" ]; then
     if describe_stale_submodule_pins "$worktree" "$status"; then
       # Not uncommitted work, but not a copy to launch from either, and it may hold commits the pin check does not
-      # see: it is left exactly as found, leased, and another copy is taken (never abandoned after one get).
+      # see: this spawn writes nothing to it, it is leased, and another copy is taken (never abandoned after one get).
       echo "error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work" >&2
       fm_slot_skip "$worktree" stale_submodule "its submodule checkout is behind the base it records; it is not touched"
       return
@@ -5140,11 +5147,9 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     fm_slot_prove_idle "$worktree" "$SPAWN_MOVE_EXPECTED" "${PROJ_ABS:-}" || return $?
   fi
   SPAWN_PROVEN_COPY=
-  # The refs this spawn itself may write between the proof and the move: origin's default tracking ref and origin/HEAD
-  # (Main 003), and the preservation anchor of this task's own detached copy (refs/fm/anchor/<task>-<sha>, written by
-  # fm_slot_prepare_base). Any other ref that differs after the move fails the spawn.
-  FM_SLOT_REF_ALLOW="refs/remotes/origin/HEAD refs/remotes/origin/$SPAWN_MOVE_DEFAULT refs/fm/anchor/$ID-*"
-  spawn_record_origin_refs "$worktree"
+  # No ref is written between the proof and the move: every ref is compared exactly, and the only change admitted is
+  # the anchor this task's own preparation created (fm_slot_prepare_base). Origin's tracking refs are recorded below,
+  # only after a move that succeeded (Main 1823 D-B).
   if [ -z "$SPAWN_MOVE_EXPECTED" ]; then
     fm_slot_proof_drop
     return 0
@@ -5162,6 +5167,7 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$SPAWN_MOVE_TARGET' ('$SPAWN_MOVE_EXPECTED'); refusing to launch" >&2
     return 1
   fi
+  spawn_record_origin_refs "$worktree"
 }
 
 herdr_projection_meta_field_exact() { # <meta> <key>
@@ -6300,6 +6306,11 @@ spawn_acquire_pool_slot() {
       p_real=$(real_path_or_raw "$p")
       last_reason="it is an isolated worktree, but no second read agreed with it"
       if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
+        # The bound is read once more, here, immediately before the copy is accepted (Main 1823 D-D).
+        if [ $((SECONDS - acquire_start)) -ge "$acquire_ceiling" ]; then
+          acquire_stop="absolute extreme ${acquire_ceiling}s reached"
+          break
+        fi
         WT="$p"
         break
       fi
@@ -6388,7 +6399,7 @@ spawn_skip_copy() {
   mkdir -p "$DATA/$ID" 2>/dev/null &&
     printf '%s\t%s\tfirstmate-skipped:%s\t%s\n' "$skipped" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)" >>"$DATA/$ID/skipped-copies.tsv" ||
     echo "warning: could not record skipped copy $skipped in $DATA/$ID/skipped-copies.tsv; it stays leased as firstmate-skipped:$ID" >&2
-  echo "skipped: copy $skipped (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner and left exactly as found; taking another copy" >&2
+  echo "skipped: copy $skipped (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner; ${FM_SLOT_SKIP_NOTE:-this spawn wrote nothing to it}; taking another copy" >&2
   WT=
 }
 spawn_try_skip() { # <rc of the failed slot step>
@@ -6562,7 +6573,7 @@ fi
 FM_SLOT_SPAWN_PID=$$
 # A fresh spawn proves each copy idle BEFORE anything is written to it (no detach, no ref, no checkout: only
 # bin/fm-slot-provision-lib.sh fm_slot_prove_idle may decide to skip), and a copy it cannot prove is leased in
-# place and left exactly as found while another is taken. Only a proven copy is prepared and moved. A relaunch
+# place, with nothing written to it, while another is taken. Only a proven copy is prepared and moved. A relaunch
 # keeps the copy its task's work lives in, so it never skips: a copy in doubt is refused and retained.
 while :; do
 spawn_validate_local_base "$WT" || exit 1

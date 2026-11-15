@@ -850,10 +850,10 @@
       "id": "pooled-copy-no-discard",
       "version": "1",
       "owner": "bin/fm-spawn.sh",
-      "invariant": "Refreshing a pooled launch base moves a copy only after a read-only proof that it is clean and idle, and only by a fast-forward that git itself refuses to complete over lost work; any doubt skips the copy with nothing written to it. One window is not excluded: an ignored file or a holder that appears after the proof and before the merge, which the second snapshot reports as a failed spawn after the fact.",
+      "invariant": "Refreshing a pooled launch base moves a copy only after a read-only proof that it is clean (submodules and index flags counted) and idle, and only by a fast-forward that git itself refuses to complete over lost work; any doubt skips the copy with nothing written to it. Every ref is compared exactly between the proof and the move, and a refusal never writes or deletes a file: it undoes its own step by ref only, and only when HEAD, the branch and the commit are exactly what it left. One window is not excluded and not detected: an ignored file or a holder that appears after the proof and before the merge is in neither inventory, so the second snapshot does not report it and the merge may overwrite it.",
       "layer": "runtime-block",
       "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: site:bin/fm-spawn.sh:6eceab4636",
-      "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the target tree tracks, has a live holder (any process in it that is not the spawn's own pane, a lock, a lease, or a contention row, readable or not), or has a stale submodule checkout; skips or refuses it with nothing written to it, and leases a skipped copy in place",
+      "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the target tree tracks, has an index flag on a tracked file or inside a submodule, has a live holder (any process in it that is not the spawn's own pane, a lock, a lease, or a contention row, readable or not), or has a stale submodule checkout; skips or refuses it with nothing written to it, and leases a skipped copy in place",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
@@ -872,11 +872,7 @@
       "sites": [
         {
           "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target and a second snapshot shows no change ($(printf '%s' \"$merge_out\" | sed -n '1p'))\""
-        },
-        {
-          "file": "bin/fm-slot-provision-lib.sh",
-          "match": "echo \"error: pooled copy '$slot' was detached from branch $FM_SLOT_PREVIOUS_BRANCH by this spawn's preparation, git refused the move, and the branch could not be put back; the copy stays detached and is kept as it is, and no worker is admitted\" >&2"
+          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target and a second read shows no other change${note:+; $note}\""
         },
         {
           "file": "bin/fm-spawn.sh",

@@ -1041,7 +1041,9 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
         removed)
           assert_contains "$out" 'slot provisioner is missing' 'removed owner silently downgraded governance'
           [ ! -e "$case_dir/provisioner.called" ] || fail 'removed owner was invoked'
-          [ "$(git -C "$pool" rev-parse HEAD)" = "$before" ] || fail 'early governed refusal lost original checkout'
+          # Main 1829/1842: the move to the target had already succeeded and the refusal runs no file-rewriting checkout, so
+          # the copy stays on the target (detached); the previous owner's branch is where it was and nothing is lost.
+          [ "$(git -C "$pool" rev-parse HEAD)" = "$advanced" ] || fail 'early governed refusal moved the copy off the target it was moved to'
           ;;
         *)
           [ -f "$case_dir/provisioner.called" ] || fail 'required project owner was not invoked'
@@ -1058,7 +1060,13 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
   esac
   if [ "$shape" = present ] || [ "$shape" = removed ]; then
     [ "$(git -C "$pool" rev-parse refs/heads/previous-owner)" = "$before" ] || fail 'freshness moved the previous owner branch'
-    [ "$(git -C "$pool" branch --show-current)" = previous-owner ] || fail 'refusal did not restore the previous checkout'
+    # Main 1829/1842: a refusal after a move that succeeded does not run the checkout that would rewrite the files of the
+    # target back to the previous commit. The copy stays on the target, detached; the branch holds the old commit.
+    [ -z "$(git -C "$pool" branch --show-current)" ] || fail 'a refusal after a successful move switched the copy onto a branch'
+    [ "$(git -C "$pool" rev-parse HEAD)" = "$advanced" ] || fail 'a refusal after a successful move changed the commit the copy was moved to'
+    [ -f "$pool/advanced.txt" ] && [ -f "$pool/README.md" ] || fail 'a refusal after a successful move lost a file of the copy'
+    assert_contains "$out" "$pool" 'the refusal did not name the copy it left as it was'
+    assert_contains "$out" 'would change files' 'the refusal did not say why it left the copy as it was'
   fi
   [ ! -d "$pool/.claude/worktrees" ] || fail 'governance created nested isolation'
   pass "final revision governance: $shape $kind"
@@ -1685,6 +1693,19 @@ slot_digest() {
 # The refs a spawn may change while it works in ANOTHER copy: origin's default tracking ref and origin/HEAD (Main 003).
 # New refs (the task's own branch, anchors) may appear. Nothing else that existed before may differ or vanish.
 
+# second_copy_refs <id> [governed]: the "<ref>=<sha>" pairs that a spawn which skipped one copy and then MOVED another
+# copy of the same repository legitimately writes into the shared ref set: origin's default tracking ref and origin/HEAD
+# at origin's tip (recorded after the move succeeded) and, for a governed task, its branch and the preservation anchor
+# of the detached copy it started from. The skipped copy's own digest may differ by exactly these and nothing else.
+second_copy_refs() {
+  local id=$1 tip
+  tip=$(git -C "$CASE_DIR/origin.git" rev-parse --verify "refs/heads/$DEFAULT_BRANCH") || fail "origin's tip cannot be read"
+  printf '%s\n' "refs/remotes/origin/$DEFAULT_BRANCH=$tip" "refs/remotes/origin/HEAD=$tip"
+  if [ "${2:-}" = governed ]; then
+    printf '%s\n' "refs/heads/fm/$id=$tip" "refs/fm/anchor/$id-$(git -C "$PROJECT_DIR" rev-parse --short "$INITIAL_SHA")=$INITIAL_SHA"
+  fi
+}
+
 # assert_digest_unchanged <slot> <before-digest> <message>: the copy reads back as it did, and every ref that existed
 # still has the same value, but for the two allowed ones.
 # assert_digest_unchanged <slot> <before-digest> <label> [<ref>=<sha>...]: the digest now equals <before-digest> in HEAD,
@@ -1741,7 +1762,8 @@ test_a_skipped_dirty_copy_is_left_as_found_and_another_is_taken() {
   assert_contains "$out" "skipped: copy ${SKIP_SLOTS[0]}" "the skip was not reported"
   assert_contains "$out" "(dirty_tree)" "the skip did not name its reason"
   assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the second copy"
-  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped copy changed"
+  # shellcheck disable=SC2046 # one word per "<ref>=<sha>" pair
+  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped copy changed" $(second_copy_refs "$id")
   assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" "the skipped copy was not leased durably before it was left"
   [ "$(git -C "${SKIP_SLOTS[1]}" rev-parse HEAD)" = "$(git -C "${SKIP_SLOTS[1]}" rev-parse origin/main)" ] \
     || fail "the second copy was not moved to origin's tip"
@@ -1766,7 +1788,8 @@ test_a_skipped_copy_with_an_unlanded_commit_keeps_it_and_another_is_taken() {
   expect_code 0 "$status" "a copy holding an unlanded commit should be skipped"$'\n'"$out"
   assert_contains "$out" "(not_fast_forward)" "the skip did not name its reason"
   [ "$(git -C "${SKIP_SLOTS[0]}" rev-parse HEAD)" = "$extra" ] || fail "the unlanded commit is no longer HEAD of the skipped copy"
-  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped copy changed"
+  # shellcheck disable=SC2046 # one word per "<ref>=<sha>" pair
+  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped copy changed" $(second_copy_refs "$id")
   assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the second copy"
   pass "a copy holding an unlanded commit is skipped with the commit kept, and the task runs on another copy"
 }
@@ -1918,7 +1941,8 @@ test_a_governed_attached_copy_keeps_its_branch_when_skipped() {
   out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
   [ "$(cat "$CASE_DIR/get-count")" -ge 2 ] || fail "no second copy was requested"$'\n'"$out"
   [ "$(git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD)" = refs/heads/previous-owner ] || fail "the skipped governed copy was left detached"
-  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped governed copy changed"
+  # shellcheck disable=SC2046 # one word per "<ref>=<sha>" pair
+  assert_digest_unchanged "${SKIP_SLOTS[0]}" "$before" "the skipped governed copy changed" $(second_copy_refs "$id" governed)
   pass "a skipped governed copy keeps its branch and every byte"
 }
 
@@ -2169,8 +2193,8 @@ SH
 
 # 2 (spawn level). A governed copy that git refuses to move after the preparation detached it is not reported as
 # untouched: its branch is as found, or the output says it was detached.
-# Main 1823 D-A: git refuses the move after the preparation detached a governed copy. The refusal runs no checkout and
-# switches no HEAD: the copy stays detached, its branch is where it was, and the output says so instead of "untouched".
+# Main 1829: git refuses the move after the preparation detached a governed copy. The detach is undone by ref (no file is
+# touched) because the proof holds, so the previous owner's branch is checked out again and is where it was.
 refuse_governed_after_preparation() { # <name> <id>; sets GOV_OUT
   local name=$1 id=$2 real_git
   make_governed_skip_case "$name" "$id"
@@ -2182,25 +2206,13 @@ case " \$* " in *' merge --ff-only '*) exit 1 ;; esac
 exec '$real_git' "\$@"
 SH
   chmod +x "$FAKEBIN_DIR/git"
-  GOV_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
+  GOV_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn_skipping "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
 }
 
-test_a_governed_refusal_after_preparation_leaves_the_copy_detached() {
+test_a_governed_refusal_after_preparation_puts_the_branch_back() {
   refuse_governed_after_preparation governed-refused-prep pool-governed-refused-after-prep
-  ! git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD >/dev/null || fail "a refusal switched the copy back onto a branch"$'\n'"$GOV_OUT"
-  pass "a governed copy refused after preparation stays detached"
-}
-
-test_a_governed_refusal_after_preparation_says_the_copy_stays_detached() {
-  refuse_governed_after_preparation governed-refused-says pool-governed-refused-says
-  assert_contains "$GOV_OUT" "stays detached" "the output did not say the copy stays detached"
-  pass "the output says a governed copy refused after preparation stays detached"
-}
-
-test_a_governed_refusal_after_preparation_never_says_untouched() {
-  refuse_governed_after_preparation governed-refused-untouched pool-governed-refused-untouched
-  assert_not_contains "$GOV_OUT" "left untouched" "a copy this spawn detached was called untouched"
-  pass "a governed copy this spawn detached is never called untouched"
+  [ "$(git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD)" = refs/heads/previous-owner ] || fail "the previous owner's branch was not put back"$'\n'"$GOV_OUT"
+  pass "a governed copy refused after preparation has its branch back"
 }
 
 test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
@@ -2292,9 +2304,7 @@ test_the_bound_is_rechecked_just_before_a_copy_is_accepted
 test_the_bound_refusal_at_accept_launches_nothing
 test_a_copy_accepted_inside_the_bound_is_launched
 test_a_refused_move_leaves_every_ref_unchanged
-test_a_governed_refusal_after_preparation_leaves_the_copy_detached
-test_a_governed_refusal_after_preparation_says_the_copy_stays_detached
-test_a_governed_refusal_after_preparation_never_says_untouched
+test_a_governed_refusal_after_preparation_puts_the_branch_back
 test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was
 
 echo "# all fm-spawn-pool-base-freshen tests passed"

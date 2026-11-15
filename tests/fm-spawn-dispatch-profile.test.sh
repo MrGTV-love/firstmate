@@ -2733,7 +2733,7 @@ test_teamclaude_launcher_is_inherited_by_secondmates() {
 }
 
 test_governed_slot_refuses_before_admission_and_preserves_work() {
-  local rec id=slot-refused out status retained_head common
+  local rec id=slot-refused out status retained_head common tip
   rec=$(make_spawn_case slot-refused codex "$id")
   read_case_record "$rec"
   mkdir -p "$PROJ_DIR/scripts/git-stability"
@@ -2743,13 +2743,19 @@ import sys
 print(json.dumps({"state": "BLOCKED", "reason": "manifest_exists", "blocked_reasons": ["manifest_exists"]}))
 sys.exit(2)
 PY
-  git -C "$PROJ_DIR" add scripts
-  git -C "$PROJ_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
-  git -C "$PROJ_DIR" push -q origin main
+  # The copy holds a commit of its own (an earlier task's work). A copy whose HEAD origin lacks is skipped untouched, so the
+  # earlier work is first landed on origin; the copy then sits behind origin's tip, is moved forward, and the project owner
+  # refuses (the refusal runs no checkout, so the copy stays on the tip it was moved to).
   printf 'retained work\n' > "$WT_DIR/retained.txt"
   git -C "$WT_DIR" add retained.txt
   git -C "$WT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'unrelated previous task work'
   retained_head=$(git -C "$WT_DIR" rev-parse HEAD)
+  git -C "$WT_DIR" push -q origin "HEAD:refs/heads/main"
+  git -C "$PROJ_DIR" pull -q --ff-only origin main
+  git -C "$PROJ_DIR" add scripts
+  git -C "$PROJ_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
+  git -C "$PROJ_DIR" push -q origin main
+  tip=$(git -C "$PROJ_DIR" rev-parse HEAD)
   common=$(git -C "$WT_DIR" rev-parse --path-format=absolute --git-common-dir)
   printf 'foreign manifest bytes\n' > "$common/foreign-manifest"
 
@@ -2759,7 +2765,8 @@ PY
   assert_contains "$out" 'manifest_exists' 'spawn lost the actual provisioner refusal'
   [ ! -s "$LAUNCH_LOG" ] || fail 'a refused provisioner sent a harness launch'
   [ "$(git -C "$WT_DIR" rev-parse refs/heads/wt-slot-refused)" = "$retained_head" ] || fail 'freshness reset moved the previous task branch'
-  [ "$(git -C "$WT_DIR" rev-parse HEAD)" = "$retained_head" ] || fail 'refused spawn did not restore the assigned checkout'
+  [ "$(git -C "$WT_DIR" rev-parse HEAD)" = "$tip" ] || fail 'refused spawn moved the assigned checkout off the tip it was moved to'
+  ! git -C "$WT_DIR" symbolic-ref -q HEAD >/dev/null || fail 'a refusal after a successful move switched the copy onto a branch'
   [ "$(cat "$common/foreign-manifest")" = 'foreign manifest bytes' ] || fail 'refused spawn changed foreign data'
   assert_present "$WT_DIR/retained.txt" 'refused spawn lost retained work'
   assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'refused spawn lost retained-copy custody'
