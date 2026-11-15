@@ -1371,6 +1371,7 @@ anchor_world() { # <name>: a governed detached copy, proven and prepared; sets W
   [ -n "$FM_SLOT_EXPECT_REFS" ] || fail "the preparation wrote no anchor, so the anchor cases would prove nothing"
   git -C "$W_PROJ" rev-parse --verify --quiet "${FM_SLOT_EXPECT_REFS%%=*}" >/dev/null || fail "the anchor ref does not exist"
 }
+# shellcheck disable=SC2329 # Called from the anchor cases.
 anchor_world_done() { fm_task_copy_preserve() { return 0; }; }
 
 test_the_anchor_the_preparation_wrote_is_admitted() {
@@ -1402,6 +1403,7 @@ test_the_anchor_the_preparation_wrote_fails_the_move_when_it_ends_at_another_com
   local bin="$W_DIR/anchor-moved" real_git out rc=0
   real_git=$(command -v git)
   mkdir -p "$bin"
+  # shellcheck disable=SC2016 # The shim's own shell expands $*, $(..) and "$@".
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref "$(%s -C %s for-each-ref --format="%%(refname)" "refs/fm/anchor/tid-*" | head -n 1)" %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "'$real_git'" "'$W_SLOT'" "$W_TARGET" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(FM_SLOT_REF_ALLOW='refs/fm/anchor/tid-*' PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
