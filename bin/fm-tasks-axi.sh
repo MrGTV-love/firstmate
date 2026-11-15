@@ -405,21 +405,6 @@ ledger_task_filed() {  # <captured-stdout-file>
     "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$id" "$repo" "$kind" "$priority" || true
 }
 
-# fm_tasks_axi_reported_state <output-file> <id>: the state a public-followup completion printed
-# for <id>, from its TOON (`public_followup:` with `  id:` and `  state:`) or JSON (`.task`)
-# output, or nothing.
-fm_tasks_axi_reported_state() {
-  if [ "$(head -c 1 "$1" 2>/dev/null)" = "{" ] && command -v jq >/dev/null 2>&1; then
-    jq -r --arg id "$2" 'if (.task.id // "") == $id then (.task.state // "") else "" end' "$1" 2>/dev/null
-    return 0
-  fi
-  awk -v want="$2" '
-    /^public_followup:/ { inblk = 1; id = ""; next }
-    inblk && /^[^ ]/ { inblk = 0 }
-    inblk && /^  id: / { id = substr($0, 7) }
-    inblk && /^  state: / && id == want { print substr($0, 10); exit }' "$1"
-}
-
 case "$TASK_COMMAND" in
   add|create)
     if [ -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] && add_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-add.XXXXXX" 2>/dev/null); then
@@ -451,37 +436,44 @@ case "${ARGS[0]:-}:${ARGS[1]:-}" in
     # once. Run them without exec so a row they finished stops blocking its dependents,
     # exactly like done/close.
     pf_id=${ARGS[2]:-}
-    # The completion's own output is kept: when the row cannot be read afterwards, the state
-    # tasks-axi itself printed for this id decides, so a completion that reported Done never
-    # leaves its blocked-by edge behind.
-    pf_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-pf.XXXXXX" 2>/dev/null) || pf_out=
-    if [ -n "$pf_out" ]; then
-      tasks-axi "${ARGS[@]}" > "$pf_out"
-      pf_status=$?
-      cat -- "$pf_out"
-    else
-      tasks-axi "${ARGS[@]}"
-      pf_status=$?
-    fi
+    # Proof of Done (Main 1795): tasks-axi 0.2.6 exits 0 from `public-followup waive` and
+    # `public-followup record-delivery` only when the row is Done. A new completion stores its
+    # terminal delivery state and Done in one atomic mutation (dist/src/backends/markdown.js:822-834,
+    # refusing anything else), the idempotent "already" path returns only for a row already
+    # waived or posted, and a waived or posted row that is not Done fails to parse
+    # (dist/src/public-followup.js:877-887, checked for every row read at markdown-grammar.js:359).
+    # So when the row cannot be read back, exit 0 is the proof, and its edges clear in the same run.
     pf_help=0
     for pf_arg in "${ARGS[@]}"; do
       case "$pf_arg" in -h|--help) pf_help=1 ;; esac
     done
+    # Main 1785 F5: the capture file exists before the completion runs. When it cannot be made,
+    # the completion does not run, so nothing changes, and the caller is told to retry.
+    if ! pf_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-pf.XXXXXX" 2>/dev/null); then
+      printf 'actionable: the %s of %s did not run, so nothing changed: the wrapper could not make the file that keeps its output, which it needs to clear the items %s blocks; retry when %s is writable\n' \
+        "${ARGS[1]}" "$pf_id" "$pf_id" "${TMPDIR:-/tmp}" >&2
+      exit 1
+    fi
+    tasks-axi "${ARGS[@]}" > "$pf_out"
+    pf_status=$?
+    cat -- "$pf_out"
     if [ "$pf_status" -eq 0 ] && [ "$pf_help" = 0 ] && [[ "$pf_id" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]; then
       if fm_backlog_row_probe "$DATA" "$pf_id"; then
-        [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] || fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
+        if [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ]; then
+          fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
+        else
+          printf 'actionable: tasks-axi accepted the %s of %s, but it reads %s, not done, which its contract does not allow; its blocked-by edges stay\n' \
+            "${ARGS[1]}" "$pf_id" "${FM_BACKLOG_ROW_STATE%% *}" >&2
+        fi
       elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
         fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
-      elif [ -n "$pf_out" ] && [ "$(fm_tasks_axi_reported_state "$pf_out" "$pf_id")" = "done" ]; then
-        printf 'note: the state of %s could not be read after its %s (%s); tasks-axi reported it done, so its blocked-by edges are cleared\n' \
+      else
+        printf 'note: the state of %s could not be read after its %s (%s); tasks-axi exits 0 from that completion only when the row is Done, so its blocked-by edges are cleared now\n' \
           "$pf_id" "${ARGS[1]}" "${FM_BACKLOG_ROW_ERROR:-unknown error}" >&2
         fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
-      else
-        printf 'actionable: tasks-axi accepted the %s of %s, but its state could not be read (%s); if it is done, clear the items it blocked with tasks-axi unblock <item> --by %s\n' \
-          "${ARGS[1]}" "$pf_id" "${FM_BACKLOG_ROW_ERROR:-unknown error}" "$pf_id" >&2
       fi
     fi
-    [ -z "$pf_out" ] || rm -f -- "$pf_out"
+    rm -f -- "$pf_out"
     exit "$pf_status"
     ;;
 esac

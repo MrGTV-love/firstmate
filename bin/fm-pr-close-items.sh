@@ -157,43 +157,50 @@ left_open() {  # <id> <reason> [teardown]
 # through the forge's own tool. <out-file>.merged holds true only when the same record
 # says it is merged. On failure the reason is left in <out-file>.err.
 read_body() {
-  local url=$1 out=$2 json login rc=0
+  # Main 1785 F1 and F2: the forge's bytes go to files, never through command substitution
+  # (which drops NUL bytes), and every step that writes the body file must succeed; any failed
+  # step is a failed read, so the caller refuses the whole body and names the reason.
+  local url=$1 out=$2 login rc=0 state
   echo false > "$out.merged"
+  : > "$out.err"
   fm_pr_url_parse "$url" || { echo "not a pull request URL" > "$out.err"; return 1; }
   case "$FM_PR_PROVIDER" in
     github)
       # The first line is the state; the rest is the body.
-      json=$(gh pr view "$url" --json body,state --jq '(.state // "") + "\n" + (.body // "")' 2>"$out.err") || rc=$?
+      gh pr view "$url" --json body,state --jq '(.state // "") + "\n" + (.body // "")' > "$out.raw" 2>"$out.err" || rc=$?
       if [ "$rc" -eq 0 ]; then
-        printf '%s\n' "$json" | sed '1d' > "$out"
-        [ "$(printf '%s\n' "$json" | sed -n '1p')" != MERGED ] || echo true > "$out.merged"
+        state=$(head -n 1 "$out.raw") || rc=$?
       fi
+      if [ "$rc" -eq 0 ]; then
+        tail -n +2 "$out.raw" > "$out" 2>>"$out.err" || { rc=$?; echo "the body could not be written from the forge's answer (status $rc)" >> "$out.err"; }
+      fi
+      [ "$rc" -ne 0 ] || [ "$state" != MERGED ] || echo true > "$out.merged"
       ;;
     gitlab)
       command -v jq >/dev/null 2>&1 || { echo "jq is not installed" > "$out.err"; return 1; }
-      json=$(GITLAB_HOST="$FM_PR_HOST" glab mr view "$FM_PR_NUMBER" -R "https://$FM_PR_HOST/$FM_PR_PATH" -F json 2>"$out.err") || rc=$?
+      GITLAB_HOST="$FM_PR_HOST" glab mr view "$FM_PR_NUMBER" -R "https://$FM_PR_HOST/$FM_PR_PATH" -F json > "$out.raw" 2>"$out.err" || rc=$?
       if [ "$rc" -eq 0 ]; then
-        printf '%s' "$json" | jq -er 'if type == "object" then (.description // "") else error("not a merge request record") end' > "$out" 2>"$out.err" || rc=$?
-        printf '%s' "$json" | jq -r 'if type == "object" and .state == "merged" then true else false end' > "$out.merged" 2>/dev/null || echo false > "$out.merged"
+        jq -jer 'if type == "object" then (.description // "") + "\n" else error("not a merge request record") end' "$out.raw" > "$out" 2>"$out.err" || rc=$?
       fi
+      [ "$rc" -ne 0 ] || jq -r 'if type == "object" and .state == "merged" then true else false end' "$out.raw" > "$out.merged" 2>/dev/null || echo false > "$out.merged"
       ;;
     forgejo)
       command -v jq >/dev/null 2>&1 || { echo "jq is not installed" > "$out.err"; return 1; }
       login=$(fm_pr_forgejo_login "$FM_PR_HOST") || { echo "no single tea login for $FM_PR_HOST" > "$out.err"; return 1; }
       # "tea api" exits 0 on an HTTP error and prints the error body, so only a record
       # that has a body field counts as a read.
-      json=$(tea api --login "$login" --repo "$FM_PR_OWNER/$FM_PR_REPO" "/repos/{owner}/{repo}/pulls/$FM_PR_NUMBER" 2>"$out.err") || rc=$?
+      tea api --login "$login" --repo "$FM_PR_OWNER/$FM_PR_REPO" "/repos/{owner}/{repo}/pulls/$FM_PR_NUMBER" > "$out.raw" 2>"$out.err" || rc=$?
       if [ "$rc" -eq 0 ]; then
-        printf '%s' "$json" | jq -er 'if type == "object" and has("merged") then (.body // "") else error("the forge answered: " + ((.message // "no pull request record") | tostring)) end' > "$out" 2>"$out.err" || rc=$?
-        printf '%s' "$json" | jq -r 'if type == "object" and .merged == true then true else false end' > "$out.merged" 2>/dev/null || echo false > "$out.merged"
+        jq -jer 'if type == "object" and has("merged") then (.body // "") + "\n" else error("the forge answered: " + ((.message // "no pull request record") | tostring)) end' "$out.raw" > "$out" 2>"$out.err" || rc=$?
       fi
+      [ "$rc" -ne 0 ] || jq -r 'if type == "object" and .merged == true then true else false end' "$out.raw" > "$out.merged" 2>/dev/null || echo false > "$out.merged"
       ;;
     *)
       echo "reading a ${FM_PR_PROVIDER:-unknown} pull request body is not supported" > "$out.err"
       return 1
       ;;
   esac
-  [ "$rc" -eq 0 ] || { [ -s "$out.err" ] || echo "the read failed with status $rc" > "$out.err"; return 1; }
+  [ "$rc" -eq 0 ] || { [ -s "$out.err" ] || echo "the read failed with status $rc" > "$out.err"; echo false > "$out.merged"; return 1; }
   return 0
 }
 
@@ -269,8 +276,19 @@ MERGED=$(cat "$WORK/body.merged" 2>/dev/null) || MERGED=false
 # Each body is parsed once (bin/fm-pr-closes-lib.sh fm_pr_closes_parse, the one parse); every
 # close, edge change and report below comes from that one result, and a body's result is
 # complete before anything it names is closed.
-parse_body() {  # <body-file>
-  fm_pr_closes_parse "$1" "$URL" > "$1.parse"
+parse_body() {  # <body-file> <where>
+  # Main 1785 F3: a parse that fails is an actionable non-close naming the body, the reason and
+  # the ids that could be read. Only a result whose status is `block` ever closes anything, so a
+  # result that is missing or cut short closes nothing.
+  local reason ids
+  fm_pr_closes_parse "$1" "$URL" > "$1.parse" && return 0
+  reason=$(got "$1" reason 2>/dev/null)
+  ids=$(got "$1" seenid 2>/dev/null | paste -sd ',' - | sed 's/,/, /g')
+  LEFT=$((LEFT + 1))
+  printf 'actionable: close-at-merge: could not parse %s, so nothing named by it was closed and no blocked-by edge changed: %s; it names item ids: %s; retry: %s %s %s\n' \
+    "$2" "${reason:-the parse result could not be written}" "${ids:-none that could be read}" "$0" "$TASK_ID" "$URL" >&2
+  printf 'status\tfailed\n' > "$1.parse" 2>/dev/null || true
+  return 1
 }
 got() {  # <body-file> <record type>
   fm_pr_closes_get "$1.parse" "$2"
@@ -310,7 +328,7 @@ report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, repor
     "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$2" "$0" "$TASK_ID" "$URL" >&2
 }
 
-parse_body "$WORK/body"
+parse_body "$WORK/body" "the body of $URL" || true
 report_refusal "$WORK/body" "the body of $URL"
 if [ "$(got "$WORK/body" status)" = block ]; then
   while IFS= read -r id; do
@@ -337,7 +355,7 @@ while IFS= read -r candidate; do
   n=$((n + 1))
   MEMBER_URLS[n]=$member
   if read_body "$member" "$WORK/member-$n"; then
-    parse_body "$WORK/member-$n"
+    parse_body "$WORK/member-$n" "the body of train member $member" || true
     report_refusal "$WORK/member-$n" "the body of train member $member"
     if [ "$(got "$WORK/member-$n" status)" = block ]; then
       while IFS= read -r id; do

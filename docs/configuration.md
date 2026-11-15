@@ -1198,6 +1198,10 @@ Anything else refuses the whole body before any close: nothing in it closes, no 
 The reader interprets no Markdown or HTML, so a block that a body quotes anywhere (in a code span, fence, quote, table, `div`, `details` element, comment or a member body's example) refuses the body, because it is not first or it puts the marker text on another line.
 A real block below any other text refuses too: that is the intended cost of acting only on positive proof, so put the block at the very top of the body.
 A body with no line holding the marker text has no block; it closes nothing and is not a refusal.
+The forge's answer is written to files, never passed through command substitution, and a body that a read step could not write in full is no read: the merge prints one `actionable:` line with the pull request and the reason and closes nothing from that body.
+A NUL byte anywhere in a body refuses it the same way, before any parse; whether a real forge can carry a NUL byte in a pull request body was not tested.
+A parse that cannot run closes nothing from that body either, and the merge prints one `actionable:` line naming the pull request, the body and the reason, with the item ids it could read.
+A refusal names each item id exactly as the block spells it.
 The refusal is per body: a refused member body closes none of the items its own block names, while the train's own block and the other members still close, and a task whose record holds the refused member's URL as `pr=` still goes through the completion (a ship or scout task with a live record is refused there).
 Commit messages are never read: only the pull request body is.
 A directive line outside the block, in a body with a block, without one, or in a refused body, closes nothing, and the merge reports it as an `actionable:` line that counts as left open.
@@ -1215,6 +1219,7 @@ When it is the merged pull request's own task, its own teardown closes it, so th
 A task of any other kind that still has a live record closes like any other named item.
 [`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes and the reason it reports for each item it leaves open, an unknown id, a finished item, an open captain call and a proof the completion refuses among them.
 A close that fails never undoes or fails the merge, and a repeat run changes nothing.
+A typed `public-followup` completion runs only when the wrapper can first make the file that keeps its output; otherwise nothing runs and nothing changes. tasks-axi exits 0 from `public-followup waive` and `record-delivery` only when the row is Done (its own source at 0.2.6; the wrapper header cites it), so when the row cannot be read back after a completion that exited 0, the wrapper still clears that item's edges in the same run and says so.
 An item that moves to Done through `bin/fm-tasks-axi.sh` (`done`, `close`, or a typed `public-followup` completion), a backlog transition such as teardown's, or a captain-hold `answer`, `withdraw` or `reconcile close` also leaves every other active item's blocked-by list, and the cleared items are reported; an item with another unfinished blocker keeps waiting on it, and [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.
 A raw `tasks-axi done` skips this clear, and so does teardown in a home where the backlog transition gate does not apply.
 [`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.

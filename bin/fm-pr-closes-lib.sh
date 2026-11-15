@@ -30,6 +30,13 @@
 #   member counts once.
 # - A body with no line holding the marker text has no block and closes nothing; it is not a
 #   refusal.
+# - A NUL byte anywhere in the body refuses it before any pass (Main 1785 F2), since a tool on
+#   the way may drop it. bin/fm-pr-close-items.sh writes the forge's bytes to files, never
+#   through command substitution, and refuses a body any read step failed to write in full.
+# - A parse that fails (its snapshot or pass cannot run) gives `status failed`, never `block`, so
+#   it closes nothing; the caller reports it (Main 1785 F3).
+# - One token reading (Main 1785 F4): the value of an exact directive line is the same for the
+#   close and for every report, so a refusal names each id exactly as written.
 # The reader interprets no Markdown and no HTML. Because the block must open the body, any
 # block that a body quotes as an example (in a code span, a fence, a quote, a table, a div, a
 # details element, a comment or a member body's example) is either not first or puts marker text
@@ -60,7 +67,8 @@ FM_PR_CLOSES_MARKER='firstmate-backlog-closes:'
 # with the one line grammar, each block member is then checked with fm_pr_url_parse, and a
 # member that fails refuses the whole body, so the same pass runs again on the same snapshot
 # with that reason. Prints one record per line, `<type><TAB><value>`, in this order:
-#   status   block (an honored block), refused, or none (no line holds the marker text)
+#   status   block (an honored block), refused, none (no line holds the marker text), or
+#            failed (the parse could not run; fm_pr_closes_failed, exit 1)
 #   reason   why the body is refused (refused only)
 #   id       an item id of a `Closes-backlog-item:` line inside the honored block, once each
 #   member   a `Train-member:` URL inside the honored block, once each
@@ -77,11 +85,31 @@ FM_PR_CLOSES_MARKER='firstmate-backlog-closes:'
 # one space and nothing after the id; `Train-member: <url>` with one space and one value with no
 # space after it, the value being a pull request URL by fm_pr_url_parse.
 fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
-  local merged=${2:-} snap result member why=''
-  snap=$(mktemp "${TMPDIR:-/tmp}/fm-pr-closes.XXXXXX") || return 1
-  cat -- "$1" > "$snap" || { rm -f -- "$snap"; return 1; }
-  result=$(fm_pr_closes_pass "$snap" "$merged" '')
-  if [ "${result%%$'\n'*}" = "$(printf 'status\tblock')" ]; then
+  local merged=${2:-} snap result member why='' size kept rc=0
+  # A failure of the parse itself (Main 1785 F3) prints `status failed` and its reason, with the
+  # ids the same pass can read from the original file under a forced refusal, and returns 1.
+  if ! snap=$(mktemp "${TMPDIR:-/tmp}/fm-pr-closes.XXXXXX" 2>/dev/null); then
+    fm_pr_closes_failed "$1" "$merged" "the parse could not make its snapshot"
+    return 1
+  fi
+  if ! cat -- "$1" > "$snap" 2>/dev/null; then
+    rm -f -- "$snap"
+    fm_pr_closes_failed "$1" "$merged" "the parse could not copy the body into its snapshot"
+    return 1
+  fi
+  # Main 1785 F2: a NUL byte anywhere refuses the whole body before any pass, because a tool on
+  # the way (a command substitution, an awk) may drop it; the forced pass reads a copy with each
+  # NUL shown as `?`, only for the report.
+  size=$(LC_ALL=C wc -c < "$snap" | tr -d ' ') && kept=$(LC_ALL=C tr -d '\000' < "$snap" | LC_ALL=C wc -c | tr -d ' ') || rc=1
+  if [ "$rc" -eq 0 ] && [ "$size" != "$kept" ]; then
+    LC_ALL=C tr '\000' '?' < "$snap" > "$snap.nul" && result=$(fm_pr_closes_pass "$snap.nul" "$merged" "the body holds a NUL byte, which no line of a closes block may hold") || rc=1
+    rm -f -- "$snap" "$snap.nul"
+    [ "$rc" -eq 0 ] || { fm_pr_closes_failed "$1" "$merged" "the parse could not read its snapshot"; return 1; }
+    printf '%s\n' "$result"
+    return 0
+  fi
+  [ "$rc" -eq 0 ] && result=$(fm_pr_closes_pass "$snap" "$merged" '') || rc=1
+  if [ "$rc" -eq 0 ] && [ "${result%%$'\n'*}" = "$(printf 'status\tblock')" ]; then
     while IFS= read -r member; do
       [ -n "$member" ] || continue
       if ! fm_pr_url_parse "$member" || [ "$FM_PR_URL" != "$member" ]; then
@@ -94,10 +122,20 @@ fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
       fi
       [ -z "$why" ] || break
     done <<< "$(printf '%s\n' "$result" | LC_ALL=C awk -F '\t' '$1 == "member" { print substr($0, 8) }')"
-    [ -z "$why" ] || result=$(fm_pr_closes_pass "$snap" "$merged" "$why")
+    [ -z "$why" ] || result=$(fm_pr_closes_pass "$snap" "$merged" "$why") || rc=1
   fi
   rm -f -- "$snap"
+  [ "$rc" -eq 0 ] || { fm_pr_closes_failed "$1" "$merged" "the parse's pass failed"; return 1; }
   printf '%s\n' "$result"
+}
+
+# fm_pr_closes_failed <body-file> <merged-pr-url> <reason>: the result of a parse that failed:
+# `status failed`, the reason, and the seenid and seenpr records the same pass reads from the
+# original file under a forced refusal, when it can.
+fm_pr_closes_failed() {
+  printf 'status\tfailed\nreason\t%s\n' "$3"
+  fm_pr_closes_pass "$1" "$2" "$3" 2>/dev/null | LC_ALL=C awk -F '\t' '$1 == "seenid" || $1 == "seenpr"'
+  return 0
 }
 
 # fm_pr_closes_pass <snapshot> <merged-pr-url> <forced-reason>: the structural pass of the one
@@ -115,6 +153,9 @@ fm_pr_closes_pass() {
       if (l ~ /^(Closes-backlog-item|Train-member|Closes):/) return "malformed"
       return "prose"
     }
+    # The one token reading (Main 1785 F4): the value of an exact directive line, the same for
+    # the close (id, member, legacy) and for every report (seenid, seenpr).
+    function token(l) { return substr(l, index(l, ": ") + 2) }
     function words(l,   n, i, w, t, e, parts) {
       n = split(l, parts, /[^A-Za-z0-9._-]+/)
       for (i = 1; i <= n; i++) {
@@ -136,7 +177,10 @@ fm_pr_closes_pass() {
         rest = substr(rest, RSTART + RLENGTH)
       }
     }
-    function seen_tokens(l,   w, word, rest, p, n, j, t, tok) {
+    function seen_tokens(l,   w, word, rest, p, n, j, t, tok, k) {
+      k = kind(l)
+      if (k == "id" || k == "legacy") { out("seenid", token(l)); links(l, "seenpr"); return }
+      if (k == "member") { out("seenpr", token(l)); links(l, "seenpr"); return }
       for (w = 1; w <= 3; w++) {
         word = (w == 1) ? "Closes-backlog-item:" : (w == 2) ? "Closes:" : "Train-member:"
         rest = l
@@ -147,7 +191,9 @@ fm_pr_closes_pass() {
             t = tok[j]
             if (t == "") continue
             if (t ~ /^(Closes-backlog-item|Closes|Train-member):/) break
-            sub(/[.;:]+$/, "", t)
+            # A token is kept as written when it has an id or link shape; only otherwise is
+            # trailing sentence punctuation dropped.
+            if (t !~ /^https?:\/\// && !idform(t)) sub(/[.;:]+$/, "", t)
             if (t ~ /^https?:\/\//) out("seenpr", t)
             else if (idform(t)) out("seenid", t)
           }
@@ -181,7 +227,7 @@ fm_pr_closes_pass() {
           k = kind(t)
           if (k == "id") continue
           if (k == "member") {
-            if (substr(t, 15) == U) { reason = sprintf("line %d inside its closes block names the merged pull request itself as a Train-member: %s", i, t); break }
+            if (token(t) == U) { reason = sprintf("line %d inside its closes block names the merged pull request itself as a Train-member: %s", i, t); break }
             continue
           }
           reason = sprintf("line %d inside its closes block is not exactly a Closes-backlog-item: <item-id> line, a Train-member: <url> line or an empty line: %s", i, t)
@@ -197,14 +243,14 @@ fm_pr_closes_pass() {
         if (status == "block" && i > first && i < end) {
           if (t == "") continue
           k = kind(t)
-          if (k == "id") out("id", substr(t, 22))
-          else out("member", substr(t, 15))
+          if (k == "id") out("id", token(t))
+          else out("member", token(t))
           continue
         }
         k = kind(t)
         if (k == "id" || k == "member") out("outside", t)
         else if (k == "malformed") out("malformed", t)
-        else if (k == "legacy") out("legacy", substr(t, 9))
+        else if (k == "legacy") out("legacy", token(t))
         if (k != "id" && k != "legacy") { words(t); links(t, "link") }
       }
       for (i = 1; i <= NR; i++) seen_tokens(line[i])
