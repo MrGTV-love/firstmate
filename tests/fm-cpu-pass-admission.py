@@ -870,7 +870,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         child.wait(timeout=30)
         time.sleep(1.5)
         if (folder / 'x.agent').exists():
-            pid = json.loads((folder / 'x.agent').read_text())['pid']
+            pid = agent_info(folder / 'x.agent')['pid']
             if alive(pid):
                 os.kill(pid, signal.SIGKILL)
                 raise AssertionError('agent %d kept running after the gate died at the handoff' % pid)

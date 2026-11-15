@@ -698,6 +698,20 @@ def reserving_held(folder, runs):
     return count
 
 
+def agent_info(path):
+    """The agent stand-in's marker, once it is written whole (the stand-in writes it in one call that is not atomic)."""
+    found = {}
+
+    def whole():
+        try:
+            found.update(json.loads(path.read_text()))
+            return True
+        except (OSError, ValueError):
+            return False
+    wait_for(whole, 'the agent marker %s written' % path.name)
+    return found
+
+
 def settled_held(folder, runs):
     """reserving_held after two censuses: an attempt with nothing left of it ends only at the second (Main 1759)."""
     reserving_held(folder, runs)

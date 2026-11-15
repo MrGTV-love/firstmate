@@ -22,7 +22,7 @@ try:
         child, log = gate(folder, env, 'x', mode='exit-0', stdin=b'prompt text')
         finish(child)
         text = log.with_suffix('.stderr').read_text()
-        seen = json.loads((folder / 'x.agent').read_text())
+        seen = agent_info(folder / 'x.agent')
         assert 'launch-gate run=x branch=fm/x step=ci:running' in text and 'launch-gate admitted: ' in text, text
         assert seen['stdin'] == 'prompt text' and seen['argv'] == ['-p', '--flag'] and seen['cwd'] == os.path.realpath(folder / 'wt-x'), seen
         (folder / 'elsewhere').mkdir()
@@ -128,7 +128,7 @@ try:
         wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
         import re
         stamps = dict(re.findall(r'(admitted_ns|published_ns|agent_started_ns|unlocked_ns)=(\d+)', log.with_suffix('.stderr').read_text()))
-        started = json.loads((folder / 'x.agent').read_text())['started_ns']
+        started = agent_info(folder / 'x.agent')['started_ns']
         assert int(stamps['admitted_ns']) <= int(stamps['published_ns']) <= int(stamps['agent_started_ns']) <= int(stamps['unlocked_ns']), stamps
         assert int(stamps['published_ns']) <= started, (stamps, started)
         assert reserving_held(folder, ['x']) == 1
@@ -182,7 +182,7 @@ try:
         child, log = gate(folder, env, 'x')
         wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
         # The reading shows the agent's own process (pid and exact start time, as the census reports it).
-        agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
+        agent_pid = agent_info(folder / 'x.agent')['pid']
         facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', GIB // 5, agent_pid, start_us(agent_pid))])
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
         wait_for(lambda: 'waiting: counted=1 projected=%d ' % (9 * GIB) in (folder / 'later.stderr').read_text(), 'A, not startup memory')
@@ -310,7 +310,7 @@ try:
             folder, db, env = gate_case('gate-kill-' + label)
             child, log = gate(folder, env, 'x')
             wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-            agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
+            agent_pid = agent_info(folder / 'x.agent')['pid']
             kill(child)
             finish(child, -signal.SIGKILL)
             wait_for(lambda: not alive(agent_pid), label + ': no agent left')
@@ -319,7 +319,7 @@ try:
         folder, db, env = gate_case('gate-raise')
         child, log = gate(folder, dict(env, CASE_GATE_RAISE='1'), 'x')
         wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-        agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
+        agent_pid = agent_info(folder / 'x.agent')['pid']
         finish(child, 1)
         wait_for(lambda: not alive(agent_pid), 'no agent after an internal error')
         wait_for(lambda: reserving_held(folder, ['x']) == 0, 'the attempt ends after an internal error')
@@ -784,7 +784,7 @@ os.waitpid(child, 0)
             folder, db, env = gate_case('m1683-join-' + label, available=40 * GIB, runs=[('x', 'ci', 'running', None)])
             child, log = gate(folder, env, 'x')
             wait_for(lambda: (folder / 'x.agent').exists(), 'x runs')
-            agent_pid = json.loads((folder / 'x.agent').read_text())['pid']
+            agent_pid = agent_info(folder / 'x.agent')['pid']
             exact = start_us(agent_pid)
             started = exact - exact % 1000000 + (exact % 1000000 + offset) % 1000000
             facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', 10 * GIB, agent_pid, started)])
