@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# bin/fm-lint.sh's changed-file and cache selection: which roots a source
-# change selects, when cached findings must be invalidated, and the dataflow
+# bin/fm-lint.sh's changed-file selection: which roots a source change selects,
+# that every run analyses each root again (no result is reused), and the dataflow
 # findings that survive a joint or private source.
 # Modes, installer and policy refusals live in tests/fm-lint-policy.test.sh;
 # host slots, scheduling and memory-limit retry in tests/fm-lint-slots.test.sh;
@@ -49,10 +49,10 @@ SH
     "$repo/bin/fm-lint.sh" --list-files) || fail "inert-text selection failed"
   assert_not_contains "$listed" bin/inert.sh "inert source text selected a non-consumer"
   for attempt in 1 2; do
-    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/inert.sh 2>&1) || fail "inert-word lint failed: $out"
   done
-  assert_contains "$out" 'cache hit bin/inert.sh' "inert source text disabled successful-result reuse"
+  assert_not_contains "$out" 'cache hit' "a run reused an analysis result; every root is analysed"
   pass "inert quoted programs, prose, comments, conditionals, and heredocs are not imports"
 }
 
@@ -98,13 +98,9 @@ SH
     for root in bin/child.sh bin/child-caller.sh bin/substitution.sh bin/nested.sh bin/nested-caller.sh; do
       assert_contains "$listed" "$root" "$state import did not select $root"
       for attempt in 1 2; do
-        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
-        if [ "$attempt" -eq 1 ]; then
-          assert_not_contains "$out" "cache hit $root" "$state child import reused stale analysis"
-        else
-          assert_contains "$out" "cache hit $root" "resolved $state child import was not reusable"
-        fi
+        assert_not_contains "$out" "cache hit" "$state $root attempt $attempt reused an analysis result"
       done
     done
   done
@@ -119,7 +115,7 @@ bash -c '
 ' _ "$runtime_target"
 SH
   for attempt in 1 2; do
-    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/unresolved-child.sh 2>&1) || fail "unresolved child lint failed: $out"
     assert_not_contains "$out" 'cache hit bin/unresolved-child.sh' "unresolved child import authorized reuse"
   done
@@ -127,7 +123,7 @@ SH
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --list-files) || fail "unresolved child selection failed"
   assert_contains "$listed" bin/unresolved-child.sh "unresolved child import lost conservative selection"
-  pass "child-shell positional imports and executable substitutions govern selection and cache inputs"
+  pass "child-shell positional imports and executable substitutions govern selection, and every run analyses each root"
 }
 
 test_stdin_heredoc_imports_select_and_invalidate_callers() {
@@ -199,13 +195,9 @@ SH
       bin/dash-stdin.sh bin/options-dash-stdin.sh bin/escaped-stdin.sh bin/static-stdin.sh; do
       assert_contains "$listed" "$root" "$state stdin import did not select $root"
       for attempt in 1 2; do
-        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
-        if [ "$attempt" -eq 1 ]; then
-          assert_not_contains "$out" "cache hit $root" "$state stdin import reused stale analysis"
-        else
-          assert_contains "$out" "cache hit $root" "resolved $state stdin import was not reusable"
-        fi
+        assert_not_contains "$out" "cache hit" "$state $root attempt $attempt reused an analysis result"
       done
     done
   done
@@ -234,12 +226,12 @@ SH
   for root in bin/unknown-stdin.sh bin/expanded-stdin.sh; do
     assert_contains "$listed" "$root" "unknown child stdin lost conservative selection"
     for attempt in 1 2; do
-      out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
         "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "unknown stdin lint failed: $out"
       assert_not_contains "$out" "cache hit $root" "unknown child stdin authorized reuse"
     done
   done
-  pass "executable stdin imports select direct and transitive callers and invalidate reusable closures"
+  pass "executable stdin imports select direct and transitive callers, and every run analyses each root"
 }
 
 test_nonprogram_heredocs_remain_inert() {
@@ -278,10 +270,10 @@ SH
     "$repo/bin/fm-lint.sh" --list-files) || fail "inert stdin selection failed"
   assert_not_contains "$listed" bin/inert-stdin.sh "nonprogram heredocs selected an inert root"
   for attempt in 1 2; do
-    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/inert-stdin.sh 2>&1) || fail "inert stdin lint failed: $out"
   done
-  assert_contains "$out" 'cache hit bin/inert-stdin.sh' "nonprogram heredocs disabled successful reuse"
+  assert_not_contains "$out" 'cache hit' "a second run of the inert-heredoc root reused an analysis result"
   pass "command-string, script-file, and non-stdin heredocs remain import data"
 }
 
@@ -305,7 +297,7 @@ test_production_fixture_stdin_imports_invalidate_cache() {
         "$repo/bin/fm-lint.sh" --list-files) || fail "$state $helper selection failed"
       assert_contains "$listed" "$root" "$state $helper did not select its production stdin consumer"
       for attempt in 1 2; do
-        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $helper lint failed: $out"
         if [ "$attempt" -eq 1 ] || [ "$helper" != herdr-test-safety ]; then
           assert_not_contains "$out" "cache hit $root" "$state $helper authorized stale or unknown reuse"
@@ -328,29 +320,29 @@ test_production_nested_sources_and_pending_reply_cache() {
     bin/fm-ff-lib.sh bin/fm-arm-pretool-check.sh \
     bin/fm-vendor-auth-probe.sh bin/fm-worker-account-lib.sh; do
     for attempt in 1 2; do
-      out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/nested-cache" \
+      out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
         "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$root lint failed: $out"
     done
-    assert_contains "$out" "cache hit $root" "balanced production source words disabled reuse for $root"
+    assert_not_contains "$out" "cache hit" "a second run of $root reused an analysis result"
   done
   if ! pinned_ready; then
     pass "SKIP (ShellCheck $REQUIRED not resolved): real pending-reply closure cache regression"
     return
   fi
   for attempt in 1 2; do
-    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/real-cache" \
+    out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/fm-pending-reply-lib.sh 2>&1) \
       || fail "production pending-reply check $attempt failed: $out"
   done
-  assert_contains "$out" 'cache hit bin/fm-pending-reply-lib.sh' \
-    "unchanged successful production pending-reply closure was not reusable"
+  assert_not_contains "$out" 'cache hit' \
+    "a second run of the production pending-reply closure reused an analysis result"
   printf '\n' >> "$repo/bin/fm-composer-lib.sh"
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/real-cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/fm-pending-reply-lib.sh 2>&1) \
     || fail "changed production source check failed: $out"
   assert_not_contains "$out" 'cache hit bin/fm-pending-reply-lib.sh' \
     "a real adapter source mutation reused stale pending-reply analysis"
-  pass "production nested source words reuse results and the real pending-reply closure invalidates on adapter sources"
+  pass "production nested sources and the real pending-reply closure are analysed on every run"
 }
 
 test_unresolved_runtime_sources_select_possible_callers() {
@@ -440,7 +432,7 @@ SH
 needs_argument
 SH
   for attempt in 1 2; do
-    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
       || fail "runtime consumer check failed: $out"
     assert_not_contains "$out" 'cache hit bin/transitive.sh' \
@@ -454,7 +446,7 @@ target=${1:-bin/library.sh}
 printf 'ok\n'
 SH
   for attempt in 1 2; do
-    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
       || fail "isolated runtime consumer check failed: $out"
     assert_not_contains "$out" 'cache hit bin/transitive.sh' \
@@ -473,7 +465,7 @@ needs_argument() {
   printf '%s\n' "$1"
 }
 SH
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
     && fail "runtime consumer hid a changed imported argument requirement"
   assert_contains "$out" SC2119 "runtime consumer lost its joint missing-argument finding"
@@ -499,7 +491,7 @@ ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh'
     index=$((index + 1))
     printf '%s\n' '#!/usr/bin/env bash' "$command_line" \
       "printf '%s\\n' \"\$module_value\"" > "$repo/bin/spelling-$index.sh"
-    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 "bin/spelling-$index.sh" 2>&1) \
       || fail "source spelling $index did not initially pass: $out"
   done
@@ -508,7 +500,7 @@ ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh'
 builtin source bin/library.sh
 SH
   for attempt in 1 2; do
-    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/unparsed.sh 2>&1) \
       || fail "unsupported source wrapper check $attempt failed: $out"
     assert_not_contains "$out" 'cache hit bin/unparsed.sh' \
@@ -521,7 +513,7 @@ SH
   assert_not_contains "$listed" bin/unparsed.sh "an unrelated change selected a root with an unparsed source form"
   fm_lint_write_diff_file "$diff_file" bin/library.sh
   printf '%s\n' '#!/usr/bin/env bash' 'export other_value=ok' > "$repo/bin/library.sh"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
     FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --jobs 1 2>&1) && fail "source spelling hid changed imported state"
   assert_contains "$out" SC2154 "source spelling or cached success hid the dataflow warning"
@@ -554,14 +546,14 @@ SH
 . "$(dirname "${BASH_SOURCE[0]}")/library.sh"
 needs_argument supplied
 SH
-  # Prove this exact joint call passed and was cached before mutating the caller.
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
+  # Prove this exact joint call passed, twice, before mutating the caller.
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
     || fail "argument-bearing joint call did not pass: $out"
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
-    || fail "argument-bearing cached joint call did not pass: $out"
-  assert_contains "$out" 'cache hit bin/consumer.sh' "clean joint call was not cached"
+    || fail "argument-bearing joint call did not pass again: $out"
+  assert_not_contains "$out" 'cache hit' "a second run of the clean joint call reused an analysis result"
   cat > "$repo/bin/consumer.sh" <<'SH'
 #!/usr/bin/env bash
 # shellcheck source=bin/library.sh
@@ -569,34 +561,29 @@ SH
 needs_argument
 SH
   # The definition alone is clean; only source-aware caller analysis catches it.
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/library.sh 2>&1) \
     || fail "owner-only fixture should be clean: $out"
   assert_not_contains "$out" SC2119 "owner-only analysis unexpectedly caught the call-dependent defect"
-  for mode in explicit changed cold-cache mutated-cache ci; do
+  for mode in explicit changed again ci; do
     rc=0
     case "$mode" in
       explicit)
-        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+        out=$(CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || rc=$?
         ;;
       changed)
-        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
           "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || rc=$?
         ;;
-      cold-cache)
-        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cold-cache" \
+      again)
+        out=$(CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || rc=$?
-        ;;
-      mutated-cache)
-        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
-          "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || rc=$?
-        assert_not_contains "$out" 'cache hit bin/consumer.sh' \
-          "consumer mutation reused its argument-bearing cached result"
+        assert_not_contains "$out" 'cache hit' "a run after the consumer mutation reused an analysis result"
         ;;
       ci)
-        out=$(CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
+        out=$(CI=true GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || rc=$?
         assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
         ;;
@@ -605,7 +592,7 @@ SH
     assert_contains "$out" SC2119 "$mode joint source analysis lost the call-dependent warning"
     assert_contains "$out" 'In bin/consumer.sh line' "$mode did not analyze the calling consumer"
   done
-  pass "joint-source calls retain SC2119 in explicit, changed, cold, mutated-cache, and CI modes"
+  pass "joint-source calls retain SC2119 in explicit, changed, repeated and CI runs"
 }
 
 test_private_source_keeps_changed_call_dependent_findings() {
@@ -633,45 +620,41 @@ _load_library() {
 _load_library "$@"
 needs_argument
 SH
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) \
     || fail "private-source consumer did not initially pass: $out"
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) \
-    || fail "private-source consumer did not reuse its clean result: $out"
-  assert_contains "$out" 'cache hit bin/consumer.sh' "private-source consumer was not cached"
+    || fail "private-source consumer did not pass again: $out"
+  assert_not_contains "$out" 'cache hit' "a second run of the private-source consumer reused an analysis result"
   cat > "$repo/bin/library.sh" <<'SH'
 #!/usr/bin/env bash
 needs_argument() {
   printf '%s\n' "$1"
 }
 SH
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" bin/library.sh 2>&1) \
     || fail "private-source owner alone should remain clean: $out"
-  for mode in explicit changed cold-cache mutated-cache ci; do
+  for mode in explicit changed again ci; do
     rc=0
     case "$mode" in
       explicit)
-        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+        out=$(CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || rc=$?
         ;;
       changed)
-        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
           "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
         ;;
-      cold-cache)
-        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cold-cache" \
+      again)
+        out=$(CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || rc=$?
-        ;;
-      mutated-cache)
-        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-          "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || rc=$?
-        assert_not_contains "$out" 'cache hit bin/consumer.sh' "changed private import reused a stale success"
+        assert_not_contains "$out" 'cache hit' "a run after the private import changed reused an analysis result"
         ;;
       ci)
-        out=$(CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+        out=$(CI=true GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
         assert_not_contains "$out" 'cache hit ' "CI reused a private-source success"
         ;;
@@ -680,11 +663,11 @@ SH
     assert_contains "$out" SC2119 "$mode private source lost the imported call-site diagnostic"
     assert_contains "$out" 'In bin/consumer.sh line' "$mode did not analyze the private import's consumer"
   done
-  pass "private-source imports retain changed-library call diagnostics across selection and cache modes"
+  pass "private-source imports retain changed-library call diagnostics in explicit, changed, repeated and CI runs"
 }
 
-test_declaration_source_words_do_not_disable_cache() {
-  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): declaration cache regression"; return; }
+test_declaration_source_words_keep_changed_argument_findings() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): declaration source regression"; return; }
   local tmp repo out
   tmp=$(fm_test_tmproot fm-lint-declaration-cache)
   repo="$tmp/repo"
@@ -704,26 +687,24 @@ SH
 . bin/library.sh
 library_value
 SH
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
     || fail "declaration fixture did not pass: $out"
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
-    || fail "cached declaration fixture did not pass: $out"
-  assert_contains "$out" 'cache hit bin/consumer.sh' \
-    "a declaration argument or inline function comment disabled consumer reuse"
+    || fail "declaration fixture did not pass again: $out"
+  assert_not_contains "$out" 'cache hit' "a second run of the declaration fixture reused an analysis result"
   cat > "$repo/bin/library.sh" <<'SH'
 #!/usr/bin/env bash
 library_value() {
   printf '%s\n' "$1"
 }
 SH
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
-    && fail "cached declaration consumer hid a changed argument requirement"
+    && fail "declaration consumer hid a changed argument requirement"
   assert_contains "$out" SC2119 "changed library argument requirement was hidden"
-  assert_not_contains "$out" 'cache hit bin/consumer.sh' "changed declaration library reused a cached caller"
-  pass "declaration words permit reuse without hiding changed cross-file argument requirements"
+  pass "declaration words never hide changed cross-file argument requirements"
 }
 
 test_fast_cache_cannot_hide_full_analysis_findings() {
@@ -740,13 +721,13 @@ outer() {
 }
 outer
 SH
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$LINT" --fast "$tmp/unused.sh" 2>&1) || fail "fast fixture did not pass: $out"
   rc=0
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(CI='' GITHUB_ACTIONS='' \
     "$LINT" "$tmp/unused.sh" 2>&1) || rc=$?
   [ "$rc" -eq 1 ] || fail "full analysis reused the fast success: $out"
-  assert_contains "$out" SC2329 "a fast cache entry hid the full-analysis finding"
+  assert_contains "$out" SC2329 "a fast success hid the full-analysis finding"
   pass "a fast-mode success cannot satisfy source-aware extended analysis"
 }
 
@@ -806,7 +787,7 @@ test_selection_adds_no_unchanged_imported_roots() {
   assert_contains "$listed" bin/consumer.sh "changed consumer was not selected"
   assert_contains "$listed" bin/caller.sh "changed consumer did not select its caller"
   assert_not_contains "$listed" bin/library.sh "changed consumer selected its unchanged imported library"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_JOBS=1 FM_LINT_CACHE_DIR=off \
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_JOBS=1 \
     "$repo/bin/fm-lint.sh" bin/caller.sh 2>&1) || fail "explicit caller lint failed: $out"
   [ "$(cat "$log")" = bin/caller.sh ] \
     || fail "explicit path added imported roots"$'\n'"logged: $(cat "$log")"
@@ -846,6 +827,8 @@ test_runtime_backend_changes_select_every_dispatcher_consumer() {
 }
 
 test_runtime_backend_inputs_invalidate_dispatcher_cache() {
+  # No analysis result is reused (Main 1862): every call of the check helper, the
+  # same input twice included, runs the analysis, whatever a backend change did.
   local tmp repo fakebin log backend root attempt state out
   tmp=$(fm_test_tmproot fm-lint-runtime-cache)
   repo="$tmp/repo"
@@ -858,41 +841,31 @@ SH
   log="$tmp/shellcheck.log"
   fm_lint_stub_shellcheck "$fakebin" "$log"
   for backend in tmux herdr zellij orca cmux; do
-    for attempt in 1 2; do
-      for root in bin/fm-backend.sh bin/caller.sh; do
-        out=$(perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
-          "$fakebin/shellcheck" --norc --external-sources -- "$root" 2>&1) \
-          || fail "$backend cache warm-up $attempt failed for $root: $out"
-        if [ "$attempt" -eq 2 ]; then
-          assert_contains "$out" "cache hit $root" "clean $root result was not reusable"
-        fi
-      done
-    done
-    for state in changed deleted; do
+    for state in unchanged unchanged changed deleted; do
       if [ "$state" = changed ]; then
         printf '\n' >> "$repo/bin/backends/$backend.sh"
-      else
+      elif [ "$state" = deleted ]; then
         rm "$repo/bin/backends/$backend.sh"
       fi
       : > "$log"
       for root in bin/fm-backend.sh bin/caller.sh; do
-        out=$(perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
+        out=$(perl "$repo/bin/fm-lint-cache.pl" check "$repo" \
           "$fakebin/shellcheck" --norc --external-sources -- "$root" 2>&1) \
           || fail "$state $backend check failed for $root: $out"
-        assert_not_contains "$out" "cache hit $root" "$state $backend reused stale $root analysis"
+        assert_not_contains "$out" "cache hit" "$state $backend reused an analysis result for $root"
       done
       [ "$(cat "$log")" = $'bin/fm-backend.sh\nbin/caller.sh' ] \
-        || fail "$state $backend did not recheck dispatcher and transitive caller: $(cat "$log")"
+        || fail "$state $backend did not analyse the dispatcher and its caller: $(cat "$log")"
     done
     cp "$ROOT/bin/backends/$backend.sh" "$repo/bin/backends/$backend.sh"
   done
-  pass "changes and deletions of every runtime backend invalidate dispatcher and caller caches"
+  pass "every check of a runtime backend's dispatcher and caller is analysed, unchanged, changed or deleted"
 }
 
-test_shared_cache_reuses_only_identical_successful_inputs() {
-  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): shared cache regression"; return; }
+test_every_run_analyses_every_root_and_reuses_nothing() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): no-reuse regression"; return; }
   local tmp one two fakebin real log out rc before after first second
-  tmp=$(fm_test_tmproot fm-lint-cache)
+  tmp=$(fm_test_tmproot fm-lint-no-reuse)
   one="$tmp/one"
   two="$tmp/two"
   fm_lint_small_repo "$one"
@@ -904,33 +877,27 @@ test_shared_cache_reuses_only_identical_successful_inputs() {
 #!/usr/bin/env bash
 if [ "\${1:-}" != --version ]; then
   printf '%s\n' "\${!#}" >> "$log"
-  sleep 0.2
 fi
 exec "$real" "\$@"
 SH
   chmod +x "$fakebin/shellcheck"
   fm_lint_hide_outside_shellcheck "$fakebin"
-  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
     "$one/bin/fm-lint.sh" bin/consumer.sh bin/library.sh > "$tmp/one.out" 2>&1 &
   first=$!
-  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
     "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh > "$tmp/two.out" 2>&1 &
   second=$!
-  wait "$first" || fail "first simultaneous cache miss failed: $(cat "$tmp/one.out")"
-  wait "$second" || fail "second simultaneous cache miss failed: $(cat "$tmp/two.out")"
-  [ "$(LC_ALL=C sort "$log")" = $'bin/consumer.sh\nbin/library.sh' ] \
-    || fail "identical simultaneous roots were checked more than once: $(cat "$log")"
-  printf '#!/usr/bin/env bash\nexport SHARED_VALUE=changed\n' > "$two/bin/library.sh"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) || fail "changed source check failed: $out"
-  [ "$(wc -l < "$log" | tr -d ' ')" = 4 ] \
-    || fail "source content mutation reused an obsolete successful result"
+  wait "$first" || fail "first simultaneous run failed: $(cat "$tmp/one.out")"
+  wait "$second" || fail "second simultaneous run failed: $(cat "$tmp/two.out")"
+  [ "$(LC_ALL=C sort "$log")" = $'bin/consumer.sh\nbin/consumer.sh\nbin/library.sh\nbin/library.sh' ] \
+    || fail "two simultaneous runs did not each analyse both roots: $(cat "$log")"
   before=$(wc -l < "$log" | tr -d ' ')
-  printf '\n' >> "$fakebin/shellcheck"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) || fail "changed binary check failed: $out"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
+    "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) || fail "unchanged repeat failed: $out"
   after=$(wc -l < "$log" | tr -d ' ')
-  [ "$after" -eq "$((before + 2))" ] || fail "changed ShellCheck binary reused obsolete results"
+  [ "$after" -eq "$((before + 2))" ] || fail "an unchanged repeat reused a result instead of analysing both roots"
+  assert_not_contains "$out" 'cache hit' "an unchanged repeat reported a reused result"
   cat >> "$two/bin/library.sh" <<'SH'
 bad() {
   local a= b=
@@ -939,17 +906,15 @@ bad() {
 bad
 SH
   for rc in 1 2; do
-    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-      "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) && fail "cached library defect unexpectedly passed"
-    assert_contains "$out" SC1007 "a cached result hid the seeded source defect"
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
+      "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) && fail "a library defect unexpectedly passed"
+    assert_contains "$out" SC1007 "a run hid the seeded source defect"
   done
-  [ "$(grep -c '^bin/library.sh$' "$log")" = 5 ] \
-    || fail "a finding was reused instead of rechecked"
   rm "$two/bin/library.sh"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) && fail "cached result hid a deleted source"
-  assert_contains "$out" SC1091 "deleted cached source did not invalidate the caller"
-  pass "shared cache single-flights identical misses and invalidates sources, binaries and failures"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
+    "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) && fail "a run hid a deleted source"
+  assert_contains "$out" SC1091 "a deleted source was not reported for its caller"
+  pass "simultaneous and repeated runs each analyse every root, and findings are never hidden"
 }
 
 test_list_files_reports_the_shell_inventory() {
@@ -1074,13 +1039,13 @@ test_unresolved_runtime_sources_refuse_cached_success
 test_source_spellings_keep_changed_and_cached_dataflow_findings
 test_joint_sources_keep_call_dependent_findings
 test_private_source_keeps_changed_call_dependent_findings
-test_declaration_source_words_do_not_disable_cache
+test_declaration_source_words_keep_changed_argument_findings
 test_fast_cache_cannot_hide_full_analysis_findings
 test_changed_dependencies_and_deleted_sources_retain_findings
 test_selection_adds_no_unchanged_imported_roots
 test_runtime_backend_changes_select_every_dispatcher_consumer
 test_runtime_backend_inputs_invalidate_dispatcher_cache
-test_shared_cache_reuses_only_identical_successful_inputs
+test_every_run_analyses_every_root_and_reuses_nothing
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint
 test_canonical_partitions_balance_measured_cost

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bin/fm-lint.sh's host slots and resource bounds: deterministic job
 # completion, the CPU-derived host cap, waiter and admission fairness,
-# cache hits that skip the pool, refused or failing slot state, per-root
+# refused or failing slot state, per-root
 # deadlines, a named memory-limit death and its retry without external sources.
 # Changed-file selection lives in tests/fm-lint.test.sh; modes and installer
 # refusals in tests/fm-lint-policy.test.sh; memory fallback and evidence,
@@ -749,69 +749,10 @@ PL
   pass "the queue scan handles slot paths with spaces and tickets cancelled mid-scan"
 }
 
-test_cached_success_does_not_wait_for_host_slots() {
-  # A stand-in analysis in a fixture pool directory, a test seam that is still
-  # bounded host-wide by the growth guard and the outside count.
-  local tmp repo out fakebin
-  tmp=$(fm_test_tmproot fm-lint-cache-slots)
-  repo=$(fm_lint_isolated_copy "$tmp" cached)
-  fakebin=$(fm_fakebin "$tmp/fake")
-  fm_lint_native_version_stub "$fakebin" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): cached success does not wait for host slots"; return; }
-  # The warm-up runs in the pool the hit run uses, as two runs of one user do in
-  # the host pool. The hit run still probes the version, in the probe's own lane,
-  # which no slot holds.
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_LINT_SLOT_DIR="$tmp/slots" \
-    "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "cache warm-up failed: $out"
-  perl - "$repo/bin/fm-lint.sh" "$tmp" "$fakebin" <<'PL' || fail "warm cache queued behind an occupied host slot"
-use strict;
-use warnings;
-use File::Path qw(make_path);
-use Fcntl qw(:flock);
-use POSIX qw(WNOHANG);
-use Time::HiRes qw(time sleep);
-my ($lint, $tmp, $fakebin) = @ARGV;
-make_path("$tmp/slots");
-open(my $holder, '>>', "$tmp/slots/slot.0") or die "$!";
-flock($holder, LOCK_EX) or die "$!";
-local %ENV = (%ENV, PATH => "$fakebin:$ENV{PATH}", CI => '', GITHUB_ACTIONS => '', FM_LINT_CACHE_DIR => "$tmp/cache",
-    FM_LINT_SLOT_DIR => "$tmp/slots", FM_LINT_HOST_SLOTS => 1);
-my $pid = fork();
-die "fork: $!" unless defined $pid;
-if (!$pid) {
-    close $holder;
-    open STDOUT, '>', "$tmp/hit.out" or die "$!";
-    open STDERR, '>&', \*STDOUT or die "$!";
-    exec '/bin/bash', $lint, 'bin/consumer.sh';
-    die "exec: $!";
-}
-my $error;
-my $deadline = time() + 10;
-while (waitpid($pid, WNOHANG) == 0) {
-    if (time() > $deadline) {
-        $error = "cache hit required an analysis slot\n";
-        kill 'TERM', $pid;
-        close $holder;
-        waitpid($pid, 0);
-        last;
-    }
-    sleep 0.01;
-}
-$error ||= "cache hit failed: $?\n" if $?;
-close $holder;
-open(my $output, '<', "$tmp/hit.out") or die "$!";
-local $/;
-my $text = <$output>;
-die $error, $text if $error;
-die "did not reuse the successful analysis: $text\n" unless $text =~ /cache hit bin\/consumer[.]sh/;
-PL
-  pass "a content-identical cached success finishes while all host slots remain occupied"
-}
-
 # fm_lint_native_version_stub <fakebin> <starts log> <version>: a native ShellCheck
 # stand-in (a compiled program, because a script is a wrapper and is probed every
-# run) that logs its arguments, answers --version (after 0.15 s, so the version
-# probe's delegate sampler sees it run) and exits 0 for everything else, after
-# FM_TEST_ANALYSIS_SECS seconds when that is set.
+# run) that logs its arguments, answers --version (after 0.15 s) and exits 0 for
+# everything else, after FM_TEST_ANALYSIS_SECS seconds when that is set.
 # Returns 1 when the host has no C compiler.
 fm_lint_native_version_stub() {
   local fakebin=$1 log=$2 version=$3 src
@@ -857,21 +798,21 @@ SH
   # The delegate reports the pinned version: strict mode accepts it.
   printf '0.11.0\n' > "$tmp/delegate.version"
   rc=0
-  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
       "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/first.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fail "a wrapper whose delegate reports the pinned version was rejected ($rc): $(cat "$tmp/first.out")"
   # The delegate changes; the wrapper's own bytes do not. The run must see the
   # new version and refuse it under the strict policy.
   printf '0.10.0\n' > "$tmp/delegate.version"
   rc=0
-  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
       "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/second.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 1 ] || fail "a wrapper whose delegate changed to 0.10.0 passed the strict version policy on a remembered version ($rc): $(cat "$tmp/second.out")"
   grep -q 'found 0.10.0' "$tmp/second.out" || fail "the refusal did not name the delegate's current version: $(cat "$tmp/second.out")"
   # And back: the corrected delegate is accepted again, not rejected on the record of the bad one.
   printf '0.11.0\n' > "$tmp/delegate.version"
   rc=0
-  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
       "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/third.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fail "a corrected delegate was rejected on a remembered version ($rc): $(cat "$tmp/third.out")"
   pass "a script ShellCheck is probed every run: a changed delegate is refused under the strict policy and a corrected one accepted, with the wrapper's bytes unchanged"
@@ -1417,7 +1358,7 @@ test_the_roots_log_keeps_the_time_reading_and_the_watch_peak_in_separate_columns
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/w/root.sh"
   printf '0\t%s\n' "$tmp/w/root.sh" > "$tmp/w/manifest"
   FM_TEST_RUN_MEMORY_KIB=2097152 FM_TEST_RUN_RSS_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
-    env FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_CACHE=off FM_LINT_INTERNAL_SLOT_DIR="$tmp/w/slots" FM_LINT_INTERNAL_NCPU=18 \
+    env FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_SLOT_DIR="$tmp/w/slots" FM_LINT_INTERNAL_NCPU=18 \
     FM_LINT_INTERNAL_RUN_ID=peaks FM_LINT_INTERNAL_ROOT_SECS=20 FM_LINT_INTERNAL_GRACE=1 \
     FM_LINT_INTERNAL_ROOTS_LOG="$tmp/roots.tsv" FM_LINT_SHELLCHECK="$tmp/bin/shellcheck" FM_TEST_MEM_HOLD=2.5 \
     PATH="$tmp/bin:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/w" \
@@ -1800,7 +1741,7 @@ PY
 }
 
 test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
-  local tmp waiter runner deadline helper form index=0 root_pid stopped hold
+  local tmp waiter runner deadline helper form index=0 held hold
   local -a forms=(ps)
   command -v python3 >/dev/null 2>&1 || { pass "SKIP (python3 not resolved): a waiting gate's table read"; return; }
   tmp=$(fm_test_tmproot fm-lint-waiting-reader)
@@ -1825,8 +1766,8 @@ test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
   # full command from ps; and, where a gate with ps refused reads libproc, its bare
   # name, a parenthesized name, a zombie row or, before its exec, the gate's own
   # command. Its root of 80 MiB is over its 40000 KiB budget, and only a gate that
-  # is not the oldest running gate stops its own root, so that root must run to
-  # its end each time.
+  # is not the oldest running gate holds its own root (it writes <peak file>.hold,
+  # which the root's resident watch acts on), so that root must never be held.
   [ "$(uname)" != Darwin ] || forms+=(drop '(ps)' '<defunct>' '[ps] <defunct>' parent /usr/bin/true)
   for form in "${forms[@]}"; do
     index=$((index + 1))
@@ -1846,24 +1787,28 @@ test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
     runner=$!
     if [ "$form" = /usr/bin/true ]; then
       # The control: the same reading, with the helper's row a started command,
-      # names the waiting gate the oldest, so this root is stopped. Without this
-      # stop, the passes above could come from a reading that never worked. This
-      # root outlives the slowest reading and ends as soon as the stop is seen.
-      root_pid=$(fm_lint_child_of "$runner" "80 * 1048576") || { fm_lint_kill_tree "$runner" "$waiter"; fail "the control root never started"; }
-      stopped=0
+      # names the waiting gate the oldest, so this root is held. Without this
+      # hold, the passes above could come from a reading that never worked. This
+      # root outlives the slowest reading and ends as soon as the hold is seen.
+      held=0
       deadline=$((SECONDS + 45))
       while [ "$SECONDS" -lt "$deadline" ]; do
-        case "$(ps -o stat= -p "$root_pid" 2>/dev/null)" in *T*) stopped=1; break ;; esac
+        if compgen -G "$tmp/running-pool.$index/slot.*.peak.hold" > /dev/null; then held=1; break; fi
         sleep 0.1
       done
       fm_lint_kill_tree "$runner"
-      [ "$stopped" -eq 1 ] || { fm_lint_kill_tree "$waiter"; fail "a root under an older running gate was not stopped, so this test proved nothing"; }
+      [ "$held" -eq 1 ] || { fm_lint_kill_tree "$waiter"; fail "a root under an older running gate was not held, so this test proved nothing"; }
       continue
     fi
+    held=0
     deadline=$((SECONDS + 45))
-    while [ ! -e "$tmp/ended.$index" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
+    while [ ! -e "$tmp/ended.$index" ] && [ "$SECONDS" -lt "$deadline" ]; do
+      if compgen -G "$tmp/running-pool.$index/slot.*.peak.hold" > /dev/null; then held=1; fi
+      sleep 0.2
+    done
     fm_lint_kill_tree "$runner"
-    [ -e "$tmp/ended.$index" ] || { fm_lint_kill_tree "$waiter"; fail "a younger root over the budget was held back while an older gate only waited on its table read (table form: $form)"; }
+    [ -e "$tmp/ended.$index" ] || { fm_lint_kill_tree "$waiter"; fail "a younger root over the budget did not finish while an older gate only waited on its table read (table form: $form)"; }
+    [ "$held" -eq 0 ] || { fm_lint_kill_tree "$waiter"; fail "a younger root over the budget was held while an older gate only waited on its table read (table form: $form)"; }
     kill -0 "$helper" 2>/dev/null || fail "the older gate's table read ended before the younger root (table form: $form), so this test proved nothing"
   done
   fm_lint_kill_tree "$waiter"
@@ -2635,7 +2580,7 @@ for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
     open(my $manifest, '>', "$dir/manifest") or die "$!";
     print {$manifest} "0\t$dir/root.sh\n";
     close $manifest;
-    local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
+    local %ENV = (%ENV, FM_LINT_INTERNAL => 1, 
         FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
         FM_LINT_INTERNAL_RUN_ID => 'worker',
         FM_LINT_HOST_SLOTS => 1,
@@ -2773,7 +2718,7 @@ for my $retry (0, 1) {
     print {$root} "#!/bin/bash\nexit 0\n";
     close $root;
     local %ENV = (%ENV, BASH_ENV => "$tmp/bash-env", RETRY => $retry,
-        FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
+        FM_LINT_INTERNAL => 1, 
         FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
         FM_LINT_INTERNAL_RUN_ID => 'worker',
         FM_LINT_HOST_SLOTS => 1,
@@ -3172,125 +3117,6 @@ SH
   awk -F '\t' '$1 == "end" && $3 ~ /teardown\.sh$/ && $9 == 1 && $10 == "findings" { found=1 } END { exit !found }' \
     "$tmp/finding.roots.tsv" || fail "the fallback finding was not recorded as a failure"
   pass "memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding"
-}
-
-test_cache_key_wait_preserves_root_retry_budget() {
-  local tmp repo fakebin out
-  tmp=$(fm_test_tmproot fm-lint-cache-retry-clock)
-  repo=$(fm_lint_isolated_copy "$tmp" retry)
-  fakebin=$(fm_fakebin "$tmp/fake")
-  cat > "$fakebin/shellcheck" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = --version ]; then
-  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
-  exit 0
-fi
-[ "${FM_TEST_SEED:-0}" = 1 ] && exit 0
-for arg in "$@"; do
-  if [ "$arg" = --external-sources ]; then
-    printf 'shellcheck: Heap exhausted;\n' >&2
-    exit 251
-  fi
-done
-exit 0
-SH
-  chmod +x "$fakebin/shellcheck"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_SEED=1 \
-    FM_LINT_CACHE_DIR="$tmp/cache" "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) \
-    || fail "key identity warm-up failed: $out"
-  # The test exercises the real watchdog's time budget, not address-space
-  # enforcement. macOS cannot enforce ulimit -v, so only that builtin is
-  # simulated in the private fixture; Linux retains the real memory bound.
-  : > "$tmp/bash-env"
-  if ! fm_lint_bounds_supported; then
-    cat > "$tmp/bash-env" <<'SH'
-ulimit() {
-  if [ "${1:-}" = -v ]; then return 0; fi
-  builtin ulimit "$@"
-}
-SH
-  fi
-  # The worker runs under a lint run's entry (the owner stand-in).
-  fm_lint_write_owner_stand_in "$tmp/owner" "$repo" "$(command -v python3)"
-  FM_TEST_RUN_BOUNDED=perl FM_TEST_RUN_MEMORY_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
-    perl - "$repo/bin/fm-lint.sh" "$fakebin/shellcheck" "$tmp" <<'PL' || fail "cache queue consumed the memory retry budget"
-use strict;
-use warnings;
-use File::Path qw(make_path);
-use Fcntl qw(:flock);
-use POSIX qw(WNOHANG);
-use Time::HiRes qw(time sleep);
-my ($lint, $tool, $tmp) = @ARGV;
-my @locks = glob "$tmp/cache/*.lock";
-die "expected one warmed root key\n" unless @locks == 1;
-unlink $_ for glob "$tmp/cache/*.passed";
-open(my $holder, '>>', $locks[0]) or die "$!";
-flock($holder, LOCK_EX) or die "$!";
-open(my $module, '>', "$tmp/CacheReady.pm") or die "$!";
-print {$module} <<'MODULE';
-package CacheReady;
-use Fcntl qw(LOCK_NB);
-BEGIN {
-    *CORE::GLOBAL::flock = sub {
-        unless ($_[1] & LOCK_NB) {
-            open(my $fh, '>', "$ENV{CASE_DIR}/waiting") or die "$!";
-            close $fh;
-        }
-        return CORE::flock($_[0], $_[1]);
-    };
-}
-1;
-MODULE
-close $module;
-make_path("$tmp/out");
-open(my $manifest, '>', "$tmp/manifest") or die "$!";
-print {$manifest} "0\tbin/consumer.sh\n";
-close $manifest;
-local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => "$tmp/cache",
-    FM_LINT_INTERNAL_SLOT_DIR => "$tmp/slots", FM_LINT_INTERNAL_NCPU => 18, FM_LINT_INTERNAL_RUN_ID => 'worker',
-    FM_LINT_INTERNAL_BOUNDED => 'perl', FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
-    FM_LINT_INTERNAL_ROOT_SECS => 8, FM_LINT_INTERNAL_GRACE => 1,
-    FM_LINT_INTERNAL_ROOTS_LOG => "$tmp/roots.tsv", FM_LINT_SHELLCHECK => $tool,
-    PERL5OPT => "-I$tmp -MCacheReady", CASE_DIR => $tmp, BASH_ENV => "$tmp/bash-env");
-my $pid = fork();
-die "fork: $!" unless defined $pid;
-if (!$pid) {
-    close $holder;
-    open STDOUT, '>', "$tmp/worker.out" or die "$!";
-    open STDERR, '>&', \*STDOUT or die "$!";
-    exec '/bin/bash', $lint, '--internal-worker', "$tmp/manifest", "$tmp/out", 0;
-    die "exec: $!";
-}
-my $error;
-eval {
-    my $deadline = time() + 30;
-    until (-e "$tmp/waiting") { die "key waiter did not start\n" if time() > $deadline; sleep 0.01; }
-    sleep 10; # Deliberately longer than the root's eight-second analysis budget.
-    close $holder;
-    $deadline = time() + 30;
-    while (waitpid($pid, WNOHANG) == 0) {
-        die "root did not finish\n" if time() > $deadline;
-        sleep 0.01;
-    }
-    die "memory fallback failed: $?\n" if $?;
-    open(my $roots, '<', "$tmp/roots.tsv") or die "$!";
-    my @ends = map { [split /\t/] } grep { /^end\t/ } <$roots>;
-    die "root did not finish with a successful memory retry\n"
-        unless @ends == 1 && $ends[0][8] == 0 && $ends[0][9] eq 'memory-fallback';
-    my $span = $ends[0][6] - $ends[0][5];
-    die "key queue time was charged to root duration\n" unless $span - $ends[0][7] >= 9000;
-};
-$error = $@;
-close $holder;
-if ($error) {
-    kill 'TERM', $pid;
-    waitpid($pid, 0);
-    open(my $output, '<', "$tmp/out/shard.0.out") or die "$!";
-    local $/;
-    die $error, <$output>;
-}
-PL
-  pass "a cache-key wait longer than the root deadline preserves its memory retry budget"
 }
 
 # A ShellCheck stand-in whose source-following run grows resident memory by
@@ -4365,14 +4191,13 @@ test_an_inherited_census_switch_never_turns_a_lint_into_a_success() {
   repo=$(fm_lint_isolated_copy "$tmp" census)
   fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
   : > "$tmp/starts.log"
-  ( cd "$repo" && env FM_LINT_INTERNAL_CENSUS_ONLY=1 PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env FM_LINT_INTERNAL_CENSUS_ONLY=1 PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/flag.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a lint with an inherited census switch exited 0: $(cat "$tmp/flag.out")"
-  [ -z "$(find "$tmp/cache" -name '*.passed' -print 2>/dev/null)" ] || fm_lint_fail_settled "a lint with an inherited census switch wrote a reusable success: $(find "$tmp/cache" -name '*.passed')"
   ! grep -q -- '-- bin/consumer.sh' "$tmp/starts.log" || fm_lint_fail_settled "the refused run started an analysis"
   # The control.
   rc=0
-  ( cd "$repo" && env -u FM_LINT_INTERNAL_CENSUS_ONLY PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env -u FM_LINT_INTERNAL_CENSUS_ONLY PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/plain.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 1 ] || fm_lint_fail_settled "the same lint without the switch exited $rc, expected its finding (1): $(cat "$tmp/plain.out")"
   grep -q -- '-- bin/consumer.sh' "$tmp/starts.log" || fm_lint_fail_settled "the plain run started no analysis: $(cat "$tmp/starts.log")"
@@ -4386,9 +4211,8 @@ test_an_inherited_census_switch_never_turns_a_lint_into_a_success() {
 # copy's host ledger the way bin/fm-lint.sh does, holds its flock on descriptor 9,
 # and runs the rest of its arguments as its child with FM_LINT_INTERNAL_RUN_ENTRY
 # set. The run entry names the given python and the bound mechanism and limits in
-# FM_TEST_RUN_BOUNDED, FM_TEST_RUN_MEMORY_KIB, FM_TEST_RUN_RSS_KIB and
-# FM_TEST_RUN_VERSION (none, 12582912, 262144 and 0.11.0 by default); its delegate
-# is "unresolved", so its workers keep no analysis cache.
+# FM_TEST_RUN_BOUNDED, FM_TEST_RUN_MEMORY_KIB and FM_TEST_RUN_RSS_KIB
+# (none, 12582912 and 262144 by default).
 fm_lint_write_owner_stand_in() {
   local dir=$1 repo=$2 python=$3 perl_bin
   perl_bin=$(command -v perl)
@@ -4398,7 +4222,7 @@ fm_lint_write_owner_stand_in() {
 ledger=\$(sed -n 's/^HOST_POOL_ROOT=//p' '$repo/bin/fm-lint.sh')/admission.lock.ledger
 mkdir -p "\$ledger"
 entry="\$ledger/run.\$\$.1"
-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' "\${FM_TEST_RUN_BOUNDED:-none}" "\${FM_TEST_RUN_MEMORY_KIB:-12582912}" "\${FM_TEST_RUN_RSS_KIB:-262144}" "\${FM_TEST_RUN_VERSION:-0.11.0}" unresolved > "\$entry"
+printf '%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' "\${FM_TEST_RUN_BOUNDED:-none}" "\${FM_TEST_RUN_MEMORY_KIB:-12582912}" "\${FM_TEST_RUN_RSS_KIB:-262144}" > "\$entry"
 exec 9>>"\$entry"
 '$perl_bin' -MFcntl=:flock -e 'open(my \$fh, ">>&=", 9) or exit 1; flock(\$fh, LOCK_EX | LOCK_NB) or exit 1' || exit 9
 rc=0
@@ -4535,7 +4359,7 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
       checker) extra=(FM_LINT_INTERNAL_BOUNDED=none FM_LINT_INTERNAL_RSS_KIB=262144 FM_LINT_PERL_BIN=/usr/bin/true) ;;
     esac
     rc=0
-    ( cd "$repo" && env -u FM_LINT_INTERNAL_RSS_KIB FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_CACHE=off FM_LINT_INTERNAL_SLOT_DIR="$tmp/worker/host/lint-slots" \
+    ( cd "$repo" && env -u FM_LINT_INTERNAL_RSS_KIB FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_SLOT_DIR="$tmp/worker/host/lint-slots" \
         FM_LINT_INTERNAL_NCPU=18 FM_LINT_INTERNAL_RUN_ID="direct$case_name" FM_LINT_INTERNAL_MEMORY_KIB=12582912 \
         FM_LINT_INTERNAL_ROOT_SECS=20 FM_LINT_INTERNAL_GRACE=1 FM_LINT_HOST_SLOTS=9 FM_LINT_SHELLCHECK="$tmp/fake/shellcheck" \
         "${extra[@]}" bash "$repo/bin/fm-lint.sh" --internal-worker "$tmp/w/manifest" "$tmp/w/out" 0 > "$tmp/w/$case_name.out" 2>&1 ) || rc=$?
@@ -4544,7 +4368,7 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
   done
   # The control.
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       FM_LINT_INTERNAL_RSS_KIB=99999999 FM_LINT_INTERNAL_BOUNDED=none \
       FM_LINT_INTERNAL_HOST_LOCK=/nonexistent/lint/host.lock FM_LINT_INTERNAL_HOST_RSS_KIB=1 \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/owner.out" 2>&1 ) || rc=$?
@@ -4644,74 +4468,35 @@ fm_lint_live() {  # <pid>: 0 while the process exists (read through libproc; no 
   python3 "$ROOT/bin/fm-proc-info.py" ppid "$1" > /dev/null 2>&1
 }
 
-# (F11) The identity helper sends only to an exact identity, never to one known
-# only by its start second, stops only a process inside the gate's own tree, and
-# resumes only the exact identity it stopped. Every send is recorded by the stub,
-# not delivered.
-test_the_watch_signals_a_process_only_when_its_start_time_still_matches() {
-  if [ "$(uname)" != Darwin ]; then
-    wait 2>/dev/null || true
-    pass "SKIP (the libproc identity reader is macOS only): signal by start time"
-    return
-  fi
-  local tmp real_python log target other identity sec usec out stopped short short_id
-  tmp=$(fm_test_tmproot fm-lint-identity)
+# (Main 1846 F5) The signal helper sends only to a process group: every per-process
+# form (a pid with a start time, a pid under an ancestor, a bare pid) and a malformed
+# group are refused before anything runs, and a group item goes through the one
+# send. Every send is recorded by the stub, none delivered, and the group named is
+# one no process leads.
+test_the_signal_helper_sends_only_to_a_process_group() {
+  local tmp real_python log out item stop
+  tmp=$(fm_test_tmproot fm-lint-group-signal)
   real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
   log="$tmp/signals.log"
-  sleep 6 > /dev/null 2>&1 &
-  target=$!
-  sleep 6 > /dev/null 2>&1 &
-  other=$!
-  identity=$(fm_lint_identity_of "$target") || fm_lint_fail_settled "could not read the start time of the target"
-  sec=${identity%%:*}
-  usec=${identity##*:}
   sig() { FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" perl "$ROOT/bin/fm-lint-cache.pl" signal "$@" 2>&1; }
   : > "$log"
-  # (1) A start time that differs, in the seconds or in the microseconds: nothing is sent.
-  out=$(sig KILL "$target:$((sec - 100)):$usec" "$target:$sec:$((usec + 1))")
-  [ "$out" = "mismatch $target"$'\n'"mismatch $target" ] || fm_lint_fail_settled "the mismatch was not reported: $out"
-  [ ! -s "$log" ] || fm_lint_fail_settled "a pid whose start time did not match was sent a signal: $(cat "$log")"
-  # (2) An identity known only by its start second (the shape a table gives): never sent.
-  out=$(sig KILL "$target:$sec:-")
-  [ ! -s "$log" ] || fm_lint_fail_settled "a process known only by its start second was sent a signal: $(cat "$log") ($out)"
-  [ "$out" = "inexact $target" ] || fm_lint_fail_settled "a seconds-only identity was not reported inexact: $out"
-  # (3) The exact identity is sent (the stub records it), so the check does not refuse everything.
-  out=$(sig KILL "$target:$sec:$usec")
-  [ "$out" = "sent $target" ] && grep -qx "kill $target 9" "$log" || fm_lint_fail_settled "the exact identity was not sent: $out / $(cat "$log")"
-  # (4) STOP inside the gate's tree: a descendant of this shell is stopped and its
-  # exact start time reported; a process that is not a descendant of the named
-  # ancestor (the other sleep) is not.
-  : > "$log"
-  out=$(sig STOP "under:$$:$target" "under:$other:$target")
-  stopped=$(printf '%s\n' "$out" | sed -n "s/^sent $target //p")
-  [ "$stopped" = "$sec $usec" ] || fm_lint_fail_settled "STOP under the gate did not report the exact start time it read: $out"
-  printf '%s\n' "$out" | grep -qx "mismatch $target" || fm_lint_fail_settled "STOP under a process that is not an ancestor was not refused: $out"
-  [ "$(grep -c "^kill $target 17\$" "$log")" -eq 1 ] || fm_lint_fail_settled "STOP was not sent exactly once, to the descendant: $(cat "$log")"
-  # (5) CONT resumes only that exact identity.
-  : > "$log"
-  out=$(sig CONT "$target:$sec:$((usec + 1))")
-  [ "$out" = "mismatch $target" ] && [ ! -s "$log" ] || fm_lint_fail_settled "CONT reached an identity that was not the one stopped: $out / $(cat "$log")"
-  out=$(sig CONT "$target:${stopped% *}:${stopped#* }")
-  [ "$out" = "sent $target" ] && grep -qx "kill $target 19" "$log" || fm_lint_fail_settled "CONT did not reach the exact identity stopped: $out / $(cat "$log")"
-  # (6) An ended process is reported gone; a malformed item is refused.
-  sleep 0.1 > /dev/null 2>&1 &
-  short=$!
-  short_id=$(fm_lint_identity_of "$short") || short_id=
-  wait "$short" 2>/dev/null || true
-  if [ -n "$short_id" ]; then
-    out=$(sig KILL "$short:${short_id%%:*}:${short_id##*:}")
-    [ "$out" = "gone $short" ] || fm_lint_fail_settled "an ended process was not reported gone: $out"
-  fi
-  sig KILL abc > /dev/null && fm_lint_fail_settled "a malformed item was accepted"
-  wait 2>/dev/null || true
-  pass "the identity helper sends only to an exact start time, never to a seconds-only identity, stops only inside the named tree and resumes only the exact identity it stopped (every send recorded by the stub, none delivered)"
+  for item in "123:1:2" "under:1:123" 123 group:abc "group:"; do
+    sig KILL "$item" > /dev/null && fm_lint_fail_settled "the signal helper accepted the item '$item'"
+  done
+  [ ! -s "$log" ] || fm_lint_fail_settled "a refused item was sent: $(cat "$log")"
+  stop=$(kill -l STOP)
+  out=$(sig STOP group:999999990)
+  [ "$out" = "sent 999999990" ] && grep -qx "killpg 999999990 $stop" "$log" \
+    || fm_lint_fail_settled "a group item was not sent as a group: $out / $(cat "$log")"
+  ! grep -q '^kill ' "$log" || fm_lint_fail_settled "the helper sent a signal to a single process: $(cat "$log")"
+  pass "the signal helper refuses every per-process form and sends a group item only as a group (sends recorded by the stub, none delivered)"
 }
-
-# (F11) While the libproc reader is down the watch follows the tree through the
-# process table, whose start times are whole seconds: a member it found there is
-# counted and the tree is ended over the bound, but that member is never signalled,
-# only recorded (rss_signal_skipped=<pid>:inexact). The stub records every send.
+# (F11, Main 1846 F5) While the libproc reader is down the watch follows the tree
+# through the process table, whose start times are whole seconds: a descendant that
+# left the root's group is counted and the root's group is ended over the bound, but
+# that descendant is never signalled; it outlives the root, so the root fails (96)
+# and records it (rss_escaped=<pid>). The stub records every send.
 test_the_watch_never_signals_a_member_known_only_by_its_start_second() {
   if [ "$(uname)" != Darwin ]; then
     wait 2>/dev/null || true
@@ -4738,19 +4523,20 @@ SH
   pid=$(cat "$tmp/leaver.pid" 2>/dev/null || true)
   [ -n "$pid" ] || fm_lint_fail_settled "the group-leaving descendant did not start"
   grep -q '^rss_reader_unavailable=exited-at-start$' "$tmp/rss" || fm_lint_fail_settled "the test did not run with the reader down: $(cat "$tmp/rss")"
-  [ "$rc" -eq 98 ] || fm_lint_fail_settled "the watch exited $rc with its reader down, expected 98: it did not count a descendant that left the group: $(cat "$tmp/err")"
-  ! grep -q "^kill $pid " "$log" || fm_lint_fail_settled "the watch signalled a member it knew only by its start second (pid $pid): $(cat "$log")"
-  grep -q "^rss_signal_skipped=.*$pid:inexact" "$tmp/rss" || fm_lint_fail_settled "the unsignalled member was not recorded: $(cat "$tmp/rss")"
+  [ "$rc" -eq 96 ] || fm_lint_fail_settled "the watch exited $rc with its reader down, expected 96: a counted descendant outside the group outlived the root: $(cat "$tmp/err")"
+  grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group was not ended over the bound (recorded): $(cat "$log")"
+  ! grep -q " $pid " "$log" || fm_lint_fail_settled "the watch signalled the descendant outside the root's group (pid $pid): $(cat "$log")"
+  grep -q "^rss_escaped=.*$pid" "$tmp/rss" || fm_lint_fail_settled "the descendant that outlived the root was not recorded: $(cat "$tmp/rss")"
   wait 2>/dev/null || true
-  pass "with its reader down the watch counts a descendant found by the process table and ends over the bound, but never signals a member known only by its start second and records it as inexact"
+  pass "with its reader down the watch counts a descendant found by the process table and ends the root's group over the bound; the descendant is never signalled, and because it outlives the root the root fails and records it"
 }
 
 # (F11) A restarted reader starts with an empty set of members; the watch keeps
 # every member it already knew that still runs. A descendant seen by the first
 # reader leaves the group and is orphaned; the first reader then exits; after the
 # restart the orphan holds 160 MiB against a 100 MiB bound. The watch must still
-# count it, end the tree and signal the orphan by the exact identity the first
-# reader gave (recorded by the stub, not delivered).
+# count it and end the root's group; the orphan is never signalled, and since it
+# outlives the root the root fails (96) and records it (sends recorded by the stub).
 test_a_restarted_reader_keeps_a_member_that_left_the_group_and_was_orphaned() {
   if [ "$(uname)" != Darwin ]; then
     wait 2>/dev/null || true
@@ -4785,10 +4571,12 @@ SH
   [ -n "$orphan" ] || fm_lint_fail_settled "the orphan did not start"
   [ -e "$tmp/reader.mark" ] || fm_lint_fail_settled "the first reader never started, so nothing was restarted"
   grep -q '^rss_samples=libproc:' "$tmp/rss" || fm_lint_fail_settled "no sample record: $(cat "$tmp/rss")"
-  [ "$rc" -eq 98 ] || fm_lint_fail_settled "after its reader restarted the watch exited $rc, expected 98: it dropped an orphaned member the first reader had seen: $(cat "$tmp/err") $(cat "$tmp/rss")"
-  grep -q "^kill $orphan 9\$" "$log" || fm_lint_fail_settled "the orphan was not signalled by its exact identity after the restart: $(cat "$log") / $(cat "$tmp/rss")"
+  [ "$rc" -eq 96 ] || fm_lint_fail_settled "after its reader restarted the watch exited $rc, expected 96: $(cat "$tmp/err") $(cat "$tmp/rss")"
+  grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group was not ended over the bound: $(cat "$log") / $(cat "$tmp/rss")"
+  ! grep -q " $orphan " "$log" || fm_lint_fail_settled "the watch signalled the orphan outside the root's group: $(cat "$log")"
+  grep -q "^rss_escaped=.*$orphan" "$tmp/rss" || fm_lint_fail_settled "the counted orphan that outlived the root was not recorded: $(cat "$tmp/rss")"
   wait 2>/dev/null || true
-  pass "a restarted reader does not lose a member that left the group and was orphaned: the watch counted it, ended the tree over the bound and signalled it by the exact identity the first reader gave"
+  pass "a restarted reader does not lose a member that left the group and was orphaned: the watch counted it and ended the root's group over the bound, never signalled the orphan, and failed the root it outlived"
 }
 
 # (F11) A watch that loses every reader of its root's memory (libproc and the
@@ -4811,7 +4599,7 @@ test_a_watch_that_loses_every_reader_starts_no_further_root_and_fails_the_run() 
   printf '#!/bin/sh\ncase "$*" in *pgid=*) exit 1 ;; esac\n[ -n "%s" ] && exec "%s" "$@"\nexit 1\n' "$real_ps" "$real_ps" > "$tmp/fake/ps"
   chmod +x "$tmp/fake/ps"
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_JOBS=1 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_JOBS=1 \
       FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
       FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh bin/consumer.sh bin/library.sh > "$tmp/out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose watch lost every reader exited 0 with a root not analyzed: $(cat "$tmp/out")"
@@ -4860,79 +4648,23 @@ test_a_compiled_launcher_is_probed_every_run_and_its_delegates_version_decides()
   fm_lint_native_launcher "$tmp/fake" "$tmp/starts.log" "$tmp/delegate.version" \
     || { pass "SKIP (no C compiler for a compiled launcher): native launcher probed every run"; return; }
   rc=0
-  ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/first.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fm_lint_fail_settled "a launcher whose delegate reports the pinned version was rejected ($rc): $(cat "$tmp/first.out")"
   printf '0.10.0\n' > "$tmp/delegate.version"
   rc=0
-  ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/second.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 1 ] || fm_lint_fail_settled "a compiled launcher whose delegate changed to 0.10.0 passed the strict version policy ($rc): $(cat "$tmp/second.out")"
   grep -q 'found 0.10.0' "$tmp/second.out" || fm_lint_fail_settled "the refusal did not name the delegate's current version: $(cat "$tmp/second.out")"
   printf '0.11.0\n' > "$tmp/delegate.version"
   rc=0
-  ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/third.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fm_lint_fail_settled "a corrected delegate was rejected ($rc): $(cat "$tmp/third.out")"
   [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 3 ] || fm_lint_fail_settled "the launcher was not probed on each of its three runs: $(cat "$tmp/starts.log")"
   wait 2>/dev/null || true
   pass "a compiled launcher is probed every run: its delegate's change to 0.10.0 is refused under the strict policy and the corrected delegate accepted, with the launcher's bytes unchanged"
-}
-
-# (F6) A warm cache hit of a wrapper (a script ShellCheck, probed every run) behind
-# a host budget another root fills reserves nothing in the roots' budget and waits
-# for nothing: its only start is the version probe, in the probe's own lane, and
-# the recorded waits (probe_wait_ms, the root's wait_ms) are near zero. The
-# control: a root that needs analysis behind the same holder waits for it.
-test_a_warm_cache_hit_behind_an_occupied_budget_reserves_nothing_and_waits_for_nothing() {
-  local tmp repo rc=0 run probe_wait root_wait waited deadline
-  tmp=$(fm_test_tmproot fm-lint-warm-hit)
-  FM_LINT_RELEASE_FILES="$tmp/release"
-  repo=$(fm_lint_isolated_copy "$tmp" hit)
-  # A compiled stand-in: a script launcher keeps no cache (its delegate cannot be
-  # resolved), so only a compiled ShellCheck has warm hits.
-  mkdir -p "$tmp/fake"
-  fm_lint_native_version_stub "$tmp/fake" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): warm cache hit behind an occupied budget"; return; }
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_TEST_ANALYSIS_RC=0 \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/warm.out" 2>&1 ) || fm_lint_fail_settled "cache warm-up failed: $(cat "$tmp/warm.out")"
-  # The whole host-wide budget (3,670,016 KiB) is charged to a live entry.
-  fm_lint_hold_ledger_entry "$tmp/hit/host/admission.lock.ledger" 3670016 "$tmp/release" "$tmp/ready"
-  waited=0
-  while [ ! -s "$tmp/ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
-  : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_TEST_ANALYSIS_RC=0 \
-      FM_LINT_TELEMETRY="$tmp/hit.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/hit.out" 2>&1 ) &
-  run=$!
-  deadline=$((SECONDS + 15))
-  while fm_lint_live "$run" && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1; done
-  if fm_lint_live "$run"; then
-    : > "$tmp/release"
-    wait "$run" 2>/dev/null || true
-    fm_lint_fail_settled "a warm cache hit waited behind the occupied budget: $(cat "$tmp/starts.log")"
-  fi
-  wait "$run" || rc=$?
-  [ "$rc" -eq 0 ] || { : > "$tmp/release"; fm_lint_fail_settled "the warm cache hit failed ($rc): $(cat "$tmp/hit.out")"; }
-  grep -q 'cache hit bin/consumer[.]sh' "$tmp/hit.out" || { : > "$tmp/release"; fm_lint_fail_settled "the run did not reuse the cached success: $(cat "$tmp/hit.out")"; }
-  [ "$(cat "$tmp/starts.log")" = "--version" ] || { : > "$tmp/release"; fm_lint_fail_settled "the warm hit started more than its version probe: $(cat "$tmp/starts.log")"; }
-  probe_wait=$(awk -F '\t' '$1 == "meta" && $2 == "probe_wait_ms" { print $3 }' "$tmp/hit.roots.tsv")
-  root_wait=$(awk -F '\t' '$1 == "end" { print $17 }' "$tmp/hit.roots.tsv")
-  { [ -n "$probe_wait" ] && [ "$probe_wait" -lt 1000 ] && [ "$root_wait" = 0 ]; } \
-    || { : > "$tmp/release"; fm_lint_fail_settled "recorded waits behind the occupied budget: probe ${probe_wait:-none} ms, root ${root_wait:-none} ms"; }
-  # The control: an analysis behind the same holder waits for it.
-  : > "$tmp/starts.log"
-  rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
-      FM_LINT_TELEMETRY="$tmp/cold.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/cold.out" 2>&1 ) &
-  run=$!
-  sleep 3
-  grep -q -- '-- bin/consumer.sh' "$tmp/starts.log" && { : > "$tmp/release"; wait "$run"; fm_lint_fail_settled "an analysis started behind a budget another root fills"; }
-  : > "$tmp/release"
-  wait "$run" || rc=$?
-  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the analysis did not finish once the budget was released ($rc): $(cat "$tmp/cold.out")"
-  root_wait=$(awk -F '\t' '$1 == "end" { print $17 }' "$tmp/cold.roots.tsv")
-  [ "${root_wait:-0}" -ge 2000 ] || fm_lint_fail_settled "the analysis behind the holder recorded a wait of only ${root_wait:-none} ms"
-  wait 2>/dev/null || true
-  pass "a warm cache hit behind a filled budget started only its version probe, in the probe's lane (waits: probe $probe_wait ms, root 0 ms); an analysis behind the same holder waited $root_wait ms"
 }
 
 # The version probe waits only for its own lane (another probe), never behind
@@ -4949,7 +4681,7 @@ test_the_version_probe_waits_only_for_its_own_lane() {
   waited=0
   while [ ! -e "$tmp/lane.ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_ANALYSIS_RC=0 \
       FM_LINT_TELEMETRY="$tmp/t.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/out" 2>&1 ) &
   run=$!
   # The run needs about a second to reach the lane (its census first); the lane is
@@ -4965,10 +4697,13 @@ test_the_version_probe_waits_only_for_its_own_lane() {
   pass "the version probe waited for its held lane ($probe_wait ms recorded) and started nothing meanwhile"
 }
 
-# The same rule inside the watch: its tree member list is named by pid and start
-# time, so a member that ended and whose pid an unrelated process now holds is
-# not signalled when the tree is ended, and the skip is recorded. Every send is
-# recorded by the stub, none delivered.
+# (Main 1846 F1, F5) Each reader reply is bound to the processes it measured: a reply
+# that names the bystander's pid with another start time (a member that ended, whose
+# pid was reused) is unknown, so the root runs unmeasured (96) and nothing is sent.
+# The control: named with its true start time, the bystander is counted, the root's
+# group is ended over the bound, the bystander is never signalled, and since it
+# outlives the root the root fails (96) and records it. Every send is recorded by the
+# stub, none delivered.
 test_the_watch_never_ends_an_unrelated_process_that_holds_a_members_old_pid() {
   if [ "$(uname)" != Darwin ]; then
     wait 2>/dev/null || true
@@ -4995,17 +4730,18 @@ test_the_watch_never_ends_an_unrelated_process_that_holds_a_members_old_pid() {
     rc=0
     FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=members FM_TEST_MEMBER="$bystander:$sec:$usec" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- sleep 3 > "$tmp/err.$label" 2>&1 || rc=$?
-    [ "$rc" -eq 98 ] || fm_lint_fail_settled "the watch exited $rc ($label), expected 98 for a tree over its bound: $(cat "$tmp/err.$label")"
+    [ "$rc" -eq 96 ] || fm_lint_fail_settled "the watch exited $rc ($label), expected 96: $(cat "$tmp/err.$label")"
+    ! grep -q " $bystander " "$log" || fm_lint_fail_settled "the watch signalled the bystander ($label): $(cat "$log")"
     if [ "$label" = reused ]; then
-      ! grep -q "^kill $bystander " "$log" || fm_lint_fail_settled "the watch signalled an unrelated process that only held a member's old pid: $(cat "$log")"
-      grep -q "^rss_signal_skipped=$bystander:mismatch\$" "$tmp/rss.$label" || fm_lint_fail_settled "the skipped signal was not recorded: $(cat "$tmp/rss.$label")"
+      grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" || fm_lint_fail_settled "a reply naming a reused pid was counted: $(cat "$tmp/rss.$label")"
+      [ ! -s "$log" ] || fm_lint_fail_settled "the watch ended a root over a reply it could not bind: $(cat "$log")"
     else
-      grep -q "^kill $bystander 9\$" "$log" || fm_lint_fail_settled "the watch did not signal a member whose pid and start time matched: $(cat "$log")"
-      ! grep -q '^rss_signal_skipped=' "$tmp/rss.$label" || fm_lint_fail_settled "a matching member was recorded as skipped: $(cat "$tmp/rss.$label")"
+      grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group was not ended over the bound (recorded): $(cat "$log")"
+      grep -q "^rss_escaped=.*$bystander" "$tmp/rss.$label" || fm_lint_fail_settled "the counted bystander that outlived the root was not recorded: $(cat "$tmp/rss.$label")"
     fi
   done
   wait 2>/dev/null || true
-  pass "the watch signals a member by pid and exact start time, sends nothing to an unrelated process that holds a member's old pid, and records the skip (sends recorded by the stub, none delivered)"
+  pass "a reply naming a reused pid is unknown and the root fails unmeasured with nothing sent; with the true identity the member is counted, only the root's group is ended, and the member that outlives it fails the root (sends recorded by the stub, none delivered)"
 }
 
 # (F7) Two runs at once, each against a pool whose slot file cannot be opened,
@@ -5021,10 +4757,10 @@ test_concurrent_runs_against_an_unusable_slot_both_refuse_and_then_both_run() {
   : > "$tmp/pool/slot.0"
   chmod 000 "$tmp/pool/slot.0"
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
       FM_TEST_ANALYSIS_RC=0 FM_TEST_ANALYSIS_SECS=1 bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) &
   run1=$!
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
       FM_TEST_ANALYSIS_RC=0 FM_TEST_ANALYSIS_SECS=1 bash bin/fm-lint.sh bin/library.sh > "$tmp/run2.out" 2>&1 ) &
   run2=$!
   wait "$run1" || rc1=$?
@@ -5036,10 +4772,10 @@ test_concurrent_runs_against_an_unusable_slot_both_refuse_and_then_both_run() {
     || fm_lint_fail_settled "a refusal did not name the unusable slot file: $(cat "$tmp/run1.out" "$tmp/run2.out")"
   # The control.
   rc1=0; rc2=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
       FM_TEST_ANALYSIS_RC=0 FM_TEST_ANALYSIS_SECS=1 bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run3.out" 2>&1 ) &
   run1=$!
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
       FM_TEST_ANALYSIS_RC=0 FM_TEST_ANALYSIS_SECS=1 bash bin/fm-lint.sh bin/library.sh > "$tmp/run4.out" 2>&1 ) &
   run2=$!
   wait "$run1" || rc1=$?
@@ -5063,14 +4799,14 @@ test_a_run_never_takes_a_version_from_a_probe_that_started_before_it_waited() {
   printf '0.11.0\n' > "$tmp/delegate.version"
   fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log" "$tmp/delegate.version"
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 FM_TEST_PROBE_SECS=4 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_ANALYSIS_RC=0 FM_TEST_PROBE_SECS=4 \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) &
   run1=$!
   waited=0
   while ! grep -q -- '^--version$' "$tmp/starts.log" && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
   grep -q -- '^--version$' "$tmp/starts.log" || fm_lint_fail_settled "run 1's probe never started"
   printf '0.10.0\n' > "$tmp/delegate.version"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_ANALYSIS_RC=0 \
       bash bin/fm-lint.sh --strict-version bin/library.sh > "$tmp/run2.out" 2>&1 ) || rc2=$?
   wait "$run1" || rc1=$?
   [ "$rc2" -eq 1 ] || fm_lint_fail_settled "a strict run that began waiting during another run's probe exited $rc2 on that probe's older version: $(cat "$tmp/run2.out")"
@@ -5117,11 +4853,11 @@ test_runs_with_different_delegates_each_probe_their_own_shellcheck() {
     while [ ! -e "$tmp/lane.ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
     : > "$tmp/starts.log"
     rc_a=0; rc_b=0
-    ( cd "$repo" && env HOME="$tmp/home.new" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    ( cd "$repo" && env HOME="$tmp/home.new" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
         bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/$label.a.out" 2>&1 ) &
     run_a=$!
     sleep 0.5
-    ( cd "$repo" && env HOME="$home_b" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    ( cd "$repo" && env HOME="$home_b" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
         bash bin/fm-lint.sh --strict-version bin/library.sh > "$tmp/$label.b.out" 2>&1 ) &
     sleep 2
     : > "$tmp/lane.release.$label"
@@ -5168,12 +4904,12 @@ exit 0
 EOF
   chmod +x "$tmp/fake/shellcheck"
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) &
   run1=$!
   waited=0
   while [ ! -e "$tmp/first" ] && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/library.sh > "$tmp/run2.out" 2>&1 ) &
   run2=$!
   # Run 2 needs about a second to reach the lane, then waits past the 1 s bound.
@@ -5206,13 +4942,13 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   chmod +x "$tmp/fake/uname"
   : > "$tmp/starts.log"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_REQUIRE_BOUNDS=0 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_REQUIRE_BOUNDS=0 \
       bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/strict.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 2 ] || fm_lint_fail_settled "a strict run where the caps are not enforced exited $rc, expected the refusal (2): $(cat "$tmp/strict.out")"
   grep -q 'strict mode refuses on Linux' "$tmp/strict.out" || fm_lint_fail_settled "the refusal did not say why: $(cat "$tmp/strict.out")"
   [ ! -s "$tmp/starts.log" ] || fm_lint_fail_settled "the refused strict run started ShellCheck: $(cat "$tmp/starts.log")"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_REQUIRE_BOUNDS=0 FM_TEST_ANALYSIS_RC=0 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_REQUIRE_BOUNDS=0 FM_TEST_ANALYSIS_RC=0 \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/plain.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 2 ] && ! grep -q 'strict mode refuses' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run there was refused ($rc): $(cat "$tmp/plain.out")"
   grep -q 'are not enforced' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run did not warn that the caps are not enforced: $(cat "$tmp/plain.out")"
@@ -5223,7 +4959,7 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   printf '0.10.0\n' > "$tmp/version"
   fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log" "$tmp/version"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_STRICT_VERSION=1 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_STRICT_VERSION=1 \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/inherited.out" 2>&1 ) || rc=$?
   ! grep -q 'strict mode refuses' "$tmp/inherited.out" \
     || fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION took the memory-cap refusal: $(cat "$tmp/inherited.out")"
@@ -5258,22 +4994,20 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
   real_ps=$(command -v ps || true)
   printf '#!/bin/sh\ncase "$*" in *pgid=*) exit 1 ;; esac\n[ -n "%s" ] && exec "%s" "$@"\nexit 1\n' "$real_ps" "$real_ps" > "$tmp/fake/ps"
   chmod +x "$tmp/fake/ps"
-  # (1) The only root: a compiled stand-in (so the cache is on) that exits 0 itself,
-  # but ran unmeasured.
+  # (1) The only root: a compiled stand-in that exits 0 itself, but ran unmeasured.
   mkdir -p "$tmp/native"
   fm_lint_native_version_stub "$tmp/native" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): reader loss fails the root"; return; }
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
       FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/only.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose only root ran unmeasured exited 0: $(cat "$tmp/only.out")"
-  [ -z "$(find "$tmp/cache" -name '*.passed' -print 2>/dev/null)" ] || fm_lint_fail_settled "a root that ran unmeasured left a reusable success"
   grep -q 'reason=unmeasured' "$tmp/only.out" || fm_lint_fail_settled "the run did not name the unmeasured root: $(cat "$tmp/only.out")"
   # (2) Two workers, one slot: the second root waits at the gate while the first
   # runs unmeasured, and is then not admitted.
   : > "$tmp/starts.log"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_HOST_SLOTS=1 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_HOST_SLOTS=1 \
       FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
       FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/queued.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run with an unmeasured root exited 0: $(cat "$tmp/queued.out")"
@@ -5288,7 +5022,9 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
 # ends unmeasured (96). The reader names the member once,
 # with a start time 1 microsecond off, then is down; the process table shows that
 # pid with the same second and 160 MiB. The control: named with its true start time,
-# the same process is counted and the tree is ended over the bound (sends recorded).
+# the same process is counted and the root's group is ended over the bound; the
+# process, outside that group, is never signalled and outlives the root, so the root
+# fails (96) and records it (sends recorded).
 test_a_same_second_replacement_is_not_counted_against_the_root() {
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the libproc identity reader is macOS only): same-second replacement"
@@ -5322,18 +5058,21 @@ test_a_same_second_replacement_is_not_counted_against_the_root() {
       [ "$rc" -eq 96 ] && grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" \
         || fm_lint_fail_settled "a same-second replacement did not make the tree unknown (exit $rc): $(cat "$tmp/rss.$label")"
     else
-      [ "$rc" -eq 98 ] || fm_lint_fail_settled "the watch did not count a member with its true start time ($rc): $(cat "$tmp/err.$label")"
-      grep -q '^killpg ' "$log" || fm_lint_fail_settled "the tree over the bound was not ended (recorded): $(cat "$log")"
+      [ "$rc" -eq 96 ] || fm_lint_fail_settled "the watch did not count a member with its true start time, or did not fail the root it outlived ($rc): $(cat "$tmp/err.$label")"
+      grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group over the bound was not ended (recorded): $(cat "$log")"
+      ! grep -q " $big " "$log" || fm_lint_fail_settled "the watch signalled the member outside the root's group: $(cat "$log")"
+      grep -q "^rss_escaped=.*$big" "$tmp/rss.$label" || fm_lint_fail_settled "the member that outlived the root was not recorded: $(cat "$tmp/rss.$label")"
     fi
   done
-  pass "a same-second replacement of a known member is not counted, so the root is not ended for it; the member with its true start time is counted and the tree ended over the bound (sends recorded, none delivered)"
+  pass "a same-second replacement of a known member is not counted, so the root is not ended for it; the member with its true start time is counted, the root's group ended over the bound, and the member it never signals fails the root (sends recorded, none delivered)"
 }
 
-# (F5, re-run at the head) The watch ends a counted descendant that left the
-# process group, by the exact identity its reader gave, and leaves an under-bound
-# tree alone. Every send is recorded by the stub, none delivered; the processes end
+# (F5, Main 1846 F5) A counted descendant that left the process group is never
+# signalled: over the bound the watch ends the root's group, and the descendant,
+# which outlives it, fails the root (96, rss_escaped=<pid>); an under-bound tree is
+# left alone. Every send is recorded by the stub, none delivered; the processes end
 # on their own.
-test_the_watch_ends_a_descendant_that_left_the_process_group() {
+test_a_descendant_that_left_the_group_and_outlives_the_root_fails_it_unsignalled() {
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the libproc tree reader is macOS only): group-leaving descendant termination"
     return
@@ -5357,15 +5096,17 @@ SH
     pid=$(cat "$tmp/leaver.$label.pid" 2>/dev/null || true)
     [ -n "$pid" ] || fm_lint_fail_settled "the group-leaving descendant did not start ($label)"
     if [ "$label" = over ]; then
-      [ "$rc" -eq 98 ] || fm_lint_fail_settled "the watch exited $rc, expected 98 for a root over its bound: $(cat "$tmp/err.$label")"
-      grep -q "^kill $pid 9\$" "$tmp/signals.over" || fm_lint_fail_settled "the counted descendant that left the group was not ended (recorded): $(cat "$tmp/signals.over")"
+      [ "$rc" -eq 96 ] || fm_lint_fail_settled "the watch exited $rc, expected 96 for a root over its bound whose counted descendant outlived it: $(cat "$tmp/err.$label")"
+      grep -q '^killpg ' "$tmp/signals.over" || fm_lint_fail_settled "the root's group over the bound was not ended (recorded): $(cat "$tmp/signals.over")"
+      ! grep -q " $pid " "$tmp/signals.over" || fm_lint_fail_settled "the watch signalled the descendant outside the root's group: $(cat "$tmp/signals.over")"
+      grep -q "^rss_escaped=.*$pid" "$tmp/rss.over" || fm_lint_fail_settled "the descendant that outlived the root was not recorded: $(cat "$tmp/rss.over")"
     else
       [ "$rc" -eq 0 ] || fm_lint_fail_settled "a root whose tree stays under the bound exited $rc: $(cat "$tmp/err.$label")"
       [ ! -s "$tmp/signals.under" ] || fm_lint_fail_settled "the watch signalled a tree under the bound: $(cat "$tmp/signals.under")"
     fi
   done
   wait 2>/dev/null || true
-  pass "the watch ends a counted descendant that left the process group by its exact identity and sends nothing to an under-bound tree (sends recorded, none delivered)"
+  pass "over the bound the watch ends only the root's group, never the counted descendant that left it, and that descendant fails the root it outlives; an under-bound tree gets nothing (sends recorded, none delivered)"
 }
 
 # (Main 1791 item 1) The watch's exact-member reader, run as the watch runs it (its
@@ -5450,7 +5191,7 @@ test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends() {
   identity=$(fm_lint_identity_of "$holder") || fm_lint_fail_settled "could not read the start time of the stand-in probe"
   printf '999999\t%s\t%s\t%s\t0\n' "$holder" "${identity%%:*}" "${identity##*:}" > "$tmp/record/host/admission.lock.probe.holder"
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_ANALYSIS_RC=0 \
       FM_LINT_TELEMETRY="$tmp/held.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/held.out" 2>&1 ) &
   # The run needs a second or more to reach the lane (its census first, longer under
   # load) and then waits past the 1 s bound: look for its report for up to 6 s.
@@ -5470,7 +5211,7 @@ test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends() {
   wait "$short" 2>/dev/null || true
   printf '999999\t%s\t%s\t%s\t0\n' "$short" "${short_id%%:*}" "${short_id##*:}" > "$tmp/record/host/admission.lock.probe.holder"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_ANALYSIS_RC=0 \
       FM_LINT_TELEMETRY="$tmp/free.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/free.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fm_lint_fail_settled "a record naming an ended probe did not free the lane ($rc): $(cat "$tmp/free.out")"
   probe_wait=$(awk -F '\t' '$1 == "meta" && $2 == "probe_wait_ms" { print $3 }' "$tmp/free.roots.tsv")
@@ -5479,13 +5220,12 @@ test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends() {
   pass "a lane record naming a probe that still runs held the lane after its run had gone: the next run reported blocked, waited, and probed once it ended; a record naming an ended probe freed the lane at once"
 }
 
-# (Main 1791 item 4) With the cache on, a launcher whose delegate changes between two
-# runs of one version must not reuse the first delegate's success: a script launcher
-# keeps no cache, so delegate B's finding is reported after delegate A passed. The
-# control: a compiled ShellCheck (its own bytes are what runs) reuses its success.
-test_a_launcher_switching_to_another_delegate_of_one_version_never_reuses_its_success() {
+# (Main 1791 item 4, Main 1862) A launcher whose delegate changes between runs of one
+# version: every run is analysed (no result is reused), so delegate B's finding is
+# reported after delegate A passed, and back on A the run is analysed again.
+test_a_launcher_switching_delegates_is_analysed_every_run() {
   local tmp repo rc
-  tmp=$(fm_test_tmproot fm-lint-delegate-cache)
+  tmp=$(fm_test_tmproot fm-lint-delegate-switch)
   repo=$(fm_lint_isolated_copy "$tmp" delegate)
   mkdir -p "$tmp/fake"
   printf 'A\n' > "$tmp/delegate.choice"
@@ -5502,27 +5242,23 @@ exit 0
 EOF
   chmod +x "$tmp/fake/shellcheck"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fail "delegate A's run failed ($rc): $(cat "$tmp/a.out")"
   printf 'B\n' > "$tmp/delegate.choice"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/b.out" 2>&1 ) || rc=$?
-  [ "$rc" -eq 1 ] || fail "delegate B's run reused delegate A's success (exit $rc): $(cat "$tmp/b.out")"
+  [ "$rc" -eq 1 ] || fail "delegate B's run did not report its finding (exit $rc): $(cat "$tmp/b.out")"
   grep -q 'SC9998' "$tmp/b.out" || fail "delegate B's finding was not reported: $(cat "$tmp/b.out")"
-  ! grep -q 'cache hit' "$tmp/b.out" || fail "delegate B's run reported a cache hit: $(cat "$tmp/b.out")"
-  # The control: a compiled ShellCheck, analyzed once, is a cache hit the second time.
-  mkdir -p "$tmp/native"
-  fm_lint_native_version_stub "$tmp/native" "$tmp/native.log" 0.11.0 || { pass "a script launcher keeps no cache, so delegate B's finding was reported after delegate A passed (control skipped: no C compiler)"; return; }
-  ( cd "$repo" && env PATH="$tmp/native:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache2" \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/n1.out" 2>&1 ) || fail "the compiled ShellCheck's first run failed: $(cat "$tmp/n1.out")"
-  ( cd "$repo" && env PATH="$tmp/native:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache2" \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/n2.out" 2>&1 ) || fail "the compiled ShellCheck's second run failed: $(cat "$tmp/n2.out")"
-  grep -q 'cache hit bin/consumer[.]sh' "$tmp/n2.out" || fail "a compiled ShellCheck did not reuse its own success: $(cat "$tmp/n2.out")"
-  pass "a script launcher keeps no cache, so after delegate A passed, delegate B of the same version was analyzed and its finding reported; a compiled ShellCheck reuses its own success"
+  printf 'A\n' > "$tmp/delegate.choice"
+  : > "$tmp/starts.log"
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a2.out" 2>&1 ) || fail "delegate A's second run failed: $(cat "$tmp/a2.out")"
+  grep -v -- '--version' "$tmp/starts.log" | grep -q '^A .*bin/consumer[.]sh' || fail "delegate A's second run was not analysed: $(cat "$tmp/starts.log")"
+  ! grep -q 'cache hit' "$tmp/a.out" "$tmp/b.out" "$tmp/a2.out" || fail "a run reported a reused analysis result"
+  pass "after delegate A passed, delegate B of the same version was analysed and its finding reported, and back on A the run was analysed again"
 }
-
 # (Main 1791 item 5) A watch that cannot write the run's stop mark (its directory is
 # made read-only while the first root runs unmeasured) still stops the run: the root
 # fails, the worker cannot mark it either and stops, and the root waiting at the gate
@@ -5544,7 +5280,7 @@ test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root() {
   printf '#!/bin/sh\ncase "$*" in *pgid=*) exit 1 ;; esac\n[ -n "%s" ] && exec "%s" "$@"\nexit 1\n' "$real_ps" "$real_ps" > "$tmp/fake/ps"
   chmod +x "$tmp/fake/ps"
   : > "$tmp/starts.log"
-  ( cd "$repo" && env TMPDIR="$tmp/tmpdir" PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_HOST_SLOTS=1 \
+  ( cd "$repo" && env TMPDIR="$tmp/tmpdir" PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_HOST_SLOTS=1 \
       FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=6 FM_TEST_SIGNAL_LOG="$tmp/signals.log" \
       bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/out" 2>&1 ) &
   run=$!
@@ -5561,7 +5297,7 @@ test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root() {
   # The control: readers healthy, both roots analyzed.
   : > "$tmp/starts.log"
   rc=0
-  ( cd "$repo" && env TMPDIR="$tmp/tmpdir" PATH="$tmp/native:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_HOST_SLOTS=1 \
+  ( cd "$repo" && env TMPDIR="$tmp/tmpdir" PATH="$tmp/native:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_HOST_SLOTS=1 \
       bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/control.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] && [ "$(grep -c -- '-- bin/' "$tmp/starts.log")" -eq 2 ] || fm_lint_fail_settled "with readers healthy the run did not analyze both roots ($rc): $(cat "$tmp/control.out")"
   pass "a stop mark that could not be written still stopped the run: the unmeasured root failed, no second root was admitted, and the failure was said; with readers healthy both roots ran"
@@ -5633,7 +5369,7 @@ test_an_empty_or_damaged_lane_record_holds_the_lane() {
     if [ "$kind" = empty ]; then : > "$tmp/damaged/host/admission.lock.probe.holder"; else printf 'not a record\n' > "$tmp/damaged/host/admission.lock.probe.holder"; fi
     : > "$tmp/starts.log"
     rc=0
-    ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+    ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_ANALYSIS_RC=0 \
         bash bin/fm-lint.sh bin/consumer.sh > "$tmp/$kind.out" 2>&1 ) &
     run=$!
     waited=0
@@ -5650,53 +5386,65 @@ test_an_empty_or_damaged_lane_record_holds_the_lane() {
   pass "an empty or a damaged lane record holds the lane (the run reports blocked and starts no probe); once removed, the run probes and finishes"
 }
 
-# (Main 1806 item 3) Positive proof: a new root is admitted only while every watched
-# running root shows a fresh measurement record. A live ledger entry for a watched root
-# whose record is 60 s old keeps a new root out; once the record is renewed the root
-# is admitted. The control: with a fresh record the root is admitted at once.
+# (Main 1806 item 3, Main 1846 F2) Positive proof: a new root is admitted only while
+# every watched running root's measurement record names a successful sample at most
+# 5 s old. A live ledger entry for a watched root keeps a new root out while its
+# record is absent (not yet sampled), empty, invalidated ("failed ...") or names a
+# sample 60 s old, whatever the file's own time; once it names a fresh sample the
+# root is admitted. The control: beside a fresh sample the root is admitted at once.
 test_a_stale_measurement_record_admits_no_new_root() {
-  local tmp root pid waited
+  local tmp root pid waited state
   tmp=$(fm_test_tmproot fm-lint-stale-health)
   FM_LINT_RELEASE_FILES="$tmp/release"
   mkdir -p "$tmp/bin" "$tmp/host.lock.ledger"
   fm_lint_write_barrier_shellcheck "$tmp/bin" 8 "$tmp/barrier.log"
   root="$tmp/a.sh"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$root"
-  : > "$tmp/barrier.log"
   perl -MFcntl=:flock -MTime::HiRes=sleep,time -e '
     my ($dir, $peak, $release, $ready) = @ARGV;
     my $path = "$dir/entry.$$.1";
     open(my $fh, ">>", $path) or die; flock($fh, LOCK_EX) or die;
     truncate($fh, 0); syswrite($fh, "$$\t65536\t$peak\t1\n");
     open(my $r, ">", $ready) or die; close $r;
-    my $u = time() + 60; sleep 0.05 until -e $release || time() > $u; unlink $path;' \
+    my $u = time() + 120; sleep 0.05 until -e $release || time() > $u; unlink $path;' \
     "$tmp/host.lock.ledger" "$tmp/peak" "$tmp/release" "$tmp/ready" &
   waited=0
   while [ ! -e "$tmp/ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
-  : > "$tmp/peak.health"
-  touch -t 200001010000 "$tmp/peak.health"
-  FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" stale "$root" -- \
-    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/stale.out" 2>&1 &
-  pid=$!
-  sleep 3
-  [ ! -s "$tmp/barrier.log" ] || fm_lint_fail_settled "a root was admitted beside a watched root whose measurement record is stale"
-  touch "$tmp/peak.health"
-  wait "$pid" || fm_lint_fail_settled "the root failed once the record was renewed: $(cat "$tmp/stale.out")"
-  [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root did not start once the record was renewed"
-  [ "$(cat "$tmp/pool.wait.stale")" -ge 2500 ] || fm_lint_fail_settled "the recorded wait $(cat "$tmp/pool.wait.stale") ms is shorter than the record stayed stale"
-  # The control: a fresh record admits at once.
-  touch "$tmp/peak.health"
+  sample_at() { perl -MTime::HiRes=time -e 'printf "sample %.6f\n", time() - $ARGV[0]' "$1"; }
+  for state in absent empty failed old; do
+    : > "$tmp/barrier.log"
+    rm -f "$tmp/peak.health"
+    case "$state" in
+      empty) : > "$tmp/peak.health" ;;
+      failed) printf 'failed a sample was missed\n' > "$tmp/peak.health" ;;
+      old) sample_at 60 > "$tmp/peak.health" ;;
+    esac
+    FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" "$state" "$root" -- \
+      "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/$state.out" 2>&1 &
+    pid=$!
+    sleep 3
+    [ ! -s "$tmp/barrier.log" ] || fm_lint_fail_settled "a root was admitted beside a watched root whose measurement record is $state"
+    sample_at 0 > "$tmp/peak.health"
+    wait "$pid" || fm_lint_fail_settled "the root failed once the record named a fresh sample ($state): $(cat "$tmp/$state.out")"
+    [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root did not start once the record named a fresh sample ($state)"
+    [ "$(cat "$tmp/pool.wait.$state")" -ge 2500 ] || fm_lint_fail_settled "the recorded wait $(cat "$tmp/pool.wait.$state") ms is shorter than the record stayed $state"
+  done
+  # The control: a fresh sample admits at once.
+  : > "$tmp/barrier.log"
+  sample_at 0 > "$tmp/peak.health"
   FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" fresh "$root" -- \
-    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/fresh.out" 2>&1 || fm_lint_fail_settled "the root beside a fresh record failed: $(cat "$tmp/fresh.out")"
-  [ "$(cat "$tmp/pool.wait.fresh")" -lt 1000 ] || fm_lint_fail_settled "a root beside a fresh record waited $(cat "$tmp/pool.wait.fresh") ms"
+    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/fresh.out" 2>&1 || fm_lint_fail_settled "the root beside a fresh sample failed: $(cat "$tmp/fresh.out")"
+  [ "$(cat "$tmp/pool.wait.fresh")" -lt 1000 ] || fm_lint_fail_settled "a root beside a fresh sample waited $(cat "$tmp/pool.wait.fresh") ms"
   : > "$tmp/release"
   wait 2>/dev/null || true
-  pass "a watched running root whose measurement record is stale keeps every new root out; once renewed the root is admitted; beside a fresh record it is admitted at once"
+  pass "a watched running root whose record is absent, empty, invalidated or names an old sample keeps every new root out; once it names a fresh sample the root is admitted; beside a fresh sample it is admitted at once"
 }
 
 # (Main 1806 item 4) Reader loss wins over an over-cap end: every reader fails for the
 # first ticks (the root is unmeasured), then the table recovers and the root grows past
 # the bound. The watch exits 96 (unmeasured), not 98, so no memory retry can follow.
+# (Main 1846 F3) A short loss counts the same: readers fail for about 2 s only, the
+# table recovers, and the root still exits 96.
 # The control: with the table working throughout, the same growth ends with 98.
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured() {
   if [ "$(uname)" != Darwin ]; then
@@ -5710,27 +5458,27 @@ test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured() {
   cat > "$tmp/root.sh" <<'SH'
 perl -e 'my $mib = shift; sleep 6; my $held = "x" x ($mib * 1024 * 1024); sleep 3' 160
 SH
-  for label in loss control; do
+  for label in loss short control; do
     until_epoch=0
     [ "$label" = loss ] && until_epoch=$(( $(date +%s) + 5 ))
+    [ "$label" = short ] && until_epoch=$(( $(date +%s) + 2 ))
     rc=0
     FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=exit \
       FM_TEST_WATCH_TABLE="failuntil:$until_epoch" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- bash "$tmp/root.sh" > "$tmp/err.$label" 2>&1 || rc=$?
-    if [ "$label" = loss ]; then
-      [ "$rc" -eq 96 ] || fail "a root unmeasured for its first ticks and later over the bound exited $rc, expected 96: $(cat "$tmp/err.$label") $(cat "$tmp/rss.$label")"
+    if [ "$label" != control ]; then
+      [ "$rc" -eq 96 ] || fail "a root unmeasured for its first ticks ($label) and later over the bound exited $rc, expected 96: $(cat "$tmp/err.$label") $(cat "$tmp/rss.$label")"
       grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" || fail "the unmeasured interval was not recorded: $(cat "$tmp/rss.$label")"
     else
       [ "$rc" -eq 98 ] || fail "the control over the bound exited $rc, expected 98: $(cat "$tmp/err.$label")"
     fi
   done
-  pass "a root unmeasured for an interval and later over the bound exits 96 (unmeasured), not 98; measured throughout, the same growth exits 98"
+  pass "a root unmeasured for an interval, long or short, and later over the bound exits 96 (unmeasured), not 98; measured throughout, the same growth exits 98"
 }
 
-# (Main 1806 item 5) A compiled launcher that runs delegate A or B (one version, chosen
-# by a file) with the cache on: after A passed, B's run misses and reports B's finding;
-# back to A, A's success is reused (the control). The delegate is identified from what
-# the version probe was seen to run.
+# (Main 1806 item 5, Main 1862) A compiled launcher that runs delegate A or B (one
+# version, chosen by a file): every run is analysed, so after A passed B's finding is
+# reported, and back on A the run is analysed again.
 fm_lint_compiled_launcher_with_delegates() {  # <dir> <choice file>; 1 without cc
   local dir=$1 choice=$2 name
   command -v cc >/dev/null 2>&1 || return 1
@@ -5766,31 +5514,41 @@ C
   cc -o "$dir/bin/shellcheck" "$dir/launcher.c" 2>/dev/null || return 1
 }
 
-test_a_compiled_launcher_switching_delegates_misses_the_cache_and_reuses_its_own() {
+test_a_compiled_launcher_switching_delegates_is_analysed_every_run() {
   local tmp repo rc
   tmp=$(fm_test_tmproot fm-lint-compiled-delegates)
   repo=$(fm_lint_isolated_copy "$tmp" compiled)
   printf 'a\n' > "$tmp/choice"
   fm_lint_compiled_launcher_with_delegates "$tmp/c" "$tmp/choice" || { pass "SKIP (no C compiler): compiled launcher delegates"; return; }
   rc=0
-  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a1.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fail "delegate A's first run failed ($rc): $(cat "$tmp/a1.out")"
-  ! grep -q 'could not be positively identified' "$tmp/a1.out" || fail "delegate A was not identified, so the cache was off: $(cat "$tmp/a1.out")"
   printf 'b\n' > "$tmp/choice"
   rc=0
-  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/b.out" 2>&1 ) || rc=$?
-  [ "$rc" -eq 1 ] || fail "delegate B reused delegate A's success through the unchanged launcher (exit $rc): $(cat "$tmp/b.out")"
+  [ "$rc" -eq 1 ] || fail "delegate B's run through the unchanged launcher did not report its finding (exit $rc): $(cat "$tmp/b.out")"
   grep -q 'SC9997' "$tmp/b.out" || fail "delegate B's finding was not reported: $(cat "$tmp/b.out")"
   printf 'a\n' > "$tmp/choice"
-  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a2.out" 2>&1 ) || fail "delegate A's second run failed: $(cat "$tmp/a2.out")"
-  grep -q 'cache hit bin/consumer[.]sh' "$tmp/a2.out" || fail "delegate A did not reuse its own success: $(cat "$tmp/a2.out")"
-  pass "with the cache on, a compiled launcher switched to delegate B missed A's success and reported B's finding; back on A it reused A's own success"
+  ! grep -q 'cache hit' "$tmp/a1.out" "$tmp/b.out" "$tmp/a2.out" || fail "a run reported a reused analysis result"
+  pass "a compiled launcher switched to delegate B reported B's finding, and every run, back on A included, was analysed"
+}
+# (Main 1846 F1-F3, F5; Main 1862) The watch's, the gate's and the signal helper's
+# decisions on synthetic input: tests/fm-lint-watch-decisions.py takes each rule out
+# of bin/fm-lint-cache.pl and runs it in a foreground interpreter; it starts no lint,
+# watch, gate or background process and sends no signal.
+test_watch_gate_and_signal_decisions_hold_on_synthetic_input() {
+  local out rc=0
+  out=$(python3 -I "$ROOT/tests/fm-lint-watch-decisions.py" "$ROOT" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a watch, gate or signal decision failed:"$'\n'"$out"
+  pass "the watch's tick and exit rules, the measurement record, reply binding, group-only signals and the removed cache hold on synthetic input ($(printf '%s\n' "$out" | grep -c '^ok - ') cases)"
 }
 
 fm_lint_test_cases=(
+test_watch_gate_and_signal_decisions_hold_on_synthetic_input
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
 test_oversubscribed_runs_share_the_cap_and_all_finish
@@ -5801,8 +5559,6 @@ test_stopped_head_waiter_does_not_block_the_queue
 test_stopped_admission_coordinator_does_not_freeze_free_capacity
 test_slow_ps_does_not_hold_admission_against_the_next_root
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
-test_cached_success_does_not_wait_for_host_slots
-test_a_warm_cache_hit_behind_an_occupied_budget_reserves_nothing_and_waits_for_nothing
 test_runs_with_different_delegates_each_probe_their_own_shellcheck
 test_a_compiled_launcher_is_probed_every_run_and_its_delegates_version_decides
 test_a_wrapper_around_shellcheck_is_probed_every_run_and_its_current_version_decides
@@ -5859,8 +5615,8 @@ test_rss_shim_that_resolves_to_itself_is_refused
 test_resident_watch_reads_only_its_own_tree
 test_resident_watch_bounds_footprint_beyond_resident
 test_resident_watch_ends_a_tree_whose_memory_sits_in_descendants_and_an_orphan
-test_the_watch_ends_a_descendant_that_left_the_process_group
-test_the_watch_signals_a_process_only_when_its_start_time_still_matches
+test_a_descendant_that_left_the_group_and_outlives_the_root_fails_it_unsignalled
+test_the_signal_helper_sends_only_to_a_process_group
 test_the_watch_never_ends_an_unrelated_process_that_holds_a_members_old_pid
 test_the_watch_never_signals_a_member_known_only_by_its_start_second
 test_a_restarted_reader_keeps_a_member_that_left_the_group_and_was_orphaned
@@ -5869,18 +5625,17 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted
 test_a_same_second_replacement_is_not_counted_against_the_root
 test_the_exact_member_reader_counts_only_an_unchanged_identity
 test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends
-test_a_launcher_switching_to_another_delegate_of_one_version_never_reuses_its_success
+test_a_launcher_switching_delegates_is_analysed_every_run
 test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root
 test_the_exact_member_reader_adopts_a_child_only_with_its_listed_identity
 test_an_empty_or_damaged_lane_record_holds_the_lane
 test_a_stale_measurement_record_admits_no_new_root
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
-test_a_compiled_launcher_switching_delegates_misses_the_cache_and_reuses_its_own
+test_a_compiled_launcher_switching_delegates_is_analysed_every_run
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
 test_resident_watch_samples_a_slow_later_reply_by_ps
 test_resident_watch_retries_a_replacement_that_exits
 test_resident_watch_gives_up_after_three_failed_restarts
-test_cache_key_wait_preserves_root_retry_budget
 )
 fm_lint_run "$@"

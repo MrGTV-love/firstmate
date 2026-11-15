@@ -23,8 +23,6 @@ LINT="$ROOT/bin/fm-lint.sh"
 INSTALLER="$ROOT/bin/fm-install-shellcheck.sh"
 # The pinned version, read from the single source (the one owner itself).
 REQUIRED=$("$LINT" --required-version)
-# Ordinary regressions must not read or populate the operator's shared cache.
-export FM_LINT_CACHE_DIR=off
 # Nor may they queue in the operator's live host pool: every lint run of these
 # suites uses this suite's own fixture pool, which the gate still bounds host-wide
 # by the growth guard and the outside count. A test that proves the default host

@@ -429,19 +429,19 @@ test_ci_forces_full_lint_even_with_empty_diff() {
     "$repo/bin/fm-lint.sh" --list-files)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "CI=true did not force the full canonical file set"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
-    || fail "local cache warm-up failed: $out"
+    || fail "local run before the CI runs failed: $out"
   for run in 1 2; do
     : > "$log"
-    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' \
       FM_TEST_GIT_DIFF_FILE="$diff_file" \
       "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || fail "CI inventory lint failed: $out"
     [ "$(LC_ALL=C sort "$log")" = "$expected" ] \
-      || fail "CI run $run did not analyze the complete uncached inventory: $(cat "$log")"
-    assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
+      || fail "CI run $run did not analyze the complete inventory: $(cat "$log")"
+    assert_not_contains "$out" 'cache hit ' "CI reused a local lint success"
   done
-  pass "CI=true checks the complete uncached inventory even with an empty diff"
+  pass "CI=true checks the complete inventory even with an empty diff"
 }
 
 test_main_branch_forces_full_lint() {
