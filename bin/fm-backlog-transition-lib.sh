@@ -1042,12 +1042,13 @@ fm_backlog_record_remove() {
 # that rm -f meets; elsewhere, the directory's write and search permission, the
 # sticky-bit ownership rule, and the Linux immutable and append-only attributes
 # of the entry and its directory where they can be read. An absent path passes.
-# A cause neither covers, or a host without python3, passes too, and the removal
-# itself still refuses it.
+# It refuses on doubt: a host without python3, or a check that cannot complete,
+# fails, so the caller refuses before its first mutation. A cause the checks do
+# not cover passes, and the removal itself still refuses it.
 fm_backlog_path_deletable() {  # <path>
   local rc=0
   { [ -e "$1" ] || [ -L "$1" ]; } || return 0
-  command -v python3 >/dev/null 2>&1 || return 0
+  command -v python3 >/dev/null 2>&1 || return 1
   python3 -I -c '
 import ctypes, ctypes.util, os, stat, sys
 path = sys.argv[1]
@@ -1078,7 +1079,7 @@ if sys.platform.startswith("linux"):
             sys.exit(3)
 sys.exit(0)
 ' "$1" >/dev/null 2>&1 || rc=$?
-  [ "$rc" != 3 ]
+  [ "$rc" = 0 ]
 }
 
 # Whether fm_backlog_record_remove would remove <path> now, decided without

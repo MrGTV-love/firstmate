@@ -2179,9 +2179,13 @@ fm_teardown_return_pending_gen() {  # <file>; prints the last spawn_gen= value
   printf '%s' "$value"
 }
 
+# A marker that is a symbolic link, to any target, is not proof that the slot is
+# settled, so while the record exists it counts as pending.
 fm_teardown_return_pending() {  # <state-dir> <id>
   local marker="$1/$2.teardown-return-pending" meta="$1/$2.meta" marked current
-  [ -f "$marker" ] && [ ! -L "$marker" ] && [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
+  [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
+  [ ! -L "$marker" ] || return 0
+  [ -f "$marker" ] || return 1
   marked=$(fm_teardown_return_pending_gen "$marker") || return 1
   current=$(fm_teardown_return_pending_gen "$meta") || return 1
   [ "$marked" = "$current" ]

@@ -2365,40 +2365,70 @@ teardown_busy_retire_ready() {  # <state-dir> <id> <gen>
 # still claims it, printed; fails when there is no such record, it names no
 # slot, or the slot's claim does not name this task. That slot still awaits its
 # return, so the task record and the return-pending record are retired only
-# after it is returned, or while this close holds it on purpose. A scout keeps
-# its own route, which returns only its copy and leaves the slot's claim, so a
-# scout's record never owes a slot here.
+# after it is returned, or while this close holds it on purpose. A record that
+# is a symbolic link, to any target, is not proof that the slot is settled:
+# it is read through the link, and when no claimed slot can be read from it,
+# an empty slot is printed and it still counts as owed. A scout keeps its own
+# route, which returns only its copy and leaves the slot's claim, so a scout's
+# record never owes a slot here.
 teardown_return_pending_owed_slot() {
-  local marker="$STATE/$ID.teardown-return-pending" slot
+  local marker="$STATE/$ID.teardown-return-pending" slot=
   [ "$KIND" != scout ] || return 1
-  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
-  slot=$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)
-  [ -n "$slot" ] && [ -d "$slot" ] || return 1
+  if [ -L "$marker" ]; then
+    [ ! -f "$marker" ] || slot=$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)
+    [ -n "$slot" ] && [ -d "$slot" ] || return 0
+  else
+    [ -f "$marker" ] || return 1
+    slot=$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)
+    [ -n "$slot" ] && [ -d "$slot" ] || return 1
+  fi
   fm_treehouse_slot_owner_state "$slot" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || return 1
   fm_task_copy_canonical_dir "$slot"
 }
 
+# What an owed slot is, for a refusal: the slot, and whether the record that
+# names it is a symbolic link.
+teardown_owed_slot_text() {  # <owed-slot-or-empty>
+  local marker="$STATE/$ID.teardown-return-pending" text
+  if [ -n "$1" ]; then text="pool slot $1, which task $ID still claims"; else text="a pool slot that cannot be read from it"; fi
+  [ ! -L "$marker" ] || text="$text (the return-pending record $marker is a symbolic link, which does not prove the slot settled)"
+  printf '%s' "$text"
+}
+
 # The backstop, just before the task record is retired, for a slot this run
 # meant to return but did not: while a return-pending record names a slot the
-# task still claims, and this close does not hold that slot on purpose (a held
-# or peer close), it refuses so the task record and that record are kept.
+# task still claims, or is a link, and this close does not hold that slot on
+# purpose (a held or peer close), it refuses so the task record and that record
+# are kept.
 teardown_owed_slot_settled() {
   local owed candidate
   [ "$KIND" != secondmate ] || return 0
   owed=$(teardown_return_pending_owed_slot) || return 0
-  for candidate in "$TEARDOWN_HELD_SLOT" "$TEARDOWN_PEER_SLOT"; do
-    [ -n "$candidate" ] || continue
-    [ "$(fm_task_copy_canonical_dir "$candidate" 2>/dev/null)" != "$owed" ] || return 0
-  done
-  echo "REFUSED: pool slot $owed is still claimed by task $ID and its return-pending record says it awaits its return, which this run did not complete; the task record and the return-pending record are kept for a retry" >&2
+  if [ -n "$owed" ]; then
+    for candidate in "$TEARDOWN_HELD_SLOT" "$TEARDOWN_PEER_SLOT"; do
+      [ -n "$candidate" ] || continue
+      [ "$(fm_task_copy_canonical_dir "$candidate" 2>/dev/null)" != "$owed" ] || return 0
+    done
+  fi
+  echo "REFUSED: task $ID's return-pending record names $(teardown_owed_slot_text "$owed"), and this run did not return it; the task record and the return-pending record are kept for a retry" >&2
   return 1
 }
 
 # Whether <slot> is one this teardown returns or holds: its enclosing, return,
 # held, peer or shared slot, or its own copy when that copy is the pool slot.
-teardown_route_covers_slot() {  # <canonical-slot>
+# For a slot that cannot be read (empty), whether this teardown takes any slot
+# route at all: its reservation then rewrites the record with the slot it holds.
+teardown_route_covers_slot() {  # <canonical-slot-or-empty>
   local candidate real
+  if [ -z "$1" ]; then
+    for candidate in "$TEARDOWN_ENCLOSING_SLOT" "$TEARDOWN_RETURN_SLOT" "$TEARDOWN_HELD_SLOT" \
+        "$TEARDOWN_PEER_SLOT" "$TEARDOWN_SHARED_SLOT"; do
+      [ -z "$candidate" ] || return 0
+    done
+    fm_treehouse_pool_slot "$PROJ" "$WT"
+    return
+  fi
   for candidate in "$TEARDOWN_ENCLOSING_SLOT" "$TEARDOWN_RETURN_SLOT" "$TEARDOWN_HELD_SLOT" \
       "$TEARDOWN_PEER_SLOT" "$TEARDOWN_SHARED_SLOT" "$WT"; do
     [ -n "$candidate" ] || continue
@@ -2406,6 +2436,27 @@ teardown_route_covers_slot() {  # <canonical-slot>
     [ "$real" != "$1" ] || return 0
   done
   return 1
+}
+
+# The task's runtime records teardown removes in one rm -f after its status is
+# retired, in TEARDOWN_RUNTIME_PATHS; the entry preflight checks the same list.
+TEARDOWN_RUNTIME_PATHS=()
+teardown_task_runtime_paths() {
+  TEARDOWN_RUNTIME_PATHS=("$STATE/$ID.turn-ended" "$STATE/$ID.progress"
+    "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")"
+    "$STATE/$ID.pi-ext.ts" "$STATE/$ID.omp-ext.ts" "$STATE/$ID.omp-fallback.yml" "$STATE/$ID.live-model"
+    "$STATE/$ID.grok-turnend-token"
+    "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" "$STATE/$ID.write-confinement.sb"
+    "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session"
+    "$STATE/$ID.muse-session-current" "$STATE/$ID.cursor-session"
+    "$STATE/$ID.control-relaunch" "$STATE/$ID.control-relaunch.meta-prior"
+    "$STATE/$ID.control-relaunch.brief-prior" "$STATE/$ID.control-relaunch.note"
+    "$STATE/$ID.reconcile-nudged" "$STATE/$ID.gemini-settings.json"
+    "$STATE/$ID.claude-settings.json" "$STATE/$ID.devin-config.json" "$STATE/$ID.dsh-session"
+    "$STATE/.$ID.branch-outcome-index"
+    "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID"
+    "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID"
+    "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity")
 }
 
 # One state record teardown removes later with rm -f, checked now: absent, or an
@@ -2493,6 +2544,10 @@ teardown_entry_preflight() {
       "$(status_daemon_seen_marker_path "$STATE" "$ID")"; do
     teardown_preflight_removable "$path" "status record" || return 1
   done
+  teardown_task_runtime_paths
+  for path in "${TEARDOWN_RUNTIME_PATHS[@]}"; do
+    teardown_preflight_removable "$path" "runtime record" || return 1
+  done
   if ! status_retire_presentation_task_ready "$STATE" "$ID"; then
     TEARDOWN_PREFLIGHT_ERROR="the shared status manifest $STATE/.status-presentation-cursor cannot be retired for task $ID (not a readable regular file, a row that does not parse, or a state directory that cannot be written)"
     return 1
@@ -2502,7 +2557,7 @@ teardown_entry_preflight() {
   fi
   if [ "$KIND" != secondmate ] && owed=$(teardown_return_pending_owed_slot) \
      && ! teardown_route_covers_slot "$owed"; then
-    TEARDOWN_PREFLIGHT_ERROR="task $ID's return-pending record names pool slot $owed, which the task still claims, but this teardown found no route that returns or holds that slot, so neither record may be retired"
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's return-pending record names $(teardown_owed_slot_text "$owed"), but this teardown found no route that returns or holds that slot, so neither record may be retired"
     return 1
   fi
   if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ] \
@@ -7069,21 +7124,8 @@ retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" cleaned_up "$ID" || true
 status_retire_presentation_task "$STATE" "$ID" || exit 1
 fm_wake_queue_prune_task "$STATE" "$ID" "$T" 2>/dev/null || true
-rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
-  "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
-  "$STATE/$ID.pi-ext.ts" "$STATE/$ID.omp-ext.ts" "$STATE/$ID.omp-fallback.yml" "$STATE/$ID.live-model" \
-  "$STATE/$ID.grok-turnend-token" \
-  "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" "$STATE/$ID.write-confinement.sb" \
-  "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
-  "$STATE/$ID.muse-session-current" "$STATE/$ID.cursor-session" \
-  "$STATE/$ID.control-relaunch" "$STATE/$ID.control-relaunch.meta-prior" \
-  "$STATE/$ID.control-relaunch.brief-prior" "$STATE/$ID.control-relaunch.note" \
-  "$STATE/$ID.reconcile-nudged" "$STATE/$ID.gemini-settings.json" \
-  "$STATE/$ID.claude-settings.json" "$STATE/$ID.devin-config.json" "$STATE/$ID.dsh-session" \
-  "$STATE/.$ID.branch-outcome-index" \
-  "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
-  "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
-  "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
+teardown_task_runtime_paths
+rm -f "${TEARDOWN_RUNTIME_PATHS[@]}"
 # The steering inbox (bin/fm-task-inbox-lib.sh) is runtime state for the
 # retired endpoint; teardown only runs after landing is confirmed, so any
 # leftover unhandled steer here is moot rather than unlanded work.

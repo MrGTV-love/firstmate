@@ -552,8 +552,11 @@ status_daemon_seen_marker_path() {  # <state> <task-id>
 # refuse before its own first mutation: absent, or a readable regular file that
 # is not a link and whose rows all parse. When the retirement will rewrite the
 # manifest (the task has a status record or a manifest row), the state
-# directory must also be writable. Sets STATUS_RETIRE_REWRITES to 1 when the
-# manifest itself will be replaced, so the caller can check that it can be.
+# directory must also be writable, and the temporary file the retirement writes
+# beside the manifest (named for this shell's pid, as there) must be absent or
+# a writable regular file that is not a link. Sets STATUS_RETIRE_REWRITES to 1
+# when the manifest itself will be replaced, so the caller can check that it can
+# be.
 # shellcheck disable=SC2034 # STATUS_RETIRE_REWRITES is read by callers.
 STATUS_RETIRE_REWRITES=0
 # shellcheck disable=SC2034 # STATUS_RETIRE_REWRITES is read by callers.
@@ -582,6 +585,9 @@ EOF
   fi
   if [ "$found" = 1 ]; then
     [ -d "$state" ] && [ -w "$state" ] && [ -x "$state" ] || return 1
+  fi
+  if [ "$STATUS_RETIRE_REWRITES" = 1 ] && { [ -e "$manifest.tmp.$$" ] || [ -L "$manifest.tmp.$$" ]; }; then
+    [ -f "$manifest.tmp.$$" ] && [ ! -L "$manifest.tmp.$$" ] && [ -w "$manifest.tmp.$$" ] || return 1
   fi
   return 0
 }

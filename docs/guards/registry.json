@@ -2251,7 +2251,7 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: pool slot $owed is still claimed by task $ID and its return-pending record says it awaits its return, which this run did not complete; the task record and the return-pending record are kept for a retry\" >&2"
+          "match": "echo \"REFUSED: task $ID's return-pending record names $(teardown_owed_slot_text \"$owed\"), and this run did not return it; the task record and the return-pending record are kept for a retry\" >&2"
         }
       ]
     },
