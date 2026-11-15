@@ -168,9 +168,13 @@
 # key, a lone -- ends the options where an option may stand, and the first word
 # that is not an option starts the message. --answers-none and any --resolve-key
 # form, both as options, are the pair, so it wins over any option error, such as a
-# malformed or duplicate --resolve-key. A key never starts with -, so a
-# --resolve-key whose next word starts with - is refused there too (and
-# --resolve-key --answers-none is the pair). Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
+# malformed or duplicate --resolve-key; a split-form value that is exactly
+# --answers-none (--resolve-key --answers-none) counts as that flag too. A message
+# word before a lone -- that is exactly --answers-none or a --resolve-key form is
+# refused at the same point ("a message word looks like a choice flag"), so text
+# that starts with a flag goes after --. The split form --resolve-key <value> takes
+# no value that starts with -; that is a held option error, and such a key is
+# answered with the = form (--resolve-key=-urgent). Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
 # as a security guard, and may write its one guard event: to
 # state/guard-events.jsonl by default, or, with an explicit FM_GUARD_EVENT_LOG,
 # to that log, creating its directory when needed, as on base
@@ -182,7 +186,8 @@
 # guard's allow event is recorded (also for a send with no arguments, an unknown
 # home or state directory, and an unresolvable target) and the lease guard runs
 # before an option error
-# (a malformed, duplicate or missing --resolve-key or --fire-and-forget value) is
+# (a malformed, duplicate or missing --resolve-key or --fire-and-forget value, or a
+# split-form --resolve-key value that starts with -) is
 # reported, so a send under the other actor's live lease still exits 6. A --key send and
 # a send to an explicit backend target cannot answer a decision, so the rule
 # does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
@@ -296,17 +301,18 @@ fi
 #   FM_TOK_END         1 when a lone -- ended the options
 #   FM_TOK_WORDS       how many words the options took (the message starts after them)
 #   FM_TOK_ERROR       the first option error, held for the base order below
-#   FM_TOK_DASH_KEY    the first --resolve-key value that starts with -, refused at once
-# After an option error the walk goes on with the same grammar, so a pair after the error
-# is still seen; its keys and words are then unused, because the send stops.
+#   FM_TOK_FLAG_WORD   the first message word before a lone -- that is exactly
+#                      --answers-none or a --resolve-key form (refused at once)
+# The split form --resolve-key <value> always takes the next word as the value, whatever it
+# starts with. A value that starts with - is a held option error there (a key that starts
+# with - is answered with the = form, --resolve-key=-urgent); a value that is exactly
+# --answers-none also counts as that flag, so the pair is still seen. After an option error
+# the walk goes on with the same grammar, so a pair after the error is still seen; its keys
+# and words are then unused, because the send stops.
 fm_send_tok_error() { [ -n "$FM_TOK_ERROR" ] || FM_TOK_ERROR=$1; }
 fm_send_tok_key() { # <key>
   local k=$1
   case "$k" in
-  -*)
-    [ -n "$FM_TOK_DASH_KEY" ] || FM_TOK_DASH_KEY=$k
-    return 0
-    ;;
   '' | *[!A-Za-z0-9._-]*)
     fm_send_tok_error "error: --resolve-key '$k' is not a valid decision key (allowed: A-Z a-z 0-9 . _ -)"
     return 0
@@ -321,8 +327,8 @@ fm_send_tok_key() { # <key>
   FM_TOK_KEYS="${FM_TOK_KEYS}${FM_TOK_KEYS:+ }$k"
 }
 fm_send_tokenize() { # <words after the target...>
-  local n=0
-  FM_TOK_KEYS='' FM_TOK_NONE=0 FM_TOK_KEY_SEEN=0 FM_TOK_FAF='' FM_TOK_END=0 FM_TOK_ERROR='' FM_TOK_DASH_KEY=''
+  local n=0 word
+  FM_TOK_KEYS='' FM_TOK_NONE=0 FM_TOK_KEY_SEEN=0 FM_TOK_FAF='' FM_TOK_END=0 FM_TOK_ERROR='' FM_TOK_FLAG_WORD=''
   while [ $# -gt 0 ]; do
     case "$1" in
     --resolve-key)
@@ -332,11 +338,11 @@ fm_send_tokenize() { # <words after the target...>
         shift
         n=$((n + 1))
       elif [ "${2#-}" != "$2" ]; then
-        # A key never starts with -: the next word stays a word of its own (an option,
-        # or the lone -- that ends the options), and this --resolve-key is refused.
-        fm_send_tok_key "$2"
-        shift
-        n=$((n + 1))
+        # The split form takes no value that starts with -: held as an option error.
+        [ "$2" != --answers-none ] || FM_TOK_NONE=1
+        fm_send_tok_error "error: --resolve-key '$2': the split form takes no key that starts with -; give such a key as --resolve-key=<key>, and put -- before message text that starts with a flag. Refusing it; nothing was sent."
+        shift 2
+        n=$((n + 2))
       else
         fm_send_tok_key "$2"
         shift 2
@@ -383,19 +389,33 @@ fm_send_tokenize() { # <words after the target...>
     esac
   done
   FM_TOK_WORDS=$n
+  # The message words before a lone --: one that is exactly --answers-none or a
+  # --resolve-key form looks like a choice flag. A --key send's words are no message.
+  if [ "$FM_TOK_END" = 0 ] && [ "${1:-}" != --key ]; then
+    for word in "$@"; do
+      case "$word" in
+      --) break ;;
+      --answers-none | --resolve-key | --resolve-key=*)
+        FM_TOK_FLAG_WORD=$word
+        break
+        ;;
+      esac
+    done
+  fi
 }
 # The contradictory pair (--answers-none and any --resolve-key form, both as options in
-# that grammar) and a --resolve-key value that starts with - are refused here, before any
-# side effect: before the explicit-home allow, the supervision warning, the lease guard and
-# target resolution. The pair is reported first when both apply.
-FM_TOK_WORDS=0 FM_TOK_KEYS='' FM_TOK_NONE=0 FM_TOK_KEY_SEEN=0 FM_TOK_FAF='' FM_TOK_END=0 FM_TOK_ERROR='' FM_TOK_DASH_KEY=''
+# that grammar) and a message word that looks like a choice flag are refused here, before
+# any side effect: before the explicit-home allow, the supervision warning, the lease guard
+# and target resolution. The pair is reported first when both apply. Every other option
+# error, a split-form key that starts with - included, is held for the base order below.
+FM_TOK_WORDS=0 FM_TOK_KEYS='' FM_TOK_NONE=0 FM_TOK_KEY_SEEN=0 FM_TOK_FAF='' FM_TOK_END=0 FM_TOK_ERROR='' FM_TOK_FLAG_WORD=''
 [ $# -eq 0 ] || fm_send_tokenize "${@:2}"
 if [ "$FM_TOK_NONE" = 1 ] && [ "$FM_TOK_KEY_SEEN" = 1 ]; then
   echo "error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent." >&2
   exit 1
 fi
-if [ -n "$FM_TOK_DASH_KEY" ]; then
-  echo "error: --resolve-key '$FM_TOK_DASH_KEY' is not a valid decision key: a key never starts with - (allowed: A-Z a-z 0-9 . _ -, not first -). Put the key right after --resolve-key, and a lone -- before a message that starts with -. Nothing was sent." >&2
+if [ -n "$FM_TOK_FLAG_WORD" ]; then
+  echo "error: a message word looks like a choice flag ($FM_TOK_FLAG_WORD); put -- before message text that starts with a flag. Refusing it; nothing was sent." >&2
   exit 1
 fi
 

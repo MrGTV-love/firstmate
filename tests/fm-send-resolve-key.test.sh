@@ -117,6 +117,22 @@ drain_out() {  # <home>
   FM_STATE_OVERRIDE="$1/state" "$DRAIN" 2>/dev/null
 }
 
+# A key that starts with - is a valid key of the fold; it is answered with the = form.
+test_dash_key_is_answered_with_the_equals_form() {
+  local dir fb log home rc
+  dir="$TMP_ROOT/dash-key"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_home dash-key)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'blocked [key=-urgent]: choose\n' > "$home/state/t1.status"
+  run_send "$fb" "$home" "$log" t1 --resolve-key=-urgent "go with the fix"; rc=$?
+  expect_code 0 "$rc" "--resolve-key=-urgent answers the open -urgent key"
+  grep -qF "go with the fix" "$home/state/t1.inbox/001.msg" || fail "the answer did not reach the inbox record"
+  fm_test_fold "$home/state/t1.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the -urgent key is still open after its = form answer: $FM_TEST_FOLD"
+  pass "fm-send --resolve-key: a key that starts with - is answered and closed with the = form"
+}
+
 test_answer_send_closes_open_decision() {
   local dir fb log home rc out
   dir="$TMP_ROOT/closes"; mkdir -p "$dir"
@@ -1104,6 +1120,9 @@ test_held_lease_answers_6_before_an_option_error() {
   assert_not_contains "$(cat "$err")" "not a valid decision key" "the option error is not reported while the lease refuses"
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 --resolve-key k1 "answer"; rc=$?
   expect_code 6 "$rc" "a duplicate key under the live lease exits 6: $(cat "$err")"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key -x "answer"; rc=$?
+  expect_code 6 "$rc" "a split-form key that starts with - is a held option error, so the live lease answers 6 first: $(cat "$err")"
+  assert_not_contains "$(cat "$err")" "split form takes no key" "the held dash-key error is not reported while the lease refuses"
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "answer"; rc=$?
   expect_code 6 "$rc" "a valid key under the live lease exits 6 (control): $(cat "$err")"
   [ ! -e "$home/state/t1.inbox" ] || fail "a lease-refused send was delivered"
@@ -1113,6 +1132,10 @@ test_held_lease_answers_6_before_an_option_error() {
   expect_code 1 "$rc" "with no live lease a malformed key is refused with 1 (control)"
   assert_contains "$(cat "$err")" "not a valid decision key" "the option error names the bad key"
   [ ! -e "$home/state/t1.inbox" ] || fail "a malformed-key send was delivered"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key -x "answer"; rc=$?
+  expect_code 1 "$rc" "with no live lease a split-form dash key is refused with 1 (control)"
+  assert_contains "$(cat "$err")" "split form takes no key that starts with -" "the held dash-key error is reported after the guards"
+  [ ! -e "$home/state/t1.inbox" ] || fail "a split-form dash-key send was delivered"
   pass "fm-send: a held lease answers 6 before an option error, as on base; with no lease the option error answers 1"
 }
 
@@ -1162,10 +1185,12 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   # both standing as options (one grammar, fm_send_tokenize), nothing but the gate event
   # is recorded, no supervision warning is printed and the stale lease is untouched. Each
   # case is the whole argument list after the target, so the last one really leaves
-  # --resolve-key without a value; a key never starts with -, so in
-  # --resolve-key --answers-none the none flag stands as an option and it is the pair too.
+  # --resolve-key without a value. The split form takes the next word as its value, so
+  # after --resolve-key -x or --resolve-key -- the none flag is still seen; a value that
+  # is exactly --answers-none counts as that flag (--resolve-key --answers-none).
   for pair in "--answers-none --resolve-key k1 --resolve-key k1 go" "--answers-none --resolve-key=bad@ go" \
-    "--resolve-key=bad@ --answers-none go" "--resolve-key --answers-none answer" "--answers-none --resolve-key"; do
+    "--resolve-key=bad@ --answers-none go" "--resolve-key --answers-none answer" "--answers-none --resolve-key" \
+    "--resolve-key -x --answers-none answer" "--resolve-key -- --answers-none go"; do
     # shellcheck disable=SC2086 # Word-split on purpose: each case is an argument list.
     refusal_env_send "$fb" "$home" "$log" "$err" t1 $pair; rc=$?
     expect_code 1 "$rc" "the pair with an option error ($pair) refuses with exit 1: $(cat "$err")"
@@ -1174,18 +1199,16 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
     assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "pair with an option error ($pair)"
     assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the pair refusal ($pair)"
   done
-  # A key never starts with -: --resolve-key -- (Main 1866 G1) is refused as an invalid
-  # key at the same point, before any side effect; the -- is not taken as the key, and
-  # the --answers-none after it is message text, not the pair.
-  for dashkey in "--resolve-key -- --answers-none go" "--resolve-key=-x go" "--resolve-key -k1 go"; do
+  # A message word before a lone -- that is exactly --answers-none or a --resolve-key form
+  # looks like a choice flag and is refused at the same point (Main 1880 F2).
+  for flagword in "--resolve-key k1 go --answers-none" "--resolve-key k1 go --resolve-key=k2" "--answers-none go --resolve-key k1"; do
     # shellcheck disable=SC2086 # Word-split on purpose: each case is an argument list.
-    refusal_env_send "$fb" "$home" "$log" "$err" t1 $dashkey; rc=$?
-    expect_code 1 "$rc" "a key that starts with - ($dashkey) is refused with exit 1: $(cat "$err")"
-    assert_contains "$(cat "$err")" "a key never starts with -" "the dash-key refusal is the one reported ($dashkey)"
-    assert_not_contains "$(cat "$err")" "contradict each other" "a dash key is not the pair ($dashkey)"
-    assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the dash-key refusal ($dashkey)"
-    assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "dash-key refusal ($dashkey)"
-    assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the dash-key refusal ($dashkey)"
+    refusal_env_send "$fb" "$home" "$log" "$err" t1 $flagword; rc=$?
+    expect_code 1 "$rc" "a flag-like message word ($flagword) is refused with exit 1: $(cat "$err")"
+    assert_contains "$(cat "$err")" "a message word looks like a choice flag" "the flag-word refusal is the one reported ($flagword)"
+    assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the flag-word refusal ($flagword)"
+    assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "flag-word refusal ($flagword)"
+    assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the flag-word refusal ($flagword)"
   done
 
   { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t1.status"
@@ -1241,7 +1264,7 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   expect_code 3 "$rc" "a gate agent outside a lab home is refused by containment first"
   assert_contains "$(cat "$err")" "gate agent must not drive the fleet" "the containment refusal is the one shown"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "deny"' "denied gate agent"
-  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error), dash-key and unknown-open-set refusals; telemetry, banner and lease come after"
+  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error), flag-like message word and unknown-open-set refusals; telemetry, banner and lease come after"
 }
 
 # -- ends the options, so a literal body that starts with -- can be sent, and
@@ -1611,6 +1634,7 @@ EOF
 }
 
 test_answer_send_closes_open_decision
+test_dash_key_is_answered_with_the_equals_form
 test_answer_close_is_self_announced
 test_separate_resolve_key_answers_do_not_rewake
 test_colon_first_key_position_is_answerable
