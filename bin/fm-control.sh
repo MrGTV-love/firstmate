@@ -1409,9 +1409,19 @@ if [ -n "$(fm_meta_get "$META" remote_host)" ]; then
   die "task $ID is a remotely placed secondmate on $(fm_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane"
 fi
 
+# A caller that compared this task's endpoint (bin/fm-secondmate-restart.sh,
+# directly or through the host relaunch verb) sets FM_CONTROL_EXPECTED_ENDPOINT,
+# and the validated endpoint must be exactly that one before any lifecycle step
+# (Main 1856 F3). Unset, nothing changes.
+fm_control_require_expected_endpoint() { # <validated-endpoint>
+  [ -z "${FM_CONTROL_EXPECTED_ENDPOINT:-}" ] || [ "$1" = "$FM_CONTROL_EXPECTED_ENDPOINT" ] \
+    || die "task $ID's endpoint is '$1', not the compared endpoint '$FM_CONTROL_EXPECTED_ENDPOINT'; refusing before any lifecycle step"
+}
+
 fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
 BACKEND=$FM_BACKEND_VALIDATED_BACKEND
 T=$FM_BACKEND_VALIDATED_TARGET
+fm_control_require_expected_endpoint "$T"
 LABEL="fm-$ID"
 RECORDED_HARNESS=$(fm_meta_get "$META" harness)
 KIND=$(fm_meta_get "$META" kind)
@@ -1496,7 +1506,8 @@ busy_verdict() {
 }
 
 # ATTRIBUTION_REFUSAL carries the cause a refusal names: the verdict is read once
-# by fm_launch_proof_herdr_refusal, and every refusing site appends its text.
+# by fm_launch_proof_herdr_refusal, bound to the endpoint T every delivery uses
+# (Main 1856 F2), and every refusing site appends its text.
 ATTRIBUTION_REFUSAL=''
 require_live_task_attribution() {
   local state=${1:-} absence
@@ -1512,7 +1523,13 @@ require_live_task_attribution() {
     alive) ;;
     *) return 1 ;;
   esac
-  if ATTRIBUTION_REFUSAL=$(fm_launch_proof_herdr_refusal "$META"); then
+  # The proof must be of T, the one endpoint every delivery below uses: a
+  # record that names another endpoint now refuses (Main 1856 F2).
+  if [ "$(fm_meta_get "$META" window)" != "$T" ]; then
+    ATTRIBUTION_REFUSAL="its record no longer names the endpoint $T this action targets"
+    return 1
+  fi
+  if ATTRIBUTION_REFUSAL=$(fm_launch_proof_herdr_refusal "$META" "$T"); then
     ATTRIBUTION_REFUSAL=''
     return 0
   fi
@@ -1529,7 +1546,7 @@ wait_agent_state() {  # <timeout> <wanted>...
     for want in "$@"; do
       if [ "$state" = "$want" ]; then
         if [ "$want" = alive ] && [ "$BACKEND" = herdr ] \
-          && ! fm_launch_proof_herdr_authorizes "$META"; then
+          && ! fm_launch_proof_herdr_authorizes "$META" "$T"; then
           continue
         fi
         printf '%s' "$state"

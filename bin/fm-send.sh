@@ -487,6 +487,19 @@ fm_send_remote_route_expected() { # <meta>
   [ -n "${FM_SEND_EXPECTED_ENDPOINT:-}" ] && [ "$T" = "$FM_SEND_EXPECTED_ENDPOINT" ] \
     && [ "$(fm_backend_target_of_meta "$1")" = "$FM_SEND_EXPECTED_ENDPOINT" ]
 }
+# A local compared route also re-checks the agent now at that endpoint, right
+# before delivery (Main 1856 F4): the restart's own attribution decision,
+# re-run on the record, must still proceed and name the compared endpoint.
+fm_send_expected_attribution() { # <meta>
+  [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] || return 0
+  if ! declare -F fm_secondmate_restart_attribution >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-secondmate-restart-lib.sh
+    . "$SCRIPT_DIR/fm-secondmate-restart-lib.sh" || return 1
+  fi
+  fm_secondmate_restart_attribution "$1" || return 1
+  [ "${FM_SECONDMATE_RESTART_ROUTE_PLACEMENT:-}" = local ] \
+    && [ "${FM_SECONDMATE_RESTART_ROUTE_TARGET:-}" = "${FM_SEND_EXPECTED_ENDPOINT:-}" ]
+}
 if ! fm_send_remote_route_expected "${TARGET_META:-}"; then
   echo "error: steer not sent to ${TARGET_REMOTE_ID:-$RAW_TARGET}: its resolved route is not the expected route (placement '${FM_SEND_EXPECTED_PLACEMENT:-}', endpoint '${FM_SEND_EXPECTED_ENDPOINT:-${FM_SEND_EXPECTED_REMOTE_TARGET:-}}', host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent" >&2
   exit 1
@@ -1095,7 +1108,8 @@ else
       { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
         [ "$CURRENT_INBOX_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
       [ -n "$(fm_meta_get "$TARGET_META" remote_host)" ] ||
-      ! fm_send_remote_route_expected "$TARGET_META"; then
+      ! fm_send_remote_route_expected "$TARGET_META" ||
+      ! fm_send_expected_attribution "$TARGET_META"; then
       fm_lock_release "$INBOX_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true

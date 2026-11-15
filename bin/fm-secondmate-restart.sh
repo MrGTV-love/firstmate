@@ -199,7 +199,10 @@ restart_mate() {  # <array-index>
       "$id" "${HARNESS[i]}" "${MODEL[i]:-default}" "${EFFORT[i]:-default}" < /dev/null 2>&1)
     restart_rc=$?
   else
+    # The control plane relaunches only the endpoint this mate's decision
+    # compared (Main 1856 F3).
     restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      FM_CONTROL_EXPECTED_ENDPOINT="${ROUTE_TARGET[i]}" \
       "$SCRIPT_DIR/fm-control.sh" "$id" relaunch 2>&1)
     restart_rc=$?
   fi

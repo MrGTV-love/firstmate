@@ -192,8 +192,8 @@ cmd_attribution() { # <id> <recorded-target>
   if cause=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" \
-    FM_LAUNCH_PROOF_VERB_PATH=1 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" && fm_launch_proof_herdr_refusal "$2"' \
-    _ "$SCRIPT_DIR" "$meta" 2>/dev/null); then
+    FM_LAUNCH_PROOF_VERB_PATH=1 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" && fm_launch_proof_herdr_refusal "$2" "$3"' \
+    _ "$SCRIPT_DIR" "$meta" "$target" 2>/dev/null); then
     printf 'attribution=proceed\n'
   else
     cause=$(printf '%s\n' "$cause" | sed -n '/./{s/[[:space:]]\{1,\}/ /g;p;q;}')
@@ -373,6 +373,7 @@ cmd_relaunch() {
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_SKIP_SECONDMATE_INHERIT=internal \
     FM_SKIP_SECONDMATE_SYNC=internal FM_COMPACT_ADVISER_DISABLE="$compact_disable" \
+    FM_CONTROL_EXPECTED_ENDPOINT="$expected_target" \
     "$SCRIPT_DIR/fm-control.sh" "${control_args[@]}"
   # A parent tracking this route needs the identity the relaunch actually
   # produced, not the one it asked for, so it can republish its own record the
@@ -397,7 +398,7 @@ cmd_stay() {
 }
 
 cmd_send() {
-  local id=$1 message=$2 delivery_mode='' expected='' arg rec ring_rc=0 meta meta_lock
+  local id=$1 message=$2 delivery_mode='' expected='' arg rec ring_rc=0 meta meta_lock decision
   shift 2
   validate_id "$id"
   # An expected target (Main 1714 (c)) binds this delivery to the endpoint the
@@ -423,6 +424,18 @@ cmd_send() {
     die "this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected'; refusing before the record is written"
     # shellcheck disable=SC2317 # die exits; this stops a stand-in die that returns
     return 1
+  fi
+  # The agent now at that endpoint must still be this task's own (Main 1856
+  # F4): the same host decision the parent asked for, read again right before
+  # the record is written, refuses a replaced agent at an unchanged address.
+  if [ -n "$expected" ]; then
+    decision=$(cmd_attribution "$id" "$expected")
+    if [ "$decision" != attribution=proceed ]; then
+      fm_lock_release "$meta_lock"
+      die "the agent at this host's endpoint for $id is no longer attributed to this task (${decision#attribution=refuse: }); refusing before the record is written"
+      # shellcheck disable=SC2317 # die exits; this stops a stand-in die that returns
+      return 1
+    fi
   fi
   # A remote steer is delivered by durable record, never by typing its payload
   # into the pane: write it into this secondmate's host-local steering inbox,
