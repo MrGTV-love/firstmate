@@ -4237,8 +4237,8 @@ fm_lint_isolated_copy() {
 
 # fm_lint_write_logging_shellcheck <dir> <starts log> [<version file>]: a script
 # ShellCheck stand-in that appends every invocation's arguments to <starts log>,
-# answers --version with the version in <version file> (0.11.0 without one) after
-# FM_TEST_PROBE_SECS seconds, and otherwise prints one finding for the root and
+# answers --version with the version in <version file> (0.11.0 without one), read
+# when the probe starts and printed FM_TEST_PROBE_SECS seconds later, and otherwise prints one finding for the root and
 # exits FM_TEST_ANALYSIS_RC (1 by default) after FM_TEST_ANALYSIS_SECS seconds.
 fm_lint_write_logging_shellcheck() {
   local dir=$1 log=$2 version=${3:-}
@@ -4247,9 +4247,9 @@ fm_lint_write_logging_shellcheck() {
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> '$log'
 if [ "\${1:-}" = --version ]; then
-  sleep "\${FM_TEST_PROBE_SECS:-0}"
   v=0.11.0
   [ -z '$version' ] || v=\$(cat '$version')
+  sleep "\${FM_TEST_PROBE_SECS:-0}"
   printf 'ShellCheck - shell script analysis tool\nversion: %s\n' "\$v"
   exit 0
 fi
@@ -5120,6 +5120,96 @@ test_concurrent_runs_against_an_unusable_slot_both_refuse_and_then_both_run() {
   pass "two concurrent runs against an unusable slot file both refuse naming it and start nothing; with it usable both analyze their root and leave no ticket"
 }
 
+# (Main 1770 (6)) A run never takes a version from a probe that started before it
+# began waiting: run 1's probe reads 0.11.0 and is still running when the delegate
+# changes to 0.10.0 and run 2 (strict) arrives; run 2 must probe again and refuse
+# 0.10.0. The control: run 1 reports its own probe's 0.11.0.
+test_a_run_never_takes_a_version_from_a_probe_that_started_before_it_waited() {
+  local tmp repo rc1=0 rc2=0 run1 waited
+  tmp=$(fm_test_tmproot fm-lint-probe-fresh)
+  repo=$(fm_lint_isolated_copy "$tmp" fresh)
+  printf '0.11.0\n' > "$tmp/delegate.version"
+  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log" "$tmp/delegate.version"
+  : > "$tmp/starts.log"
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 FM_TEST_PROBE_SECS=4 \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) &
+  run1=$!
+  waited=0
+  while ! grep -q -- '^--version$' "$tmp/starts.log" && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
+  grep -q -- '^--version$' "$tmp/starts.log" || fm_lint_fail_settled "run 1's probe never started"
+  printf '0.10.0\n' > "$tmp/delegate.version"
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+      bash bin/fm-lint.sh --strict-version bin/library.sh > "$tmp/run2.out" 2>&1 ) || rc2=$?
+  wait "$run1" || rc1=$?
+  [ "$rc2" -eq 1 ] || fm_lint_fail_settled "a strict run that began waiting during another run's probe exited $rc2 on that probe's older version: $(cat "$tmp/run2.out")"
+  grep -q 'found 0.10.0' "$tmp/run2.out" || fm_lint_fail_settled "the strict run did not name the delegate's version when it waited: $(cat "$tmp/run2.out")"
+  [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 2 ] || fm_lint_fail_settled "the strict run did not probe again: $(cat "$tmp/starts.log")"
+  [ "$rc1" -eq 0 ] && grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/run1.out" || fm_lint_fail_settled "run 1 did not report its own probe's version ($rc1): $(cat "$tmp/run1.out")"
+  wait 2>/dev/null || true
+  pass "a run that began waiting during another run's probe probed again and refused the delegate's 0.10.0 under the strict policy; the earlier run reported its own probe's 0.11.0"
+}
+
+# (Main 1770 (7)) A version probe that outlives its bound is never ended. Its lane
+# stays held while any process the probe started still runs; a run waiting that long
+# says it is blocked and waits; it proceeds once that process has ended. The probe's
+# own run also says so while its probe runs past the bound. The copy's bound is 1 s.
+test_a_hung_version_probe_keeps_its_lane_until_its_processes_end_and_waiters_report_blocked() {
+  local tmp repo rc=0 run2 run3 probe_wait
+  tmp=$(fm_test_tmproot fm-lint-probe-hung)
+  FM_LINT_RELEASE_FILES="$tmp/release $tmp/release2"
+  repo=$(fm_lint_isolated_copy "$tmp" hung)
+  perl -pi -e 's{^PROBE_BOUND_SECONDS=.*$}{PROBE_BOUND_SECONDS=1}' "$repo/bin/fm-lint.sh"
+  mkdir -p "$tmp/fake"
+  # --version: the first time, leave a process (its output closed) that lives until
+  # the release file exists, as a probe whose child outlives it would; with
+  # FM_TEST_PROBE_HOLD, run until release2 exists before answering. Each process
+  # ends on its own (20 s at most).
+  cat > "$tmp/fake/shellcheck" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$tmp/starts.log'
+if [ "\${1:-}" = --version ]; then
+  if [ ! -e '$tmp/left' ]; then
+    : > '$tmp/left'
+    ( exec >/dev/null 2>&1 </dev/null; perl -MTime::HiRes=sleep,time -e 'my \$u = time() + 20; sleep 0.05 until -e \$ARGV[0] || time() > \$u' '$tmp/release' ) &
+  fi
+  if [ -n "\${FM_TEST_PROBE_HOLD:-}" ]; then perl -MTime::HiRes=sleep,time -e 'my \$u = time() + 20; sleep 0.05 until -e \$ARGV[0] || time() > \$u' '$tmp/release2'; fi
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$tmp/fake/shellcheck"
+  : > "$tmp/starts.log"
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) || fm_lint_fail_settled "run 1 failed: $(cat "$tmp/run1.out")"
+  # Run 1 ended; the process its probe left still runs.
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_TELEMETRY="$tmp/run2.tsv" \
+      bash bin/fm-lint.sh bin/library.sh > "$tmp/run2.out" 2>&1 ) &
+  run2=$!
+  sleep 3
+  [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 1 ] \
+    || fm_lint_fail_settled "a run probed while a process of the earlier probe still held the lane: $(cat "$tmp/starts.log")"
+  grep -q 'blocked: the version probe lane' "$tmp/run2.out" || fm_lint_fail_settled "a run waiting past the probe bound did not report it was blocked: $(cat "$tmp/run2.out")"
+  : > "$tmp/release"
+  wait "$run2" || rc=$?
+  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the waiting run did not finish once the probe's process ended ($rc): $(cat "$tmp/run2.out")"
+  probe_wait=$(awk -F '\t' '$1 == "meta" && $2 == "probe_wait_ms" { print $3 }' "$tmp/run2.roots.tsv")
+  [ -n "$probe_wait" ] && [ "$probe_wait" -ge 2000 ] || fm_lint_fail_settled "the waiting run recorded a lane wait of ${probe_wait:-none} ms"
+  # The probe's own run, while its probe runs past the bound.
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_PROBE_HOLD=1 \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run3.out" 2>&1 ) &
+  run3=$!
+  sleep 3
+  grep -q 'blocked: the version probe (pid [0-9]*) has run more than 1 s' "$tmp/run3.out" \
+    || fm_lint_fail_settled "a run whose probe ran past its bound did not report it was blocked: $(cat "$tmp/run3.out")"
+  : > "$tmp/release2"
+  wait "$run3" || rc=$?
+  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the run whose probe ran past its bound failed after the probe ended ($rc): $(cat "$tmp/run3.out")"
+  wait 2>/dev/null || true
+  pass "a probe that outlives its bound keeps the lane until its last process ends (the next run waited $probe_wait ms and reported blocked, nothing was ended); a run whose own probe runs past the bound reports blocked and finishes when it ends"
+}
+
 fm_lint_test_cases=(
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
@@ -5158,6 +5248,8 @@ test_an_unreadable_host_census_never_starts_a_root_in_any_pool
 test_a_host_that_loses_its_process_table_stops_the_run_after_one_refusal
 test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_pool
 test_the_version_probe_waits_only_for_its_own_lane
+test_a_run_never_takes_a_version_from_a_probe_that_started_before_it_waited
+test_a_hung_version_probe_keeps_its_lane_until_its_processes_end_and_waiters_report_blocked
 test_every_mode_takes_its_budget_from_the_same_host_wide_bound
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first
 test_the_roots_log_records_each_roots_queue_wait_in_wait_ms

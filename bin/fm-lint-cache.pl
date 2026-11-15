@@ -202,28 +202,35 @@ if (($ARGV[0] // '') eq 'admitted-run') {
     exit(defined fm_live_ledger_owner($ledger_dir, $entry, 'run', qr{\A\S*(?:bash|sh)\S*\s+(?:-\S+\s+)*\S*fm-lint\.sh(?:\s|\z)}) ? 0 : 1);
 }
 
-# Private mode: perl fm-lint-cache.pl probe <host lock> <key> <wait-file> -- <command...>
+# Private mode: perl fm-lint-cache.pl probe <host lock> <key> <wait-file> <bound-seconds> -- <command...>
 # The version probe's lane in the host-wide budget. bin/fm-lint.sh keeps a fixed
 # share of the budget for it (its PROBE_RESERVE_KIB) and gives the roots' admission
 # the rest, so a probe never waits behind roots holding the budget and a run whose
 # roots are all cache hits reserves nothing in the roots' budget. One probe runs at
 # a time on the host: the lane is the flock of <host lock>.probe, and the command
 # (a ShellCheck --version that bin/fm-lint.sh has wrapped in its memory bound) runs
-# only while it is held. A probe that waited for the lane first looks in
-# <host lock>.probe.d/<key> (<key> names the ShellCheck file and its bytes): a
-# version written there by a probe that ended after this one began waiting is
-# printed as its own result and nothing is started, so runs whose probes overlap
-# share one. Otherwise the command runs, its output is passed through, and a
-# version it prints with exit 0 is written there with its end time. A version is
-# never taken from a probe that ended before this one began waiting. The time spent
-# waiting for the lane is written in milliseconds to <wait-file>. A lane that cannot
-# be used names its path and exits 2 without starting the command.
+# only while it is held. The command inherits the lane's descriptor, so the lane is
+# free again only when the kernel releases that flock: when the probe and every
+# process it started have ended. Nothing ends a probe: a probe that runs past
+# <bound-seconds> keeps the lane, its own run says so on stderr once, and every run
+# that has waited for the lane longer than that bound says on stderr once that it
+# is blocked, naming the holder's pid and start, and keeps waiting.
+# A probe that waited for the lane first looks in <host lock>.probe.d/<key> (<key>
+# names the ShellCheck file and its bytes): a version written there by a probe whose
+# command STARTED after this one began waiting is printed as its own result and
+# nothing is started, so runs that queue behind one prober share the next probe,
+# and no run takes a version read before it began waiting. Otherwise the command
+# runs, its output is passed through, and a version it prints with exit 0 is written
+# there with the time the command started. The time spent waiting for the lane is
+# written in milliseconds to <wait-file>. A lane that cannot be used names its path
+# and exits 2 without starting the command.
 if (($ARGV[0] // '') eq 'probe') {
     require POSIX;
     require Time::HiRes;
-    my (undef, $host_lock, $key, $wait_file, $dashes, @command) = @ARGV;
+    my (undef, $host_lock, $key, $wait_file, $bound, $dashes, @command) = @ARGV;
     die "fm-lint-probe: invalid private invocation\n"
-        unless defined $dashes && $dashes eq '--' && @command && length($host_lock // '') && ($key // '') =~ /\A[0-9a-z]{1,64}\z/;
+        unless defined $dashes && $dashes eq '--' && @command && length($host_lock // '') && ($key // '') =~ /\A[0-9a-z]{1,64}\z/
+            && ($bound // '') =~ /\A[1-9][0-9]*\z/;
     my $refuse = sub {
         my ($path, $why) = @_;
         print STDERR "fm-lint: version probe lane unusable at $path ($why); the host-wide ShellCheck memory bound cannot be enforced, "
@@ -235,10 +242,21 @@ if (($ARGV[0] // '') eq 'probe') {
     for my $name (keys %signal_number) { $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; }; }
     my $arrived = Time::HiRes::time();
     my $lane_path = "$host_lock.probe";
+    my $holder_path = "$host_lock.probe.holder";
     open(my $lane, '>>', $lane_path) or $refuse->($lane_path, $!);
+    my $reported;
     until (flock($lane, LOCK_EX | LOCK_NB)) {
         $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($lane_path, $!);
         exit 128 + $signal_number{$caught} if $caught;
+        if (!$reported && Time::HiRes::time() - $arrived > $bound) {
+            my $holder = '';
+            if (open(my $fh, '<', $holder_path)) { $holder = <$fh> // ''; close $fh; }
+            my ($pid, $since) = $holder =~ /\A([0-9]+)\t([0-9]+(?:\.[0-9]+)?)\n\z/ ? ($1, $2) : ('unknown', undef);
+            printf STDERR "fm-lint: blocked: the version probe lane %s has been held for more than %d s (holder pid %s%s); "
+                . "this run waits until that probe and every process it started have ended; nothing is ended\n",
+                $lane_path, $bound, $pid, defined $since ? sprintf(', its probe started %d s ago', Time::HiRes::time() - $since) : '';
+            $reported = 1;
+        }
         Time::HiRes::sleep(0.02);
     }
     if (open(my $fh, '>', $wait_file)) { printf {$fh} "%d\n", (Time::HiRes::time() - $arrived) * 1000; close $fh; }
@@ -254,6 +272,15 @@ if (($ARGV[0] // '') eq 'probe') {
             exit 0;
         }
     }
+    my $started = Time::HiRes::time();
+    {
+        my ($staged, $fh) = ("$holder_path.tmp.$$");
+        open($fh, '>', $staged) && printf({$fh} "%d\t%.6f\n", $$, $started) && close($fh) && rename($staged, $holder_path)
+            or unlink $staged;
+    }
+    # The command keeps the lane's descriptor across exec, so the lane stays held
+    # while any process of the probe runs.
+    defined fcntl($lane, F_SETFD, 0) or $refuse->($lane_path, $!);
     pipe(my $from_probe, my $to_caller) or die "fm-lint-probe: pipe: $!\n";
     $child = fork();
     die "fm-lint-probe: fork: $!\n" unless defined $child;
@@ -266,7 +293,23 @@ if (($ARGV[0] // '') eq 'probe') {
     }
     close $to_caller;
     kill 'TERM', $child if $caught;
-    my $output = do { local $/; <$from_probe> } // '';
+    my ($output, $over) = ('', 0);
+    my $ready = '';
+    vec($ready, fileno($from_probe), 1) = 1;
+    while (1) {
+        my $n = select(my $readable = $ready, undef, undef, 0.2);
+        if ($n > 0) {
+            my $got = sysread($from_probe, $output, 65536, length $output);
+            last if defined $got && $got == 0;
+            next if defined $got || $!{EINTR};
+            last;
+        }
+        if (!$over && Time::HiRes::time() - $started > $bound) {
+            printf STDERR "fm-lint: blocked: the version probe (pid %d) has run more than %d s and keeps the lane %s; "
+                . "this run waits for it to end; nothing is ended\n", $child, $bound, $lane_path;
+            $over = 1;
+        }
+    }
     close $from_probe;
     my $reaped;
     while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
@@ -275,7 +318,7 @@ if (($ARGV[0] // '') eq 'probe') {
     my $rc = ($status & 127) ? 128 + ($status & 127) : $status >> 8;
     if ($rc == 0 && $output =~ /^version:\s*([0-9A-Za-z.+-]+)\s*$/m) {
         my ($staged, $version, $fh) = ("$result.tmp.$$", $1);
-        if (open($fh, '>', $staged) && printf({$fh} "%.6f\t%s\n", Time::HiRes::time(), $version) && close($fh)) {
+        if (open($fh, '>', $staged) && printf({$fh} "%.6f\t%s\n", $started, $version) && close($fh)) {
             rename($staged, $result) or unlink $staged;
         } else {
             unlink $staged;

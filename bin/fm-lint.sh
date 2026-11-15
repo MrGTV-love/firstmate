@@ -157,10 +157,12 @@
 # host, held to 64 MiB by the resident watch on native macOS (it holds about
 # 15 MB for 0.02 s) and to the per-root address-space limit under the enforced
 # envelope, and never queued behind roots, so a run whose roots are all cache
-# hits reserves nothing in the roots' budget. Runs whose probes of one ShellCheck
-# file overlap share one probe (a run takes a version printed by a probe that
-# ended after it began waiting for the lane); the roots log's probe_wait_ms meta
-# line records the wait for the lane. With nothing held
+# hits reserves nothing in the roots' budget. Runs queued for the lane share the
+# next probe of one ShellCheck file (a run takes only a version whose probe started
+# after the run began waiting); the roots log's probe_wait_ms meta line records the
+# wait for the lane. A probe that runs past its bound (PROBE_BOUND_SECONDS, 30 s)
+# is never ended: it keeps the lane until it and every process it started have
+# ended, and it and every run waiting that long report "blocked" on stderr. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, a record whose input
@@ -188,8 +190,8 @@
 # expression is not R: roots that all grow from their charges to the 8 GiB cap
 # together could hold the number of admitted roots times 8 GiB (an algebraic
 # ceiling, never measured here: with this host's 41 roots admissible at once it
-# is 352262914048 bytes, about 328 GiB; whether it is acceptable is Main's
-# decision, open).
+# is 352262914048 bytes, about 328 GiB. It is unmeasured, so no ceiling is
+# claimed (Main 1770)).
 # A strict byte bound at
 # every moment is not available on this host without a kernel limit or killing
 # and re-running a grown root (a design Main withdrew), and SIGSTOP releases
@@ -247,9 +249,10 @@
 # cannot take the lock waits, and no path decides without it. A live entry that
 # cannot be opened or read is a charge the gate cannot account for: the gate
 # refuses (exit 2) and names it. The pool, the lock and the ledger are per user
-# (the shell's UID): a lint run by another OS user on the same host keeps its own
-# and is not counted here, except as processes named shellcheck in the table read
-# at admission. A pool whose gates predate
+# (the shell's UID), and the bound applies to the runs of one UID only: a lint run
+# by another OS user on the same host keeps its own and is not counted here,
+# except as processes named shellcheck in the table read at admission. That is a
+# residual; no cross-UID bound is claimed. A pool whose gates predate
 # the ledger is still counted through its slot files and its processes. Each lint
 # run also writes a run entry there (run.<pid>.<time>, held for the run's life)
 # naming the perl and python it resolved, its bound mechanism and its per-root
@@ -257,7 +260,9 @@
 # own roots (--internal-worker, --internal-timed, --internal-root) take those
 # values from a live run entry and an admitted gate entry in this ledger, whose
 # owners are their ancestors, and from no setting or inherited variable, or exit 2
-# and start nothing. FM_LINT_INTERNAL_CENSUS_ONLY in the environment stops a lint
+# and start nothing. Residual: a process of the same user that writes a forged
+# entry into the 0700 ledger directory, naming a checker of its choice, is not
+# refused; such an actor is outside the confused-agent threat model this guards. FM_LINT_INTERNAL_CENSUS_ONLY in the environment stops a lint
 # (exit 2) before any ShellCheck starts. Host load
 # average never changes admission, so unrelated machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
@@ -396,6 +401,11 @@ HOST_RSS_KIB=3670016
 # The version probe's own lane inside that budget (one probe at a time on the host,
 # held to this many KiB); the roots' admission works with the rest.
 PROBE_RESERVE_KIB=65536
+# The probe's time bound: a probe still running after it, and every run waiting for
+# the lane that long, report on stderr that they are blocked and keep waiting
+# (nothing is ended; the lane frees only when the probe's processes have ended).
+# `shellcheck --version` takes about 0.02 s.
+PROBE_BOUND_SECONDS=30
 ROOTS_RSS_KIB=$((HOST_RSS_KIB - PROBE_RESERVE_KIB))
 # The host ledger: gate entries (entry.*) and each lint run's entry (run.*), which
 # carries the values that bound every root the run starts. The private modes read
@@ -2358,10 +2368,13 @@ fi
 # native macOS and to the per-root address-space limit under the enforced
 # envelope), and the roots' admission works with the rest (ROOTS_RSS_KIB), so a
 # run whose roots are all cache hits waits only for another probe, never behind
-# roots holding the budget, and reserves nothing in the roots' budget. Runs whose
-# probes of the same ShellCheck overlap share one probe: a run that waited for the
-# lane takes the version printed by a probe of the same file that ended after the
-# run began waiting.
+# roots holding the budget, and reserves nothing in the roots' budget. Runs that
+# queue for the lane share a probe: a run that waited takes the version printed by a
+# probe of the same file whose command started after the run began waiting, never
+# one read before (so a shared version is as fresh as the run's own probe would be).
+# A probe past PROBE_BOUND_SECONDS keeps the lane; it and every run waiting that
+# long report "blocked" on stderr and wait, and nothing ends it: the lane frees only
+# when the probe and every process it started have ended.
 probe_rc=0
 resolved=
 probe_command=("$SHELLCHECK_BIN" --version)
@@ -2375,10 +2388,11 @@ fi
 probe_key=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; print Digest::SHA->new(256)->add("$ARGV[0]\0")->addfile($fh)->hexdigest' \
   "$SHELLCHECK_BIN" 2>/dev/null) || probe_key=unreadable
 resolved=$(FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" \
-    "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" probe "$HOST_POOL_ROOT/admission.lock" "$probe_key" "$TMP_ROOT/probe.wait" -- \
-    "${probe_command[@]}" 2>"$TMP_ROOT/probe.err" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
+    "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" probe "$HOST_POOL_ROOT/admission.lock" "$probe_key" "$TMP_ROOT/probe.wait" \
+    "$PROBE_BOUND_SECONDS" -- "${probe_command[@]}" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
+# The probe's stderr (a refusal, or a blocked report while the lane is held past its
+# bound) reaches this run's stderr as it is written.
 if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
-  cat "$TMP_ROOT/probe.err" >&2
   exit 2
 fi
 # The probe's wait for its lane, in milliseconds, for the roots log.
