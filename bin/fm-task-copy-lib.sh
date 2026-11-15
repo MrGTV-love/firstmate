@@ -159,7 +159,8 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
 # changed further is not equal, so it is unproved. Any read that fails leaves
 # FM_TASK_COPY_UNASKED set; an entry that differs clears it, as an answer.
 fm_task_copy_blobs_in_default() {  # <dir> <default-ref> <head>
-  local dir=$1 ref=$2 head=$3 base listed theirs ours
+  local dir=$1 ref=$2 head=$3 base listed theirs ours path
+  local -a paths=()
   FM_TASK_COPY_UNASKED='the content check could not read the trees it compares'
   [ -n "$ref" ] && [ -n "$head" ] || return 1
   base=$(git -C "$dir" merge-base "$ref" "$head" 2>/dev/null) || return 1
@@ -169,17 +170,15 @@ fm_task_copy_blobs_in_default() {  # <dir> <default-ref> <head>
     rm -f -- "$listed"
     return 1
   fi
-  if [ ! -s "$listed" ]; then
-    rm -f -- "$listed"
+  while IFS= read -r -d '' path; do paths+=("$path"); done < "$listed"
+  rm -f -- "$listed"
+  if [ "${#paths[@]}" -eq 0 ]; then
     FM_TASK_COPY_UNASKED=
     return 0
   fi
-  theirs=$(xargs -0 git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$ref" -- < "$listed" 2>/dev/null) \
-    && ours=$(xargs -0 git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$head" -- < "$listed" 2>/dev/null) || {
-    rm -f -- "$listed"
-    return 1
-  }
-  rm -f -- "$listed"
+  # The caller's git (a bounded wrapper in some callers) reads both trees.
+  theirs=$(git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$ref" -- "${paths[@]}" 2>/dev/null) || return 1
+  ours=$(git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$head" -- "${paths[@]}" 2>/dev/null) || return 1
   FM_TASK_COPY_UNASKED=
   [ "$(printf '%s\n' "$theirs" | LC_ALL=C sort)" = "$(printf '%s\n' "$ours" | LC_ALL=C sort)" ]
 }
