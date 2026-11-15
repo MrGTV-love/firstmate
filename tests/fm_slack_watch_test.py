@@ -5919,6 +5919,11 @@ if order:
 plane.Watch.bound = lambda self: True
 plane.Watch.backlog = lambda self: []
 plane.run = lambda script, *args, text=None: subprocess.CompletedProcess([], 0, stdout='x\n', stderr='')
+if os.environ.get('INV4_BLOCK_RESOLVER'):
+    # A system resolver that never returns (Main 1729 (b)): every name lookup of this process blocks for good; no network, no signal, no child process.
+    import socket, threading as _threading
+    _never = _threading.Event()
+    socket.getaddrinfo = lambda *args, **kwargs: _never.wait() or []
 if os.environ.get('INV4_CARD'):
     # One held decision card (the ordered event model): the board's open row, live; each answer handed to the intake is logged, and the stand-in closes it.
     import json as _json
@@ -8397,6 +8402,82 @@ class Round9Findings(InvariantScenario):
             release.set()
         self.assertLessEqual(len(alive), 1, alive)
         self.assertTrue(all(isinstance(c, dict) for c in cutoffs), cutoffs)
+
+    # ---- Main 1729 (b), (c): the real boundary of a name lookup that never returns ----
+
+    DRIVER = Invariant4OwnerFirst.DRIVER
+    run_check = Invariant4OwnerFirst.run_check
+
+    def counting_listener(self):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(('127.0.0.1', 0))
+        listener.listen(8)
+        listener.settimeout(0.2)
+        self.addCleanup(listener.close)
+        accepted, stop = [], threading.Event()
+        def accept():
+            while not stop.is_set():
+                try:
+                    conn, _ = listener.accept()
+                    accepted.append(time.monotonic())
+                    conn.close()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    return
+        threading.Thread(target=accept, daemon=True).start()
+        self.addCleanup(stop.set)
+        return listener.getsockname()[1], accepted
+
+    def test_r9_main1729_a_check_whose_name_lookup_never_returns_exits_within_its_bound_and_sends_nothing(self):
+        port, accepted = self.counting_listener()
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            self.run_check(home, 'normal', 'owner', command='check')
+            started = time.monotonic()
+            with patch.dict(os.environ, {'INV4_BLOCK_RESOLVER': '1'}):
+                rc, out, calls = self.run_check(home, 'trickle', 'blocked', command='check-second', server='https://127.0.0.1:%d/' % port)
+            exited = time.monotonic() - started                                 # the whole CLI process, started and ended
+            time.sleep(1.0)
+            self.assertEqual(rc, 0, out)
+            self.assertLessEqual(exited, plane.OWNER_WAKE_WAIT_BOUND, exited)
+            self.assertEqual(accepted, [], 'a connection reached the server')   # nothing sent, before or after the process ended
+
+    def test_r9_main1729_while_one_lookup_is_stuck_every_later_call_is_refused_and_recorded_with_no_growth(self):
+        import tracemalloc
+        port, accepted = self.counting_listener()
+        stuck, real_lookup = threading.Event(), socket.getaddrinfo
+        def blocking(*args, **kwargs):
+            stuck.wait()
+            return real_lookup(*args, **kwargs)
+        self.addCleanup(stuck.set)
+        with patch.object(socket, 'getaddrinfo', blocking):
+            def one(n):
+                slack = plane.Slack('fixture-token-not-a-secret-r9-c')
+                slack.base = 'https://127.0.0.1:%d/' % port
+                deadline = time.monotonic() + 0.1
+                slack.time_left = lambda: deadline - time.monotonic()
+                outcome = 'completed'
+                try:
+                    slack.call('chat.postMessage', channel=INV_SECOND_DM, text='x', client_msg_id='r9-c-%d' % n)
+                except Exception as error:
+                    outcome = type(error).__name__
+                return outcome, slack.last_cutoff
+            one(0)                                                              # the lookup that stays stuck
+            tracemalloc.start()
+            before = tracemalloc.get_traced_memory()[0]
+            results = [one(n) for n in range(1, 31)]
+            grown = tracemalloc.get_traced_memory()[0] - before
+            tracemalloc.stop()
+            lookups = [t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()]
+            stuck.set()
+        self.assertEqual({o for o, _ in results}, {'DeadlineSpent'})
+        self.assertTrue(all(isinstance(c, dict) and c.get('lookup_pending') and c.get('sent') is False for _, c in results), results[:2])
+        self.assertLessEqual(len(lookups), 1, lookups)
+        self.assertLess(grown, 256 * 1024, grown)                               # no growth with the number of calls
+        self.assertEqual(accepted, [])
 
     # ---- F10: an interrupted span report appends its row once ----
 
