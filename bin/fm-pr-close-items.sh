@@ -168,7 +168,7 @@ read_body() {
   case "$FM_PR_PROVIDER" in
     github)
       # The first line is the state; the rest is the body.
-      gh pr view "$url" --json body,state --jq '(.state // "") + "\n" + (.body // "")' > "$out.raw" 2>"$out.err" || rc=$?
+      gh pr view "$url" --json body,state --jq 'if type == "object" and has("body") and has("state") then (.state // "") + "\n" + (.body // "") else error("the forge answered with no body field") end' > "$out.raw" 2>"$out.err" || rc=$?
       if [ "$rc" -eq 0 ]; then
         state=$(head -n 1 "$out.raw") || rc=$?
       fi
@@ -181,7 +181,7 @@ read_body() {
       command -v jq >/dev/null 2>&1 || { echo "jq is not installed" > "$out.err"; return 1; }
       GITLAB_HOST="$FM_PR_HOST" glab mr view "$FM_PR_NUMBER" -R "https://$FM_PR_HOST/$FM_PR_PATH" -F json > "$out.raw" 2>"$out.err" || rc=$?
       if [ "$rc" -eq 0 ]; then
-        jq -jer 'if type == "object" then (.description // "") + "\n" else error("not a merge request record") end' "$out.raw" > "$out" 2>"$out.err" || rc=$?
+        jq -jer 'if type == "object" and has("description") then (.description // "") + "\n" else error("the forge answered with no description field") end' "$out.raw" > "$out" 2>"$out.err" || rc=$?
       fi
       [ "$rc" -ne 0 ] || jq -r 'if type == "object" and .state == "merged" then true else false end' "$out.raw" > "$out.merged" 2>/dev/null || echo false > "$out.merged"
       ;;
@@ -189,10 +189,11 @@ read_body() {
       command -v jq >/dev/null 2>&1 || { echo "jq is not installed" > "$out.err"; return 1; }
       login=$(fm_pr_forgejo_login "$FM_PR_HOST") || { echo "no single tea login for $FM_PR_HOST" > "$out.err"; return 1; }
       # "tea api" exits 0 on an HTTP error and prints the error body, so only a record
-      # that has a body field counts as a read.
+      # that has both a merged and a body field counts as a read (Main 1875 F6: a missing field
+      # is a read error, never an empty body; a present empty or null body is empty).
       tea api --login "$login" --repo "$FM_PR_OWNER/$FM_PR_REPO" "/repos/{owner}/{repo}/pulls/$FM_PR_NUMBER" > "$out.raw" 2>"$out.err" || rc=$?
       if [ "$rc" -eq 0 ]; then
-        jq -jer 'if type == "object" and has("merged") then (.body // "") + "\n" else error("the forge answered: " + ((.message // "no pull request record") | tostring)) end' "$out.raw" > "$out" 2>"$out.err" || rc=$?
+        jq -jer 'if type == "object" and has("merged") and has("body") then (.body // "") + "\n" else error("the forge answered: " + ((.message // "a record with no merged or no body field") | tostring)) end' "$out.raw" > "$out" 2>"$out.err" || rc=$?
       fi
       [ "$rc" -ne 0 ] || jq -r 'if type == "object" and .merged == true then true else false end' "$out.raw" > "$out.merged" 2>/dev/null || echo false > "$out.merged"
       ;;
@@ -236,11 +237,11 @@ consider() {  # <id> <proof-url> <where it was named>
   if [ "$rc" -eq 0 ]; then
     CLOSED=$((CLOSED + 1))
     printf 'close-at-merge: closed %s with %s (named by %s)\n' "$id" "$proof" "$source"
-    printf '%s\n' "$out" | sed -n 's/^unblocked: /close-at-merge: unblocked: /p'
-    printf '%s\n' "$out" | sed -n 's/^actionable: /actionable: close-at-merge: /p' >&2
+    sed -n 's/^unblocked: /close-at-merge: unblocked: /p' <<< "$out"
+    sed -n 's/^actionable: /actionable: close-at-merge: /p' <<< "$out" >&2
     return 0
   fi
-  first=$(printf '%s\n' "$out" | sed -n '1p')
+  first=${out%%$'\n'*}
   first=${first#fm-tasks-axi: }
   case "$first" in
     *"open owner call"*) left_open "$id" "it is an open owner call: $first" ;;
@@ -255,167 +256,171 @@ consider() {  # <id> <proof-url> <where it was named>
   esac
 }
 
-tasks_recording_pr() {  # <pr-url>; prints task ids whose record holds exactly that URL
-  local meta task
+# tasks_recording_pr <pr-url>: sets RECORDING_TASKS to the task ids whose record holds exactly
+# that URL as its last pr= value (fm_meta_get's rule). Main 1875 F7: each record is read whole,
+# its status checked; a record that cannot be read is unknown, never "no match", so it is
+# reported as an actionable line that counts as left open.
+tasks_recording_pr() {
+  local meta task text pr
+  RECORDING_TASKS=''
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     task=${meta##*/}
     task=${task%.meta}
     fm_pr_task_id_valid "$task" || continue
-    [ "$(fm_meta_get "$meta" pr)" = "$1" ] || continue
-    printf '%s\n' "$task"
+    if ! text=$(cat -- "$meta" 2>/dev/null) ||
+       ! pr=$(LC_ALL=C awk 'index($0, "pr=") == 1 { v = substr($0, 4) } END { print v }' <<< "$text"); then
+      LEFT=$((LEFT + 1))
+      printf 'actionable: close-at-merge: could not read the task record of %s, so it is not known whether it holds train member %s; nothing was closed for it; retry: %s %s %s\n' \
+        "$task" "$1" "$0" "$TASK_ID" "$URL" >&2
+      continue
+    fi
+    [ "$pr" = "$1" ] || continue
+    RECORDING_TASKS="$RECORDING_TASKS$task"$'\n'
   done
 }
 
 if ! read_body "$URL" "$WORK/body"; then
+  body_err=$(sed -n '1p' "$WORK/body.err" 2>/dev/null) || body_err=''
   printf 'actionable: close-at-merge could not read the body of %s (%s), so it closed nothing and the merge result is unchanged; retry: %s %s %s\n' \
-    "$URL" "$(sed -n '1p' "$WORK/body.err")" "$0" "$TASK_ID" "$URL" >&2
+    "$URL" "${body_err:-the read failed}" "$0" "$TASK_ID" "$URL" >&2
   exit 1
 fi
 MERGED=$(cat "$WORK/body.merged" 2>/dev/null) || MERGED=false
 
-# Each body is parsed once (bin/fm-pr-closes-lib.sh fm_pr_closes_parse, the one parse); every
-# close, edge change and report below comes from that one result, and a body's result is
-# complete before anything it names is closed.
-parse_body() {  # <body-file> <where>
-  # Main 1785 F3: a parse that fails is an actionable non-close naming the body, the reason and
-  # the ids that could be read. Only a result whose status is `block` ever closes anything, so a
-  # result that is missing or cut short closes nothing.
-  local reason ids
-  fm_pr_closes_parse "$1" "$URL" > "$1.parse" && return 0
-  reason=$(got "$1" reason 2>/dev/null) || reason=''
-  ids=$(got "$1" seenid 2>/dev/null) || ids=''
-  ids=$(joined "$ids")
+# Each body is parsed once (bin/fm-pr-closes-lib.sh fm_pr_closes_parse, the one parse), and its
+# whole result is loaded once (fm_pr_closes_load) before anything it names acts: every close,
+# edge change and report below comes from that one loaded result (Main 1742, Main 1875 rule P).
+# A result that cannot be loaded whole closes nothing, reads no member and changes no edge.
+#
+# body_unread <where>: the parse result of a body could not be read whole. With no result, the
+# items it names are not known (there is no second reader), so one line says so and counts as
+# left open.
+body_unread() {
+  LEFT=$((LEFT + 1))
+  printf 'actionable: close-at-merge: could not read the parse result of %s whole, so nothing named by it was closed, no member was read from it and no blocked-by edge changed; the item ids it names are not known without that result; retry: %s %s %s\n' \
+    "$1" "$0" "$TASK_ID" "$URL" >&2
+}
+# load_body <body-file> <where>: Main 1851 F2 and 1875 rule P. Loads the body's parse result
+# whole, or reports it unread; a parse that failed is reported with its reason and the ids it
+# names. Returns 0 only for a loaded result that did not fail.
+load_body() {
+  fm_pr_closes_load "$1.parse" || { body_unread "$2"; return 1; }
+  [ "$FM_PR_CLOSES_STATUS" = failed ] || return 0
   LEFT=$((LEFT + 1))
   printf 'actionable: close-at-merge: could not parse %s, so nothing named by it was closed and no blocked-by edge changed: %s; it names item ids: %s; retry: %s %s %s\n' \
-    "$2" "${reason:-the parse result could not be written}" "${ids:-none that could be read}" "$0" "$TASK_ID" "$URL" >&2
-  printf 'status\tfailed\n' > "$1.parse" 2>/dev/null || true
+    "$2" "${FM_PR_CLOSES_REASON:-unknown reason}" "$(joined "$FM_PR_CLOSES_SEENIDS")" "$0" "$TASK_ID" "$URL" >&2
   return 1
 }
-got() {  # <body-file> <record type>
-  fm_pr_closes_get "$1.parse" "$2"
+# loaded_for <body-file> <where>: the loaded result is this body's, or it is loaded now.
+loaded_for() {
+  [ "$FM_PR_CLOSES_LOADED" = "$1.parse" ] || load_body "$1" "$2"
 }
-# report_read <body-file> <record type> <where> <what>: Main 1851: a report reads the parse
-# result whole, with the reader's status checked, so a failed read never drops a report without
-# a word. Sets REPORT_LINES. On a failed read it prints one actionable line that counts as left
-# open, sets REPORT_LINES empty and returns 1.
-report_read() {
-  if REPORT_LINES=$(got "$1" "$2"); then return 0; fi
-  REPORT_LINES=''
-  LEFT=$((LEFT + 1))
-  printf 'actionable: close-at-merge: could not read the %s of %s from its parse result, so they are not reported here; nothing they name was closed; retry: %s %s %s\n' \
-    "$4" "$3" "$0" "$TASK_ID" "$URL" >&2
-  return 1
-}
-joined() {  # <newline list>: the list on one line, comma separated
-  [ -n "$1" ] || return 0
-  printf '%s\n' "$1" | paste -sd ',' - | sed 's/,/, /g'
+joined() {  # <newline list>: the list on one line, comma separated, or "none"
+  local item out=''
+  while IFS= read -r item; do
+    [ -n "$item" ] || continue
+    out="${out:+$out, }$item"
+  done <<< "$1"
+  printf '%s' "${out:-none}"
 }
 
 # report_refusal <body-file> <where>: a refused body closes nothing, reads no member and changes
 # no edge. One line names the reason and every item id and pull request link the body names.
+# It reads only the loaded result; a body whose result cannot be loaded is reported unread.
 report_refusal() {
-  local reason ids prs
-  [ "$(got "$1" status)" = refused ] || return 0
-  reason=$(got "$1" reason) || reason='(its reason could not be read)'
-  if report_read "$1" seenid "$2" "item ids"; then ids=$(joined "$REPORT_LINES"); else ids='(not readable)'; fi
-  if report_read "$1" seenpr "$2" "pull request links"; then prs=$(joined "$REPORT_LINES"); else prs='(not readable)'; fi
+  loaded_for "$1" "$2" || return 1
+  [ "$FM_PR_CLOSES_STATUS" = refused ] || return 0
   LEFT=$((LEFT + 1))
   printf 'actionable: close-at-merge: refused to close anything named by %s: %s; it names item ids: %s; pull request links: %s; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is %s, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then %s, with the marker text nowhere else; fix it, then retry: %s %s %s\n' \
-    "$2" "$reason" "${ids:-none}" "${prs:-none}" "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$0" "$TASK_ID" "$URL" >&2
+    "$2" "$FM_PR_CLOSES_REASON" "$(joined "$FM_PR_CLOSES_SEENIDS")" "$(joined "$FM_PR_CLOSES_SEENPRS")" "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$0" "$TASK_ID" "$URL" >&2
 }
 
-: > "$WORK/old-form"
+OLD_FORM=''
 report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, report malformed and outside-block directive lines
   local old line outside=0
-  report_read "$1" legacy "$2" "old Closes: lines" || true
+  loaded_for "$1" "$2" || return 1
   while IFS= read -r old; do
-    [ -z "$old" ] || printf '%s\t%s\n' "$old" "$2" >> "$WORK/old-form"
-  done <<< "$REPORT_LINES"
-  report_read "$1" malformed "$2" "malformed directive lines" || true
+    [ -z "$old" ] || OLD_FORM="$OLD_FORM$old"$'\t'"$2"$'\n'
+  done <<< "$FM_PR_CLOSES_LEGACY"
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     LEFT=$((LEFT + 1))
     printf 'actionable: close-at-merge: ignored a malformed directive line in %s: %s; the forms are one Closes-backlog-item: <item-id> or Train-member: <GitHub, GitLab or Forgejo pull request URL> per line, one space after the colon and nothing after the value\n' "$2" "$line" >&2
-  done <<< "$REPORT_LINES"
-  report_read "$1" outside "$2" "directive lines outside the block" || true
+  done <<< "$FM_PR_CLOSES_MALFORMED"
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     LEFT=$((LEFT + 1))
     outside=1
     printf 'actionable: close-at-merge: ignored a directive line outside a directive block in %s: %s\n' "$2" "$line" >&2
-  done <<< "$REPORT_LINES"
+  done <<< "$FM_PR_CLOSES_OUTSIDE"
   [ "$outside" = 0 ] || printf 'actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a %s line and end with a %s line; fix %s, then retry: %s %s %s\n' \
     "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$2" "$0" "$TASK_ID" "$URL" >&2
 }
 
-# load_body <body-file> <where>: Main 1851 F2. The parse result's status, ids and members are
-# read whole, each reader's status checked, before any of that body's items acts. When that read
-# fails, nothing in the body closes, and every item id it names gets its own not-closed line.
-load_body() {
+# close_body <body-file> <where> <prose-where> <prose-how> [member]: parse, load whole, report every
+# refusal and outside line, then close the block's items; the body's prose, links and (for a
+# member) its own Train-member lines are kept for the mention reports. Sets BODY_STATUS and
+# BODY_MEMBERS from the one loaded result.
+MENTION_WHERE=() MENTION_HOW=() MENTION_WORDS=() MENTION_LINKS=() MENTION_MEMBERS=()
+close_body() {
   local id ids
-  fm_pr_closes_load "$1.parse" && return 0
-  ids=$(got "$1" seenid 2>/dev/null) || ids=''
-  LEFT=$((LEFT + 1))
-  printf 'actionable: close-at-merge: could not read the parse result of %s, so nothing named by it was closed and no blocked-by edge changed; retry: %s %s %s\n' \
-    "$2" "$0" "$TASK_ID" "$URL" >&2
+  BODY_STATUS=unread BODY_MEMBERS=''
+  fm_pr_closes_parse "$1" "$URL" > "$1.parse" 2>/dev/null || true
+  load_body "$1" "$2" || return 0
+  BODY_STATUS=$FM_PR_CLOSES_STATUS BODY_MEMBERS=$FM_PR_CLOSES_MEMBERS ids=$FM_PR_CLOSES_IDS
+  MENTION_WHERE+=("$3")
+  MENTION_HOW+=("$4")
+  MENTION_WORDS+=("$FM_PR_CLOSES_WORDS")
+  MENTION_LINKS+=("$FM_PR_CLOSES_LINKS")
+  # A member's own Train-member lines list nothing (a member's members are not read): kept to
+  # be reported.
+  if [ "$BODY_STATUS" = block ] && [ "${5:-}" = member ]; then MENTION_MEMBERS+=("$FM_PR_CLOSES_MEMBERS"); else MENTION_MEMBERS+=(''); fi
+  report_refusal "$1" "$2"
+  report_old_form "$1" "$2"
+  [ "$BODY_STATUS" = block ] || return 0
   while IFS= read -r id; do
-    [ -n "$id" ] || continue
-    left_open "$id" "the parse result of $2 could not be read, so it was not closed; retry: $0 $TASK_ID $URL"
+    [ -z "$id" ] || consider "$id" "$URL" "$2"
   done <<< "$ids"
-  return 1
 }
 
-parse_body "$WORK/body" "the body of $URL" || true
-report_refusal "$WORK/body" "the body of $URL"
-BODY_STATUS=failed BODY_IDS='' BODY_MEMBERS=''
-if load_body "$WORK/body" "the body of $URL"; then
-  BODY_STATUS=$FM_PR_CLOSES_STATUS BODY_IDS=$FM_PR_CLOSES_IDS BODY_MEMBERS=$FM_PR_CLOSES_MEMBERS
-fi
-if [ "$BODY_STATUS" = block ]; then
-  while IFS= read -r id; do
-    [ -z "$id" ] || consider "$id" "$URL" "the body of $URL"
-  done <<< "$BODY_IDS"
-fi
-report_old_form "$WORK/body" "the body of $URL"
+close_body "$WORK/body" "the body of $URL" "the prose of $URL" \
+  "add a Closes-backlog-item: <id> line to the body's closes block if this merge finished it"
+TRAIN_STATUS=$BODY_STATUS TRAIN_MEMBERS=$BODY_MEMBERS
 
 n=0
-MEMBER_URLS=()
 MEMBER_SEEN=$'\n'
-while IFS= read -r candidate; do
-  [ -n "$candidate" ] || continue
-  # The parse proved each member is a canonical GitHub, GitLab or Forgejo pull request URL of any
-  # repository, and not the merged one itself; fm_pr_url_parse only sets the provider fields
-  # read_body needs.
-  if ! fm_pr_url_parse "$candidate"; then
-    LEFT=$((LEFT + 1))
-    printf 'actionable: close-at-merge: could not use Train-member %s, so nothing was closed for it; retry: %s %s %s\n' "$candidate" "$0" "$TASK_ID" "$URL" >&2
-    continue
-  fi
-  member=$FM_PR_URL
-  case "$MEMBER_SEEN" in *$'\n'"$member"$'\n'*) continue ;; esac
-  MEMBER_SEEN="$MEMBER_SEEN$member"$'\n'
-  n=$((n + 1))
-  MEMBER_URLS[n]=$member
-  if read_body "$member" "$WORK/member-$n"; then
-    parse_body "$WORK/member-$n" "the body of train member $member" || true
-    report_refusal "$WORK/member-$n" "the body of train member $member"
-    if load_body "$WORK/member-$n" "the body of train member $member" && [ "$FM_PR_CLOSES_STATUS" = block ]; then
-      while IFS= read -r id; do
-        [ -z "$id" ] || consider "$id" "$URL" "the body of train member $member"
-      done <<< "$FM_PR_CLOSES_IDS"
+if [ "$TRAIN_STATUS" = block ]; then
+  while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    # The parse proved each member is a canonical GitHub, GitLab or Forgejo pull request URL of
+    # any repository, and not the merged one itself; fm_pr_url_parse only sets the provider
+    # fields read_body needs.
+    if ! fm_pr_url_parse "$candidate"; then
+      LEFT=$((LEFT + 1))
+      printf 'actionable: close-at-merge: could not use Train-member %s, so nothing was closed for it; retry: %s %s %s\n' "$candidate" "$0" "$TASK_ID" "$URL" >&2
+      continue
     fi
-    report_old_form "$WORK/member-$n" "the body of train member $member"
-  else
-    LEFT=$((LEFT + 1))
-    printf 'actionable: close-at-merge: could not read the body of train member %s (%s); retry: %s %s %s\n' \
-      "$member" "$(sed -n '1p' "$WORK/member-$n.err")" "$0" "$TASK_ID" "$URL" >&2
-  fi
-  while IFS= read -r task; do
-    [ -n "$task" ] || continue
-    consider "$task" "$URL" "the task record that holds train member $member"
-  done < <(tasks_recording_pr "$member")
-done <<< "$([ "$BODY_STATUS" != block ] || printf '%s\n' "$BODY_MEMBERS")"
+    member=$FM_PR_URL
+    case "$MEMBER_SEEN" in *$'\n'"$member"$'\n'*) continue ;; esac
+    MEMBER_SEEN="$MEMBER_SEEN$member"$'\n'
+    n=$((n + 1))
+    if read_body "$member" "$WORK/member-$n"; then
+      close_body "$WORK/member-$n" "the body of train member $member" "the prose of train member $member" \
+        "add a Closes-backlog-item: <id> line to the train body's closes block or to that member's if it finished the item" member
+    else
+      member_err=$(sed -n '1p' "$WORK/member-$n.err" 2>/dev/null) || member_err=''
+      LEFT=$((LEFT + 1))
+      printf 'actionable: close-at-merge: could not read the body of train member %s (%s); retry: %s %s %s\n' \
+        "$member" "${member_err:-the read failed}" "$0" "$TASK_ID" "$URL" >&2
+    fi
+    tasks_recording_pr "$member"
+    while IFS= read -r task; do
+      [ -n "$task" ] || continue
+      consider "$task" "$URL" "the task record that holds train member $member"
+    done <<< "$RECORDING_TASKS"
+  done <<< "$TRAIN_MEMBERS"
+fi
 
 while IFS=$'\t' read -r old where; do
   [ -n "$old" ] || continue
@@ -426,87 +431,73 @@ while IFS=$'\t' read -r old where; do
   else
     left_open "$old" "$where names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: $old' in the body's closes block, then retry: $0 $TASK_ID $URL"
   fi
-done < "$WORK/old-form"
+done <<< "$OLD_FORM"
 
 # Mentions outside the block: reported, never closed. The merged body and every train member
-# body that was read are checked, against one read of the backlog.
-MENTION_BODIES=("$WORK/body")
-MENTION_WHERE=("the prose of $URL")
-MENTION_HOW=("add a Closes-backlog-item: <id> line to the body's closes block if this merge finished it")
-m=1
-while [ "$m" -le "$n" ]; do
-  if [ -f "$WORK/member-$m.parse" ]; then
-    MENTION_BODIES+=("$WORK/member-$m")
-    MENTION_WHERE+=("the prose of train member ${MEMBER_URLS[$m]}")
-    MENTION_HOW+=("add a Closes-backlog-item: <id> line to the train body's closes block or to that member's if it finished the item")
-  fi
-  m=$((m + 1))
-done
+# body that was loaded are checked, against one read of the backlog.
 PROSE_AT=()
 k=0
-while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
-  if report_read "${MENTION_BODIES[$k]}" word "${MENTION_WHERE[$k]}" "mentioned words"; then
-    [ -z "$REPORT_LINES" ] || PROSE_AT+=("$k")
-  fi
+while [ "$k" -lt "${#MENTION_WORDS[@]}" ]; do
+  [ -z "${MENTION_WORDS[$k]}" ] || PROSE_AT+=("$k")
   k=$((k + 1))
 done
 if [ "${#PROSE_AT[@]}" -gt 0 ]; then
+  active_ids=''
   if states=$(fm_backlog_row_states "$DATA" 2>/dev/null); then
-    : > "$WORK/active-ids"
     while IFS= read -r row; do
       [ -n "$row" ] && [ "${row#*:}" != "done" ] || continue
-      printf '%s\n' "${row%%:*}" >> "$WORK/active-ids"
-    done <<ROWS
-$states
-ROWS
-    SEEN="$SEEN$TASK_ID"$'\n'
-    for k in "${PROSE_AT[@]}"; do
-      report_read "${MENTION_BODIES[$k]}" word "${MENTION_WHERE[$k]}" "mentioned words" || continue
-      match_rc=0
-      matches=$(printf '%s\n' "$REPORT_LINES" | grep -Fxf "$WORK/active-ids") || match_rc=$?
-      if [ "$match_rc" -gt 1 ]; then
+      active_ids="$active_ids${row%%:*}"$'\n'
+    done <<< "$states"
+    if printf '%s' "$active_ids" > "$WORK/active-ids"; then
+      SEEN="$SEEN$TASK_ID"$'\n'
+      for k in "${PROSE_AT[@]}"; do
+        match_rc=0
+        matches=$(grep -Fxf "$WORK/active-ids" <<< "${MENTION_WORDS[$k]}") || match_rc=$?
+        if [ "$match_rc" -gt 1 ]; then
+          LEFT=$((LEFT + 1))
+          printf 'actionable: close-at-merge: could not check which ids %s mentions, so none were checked; nothing was closed for them\n' "${MENTION_WHERE[$k]}" >&2
+          continue
+        fi
+        while IFS= read -r word; do
+          [ -n "$word" ] || continue
+          case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
+          SEEN="$SEEN$word"$'\n'
+          printf 'actionable: close-at-merge: mentioned %s in %s: nothing was closed for it; %s\n' \
+            "$word" "${MENTION_WHERE[$k]}" "${MENTION_HOW[$k]//<id>/$word}" >&2
+        done <<< "$matches"
+      done
+    else
+      for k in "${PROSE_AT[@]}"; do
         LEFT=$((LEFT + 1))
-        printf 'actionable: close-at-merge: could not check which ids %s mentions, so none were checked; nothing was closed for them\n' "${MENTION_WHERE[$k]}" >&2
-        continue
-      fi
-      while IFS= read -r word; do
-        [ -n "$word" ] || continue
-        case "$SEEN" in *$'\n'"$word"$'\n'*) continue ;; esac
-        SEEN="$SEEN$word"$'\n'
-        printf 'actionable: close-at-merge: mentioned %s in %s: nothing was closed for it; %s\n' \
-          "$word" "${MENTION_WHERE[$k]}" "${MENTION_HOW[$k]//<id>/$word}" >&2
-      done <<< "$matches"
-    done
+        printf 'actionable: close-at-merge: could not write the backlog ids to check which ids %s mentions, so none were checked\n' "${MENTION_WHERE[$k]}" >&2
+      done
+    fi
   else
     for k in "${PROSE_AT[@]}"; do
       printf 'actionable: close-at-merge: could not list the backlog to check which ids %s mentions, so none were checked\n' "${MENTION_WHERE[$k]}" >&2
     done
   fi
 fi
-# Pull request links in the merged body and in every train member body that was read: each
+# Pull request links in the merged body and in every train member body that was loaded: each
 # link that is neither the merged pull request nor a listed member is reported once.
 LINKED_SEEN=$MEMBER_SEEN
 k=0
-while [ "$k" -lt "${#MENTION_BODIES[@]}" ]; do
-  report_read "${MENTION_BODIES[$k]}" link "${MENTION_WHERE[$k]}" "pull request links" || true
+while [ "$k" -lt "${#MENTION_LINKS[@]}" ]; do
   while IFS= read -r linked; do
     fm_pr_url_parse "$linked" || continue
     [ "$FM_PR_URL" != "$URL" ] || continue
     case "$LINKED_SEEN" in *$'\n'"$FM_PR_URL"$'\n'*) continue ;; esac
     LINKED_SEEN="$LINKED_SEEN$FM_PR_URL"$'\n'
     printf 'actionable: close-at-merge: mentioned %s in %s: no item was closed for it; list it as a Train-member: line if it landed with this merge\n' "$FM_PR_URL" "${MENTION_WHERE[$k]}" >&2
-  done <<< "$REPORT_LINES"
+  done <<< "${MENTION_LINKS[$k]}"
   # A member's own Train-member lines (in its block) list nothing: a member's members are not read.
-  if [ "$k" -gt 0 ] && [ "$(got "${MENTION_BODIES[$k]}" status)" = block ]; then
-    report_read "${MENTION_BODIES[$k]}" member "${MENTION_WHERE[$k]}" "Train-member: lines" || true
-    while IFS= read -r linked; do
-      [ -n "$linked" ] || continue
-      case "$LINKED_SEEN" in *$'\n'"$linked"$'\n'*) continue ;; esac
-      LINKED_SEEN="$LINKED_SEEN$linked"$'\n'
-      printf 'actionable: close-at-merge: named %s with a Train-member: line in the body of %s: a member body lists no members, so no item was closed for it; list it as a Train-member: line in the train body if it landed with this merge\n' \
-        "$linked" "${MENTION_WHERE[$k]#the prose of }" >&2
-    done <<< "$REPORT_LINES"
-  fi
+  while IFS= read -r linked; do
+    [ -n "$linked" ] || continue
+    case "$LINKED_SEEN" in *$'\n'"$linked"$'\n'*) continue ;; esac
+    LINKED_SEEN="$LINKED_SEEN$linked"$'\n'
+    printf 'actionable: close-at-merge: named %s with a Train-member: line in the body of %s: a member body lists no members, so no item was closed for it; list it as a Train-member: line in the train body if it landed with this merge\n' \
+      "$linked" "${MENTION_WHERE[$k]#the prose of }" >&2
+  done <<< "${MENTION_MEMBERS[$k]}"
   k=$((k + 1))
 done
 

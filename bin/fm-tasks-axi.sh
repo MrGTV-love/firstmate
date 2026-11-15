@@ -449,17 +449,24 @@ if [ "$pf_form" != 1 ]; then
   fi
   tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$pf_out"
   pf_status=$?
-  cat -- "$pf_out"
+  # Main 1875 F8: the replay of the kept output is checked. When it fails, the caller may hold
+  # cut output (a JSON caller, invalid JSON), so the wrapper says the completion's own status
+  # and exits 1, and the item's edges are handled below on the store's state as usual.
+  pf_replay=0
+  cat -- "$pf_out" || pf_replay=$?
+  if [ "$pf_replay" -ne 0 ]; then
+    printf 'actionable: tasks-axi finished the %s of %s with status %s, but the wrapper could not show its output (status %s), so what was printed may be cut; read the item with tasks-axi show %s before acting on it\n' \
+      "$pf_name" "${pf_id:-its item}" "$pf_status" "$pf_replay" "${pf_id:-<id>}" >&2
+  fi
   if [ "$pf_status" -eq 0 ] && [ "$pf_form" = 2 ]; then
     printf 'actionable: tasks-axi accepted the %s, but the wrapper could not resolve which item it completed from these arguments, so no blocked-by edge was cleared; clear the items it blocked with tasks-axi unblock <item> --by <id>\n' \
       "$pf_name" >&2
   elif [ "$pf_status" -eq 0 ] && [ "$pf_form" = 0 ]; then
-    # Proof of Done (Main 1795): tasks-axi 0.2.6 exits 0 from `public-followup waive` and
-    # `public-followup record-delivery` only when the row it completed is Done. A new completion
-    # stores its terminal delivery state and Done in one mutation (dist/src/backends/markdown.js:
-    # 821-834, refusing anything else), the idempotent "already" path returns only for a row
-    # already waived or posted, and a waived or posted row that is not Done fails to parse
-    # (dist/src/public-followup.js:877-887, checked for every row read at markdown-grammar.js:359).
+    # tasks-axi 0.2.6 exits 0 from `public-followup waive` and `record-delivery` only when the row
+    # it completed is Done (dist/src/backends/markdown.js:821-834; dist/src/public-followup.js:
+    # 877-887, checked for every row read at markdown-grammar.js:359). The edges clear only when
+    # the row reads done, or is no longer in the active backlog. Main 1875: when the row cannot be
+    # read, every edge and hold of that id is kept (the base behaviour) and the item is reported.
     if fm_backlog_row_probe "$DATA" "$pf_id"; then
       if [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ]; then
         fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
@@ -470,33 +477,12 @@ if [ "$pf_form" != 1 ]; then
     elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
       fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
     else
-      # Main 1853: exit 0 proves only that the row the command completed is Done. Another item
-      # may hold that id by now, so the active backlog is read again through the same store
-      # tasks-axi writes: any item with that id that is not done keeps every edge and hold.
-      pf_read_error=${FM_BACKLOG_ROW_ERROR:-unknown error}
-      if pf_states=$(fm_backlog_row_states "$DATA"); then
-        pf_verdict=$(printf '%s\n' "$pf_states" | fm_typed_completion_store_verdict "$pf_id")
-      else
-        pf_verdict='unread'
-      fi
-      case "$pf_verdict" in
-        clear)
-          printf 'note: the state of %s could not be read after its %s (%s); tasks-axi exits 0 from that completion only when the row is Done, and the active backlog holds no unfinished item with that id, so its blocked-by edges are cleared now\n' \
-            "$pf_id" "$pf_name" "$pf_read_error" >&2
-          fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
-          ;;
-        keep\ *)
-          printf 'actionable: tasks-axi accepted the %s of %s, but the active backlog now holds an item with that id that is %s, not done, so no blocked-by edge or hold was changed; once the item that finished is confirmed, clear its dependents with tasks-axi unblock <item> --by %s\n' \
-            "$pf_name" "$pf_id" "${pf_verdict#keep }" "$pf_id" >&2
-          ;;
-        *)
-          printf 'actionable: tasks-axi accepted the %s of %s, but neither its row (%s) nor the active backlog could be read, so no blocked-by edge was cleared; clear its dependents with tasks-axi unblock <item> --by %s once it reads done\n' \
-            "$pf_name" "$pf_id" "$pf_read_error" "$pf_id" >&2
-          ;;
-      esac
+      printf 'actionable: %s: closed, edges kept: row unreadable; tasks-axi finished its %s, but its row could not be read back (%s), so every blocked-by edge and hold on %s is kept; once it reads done, clear its dependents with tasks-axi unblock <item> --by %s\n' \
+        "$pf_id" "$pf_name" "${FM_BACKLOG_ROW_ERROR:-unknown error}" "$pf_id" "$pf_id" >&2
     fi
   fi
   rm -f -- "$pf_out"
+  [ "$pf_replay" -eq 0 ] || exit 1
   exit "$pf_status"
 fi
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

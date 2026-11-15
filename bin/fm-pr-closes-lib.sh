@@ -14,8 +14,9 @@
 # The block is honored only when all of these hold; it acts only on positive proof, and any
 # doubt refuses the whole body (Main 045, "refuse when in doubt"):
 # - The begin line is the body's first non-empty line, exactly that text from column 0. A line
-#   is empty when it has no characters once one trailing carriage return (GitHub bodies often
-#   use CRLF) is removed; every line loses that one carriage return before any check.
+#   is empty when it has no characters. A carriage return is a control byte like any other
+#   (Main 1741): a begin, end or block line that holds one, a CRLF line end included, refuses the
+#   body.
 # - One end line follows, exactly that text.
 # - The marker text (`firstmate-backlog-closes:`) appears on no other line of the body.
 # - Every line between them is printable ASCII (no tab, no control byte, nothing above 0x7E)
@@ -33,8 +34,11 @@
 # - A NUL byte anywhere in the body refuses it before any pass (Main 1785 F2), since a tool on
 #   the way may drop it. bin/fm-pr-close-items.sh writes the forge's bytes to files, never
 #   through command substitution, and refuses a body any read step failed to write in full.
-# - A parse that fails (its snapshot or pass cannot run) gives `status failed`, never `block`, so
-#   it closes nothing; the caller reports it (Main 1785 F3).
+# - A parse that fails (its snapshot, its byte count or its pass cannot run) gives `status
+#   failed`, never `block`, so it closes nothing; the caller reports it (Main 1785 F3).
+# - Every stage's status is checked (Main 1875 rule P): no stage feeds a pipe whose status is
+#   lost. Each producer writes to a file or a variable, its status checked, before any consumer
+#   reads it, and a result is complete only when its last record is `end complete`.
 # - One token reading (Main 1785 F4): the value of an exact directive line is the same for the
 #   close and for every report, so a refusal names each id exactly as written.
 # The reader interprets no Markdown and no HTML. Because the block must open the body, any
@@ -81,6 +85,7 @@ FM_PR_CLOSES_MARKER='firstmate-backlog-closes:'
 #   link     a pull request, merge request or change link in that text, once each
 #   seenid   an id-shaped token after a directive word anywhere in the body, once each
 #   seenpr   a link token after a directive word, or a pull request link, anywhere, once each
+#   end      `complete`, always the last record; a result without it is cut short and unread
 # Line forms (the one grammar): `Closes-backlog-item: <item-id>` and `Closes: <item-id>` with
 # one space and nothing after the id; `Train-member: <url>` with one space and one value with no
 # space after it, the value being a pull request URL by fm_pr_url_parse.
@@ -100,8 +105,22 @@ fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
   # Main 1785 F2: a NUL byte anywhere refuses the whole body before any pass, because a tool on
   # the way (a command substitution, an awk) may drop it; the forced pass reads a copy with each
   # NUL shown as `?`, only for the report.
-  size=$(LC_ALL=C wc -c < "$snap" | tr -d ' ') && kept=$(LC_ALL=C tr -d '\000' < "$snap" | LC_ALL=C wc -c | tr -d ' ') || rc=1
-  if [ "$rc" -eq 0 ] && [ "$size" != "$kept" ]; then
+  # Main 1875 rule P: each count is its own stage with its status checked, and a count that is
+  # not a number is a failed count, so a failed stage can never pass for "no NUL byte".
+  size=$(LC_ALL=C wc -c < "$snap") || rc=1
+  [ "$rc" -ne 0 ] || LC_ALL=C tr -d '\000' < "$snap" > "$snap.kept" || rc=1
+  [ "$rc" -ne 0 ] || kept=$(LC_ALL=C wc -c < "$snap.kept") || rc=1
+  if [ "$rc" -eq 0 ]; then
+    size=${size//[[:space:]]/} kept=${kept//[[:space:]]/}
+    case "$size:$kept" in *[!0-9:]*|:*|*:) rc=1 ;; esac
+  fi
+  rm -f -- "$snap.kept"
+  if [ "$rc" -ne 0 ]; then
+    rm -f -- "$snap"
+    fm_pr_closes_failed "$1" "$merged" "the parse could not count the bytes of its snapshot"
+    return 1
+  fi
+  if [ "$size" != "$kept" ]; then
     LC_ALL=C tr '\000' '?' < "$snap" > "$snap.nul" && result=$(fm_pr_closes_pass "$snap.nul" "$merged" "the body contains a NUL byte, so nothing in it is read as a closes block") || rc=1
     rm -f -- "$snap" "$snap.nul"
     [ "$rc" -eq 0 ] || { fm_pr_closes_failed "$1" "$merged" "the parse could not read its snapshot"; return 1; }
@@ -139,8 +158,15 @@ fm_pr_closes_parse() {  # <body-file> <merged-pr-url>
 # `status failed`, the reason, and the seenid and seenpr records the same pass reads from the
 # original file under a forced refusal, when it can.
 fm_pr_closes_failed() {
+  local forced seen
   printf 'status\tfailed\nreason\t%s\n' "$3"
-  fm_pr_closes_pass "$1" "$2" "$3" 2>/dev/null | LC_ALL=C awk -F '\t' '$1 == "seenid" || $1 == "seenpr"'
+  # Main 1875 rule P: the forced pass and the filter are separate stages, each checked; when
+  # either fails, the result names no ids rather than a cut list.
+  if forced=$(fm_pr_closes_pass "$1" "$2" "$3" 2>/dev/null) &&
+     seen=$(LC_ALL=C awk -F '\t' '$1 == "seenid" || $1 == "seenpr"' <<< "$forced"); then
+    [ -z "$seen" ] || printf '%s\n' "$seen"
+  fi
+  printf 'end\tcomplete\n'
   return 0
 }
 
@@ -207,7 +233,7 @@ fm_pr_closes_pass() {
       }
       links(l, "seenpr")
     }
-    { sub(/\r$/, ""); line[NR] = $0 }
+    { line[NR] = $0 }
     END {
       nm = 0; first = 0; end = 0; reason = ""
       for (i = 1; i <= NR; i++) {
@@ -262,33 +288,55 @@ fm_pr_closes_pass() {
         if (k != "id" && k != "legacy") { words(t); links(t, "link") }
       }
       for (i = 1; i <= NR; i++) seen_tokens(line[i])
+      print "end\tcomplete"
     }' "$1"
 }
 
 # fm_pr_closes_get <parse-result-file> <type>: the values of one record type of a parse result,
-# in order. It reads the result, never a body.
+# in order. It reads the result, never a body: the whole file into a variable, its status
+# checked, and only a complete result (its last record `end complete`); otherwise it fails.
 fm_pr_closes_get() {  # <parse-result-file> <type>
-  LC_ALL=C awk -v t="$2" '{ i = index($0, "\t"); if (substr($0, 1, i - 1) == t) print substr($0, i + 1) }' "$1"
+  local text
+  text=$(cat -- "$1") || return 1
+  [ "${text##*$'\n'}" = "$(printf 'end\tcomplete')" ] || return 1
+  fm_pr_closes_values "$text" "$2"
 }
 
 # fm_pr_closes_values <parse-result-text> <type>: the same, from a result held in a variable.
+# The text reaches awk as a here-string, so no producer stage can fail unseen (Main 1875 rule P).
 fm_pr_closes_values() {  # <parse-result-text> <type>
-  printf '%s\n' "$1" | LC_ALL=C awk -v t="$2" '{ i = index($0, "\t"); if (substr($0, 1, i - 1) == t) print substr($0, i + 1) }'
+  LC_ALL=C awk -v t="$2" '{ i = index($0, "\t"); if (substr($0, 1, i - 1) == t) print substr($0, i + 1) }' <<< "$1"
 }
 
-# fm_pr_closes_load <parse-result-file>: reads the status, ids and members of a parse result
-# whole, each with its reader's status checked (Main 1851 F2), into FM_PR_CLOSES_STATUS,
-# FM_PR_CLOSES_IDS and FM_PR_CLOSES_MEMBERS (newline lists). Returns 1, with all three empty,
-# when any of them cannot be read, so a caller acts on all of a body's items or on none.
+# fm_pr_closes_load <parse-result-file>: reads a parse result once and whole (Main 1851 F2,
+# Main 1875 rule P): the file into a variable with its status checked, complete only when its
+# last record is `end complete` and its first is one status, then every record type the close
+# step uses, each with its status checked, into FM_PR_CLOSES_STATUS, _REASON, _IDS, _MEMBERS,
+# _OUTSIDE, _MALFORMED, _LEGACY, _WORDS, _LINKS, _SEENIDS and _SEENPRS (newline lists), and
+# FM_PR_CLOSES_LOADED to the file. Returns 1, with every one of them empty, when any part
+# cannot be read, so a caller acts on all of a body's records or on none.
 fm_pr_closes_load() {  # <parse-result-file>
-  local status ids members
+  local text t v
+  local -a got=()
   # shellcheck disable=SC2034  # The callers read these.
-  FM_PR_CLOSES_STATUS='' FM_PR_CLOSES_IDS='' FM_PR_CLOSES_MEMBERS=''
-  status=$(fm_pr_closes_get "$1" status) || return 1
-  ids=$(fm_pr_closes_get "$1" id) || return 1
-  members=$(fm_pr_closes_get "$1" member) || return 1
-  case "$status" in block|refused|none|failed) ;; *) return 1 ;; esac
+  FM_PR_CLOSES_LOADED='' FM_PR_CLOSES_STATUS='' FM_PR_CLOSES_REASON='' FM_PR_CLOSES_IDS='' \
+    FM_PR_CLOSES_MEMBERS='' FM_PR_CLOSES_OUTSIDE='' FM_PR_CLOSES_MALFORMED='' FM_PR_CLOSES_LEGACY='' \
+    FM_PR_CLOSES_WORDS='' FM_PR_CLOSES_LINKS='' FM_PR_CLOSES_SEENIDS='' FM_PR_CLOSES_SEENPRS=''
+  text=$(cat -- "$1") || return 1
+  [ "${text##*$'\n'}" = "$(printf 'end\tcomplete')" ] || return 1
+  case "${text%%$'\n'*}" in
+    "$(printf 'status\tblock')"|"$(printf 'status\trefused')"|"$(printf 'status\tnone')"|"$(printf 'status\tfailed')") ;;
+    *) return 1 ;;
+  esac
+  # Every record type is read before any global is set, so a failure leaves them all empty.
+  for t in status reason id member outside malformed legacy word link seenid seenpr; do
+    v=$(fm_pr_closes_values "$text" "$t") || return 1
+    got+=("$v")
+  done
   # shellcheck disable=SC2034  # The callers read these.
-  FM_PR_CLOSES_STATUS=$status FM_PR_CLOSES_IDS=$ids FM_PR_CLOSES_MEMBERS=$members
+  FM_PR_CLOSES_STATUS=${got[0]} FM_PR_CLOSES_REASON=${got[1]} FM_PR_CLOSES_IDS=${got[2]} \
+    FM_PR_CLOSES_MEMBERS=${got[3]} FM_PR_CLOSES_OUTSIDE=${got[4]} FM_PR_CLOSES_MALFORMED=${got[5]} \
+    FM_PR_CLOSES_LEGACY=${got[6]} FM_PR_CLOSES_WORDS=${got[7]} FM_PR_CLOSES_LINKS=${got[8]} \
+    FM_PR_CLOSES_SEENIDS=${got[9]} FM_PR_CLOSES_SEENPRS=${got[10]} FM_PR_CLOSES_LOADED=$1
   return 0
 }

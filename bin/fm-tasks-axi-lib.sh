@@ -199,41 +199,70 @@ fm_tasks_axi_backend_available() {
   fm_tasks_axi_compatible
 }
 
-# Typed public-followup completions (Main 1851 F4, Main 1853). bin/fm-tasks-axi.sh clears a
+# Typed public-followup completions (Main 1851 F4, Main 1875 F3). bin/fm-tasks-axi.sh clears a
 # finished obligation's blocked-by edges after `public-followup waive` or `record-delivery`, so
 # it must name the same id tasks-axi completed, in every form tasks-axi 0.2.6 accepts.
 #
 # fm_typed_completion_resolve <tasks-axi args...>: reads the arguments with tasks-axi's own
-# grammar: an optional leading `task` noun (dist/src/cli.js:82-83); then for the handler,
-# takeBoolFlag --json, then takeFlag for each value flag in the handler's order (waive: --reason,
-# --approved-by; record-delivery: --receipt-file), each as `--flag value` (a value may not start
-# with `--`) or `--flag=value` (dist/src/args.js:7-15, 52-80; commands/public-followup.js:589-594,
-# 709-718); then exactly one positional, the id. Sets FM_TYPED_COMPLETION (waive or
-# record-delivery) and FM_TYPED_COMPLETION_ID. Returns 0 for a resolved id, 1 when the arguments
-# are not a typed completion, 2 when they are one but no single valid id can be resolved (the
-# caller clears nothing and warns), and 3 for a help call.
+# grammar: an optional leading `task` noun (dist/src/cli.js:82-83); the command
+# `public-followup`; then, in everything after the command, the global `--backend` and `--file`
+# flags are taken out wherever they stand, each as `--flag value` (a value may not start with
+# `--` and may not be empty) or `--flag=value` (non-empty), the way cli.js parseGlobalFlags does
+# (dist/src/cli.js:102-140, args.js:7-15); what is left starts with the subcommand. Then for the
+# handler, takeBoolFlag --json, then takeFlag for each value flag in the handler's order (waive:
+# --reason, --approved-by; record-delivery: --receipt-file), each as `--flag value` or
+# `--flag=value` (dist/src/args.js:52-80; commands/public-followup.js:589-594, 709-718); then
+# exactly one positional, the id. Sets FM_TYPED_COMPLETION (waive or record-delivery) and
+# FM_TYPED_COMPLETION_ID. Returns 0 for a resolved id, 1 when the arguments are not a typed
+# completion, 2 when they may be one but no single valid id can be resolved (the caller runs
+# it with the capture guard, clears nothing and warns), and 3 for a help call.
 fm_typed_completion_resolve() {
   local -a a rest vflags
-  local flag i n tok found positional='' count=0
+  local flag i n tok found positional='' count=0 help=0 bad=0
   FM_TYPED_COMPLETION=
   FM_TYPED_COMPLETION_ID=
   a=("$@")
   [ "${a[0]:-}" != task ] || a=("${a[@]:1}")
   [ "${a[0]:-}" = public-followup ] || return 1
-  case "${a[1]:-}" in
-    waive) vflags=(--reason --approved-by) ;;
-    record-delivery) vflags=(--receipt-file) ;;
-    *) return 1 ;;
-  esac
-  # shellcheck disable=SC2034  # bin/fm-tasks-axi.sh reads it.
-  FM_TYPED_COMPLETION=${a[1]}
-  a=("${a[@]:2}")
+  a=("${a[@]:1}")
   # Help: the runner prints a command's help and runs nothing when any argument after the command
   # is exactly `--help` (axi-sdk-js 0.1.12 dist/cli.js:77-82; tasks-axi dist/src/cli.js:84), even
   # where a flag would take it as a value. `-h` is no help flag there.
   for tok in ${a[@]+"${a[@]}"}; do
-    [ "$tok" != --help ] || return 3
+    [ "$tok" != --help ] || help=1
   done
+  # parseGlobalFlags: take out every --backend and --file, in either form, wherever it stands.
+  rest=()
+  n=${#a[@]}
+  for ((i = 0; i < n; i++)); do
+    tok=${a[i]}
+    case "$tok" in
+      --backend|--file)
+        if [ $((i + 1)) -lt "$n" ] && [ "${a[i+1]#--}" = "${a[i+1]}" ] && [ -n "${a[i+1]//[[:space:]]/}" ]; then
+          i=$((i + 1))
+        else
+          bad=1
+        fi
+        continue
+        ;;
+      --backend=*|--file=*)
+        [ -n "${tok#*=}" ] || bad=1
+        continue
+        ;;
+    esac
+    rest+=("$tok")
+  done
+  a=(${rest[@]+"${rest[@]}"})
+  case "${a[0]:-}" in
+    waive) vflags=(--reason --approved-by) ;;
+    record-delivery) vflags=(--receipt-file) ;;
+    *) [ "$bad" = 0 ] && return 1; [ "$help" = 0 ] || return 3; return 2 ;;
+  esac
+  # shellcheck disable=SC2034  # bin/fm-tasks-axi.sh reads it.
+  FM_TYPED_COMPLETION=${a[0]}
+  [ "$help" = 0 ] || return 3
+  [ "$bad" = 0 ] || return 2
+  a=("${a[@]:1}")
   # takeBoolFlag: remove the first --json.
   rest=() found=0
   for tok in ${a[@]+"${a[@]}"}; do
@@ -265,20 +294,4 @@ fm_typed_completion_resolve() {
   # shellcheck disable=SC2034  # bin/fm-tasks-axi.sh reads it.
   FM_TYPED_COMPLETION_ID=$positional
   return 0
-}
-
-# fm_typed_completion_store_verdict <id>: reads `<id>:<state>` lines of the active backlog (the
-# output of fm_backlog_row_states, a `tasks-axi list` of the same store tasks-axi writes) on
-# standard input and prints `clear` when no row has that id or every row with it is done, or
-# `keep <state>` for the first row with that id that is not done (Main 1853: any unfinished item
-# under that id keeps every edge and hold).
-fm_typed_completion_store_verdict() {
-  local want=$1 line
-  while IFS= read -r line; do
-    [ "${line%%:*}" = "$want" ] || continue
-    [ "${line#*:}" = "done" ] && continue
-    printf 'keep %s\n' "${line#*:}"
-    return 0
-  done
-  printf 'clear\n'
 }
