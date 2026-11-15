@@ -3301,7 +3301,9 @@ class Watch:
         start of this owner check is also written to its own small file (OWNER_CHECK_FILE), so a hand-over of an earlier, interrupted sweep is known as such
         even when both writes of second.json fail (F5 of the review of c5868b6f)."""
         try:
-            write_atomically(self.root / OWNER_CHECK_FILE, json.dumps({'sweep': getattr(self, 'sweep_id', None), 'at': getattr(self, 'run_wall', None)}))
+            root = getattr(self, 'root', None)
+            if root is not None:
+                write_atomically(root / OWNER_CHECK_FILE, json.dumps({'sweep': getattr(self, 'sweep_id', None), 'at': getattr(self, 'run_wall', None)}))
         except OSError:
             pass
         try:
@@ -4007,8 +4009,11 @@ class Watch:
 
     def refusal_logged(self, event):
         """Whether the plane's log already holds a row for this event (a whole line that names it)."""
+        root = getattr(self, 'root', None)
+        if root is None:
+            return False
         try:
-            lines = (self.root / REFUSAL_FILE).read_text().split('\n')
+            lines = (root / REFUSAL_FILE).read_text().split('\n')
         except FileNotFoundError:
             lines = []
         except OSError:

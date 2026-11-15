@@ -1283,7 +1283,9 @@ class SafetyTest(unittest.TestCase):
             home.poll(); home.check(); home.reply(r, r, 'a'); home.read(r, f)
             names = {n for n in home.watch_files()}
             # second.json: the time of each completed run, kept on every plane for a later first enable of the second person (Main's ruling e59cdb79).
-            self.assertEqual({n for n in names if not n.startswith('replay-state-')}, {'state.json', 'lock', 'requests.jsonl', 'outbound.jsonl', 'attempts.jsonl', 'second.json'})
+            # owner-check-at: the latest owner check's sweep identity (round 9, F5), inside the plane's own state folder as SC6 allows.
+            self.assertEqual({n for n in names if not n.startswith('replay-state-')}, {'state.json', 'lock', 'requests.jsonl', 'outbound.jsonl', 'attempts.jsonl', 'second.json',
+                                                                                     'owner-check-at'})
             self.assertEqual({item[0] for item in home.children.scripts()}, {'fm-captain-hold.sh'})   # no other process starts
 
 
