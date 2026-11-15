@@ -767,12 +767,14 @@ test_launch_proof_selector_refuses_missing_or_failed_reads() (
   mkdir -p "$T"
   META="$T/sel.meta"
   printf 'window=lab:w1:p2\nharness=claude\nspawn_gen=s1\nlaunch_proof=env-v1\n' > "$META"
+  # shellcheck disable=SC2329 # the selector under test calls it
   ps() {
     [ "$*" = '-axo pid=,ppid=' ] || return 1
     printf '3101 1\n'
     case "$scenario" in stable) printf '3102 3101\n' ;; missing-member) ;; partial-failure) return 1 ;; esac
   }
   for harness in claude omp; do
+    # shellcheck disable=SC2329 # the selector under test calls it
     fm_backend_herdr_cli() {
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":3101,"foreground_processes":[{"pid":3101,"name":"%s","argv0":"%s"},{"pid":3102,"name":"helper","argv0":"helper"}]}}}' "$harness" "$harness"
     }
