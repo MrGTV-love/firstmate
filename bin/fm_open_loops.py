@@ -1107,15 +1107,24 @@ class Collector:
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
         for marker in self.state_files:
-            if not marker.name.endswith(".teardown-return-pending") or marker.is_symlink() or not marker.is_file():
+            if not marker.name.endswith(".teardown-return-pending"):
+                continue
+            linked = marker.is_symlink()
+            if not linked and not marker.is_file():
                 continue
             task_id = marker.name[:-len(".teardown-return-pending")]
             meta = self.state / (task_id + ".meta")
             if meta.is_symlink() or not meta.is_file():
                 continue
-            if self.spawn_gen(marker) != self.spawn_gen(meta):
+            if not linked and self.spawn_gen(marker) != self.spawn_gen(meta):
                 continue
-            fields = dict(line.split("=", 1) for line in marker.read_text().splitlines() if "=" in line)
+            try:
+                text = marker.read_text()
+            except (OSError, ValueError):
+                if not linked:
+                    raise
+                text = ""
+            fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
             child = f" for child {fields['child']}" if fields.get("child") else ""
             self.add("interrupted_teardown", task_id,
                      f"re-run bin/fm-teardown.sh {task_id} to finish returning its pool slot{child}; "
