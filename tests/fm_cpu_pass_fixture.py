@@ -574,7 +574,7 @@ def prove(folder, db, run, key=None):
     (folder / 'pool').mkdir(exist_ok=True)
     write_json(folder / 'pool' / ('attempt-proof-%s.json' % run), dict(
         id='proof-' + run, run=run, repo='repo', step='ci', reserves=True, t0_us=1, root=[1, 0], gate=None, watcher=None,
-        coalition=None, session_key=key, members=[], quiet_us=1, ended_us=1))
+        coalition=None, session_key=key, members=[], ended_us=1))
 
 
 def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), timeout='240m', ci_ms=(60000,), round_age=0,

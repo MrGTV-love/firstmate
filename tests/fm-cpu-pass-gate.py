@@ -223,7 +223,7 @@ try:
         me = engine().kernel_snapshot()[os.getpid()]
         (folder / 'pool' / 'attempt-dead.json').write_text(json.dumps(dict(
             id='dead', run='x', repo='repo', step='ci', reserves=True, t0_us=int(time.time() * 1000000), root=[gone.pid, 1],
-            gate=None, watcher=None, coalition=me[2], session_key='dead-key', members=[], quiet_us=None, ended_us=None)))
+            gate=None, watcher=None, coalition=me[2], session_key='dead-key', members=[], ended_us=None)))
         # The daemon's row for that launch, carrying its own key: once the record ends, the launch is shown ended.
         change(db, "INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at, duration_ms, exit_status,"
                    " session_key) VALUES ('dead', 'x', 'ci', 'ci', 1, 2, 1, 'launched', 'dead-key')")
@@ -615,13 +615,13 @@ os.waitpid(child, 0)
         registered = (folder.parent / 'coalition.pids').read_text().split() if (folder.parent / 'coalition.pids').exists() else []
         assert pid in snapshot and snapshot[pid][1] == started and snapshot[pid][0] == 1 and str(pid) not in registered, (
             'control premise: the outside orphan lives at the decision', pid, snapshot.get(pid))
-        # Its coalition as the decision saw it: known, and outside X's launch coalition. Outside the case (lineage lost,
-        # not registered) the scope reports the real coalition moved by 1000000 (fm_cpu_pass_fixture scope_coalition);
-        # X's records carry the case's own, unmoved.
+        # Its coalition as the decision saw it, known and outside X's launch coalition: this test's engine() reads
+        # coalitions through the same scope as the engine under test (fm_cpu_pass_fixture scope_coalition), so the
+        # snapshot's value is already the scoped one, compared as it is.
         launch = {json.loads(path.read_text()).get('coalition') for path in (folder / 'pool').glob('attempt-*.json')
                   if not path.name.startswith('attempt-proof-')}
         seen = snapshot[pid][2]
-        assert seen is not None and launch and None not in launch and seen + 1000000 not in launch, (
+        assert seen is not None and launch and None not in launch and seen not in launch, (
             'control premise: the orphan is in another coalition than the launch', seen, launch)
         os.kill(pid, signal.SIGKILL)
 
@@ -712,7 +712,7 @@ os.waitpid(child, 0)
             for index, key in enumerate(records):
                 (folder / 'pool' / ('attempt-r%d.json' % index)).write_text(json.dumps(dict(
                     id='r%d' % index, run='x', repo='repo', step='ci', reserves=True, t0_us=15000000 + index * 10000000,
-                    root=[gone.pid, 1], gate=None, watcher=None, coalition=0, session_key=key, members=[], quiet_us=1, ended_us=1)))
+                    root=[gone.pid, 1], gate=None, watcher=None, coalition=0, session_key=key, members=[], ended_us=1)))
             finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'm'), 0) if released else None
             if released:
                 assert 'x:ci-waiting:0' in (folder / 'm.stderr').read_text(), (label, (folder / 'm.stderr').read_text())

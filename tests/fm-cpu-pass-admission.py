@@ -1287,24 +1287,24 @@ if intent.startswith('reg'):
         outer = launch(mem_guard + ['bash', '-c', line.format(abs=client, go=go)], env, folder / 'outer', cwd=registered_checkout(folder, db))
         wait_for(lambda: calls(folder) == ['reg-first'], 'the first client ran')
         lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
-        until = time.monotonic() + 15
-        while True:
+        def free():
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
+                return True
             except BlockingIOError:
-                if time.monotonic() >= until:
-                    os.close(lock); go.touch()
-                    raise AssertionError('the admitted command still holds the start lock after its first client ended')
-                time.sleep(0.05)
-        try:
-            elsewhere = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', str(client), 'axi', 'run', '--intent', 'elsewhere'],
-                               env, folder / 'elsewhere')
-            pending(folder, 1)
-            go.touch()
-            pending(folder, 2)
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
+                return False
+        wait_for(free, 'the admitted command released the start lock')
+        fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
+        # A process pile-up holds every decision (not the start lock: a claim is made under that lock, Main 1812 A), so
+        # the higher-class start queues first and the second client queues behind it; then the pile-up clears.
+        procs(folder, count=10600)
+        elsewhere = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', str(client), 'axi', 'run', '--intent', 'elsewhere'],
+                           env, folder / 'elsewhere')
+        pending(folder, 1)
+        go.touch()
+        pending(folder, 2)
+        assert calls(folder) == ['reg-first'], calls(folder)
+        procs(folder)
         assert ended(elsewhere, folder, 'the elsewhere start') == 0
         assert ended(outer, folder, 'the outer command') == 0
         assert calls(folder) == ['reg-first', 'elsewhere', 'second'], calls(folder)  # the nonce row proved reg-first's run its own
