@@ -183,9 +183,10 @@ fm_launch_proof_herdr_pid() { # <meta> [with-listed] -> the attributed live fore
 # All five adoption checks live here so lifecycle readers can recheck them too.
 # One record read (Main 1874 rule S): the window, the generation and the
 # Python proof all rest on this decision's bytes of <meta> (a caller's when it
-# holds them), and the Python proof refuses any other bytes. A caller that read
-# the session record passes the sha256 of those bytes in
-# FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256, and the proof refuses any other.
+# holds them), and the Python proof refuses any other bytes. Every caller reads
+# the session record once and passes the sha256 of those bytes in
+# FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256 (mandatory, as the endpoint is for
+# fm_launch_proof_herdr_refusal), and the proof refuses any other.
 fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
   local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local meta=$1 target session pane pid reference gen sha
@@ -298,10 +299,10 @@ try:
             "generation proof needs an existing regular session record")
     session_raw = record_path.read_bytes()
     expected_session = os.environ.get("FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256", "")
-    if expected_session:
-        import hashlib
-        require(hashlib.sha256(session_raw).hexdigest() == expected_session,
-                "generation proof needs the same session record bytes the caller read")
+    require(expected_session != "", "generation proof needs the digest of the session record the caller read")
+    import hashlib
+    require(hashlib.sha256(session_raw).hexdigest() == expected_session,
+            "generation proof needs the same session record bytes the caller read")
     old = json.loads(session_raw.decode())
     require(isinstance(old, dict) and old.get("version") == 1 and old.get("spawn_gen") == gen,
             "generation proof needs the existing record spawn_gen to equal metadata spawn_gen")
@@ -852,7 +853,14 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
     case "$verdict" in
       managed) fm_launch_proof_token_checks "$meta" "$pid" "$gen"; return ;;
       unmanaged)
-        table=$(LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) || table=''
+        # The same complete-table rule as the refusal checks (Main 1874): a
+        # failed read or a short row could hide a member pinned elsewhere,
+        # whose next action differs, so it is unknown.
+        if ! table=$(set -o pipefail; LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) || [ -z "$table" ] \
+          || ! awk 'NF != 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^[0-9]+$/ {bad = 1} END {exit bad}' <<< "$table"; then
+          printf 'unknown\tthe process table could not be read completely, so the agent'"'"'s process group cannot be judged'
+          return
+        fi
         if fm_launch_proof_group_pinned_elsewhere "$gen" "$table" "$pid"; then
           verdict='pinned-elsewhere'
         fi

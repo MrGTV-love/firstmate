@@ -165,8 +165,11 @@ state_value() { # <id>; prints recovery-grade state
   fm_backend_agent_state "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" 2>/dev/null || printf 'unreadable\n'
 }
 
-cmd_attribution() { # <id> <recorded-target>
-  local id=$1 target=$2 meta state cause
+# <record-sha256> is internal to the send verb (the verb line takes two
+# arguments): the proof must then rest on record bytes with that digest, so the
+# send's check and its doorbell re-check judge the bytes the send read.
+cmd_attribution() { # <id> <recorded-target> [<record-sha256>]
+  local id=$1 target=$2 digest=${3:-} meta state cause
   validate_id "$id"
   validate_home "$id"
   case "$target" in ''|*[![:print:]]*) printf 'attribution=refuse: the recorded target is empty or not printable\n'; return 0 ;; esac
@@ -185,15 +188,27 @@ cmd_attribution() { # <id> <recorded-target>
   fi
   state=$(fm_backend_agent_state "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" 2>/dev/null) || state=unreadable
   case "$state" in
-    dead|missing) printf 'attribution=proceed\n'; return 0 ;;
+    dead|missing)
+      if [ -n "$digest" ] && [ "$(record_snapshot "$meta" || true)" != "$digest" ]; then
+        printf 'attribution=refuse: its record changed after this send read it\n'
+        return 0
+      fi
+      printf 'attribution=proceed\n'; return 0 ;;
     alive) ;;
     *) printf "attribution=refuse: its Herdr agent state reads '%s' rather than a positively classified state\n" "$state"; return 0 ;;
   esac
   if cause=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" \
-    FM_LAUNCH_PROOF_VERB_PATH=1 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" && fm_launch_proof_herdr_refusal "$2" "$3"' \
-    _ "$SCRIPT_DIR" "$meta" "$target" 2>/dev/null); then
+    FM_LAUNCH_PROOF_VERB_PATH=1 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" || exit 1
+      if [ -n "$4" ]; then
+        fm_launch_proof_record_read "$2"
+        [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] \
+          && [ "$(set -o pipefail; printf "%s" "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d" " -f1)" = "$4" ] \
+          || { printf "its record changed after this send read it"; exit 1; }
+      fi
+      fm_launch_proof_herdr_refusal "$2" "$3"' \
+    _ "$SCRIPT_DIR" "$meta" "$target" "$digest" 2>/dev/null); then
     printf 'attribution=proceed\n'
   else
     cause=$(printf '%s\n' "$cause" | sed -n '/./{s/[[:space:]]\{1,\}/ /g;p;q;}')
@@ -397,11 +412,13 @@ cmd_stay() {
     "$SCRIPT_DIR/fm-control.sh" "$id" stay
 }
 
-# The exact bytes of a task record (bin/fm-launch-proof-lib.sh owns the reader:
-# a failed, empty or NUL-bearing read fails), read in a separate process.
+# The sha256 of a task record's exact bytes (bin/fm-launch-proof-lib.sh owns the
+# reader: a failed, empty or NUL-bearing read fails), read in a separate process.
 record_snapshot() { # <meta>
   # shellcheck disable=SC2016 # the script expands in the child shell
-  bash -c '. "$1/fm-launch-proof-lib.sh" >/dev/null 2>&1 && fm_launch_proof_bytes "$2"' _ "$SCRIPT_DIR" "$1"
+  bash -c '. "$1/fm-launch-proof-lib.sh" >/dev/null 2>&1 && bytes=$(fm_launch_proof_bytes "$2") || exit 1
+    digest=$(set -o pipefail; printf "%s" "${bytes%x}" | shasum -a 256 | cut -d" " -f1) && [ -n "$digest" ] || exit 1
+    printf "%s" "$digest"' _ "$SCRIPT_DIR" "$1"
 }
 
 cmd_send() {
@@ -436,13 +453,13 @@ cmd_send() {
   # F4): the same host decision the parent asked for, read again right before
   # the record is written, refuses a replaced agent at an unchanged address.
   # One endpoint snapshot binds the check, the write and the doorbell (Main
-  # 1874 rule S and (i)): the record's bytes before and after the decision
-  # must be equal.
+  # 1874 rule S and (i)): the send reads the record's digest once, and each
+  # attribution decision must rest on record bytes with that digest.
   if [ -n "$expected" ]; then
     snapshot=$(record_snapshot "$meta") || snapshot=''
-    decision=$(cmd_attribution "$id" "$expected")
-    if [ -z "$snapshot" ] || [ "$decision" != attribution=proceed ] \
-      || [ "$(record_snapshot "$meta" || true)" != "$snapshot" ]; then
+    decision='attribution=refuse: its record could not be read'
+    [ -z "$snapshot" ] || decision=$(cmd_attribution "$id" "$expected" "$snapshot")
+    if [ "$decision" != attribution=proceed ]; then
       fm_lock_release "$meta_lock"
       die "the agent at this host's endpoint for $id is no longer attributed to this task (${decision#attribution=refuse: }); refusing before the record is written"
       # shellcheck disable=SC2317 # die exits; this stops a stand-in die that returns
@@ -471,13 +488,11 @@ cmd_send() {
       return 0
       ;;
   esac
-  # The doorbell rings only while that snapshot holds: the same record bytes
-  # and the same decision, read again now. Otherwise the steer stays in the
-  # inbox for the next agent that reads it, and the ring is withheld.
+  # The doorbell rings only while that snapshot holds: the decision, read again
+  # now, must proceed on record bytes with the same digest. Otherwise the steer
+  # stays in the inbox for the next agent that reads it, and the ring is withheld.
   if [ -n "$expected" ]; then
-    if [ "$(record_snapshot "$meta" || true)" != "$snapshot" ] \
-      || [ "$(cmd_attribution "$id" "$expected")" != attribution=proceed ] \
-      || [ "$(record_snapshot "$meta" || true)" != "$snapshot" ]; then
+    if [ "$(cmd_attribution "$id" "$expected" "$snapshot")" != attribution=proceed ]; then
       printf 'notice: doorbell withheld: the record or the agent at %s is no longer the one this steer was checked against, so the pane was not rung; the steer stays durably recorded at %s for the next agent that reads its inbox\n' "$REMOTE_ENDPOINT_TARGET" "$rec" >&2
       return 0
     fi

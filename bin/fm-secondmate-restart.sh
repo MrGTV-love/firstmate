@@ -295,7 +295,7 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
     if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
       PLAN[i]="refused"
-      REASON[i]=$FM_SECONDMATE_RESTART_REASON
+      REASON[i]="${REASON[i]}; $FM_SECONDMATE_RESTART_REASON"
     else
       # The fallback nudge must use this first compared route (Main 1807 (6)).
       ROUTE_PLACEMENT[i]=$FM_SECONDMATE_RESTART_ROUTE_PLACEMENT ROUTE_HOST[i]=$FM_SECONDMATE_RESTART_ROUTE_HOST
@@ -308,11 +308,21 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   PLACEMENT[i]=$FM_SECONDMATE_RESTART_PLACEMENT
   HOST[i]=$FM_SECONDMATE_RESTART_HOST
   HARNESS[i]=$FM_SECONDMATE_RESTART_HARNESS
+  CAPABLE_BYTES=$FM_SECONDMATE_RESTART_CAPABLE_BYTES
   # Attribution is decided before any effect reaches the pane: an agent that is
   # not positively this task's own gets no request, no record and no nudge.
   if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
     PLAN[i]="refused"
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    i=$((i + 1))
+    continue
+  fi
+  # The capability and attribution decisions must rest on the same record
+  # bytes (Main 1874 rule S), so the placement and host the relaunch branches
+  # on are the route the attribution compared.
+  if [ -z "$CAPABLE_BYTES" ] || [ "$FM_SECONDMATE_RESTART_RECORD_BYTES" != "$CAPABLE_BYTES" ]; then
+    PLAN[i]="refused"
+    REASON[i]="its record changed between its capability and attribution decisions, so no request, record or nudge was sent to it"
     i=$((i + 1))
     continue
   fi
@@ -359,9 +369,9 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     continue
   fi
   if ! fm_secondmate_restart_route_is "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" \
-    "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}"; then
+    "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}" || [ "$FM_SECONDMATE_RESTART_RECORD_BYTES" != "$CAPABLE_BYTES" ]; then
     PLAN[i]="refused"
-    REASON[i]="its route changed after its first decision, so no request, record or nudge was sent to it"
+    REASON[i]="its route or record changed after its first decision, so no request, record or nudge was sent to it"
     i=$((i + 1))
     continue
   fi

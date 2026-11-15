@@ -46,46 +46,66 @@ FM_SECONDMATE_PERSIST_REQUEST='Firstmate was updated and I am about to restart y
 #   FM_SECONDMATE_RESTART_HARNESS    the verified control adapter it runs on
 #   FM_SECONDMATE_RESTART_HOST       the configured host (remote placement only)
 # and on failure sets FM_SECONDMATE_RESTART_REASON to one operator-readable line.
+# Every field comes from one read of the record (Main 1874 rule S), whose bytes
+# it leaves in FM_SECONDMATE_RESTART_CAPABLE_BYTES so a later decision on the
+# same mate can require the same bytes.
+FM_SECONDMATE_RESTART_CAPABLE_BYTES=""
 FM_SECONDMATE_RESTART_PLACEMENT=""
 FM_SECONDMATE_RESTART_BACKEND=""
 FM_SECONDMATE_RESTART_HARNESS=""
 FM_SECONDMATE_RESTART_HOST=""
 FM_SECONDMATE_RESTART_REASON=""
+# The launch-proof library owns the strict record reader both decisions use.
+fm_secondmate_restart_load_proof_lib() {
+  declare -F fm_launch_proof_record_read >/dev/null 2>&1 && return 0
+  # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
+  . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
+}
+
 fm_secondmate_restart_capable() {  # <meta-file>
-  local meta=$1 kind window remote_host backend harness family
+  local meta=$1 kind window remote_host backend harness family bytes
   FM_SECONDMATE_RESTART_PLACEMENT=""
   FM_SECONDMATE_RESTART_BACKEND=""
   FM_SECONDMATE_RESTART_HARNESS=""
   FM_SECONDMATE_RESTART_HOST=""
   FM_SECONDMATE_RESTART_REASON=""
+  FM_SECONDMATE_RESTART_CAPABLE_BYTES=""
 
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
     FM_SECONDMATE_RESTART_REASON="no durable record for this second mate in this home"
     return 1
   fi
-  kind=$(fm_meta_get "$meta" kind)
+  fm_secondmate_restart_load_proof_lib
+  if ! bytes=$(fm_launch_proof_bytes "$meta"); then
+    FM_SECONDMATE_RESTART_REASON="its durable record is not one readable record without NUL bytes"
+    return 1
+  fi
+  bytes=${bytes%x}
+  FM_SECONDMATE_RESTART_CAPABLE_BYTES=$bytes
+  kind=$(fm_launch_proof_bytes_field "$bytes" kind)
   if [ "$kind" != secondmate ]; then
     FM_SECONDMATE_RESTART_REASON="the durable record is not a second mate's"
     return 1
   fi
-  window=$(fm_meta_get "$meta" window)
+  window=$(fm_launch_proof_bytes_field "$bytes" window)
   if [ -z "$window" ]; then
     FM_SECONDMATE_RESTART_REASON="the durable record names no endpoint, so there is no agent to replace"
     return 1
   fi
-  harness=$(fm_meta_get "$meta" harness)
-  remote_host=$(fm_meta_get "$meta" remote_host)
+  harness=$(fm_launch_proof_bytes_field "$bytes" harness)
+  remote_host=$(fm_launch_proof_bytes_field "$bytes" remote_host)
   if [ -n "$remote_host" ]; then
     FM_SECONDMATE_RESTART_PLACEMENT=remote
     FM_SECONDMATE_RESTART_HOST=$remote_host
     # A remote mate's endpoint record lives on its host; the parent's own record
     # names the backend that launch established there, and the remote route
     # accepts nothing but herdr.
-    backend=$(fm_meta_get "$meta" remote_backend)
+    backend=$(fm_launch_proof_bytes_field "$bytes" remote_backend)
     [ -n "$backend" ] || backend=herdr
   else
     FM_SECONDMATE_RESTART_PLACEMENT=local
-    backend=$(fm_backend_of_meta "$meta")
+    backend=$(fm_launch_proof_bytes_field "$bytes" backend)
+    [ -n "$backend" ] || backend=tmux
   fi
   FM_SECONDMATE_RESTART_BACKEND=$backend
   if ! fm_control_backend_state_verified "$backend"; then
@@ -140,10 +160,7 @@ fm_secondmate_restart_attribution() {  # <meta-file>
   FM_SECONDMATE_RESTART_ROUTE_PLACEMENT='' FM_SECONDMATE_RESTART_ROUTE_HOST=''
   FM_SECONDMATE_RESTART_ROUTE_ROOT='' FM_SECONDMATE_RESTART_ROUTE_HOME='' FM_SECONDMATE_RESTART_ROUTE_TARGET=''
   FM_SECONDMATE_RESTART_RECORD_BYTES=''
-  if ! declare -F fm_launch_proof_record_read >/dev/null 2>&1; then
-    # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
-    . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
-  fi
+  fm_secondmate_restart_load_proof_lib
   fm_launch_proof_record_read "$meta"
   if [ "$FM_LAUNCH_PROOF_RECORD_OK" != 1 ] || [ -L "$meta" ]; then
     FM_SECONDMATE_RESTART_REASON="its record is not one readable regular record without NUL bytes, so nothing about its agent can be decided and no request, record or nudge was sent to it"
