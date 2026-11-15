@@ -2454,13 +2454,13 @@ esac
 # it on this merge's own backlog.
 close_mode=()
 [ "$outcome_rc" -eq 0 ] || close_mode=(--not-recorded)
+close_call=("$SCRIPT_DIR/fm-pr-close-items.sh" ${close_mode[@]+"${close_mode[@]}"} "$ID" "$URL")
 close_rc=0
-FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-  "$SCRIPT_DIR/fm-pr-close-items.sh" ${close_mode[@]+"${close_mode[@]}"} "$ID" "$URL" </dev/null || close_rc=$?
+FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "${close_call[@]}" </dev/null || close_rc=$?
 case "$close_rc" in
   0|3) ;;
-  *) printf 'actionable: the merge of %s stands, but its close step failed with status %s, so the backlog items it names may be left open; retry: %s %s%s %s\n' \
-       "$URL" "$close_rc" "$SCRIPT_DIR/fm-pr-close-items.sh" "${close_mode[@]+"${close_mode[*]} "}" "$ID" "$URL" >&2 ;;
+  *) printf 'actionable: the merge of %s stands, but its close step failed with status %s, so the backlog items it names may be left open; retry: %s\n' \
+       "$URL" "$close_rc" "${close_call[*]}" >&2 ;;
 esac
 
 # The merge is verified and its outcome recorded: arm the prune of the task's

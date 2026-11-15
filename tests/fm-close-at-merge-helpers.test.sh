@@ -373,6 +373,30 @@ test_f8_a_failed_replay_is_not_success() {
   check "f8 control: an intact replay exits 0 with the output" '0 {"ok":true}' "$rc $out"
 }
 
+# Main 1898 N1: when the close step fails, the merge's retry line must be the same call the merge
+# made, word for word, whether its outcome was recorded or not. The close-step block is taken out
+# of bin/fm-pr-merge.sh and run with the close step as a shell function that fails with status 5.
+close_step_retry() {  # <outcome_rc>: prints the call the merge made, then the retry line's words
+  bash -c 'block=$(awk "/^close_mode=\\(\\)\$/ {copy=1} copy {print} copy && /^esac\$/ {exit}" "$1/bin/fm-pr-merge.sh")
+    set -u
+    outcome_rc=$2 SCRIPT_DIR=/fm/bin ID=merging-task URL=https://github.com/o/r/pull/9 FM_HOME=/fm STATE=/fm/state
+    eval "$SCRIPT_DIR/fm-pr-close-items.sh() { builtin printf \"call:\"; builtin printf \" %s\" \"\$@\"; builtin printf \"\\n\"; return 5; }"
+    exec 3>&1
+    line=$({ eval "$block"; } 2>&1 >&3)
+    builtin printf "retry:"; builtin printf " %s" ${line#*retry: }; builtin printf "\n"' _ "$ROOT" "$1"
+}
+test_n1_the_retry_line_is_the_call_the_merge_made() {
+  local out want
+  out=$(close_step_retry 0)
+  want='call: merging-task https://github.com/o/r/pull/9'
+  check "n1: a recorded merge's close step is called with the id and the URL" "$want" "$(sed -n 1p <<< "$out")"
+  check "n1: a recorded merge's retry line separates the id and the URL" \
+    "retry: /fm/bin/fm-pr-close-items.sh merging-task https://github.com/o/r/pull/9" "$(sed -n 2p <<< "$out")"
+  out=$(close_step_retry 1)
+  check "n1 control: an unrecorded merge's retry line keeps --not-recorded" \
+    "retry: /fm/bin/fm-pr-close-items.sh --not-recorded merging-task https://github.com/o/r/pull/9" "$(sed -n 2p <<< "$out")"
+}
+
 # A bare wrapper call has no arguments; under `set -u` the typed branch must not stop bash 3.2.
 test_f4_a_call_with_no_arguments_runs() {
   local out
@@ -445,6 +469,7 @@ test_locked_clear_holds_the_store_lock_writers_take
 test_locked_clear_reads_the_answer_from_stdout
 test_locked_clear_refuses_another_tasks_axi
 test_f8_a_failed_replay_is_not_success
+test_n1_the_retry_line_is_the_call_the_merge_made
 test_f4_a_call_with_no_arguments_runs
 test_f4_every_typed_form_resolves_its_id
 test_f5_a_nul_without_a_marker_is_refused
