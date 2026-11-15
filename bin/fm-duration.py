@@ -207,10 +207,12 @@ nested bin/fm-cpu-pass.sh runs lease. The slot and the pass are one acquisition:
 waiter holds neither while it waits. It watches for a free slot holding nothing, takes
 the pass (queueing in the pool as any request does), tries the slot, and when another
 waiter has taken that slot meanwhile it returns the pass and waits again. A process that
-took its slot through gate or run therefore holds a pass in the same moment, unless it
-already runs inside a pass or the pool cannot be used, and never waits for a pass while
-it holds a slot. A command nested under it takes no pass; it waits only for slots, or
-for a lease of its holder's tokens. The pass stays held until COMMAND itself ends: a
+took its slot through gate or run therefore holds a pass in the same moment, unless the
+pool cannot be used, and never waits for a pass while it holds a slot. Inside a pass whose
+holder exported tokens, gate (--passes N, default 1) and run lease N of those tokens in the
+same acquisition with their slot, again waiting holding neither, unless an ancestor gate
+holds this very key; the command then gets the leased count as its own reservation. A
+command nested under a holder takes no pass of the pool. The pass stays held until COMMAND itself ends: a
 guard process forked after COMMAND starts keeps the pass descriptors open and exits when
 COMMAND's pid is gone, so killing only this process does not free the pass for a second
 worker (COMMAND's own descendants do not hold it; a reused pid keeps it a little longer,
@@ -1092,13 +1094,16 @@ class Admission:
         self.slot = None
 
 
-def admit(key, log_fd=2, queued=None, pass_label=None):
+def admit(key, log_fd=2, queued=None, pass_label=None, passes=1):
     """(slot fd, CPU pass fds, token directory) as an Admission for KEY; each is empty when this key takes none.
 
     With PASS_LABEL a test.* key also takes one pass of the host-wide pool, as one acquisition with the
     slot: the caller waits holding neither. FM_CPU_PASS_HELD is set for the command when a pass was
-    taken (1) or the pool cannot be used (0). A list passed as QUEUED receives the seconds spent
-    queued behind busy slots, leaving out the time spent waiting in the pool for a pass.
+    taken (1) or the pool cannot be used (0). A command that already runs inside a pass whose holder
+    exported tokens (FM_CPU_PASS_TOKENS) instead leases PASSES of those tokens in the same acquisition
+    with its slot, unless an ancestor gate holds this very key, and its command gets that many as its
+    own reservation. A list passed as QUEUED receives the seconds spent queued behind busy slots,
+    leaving out the time spent waiting in the pool or for tokens.
     """
     admission = Admission()
     if not key.startswith(SLOT_PREFIX):
@@ -1107,24 +1112,32 @@ def admit(key, log_fd=2, queued=None, pass_label=None):
     inherited = cpu_passes_held()
     state = dict(degraded=False, module=None)
 
-    def take():
-        return take_cpu_pass(key, pass_label, log_fd, state)
+    tokens = os.environ.get(TOKENS_ENV, '')
+    held_key = key in os.environ.get(SLOT_HELD_ENV, '').split('\t')
+    tool = pass_label is not None and (ROOT / 'bin' / 'fm-cpu-pass.py').is_file()
+    wanted = tool and inherited is None
+    leasing = tool and inherited is not None and 0 < passes <= inherited and bool(tokens) and os.path.isdir(tokens) and not held_key
 
-    wanted = pass_label is not None and inherited is None and (ROOT / 'bin' / 'fm-cpu-pass.py').is_file()
-    if limit == 0 or key in os.environ.get(SLOT_HELD_ENV, '').split('\t'):
+    def take():
+        return take_cpu_pass(key, pass_label, log_fd, state, (tokens, inherited, passes) if leasing else None)
+
+    if limit == 0 or held_key:
         pass
     elif fcntl is None or os.name != 'posix':
         slot_log(log_fd, f'running {key} without a slot: this Python has no POSIX file locks')
     else:
         try:
-            admission.slot, admission.passes = queue_for_slot(key, slot_directory(key), limit, log_fd, queued, take if wanted else None)
+            admission.slot, admission.passes = queue_for_slot(key, slot_directory(key), limit, log_fd, queued, take if wanted or leasing else None)
         except (OSError, ValueError) as error:
             slot_log(log_fd, f'running {key} without a slot: {error}')
-    if wanted and admission.slot is None and not admission.passes:
+    if (wanted or leasing) and admission.slot is None and not admission.passes:
         admission.passes = take()
-    if wanted:
-        os.environ[CPU_HELD_ENV] = '1' if admission.passes else '0'
+    if wanted or leasing:
         admission.pool = state['module']
+        if wanted:
+            os.environ[CPU_HELD_ENV] = '1' if admission.passes else '0'
+        elif admission.passes:
+            os.environ[CPU_HELD_ENV] = str(passes)
         if admission.passes and admission.pool is not None:
             admission.tokens = admission.pool.make_tokens()
             os.environ[TOKENS_ENV] = admission.tokens
@@ -1325,11 +1338,12 @@ def release_slot(fd):
         os.close(fd)
 
 
-def take_cpu_pass(key, label, log_fd, state):
+def take_cpu_pass(key, label, log_fd, state, lease=None):
     """The descriptors holding one CPU pass of the host-wide pool, waiting for it holding nothing else; empty when the work runs without one.
 
     docs/cpu-pass-pool.md rule 7: whatever the pool does, the command runs. An unusable pool, or a pool
-    helper that cannot load, says so once (STATE remembers it) and returns no pass.
+    helper that cannot load, says so once (STATE remembers it) and returns no pass. With LEASE, a tuple
+    (token directory, passes held, passes wanted), it leases tokens of the reservation it runs inside instead.
     """
     if state['degraded']:
         return []
@@ -1344,18 +1358,20 @@ def take_cpu_pass(key, label, log_fd, state):
             finally:
                 sys.dont_write_bytecode = previous
         pool = state['module']
+        if lease is not None:
+            return pool.acquire(lease[0], lease[1], lease[2], label, log_fd)
         directory = pool.pool_dir()
         pool.ensure_pool_dir(directory)
         return pool.acquire(directory, pool.pool_size(), 1, label, log_fd)
     except KeyboardInterrupt:
         raise
     except Exception as error:  # pool unusable: PoolUnavailable, OSError, or a helper that cannot load
-        slot_log(log_fd, f'running {key} without a CPU pass: {error}')
+        slot_log(log_fd, f'running {key} without {"leasing from its reservation" if lease is not None else "a CPU pass"}: {error}')
         state['degraded'] = True
         return []
 
 
-def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None):
+def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None, passes=1):
     """Run COMMAND while holding one of KEY's slots (and one CPU pass with PASS_LABEL); exit with its status.
 
     With cpu_file, write the command tree's CPU milliseconds there after it
@@ -1378,7 +1394,7 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None):
             log_fd = 2
     queued = []
     try:
-        admission = admit(key, log_fd, queued, pass_label)
+        admission = admit(key, log_fd, queued, pass_label, passes)
     except ValueError as error:
         slot_log(log_fd, str(error))
         return 125
@@ -1740,7 +1756,7 @@ def main():
     observer.add_argument('paths', nargs='*')
     observer.add_argument('--while-alive', action='store_true')
     gater = commands.add_parser('gate')
-    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('--cpu-file'); gater.add_argument('--cpu-pass', metavar='LABEL'); gater.add_argument('command', nargs=argparse.REMAINDER)
+    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('--cpu-file'); gater.add_argument('--cpu-pass', metavar='LABEL'); gater.add_argument('--passes', type=int, default=1); gater.add_argument('command', nargs=argparse.REMAINDER)
     nm = commands.add_parser('import-nm')
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
@@ -1810,7 +1826,7 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('gate requires -- COMMAND')
-        return gate(args.key, command, args.log_fd, args.wait_file, args.cpu_file, args.cpu_pass or f'fm-duration gate {args.key}')
+        return gate(args.key, command, args.log_fd, args.wait_file, args.cpu_file, args.cpu_pass or f'fm-duration gate {args.key}', args.passes)
     return 0
 
 

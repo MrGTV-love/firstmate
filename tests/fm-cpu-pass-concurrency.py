@@ -248,7 +248,9 @@ def kill_group(child):
 def sampling_valid(case, seen, label):
     """A sampler that saw no worker, or that slept longer than a worker lives, proves nothing about a cap."""
     case.check(seen['peak_total'] > 0, '%s: the sampler never saw a worker, so a cap that held proves nothing' % label)
-    case.check(seen['gap_p99_ms'] <= 100 and seen['gap_max_ms'] <= 1000,
+    # The contract asks for a sample at least every 50 ms: the p99 gap enforces that cadence, and a maximum gap of 250 ms is the
+    # point where the sampler is declared invalid (a worker lives at least 300 ms), reported as invalid sampling, not a product failure.
+    case.check(seen['gap_p99_ms'] <= 50 and seen['gap_max_ms'] <= 250,
                '%s: the sampler skipped too long (p99 gap %d ms, max gap %d ms): it may have missed a short-lived worker' % (label, seen['gap_p99_ms'], seen['gap_max_ms']))
 
 
@@ -790,6 +792,7 @@ def case_drain():
     codes = wait_all(jobs)
     seen = world.sample_stop()
     started = [group for group, _, _ in sorted(starts(world), key=lambda row: row[2])]
+    sampling_valid(case, seen, 'drain')
     case.measure(requests=burst, pool_size=N, sampled_max_workers_total=seen['peak_total'], sampled_max_passes_held=seen['peak_held'],
                  arrival_order=' '.join(order), start_order=' '.join(started), completed=sum(1 for code in codes if code == 0))
     case.check(codes == [0] * burst, 'a burst request did not complete: %s' % codes)
@@ -974,11 +977,14 @@ def case_sampler_control():
     sampling_valid(blind, dict(peak_total=0, gap_p99_ms=20, gap_max_ms=30), 'blind')
     slow = Case('x', 'x')
     sampling_valid(slow, dict(peak_total=3, gap_p99_ms=400, gap_max_ms=2500), 'slow')
+    cadence = Case('x', 'x')
+    sampling_valid(cadence, dict(peak_total=3, gap_p99_ms=80, gap_max_ms=120), 'sparse')
     sound = Case('x', 'x')
     sampling_valid(sound, dict(peak_total=3, gap_p99_ms=31, gap_max_ms=44), 'sound')
     case.measure(blind_sampler_violations=len(blind.violations), slow_sampler_violations=len(slow.violations), sound_sampler_violations=len(sound.violations))
     case.check(len(blind.violations) == 1, 'a sampler that saw no worker was accepted')
     case.check(len(slow.violations) == 1, 'a sampler that skipped for seconds was accepted')
+    case.check(len(cadence.violations) == 1, 'a sampler slower than the 50 ms cadence the contract asks for was accepted')
     case.check(not sound.violations, 'a sound sampler was rejected: %s' % sound.violations)
     return case
 
@@ -1087,6 +1093,26 @@ def case_mixed_cycle():
     return case
 
 
+def case_lease_slot_cycle():
+    """F3 one level down: a nested gate holder that calls a nested run, and a leaseholder that calls the gate's key, both finish."""
+    case = Case('F3 lease cycle', 'under one pass: gate test.A -> fm-cpu-pass.sh run, while a sibling leaseholder calls gate test.A, pool of 1')
+    world = World('lease-cycle', cores=1)
+    only_one = dict(FM_TEST_KEY_SLOTS='1')
+    b_ready, a_done, b_done = (world.folder / name for name in ('b.ready', 'a.done', 'b.done'))
+    script = ('cd "$1" || exit 1\n'
+              'bash "$2" run -- bash -c \'touch "$1"; sleep 2; exec "$2" "$3" gate test.A -- touch "$4"\' _ "$3" "$4" "$5" "$6" &\n'
+              'while [ ! -e "$3" ]; do sleep 0.05; done\n'
+              '"$4" "$5" gate test.A -- bash "$2" run -- touch "$8" &\n'
+              'wait\n')
+    outer = world.launch('outer', ['bash', tool('fm-cpu-pass.sh'), 'run', '--passes', '1', '--label', 'outer', '--', 'bash', '-c', script, '_',
+                                   str(repo), tool('fm-cpu-pass.sh'), str(b_ready), pyshim, tool('fm-duration.py'), str(b_done), 'unused', str(a_done)], extra=only_one)
+    began = time.monotonic()
+    codes = wait_all([outer], timeout=120)
+    case.measure(exit_codes=codes, seconds=round(time.monotonic() - began, 1))
+    case.check(codes == [0] and a_done.exists() and b_done.exists(), 'the nested slot holder and the leaseholder did not both finish: %s %s' % (codes, world.text('outer')[-300:]))
+    return case
+
+
 def case_holder_killed():
     """F6: a pass stays held until its command ends, so killing only the holder frees nothing for a second worker."""
     case = Case('F6 holder kill', 'SIGKILL of only the gate / pass-holder process: a queued request does not start until the worker ends')
@@ -1136,7 +1162,7 @@ def case_one_candidate_proof():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_holder_killed, case_one_candidate_proof, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():

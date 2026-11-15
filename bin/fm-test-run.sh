@@ -144,10 +144,10 @@
 # and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # When the holder's reservation has tokens (FM_CPU_PASS_TOKENS, bin/fm-cpu-pass.py), each
 # script leases its share of them (the count divided by --jobs, rounded down; the whole
-# count for a script it runs alone) before it waits for a slot and waits while sibling
-# runners hold them, so runners that are siblings of this one draw on the same reservation
-# and workers alive together never exceed the passes held. The script's own tree then has
-# exactly the leased count. A holder that only exports the marker has no tokens: each script
+# count for a script it runs alone) in the same acquisition as its slot (gate --passes N),
+# waiting holding neither while sibling runners hold them, so runners that are siblings of
+# this one draw on the same reservation and workers alive together never exceed the passes
+# held. The script's own tree then has exactly the leased count. A holder that only exports the marker has no tokens: each script
 # runs with its share of the count as its marker instead and the marker is trusted.
 # The marker must be a nonnegative decimal integer (001 means 1) or every execution mode,
 # --check-coverage included, exits 125; 0 denotes degraded work with no CPU-pass
@@ -3303,6 +3303,10 @@ run_script_bounded() {  # <script> <out> <stream> <id>
     pass_option=()
     if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
       pass_option=(--cpu-pass "fm-test-run $script")
+    elif [ -n "$lease" ]; then
+      # Inside a holder with tokens: the gate leases the script's share together with its slot.
+      pass_option=(--cpu-pass "fm-test-run $script" --passes "$lease")
+      lease=
     fi
     cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
       --wait-file "$out.slotwait" --cpu-file "$out.cpu" ${pass_option[@]+"${pass_option[@]}"} \
@@ -3312,7 +3316,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
   fi
   if [ -n "$lease" ]; then
-    # Outermost, so a script holds its leased tokens before it waits for a slot: no slot holder waits for a token.
+    # No per-key gate to lease through (slots off or no helper): lease the share around the script itself.
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --passes "$lease" --label "fm-test-run $script" \
       --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
   fi

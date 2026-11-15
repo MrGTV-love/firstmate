@@ -76,7 +76,7 @@ Firstmate's own heavy entry points take passes outside their timing and bounds; 
 - `bin/fm-test-isolation-proof.sh` takes min(`--jobs`, candidates, pool size) for its whole run; its header owns how it counts and records concurrency.
 - `.github/workflows/ci.yml` routes the long single-worker stock-bash tests (fleet snapshot view, bearings snapshot) and the two guard-lint scans through `bin/fm-cpu-pass.sh run`, so they are named in the runner machine's holder list.
 
-A command that takes a per-key slot through `fm-duration.py gate` or `run` takes its pass in the same acquisition and waits holding neither ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)); a command nested under it takes no pass and waits only for slots or for a lease of its holder's tokens, so a process that holds a slot never waits for a pass.
+A command that takes a per-key slot through `fm-duration.py gate` or `run` takes its pass in the same acquisition and waits holding neither ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)); inside a pass whose holder exported tokens it leases tokens in the same acquisition instead, so a process that took its slot through `gate` or `run` never waits for a pass or a lease while it holds that slot.
 Waiting for a pass or a slot is by capacity alone: no elapsed time admits a waiter.
 
 ## Fresh pipeline starts
