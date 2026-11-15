@@ -219,11 +219,19 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def metadata(path):
+def metadata(path, expected_sha256=None):
     require(path.is_file() and not path.is_symlink(),
             f"record proof needs a readable regular metadata file: {path.name}")
+    raw = path.read_bytes()
+    # A caller that already read the record passes its sha256: the proof must
+    # rest on those same bytes, so an A-to-B-to-A rewrite cannot slip a B proof
+    # past a final A comparison (Main 1856 (a)).
+    if expected_sha256:
+        import hashlib
+        require(hashlib.sha256(raw).hexdigest() == expected_sha256,
+                "record proof needs the same record bytes the caller read")
     fields = {}
-    for line in path.read_text().splitlines():
+    for line in raw.decode().splitlines():
         key, sep, value = line.partition("=")
         if sep:
             fields.setdefault(key, []).append(value)
@@ -251,7 +259,7 @@ try:
     meta = Path(sys.argv[1])
     pid = int(sys.argv[2])
     live = Path(sys.argv[3])
-    fields = metadata(meta)
+    fields = metadata(meta, os.environ.get("FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256"))
     require(single(fields, "backend") == "herdr" and single(fields, "harness") == "omp"
             and not remote(fields), "endpoint proof needs a local Herdr omp task")
     session = single(fields, "herdr_session")
@@ -356,14 +364,34 @@ PY
 # bytes live only as long as that decision. A read that needs the file again
 # (the omp adoption proof) compares it byte for byte and refuses on a change.
 FM_LAUNCH_PROOF_RECORD_CAUSE='its launch record is not one readable record with at most one launch_proof line naming a known proof (it is missing, unreadable, empty, duplicated, changed while read, or names an unknown proof), so nothing proves the live agent'
+# The exact bytes of a regular, readable, nonempty file, trailing newlines kept
+# (Main 1856 F6). A shell variable cannot hold a NUL byte, so each NUL is turned
+# into a \001 byte on the way in, and any \001 then refuses: no record that
+# carries either byte is read as text. Fails on a failed read (pipefail).
+fm_launch_proof_bytes() { # <file>
+  local raw
+  { [ -f "$1" ] && [ -r "$1" ]; } || return 1
+  raw=$(set -o pipefail; cat -- "$1" 2>/dev/null | LC_ALL=C tr '\000' '\001' && printf x) || return 1
+  raw=${raw%x}
+  [ -n "$raw" ] || return 1
+  case "$raw" in *$'\001'*) return 1 ;; esac
+  printf '%sx' "$raw"
+}
+
+# One field of <bytes> as fm_meta_get reads a record: the last <key>= line wins.
+fm_launch_proof_bytes_field() { # <bytes> <key>
+  local line value=''
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in "$2="*) value=${line#*=} ;; esac
+  done <<< "$1"
+  printf '%s' "$value"
+}
+
 fm_launch_proof_record_read() { # <meta>: sets FM_LAUNCH_PROOF_RECORD_PATH, _BYTES, _OK in scope
   local raw
   FM_LAUNCH_PROOF_RECORD_PATH=$1 FM_LAUNCH_PROOF_RECORD_BYTES='' FM_LAUNCH_PROOF_RECORD_OK=0
-  { [ -f "$1" ] && [ -r "$1" ]; } || return 0
-  raw=$(cat -- "$1" 2>/dev/null && printf x) || return 0
-  raw=${raw%x}
-  [ -n "$raw" ] || return 0
-  FM_LAUNCH_PROOF_RECORD_BYTES=$raw FM_LAUNCH_PROOF_RECORD_OK=1
+  raw=$(fm_launch_proof_bytes "$1") || return 0
+  FM_LAUNCH_PROOF_RECORD_BYTES=${raw%x} FM_LAUNCH_PROOF_RECORD_OK=1
 }
 
 # Reads <meta> unless this decision already holds its bytes. Callers declare the
@@ -375,13 +403,9 @@ fm_launch_proof_record_ensure() { # <meta>
 # One field of <meta>, from this decision's bytes when it holds them (the last
 # line for <key> wins, as fm_meta_get reads it), else from the file.
 fm_launch_proof_field() { # <meta> <key>
-  local line value=''
   if [ "${FM_LAUNCH_PROOF_RECORD_PATH-}" = "$1" ]; then
     [ "${FM_LAUNCH_PROOF_RECORD_OK-}" = 1 ] || return 0
-    while IFS= read -r line || [ -n "$line" ]; do
-      case "$line" in "$2="*) value=${line#*=} ;; esac
-    done <<< "$FM_LAUNCH_PROOF_RECORD_BYTES"
-    printf '%s' "$value"
+    fm_launch_proof_bytes_field "$FM_LAUNCH_PROOF_RECORD_BYTES" "$2"
     return 0
   fi
   fm_meta_get "$1" "$2"
@@ -391,7 +415,7 @@ fm_launch_proof_field() { # <meta> <key>
 fm_launch_proof_record_unchanged() { # <meta>
   local raw
   [ "${FM_LAUNCH_PROOF_RECORD_OK-}" = 1 ] && [ "${FM_LAUNCH_PROOF_RECORD_PATH-}" = "$1" ] || return 1
-  raw=$(cat -- "$1" 2>/dev/null && printf x) || return 1
+  raw=$(fm_launch_proof_bytes "$1") || return 1
   [ "${raw%x}" = "$FM_LAUNCH_PROOF_RECORD_BYTES" ]
 }
 
@@ -426,13 +450,15 @@ fm_launch_proof_record_legacy() { # <meta>
 # Whether <from>'s parent chain in <process-table> (pid ppid [pgid] rows) reaches
 # <to>: 0 it does, with every link's live parent read now equal to the table's;
 # 1 the chain ends first; 2 a link's live parent differs from the table's, so
-# the two reads disagree. Prints nothing.
+# the two reads disagree or the live parent read fails. Prints nothing.
 fm_launch_proof_chain() { # <process-table> <from> <to>
   local table=$1 pid=$2 to=$3 parent live depth=0
   while [ "$depth" -lt 64 ]; do
     parent=$(awk -v p="$pid" '$1 == p {print $2; exit}' <<< "$table")
     [ -n "$parent" ] || return 1
-    live=$(LC_ALL=C ps -p "$pid" -o ppid= 2>/dev/null | tr -d ' ')
+    # pipefail: a reader that prints a plausible parent and then fails is no
+    # evidence (Main 1856 F8).
+    live=$(set -o pipefail; LC_ALL=C ps -p "$pid" -o ppid= 2>/dev/null | tr -d ' ') || return 2
     [ "$live" = "$parent" ] || return 2
     [ "$parent" != "$to" ] || return 0
     [ "$parent" -gt 1 ] 2>/dev/null || return 1
@@ -521,30 +547,33 @@ fm_launch_proof_claim_states() { # <meta>
 # printing what could not be read: an unreadable directory or record is never
 # "no claim".
 fm_launch_proof_state_claimed() { # <self-meta> <state-dir> <cwd> <home> <root>
-  local self=$1 dir=$2 cwd=$3 home=$4 root=$5 target session pane peer path
+  local self=$1 dir=$2 cwd=$3 home=$4 root=$5 target session pane peer path bytes
   target=$(fm_launch_proof_field "$self" window)
   session=${target%%:*}; pane=${target#*:}
   { [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ]; } || { printf 'the task records at %s' "$dir"; return 2; }
   for peer in "$dir"/*.meta; do
     [ -e "$peer" ] || [ -L "$peer" ] || continue
     [ ! "$peer" -ef "$self" ] || continue
-    { [ -f "$peer" ] && [ -r "$peer" ]; } || { printf 'the task record %s' "$peer"; return 2; }
-    [ -z "$(fm_meta_get "$peer" remote_host)" ] || continue
-    if [ -n "$target" ] && [ "$(fm_meta_get "$peer" window)" = "$target" ]; then
+    # One strict read of each peer (Main 1856 F7): a failed, empty or
+    # NUL-bearing read is unknown, never "no claim".
+    bytes=$(fm_launch_proof_bytes "$peer") || { printf 'the task record %s' "$peer"; return 2; }
+    bytes=${bytes%x}
+    [ -z "$(fm_launch_proof_bytes_field "$bytes" remote_host)" ] || continue
+    if [ -n "$target" ] && [ "$(fm_launch_proof_bytes_field "$bytes" window)" = "$target" ]; then
       printf '%s' "${peer##*/}"; return 1
     fi
-    if [ -n "$session" ] && [ "$(fm_meta_get "$peer" herdr_session)" = "$session" ] \
-      && [ "$(fm_meta_get "$peer" herdr_pane_id)" = "$pane" ]; then
+    if [ -n "$session" ] && [ "$(fm_launch_proof_bytes_field "$bytes" herdr_session)" = "$session" ] \
+      && [ "$(fm_launch_proof_bytes_field "$bytes" herdr_pane_id)" = "$pane" ]; then
       printf '%s' "${peer##*/}"; return 1
     fi
-    for path in "$(fm_launch_proof_physical_dir "$(fm_meta_get "$peer" home)")" \
-      "$(fm_launch_proof_physical_dir "$(fm_meta_get "$peer" worktree)")"; do
+    for path in "$(fm_launch_proof_physical_dir "$(fm_launch_proof_bytes_field "$bytes" home)")" \
+      "$(fm_launch_proof_physical_dir "$(fm_launch_proof_bytes_field "$bytes" worktree)")"; do
       [ -n "$path" ] || continue
       if { [ -n "$home" ] && [ "$path" = "$home" ]; } || { [ -n "$root" ] && [ "$path" = "$root" ]; }; then
         printf '%s' "${peer##*/}"; return 1
       fi
     done
-    path=$(fm_launch_proof_physical_dir "$(fm_meta_get "$peer" worktree)")
+    path=$(fm_launch_proof_physical_dir "$(fm_launch_proof_bytes_field "$bytes" worktree)")
     [ -n "$path" ] || continue
     case "$cwd/" in
       "$path"/*)
@@ -564,7 +593,7 @@ fm_launch_proof_state_claimed() { # <self-meta> <state-dir> <cwd> <home> <root>
 # with no root walk and no bin/fm-wake-lib.sh. Returns as
 # fm_launch_proof_state_claimed does.
 fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
-  local meta=$1 cwd=$2 home=$3 root=$4 state named inventory dir key peer seen_dir known i=0 rc out
+  local meta=$1 cwd=$2 home=$3 root=$4 state named inventory dir key peer seen_dir known i=0 rc out bytes
   local -a queue=() seen=()
   state=$(dirname -- "$meta")
   queue=("$state")
@@ -594,9 +623,13 @@ fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
     [ -z "${FM_LAUNCH_PROOF_VERB_PATH:-}" ] || continue
     for peer in "$dir"/*.meta; do
       [ -f "$peer" ] || continue
-      [ "$(fm_meta_get "$peer" kind)" = secondmate ] || continue
-      [ -z "$(fm_meta_get "$peer" remote_host)" ] || continue
-      named=$(fm_meta_get "$peer" home)
+      # The claim scan above already read each peer strictly; a peer that
+      # cannot be read again here is unknown.
+      bytes=$(fm_launch_proof_bytes "$peer") || { printf 'the task record %s' "$peer"; return 2; }
+      bytes=${bytes%x}
+      [ "$(fm_launch_proof_bytes_field "$bytes" kind)" = secondmate ] || continue
+      [ -z "$(fm_launch_proof_bytes_field "$bytes" remote_host)" ] || continue
+      named=$(fm_launch_proof_bytes_field "$bytes" home)
       [ -z "$named" ] || queue+=("$named/state")
     done
   done
@@ -618,6 +651,12 @@ fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
   local -a members=()
   table=$(set -o pipefail; LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) && [ -n "$table" ] || {
     printf 'unknown\tthe process table could not be read completely, so the agent'"'"'s process group cannot be judged'
+    return
+  }
+  # Every row must carry a pid, a parent and a group (Main 1856 F8): a short or
+  # malformed row may hide a member, so the table is no evidence.
+  awk 'NF != 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^[0-9]+$/ {bad = 1} END {exit bad}' <<< "$table" || {
+    printf 'unknown\tthe process table has a short or malformed row, so the agent'"'"'s process group cannot be judged'
     return
   }
   group=$(awk -v p="$pid" '$1 == p {print $3; exit}' <<< "$table")
@@ -780,7 +819,8 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
     if [ "$verdict" = unmanaged ]; then
       # Adoption is a second authorization route, not a relaxed environment
       # comparison. A valid record alone still cannot license lifecycle input.
-      adopted=$(fm_launch_proof_omp_adoption "$meta" 2>/dev/null) \
+      adopted=$(FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$(printf '%s' "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d' ' -f1) \
+        fm_launch_proof_omp_adoption "$meta" 2>/dev/null) \
         || { printf '%s\t' "$refusal"; return; }
       # The adoption proof reads the record again: it must be the same bytes.
       fm_launch_proof_record_unchanged "$meta" \
@@ -843,11 +883,17 @@ fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|contested|unknown
 # than a known proof, and a record that cannot be read as one record with at
 # most one launch_proof, refuses. The record and the verdict are each read
 # exactly once.
-fm_launch_proof_herdr_refusal() { # <meta>
+fm_launch_proof_herdr_refusal() { # <meta> [<expected-endpoint>]
   local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
   local proof judged verdict harness
   fm_launch_proof_record_ensure "$1"
   harness=$(fm_launch_proof_field "$1" harness)
+  # The proof is of the endpoint the action targets (Main 1856 F2): the record
+  # this decision read must name exactly that endpoint.
+  if [ -n "${2:-}" ] && [ "$(fm_launch_proof_field "$1" window)" != "$2" ]; then
+    printf 'its launch record no longer names the endpoint this action targets (%s); refusing; retry once the record is settled, or decide the lane by hand' "$2"
+    return 1
+  fi
   if ! proof=$(fm_launch_proof_record_proof "$1") || { [ "$proof" != absent ] && [ "$proof" != proof=env-v1 ]; }; then
     [ "$harness" != claude ] \
       || printf '%s; %s' "$FM_LAUNCH_PROOF_RECORD_CAUSE" "$(fm_launch_proof_refusal_next unknown "$1")"
@@ -863,6 +909,6 @@ fm_launch_proof_herdr_refusal() { # <meta>
   return 1
 }
 
-fm_launch_proof_herdr_authorizes() { # <meta>
-  fm_launch_proof_herdr_refusal "$1" >/dev/null
+fm_launch_proof_herdr_authorizes() { # <meta> [<expected-endpoint>]
+  fm_launch_proof_herdr_refusal "$@" >/dev/null
 }
