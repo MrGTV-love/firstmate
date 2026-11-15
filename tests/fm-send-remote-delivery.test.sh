@@ -377,6 +377,7 @@ lost_remote_request() {
   pend=$(pending_record "$home")
   LOST_CORR=$(fm_pending_reply_get "$pend" corr_id)
   LOST_KEY=pending-reply-$LOST_CORR
+  # shellcheck disable=SC2016 # the child bash expands its positional arguments
   send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 \
     bash -c '. "$1/bin/fm-pending-reply-lib.sh"; fm_pending_reply_maybe_escalate "$2" "$3"' _ "$ROOT" "$home/state" "$LOST_CORR" \
     >/dev/null 2>&1 || true
@@ -965,6 +966,7 @@ test_local_typed_resend_with_correlation_meets_the_choice_rule() {
   expect_code 3 "$rc" "setup: the typed request's submit stays unconfirmed: $(cat "$dir/err")"
   rec=$(pending_record "$home"); corr=$(fm_pending_reply_get "$rec" corr_id); key=pending-reply-$corr
   fm_pending_reply_mark_delivery_unknown "$home/state" "$corr" || true
+  # shellcheck disable=SC2016 # the child bash expands its positional arguments
   env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" \
     bash -c '. "$1/bin/fm-pending-reply-lib.sh"; fm_pending_reply_maybe_escalate "$2" "$3"' _ "$ROOT" "$home/state" "$corr" \
     >/dev/null 2>&1 || true
