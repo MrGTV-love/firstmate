@@ -7678,7 +7678,8 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
 # of b6786352 (data/<task>/r4-review/falsifiers/) and keeps its control. Each runs
 # the real library helpers on throwaway repositories in its own bash process,
 # as the falsifiers do: no full teardown, no process is started or signalled,
-# and the driver, launcher and process observations are recording stubs.
+# and the driver, launcher and process observations are recording stubs (the
+# process scans live in bin/fm-teardown.sh, which these cases do not source).
 # r5_harness <case> <body> runs <body> after a preamble that sources the
 # libraries of the tree under test and prints its output; r5_expect checks one
 # line of it.
@@ -8047,6 +8048,8 @@ BODY
 test_r5_stale_bundle_credit_stops_before_the_driver() {
   local body=$TMP_ROOT/r5-body-credit.sh
   cat > "$body" <<'BODY'
+pids_with_cwd_under() { :; }
+pids_with_open_file_under() { :; }
 teardown_launcher_live_since() { return 1; }
 fm_lock_path_mtime() {
   if [ "$shape" = changed ]; then : > "$source_bundle"; : > "$stored"; fi
@@ -8099,6 +8102,8 @@ BODY
 test_r5_lock_changed_after_its_first_line_refuses() {
   local body=$TMP_ROOT/r5-body-lock.sh
   cat > "$body" <<'BODY'
+pids_with_cwd_under() { :; }
+pids_with_open_file_under() { :; }
 teardown_closeout_credit() { TEARDOWN_CLOSEOUT_CREDIT=(); TEARDOWN_CLOSEOUT_CREDIT_FILE=; }
 fm_lock_path_mtime() { printf '1\n'; }
 teardown_launcher_live_since() { return 1; }
