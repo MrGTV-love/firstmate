@@ -1309,6 +1309,57 @@ def m1876_short_argv():
             below_holder(4242, lambda: waits('m1876-short-argv-control', w, 11))
 
 
+def m1892_atomic_record_write():
+    # Main 1892: an attempt record's update that fails while its new text is made (no space) leaves the old record
+    # whole: an in-place write truncates first and leaves it empty, so every later decision waits on an unreadable
+    # record for good. Helper level: the engine's own update_attempt on a real pool file. Controls: the failed update
+    # returns None and leaves no temporary file; a good update writes the member, the record still valid.
+    import types
+    w = quiet_world('m1892-atomic')
+    path = w.pool / 'attempt-x.json'
+    before = path.read_text()
+
+    def dumps(*a, **k):
+        raise OSError(28, 'No space left on device')
+    real = engine.json
+    engine.json = types.SimpleNamespace(loads=json.loads, dumps=dumps, JSONDecodeError=json.JSONDecodeError)
+    try:
+        got = engine.update_attempt(str(path), lambda r: r['members'].append([50, 100200000]))
+    finally:
+        engine.json = real
+    after = path.read_text()
+    leftovers = sorted(q.name for q in w.pool.iterdir() if q.name.startswith('.'))
+    if after != before:
+        w.close()
+    harm('m1892-failed-write-empties-record', after == before, len(before), len(after))
+    good = engine.update_attempt(str(path), lambda r: r['members'].append([50, 100200000]))
+    final = json.loads(path.read_text())
+    w.close()
+    control(got is None and not leftovers, 'the failed update returns None and leaves nothing', got, leftovers)
+    control(good is not None and final['members'] == [[50, 100200000]] and engine.valid_attempt(final), good, final)
+    # Control: another writer (the gate's session-key relay, outside the start lock) replaces the record while this
+    # update waits for its lock: this update reads the replaced record, and neither change is lost.
+    w = quiet_world('m1892-concurrent')
+    path = str(w.pool / 'attempt-x.json')
+    real_fcntl, fired = engine.fcntl, []
+    real_flock = real_fcntl.flock
+
+    def flock(fd, operation):
+        if not fired:
+            fired.append(None)  # once: the other writer's own lock call goes straight through
+            fired[0] = engine.update_attempt(path, lambda r: r.__setitem__('session_key', 'key-late'))
+        return real_flock(fd, operation)
+    engine.fcntl = types.SimpleNamespace(flock=flock, LOCK_EX=real_fcntl.LOCK_EX, LOCK_UN=real_fcntl.LOCK_UN)
+    try:
+        mine = engine.update_attempt(path, lambda r: r['members'].append([50, 100200000]))
+    finally:
+        engine.fcntl = real_fcntl
+    both = json.loads(Path(path).read_text())
+    w.close()
+    control(fired and fired[0] is not None and mine is not None and both['session_key'] == 'key-late'
+            and both['members'] == [[50, 100200000]], 'no update lost', fired, both)
+
+
 def m1876_oversized_confirmation():
     # Finding 6: the confirming read of a possible orphan of X (pid 42, its coalition read as foreign) is longer than
     # one record: unknown, so its coalition is not taken as its own: X holds and the decision waits. Truncated and taken
@@ -1494,6 +1545,7 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1876 a short pending read waits', m1876_short_pending_read),
          ('Main 1876 a partial process table counts the entry', m1876_partial_process_table),
          ('Main 1876 a short argument record counts the entry', m1876_short_argv),
+         ('Main 1892 a failed record write leaves the old record whole', m1892_atomic_record_write),
          ('Main 1876 an oversized confirmation is unknown', m1876_oversized_confirmation),
          ('Main 1876 a row read error waits', m1876_row_read_error),
          ('Main 1656 an escaped descendant holds its attempt (facts)', m1656_escaped_descendant),

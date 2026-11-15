@@ -1279,17 +1279,35 @@ def read_attempt(path: str) -> Optional[dict]:
 
 
 def update_attempt(path: str, change) -> Optional[dict]:
-    """Apply change(record) to the record at PATH under its lock; returns the new record, None when unreadable."""
+    """Apply change(record) to the record at PATH under its lock; returns the new record, None when it fails.
+
+    The new record is written whole to a temporary file in the same folder and renamed over PATH, so a failed write
+    leaves the old record whole, never an empty or partial one (Main 1892). Writers lock the file they opened and
+    then check PATH still names it: one renamed in meanwhile is reopened, so no update is lost to a concurrent one.
+    """
     try:
-        with open(path, "r+", encoding="utf-8") as handle:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            record = json.loads(handle.read())
-            change(record)
-            handle.seek(0)
-            handle.truncate()
-            handle.write(json.dumps(record, sort_keys=True))
-            handle.flush()
-            return record
+        for _ in range(64):
+            with open(path, "r", encoding="utf-8") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                opened = os.fstat(handle.fileno())
+                current = os.stat(path)
+                if (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino):
+                    continue  # replaced since it was opened: read the record now at PATH
+                record = json.loads(handle.read())
+                change(record)
+                fd, temporary = tempfile.mkstemp(prefix="." + ATTEMPT_PREFIX, dir=os.path.dirname(path) or ".")
+                try:
+                    with os.fdopen(fd, "w", encoding="utf-8") as out:
+                        out.write(json.dumps(record, sort_keys=True))
+                        out.flush()
+                        os.fsync(out.fileno())
+                    os.rename(temporary, path)
+                except BaseException:
+                    with contextlib.suppress(OSError):
+                        os.unlink(temporary)
+                    raise
+                return record
+        return None
     except (OSError, ValueError):
         return None
 
