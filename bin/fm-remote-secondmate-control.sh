@@ -410,7 +410,7 @@ cmd_send() {
   fi
   if [ -n "$expected" ] && [ "$REMOTE_ENDPOINT_TARGET" != "$expected" ]; then
     fm_lock_release "$meta_lock"
-    die "this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected'; nothing was recorded"
+    die "this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected'; refusing before the record is written"
   fi
   # A remote steer is delivered by durable record, never by typing its payload
   # into the pane: write it into this secondmate's host-local steering inbox,

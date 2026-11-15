@@ -468,7 +468,7 @@ fm_send_remote_route_expected() { # <meta>
     && [ "$(fm_meta_get "$1" home)" = "${FM_ON_EXPECTED_HOME:-}" ]
 }
 if [ "$TARGET_BACKEND" = remote ] && ! fm_send_remote_route_expected "$TARGET_META"; then
-  echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID: its record's remote route is not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); nothing was recorded or sent" >&2
+  echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID: its record's remote route is not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent" >&2
   exit 1
 fi
 shift

@@ -113,7 +113,7 @@ done
 if [ -n "${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}" ]; then
   [ "$HOST" = "${FM_ON_EXPECTED_HOST:-}" ] && [ "$ROOT" = "${FM_ON_EXPECTED_ROOT:-}" ] \
     && [ "$HOME_PATH" = "${FM_ON_EXPECTED_HOME:-}" ] \
-    || die "remote route '$ROUTE' resolves to host '$HOST', root '$ROOT', home '$HOME_PATH', not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); nothing was sent"
+    || die "remote route '$ROUTE' resolves to host '$HOST', root '$ROOT', home '$HOME_PATH', not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before ssh"
 fi
 
 ROOT_B64=$(printf '%s' "$ROOT" | encode_base64)
