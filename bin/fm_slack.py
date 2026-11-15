@@ -7,6 +7,7 @@ import json
 import os
 import socket
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -171,7 +172,7 @@ class Slack:
 
     # A caller with a total deadline sets time_left to a function that gives the seconds left (the second person's pass, SECOND_BUDGET); None is no total bound.
     time_left = None
-    # The last call cut off at its deadline: {'ended': whether its reader ended after its socket was closed} (_bounded).
+    # The last call cut off at its deadline: {'ended': whether its reader ended after its socket was closed, 'closed_at': when (monotonic)} (_bounded).
     last_cutoff = None
 
     def call(self, method, **fields):
@@ -224,8 +225,9 @@ class Slack:
         if outcome:
             return outcome[0]
         fence.close()
+        closed_at = time.monotonic()
         reader.join(CUTOFF_JOIN)
-        self.last_cutoff = {'ended': not reader.is_alive()}
+        self.last_cutoff = {'ended': not reader.is_alive(), 'closed_at': closed_at}
         raise DeadlineSpent()
 
     def _exchange(self, request, timeout, opener=None):
