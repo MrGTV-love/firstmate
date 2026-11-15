@@ -6878,7 +6878,8 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
     if [ "$kind" = accept ]; then
       route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success "$pr"
     elif [ "$state" = MERGED ]; then
-      route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed blocked "$pr"
+      # The contract's allowing fake: the merged-nearest reject is kept by the content proof although the driver would allow.
+      route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success "$pr"
     else
       route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success "$pr"
     fi

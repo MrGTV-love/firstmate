@@ -4107,7 +4107,8 @@ test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_an
     if [ "$kind" = accept ]; then
       route_script_row "$W" "$name" allowed success "$pr"
     elif [ "$state" = MERGED ]; then
-      route_script_row "$W" "$name" refuse blocked "$pr"
+      # The contract's allowing fake: the merged-nearest reject is kept by the content proof although the driver would allow.
+      route_script_row "$W" "$name" allowed success "$pr"
     else
       route_script_row "$W" "$name" allowed success "$pr"
     fi
@@ -4208,7 +4209,8 @@ PROVE_WHY=
 # shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
 route_prove() {
   local out
-  out=$(ROUTE_PROVE_REPO=$1 ROUTE_PROVE_TIP=$2 ROUTE_PROVE_MERGE=$3 route_lib 'rc=0; teardown_route_content_proven "$ROUTE_PROVE_REPO" "$ROUTE_PROVE_TIP" "$ROUTE_PROVE_MERGE" || rc=$?; printf "RC=%s\nWHY=%s\n" "$rc" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"' 2>&1)
+  out=$(ROUTE_PROVE_REPO=$1 ROUTE_PROVE_TIP=$2 ROUTE_PROVE_MERGE=$3 route_lib "${ROUTE_TRIP_SNIPPET:-:}"'
+rc=0; teardown_route_content_proven "$ROUTE_PROVE_REPO" "$ROUTE_PROVE_TIP" "$ROUTE_PROVE_MERGE" || rc=$?; printf "RC=%s\nWHY=%s\n" "$rc" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"' 2>&1)
   PROVE_RC=$(printf '%s\n' "$out" | sed -n 's/^RC=//p' | head -n 1)
   PROVE_WHY=$(printf '%s\n' "$out" | sed -n 's/^WHY=//p' | head -n 1)
   [ -n "$PROVE_RC" ] || PROVE_RC="no answer: $out"
@@ -4413,14 +4415,12 @@ test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed() {
     [ "$channel" != default ] || git -C "$CR" config merge.default liar
     [ "$channel" != info ] || printf 'policy.txt merge=liar\n' > "$CR/.git/info/attributes"
     route_prove "$CR" "$CT" "$CM"
-    if [ "$channel" = info ]; then
-      assert_unproved "a text twin whose path info/attributes gives a custom merge driver" "info/attributes"
-    else
-      assert_proved "the legitimate text twin under a configured lying driver ($channel)"
-    fi
+    # A configured merge driver of any name keeps the text proof from running (Main 1841 F1):
+    # the twin is refused too, and the same twin with no driver configured is proved (see the F1 case).
+    assert_unproved "the text twin under a configured lying driver ($channel)" "merge driver"
     [ ! -e "$CMARK" ] || fail "the lying driver ran on the twin (channel $channel)"
   done
-  pass "a lying merge driver selected through .gitattributes, merge.default or info/attributes never runs: the POLICY case is kept, the text twin routes under the same configuration, and info/attributes naming a driver keeps the copy"
+  pass "a lying merge driver selected through .gitattributes, merge.default or info/attributes never runs: the POLICY case is kept, and so is the text twin, because a merge driver configured in the repository keeps the text proof from running"
 }
 
 # route_closeout <plan|execute> <name> [<before> [<after>]]: teardown_run_closeout in a
@@ -4507,18 +4507,12 @@ test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_rou
     [ -z "$(route_calls_for policy)" ] || fail "the closeout driver was asked for the POLICY copy through $channel: $(route_calls_for policy)"
     [ ! -e "$marker" ] || fail "the lying driver ran through $channel: the route let a configured merge driver decide"
     route_closeout plan twin
-    if [ "$channel" = info ]; then
-      [ "$CO_ROUTE" = invalid ] && [ -z "$(route_calls_for twin)" ] || fail "a path whose info/attributes names a custom driver reached the driver ($CO_ROUTE): $(route_calls_for twin)"
-      assert_contains "$CO_OUT" "info/attributes" "the twin's refusal does not name info/attributes"
-    else
-      [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "the text twin under a configured lying driver ($channel) did not route ($CO_RC $CO_ROUTE): $CO_OUT"
-      [ "$(route_call_count twin)" = 1 ] || fail "the twin was not asked once: $(route_calls_for twin)"
-      assert_contains "$(route_calls_for twin)" "--pr 8" "the twin's plan was not asked by the --pr route"
-    fi
+    # A merge driver configured in the repository keeps the text proof from running (Main 1841 F1).
+    [ "$CO_ROUTE" = invalid ] && [ -z "$(route_calls_for twin)" ] || fail "the text twin under a configured lying driver ($channel) reached the driver ($CO_ROUTE): $(route_calls_for twin)"
     [ ! -e "$marker" ] || fail "the lying driver ran on the twin through $channel"
-    printf 'liar %s: POLICY copy kept with no driver call, twin %s, marker absent\n' "$channel" "$([ "$channel" = info ] && echo kept || echo routed)"
+    printf 'liar %s: POLICY copy and twin kept with no driver call, marker absent\n' "$channel"
   done
-  pass "through the whole route on real git, a lying merge driver selected by .gitattributes, merge.default or info/attributes never runs: the POLICY copy is kept with an empty closeout argv and the text twin under the same configuration routes (kept when info/attributes names a driver)"
+  pass "through the whole route on real git, a lying merge driver selected by .gitattributes, merge.default or info/attributes never runs: the POLICY copy is kept with an empty closeout argv and so is the text twin, because a merge driver configured in the repository keeps the text proof from running"
 }
 
 test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an_unreachable_remote_keeps_the_copy() {
@@ -4939,6 +4933,316 @@ test_a_copy_with_no_record_is_asked_exactly_as_before_at_every_no_record_call() 
   pass "a copy with no record is asked exactly as before: --cleanup-worktree <copy>, plus --execute-cleanup at the execute, and no --no-evidence-files"
 }
 
+# --- code round 2 (Main 1841): helper-level cases, libraries only -------------------
+# Nothing below starts, signals or kills a process or a process group, reaches
+# bin/fm-teardown.sh, runs a sweep in apply mode or reads a forge. Four tripwires stand
+# where a forge read, a remote read or a timed run would be: each writes a sentinel
+# file and fails, and every case asserts the sentinel is absent. The cases marked
+# "through the route" call the route owner with the forge answer stubbed and the
+# scripted driver as an ordinary child; they are written but are Unverified locally
+# (Main 1850: when unsure, barred) and owed to the pipeline test step and CI.
+IFS= read -r -d '' ROUTE_TRIP_SNIPPET <<'EOS' || true
+fm_timeout_perl_bound() { : > "$ROUTE_TRIP_FILE"; return 99; }
+fm_run_timed() { : > "$ROUTE_TRIP_FILE"; return 99; }
+teardown_route_forge_read() { : > "$ROUTE_TRIP_FILE"; return 99; }
+teardown_route_remote_default() { : > "$ROUTE_TRIP_FILE"; return 99; }
+EOS
+
+route_trip_arm() {
+  ROUTE_TRIP_FILE=$TMP_ROOT/trip.$$.$RANDOM
+  export ROUTE_TRIP_FILE
+  rm -f "$ROUTE_TRIP_FILE"
+}
+route_trip_check() {  # <label>
+  [ ! -e "$ROUTE_TRIP_FILE" ] || fail "$1: a barred path ran (a forge read, a remote read or a timed run)"
+}
+
+# The forge answer of the route owner, stubbed: the PR merged at the world's last merge commit.
+route_stub_before() {
+  printf '%s\nteardown_route_pr_landed() { TEARDOWN_ROUTE_HEADREF=fm/pr-7-head; TEARDOWN_ROUTE_MERGE=%s; return 0; }\n' "$ROUTE_TRIP_SNIPPET" "$ROUTE_MERGE"
+}
+
+# F1: a custom merge driver named in the repository's configuration, in any scope git
+# reads there, keeps the text proof from running. The reviewer's case is a driver named
+# text, which shadows the built-in one that merge.default=text selects.
+test_a_repository_configured_merge_driver_of_any_name_keeps_the_text_proof_from_running() {
+  local marker kind
+  make_world world-driver-config
+  route_trip_arm
+  marker=$TMP_ROOT/driver-ran
+  for kind in shadow-text other-name included-file command-scope; do
+    rm -f "$marker"
+    route_content_fixture "cfg-$kind" policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
+    case "$kind" in
+      shadow-text) git -C "$CR" config merge.text.driver "touch '$marker'; true" ;;
+      other-name) git -C "$CR" config merge.mine.driver "touch '$marker'; true"; git -C "$CR" config merge.default mine ;;
+      included-file)
+        printf '[merge "text"]\n\tdriver = touch %s; true\n' "'$marker'" > "$CR/.git/extra.cfg"
+        git -C "$CR" config include.path "$CR/.git/extra.cfg"
+        ;;
+    esac
+    if [ "$kind" = command-scope ]; then
+      GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.text.driver GIT_CONFIG_VALUE_0="touch '$marker'; true" route_prove "$CR" "$CT" "$CM"
+    else
+      route_prove "$CR" "$CT" "$CM"
+    fi
+    assert_unproved "the POLICY case with a configured merge driver ($kind)" "merge driver"
+    [ ! -e "$marker" ] || fail "the configured merge driver ran ($kind): the text proof let it decide"
+    printf 'driver config %s: refused, marker absent; reason: %s\n' "$kind" "${PROVE_WHY:0:150}"
+  done
+  # Control: the same history with no driver configured. The real merge conflicts.
+  route_content_fixture cfg-none policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
+  route_prove "$CR" "$CT" "$CM"
+  assert_unproved "the POLICY case with no driver configured" "not clean"
+  # Control: a legitimate twin with no driver configured is proved.
+  route_content_fixture cfg-twin policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+  route_prove "$CR" "$CT" "$CM"
+  assert_proved "the legitimate text twin with no driver configured"
+  # A twin under a configured driver is refused: refusal, not neutralisation.
+  route_content_fixture cfg-twin-shadow policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+  git -C "$CR" config merge.text.driver "touch '$marker'; true"
+  route_prove "$CR" "$CT" "$CM"
+  assert_unproved "the legitimate twin under a configured driver" "merge driver"
+  [ ! -e "$marker" ] || fail "the configured merge driver ran on the twin"
+  route_trip_check "driver config"
+  pass "a merge driver configured in the repository (named text or any other name, by include file or by command scope) keeps the text proof from running and the copy kept, the marker stays absent, and the same history with no driver conflicts while a legitimate twin with no driver is proved"
+}
+
+# F1 and F5, through the route: with a driver scripted to allow, a copy whose lines the
+# merge commit lacks is kept with an empty driver argv. Unverified locally (see above).
+test_an_allowing_driver_is_never_asked_for_a_copy_whose_lines_the_merge_commit_lacks() {
+  local variant marker
+  for variant in no-config shadow-text; do
+    route_world "route-allow-$variant"
+    marker=$W/driver-ran
+    route_content_copy policy 7 policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
+    route_content_copy twin 8 twin.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    [ "$variant" != shadow-text ] || git -C "$SLOT" config merge.text.driver "touch '$marker'; true"
+    route_trip_arm
+    route_closeout plan policy "$(route_stub_before)"
+    [ "$CO_ROUTE" = invalid ] && [ "$CO_RC" != 0 ] || fail "the copy whose lines the merge commit lacks was not kept ($variant: $CO_RC $CO_ROUTE): $CO_OUT"
+    [ -z "$(route_calls_for policy)" ] || fail "the allowing driver was asked for the copy ($variant): $(route_calls_for policy)"
+    [ ! -e "$marker" ] || fail "the configured merge driver ran ($variant)"
+    route_closeout plan twin "$(route_stub_before)"
+    if [ "$variant" = no-config ]; then
+      [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "the legitimate twin did not route ($CO_RC $CO_ROUTE): $CO_OUT"
+      [ "$(route_call_count twin)" = 1 ] || fail "the twin was not asked once: $(route_calls_for twin)"
+    else
+      [ "$CO_ROUTE" = invalid ] && [ -z "$(route_calls_for twin)" ] || fail "the twin under a configured driver reached the driver ($CO_ROUTE): $(route_calls_for twin)"
+    fi
+    route_trip_check "allowing driver $variant"
+  done
+  pass "with a driver scripted to allow, a copy whose lines the merge commit lacks is kept with an empty driver argv (with no config, and with a configured text driver that never runs), and the legitimate twin routes only when no driver is configured"
+}
+
+# F2: the checkout check, on a real repository with the real functions and a git
+# wrapper that fails or disturbs the reflog reads of the check, as the reviewer's falsifier does.
+IFS= read -r -d '' ROUTE_GITWRAP_SNIPPET <<'EOS' || true
+git() {
+  case " $* " in
+    *" reflog show "*)
+      n=$(cat "$RL_COUNT"); n=$((n + 1)); printf '%s' "$n" > "$RL_COUNT"
+      if [ "$RL_FAIL_FROM" != - ] && [ "$n" -ge "$RL_FAIL_FROM" ]; then return 128; fi
+      if [ "$RL_APPEND_AT" = "$n" ]; then
+        command git -C "$RL_REPO" switch -q other && command git -C "$RL_REPO" switch -q main
+      fi
+      ;;
+  esac
+  command git "$@"
+}
+EOS
+IFS= read -r -d '' ROUTE_RL_SCRIPT <<'EOS' || true
+set +u
+TEARDOWN_CKO_OPEN=0
+TEARDOWN_CKO_WHY=
+teardown_route_checkout_open "$RL_REPO" copy || { printf 'check_rc=open-failed reads=%s reason=%s\n' "$(cat "$RL_COUNT")" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"; exit 0; }
+if [ "$RL_SWITCH" = 1 ]; then command git -C "$RL_REPO" switch -q pr-head && command git -C "$RL_REPO" switch -q main; fi
+if [ "$RL_REWRITE" = 1 ]; then
+  f=$RL_REPO/.git/logs/HEAD
+  n=$(wc -l < "$f" | tr -d ' ')
+  awk -v n="$n" -v msg='checkout: moving from x to y' 'NR == n { i = index($0, "\t"); $0 = substr($0, 1, i - 1) "\t" msg } { print }' "$f" > "$f.new" && mv "$f.new" "$f"
+fi
+[ "$RL_CLEAR" != 1 ] || TEARDOWN_CKO_ANCHOR=
+rc=0
+teardown_route_checkout_check "$RL_REPO" pr-head || rc=$?
+printf 'check_rc=%s reads=%s reason=%s\n' "$rc" "$(cat "$RL_COUNT")" "$TEARDOWN_CKO_WHY"
+EOS
+route_reflog_scenario() {  # <name> <switch> <fail-from|-> <append-at|-> <rewrite> <clear-anchor>
+  local name=$1 repo
+  repo=$TMP_ROOT/reflog-$name
+  rm -rf "$repo"
+  git init -q -b main "$repo"
+  git -C "$repo" config user.name t
+  git -C "$repo" config user.email t@example.invalid
+  printf 'a\n' > "$repo/f"
+  git -C "$repo" add f
+  git -C "$repo" commit -qm base
+  git -C "$repo" branch pr-head
+  git -C "$repo" branch other
+  printf 0 > "$TMP_ROOT/reflog-$name.count"
+  ROUTE_RL_OUT=$(RL_REPO=$repo RL_COUNT=$TMP_ROOT/reflog-$name.count RL_SWITCH=$2 RL_FAIL_FROM=$3 RL_APPEND_AT=$4 RL_REWRITE=$5 RL_CLEAR=$6 \
+    route_lib "$ROUTE_TRIP_SNIPPET
+$ROUTE_GITWRAP_SNIPPET
+$ROUTE_RL_SCRIPT" 2>&1)
+  ROUTE_RL_RC=$(printf '%s\n' "$ROUTE_RL_OUT" | sed -n 's/^check_rc=\([^ ]*\) .*/\1/p' | tail -n 1)
+  printf 'reflog %s: %s\n' "$name" "$(printf '%s' "$ROUTE_RL_OUT" | tail -n 1 | cut -c1-200)"
+}
+test_the_checkout_check_reads_the_reflog_once_and_stops_on_a_read_error_an_interleaved_entry_or_a_missing_anchor() {
+  local switch_out
+  make_world world-reflog
+  route_trip_arm
+  route_reflog_scenario stable 0 - - 0 0
+  [ "$ROUTE_RL_RC" = 0 ] || fail "the stable control was refused: $ROUTE_RL_OUT"
+  route_reflog_scenario switch 1 - - 0 0
+  [ "$ROUTE_RL_RC" = 1 ] || fail "a readable switch and restore was accepted: $ROUTE_RL_OUT"
+  assert_contains "$ROUTE_RL_OUT" "pr-head" "a readable switch and restore is not named"
+  switch_out=$ROUTE_RL_OUT
+  # The follow-up read of the check fails (the reviewer's first case). With one read there is no second one to lose.
+  route_reflog_scenario failed-second-read 1 3 - 0 0
+  [ "$ROUTE_RL_RC" = 1 ] || fail "a switch and restore was accepted when the follow-up reflog read failed: $ROUTE_RL_OUT"
+  # The read of the check fails: no proof, so the stop flag.
+  route_reflog_scenario read-error 1 2 - 0 0
+  [ "$ROUTE_RL_RC" = 1 ] || fail "a failed reflog read was accepted: $ROUTE_RL_OUT"
+  assert_contains "$ROUTE_RL_OUT" "cannot be read" "a reflog read error is not named"
+  # Unrelated entries appended between the reads (the reviewer's second case), and before the read.
+  route_reflog_scenario interleaved-between 1 - 3 0 0
+  [ "$ROUTE_RL_RC" = 1 ] || fail "a switch and restore was accepted when unrelated entries were appended between the reads: $ROUTE_RL_OUT"
+  route_reflog_scenario interleaved-before 1 - 2 0 0
+  [ "$ROUTE_RL_RC" = 1 ] || fail "a switch among appended entries was accepted: $ROUTE_RL_OUT"
+  assert_contains "$ROUTE_RL_OUT" "pr-head" "a switch among appended entries is not named"
+  # The anchor: the newest entry of the first read must still stand where it stood.
+  route_reflog_scenario anchor-rewritten 0 - - 1 0
+  [ "$ROUTE_RL_RC" = 1 ] || fail "a rewritten newest entry was accepted: $ROUTE_RL_OUT"
+  assert_contains "$ROUTE_RL_OUT" "no longer holds" "a rewritten newest entry is not named"
+  route_reflog_scenario anchor-empty 0 - - 0 1
+  [ "$ROUTE_RL_RC" = 1 ] || fail "an empty anchor was accepted: $ROUTE_RL_OUT"
+  assert_contains "$switch_out" "reads=2" "the check did not read the reflog once (one read at the first step, one at the check): $switch_out"
+  route_trip_check "checkout check"
+  pass "the checkout check reads the HEAD reflog once, finds a switch and restore even when a follow-up read fails or unrelated entries are appended, refuses on a read error, a rewritten newest entry and an empty anchor, and accepts the stable control"
+}
+
+# F2 through the route owner: the post-call check sets the stop flag. Unverified locally.
+test_a_reflog_read_error_a_masked_interleaving_or_a_rewritten_anchor_sets_the_stop_flag() {
+  local variant
+  for variant in quiet read-error failed-second-read interleaved anchor-rewritten; do
+    route_world "stopflag-$variant"
+    git -C "$SLOT" branch fm/pr-7-head "$ROUTE_MERGE"
+    route_copy zz-a 7
+    route_trip_arm
+    printf '0' > "$W/rl.count"
+    export RL_REPO=$SLOT RL_COUNT=$W/rl.count RL_FAIL_FROM=- RL_APPEND_AT=-
+    mkdir -p "$W/ans/zz-a"
+    case "$variant" in
+      read-error) RL_FAIL_FROM=3 ;;
+      failed-second-read)
+        printf 'git -C "%s" checkout -q fm/pr-7-head && git -C "%s" checkout -q main\n' "$SLOT" "$SLOT" > "$W/ans/zz-a/plan.after"
+        RL_FAIL_FROM=4
+        ;;
+      interleaved)
+        printf 'git -C "%s" checkout -q fm/pr-7-head && git -C "%s" checkout -q main\n' "$SLOT" "$SLOT" > "$W/ans/zz-a/plan.after"
+        RL_APPEND_AT=4
+        ;;
+      anchor-rewritten)
+        # shellcheck disable=SC2016 # the hook expands its own variables when it runs
+        printf 'f=%s/.git/logs/HEAD; n=$(wc -l < "$f" | tr -d " "); awk -v n="$n" -v msg="checkout: moving from x to y" %s "$f" > "$f.new" && mv "$f.new" "$f"\n' "$SLOT" "'NR == n { i = index(\$0, \"\\t\"); \$0 = substr(\$0, 1, i - 1) \"\\t\" msg } { print }'" > "$W/ans/zz-a/plan.after"
+        ;;
+    esac
+    route_closeout plan zz-a "$(route_stub_before)
+$ROUTE_GITWRAP_SNIPPET"
+    route_trip_check "stop flag $variant"
+    if [ "$variant" = quiet ]; then
+      [ "$CO_RC" = 0 ] && [ "$CO_SWITCHED" != 1 ] || fail "the quiet control did not route without a stop ($CO_RC $CO_SWITCHED): $CO_OUT"
+    else
+      [ "$CO_SWITCHED" = 1 ] || fail "the stop flag was not set ($variant: rc $CO_RC): $CO_OUT"
+      [ "$CO_RC" != 0 ] || fail "the route reported success although the stop flag was set ($variant)"
+    fi
+  done
+  pass "through the route owner, a failed post-call reflog read, a failed or masked follow-up read, unrelated entries landing between reads and a rewritten newest entry each set the stop flag, and the quiet control routes without it"
+}
+
+# F3: the temporary-refusal classifier of the sweep, loaded alone from the sweep script
+# and run in the library bash. A refusal on the --pr route is temporary only when it is
+# the called PR's complete fifteen-key envelope; anything else is permanent.
+test_a_refusal_is_temporary_only_when_it_is_the_called_prs_complete_envelope() {
+  local fn valid out
+  make_world world-temporary-refusal
+  fn=$(awk '/^execute_refusal_is_temporary\(\) \{/ { p = 1 } p { print } p && /^}/ { exit }' "$SWEEP")
+  [ -n "$fn" ] || fail "the sweep has no execute_refusal_is_temporary function to load"
+  # shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+  temp_probe() {  # <label> <expected 0|1> <doc> [<called pr>]
+    out=$(CASE_ROUTE=pr CASE_PR=${4:-7} CASE_STDOUT=$3 \
+      route_lib "$fn"'
+TEARDOWN_CLOSEOUT_ROUTE=$CASE_ROUTE; TEARDOWN_CLOSEOUT_ROUTE_PR=$CASE_PR; TEARDOWN_CLOSEOUT_STDOUT=$CASE_STDOUT; TEARDOWN_CLOSEOUT_OUT=
+rc=0; execute_refusal_is_temporary 3 || rc=$?; printf "rc=%s" "$rc"' 2>&1)
+    assert_equals "rc=$2" "$out" "$1: the temporary-refusal classifier answered $out, not rc=$2 (rc=0 is temporary)"
+    printf 'temporary refusal, %s: %s\n' "$1" "$([ "$out" = rc=0 ] && echo temporary || echo permanent)"
+  }
+  valid=$(route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' 7)
+  temp_probe "the complete envelope for the called PR (the scripted temporary answer)" 0 "$valid"
+  temp_probe "a complete envelope with the live-or-unknown reason" 0 "$(route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_skipped_live_or_unknown"' 7)"
+  temp_probe "a complete envelope for PR 8 in answer to PR 7" 1 "$(route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' 8)"
+  temp_probe "an envelope with evidence_digest missing" 1 "$(printf '%s' "$valid" | jq -c 'del(.evidence_digest)')"
+  temp_probe "an envelope with an extra key" 1 "$(printf '%s' "$valid" | jq -c '. + {extra: 1}')"
+  temp_probe "an envelope whose pr is the string 7" 1 "$(printf '%s' "$valid" | jq -c '.pr = "7"')"
+  temp_probe "an envelope whose pr is null" 1 "$(printf '%s' "$valid" | jq -c '.pr = null')"
+  temp_probe "a removal claim" 1 "$(printf '%s' "$valid" | jq -c '.worktree_removed = true')"
+  temp_probe "a retained-tree signal" 1 "$(printf '%s' "$valid" | jq -c '.next_command = "archive_then_retain_tree"')"
+  # The plain lane is unchanged: its refusal is the {"allowed": false, "reason": ...} document.
+  # shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+  out=$(CASE_ROUTE='' CASE_PR='' CASE_STDOUT='{"allowed": false, "reason": "cleanup_lease_conflict"}' \
+    route_lib "$fn"'
+TEARDOWN_CLOSEOUT_ROUTE=$CASE_ROUTE; TEARDOWN_CLOSEOUT_ROUTE_PR=$CASE_PR; TEARDOWN_CLOSEOUT_STDOUT=$CASE_STDOUT; TEARDOWN_CLOSEOUT_OUT=
+rc=0; execute_refusal_is_temporary 3 || rc=$?; printf "rc=%s" "$rc"' 2>&1)
+  assert_equals "rc=0" "$out" "the plain lane's temporary refusal is no longer temporary"
+  pass "a refusal on the --pr route is temporary only when it is exactly the fifteen-key envelope for the called PR with a cleanup_gate predicate and a temporary reason; another PR, a missing or extra key, a string or null pr, a removal claim and a retained-tree signal are permanent, and the plain lane is unchanged"
+}
+
+# F4: the forge timeout override is honoured or refused with its value named, never a
+# silent 60. The forge and remote reads are stubbed; only the value they receive is seen.
+IFS= read -r -d '' ROUTE_OV_PRE <<'EOS' || true
+fm_timeout_perl_bound() { : > "$ROUTE_TRIP_FILE"; return 99; }
+fm_run_timed() { : > "$ROUTE_TRIP_FILE"; return 99; }
+gh() { return 1; }
+teardown_route_forge_read() { PROBE_BOUND=$1; TEARDOWN_ROUTE_FORGE_OUT=$(printf 'MERGED\t%s\tfm/pr-7-head' "$OV_MERGE"); return 0; }
+teardown_route_remote_default() { TEARDOWN_ROUTE_REMOTE_DEFAULT=main; return 0; }
+PROBE_BOUND=; TEARDOWN_CLOSEOUT_ROUTE_WHY=; TEARDOWN_ROUTE_BASE=
+rc=0; teardown_route_pr_landed "$OV_REPO" 7 || rc=$?
+printf 'route_rc=%s bound=%s reason=%s\n' "$rc" "$PROBE_BOUND" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"
+EOS
+test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty() {
+  local repo value out merge
+  make_world world-forge-override
+  repo=$TMP_ROOT/override-repo
+  rm -rf "$repo"
+  git init -q -b main "$repo"
+  git -C "$repo" config user.name t
+  git -C "$repo" config user.email t@example.invalid
+  printf 'a\n' > "$repo/f"
+  git -C "$repo" add f
+  git -C "$repo" commit -qm base
+  git -C "$repo" update-ref refs/remotes/origin/main HEAD
+  git -C "$repo" config remote.origin.url https://github.com/example/demo.git
+  merge=$(git -C "$repo" rev-parse HEAD)
+  route_trip_arm
+  out=$(unset FM_TEARDOWN_FORGE_TIMEOUT; OV_REPO=$repo OV_MERGE=$merge route_lib "$ROUTE_OV_PRE" 2>&1)
+  assert_contains "$out" "route_rc=0 bound=60 " "the default bound is not 60: $out"
+  for value in 12 10000 999999999; do
+    out=$(FM_TEARDOWN_FORGE_TIMEOUT=$value OV_REPO=$repo OV_MERGE=$merge route_lib "$ROUTE_OV_PRE" 2>&1)
+    assert_contains "$out" "route_rc=0 bound=$value " "the override $value was not honoured: $out"
+    printf 'forge timeout override %s: honoured (%s)\n' "$value" "$(printf '%s' "$out" | cut -c1-60)"
+  done
+  for value in abc 0 -5 1.5 007 1000000000; do
+    out=$(FM_TEARDOWN_FORGE_TIMEOUT=$value OV_REPO=$repo OV_MERGE=$merge route_lib "$ROUTE_OV_PRE" 2>&1)
+    assert_contains "$out" "route_rc=1 bound= " "the bad override $value did not refuse before a forge read: $out"
+    assert_contains "$out" "FM_TEARDOWN_FORGE_TIMEOUT" "the refusal for $value does not name the setting: $out"
+    assert_contains "$out" "'$value'" "the refusal for $value does not name the value: $out"
+    printf 'forge timeout override %s: refused (%s)\n' "$value" "$(printf '%s' "$out" | sed 's/.*reason=//' | cut -c1-150)"
+  done
+  route_trip_check "forge timeout override"
+  pass "the forge timeout is 60 by default, an override of 12, 10000 or 999999999 seconds is honoured, and a value that is not a whole number of seconds from 1 to 999999999 refuses the route with the setting and the value named before any forge read"
+}
+
+
 # FM_TEST_ONLY=<function> runs one case, which keeps a mutation proof quick.
 fm_test_only
 
@@ -5076,4 +5380,10 @@ test_a_detected_switch_stops_the_run_even_when_the_first_executes_answer_is_a_re
 test_an_ordinary_refusal_without_a_switch_keeps_the_copy_and_the_run_goes_on_to_the_next_copy
 test_a_switch_and_restore_between_the_plan_and_the_execute_is_found_from_the_plans_first_read
 test_a_copy_with_no_record_is_asked_exactly_as_before_at_every_no_record_call
+test_a_repository_configured_merge_driver_of_any_name_keeps_the_text_proof_from_running
+test_an_allowing_driver_is_never_asked_for_a_copy_whose_lines_the_merge_commit_lacks
+test_the_checkout_check_reads_the_reflog_once_and_stops_on_a_read_error_an_interleaved_entry_or_a_missing_anchor
+test_a_reflog_read_error_a_masked_interleaving_or_a_rewritten_anchor_sets_the_stop_flag
+test_a_refusal_is_temporary_only_when_it_is_the_called_prs_complete_envelope
+test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty
 pass "fm-copy-sweep"
