@@ -20,10 +20,11 @@
 # another member of its process group), unmanaged (a readable environment with
 # no token: an unpinned native restore, which nothing can authorize, since a
 # native restore runs outside the launch environment), unknown (unreadable, or
-# no spawn_gen). A matching token is managed only after the refusal checks of
-# fm_launch_proof_claude_checks pass; a failed check is contested, unknown or
-# pinned-elsewhere, with its own cause. There is no claude adoption route
-# (Main 1637).
+# no spawn_gen). For every harness, a matching token on a versioned record is
+# managed only after the refusal checks of fm_launch_proof_token_checks pass;
+# a failed check is contested, unknown or pinned-elsewhere, with its own cause.
+# An adopted omp process carries no token and keeps its own adoption proofs.
+# There is no claude adoption route (Main 1637).
 # No endpoint discovery: callers supply this home's validated exact endpoint.
 
 _FM_LAUNCH_PROOF_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
@@ -550,9 +551,9 @@ fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
   return 0
 }
 
-# The refusal checks a claude agent whose token matches its record must pass
-# before it is managed (Main 1709 ruling 1, Main 1713 (1), Main 1716 (A) and
-# (C)). In this order: the process table, each other member of the agent's
+# The refusal checks an agent whose token matches its versioned record must
+# pass before it is managed, for every harness (Main 1709 ruling 1, Main 1713
+# (1), Main 1716 (A) and (C), Main 1777 (1)). In this order: the process table, each other member of the agent's
 # process group (one environment read each: a pin for another generation or an
 # unreadable environment refuses, with no descendant exemption), the descendant
 # rule (every other member is an ancestor of the agent in its group or a proven
@@ -560,7 +561,7 @@ fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
 # worktree), and the claim inventory. None is proof: each can only refuse. E3
 # (k), a matching pin keeping its base outcome, applies only after all pass.
 # Prints <verdict><TAB><cause>, the cause empty when the verdict's own applies.
-fm_launch_proof_claude_checks() { # <meta> <pid> <spawn-gen>
+fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
   local meta=$1 pid=$2 gen=$3 table group kid environment pinned foreign='' unread='' rc cwd home root claim
   local -a members=()
   table=$(set -o pipefail; LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) && [ -n "$table" ] || {
@@ -635,7 +636,7 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-els
 }
 
 fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
-  local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged harness table
+  local meta=$1 pid=$2 proof gen verdict record task_file current_file adopted refusal=unmanaged harness table token
   proof=$(fm_launch_proof_record_proof "$meta") \
     || { printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return; }
   case "$proof" in
@@ -651,7 +652,7 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
     # matching token the refusal checks.
     verdict=$(fm_launch_proof_pid_classify "$pid" "$gen")
     case "$verdict" in
-      managed) fm_launch_proof_claude_checks "$meta" "$pid" "$gen"; return ;;
+      managed) fm_launch_proof_token_checks "$meta" "$pid" "$gen"; return ;;
       unmanaged)
         table=$(LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) || table=''
         if fm_launch_proof_group_pinned_elsewhere "$gen" "$table" "$pid"; then
@@ -664,6 +665,11 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
   fi
   verdict=$(fm_launch_proof_pid "$pid" "$gen")
   [ "$verdict" != unknown ] || refusal=unknown
+  # A versioned record whose live token matches is managed, for every harness,
+  # only after the same refusal checks (Main 1777 (1)); a legacy record keeps
+  # its base outcome. Adoption carries no token and has its own proofs.
+  token=''
+  [ "$verdict" != managed ] || [ "$proof" != env-v1 ] || token=1
   if [ "$harness" = omp ]; then
     # A current activation for this live PID is mandatory, even after adoption.
     record=$(jq -ec --arg gen "$gen" --argjson pid "$pid" '
@@ -689,6 +695,10 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
         || { printf '%s\t' "$refusal"; return; }
       verdict=managed
     fi
+  fi
+  if [ -n "$token" ]; then
+    fm_launch_proof_token_checks "$meta" "$pid" "$gen"
+    return
   fi
   case "$verdict" in
     managed|unknown) printf '%s\t' "$verdict" ;;
