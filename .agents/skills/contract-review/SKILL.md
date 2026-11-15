@@ -47,7 +47,8 @@ After the run, run `bin/fm-contract-review-pack.sh check --pack <pack> --log <pa
 The transcript is the only evidence of what the run read; the report's `Inputs read` list is the reviewer's declaration, not evidence.
 A report with no `Inputs read` list voids the round.
 The check judges every recorded read and search against the authorized inputs: the pack's own files, the three named references, a file tracked by the passed repository root, and the run's own work folder.
-The entrypoint's copy of `OPERATIONAL-BOUNDARIES.md` in the work folder is authorized only while its bytes equal the installed define-done-and-grading file, and a `skill://` read that resolves to that installed file is authorized.
+The named references are the installed `assess-done-and-grade/SKILL.md`, and the installed define-done-and-grading `SKILL.md`, `OPERATIONAL-BOUNDARIES.md` and `CLI-EXAMPLE.md`, read by path, by a `../` form or as `skill://`; any other file in those folders is a leak.
+The entrypoint's copy of `OPERATIONAL-BOUNDARIES.md` in the work folder is authorized only while its bytes equal the installed define-done-and-grading file.
 A search of the work folder is authorized only while it holds nothing but that copy, the report and files the reviewer wrote; a search of a parent of the work folder is a leak.
 An excluded path is refused even when it is tracked or sits under the root, and a gitignored file is not tracked context.
 `INPUT LEAK` means a recorded read that is not authorized: the round is void, it is not a round, it is not recorded in the register, and it is rerun on a fresh pack.
@@ -108,14 +109,14 @@ The meaning of each exit is in the define-done-and-grading skill, section "Revie
 
 Allowed inputs, and only these:
 - Every file in this folder.
-- The assess-done-and-grade skill, the pinned rubric and the define-done-and-grading skill, which this review names as references to read.
+- The assess-done-and-grade skill, the pinned rubric and the define-done-and-grading skill with its `OPERATIONAL-BOUNDARIES.md` and `CLI-EXAMPLE.md`, which this review names as references to read.
 - A file that the repository root named in your instructions tracks, read only to check that a criterion can run.
 
 Open nothing else.
 Open inputs with the read and search tools, not with shell or code commands, so the run's record shows each file you opened.
 Pass `gitignore: true` on every search.
 Do not open agent, artifact, process or history records: no check can prove they belong to this review.
-Do not search or list a skill folder: no file in it other than its `SKILL.md` is an input.
+Do not search or list a skill folder: no file in it other than those named above is an input.
 Any helper or subagent you start is bound by this list, and what it opens belongs in your `Inputs read`.
 A report, review, register, history, earlier folder, sibling folder, transcript or copy of the contract from elsewhere is not an input.
 If a task needs a file that is not allowed, say so in the report as a check not performed.

@@ -20,9 +20,15 @@
 # author's candidate or history. A search of the work folder is admitted only while the
 # folder holds nothing but that copy, the report and files the reviewer wrote; a copy with
 # other bytes, and a search of a parent of the work folder, still void the round.
+# Harm-model reassessment (Main 1982, the same reason): the installed skill files a reviewer
+# is told to read are not author text, so the check admits a read, by path, by a ../ form or
+# as skill://, whose real path is exactly one of define-done-and-grading/SKILL.md,
+# OPERATIONAL-BOUNDARIES.md and CLI-EXAMPLE.md, or assess-done-and-grade/SKILL.md, inside the
+# installed skills folder. Any other file there, and a link that resolves outside it, still voids.
 # Known limits: author text inside a request, a context file or a known section reaches the
 # reviewer; shell, eval, other tools and unrecorded subagents leave a round unverified; a
-# read that leaves no record cannot be seen.
+# read that leaves no record cannot be seen; a falsifier saved through bash, or a file a
+# falsifier creates, makes a later search of the work folder void the round.
 #
 # usage:
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
@@ -100,8 +106,8 @@
 #   OPERATIONAL-BOUNDARIES.md there whose bytes differ from the installed one; a search of
 #   the work folder that holds only that copy, the report and files the run wrote; the
 #   transcript itself; the SKILL.md of assess-done-and-grade or define-done-and-grading, by
-#   path or as skill://<name>; a skill:// read that resolves to the installed
-#   define-done-and-grading OPERATIONAL-BOUNDARIES.md; the review rubric, by path or by the pinned raw.githubusercontent.com
+#   path or as skill://<name>; the installed define-done-and-grading OPERATIONAL-BOUNDARIES.md
+#   and CLI-EXAMPLE.md, by path or as skill://; the review rubric, by path or by the pinned raw.githubusercontent.com
 #   or github.com blob URL of this repository's origin; a file the manifest's root tracks;
 #   and a search root under the root whose search reaches no untracked file (and, unless the
 #   call sets gitignore true, no ignored file). A path in the excluded record is refused
@@ -513,7 +519,11 @@ if work_rec is None:
     print("fm-contract-review-pack: excluded record has no work folder; rebuild the pack: " + manifest, file=sys.stderr)
     sys.exit(2)
 named_skills = ("assess-done-and-grade", "define-done-and-grading")
-skill_files = {real(os.path.join(skills, s, "SKILL.md")) for s in named_skills}
+skills_real = real(skills)
+skill_refs = ("define-done-and-grading/SKILL.md", "define-done-and-grading/OPERATIONAL-BOUNDARIES.md",
+              "define-done-and-grading/CLI-EXAMPLE.md", "assess-done-and-grade/SKILL.md")
+skill_files = {f for f in (real(os.path.join(skills, r)) for r in skill_refs)
+               if f.startswith(skills_real.rstrip("/") + "/") and os.path.isfile(f)}
 rubric_real = real(rubric) if rubric else ""
 log_real = real(log)
 opb_installed = real(os.path.join(skills, "define-done-and-grading", "OPERATIONAL-BOUNDARIES.md"))
@@ -617,11 +627,11 @@ def judge_read(raw, cwd):
         scheme, rest = m.group(1), m.group(2)
         if scheme == "skill":
             name = rest.rstrip("/")
-            if name in named_skills or (name.endswith("/SKILL.md") and name[:-9] in named_skills):
+            if name in named_skills:
+                name += "/SKILL.md"
+            if real(os.path.join(skills, name)) in skill_files:
                 return None
-            if real(os.path.join(skills, name)) == opb_installed and os.path.isfile(opb_installed):
-                return None
-            return "a skill path other than the SKILL.md of the two named skills"
+            return "a skill path other than the named installed skill files"
         if scheme in ("http", "https"):
             pinned = ["https://raw.githubusercontent.com/%s/%s/docs/review-rubric.md" % (slug, rubric_rev),
                       "https://github.com/%s/blob/%s/docs/review-rubric.md" % (slug, rubric_rev)]

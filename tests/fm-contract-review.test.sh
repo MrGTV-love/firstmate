@@ -308,6 +308,8 @@ make_leak_world() { # builds LEAK_* variables
   printf 'assess\n' >"$LEAK_SKILLS/assess-done-and-grade/SKILL.md"
   printf 'define\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md"
   printf 'boundaries\n' >"$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md"
+  printf 'cli example\n' >"$LEAK_SKILLS/define-done-and-grading/CLI-EXAMPLE.md"
+  printf 'maintainer notes\n' >"$LEAK_SKILLS/define-done-and-grading/MAINTAINERS.md"
   fm_git_init_commit "$LEAK_ROOT"
   git -C "$LEAK_ROOT" add bin docs sources notes README.md .gitignore
   git -C "$LEAK_ROOT" -c user.name=t -c user.email=t@example.invalid commit -qm files
@@ -393,7 +395,7 @@ test_every_round_finding_read_is_a_leak() {
     "$(tool_call grep pattern F1 path "$LEAK_ROOT" gitignore false)"
     "$(tool_call glob path "$LEAK_ROOT/data/**/*.md")"
     "$(tool_call read path skill://diagnostic-reasoning)"
-    "$(tool_call read path "$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md")"
+    "$(tool_call read path "$LEAK_SKILLS/define-done-and-grading/MAINTAINERS.md")"
     "$(tool_call read path https://example.com/anything)"
     "$(tool_call read path pr://owner/repo/380)"
   )
@@ -756,6 +758,38 @@ test_pinned_operational_boundaries_reads_are_clean() {
   pass "the pinned OPERATIONAL-BOUNDARIES.md reads and clean work-folder searches pass; a changed copy, a planted file and a parent search void"
 }
 
+test_named_installed_skill_files_are_clean() {
+  local log="$TMP_ROOT/isf/s.jsonl" call n=0 d="$LEAK_SKILLS/define-done-and-grading"
+  make_leak_world
+  # R17-1 (Main 1982): a read that resolves to one of the named installed skill files.
+  local -a calls=(
+    "$(tool_call read path "$d/OPERATIONAL-BOUNDARIES.md")"
+    "$(tool_call read path "$LEAK_SKILLS/assess-done-and-grade/../define-done-and-grading/OPERATIONAL-BOUNDARIES.md")"
+    "$(tool_call read path "$d/OPERATIONAL-BOUNDARIES.md:1-200")"
+    "$(tool_call read path "$d/CLI-EXAMPLE.md")"
+    "$(tool_call read path skill://define-done-and-grading/CLI-EXAMPLE.md)"
+    "$(tool_call read path skill://assess-done-and-grade/SKILL.md)"
+  )
+  for call in "${calls[@]}"; do
+    n=$((n + 1))
+    write_transcript "$log" "$LEAK_WORK" "$call"
+    run_check "$log"
+    assert_equals 0 "$CHECK_RC" "named skill file read $n was not clean: $call -> $CHECK_OUT"
+  done
+  # Controls: another file in the same folder, a named file that links outside the skills
+  # folder, and an author file.
+  printf 'outside\n' >"$TMP_ROOT/outside-cli.md"
+  ln -sf "$TMP_ROOT/outside-cli.md" "$d/CLI-EXAMPLE.md"
+  for call in "$(tool_call read path "$d/MAINTAINERS.md")" "$(tool_call read path skill://define-done-and-grading/MAINTAINERS.md)" \
+    "$(tool_call read path "$d/CLI-EXAMPLE.md")" "$(tool_call read path skill://define-done-and-grading/CLI-EXAMPLE.md)" \
+    "$(tool_call read path "$LEAK_ROOT/sources/raw-contract.md")"; do
+    write_transcript "$log" "$LEAK_WORK" "$call"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "a control read was not a leak: $call -> $CHECK_OUT"
+  done
+  pass "reads that resolve to the named installed skill files are clean; another file, an outside link and an author file void"
+}
+
 test_report_with_no_inputs_read_voids() {
   local log="$TMP_ROOT/nir/s.jsonl"
   make_leak_world
@@ -806,4 +840,5 @@ fm_test_run_cases \
   test_patch_form_edit_is_judged \
   test_pinned_operational_boundaries_reads_are_clean \
   test_report_with_no_inputs_read_voids \
+  test_named_installed_skill_files_are_clean \
   -- "$@"
