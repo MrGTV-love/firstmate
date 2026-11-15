@@ -48,8 +48,8 @@ unset TMUX TMUX_PANE HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH \
 # Its `capabilities --json` proves persistent recovered leases and publishes a
 # protected holder unless FM_FAKE_TREEHOUSE_CAPABILITY names another answer
 # (false, malformed, unknown, failing, none for an empty success, no-holder for a
-# schema 1 build without recovered_quarantine_holder, or no-version and
-# empty-version for a schema 2 answer without a usable version field); every call is appended to
+# schema 1 build without recovered_quarantine_holder, or no-version, empty-version,
+# number-version and blank-version for a schema 2 answer without a usable version field); every call is appended to
 # FM_FAKE_TREEHOUSE_LOG when set, so a case can prove bootstrap ran no pool command.
 make_fake_toolchain() {
   local dir=$1 fakebin
@@ -84,6 +84,7 @@ if [ "${1:-}" = capabilities ]; then
     no-version) printf '%s\n' '{"schema_version":2,"persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
     empty-version) printf '%s\n' '{"schema_version":2,"version":"","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
     number-version) printf '%s\n' '{"schema_version":2,"version":3,"persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
+    blank-version) printf '%s\n' '{"schema_version":2,"version":" \t ","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
     malformed) printf '%s\n' 'not json' ;;
     none) ;;
     failing) exit 3 ;;
@@ -1015,7 +1016,7 @@ test_treehouse_lease_check_follows_resolved_backend() {
 # probe runs nothing but `capabilities`.
 test_treehouse_recovered_capability_diagnostic() {
   local case_dir fakebin out calls answer
-  for answer in unknown none malformed false failing no-holder no-version empty-version number-version; do
+  for answer in unknown none malformed false failing no-holder no-version empty-version number-version blank-version; do
     case_dir="$TMP_ROOT/capability-$answer"
     mkdir -p "$case_dir/home/config"
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"

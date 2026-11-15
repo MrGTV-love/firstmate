@@ -843,7 +843,7 @@
         {
           "file": "bin/fm-task-copy-lib.sh",
           "match": "remedy=\"Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry;"
-        },
+        , "count": 2},
         {
           "file": "bin/fm-task-copy-lib.sh",
           "match": "remedy=\"Report this entry for repair: run (cd '$project' && treehouse status) with the installed treehouse"
@@ -2248,7 +2248,7 @@
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME.\" >&2"
         },
-        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned"},
+        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned", "count": 2},
         {"file": "bin/fm-teardown.sh", "match": "teardown_unclaimed_note \"treehouse refused the exact conditional return"}
       ]
     },

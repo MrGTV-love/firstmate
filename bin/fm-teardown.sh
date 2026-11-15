@@ -4467,10 +4467,26 @@ TEARDOWN_UNCLAIMED_KIND=
 TEARDOWN_UNCLAIMED_NAME=
 TEARDOWN_UNCLAIMED_HOLDER=
 TEARDOWN_UNCLAIMED_LEASE_ID=
+# The lease the planning saw (state|holder|lease id|name), for the retirement gate.
+TEARDOWN_UNCLAIMED_SEEN=
 
 TEARDOWN_UNCLAIMED_WHY=
 teardown_unclaimed_note() {  # <reason>
   TEARDOWN_UNCLAIMED_WHY=$1
+}
+
+# Ahead of every retirement, launch-agent and process-reaping helper (they run on the
+# recorded copy before project custody), the slot's lease is read fresh and must be
+# the one the planning saw. A successor, a changed holder or a new lease id means the
+# slot may no longer be this task's, so nothing is retired or signalled and the
+# teardown refuses with the record kept; a retry plans again from what it then reads.
+teardown_unclaimed_retire_gate() {
+  local now
+  fm_task_copy_pool_slot_lease "$TEARDOWN_UNCLAIMED_SLOT" || true
+  now="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
+  [ "$now" = "$TEARDOWN_UNCLAIMED_SEEN" ] && return 0
+  echo "REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned: its lease changed since the route was planned (planned '$TEARDOWN_UNCLAIMED_SEEN', now '$now'), so a successor may hold it; no run, launch agent or process was retired or signalled on the recorded copy, and task $ID's record is kept for a retry." >&2
+  return 1
 }
 
 # Run one phase; the only place the route reports a refusal.
@@ -4649,11 +4665,13 @@ teardown_unclaimed_prove_custody() {
 # stays in place and no return-pending marker is written. On a proven treehouse
 # an entry provably someone else's or already free with no interrupted release of
 # this task's (another holder, absent, unleased with no marker naming the slot)
-# keeps that same no-return behavior. Every other reading (this task's own lease,
-# with or without a lease id, a legacy lease with no holder and no lease id, whose
-# owner cannot be told, a recovered quarantine, a conflicting or unreadable entry,
-# an interrupted release) is planned, so any refusal there keeps the record and
-# the retry obligation.
+# keeps that same no-return behavior; "someone else's" needs positive proof, an
+# ordinary lease with a lease id naming another holder. Every other reading (this
+# task's own lease, with or without a lease id, any legacy lease, whatever holder
+# it names or none, because with no lease id its owner cannot be told, a recovered
+# quarantine, a conflicting or unreadable entry, an interrupted release) is planned,
+# so any refusal there keeps the record and the retry obligation. It records what it
+# saw in TEARDOWN_UNCLAIMED_SEEN for teardown_unclaimed_retire_gate.
 teardown_unclaimed_candidate() {  # <slot>
   local slot=$1 marked
   [ "$FORCE" != --force ] || return 1
@@ -4662,16 +4680,17 @@ teardown_unclaimed_candidate() {  # <slot>
   fm_task_copy_treehouse_persists_recovered_leases || return 1
   fm_task_copy_pool_slot_lease "$slot" || true
   case "$FM_TASK_COPY_LEASE_STATE" in
-    ordinary) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
-    legacy) [ -z "$FM_TASK_COPY_LEASE_HOLDER" ] || [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
-    recovered|conflicting|unreadable) return 0 ;;
+    ordinary) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] || return 1 ;;
+    legacy|recovered|conflicting|unreadable) ;;
     unleased)
       fm_teardown_return_pending "$STATE" "$ID" || return 1
       marked=$(sed -n 's/^slot=//p' "$STATE/$ID.teardown-return-pending" 2>/dev/null | head -1)
-      [ -n "$marked" ] && [ "$(fm_task_copy_canonical_dir "$marked" 2>/dev/null)" = "$slot" ]
+      { [ -n "$marked" ] && [ "$(fm_task_copy_canonical_dir "$marked" 2>/dev/null)" = "$slot" ]; } || return 1
       ;;
     *) return 1 ;;
   esac
+  TEARDOWN_UNCLAIMED_SEEN="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
+  return 0
 }
 
 # Before project custody, take the root's landed-work proof the way the claimed
@@ -4720,7 +4739,10 @@ teardown_unclaimed_slot_release() {
       return 1
     }
     args=(return "$slot" --if-lease-holder "$TEARDOWN_UNCLAIMED_HOLDER")
-    [ "$TEARDOWN_UNCLAIMED_KIND" != ordinary ] || args+=(--if-lease-id "$TEARDOWN_UNCLAIMED_LEASE_ID")
+    # An entry that carries a lease id, a recovered one included, binds it: a same-holder
+    # successor with a new id must not be cleared. Only an id-less recovered entry
+    # is released by its holder alone.
+    [ -z "$TEARDOWN_UNCLAIMED_LEASE_ID" ] || args+=(--if-lease-id "$TEARDOWN_UNCLAIMED_LEASE_ID")
     out=$(cd "$PROJ" && treehouse "${args[@]}" </dev/null 2>&1) || rc=$?
     if [ "$rc" -ne 0 ]; then
       teardown_unclaimed_note "treehouse refused the exact conditional return (exit $rc): $out"
@@ -5266,6 +5288,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       ;;
     retire)
+      [ -z "$TEARDOWN_UNCLAIMED_SLOT" ] || teardown_unclaimed_retire_gate || exit 1
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
       swept=("$WT")
       for root in ${TEARDOWN_RETURN_SLOT:+"$TEARDOWN_RETURN_SLOT"} \

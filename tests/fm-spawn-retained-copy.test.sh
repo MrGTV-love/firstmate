@@ -508,7 +508,7 @@ PROTECTED_HOLDER='quarantined: persistent recovered lease'
 # subcommand the guard might use as a diagnostic (status, lease, get, return)
 # marks $CASE_DIR/treehouse-forbidden and fails, so the case can prove the probe
 # is the only thing the guard ever runs.
-install_capability_treehouse() {  # <answer: proven|false|malformed|none|failing|unknown|wrong-schema|no-holder|empty-holder|old-holder|no-version|empty-version|number-version>
+install_capability_treehouse() {  # <answer: proven|false|malformed|none|failing|unknown|wrong-schema|no-holder|empty-holder|old-holder|no-version|empty-version|number-version|blank-version>
   local answer=$1
   : > "$CASE_DIR/treehouse-calls"
   rm -f "$CASE_DIR/treehouse-forbidden"
@@ -526,6 +526,7 @@ if [ "\${1:-}" = capabilities ]; then
     no-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
     empty-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:"",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
     number-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:3,persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
+    blank-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:" \t ",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
     malformed) printf '%s\n' 'not json' ;;
     none) ;;
     failing) exit 3 ;;
@@ -558,7 +559,7 @@ assert_only_capability_probes() {  # <label>
 test_recovered_slot_refuses_without_proven_capability() {
   local answer name entry
   local recovered=$OLD_RECOVERED
-  for answer in unknown none malformed false failing wrong-schema no-holder empty-holder old-holder no-version empty-version number-version; do
+  for answer in unknown none malformed false failing wrong-schema no-holder empty-holder old-holder no-version empty-version number-version blank-version; do
     name="recovered-unproven-$answer"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
@@ -578,40 +579,62 @@ test_recovered_slot_refuses_without_proven_capability() {
   pass "a recovered lease keeps refusing allocation on a treehouse that does not prove persistent recovered leases, names the upgrade, and runs no pool command"
 }
 
-# Which leased entries need the capability proof (Main 1738). The consumer learns
-# the protected holder text only from a proven probe, so on a provider that did not
-# prove it, an entry is admitted as an ordinary lease only when it has a lease id,
-# no recovery reason and an ordinary holder. An entry with no lease id, with a
-# recovery reason, or whose holder begins with the recovered prefix has a
-# recovered shape (the live pools hold both: id-less, and with an id plus a
-# recovery reason) and is refused until the provider proves the capability. The
-# probe only runs for a recovered shape, and with the proof every shape is admitted
-# as before. A Firstmate home slot keeps its exemption and is not asked.
+# Which leased entries the allocation guard admits (Main 1702, 1738, 1762: refuse
+# when in doubt, act only on positive proof). The consumer learns the protected
+# holder text only from a proven probe, so an entry is admitted as an ordinary
+# lease only when it has a lease id, a holder that is not recovered-looking, and no
+# recovery reason. Everything else (no lease id, a recovery reason, a holder
+# beginning "recovered:", no holder, two leased entries for one slot) needs the
+# proof, and even with the proof it is admitted only when its holder IS the
+# published protected holder; two entries for one slot and an entry that cannot be
+# read are never admitted. The probe runs only for such an entry.
+assert_unproved_lease_refusal() {  # <name> <label> <proven|unproven>
+  local remedy
+  if [ "$3" = unproven ]; then
+    remedy="Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
+  else
+    remedy="Inspect the entry with: (cd '$PROJECT_DIR' && treehouse status)"
+  fi
+  assert_retained_refusal "$1" "carries a lease that is not provably an ordinary one" "$remedy" "treehouse lease '"
+  assert_only_capability_probes "$2"
+  grep -Fxq 'capabilities --json' "$CASE_DIR/treehouse-calls" || fail "$2: the guard never probed the capability"
+  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$2: the refusal changed the pool state"
+}
+
 test_unproven_provider_admits_only_ordinary_leases() {
-  local shape provider name entry out rc id=0123456789abcdef0123456789abcdef
+  local shape provider name entry out rc expect id=0123456789abcdef0123456789abcdef
   for provider in unproven proven; do
-    for shape in ordinary idless idless-ordinary-holder reason-with-id recovered-prefix-with-id; do
+    for shape in ordinary idless-protected idless-ordinary-holder reason-with-id reason-protected recovered-prefix-with-id \
+        holderless-with-id duplicate-idless duplicate-reason-with-id; do
       name="shape-$provider-$shape"
       make_retained_case "$name"
       add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
       case "$shape" in
         ordinary) entry=$(printf ',"leased":true,"lease_holder":"holder","lease_id":"%s"' "$id") ;;
-        idless) entry=$(printf ',"leased":true,"lease_holder":"%s"' "$PROTECTED_HOLDER") ;;
+        idless-protected|duplicate-idless) entry=$(printf ',"leased":true,"lease_holder":"%s"' "$PROTECTED_HOLDER") ;;
         idless-ordinary-holder) entry=',"leased":true,"lease_holder":"holder"' ;;
-        reason-with-id) entry=$(printf ',"leased":true,"lease_holder":"holder","lease_id":"%s","recovery_reason":"state file was corrupt or truncated"' "$id") ;;
+        reason-with-id|duplicate-reason-with-id) entry=$(printf ',"leased":true,"lease_holder":"holder","lease_id":"%s","recovery_reason":"state file was corrupt or truncated"' "$id") ;;
+        reason-protected) entry=$(printf ',"leased":true,"lease_holder":"%s","lease_id":"%s","recovery_reason":"state file was corrupt or truncated"' "$PROTECTED_HOLDER" "$id") ;;
         recovered-prefix-with-id) entry=$(printf ',"leased":true,"lease_holder":"recovered: another state file reason","lease_id":"%s"' "$id") ;;
+        holderless-with-id) entry=$(printf ',"leased":true,"lease_id":"%s"' "$id") ;;
       esac
       add_free_second_slot "$entry"
+      case "$shape" in
+        duplicate-*)
+          jq --arg p "$SLOT_DIR" '.worktrees += [(.worktrees[] | select(.path == $p))]' "$CASE_DIR/pool/treehouse-state.json" > "$CASE_DIR/pool/state.next" \
+            && mv "$CASE_DIR/pool/state.next" "$CASE_DIR/pool/treehouse-state.json" ;;
+      esac
       if [ "$provider" = proven ]; then install_capability_treehouse proven; else install_capability_treehouse failing; fi
       retained_fingerprint > "$CASE_DIR/before-copy"
       cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
-      if [ "$provider" = unproven ] && [ "$shape" != ordinary ]; then
-        assert_retained_refusal "$name" "is not a Firstmate home and carries" \
-          "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true" \
-          "treehouse lease '"
-        assert_only_capability_probes "$provider/$shape"
-        grep -Fxq 'capabilities --json' "$CASE_DIR/treehouse-calls" || fail "$provider/$shape: the guard never probed the capability"
-        cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$provider/$shape: the refusal changed the pool state"
+      # What is admitted: an ordinary entry always; on a proven provider an entry on
+      # the published protected holder; nothing else.
+      expect=refuse
+      case "$provider/$shape" in
+        */ordinary|proven/idless-protected|proven/reason-protected) expect=admit ;;
+      esac
+      if [ "$expect" = refuse ]; then
+        assert_unproved_lease_refusal "$name" "$provider/$shape" "$provider"
         continue
       fi
       rc=0
@@ -624,13 +647,80 @@ test_unproven_provider_admits_only_ordinary_leases() {
       assert_only_capability_probes "$provider/$shape"
       retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$provider/$shape: spawn changed the leased slot"
       cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$provider/$shape: spawn wrote the pool state"
-      if [ "$provider" = unproven ]; then
+      if [ "$shape" = ordinary ]; then
         ! grep -Fxq 'capabilities --json' "$CASE_DIR/treehouse-calls" || fail "$provider/$shape: an ordinary lease was probed although its shape needs no proof"
       fi
     done
   done
-  pass "on a provider that did not prove the capability only an ordinary lease with a lease id is admitted; id-less, recovery-reason and recovered-prefix entries refuse and name the upgrade, and with the proof all are admitted"
+  pass "an ordinary lease with a lease id is admitted without the proof; id-less, recovery-reason, recovered-prefix, holderless and duplicate entries refuse, and with the proof only an entry on the published protected holder is admitted"
 }
+
+# The same guard, as a function with in-memory pool state and stubs, for the reads
+# a fixture pool cannot fail: when the fresh read of the slot's entry fails after
+# the scan found it leased, an unproven provider is refused and nothing is
+# admitted; and a version of only whitespace does not prove the capability.
+test_unproved_fresh_read_and_blank_version_are_refused() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local label rc verdict STATE_JSON FAIL_SECOND=0 ANSWER=failing
+  command -v jq >/dev/null 2>&1 || fail "the in-memory guard checks require jq"
+  [() {
+    if [[ ${1-} == -f && ${2-} == /virtual/*/'*.meta' ]]; then return 0; fi
+    if [[ ${1-} == -L && ${2-} == /virtual/*/'*.meta' ]]; then return 1; fi
+    builtin [ "$@"
+  }
+  fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=(/virtual/home/state); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
+  fm_meta_get() { printf '%s\n' /virtual/pool/1/project/nested; }
+  fm_task_copy_canonical_dir() { printf '%s\n' "$1"; }
+  fm_task_copy_enclosing_pool_slot() { printf '%s\n' /virtual/pool/1/project; }
+  jq() {
+    local last=${!#} arg
+    if [[ $last == */treehouse-state.json ]]; then
+      for arg in "$@"; do
+        if [[ $FAIL_SECOND == 1 && $arg == *'("I" + '* ]]; then return 1; fi
+      done
+      local -a args=("$@")
+      unset 'args[${#args[@]}-1]'
+      command jq "${args[@]}" <<<"$STATE_JSON"
+    else
+      command jq "$@"
+    fi
+  }
+  treehouse() {
+    [[ ${1-} == capabilities && ${2-} == --json ]] || return 91
+    case "$ANSWER" in
+      failing) return 3 ;;
+      valid) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
+      blank) printf '%s\n' '{"schema_version":2,"version":" \t ","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}' ;;
+    esac
+  }
+  reset_probe() { FM_TASK_COPY_RECOVERED_CAPABILITY_BIN=; FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=; FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=; }
+  entry() { command jq -cn --arg holder "$1" --arg id "$2" '{name:"1",path:"/virtual/pool/1/project",leased:true,lease_holder:$holder,lease_id:$id}'; }
+  run_guard() {  # <label> <entry-objects>
+    STATE_JSON="{\"worktrees\":[$2]}"
+    reset_probe
+    rc=0
+    fm_task_copy_pool_slots_hold_no_current_copy /virtual/project /virtual/home/state >/dev/null 2>&1 || rc=$?
+  }
+  # control: an ordinary entry whose second read works is admitted
+  ANSWER=failing FAIL_SECOND=0
+  run_guard ordinary "$(entry holder id-1)"
+  [ "$rc" = 0 ] || fail "the ordinary control was refused"
+  # an id-less recovered-shaped entry whose fresh read then fails is refused
+  FAIL_SECOND=1
+  run_guard second-read-fails "$(entry 'quarantined: fixture' '')"
+  [ "$rc" != 0 ] || fail "an entry whose fresh read failed was admitted on an unproven provider"
+  # whitespace-only version: not proven; control: a real version is
+  for label in valid blank; do
+    ANSWER=$label
+    reset_probe
+    rc=0
+    fm_task_copy_treehouse_persists_recovered_leases || rc=$?
+    verdict=$rc
+    case "$label:$verdict" in valid:0|blank:1) ;; *) fail "version $label: capability exit $verdict" ;; esac
+  done
+  pass "a failed fresh read refuses on an unproven provider (an ordinary entry still admits), and a whitespace-only version is not a proof"
+)
 
 # The capability-positive half: with the proof, a recovered slot on the
 # published protected holder holding a task's current copy is a durable
@@ -1163,6 +1253,17 @@ test_secondmate_home_slot_with_other_project_copy_allows_allocation() {
     add_free_second_slot "$entry"
     cp "$sm_home/state/foreign.meta" "$CASE_DIR/before-meta"
     git -C "$NESTED_COPY" rev-parse HEAD > "$CASE_DIR/before-head"
+    if [ "$lease" = recovered ]; then
+      # A home slot on the recovered holder gets no exemption from the capability
+      # proof (Main 1738): on a provider that did not prove it the guard refuses.
+      install_capability_treehouse failing
+      cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+      assert_retained_refusal "$name" "carries Treehouse's recovered-state lease" \
+        "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true" "treehouse lease '"
+      assert_only_capability_probes "$lease"
+      cmp -s "$CASE_DIR/before-meta" "$sm_home/state/foreign.meta" || fail "$lease: the refusal changed the foreign record"
+      continue
+    fi
     rc=0
     out=$(run_retained_spawn "$name") || rc=$?
     expect_code 0 "$rc" "$lease: a secondmate home slot holding another project's copy stopped the spawn"$'\n'"$out"
@@ -1174,7 +1275,7 @@ test_secondmate_home_slot_with_other_project_copy_allows_allocation() {
     git -C "$NESTED_COPY" rev-parse HEAD | cmp -s - "$CASE_DIR/before-head" || fail "$lease: spawn moved the foreign copy"
     assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$lease: spawn lost the foreign copy's work"
   done
-  pass "a leased secondmate home slot holding another project's task copy does not stop a spawn"
+  pass "an ordinary leased secondmate home slot holding another project's task copy does not stop a spawn, and a recovered one gets no exemption on an unproven provider"
 }
 
 test_slot_left_by_reassociated_task_is_allocatable() {
@@ -1219,6 +1320,7 @@ test_unprovable_entry_path_refusal_names_no_lease
 test_unprovable_slot_hold_still_refuses
 test_recovered_slot_refuses_without_proven_capability
 test_unproven_provider_admits_only_ordinary_leases
+test_unproved_fresh_read_and_blank_version_are_refused
 test_recovered_slot_allows_allocation_with_proven_capability
 test_proven_capability_does_not_relax_other_refusals
 test_old_holder_is_adopted_and_old_session_exit_cannot_sweep

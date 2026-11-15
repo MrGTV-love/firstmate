@@ -3628,7 +3628,8 @@ SH
 # Slot A holds task-x1 (leased ordinarily to it, or by the recovered holder) with
 # the task's nested copy inside it and no .fm-slot-owner claim; slot B is a
 # recovered quarantine holding a live non-ignored nested copy with an unlanded
-# commit. <a-lease> is ordinary or recovered, on the protected holder a proven
+# commit. <a-lease> is ordinary, recovered or recovered-id (a recovered entry that
+# keeps its lease id), on the protected holder a proven
 # provider publishes, or ordinary-old or recovered-old, on the old recovered
 # holder. Sets UNC_CASE, UNC_ENV (a bash array of env assignments), UNC_A, UNC_B,
 # UNC_STATE, UNC_NESTED, UNC_B_COPY, UNC_PROTECTED_HOLDER.
@@ -3712,6 +3713,7 @@ SH
   jq --arg r "$holder" --arg b "$UNC_B" --arg a "$UNC_A" --arg kind "$kind" '
     .worktrees |= map(
       if .path == $b then (.lease_holder = $r | del(.lease_id))
+      elif .path == $a and $kind == "recovered-id" then (.lease_holder = $r)
       elif .path == $a and ($kind | startswith("recovered")) then (.lease_holder = $r | del(.lease_id))
       else . end)' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE" || return 1
   UNC_NESTED=$UNC_A/.claude/worktrees/x
@@ -3838,7 +3840,7 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
   local provider kind case_dir out rc lease_id label
   unc_providers "R3/R6 real-provider release"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for kind in ordinary recovered recovered-old; do
+    for kind in ordinary recovered recovered-old recovered-id; do
       label="$provider $kind"
       UNC_B_HOLDER_AFTER=
       [ "$kind" != recovered-old ] || UNC_B_HOLDER_AFTER=adopted
@@ -3858,6 +3860,11 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
       if [ "$kind" = ordinary ]; then
         grep -Fx "return $UNC_A --if-lease-holder task-x1 --if-lease-id $lease_id" "$case_dir/treehouse.argv" >/dev/null \
           || fail "$label: the exact conditional return was not issued: $(cat "$case_dir/treehouse.argv")"
+      elif [ "$kind" = recovered-id ]; then
+        # An entry that carries a lease id binds it: the final return passes it too.
+        [ -n "$lease_id" ] || fail "$label: the fixture's recovered entry lost its lease id"
+        grep -Fx "return $UNC_A --if-lease-holder $UNC_PROTECTED_HOLDER --if-lease-id $lease_id" "$case_dir/treehouse.argv" >/dev/null \
+          || fail "$label: the return did not bind the recovered entry's lease id: $(cat "$case_dir/treehouse.argv")"
       else
         grep -Fx "return $UNC_A --if-lease-holder $UNC_PROTECTED_HOLDER" "$case_dir/treehouse.argv" >/dev/null \
           || fail "$label: the recovered return was not issued by the protected holder: $(cat "$case_dir/treehouse.argv")"
@@ -3892,31 +3899,38 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
   local provider mode case_dir out rc
   unc_providers "R4 real-provider interruptions"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for mode in fail-before fail-after successor-holder successor-lease-id cleanup-successor-holder cleanup-successor-lease-id cleanup-untracked; do
-      unc_pool_case "unclaimed-interrupt-$mode" ordinary "$provider" || fail "$provider $mode: cannot build the pool"
+    for mode in fail-before fail-after successor-holder successor-lease-id cleanup-successor-holder cleanup-successor-lease-id cleanup-untracked \
+        recovered-successor-lease-id recovered-cleanup-successor-lease-id; do
+      # The recovered modes run slot A as a recovered entry that carries a lease id:
+      # a successor under the same protected holder with a new id must not be cleared.
+      akind=ordinary
+      case "$mode" in recovered-*) akind=recovered-id; mode_name=${mode#recovered-} ;; *) mode_name=$mode ;; esac
+      unc_pool_case "unclaimed-interrupt-$mode" "$akind" "$provider" || fail "$provider $mode: cannot build the pool"
+      a_holder=task-x1
+      [ "$akind" = ordinary ] || a_holder=$UNC_PROTECTED_HOLDER
       case_dir=$UNC_CASE
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
       jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/b-entry.before"
-      case "$mode" in
+      case "$mode_name" in
         cleanup-untracked) unc_untracked_at_cleanup "$case_dir" ;;
-        cleanup-*) unc_successor_at_cleanup "$case_dir" "${mode#cleanup-}" ;;
-        *) printf '%s\n' "$mode" > "$case_dir/inject" ;;
+        cleanup-*) unc_successor_at_cleanup "$case_dir" "${mode_name#cleanup-}" ;;
+        *) printf '%s\n' "$mode_name" > "$case_dir/inject" ;;
       esac
       rc=0
       out=$(unc_run_teardown "$case_dir") || rc=$?
       [ "$rc" -ne 0 ] || fail "$provider $mode: teardown reported success despite the injected failure"$'\n'"$out"
       assert_present "$case_dir/state/task-x1.meta" "$provider $mode: the task record was retired despite the failure"
       assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $mode: the return-pending marker was dropped despite the failure"
-      case "$mode" in
+      case "$mode_name" in
         fail-before|cleanup-untracked) jq -e '.[1] == true and .[2] == "task-x1"' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the lease moved: $(unc_a_entry)" ;;
         fail-after) jq -e '.[1] == null' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the provider's return did not run: $(unc_a_entry)" ;;
         *successor-holder)
           jq -e '.[1] == true and .[2] == "successor"' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the successor's lease was cleared: $(unc_a_entry)" ;;
         *successor-lease-id)
-          jq -e --arg id "$UNC_SUCCESSOR_ID" '.[1] == true and .[2] == "task-x1" and .[3] == $id' <<<"$(unc_a_entry)" >/dev/null \
+          jq -e --arg id "$UNC_SUCCESSOR_ID" --arg h "$a_holder" '.[1] == true and .[2] == $h and .[3] == $id' <<<"$(unc_a_entry)" >/dev/null \
             || fail "$provider $mode: the successor lease id was cleared: $(unc_a_entry)" ;;
       esac
-      case "$mode" in
+      case "$mode_name" in
         cleanup-untracked)
           # Git itself refuses the plain removal of a copy that gained untracked work:
           # the copy and that work stay, nothing is returned, and the refusal names git.
@@ -3937,7 +3951,7 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
           assert_absent "$case_dir/state/task-x1.meta" "$provider $mode: the retry left the record"
           assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $mode: the retry left the return-pending marker"
           jq -e '.[1] == null' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the retry left the slot leased: $(unc_a_entry)"
-          if [ "$mode" = fail-after ]; then
+          if [ "$mode_name" = fail-after ]; then
             assert_equals 1 "$(unc_return_count "$case_dir")" "$provider $mode: the retry reset the slot a second time: $(cat "$case_dir/treehouse.argv")"
           fi
           ;;
@@ -3960,7 +3974,7 @@ test_unclaimed_release_refuses_each_custody_condition() {
   local provider cond case_dir out rc pid before
   unc_providers "R5 real-provider custody refusals"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for cond in other-copy other-prior-record unregistered-copy ignored-unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root legacy-lease legacy-no-holder unreadable-state duplicate-entry live-process; do
+    for cond in other-copy other-prior-record unregistered-copy ignored-unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root legacy-lease legacy-no-holder legacy-other-holder unreadable-state duplicate-entry live-process; do
       unc_pool_case "unclaimed-refuse-$cond" ordinary "$provider" || fail "$provider $cond: cannot build the pool"
       case_dir=$UNC_CASE
       pid=
@@ -4009,6 +4023,11 @@ test_unclaimed_release_refuses_each_custody_condition() {
           # Leased, but with neither a holder nor a lease id: whose it is cannot be told.
           jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= del(.lease_id, .lease_holder)' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
           ;;
+        legacy-other-holder)
+          # A legacy lease (no lease id) that names another holder: the id-less entry
+          # is unproven ownership, so it refuses and keeps the retry obligation.
+          jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= (del(.lease_id) | .lease_holder = "someone-else")' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+          ;;
         unreadable-state) printf '{"worktrees":[{"name":"1"\n' > "$UNC_STATE" ;;
         duplicate-entry)
           jq --arg p "$UNC_A" '.worktrees += [(.worktrees[] | select(.path == $p) | .name = "9")]' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
@@ -4021,15 +4040,22 @@ test_unclaimed_release_refuses_each_custody_condition() {
       [ -z "$pid" ] || teardown_fixture_stop "$pid"
       [ "$rc" -ne 0 ] || fail "$provider $cond: teardown completed although the slot must not be returned"$'\n'"$out"
       assert_present "$case_dir/state/task-x1.meta" "$provider $cond: the task record was retired"
-      # An unreadable claim or an unavailable home refuses in the existing early
-      # checks, before any marker is written; every other condition refuses inside
-      # the release route, after the marker.
+      # Every condition keeps the task record, and refuses inside the release route
+      # keep the return-pending marker too. An unreadable claim and an unavailable
+      # home refuse in the early checks of a still-live task, before any slot step
+      # and before the endpoint is touched, exactly as those checks promise
+      # ("nothing was changed"): a marker there would read as an interrupted
+      # teardown, which the idle reaper treats as reap-ready, so no marker is
+      # written and the refusal is asserted as such.
       case "$cond" in
-        unsafe-claim|unavailable-home) ;;
+        unsafe-claim|unavailable-home)
+          assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: an early refusal of a live task wrote a return-pending marker"
+          assert_contains "$out" "nothing was changed" "$provider $cond: the early refusal did not say nothing was changed"
+          ;;
         *) assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: the return-pending marker was dropped" ;;
       esac
       case "$cond" in
-        legacy-lease|legacy-no-holder) assert_contains "$out" "its lease has no lease id" "$provider $cond: the refusal did not name its cause" ;;
+        legacy-lease|legacy-no-holder|legacy-other-holder) assert_contains "$out" "its lease has no lease id" "$provider $cond: the refusal did not name its cause" ;;
         unreadable-state) assert_contains "$out" "its pool state cannot be read exactly" "$provider $cond: the refusal did not name its cause" ;;
         duplicate-entry) assert_contains "$out" "more than one pool-state entry names it" "$provider $cond: the refusal did not name its cause" ;;
       esac
@@ -4084,18 +4110,19 @@ test_unclaimed_slot_on_unproven_provider_stays_inert() {
   pass 'on an unproven treehouse the unclaimed-slot route stays inert: teardown completes, keeps the reassociated copy, and writes no return-pending marker'
 }
 
-# Control for the holderless legacy refusal: a legacy lease (no lease id) whose
-# holder is provably another task's is not this task's to return or to keep a retry
-# obligation for. On a proven provider teardown completes outside the route, leaves
-# slot A and the reassociated copy as they are, writes no marker and issues no
-# return, exactly as for an ordinary lease held by someone else.
-test_unclaimed_legacy_lease_of_another_holder_stays_outside_the_route() {
+# Control for the legacy refusal: an ordinary lease (it carries a lease id) held by
+# another task is provably someone else's, not this task's to return or to keep a
+# retry obligation for. On a proven provider teardown completes outside the route,
+# leaves slot A and the reassociated copy as they are, writes no marker and issues
+# no return. A legacy lease (no lease id) is never presumed someone else's: the R5
+# conditions legacy-no-holder and legacy-other-holder refuse instead.
+test_unclaimed_ordinary_lease_of_another_holder_stays_outside_the_route() {
   local provider case_dir out rc before
-  unc_providers "legacy lease of another holder on the real provider"
+  unc_providers "ordinary lease of another holder on the real provider"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    unc_pool_case unclaimed-legacy-other ordinary "$provider" || fail "$provider: cannot build the pool"
+    unc_pool_case unclaimed-ordinary-other ordinary "$provider" || fail "$provider: cannot build the pool"
     case_dir=$UNC_CASE
-    jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= (del(.lease_id) | .lease_holder = "someone-else")' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+    jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= (.lease_holder = "someone-else")' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
     before=$(cat "$UNC_STATE")
     unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.before"
     rc=0
@@ -4105,11 +4132,76 @@ test_unclaimed_legacy_lease_of_another_holder_stays_outside_the_route() {
     assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider: a return-pending marker was written outside the route"
     ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider: a return was issued: $(cat "$case_dir/treehouse.argv")"
     [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider: the pool state changed"
-    unc_assert_only_route_commands "$case_dir" "$provider legacy-other"
+    unc_assert_only_route_commands "$case_dir" "$provider ordinary-other"
     unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.after"
     cmp -s "$case_dir/nested.before" "$case_dir/nested.after" || fail "$provider: the reassociated copy was not left in place"
   done
-  pass 'a legacy lease held by another holder stays outside the unclaimed-slot route: no marker, no return, the copy and slot left as they were'
+  pass 'an ordinary lease held by another task stays outside the unclaimed-slot route: no marker, no return, the copy and slot left as they were'
+}
+
+# A slot that gained a successor between the route's planning and the retirement
+# phase runs no retirement, launch-agent or process-reaping helper on the recorded
+# copy, and teardown refuses with the record kept. The actual teardown_nested_slot
+# is run as a function with the helpers replaced by recorders (the same harness
+# shape the outside review used), so no process can be signalled: every case
+# prints the helpers it reached. Controls: an unchanged lease and an interrupted
+# release that is still unleased reach them.
+test_unclaimed_successor_runs_no_retirement_helper() {
+  local script scenario out rc seen now expect
+  script=$(python3 - "$ROOT/bin/fm-teardown.sh" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+def fn(name, required):
+    m = re.search(r'^' + re.escape(name) + r'\(\) \{[^\n]*\n.*?^\}', text, re.M | re.S)
+    if not m:
+        if required:
+            raise SystemExit('missing function: ' + name)
+        return ''
+    return m.group(0)
+print(fn('teardown_nested_slot', True))
+print(fn('teardown_unclaimed_retire_gate', False))
+PY
+) || fail "cannot extract the teardown functions"
+  for scenario in control successor-holder successor-lease-id interrupted-unleased; do
+    seen='ordinary|task-x1|id-1|1'
+    case "$scenario" in
+      control) now='ordinary|task-x1|id-1|1'; expect=helpers ;;
+      successor-holder) now='ordinary|successor|id-2|1'; expect=refused ;;
+      successor-lease-id) now='ordinary|task-x1|id-2|1'; expect=refused ;;
+      interrupted-unleased) seen='unleased|||1'; now='unleased|||1'; expect=helpers ;;
+    esac
+    rc=0
+    out=$(SEEN="$seen" NOW="$now" bash -c '
+      FORCE= KIND=ship ID=task-x1 WT=/fixture/pool/1/repo/nested TASK_TMP=/fixture/task-tmp META=/fixture/meta STATE=/fixture/state
+      TEARDOWN_UNCLAIMED_SLOT=/fixture/pool/1/repo TEARDOWN_RETURN_SLOT= TEARDOWN_NESTED_COPIES=() TEARDOWN_UNCLAIMED_SEEN=$SEEN
+      fm_task_copy_pool_slot_lease() {
+        IFS="|" read -r FM_TASK_COPY_LEASE_STATE FM_TASK_COPY_LEASE_HOLDER FM_TASK_COPY_LEASE_ID FM_TASK_COPY_LEASE_NAME <<<"$NOW"
+        return 0
+      }
+      teardown_unclaimed_root_is_own() { return 1; }
+      conclude_task_no_mistakes_run() { echo "HELPER conclude_run $1"; }
+      retire_task_private_nm_launch_agents() { echo "HELPER retire_agents $1"; }
+      teardown_foreign_procs_retire() { echo "HELPER foreign_procs_retire"; }
+      reap_task_worktree_processes() { echo "HELPER reap $*"; }
+      '"$script"'
+      teardown_nested_slot retire
+      echo RETIRE_DONE
+    ' 2>&1) || rc=$?
+    case "$expect" in
+      helpers)
+        expect_code 0 "$rc" "$scenario: the legitimate retirement was refused"$'\n'"$out"
+        assert_contains "$out" "HELPER reap" "$scenario: the retirement helpers did not run"
+        assert_contains "$out" RETIRE_DONE "$scenario: the retirement did not finish"
+        ;;
+      refused)
+        [ "$rc" -ne 0 ] || fail "$scenario: retirement ran although the slot has a successor"$'\n'"$out"
+        assert_not_contains "$out" "HELPER" "$scenario: a retirement helper ran on the recorded copy of a slot with a successor"$'\n'"$out"
+        assert_not_contains "$out" RETIRE_DONE "$scenario: retirement completed"
+        assert_contains "$out" "its lease changed since the route was planned" "$scenario: the refusal did not name the changed lease"
+        ;;
+    esac
+  done
+  pass 'a slot whose lease changed after planning runs no retirement, launch-agent or process-reaping helper on the recorded copy, while an unchanged lease and an interrupted unleased release still retire'
 }
 
 # The route retires what the claimed route retires before the slot goes back: the
@@ -4206,7 +4298,8 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return
 test_unclaimed_release_interruptions_converge_and_never_clear_a_successor
 test_unclaimed_release_refuses_each_custody_condition
 test_unclaimed_slot_on_unproven_provider_stays_inert
-test_unclaimed_legacy_lease_of_another_holder_stays_outside_the_route
+test_unclaimed_ordinary_lease_of_another_holder_stays_outside_the_route
+test_unclaimed_successor_runs_no_retirement_helper
 test_unclaimed_release_concludes_runs_and_agents_on_the_slot
 test_unclaimed_refusal_leaves_runs_and_agents_on_the_slot
 test_vernant_slot_manifest_retirement
