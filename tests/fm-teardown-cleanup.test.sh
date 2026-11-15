@@ -7106,13 +7106,16 @@ test_r4_own_nested_untracked_claude_file_refuses() {
 
 # R3: at the lock reread just before the driver, an absent, unreadable,
 # unparsable or changed lock refuses and the driver is never called; an
-# unchanged lock reaches the driver. The mutation runs inside the credit step
-# (the copy's symbolic-ref read in teardown_credit_pr), after the last reprove.
+# unchanged lock reaches the driver. The mutation runs inside the credit step:
+# the unchanged run counts the copy's symbolic-ref reads, whose last one is
+# teardown_credit_pr's, and each changed run mutates at that read.
 test_r4_late_lock_change_refuses_before_the_driver() {
-  local rc state label marker admin
+  local rc state label marker admin last=0
   for state in unchanged absent unreadable unparsable changed; do
     label="r4-lock-$state"
-    make_own_locked_copy_case "$label" enclosing "$R4_DEAD_PID"
+    # The copy is a prior copy, so no worktree read of the task reaches it
+    # before the credit step.
+    make_own_locked_copy_case "$label" reverse "$R4_DEAD_PID"
     admin=$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)
     marker="$FOREIGN_CASE/credit-read"
     case "$state" in
@@ -7124,22 +7127,29 @@ test_r4_late_lock_change_refuses_before_the_driver() {
     esac > "$FOREIGN_CASE/mutate.sh"
     cat > "$FOREIGN_CASE/fakebin/git" <<SH
 #!/usr/bin/env bash
-if [ "\$1" = -C ] && [ "\$2" = '$FOREIGN_COPY' ] && [ "\$3 \$4 \$5 \$6" = 'symbolic-ref --quiet --short HEAD' ] && [ ! -e '$marker' ]; then
-  : > '$marker'
-  bash '$FOREIGN_CASE/mutate.sh'
+if [ "\$1" = -C ] && [ "\$2" = '$FOREIGN_COPY' ] && [ "\$3 \$4 \$5 \$6" = 'symbolic-ref --quiet --short HEAD' ]; then
+  n=\$(( \$(cat '$FOREIGN_CASE/reads' 2>/dev/null || echo 0) + 1 ))
+  echo "\$n" > '$FOREIGN_CASE/reads'
+  if [ "\$n" = '$last' ] && [ ! -e '$marker' ]; then
+    : > '$marker'
+    bash '$FOREIGN_CASE/mutate.sh'
+  fi
 fi
 exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
 SH
     chmod +x "$FOREIGN_CASE/fakebin/git"
     run_foreign_teardown rc
-    assert_present "$marker" "$label: the credit step did not run, so the mutation point was never reached"
     if [ "$state" = unchanged ]; then
       expect_code 0 "$rc" "$label: an unchanged lock must reach the driver and close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
       assert_present "$FOREIGN_CASE/closeout.log" "$label: the driver was not called"
+      last=$(cat "$FOREIGN_CASE/reads" 2>/dev/null || echo 0)
+      [ "$last" -ge 1 ] || fail "$label: the credit step read no branch, so no mutation point exists"
       continue
     fi
+    assert_present "$marker" "$label: the credit step's read was not reached, so the mutation never ran"
     expect_code 1 "$rc" "$label: a changed lock must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
     assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver was called after the lock changed"
+    assert_grep "teardown did not run Vernant's closeout driver" "$FOREIGN_CASE/stderr" "$label: the refusal did not come from the reread before the driver"
     assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
     assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
   done
