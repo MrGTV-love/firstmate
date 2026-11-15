@@ -309,8 +309,8 @@
 # sample, and the first missed sample or failed publication invalidates it at once.
 # Every gate on the host admits a new root only while each watched running root's
 # record names a sample at most 5 s old: positive proof, not a missing stop mark.
-# Linux runs are never watched (the accepted no-cap limit; the first gate of a run
-# that admits beside an unwatched root says so), and CI
+# Linux runs are never watched (the accepted no-cap limit; the run's warning says
+# admission counts them by charge only), and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # ShellCheck started outside this script (an agent or a test running it
 # directly) holds no slot and is not bounded by the pool; each admission counts
@@ -2415,9 +2415,9 @@ if [ "$(uname)" != Darwin ]; then
     exit 2
   fi
   if [ "$BOUND_MECH" = none ]; then
-    printf 'fm-lint.sh: WARNING: on %s without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap and the 64 MiB version-probe lane are not enforced; the host-wide admission still counts every root.\n' "$(uname)" >&2
+    printf 'fm-lint.sh: WARNING: on %s without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap and the 64 MiB version-probe lane are not enforced; the host-wide admission still counts every root, by its charge only, because no resident watch measures roots here.\n' "$(uname)" >&2
   else
-    printf 'fm-lint.sh: WARNING: on %s no memory cap is enforced: the per-root resident cap and the 64 MiB version-probe lane do not apply, and the %s KiB per-process address-space limit is not a resident-memory cap; the host-wide admission still counts every root.\n' "$(uname)" "$ROOT_MEMORY_KIB" >&2
+    printf 'fm-lint.sh: WARNING: on %s no memory cap is enforced: the per-root resident cap and the 64 MiB version-probe lane do not apply, and the %s KiB per-process address-space limit is not a resident-memory cap; the host-wide admission still counts every root, by its charge only, because no resident watch measures roots here.\n' "$(uname)" "$ROOT_MEMORY_KIB" >&2
   fi
 fi
 

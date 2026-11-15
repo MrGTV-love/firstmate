@@ -3268,8 +3268,9 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # shim logs how many processes each call listed to FM_TEST_PS_LOG; the python3 shim logs each
 # call's arguments to FM_TEST_PY_LOG, fails at once under FM_TEST_PY_REFUSE=1,
 # and with FM_TEST_PY_MEMORY set (resident and footprint KiB) answers each line a
-# rss-tree reader is sent with the larger of the two as the reader's JSON reply
-# instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
+# rss-tree reader is sent with the larger of the two as the reader's JSON reply,
+# naming the root by its real identity (read once when the reader starts), instead
+# of reading memory; with FM_TEST_PY_PLAN=<file> too,
 # the Nth rss-tree reader started follows line N of <file>: stall answers its
 # first line 3 s late, slow answers its first line 1 s late, slow-later answers
 # its second line 1 s late, exit exits before any reply, and anything else (or
@@ -3305,6 +3306,11 @@ fi
 printf '%s\n' "$*" >> "$FM_TEST_PY_LOG"
 [ "${FM_TEST_PY_REFUSE:-0}" = 0 ] || exit 1
 if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = rss-tree ]; then
+  ident=$("$FM_TEST_REAL_PYTHON" -I -c 'import importlib.util, sys
+spec = importlib.util.spec_from_file_location("fp", sys.argv[1])
+fp = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fp)
+print("%d,%d" % tuple(fp.process_identity(fp.kinfo(int(sys.argv[2])))))' "$1" "$3") || exit 1
   plan=
   [ -z "${FM_TEST_PY_PLAN:-}" ] || plan=$(sed -n "$(grep -c rss-tree "$FM_TEST_PY_LOG")p" "$FM_TEST_PY_PLAN")
   [ "$plan" != exit ] || exit 1
@@ -3315,7 +3321,7 @@ if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = rss-tree ]; then
       stall:1) sleep 3 ;;
       slow:1|slow-later:2) sleep 1 ;;
     esac
-    printf '{"rss_kib":%s,"members":[],"uncounted":[]}\n' "$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')"
+    printf '{"rss_kib":%s,"members":[[%s,%s]],"uncounted":[]}\n' "$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')" "$3" "$ident"
   done
   exit 0
 fi
@@ -4513,7 +4519,7 @@ test_the_watch_never_signals_a_member_known_only_by_its_start_second() {
   # bound; it and the root end on their own. (The size is an argument: a constant
   # string repeat is built when perl compiles the program, before the fork.)
   cat > "$tmp/leaver-parent.sh" <<'SH'
-perl -MPOSIX -MTime::HiRes=sleep -e 'my $mib = shift; sleep 1.6; POSIX::setpgid(0, 0); sleep 0.5; my $held = "x" x ($mib * 1024 * 1024); sleep 5' 160 &
+perl -MPOSIX -MTime::HiRes=sleep -e 'my $mib = shift; sleep 1.6; POSIX::setpgid(0, 0); sleep 0.5; my $held = "x" x ($mib * 1024 * 1024); sleep 12' 160 &
 echo "$!" > "$1"
 sleep 9
 SH
@@ -4558,7 +4564,7 @@ perl -MPOSIX -MTime::HiRes=sleep -e '
     open(my $f, ">", $pidfile) or die; print {$f} "$$\n"; close $f;
     sleep 7.5;
     my $held = "x" x ($mib * 1024 * 1024);
-    sleep 4;
+    sleep 11;
     exit 0;
   }
   sleep 3.3;
@@ -5035,7 +5041,7 @@ test_a_same_second_replacement_is_not_counted_against_the_root() {
   real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
   for label in replacement control; do
-    perl -e 'my $mib = shift; my $held = "x" x ($mib * 1024 * 1024); sleep 9' 160 > /dev/null 2>&1 &
+    perl -e 'my $mib = shift; my $held = "x" x ($mib * 1024 * 1024); sleep 12' 160 > /dev/null 2>&1 &
     big=$!
     sleep 0.5
     identity=$(fm_lint_identity_of "$big") || fm_lint_fail_settled "could not read the start time of the large process"
@@ -5082,7 +5088,7 @@ test_a_descendant_that_left_the_group_and_outlives_the_root_fails_it_unsignalled
   real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
   cat > "$tmp/leaver-parent.sh" <<'SH'
-perl -MPOSIX -e 'my $mib = shift; POSIX::setpgid(0, 0); my $held = "x" x ($mib * 1024 * 1024); sleep 5' "$2" &
+perl -MPOSIX -e 'my $mib = shift; POSIX::setpgid(0, 0); my $held = "x" x ($mib * 1024 * 1024); sleep 10' "$2" &
 echo "$!" > "$1"
 sleep 5
 SH

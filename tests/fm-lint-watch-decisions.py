@@ -124,6 +124,10 @@ def check_health_record():
         report('F2 an invalidated record says it failed', open(path).read().startswith('failed '), open(path).read())
         # A failed publication: the directory cannot take a new file. The publish
         # reports failure; the invalidation still rewrites the existing record in place.
+        # (As root a read-only directory still takes files, so the case cannot be made.)
+        if os.geteuid() == 0:
+            print('ok - F2 failed publication # SKIP as root a read-only directory still takes files')
+            return
         with open(path, 'w') as handle:
             handle.write('sample %.6f\n' % now)
         os.chmod(work, 0o500)
@@ -201,6 +205,8 @@ def check_reply_binding():
            0 <= verify_at < adopt_at, 'the reply is adopted before it is checked')
     report('F1 a reply without a whole member list is unknown',
            "return undef unless ref $named eq 'ARRAY'" in watch_block, 'a reply without members is still counted')
+    report('F1 a reply that measured memory but names no process is unknown',
+           'return undef if !@$named && $kib;' in watch_block, 'such a reply is still counted')
     fallback = re.search(r'\n(        \$next\{\$_\} = \[\$table->\{\$_\}\[3\], undef\] for keys %selected;\n)', SOURCE)
     if not fallback:
         report('F1 the table fallback keeps a selected member to the second only', False, 'the fallback line is missing')

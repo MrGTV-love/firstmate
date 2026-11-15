@@ -759,7 +759,7 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         return $found;
     };
     my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued, $stale_roots, $unwatched_noted);
+    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued, $stale_roots);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
@@ -976,22 +976,13 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                         # anywhere until that root has ended. A root recorded as
                         # unwatched (a host where no resident watch runs) needs no
                         # record: the accepted no-cap limit applies to it, and the
-                        # first gate of a run that admits beside one says so once.
+                        # lint run says so once before any root starts.
                         my $stale = grep {
                             my ($gate_pid, undef, $peak, $watched) = @$_;
                             defined $gate_pid && $gate_pid != $$ && ($watched // 1)
                                 && !(defined $peak && length $peak && fm_health_fresh("$peak.health", Time::HiRes::time()))
                         } values %by_gate;
                         $stale_roots = $stale;
-                        if (!$unwatched_noted && length $abort_file
-                            && grep { my ($gate_pid, undef, undef, $watched) = @$_; defined $gate_pid && $gate_pid != $$ && defined $watched && !$watched } values %by_gate) {
-                            $unwatched_noted = 1;
-                            if (sysopen(my $note, "$abort_file.unwatched-noted", Fcntl::O_WRONLY() | Fcntl::O_CREAT() | Fcntl::O_EXCL())) {
-                                close $note;
-                                print STDERR "fm-lint: a running root is not memory-measured on this host (no resident watch runs here); "
-                                    . "admission counts only its charge, and no memory cap is claimed for it\n";
-                            }
-                        }
                         my $outside = $foreign->($table, @host_charges);
                         $fits = !$stale && (!@host_charges && !$outside
                             || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib);
@@ -1485,6 +1476,8 @@ PYTHON
                 # identity, cannot be bound to the processes it measured: unknown.
                 return undef unless ref $named eq 'ARRAY'
                     && !grep { ref $_ ne 'ARRAY' || @$_ < 3 || grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
+                # Memory measured with no process named cannot be bound to any: unknown.
+                return undef if !@$named && $kib;
                 {
                     my %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) } @$named;
                     return undef unless $verify_members->(%reply);
