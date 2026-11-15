@@ -1323,7 +1323,11 @@ stop_stopped_shells() {
   done
   STOPPED_SHELL_PIDS=()
 }
-trap stop_stopped_shells EXIT
+trap 'stop_stopped_shells; fm_test_cleanup' EXIT
+trap 'stop_stopped_shells; fm_test_cleanup; exit 130' INT
+trap 'stop_stopped_shells; fm_test_cleanup; exit 143' TERM
+trap 'stop_stopped_shells; fm_test_cleanup; exit 129' HUP
+trap 'stop_stopped_shells; fm_test_cleanup; exit 131' QUIT
 make_stopped_tmux() { # <dir>
   local pid
   mkdir "$1"

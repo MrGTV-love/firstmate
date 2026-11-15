@@ -31,7 +31,11 @@ cleanup_held() {
   for pid in ${HELD_PIDS[@]+"${HELD_PIDS[@]}"}; do kill_tree "$pid"; done
   HELD_PIDS=()
 }
-trap cleanup_held EXIT
+trap 'cleanup_held; fm_test_cleanup' EXIT
+trap 'cleanup_held; fm_test_cleanup; exit 130' INT
+trap 'cleanup_held; fm_test_cleanup; exit 143' TERM
+trap 'cleanup_held; fm_test_cleanup; exit 129' HUP
+trap 'cleanup_held; fm_test_cleanup; exit 131' QUIT
 
 # make_world <name> [governed]: origin, a project clone on main, a publisher clone, and a pool slot
 # (a detached worktree) at the first commit. Sets W_DIR W_PROJ W_SLOT W_PUB W_BASE.
