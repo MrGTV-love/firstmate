@@ -42,7 +42,7 @@ Use a reviewer model outside the author's family.
 Never retry a model that failed; switch to another allowed model.
 Never run a review in a pack folder that already holds a report.
 
-After the run, run `bin/fm-contract-review-pack.sh check --pack <pack> --log <pack>/omp-session`, the session transcript the entrypoint writes into the pack folder.
+After the run, run `bin/fm-contract-review-pack.sh check --pack <pack> --log <pack>.omp-session`, the session transcript folder the entrypoint writes beside the pack.
 The transcript is the only evidence of what the run read; the report's `Inputs read` list is the reviewer's declaration, not evidence.
 The check judges every recorded read and search against the authorized inputs: the pack's own files, the three named references, a file tracked by the passed repository root, and the run's own work folder.
 An excluded path is refused even when it is tracked or sits under the root, and a gitignored file is not tracked context.
