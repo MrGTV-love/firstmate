@@ -1598,6 +1598,34 @@ test_nested_return_pending_link_shapes() {
   pass "a return-pending link to a regular file in the state directory closes with its target unchanged; dangling, directory and outside links refuse before any mutation"
 }
 
+# A forced drop whose slot lease fails at the reservation refuses with the
+# captain's drop record still absent: the words are written only after the
+# preflight and the reservation, just before the first discard. Once the lease
+# works, the same forced teardown closes and retains the words.
+test_nested_forced_drop_record_follows_the_reservation() {
+  local shape case_dir rc label
+  for shape in plain enclosing; do
+    label="nested-forced-drop-after-reservation-$shape"
+    nested_fixture "$label" "$shape" mine landed
+    case_dir=$NESTED_CASE
+    held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+    : > "$case_dir/lease-fails"
+    rc=0
+    nested_run "$case_dir" --force || rc=$?
+    expect_code 1 "$rc" "$label: a failed lease must refuse: $(tail -3 "$case_dir/stderr")"
+    assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: the refused close wrote the drop record"
+    assert_present "$NESTED_COPY/.git" "$label: the refused close removed the nested copy"
+    assert_present "$case_dir/state/task-x1.meta" "$label: the refused close retired the task record"
+    rm -f "$case_dir/lease-fails"
+    rc=0
+    nested_run "$case_dir" --force || rc=$?
+    expect_code 0 "$rc" "$label: the retry with a working lease must close: $(tail -3 "$case_dir/stderr")"
+    assert_nested_closed "$case_dir" "$label"
+    cmp -s "$FM_TEST_DROP_WORDS" "$case_dir/data/task-x1/captain-drop.md" || fail "$label: the closing run did not retain the captain's words"
+  done
+  pass "a forced plain or prior-shape nested close whose lease fails leaves no drop record, and the working retry retains the words and closes"
+}
+
 # The plain shape gets the prior shape's disposition for every claim state and
 # fixture: the same exit class, the same removals, the same number of slot
 # returns and the same markers.
@@ -4365,6 +4393,7 @@ test_nested_pending_close_check_needs_no_hard_link
 test_nested_entry_preflight_refuses_before_any_mutation
 test_nested_lock_retry_ignores_its_own_tracked_hook
 test_nested_return_pending_link_shapes
+test_nested_forced_drop_record_follows_the_reservation
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
 test_gate_409_recorded_case_tears_down
