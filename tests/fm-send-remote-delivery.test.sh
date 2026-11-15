@@ -208,6 +208,21 @@ remote_inbox_records() {  # <remote-home>
   find "$1/state/parent-route/rsm.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null
 }
 
+# assert_one_remote_record_body <remote-home> <corr> <message> <what>: the remote
+# steering inbox holds exactly one record, and its body (everything after the record's
+# -- line, bin/fm-task-inbox-lib.sh) is exactly the marked request: the from-firstmate
+# marker, the correlation token for <corr>, one space, then <message>. A record with no
+# -- line (an empty file, say) fails.
+assert_one_remote_record_body() {
+  local recs body want
+  recs=$(remote_inbox_records "$1")
+  [ -n "$recs" ] || fail "$4: no record reached the remote steering inbox"
+  case "$recs" in *$'\n'*) fail "$4: more than one remote record: $recs" ;; esac
+  body=$(fm_task_inbox_body "$recs") || fail "$4: the remote record has no body: $(cat "$recs")"
+  want="${FM_FROMFIRST_MARK}$(fm_pending_reply_corr_token "$2") $3"
+  [ "$body" = "$want" ] || fail "$4: the remote record's body is not the request with correlation $2: $body"
+}
+
 # The single non-dot pending-reply record in <home>, or empty.
 pending_record() {  # <home>
   find "$1/state/pending-replies" -maxdepth 1 -type f ! -name '.*' 2>/dev/null | head -1
@@ -403,7 +418,7 @@ run_printed_resend() {  # <fakebin> <ssh-log> <command> <out-prefix>
 # no-choice send, and the refusal lists every open key, the request's own
 # reserved blocker included (review N2).
 test_remote_printed_resend_survives_real_escalation() {
-  local dir fb ssh_log home rhome rc corr key count rec faf_text blocker_row
+  local dir fb ssh_log home rhome rc corr key count faf_text blocker_row
   dir="$TMP_ROOT/remote-escalated-resend"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
   rhome=$(setup_remote_secondmate_home remote-escalated-resend)
@@ -460,11 +475,7 @@ test_remote_printed_resend_survives_real_escalation() {
   # The printed command, as printed, passes the ordinary rule and lands once.
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/resend" || rc=$?
   expect_code 0 "$rc" "the printed correlation resend must be accepted: $(cat "$dir/resend.err")"
-  count=$(remote_inbox_records "$rhome" | grep -c . || true)
-  [ "$count" = 1 ] || fail "the printed resend must land exactly one remote record, found $count"
-  rec=$(remote_inbox_records "$rhome" | head -1)
-  grep -F "corr=$corr" "$rec" >/dev/null || fail "the resend did not preserve correlation $corr: $(cat "$rec")"
-  grep -F "please rename the metric" "$rec" >/dev/null || fail "the resend did not preserve the body: $(cat "$rec")"
+  assert_one_remote_record_body "$rhome" "$corr" "please rename the metric" "the printed escalated resend"
   # Deduplicated: running the printed command again lands no second record.
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/again" || rc=$?
   count=$(remote_inbox_records "$rhome" | grep -c . || true)
@@ -505,7 +516,7 @@ test_remote_printed_resend_carries_the_original_choice() {
   case "$blocker_row" in *$'\n'*) fail "setup: more than two open decisions before the resend: $FM_TEST_FOLD" ;; esac
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/keyed" || rc=$?
   expect_code 0 "$rc" "the printed keyed resend is accepted: $(cat "$dir/keyed.err")"
-  [ "$(remote_inbox_records "$rhome" | grep -c .)" = 1 ] || fail "the keyed resend must land one record"
+  assert_one_remote_record_body "$rhome" "$LOST_CORR" "use net_revenue" "the printed keyed resend"
   fm_test_fold "$home/state/rsm.status"
   [ "$FM_TEST_FOLD" = "$blocker_row" ] \
     || fail "the keyed resend closed metric-name once delivered, and only the request's own blocker stays open, unchanged: $FM_TEST_FOLD"
@@ -522,6 +533,7 @@ test_remote_printed_resend_carries_the_original_choice() {
   esac
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/none" || rc=$?
   expect_code 0 "$rc" "the printed none resend is accepted: $(cat "$dir/none.err")"
+  assert_one_remote_record_body "$rhome" "$LOST_CORR" "status of the weekly run" "the printed none resend"
   assert_contains "$(drain_out "$home")" "[key=metric-name]" "the none resend leaves metric-name open"
   pass "fm-send remote: the printed resend repeats the original choice, keyed or none"
 }
