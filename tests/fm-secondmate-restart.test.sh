@@ -446,18 +446,21 @@ setup_remote_case() {  # <case-dir> <id> <ssh-mode>
   local fb="$dir/fakebin"
   mkdir -p "$dir/$id-home"
   {
+    # The fields bin/fm-spawn.sh writes for a remote secondmate: worktree and
+    # home are the registry home, project and remote_root the registry root.
     echo "window=remote:$id"
     echo "endpoint_task_id=$id"
-    echo "worktree=$dir/$id-home"
-    echo "project=$dir/$id-home"
+    echo "worktree=/srv/$id"
+    echo "project=/srv/fm"
     echo "harness=claude"
     echo "kind=secondmate"
     echo "mode=secondmate"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
-    echo "home=$dir/$id-home"
+    echo "home=/srv/$id"
     echo "remote_host=remote-mac"
+    echo "remote_root=/srv/fm"
     echo "remote_backend=herdr"
     echo "remote_target=fm-remote:2ndmate-$id"
   } > "$dir/home/state/$id.meta"
@@ -480,6 +483,8 @@ decode() { printf '%s' "$1" | base64 --decode 2>/dev/null || printf '%s' "$1" | 
 rargs=()
 while IFS= read -r -d '' a; do rargs+=("$a"); done < <(decode "$argv_b64")
 printf '%s\n' "${rargs[*]}" >> "$FM_FAKE_SSH_LOG"
+# Every call's route (root and home as fm-on resolved them), one line each.
+printf 'root=%s home=%s %s\n' "$(decode "$2")" "$(decode "$3")" "${rargs[0]} ${rargs[1]:-}" >> "$FM_FAKE_SSH_LOG.route"
 if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ] && [ "${rargs[0]}" = fm-remote-inherit.sh ]; then
   remote_root=$(decode "$2")
   remote_home=$(decode "$3")
@@ -499,8 +504,21 @@ case "${rargs[1]:-}" in
       nul-proceed) printf 'attribution=pro\000ceed\n' ;;
       *) printf '%s\n' "${FM_FAKE_REMOTE_ATTRIBUTION:-attribution=proceed}" ;;
     esac
+    # A barrier after the parent's comparison: the registry, the record or the
+    # host endpoint changes before the delivery.
+    [ -z "${FM_FAKE_AFTER_ASK:-}" ] || "$FM_FAKE_AFTER_ASK"
     ;;
   send)
+    # The host verb refuses an expected target other than its own endpoint.
+    for a in "${rargs[@]:2}"; do
+      case "$a" in
+        expected-target=*)
+          if [ "${a#expected-target=}" != "${FM_FAKE_HOST_TARGET:-fm-remote:2ndmate-${rargs[2]}}" ]; then
+            printf 'error: this host endpoint is not the expected target\n' >&2
+            exit 1
+          fi ;;
+      esac
+    done
     # Model the live remote mate: act on the instruction and report back on the
     # parent channel, carrying the correlation token the request embedded.
     if [ -n "${FM_FAKE_ANSWER_STATUS:-}" ]; then
@@ -678,7 +696,7 @@ test_remote_omitted_backend_is_herdr_and_obeys_its_host() {
 # --- Main 1634 D4: the host decision is bound to the parent-recorded route -----
 test_remote_attribution_is_bound_to_the_recorded_route() {
   local dir out rc case meta
-  for case in other-host no-target unregistered; do
+  for case in other-host other-root other-home no-root no-home no-target unregistered; do
     dir=$(new_case remote-route)
     setup_remote_case "$dir" sm2 ok
     meta="$dir/home/state/sm2.meta"
@@ -686,6 +704,16 @@ test_remote_attribution_is_bound_to_the_recorded_route() {
       other-host)
         grep -v '^remote_host=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
         printf 'remote_host=other-mac\n' >> "$meta" ;;
+      other-root)
+        grep -v '^remote_root=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+        printf 'remote_root=/srv/other\n' >> "$meta" ;;
+      other-home)
+        grep -v '^home=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+        printf 'home=/srv/other\n' >> "$meta" ;;
+      no-root)
+        grep -v '^remote_root=' "$meta" > "$meta.new" && mv "$meta.new" "$meta" ;;
+      no-home)
+        grep -v '^home=' "$meta" > "$meta.new" && mv "$meta.new" "$meta" ;;
       no-target)
         grep -v '^remote_target=' "$meta" > "$meta.new" && mv "$meta.new" "$meta" ;;
       unregistered)
@@ -703,7 +731,48 @@ test_remote_attribution_is_bound_to_the_recorded_route() {
     [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
       || fail "a $case route created a pending-reply record"
   done
-  pass "D4 a remote mate whose registry route differs from its record, or that records no target, is asked nothing and sent nothing"
+  pass "D4 a remote mate whose registry host, root or home differs from its record, or that records no target, is asked nothing and sent nothing"
+}
+
+# --- Main 1709 ruling 3, Main 1714 (d): the delivery uses the compared route ----
+# Barriers after the host decision change the registry, the record or the host
+# endpoint; each delivery then refuses, with no request, record or relaunch.
+test_remote_delivery_uses_the_compared_route() {
+  local dir out rc case
+  for case in control registry-after-ask meta-after-ask endpoint-after-ask; do
+    dir=$(new_case remote-compared)
+    setup_remote_case "$dir" sm2 ok
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    case "$case" in
+      registry-after-ask)
+        printf '#!/usr/bin/env bash\nsed -i.bak "s|home: /srv/sm2|home: /srv/moved|" %q\n' "$dir/home/data/secondmates.md" > "$dir/after-ask" ;;
+      meta-after-ask)
+        printf '#!/usr/bin/env bash\nsed -i.bak "s|^remote_root=.*|remote_root=/srv/moved|" %q\n' "$dir/home/state/sm2.meta" > "$dir/after-ask" ;;
+      endpoint-after-ask)
+        printf '#!/usr/bin/env bash\n:\n' > "$dir/after-ask"
+        export FM_FAKE_HOST_TARGET=fm-remote:2ndmate-other ;;
+    esac
+    if [ -f "$dir/after-ask" ]; then chmod +x "$dir/after-ask"; export FM_FAKE_AFTER_ASK="$dir/after-ask"; fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_AFTER_ASK FM_FAKE_HOST_TARGET
+    if [ "$case" = control ]; then
+      expect_code 0 "$rc" "the compared route must restart"$'\n'"$out"
+      grep '^fm-remote-secondmate-control.sh send' "$dir/ssh.log" | grep -q 'expected-target=fm-remote:2ndmate-sm2' \
+        || fail "the persistence request did not carry the compared target"$'\n'"$(cat "$dir/ssh.log")"
+      ! grep -v '^root=/srv/fm home=/srv/sm2 ' "$dir/ssh.log.route" | grep -q . \
+        || fail "a call crossed another route"$'\n'"$(cat "$dir/ssh.log.route")"
+      continue
+    fi
+    [ "$rc" -ne 0 ] || fail "$case: the restart went on after the route changed"$'\n'"$out"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "$case: the mate was relaunched"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] \
+      || fail "$case: a pending-reply record remained"
+    case "$case" in
+      registry-after-ask|meta-after-ask)
+        assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "$case: a request crossed a changed route" ;;
+    esac
+  done
+  pass "a remote restart delivers only over the route it compared: a registry, record or endpoint change after the decision refuses"
 }
 
 test_remote_fleet_restart_obeys_initiating_policy() {
@@ -1125,6 +1194,7 @@ test_remote_unproven_agent_gets_no_request_record_or_nudge
 test_remote_backend_other_than_herdr_refuses_before_any_effect
 test_remote_omitted_backend_is_herdr_and_obeys_its_host
 test_remote_attribution_is_bound_to_the_recorded_route
+test_remote_delivery_uses_the_compared_route
 test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown
