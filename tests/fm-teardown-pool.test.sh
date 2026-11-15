@@ -3648,8 +3648,8 @@ unc_pool_case() {
   if [ "$provider" = real ]; then
     bin=$FM_TEST_TREEHOUSE_PROVIDER
     UNC_PROTECTED_HOLDER=$(unc_real_protected_holder)
-    UNC_A=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --no-fetch --lease --lease-holder task-x1 </dev/null 2>/dev/null) || return 1
-    UNC_B=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --no-fetch --lease --lease-holder sib </dev/null 2>/dev/null) || return 1
+    UNC_A=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --root "$case_dir/real-root" --no-fetch --lease --lease-holder task-x1 </dev/null 2>/dev/null) || return 1
+    UNC_B=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --root "$case_dir/real-root" --no-fetch --lease --lease-holder sib </dev/null 2>/dev/null) || return 1
     UNC_A=$(cd "$UNC_A" && pwd -P)
     UNC_B=$(cd "$UNC_B" && pwd -P)
     pool=${UNC_A%/*/*}
@@ -3898,7 +3898,7 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
       [ "$provider" = real ] || continue
       ! compgen -G "${UNC_A%/*/*/*}/treehouse-recovered-backup-*" >/dev/null || fail "$label: a recovered backup appeared"
       # The released slot can be allocated again.
-      (cd "$case_dir/project" && env "${UNC_ENV[@]}" "$UNC_PROVIDER" get --no-fetch --lease --lease-holder next </dev/null) \
+      (cd "$case_dir/project" && env "${UNC_ENV[@]}" "$UNC_PROVIDER" get --root "$case_dir/real-root" --no-fetch --lease --lease-holder next </dev/null) \
         | grep -Fx "$UNC_A" >/dev/null || fail "$label: the released slot was not allocatable"
     done
   done
@@ -3987,26 +3987,42 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
 # The two early refusals of a live task (an unreadable slot claim, an unavailable
 # registered home) must be refused for their own cause: another generic refusal that
 # also says nothing was changed must not satisfy the case.
-assert_early_refusal_cause() {  # <cond> <output> <label>
+assert_early_refusal_cause() {  # <cond> <output> <label> <path-the-refusal-must-name>
+  local flat
+  flat=$(printf '%s' "$2" | tr '\n' ' ')
+  # Facts, not prose: the refusal names the thing that is wrong and the path it is
+  # wrong at, in whatever words. A generic refusal, or the other early refusal, names
+  # neither.
   case "$1" in
     unsafe-claim)
-      assert_contains "$2" "carries a slot-owner claim that cannot be read" "$3: the refusal did not name the unreadable slot claim" ;;
+      printf '%s' "$flat" | grep -Eiq 'claim' || fail "$3: the refusal does not speak of a slot claim"
+      printf '%s' "$flat" | grep -Eiq '(cannot|can.?t|could not|unable to|not) +(be +)?(read|parsed|trusted)|unreadable|unsafe' \
+        || fail "$3: the refusal does not say the claim cannot be read"
+      ;;
     unavailable-home)
-      assert_contains "$2" "registered local Firstmate home is unavailable" "$3: the refusal did not name the unavailable home" ;;
+      printf '%s' "$flat" | grep -Eiq 'home' || fail "$3: the refusal does not speak of a home"
+      printf '%s' "$flat" | grep -Eiq 'unavailable|not available|unreachable|missing|(cannot|could not) +(be +)?(read|reached|found)' \
+        || fail "$3: the refusal does not say the home is unavailable"
+      ;;
   esac
-  assert_contains "$2" "nothing was changed" "$3: the early refusal did not say nothing was changed"
+  case "$flat" in *"$4"*) ;; *) fail "$3: the refusal does not name $4" ;; esac
 }
 
 test_early_refusal_assertion_names_the_specific_cause() {
-  local generic='REFUSED: some other check failed; nothing was changed'
-  local unsafe="REFUSED: task t's recorded worktree /w carries a slot-owner claim that cannot be read, so the slot cannot be proved to still be this task's; nothing was changed - not even with --force."
+  local generic='REFUSED: some other check failed at /w; nothing was changed'
+  local unsafe="REFUSED: task t's recorded worktree /w carries a slot-owner claim that cannot be read, so the slot cannot be proved to still be this task's; nothing was changed."
+  local reworded="refused: the claim file beside /w is unreadable, so ownership is unproven"
   local home='REFUSED: registered local Firstmate home is unavailable: /h; nothing was changed'
-  ( assert_early_refusal_cause unsafe-claim "$unsafe" control ) >/dev/null 2>&1 || fail "the unsafe-claim refusal was rejected"
-  ( assert_early_refusal_cause unavailable-home "$home" control ) >/dev/null 2>&1 || fail "the unavailable-home refusal was rejected"
-  ! ( assert_early_refusal_cause unsafe-claim "$generic" generic ) >/dev/null 2>&1 || fail "a generic refusal passed as an unsafe claim"
-  ! ( assert_early_refusal_cause unavailable-home "$generic" generic ) >/dev/null 2>&1 || fail "a generic refusal passed as an unavailable home"
-  ! ( assert_early_refusal_cause unavailable-home "$unsafe" crossed ) >/dev/null 2>&1 || fail "the unsafe-claim refusal passed as an unavailable home"
-  pass 'the early-refusal assertion needs the specific cause: a generic refusal, or the other early refusal, does not pass'
+  local home_reworded='refused: the home /h could not be reached'
+  ( assert_early_refusal_cause unsafe-claim "$unsafe" control /w ) >/dev/null 2>&1 || fail "the unsafe-claim refusal was rejected"
+  ( assert_early_refusal_cause unsafe-claim "$reworded" reworded /w ) >/dev/null 2>&1 || fail "an equivalent, differently worded unsafe-claim refusal was rejected"
+  ( assert_early_refusal_cause unavailable-home "$home" control /h ) >/dev/null 2>&1 || fail "the unavailable-home refusal was rejected"
+  ( assert_early_refusal_cause unavailable-home "$home_reworded" reworded /h ) >/dev/null 2>&1 || fail "an equivalent, differently worded unavailable-home refusal was rejected"
+  ! ( assert_early_refusal_cause unsafe-claim "$generic" generic /w ) >/dev/null 2>&1 || fail "a generic refusal passed as an unsafe claim"
+  ! ( assert_early_refusal_cause unavailable-home "$generic" generic /h ) >/dev/null 2>&1 || fail "a generic refusal passed as an unavailable home"
+  ! ( assert_early_refusal_cause unavailable-home "$unsafe" crossed /h ) >/dev/null 2>&1 || fail "the unsafe-claim refusal passed as an unavailable home"
+  ! ( assert_early_refusal_cause unsafe-claim "$unsafe" wrong-path /elsewhere ) >/dev/null 2>&1 || fail "a refusal naming another path passed"
+  pass 'the early-refusal assertion needs the facts (the claim or home, that it cannot be read or reached, and its path) in any wording: a generic refusal, the other early refusal, or another path does not pass'
 }
 
 # R5: one custody or proof condition at a time. Each leaves slot A leased exactly
@@ -4092,7 +4108,11 @@ test_unclaimed_release_refuses_each_custody_condition() {
       case "$cond" in
         unsafe-claim|unavailable-home)
           assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: an early refusal of a live task wrote a return-pending marker"
-          assert_early_refusal_cause "$cond" "$out" "$provider $cond"
+          if [ "$cond" = unsafe-claim ]; then
+            assert_early_refusal_cause "$cond" "$out" "$provider $cond" "$UNC_A"
+          else
+            assert_early_refusal_cause "$cond" "$out" "$provider $cond" "$case_dir/missing-home"
+          fi
           ;;
         *) assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: the return-pending marker was dropped" ;;
       esac

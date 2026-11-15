@@ -510,12 +510,47 @@ fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-m
   return 0
 }
 
+# Whether <dir> is a slot of a Treehouse pool of <project> whose state file is
+# missing (or is not a regular file), so that no state-file based test can name it.
+# Git identity alone never makes a directory a slot (the project's own checkout and
+# its nested copies share the project's Git identity): <dir> must be the top level of
+# a worktree of the project's repository and its pool folder must be evidenced as a
+# Treehouse pool, by the folder `treehouse pool-dir` names for the project or by a
+# `.treehouse` component in its path. A copy inside such a slot has a hold that
+# cannot be read, which the allocation guard must refuse rather than skip.
+fm_task_copy_pool_slot_without_state() {  # <project> <dir>
+  local project=$1 dir=$2 slot pool project_common slot_common top pool_dir
+  [ -d "$project" ] && [ -d "$dir" ] || return 1
+  slot=$(CDPATH='' cd -- "$dir" 2>/dev/null && pwd -P) || return 1
+  pool=$(dirname "$(dirname "$slot")")
+  [ ! -f "$pool/treehouse-state.json" ] || [ -L "$pool/treehouse-state.json" ] || return 1
+  top=$(git -C "$slot" rev-parse --show-toplevel 2>/dev/null) || return 1
+  top=$(CDPATH='' cd -- "$top" 2>/dev/null && pwd -P) || return 1
+  [ "$top" = "$slot" ] || return 1
+  project_common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  slot_common=$(git -C "$slot" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  project_common=$(CDPATH='' cd -- "$project_common" 2>/dev/null && pwd -P) || return 1
+  slot_common=$(CDPATH='' cd -- "$slot_common" 2>/dev/null && pwd -P) || return 1
+  [ "$project_common" = "$slot_common" ] || return 1
+  if pool_dir=$(fm_task_copy_treehouse_pool_dir "$project") && [ "$pool" -ef "$pool_dir" ]; then
+    return 0
+  fi
+  case "/$pool/" in */.treehouse/*) return 0 ;; esac
+  return 1
+}
+
 # The pool slot of <project> that strictly contains <canonical-path>, or a
-# failure when none does.
-fm_task_copy_enclosing_pool_slot() {  # <project> <canonical-path>
-  local project=$1 dir=${2%/*}
+# failure when none does. With "strict" (the allocation guard) a slot whose state file
+# is missing counts too (fm_task_copy_pool_slot_without_state), so its copy's hold is
+# judged unknown and refused, never skipped.
+fm_task_copy_enclosing_pool_slot() {  # <project> <canonical-path> [strict]
+  local project=$1 dir=${2%/*} strict=${3:-}
   while [ -n "$dir" ]; do
     if [ -f "${dir%/*/*}/treehouse-state.json" ] && fm_treehouse_pool_slot "$project" "$dir"; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    if [ "$strict" = strict ] && { fm_treehouse_pool_slot "$project" "$dir" || fm_task_copy_pool_slot_without_state "$project" "$dir"; }; then
       printf '%s\n' "$dir"
       return 0
     fi
@@ -863,7 +898,7 @@ fm_task_copy_current_pool_listing() {  # <project>
 # (fm_task_copy_current_pool_listing) holds is.
 FM_TASK_COPY_POOL_CURRENCY=
 FM_TASK_COPY_CURRENT_SLOT_NAME=
-fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
+fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name> [proof]
   local project=$1 slot=$2 state_name=$3 current listing name path
   FM_TASK_COPY_POOL_CURRENCY=unknown
   FM_TASK_COPY_CURRENT_SLOT_NAME=
@@ -874,6 +909,12 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
       return 0
     fi
     FM_TASK_COPY_POOL_CURRENCY=superseded
+    return 1
+  fi
+  # With "proof" (the allocation guard) the status listing below, a state-lock command
+  # that an older treehouse answers with its own recovery, is never the fallback unless
+  # the capability is proven; without it the currency stays unknown.
+  if [ "${4:-}" = proof ] && ! fm_task_copy_treehouse_persists_recovered_leases; then
     return 1
   fi
   fm_task_copy_current_pool_listing "$project" || return 1
@@ -985,7 +1026,7 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       copy=$(fm_meta_get "$meta" worktree)
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
-      slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
+      slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy" strict) || continue
       fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
       fm_task_copy_guard_admit_held "$slot"
       if [ "$FM_TASK_COPY_SLOT_STATE" = recovered ] && fm_task_copy_treehouse_persists_recovered_leases; then
@@ -999,12 +1040,14 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       case "$FM_TASK_COPY_SLOT_STATE" in
         held) continue ;;
         unleased)
-          if fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME"; then
+          if fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME" proof; then
             remedy="To hold that slot in place without touching its contents, run: (cd '$project' && treehouse lease '$FM_TASK_COPY_CURRENT_SLOT_NAME' --lease-holder '$id')"
           elif [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
             continue
-          else
+          elif fm_task_copy_treehouse_persists_recovered_leases; then
             remedy="To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')"
+          else
+            remedy="Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; on the installed treehouse even a status read can run its own recovery and move a copy, so the guard did not run one to find whether slot $slot is in the current pool."
           fi
           ;;
         conflicting)

@@ -78,7 +78,14 @@ add_nested_record() {  # <meta> <repo> <parent> <branch>
     "worktree=$NESTED_COPY" "project=$repo" "kind=ship"
 }
 
+# The preservation fingerprint of the enclosing slot AND of the nested linked worktree
+# a case recorded (NESTED_COPY): its own HEAD, which an enclosing-slot read of HEAD and
+# file bytes cannot see (a nested HEAD moved to a commit with the same bytes).
 retained_fingerprint() {
+  if [ -n "${NESTED_COPY:-}" ] && [ -d "$NESTED_COPY" ]; then
+    printf 'nested HEAD '
+    git -C "$NESTED_COPY" rev-parse HEAD
+  fi
   git -C "$SLOT_DIR" rev-parse HEAD
   git -C "$SLOT_DIR" symbolic-ref --quiet HEAD || true
   git -C "$SLOT_DIR" reflog
@@ -347,6 +354,8 @@ test_slot_holding_live_nested_current_copy_refuses() {
   for spelling in direct alias; do
     name="nested-live-$spelling"
     make_retained_case "$name"
+    # an unproven provider that answers pool-dir, as the installed treehouse does
+    install_boundary_treehouse failing pool-dir-answers status-forbidden
     nested="$SLOT_DIR/.claude/worktrees/replacement"
     mkdir -p "$SLOT_DIR/.claude/worktrees"
     git -C "$PROJECT_DIR" worktree add --quiet -b "nested-$name" "$nested"
@@ -460,6 +469,7 @@ test_unprovable_slot_hold_still_refuses() {
     name="unproved-$shape"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    install_boundary_treehouse failing pool-dir-answers status-forbidden
     remedy=
     forbidden=
     case "$shape" in
@@ -806,6 +816,170 @@ test_forged_capability_holder_cannot_collapse_to_the_old_literal() (
   pass "a capability answer whose holder is the old holder plus a newline, or only a newline, is not proof and cannot make an old-holder slot pass; a distinct protected holder still needs its adoption"
 )
 
+# A fixture treehouse for the two allocation boundaries of Main 1817: <caps> is the
+# capability answer (failing: unproven; proven), <pool-dir> either answers the case's
+# own pool folder or fails, and <status> either marks treehouse-forbidden and fails
+# (the guard must not run it) or answers a listing of slot 1 (a proven provider may).
+# Every call is recorded; any other pool command marks treehouse-forbidden.
+install_boundary_treehouse() {  # <failing|proven> <pool-dir-answers|pool-dir-fails> <status-forbidden|status-lists>
+  local caps=$1 pooldir=$2 status=$3
+  : > "$CASE_DIR/treehouse-calls"
+  rm -f "$CASE_DIR/treehouse-forbidden"
+  cat > "$FAKEBIN_DIR/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$CASE_DIR/treehouse-calls"
+case "\${1:-}" in
+  capabilities)
+    [ "$caps" = proven ] || exit 3
+    jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:"v-fake",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}'
+    exit 0
+    ;;
+  pool-dir)
+    [ "$pooldir" = pool-dir-answers ] || exit 1
+    printf '%s\n' "$CASE_DIR/pool"
+    exit 0
+    ;;
+  status)
+    if [ "$status" = status-lists ]; then
+      printf '%s\n' '[{"name":"1","path":"$SLOT_DIR"}]'
+      exit 0
+    fi
+    : > "$CASE_DIR/treehouse-forbidden"
+    exit 1
+    ;;
+  lease|get|return|list|prune|destroy)
+    : > "$CASE_DIR/treehouse-forbidden"
+    exit 1
+    ;;
+esac
+exit 0
+SH
+  chmod +x "$FAKEBIN_DIR/treehouse"
+}
+
+# A control spawn: the allocation guard did not refuse and the spawn launched and sent
+# its treehouse get (the pool has no state file in these cases, so no slot claim is
+# asserted: only that the guard stayed out of the way).
+assert_boundary_control_spawns() {  # <name> <message>
+  local out rc=0
+  out=$(run_retained_spawn "$1") || rc=$?
+  expect_code 0 "$rc" "$2"$'\n'"$out"
+  assert_not_contains "$out" "refusing allocation" "$2: the guard refused"
+  assert_contains "$out" "spawned new-$1" "$2: spawn did not launch"
+  grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "$2: spawn never sent its treehouse get"
+}
+
+# The two fail-open boundaries (Main 1817), each with a control:
+#  - an unproven provider is never asked for `treehouse status` to find out whether an
+#    unleased recorded slot is in the current pool (older treehouse answers status
+#    with its own recovery): the guard refuses with no status call. Control: a proven
+#    provider may use the listing, and does.
+#  - a recorded copy inside a Treehouse pool slot whose state file is missing is
+#    refused (its hold cannot be read), not skipped, whether the pool is evidenced by
+#    `treehouse pool-dir` or by a `.treehouse` path component. Controls: a copy nested
+#    under the project's own checkout, with the same state file missing and the same
+#    unproven provider, is admitted (Git identity alone never makes a slot), as is a
+#    home that uses no Treehouse pool.
+test_unproven_allocation_runs_no_status_to_place_a_slot() {
+  local name out rc root
+  # 1a. unproven: no status, refusal names the upgrade
+  name=boundary-no-status-unproven
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  install_boundary_treehouse failing pool-dir-fails status-forbidden
+  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+  rc=0
+  out=$(run_retained_spawn "$name") || rc=$?
+  # the prohibited behavior first: the unproven guard ran no status, whatever it then said
+  [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$name: the unproven guard ran a pool command (status): $(cat "$CASE_DIR/treehouse-calls")"
+  ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$name: the unproven guard ran treehouse status: $(cat "$CASE_DIR/treehouse-calls")"
+  [ "$rc" -ne 0 ] || fail "$name: the spawn was accepted beside an unplaced unleased slot: $out"
+  assert_contains "$out" "is not leased in Treehouse state" "$name: the refusal lost its reason"
+  assert_contains "$out" "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true" "$name: the refusal did not name the upgrade"
+  ! grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "$name: a refused allocation sent treehouse get"
+  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$name: the refusal changed the pool state"
+  # 1b. control: a proven provider may list, and the listing names the lease remedy
+  name=boundary-status-proven
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  install_boundary_treehouse proven pool-dir-fails status-lists
+  assert_retained_refusal "$name" "is not leased in Treehouse state" "treehouse lease '1'"
+  grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$name: the proven guard did not use the listing"
+  pass "an unproven provider is never asked for status to place an unleased slot (the refusal names the upgrade), while a proven provider may use the listing"
+}
+
+test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn() {
+  local name out rc
+  # 2a. missing state file, pool evidenced by pool-dir
+  name=boundary-missing-state-pooldir
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  rm -f "$CASE_DIR/pool/treehouse-state.json"
+  install_boundary_treehouse failing pool-dir-answers status-forbidden
+  assert_retained_refusal "$name" "cannot be proved leased"
+  [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$name: the guard ran a pool command: $(cat "$CASE_DIR/treehouse-calls")"
+  # 3a. control: a copy under the project's own checkout, state file missing, unproven provider
+  name=boundary-control-primary-checkout
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$PROJECT_DIR" "nested-$name"
+  rm -f "$CASE_DIR/pool/treehouse-state.json"
+  install_boundary_treehouse failing pool-dir-answers status-forbidden
+  assert_boundary_control_spawns "$name" "a copy under the project's own checkout stopped the spawn although it is no pool slot"
+  # 3b. control: no record names any copy at all (a home with no Treehouse pool use)
+  name=boundary-control-no-record
+  make_retained_case "$name"
+  rm -f "$CASE_DIR/pool/treehouse-state.json"
+  install_boundary_treehouse failing pool-dir-fails status-forbidden
+  assert_boundary_control_spawns "$name" "a home with no recorded copy stopped the spawn"
+  pass "a recorded copy in a pool slot with no state file refuses (pool-dir evidence), while a copy under the project's own checkout and a home with no pool use still spawn"
+}
+
+# The `.treehouse` half of the missing-state boundary, with real directories: a slot
+# of the project's repository under a `.treehouse` path whose pool folder has no state
+# file, `treehouse pool-dir` failing, an unproven provider. The recorded copy inside it
+# refuses (the hold cannot be read). Controls: the same copy under a path with no
+# `.treehouse` component is not evidenced as a pool slot and is not refused; a pool
+# whose state file exists is judged by it as before.
+test_missing_state_slot_under_a_dot_treehouse_path_refuses() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local variant root project slot nested_path rc expect
+  # variant: where the pool is, what `treehouse pool-dir` answers, and the verdict
+  for variant in 'dot-treehouse|dot|fails|refuse' 'pool-dir-evidence|plain|answers-pool|refuse' \
+      'plain-path|plain|fails|admit' 'pool-dir-elsewhere|plain|answers-other|admit'; do
+    IFS='|' read -r variant where pooldir expect <<<"$variant"
+    root="$TMP_ROOT/missing-state-$variant"
+    [ "$where" != dot ] || root="$root/.treehouse"
+    project="$TMP_ROOT/missing-state-$variant-project"
+    fm_git_init_commit "$project"
+    slot="$root/pool/1/project"
+    mkdir -p "$root/pool/1" "$TMP_ROOT/missing-state-$variant-home/state" "$TMP_ROOT/missing-state-$variant-other"
+    git -C "$project" worktree add --quiet --detach "$slot"
+    slot=$(cd "$slot" && pwd -P)
+    git -C "$project" worktree add --quiet -b "nested-$variant" "$slot/.claude/worktrees/nested"
+    nested_path=$(cd "$slot/.claude/worktrees/nested" && pwd -P)
+    : > "$TMP_ROOT/missing-state-$variant-home/state/holder.meta"
+    ( fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$TMP_ROOT/missing-state-$variant-home/state"); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
+      fm_meta_get() { printf '%s\n' "$nested_path"; }
+      treehouse() {
+        [ "${1-}" = pool-dir ] || return 1
+        case "$pooldir" in
+          answers-pool) (cd "$root/pool" && pwd -P) ;;
+          answers-other) (cd "$TMP_ROOT/missing-state-$variant-other" && pwd -P) ;;
+          *) return 1 ;;
+        esac
+      }
+      rc=0
+      fm_task_copy_pool_slots_hold_no_current_copy "$project" "$TMP_ROOT/missing-state-$variant-home/state" >/dev/null 2>&1 || rc=$?
+      case "$expect" in
+        refuse) [ "$rc" != 0 ] || fail "$variant: a copy in a pool slot with no state file was skipped" ;;
+        admit) [ "$rc" = 0 ] || fail "$variant: a copy in a worktree with no pool evidence was refused" ;;
+      esac
+    ) || exit 1
+  done
+  pass "a recorded copy in a Treehouse slot with no state file refuses when the pool is evidenced by a .treehouse path or by treehouse pool-dir, and the same copy with no pool evidence (a plain path, or a pool-dir that names another folder) is not taken for a pool slot"
+)
+
 # The capability-positive half: with the proof, a recovered slot on the
 # published protected holder holding a task's current copy is a durable
 # exclusion, so the spawn takes the free slot and leaves the recovered one, its
@@ -1125,7 +1299,7 @@ test_proven_capability_does_not_relax_other_refusals() {
 # recovered slot (mode chooses-recovered, the defect the case must be able to see),
 # and a get without an explicit --root is refused. Every call is recorded; status,
 # lease, return, list, prune and destroy mark treehouse-forbidden and fail.
-install_getting_treehouse() {  # <normal|chooses-recovered>
+install_getting_treehouse() {  # <normal|chooses-recovered|fails>
   local mode=$1
   : > "$CASE_DIR/treehouse-calls"
   rm -f "$CASE_DIR/treehouse-forbidden"
@@ -1147,6 +1321,7 @@ case "\${1:-}" in
     [ -n "\$root" ] || { echo "fake treehouse: get needs an explicit --root" >&2; exit 2; }
     case "$mode" in
       chooses-recovered) printf '%s\n' "$SLOT_DIR"; exit 0 ;;
+      fails) echo "fake treehouse: get failed" >&2; exit 1 ;;
     esac
     jq -r '[.worktrees[] | select((.leased // false) | not)][0].path' "\$state"
     exit 0
@@ -1169,6 +1344,11 @@ SH
 assert_spawn_took_the_slot_its_own_get_chose() {  # <name> <free-slot> <label>
   local chosen
   chosen=$(cat "$CASE_DIR/pane-path" 2>/dev/null) || fail "$3: the recorded treehouse get never ran, so no slot was chosen"
+  # the fixture kept a live subshell in the chosen slot, as a real pane does: its own
+  # recorded working directory is the chosen slot and it was still beating when the
+  # spawn finished (it is released by removing the .alive marker, never by a signal)
+  [ -e "$CASE_DIR/pane-path.alive" ] || fail "$3: the fixture's live subshell was released before the spawn finished"
+  [ -e "$CASE_DIR/pane-path.beat" ] || fail "$3: the fixture's live subshell never beat"
   [ "$(grep -c '^get ' "$CASE_DIR/treehouse-calls")" = 1 ] || fail "$3: the spawn's get did not run exactly once: $(cat "$CASE_DIR/treehouse-calls")"
   grep -Fxq "get --root $CASE_DIR/real-root" "$CASE_DIR/treehouse-calls" || fail "$3: the get did not carry the explicit fixture root: $(cat "$CASE_DIR/treehouse-calls")"
   [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$3: a pool diagnostic command ran: $(cat "$CASE_DIR/treehouse-calls")"
@@ -1196,8 +1376,8 @@ run_spawn_with_own_get() {  # <name>
 # check, run against a get that hands out the recovered slot, must fail; so a broken
 # interactive allocation can no longer coexist with a passing test.
 test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose() (
-  local mode name out rc second
-  for mode in normal chooses-recovered; do
+  local mode name out rc second mutant
+  for mode in normal chooses-recovered fails; do
     name="own-get-$mode"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
@@ -1211,16 +1391,141 @@ test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose() (
     rm -f "$CASE_DIR/pane-path"
     rc=0
     out=$(run_spawn_with_own_get "$name") || rc=$?
-    if [ "$mode" = normal ]; then
-      expect_code 0 "$rc" "$mode: the spawn beside a recovered quarantine failed"$'\n'"$out"
-      assert_contains "$out" "spawned new-$name" "$mode: spawn did not launch"
-      assert_spawn_took_the_slot_its_own_get_chose "$name" "$second" "$mode"
-    else
-      ! ( assert_spawn_took_the_slot_its_own_get_chose "$name" "$second" "$mode" ) >/dev/null 2>&1 \
-        || fail "$mode: the validator accepted a get that handed out the recovered slot"
-    fi
+    case "$mode" in
+      normal)
+        expect_code 0 "$rc" "$mode: the spawn beside a recovered quarantine failed"$'\n'"$out"
+        assert_contains "$out" "spawned new-$name" "$mode: spawn did not launch"
+        assert_spawn_took_the_slot_its_own_get_chose "$name" "$second" "$mode"
+        ;;
+      chooses-recovered)
+        # The mutant must be rejected by the named assertion: the validator saw the
+        # recovered slot being chosen, not merely some failure (a missing path file,
+        # an unrelated refusal).
+        mutant=$( ( assert_spawn_took_the_slot_its_own_get_chose "$name" "$second" "$mode" ) 2>&1 ) \
+          && fail "$mode: the validator accepted a get that handed out the recovered slot"
+        case "$mutant" in
+          *"the get chose the recovered slot $SLOT_DIR"*) ;;
+          *) fail "$mode: the validator failed for the wrong reason: $mutant" ;;
+        esac
+        ;;
+      fails)
+        # a get that fails fails the spawn and leaves no path: nothing is faked
+        [ "$rc" -ne 0 ] || fail "$mode: the spawn succeeded although its treehouse get failed"$'\n'"$out"
+        [ ! -s "$CASE_DIR/pane-path" ] || fail "$mode: a path was fabricated for a failed get"
+        ;;
+    esac
+    rm -f "$CASE_DIR/pane-path.alive"
   done
   pass "the spawn's own treehouse get is executed against the private pool with an explicit root, the test reads the slot that command chose, the recovered slot is byte-preserved, and a get that hands out the recovered slot is detected"
+)
+
+# The oracle's own check (Main 1817): moving the nested copy's HEAD to a commit with
+# the same bytes changes the fingerprint now; the enclosing-slot-only fingerprint it
+# replaces does not, which is why it could pass a moved nested copy.
+test_retained_fingerprint_sees_the_nested_copy_head() (
+  local name=fp-nested-head before after old_before old_after
+  old_fingerprint() {
+    git -C "$SLOT_DIR" rev-parse HEAD
+    git -C "$SLOT_DIR" symbolic-ref --quiet HEAD || true
+    git -C "$SLOT_DIR" reflog
+    git -C "$SLOT_DIR" status --porcelain --untracked-files=all
+    (cd "$SLOT_DIR" && find . -path ./.git -prune -o -type f -print | LC_ALL=C sort | while IFS= read -r file; do
+      printf '%s ' "$file"
+      cksum < "$file"
+    done)
+  }
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  before=$(retained_fingerprint)
+  old_before=$(old_fingerprint)
+  git -C "$NESTED_COPY" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "same bytes, new HEAD"
+  after=$(retained_fingerprint)
+  old_after=$(old_fingerprint)
+  [ "$old_before" = "$old_after" ] || fail "the control is wrong: the enclosing-slot-only fingerprint saw the nested HEAD move"
+  [ "$before" != "$after" ] || fail "the fingerprint did not see the nested copy's HEAD move to a commit with the same bytes"
+  pass "the preservation fingerprint reads the nested copy's HEAD: a same-bytes HEAD move changes it, and the old enclosing-slot-only fingerprint did not"
+)
+
+# The recovered slot's pool-state entry must be preserved field by field: every field
+# of the entry for <path> (leased, lease_holder, lease_id, leased_at, recovery_reason,
+# owner fields, anything the provider keeps) equals the earlier read, except the fields
+# named (the protected-holder rewrite changes lease_holder only). Other entries are not
+# its business: a compliant provider may record changes to the free candidate it hands
+# out, so the whole state file is never compared.
+assert_lease_entry_preserved() {  # <before-state> <after-state> <path> <label> [except-field...]
+  local before=$1 after=$2 path=$3 label=$4 drop
+  shift 4
+  drop=$(jq -cn '$ARGS.positional' --args -- "$@")
+  jq -e --slurpfile b "$before" --arg p "$path" --argjson drop "$drop" '
+    def entry($f): [$f.worktrees[]? | select(.path == $p)];
+    def strip: map(reduce $drop[] as $k (.; del(.[$k])));
+    (entry($b[0]) | length) == 1
+    and (entry(.) | length) == 1
+    and (entry($b[0]) | strip) == (entry(.) | strip)' "$after" >/dev/null \
+    || fail "$label: the recovered slot's pool entry changed in a field it must keep: before $(jq -c --arg p "$path" '[.worktrees[]? | select(.path == $p)]' "$before") after $(jq -c --arg p "$path" '[.worktrees[]? | select(.path == $p)]' "$after")"
+}
+
+# The oracle's own check: it accepts a rewrite of only the named field and a change
+# elsewhere in the state file, and rejects a change to ANY other field of the slot's
+# entry (lease id, lease time, leased flag, a recovery reason, a second entry).
+test_lease_entry_oracle_checks_every_field() (
+  local dir variant expect rc
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-lease-entry.XXXXXX") || fail "cannot create a scratch directory"
+  jq -n '{worktrees:[{name:"1",path:"/slot/a",leased:true,lease_holder:"recovered: old",lease_id:"id-1",leased_at:100,recovery_reason:"corrupt",owner_pid:0},{name:"2",path:"/slot/b"}]}' > "$dir/before.json"
+  for variant in 'identical|.|none|accept' \
+      'holder-rewritten|.worktrees[0].lease_holder = "quarantined: p"|lease_holder|accept' \
+      'free-slot-changed|.worktrees[1].leased = true|none|accept' \
+      'holder-rewritten-not-allowed|.worktrees[0].lease_holder = "quarantined: p"|none|reject' \
+      'lease-id-changed|.worktrees[0].lease_id = "id-2"|lease_holder|reject' \
+      'lease-time-changed|.worktrees[0].leased_at = 101|lease_holder|reject' \
+      'leased-flag-cleared|.worktrees[0].leased = false|lease_holder|reject' \
+      'reason-dropped|del(.worktrees[0].recovery_reason)|lease_holder|reject' \
+      'owner-field-added|.worktrees[0].owner_pid = 7|lease_holder|reject' \
+      'second-entry|.worktrees += [.worktrees[0]]|lease_holder|reject'; do
+    IFS='|' read -r variant filter except expect <<<"$variant"
+    jq "$filter" "$dir/before.json" > "$dir/after.json"
+    rc=0
+    if [ "$except" = none ]; then
+      ( assert_lease_entry_preserved "$dir/before.json" "$dir/after.json" /slot/a "$variant" ) >/dev/null 2>&1 || rc=$?
+    else
+      ( assert_lease_entry_preserved "$dir/before.json" "$dir/after.json" /slot/a "$variant" "$except" ) >/dev/null 2>&1 || rc=$?
+    fi
+    case "$expect:$rc" in
+      accept:0|reject:1) ;;
+      *) rm -rf "$dir"; fail "$variant: the lease-entry oracle gave exit $rc, expected to $expect" ;;
+    esac
+  done
+  rm -rf "$dir"
+  pass "the lease-entry oracle accepts the named holder rewrite and unrelated slots changing, and rejects a change to the lease id, lease time, leased flag, recovery reason, owner fields or a second entry"
+)
+
+# Every allocation a fixture makes with a real provider names its pool root with an
+# explicit --root (the contract's fixture hard gate; TREEHOUSE_ROOT in the environment
+# is not that argument). The scanner lists the provider `get` calls of a file that carry
+# none; the test runs it over both suites that drive a real provider and over a mutant
+# file with one root-less get, which it must catch.
+provider_gets_without_root() {  # <file>
+  grep -n -E '("\$bin"|"\$UNC_PROVIDER"|"\$FM_TEST_TREEHOUSE_PROVIDER") get ' "$1" | grep -v -e '--root' || true
+}
+
+test_fixture_provider_gets_name_a_root() (
+  local file found dir q d
+  for file in "$ROOT/tests/fm-teardown-pool.test.sh" "$ROOT/tests/fm-spawn-retained-copy.test.sh"; do
+    found=$(provider_gets_without_root "$file")
+    [ -z "$found" ] || fail "a real-provider fixture allocation names no --root in ${file##*/}: $found"
+  done
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-gets.XXXXXX") || fail "cannot create a scratch directory"
+  # the sample lines are assembled from fragments so that this file carries no call
+  # the scanner itself would flag
+  q='"' d='$'
+  printf '%s\n' "a=${q}${d}bin${q} get --root r --no-fetch --lease" > "$dir/good.sh"
+  printf '%s\n' "a=${q}${d}bin${q} get --no-fetch --lease" > "$dir/bad.sh"
+  printf '%s\n' "x=${q}${d}UNC_PROVIDER${q} get --no-fetch --lease --lease-holder next" > "$dir/bad2.sh"
+  [ -z "$(provider_gets_without_root "$dir/good.sh")" ] || { rm -rf "$dir"; fail "the scanner flagged a get that names its root"; }
+  [ -n "$(provider_gets_without_root "$dir/bad.sh")" ] || { rm -rf "$dir"; fail "the scanner missed a root-less get (the mutant)"; }
+  [ -n "$(provider_gets_without_root "$dir/bad2.sh")" ] || { rm -rf "$dir"; fail "the scanner missed a root-less reuse get (the mutant)"; }
+  rm -rf "$dir"
+  pass "every real-provider fixture get in the teardown and spawn suites names an explicit --root, and the scanner catches a get that does not"
 )
 
 # The real-provider half of the capability-positive case. Needs the treehouse
@@ -1309,9 +1614,15 @@ real_provider_recovered_slot_cases() {
     [ ! -e "$a/../.fm-slot-owner" ] || fail "$order: spawn claimed the recovered slot"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$order: spawn changed the recovered slot"
     cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$order: spawn changed the holder's record"
+    # Slot A's entry, field by field: the protected start keeps every field; the old
+    # start changes lease_holder only (the adopting rewrite). The free slot's entry and
+    # the rest of the state file are the provider's own business.
     if [ "$start" = protected ]; then
-      cmp -s "$CASE_DIR/before-state" "$state" || fail "$order: spawn wrote the pool state (a lease or reassociation for the recovered slot)"
+      assert_lease_entry_preserved "$CASE_DIR/before-state" "$state" "$a" "$start/$order: after the spawn"
+    else
+      assert_lease_entry_preserved "$CASE_DIR/before-state" "$state" "$a" "$start/$order: after the spawn" lease_holder
     fi
+    cp "$state" "$CASE_DIR/after-spawn-state"
     jq -e --arg a "$a" --arg r "$recovered" '[.worktrees[] | select(.path == $a)] | length == 1 and .[0].leased == true and .[0].lease_holder == $r and ((.[0].lease_id // "") == "")' "$state" >/dev/null \
       || fail "$start/$order: the recovered slot is not leased under the protected holder after the spawn"
     old_session_exit "$state"
@@ -1324,6 +1635,7 @@ real_provider_recovered_slot_cases() {
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$order: the real get changed the recovered slot"
     jq -e --arg a "$a" --arg r "$recovered" '.worktrees[] | select(.path == $a) | .lease_holder == $r and (.lease_id // "") == ""' "$state" >/dev/null \
       || fail "$order: the recovered entry changed after the real get"
+    assert_lease_entry_preserved "$CASE_DIR/after-spawn-state" "$state" "$a" "$start/$order: after the further get"
     ! compgen -G "$pool/../treehouse-recovered-backup-*" >/dev/null || fail "$order: the real get left a recovered backup"
   done
   done
@@ -1370,7 +1682,7 @@ test_nested_copy_in_leased_slot_allows_allocation() {
 # before treehouse get, so the harm is still caught.
 test_nested_copy_in_superseded_slot_allows_allocation() {
   local mode name out rc current old
-  for mode in status pool-dir; do
+  for mode in status pool-dir status-unproven; do
     name="superseded-nested-$mode"
     rc=0
     make_retained_case "$name"
@@ -1386,11 +1698,29 @@ test_nested_copy_in_superseded_slot_allows_allocation() {
 #!/usr/bin/env bash
 case "\${1:-}" in
   pool-dir) [ ! -f "$CASE_DIR/pool-dir" ] || cat "$CASE_DIR/pool-dir" ;;
+  capabilities)
+    [ -e "$CASE_DIR/proven" ] || exit 3
+    jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:"v-fake",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}'
+    ;;
   status) printf 'status\n' >> "$CASE_DIR/status-calls"; [ ! -f "$CASE_DIR/status.json" ] || cat "$CASE_DIR/status.json" ;;
 esac
 exit 0
 SH
     chmod +x "$FAKEBIN_DIR/treehouse"
+    # A treehouse without pool-dir is placed through its status listing, a state-lock
+    # command an unproven provider answers with its own recovery: only a provider that
+    # proved the capability may be asked (status), and an unproven one is refused with
+    # no status call (status-unproven).
+    [ "$mode" != status ] || : > "$CASE_DIR/proven"
+    if [ "$mode" = status-unproven ]; then
+      printf '[{"name":"1","path":"%s"}]\n' "$current" > "$CASE_DIR/status.json"
+      PANE_DIR=$SLOT_DIR
+      : > "$CASE_DIR/pane-log"
+      : > "$CASE_DIR/launch-log"
+      assert_retained_refusal "$name" "contains task holder's current copy" "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
+      [ ! -e "$CASE_DIR/status-calls" ] || fail "$mode: the unproven guard read a status listing"
+      continue
+    fi
     if [ "$mode" = status ]; then
       printf '[{"name":"1","path":"%s"}]\n' "$current" > "$CASE_DIR/status.json"
     else
@@ -1514,6 +1844,12 @@ test_unprovable_slot_hold_still_refuses
 test_recovered_slot_refuses_without_proven_capability
 test_unproven_provider_admits_only_ordinary_leases
 test_unproved_fresh_read_and_blank_version_are_refused
+test_unproven_allocation_runs_no_status_to_place_a_slot
+test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn
+test_missing_state_slot_under_a_dot_treehouse_path_refuses
+test_retained_fingerprint_sees_the_nested_copy_head
+test_lease_entry_oracle_checks_every_field
+test_fixture_provider_gets_name_a_root
 test_forged_capability_holder_cannot_collapse_to_the_old_literal
 test_recovered_slot_allows_allocation_with_proven_capability
 test_proven_capability_does_not_relax_other_refusals

@@ -107,10 +107,16 @@ fm_test_fake_gh_axi() {
 # that is exactly `treehouse get` (what bin/fm-spawn.sh types into the pane) is run
 # for real from that directory, with an explicit `--root "$FM_FAKE_TMUX_GET_ROOT"`
 # appended (every fixture allocation names its pool root), the command found first
-# on PATH, EOF on stdin. Its last output line is the slot the command itself chose:
-# it is written to FM_FAKE_PANE_PATH_FILE, which pane_current_path then reports, and
-# the call is appended to FM_FAKE_TMUX_GET_LOG. Without the variable the payload is
-# only recorded, as before, and the pane path stays the preselected one.
+# on PATH, EOF on stdin. Like a real pane, the fixture keeps a LIVE subshell: the
+# command runs in the background, its last output line is the slot the command itself
+# chose, and the subshell cd's into that slot, records its own working directory in
+# FM_FAKE_PANE_PATH_FILE (which pane_current_path then reports) and stays alive,
+# touching FM_FAKE_PANE_PATH_FILE.beat every 0.2 s, until the test removes
+# FM_FAKE_PANE_PATH_FILE.alive (or about two minutes pass): no signal is ever sent.
+# tmux does not wait for it to exit. A get that fails or names no directory leaves no
+# path file and fails the send. The call is appended to FM_FAKE_TMUX_GET_LOG. Without
+# the variable the payload is only recorded, as before, and the pane path stays the
+# preselected one.
 #
 # The pane path defaults to empty when FM_FAKE_PANE_PATH is unset. Window
 # cleanup and option operations are no-ops. Launch logging is env-gated, so
@@ -187,8 +193,26 @@ case "${1:-}" in
       for a in "$@"; do
         if [ "$a" = "treehouse get" ]; then
           printf 'treehouse get --root %s\n' "${FM_FAKE_TMUX_GET_ROOT:?FM_FAKE_TMUX_GET_ROOT is required with FM_FAKE_TMUX_GET_DIR}" >> "${FM_FAKE_TMUX_GET_LOG:-/dev/null}"
-          chosen=$(cd "$FM_FAKE_TMUX_GET_DIR" && treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null) || exit 1
-          printf '%s\n' "${chosen##*$'\n'}" > "${FM_FAKE_PANE_PATH_FILE:?FM_FAKE_PANE_PATH_FILE is required with FM_FAKE_TMUX_GET_DIR}"
+          pane_file=${FM_FAKE_PANE_PATH_FILE:?FM_FAKE_PANE_PATH_FILE is required with FM_FAKE_TMUX_GET_DIR}
+          rm -f "$pane_file"
+          : > "$pane_file.alive"
+          (
+            chosen=$(cd "$FM_FAKE_TMUX_GET_DIR" && treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null) || exit 1
+            cd "${chosen##*$'\n'}" || exit 1
+            pwd -P > "$pane_file"
+            n=0
+            while [ -e "$pane_file.alive" ] && [ "$n" -lt 600 ]; do
+              : > "$pane_file.beat"
+              n=$((n + 1))
+              /bin/sleep 0.2
+            done
+          ) </dev/null >/dev/null 2>&1 &
+          n=0
+          while [ ! -s "$pane_file" ] && [ "$n" -lt 100 ]; do
+            n=$((n + 1))
+            /bin/sleep 0.1
+          done
+          [ -s "$pane_file" ] || exit 1
         fi
       done
     fi
