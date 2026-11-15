@@ -16,9 +16,8 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
 A command that begins a new no-mistakes run, as fm-cpu-pass.py's
 fresh_pipeline_start judges it (a rerun, or axi run with an intent input, behind
 the wrapper forms it models), automatically enters that pipeline-start owner
-before any run clock or sample; under a no-mistakes. key, or under any key when
-a word of the command names no-mistakes, any other command runs with that
-engine's exec interception first on PATH, which admits a fresh no-mistakes the
+before any run clock or sample; under any key, any other command runs with
+that engine's exec interception first on PATH, which admits a fresh no-mistakes the
 command itself reaches. --pipeline-priority chooses merge-train,
 machinery, vernant-build or other (default); docs/cpu-pass-pool.md owns policy.
 The admission owner re-executes this runner once with an internal argument that

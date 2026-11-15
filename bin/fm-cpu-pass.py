@@ -105,8 +105,8 @@ Pipeline starts:
     interpreter or shell running a script, a shell's -c command line and the
     admission routes themselves); any other program's arguments are data.
     A COMMAND it does not judge a new run runs with the exec interception
-    first on PATH (fm-mem-guard.sh run, and fm-duration.py run under a
-    no-mistakes. key or when a word of the command names no-mistakes): a
+    first on PATH (fm-mem-guard.sh run, and fm-duration.py run under any
+    key): a
     private 0700 directory in the user's temporary directory holding one
     symlink named no-mistakes to fm-cpu-pass.sh, which runs exec-intercept: it
     judges the client's own argv by the same facts, admits a new run in the
@@ -114,8 +114,9 @@ Pipeline starts:
     every such directory removed from PATH. An admitted command keeps the
     interception unless it runs the client directly (runs_client_directly), so
     each further fresh client in it is admitted on its own. When the directory
-    cannot be placed the route says why and holds the whole command as one
-    start. Limit: a fresh start no wrapper here can see, the real client called
+    cannot be placed the route says why; a command no word of which names
+    no-mistakes, and the no-mistakes client itself on a call that is no new
+    run, runs at once, and any other command is held as one start. Limit: a fresh start no wrapper here can see, the real client called
     by its absolute path past the interception, a PATH reset (sudo, env -i) or a
     start outside every route, is admitted only by run-creation admission in
     the no-mistakes fork (backlog task nm-run-creation-admission).
@@ -1207,15 +1208,24 @@ class CensusUnknown(Exception):
 
 
 def database_opens() -> bool:
-    """Whether the host run database can be opened at all: it exists, reads, and begins with SQLite's header.
+    """Whether the host run database can be opened at all: it exists, reads, begins with SQLite's header, and its
+    -wal file, when one exists, reads.
 
     A file fact, never an error message: a missing, unreadable or non-SQLite file cannot be opened (P5.errors.db,
-    exit 125 as before); any other failed read of an opened database is unknown (Main 1903 U-1).
+    exit 125 as before); any other failed read of an opened database is unknown (Main 1903 U-1). The file judged is
+    the one SQLite itself opens for the read (PRAGMA database_list, which reads no page and takes no lock).
     """
+    path = Path(HOST_STATE_DB).expanduser().resolve()
     try:
-        with open(Path(HOST_STATE_DB).expanduser().resolve(), "rb") as handle:
-            return handle.read(16) == b"SQLite format 3\x00"
-    except OSError:
+        with contextlib.closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
+            files = [row[2] for row in connection.execute("PRAGMA database_list") if row[1] == "main"]
+        with open(files[0], "rb") as handle:
+            if handle.read(16) != b"SQLite format 3\x00":
+                return False
+        with contextlib.suppress(FileNotFoundError):
+            open(files[0] + "-wal", "rb").close()
+        return True
+    except (OSError, sqlite3.Error, IndexError):
         return False
 
 
