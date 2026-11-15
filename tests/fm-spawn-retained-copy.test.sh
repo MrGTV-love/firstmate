@@ -508,7 +508,7 @@ PROTECTED_HOLDER='quarantined: persistent recovered lease'
 # subcommand the guard might use as a diagnostic (status, lease, get, return)
 # marks $CASE_DIR/treehouse-forbidden and fails, so the case can prove the probe
 # is the only thing the guard ever runs.
-install_capability_treehouse() {  # <answer: proven|false|malformed|none|failing|unknown|wrong-schema|no-holder|empty-holder|old-holder|no-version|empty-version|number-version|blank-version>
+install_capability_treehouse() {  # <answer: proven|false|malformed|none|failing|unknown|wrong-schema|no-holder|empty-holder|old-holder|no-version|empty-version|number-version|blank-version|holder-old-newline|holder-newline|holder-tab|holder-trailing-space|holder-leading-space>
   local answer=$1
   : > "$CASE_DIR/treehouse-calls"
   rm -f "$CASE_DIR/treehouse-forbidden"
@@ -527,6 +527,11 @@ if [ "\${1:-}" = capabilities ]; then
     empty-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:"",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
     number-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:3,persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
     blank-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:" \t ",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
+    holder-old-newline) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"'"$OLD_RECOVERED"'\n"}' ;;
+    holder-newline) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"\n"}' ;;
+    holder-tab) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined:\tfixture"}' ;;
+    holder-trailing-space) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture "}' ;;
+    holder-leading-space) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":" quarantined: fixture"}' ;;
     malformed) printf '%s\n' 'not json' ;;
     none) ;;
     failing) exit 3 ;;
@@ -559,7 +564,7 @@ assert_only_capability_probes() {  # <label>
 test_recovered_slot_refuses_without_proven_capability() {
   local answer name entry
   local recovered=$OLD_RECOVERED
-  for answer in unknown none malformed false failing wrong-schema no-holder empty-holder old-holder no-version empty-version number-version blank-version; do
+  for answer in unknown none malformed false failing wrong-schema no-holder empty-holder old-holder no-version empty-version number-version blank-version holder-old-newline holder-newline holder-tab holder-trailing-space holder-leading-space; do
     name="recovered-unproven-$answer"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
@@ -727,6 +732,78 @@ test_unproved_fresh_read_and_blank_version_are_refused() (
     case "$label:$verdict" in valid:0|blank:1) ;; *) fail "version $label: capability exit $verdict" ;; esac
   done
   pass "a failed fresh read refuses on an unproven provider (an ordinary entry still admits), and a whitespace-only version is not a proof"
+)
+
+# A provider that publishes the old recovered holder followed by a newline (or only a
+# newline) used to look proven: the raw value differed from the old holder in jq, but
+# command substitution stored it stripped, equal to the old holder, so a recorded copy
+# on a slot still on the old holder compared equal to the "protected" holder and was
+# admitted (Main 1817). The shared guard now refuses: the capability is not proven, the
+# stored holder is never the old holder, and a failed adopting status leaves the slot
+# refused. Control: a normal distinct protected holder with the same failed status also
+# refuses (it needs the adoption), and with an adopting status it is admitted.
+test_forged_capability_holder_cannot_collapse_to_the_old_literal() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local case_name rc dir fslot
+  command -v jq >/dev/null 2>&1 || fail "the in-memory guard checks require jq"
+  dir="$TMP_ROOT/forged-holder"
+  fslot="$dir/pool/1/project"
+  mkdir -p "$fslot/state" "$dir/project"
+  : > "$fslot/state/holder.meta"
+  fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$fslot/state"); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
+  fm_meta_get() { printf '%s\n' "$fslot/nested"; }
+  fm_task_copy_canonical_dir() { printf '%s\n' "$1"; }
+  fm_task_copy_enclosing_pool_slot() { printf '%s\n' "$fslot"; }
+  jq() {
+    local last=${!#}
+    if [[ $last == */treehouse-state.json ]]; then
+      local -a args=("$@")
+      unset 'args[${#args[@]}-1]'
+      command jq "${args[@]}" < "$dir/state.json"
+    else
+      command jq "$@"
+    fi
+  }
+  treehouse() {
+    case ${1-} in
+      capabilities)
+        case $CASE in
+          forged-old-newline) command jq -cn --arg h "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER"$'\n' '{schema_version:2,version:"fixture",persistent_recovered_leases:true,recovered_quarantine_holder:$h}' ;;
+          forged-newline-only) command jq -cn '{schema_version:2,version:"fixture",persistent_recovered_leases:true,recovered_quarantine_holder:"\n"}' ;;
+          valid-new*) command jq -cn '{schema_version:2,version:"fixture",persistent_recovered_leases:true,recovered_quarantine_holder:"quarantined: fixture"}' ;;
+        esac ;;
+      status)
+        if [[ $CASE == valid-new-adopts ]]; then
+          command jq -cn '{worktrees:[{name:"1",path:"'"$fslot"'",leased:true,lease_holder:"quarantined: fixture"}]}' > "$dir/state.json"
+          printf '[]\n'
+        else
+          return 1
+        fi ;;
+      *) return 1 ;;
+    esac
+  }
+  for case_name in forged-old-newline forged-newline-only valid-new valid-new-adopts; do
+    CASE=$case_name
+    command jq -cn --arg h "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" '{worktrees:[{name:"1",path:"'"$fslot"'",leased:true,lease_holder:$h}]}' > "$dir/state.json"
+    FM_TASK_COPY_RECOVERED_CAPABILITY_BIN=
+    FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=
+    FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=
+    FM_TASK_COPY_POOL_LISTING_PROJECTS=()
+    FM_TASK_COPY_POOL_LISTINGS=()
+    rc=0
+    fm_task_copy_pool_slots_hold_no_current_copy "$dir/project" "$fslot/state" >/dev/null 2>&1 || rc=$?
+    case "$case_name" in
+      forged-*)
+        [ "$rc" != 0 ] || fail "$case_name: a forged capability holder let the old-holder slot through"
+        [ "$FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT" = no ] || fail "$case_name: the forged answer was taken as proof ($FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT)"
+        [ "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" != "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ] || fail "$case_name: the stored holder collapsed to the old holder"
+        ;;
+      valid-new) [ "$rc" != 0 ] || fail "$case_name: an old-holder slot was admitted without an adopting status" ;;
+      valid-new-adopts) [ "$rc" = 0 ] || fail "$case_name: a proven provider that adopts the slot was refused" ;;
+    esac
+  done
+  pass "a capability answer whose holder is the old holder plus a newline, or only a newline, is not proof and cannot make an old-holder slot pass; a distinct protected holder still needs its adoption"
 )
 
 # The capability-positive half: with the proof, a recovered slot on the
@@ -1437,6 +1514,7 @@ test_unprovable_slot_hold_still_refuses
 test_recovered_slot_refuses_without_proven_capability
 test_unproven_provider_admits_only_ordinary_leases
 test_unproved_fresh_read_and_blank_version_are_refused
+test_forged_capability_holder_cannot_collapse_to_the_old_literal
 test_recovered_slot_allows_allocation_with_proven_capability
 test_proven_capability_does_not_relax_other_refusals
 test_old_holder_is_adopted_and_old_session_exit_cannot_sweep

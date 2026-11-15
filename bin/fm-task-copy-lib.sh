@@ -547,7 +547,11 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # non-whitespace character (the version field the provider's contract requires, so
 # an empty or whitespace-only version is not proven), persistent_recovered_leases
 # true, and recovered_quarantine_holder a non-empty string that is not the old
-# holder; an unknown command (an older Treehouse), a failing run, malformed
+# holder, holds no control character (any code point below 0x20, and 0x7f), and neither
+# begins nor ends with whitespace (interior spaces are part of real holders); the holder
+# is then checked again after capture, because command substitution strips trailing
+# newlines, so the stored value must be non-empty and differ from the old holder;
+# an unknown command (an older Treehouse), a failing run, malformed
 # output, a missing or false field, and a missing jq are all not proven. Never
 # derived from the version string.
 # Sets FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER to the published holder when
@@ -576,8 +580,11 @@ fm_task_copy_treehouse_persists_recovered_leases() {
     elif out=$(cd / && TREEHOUSE_NO_UPDATE_CHECK=1 "$bin" capabilities --json </dev/null 2>/dev/null) \
         && holder=$(jq -e -r -s --arg old "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" '
           if length == 1 and (.[0] | type == "object" and .schema_version == 2 and (.version | type == "string" and test("\\S")) and .persistent_recovered_leases == true
-              and (.recovered_quarantine_holder | type == "string" and length > 0 and . != $old))
-          then .[0].recovered_quarantine_holder else false end' <<<"$out" 2>/dev/null); then
+              and (.recovered_quarantine_holder | type == "string" and length > 0 and . != $old
+                   and (explode | all(. >= 32 and . != 127))
+                   and ((test("^\\s") or test("\\s$")) | not)))
+          then .[0].recovered_quarantine_holder else false end' <<<"$out" 2>/dev/null) \
+        && [ -n "$holder" ] && [ "$holder" != "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ]; then
       FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=yes
       FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=$holder
     else
