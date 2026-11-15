@@ -1328,11 +1328,13 @@ def judge_attempts(directory: str, running: set, snapshot=None) -> Dict[str, dic
         records[path] = record if valid_attempt(record) else None
     if not records:
         return {}
-    if snapshot is None:
+    if snapshot is None and any(record is not None and record.get("ended_us") is None for record in records.values()):
         try:
             snapshot = kernel_snapshot()
         except (OSError, ValueError, AttributeError) as exc:
             snapshot = exc
+    elif snapshot is None:
+        snapshot = {}  # every readable record has ended: no attempt is judged, so no process fact is read
     states = {}
     unreadable = isinstance(snapshot, Exception)
     for path, record in records.items():
