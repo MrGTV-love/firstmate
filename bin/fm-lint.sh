@@ -84,7 +84,13 @@
 # line of the roots log. Inside it the version probe has a lane of its own,
 # PROBE_RESERVE_KIB = 65536 KiB (one probe at a time on the host), and the roots'
 # admission works with the rest, ROOTS_RSS_KIB = 3604480 KiB; the total stays
-# 3670016 KiB. Tests get no seam either: a test uses a private
+# 3670016 KiB. The two parts sum to B only while the probe holds at most 64 MiB.
+# That is measured for the real `shellcheck --version` (about 15 MB for 0.02 s) and
+# enforced only by the macOS resident watch, from its first sample one second after
+# the probe starts; a probe that holds more than 64 MiB under the enforced envelope,
+# or before that first sample, can put the total above B by its excess (for example
+# 64 MiB over B for a 128 MiB probe). That gap is unmeasured; it is stated, not
+# claimed closed. Tests get no seam either: a test uses a private
 # FM_LINT_SLOT_DIR pool, and a test that starts ShellCheck counts against this same
 # host-wide budget and may queue on it.
 # T is at most the budget at the moment a root is admitted, and the bound it keeps
@@ -162,8 +168,10 @@
 # roots' budget; the probe's own bounded wait for its lane is the one wait such a
 # run has, an allowed wait inside B (Main 1775). Every run probes its own ShellCheck:
 # no run takes another run's answer. The roots log's probe_wait_ms meta line records
-# the wait for the lane. The probe is the lane holder's direct child, and the lane
-# is released when that child has exited; a probe that runs past its bound
+# the wait for the lane. The lane is a record naming the probe by its exact
+# identity, and it frees only when that probe has provably ended (its pid is gone,
+# or holds another start time), never because the run that started it or any
+# descriptor died; a probe that runs past its bound
 # (PROBE_BOUND_SECONDS, 30 s) is never ended, and it and every run waiting that
 # long report "blocked" on stderr and keep waiting. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
@@ -412,8 +420,8 @@ HOST_RSS_KIB=3670016
 PROBE_RESERVE_KIB=65536
 # The probe's time bound: a probe still running after it, and every run waiting for
 # the lane that long, report on stderr that they are blocked and keep waiting
-# (nothing is ended; the lane is released when the probe, the lane holder's direct
-# child, has exited). `shellcheck --version` takes about 0.02 s.
+# (nothing is ended; the lane frees only when the probe it records by exact
+# identity has provably ended). `shellcheck --version` takes about 0.02 s.
 PROBE_BOUND_SECONDS=30
 ROOTS_RSS_KIB=$((HOST_RSS_KIB - PROBE_RESERVE_KIB))
 # The host ledger: gate entries (entry.*) and each lint run's entry (run.*), which
@@ -798,6 +806,15 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
       fm_lint_run_root "$index" "$path" "$output_dir" "$shard_index" || invocation_rc=$?
       if [ "$rc" -eq 0 ] && [ "$invocation_rc" -ne 0 ]; then
         rc=$invocation_rc
+      fi
+      # A root that ran unmeasured (status 96): mark the run, so neither worker
+      # starts another root, even if the watch could not write the mark itself;
+      # if this mark cannot be written either, this worker starts no further root.
+      if [ "$invocation_rc" -eq 96 ] && [ -n "${FM_LINT_INTERNAL_ABORT_FILE:-}" ] && [ ! -e "$FM_LINT_INTERNAL_ABORT_FILE" ]; then
+        if ! printf 'a root ran unmeasured (its resident-memory watch lost every reader)\n' >> "$FM_LINT_INTERNAL_ABORT_FILE" 2>/dev/null; then
+          printf 'fm-lint: the run could not be marked to stop at %s; this worker starts no further root\n' "$FM_LINT_INTERNAL_ABORT_FILE" >> "$output.out"
+          break
+        fi
       fi
     done
     trap - HUP INT TERM
@@ -2088,6 +2105,19 @@ CACHE_DIR=${FM_LINT_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint}
 if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
   CACHE_DIR=off
 fi
+# The analysis cache keys each result by the ShellCheck that analyzed it: the real
+# path and bytes of the resolved file (symbolic links followed), the HOME, and the
+# version this run's own probe printed. A ShellCheck that is a script is a launcher
+# whose delegate cannot be resolved from its own bytes (it can choose by HOME, a file
+# or any other state), so a run with one keeps no cache: it neither reuses nor
+# records a success. Residual: a compiled program that chooses another binary from
+# outside state is keyed by its own bytes; nothing here can tell it from ShellCheck.
+# shellcheck disable=SC2016  # $fh, $magic are Perl variables in the -e program.
+if [ "$CACHE_DIR" != off ] && [ -n "$SHELLCHECK_BIN" ] \
+  && ! "$PERL_BIN" -MCwd=abs_path -e 'my $path = abs_path($ARGV[0]) // exit 1; open(my $fh, "<", $path) or exit 1; read($fh, my $magic, 2); exit(($magic // "") eq "#!" ? 1 : 0)' "$SHELLCHECK_BIN" 2>/dev/null; then
+  printf 'fm-lint.sh: %s is a script (or cannot be read): its delegate cannot be resolved, so this run keeps no analysis cache.\n' "$SHELLCHECK_BIN" >&2
+  CACHE_DIR=off
+fi
 if [ "$FAST" -eq 1 ]; then
   printf 'fm-lint.sh: fast local mode; ShellCheck extended analysis disabled\n' >&2
 else
@@ -2371,17 +2401,29 @@ if ! census_problem=$(FM_LINT_INTERNAL_HOST_RSS_KIB="$ROOTS_RSS_KIB" \
   exit 2
 fi
 
-# Outside macOS without the enforced envelope (FM_LINT_REQUIRE_BOUNDS=1) nothing
-# holds a root to the per-root resident cap or the version probe to its 64 MiB
-# lane (the resident watch is macOS only). A strict run (--strict-version, or CI)
-# refuses there before any ShellCheck starts; any other run says on stderr that
-# those caps are not enforced on this host.
-if [ "$(uname)" != Darwin ] && [ "$BOUND_MECH" = none ]; then
-  if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
-    printf 'fm-lint.sh: strict mode refuses on %s: without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap (FM_LINT_ROOT_RSS_KIB) and the 64 MiB version-probe lane cannot be enforced on this host (the resident watch runs on macOS only). Run with FM_LINT_REQUIRE_BOUNDS=1, or on macOS.\n' "$(uname)" >&2
+# Strict mode is this run's own --strict-version argument and nothing else: an
+# FM_LINT_STRICT_VERSION inherited from the environment is ignored and replaced
+# below. The version pin is also enforced in CI (GITHUB_ACTIONS or CI set to true),
+# as before. Outside macOS the per-root resident cap (FM_LINT_ROOT_RSS_KIB) and the
+# 64 MiB version-probe lane are not enforced: without FM_LINT_REQUIRE_BOUNDS=1
+# nothing holds them, and with it only the per-process address-space limit
+# (FM_LINT_ROOT_MEMORY_KIB) does. A strict run refuses there, whatever the bound
+# mechanism, before any ShellCheck starts; any other run says so on stderr.
+FM_LINT_STRICT_VERSION=$STRICT_VERSION
+if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
+  FM_LINT_STRICT_VERSION=1
+fi
+export FM_LINT_STRICT_VERSION
+if [ "$(uname)" != Darwin ]; then
+  if [ "$STRICT_VERSION" -eq 1 ]; then
+    printf 'fm-lint.sh: strict mode refuses on %s: the per-root resident cap (FM_LINT_ROOT_RSS_KIB) and the 64 MiB version-probe lane cannot be enforced on this host (the resident watch runs on macOS only; FM_LINT_REQUIRE_BOUNDS=1 applies only an address-space limit). Run strict lints on macOS.\n' "$(uname)" >&2
     exit 2
   fi
-  printf 'fm-lint.sh: WARNING: on %s without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap and the 64 MiB version-probe lane are not enforced; the host-wide admission still counts every root.\n' "$(uname)" >&2
+  if [ "$BOUND_MECH" = none ]; then
+    printf 'fm-lint.sh: WARNING: on %s without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap and the 64 MiB version-probe lane are not enforced; the host-wide admission still counts every root.\n' "$(uname)" >&2
+  else
+    printf 'fm-lint.sh: WARNING: on %s the per-root resident cap and the 64 MiB version-probe lane are enforced only as the %s KiB per-process address-space limit; the host-wide admission still counts every root.\n' "$(uname)" "$ROOT_MEMORY_KIB" >&2
+  fi
 fi
 
 # The version probe is a ShellCheck start like any other: every run probes its own
@@ -2394,9 +2436,10 @@ fi
 # address-space limit under the enforced envelope, and by nothing on another host
 # without it), and the roots' admission works with the rest (ROOTS_RSS_KIB), so a
 # run whose roots are all cache hits waits only for another probe, never behind
-# roots holding the budget, and reserves nothing in the roots' budget. The probe is
-# the lane holder's direct child; the lane is released when it has exited. A probe
-# past PROBE_BOUND_SECONDS keeps the lane; it and every run waiting that long report
+# roots holding the budget, and reserves nothing in the roots' budget. The lane is a
+# record naming the probe by its exact identity; it frees only when that probe has
+# provably ended, never because its run or a descriptor died. A probe past
+# PROBE_BOUND_SECONDS keeps the lane; it and every run waiting that long report
 # "blocked" on stderr and wait, and nothing ends it.
 probe_rc=0
 resolved=
@@ -2426,11 +2469,8 @@ printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$$" "$PERL_BIN" "$WATCH_PYTHON" "$BOUND_M
 probe_wait_ms=$(tr -d '[:space:]' < "$TMP_ROOT/probe.wait" 2>/dev/null) || probe_wait_ms=
 case "$probe_wait_ms" in ''|*[!0-9]*) probe_wait_ms=unavailable ;; esac
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
-if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
-  export FM_LINT_STRICT_VERSION=1
-fi
 if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
-  if [ "${FM_LINT_STRICT_VERSION:-0}" = 1 ]; then
+  if [ "$FM_LINT_STRICT_VERSION" = 1 ]; then
     printf 'fm-lint.sh: ShellCheck %s required for CI parity, found %s. Install %s with bin/fm-install-shellcheck.sh <destination-directory>.\n' \
       "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
     exit 1

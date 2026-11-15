@@ -809,7 +809,8 @@ PL
 
 # fm_lint_native_version_stub <fakebin> <starts log> <version>: a native ShellCheck
 # stand-in (a compiled program, because a script is a wrapper and is probed every
-# run) that logs its arguments, answers --version and exits 0 for everything else.
+# run) that logs its arguments, answers --version and exits 0 for everything else,
+# after FM_TEST_ANALYSIS_SECS seconds when that is set.
 # Returns 1 when the host has no C compiler.
 fm_lint_native_version_stub() {
   local fakebin=$1 log=$2 version=$3 src
@@ -817,11 +818,15 @@ fm_lint_native_version_stub() {
   src="$fakebin/stub.c"
   cat > "$src" <<C
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 int main(int argc, char **argv) {
   FILE *f = fopen("$log", "a");
   if (f) { for (int i = 1; i < argc; i++) fprintf(f, "%s%s", i > 1 ? " " : "", argv[i]); fprintf(f, "\n"); fclose(f); }
   if (argc > 1 && strcmp(argv[1], "--version") == 0) { printf("ShellCheck - shell script analysis tool\nversion: $version\n"); return 0; }
+  const char *secs = getenv("FM_TEST_ANALYSIS_SECS");
+  if (secs) sleep((unsigned) atoi(secs));
   return 0;
 }
 C
@@ -4879,7 +4884,10 @@ test_a_warm_cache_hit_behind_an_occupied_budget_reserves_nothing_and_waits_for_n
   tmp=$(fm_test_tmproot fm-lint-warm-hit)
   FM_LINT_RELEASE_FILES="$tmp/release"
   repo=$(fm_lint_isolated_copy "$tmp" hit)
-  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
+  # A compiled stand-in: a script launcher keeps no cache (its delegate cannot be
+  # resolved), so only a compiled ShellCheck has warm hits.
+  mkdir -p "$tmp/fake"
+  fm_lint_native_version_stub "$tmp/fake" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): warm cache hit behind an occupied budget"; return; }
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_TEST_ANALYSIS_RC=0 \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/warm.out" 2>&1 ) || fm_lint_fail_settled "cache warm-up failed: $(cat "$tmp/warm.out")"
   # The whole host-wide budget (3,670,016 KiB) is charged to a live entry.
@@ -4919,7 +4927,7 @@ test_a_warm_cache_hit_behind_an_occupied_budget_reserves_nothing_and_waits_for_n
   root_wait=$(awk -F '\t' '$1 == "end" { print $17 }' "$tmp/cold.roots.tsv")
   [ "${root_wait:-0}" -ge 2000 ] || fm_lint_fail_settled "the analysis behind the holder recorded a wait of only ${root_wait:-none} ms"
   wait 2>/dev/null || true
-  pass "a wrapper's warm cache hit behind a filled budget started only its version probe, in the probe's lane (waits: probe $probe_wait ms, root 0 ms); an analysis behind the same holder waited $root_wait ms"
+  pass "a warm cache hit behind a filled budget started only its version probe, in the probe's lane (waits: probe $probe_wait ms, root 0 ms); an analysis behind the same holder waited $root_wait ms"
 }
 
 # The version probe waits only for its own lane (another probe), never behind
@@ -5104,11 +5112,11 @@ test_runs_with_different_delegates_each_probe_their_own_shellcheck() {
     while [ ! -e "$tmp/lane.ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
     : > "$tmp/starts.log"
     rc_a=0; rc_b=0
-    ( cd "$repo" && env HOME="$tmp/home.new" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+    ( cd "$repo" && env HOME="$tmp/home.new" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
         bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/$label.a.out" 2>&1 ) &
     run_a=$!
     sleep 0.5
-    ( cd "$repo" && env HOME="$home_b" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+    ( cd "$repo" && env HOME="$home_b" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
         bash bin/fm-lint.sh --strict-version bin/library.sh > "$tmp/$label.b.out" 2>&1 ) &
     sleep 2
     : > "$tmp/lane.release.$label"
@@ -5204,7 +5212,26 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   [ "$rc" -ne 2 ] && ! grep -q 'strict mode refuses' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run there was refused ($rc): $(cat "$tmp/plain.out")"
   grep -q 'are not enforced' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run did not warn that the caps are not enforced: $(cat "$tmp/plain.out")"
   grep -q -- '^--version$' "$tmp/starts.log" || fm_lint_fail_settled "the non-strict run did not go on to probe the version: $(cat "$tmp/starts.log")"
-  pass "where the resident cap and the probe lane are not enforced a strict run refuses before any ShellCheck starts and names why; a non-strict run warns and goes on"
+  # An FM_LINT_STRICT_VERSION inherited from the environment is not strict mode:
+  # the run is not refused, and a version that differs from the pin is a warning.
+  printf '0.10.0\n' > "$tmp/version"
+  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log" "$tmp/version"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_STRICT_VERSION=1 \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/inherited.out" 2>&1 ) || rc=$?
+  ! grep -q 'strict mode refuses\|required for CI parity' "$tmp/inherited.out" \
+    || fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION acted as strict mode: $(cat "$tmp/inherited.out")"
+  grep -q 'WARNING: ShellCheck 0.10.0 differs' "$tmp/inherited.out" || fm_lint_fail_settled "the differing version was not a warning: $(cat "$tmp/inherited.out")"
+  # Whatever the bound mechanism: the refusal, taken from this script and run with the
+  # enforced envelope's mechanism on a host that reports Linux, refuses a strict run.
+  local branch
+  branch=$(perl -0ne 'print $1 if /\n(FM_LINT_STRICT_VERSION=\$STRICT_VERSION\n.*?\n)# The version probe is a ShellCheck start/s' "$repo/bin/fm-lint.sh")
+  [ -n "$branch" ] || fm_lint_fail_settled "the strict-mode block was not found in the script"
+  rc=0
+  env PATH="$tmp/fake:$PATH" GITHUB_ACTIONS='' CI='' bash -c 'STRICT_VERSION=1 BOUND_MECH=perl ROOT_MEMORY_KIB=12582912; '"$branch"'; printf reached_probe' > "$tmp/envelope.out" 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] && grep -q 'strict mode refuses on Linux' "$tmp/envelope.out" \
+    || fm_lint_fail_settled "a strict run under the enforced envelope on Linux was not refused ($rc): $(cat "$tmp/envelope.out")"
+  pass "where the resident cap and the probe lane are not enforced a strict run refuses before any ShellCheck starts and names why, also under the enforced envelope; a non-strict run warns and goes on; an inherited FM_LINT_STRICT_VERSION is not strict mode"
 }
 
 # (Main 1775 N4) A root whose watch lost every reader fails: the run exits nonzero and
@@ -5224,9 +5251,12 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
   real_ps=$(command -v ps || true)
   printf '#!/bin/sh\ncase "$*" in *pgid=*) exit 1 ;; esac\n[ -n "%s" ] && exec "%s" "$@"\nexit 1\n' "$real_ps" "$real_ps" > "$tmp/fake/ps"
   chmod +x "$tmp/fake/ps"
-  # (1) The only root: it exits 0 itself, but ran unmeasured.
+  # (1) The only root: a compiled stand-in (so the cache is on) that exits 0 itself,
+  # but ran unmeasured.
+  mkdir -p "$tmp/native"
+  fm_lint_native_version_stub "$tmp/native" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): reader loss fails the root"; return; }
   : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  ( cd "$repo" && env PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
       FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/only.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose only root ran unmeasured exited 0: $(cat "$tmp/only.out")"
@@ -5247,7 +5277,8 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
 
 # (Main 1775 N4) A member the watch knows whose pid now belongs to a process that
 # started in the same second but not at the same instant (a replacement) is not
-# counted, so the root's group is not ended for it. The reader names the member once,
+# counted, so the root's group is not ended for it; the tree is unknown, so the root
+# ends unmeasured (96). The reader names the member once,
 # with a start time 1 microsecond off, then is down; the process table shows that
 # pid with the same second and 160 MiB. The control: named with its true start time,
 # the same process is counted and the tree is ended over the bound (sends recorded).
@@ -5279,6 +5310,10 @@ test_a_same_second_replacement_is_not_counted_against_the_root() {
     if [ "$label" = replacement ]; then
       [ "$rc" -ne 98 ] || fm_lint_fail_settled "the watch ended the root over a same-second replacement it counted as its member: $(cat "$tmp/err.$label") / $(cat "$log")"
       ! grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group was signalled over a same-second replacement: $(cat "$log")"
+      # Main 1775/1791: the replacement makes the tree unknown, so the root ends
+      # unmeasured (96), never quietly passed.
+      [ "$rc" -eq 96 ] && grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" \
+        || fm_lint_fail_settled "a same-second replacement did not make the tree unknown (exit $rc): $(cat "$tmp/rss.$label")"
     else
       [ "$rc" -eq 98 ] || fm_lint_fail_settled "the watch did not count a member with its true start time ($rc): $(cat "$tmp/err.$label")"
       grep -q '^killpg ' "$log" || fm_lint_fail_settled "the tree over the bound was not ended (recorded): $(cat "$log")"
@@ -5324,6 +5359,194 @@ SH
   done
   wait 2>/dev/null || true
   pass "the watch ends a counted descendant that left the process group by its exact identity and sends nothing to an under-bound tree (sends recorded, none delivered)"
+}
+
+# (Main 1791 item 1) The watch's exact-member reader, run as the watch runs it (its
+# program taken from bin/fm-lint-cache.pl) against a fake process table: a member is
+# counted only when two reads give exactly its recorded identity. A replacement
+# between the reads, a same-second replacement and a live member whose memory
+# cannot be read each print "unknown" (never a member, never nothing); a member whose
+# pid is in neither the identity read nor the process table is "gone". The control:
+# an unchanged member is counted with its recorded identity.
+fm_lint_exact_reader() {  # <first usec> <second usec> <memory: ok|unreadable> <pid present: yes|no>
+  local program
+  program=$(perl -0ne 'print $1 if /my \$exact_members_py = <<.PYTHON.;\n(.*?)\nPYTHON\n/s' "$ROOT/bin/fm-lint-cache.pl")
+  [ -n "$program" ] || { printf 'NO-READER\n'; return; }
+  python3 -I -B -c "
+import importlib.util, sys, types
+FIXTURE = (int(sys.argv[1]), int(sys.argv[2]), sys.argv[3] == 'ok', sys.argv[4] == 'yes')
+class Loader:
+    def exec_module(self, module):
+        calls = []
+        first, second, memory_ok, alive = FIXTURE
+        def kinfo(pid):
+            if not alive:
+                raise LookupError(pid)
+            calls.append(pid)
+            return (100, first if len(calls) == 1 else second)
+        def memory(pid):
+            if not memory_ok:
+                raise LookupError(pid)
+            return (160 * 1048576, 160 * 1048576)
+        module.processes = lambda: [(42, 1)] if alive else [(7, 1)]
+        module.kinfo = kinfo
+        module.process_identity = lambda record: record
+        module.memory = memory
+importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=Loader())
+importlib.util.module_from_spec = lambda spec: types.SimpleNamespace()
+sys.argv = ['reader', 'helper', '42:100:1']
+exec(compile(sys.stdin.read(), 'reader', 'exec'))
+" "$@" <<<"$program"
+}
+
+test_the_exact_member_reader_counts_only_an_unchanged_identity() {
+  local out
+  out=$(fm_lint_exact_reader 1 2 ok yes)
+  [ "$out" = unknown ] || fail "a replacement between the two identity reads was not unknown: '$out'"
+  out=$(fm_lint_exact_reader 2 2 ok yes)
+  [ "$out" = unknown ] || fail "a same-second replacement was not unknown: '$out'"
+  out=$(fm_lint_exact_reader 1 1 unreadable yes)
+  [ "$out" = unknown ] || fail "a live member whose memory cannot be read was not unknown: '$out'"
+  out=$(fm_lint_exact_reader 1 1 ok no)
+  [ "$out" = 'gone 42' ] || fail "a member absent from the identity read and the process table was not gone: '$out'"
+  out=$(fm_lint_exact_reader 1 1 ok yes)
+  [ "$out" = 'member 42 100 1 163840' ] || fail "an unchanged member was not counted with its recorded identity: '$out'"
+  pass "the exact-member reader counts a member only when two reads give its recorded identity; a replacement between reads, a same-second replacement and an unreadable live member are unknown; an absent pid is gone"
+}
+
+# (Main 1791 item 2) The probe lane is a record naming the probe by its exact
+# identity; it frees only when that process has provably ended. A record left by a
+# run whose helper died, naming a probe that still runs (a test-owned process that
+# ends on its own after 4 s), holds the lane: the next run reports blocked, starts no
+# probe, and probes once that process has ended. The control: a record naming a
+# process that has ended frees the lane at once. The copy's bound is 1 s.
+test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the libproc identity reader is macOS only): probe lane record"
+    return
+  fi
+  local tmp repo holder identity rc=0 probe_wait short short_id
+  tmp=$(fm_test_tmproot fm-lint-probe-record)
+  repo=$(fm_lint_isolated_copy "$tmp" record)
+  perl -pi -e 's{^PROBE_BOUND_SECONDS=.*$}{PROBE_BOUND_SECONDS=1}' "$repo/bin/fm-lint.sh"
+  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
+  sleep 5 > /dev/null 2>&1 &
+  holder=$!
+  identity=$(fm_lint_identity_of "$holder") || fm_lint_fail_settled "could not read the start time of the stand-in probe"
+  printf '999999\t%s\t%s\t%s\t0\n' "$holder" "${identity%%:*}" "${identity##*:}" > "$tmp/record/host/admission.lock.probe.holder"
+  : > "$tmp/starts.log"
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+      FM_LINT_TELEMETRY="$tmp/held.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/held.out" 2>&1 ) &
+  sleep 3
+  [ ! -s "$tmp/starts.log" ] || fm_lint_fail_settled "a probe started while the lane record named a probe that still runs: $(cat "$tmp/starts.log")"
+  grep -q 'blocked: the version probe lane' "$tmp/held.out" || fm_lint_fail_settled "the waiting run did not report it was blocked: $(cat "$tmp/held.out")"
+  wait "$!" || rc=$?
+  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the run did not finish once the recorded probe ended ($rc): $(cat "$tmp/held.out")"
+  probe_wait=$(awk -F '\t' '$1 == "meta" && $2 == "probe_wait_ms" { print $3 }' "$tmp/held.roots.tsv")
+  [ -n "$probe_wait" ] && [ "$probe_wait" -ge 2000 ] || fm_lint_fail_settled "the run recorded a lane wait of ${probe_wait:-none} ms"
+  wait 2>/dev/null || true
+  # The control: a record naming a process that has ended.
+  sleep 0.1 > /dev/null 2>&1 &
+  short=$!
+  short_id=$(fm_lint_identity_of "$short") || short_id=1:1
+  wait "$short" 2>/dev/null || true
+  printf '999999\t%s\t%s\t%s\t0\n' "$short" "${short_id%%:*}" "${short_id##*:}" > "$tmp/record/host/admission.lock.probe.holder"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+      FM_LINT_TELEMETRY="$tmp/free.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/free.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 0 ] || fm_lint_fail_settled "a record naming an ended probe did not free the lane ($rc): $(cat "$tmp/free.out")"
+  probe_wait=$(awk -F '\t' '$1 == "meta" && $2 == "probe_wait_ms" { print $3 }' "$tmp/free.roots.tsv")
+  [ -n "$probe_wait" ] && [ "$probe_wait" -lt 1000 ] || fm_lint_fail_settled "a record naming an ended probe still made the run wait ${probe_wait:-none} ms"
+  [ ! -e "$tmp/record/host/admission.lock.probe.holder" ] || fm_lint_fail_settled "the lane record was not removed after the probe ended"
+  pass "a lane record naming a probe that still runs held the lane after its run had gone: the next run reported blocked, waited, and probed once it ended; a record naming an ended probe freed the lane at once"
+}
+
+# (Main 1791 item 4) With the cache on, a launcher whose delegate changes between two
+# runs of one version must not reuse the first delegate's success: a script launcher
+# keeps no cache, so delegate B's finding is reported after delegate A passed. The
+# control: a compiled ShellCheck (its own bytes are what runs) reuses its success.
+test_a_launcher_switching_to_another_delegate_of_one_version_never_reuses_its_success() {
+  local tmp repo rc
+  tmp=$(fm_test_tmproot fm-lint-delegate-cache)
+  repo=$(fm_lint_isolated_copy "$tmp" delegate)
+  mkdir -p "$tmp/fake"
+  printf 'A\n' > "$tmp/delegate.choice"
+  cat > "$tmp/fake/shellcheck" <<EOF
+#!/usr/bin/env bash
+printf '%s %s\n' "\$(cat '$tmp/delegate.choice')" "\$*" >> '$tmp/starts.log'
+if [ "\${1:-}" = --version ]; then printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'; exit 0; fi
+if [ "\$(cat '$tmp/delegate.choice')" = B ]; then
+  for a in "\$@"; do last=\$a; done
+  printf 'In %s line 1:\nSC9998 (warning): delegate B finding\n' "\$last"
+  exit 1
+fi
+exit 0
+EOF
+  chmod +x "$tmp/fake/shellcheck"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 0 ] || fail "delegate A's run failed ($rc): $(cat "$tmp/a.out")"
+  printf 'B\n' > "$tmp/delegate.choice"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/b.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 1 ] || fail "delegate B's run reused delegate A's success (exit $rc): $(cat "$tmp/b.out")"
+  grep -q 'SC9998' "$tmp/b.out" || fail "delegate B's finding was not reported: $(cat "$tmp/b.out")"
+  ! grep -q 'cache hit' "$tmp/b.out" || fail "delegate B's run reported a cache hit: $(cat "$tmp/b.out")"
+  # The control: a compiled ShellCheck, analyzed once, is a cache hit the second time.
+  mkdir -p "$tmp/native"
+  fm_lint_native_version_stub "$tmp/native" "$tmp/native.log" 0.11.0 || { pass "a script launcher keeps no cache, so delegate B's finding was reported after delegate A passed (control skipped: no C compiler)"; return; }
+  ( cd "$repo" && env PATH="$tmp/native:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache2" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/n1.out" 2>&1 ) || fail "the compiled ShellCheck's first run failed: $(cat "$tmp/n1.out")"
+  ( cd "$repo" && env PATH="$tmp/native:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache2" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/n2.out" 2>&1 ) || fail "the compiled ShellCheck's second run failed: $(cat "$tmp/n2.out")"
+  grep -q 'cache hit bin/consumer[.]sh' "$tmp/n2.out" || fail "a compiled ShellCheck did not reuse its own success: $(cat "$tmp/n2.out")"
+  pass "a script launcher keeps no cache, so after delegate A passed, delegate B of the same version was analyzed and its finding reported; a compiled ShellCheck reuses its own success"
+}
+
+# (Main 1791 item 5) A watch that cannot write the run's stop mark (its directory is
+# made read-only while the first root runs unmeasured) still stops the run: the root
+# fails, the worker cannot mark it either and stops, and the root waiting at the gate
+# (two workers, one slot) is refused because the mark location cannot be checked. The
+# control: with readers healthy, the same run analyzes both roots.
+test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident watch runs on native macOS only): stop mark failure"
+    return
+  fi
+  local tmp repo real_python real_ps rc=0 run waited tmproot
+  tmp=$(fm_test_tmproot fm-lint-mark-failure)
+  repo=$(fm_lint_isolated_copy "$tmp" mark)
+  real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/fake" "$real_python"
+  mkdir -p "$tmp/native" "$tmp/tmpdir"
+  fm_lint_native_version_stub "$tmp/native" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): stop mark failure"; return; }
+  real_ps=$(command -v ps || true)
+  printf '#!/bin/sh\ncase "$*" in *pgid=*) exit 1 ;; esac\n[ -n "%s" ] && exec "%s" "$@"\nexit 1\n' "$real_ps" "$real_ps" > "$tmp/fake/ps"
+  chmod +x "$tmp/fake/ps"
+  : > "$tmp/starts.log"
+  ( cd "$repo" && env TMPDIR="$tmp/tmpdir" PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_HOST_SLOTS=1 \
+      FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=6 FM_TEST_SIGNAL_LOG="$tmp/signals.log" \
+      bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/out" 2>&1 ) &
+  run=$!
+  waited=0
+  while ! grep -q -- '-- bin/' "$tmp/starts.log" && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
+  tmproot=$(find "$tmp/tmpdir" -maxdepth 1 -name 'fm-lint.*' -type d | head -1)
+  [ -n "$tmproot" ] || fm_lint_fail_settled "the run's temporary directory was not found"
+  chmod 555 "$tmproot"
+  wait "$run" || rc=$?
+  chmod 755 "$tmproot"
+  [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose stop mark could not be written exited 0: $(cat "$tmp/out")"
+  [ "$(grep -c -- '-- bin/' "$tmp/starts.log")" -eq 1 ] || fm_lint_fail_settled "a second root was admitted although the run could not be marked to stop: $(cat "$tmp/starts.log")"
+  grep -q 'could not mark the run' "$tmp/out" || fm_lint_fail_settled "the failed stop mark was not said: $(cat "$tmp/out")"
+  # The control: readers healthy, both roots analyzed.
+  : > "$tmp/starts.log"
+  rc=0
+  ( cd "$repo" && env TMPDIR="$tmp/tmpdir" PATH="$tmp/native:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_HOST_SLOTS=1 \
+      bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/control.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 0 ] && [ "$(grep -c -- '-- bin/' "$tmp/starts.log")" -eq 2 ] || fm_lint_fail_settled "with readers healthy the run did not analyze both roots ($rc): $(cat "$tmp/control.out")"
+  pass "a stop mark that could not be written still stopped the run: the unmeasured root failed, no second root was admitted, and the failure was said; with readers healthy both roots ran"
 }
 
 fm_lint_test_cases=(
@@ -5403,6 +5626,10 @@ test_a_restarted_reader_keeps_a_member_that_left_the_group_and_was_orphaned
 test_a_watch_that_loses_every_reader_starts_no_further_root_and_fails_the_run
 test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted
 test_a_same_second_replacement_is_not_counted_against_the_root
+test_the_exact_member_reader_counts_only_an_unchanged_identity
+test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends
+test_a_launcher_switching_to_another_delegate_of_one_version_never_reuses_its_success
+test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
 test_resident_watch_samples_a_slow_later_reply_by_ps

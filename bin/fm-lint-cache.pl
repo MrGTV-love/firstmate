@@ -145,6 +145,50 @@ if (($ARGV[0] // '') eq 'signal') {
     exit 0;
 }
 
+# The state of one process, for the probe lane: perl runs
+#   python -I -c $PROCESS_STATE_PY <fm-proc-info.py> identity <pid>
+# which prints "<sec> <usec>" (its exact start time: libproc's seconds and
+# microseconds on macOS, /proc's start time in clock ticks and 0 on Linux) or
+# "unknown"; and ... state <pid> <sec> <usec>, which prints "alive" when that pid
+# still has exactly that start time, "ended" when the pid is no longer in the process
+# table or now holds another start time, and "unknown" for anything it cannot read.
+my $PROCESS_STATE_PY = <<'PYTHON';
+import importlib.util, os, sys
+LINUX = os.path.exists("/proc/self/stat")
+if not LINUX:
+    spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
+    fp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fp)
+def identity(pid):
+    if LINUX:
+        try:
+            with open("/proc/%d/stat" % pid) as handle:
+                return int(handle.read().rsplit(")", 1)[1].split()[19]), 0
+        except FileNotFoundError:
+            raise LookupError(pid)
+    return tuple(fp.process_identity(fp.kinfo(pid)))
+def present(pid):
+    if LINUX:
+        return os.path.exists("/proc/%d" % pid)
+    return any(each == pid for each, _ in fp.processes())
+try:
+    mode, pid = sys.argv[2], int(sys.argv[3])
+    if mode == "identity":
+        print("%d %d" % identity(pid))
+        sys.exit(0)
+    recorded = (int(sys.argv[4]), int(sys.argv[5]))
+    try:
+        now = identity(pid)
+    except LookupError:
+        print("unknown" if present(pid) else "ended")
+        sys.exit(0)
+    print("alive" if tuple(now) == recorded else "ended")
+except SystemExit:
+    raise
+except Exception:
+    print("unknown")
+PYTHON
+
 # Process facts for the admission checks below: the parent of a pid, and its
 # command line, from ps or, where ps is refused, from fm-proc-info.py.
 sub fm_process_fact {
@@ -223,19 +267,27 @@ if (($ARGV[0] // '') eq 'admitted-run') {
 # The version probe's lane in the host-wide budget. bin/fm-lint.sh keeps a fixed
 # share of the budget for it (its PROBE_RESERVE_KIB) and gives the roots' admission
 # the rest, so a probe never waits behind roots holding the budget and a run whose
-# roots are all cache hits reserves nothing in the roots' budget. One probe runs at
-# a time on the host: the lane is the flock of <host lock>.probe, held by this
-# process alone (the descriptor is closed on exec, so no process the probe starts
-# holds it). Every run probes its own ShellCheck: no run takes another run's answer.
-# The command (a ShellCheck --version that bin/fm-lint.sh has wrapped in its memory
-# bound) is this process's direct child, and this process waits for it: the lane is
-# released when that child has exited and been reaped. Nothing ends a probe. A probe
-# still running after <bound-seconds> keeps the lane, and its own run says so on
-# stderr once, whether or not the probe still holds its output open; every run that
-# has waited for the lane longer than that bound says on stderr once that it is
-# blocked, naming the holder's pid and start, and keeps waiting. The time spent
-# waiting for the lane is written in milliseconds to <wait-file>. A lane that cannot
-# be used names its path and exits 2 without starting the command.
+# roots are all cache hits reserves nothing in the roots' budget. Every run probes
+# its own ShellCheck: no run takes another run's answer.
+# One probe runs at a time on the host. The lane is a record, <host lock>.probe.holder,
+# naming the probe process by its exact identity (pid and start time), read and
+# written only under the flock of <host lock>.probe, which is held for those few
+# steps alone. The lane is free only when the record is absent or the process it
+# names has provably ended: its pid is no longer in the process table, or that pid
+# now holds another start time. A process the record names that still runs, or
+# whose identity cannot be read, holds the lane, whether or not the run that started
+# it is still alive; a record that cannot be parsed holds it too. So the death of a
+# probe's run, or of any descriptor, never frees the lane while its probe runs.
+# The probe is this process's direct child: it is forked, waits until its identity
+# is recorded, and only then executes the command; if this process dies first the
+# child exits without executing anything. This process waits for it on one timer,
+# whether or not it holds its output open, and removes the record (under the flock)
+# once it has reaped that child. Nothing ends a probe: a probe still running after
+# <bound-seconds>, and every run that has waited longer than that for the lane, say
+# on stderr once that they are blocked, naming the record, and keep waiting. The
+# time spent waiting for the lane is written in milliseconds to <wait-file>. A lane
+# whose record cannot be written names its path and exits 2 without running the
+# command.
 if (($ARGV[0] // '') eq 'probe') {
     require POSIX;
     require Time::HiRes;
@@ -250,81 +302,137 @@ if (($ARGV[0] // '') eq 'probe') {
     };
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     my ($caught, $child);
-    for my $name (keys %signal_number) { $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; }; }
+    for my $name (keys %signal_number) { $SIG{$name} = sub { $caught = $name; }; }
+    my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
+    my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
+    # The state of a recorded process: "alive" (that pid still has that start time),
+    # "ended" (the pid is gone, or holds another start time) or "unknown".
+    my $state = sub {
+        my ($pid, $sec, $usec) = @_;
+        no warnings 'exec';
+        open(my $py, '-|', $python, '-I', '-c', $PROCESS_STATE_PY, $helper, 'state', $pid, $sec, $usec) or return 'unknown';
+        my $answer = <$py> // '';
+        close $py;
+        return $answer =~ /\A(alive|ended)\n\z/ ? $1 : 'unknown';
+    };
+    my $identity = sub {
+        my ($pid) = @_;
+        no warnings 'exec';
+        open(my $py, '-|', $python, '-I', '-c', $PROCESS_STATE_PY, $helper, 'identity', $pid) or return;
+        my $answer = <$py> // '';
+        close $py;
+        return $answer =~ /\A([0-9]+) ([0-9]+)\n\z/ ? ($1, $2) : ();
+    };
     my $arrived = Time::HiRes::time();
     my $lane_path = "$host_lock.probe";
     my $holder_path = "$host_lock.probe.holder";
     open(my $lane, '>>', $lane_path) or $refuse->($lane_path, $!);
-    my $reported;
-    until (flock($lane, LOCK_EX | LOCK_NB)) {
-        $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($lane_path, $!);
+    my ($reported, $go_write, $record);
+    while (1) {
         exit 128 + $signal_number{$caught} if $caught;
+        my $why;
+        if (flock($lane, LOCK_EX | LOCK_NB)) {
+            $record = '';
+            if (open(my $fh, '<', $holder_path)) { local $/; $record = <$fh> // ''; close $fh; }
+            elsif (!$!{ENOENT}) { $why = "its record $holder_path cannot be read ($!)"; }
+            my $free = !defined $why && $record eq '';
+            if (!defined $why && !$free) {
+                if ($record =~ /\A([0-9]+)\t([0-9]+)\t([0-9]+)\t([0-9]+)\t[0-9.]+\n\z/) {
+                    my $answer = $state->($2, $3, $4);
+                    $free = $answer eq 'ended';
+                    $why = $answer eq 'alive' ? "its probe (pid $2, started by pid $1) still runs"
+                        : "the identity of its probe (pid $2) cannot be read" unless $free;
+                } else {
+                    $why = "its record $holder_path cannot be parsed";
+                }
+            }
+            if ($free) {
+                pipe(my $go_read, $go_write) or die "fm-lint-probe: pipe: $!\n";
+                pipe(my $from_probe, my $to_caller) or die "fm-lint-probe: pipe: $!\n";
+                $child = fork();
+                die "fm-lint-probe: fork: $!\n" unless defined $child;
+                if (!$child) {
+                    close $go_write;
+                    close $from_probe;
+                    my $byte = '';
+                    sysread($go_read, $byte, 1);
+                    POSIX::_exit(127) unless $byte eq 'g';
+                    open(STDOUT, '>&', $to_caller) or POSIX::_exit(127);
+                    exec {$command[0]} @command;
+                    warn "fm-lint-probe: exec $command[0]: $!\n";
+                    POSIX::_exit(127);
+                }
+                close $go_read;
+                close $to_caller;
+                my @id = $identity->($child);
+                my ($staged, $fh) = ("$holder_path.tmp.$$");
+                $record = sprintf "%d\t%d\t%s\t%s\t%.6f\n", $$, $child, @id ? @id : ('', ''), Time::HiRes::time();
+                unless (@id && open($fh, '>', $staged) && print({$fh} $record) && close($fh) && rename($staged, $holder_path)) {
+                    my $err = @id ? "$!" : "the probe's identity cannot be read";
+                    unlink $staged;
+                    close $go_write;
+                    waitpid($child, 0);
+                    $refuse->($holder_path, $err);
+                }
+                flock($lane, LOCK_UN);
+                if (open(my $wf, '>', $wait_file)) { printf {$wf} "%d\n", (Time::HiRes::time() - $arrived) * 1000; close $wf; }
+                syswrite($go_write, 'g');
+                close $go_write;
+                # Read the probe's output and wait for the probe itself on one timer,
+                # so the bound is judged whether or not it closed its output early.
+                my ($output, $eof, $over, $status) = ('', 0, 0);
+                my $ready = '';
+                vec($ready, fileno($from_probe), 1) = 1;
+                my $started = Time::HiRes::time();
+                while (1) {
+                    if (!$eof) {
+                        my $n = select(my $readable = $ready, undef, undef, 0.1);
+                        if ($n > 0) {
+                            my $got = sysread($from_probe, $output, 65536, length $output);
+                            $eof = 1 if defined $got && $got == 0 || !defined $got && !$!{EINTR};
+                        }
+                    } else {
+                        Time::HiRes::sleep(0.1);
+                    }
+                    my $reaped = waitpid($child, POSIX::WNOHANG());
+                    if ($reaped == $child) {
+                        $status = $?;
+                        while (!$eof && select(my $readable = $ready, undef, undef, 0) > 0) {
+                            my $got = sysread($from_probe, $output, 65536, length $output);
+                            $eof = 1 unless defined $got && $got > 0;
+                        }
+                        last;
+                    }
+                    if ($reaped == -1 && !$!{EINTR}) { $status = 127 << 8; last; }
+                    if (!$over && Time::HiRes::time() - $started > $bound) {
+                        printf STDERR "fm-lint: blocked: the version probe (pid %d) has run more than %d s and keeps the lane %s; "
+                            . "this run waits for it to end; nothing is ended\n", $child, $bound, $holder_path;
+                        $over = 1;
+                    }
+                }
+                close $from_probe;
+                # The child is reaped: the record names a process proven ended.
+                if (flock($lane, LOCK_EX)) {
+                    my $now = '';
+                    if (open(my $fh, '<', $holder_path)) { local $/; $now = <$fh> // ''; close $fh; }
+                    unlink $holder_path if $now eq $record;
+                    flock($lane, LOCK_UN);
+                }
+                print $output;
+                exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
+            }
+            flock($lane, LOCK_UN);
+        } else {
+            $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($lane_path, $!);
+            $why = 'another run is reading or writing its record';
+        }
         if (!$reported && Time::HiRes::time() - $arrived > $bound) {
-            my $holder = '';
-            if (open(my $fh, '<', $holder_path)) { $holder = <$fh> // ''; close $fh; }
-            my ($pid, $since) = $holder =~ /\A([0-9]+)\t([0-9]+(?:\.[0-9]+)?)\n\z/ ? ($1, $2) : ('unknown', undef);
-            printf STDERR "fm-lint: blocked: the version probe lane %s has been held for more than %d s (holder pid %s%s); "
-                . "this run waits until that probe has ended; nothing is ended\n",
-                $lane_path, $bound, $pid, defined $since ? sprintf(', its probe started %d s ago', Time::HiRes::time() - $since) : '';
+            printf STDERR "fm-lint: blocked: the version probe lane %s has been held for more than %d s (%s); "
+                . "this run waits until that probe has provably ended; nothing is ended\n", $holder_path, $bound, $why;
             $reported = 1;
         }
-        Time::HiRes::sleep(0.02);
+        Time::HiRes::sleep(0.1);
     }
-    if (open(my $fh, '>', $wait_file)) { printf {$fh} "%d\n", (Time::HiRes::time() - $arrived) * 1000; close $fh; }
-    my $started = Time::HiRes::time();
-    {
-        my ($staged, $fh) = ("$holder_path.tmp.$$");
-        open($fh, '>', $staged) && printf({$fh} "%d\t%.6f\n", $$, $started) && close($fh) && rename($staged, $holder_path)
-            or unlink $staged;
-    }
-    pipe(my $from_probe, my $to_caller) or die "fm-lint-probe: pipe: $!\n";
-    $child = fork();
-    die "fm-lint-probe: fork: $!\n" unless defined $child;
-    if (!$child) {
-        close $from_probe;
-        open(STDOUT, '>&', $to_caller) or POSIX::_exit(127);
-        exec {$command[0]} @command;
-        warn "fm-lint-probe: exec $command[0]: $!\n";
-        POSIX::_exit(127);
-    }
-    close $to_caller;
-    kill 'TERM', $child if $caught;
-    # Read the probe's output and wait for the probe itself, both on one timer, so
-    # the bound is judged whether the probe holds its output open or closed it early.
-    my ($output, $eof, $over, $status) = ('', 0, 0);
-    my $ready = '';
-    vec($ready, fileno($from_probe), 1) = 1;
-    while (1) {
-        if (!$eof) {
-            my $n = select(my $readable = $ready, undef, undef, 0.1);
-            if ($n > 0) {
-                my $got = sysread($from_probe, $output, 65536, length $output);
-                $eof = 1 if defined $got && $got == 0 || !defined $got && !$!{EINTR};
-            }
-        } else {
-            Time::HiRes::sleep(0.1);
-        }
-        my $reaped = waitpid($child, POSIX::WNOHANG());
-        if ($reaped == $child) {
-            $status = $?;
-            # Take what the probe wrote; a process it left that still holds the
-            # output open does not keep this run waiting.
-            while (!$eof && select(my $readable = $ready, undef, undef, 0) > 0) {
-                my $got = sysread($from_probe, $output, 65536, length $output);
-                $eof = 1 unless defined $got && $got > 0;
-            }
-            last;
-        }
-        if ($reaped == -1 && !$!{EINTR}) { $status = 127 << 8; last; }
-        if (!$over && Time::HiRes::time() - $started > $bound) {
-            printf STDERR "fm-lint: blocked: the version probe (pid %d) has run more than %d s and keeps the lane %s; "
-                . "this run waits for it to end; nothing is ended\n", $child, $bound, $lane_path;
-            $over = 1;
-        }
-    }
-    close $from_probe;
-    print $output;
-    exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
 }
 
 # Private gate protocol; bin/fm-lint.sh's header owns the public pool controls.
@@ -696,17 +804,26 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     # census failed, marked FM_LINT_INTERNAL_ABORT_FILE: its gates admit no new root,
     # checked while waiting and again under the host lock before admitting.
     my $abort_file = $ENV{FM_LINT_INTERNAL_ABORT_FILE} // '';
+    # Stopped: the mark exists, or its directory is not a writable directory, so a
+    # mark the run needed could not have been written there (refuse on doubt).
+    my $aborted = sub {
+        return 0 unless length $abort_file;
+        my $dir = dirname($abort_file);
+        return -e $abort_file || !(-d $dir && -w _);
+    };
     my $refuse_aborted = sub {
         unlink($ticket_path) if $ticket_path;
         my $why = '';
         if (open(my $mark, '<', $abort_file)) { $why = <$mark> // ''; close $mark; }
         chomp $why;
+        $why = 'its stop mark ' . $abort_file . ' cannot be checked or written: ' . dirname($abort_file) . ' is not a writable directory'
+            if !length $why && !-e $abort_file;
         print STDERR "fm-lint: this run admits no new root: " . (length $why ? $why : 'it was marked to stop') . "\n";
         exit 2;
     };
     $waited_from = Time::HiRes::time();
     ACQUIRE: while (!$slot && !$caught) {
-        $refuse_aborted->() if length $abort_file && -e $abort_file;
+        $refuse_aborted->() if $aborted->();
         if (flock($coordinator, LOCK_EX | LOCK_NB)) {
             undef $blocked_at;
             undef $bypass;
@@ -844,7 +961,7 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                             || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib;
                     }
                 }
-                if ($fits && length $abort_file && -e $abort_file) { flock($host, LOCK_UN); $refuse_aborted->(); }
+                if ($fits && $aborted->()) { flock($host, LOCK_UN); $refuse_aborted->(); }
                 flock($host, LOCK_UN) if $held && !$fits;
                 if ($fits) {
                     ($slot, $slot_path) = @{shift @free};
@@ -1177,52 +1294,70 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         return %table ? \%table : undef;
     };
     # Members the watch knows by exact identity but cannot reach through the root:
-    # each "<pid>:<sec>:<usec>" that still runs with exactly that start time, and
-    # every descendant of those, read through libproc with its own exact identity
-    # and its memory (the larger of resident size and footprint, KiB). Returns
-    # { pid => [sec, usec, KiB] }, or undef when any of them cannot be read: such a
-    # tick is unknown, never a guess. A pid that now holds another start time is a
-    # replacement and is not counted.
+    # each "<pid>:<sec>:<usec>" is read through libproc twice, with every descendant
+    # of those, each with its memory (the larger of resident size and footprint, KiB).
+    # A member is counted only when both reads give exactly the identity the watch
+    # recorded; a descendant only when its two reads agree. A member whose pid is in
+    # neither libproc nor the kernel's process table has provably ended and is
+    # dropped ("gone"). Anything else - a pid that now holds another start time (a
+    # replacement, in the same second or not), reads that disagree, a member present
+    # but unreadable, a memory read that fails - prints "unknown": that member is
+    # never adopted, never signalled, and the tick is unknown. Returns
+    # { pid => [sec, usec, KiB] }, or undef for an unknown tick (the caller then keeps
+    # its known set unchanged).
     my $exact_members_py = <<'PYTHON';
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
 fp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fp)
-try:
-    children = {}
-    for pid, ppid in fp.processes():
-        children.setdefault(ppid, []).append(pid)
-except Exception:
+def unknown():
     print("unknown")
     sys.exit(0)
+try:
+    children, present = {}, set()
+    for pid, ppid in fp.processes():
+        children.setdefault(ppid, []).append(pid)
+        present.add(pid)
+except Exception:
+    unknown()
+def identity(pid):
+    return tuple(fp.process_identity(fp.kinfo(pid)))
 queue = []
 for item in sys.argv[2:]:
     pid, sec, usec = (int(part) for part in item.split(":"))
     try:
-        identity = tuple(fp.process_identity(fp.kinfo(pid)))
+        first = identity(pid)
     except LookupError:
+        if pid in present:
+            unknown()
+        print("gone", pid)
         continue
     except Exception:
-        print("unknown")
-        sys.exit(0)
-    if identity == (sec, usec):
-        queue.append(pid)
+        unknown()
+    if first != (sec, usec):
+        unknown()
+    queue.append((pid, first))
 seen = set()
 while queue:
-    pid = queue.pop()
+    pid, first = queue.pop()
     if pid in seen:
         continue
     seen.add(pid)
     try:
-        identity = fp.process_identity(fp.kinfo(pid))
         resident, footprint = fp.memory(pid)
-    except LookupError:
-        continue
+        second = identity(pid)
     except Exception:
-        print("unknown")
-        sys.exit(0)
-    print("member", pid, identity[0], identity[1], max(resident, footprint) // 1024)
-    queue.extend(children.get(pid, []))
+        unknown()
+    if second != first:
+        unknown()
+    print("member", pid, second[0], second[1], max(resident, footprint) // 1024)
+    for child in children.get(pid, []):
+        try:
+            queue.append((child, identity(child)))
+        except LookupError:
+            continue
+        except Exception:
+            unknown()
 PYTHON
     my $exact_members = sub {
         my @items = @_;
@@ -1233,7 +1368,7 @@ PYTHON
         my (%found, $unknown);
         while (my $line = <$py>) {
             if ($line =~ /\Amember ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)\n\z/) { $found{$1 + 0} = [$2 + 0, $3 + 0, $4 + 0]; }
-            else { $unknown = 1; }
+            elsif ($line !~ /\Agone [0-9]+\n\z/) { $unknown = 1; }
         }
         close $py;
         return $? || $unknown ? undef : \%found;
@@ -1279,8 +1414,10 @@ PYTHON
                     if (@missing) {
                         my @inexact = grep { !defined $known{$_}[1] } @missing;
                         if (@inexact) {
+                            # Only a pid absent from the table has provably ended; one
+                            # still listed, with that second or another, is unknown.
                             my $table = $read_table->() or return undef;
-                            return undef if grep { $table->{$_} && $table->{$_}[3] == $known{$_}[0] } @inexact;
+                            return undef if grep { $table->{$_} } @inexact;
                         }
                         my $found = $exact_members->(map { "$_:$known{$_}[0]:$known{$_}[1]" } grep { defined $known{$_}[1] } @missing)
                             or return undef;
@@ -1323,8 +1460,10 @@ PYTHON
         delete $selected{$$};
         my (@exact, %next);
         for my $pid (grep { !$selected{$_} && $_ != $$ } keys %known) {
-            next unless $table->{$pid} && $table->{$pid}[3] == $known{$pid}[0];
-            return undef unless defined $known{$pid}[1];
+            # Absent from the table: provably ended, dropped. Listed with another
+            # start second (a replacement) or known only to the second: unknown.
+            next unless $table->{$pid};
+            return undef unless defined $known{$pid}[1] && $table->{$pid}[3] == $known{$pid}[0];
             push @exact, "$pid:$known{$pid}[0]:$known{$pid}[1]";
         }
         my $found = $exact_members->(@exact) or return undef;
@@ -1345,7 +1484,7 @@ PYTHON
         %known = %next;
         return $total;
     };
-    my ($child, $caught, $term_at, $over, $warned);
+    my ($child, $caught, $term_at, $over, $warned, $mark_failed);
     # End the whole counted tree: the root's process group, and every member known
     # by pid and start time, which also reaches a descendant that moved to another
     # group or was orphaned. The group is signalled as a group only until the root
@@ -1394,10 +1533,25 @@ PYTHON
             # Every reader failed three ticks in a row: this root runs unmeasured.
             # The run admits no new root (the abort mark its workers check), and the
             # loss is recorded on stderr and in <rss-file>.
+            # The mark is written under the host lock that every gate holds for its
+            # last check, so no gate admits between this mark and its own check;
+            # every step is checked, and a mark that cannot be written is said
+            # (the root still fails, and the worker marks the run itself).
             my $abort = $ENV{FM_LINT_INTERNAL_ABORT_FILE} // '';
-            if (length $abort && open(my $mark, '>>', $abort)) {
-                print {$mark} "the resident-memory watch lost every reader of a running root's memory (libproc and the process table)\n";
-                close $mark;
+            my $lock_path = $ENV{FM_LINT_INTERNAL_HOST_LOCK} // '';
+            if (length $abort) {
+                my ($lock, $mark, $published);
+                if (!length $lock_path || (open($lock, '>>', $lock_path) && flock($lock, LOCK_EX))) {
+                    $published = open($mark, '>>', $abort)
+                        && print({$mark} "the resident-memory watch lost every reader of a running root's memory (libproc and the process table)\n")
+                        && close($mark);
+                }
+                my $why = $!;
+                close $lock if $lock;
+                unless ($published) {
+                    warn "fm-lint: resident-memory watch could not mark the run at $abort ($why); the root fails and the worker stops the run\n";
+                    $mark_failed = 1;
+                }
             }
             warn "fm-lint: resident-memory watch cannot sample this root (no reader answers); the root fails (status 96), and the run admits no further root\n";
             $warned = 1;
@@ -1448,6 +1602,7 @@ PYTHON
         printf {$fh} "watch_peak_kib=%d\n", $peak if $peak;
         print {$fh} 'rss_signal_skipped=' . join(',', map { "$_:$skipped{$_}" } sort { $a <=> $b } keys %skipped) . "\n" if %skipped;
         print {$fh} "rss_unmeasured=1\n" if $warned;
+        print {$fh} "rss_mark_failed=1\n" if $mark_failed;
         close $fh;
     }
     exit 98 if $over;
