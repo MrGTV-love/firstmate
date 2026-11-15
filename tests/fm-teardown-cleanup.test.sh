@@ -4942,7 +4942,7 @@ test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
       cat > "$FOREIGN_CASE/fakebin/cp" <<SH
 #!/usr/bin/env bash
 case " \$* " in
-  *nested-copy-preserved*) echo "cp: simulated copy failure" >&2; exit 1 ;;
+  *nested-copy-preserved*|*/.teardown-run.*/ignored-*) echo "cp: simulated copy failure" >&2; exit 1 ;;
 esac
 exec "$real_cp" "\$@"
 SH

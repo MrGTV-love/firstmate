@@ -3993,7 +3993,7 @@ test_foreign_bundle_preservation_keeps_other_proofs() {
         real_cp=$(command -v cp)
         cat > "$FOREIGN_CASE/fakebin/cp" <<SH
 #!/usr/bin/env bash
-case " \$* " in *nested-copy-preserved*) exit 1 ;; esac
+case " \$* " in *nested-copy-preserved*|*/.teardown-run.*/ignored-*) exit 1 ;; esac
 exec "$real_cp" "\$@"
 SH
         chmod +x "$FOREIGN_CASE/fakebin/cp"

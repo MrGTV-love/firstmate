@@ -873,12 +873,16 @@ SH
   chmod +x "$case_dir/fakebin/lsof"
 }
 
+# A fake stat that fails only for a git lock file's mtime; every other stat
+# (such as the entry preflight's device check) runs the real one.
 add_stat_error() {
   local case_dir=$1
-  cat > "$case_dir/fakebin/stat" <<'SH'
+  cat > "$case_dir/fakebin/stat" <<SH
 #!/usr/bin/env bash
-echo "stat: simulated failure" >&2
-exit 1
+case "\${*: -1}" in
+  *.lock) echo "stat: simulated failure" >&2; exit 1 ;;
+esac
+exec $(command -v stat) "\$@"
 SH
   chmod +x "$case_dir/fakebin/stat"
 }
@@ -983,11 +987,12 @@ backlog_row_state() {
 
 # Build the teardown test's executable search path without lsof, regardless of
 # whether the host installs it in /usr/bin, /usr/sbin, or a package-manager bin.
+# It keeps python3, which the entry preflight's removability check needs.
 make_path_without_lsof() {  # <case-dir>
   local case_dir=$1 path_dir="$1/path-without-lsof" cmd resolved
   mkdir -p "$path_dir"
   for cmd in awk bash basename cat chmod cp cut date dirname env find git grep head hostname id ln \
-    mkdir mktemp mv perl ps readlink realpath rm sed sh sleep sort stat tail timeout tr uname wc xargs; do
+    mkdir mktemp mv perl ps python3 readlink realpath rm sed sh sleep sort stat tail timeout tr uname wc xargs; do
     resolved=$(command -v "$cmd" 2>/dev/null) || continue
     case "$resolved" in /*) ln -sf "$resolved" "$path_dir/$cmd" ;; esac
   done
@@ -2921,7 +2926,7 @@ run_preservation_refusal() {
   printf 'unique retained bytes\n' > "$FOREIGN_COPY/unique.dat"
   cat > "$FOREIGN_CASE/fakebin/cp" <<SH
 #!/usr/bin/env bash
-case " \$* " in *nested-copy-preserved*) exit 1 ;; esac
+case " \$* " in *nested-copy-preserved*|*/.teardown-run.*/ignored-*) exit 1 ;; esac
 exec "$(command -v cp)" "\$@"
 SH
   chmod +x "$FOREIGN_CASE/fakebin/cp"

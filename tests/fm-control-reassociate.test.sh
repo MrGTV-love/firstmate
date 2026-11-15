@@ -2472,8 +2472,11 @@ SH
       assert_equals "$slot|--cleanup-worktree $na --execute-cleanup" "$(cat "$dir/closeout.log")" "$shape: the driver did not run once"
       rm -f "$dir/closeout.log"
       # A refusal after cleanup began keeps both records and marks this one
-      # for a retry; the copies, the lease and the claim stay as they were.
+      # for a retry; the copies and the lease stay as they were. The claim was
+      # already handed to the peer, which runs before any copy is removed.
       [ -f "$dir/home/state/$ida.teardown-return-pending" ] || fail "$shape: the refusal left no retry marker"
+      assert_line "task=$idb" "$dir/pool/139/.fm-slot-owner" "$shape: the claim was not handed to the peer before the copy release"
+      cp "$dir/pool/139/.fm-slot-owner" "$dir/claim-before"
       for id in "$ida" "$idb"; do
         cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" || fail "$shape: task $id's record changed"
         cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" || fail "$shape: task $id's instructions changed"
@@ -2482,7 +2485,7 @@ SH
       [ ! -e "$dir/treehouse.log" ] || fail "$shape: the pool slot was returned: $(cat "$dir/treehouse.log")"
     fi
   done
-  pass "a joint-reassociated task's Vernant-locked copy is released through the closeout driver, and a driver refusal keeps both records, copies, the lease and the claim"
+  pass "a joint-reassociated task's Vernant-locked copy is released through the closeout driver, and a driver refusal keeps both records, copies and the lease, with the claim already handed to the peer"
 }
 
 test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_reassigned_slot() {
