@@ -3307,6 +3307,16 @@ class Watch:
         if not self.second or not self.state.get('channel'):
             return
         win = self.second_window()
+        if win.get('user') and win.get('user') != self.second:
+            # The setting names another id now: the window of the id it named before is kept, by that id's hash, with its cursor and bounds, so a request of
+            # theirs typed while they were set is read again when the setting names them again, and never goes to the id named now (finding 6 of the review of
+            # d9861b24). A window kept for the id named now comes back.
+            kept = self.state.setdefault('windows', {})
+            kept[id_hash(win['user'])] = win
+            back = kept.pop(id_hash(self.second), None)
+            self.state['second'] = back if isinstance(back, dict) and back.get('user') == self.second else {}
+            self.commit()
+            win = self.second_window()
         if win.get('hold') and win.get('user') == self.second:
             return
         same = win.get('user') == self.second
