@@ -209,18 +209,25 @@ remote_inbox_records() {  # <remote-home>
 }
 
 # assert_one_remote_record_body <remote-home> <corr> <message> <what>: the remote
-# steering inbox holds exactly one record, and its body (everything after the record's
-# -- line, bin/fm-task-inbox-lib.sh) is exactly the marked request: the from-firstmate
-# marker, the correlation token for <corr>, one space, then <message>. A record with no
-# -- line (an empty file, say) fails.
+# steering inbox holds exactly one record, its name is a numeric NNN.msg (the consumer
+# reads only those: fm_task_inbox_seq_of, bin/fm-task-inbox-lib.sh), and its body (every
+# byte after the record's -- line, read from the file, not through $(...), which would
+# drop trailing newlines) is exactly the marked request: the from-firstmate marker, the
+# correlation token for <corr>, one space, then <message>, with nothing after it. A record
+# with no -- line (an empty file, say) fails.
 assert_one_remote_record_body() {
-  local recs body want
+  local recs name got want
   recs=$(remote_inbox_records "$1")
   [ -n "$recs" ] || fail "$4: no record reached the remote steering inbox"
   case "$recs" in *$'\n'*) fail "$4: more than one remote record: $recs" ;; esac
-  body=$(fm_task_inbox_body "$recs") || fail "$4: the remote record has no body: $(cat "$recs")"
-  want="${FM_FROMFIRST_MARK}$(fm_pending_reply_corr_token "$2") $3"
-  [ "$body" = "$want" ] || fail "$4: the remote record's body is not the request with correlation $2: $body"
+  name=${recs##*/}
+  case "${name%.msg}" in
+  '' | *[!0-9]*) fail "$4: the remote record $name is not a numeric NNN.msg record the consumer reads" ;;
+  esac
+  got="$TMP_ROOT/record-body.$$"; want="$TMP_ROOT/record-want.$$"
+  fm_task_inbox_body "$recs" > "$got" || fail "$4: the remote record has no body: $(cat "$recs")"
+  printf '%s' "${FM_FROMFIRST_MARK}$(fm_pending_reply_corr_token "$2") $3" > "$want"
+  cmp -s "$want" "$got" || fail "$4: the remote record's body is not, byte for byte, the request with correlation $2: $(od -c "$got" | head -5)"
 }
 
 # The single non-dot pending-reply record in <home>, or empty.
@@ -317,9 +324,9 @@ test_remote_rerun_is_idempotent() {
   corr=$(fm_pending_reply_get "$pend" corr_id)
   printf -v quoted '%q' "$home"
   expected_cmd="FM_HOME=$quoted FM_PENDING_REPLY_EXISTING_CORR=$corr"
-  # The send stated no choice, so the printed resend carries --answers-none
-  # (fm-send header, "Decision closure").
-  for arg in "$SEND" rsm --answers-none "please rename the metric"; do
+  # The send stated no choice, so the printed resend carries --answers-none, then a
+  # lone -- before the message words (fm-send header, "Decision closure").
+  for arg in "$SEND" rsm --answers-none -- "please rename the metric"; do
     printf -v quoted '%q' "$arg"
     expected_cmd="$expected_cmd $quoted"
   done
@@ -435,8 +442,8 @@ test_remote_printed_resend_survives_real_escalation() {
     *) fail "setup: the escalation did not leave $key open as blocked: $FM_TEST_FOLD" ;;
   esac
   case "$LOST_RESEND" in
-    *" rsm --answers-none please\ rename\ the\ metric") : ;;
-    *) fail "a send that stated no choice must be printed with --answers-none after the target: $LOST_RESEND" ;;
+    *" rsm --answers-none -- please\ rename\ the\ metric") : ;;
+    *) fail "a send that stated no choice must be printed with --answers-none after the target, then -- and the message: $LOST_RESEND" ;;
   esac
 
   # N2: a no-choice send with the correlation while another key is open too
@@ -502,8 +509,8 @@ test_remote_printed_resend_carries_the_original_choice() {
   printf 'needs-decision [key=metric-name]: which name for the metric\n' > "$home/state/rsm.status"
   lost_remote_request "$fb" "$home" "$ssh_log" "$dir" rsm --resolve-key metric-name "use net_revenue"
   case "$LOST_RESEND" in
-    *" rsm --resolve-key metric-name use\ net_revenue") : ;;
-    *) fail "a keyed answer must be printed with its own --resolve-key and nothing added: $LOST_RESEND" ;;
+    *" rsm --resolve-key metric-name -- use\ net_revenue") : ;;
+    *) fail "a keyed answer must be printed with its own --resolve-key, then -- and the message, and nothing else added: $LOST_RESEND" ;;
   esac
   assert_contains "$(drain_out "$home")" "[key=metric-name]" "the unconfirmed keyed answer closed nothing"
   # The fold before the resend: metric-name first (opened first), then the request's
@@ -528,14 +535,59 @@ test_remote_printed_resend_carries_the_original_choice() {
   printf 'needs-decision [key=metric-name]: which name for the metric\n' > "$home/state/rsm.status"
   lost_remote_request "$fb" "$home" "$ssh_log" "$dir" rsm --answers-none "status of the weekly run"
   case "$LOST_RESEND" in
-    *" rsm --answers-none status\ of\ the\ weekly\ run") : ;;
-    *) fail "a none-send must be printed with its one --answers-none: $LOST_RESEND" ;;
+    *" rsm --answers-none -- status\ of\ the\ weekly\ run") : ;;
+    *) fail "a none-send must be printed with its one --answers-none, then -- and the message: $LOST_RESEND" ;;
+  esac
+  # The whole open-decision set before the none resend (metric-name and the request's own
+  # reserved blocker); a none-send closes nothing, so the set after must be identical.
+  local open_before
+  fm_test_fold "$home/state/rsm.status"
+  open_before=$FM_TEST_FOLD
+  case "$open_before" in
+    "metric-name"$'\t'"needs-decision"$'\t'"which name for the metric"$'\n'"$LOST_KEY"$'\t'"blocked"$'\t'?*) : ;;
+    *) fail "setup: before the none resend, metric-name and $LOST_KEY must both be open: $open_before" ;;
   esac
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/none" || rc=$?
   expect_code 0 "$rc" "the printed none resend is accepted: $(cat "$dir/none.err")"
   assert_one_remote_record_body "$rhome" "$LOST_CORR" "status of the weekly run" "the printed none resend"
-  assert_contains "$(drain_out "$home")" "[key=metric-name]" "the none resend leaves metric-name open"
+  fm_test_fold "$home/state/rsm.status"
+  [ "$FM_TEST_FOLD" = "$open_before" ] \
+    || fail "the none resend must leave the whole open set unchanged (metric-name and the reserved blocker): before: $open_before; after: $FM_TEST_FOLD"
   pass "fm-send remote: the printed resend repeats the original choice, keyed or none"
+}
+
+# The printed resend puts every option first, then a lone --, then the original message
+# words (Main 1866 G2), so a message that holds --resolve-key, or that starts with a word
+# like --answers-none after --, is re-delivered as the same message.
+test_remote_printed_resend_keeps_the_message_boundary() {
+  local dir fb ssh_log home rhome rc
+  dir="$TMP_ROOT/remote-resend-boundary"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-resend-boundary)
+  home=$(setup_remote_parent_home remote-resend-boundary "$rhome")
+  printf 'working: watching the remote domain\n' > "$home/state/rsm.status"
+  lost_remote_request "$fb" "$home" "$ssh_log" "$dir" rsm Please inspect --resolve-key example
+  case "$LOST_RESEND" in
+    *" rsm --answers-none -- Please inspect --resolve-key example") : ;;
+    *) fail "the message words must follow a lone -- in the printed resend: $LOST_RESEND" ;;
+  esac
+  rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/inner" || rc=$?
+  expect_code 0 "$rc" "the printed resend of a message holding --resolve-key is accepted: $(cat "$dir/inner.err")"
+  assert_one_remote_record_body "$rhome" "$LOST_CORR" "Please inspect --resolve-key example" "the printed resend of a message holding --resolve-key"
+
+  dir="$TMP_ROOT/remote-resend-boundary-dash"; mkdir -p "$dir"
+  rhome=$(setup_remote_secondmate_home remote-resend-boundary-dash)
+  home=$(setup_remote_parent_home remote-resend-boundary-dash "$rhome")
+  printf 'working: watching the remote domain\n' > "$home/state/rsm.status"
+  lost_remote_request "$fb" "$home" "$ssh_log" "$dir" rsm -- --answers-none rollout notes
+  case "$LOST_RESEND" in
+    *" rsm --answers-none -- --answers-none rollout notes") : ;;
+    *) fail "a message after -- must stay after the one -- in the printed resend: $LOST_RESEND" ;;
+  esac
+  rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/dash" || rc=$?
+  expect_code 0 "$rc" "the printed resend of a message that starts with --answers-none is accepted: $(cat "$dir/dash.err")"
+  assert_one_remote_record_body "$rhome" "$LOST_CORR" "--answers-none rollout notes" "the printed resend of a message that starts with --answers-none"
+  pass "fm-send remote: the printed resend keeps the message after a lone --, so option-like message words stay message"
 }
 
 test_remote_retry_failure_preserves_ambiguous_expectation() {
@@ -1069,6 +1121,7 @@ test_local_pending_does_not_close_resolve_key() {
 test_remote_steer_lands_in_remote_inbox
 test_remote_rerun_is_idempotent
 test_remote_printed_resend_survives_real_escalation
+test_remote_printed_resend_keeps_the_message_boundary
 test_remote_printed_resend_carries_the_original_choice
 test_remote_retry_failure_preserves_ambiguous_expectation
 test_remote_fire_and_forget_never_arms_reply_recovery
