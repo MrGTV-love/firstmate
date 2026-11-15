@@ -5148,7 +5148,10 @@ test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository() {
   git -C "$sub" -c user.email=t@t -c user.name=t commit -qm 'sub'
   git -C "$FOREIGN_COPY" -c protocol.file.allow=always submodule add -q "$sub" vendor/sub
   git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'add submodule'
+  # The merged PR's commit is on origin's default branch, as a real merge puts it
+  # (Main 1815): the content check reads origin, not the project's local main.
   git -C "$FOREIGN_CASE/project" update-ref refs/heads/main "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
+  git -C "$FOREIGN_CASE/project" push -q origin main
   add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
   second=$FOREIGN_SLOT/.claude/worktrees/fc-two
   git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
