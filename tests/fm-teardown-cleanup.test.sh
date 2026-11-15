@@ -6874,7 +6874,12 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
     route_teardown_world "route-table-$num" foreign
     # R2(h): an ancestor row's copy sits at the merge commit; every other row adds its
     # own file, which the merge commit carries for a twin and lacks for a reject row.
-    if [ "$cls" != "other (history)" ]; then
+    if [ "$cls" = "other (history)" ]; then
+      # An ancestor row: its own generated tip, a real ancestor of the landed tip (Main 1887 F6).
+      route_teardown_merge_carrying "anc-$num"
+      git -C "$FOREIGN_COPY" reset -q --hard "$ROUTE_MERGE"
+      route_teardown_merge_carrying "landed-after-anc-$num"
+    else
       printf '%s\n' "row-$num" > "$FOREIGN_COPY/row-$num.txt"
       git -C "$FOREIGN_COPY" add -- "row-$num.txt"
       git -C "$FOREIGN_COPY" -c user.name=t -c user.email=t@example.invalid commit -qm "row $num"

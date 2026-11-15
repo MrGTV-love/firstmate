@@ -137,6 +137,12 @@ case " $* " in
       exit 128
     fi
     ;;
+  *" diff-tree "*)
+    if [ -n "${FAKE_GIT_DIFFTREE_FILE:-}" ]; then cat "$FAKE_GIT_DIFFTREE_FILE"; exit 0; fi
+    ;;
+  *" ls-tree "*)
+    if [ -n "${FAKE_GIT_LSTREE_FILE:-}" ]; then cat "$FAKE_GIT_LSTREE_FILE"; exit 0; fi
+    ;;
   " version ")
     if [ -n "${FAKE_GIT_VERSION:-}" ]; then
       printf 'git version %s\n' "$FAKE_GIT_VERSION"
@@ -4071,13 +4077,21 @@ test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_an
   # merge commit: an ancestor row stays there (an empty net change), every other row
   # adds its own file, and the final merge commit carries the file of each twin row
   # (identical entry) and lacks the file of every other row.
-  local -a twins=()
-  local base_commit
+  local -a twins=() ancestors=()
+  local base_commit anc_tip
   base_commit=$ROUTE_MERGE
+  # One generated commit per ancestor row, each a real ancestor of the landed tip (Main 1887).
+  while IFS=$'\t' read -r num tip cls pr state kind own; do
+    [ "$cls" != "other (history)" ] || ancestors+=("row-$num")
+  done <<< "$rows"
+  route_make_ancestor_commits ${ancestors[@]+"${ancestors[@]}"}
   while IFS=$'\t' read -r num tip cls pr state kind own; do
     name="row-$num"
-    git -C "$SLOT" worktree add -q -b "fm/$name" "$(copy_path "$name")" "$base_commit"
-    if [ "$cls" != "other (history)" ]; then
+    if [ "$cls" = "other (history)" ]; then
+      anc_tip=$(printf '%s\n' "$ROUTE_ANCESTOR_TIPS" | sed -n "s/^$name=//p")
+      git -C "$SLOT" worktree add -q -b "fm/$name" "$(copy_path "$name")" "$anc_tip"
+    else
+      git -C "$SLOT" worktree add -q -b "fm/$name" "$(copy_path "$name")" "$base_commit"
       printf '%s\n' "$name" > "$(copy_path "$name")/$name.txt"
       git -C "$(copy_path "$name")" add "$name.txt"
       git -C "$(copy_path "$name")" commit -qm "$name"
@@ -4422,6 +4436,17 @@ test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed() {
     # The proof runs no merge, so the legitimate twin routes under the same configuration (Main 1869).
     assert_proved "the legitimate text twin under a configured lying driver ($channel)"
     [ ! -e "$CMARK" ] || fail "the lying driver ran on the twin (channel $channel)"
+    # The original different-blob twin (the target changed the path further) is kept under the same configuration.
+    if [ "$channel" = attributes ]; then ROUTE_FIX_ATTR=1; else ROUTE_FIX_ATTR=; fi
+    route_content_fixture "liarfurther-$channel" policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    ROUTE_FIX_ATTR=
+    git -C "$CR" config merge.liar.name liar
+    git -C "$CR" config merge.liar.driver "touch '$CMARK'; true"
+    [ "$channel" != default ] || git -C "$CR" config merge.default liar
+    [ "$channel" != info ] || printf 'policy.txt merge=liar\n' > "$CR/.git/info/attributes"
+    route_prove "$CR" "$CT" "$CM"
+    assert_unproved "the different-blob twin under a configured lying driver ($channel)" "policy.txt"
+    [ ! -e "$CMARK" ] || fail "the lying driver ran on the different-blob twin (channel $channel)"
   done
   pass "a lying merge driver selected through .gitattributes, merge.default or info/attributes never runs, because the proof runs no merge: the POLICY case is kept and the legitimate text twin routes under the same configuration"
 }
@@ -4515,6 +4540,11 @@ test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_rou
     [ "$(route_call_count twin)" = 1 ] || fail "the twin was not asked once: $(route_calls_for twin)"
     assert_contains "$(route_calls_for twin)" "--pr 8" "the twin's plan was not asked by the --pr route"
     [ ! -e "$marker" ] || fail "the lying driver ran on the twin through $channel"
+    # The original different-blob twin (the target changed the path further) is kept under the same configuration.
+    route_content_copy further 9 further.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    route_closeout plan further
+    [ "$CO_ROUTE" = invalid ] && [ -z "$(route_calls_for further)" ] || fail "the different-blob twin reached the driver through $channel ($CO_ROUTE): $(route_calls_for further)"
+    [ ! -e "$marker" ] || fail "the lying driver ran on the different-blob twin through $channel"
     printf 'liar %s: POLICY copy kept with no driver call, twin routed, marker absent\n' "$channel"
   done
   pass "through the whole route on real git, a lying merge driver selected by .gitattributes, merge.default or info/attributes never runs: the POLICY copy is kept with an empty closeout argv and the text twin under the same configuration routes, because the proof runs no merge"
@@ -5023,6 +5053,13 @@ test_a_configured_merge_driver_of_any_name_runs_nothing_and_the_twin_routes_whil
     else
       assert_not_contains "$PROVE_OUT" "merge driver" "a notice about a merge driver appeared with none configured"
     fi
+    # The original different-blob twin (the target changed the path further) is kept (Main 1887),
+    # under the same configuration; the equal-blob twin above is the proved control.
+    route_content_fixture "cfgfurther-$kind" policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    config_driver
+    prove_with_kind
+    assert_unproved "the different-blob twin with a merge driver configured ($kind)" "policy.txt"
+    [ ! -e "$marker" ] || fail "a configured merge driver ran on the different-blob twin ($kind)"
     printf 'driver config %s: POLICY copy kept, twin proved, marker absent, no merge-tree; notice: %s\n' "$kind" "$(printf '%s' "$PROVE_OUT" | grep -a 'merge driver' | head -n 1 | cut -c1-130)"
   done
   route_trip_check "driver config"
@@ -5260,51 +5297,6 @@ test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty(
 }
 
 
-# Main 1869 inference (ii): the route's lock key comes from the same owner function that
-# the other actors use (fm_treehouse_project_lock_path), called on the project when the
-# caller names one (teardown does, through TEARDOWN_ROUTE_PROJECT) and on the slot clone
-# only when none is named (the sweep's pool slots). A slot whose origin differs from the
-# project's would otherwise take a different lock from the one teardown holds.
-# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
-test_the_route_takes_its_lock_from_the_callers_project_and_from_the_slot_only_when_none_is_named() {
-  local proj out lock_slot lock_proj
-  route_world route-lock-key
-  proj=$TMP_ROOT/lockkey-project
-  rm -rf "$proj"
-  git init -q -b main "$proj"
-  git -C "$proj" remote add origin https://github.com/example/the-project.git
-  route_trip_arm
-  out=$(ROUTE_PROJ=$proj ROUTE_SLOT=$SLOT route_lib "$ROUTE_TRIP_SNIPPET"'
-set +u
-lock_slot=$(fm_treehouse_project_lock_path "$ROUTE_SLOT") || lock_slot=none
-lock_proj=$(fm_treehouse_project_lock_path "$ROUTE_PROJ") || lock_proj=none
-printf "slot=%s\nproj=%s\n" "$lock_slot" "$lock_proj"
-TEARDOWN_ROUTE_PROJECT=$ROUTE_PROJ
-rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
-printf "named: rc=%s path=%s own=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN"
-teardown_route_lock_release
-TEARDOWN_ROUTE_PROJECT=
-rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
-printf "unnamed: rc=%s path=%s own=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN"
-teardown_route_lock_release
-fm_project_lock_try "$lock_proj" outer || { echo "outer-take-failed"; exit 0; }
-TEARDOWN_ROUTE_PROJECT=$ROUTE_PROJ
-TEARDOWN_ROUTE_LOCK_HELD=$lock_proj
-rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
-printf "borrowed: rc=%s path=%s own=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN"
-teardown_route_lock_release
-fm_project_lock_release "$lock_proj"
-' 2>&1)
-  lock_slot=$(printf '%s\n' "$out" | sed -n 's/^slot=//p')
-  lock_proj=$(printf '%s\n' "$out" | sed -n 's/^proj=//p')
-  [ -n "$lock_slot" ] && [ -n "$lock_proj" ] && [ "$lock_slot" != "$lock_proj" ] || fail "the fixture does not discriminate: the slot and the project have the same lock key: $out"
-  assert_contains "$out" "named: rc=0 path=$lock_proj own=1" "the route did not take the named project's lock: $out"
-  assert_contains "$out" "unnamed: rc=0 path=$lock_slot own=1" "the route did not fall back to the slot's lock when no project is named: $out"
-  assert_contains "$out" "borrowed: rc=0 path=$lock_proj own=0" "the route did not borrow the hold on the project's lock: $out"
-  route_trip_check "lock key"
-  pass "the route takes its lock from the project the caller names and from the slot only when none is named, through the one owner function, and borrows a proved hold on the project's lock"
-}
-
 # Main 1869 R5 note: a missing staged-cases directory skips the table cases with a success
 # line, unless FM_SUPERSEDENCE_CASES_REQUIRED=1, which makes the skip a failure.
 test_a_missing_staged_cases_skip_with_a_notice_unless_this_prs_cases_are_required() {
@@ -5320,15 +5312,323 @@ test_a_missing_staged_cases_skip_with_a_notice_unless_this_prs_cases_are_require
   [ "$rc" = 0 ] || fail "the gate refused staged cases that are present ($rc)"
   rc=0; ( FM_SUPERSEDENCE_CASES_REQUIRED=1 route_staged_cases_gate "$present" ) >/dev/null 2>&1 || rc=$?
   [ "$rc" = 0 ] || fail "the gate refused present staged cases when they are required ($rc)"
-  rc=0; out=$( ( route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
+  rc=0; out=$( ( unset CI FM_SUPERSEDENCE_CASES_REQUIRED; route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
   [ "$rc" = 1 ] || fail "absent staged cases did not skip (rc $rc): $out"
   assert_contains "$out" "SKIPPED" "the skip does not say it skipped"
   assert_contains "$out" "FM_SUPERSEDENCE_CASES_REQUIRED" "the skip does not name the setting that makes it a failure"
   rc=0; out=$( ( FM_SUPERSEDENCE_CASES_REQUIRED=1 route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
   [ "$rc" != 0 ] || fail "absent staged cases passed although they are required: $out"
   assert_contains "$out" "FM_SUPERSEDENCE_CASES_REQUIRED" "the failure does not name the setting"
-  pass "absent staged cases skip with a notice that names how to require them, and fail when FM_SUPERSEDENCE_CASES_REQUIRED=1, while present staged cases pass the gate either way"
+  # A CI run treats the cases as required (Main 1887): CI=true fails the skip, with no workflow edit.
+  rc=0; out=$( ( unset FM_SUPERSEDENCE_CASES_REQUIRED; CI=true route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
+  [ "$rc" != 0 ] || fail "absent staged cases passed under CI=true: $out"
+  assert_contains "$out" "CI" "the failure under CI=true does not name CI"
+  rc=0; ( unset FM_SUPERSEDENCE_CASES_REQUIRED; CI=true route_staged_cases_gate "$present" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 0 ] || fail "the gate refused present staged cases under CI=true ($rc)"
+  pass "absent staged cases skip with a notice that names how to require them, and fail when FM_SUPERSEDENCE_CASES_REQUIRED=1 or CI=true, while present staged cases pass the gate either way"
 }
+
+# --- code round 4 (Main 1887): helper-level cases, libraries only -------------------
+# Same rules as round 2: nothing below runs a sweep in apply mode, reads a forge, reaches
+# bin/fm-teardown.sh, starts a driver or signals a process. The route owner is called
+# without its driver, with the forge answer stubbed and the tripwires armed.
+
+# F2 (Main 1887): output of git that cannot be parsed refuses. The fake git replies with a
+# canned diff-tree or ls-tree answer (exit 0); a genuine empty change and a real nonempty
+# one, replayed, are the controls.
+test_the_content_proof_refuses_git_output_it_cannot_parse_and_accepts_a_genuine_empty_change() {
+  local base zero sha tmpf
+  make_world world-content-malformed
+  route_trip_arm
+  route_content_fixture mal f.txt 'a\n' 'a\nadded\n' 'a\nadded\n'
+  route_prove "$CR" "$CT" "$CM"; assert_proved "the real diff (control)"
+  base=$(git -C "$CR" merge-base "$CT" "$CM")
+  zero=0000000000000000000000000000000000000000
+  sha=$(git -C "$CR" rev-parse "$CT:f.txt")
+  tmpf=$W/dt.canned
+  : > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_proved "a genuine empty change (control)"
+  git -C "$CR" diff-tree -r --no-renames --no-ext-diff --no-textconv -z --raw "$base" "$CT" > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_proved "a real nonempty diff, replayed (control)"
+  printf ':100644 100644 %s %s M\0' "$zero" "$sha" > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "a metadata record with no path" "cannot be parsed"
+  printf ':100644 100644 %s %s M' "$zero" "$sha" > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "an unterminated metadata record" "cannot be parsed"
+  printf ':100644 100644 %s %s M\0f.txt' "$zero" "$sha" > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "an unterminated path" "cannot be parsed"
+  printf ':100644 M\0f.txt\0' > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "metadata with missing fields" "cannot be parsed"
+  printf ':100644 100644 %s %s M\0\0' "$zero" "$sha" > "$tmpf"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf route_prove "$CR" "$CT" "$CM"; assert_unproved "an empty path" "cannot be parsed"
+  # The deletion branch: the merge commit's entry is read with ls-tree.
+  printf ':100644 000000 %s %s D\0gone.txt\0' "$sha" "$zero" > "$tmpf"
+  : > "$W/ls.canned"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf FAKE_GIT_LSTREE_FILE=$W/ls.canned route_prove "$CR" "$CT" "$CM"; assert_proved "a deletion the merge commit also made, an empty ls-tree answer (control)"
+  printf '100644 blob %s\tgone.txt' "$sha" > "$W/ls.canned"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf FAKE_GIT_LSTREE_FILE=$W/ls.canned route_prove "$CR" "$CT" "$CM"; assert_unproved "an unterminated ls-tree entry for a deleted path" "cannot be parsed"
+  printf '100644 blob %s\tgone.txt\0' "$sha" > "$W/ls.canned"
+  FAKE_GIT_DIFFTREE_FILE=$tmpf FAKE_GIT_LSTREE_FILE=$W/ls.canned route_prove "$CR" "$CT" "$CM"; assert_unproved "a deleted path the merge commit still has" "gone.txt"
+  route_trip_check "malformed git output"
+  pass "metadata with no path, an unterminated record or path, missing fields, an empty path and an unterminated ls-tree entry keep the copy, while a genuine empty change, a replayed real diff and a deletion the merge commit also made are proved"
+}
+
+# F3 (Main 1887): the checkout window is published while the route is still proving, and a
+# switch during a proof that then refuses is reported. The forge answer is stubbed; the
+# route owner runs without its driver.
+read -r -d '' ROUTE_PROVING_SCRIPT <<'EOS' || true
+set +u
+TEARDOWN_ROUTE_DATA=$ROUTE_DATA
+TEARDOWN_CLOSEOUT_ROUTE_FILE=$ROUTE_FILE
+teardown_route_pr_landed() {
+  [ -z "$STUB_ACTOR" ] || { git -C "$ROUTE_SLOT" switch -q fm/pr-7-head && git -C "$ROUTE_SLOT" switch -q main; }
+  [ -z "$STUB_SEE" ] || cp "$TEARDOWN_CLOSEOUT_ROUTE_FILE" "$STUB_SEE"
+  if [ -n "$STUB_REFUSE" ]; then TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge says no"; return 1; fi
+  TEARDOWN_ROUTE_HEADREF=fm/pr-7-head
+  TEARDOWN_ROUTE_MERGE=$STUB_MERGE
+  return 0
+}
+TEARDOWN_CLOSEOUT_SWITCHED=0
+rc=0
+teardown_closeout_route "$ROUTE_SLOT" "$ROUTE_COPY" || rc=$?
+teardown_closeout_route_publish
+printf 'rc=%s route=%s switched=%s why=%s\n' "$rc" "$TEARDOWN_CLOSEOUT_ROUTE" "$TEARDOWN_CLOSEOUT_SWITCHED" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"
+teardown_route_lock_release
+teardown_route_checkout_close
+EOS
+route_proving_run() {  # <actor 0|1> <refuse 0|1> <see-file|-> : sets ROUTE_PROVING_OUT
+  ROUTE_PROVING_OUT=$(ROUTE_SLOT=$SLOT ROUTE_COPY=$(copy_path zz-a) ROUTE_DATA=$HOMED/data ROUTE_FILE=$W/routefile STUB_MERGE=$ROUTE_MERGE \
+    STUB_ACTOR=$([ "$1" = 1 ] && echo 1 || true) STUB_REFUSE=$([ "$2" = 1 ] && echo 1 || true) STUB_SEE=$([ "$3" = - ] || echo "$3") \
+    route_lib "$ROUTE_TRIP_SNIPPET
+$ROUTE_PROVING_SCRIPT" 2>&1)
+}
+test_the_route_publishes_its_checkout_window_while_proving_and_reports_a_switch_when_a_proof_refuses() {
+  local variant
+  for variant in window refuse-switch refuse-quiet content-switch; do
+    route_world "route-proving-$variant"
+    git -C "$SLOT" branch fm/pr-7-head "$ROUTE_MERGE"
+    route_trip_arm
+    case "$variant" in
+      window)
+        route_copy zz-a 7
+        route_proving_run 0 0 "$W/routefile.seen"
+        assert_contains "$ROUTE_PROVING_OUT" "rc=0 route=pr switched=0" "the quiet route did not complete: $ROUTE_PROVING_OUT"
+        [ "$(sed -n 1p "$W/routefile.seen")" = proving ] || fail "the file seen by the forge step is not in state proving: $(cat "$W/routefile.seen")"
+        [ "$(sed -n 4p "$W/routefile.seen")" = "$(copy_path zz-a)" ] || fail "the window's copy is not published while proving: $(cat "$W/routefile.seen")"
+        [ -n "$(sed -n 10p "$W/routefile.seen")" ] || fail "the window's anchor is not published while proving: $(cat "$W/routefile.seen")"
+        ;;
+      refuse-switch)
+        route_copy zz-a 7
+        route_proving_run 1 1 -
+        assert_contains "$ROUTE_PROVING_OUT" "rc=1 route=invalid switched=1" "a switch during a proof that then refused was not reported: $ROUTE_PROVING_OUT"
+        [ "$(sed -n 9p "$W/routefile")" = 1 ] || fail "the route file does not carry the switch: $(cat "$W/routefile")"
+        ;;
+      refuse-quiet)
+        route_copy zz-a 7
+        route_proving_run 0 1 -
+        assert_contains "$ROUTE_PROVING_OUT" "rc=1 route=invalid switched=0" "an ordinary refusal was reported as a switch: $ROUTE_PROVING_OUT"
+        ;;
+      content-switch)
+        route_content_copy zz-a 7 policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
+        route_proving_run 1 0 -
+        assert_contains "$ROUTE_PROVING_OUT" "rc=1 route=invalid switched=1" "a switch during a proof that the content proof then refused was not reported: $ROUTE_PROVING_OUT"
+        ;;
+    esac
+    route_trip_check "proving window $variant"
+    printf 'proving %s: %s\n' "$variant" "$(printf '%s' "$ROUTE_PROVING_OUT" | tail -n 1 | cut -c1-140)"
+  done
+  pass "the route's checkout window (copy, branch, HEAD, position, anchor) is in the route file while it is still proving, a switch during a proof that then refuses (at the forge step or at the content proof) is reported, and an ordinary refusal is not"
+}
+
+# F3, the parent's side: a plan killed while proving leaves a route file in state proving
+# with the window in it. The loader reads it whatever the state and the post-timeout check
+# stops on any change in the window; with the PR's head branch not known yet, any new
+# entry in the HEAD reflog counts.
+read -r -d '' ROUTE_KILLED_SCRIPT <<'EOS' || true
+set +u
+teardown_closeout_route_file_load "$ROUTE_SEEN"
+printf 'load: route=%s open=%s copy=%s\n' "$TEARDOWN_CLOSEOUT_ROUTE" "$TEARDOWN_CKO_OPEN" "$TEARDOWN_CKO_COPY"
+rc=0; teardown_route_plan_killed_check "$ROUTE_SLOT" || rc=$?
+printf 'quiet: rc=%s\n' "$rc"
+git -C "$ROUTE_SLOT" switch -q fm/pr-7-head && git -C "$ROUTE_SLOT" switch -q main
+teardown_closeout_route_file_load "$ROUTE_SEEN"
+rc=0; teardown_route_plan_killed_check "$ROUTE_SLOT" || rc=$?
+printf 'switched: rc=%s why=%s\n' "$rc" "$TEARDOWN_CKO_WHY"
+EOS
+test_a_plan_killed_while_proving_is_read_for_a_checkout_change_by_the_parent() {
+  local out
+  route_world route-killed-while-proving
+  git -C "$SLOT" branch fm/pr-7-head "$ROUTE_MERGE"
+  route_copy zz-a 7
+  route_trip_arm
+  route_proving_run 0 0 "$W/routefile.seen"
+  [ -s "$W/routefile.seen" ] || fail "the child left no route file to load"
+  out=$(ROUTE_SLOT=$SLOT ROUTE_SEEN=$W/routefile.seen route_lib "$ROUTE_TRIP_SNIPPET
+$ROUTE_KILLED_SCRIPT" 2>&1)
+  assert_contains "$out" "load: route=proving open=1 copy=$(copy_path zz-a)" "the loader did not open the window of a plan killed while proving: $out"
+  assert_contains "$out" "quiet: rc=0" "the post-timeout check refused a checkout that did not change: $out"
+  assert_contains "$out" "switched: rc=1" "the post-timeout check missed a switch and restore while proving: $out"
+  assert_contains "$out" "not known yet" "the post-timeout refusal does not say why any new reflog entry counts: $out"
+  route_trip_check "killed while proving"
+  pass "the loader opens the window of a plan killed while proving, and the post-timeout check accepts a quiet checkout and stops on a switch and restore even though the PR's head branch is not known yet"
+}
+
+# F4 (Main 1887): a claimed outer hold at another path refuses. There is no fall-through to
+# the computed lock, which stays free.
+read -r -d '' ROUTE_CLAIM_SCRIPT <<'EOS' || true
+set +u
+lock=$(fm_treehouse_project_lock_path "$ROUTE_SLOT")
+TEARDOWN_ROUTE_LOCK_HELD=$ROUTE_ELSEWHERE
+rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
+printf 'elsewhere: rc=%s own=%s why=%s\n' "$rc" "$TEARDOWN_ROUTE_LOCK_OWN" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"
+teardown_route_lock_release
+if fm_project_lock_try "$lock" probe 2>/dev/null; then echo 'computed lock: free'; fm_project_lock_release "$lock"; else echo 'computed lock: taken'; fi
+TEARDOWN_ROUTE_LOCK_HELD=
+rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
+printf 'no claim: rc=%s own=%s\n' "$rc" "$TEARDOWN_ROUTE_LOCK_OWN"
+teardown_route_lock_release
+fm_project_lock_try "$lock" outer || { echo 'outer-take-failed'; exit 0; }
+TEARDOWN_ROUTE_LOCK_HELD=$lock
+rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
+printf 'matching claim: rc=%s own=%s\n' "$rc" "$TEARDOWN_ROUTE_LOCK_OWN"
+teardown_route_lock_release
+fm_project_lock_release "$lock"
+EOS
+test_a_claimed_outer_hold_at_another_path_refuses_and_never_falls_through_to_the_computed_lock() {
+  local out
+  route_world route-claim-elsewhere
+  route_trip_arm
+  out=$(ROUTE_SLOT=$SLOT ROUTE_ELSEWHERE=$TMP_ROOT/not-the-lock route_lib "$ROUTE_TRIP_SNIPPET
+$ROUTE_CLAIM_SCRIPT" 2>&1)
+  assert_contains "$out" "elsewhere: rc=1 own=0" "a claimed hold at another path did not refuse without taking a lock: $out"
+  assert_contains "$out" "computed lock: free" "the computed lock was taken although the claim named another path: $out"
+  assert_contains "$out" "no claim: rc=0 own=1" "the no-claim control did not take its own lock: $out"
+  assert_contains "$out" "matching claim: rc=0 own=0" "the matching, proved claim control was not borrowed: $out"
+  route_trip_check "claim elsewhere"
+  pass "a claimed outer hold at a path other than the computed lock refuses with no lock taken and the computed lock still free, while no claim takes its own lock and a matching proved claim is borrowed"
+}
+
+# F5 (Main 1887): after a plan is killed, the parent releases the plan's project lock only
+# when the lock's record names the killed plan's pid and that pid is gone; otherwise the lock
+# is left for the lock library's own dead-owner recovery and the note says so. A subshell that
+# takes the lock and ends stands in for the killed plan: no process is signalled.
+read -r -d '' ROUTE_REAP_SCRIPT <<'EOS' || true
+set +u
+lock=$(fm_treehouse_project_lock_path "$ROUTE_SLOT")
+taken() { ( fm_project_lock_try "$lock" plan >/dev/null 2>&1; fm_current_pid p; printf '%s' "$p" ); }
+gone() { if [ -e "$lock" ] || [ -L "$lock" ]; then echo present; else echo gone; fi; }
+dead=$(taken)
+teardown_route_lock_reap_killed "$lock" "$dead"
+printf 'dead owner named: %s note=%s\n' "$(gone)" "$TEARDOWN_ROUTE_LOCK_NOTE"
+dead=$(taken)
+teardown_route_lock_reap_killed "$lock" 999998
+printf 'other pid named: %s note=%s\n' "$(gone)" "$TEARDOWN_ROUTE_LOCK_NOTE"
+fm_lock_reap_dead_link "$lock" >/dev/null 2>&1 || true
+fm_project_lock_try "$lock" live >/dev/null 2>&1 || { echo 'live-take-failed'; exit 0; }
+fm_current_pid me
+teardown_route_lock_reap_killed "$lock" "$me"
+printf 'live owner named: %s note=%s\n' "$(gone)" "$TEARDOWN_ROUTE_LOCK_NOTE"
+fm_project_lock_release "$lock"
+teardown_route_lock_reap_killed "$lock" "$dead"
+printf 'no lock left: %s note=%s\n' "$(gone)" "$TEARDOWN_ROUTE_LOCK_NOTE"
+EOS
+test_the_parent_releases_a_killed_plans_lock_only_when_its_owner_is_gone_and_the_record_names_it() {
+  local out
+  route_world route-lock-reap
+  route_trip_arm
+  out=$(ROUTE_SLOT=$SLOT route_lib "$ROUTE_TRIP_SNIPPET
+$ROUTE_REAP_SCRIPT" 2>&1)
+  assert_contains "$out" "dead owner named: gone" "a dead owner's lock that its record names was not released: $out"
+  assert_contains "$out" "other pid named: present" "a lock whose record names another pid was released: $out"
+  assert_contains "$out" "live owner named: present" "a live owner's lock was released: $out"
+  assert_contains "$out" "no lock left: gone" "the no-lock control changed something: $out"
+  route_trip_check "lock reap"
+  pass "the lock of a killed plan is released only when its record names the plan's pid and that pid is gone; another pid in the record and a live owner leave it for dead-owner recovery, and the note says what happened"
+}
+
+# Main 1887 inference (ii): the lock is keyed by the slot's registered project on both
+# routes. The project comes from the slot's git common directory (a Treehouse slot shares
+# its project's); a slot whose own lock key differs from its project's refuses.
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+test_the_route_keys_its_lock_by_the_slots_registered_project_and_refuses_a_slot_whose_origin_differs() {
+  local proj wt clone out lock_proj lock_clone
+  route_world route-lock-project
+  proj=$TMP_ROOT/lkp-project
+  wt=$TMP_ROOT/lkp-slot
+  clone=$TMP_ROOT/lkp-clone
+  rm -rf "$proj" "$wt" "$clone"
+  git init -q -b main "$proj"
+  git -C "$proj" config user.name t
+  git -C "$proj" config user.email t@example.invalid
+  printf 'a\n' > "$proj/f"
+  git -C "$proj" add f
+  git -C "$proj" commit -qm base
+  git -C "$proj" remote add origin https://github.com/example/the-project.git
+  git -C "$proj" worktree add -q -b slotbranch "$wt"
+  git init -q -b main "$clone"
+  git -C "$clone" remote add origin https://github.com/example/another-origin.git
+  route_trip_arm
+  out=$(ROUTE_PROJ=$proj ROUTE_WT=$wt ROUTE_CLONE=$clone route_lib "$ROUTE_TRIP_SNIPPET"'
+set +u
+printf "project_of linked slot=%s\n" "$(teardown_route_project_of "$ROUTE_WT")"
+printf "project_of clone=%s\n" "$(teardown_route_project_of "$ROUTE_CLONE")"
+printf "lock_proj=%s\nlock_clone=%s\n" "$(fm_treehouse_project_lock_path "$ROUTE_PROJ")" "$(fm_treehouse_project_lock_path "$ROUTE_CLONE")"
+TEARDOWN_ROUTE_PROJECT=
+rc=0; teardown_route_lock_take "$ROUTE_WT" copy || rc=$?
+printf "unnamed linked slot: rc=%s path=%s own=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN"
+teardown_route_lock_release
+TEARDOWN_ROUTE_PROJECT=$ROUTE_PROJ
+rc=0; teardown_route_lock_take "$ROUTE_CLONE" copy || rc=$?
+printf "slot origin differs: rc=%s own=%s why=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_OWN" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"
+teardown_route_lock_release
+TEARDOWN_ROUTE_PROJECT=
+rc=0; teardown_route_lock_take "$ROUTE_CLONE" copy || rc=$?
+printf "unnamed standalone clone: rc=%s path=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH"
+teardown_route_lock_release
+' 2>&1)
+  lock_proj=$(printf '%s\n' "$out" | sed -n 's/^lock_proj=//p')
+  lock_clone=$(printf '%s\n' "$out" | sed -n 's/^lock_clone=//p')
+  [ -n "$lock_proj" ] && [ "$lock_proj" != "$lock_clone" ] || fail "the fixture does not discriminate: the project and the other origin share a lock key: $out"
+  assert_contains "$out" "project_of linked slot=$(cd "$proj" && pwd -P)" "the project of a linked slot is not its common directory's: $out"
+  assert_contains "$out" "project_of clone=$(cd "$clone" && pwd -P)" "the project of a standalone clone is not itself: $out"
+  assert_contains "$out" "unnamed linked slot: rc=0 path=$lock_proj own=1" "a linked slot was not keyed by its project: $out"
+  assert_contains "$out" "slot origin differs: rc=1 own=0" "a slot whose origin differs from its project's did not refuse: $out"
+  assert_contains "$out" "differs" "the refusal does not say the keys differ: $out"
+  assert_contains "$out" "unnamed standalone clone: rc=0 path=$lock_clone" "a standalone clone was not keyed by itself: $out"
+  route_trip_check "lock project"
+  pass "the route derives the project from the slot's git common directory when the caller names none, keys the lock by it through the one owner function, and refuses a slot whose own lock key differs from its project's"
+}
+
+# F6 (Main 1887): one generated commit per ancestor copy, each a real ancestor of the landed tip.
+route_make_ancestor_commits() {  # <name>...: commits on main in $SLOT; sets ROUTE_ANCESTOR_TIPS (name=sha lines)
+  local name
+  ROUTE_ANCESTOR_TIPS=
+  for name in "$@"; do
+    printf '%s\n' "$name" > "$SLOT/$name.txt"
+    git -C "$SLOT" add -- "$name.txt"
+    git -C "$SLOT" commit -qm "generated ancestor $name"
+    ROUTE_ANCESTOR_TIPS="$ROUTE_ANCESTOR_TIPS$name=$(git -C "$SLOT" rev-parse HEAD)"$'\n'
+  done
+  git -C "$SLOT" push -q origin main
+  git -C "$SLOT" fetch -q origin
+}
+test_each_ancestor_copy_of_the_recorded_table_gets_its_own_generated_tip_that_is_an_ancestor_of_the_landed_tip() {
+  local name tip seen landed
+  route_world route-ancestor-tips
+  route_make_ancestor_commits row-11 row-13 row-14 row-16
+  git -C "$SLOT" commit -q --allow-empty -m "the landed tip"
+  landed=$(git -C "$SLOT" rev-parse HEAD)
+  seen=
+  while IFS='=' read -r name tip; do
+    [ -n "$name" ] || continue
+    case " $seen " in *" $tip "*) fail "$name shares its tip $tip with another ancestor copy" ;; esac
+    seen="$seen $tip"
+    git -C "$SLOT" merge-base --is-ancestor "$tip" "$landed" || fail "$name's tip is not an ancestor of the landed tip"
+    [ "$tip" != "$landed" ] || fail "$name's tip is the landed tip itself"
+  done <<< "$ROUTE_ANCESTOR_TIPS"
+  [ "$(printf '%s\n' "$ROUTE_ANCESTOR_TIPS" | grep -c .)" = 4 ] || fail "not four ancestor tips: $ROUTE_ANCESTOR_TIPS"
+  pass "the four recorded ancestor rows get four distinct generated tips, each a real ancestor of the landed tip"
+}
+
 
 # FM_TEST_ONLY=<function> runs one case, which keeps a mutation proof quick.
 fm_test_only
@@ -5473,6 +5773,12 @@ test_the_checkout_check_reads_the_reflog_once_and_stops_on_a_read_error_an_inter
 test_a_reflog_read_error_a_masked_interleaving_or_a_rewritten_anchor_sets_the_stop_flag
 test_a_refusal_is_temporary_only_when_it_is_the_called_prs_complete_envelope
 test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty
-test_the_route_takes_its_lock_from_the_callers_project_and_from_the_slot_only_when_none_is_named
 test_a_missing_staged_cases_skip_with_a_notice_unless_this_prs_cases_are_required
+test_the_content_proof_refuses_git_output_it_cannot_parse_and_accepts_a_genuine_empty_change
+test_the_route_publishes_its_checkout_window_while_proving_and_reports_a_switch_when_a_proof_refuses
+test_a_plan_killed_while_proving_is_read_for_a_checkout_change_by_the_parent
+test_a_claimed_outer_hold_at_another_path_refuses_and_never_falls_through_to_the_computed_lock
+test_the_parent_releases_a_killed_plans_lock_only_when_its_owner_is_gone_and_the_record_names_it
+test_the_route_keys_its_lock_by_the_slots_registered_project_and_refuses_a_slot_whose_origin_differs
+test_each_ancestor_copy_of_the_recorded_table_gets_its_own_generated_tip_that_is_an_ancestor_of_the_landed_tip
 pass "fm-copy-sweep"
