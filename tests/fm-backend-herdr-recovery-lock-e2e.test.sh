@@ -282,6 +282,8 @@ pathlib.Path(sys.argv[2]).write_text(source[start:end])
 PY
 . "$ROOT/bin/fm-nm-run-lib.sh"
 . "$ROOT/bin/fm-backlog-transition-lib.sh"
+# The extracted scan spells its root as lsof does through fm_control_lsof_path.
+. "$ROOT/bin/fm-control-lib.sh"
 STATE="$TEST_DIR/home-primary/state"
 . "$ROOT/bin/fm-wake-lib.sh"
 (

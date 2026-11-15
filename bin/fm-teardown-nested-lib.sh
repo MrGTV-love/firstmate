@@ -499,13 +499,14 @@ teardown_preservable_ignored() {  # <copy> [all|releasable]
   return "$rc"
 }
 
-# The NUL-ended names in <file> as one line of text, a newline in a name shown
-# as \n, for a refusal to print.
+# The NUL-ended names in <file> as one line of text, sorted and each named once
+# (Git can list a directory and an entry under it, which the .tac expansion then
+# names again), a newline in a name shown as \n, for a refusal to print.
 teardown_nul_list_text() {  # <file>
   local entry text=
   while IFS= read -r -d '' entry; do
     text+="${text:+ }${entry//$'\n'/\\n}"
-  done <"$1"
+  done < <(LC_ALL=C sort -z -u "$1")
   printf '%s' "$text"
 }
 
