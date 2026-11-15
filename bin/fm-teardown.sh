@@ -4509,7 +4509,7 @@ teardown_unclaimed_adopt_old_holder() {
 # reads. An entry still on the old recovered holder is adopted here, before any
 # helper, and must then show the protected holder.
 teardown_unclaimed_retire_gate() {
-  local now why= state holder id name
+  local now why=''
   if [ -z "$TEARDOWN_UNCLAIMED_SLOT" ]; then
     why="the route the early proof planned was not planned again under project custody, so the lease it saw is gone"
   elif [ "$TEARDOWN_UNCLAIMED_SEEN" != "$TEARDOWN_UNCLAIMED_EARLY" ]; then
