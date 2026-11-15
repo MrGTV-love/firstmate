@@ -883,6 +883,9 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# The one index-flag check and the one pool-row validation shared with the spawn's proof (Main 1886 N1, N7).
+# shellcheck source=bin/fm-slot-provision-lib.sh
+. "$SCRIPT_DIR/fm-slot-provision-lib.sh"
 # shellcheck source=bin/fm-refuse-lib.sh
 . "$SCRIPT_DIR/fm-refuse-lib.sh"
 # shellcheck source=bin/fm-teardown-nested-lib.sh
@@ -2914,7 +2917,7 @@ teardown_landed() {  # <dir> <ref> <branch>
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
 # whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
 teardown_skipped_copies() {
-  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files ok
+  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok
   local keep="$record.keep.${BASHPID:-$$}" changed=0
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
   : > "$keep" || return 0
@@ -2925,8 +2928,7 @@ teardown_skipped_copies() {
   fi
   # Unknown is never "none" (Main 1823 D-C). One row that cannot be read means the holder of any copy is unknown, so every
   # record stays; a row that does not say who holds the lease, or whose processes field is not a list, keeps its copy.
-  if ! jq -e 'type == "array" and all(.[]; type == "object" and ((.path // null | type) == "string") and (.path | length > 0))' \
-    <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" >/dev/null 2>&1; then
+  if ! fm_slot_pool_rows_valid "$FM_TASK_COPY_CURRENT_POOL_JSON"; then
     echo "warning: the pool listing from $PROJ has a row that cannot be read, so every copy this task's spawn skipped (listed in $record) stays leased; release one with: (cd '$PROJ' && treehouse return '<copy>' --if-lease-holder 'firstmate-skipped:$ID' </dev/null) once it is landed or unwanted" >&2
     rm -f "$keep"
     return 0
@@ -2934,8 +2936,14 @@ teardown_skipped_copies() {
   while IFS=$'\t' read -r copy reason holder when || [ -n "$copy" ]; do
     [ -n "$copy" ] || continue
     canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=
+    if [ -z "$canonical" ]; then
+      # A path that cannot be resolved proves nothing about the lease. The copy stays leased and its record stays (rule Q).
+      echo "warning: leaving $copy leased to $holder: its recorded path cannot be resolved, so nothing proves it is released (skipped for: $reason)" >&2
+      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      continue
+    fi
     row=
-    [ -z "$canonical" ] || row=$(jq -r --arg p "$canonical" '[.[] | select(.path == $p)] as $m
+    row=$(jq -r --arg p "$canonical" '[.[] | select(.path == $p)] as $m
       | if ($m | length) == 0 then empty
         elif ($m | length) > 1 then ["", "?", "0"]
         else $m[0] | [(if (.lease_holder | type) == "string" then .lease_holder else "" end),
@@ -2967,6 +2975,8 @@ teardown_skipped_copies() {
       echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it (skipped for: $reason)" >&2
     elif ! dirt=$(git -C "$canonical" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) || [ -n "$dirt" ]; then
       echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2
+    elif ! hidden_work=$(fm_slot_hidden_work "$canonical") || [ -n "$hidden_work" ]; then
+      echo "warning: leaving $copy leased to $holder: a tracked edit is hidden by an index flag, or the flags cannot be read (skipped for: $reason)" >&2
     elif ! ignored_files=$(git -C "$canonical" ls-files -o -i --exclude-standard 2>/dev/null) || [ -n "$ignored_files" ]; then
       echo "warning: leaving $copy leased to $holder: it holds ignored files, or they cannot be listed, and a return could replace one that sits where the reset target tracks a file (skipped for: $reason)" >&2
     else

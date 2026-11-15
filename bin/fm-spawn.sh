@@ -5156,7 +5156,7 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
   fi
   fm_slot_apply_move "$worktree" "$SPAWN_MOVE_EXPECTED" || {
     rc=$?
-    [ "$rc" = "$FM_SLOT_SKIP_RC" ] && return "$rc"
+    [ "$rc" = "$FM_SLOT_SKIP_RC" ] || [ "$rc" = "$FM_SLOT_REFUSE_RC" ] && return "$rc"
     SPAWN_APPLY_FAILED=1
     echo "error: could not move pooled worktree '$worktree' to '$SPAWN_MOVE_TARGET'; refusing to launch" >&2
     return 1
@@ -6220,14 +6220,19 @@ spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
   done
   return 1
 }
-spawn_acquire_pool_slot() {
-  # No new get once the one absolute bound is spent: the copies skipped so far stay leased where they are.
+# No new get once the one absolute bound is spent: the copies skipped so far stay leased where they are.
+spawn_acquire_bound_check() {
   if [ -n "$SPAWN_ACQUIRE_T0" ] && [ $((SECONDS - SPAWN_ACQUIRE_T0)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
     echo "error: absolute extreme ${SPAWN_ACQUIRE_CEILING}s reached across every treehouse get of this spawn; no further copy is requested (spawning project '$PROJ_ABS'; copies skipped by this spawn: ${SPAWN_SKIPPED_SLOTS[*]:-none})" >&2
     spawn_report_leased_copies >&2
     exit 1
   fi
+}
+spawn_acquire_pool_slot() {
+  spawn_acquire_bound_check
   fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
+  # The scan above takes time. The bound is read again immediately before the get is sent (Main 1886 N9).
+  spawn_acquire_bound_check
   spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
 
   # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
@@ -6393,14 +6398,38 @@ spawn_skip_copy() {
     echo "error: could not lease skipped copy $skipped durably ($lease_out); its endpoint $T stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted" >&2
     return 1
   fi
-  SPAWN_SKIPPED_SLOTS+=("$(real_path_or_raw "$skipped")")
-  SPAWN_SKIPPED_INFO+=("$skipped|${FM_SLOT_SKIP_REASON:-unknown}")
-  # The record is written when the lease is taken, so a spawn that fails later still leaves its owner a trail.
-  mkdir -p "$DATA/$ID" 2>/dev/null &&
-    printf '%s\t%s\tfirstmate-skipped:%s\t%s\n' "$skipped" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)" >>"$DATA/$ID/skipped-copies.tsv" ||
-    echo "warning: could not record skipped copy $skipped in $DATA/$ID/skipped-copies.tsv; it stays leased as firstmate-skipped:$ID" >&2
-  echo "skipped: copy $skipped (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner; ${FM_SLOT_SKIP_NOTE:-this spawn wrote nothing to it}; taking another copy" >&2
+  # Rule Q (Main 1886): a copy is skipped, and another taken, only when its record is written AND read back. A path that
+  # cannot be canonicalized, or a record that cannot be written or read back, refuses the whole spawn; the copy stays leased.
+  local real row
+  if ! real=$(CDPATH='' cd -- "$skipped" 2>/dev/null && pwd -P) || [ -z "$real" ]; then
+    echo "error: skipped copy '$skipped' cannot be resolved to a real path, so its record cannot be trusted; it stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
+    exit 1
+  fi
+  row=$(printf '%s\t%s\tfirstmate-skipped:%s\t%s' "$real" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)")
+  if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/skipped-copies.tsv" && grep -Fxq -- "$row" "$DATA/$ID/skipped-copies.tsv"; } 2>/dev/null; then
+    echo "error: could not write and read back the record of skipped copy $real in $DATA/$ID/skipped-copies.tsv; the copy stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
+    exit 1
+  fi
+  SPAWN_SKIPPED_SLOTS+=("$real")
+  SPAWN_SKIPPED_INFO+=("$real|${FM_SLOT_SKIP_REASON:-unknown}")
+  if [ "${SPAWN_SKIP_AND_CONTINUE:-1}" = 1 ]; then
+    echo "skipped: copy $real (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner; this spawn wrote nothing to it; taking another copy" >&2
+  fi
+  FM_SLOT_PREPARED=0
+  FM_SLOT_PREPARE_DETACHED=0
+  FM_SLOT_EXPECT_REFS=
   WT=
+}
+# A copy this spawn cannot hand to a worker and cannot prove untouched: lease it where it stands, record it, and refuse the
+# whole spawn (Main 1886 CUT and rule Q). Used when a move began and a later check failed, and for every doubt that is an
+# unknown rather than a known state. Never returns.
+spawn_hold_and_refuse() { # <reason>
+  FM_SLOT_SKIP_REASON=$1
+  SPAWN_SKIP_AND_CONTINUE=0
+  spawn_skip_copy || true
+  spawn_report_leased_copies >&2
+  echo "error: copy held and the spawn refused ($1); nothing more was written to it" >&2
+  exit 1
 }
 spawn_try_skip() { # <rc of the failed slot step>
   [ "$1" = "$FM_SLOT_SKIP_RC" ] && [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] || return 1
@@ -6471,9 +6500,8 @@ spawn_slot_refused() {
   HERDR_PROJECTION_ABORT_CLEANUP=0
   ORCA_ABORT_CLEANUP=0
   SPAWN_SLOT_CLAIMED=0
-  if [ "$SPAWN_SLOT_UNQUIESCED" = 0 ]; then
-    fm_slot_restore_base "$WT" || echo "error: could not restore the slot's original checkout; all branches remain preserved" >&2
-  fi
+  # A refusal does nothing (Main 1886 CUT): the copy stays exactly where the refusal found it, on whatever branch or
+  # commit that is, and the refusal record names it. No checkout, no switch of HEAD, no deletion, no undo.
   if [ "$RELAUNCH" -eq 0 ]; then
     {
       echo "window=$window"
@@ -6600,7 +6628,8 @@ if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
       BRANCH=${BRANCH:-fm/$ID}
       spawn_slot_refused
     fi
-    exit 1
+    # An unknown (could not tell) is never skipped past: the copy is leased where it stands and the spawn is refused.
+    spawn_hold_and_refuse "${FM_SLOT_SKIP_REASON:-unknown}"
   fi
   SPAWN_PROVEN_COPY=$WT
 fi
@@ -6644,12 +6673,11 @@ if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" 
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || {
     rc=$?
     spawn_try_skip "$rc" && continue
-    if [ "$SPAWN_APPLY_FAILED" = 1 ] && [ "$RELAUNCH" -eq 0 ] && [ "$SLOT_GOVERNED" = 0 ]; then
-      # The copy changed (or could not be re-read) during the move: it may hold work, so it is leased where it
-      # stands before this spawn exits, never left for the pane close to return and reset.
-      FM_SLOT_SKIP_REASON=changed_during_move
-      spawn_skip_copy || true
-      spawn_report_leased_copies >&2
+    if [ "$RELAUNCH" -eq 0 ] && [ "$SLOT_GOVERNED" = 0 ]; then
+      # The move began and a check failed, or the doubt is an unknown: the copy is leased where it stands, recorded, and
+      # the spawn is refused. It is never left for the pane close to return and reset (Main 1886 CUT).
+      if [ "$SPAWN_APPLY_FAILED" = 1 ]; then spawn_hold_and_refuse changed_during_move; fi
+      spawn_hold_and_refuse "${FM_SLOT_SKIP_REASON:-unknown}"
     fi
     [ "$SLOT_GOVERNED" = 0 ] || spawn_slot_refused
     exit 1

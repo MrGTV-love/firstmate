@@ -49,10 +49,11 @@
 # provisioner owns repeat/reuse compatibility; dirty scratch, branch/scope changes,
 # foreign active manifests, and create-only refusals stop promotion without a
 # manifest-force path. Governed scouts keep their already-provisioned task branch.
-# A refused promotion deletes a task branch only it created, so a retry is not
-# blocked once the scout advances; it warns and keeps the branch when the
-# project report may declare it or the branch moved, is checked out or the copy
-# is not restored (fm_slot_drop_created_branch in bin/fm-slot-provision-lib.sh).
+# A refused promotion does nothing to the copy: it runs no checkout, switches no
+# HEAD and deletes no branch. The copy stays where the refusal found it, which
+# can be the task branch the provisioning step set, and the refusal says where
+# that is (bin/fm-slot-provision-lib.sh fm_slot_provision). A retry then finds
+# the task branch already checked out.
 # Usage: fm-promote.sh <task-id> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--owned-path <tracked-path>]... [--upstream-consent <host>/<owner>/<repo>]
 # --upstream-consent records the captain's one-off approval for this task to
 # publish to firstmate's own upstream repository; promotion applies the same
@@ -321,7 +322,6 @@ if fm_slot_required "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" || grep -q '^slot_man
   PROMOTE_SLOT_REPORT="$DATA/$ID/slot-provision-promote.${BASHPID:-$$}.json"
   fm_slot_provision fm_slot_run_local "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" "$ID" "$BRANCH" \
     "$PROMOTE_SLOT_REPORT" '' '' "${SLOT_OWNED_PATHS[@]}" || {
-    fm_slot_drop_created_branch "$PROMOTE_WORKTREE" "$BRANCH" "$PROMOTE_SLOT_REPORT" || true
     exit 1
   }
 fi

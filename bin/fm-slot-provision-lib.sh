@@ -17,17 +17,14 @@ FM_SLOT_MANIFEST=
 FM_SLOT_BASE_SHA=
 FM_SLOT_BASE_REF=
 FM_SLOT_PREPARED_HEAD=
-FM_SLOT_PREVIOUS_BRANCH=
-FM_SLOT_PREVIOUS_HEAD=
-# What this code left checked out: its symbolic HEAD (refs/heads/<x> or detached) and its commit. An undo of its own
-# step is allowed only from exactly this (fm_slot_undo_step).
-FM_SLOT_LEFT_HEAD=
-FM_SLOT_LEFT_SYMREF=
-# The one ref change this spawn's own preparation makes before the move: "<anchor ref>=<commit it anchors>". The move
-# admits that exact creation and no other ref change (Main 1823 D-B).
+# There is no undo. A refusal, or any failed check after a move has begun, leaves HEAD, every ref and every file exactly as
+# they are and says so (Main 1886 CUT).
+# The one ref change this spawn's own preparation makes before the move: "<anchor ref>=<commit it anchors>" (absent before,
+# exactly that commit after). The move admits that one creation and no other ref change.
 FM_SLOT_EXPECT_REFS=
-# What a skip says about the copy beyond its reason, when the copy is not exactly as it was found.
-FM_SLOT_SKIP_NOTE=
+# 1 once fm_slot_prepare_base has written anything to the copy (a detach or an anchor ref). From then on the copy is no
+# longer "untouched by this spawn", so a failed move is never a skip (rule Q).
+FM_SLOT_PREPARED=0
 
 fm_slot_required() { # <project> <copy>
   [ -f "$1/scripts/git-stability/provision_existing_slot.py" ] ||
@@ -62,12 +59,11 @@ fm_slot_check_copy() { # <project> <copy>
 }
 
 fm_slot_prepare_base() { # <project> <copy> <task-id>
-  local project=$1 copy=$2 id=$3 branch
+  local project=$1 copy=$2 id=$3 branch head
   FM_SLOT_EXPECT_REFS=
   fm_slot_check_copy "$project" "$copy" || return 1
   branch=$(git -C "$copy" branch --show-current) || return 1
-  FM_SLOT_PREVIOUS_BRANCH=$branch
-  FM_SLOT_PREVIOUS_HEAD=$(git -C "$copy" rev-parse --verify HEAD) || return 1
+  head=$(git -C "$copy" rev-parse --verify HEAD) || return 1
   # The ordinary freshness owner moves HEAD. Detach first so it cannot move a
   # previous task's branch; preserve a detached tip through the existing owner.
   if [ -z "$branch" ]; then
@@ -75,22 +71,13 @@ fm_slot_prepare_base() { # <project> <copy> <task-id>
       echo "error: cannot preserve assigned slot before refreshing its base: $FM_TASK_COPY_REASON" >&2
       return 1
     }
-    [ -z "${FM_TASK_COPY_ANCHOR:-}" ] || FM_SLOT_EXPECT_REFS="$FM_TASK_COPY_ANCHOR=$FM_SLOT_PREVIOUS_HEAD"
+    [ -z "${FM_TASK_COPY_ANCHOR:-}" ] || FM_SLOT_EXPECT_REFS="$FM_TASK_COPY_ANCHOR=$head"
   fi
+  # From here something may have been written (an anchor ref), so the copy is no longer untouched by this spawn.
+  FM_SLOT_PREPARED=1
   # Detaching moves no file: the same commit stays checked out. Hooks stay off for every checkout here.
   git -C "$copy" -c core.hooksPath=/dev/null checkout --quiet --detach || return 1
-  FM_SLOT_LEFT_HEAD=$FM_SLOT_PREVIOUS_HEAD
-  FM_SLOT_LEFT_SYMREF=detached
   if [ -n "$branch" ]; then FM_SLOT_PREPARE_DETACHED=1; else FM_SLOT_PREPARE_DETACHED=0; fi
-}
-
-# Put the copy back where it was found, by ref only. A refusal never writes, overwrites or deletes a file and never runs
-# a checkout that rewrites files (Main 1829). The undo of this code's own step runs only when HEAD, the branch and the
-# commit are exactly what this code left; otherwise the copy stays as found and the reason is reported
-# (fm_slot_undo_step).
-fm_slot_restore_base() { # <copy>
-  [ -n "$FM_SLOT_PREVIOUS_HEAD" ] || return 0
-  fm_slot_undo_step "$1" "${FM_SLOT_LEFT_SYMREF:-detached}" "$FM_SLOT_LEFT_HEAD" "$FM_SLOT_PREVIOUS_BRANCH" "$FM_SLOT_PREVIOUS_HEAD"
 }
 
 fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head>
@@ -111,8 +98,7 @@ fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head
   fm_slot_prepare_base "$project" "$copy" "$id" || return 1
   fm_slot_attach "$copy" "$branch" "$expected" || return $?
   if [ "$(git -C "$copy" rev-parse --verify HEAD)" != "$expected" ]; then
-    fm_slot_restore_base "$copy" || true
-    echo "error: prepared task branch $branch moved during recovery; no worker admitted" >&2
+    echo "error: prepared task branch $branch moved during recovery; no worker admitted; the copy is left exactly where it is ($(fm_slot_where "$copy"))" >&2
     return 1
   fi
 }
@@ -135,8 +121,6 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   FM_SLOT_BASE_SHA=
   FM_SLOT_BASE_REF=
   FM_SLOT_PREPARED_HEAD=
-  FM_SLOT_CREATED=0
-  FM_SLOT_CREATED_FROM=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
   [ -f "$copy/scripts/git-stability/provision_existing_slot.py" ] || {
@@ -174,14 +158,9 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
       git -C "$copy" -c core.hooksPath=/dev/null checkout --quiet "$branch" -- || return 1
     else
       git -C "$copy" -c core.hooksPath=/dev/null checkout --quiet -b "$branch" -- || return 1
-      FM_SLOT_CREATED=1
-      FM_SLOT_CREATED_FROM=$old_branch
     fi
   fi
   FM_SLOT_PREPARED_HEAD=$old_head
-  # What this function leaves checked out: the task branch at the commit it found.
-  FM_SLOT_LEFT_HEAD=$old_head
-  FM_SLOT_LEFT_SYMREF="refs/heads/$branch"
   local args=() path
   [ -z "$local_ref" ] || args+=(--base-source local-default)
   for path in "$@"; do args+=(--owned-path "$path"); done
@@ -223,12 +202,9 @@ PY
   fi
   cat "$report" >&2
   if [ "$rc" -ne 0 ]; then
-    # Undo this function's own branch step by ref only, and only when HEAD, the branch and the commit are exactly what
-    # it left (Main 1829). Otherwise the copy stays as the refusal found it and the line below says where that is.
-    if [ "$old_branch" != "$branch" ]; then
-      fm_slot_undo_step "$copy" "refs/heads/$branch" "$old_head" "$old_branch" "$old_head" || true
-    fi
-    echo "error: slot provisioner refused task $id (exit $rc); no agent or ship transition admitted; the copy is $(fm_slot_where "$copy"); report: $report" >&2
+    # A refusal does nothing (Main 1886 CUT): no checkout, no switch of HEAD, no deletion, no undo. The copy stays exactly
+    # as the refusal found it, which can be the task branch this function set, and the line below says where that is.
+    echo "error: slot provisioner refused task $id (exit $rc); no agent or ship transition admitted; the copy is left exactly where it is ($(fm_slot_where "$copy")); report: $report" >&2
     return "$rc"
   fi
   FM_SLOT_MANIFEST=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["manifest_path"])' "$report") || return 1
@@ -237,90 +213,13 @@ PY
   FM_SLOT_PROVISIONED=1
 }
 
-# A refused promotion has no prepared record, so the task branch its own
-# provisioning call created would otherwise block every retry once the scout
-# advances. Delete only that exact alias, only while the restored checkout
-# still holds its commit and the project's report declares nothing.
-fm_slot_drop_created_branch() { # <copy> <branch> <report>
-  local copy=$1 branch=$2 report=$3 from=$FM_SLOT_CREATED_FROM head=$FM_SLOT_PREPARED_HEAD reason='' worktrees
-  [ "$FM_SLOT_CREATED" = 1 ] || return 0
-  if ! python3 -c 'import json, sys
-report = json.load(open(sys.argv[1], encoding="utf-8"))
-sys.exit(0 if isinstance(report, dict) and report.get("state") != "PASS" and "manifest_path" not in report else 1)' "$report" 2>/dev/null; then
-    reason='the project report may declare it'
-  elif ! worktrees=$(git -C "$copy" worktree list --porcelain); then
-    reason='its worktrees cannot be listed'
-  elif [ -n "$from" ] && { [ "$(git -C "$copy" symbolic-ref -q HEAD)" != "refs/heads/$from" ] ||
-    [ "$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$from^{commit}")" != "$head" ]; }; then
-    reason="the copy is not back on $from at $head"
-  elif [ -z "$from" ] && { git -C "$copy" symbolic-ref -q HEAD >/dev/null ||
-    [ "$(git -C "$copy" rev-parse --verify --quiet HEAD)" != "$head" ]; }; then
-    reason="the copy is not back to a detached $head"
-  elif git -C "$copy" symbolic-ref -q "refs/heads/$branch" >/dev/null; then
-    reason="$branch is now a symbolic ref"
-  elif printf '%s\n' "$worktrees" | grep -Fqx "branch refs/heads/$branch"; then
-    reason="$branch is checked out in a worktree"
-  elif ! git -C "$copy" update-ref --no-deref -d "refs/heads/$branch" "$head"; then
-    reason="$branch moved from $head"
-  fi
-  [ -z "$reason" ] || {
-    echo "warning: preserving task branch $branch created by this refused promotion: $reason" >&2
-    return 1
-  }
-}
-
-# Where a copy is, read-only: its branch (or detached) and its commit.
+# Where a copy is, read-only: its branch, "detached" (git says so: exit 1), or "unknown" (any other failure), and its commit.
 fm_slot_where() { # <copy>
-  local ref sha
-  ref=$(git -C "$1" symbolic-ref -q HEAD 2>/dev/null) || ref=detached
+  local ref sha rc=0
+  ref=$(git -C "$1" symbolic-ref -q HEAD 2>/dev/null) || rc=$?
+  case "$rc" in 0) ;; 1) ref=detached ;; *) ref=unknown ;; esac
   sha=$(git -C "$1" rev-parse --verify --quiet HEAD 2>/dev/null) || sha=unreadable
   printf '%s at %s' "$ref" "$sha"
-}
-
-# fm_slot_undo_step <slot> <left-symref> <left-sha> <back-branch-or-empty> <back-sha>: put the symbolic HEAD back where
-# it was before this code's own step, by ref only (symbolic-ref, or update-ref --no-deref HEAD to detach): no checkout,
-# no file written, nothing deleted. Positive proof is read here, just before the undo, and every part must hold:
-#   - HEAD is still the symbolic ref this code left (<left-symref>), not one another actor set;
-#   - HEAD is the commit this code left, or (for a task branch) the tip of that branch, so no commit is orphaned: the
-#     branch keeps it. A detached HEAD must be exactly the commit this code left;
-#   - the tree of HEAD equals the tree of the commit it returns to (<back-sha>), so no file would change;
-#   - the branch it returns to still holds <back-sha>.
-# Anything else changes nothing and says why (the copy is left as found). Main 1829, 1842.
-fm_slot_undo_step() {
-  local slot=$1 left_ref=$2 left_sha=$3 back_branch=$4 back_sha=$5 ref head tip head_tree back_tree
-  ref=$(git -C "$slot" symbolic-ref -q HEAD 2>/dev/null) || ref=detached
-  head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || head=
-  if [ "$ref" != "$left_ref" ] || [ -z "$head" ]; then
-    echo "error: '$slot' is $ref at ${head:-unreadable}, not $left_ref as this code left it; nothing is switched and the copy is left as found" >&2
-    return 1
-  fi
-  if [ "$head" != "$left_sha" ]; then
-    tip=
-    case "$ref" in refs/heads/*) tip=$(git -C "$slot" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || tip= ;; esac
-    if [ -z "$tip" ] || [ "$tip" != "$head" ]; then
-      echo "error: '$slot' is $ref at $head, not at $left_sha as this code left it; nothing is switched and the copy is left as found" >&2
-      return 1
-    fi
-  fi
-  head_tree=$(git -C "$slot" rev-parse --verify --quiet "$head^{tree}" 2>/dev/null) || head_tree=
-  back_tree=$(git -C "$slot" rev-parse --verify --quiet "$back_sha^{tree}" 2>/dev/null) || back_tree=
-  if [ -z "$head_tree" ] || [ "$head_tree" != "$back_tree" ]; then
-    echo "error: '$slot' is $ref at $head; undoing this code's step would change files (the tree there differs from the tree of $back_sha), so nothing is switched and the copy is left as found" >&2
-    return 1
-  fi
-  if [ -n "$back_branch" ]; then
-    tip=$(git -C "$slot" rev-parse --verify --quiet "refs/heads/$back_branch^{commit}" 2>/dev/null) || tip=
-    [ "$tip" = "$back_sha" ] || {
-      echo "error: branch $back_branch is at '${tip:-nothing}', not the $back_sha it held when this spawn found the copy; nothing is switched and the copy is left as found" >&2
-      return 1
-    }
-    git -C "$slot" -c core.hooksPath=/dev/null symbolic-ref HEAD "refs/heads/$back_branch" || return 1
-    FM_SLOT_LEFT_SYMREF="refs/heads/$back_branch"
-  else
-    git -C "$slot" -c core.hooksPath=/dev/null update-ref --no-deref HEAD "$back_sha" || return 1
-    FM_SLOT_LEFT_SYMREF=detached
-  fi
-  FM_SLOT_LEFT_HEAD=$back_sha
 }
 
 fm_slot_contract() { # <branch>
@@ -354,6 +253,8 @@ EOF
 # (assume-unchanged, skip-worktree) on a tracked file or inside any initialized submodule, however deep.
 # Every unreadable input is a doubt, and a doubt skips the copy (return FM_SLOT_SKIP_RC).
 FM_SLOT_SKIP_RC=20
+# Returned for a doubt that is an UNKNOWN (could not tell): the whole spawn is refused, nothing is skipped past (rule Q).
+FM_SLOT_REFUSE_RC=21
 FM_SLOT_SKIP_REASON=
 FM_SLOT_PROOF_SNAPSHOT=
 FM_SLOT_PROOF_DIR=
@@ -362,13 +263,24 @@ FM_SLOT_PREPARE_DETACHED=0
 fm_slot_skip() { # <slot> <reason-code> <detail>
   FM_SLOT_SKIP_REASON=$2
   echo "skip: pooled copy '$1' was not moved ($2): $3" >&2
-  return "$FM_SLOT_SKIP_RC"
+  if fm_slot_skip_is_known "$2"; then return "$FM_SLOT_SKIP_RC"; fi
+  return "$FM_SLOT_REFUSE_RC"
+}
+
+# Rule Q: a copy may be skipped, and another taken, only when the doubt is a KNOWN state a read-only proof established
+# (the tree is dirty, a holder is there, an ignored file is in the way, HEAD is not an ancestor, a stale submodule). Any
+# reason that means "could not tell" refuses the whole spawn instead: it is never "no holder" and never "clean".
+fm_slot_skip_is_known() { # <reason-code>
+  case "$1" in
+    dirty_tree|live_holder|ignored_collision|not_fast_forward|head_not_target|stale_submodule) return 0 ;;
+  esac
+  return 1
 }
 
 # One embedded program with five read-only modes. It runs git and lsof through PATH, so a failing
 # tool fails closed (exit 3, the reason on stderr).
 FM_SLOT_PROBE_PY=$(cat <<'FMPROBEPY'
-import datetime, hashlib, json, os, subprocess, sys, time, unicodedata
+import datetime, hashlib, json, os, stat as stat_mod, subprocess, sys, time, unicodedata
 
 def fail(text):
     sys.stderr.write(text + "\n")
@@ -394,9 +306,10 @@ def head_and_refs(slot):
     sym = git(slot, "symbolic-ref", "-q", "HEAD", allow=(0, 1))
     symref = sym.stdout.decode().strip() if sym.returncode == 0 else "detached"
     refs = {}
-    for line in git(slot, "for-each-ref", "--format=%(refname) %(objectname)").stdout.decode("utf-8", "replace").splitlines():
-        name, _, sha = line.rpartition(" ")
-        refs[name] = sha
+    # A symbolic ref is recorded with its target name, so a retarget between two refs at the same commit is a difference.
+    for line in git(slot, "for-each-ref", "--format=%(refname)%09%(objectname)%09%(symref)").stdout.decode("utf-8", "replace").splitlines():
+        name, sha, target = (line.split("\t") + ["", ""])[:3]
+        refs[name] = sha + (" -> " + target if target else "")
     return head, symref, refs
 
 def blob_of(slot, rel):
@@ -411,6 +324,13 @@ def blob_of(slot, rel):
     if proc.returncode != 0:
         fail("hash-object %r exit %d" % (rel, proc.returncode))
     return proc.stdout.decode().strip()
+
+def worktree_mode(path):
+    """The mode git would record for the worktree file: 120000 a symlink, 100755 an executable, 100644 otherwise."""
+    st = os.lstat(path)
+    if stat_mod.S_ISLNK(st.st_mode):
+        return "120000"
+    return "100755" if st.st_mode & 0o100 else "100644"
 
 def hidden_changes(slot):
     """Tracked files that status cannot report (assume-unchanged, skip-worktree) but whose bytes differ from the index."""
@@ -443,6 +363,8 @@ def hidden_changes(slot):
             continue
         if blob_of(slot, rel) != sha:
             out.append(" M %s (hidden by an index flag)" % rel)
+        elif worktree_mode(path) != mode:
+            out.append(" M %s (hidden by an index flag: mode)" % rel)
     return out
 
 def nested_flags(slot, prefix=""):
@@ -465,7 +387,24 @@ def nested_flags(slot, prefix=""):
         found += nested_flags(sub, prefix + rel + "/")
     return found
 
-def submodule_pin_only(slot, entry):
+def submodule_heads(slot, prefix=""):
+    """The HEAD of every initialized submodule, however deep, keyed by its path from the copy's root."""
+    heads = {}
+    for raw in git(slot, "ls-files", "-s", "-z").stdout.split(b"\0"):
+        if not raw:
+            continue
+        meta, _, path = raw.partition(b"\t")
+        if meta.split(b" ")[0] != b"160000":
+            continue
+        rel = enc(path)
+        sub = os.path.join(slot, rel)
+        if not os.path.lexists(os.path.join(sub, ".git")):
+            continue
+        heads[prefix + rel] = git(sub, "rev-parse", "--verify", "HEAD").stdout.decode().strip()
+        heads.update(submodule_heads(sub, prefix + rel + "/"))
+    return heads
+
+def submodule_pin_only(slot, entry, before_heads):
     """A ' M <path>' entry for a gitlink whose own worktree is clean: only the pin differs (a move that changes a pin)."""
     if not entry.startswith(" M "):
         return False
@@ -473,17 +412,24 @@ def submodule_pin_only(slot, entry):
     stage = git(slot, "ls-files", "-s", "--", path).stdout.decode()
     if not stage.startswith("160000"):
         return False
+    # Only the pin changed when the submodule's own HEAD is still the commit it had when the copy was proven. A commit made
+    # in it since then is a change, not the expected pin.
+    now = git(os.path.join(slot, path), "rev-parse", "--verify", "HEAD").stdout.decode().strip()
+    if before_heads.get(path) != now:
+        return False
     inner = subprocess.run(["git", "-C", os.path.join(slot, path), "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"],
                            capture_output=True, stdin=subprocess.DEVNULL, env=dict(os.environ, GIT_OPTIONAL_LOCKS="0"))
     if inner.returncode != 0:
         fail("submodule %r status exit %d" % (path, inner.returncode))
     return not inner.stdout.strip(b"\0 \n")
 
-def snapshot(slot, out, after_move="0"):
+def snapshot(slot, out, after_move="0", before=""):
     head, symref, refs = head_and_refs(slot)
     status = [enc(e) for e in git(slot, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none").stdout.split(b"\0") if e]
+    heads = submodule_heads(slot)
     if after_move == "1":
-        status = [e for e in status if not submodule_pin_only(slot, e)]
+        before_heads = load(before).get("subheads", {})
+        status = [e for e in status if not submodule_pin_only(slot, e, before_heads)]
     status += hidden_changes(slot)
     status += nested_flags(slot)
     ignored = {}
@@ -512,14 +458,7 @@ def snapshot(slot, out, after_move="0"):
     # ref change can look like ours is the move itself.
     head, symref, refs = head_and_refs(slot)
     with open(out, "w", encoding="utf-8") as handle:
-        json.dump({"head": head, "symref": symref, "refs": refs, "status": status, "ignored": ignored}, handle, sort_keys=True)
-
-def refresh(slot, path):
-    """Re-read HEAD, the branch and every ref into an existing snapshot (the last read before the move)."""
-    data = json.load(open(path, encoding="utf-8"))
-    data["head"], data["symref"], data["refs"] = head_and_refs(slot)
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(data, handle, sort_keys=True)
+        json.dump({"head": head, "symref": symref, "refs": refs, "status": status, "ignored": ignored, "subheads": heads}, handle, sort_keys=True)
 
 def load(path):
     with open(path, encoding="utf-8") as handle:
@@ -530,7 +469,7 @@ def load(path):
 # and every ignored entry is exactly as it was.
 def compare(before, after, mode, target, attached, detached="", expect=""):
     a, b, diffs = load(before), load(after), []
-    # expect: "<ref>=<sha>" entries, the exact refs this operation's own preparation creates (absent -> <sha>).
+    # expect: "<ref>=<sha>" entries, the exact refs this operation's own preparation creates: absent before, exactly <sha> after.
     made = dict(e.split("=", 1) for e in expect.split() if "=" in e)
     if detached == "1":
         a["symref"] = "detached"
@@ -540,7 +479,12 @@ def compare(before, after, mode, target, attached, detached="", expect=""):
     if mode != "same" and attached:
         want[attached] = target
     for ref, sha in made.items():
-        if ref not in want and b["refs"].get(ref) == sha:
+        if ref in a["refs"]:
+            # Already there before the proof: it must be exactly as it was (the general comparison covers it).
+            continue
+        if b["refs"].get(ref) != sha:
+            diffs.append("the expected anchor %s was not created at %s (it is %s)" % (ref, sha, b["refs"].get(ref, "missing")))
+        else:
             want[ref] = sha
     if mode == "same":
         for key in ("head", "symref", "status", "ignored"):
@@ -682,6 +626,8 @@ def holders(slot, real, spawn, common, governed, pane):
     inside = (slot.rstrip("/"), real.rstrip("/"))
     for pid, row in sorted(rows.items()):
         cwd = row["cwd"]
+        if cwd == "":
+            cwd = None  # an empty working directory names nowhere: unknown, never "outside the slot"
         if pid == me:
             continue
         if cwd is not None and not any(cwd == base or cwd.startswith(base + "/") for base in inside):
@@ -690,7 +636,7 @@ def holders(slot, real, spawn, common, governed, pane):
         if cwd is not None and is_own(pid, pane, began):
             continue
         if cwd is None:
-            print("H\ta live process (pid %d, %s) has no readable working directory in the lsof listing" % (pid, row["cmd"]))
+            print("U\ta live process (pid %d, %s) has no readable working directory in the lsof listing" % (pid, row["cmd"]))
         else:
             print("H\ta live process (pid %d, %s) has its working directory in the slot" % (pid, row["cmd"]))
         return
@@ -769,14 +715,16 @@ def holders(slot, real, spawn, common, governed, pane):
 mode, args = sys.argv[1], sys.argv[2:]
 if mode == "snapshot":
     snapshot(*args)
-elif mode == "refresh":
-    refresh(*args)
 elif mode == "compare":
     compare(*args)
 elif mode == "collide":
     collide(*args)
 elif mode == "holders":
     holders(*args)
+elif mode == "hidden":
+    # Tracked work hidden by an index flag, at the top level and inside every initialized submodule. One entry per line.
+    found = hidden_changes(args[0]) + nested_flags(args[0])
+    print("\n".join(found))
 elif mode == "field":
     value = load(args[0])[args[1]]
     print(value if isinstance(value, str) else "\n".join(value))
@@ -786,7 +734,19 @@ FMPROBEPY
 fm_slot_probe() { python3 -I -c "$FM_SLOT_PROBE_PY" "$@"; }
 
 # fm_slot_snapshot <slot> <out-file>: fails (nonzero) when any read fails.
-fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" "${3:-0}" 2>&1; }
+fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" "${3:-0}" "${4:-}" 2>&1; }
+
+# fm_slot_hidden_work <slot>: prints tracked work hidden by an index flag (assume-unchanged, skip-worktree), by blob or by
+# mode, at the top level and inside every initialized submodule. Returns nonzero when it cannot tell. The same function
+# the proof uses; bin/fm-teardown.sh calls it before it releases a skipped copy (Main 1886 N1).
+fm_slot_hidden_work() { fm_slot_probe hidden "$1" 2>&1; }
+
+# fm_slot_pool_rows_valid <json>: a pool listing is trusted only when it is an array and EVERY row is an object with a path
+# that is a nonempty absolute string with no NUL. One row that fails means the holder of any copy is unknown (Main 1886 N7).
+fm_slot_pool_rows_valid() {
+  jq -e 'type == "array" and all(.[]; type == "object" and ((.path // null | type) == "string") and (.path | length > 0)
+    and (.path | startswith("/")) and ((.path | contains(" ")) | not))' <<<"$1" >/dev/null 2>&1
+}
 
 # The one holder rule. A process with its working directory in the slot, or an lsof row that names a
 # process and no working directory, is a holder unless it runs under this spawn's own pane
@@ -805,6 +765,7 @@ fm_slot_holders_or_skip() { # <slot> [<project>]
   }
   case "$out" in
     H$'\t'*) fm_slot_skip "$slot" live_holder "${out#H$'\t'}"; return ;;
+    U$'\t'*) fm_slot_skip "$slot" unknown_holders "${out#U$'\t'}"; return ;;
   esac
   locked=$(git -C "$slot" worktree list --porcelain 2>/dev/null) || { fm_slot_skip "$slot" unknown_holders "git worktree list failed"; return; }
   path=
@@ -829,6 +790,9 @@ fm_slot_proof_drop() {
 # (an origin-less copy): only the clean tree and the holder rule apply.
 fm_slot_prove_idle() {
   local slot=$1 target=$2 project=${3:-} no_ancestry=${4:-} snap out head status settings tracked colliding reason=unknown_git_read
+  # A new proof starts a new copy: nothing has been written to it by this spawn yet.
+  FM_SLOT_PREPARED=0
+  FM_SLOT_PREPARE_DETACHED=0
   fm_slot_proof_drop
   [ -d "$slot" ] || { fm_slot_skip "$slot" unknown_git_read "the slot directory cannot be read"; return; }
   if [ -n "$target" ] && ! git -C "$slot" rev-parse --verify --quiet "$target^{commit}" >/dev/null 2>&1; then
@@ -847,8 +811,11 @@ fm_slot_prove_idle() {
   status=$(fm_slot_probe field "$snap" status 2>&1) || { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_git_read "the snapshot cannot be read back"; return; }
   if [ -n "$status" ]; then
     out="it is not clean, it holds uncommitted work ($(printf '%s' "$status" | sed -n '1,3p' | tr '\n' ';'))"
+    reason=dirty_tree
+    # A flag that hides a tracked edit from status is doubt, not a known state: it refuses the spawn (rule Q).
+    case "$status" in *'hidden by an index flag'*) reason=index_flag ;; esac
     fm_slot_proof_drop
-    fm_slot_skip "$slot" dirty_tree "$out"
+    fm_slot_skip "$slot" "$reason" "$out"
     return
   fi
   fm_slot_holders_or_skip "$slot" "$project" || { out=$?; fm_slot_proof_drop; return "$out"; }
@@ -887,23 +854,21 @@ fm_slot_prove_idle() {
       fi
     fi
   fi
-  fm_slot_probe refresh "$slot" "$snap" >/dev/null 2>&1 ||
-    { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_git_read "HEAD and the refs cannot be read once more before the move"; return; }
   FM_SLOT_PROOF_SNAPSHOT=$snap
 }
 
-# fm_slot_apply_move <slot> <target-sha>: move a copy the proof passed. 0 moved (or already there),
-# FM_SLOT_SKIP_RC git refused and a second snapshot shows the copy exactly as it was but for the detach this spawn's own
-# preparation made (which is put back by ref when the proof allows, and otherwise named in the report), 1 anything else
-# (the copy is kept as it now is; nothing is claimed about it). No file is written after the move was refused (Main 1829).
+# fm_slot_apply_move <slot> <target-sha>: move a copy the proof passed. 0 moved (or already there);
+# FM_SLOT_SKIP_RC git refused, nothing had been written to the copy by this spawn, and a second read shows it unchanged;
+# 1 anything else: the copy is left exactly as it is (HEAD, refs and files), no undo runs, and the caller holds the copy and
+# refuses the spawn (Main 1886 CUT, rule Q). The comparison starts at the FIRST snapshot (the proof's), never a later one.
 fm_slot_apply_move() {
-  local slot=$1 target=$2 snap=$FM_SLOT_PROOF_SNAPSHOT after head attached mode out merge_out detached_flag expect=$FM_SLOT_EXPECT_REFS rc=0 note=
+  local slot=$1 target=$2 snap=$FM_SLOT_PROOF_SNAPSHOT after head attached mode out merge_out detached_flag expect=$FM_SLOT_EXPECT_REFS rc=0 prepared=$FM_SLOT_PREPARED note
   FM_SLOT_EXPECT_REFS=
-  FM_SLOT_SKIP_NOTE=
   [ -n "$snap" ] && [ -f "$snap" ] || { echo "error: pooled copy '$slot' was not proven idle before the move" >&2; return 1; }
   after="$FM_SLOT_PROOF_DIR/after.json"
   head=$(fm_slot_probe field "$snap" head 2>/dev/null) || head=
-  attached=$(fm_slot_probe field "$snap" symref 2>/dev/null) || attached=detached
+  attached=$(fm_slot_probe field "$snap" symref 2>/dev/null) || attached=
+  [ -n "$attached" ] || { fm_slot_proof_drop; echo "error: pooled copy '$slot' has no readable symbolic HEAD in its proof; it is left exactly as it is and no worker is admitted" >&2; return 1; }
   # A copy this spawn detached while preparing it (fm_slot_prepare_base) moves as a detached HEAD.
   [ "$attached" != detached ] && [ "$FM_SLOT_PREPARE_DETACHED" != 1 ] || attached=''
   detached_flag=$FM_SLOT_PREPARE_DETACHED
@@ -914,9 +879,9 @@ fm_slot_apply_move() {
       mode=moved
     fi
   fi
-  if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo 1 || echo 0)"); then
+  if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo 1 || echo 0)" "$snap"); then
     fm_slot_proof_drop
-    echo "error: pooled copy '$slot' could not be read after the move ($(printf '%s' "$out" | sed -n '1p')); its state is unknown, so it is kept as it is and no worker is admitted" >&2
+    echo "error: pooled copy '$slot' could not be read after the move ($(printf '%s' "$out" | sed -n '1p')); its state is unknown, so it is left exactly as it is and no worker is admitted" >&2
     return 1
   fi
   case "$mode" in
@@ -925,26 +890,20 @@ fm_slot_apply_move() {
   esac
   fm_slot_proof_drop
   if [ "$rc" != 0 ]; then
-    echo "error: pooled copy '$slot' differs from the proven state beyond the expected move ($out); it is kept as it is and no worker is admitted" >&2
+    echo "error: pooled copy '$slot' differs from the proven state beyond the expected move ($out); it is left exactly as it is and no worker is admitted" >&2
     return 1
   fi
-  case "$mode" in
-    refused)
-      if [ "$detached_flag" = 1 ] && [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
-        # The preparation detached this copy; git refused the move, so the commit is where it was left. The undo is by
-        # ref only and runs only on proof; the output states which way it went.
-        if note=$(fm_slot_undo_step "$slot" detached "$FM_SLOT_PREVIOUS_HEAD" "$FM_SLOT_PREVIOUS_BRANCH" "$FM_SLOT_PREVIOUS_HEAD" 2>&1); then
-          FM_SLOT_PREPARE_DETACHED=0
-          note=
-        else
-          note="this spawn's preparation had detached the copy from branch $FM_SLOT_PREVIOUS_BRANCH (still at $FM_SLOT_PREVIOUS_HEAD) and the copy stays detached"
-        fi
-      fi
-      FM_SLOT_SKIP_NOTE=$note
-      fm_slot_skip "$slot" not_fast_forward "git refused the move to $target and a second read shows no other change${note:+; $note}"
-      return ;;
-    moved) FM_SLOT_LEFT_HEAD=$target; FM_SLOT_LEFT_SYMREF=${attached:-detached} ;;
-  esac
+  if [ "$mode" = refused ]; then
+    if [ "$prepared" = 1 ]; then
+      note=
+      [ -z "$expect" ] || note="the anchor ${expect%%=*} was created; "
+      [ "$detached_flag" != 1 ] || note="${note}this spawn's preparation detached the copy from its branch; "
+      echo "error: git refused the move of pooled copy '$slot' to $target after this spawn had prepared it (${note}it is $(fm_slot_where "$slot")); nothing is switched back, the copy is left exactly as it is, and no worker is admitted" >&2
+      return 1
+    fi
+    fm_slot_skip "$slot" not_fast_forward "git refused the move to $target and a second read shows no change ($(printf '%s' "$merge_out" | sed -n '1p'))"
+    return
+  fi
   return 0
 }
 
