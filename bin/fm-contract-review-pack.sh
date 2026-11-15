@@ -6,6 +6,16 @@
 # CONTRACT_SUBSECTIONS and QUALIFIER_WORDS below) and is the only code path in this
 # repository that assembles contract-review reviewer input.
 #
+# Harm model: a reviewer influenced by the author's analysis, prior findings or responses,
+# or a round counted clean although the reviewer read something it should not. The builder
+# admits only allow-listed contract sections and refuses what it cannot place; the check
+# passes a read only with positive proof from the run's session transcript. The guard
+# admits a known name with any qualifier, and the skill template's Definition Of Done names,
+# because real contracts use them (their text was already admitted under a known section).
+# Known limits: author text inside a request, a context file or a known section reaches the
+# reviewer; shell, eval, other tools and unrecorded subagents leave a round unverified; a
+# read that leaves no record cannot be seen.
+#
 # usage:
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
 #       [--context <file>]... --root <repo-root> [--exclude <path>]...
