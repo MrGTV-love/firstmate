@@ -1786,6 +1786,63 @@ for label, records in (('tail', base), ('two-level-tail', base + [dict(pid=1400,
     return case
 
 
+def case_mixed_version_records():
+    """U6 (Main 1927), fact level: an older participant's holder record next to a new one in one pool is counted, never dropped.
+
+    In process, no child: the older participant is simulated by holding a slot's flock and writing the record line in the
+    format of the base revision's acquire (9d516486d: "pid=%d passes=%d since=%d label=%s"); the new code then takes a pass
+    with its own acquire and reads the pool with its own probe_slots and status. It proves counting only: an older
+    participant does not know the token reservation (rule 6) and cannot lease from it, which this case does not test."""
+    import contextlib, fcntl, importlib.util, io, types
+    case = Case('U6 mixed-version records', 'an old-format holder record and a new holder share a pool of 2: the new code counts both, drops neither while held, and frees the old one only when its lock ends')
+    spec = importlib.util.spec_from_file_location('fm_cpu_pass_u6', tool('fm-cpu-pass.py'))
+    pool_mod = importlib.util.module_from_spec(spec)
+    sys.dont_write_bytecode = True
+    spec.loader.exec_module(pool_mod)
+    directory = str(root / 'mixed-version-pool')
+    pool_mod.ensure_pool_dir(directory)
+    old_format = 'pid=%d passes=%d since=%d label=%s\n'  # the base revision's record line, byte for byte
+    old_fd = os.open(pool_mod.slot_path(directory, 0), os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(old_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    os.ftruncate(old_fd, 0)
+    os.pwrite(old_fd, (old_format % (os.getpid(), 1, int(time.time()), 'old-code holder')).encode(), 0)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    new_fds = []
+    try:
+        new_fds = pool_mod.acquire(directory, 2, 1, 'new-code holder', devnull)
+        slots = pool_mod.probe_slots(directory, 2)
+        saved = (os.environ.get('FM_CPU_POOL_DIR'), pool_mod.pool_size)
+        os.environ['FM_CPU_POOL_DIR'] = directory
+        pool_mod.pool_size = lambda: 2
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            pool_mod.cmd_status(types.SimpleNamespace(json=True))
+        status = json.loads(out.getvalue())
+        os.close(old_fd)
+        old_fd = None
+        after = pool_mod.probe_slots(directory, 2)
+    finally:
+        if old_fd is not None:
+            os.close(old_fd)
+        pool_mod.release_fds(new_fds)
+        os.close(devnull)
+        if 'saved' in locals():
+            if saved[0] is None:
+                os.environ.pop('FM_CPU_POOL_DIR', None)
+            else:
+                os.environ['FM_CPU_POOL_DIR'] = saved[0]
+            pool_mod.pool_size = saved[1]
+    labels = sorted(holder['holder'].split('label=', 1)[-1] for holder in status['holders'])
+    case.measure(new_passes_taken=len(new_fds), status_held=status['held'], status_free=status['free'], holder_labels=labels,
+                 held_after_old_ends=[index for index, held, _ in after if held])
+    case.check(len(new_fds) == 1, 'the new code did not take the one free pass next to the old holder: %d' % len(new_fds))
+    case.check([held for _, held, _ in slots] == [True, True], 'probe_slots must count the old holder and the new one: %s' % slots)
+    case.check(status['held'] == 2 and status['free'] == 0, 'status must count both holders: %s' % status)
+    case.check(labels == ['new-code holder', 'old-code holder'], 'status must name both holders: %s' % labels)
+    case.check([index for index, held, _ in after if held] == [1], 'the old holder is freed only when its lock ends, and the new one stays: %s' % after)
+    return case
+
+
 def case_multiholder_cycle():
     """A-4 (Main 1750 item 5): with two slots per key, four gate chains A1, A2 -> B and B1, B2 -> A are one proven cycle and drain, with exactly one copy admitted beside the limit; one A holder running free is no cycle, and everything waits for it."""
     case = Case('A-4 multi-holder cycle', 'FM_TEST_KEY_SLOTS=2: gates A1, A2 each (exec) gate mid -> gate B while B1, B2 each (exec) gate mid -> gate A: all four finish and one waiter is admitted; control: A2 runs free, nobody is admitted until it ends')
@@ -1891,7 +1948,7 @@ def case_proof_contention():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_missing_helper_counts, case_proof_contention, case_proof_own_interval, case_async_cycle, case_gate_chain_cycle, case_multiholder_cycle, case_cycle_tail, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_missing_helper_counts, case_proof_contention, case_proof_own_interval, case_async_cycle, case_gate_chain_cycle, case_multiholder_cycle, case_cycle_tail, case_mixed_version_records, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():
