@@ -4093,17 +4093,11 @@ test_xlane_validators_reject_what_their_contracts_reject() {
 
 test_xlane_merge_by_another_lane_reaches_safe_closeout() {
   local variant
-  for variant in unregistered poll-never-published branch-pruned; do
+  local rows
+  for variant in unregistered poll-never-published; do
     make_xlane_world
     xl_merge_in_lane_m
     xl_write_done_note
-    if [ "$variant" = branch-pruned ]; then
-      # The usual squash merge: the forge deletes the PR branch, and a later fetch
-      # prunes its remote-tracking ref, so no remote ref holds the copy's HEAD.
-      git -C "$ORIGIN" branch -q -D fm/t1
-      git -C "$W/project" fetch -q --prune origin
-      [ -z "$(git -C "$COPY" for-each-ref --contains HEAD refs/remotes)" ] || fail "the pruned fixture still has a remote ref holding the copy's HEAD"
-    fi
     if [ "$variant" = poll-never-published ]; then
       # The registrar committed pr= and was interrupted before it published the poll.
       printf 'pr=%s\npr_head=%s\n' "$XL_PR" "$XL_HEAD" >> "$STATE/t1.meta"
@@ -4129,7 +4123,35 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
     [ ! -e "$XL_MC/state/t1.meta" ] || fail "$variant: lane M holds a record for t1"
     cleanup_workers
   done
-  pass "a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up"
+  # The usual squash merge: the forge deletes the PR branch and a later fetch prunes
+  # its ref, so the copy's HEAD is held only in the copy. Exact forge/copy HEAD
+  # equality no longer stands in for the named-head gate (Main 1688 Q1), so the
+  # registrar refuses to record the PR. The finished task still has its owner and a
+  # concrete next action: its content landed, so the ledger's cleanup row names plain
+  # teardown, and that teardown succeeds.
+  make_xlane_world
+  xl_merge_in_lane_m
+  xl_write_done_note
+  git -C "$ORIGIN" branch -q -D fm/t1
+  git -C "$W/project" fetch -q --prune origin
+  [ -z "$(git -C "$COPY" for-each-ref --contains HEAD refs/remotes)" ] || fail "the pruned fixture still has a remote ref holding the copy's HEAD"
+  XL_BOUND=20 xl_supervise_until false || true
+  xl_print_state "branch-pruned after supervision"
+  [ -e "$STATE/t1.meta" ] || fail "branch-pruned: the record closed although no remote ref holds the copy's HEAD"
+  ! grep -q '^pr=' "$STATE/t1.meta" || fail "branch-pruned: the registrar recorded a PR whose head is held only in the copy"
+  rows=$(xl_t1_rows)
+  printf '%s\n' "$rows" | grep -q '^pending_cleanup | home:firstmate | false | run plain bin/fm-teardown.sh t1' \
+    || fail "branch-pruned: the landed, unregistered task has no owned cleanup row naming plain teardown: $rows"
+  xl_plain_teardown "$W/pruned-teardown.err" || fail "branch-pruned: the plain teardown the row names refused: $(cat "$W/pruned-teardown.err")"
+  # Plain teardown closes the record and returns the pool slot to treehouse (whose stand-in keeps the directory).
+  [ ! -e "$STATE/t1.meta" ] || fail "branch-pruned: plain teardown left the record"
+  xl_has_event task.cleaned_up || fail "branch-pruned: O's ledger lacks task.cleaned_up for t1: $(xl_ledger_events)"
+  grep -q "^return .*$COPY" "$W/th.log" || fail "branch-pruned: plain teardown did not return the slot: $(cat "$W/th.log")"
+  assert_closed_by_plain_teardown "xlane branch-pruned" t1
+  [ "$XL_M_AFTER_MERGE" = "$(xl_digest_dir "$XL_MC/state" task-x1)" ] \
+    || fail "branch-pruned: O changed lane M's records beyond its own task: $(cd "$XL_MC/state" && ls -A)"
+  cleanup_workers
+  pass "a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up; with the PR branch pruned the copy-only head is not registered, and the owned cleanup row's plain teardown closes it"
 }
 
 
