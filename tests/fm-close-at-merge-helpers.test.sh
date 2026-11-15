@@ -76,6 +76,33 @@ test_f3_the_store_verdict_keeps_an_unfinished_item_under_the_id() {
   [ "$out" = 'clear' ] && ok "f3 control: an id absent from the active backlog clears" || not_ok "f3 control: an absent id gave: $out"
 }
 
+# Main 1853: the wrapper feeds fm_backlog_row_states (the reader of `tasks-axi list`, the store
+# tasks-axi writes) into the verdict. The list runner is replaced by a function that prints a
+# fixed list in the TOON form the reader parses, so nothing is started; the real reader parses it.
+# A quoted id is read as its id; a list whose count does not match fails, which the wrapper treats
+# as an unread backlog.
+test_f3_the_store_reader_feeds_the_verdict() {
+  local list=$TMP/list.toon bad=$TMP/bad.toon out
+  printf '%s\n' 'count: 3' 'tasks[3]{id,state,kind,repo,title,blocked_by,hold_kind,hold_reason}:' \
+    '  pf-done,done,docs,,Done item,,,' '  "pf-open",queued,docs,,Open item,,,' '  other,in_flight,ship,,Other,,,' > "$list"
+  printf '%s\n' 'count: 4' 'tasks[3]{id,state,kind,repo,title,blocked_by,hold_kind,hold_reason}:' '  pf-done,done,docs,,Done item,,,' > "$bad"
+  out=$(bash -c '. "$1/fm-backlog-transition-lib.sh"; . "$1/fm-tasks-axi-lib.sh"
+    fm_backlog_data_absolute() { printf "%s\n" "$1"; }
+    fm_backlog_tasks_axi_addressing() { FM_BACKLOG_AXI_ROOT=/; FM_BACKLOG_AXI_FILE=; }
+    fm_posix_python() { :; }
+    fm_run_progress() { cat "$LIST"; }
+    LIST=$2
+    for id in pf-done pf-open pf-absent; do
+      states=$(fm_backlog_row_states /) || { echo "$id unread"; continue; }
+      printf "%s %s\n" "$id" "$(printf "%s\n" "$states" | fm_typed_completion_store_verdict "$id")"
+    done
+    LIST=$3
+    if fm_backlog_row_states / >/dev/null; then echo "bad read"; else echo "bad unread"; fi' _ "$ROOT/bin" "$list" "$bad" 2>&1)
+  [ "$out" = "$(printf '%s\n' 'pf-done clear' 'pf-open keep queued' 'pf-absent clear' 'bad unread')" ] \
+    && ok "f3: the real store reader feeds the verdict: done clears, a quoted unfinished id keeps, absent clears, a bad count is unread" \
+    || not_ok "f3: the store reader and the verdict gave: $(printf '%s' "$out" | tr '\n' '|')"
+}
+
 # Main 1851 F4: the id is resolved with tasks-axi's own grammar in every form it accepts.
 test_f4_every_typed_form_resolves_its_id() {
   local args want got
@@ -120,6 +147,20 @@ test_f5_a_nul_without_a_marker_is_refused() {
   [ "$(field "$out" status)" = refused ] && [ -z "$(field "$out" id)" ] && ok "f5 control: a NUL inside a block refuses it" || not_ok "f5 control: a NUL inside a block was not refused"
 }
 
+# A bare wrapper call has no arguments. Under `set -u` an empty "${ARGS[@]}" stops bash 3.2 (the
+# bash on macOS) with "unbound variable", so the wrapper passes its arguments in the guarded
+# form, and the resolver answers "not a typed completion" for none.
+test_f4_a_call_with_no_arguments_is_not_a_typed_completion() {
+  local out
+  out=$(bash -u -c '. "$1"; ARGS=(); fm_typed_completion_resolve ${ARGS[@]+"${ARGS[@]}"}; echo "rc=$?"' _ "$ROOT/bin/fm-tasks-axi-lib.sh" 2>&1)
+  [ "$out" = rc=1 ] && ok "f4: no arguments are no typed completion under set -u" || not_ok "f4: no arguments gave: $out"
+  if grep -n 'fm_typed_completion_resolve\|tasks-axi "\${ARGS\[@\]}"' "$ROOT/bin/fm-tasks-axi.sh" | grep -v '^[0-9]*: *#' | grep -q '"\${ARGS\[@\]}"'; then
+    not_ok "f4: the wrapper passes an unguarded \"\${ARGS[@]}\" to the typed branch, which stops bash 3.2 on a bare call"
+  else
+    ok "f4: the wrapper passes its arguments to the typed branch in the guarded form"
+  fi
+}
+
 # The callers use these helpers (text checks of the scripts).
 test_the_callers_use_the_checked_helpers() {
   grep -q 'fm_pr_closes_load "\$1.parse"' "$ROOT/bin/fm-pr-close-items.sh" \
@@ -127,7 +168,7 @@ test_the_callers_use_the_checked_helpers() {
     && ok "f2: the close step loads each parse result whole" || not_ok "f2: the close step still reads ids through a process substitution"
   grep -q '|| close_rc=\$?' "$ROOT/bin/fm-pr-merge.sh" \
     && ok "f2: the merge script checks the close step's status" || not_ok "f2: the merge script ignores the close step's status"
-  grep -q 'fm_typed_completion_resolve "\${ARGS\[@\]}"' "$ROOT/bin/fm-tasks-axi.sh" \
+  grep -q 'fm_typed_completion_resolve \${ARGS\[@\]+"\${ARGS\[@\]}"}' "$ROOT/bin/fm-tasks-axi.sh" \
     && grep -q 'fm_typed_completion_store_verdict "\$pf_id"' "$ROOT/bin/fm-tasks-axi.sh" \
     && ok "f3 and f4: the wrapper resolves every typed form and asks the store before clearing" \
     || not_ok "f3 and f4: the wrapper does not use the resolver and the store verdict"
@@ -137,7 +178,9 @@ CASES=(
 test_f1_a_member_read_failure_refuses_the_whole_block
 test_f2_a_partial_result_read_loads_nothing
 test_f3_the_store_verdict_keeps_an_unfinished_item_under_the_id
+test_f3_the_store_reader_feeds_the_verdict
 test_f4_every_typed_form_resolves_its_id
+test_f4_a_call_with_no_arguments_is_not_a_typed_completion
 test_f5_a_nul_without_a_marker_is_refused
 test_the_callers_use_the_checked_helpers
 )
