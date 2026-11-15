@@ -428,7 +428,7 @@ test_launch_proof_claude_verdict_and_refusal() (
     local got cause
     got=$(fm_launch_proof_herdr "$META")
     assert_equals "$1" "$got" "$2"
-    cause=$(fm_launch_proof_herdr_refusal "$META") && fail "$2: authorized"
+    cause=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail "$2: authorized"
     assert_not_contains "$cause" 'adopt' "$2: never names adopt"
     row "$2" "verdict $got; refused: ${cause%%;*}"
   }
@@ -450,12 +450,12 @@ test_launch_proof_claude_verdict_and_refusal() (
   meta_for claude env-v1
   printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
   verdict_once managed 'a token matching the launch record is managed'
-  fm_launch_proof_herdr_authorizes "$META" || fail 'a pinned claude must authorize lifecycle input'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail 'a pinned claude must authorize lifecycle input'
 
   # The token is absent: an unpinned native restore, refused with its named reason.
   rm -f "$T/env-extra"
   verdict_once unmanaged 'a readable environment without the token is unmanaged'
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unpinned claude was authorized'
+  out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail 'an unpinned claude was authorized'
   assert_contains "$out" 'unpinned native restore' 'the cause names an unpinned native restore'
   assert_contains "$out" 'environment was readable and carries no launch pin' 'the cause says the environment was readable and had no pin'
   assert_contains "$out" 'no Firstmate launch record proves it' 'the cause says nothing Firstmate wrote proves it'
@@ -463,7 +463,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   assert_not_contains "$out" 'unreadable' 'the unpinned case is not called unreadable'
   for kind in ship scout; do
     meta_for claude env-v1 "$kind"
-    out=$(fm_launch_proof_herdr_refusal "$META") && fail "an unpinned claude $kind was authorized"
+    out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail "an unpinned claude $kind was authorized"
     assert_contains "$out" 'unpinned native restore' "the $kind cause names an unpinned native restore"
     assert_not_contains "$out" 'adopt' "a $kind is never sent to adopt"
   done
@@ -473,7 +473,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   jq -nc --arg gen "$PIN_GEN" '{version:1, harness:"claude", spawn_gen:$gen, window:"lab:w1:p2", pid:53733, harness_pid:53733,
     session_id:"5a3eec19-de12-4999-bed2-bbd561089154", tie:"recorded"}' > "$STATE/vernant-t1.claude-adoption.json"
   verdict_once unmanaged 'a claude adoption record does not make an unpinned lane managed'
-  fm_launch_proof_herdr_authorizes "$META" && fail 'a claude adoption record authorized an unpinned lane'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail 'a claude adoption record authorized an unpinned lane'
   rm -f "$STATE/vernant-t1.claude-adoption.json"
 
   # The token differs: pinned to another launch, for the agent or a member of its group.
@@ -481,7 +481,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   for kind in secondmate ship; do
     meta_for claude env-v1 "$kind"
     verdict_once pinned-elsewhere "a $kind token for another launch is pinned-elsewhere"
-    out=$(fm_launch_proof_herdr_refusal "$META") && fail "a $kind claude pinned to another generation was authorized"
+    out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail "a $kind claude pinned to another generation was authorized"
     assert_contains "$out" 'live agent is pinned to another launch generation' "the $kind cause names the foreign pin"
     assert_not_contains "$out" 'adopt' "a $kind pinned process is never sent to adopt"
   done
@@ -497,7 +497,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   # The environment cannot be read: unknown, with its own reason.
   : > "$T/env-unreadable"
   verdict_once unknown 'an unreadable environment is unknown'
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unreadable claude environment was authorized'
+  out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail 'an unreadable claude environment was authorized'
   assert_contains "$out" 'launch settings are unreadable' 'the unreadable cause is kept'
   assert_not_contains "$out" 'unpinned native restore' 'the unreadable case is not reported as unpinned'
   rm -f "$T/env-unreadable"
@@ -505,11 +505,11 @@ test_launch_proof_claude_verdict_and_refusal() (
   # The launch record cannot be read: no spawn_gen, or an unknown launch_proof.
   grep -v '^spawn_gen=' "$META" > "$T/meta-nogen" && mv "$T/meta-nogen" "$META"
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a versioned claude record without spawn_gen is unknown'
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a versioned claude record without spawn_gen was authorized'
+  out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail 'a versioned claude record without spawn_gen was authorized'
   assert_not_contains "$out" 'environment was readable' 'a record without spawn_gen does not claim a readable environment'
   meta_for claude env-v9
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'an unknown launch_proof is unknown'
-  fm_launch_proof_herdr_authorizes "$META" && fail 'an unknown launch_proof authorized lifecycle input'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail 'an unknown launch_proof authorized lifecycle input'
 
   # E3 rows, as amended by Main 1637: each refuses; nothing but the token is proof.
   meta_for claude env-v1
@@ -539,7 +539,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   # (j) legacy and other harnesses keep their pre-proof rules.
   meta_for claude ''
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a legacy claude record keeps the unknown verdict'
-  fm_launch_proof_herdr_authorizes "$META" || fail 'a legacy record must keep its pre-proof authorization'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail 'a legacy record must keep its pre-proof authorization'
   meta_for codex env-v1
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'another harness keeps the unknown verdict'
   pass 'claude verdicts: only the launch record and its token prove an agent, each read once; no adoption record licenses anything'
@@ -615,11 +615,11 @@ test_launch_proof_claude_refusal_checks() (
     verdict=$(fm_launch_proof_herdr "$META")
     assert_equals "$1" "$verdict" "$2"
     if [ "$1" = managed ]; then
-      fm_launch_proof_herdr_authorizes "$META" || fail "$2: a managed agent was refused"
+      fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail "$2: a managed agent was refused"
       row "$2" "verdict managed; authorized"
       return 0
     fi
-    out=$(fm_launch_proof_herdr_refusal "$META") && fail "$2: authorized"
+    out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail "$2: authorized"
     [ -z "${3:-}" ] || assert_contains "$out" "$3" "$2: names its cause"
     assert_not_contains "$out" 'adopt' "$2: never names adopt"
     row "$2" "verdict $verdict; refused: ${out%%;*}"
@@ -671,13 +671,13 @@ test_launch_proof_claude_refusal_checks() (
   # The replacement happens inside the one authorization decision.
   world; printf '%s' "$T/elsewhere" > "$T/w/cwd"
   grep -v '^launch_proof=' "$META" > "$T/w/rewrite"
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a record replaced by a legacy one during the decision was authorized'
+  out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail 'a record replaced by a legacy one during the decision was authorized'
   assert_contains "$out" 'working directory is not this task' 'the first bytes decide: the versioned checks refuse'
   row 'a versioned record replaced by a legacy one during the decision' "refused: ${out%%;*}"
   world; printf '%s' "$T/elsewhere" > "$T/w/cwd"
-  fm_launch_proof_herdr_authorizes "$META" && fail 'control: a stable versioned record with a foreign cwd was authorized'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail 'control: a stable versioned record with a foreign cwd was authorized'
   world; grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"; printf '%s' "$T/elsewhere" > "$T/w/cwd"
-  fm_launch_proof_herdr_authorizes "$META" || fail 'control: a genuine legacy record lost its authorization'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail 'control: a genuine legacy record lost its authorization'
 
   # The agent's kernel working directory.
   world; printf '%s' "$T/elsewhere" > "$T/w/cwd"
@@ -738,23 +738,23 @@ test_launch_proof_claude_refusal_checks() (
   # Ruling 2 (Main 1716 B): only a positively read record decides legacy or versioned.
   world; rm -f "$T"/w/env-*; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-53539"
   printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-53733"; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-56557"
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unpinned versioned record was authorized'
+  out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail 'an unpinned versioned record was authorized'
   grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"
-  fm_launch_proof_herdr_authorizes "$META" || fail '(j) control: a record with no launch_proof line keeps its legacy authorization'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail '(j) control: a record with no launch_proof line keeps its legacy authorization'
   fm_launch_proof_record_legacy "$META" || fail '(j) control: a record with no launch_proof line is legacy'
   for shape in 'env-v1,' ',' 'env-v1,env-v1' 'env-v9' 'legacy' 'absent'; do
     grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"
     printf '%s\n' "$shape" | tr ',' '\n' | sed '/^$/d;s/^/launch_proof=/' >> "$META"
     case "$shape" in ','|'env-v1,') printf 'launch_proof=\n' >> "$META" ;; esac
-    out=$(fm_launch_proof_herdr_refusal "$META") && fail "a record with launch_proof lines '$shape' was authorized"
+    out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail "a record with launch_proof lines '$shape' was authorized"
     fm_launch_proof_record_legacy "$META" && fail "a record with launch_proof lines '$shape' was read as legacy"
     assert_not_equals managed "$(fm_launch_proof_herdr "$META")" "launch_proof lines '$shape' are not managed"
   done
   grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"; printf 'launch_proof=env-v1\nlaunch_proof=\n' >> "$META"
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a duplicated launch_proof was authorized'
+  out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail 'a duplicated launch_proof was authorized'
   assert_contains "$out" 'launch record' 'the record cause names the launch record'
   rm -f "$META"
-  fm_launch_proof_herdr_authorizes "$META" && fail 'a missing record was authorized'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail 'a missing record was authorized'
   fm_launch_proof_record_legacy "$META" && fail 'a missing record was read as legacy'
   pass 'a matching token is managed only after the table, member, descendant, cwd and claim checks pass; only one well-formed record decides'
 )
@@ -832,23 +832,23 @@ test_launch_proof_token_checks_every_harness() (
     record "$agent_name" env-v1
     verdict=$(fm_launch_proof_herdr "$META")
     assert_equals managed "$verdict" "$agent_name control: a matching token with a clean group is managed"
-    fm_launch_proof_herdr_authorizes "$META" || fail "$agent_name control: a clean managed agent was refused"
+    fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail "$agent_name control: a clean managed agent was refused"
     row "$agent_name control: matching token, clean group" "verdict $verdict"
     printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=s9.9.9\n' > "$T/w/env-7102"
     verdict=$(fm_launch_proof_herdr "$META")
     assert_equals pinned-elsewhere "$verdict" "$agent_name: a matching token with a member pinned to another generation"
-    fm_launch_proof_herdr_authorizes "$META" && fail "$agent_name: a foreign-pinned member was authorized"
+    fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail "$agent_name: a foreign-pinned member was authorized"
     row "$agent_name: matching token, member pinned elsewhere" "verdict $verdict; refused"
     rm -f "$T/w/env-7102"
     verdict=$(fm_launch_proof_herdr "$META")
     assert_equals unknown "$verdict" "$agent_name: a matching token with an unreadable member"
-    fm_launch_proof_herdr_authorizes "$META" && fail "$agent_name: an unreadable member was authorized"
+    fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail "$agent_name: an unreadable member was authorized"
     row "$agent_name: matching token, unreadable member" "verdict $verdict; refused"
     printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-7102"
     printf 'window=lab:w1:p2\n' > "$H/state/other.meta"
     verdict=$(fm_launch_proof_herdr "$META")
     assert_equals contested "$verdict" "$agent_name: a matching token while another record claims the pane"
-    fm_launch_proof_herdr_authorizes "$META" && fail "$agent_name: a claimed pane was authorized"
+    fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail "$agent_name: a claimed pane was authorized"
     row "$agent_name: matching token, pane claimed by another record" "verdict $verdict; refused"
     rm -f "$H/state/other.meta"
   done
@@ -858,7 +858,7 @@ test_launch_proof_token_checks_every_harness() (
   printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=s9.9.9\n' > "$T/w/env-7102"
   verdict=$(fm_launch_proof_herdr "$META")
   assert_equals managed "$verdict" 'legacy control: a record with no launch_proof keeps its base managed outcome'
-  fm_launch_proof_herdr_authorizes "$META" || fail 'legacy control: a legacy record lost its authorization'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail 'legacy control: a legacy record lost its authorization'
   row 'legacy control: codex record with no launch_proof, member pinned elsewhere' "verdict $verdict (base outcome)"
   pass 'every agent_name with a versioned record passes the refusal checks before a matching token is managed; a legacy record keeps its base outcome'
 )
@@ -910,7 +910,7 @@ test_launch_proof_round8_reads() (
   record claude no-proof
   printf 'launch_proof=env-v1\000\n' >> "$META"
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'F6: a launch_proof value followed by a NUL byte is unknown'
-  fm_launch_proof_herdr_authorizes "$META" && fail 'F6: a NUL-bearing record was authorized'
+  fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" && fail 'F6: a NUL-bearing record was authorized'
   record claude
   printf 'window=lab:w9:p9\n' > "$T/home/state/peer.meta"
   assert_equals managed "$(fm_launch_proof_herdr "$META")" 'F7 control: a readable peer naming another pane'
@@ -938,16 +938,105 @@ test_launch_proof_round8_reads() (
   pass 'records and peers are read as bytes, failed reads and short rows refuse, and a claude alias with the token gets the same checks'
 )
 
-# Main 1856 (a): the omp adoption proof rests on the bytes its caller read; a
-# record that is A, then B for the proof, then A again refuses.
+# Main 1856 (a), Main 1874 findings 3 and 8: the omp adoption route is judged
+# through its caller, the verdict, on a record that really changes between
+# reads. The stable control is a genuinely successful adoption (managed), so a
+# refusal below is for the reason each case names, not for cwd or another
+# check. Every reader is a stand-in, except Python itself and a PATH lsof that
+# prints the synthetic process's cwd.
 test_launch_proof_omp_adoption_reads_the_callers_bytes() (
-  local T="$TMP/omp-aba" META A B sha out
-  mkdir -p "$T/home/state" "$T/wt"
+  local T="$TMP/omp-aba" META A B PIN='' ON_IDENTITY='' ON_REF='' AFTER_PY='' got
+  mkdir -p "$T/home/state" "$T/wt" "$T/bin"
   META="$T/home/state/om.meta"
   A=$(printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=omp\nkind=ship\nspawn_gen=sA\nworktree=%s\nlaunch_proof=env-v1\n' "$T/wt")
-  B=$(printf '%s\nmodel=changed-between-reads' "$A")
-  printf '{"version":1,"spawn_gen":"sA","pid":4242,"task_session_file":"/x","current_session_file":"/x"}\n' > "$T/home/state/om.omp-session.json"
+  B=$(printf '%s\nspawn_gen=sB' "$A")
+  : > "$T/session.jsonl"
+  printf '{"version":1,"spawn_gen":"sA","pid":4242,"task_session_file":"%s","current_session_file":"%s"}\n' \
+    "$T/session.jsonl" "$T/session.jsonl" > "$T/home/state/om.omp-session.json"
+  printf '#!/usr/bin/env bash\nprintf "p4242\\0n%%s\\0" %q\n' "$T/wt" > "$T/bin/lsof"
+  chmod +x "$T/bin/lsof"
+  write_a() { printf '%s\n' "$A" > "$META"; }
+  # shellcheck disable=SC2329 # called through the hook variables
+  write_b() { printf '%s\n' "$B" > "$META"; }
+  # shellcheck disable=SC2329 # the adoption proof calls these stand-ins
+  fm_backend_herdr_cli() { case "$*" in *'pane get'*) printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;; *) return 1 ;; esac; }
   # shellcheck disable=SC2329
+  fm_launch_proof_herdr_pid() { printf 4242; }
+  # shellcheck disable=SC2329
+  ps() {
+    case "$*" in
+      '-p 4242 -o comm='|'-p 4242 -o args=') [ -z "$ON_IDENTITY" ] || "$ON_IDENTITY"; printf 'omp\n' ;;
+      *) return 1 ;;
+    esac
+  }
+  # shellcheck disable=SC2329
+  fm_remote_herdr_process_env() { printf 'PATH=/x\nHOME=/y\n'; [ -z "$PIN" ] || printf 'FM_SPAWN_GEN=%s\n' "$PIN"; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_pane_agent_session_ref() { [ -z "$ON_REF" ] || "$ON_REF"; printf 'omp\t%s' "$T/session.jsonl"; }
+  # shellcheck disable=SC2329
+  python3() {
+    local rc=0
+    : > "$T/py.ran"
+    command python3 "$@" 2>>"$T/py.err" || rc=$?
+    [ -z "$AFTER_PY" ] || "$AFTER_PY"
+    return "$rc"
+  }
+  # shellcheck disable=SC2030 # each case scopes PATH to its own subshell
+  local PATH="$T/bin:$PATH"
+  verdict() { rm -f "$T/py.ran" "$T/py.err"; fm_launch_proof_herdr_verdict "$META" 4242; }
+
+  # Stable control: the record holds A throughout and the adoption succeeds.
+  write_a
+  got=$(verdict)
+  assert_equals managed "$got" 'control: a stable record and a provable unpinned omp process are adopted'$'\n'"$(cat "$T/py.err" 2>/dev/null)"
+  [ ! -s "$T/py.err" ] || fail "control: the adoption proof reported a refusal: $(cat "$T/py.err")"
+
+  # A-to-B-to-A at the caller: the verdict reads A; B is in the file when the
+  # Python proof reads it; A is back before the caller's final comparison.
+  write_a; ON_REF=write_b; AFTER_PY=write_a
+  got=$(verdict)
+  ON_REF=''; AFTER_PY=''
+  assert_equals unmanaged "$got" 'A-B-A: a record that was B for the proof is not adopted'
+  assert_contains "$(cat "$T/py.err" 2>/dev/null)" 'record proof needs the same record bytes the caller read' \
+    'A-B-A: the refusal is the record-bytes check, not another proof'
+  [ "$(cat "$META")" = "$A" ] || fail 'A-B-A: the record was not restored to A before the final comparison'
+
+  # Main 1874 finding 3: the live process carries foreign pin B; the record is
+  # B only while the shell's identity checks run and A again before Python.
+  # The generation check uses the caller's A, so B is foreign and the proof
+  # refuses before Python runs.
+  write_a; PIN=sB; ON_IDENTITY=write_b; ON_REF=write_a
+  got=$(verdict)
+  PIN=''; ON_IDENTITY=''; ON_REF=''
+  assert_equals unmanaged "$got" 'finding 3: a foreign pin hidden by a transient B record is not adopted'
+  [ ! -e "$T/py.ran" ] || fail 'finding 3: the foreign-pin check passed and the Python proof ran'
+
+  # Control for the foreign-pin case: the same pin with no record change refuses
+  # the same way, and the stable record without a pin is adopted again.
+  write_a; PIN=sB
+  got=$(verdict)
+  PIN=''
+  assert_equals unmanaged "$got" 'finding 3 control: a process pinned to another generation is not adopted'
+  [ ! -e "$T/py.ran" ] || fail 'finding 3 control: a foreign pin reached the Python proof'
+  write_a
+  assert_equals managed "$(verdict)" 'control: the stable adoption still succeeds after the changed cases'
+  pass 'the omp adoption, judged through its verdict caller, rests on the bytes the caller read: A-B-A and a transient generation refuse for their named reasons, and a stable adoption succeeds'
+)
+
+# Main 1874 finding 5: the retained omp proof reads each peer record strictly:
+# a peer holding a NUL byte is unknown, never a peer without a claim. The
+# control peers keep their outcome.
+test_launch_proof_omp_adoption_refuses_a_nul_peer() (
+  local T="$TMP/omp-nul-peer" META out
+  mkdir -p "$T/home/state" "$T/wt" "$T/bin"
+  META="$T/home/state/om.meta"
+  printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=omp\nkind=ship\nspawn_gen=sA\nworktree=%s\nlaunch_proof=env-v1\n' "$T/wt" > "$META"
+  : > "$T/session.jsonl"
+  printf '{"version":1,"spawn_gen":"sA","pid":4242,"task_session_file":"%s","current_session_file":"%s"}\n' \
+    "$T/session.jsonl" "$T/session.jsonl" > "$T/home/state/om.omp-session.json"
+  printf '#!/usr/bin/env bash\nprintf "p4242\\0n%%s\\0" %q\n' "$T/wt" > "$T/bin/lsof"
+  chmod +x "$T/bin/lsof"
+  # shellcheck disable=SC2329 # the adoption proof calls these stand-ins
   fm_backend_herdr_cli() { case "$*" in *'pane get'*) printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;; *) return 1 ;; esac; }
   # shellcheck disable=SC2329
   fm_launch_proof_herdr_pid() { printf 4242; }
@@ -956,16 +1045,141 @@ test_launch_proof_omp_adoption_reads_the_callers_bytes() (
   # shellcheck disable=SC2329
   fm_launch_proof_pid_pinned_elsewhere() { return 1; }
   # shellcheck disable=SC2329
-  fm_backend_herdr_pane_agent_session_ref() { printf 'omp\t/x'; }
-  PATH=/usr/bin:/bin
-  sha=$(printf '%s\n' "$A" | shasum -a 256 | cut -d' ' -f1)
-  printf '%s\n' "$A" > "$META"
-  out=$(FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$sha fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null)
-  assert_not_contains "$out" 'same record bytes' 'control: the same bytes pass the record-bytes check'
-  printf '%s\n' "$B" > "$META"
-  out=$(FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$sha fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null)
-  assert_contains "$out" 'record proof needs the same record bytes the caller read' 'a record changed between the reads refuses'
-  pass 'the omp adoption proof refuses record bytes other than the ones its caller read'
+  fm_backend_herdr_pane_agent_session_ref() { printf 'omp\t%s' "$T/session.jsonl"; }
+  # shellcheck disable=SC2031 # each case scopes PATH to its own subshell
+  local PATH="$T/bin:$PATH"
+  printf 'window=lab:w9:p9\n' > "$T/home/state/peer.meta"
+  out=$(fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null) || fail "control: a peer naming another pane blocked adoption: $out"
+  printf 'window=lab:w1:p2\n' > "$T/home/state/peer.meta"
+  out=$(fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null) && fail 'control: a peer claiming this pane was adopted'
+  assert_contains "$out" 'claimed by peer' 'control: a claiming peer names itself'
+  printf 'window=lab:w1:p2\000\n' > "$T/home/state/peer.meta"
+  out=$(fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null) && fail 'a NUL-bearing peer claiming this pane was treated as no claim'
+  assert_contains "$out" 'without NUL bytes' 'a NUL-bearing peer is unknown, with its own cause'
+  pass 'the omp adoption proof treats a NUL-bearing peer as unknown and keeps both readable peer outcomes'
+)
+
+# Main 1874 finding 4: the claim inventory reads each peer once, and the homes
+# it follows come from that same read. The stable controls keep their outcome:
+# a ship peer's home is not followed, and a secondmate peer's home whose record
+# claims the pane is a claim. A peer rewritten right after its read (a nonclaim
+# ship record that becomes a secondmate naming the claiming home) is never read
+# a second time, so the decision rests on the bytes it judged.
+test_launch_proof_claims_follow_homes_from_one_read() (
+  local T="$TMP/claims-one-read" META rc REWRITE=''
+  mkdir -p "$T/home/state" "$T/lane/state" "$T/other/state"
+  META="$T/home/state/lane.meta"
+  printf 'window=lab:w1:p2\nharness=claude\nhome=%s\n' "$T/lane" > "$META"
+  printf 'window=lab:w1:p2\n' > "$T/other/state/claimer.meta"
+  # shellcheck disable=SC2030,SC2031 # each case scopes this to its own subshell
+  local -x FM_LAUNCH_PROOF_VERB_PATH=
+  # shellcheck disable=SC2329 # the inventory calls this stand-in
+  fm_launch_proof_claim_states() { :; }
+  eval "real_$(declare -f fm_launch_proof_bytes)"
+  # shellcheck disable=SC2329 # the claim scan reads each peer through this seam
+  fm_launch_proof_bytes() {
+    real_fm_launch_proof_bytes "$@" || return
+    case "$1" in
+      */peer.meta)
+        printf 'read\n' >> "$T/peer-reads"
+        [ -z "$REWRITE" ] || printf 'window=lab:w8:p8\nkind=secondmate\nhome=%s\n' "$T/other" > "$1"
+        ;;
+    esac
+  }
+  printf 'window=lab:w8:p8\nkind=ship\nhome=%s\n' "$T/other" > "$T/home/state/peer.meta"
+  fm_launch_proof_claims "$META" "$T/lane" "$T/lane" "$T/lane" >/dev/null || fail 'control: a ship peer home was followed'
+  printf 'window=lab:w8:p8\nkind=secondmate\nhome=%s\n' "$T/other" > "$T/home/state/peer.meta"
+  rc=0; fm_launch_proof_claims "$META" "$T/lane" "$T/lane" "$T/lane" >/dev/null || rc=$?
+  assert_equals 1 "$rc" 'control: a secondmate peer home whose record claims the pane is a claim'
+  printf 'window=lab:w8:p8\nkind=ship\nhome=%s\n' "$T/other" > "$T/home/state/peer.meta"
+  rm -f "$T/peer-reads"; REWRITE=1
+  rc=0; fm_launch_proof_claims "$META" "$T/lane" "$T/lane" "$T/lane" >/dev/null || rc=$?
+  REWRITE=''
+  assert_equals 1 "$(grep -c . "$T/peer-reads")" 'a peer rewritten after its read was read a second time'
+  assert_equals 0 "$rc" 'the decision rests on the bytes it judged: a ship peer, whose home is not followed'
+  pass 'the claim inventory reads each peer once and follows secondmate homes from that read'
+)
+
+# Main 1874 finding 7: the foreground selector refuses a parent table with a
+# short row, even when every listed process and its ancestry are present.
+test_launch_proof_selector_refuses_a_short_parent_row() (
+  local T="$TMP/selector-short" META SHORT=''
+  mkdir -p "$T/home/state"
+  META="$T/home/state/s.meta"
+  printf 'window=lab:w1:p2\nharness=claude\n' > "$META"
+  # shellcheck disable=SC2329 # the selector calls these stand-ins
+  fm_backend_herdr_cli() {
+    printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":7101,"foreground_processes":[{"pid":7101,"name":"agent","argv0":"agent"},{"pid":7102,"name":"helper","argv0":"helper"}]}}}'
+  }
+  # shellcheck disable=SC2329
+  fm_agent_process_classify_name() { printf agent; }
+  # shellcheck disable=SC2329
+  ps() { case "$*" in '-axo pid=,ppid=') printf '7101 1\n7102 7101\n'; [ -z "$SHORT" ] || printf '7103\n' ;; *) return 1 ;; esac; }
+  assert_equals 7101 "$(fm_launch_proof_herdr_pid "$META")" 'control: a complete parent table selects the agent'
+  SHORT=1
+  fm_launch_proof_herdr_pid "$META" >/dev/null && fail 'a parent table with a short row selected an agent'
+  pass 'the foreground selector refuses a parent table with a short row and keeps the complete-table control'
+)
+
+# Main 1874 finding 2 and (ii): the proof is bound to the endpoint the caller
+# acts on, and the endpoint is mandatory. The restart's local decision reads
+# its record once: a record that names p1 when the decision reads it and p2
+# while the agent state is read never proves p2 for a kept p1 route.
+test_launch_proof_binds_the_acting_endpoint() (
+  local T="$TMP/bind-endpoint" META P1_PIN=s1 REWRITE='' rc
+  mkdir -p "$T/home/state" "$T/lane/state"
+  META="$T/home/state/sm.meta"
+  rec() { # <pane> -> a coherent local Herdr secondmate record naming lab:w1:<pane>
+    printf 'window=lab:w1:%s\nendpoint_task_id=sm\nworktree=%s\nproject=%s\nherdr_session=lab\nherdr_workspace_id=w1\nherdr_tab_id=w1:t1\nherdr_pane_id=w1:%s\nbackend=herdr\nharness=claude\nkind=secondmate\nspawn_gen=s1\nhome=%s\nlaunch_proof=env-v1\n' \
+      "$1" "$T/lane" "$T/lane" "$1" "$T/lane"
+  }
+  # shellcheck disable=SC2031 # each case scopes this to its own subshell
+  local -x FM_LAUNCH_PROOF_VERB_PATH=1
+  # shellcheck source=bin/fm-secondmate-restart-lib.sh
+  . "$ROOT/bin/fm-secondmate-restart-lib.sh"
+  # shellcheck disable=SC2329 # the decision calls these stand-ins
+  fm_backend_source() { return 0; }
+  # shellcheck disable=SC2329
+  fm_backend_agent_state() { [ -z "$REWRITE" ] || rec p2 > "$META"; printf alive; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_cli() {
+    local pane pid
+    case "$*" in *'--pane w1:p1'*) pane=w1:p1 pid=7201 ;; *'--pane w1:p2'*) pane=w1:p2 pid=7202 ;; *) return 1 ;; esac
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"claude","argv0":"claude"}]}}}' "$pane" "$pid" "$pid"
+  }
+  # shellcheck disable=SC2329
+  fm_agent_process_classify_name() { printf agent; }
+  # shellcheck disable=SC2329
+  ps() { case "$*" in '-axo pid=,ppid=,pgid=') printf '7201 1 7201\n7202 1 7202\n' ;; *) return 1 ;; esac; }
+  # shellcheck disable=SC2329
+  lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "${4:-}" "$T/lane"; }
+  # shellcheck disable=SC2329
+  fm_remote_herdr_process_env() {
+    printf 'PATH=/x\nHOME=/y\n'
+    case "$1" in 7201) [ -z "$P1_PIN" ] || printf 'FM_SPAWN_GEN=%s\n' "$P1_PIN" ;; 7202) printf 'FM_SPAWN_GEN=s1\n' ;; esac
+  }
+  # Control: the record is stable and the agent in p1 is provable.
+  rec p1 > "$META"
+  fm_secondmate_restart_attribution "$META" || fail "control: a provable p1 agent was refused: ${FM_SECONDMATE_RESTART_REASON:-}"
+  assert_equals lab:w1:p1 "$FM_SECONDMATE_RESTART_ROUTE_TARGET" 'control: the decision keeps the endpoint it proved'
+  # Red: p1's agent is not provable; the record moves to p2, whose agent is.
+  rec p1 > "$META"; P1_PIN=''; REWRITE=1
+  rc=0; fm_secondmate_restart_attribution "$META" || rc=$?
+  REWRITE=''
+  assert_equals 1 "$rc" 'a decision that kept p1 must not proceed on a proof of p2'
+  # The proof owner refuses without an endpoint and for another endpoint.
+  rec p2 > "$META"
+  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 || fail 'control: a provable p2 agent at its own endpoint was refused'
+  fm_launch_proof_herdr_authorizes "$META" lab:w1:p1 && fail 'a proof of p2 authorized an action on p1'
+  fm_launch_proof_herdr_authorizes "$META" && fail 'a proof with no endpoint named authorized an action'
+  assert_contains "$(fm_launch_proof_recovery_judge "$META" lab:w1:p1)" 'does not name the endpoint' \
+    'a recovery inspection of p1 on a p2 record is unknown'
+  # (ii): an unpinned claude* alias is unknown and refuses, with no token path.
+  sed -i.bak 's/^harness=claude$/harness=claude-custom/' "$META"
+  P1_PIN=''
+  assert_equals unknown "$(fm_launch_proof_herdr_verdict "$META" 7201)" '(ii): an unpinned claude alias is unknown'
+  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 || fail '(ii) control: a claude alias with the matching token keeps its checks and passes'
+  pass 'the proof is of the endpoint the caller acts on: no endpoint, another endpoint and a decision that kept p1 while p2 was proved all refuse; an unpinned claude alias is unknown'
 )
 
 fm_test_only
@@ -978,3 +1192,7 @@ test_launch_proof_selector_refuses_missing_or_failed_reads
 test_launch_proof_token_checks_every_harness
 test_launch_proof_round8_reads
 test_launch_proof_omp_adoption_reads_the_callers_bytes
+test_launch_proof_omp_adoption_refuses_a_nul_peer
+test_launch_proof_claims_follow_homes_from_one_read
+test_launch_proof_selector_refuses_a_short_parent_row
+test_launch_proof_binds_the_acting_endpoint

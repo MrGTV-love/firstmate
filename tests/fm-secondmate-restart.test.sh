@@ -527,6 +527,10 @@ case "${rargs[1]:-}" in
     if [ -f "$FM_FAKE_DIR/agent-replaced" ]; then
       if [ -e "$FM_HOME/state/pending-replies" ]; then state=present; else state=absent; fi
       printf 'send-refused pending-replies=%s\n' "$state" >> "$FM_FAKE_DIR/attribution-checks"
+      # Main 1874 finding 6: the agent can be attributable again right after the
+      # refusal, and the parent's discard of its expectation can fail.
+      [ ! -f "$FM_FAKE_DIR/restore-after-refusal" ] || rm -f "$FM_FAKE_DIR/agent-replaced"
+      [ ! -f "$FM_FAKE_DIR/discard-fails" ] || chmod 500 "$FM_HOME/state/pending-replies"
       printf 'error: the agent at this host endpoint is no longer attributed to this task\n' >&2
       exit 1
     fi
@@ -772,7 +776,7 @@ test_remote_attribution_is_bound_to_the_recorded_route() {
 # endpoint; each delivery then refuses, with no request, record or relaunch.
 test_remote_delivery_uses_the_compared_route() {
   local dir out rc case
-  for case in control registry-after-ask meta-after-ask endpoint-after-ask placement-after-ask agent-replaced-before-send; do
+  for case in control registry-after-ask meta-after-ask endpoint-after-ask placement-after-ask agent-replaced-before-send discard-fails-after-send-refusal; do
     dir=$(new_case remote-compared)
     setup_remote_case "$dir" sm2 ok
     export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
@@ -784,9 +788,13 @@ test_remote_delivery_uses_the_compared_route() {
       endpoint-after-ask)
         # The host's endpoint moves from its recorded target after the first ask.
         printf '#!/usr/bin/env bash\nprintf fm-remote:2ndmate-other > %q\n' "$dir/fake/host-target" > "$dir/after-ask" ;;
-      agent-replaced-before-send)
+      agent-replaced-before-send|discard-fails-after-send-refusal)
         # Main 1860: after the check-only ask (the second host ask) passes, the
-        # agent is replaced at the same endpoint before the send.
+        # agent is replaced at the same endpoint before the send. Main 1874
+        # finding 6: it is attributable again right after the send refuses, so a
+        # later nudge would reach it; the second case also makes the discard fail.
+        : > "$dir/fake/restore-after-refusal"
+        [ "$case" != discard-fails-after-send-refusal ] || : > "$dir/fake/discard-fails"
         # shellcheck disable=SC2016 # the expressions expand in the written script
         printf '#!/usr/bin/env bash\nn=$(grep -c . %q 2>/dev/null || true)\n[ "${n:-0}" -lt 2 ] || : > %q\n' \
           "$dir/fake/attribution-checks" "$dir/fake/agent-replaced" > "$dir/after-ask" ;;
@@ -815,13 +823,27 @@ test_remote_delivery_uses_the_compared_route() {
     [ "$rc" -ne 0 ] || fail "$case: the restart went on after the route changed"$'\n'"$out"
     assert_not_contains "$out" "restarted: sm2" "$case: the mate was reported restarted"
     assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "$case: the mate was relaunched"
-    if [ "$case" = agent-replaced-before-send ]; then
+    if [ "$case" = agent-replaced-before-send ] || [ "$case" = discard-fails-after-send-refusal ]; then
       # Main 1860: the send verb's own re-check refuses after the expectation
-      # was created; the expectation is then discarded and no record exists.
+      # was created. Main 1874 finding 6: that refusal is the mate's final
+      # outcome: it is reported unreached, the pass sends it nothing more (one
+      # send, the refused one, and no nudge, though its agent is attributable
+      # again), and the expectation is discarded or its failed discard reported.
       assert_grep 'send-refused pending-replies=present' "$dir/fake/attribution-checks" \
         "$case: the send-time refusal was not reached after the expectation"
-      [ -z "$(find "$dir/home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] \
-        || fail "$case: a pending-reply record remained after the send-time refusal"
+      [ "$(grep -c '^fm-remote-secondmate-control.sh send' "$dir/ssh.log")" = 1 ] \
+        || fail "$case: the pass sent the mate more after its send-time refusal"$'\n'"$(cat "$dir/ssh.log")"
+      assert_not_contains "$out" "nudged: sm2" "$case: a refused mate was nudged in the same pass"
+      assert_contains "$out" "unreached: sm2: the request to write down its open work was not delivered, so nothing else was sent to it" \
+        "$case: the send-time refusal was not the mate's reported outcome"$'\n'"$out"
+      if [ "$case" = discard-fails-after-send-refusal ]; then
+        assert_contains "$out" "could not be discarded" "$case: a failed discard was suppressed"$'\n'"$out"
+        chmod 700 "$dir/home/state/pending-replies"
+      else
+        assert_not_contains "$out" "could not be discarded" "$case: a clean discard was reported as failed"
+        [ -z "$(find "$dir/home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] \
+          || fail "$case: a pending-reply record remained after the send-time refusal"
+      fi
       continue
     fi
     # Main 1777 (3), Main 1807 (7): the refusal comes from a check that ran
