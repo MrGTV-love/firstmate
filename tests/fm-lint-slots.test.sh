@@ -3600,59 +3600,6 @@ SH
   pass "the resident-memory watch samples only its command's own tree: an unrelated process is not counted, and a descendant that leaves the process group is"
 }
 
-test_the_watch_ends_a_descendant_that_left_the_process_group() {
-  if [ "$(uname)" != Darwin ]; then
-    pass "SKIP (the libproc tree reader is macOS only): group-leaving descendant termination"
-    return
-  fi
-  local tmp rc pid i alive=1
-  tmp=$(fm_test_tmproot fm-lint-leaver-kill)
-  # The command starts a descendant in its own process group that holds 160 MiB,
-  # against a 100 MiB bound. The watch counts it (the reader follows descendants
-  # across groups) and must end it with the root: the test never kills it, and a
-  # survivor is cleaned up only after it is reported as a failure. No tree leash
-  # here: a leash would end the descendant itself and hide the defect.
-  cat > "$tmp/leaver-parent.sh" <<'SH'
-perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (160 * 1024 * 1024); sleep 30' &
-echo "$!" > "$1"
-sleep 6
-SH
-  rc=0
-  perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
-    bash "$tmp/leaver-parent.sh" "$tmp/leaver.pid" > /dev/null 2>&1 || rc=$?
-  pid=$(cat "$tmp/leaver.pid" 2>/dev/null || true)
-  [ -n "$pid" ] || fail "the group-leaving descendant did not start"
-  [ "$rc" -eq 98 ] || { kill -KILL "$pid" 2>/dev/null || true; fail "the watch exited $rc, expected 98 for a root over its bound"; }
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-    kill -0 "$pid" 2>/dev/null || { alive=0; break; }
-    sleep 0.2
-  done
-  if [ "$alive" -eq 1 ]; then
-    kill -KILL "$pid" 2>/dev/null || true
-    fail "the watch ended its command but left a counted descendant that moved to another process group running (pid $pid)"
-  fi
-  # The control: a descendant under the bound is not ended, and the root finishes
-  # on its own with its own status and no retry mark.
-  cat > "$tmp/small-parent.sh" <<'SH'
-perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (8 * 1024 * 1024); sleep 8' &
-echo "$!" > "$1"
-sleep 3
-SH
-  rm -f "$tmp/rss"
-  rc=0
-  perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
-    bash "$tmp/small-parent.sh" "$tmp/small.pid" > /dev/null 2>&1 || rc=$?
-  pid=$(cat "$tmp/small.pid" 2>/dev/null || true)
-  [ -n "$pid" ] || fail "the under-bound descendant did not start"
-  alive=0
-  kill -0 "$pid" 2>/dev/null && alive=1
-  kill -KILL "$pid" 2>/dev/null || true
-  [ "$rc" -eq 0 ] || fail "a root whose tree stays under the bound exited $rc, expected 0"
-  ! grep -q '^max_rss_kib=' "$tmp/rss" || fail "a tree under the bound was recorded as over it"
-  [ "$alive" -eq 1 ] || fail "the watch ended a descendant that was under the bound"
-  pass "the resident-memory watch ends a counted descendant that left the process group, and leaves an under-bound tree alone"
-}
-
 # fm_lint_identity_of <pid>: "<start seconds>:<start microseconds>" of a live
 # process, read through the helper the watch itself uses.
 fm_lint_identity_of() {
@@ -4433,8 +4380,8 @@ test_an_inherited_census_switch_never_turns_a_lint_into_a_success() {
 # copy's host ledger the way bin/fm-lint.sh does, holds its flock on descriptor 9,
 # and runs the rest of its arguments as its child with FM_LINT_INTERNAL_RUN_ENTRY
 # set. The run entry names the given python and the bound mechanism and limits in
-# FM_TEST_RUN_BOUNDED, FM_TEST_RUN_MEMORY_KIB and FM_TEST_RUN_RSS_KIB (none,
-# 12582912 and 262144 by default).
+# FM_TEST_RUN_BOUNDED, FM_TEST_RUN_MEMORY_KIB, FM_TEST_RUN_RSS_KIB and
+# FM_TEST_RUN_VERSION (none, 12582912, 262144 and 0.11.0 by default).
 fm_lint_write_owner_stand_in() {
   local dir=$1 repo=$2 python=$3 perl_bin
   perl_bin=$(command -v perl)
@@ -4444,7 +4391,7 @@ fm_lint_write_owner_stand_in() {
 ledger=\$(sed -n 's/^HOST_POOL_ROOT=//p' '$repo/bin/fm-lint.sh')/admission.lock.ledger
 mkdir -p "\$ledger"
 entry="\$ledger/run.\$\$.1"
-printf '%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' "\${FM_TEST_RUN_BOUNDED:-none}" "\${FM_TEST_RUN_MEMORY_KIB:-12582912}" "\${FM_TEST_RUN_RSS_KIB:-262144}" > "\$entry"
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' "\${FM_TEST_RUN_BOUNDED:-none}" "\${FM_TEST_RUN_MEMORY_KIB:-12582912}" "\${FM_TEST_RUN_RSS_KIB:-262144}" "\${FM_TEST_RUN_VERSION:-0.11.0}" > "\$entry"
 exec 9>>"\$entry"
 '$perl_bin' -MFcntl=:flock -e 'open(my \$fh, ">>&=", 9) or exit 1; flock(\$fh, LOCK_EX | LOCK_NB) or exit 1' || exit 9
 rc=0
@@ -4608,7 +4555,9 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
 # every libproc reader exit at once; FM_TEST_READER=dieafter:<n> makes the first
 # reader (marked by $FM_TEST_READER_MARK) answer <n> requests and then exit, and
 # later readers run normally; FM_TEST_READER=members makes every reader answer
-# 300000 KiB with the one member $FM_TEST_MEMBER ("<pid>:<sec>:<usec>").
+# 300000 KiB with the one member $FM_TEST_MEMBER ("<pid>:<sec>:<usec>");
+# FM_TEST_READER=membersonce makes the first reader (marked by $FM_TEST_READER_MARK)
+# answer once, 1000 KiB with that one member, and every later reader exit at once.
 # FM_TEST_WATCH_TABLE=fail makes the watch's process table reading (the helper's
 # table with pgid) fail.
 fm_lint_write_stub_python() {
@@ -4645,6 +4594,15 @@ if len(args) >= 3 and args[1] == "rss-tree":
         pid, sec, usec = os.environ["FM_TEST_MEMBER"].split(":")
         while sys.stdin.readline():
             print('{"rss_kib":300000,"members":[[%s,%s,%s]],"uncounted":[]}' % (pid, sec, usec), flush=True)
+        sys.exit(0)
+    if mode == "membersonce":
+        mark = os.environ["FM_TEST_READER_MARK"]
+        if os.path.exists(mark):
+            sys.exit(1)
+        open(mark, "w").close()
+        pid, sec, usec = os.environ["FM_TEST_MEMBER"].split(":")
+        if sys.stdin.readline():
+            print('{"rss_kib":1000,"members":[[%s,%s,%s]],"uncounted":[]}' % (pid, sec, usec), flush=True)
         sys.exit(0)
     if mode.startswith("dieafter:"):
         mark = os.environ["FM_TEST_READER_MARK"]
@@ -4964,45 +4922,6 @@ test_a_warm_cache_hit_behind_an_occupied_budget_reserves_nothing_and_waits_for_n
   pass "a wrapper's warm cache hit behind a filled budget started only its version probe, in the probe's lane (waits: probe $probe_wait ms, root 0 ms); an analysis behind the same holder waited $root_wait ms"
 }
 
-# (F6) Runs whose version probes of one ShellCheck overlap share one probe. The
-# probe lane is held while two runs arrive; when it is released one of them probes
-# and the other takes that probe's result. The control: a run that begins after
-# that probe has ended probes again.
-test_overlapping_version_probes_of_one_shellcheck_share_one_probe() {
-  local tmp repo rc=0 run1 run2 lane waited
-  tmp=$(fm_test_tmproot fm-lint-single-flight)
-  FM_LINT_RELEASE_FILES="$tmp/lane.release"
-  repo=$(fm_lint_isolated_copy "$tmp" flight)
-  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
-  lane="$tmp/flight/host/admission.lock.probe"
-  perl -MFcntl=:flock -MTime::HiRes=sleep,time -e 'open(my $fh, ">>", $ARGV[0]) or die; flock($fh, LOCK_EX) or die; open(my $r, ">", $ARGV[1]) or die; close $r; my $u = time() + 30; sleep 0.05 until -e $ARGV[2] || time() > $u' \
-    "$lane" "$tmp/lane.ready" "$tmp/lane.release" &
-  waited=0
-  while [ ! -e "$tmp/lane.ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
-  : > "$tmp/starts.log"
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 FM_TEST_PROBE_SECS=1 \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) &
-  run1=$!
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 FM_TEST_PROBE_SECS=1 \
-      bash bin/fm-lint.sh bin/library.sh > "$tmp/run2.out" 2>&1 ) &
-  run2=$!
-  sleep 3
-  [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 0 ] || { : > "$tmp/lane.release"; fm_lint_fail_settled "a probe started while the probe lane was held"; }
-  : > "$tmp/lane.release"
-  wait "$run1" || rc=$?
-  wait "$run2" || rc=$?
-  [ "$rc" -eq 0 ] || fm_lint_fail_settled "an overlapping run failed ($rc): $(cat "$tmp/run1.out" "$tmp/run2.out")"
-  [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 1 ] || fm_lint_fail_settled "two runs whose probes overlapped started $(grep -c -- '^--version$' "$tmp/starts.log") probes, expected one shared probe"
-  grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/run1.out" && grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/run2.out" \
-    || fm_lint_fail_settled "a run did not report the shared probe's version: $(cat "$tmp/run1.out" "$tmp/run2.out")"
-  # The control.
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run3.out" 2>&1 ) || fm_lint_fail_settled "the later run failed: $(cat "$tmp/run3.out")"
-  [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 2 ] || fm_lint_fail_settled "a run that began after the shared probe ended did not probe again: $(cat "$tmp/starts.log")"
-  wait 2>/dev/null || true
-  pass "two runs whose version probes overlapped started one probe and both used its version; a run that began after it ended probed again"
-}
-
 # The version probe waits only for its own lane (another probe), never behind
 # roots holding the budget, and the wait is recorded (probe_wait_ms).
 test_the_version_probe_waits_only_for_its_own_lane() {
@@ -5149,31 +5068,87 @@ test_a_run_never_takes_a_version_from_a_probe_that_started_before_it_waited() {
   pass "a run that began waiting during another run's probe probed again and refused the delegate's 0.10.0 under the strict policy; the earlier run reported its own probe's 0.11.0"
 }
 
-# (Main 1770 (7)) A version probe that outlives its bound is never ended. Its lane
-# stays held while any process the probe started still runs; a run waiting that long
-# says it is blocked and waits; it proceeds once that process has ended. The probe's
-# own run also says so while its probe runs past the bound. The copy's bound is 1 s.
-test_a_hung_version_probe_keeps_its_lane_until_its_processes_end_and_waiters_report_blocked() {
-  local tmp repo rc=0 run2 run3 probe_wait
-  tmp=$(fm_test_tmproot fm-lint-probe-hung)
-  FM_LINT_RELEASE_FILES="$tmp/release $tmp/release2"
-  repo=$(fm_lint_isolated_copy "$tmp" hung)
+# (Main 1775 N1) Every run probes its own ShellCheck. Two runs of one wrapper whose
+# delegate depends on HOME queue for the probe lane; each must get its own delegate's
+# version: the strict run whose HOME selects 0.10.0 refuses, the other passes. The
+# control: two runs with the same HOME both pass, each with its own probe.
+fm_lint_home_wrapper() {  # <fakebin> <starts log>
+  mkdir -p "$1"
+  cat > "$1/shellcheck" <<EOF
+#!/usr/bin/env bash
+printf '%s %s\n' "\$HOME" "\$*" >> '$2'
+if [ "\${1:-}" = --version ]; then
+  case "\$HOME" in *old*) v=0.10.0 ;; *) v=0.11.0 ;; esac
+  printf 'ShellCheck - shell script analysis tool\nversion: %s\n' "\$v"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$1/shellcheck"
+}
+
+test_runs_with_different_delegates_each_probe_their_own_shellcheck() {
+  local tmp repo lane waited run_a rc_a=0 rc_b=0 label home_b want_b
+  tmp=$(fm_test_tmproot fm-lint-own-probe)
+  FM_LINT_RELEASE_FILES="$tmp/lane.release.different $tmp/lane.release.same"
+  repo=$(fm_lint_isolated_copy "$tmp" own)
+  fm_lint_home_wrapper "$tmp/fake" "$tmp/starts.log"
+  lane="$tmp/own/host/admission.lock.probe"
+  for label in different same; do
+    if [ "$label" = different ]; then home_b="$tmp/home.old"; want_b=1; else home_b="$tmp/home.new2"; want_b=0; fi
+    mkdir -p "$tmp/home.new" "$home_b"
+    rm -f "$tmp/lane.ready"
+    perl -MFcntl=:flock -MTime::HiRes=sleep,time -e 'open(my $fh, ">>", $ARGV[0]) or die; flock($fh, LOCK_EX) or die; open(my $r, ">", $ARGV[1]) or die; close $r; my $u = time() + 30; sleep 0.05 until -e $ARGV[2] || time() > $u' \
+      "$lane" "$tmp/lane.ready" "$tmp/lane.release.$label" &
+    waited=0
+    while [ ! -e "$tmp/lane.ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
+    : > "$tmp/starts.log"
+    rc_a=0; rc_b=0
+    ( cd "$repo" && env HOME="$tmp/home.new" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+        bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/$label.a.out" 2>&1 ) &
+    run_a=$!
+    sleep 0.5
+    ( cd "$repo" && env HOME="$home_b" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+        bash bin/fm-lint.sh --strict-version bin/library.sh > "$tmp/$label.b.out" 2>&1 ) &
+    sleep 2
+    : > "$tmp/lane.release.$label"
+    wait "$run_a" || rc_a=$?
+    wait "$!" || rc_b=$?
+    wait 2>/dev/null || true
+    [ "$rc_a" -eq 0 ] || fm_lint_fail_settled "$label: the run whose delegate is the pinned 0.11.0 exited $rc_a: $(cat "$tmp/$label.a.out")"
+    [ "$rc_b" -eq "$want_b" ] || fm_lint_fail_settled "$label: the second run exited $rc_b, expected $want_b for its own delegate: $(cat "$tmp/$label.b.out")"
+    [ "$(grep -c -- ' --version$' "$tmp/starts.log")" -eq 2 ] || fm_lint_fail_settled "$label: the two runs did not each probe their own ShellCheck: $(cat "$tmp/starts.log")"
+  done
+  grep -q 'found 0.10.0' "$tmp/different.b.out" || fm_lint_fail_settled "the strict refusal did not name the run's own delegate version: $(cat "$tmp/different.b.out")"
+  wait 2>/dev/null || true
+  pass "two queued runs of one wrapper each probed their own delegate: the strict run whose HOME selects 0.10.0 refused, the 0.11.0 run passed; with one HOME both passed, each on its own probe"
+}
+
+# (Main 1775 N2) The probe is the lane holder's direct child and the run waits for
+# it on its own time bound: a probe that closes its output at once and then runs past
+# the bound still makes its run report blocked, a run waiting for the lane reports
+# blocked and starts nothing, and both finish once the probe exits. Nothing is ended.
+# The copy's bound is 1 s.
+test_a_probe_past_its_bound_is_waited_for_and_reported_even_after_closing_its_output() {
+  local tmp repo rc1=0 rc2=0 run1 run2 waited
+  tmp=$(fm_test_tmproot fm-lint-probe-overdue)
+  FM_LINT_RELEASE_FILES="$tmp/release"
+  repo=$(fm_lint_isolated_copy "$tmp" overdue)
   perl -pi -e 's{^PROBE_BOUND_SECONDS=.*$}{PROBE_BOUND_SECONDS=1}' "$repo/bin/fm-lint.sh"
+  grep -q '^PROBE_BOUND_SECONDS=1$' "$repo/bin/fm-lint.sh" || printf 'note: this copy has no probe bound to shorten\n'
   mkdir -p "$tmp/fake"
-  # --version: the first time, leave a process (its output closed) that lives until
-  # the release file exists, as a probe whose child outlives it would; with
-  # FM_TEST_PROBE_HOLD, run until release2 exists before answering. Each process
-  # ends on its own (20 s at most).
+  # The first --version prints its version, closes its output and then runs until
+  # the release file exists (20 s at most); later ones answer at once.
   cat > "$tmp/fake/shellcheck" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> '$tmp/starts.log'
 if [ "\${1:-}" = --version ]; then
-  if [ ! -e '$tmp/left' ]; then
-    : > '$tmp/left'
-    ( exec >/dev/null 2>&1 </dev/null; perl -MTime::HiRes=sleep,time -e 'my \$u = time() + 20; sleep 0.05 until -e \$ARGV[0] || time() > \$u' '$tmp/release' ) &
-  fi
-  if [ -n "\${FM_TEST_PROBE_HOLD:-}" ]; then perl -MTime::HiRes=sleep,time -e 'my \$u = time() + 20; sleep 0.05 until -e \$ARGV[0] || time() > \$u' '$tmp/release2'; fi
   printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  if [ ! -e '$tmp/first' ]; then
+    : > '$tmp/first'
+    exec >/dev/null
+    perl -MTime::HiRes=sleep,time -e 'my \$u = time() + 20; sleep 0.05 until -e \$ARGV[0] || time() > \$u' '$tmp/release'
+  fi
   exit 0
 fi
 exit 0
@@ -5181,33 +5156,174 @@ EOF
   chmod +x "$tmp/fake/shellcheck"
   : > "$tmp/starts.log"
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) || fm_lint_fail_settled "run 1 failed: $(cat "$tmp/run1.out")"
-  # Run 1 ended; the process its probe left still runs.
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_TELEMETRY="$tmp/run2.tsv" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run1.out" 2>&1 ) &
+  run1=$!
+  waited=0
+  while [ ! -e "$tmp/first" ] && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
       bash bin/fm-lint.sh bin/library.sh > "$tmp/run2.out" 2>&1 ) &
   run2=$!
-  sleep 3
-  [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 1 ] \
-    || fm_lint_fail_settled "a run probed while a process of the earlier probe still held the lane: $(cat "$tmp/starts.log")"
-  grep -q 'blocked: the version probe lane' "$tmp/run2.out" || fm_lint_fail_settled "a run waiting past the probe bound did not report it was blocked: $(cat "$tmp/run2.out")"
+  # Run 2 needs about a second to reach the lane, then waits past the 1 s bound.
+  sleep 4.5
+  grep -q 'blocked: the version probe (pid [0-9]*) has run more than 1 s' "$tmp/run1.out" \
+    || fm_lint_fail_settled "a run whose probe closed its output and ran past the bound did not report it was blocked: $(cat "$tmp/run1.out")"
+  grep -q 'blocked: the version probe lane' "$tmp/run2.out" || fm_lint_fail_settled "a run waiting past the bound did not report it was blocked: $(cat "$tmp/run2.out")"
+  [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 1 ] || fm_lint_fail_settled "a second probe started while the first probe still ran: $(cat "$tmp/starts.log")"
   : > "$tmp/release"
-  wait "$run2" || rc=$?
-  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the waiting run did not finish once the probe's process ended ($rc): $(cat "$tmp/run2.out")"
-  probe_wait=$(awk -F '\t' '$1 == "meta" && $2 == "probe_wait_ms" { print $3 }' "$tmp/run2.roots.tsv")
-  [ -n "$probe_wait" ] && [ "$probe_wait" -ge 2000 ] || fm_lint_fail_settled "the waiting run recorded a lane wait of ${probe_wait:-none} ms"
-  # The probe's own run, while its probe runs past the bound.
-  rc=0
-  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_PROBE_HOLD=1 \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/run3.out" 2>&1 ) &
-  run3=$!
-  sleep 3
-  grep -q 'blocked: the version probe (pid [0-9]*) has run more than 1 s' "$tmp/run3.out" \
-    || fm_lint_fail_settled "a run whose probe ran past its bound did not report it was blocked: $(cat "$tmp/run3.out")"
-  : > "$tmp/release2"
-  wait "$run3" || rc=$?
-  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the run whose probe ran past its bound failed after the probe ended ($rc): $(cat "$tmp/run3.out")"
+  wait "$run1" || rc1=$?
+  wait "$run2" || rc2=$?
+  [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] || fm_lint_fail_settled "the runs did not finish once the probe exited ($rc1, $rc2): $(cat "$tmp/run1.out" "$tmp/run2.out")"
   wait 2>/dev/null || true
-  pass "a probe that outlives its bound keeps the lane until its last process ends (the next run waited $probe_wait ms and reported blocked, nothing was ended); a run whose own probe runs past the bound reports blocked and finishes when it ends"
+  pass "a probe that closed its output and ran past its bound was waited for: its run and the waiting run reported blocked, no second probe started, and both finished once it exited; nothing was ended"
+}
+
+# (Main 1775 N3) Outside macOS without the enforced envelope the per-root resident
+# cap and the 64 MiB probe lane are not enforced: a strict run refuses before any
+# ShellCheck starts and says so. The control: a non-strict run there warns that the
+# caps are not enforced and goes on to probe the version (on this macOS host the
+# roots that follow cannot run as on Linux: the Linux /usr/bin/time options do not
+# exist here, so the control stops its assertions at the probe). (The host is made to
+# report Linux by a uname stand-in; the copy's host-wide directory is the test's own.)
+test_strict_mode_refuses_where_the_caps_are_not_enforced() {
+  local tmp repo rc
+  tmp=$(fm_test_tmproot fm-lint-unenforced)
+  repo=$(fm_lint_isolated_copy "$tmp" linux)
+  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
+  printf '#!/bin/sh\ncase "${1:-}" in -m) echo x86_64 ;; *) echo Linux ;; esac\n' > "$tmp/fake/uname"
+  chmod +x "$tmp/fake/uname"
+  : > "$tmp/starts.log"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_REQUIRE_BOUNDS=0 \
+      bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/strict.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 2 ] || fm_lint_fail_settled "a strict run where the caps are not enforced exited $rc, expected the refusal (2): $(cat "$tmp/strict.out")"
+  grep -q 'strict mode refuses on Linux' "$tmp/strict.out" || fm_lint_fail_settled "the refusal did not say why: $(cat "$tmp/strict.out")"
+  [ ! -s "$tmp/starts.log" ] || fm_lint_fail_settled "the refused strict run started ShellCheck: $(cat "$tmp/starts.log")"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_REQUIRE_BOUNDS=0 FM_TEST_ANALYSIS_RC=0 \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/plain.out" 2>&1 ) || rc=$?
+  [ "$rc" -ne 2 ] && ! grep -q 'strict mode refuses' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run there was refused ($rc): $(cat "$tmp/plain.out")"
+  grep -q 'are not enforced' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run did not warn that the caps are not enforced: $(cat "$tmp/plain.out")"
+  grep -q -- '^--version$' "$tmp/starts.log" || fm_lint_fail_settled "the non-strict run did not go on to probe the version: $(cat "$tmp/starts.log")"
+  pass "where the resident cap and the probe lane are not enforced a strict run refuses before any ShellCheck starts and names why; a non-strict run warns and goes on"
+}
+
+# (Main 1775 N4) A root whose watch lost every reader fails: the run exits nonzero and
+# no reusable success is recorded for it, also when it is the run's only root. A root
+# already waiting at the gate of the same run (two workers, one slot) is not admitted.
+test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident watch runs on native macOS only): reader loss fails the root"
+    return
+  fi
+  local tmp repo real_python real_ps rc=0
+  tmp=$(fm_test_tmproot fm-lint-reader-loss)
+  repo=$(fm_lint_isolated_copy "$tmp" loss)
+  real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/fake" "$real_python"
+  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
+  real_ps=$(command -v ps || true)
+  printf '#!/bin/sh\ncase "$*" in *pgid=*) exit 1 ;; esac\n[ -n "%s" ] && exec "%s" "$@"\nexit 1\n' "$real_ps" "$real_ps" > "$tmp/fake/ps"
+  chmod +x "$tmp/fake/ps"
+  # (1) The only root: it exits 0 itself, but ran unmeasured.
+  : > "$tmp/starts.log"
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
+      FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/only.out" 2>&1 ) || rc=$?
+  [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose only root ran unmeasured exited 0: $(cat "$tmp/only.out")"
+  [ -z "$(find "$tmp/cache" -name '*.passed' -print 2>/dev/null)" ] || fm_lint_fail_settled "a root that ran unmeasured left a reusable success"
+  grep -q 'reason=unmeasured' "$tmp/only.out" || fm_lint_fail_settled "the run did not name the unmeasured root: $(cat "$tmp/only.out")"
+  # (2) Two workers, one slot: the second root waits at the gate while the first
+  # runs unmeasured, and is then not admitted.
+  : > "$tmp/starts.log"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_HOST_SLOTS=1 \
+      FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
+      FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/queued.out" 2>&1 ) || rc=$?
+  [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run with an unmeasured root exited 0: $(cat "$tmp/queued.out")"
+  [ "$(grep -c -- '-- bin/' "$tmp/starts.log")" -eq 1 ] || fm_lint_fail_settled "a root waiting at the gate was admitted after the run's watch lost every reader: $(cat "$tmp/starts.log")"
+  grep -q 'admits no new root' "$tmp/queued.out" || fm_lint_fail_settled "the gate did not say why it admitted no root: $(cat "$tmp/queued.out")"
+  pass "a root that ran unmeasured fails the run and records no success, also as the only root; a root already waiting at the gate is not admitted"
+}
+
+# (Main 1775 N4) A member the watch knows whose pid now belongs to a process that
+# started in the same second but not at the same instant (a replacement) is not
+# counted, so the root's group is not ended for it. The reader names the member once,
+# with a start time 1 microsecond off, then is down; the process table shows that
+# pid with the same second and 160 MiB. The control: named with its true start time,
+# the same process is counted and the tree is ended over the bound (sends recorded).
+test_a_same_second_replacement_is_not_counted_against_the_root() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the libproc identity reader is macOS only): same-second replacement"
+    return
+  fi
+  local tmp real_python big identity sec usec label rc log
+  tmp=$(fm_test_tmproot fm-lint-same-second)
+  real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  for label in replacement control; do
+    perl -e 'my $mib = shift; my $held = "x" x ($mib * 1024 * 1024); sleep 9' 160 > /dev/null 2>&1 &
+    big=$!
+    sleep 0.5
+    identity=$(fm_lint_identity_of "$big") || fm_lint_fail_settled "could not read the start time of the large process"
+    sec=${identity%%:*}
+    usec=${identity##*:}
+    [ "$label" = replacement ] && usec=$(( usec == 999999 ? usec - 1 : usec + 1 ))
+    log="$tmp/signals.$label"
+    : > "$log"
+    rm -f "$tmp/mark.$label"
+    rc=0
+    FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=membersonce \
+      FM_TEST_READER_MARK="$tmp/mark.$label" FM_TEST_MEMBER="$big:$sec:$usec" \
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- sleep 6 > "$tmp/err.$label" 2>&1 || rc=$?
+    wait "$big" 2>/dev/null || true
+    if [ "$label" = replacement ]; then
+      [ "$rc" -ne 98 ] || fm_lint_fail_settled "the watch ended the root over a same-second replacement it counted as its member: $(cat "$tmp/err.$label") / $(cat "$log")"
+      ! grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group was signalled over a same-second replacement: $(cat "$log")"
+    else
+      [ "$rc" -eq 98 ] || fm_lint_fail_settled "the watch did not count a member with its true start time ($rc): $(cat "$tmp/err.$label")"
+      grep -q '^killpg ' "$log" || fm_lint_fail_settled "the tree over the bound was not ended (recorded): $(cat "$log")"
+    fi
+  done
+  pass "a same-second replacement of a known member is not counted, so the root is not ended for it; the member with its true start time is counted and the tree ended over the bound (sends recorded, none delivered)"
+}
+
+# (F5, re-run at the head) The watch ends a counted descendant that left the
+# process group, by the exact identity its reader gave, and leaves an under-bound
+# tree alone. Every send is recorded by the stub, none delivered; the processes end
+# on their own.
+test_the_watch_ends_a_descendant_that_left_the_process_group() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the libproc tree reader is macOS only): group-leaving descendant termination"
+    return
+  fi
+  local tmp rc pid real_python label mib
+  tmp=$(fm_test_tmproot fm-lint-leaver-kill)
+  real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  cat > "$tmp/leaver-parent.sh" <<'SH'
+perl -MPOSIX -e 'my $mib = shift; POSIX::setpgid(0, 0); my $held = "x" x ($mib * 1024 * 1024); sleep 5' "$2" &
+echo "$!" > "$1"
+sleep 5
+SH
+  for label in over under; do
+    if [ "$label" = over ]; then mib=160; else mib=8; fi
+    : > "$tmp/signals.$label"
+    rc=0
+    FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" \
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- \
+      bash "$tmp/leaver-parent.sh" "$tmp/leaver.$label.pid" "$mib" > "$tmp/err.$label" 2>&1 || rc=$?
+    pid=$(cat "$tmp/leaver.$label.pid" 2>/dev/null || true)
+    [ -n "$pid" ] || fm_lint_fail_settled "the group-leaving descendant did not start ($label)"
+    if [ "$label" = over ]; then
+      [ "$rc" -eq 98 ] || fm_lint_fail_settled "the watch exited $rc, expected 98 for a root over its bound: $(cat "$tmp/err.$label")"
+      grep -q "^kill $pid 9\$" "$tmp/signals.over" || fm_lint_fail_settled "the counted descendant that left the group was not ended (recorded): $(cat "$tmp/signals.over")"
+    else
+      [ "$rc" -eq 0 ] || fm_lint_fail_settled "a root whose tree stays under the bound exited $rc: $(cat "$tmp/err.$label")"
+      [ ! -s "$tmp/signals.under" ] || fm_lint_fail_settled "the watch signalled a tree under the bound: $(cat "$tmp/signals.under")"
+    fi
+  done
+  wait 2>/dev/null || true
+  pass "the watch ends a counted descendant that left the process group by its exact identity and sends nothing to an under-bound tree (sends recorded, none delivered)"
 }
 
 fm_lint_test_cases=(
@@ -5223,7 +5339,7 @@ test_slow_ps_does_not_hold_admission_against_the_next_root
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
 test_a_warm_cache_hit_behind_an_occupied_budget_reserves_nothing_and_waits_for_nothing
-test_overlapping_version_probes_of_one_shellcheck_share_one_probe
+test_runs_with_different_delegates_each_probe_their_own_shellcheck
 test_a_compiled_launcher_is_probed_every_run_and_its_delegates_version_decides
 test_a_wrapper_around_shellcheck_is_probed_every_run_and_its_current_version_decides
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
@@ -5249,7 +5365,8 @@ test_a_host_that_loses_its_process_table_stops_the_run_after_one_refusal
 test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_pool
 test_the_version_probe_waits_only_for_its_own_lane
 test_a_run_never_takes_a_version_from_a_probe_that_started_before_it_waited
-test_a_hung_version_probe_keeps_its_lane_until_its_processes_end_and_waiters_report_blocked
+test_a_probe_past_its_bound_is_waited_for_and_reported_even_after_closing_its_output
+test_strict_mode_refuses_where_the_caps_are_not_enforced
 test_every_mode_takes_its_budget_from_the_same_host_wide_bound
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first
 test_the_roots_log_records_each_roots_queue_wait_in_wait_ms
@@ -5284,6 +5401,8 @@ test_the_watch_never_ends_an_unrelated_process_that_holds_a_members_old_pid
 test_the_watch_never_signals_a_member_known_only_by_its_start_second
 test_a_restarted_reader_keeps_a_member_that_left_the_group_and_was_orphaned
 test_a_watch_that_loses_every_reader_starts_no_further_root_and_fails_the_run
+test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted
+test_a_same_second_replacement_is_not_counted_against_the_root
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
 test_resident_watch_samples_a_slow_later_reply_by_ps

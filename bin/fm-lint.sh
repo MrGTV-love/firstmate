@@ -155,14 +155,17 @@
 # between runs: nothing proves which ShellCheck a script or a compiled launcher
 # runs), in the probe's own lane of the budget above: one probe at a time on the
 # host, held to 64 MiB by the resident watch on native macOS (it holds about
-# 15 MB for 0.02 s) and to the per-root address-space limit under the enforced
-# envelope, and never queued behind roots, so a run whose roots are all cache
-# hits reserves nothing in the roots' budget. Runs queued for the lane share the
-# next probe of one ShellCheck file (a run takes only a version whose probe started
-# after the run began waiting); the roots log's probe_wait_ms meta line records the
-# wait for the lane. A probe that runs past its bound (PROBE_BOUND_SECONDS, 30 s)
-# is never ended: it keeps the lane until it and every process it started have
-# ended, and it and every run waiting that long report "blocked" on stderr. With nothing held
+# 15 MB for 0.02 s); under the enforced envelope the probe is held only to the
+# per-root address-space limit, not to 64 MiB, and on another host without the
+# envelope nothing holds it (see the non-macOS rule below). It is never queued
+# behind roots, so a run whose roots are all cache hits reserves nothing in the
+# roots' budget; the probe's own bounded wait for its lane is the one wait such a
+# run has, an allowed wait inside B (Main 1775). Every run probes its own ShellCheck:
+# no run takes another run's answer. The roots log's probe_wait_ms meta line records
+# the wait for the lane. The probe is the lane holder's direct child, and the lane
+# is released when that child has exited; a probe that runs past its bound
+# (PROBE_BOUND_SECONDS, 30 s) is never ended, and it and every run waiting that
+# long report "blocked" on stderr and keep waiting. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, a record whose input
@@ -281,13 +284,19 @@
 # for a tick libproc did not answer in time) and names any attempt that gave
 # up its libproc reader, with the reason. The watch and the growth guard signal a
 # process only by its exact start time (seconds and microseconds): a member known
-# only by the whole second a process table prints is counted but never signalled,
-# and is recorded in the roots log's samples column as skipped; the guard stops
-# only processes inside its own gate's tree and resumes only the exact identity it
-# stopped. A restarted libproc reader does not lose a member the watch already
-# knew. A watch that loses every reader (libproc and the process table) for three
-# ticks lets its root finish but marks the run, which starts no further root and
-# fails, naming each root it did not start. Linux runs are never watched, and CI
+# only by the whole second a process table prints is never signalled, and is
+# recorded in the roots log's samples column as skipped; the guard stops only
+# processes inside its own gate's tree and resumes only the exact identity it
+# stopped (on Linux the identity is /proc's start time). A member outside the root's
+# group and its descendants (one that left and was orphaned) is counted only after
+# libproc reads it again with its exact start time; a pid that now holds another
+# start time is a replacement and is not counted, and a member known only to the
+# whole second makes the sample unknown rather than counted, so a replacement never
+# pushes the tree over the cap. A watch whose samples stay unknown or unreadable for
+# three ticks (every reader lost) lets its root run to its end, but that root fails
+# (status 96, reason unmeasured): no success is recorded for it, the run's gates
+# admit no new root, and the run fails, naming each root it did not start. Linux
+# runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # ShellCheck started outside this script (an agent or a test running it
 # directly) holds no slot and is not bounded by the pool; each admission counts
@@ -403,8 +412,8 @@ HOST_RSS_KIB=3670016
 PROBE_RESERVE_KIB=65536
 # The probe's time bound: a probe still running after it, and every run waiting for
 # the lane that long, report on stderr that they are blocked and keep waiting
-# (nothing is ended; the lane frees only when the probe's processes have ended).
-# `shellcheck --version` takes about 0.02 s.
+# (nothing is ended; the lane is released when the probe, the lane holder's direct
+# child, has exited). `shellcheck --version` takes about 0.02 s.
 PROBE_BOUND_SECONDS=30
 ROOTS_RSS_KIB=$((HOST_RSS_KIB - PROBE_RESERVE_KIB))
 # The host ledger: gate entries (entry.*) and each lint run's entry (run.*), which
@@ -524,6 +533,7 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
   case "$rc" in
     0) printf 'ok\n'; return 0 ;;
     97) printf 'limit-unavailable\n'; return 0 ;;
+    96) printf 'unmeasured\n'; return 0 ;;
     251|98) printf 'memory\n'; return 0 ;;
   esac
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] && [ "$rc" = 124 ]; then
@@ -808,7 +818,7 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
 # (its run is alive), whose pid is an ancestor of this process and runs this lint.
 # Anything else exits 2 and starts nothing.
 fm_lint_load_run_entry() {  # <mode>
-  local mode=$1 entry=${FM_LINT_INTERNAL_RUN_ENTRY:-} name owner perl python bounded memory rss rest
+  local mode=$1 entry=${FM_LINT_INTERNAL_RUN_ENTRY:-} name owner perl python bounded memory rss version rest
   name=${entry##*/}
   case "$entry" in
     "$HOST_LEDGER_DIR/$name") ;;
@@ -819,7 +829,7 @@ fm_lint_load_run_entry() {  # <mode>
     *) entry= ;;
   esac
   if [ -z "$entry" ] || [ -L "$entry" ] || [ ! -f "$entry" ] \
-    || ! IFS=$'\t' read -r owner perl python bounded memory rss rest < "$entry"; then
+    || ! IFS=$'\t' read -r owner perl python bounded memory rss version rest < "$entry"; then
     printf 'fm-lint.sh: %s starts a command only for a lint run whose entry is in the host ledger %s.\n' "$mode" "$HOST_LEDGER_DIR" >&2
     exit 2
   fi
@@ -829,6 +839,7 @@ fm_lint_load_run_entry() {  # <mode>
   case "$bounded" in none|perl) ;; *) owner= ;; esac
   case "$memory" in ''|0*|*[!0-9]*) owner= ;; esac
   case "$rss" in ''|0*|*[!0-9]*) owner= ;; esac
+  case "$version" in ''|*[!0-9A-Za-z.+-]*) owner= ;; esac
   if [ -z "$owner" ] || [ -n "$rest" ] || [ "${#rss}" -gt 7 ] || [ "$rss" -gt 8388608 ] \
     || ! "$perl" "$SELF_DIR/fm-lint-cache.pl" admitted-run "$HOST_LEDGER_DIR" "$entry"; then
     printf 'fm-lint.sh: %s starts a command only for a live lint run whose entry in %s is valid; %s is not.\n' "$mode" "$HOST_LEDGER_DIR" "$entry" >&2
@@ -839,7 +850,9 @@ fm_lint_load_run_entry() {  # <mode>
   FM_LINT_INTERNAL_BOUNDED=$bounded
   FM_LINT_INTERNAL_MEMORY_KIB=$memory
   FM_LINT_INTERNAL_RSS_KIB=$rss
+  FM_LINT_INTERNAL_SHELLCHECK_VERSION=$version
   export FM_LINT_PERL_BIN FM_LINT_INTERNAL_PYTHON FM_LINT_INTERNAL_BOUNDED FM_LINT_INTERNAL_MEMORY_KIB FM_LINT_INTERNAL_RSS_KIB
+  export FM_LINT_INTERNAL_SHELLCHECK_VERSION
 }
 
 # Private subprocess mode used only by the bounded parent above.
@@ -2358,23 +2371,33 @@ if ! census_problem=$(FM_LINT_INTERNAL_HOST_RSS_KIB="$ROOTS_RSS_KIB" \
   exit 2
 fi
 
-# The version probe is a ShellCheck start like any other: every run probes, in
-# every mode except --list-files (which starts no ShellCheck), and the version
-# policy applies to what that probe printed. No version is remembered across runs:
-# nothing proves which ShellCheck a launcher (a script, or a compiled program)
-# runs, so a version kept under the launcher's bytes could pass a changed
-# delegate. The probe has its own lane in the host-wide budget (PROBE_RESERVE_KIB,
-# one probe at a time on the host, held to that many KiB by the resident watch on
-# native macOS and to the per-root address-space limit under the enforced
-# envelope), and the roots' admission works with the rest (ROOTS_RSS_KIB), so a
+# Outside macOS without the enforced envelope (FM_LINT_REQUIRE_BOUNDS=1) nothing
+# holds a root to the per-root resident cap or the version probe to its 64 MiB
+# lane (the resident watch is macOS only). A strict run (--strict-version, or CI)
+# refuses there before any ShellCheck starts; any other run says on stderr that
+# those caps are not enforced on this host.
+if [ "$(uname)" != Darwin ] && [ "$BOUND_MECH" = none ]; then
+  if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
+    printf 'fm-lint.sh: strict mode refuses on %s: without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap (FM_LINT_ROOT_RSS_KIB) and the 64 MiB version-probe lane cannot be enforced on this host (the resident watch runs on macOS only). Run with FM_LINT_REQUIRE_BOUNDS=1, or on macOS.\n' "$(uname)" >&2
+    exit 2
+  fi
+  printf 'fm-lint.sh: WARNING: on %s without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap and the 64 MiB version-probe lane are not enforced; the host-wide admission still counts every root.\n' "$(uname)" >&2
+fi
+
+# The version probe is a ShellCheck start like any other: every run probes its own
+# ShellCheck, in every mode except --list-files (which starts no ShellCheck), and
+# the version policy applies to what that probe printed. No version is remembered
+# or shared across runs: nothing proves which ShellCheck a launcher (a script, or a
+# compiled program) runs for a given HOME and environment. The probe has its own lane
+# in the host-wide budget (PROBE_RESERVE_KIB, one probe at a time on the host, held
+# to that many KiB by the resident watch on native macOS, to the per-root
+# address-space limit under the enforced envelope, and by nothing on another host
+# without it), and the roots' admission works with the rest (ROOTS_RSS_KIB), so a
 # run whose roots are all cache hits waits only for another probe, never behind
-# roots holding the budget, and reserves nothing in the roots' budget. Runs that
-# queue for the lane share a probe: a run that waited takes the version printed by a
-# probe of the same file whose command started after the run began waiting, never
-# one read before (so a shared version is as fresh as the run's own probe would be).
-# A probe past PROBE_BOUND_SECONDS keeps the lane; it and every run waiting that
-# long report "blocked" on stderr and wait, and nothing ends it: the lane frees only
-# when the probe and every process it started have ended.
+# roots holding the budget, and reserves nothing in the roots' budget. The probe is
+# the lane holder's direct child; the lane is released when it has exited. A probe
+# past PROBE_BOUND_SECONDS keeps the lane; it and every run waiting that long report
+# "blocked" on stderr and wait, and nothing ends it.
 probe_rc=0
 resolved=
 probe_command=("$SHELLCHECK_BIN" --version)
@@ -2384,17 +2407,21 @@ if [ "$BOUND_MECH" != none ]; then
 elif [ "$(uname)" = Darwin ]; then
   probe_command=("$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" rsswatch "$PROBE_RESERVE_KIB" "$TMP_ROOT/probe.rss" -- "${probe_command[@]}")
 fi
-# shellcheck disable=SC2016  # $fh is a Perl variable in the -e program.
-probe_key=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; print Digest::SHA->new(256)->add("$ARGV[0]\0")->addfile($fh)->hexdigest' \
-  "$SHELLCHECK_BIN" 2>/dev/null) || probe_key=unreadable
 resolved=$(FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" \
-    "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" probe "$HOST_POOL_ROOT/admission.lock" "$probe_key" "$TMP_ROOT/probe.wait" \
+    "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" probe "$HOST_POOL_ROOT/admission.lock" "$TMP_ROOT/probe.wait" \
     "$PROBE_BOUND_SECONDS" -- "${probe_command[@]}" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
 # The probe's stderr (a refusal, or a blocked report while the lane is held past its
 # bound) reaches this run's stderr as it is written.
 if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
   exit 2
 fi
+# The version this run's own probe printed is part of the run's entry: the analysis
+# cache keys each result by it, with the resolved ShellCheck file and the HOME.
+case "$resolved" in ''|*[!0-9A-Za-z.+-]*) entry_version=unknown ;; *) entry_version=$resolved ;; esac
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$$" "$PERL_BIN" "$WATCH_PYTHON" "$BOUND_MECH" "$ROOT_MEMORY_KIB" "$ROOT_RSS_KIB" "$entry_version" > "$RUN_ENTRY" || {
+  printf 'fm-lint.sh: host ledger unusable (%s cannot be written); no root was started.\n' "$RUN_ENTRY" >&2
+  exit 2
+}
 # The probe's wait for its lane, in milliseconds, for the roots log.
 probe_wait_ms=$(tr -d '[:space:]' < "$TMP_ROOT/probe.wait" 2>/dev/null) || probe_wait_ms=
 case "$probe_wait_ms" in ''|*[!0-9]*) probe_wait_ms=unavailable ;; esac
