@@ -2369,13 +2369,16 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect() {
 # N4 host leg: the real fm-remote-secondmate-control.sh attribution verb, run as
 # the host runs it (FM_HOME is the seeded secondmate home, the endpoint record is
 # its private parent-route record in the fm-remote session), on the fake Herdr.
-remote_attribution() { # <case-dir> <id>; sets REMOTE_ATTRIBUTION_OUT, failing unless the verb exits 0
-  local dir=$1 id=$2 rc=0
+remote_attribution() { # <case-dir> <id> [<target>]; sets REMOTE_ATTRIBUTION_OUT, failing unless the verb exits 0
+  local dir=$1 id=$2 rc=0 target=${3:-}
+  # The parent passes the endpoint target it recorded; by default, the one the
+  # host-local record names.
+  [ -n "$target" ] || target=$(sed -n 's/^window=//p' "$dir/home/state/$id.meta" | tail -1)
   # shellcheck disable=SC2031 # PATH is read here, not modified
   REMOTE_ATTRIBUTION_OUT=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/wt" FM_FAKE_DIR="$dir/fake" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
-    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" 2>/dev/null) || rc=$?
+    "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" "$target" 2>/dev/null) || rc=$?
   [ "$rc" = 0 ] || fail "the attribution verb exited $rc: $REMOTE_ATTRIBUTION_OUT"
 }
 
@@ -2411,6 +2414,10 @@ test_remote_attribution_verb_reads_the_host_verdict() {
   printf old > "$dir/fake/recovery-spawn-gen"
   remote_attribution "$dir" "$id"
   assert_equals attribution=proceed "$REMOTE_ATTRIBUTION_OUT" "a live agent pinned to this launch proceeds"
+  # D4: the decision is bound to the target the parent recorded.
+  remote_attribution "$dir" "$id" "fm-remote:w9:p99"
+  assert_contains "$REMOTE_ATTRIBUTION_OUT" "attribution=refuse: " "a target other than the host's own endpoint refuses"
+  assert_contains "$REMOTE_ATTRIBUTION_OUT" "fm-remote:w9:p99" "the refusal names the recorded target it could not match"
   : > "$dir/fake/recovery-spawn-gen"
   rm -f "$dir/fake/herdr-agent-live"
   remote_attribution "$dir" "$id"

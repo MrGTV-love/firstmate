@@ -601,7 +601,7 @@ test_remote_unproven_agent_gets_no_request_record_or_nudge() {
     expect_code 3 "$rc" "remote verdict '$verdict' must leave the mate unreached"$'\n'"$out"
     assert_contains "$out" "unreached: sm2: its remote agent on remote-mac was not attributed to this task" \
       "remote verdict '$verdict' must be reported as an unattributed remote agent"
-    grep -q '^fm-remote-secondmate-control.sh attribution sm2$' "$dir/ssh.log" \
+    grep -q '^fm-remote-secondmate-control.sh attribution sm2 fm-remote:2ndmate-sm2$' "$dir/ssh.log" \
       || fail "the host verdict was never asked for"$'\n'"$(cat "$dir/ssh.log")"
     assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "remote verdict '$verdict' must send no request or nudge"
     assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "remote verdict '$verdict' must not relaunch"
@@ -626,7 +626,7 @@ test_remote_backend_other_than_herdr_refuses_before_any_effect() {
     if [ "$backend" = omitted ]; then
       # An omitted remote_backend is Herdr: the host is asked and the restart goes on.
       expect_code 0 "$rc" "an omitted remote_backend must ask the host and restart"$'\n'"$out"
-      grep -q '^fm-remote-secondmate-control.sh attribution sm2$' "$dir/ssh.log" || fail "the host verdict was not asked for an omitted backend"
+      grep -q '^fm-remote-secondmate-control.sh attribution sm2 fm-remote:2ndmate-sm2$' "$dir/ssh.log" || fail "the host verdict was not asked for an omitted backend"
       continue
     fi
     expect_code 3 "$rc" "remote_backend=$backend must leave the mate unreached"$'\n'"$out"
@@ -655,7 +655,7 @@ test_remote_omitted_backend_is_herdr_and_obeys_its_host() {
     fi
     out=$(run_restart "$dir" sm2); rc=$?
     unset FM_FAKE_ANSWER_STATUS FM_FAKE_REMOTE_ATTRIBUTION
-    grep -q '^fm-remote-secondmate-control.sh attribution sm2$' "$dir/ssh.log" \
+    grep -q '^fm-remote-secondmate-control.sh attribution sm2 fm-remote:2ndmate-sm2$' "$dir/ssh.log" \
       || fail "an omitted remote_backend ($verdict) was not asked of its host"$'\n'"$(cat "$dir/ssh.log")"
     assert_not_contains "$out" "names remote_backend" "an omitted remote_backend ($verdict) must not be refused as another backend"
     if [ "$verdict" = proceed ]; then
@@ -673,6 +673,37 @@ test_remote_omitted_backend_is_herdr_and_obeys_its_host() {
       || fail "an omitted remote_backend whose host refuses created a pending-reply record"
   done
   pass "Main 1630 an omitted remote_backend is herdr: its host is asked, and its answer decides"
+}
+
+# --- Main 1634 D4: the host decision is bound to the parent-recorded route -----
+test_remote_attribution_is_bound_to_the_recorded_route() {
+  local dir out rc case meta
+  for case in other-host no-target unregistered; do
+    dir=$(new_case remote-route)
+    setup_remote_case "$dir" sm2 ok
+    meta="$dir/home/state/sm2.meta"
+    case "$case" in
+      other-host)
+        grep -v '^remote_host=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+        printf 'remote_host=other-mac\n' >> "$meta" ;;
+      no-target)
+        grep -v '^remote_target=' "$meta" > "$meta.new" && mv "$meta.new" "$meta" ;;
+      unregistered)
+        : > "$dir/home/data/secondmates.md" ;;
+    esac
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS
+    expect_code 3 "$rc" "a $case route must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2:" "a $case route must be reported unreached"
+    assert_contains "$out" "route" "a $case route must name the route it could not bind"
+    assert_no_grep 'fm-remote-secondmate-control.sh attribution' "$dir/ssh.log" "a $case route must not ask an unbound host"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "a $case route must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "a $case route must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "a $case route created a pending-reply record"
+  done
+  pass "D4 a remote mate whose registry route differs from its record, or that records no target, is asked nothing and sent nothing"
 }
 
 test_remote_fleet_restart_obeys_initiating_policy() {
@@ -1093,6 +1124,7 @@ test_remote_mate_restarts_over_the_transport_hop
 test_remote_unproven_agent_gets_no_request_record_or_nudge
 test_remote_backend_other_than_herdr_refuses_before_any_effect
 test_remote_omitted_backend_is_herdr_and_obeys_its_host
+test_remote_attribution_is_bound_to_the_recorded_route
 test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown
