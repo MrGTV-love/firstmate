@@ -3582,6 +3582,182 @@ SH
   pass "the resident-memory watch ends a counted descendant that left the process group, and leaves an under-bound tree alone"
 }
 
+# fm_lint_identity_of <pid>: "<start seconds>:<start microseconds>" of a live
+# process, read through the helper the watch itself uses.
+fm_lint_identity_of() {
+  python3 -I -c 'import importlib.util, sys
+spec = importlib.util.spec_from_file_location("fp", sys.argv[1])
+fp = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fp)
+print("%d:%d" % fp.process_identity(fp.kinfo(int(sys.argv[2]))))' "$ROOT/bin/fm-proc-info.py" "$1"
+}
+
+# fm_lint_write_stub_python <dir> <real python>: a python3 stand-in for
+# FM_LINT_INTERNAL_PYTHON. It forwards everything to the real python except the
+# resident-tree reader (`<helper> rss-tree <pid>`), which it replaces by
+# FM_TEST_READER: "exit" (the reader dies before it replies) or "members" (each
+# request is answered with 300000 KiB and FM_TEST_MEMBER as the only member).
+fm_lint_write_stub_python() {
+  mkdir -p "$1"
+  cat > "$1/reader.py" <<'PY'
+import os, sys
+mode = os.environ.get("FM_TEST_READER", "")
+if mode == "exit":
+    sys.exit(1)
+pid, sec, usec = os.environ["FM_TEST_MEMBER"].split(":")
+for _ in sys.stdin:
+    sys.stdout.write('{"rss_kib":300000,"members":[[%s,%s,%s]],"uncounted":[]}\n' % (pid, sec, usec))
+    sys.stdout.flush()
+PY
+  cat > "$1/python3" <<SH
+#!/bin/sh
+if [ "\$2" = rss-tree ]; then exec '$2' '$1/reader.py'; fi
+exec '$2' "\$@"
+SH
+  chmod +x "$1/python3"
+}
+
+# The watch signals a process only when the pid still names the process it
+# saw: a pid is reused once its process ends, and a signal to the reused pid
+# would end an unrelated process.
+test_the_watch_signals_a_process_only_when_its_start_time_still_matches() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the libproc identity reader is macOS only): signal by start time"
+    return
+  fi
+  local tmp bystander identity sec usec out rc real_python i alive
+  tmp=$(fm_test_tmproot fm-lint-identity)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  sleep 300 &
+  bystander=$!
+  identity=$(fm_lint_identity_of "$bystander") || { kill -KILL "$bystander" 2>/dev/null; fail "could not read the start time of the bystander"; }
+  sec=${identity%%:*}
+  usec=${identity##*:}
+  # (1) The pid is live but its start time differs (the shape of a reused pid):
+  # nothing is sent, in the seconds or in the microseconds.
+  out=$(perl "$ROOT/bin/fm-lint-cache.pl" signal KILL "$bystander:$((sec - 100)):$usec" "$bystander:$sec:$((usec + 1))" 2>&1)
+  kill -0 "$bystander" 2>/dev/null || fail "a process whose pid matched but whose start time did not was signalled: $out"
+  [ "$out" = "mismatch $bystander"$'\n'"mismatch $bystander" ] || { kill -KILL "$bystander" 2>/dev/null; fail "the mismatch was not reported: $out"; }
+  # (2) An unreadable identity sends nothing and says so.
+  mkdir -p "$tmp/broken"
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/broken/python3"
+  chmod +x "$tmp/broken/python3"
+  out=$(FM_LINT_INTERNAL_PYTHON="$tmp/broken/python3" perl "$ROOT/bin/fm-lint-cache.pl" signal KILL "$bystander:$sec:$usec" 2>&1)
+  kill -0 "$bystander" 2>/dev/null || fail "a process whose identity could not be read was signalled: $out"
+  [ "$out" = "unreadable $bystander" ] || { kill -KILL "$bystander" 2>/dev/null; fail "the unreadable identity was not reported: $out"; }
+  # (3) The control: the exact start time is signalled, so the check does not
+  # simply refuse everything.
+  out=$(perl "$ROOT/bin/fm-lint-cache.pl" signal KILL "$bystander:$sec:$usec" 2>&1)
+  alive=1
+  for i in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$bystander" 2>/dev/null || { alive=0; break; }; sleep 0.2; done
+  wait "$bystander" 2>/dev/null || true
+  [ "$out" = "sent $bystander" ] || { kill -KILL "$bystander" 2>/dev/null; fail "the exact start time was not signalled: $out"; }
+  [ "$alive" -eq 0 ] || { kill -KILL "$bystander" 2>/dev/null; fail "the signal named by its exact start time did not end the process"; }
+  # (4) A process that is gone is reported gone, and nothing else is touched.
+  out=$(perl "$ROOT/bin/fm-lint-cache.pl" signal KILL "$bystander:$sec:$usec" 2>&1)
+  [ "$out" = "gone $bystander" ] || fail "an ended process was not reported gone: $out"
+  rc=0
+  perl "$ROOT/bin/fm-lint-cache.pl" signal KILL "abc" > /dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "a malformed member was accepted"
+  pass "a signal by start time reaches the process with that exact start time and sends nothing to a live pid whose start time differs or cannot be read"
+}
+
+# The same rule inside the watch: its tree member list is named by pid and start
+# time, so a member that ended and whose pid an unrelated process now holds is
+# not signalled when the tree is ended.
+test_the_watch_never_ends_an_unrelated_process_that_holds_a_members_old_pid() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the libproc identity reader is macOS only): reused member pid"
+    return
+  fi
+  local tmp bystander identity sec usec rc real_python label
+  tmp=$(fm_test_tmproot fm-lint-reused-pid)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  for label in reused control; do
+    sleep 300 &
+    bystander=$!
+    identity=$(fm_lint_identity_of "$bystander") || { kill -KILL "$bystander" 2>/dev/null; fail "could not read the bystander's start time"; }
+    sec=${identity%%:*}
+    usec=${identity##*:}
+    # The reader names the bystander's pid with a start time of 100 s earlier
+    # (a member that ended, whose pid was reused: the label "reused"), or with the
+    # bystander's own start time (the label "control").
+    [ "$label" = reused ] && sec=$((sec - 100))
+    rm -f "$tmp/rss.$label"
+    rc=0
+    FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=members FM_TEST_MEMBER="$bystander:$sec:$usec" \
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- sleep 20 > "$tmp/err.$label" 2>&1 || rc=$?
+    [ "$rc" -eq 98 ] || { kill -KILL "$bystander" 2>/dev/null; fail "the watch exited $rc ($label), expected 98 for a tree over its bound: $(cat "$tmp/err.$label")"; }
+    if [ "$label" = reused ]; then
+      kill -0 "$bystander" 2>/dev/null || fail "the watch ended an unrelated process that only held a member's old pid"
+      grep -q "^rss_signal_skipped=$bystander:mismatch\$" "$tmp/rss.$label" \
+        || { kill -KILL "$bystander" 2>/dev/null; fail "the skipped signal was not recorded: $(cat "$tmp/rss.$label")"; }
+      kill -KILL "$bystander" 2>/dev/null || true
+    else
+      sleep 0.5
+      if kill -0 "$bystander" 2>/dev/null; then kill -KILL "$bystander" 2>/dev/null; fail "the watch did not end a member whose pid and start time matched"; fi
+      ! grep -q '^rss_signal_skipped=' "$tmp/rss.$label" || fail "a matching member was recorded as skipped: $(cat "$tmp/rss.$label")"
+    fi
+    wait "$bystander" 2>/dev/null || true
+  done
+  pass "the watch ends a member by pid and start time, and leaves an unrelated process that holds a member's old pid alone and records the skip"
+}
+
+# While the libproc reader is down the watch samples the process table, and that
+# sample follows the tree by identity, not only the root's own process group.
+test_the_watch_follows_a_descendant_that_left_the_group_while_its_reader_is_down() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the libproc helper table is macOS only): reader-down tree sample"
+    return
+  fi
+  local tmp rc pid i alive=1 real_python
+  tmp=$(fm_test_tmproot fm-lint-reader-down)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  # A descendant is in the root's group for the first ticks, then leaves it, and
+  # then holds 160 MiB against a 100 MiB bound. The reader dies at once, so every
+  # sample is the table sample.
+  cat > "$tmp/leaver-parent.sh" <<'SH'
+perl -MPOSIX -MTime::HiRes=sleep -e 'sleep 1.6; POSIX::setpgid(0, 0); sleep 0.5; my $held = "x" x (160 * 1024 * 1024); sleep 30' &
+echo "$!" > "$1"
+sleep 8
+SH
+  rc=0
+  FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=exit \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
+    bash "$tmp/leaver-parent.sh" "$tmp/leaver.pid" > /dev/null 2>&1 || rc=$?
+  pid=$(cat "$tmp/leaver.pid" 2>/dev/null || true)
+  [ -n "$pid" ] || fail "the group-leaving descendant did not start"
+  [ "$rc" -eq 98 ] || { kill -KILL "$pid" 2>/dev/null || true; fail "the watch exited $rc with its reader down, expected 98: it did not count a descendant that left the group"; }
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    kill -0 "$pid" 2>/dev/null || { alive=0; break; }
+    sleep 0.2
+  done
+  [ "$alive" -eq 0 ] || { kill -KILL "$pid" 2>/dev/null || true; fail "the watch left a counted descendant that moved to another group running while its reader was down (pid $pid)"; }
+  grep -q '^rss_reader_unavailable=exited-at-start$' "$tmp/rss" || fail "the test did not run with the reader down: $(cat "$tmp/rss")"
+  # The control: the same shape with 8 MiB held stays under the bound, the root
+  # ends on its own status, and the descendant is left alone.
+  cat > "$tmp/small-parent.sh" <<'SH'
+perl -MPOSIX -MTime::HiRes=sleep -e 'sleep 1.6; POSIX::setpgid(0, 0); sleep 0.5; my $held = "x" x (8 * 1024 * 1024); sleep 20' &
+echo "$!" > "$1"
+sleep 4
+SH
+  rm -f "$tmp/rss"
+  rc=0
+  FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=exit \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
+    bash "$tmp/small-parent.sh" "$tmp/small.pid" > /dev/null 2>&1 || rc=$?
+  pid=$(cat "$tmp/small.pid" 2>/dev/null || true)
+  [ -n "$pid" ] || fail "the under-bound descendant did not start"
+  alive=0
+  kill -0 "$pid" 2>/dev/null && alive=1
+  kill -KILL "$pid" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "a root whose tree stays under the bound exited $rc with its reader down, expected 0"
+  [ "$alive" -eq 1 ] || fail "the watch ended a descendant that was under the bound"
+  pass "with its reader down the watch follows a descendant that left the group by identity, ends it over the bound and leaves an under-bound one alone"
+}
+
 # fm_lint_footprint_lint <tmp> [<env>...]: lint <tmp>/footprint.sh, whose
 # source-following run holds 8 MiB for 4 s, under the resident-watch shims and a
 # process budget, with a fake reader that reports 1024 KiB resident and 204800
@@ -4178,6 +4354,9 @@ test_resident_watch_reads_only_its_own_tree
 test_resident_watch_bounds_footprint_beyond_resident
 test_resident_watch_ends_a_tree_whose_memory_sits_in_descendants_and_an_orphan
 test_the_watch_ends_a_descendant_that_left_the_process_group
+test_the_watch_signals_a_process_only_when_its_start_time_still_matches
+test_the_watch_never_ends_an_unrelated_process_that_holds_a_members_old_pid
+test_the_watch_follows_a_descendant_that_left_the_group_while_its_reader_is_down
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
 test_resident_watch_samples_a_slow_later_reply_by_ps

@@ -18,6 +18,77 @@ use Fcntl qw(:flock F_SETFD);
 use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
 
+# Signalling by process identity. A process is named by its pid and the exact
+# time it started (the kernel's start seconds and microseconds), never by its pid
+# alone: a pid is reused once its process ends, and a signal to a reused pid ends
+# an unrelated process. fm_signal_by_identity (the private `signal` mode below
+# and the resident watch's end of a tree) sends <signal> to each "<pid>:<sec>:<usec>"
+# whose live process still has that start time, in one python process that reads
+# the identity and sends in the same step, and sends nothing to a process whose
+# start time differs or cannot be read. It returns { gone, mismatch, unreadable,
+# sent } as lists of pids. A usec of "-" compares the start second alone (an
+# identity taken from ps, which prints whole seconds). The residual is the few
+# microseconds between that read and that send, which no portable call closes.
+my $IDENTITY_SIGNAL_PY = <<'PY';
+import importlib.util, os, signal, sys
+spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
+fp = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fp)
+number = getattr(signal, "SIG" + sys.argv[2])
+for item in sys.argv[3:]:
+    pid, sec, usec = item.split(":")
+    pid = int(pid)
+    try:
+        identity = fp.process_identity(fp.kinfo(pid))
+    except LookupError:
+        print("gone", pid)
+        continue
+    except Exception:
+        print("unreadable", pid)
+        continue
+    if identity[0] != int(sec) or (usec != "-" and identity[1] != int(usec)):
+        print("mismatch", pid)
+        continue
+    try:
+        os.kill(pid, number)
+        print("sent", pid)
+    except ProcessLookupError:
+        print("gone", pid)
+    except OSError:
+        print("unreadable", pid)
+PY
+sub fm_signal_by_identity {
+    my ($name, @members) = @_;
+    my %result = (gone => [], mismatch => [], unreadable => [], sent => []);
+    return \%result unless @members;
+    my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
+    my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
+    my %seen;
+    if (-r $helper && open(my $py, '-|', $python, '-I', '-c', $IDENTITY_SIGNAL_PY, $helper, $name,
+            map { sprintf '%d:%d:%s', $_->[0], $_->[1], defined $_->[2] ? $_->[2] : '-' } @members)) {
+        while (my $line = <$py>) {
+            next unless $line =~ /\A(gone|mismatch|unreadable|sent) ([0-9]+)\n\z/;
+            push @{$result{$1}}, $2 + 0;
+            $seen{$2 + 0} = 1;
+        }
+        close $py;
+    }
+    # A process the helper did not answer for is unreadable: nothing is sent to it.
+    push @{$result{unreadable}}, grep { !$seen{$_} } map { $_->[0] } @members;
+    return \%result;
+}
+# Private mode: perl fm-lint-cache.pl signal <HUP|INT|TERM|KILL|CONT|STOP> <pid:sec:usec>...
+# prints "<gone|mismatch|unreadable|sent> <pid>" for each and exits 0 (the watch's
+# identity check, reachable by a test).
+if (($ARGV[0] // '') eq 'signal') {
+    my (undef, $name, @items) = @ARGV;
+    die "fm-lint-signal: invalid private invocation\n"
+        unless ($name // '') =~ /\A(?:HUP|INT|TERM|KILL|CONT|STOP)\z/ && @items && !grep { !/\A[0-9]+:[0-9]+:(?:[0-9]+|-)\z/ } @items;
+    my $result = fm_signal_by_identity($name, map { [split /:/] } @items);
+    for my $kind (qw(sent gone mismatch unreadable)) { print "$kind $_\n" for @{$result->{$kind}}; }
+    exit 0;
+}
+
 # Private gate protocol; bin/fm-lint.sh's header owns the public pool controls.
 # Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <run-id> <wait-file> -- <command...>
 # Commands inherit the flock descriptor across exec, so killing the gate cannot
@@ -629,6 +700,19 @@ if (($ARGV[0] // '') eq 'gate') {
 # the watch itself sits in a group of its own, out of reach of its owner's
 # group sweep. Samples that keep failing warn once and sampling goes on each
 # later tick rather than failing lint.
+# The watch never signals a process by its pid alone. It keeps, for each member
+# of the tree, the pid and the exact time the process started, taken from the
+# reader's reply (or, for the tick that ps or the helper's table answers, from
+# the start seconds they print), and ends a member only through
+# fm_signal_by_identity above, which sends nothing to a process whose start time
+# differs or cannot be read and names it on stderr and in <rss-file> as
+# rss_signal_skipped=<pid>:<mismatch|unreadable>. The root's own process group
+# is signalled as a group only while the watch has not yet reaped the root,
+# because that pid cannot be reused until then. While the reader is down, each tick
+# is sampled from the process table (ps, or the helper's table and memory when ps
+# is refused): the root's group, every member the watch already knew whose start
+# time still matches, and the descendants of all of them, so a descendant that
+# left the group is still counted and ended.
 if (($ARGV[0] // '') eq 'rsswatch') {
     require POSIX;
     require Time::HiRes;
@@ -646,7 +730,8 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
     my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
     my ($reader_failures, %samples) = (0, libproc => 0, ps => 0);
-    my @members;
+    my %known;    # pid => [start seconds, start microseconds or undef], every member seen
+    my ($child_reaped, %skipped);
     my $stop_reader = sub {
         return unless $reader_pid;
         kill 'KILL', $reader_pid;
@@ -667,6 +752,54 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         ($reader_fresh, $reader_answered) = ($first && $reader_pid ? 1 : 0, 0);
         return if $reader_pid;
         $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
+    };
+    # One read of the host's process table for the tick the reader cannot answer:
+    # { pid => [ppid, pgid, resident KiB, start seconds] } from ps, or, where ps is
+    # refused, from fm-proc-info.py (table for the ids and start, memory for the
+    # sizes); undef when neither answers.
+    my %month = (Jan => 0, Feb => 1, Mar => 2, Apr => 3, May => 4, Jun => 5, Jul => 6, Aug => 7, Sep => 8, Oct => 9, Nov => 10, Dec => 11);
+    my $start_seconds = sub {
+        my ($text) = @_;
+        return undef unless ($text // '') =~ /\A\w{3}\s+(\w{3})\s+([0-9]+)\s+([0-9]+):([0-9]+):([0-9]+)\s+([0-9]{4})\z/ && exists $month{$1};
+        return POSIX::mktime($5, $4, $3, $2, $month{$1}, $6 - 1900);
+    };
+    my $read_table = sub {
+        my %table;
+        {
+            no warnings 'exec';
+            local $ENV{LC_ALL} = 'C';
+            if (open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,ppid=,pgid=,rss=,lstart=')) {
+                while (my $line = <$ps>) {
+                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(\S+\s+\S+\s+[0-9]+\s+[0-9:]+\s+[0-9]+)\s*\z/;
+                    my $started = $start_seconds->($5) // next;
+                    $table{$1} = [$2 + 0, $3 + 0, $4 + 0, $started];
+                }
+                close $ps;
+            }
+        }
+        return \%table if %table;
+        return undef unless -r $helper;
+        no warnings 'exec';
+        my %rss;
+        if (open(my $py, '-|', $python, $helper, 'memory')) {
+            local $/;
+            my $json = <$py>;
+            close $py;
+            require JSON::PP;
+            my $rows = eval { JSON::PP::decode_json($json // '') };
+            for my $row (ref $rows eq 'ARRAY' ? @$rows : ()) {
+                $rss{$row->{pid}} = int($row->{rss_bytes} / 1024) if ref $row eq 'HASH' && defined $row->{pid} && defined $row->{rss_bytes};
+            }
+        }
+        if (open(my $py, '-|', $python, $helper, 'table', 'pid,ppid,pgid,lstart')) {
+            while (my $line = <$py>) {
+                next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(\S+\s+\S+\s+[0-9]+\s+[0-9:]+\s+[0-9]+)\s*\z/;
+                my $started = $start_seconds->($4) // next;
+                $table{$1} = [$2 + 0, $3 + 0, $rss{$1} // 0, $started];
+            }
+            close $py;
+        }
+        return %table ? \%table : undef;
     };
     # KiB of the group leader <pid>, its live descendants and the members of its
     # tree orphaned since the reader saw them, the larger of footprint and
@@ -691,8 +824,10 @@ if (($ARGV[0] // '') eq 'rsswatch') {
                 # descendant that left the root's process group: those are the
                 # processes this watch ends along with the group.
                 my $named = eval { require JSON::PP; JSON::PP::decode_json($answer)->{members} };
-                @members = map { $_->[0] } grep { ref $_ eq 'ARRAY' && defined $_->[0] && $_->[0] =~ /\A[0-9]+\z/ } @$named
-                    if ref $named eq 'ARRAY';
+                if (ref $named eq 'ARRAY') {
+                    %known = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) }
+                        grep { ref $_ eq 'ARRAY' && @$_ >= 3 && !grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
+                }
                 return $kib;
             }
             my $fresh = $reader_fresh;
@@ -702,32 +837,53 @@ if (($ARGV[0] // '') eq 'rsswatch') {
                 : ++$reader_failures > 3 ? 'restarts-failed' : undef;
             $start_reader->($root_pid) unless $reader_down;
         }
-        my (%parent, %rss);
-        {
-            no warnings 'exec';
-            if (open(my $ps, '-|', 'ps', '-o', 'pid=,ppid=,rss=', '-g', $root_pid)) {
-                while (my $line = <$ps>) {
-                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s*\z/;
-                    ($parent{$1}, $rss{$1}) = ($2, $3);
-                }
-                close $ps;
-            }
-        }
-        return undef unless exists $rss{$root_pid};
+        # The reader is down for this tick: sample the process table and select the
+        # tree by identity, not only the root's group.
+        my $table = $read_table->();
+        return undef unless $table && exists $table->{$root_pid};
         $samples{ps}++;
-        # Every member of the root's group counts, a descendant or an orphan whose
-        # parent left it to the init process.
+        my %children;
+        push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
+        # The root's group (the root is not yet reaped while this runs, so its pid
+        # and group are ours), every member known whose start time still matches,
+        # and the descendants of all of them.
+        my @queue = grep { $table->{$_}[1] == $root_pid } keys %$table;
+        push @queue, grep { $table->{$_} && $table->{$_}[3] == $known{$_}[0] } keys %known;
+        my %selected;
+        while (defined(my $member = shift @queue)) {
+            next if $selected{$member}++ || !$table->{$member} || $member == $$;
+            push @queue, @{$children{$member} // []};
+        }
+        delete $selected{$$};
+        my %next;
+        for my $pid (keys %selected) {
+            my $before = $known{$pid};
+            $next{$pid} = [$table->{$pid}[3], $before && $before->[0] == $table->{$pid}[3] ? $before->[1] : undef];
+        }
+        %known = %next;
         my $total = 0;
-        $total += $_ for values %rss;
+        $total += $table->{$_}[2] for keys %selected;
         return $total;
     };
     my ($child, $caught, $term_at, $over, $warned);
-    # End the whole counted tree: the root's process group, and every member the
-    # reader last named, which also reaches a descendant that moved to another
-    # group or was orphaned. The watch's own pid is never a target.
+    # End the whole counted tree: the root's process group, and every member known
+    # by pid and start time, which also reaches a descendant that moved to another
+    # group or was orphaned. The group is signalled as a group only until the root
+    # is reaped (its pid cannot be reused before that); every other member only
+    # through fm_signal_by_identity, which sends nothing to a pid whose process
+    # started at another time, or whose start time cannot be read, and the watch
+    # records it. The watch's own pid and the root's are never members to signal.
     my $end_tree = sub {
-        kill 'KILL', -$child if $child;
-        for my $pid (@members) { kill 'KILL', $pid unless $pid == $$ || $pid == ($child // 0); }
+        kill 'KILL', -$child if $child && !$child_reaped;
+        my @members = map { [$_, @{$known{$_}}] } grep { $_ != $$ && $_ != ($child // 0) } sort { $a <=> $b } keys %known;
+        my $result = fm_signal_by_identity('KILL', @members);
+        for my $kind (qw(mismatch unreadable)) {
+            for my $pid (@{$result->{$kind}}) {
+                next if $skipped{$pid};
+                $skipped{$pid} = $kind;
+                warn "fm-lint: resident-memory watch sent nothing to pid $pid: its start time $kind\n";
+            }
+        }
     };
     my ($peak, $misses) = (0, 0);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
@@ -735,7 +891,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         $SIG{$name} = sub {
             $caught = $name;
             $term_at //= Time::HiRes::time();
-            kill 'TERM', -$child if $child;
+            kill 'TERM', -$child if $child && !$child_reaped;
         };
     }
     # Perl restarts waitpid after a handled signal, so the sampling runs in the
@@ -745,7 +901,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         if (!$caught && getppid() != $owner) {
             $caught = 'TERM';
             $term_at = Time::HiRes::time();
-            kill 'TERM', -$child;
+            kill 'TERM', -$child unless $child_reaped;
         }
         $end_tree->() if $caught && Time::HiRes::time() - $term_at >= 5;
         return if $caught || $over;
@@ -793,6 +949,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     kill 'TERM', -$child if $caught;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 1, 1);
     my $reaped = waitpid($child, 0);
+    $child_reaped = 1 if $reaped == $child;
     my $status = $reaped == $child ? $? : 127 << 8;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
     $end_tree->() if $over || $caught;
@@ -800,6 +957,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     if (open(my $fh, '>>', $rss_file)) {
         printf {$fh} "rss_samples=libproc:%d,ps:%d\n", @samples{qw(libproc ps)};
         print {$fh} "rss_reader_unavailable=$reader_down\n" if $reader_down;
+        print {$fh} 'rss_signal_skipped=' . join(',', map { "$_:$skipped{$_}" } sort { $a <=> $b } keys %skipped) . "\n" if %skipped;
         close $fh;
     }
     exit 98 if $over;
