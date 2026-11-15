@@ -4223,13 +4223,17 @@ unc_teardown_functions() {  # prints the extracted functions
   python3 - "$ROOT/bin/fm-teardown.sh" <<'PY'
 import re, sys
 text = open(sys.argv[1]).read()
+optional = ('teardown_unclaimed_adopt_old_holder', 'teardown_unclaimed_pass', 'teardown_unclaimed_pass_checks',
+            'teardown_unclaimed_pass_refusal', 'teardown_unclaimed_foreign_live_pids')
 for name in ('teardown_nested_slot', 'teardown_unclaimed_candidate', 'teardown_unclaimed_early_proof',
-             'teardown_unclaimed_retire_gate', 'teardown_unclaimed_adopt_old_holder', 'teardown_unclaimed_note'):
+             'teardown_unclaimed_retire_gate', 'teardown_unclaimed_adopt_old_holder', 'teardown_unclaimed_note',
+             'teardown_unclaimed_pass', 'teardown_unclaimed_pass_checks', 'teardown_unclaimed_pass_refusal',
+             'teardown_unclaimed_foreign_live_pids'):
     m = re.search(r'^' + re.escape(name) + r'\(\) \{[^\n]*\n.*?^\}', text, re.M | re.S)
     if not m:
-        # only the adoption helper may be absent: the extraction then still runs the
-        # delivered gate, so the cases show what it does without it
-        if name == 'teardown_unclaimed_adopt_old_holder':
+        # the adoption helper and the pass functions may be absent: the extraction then
+        # still runs the delivered gate, so the cases show what it does without them
+        if name in optional:
             continue
         raise SystemExit('missing function: ' + name)
     print(m.group(0))
@@ -4243,7 +4247,7 @@ unc_route_harness() {  # <script-functions>; env: MODE HOLDER_EARLY ID_EARLY HOL
     OLD="recovered: old" PROTECTED="protected: new"
     FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER=$OLD FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=$PROTECTED
     TEARDOWN_RECORD_SLOT=/fixture/pool/1/repo TEARDOWN_ENCLOSING_SLOT= TEARDOWN_UNCLAIMED_SLOT= TEARDOWN_UNCLAIMED_SEEN= TEARDOWN_UNCLAIMED_EARLY=
-    TEARDOWN_RETURN_SLOT= TEARDOWN_NESTED_COPIES=()
+    TEARDOWN_RETURN_SLOT= TEARDOWN_NESTED_COPIES=() TEARDOWN_UNCLAIMED_LANDED=
     READ=early
     fm_treehouse_slot_owner_state() { FM_TREEHOUSE_SLOT_OWNER=absent; }
     fm_task_copy_treehouse_persists_recovered_leases() { return 0; }
@@ -4261,6 +4265,8 @@ unc_route_harness() {  # <script-functions>; env: MODE HOLDER_EARLY ID_EARLY HOL
       return 0
     }
     teardown_landed() { :; }
+    pids_with_cwd_under() { :; }
+    fm_task_copy_priors_inside() { :; }
     teardown_unclaimed_root_is_own() { return 1; }
     conclude_task_no_mistakes_run() { echo "HELPER conclude_run $1"; }
     retire_task_private_nm_launch_agents() { echo "HELPER retire_agents $1"; }
