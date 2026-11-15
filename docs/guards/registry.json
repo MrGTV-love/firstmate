@@ -850,7 +850,7 @@
       "id": "pooled-copy-no-discard",
       "version": "1",
       "owner": "bin/fm-spawn.sh",
-      "invariant": "Refreshing a pooled launch base never discards dirty, unlanded or ignored work: the copy moves only by a fast-forward that git itself refuses to complete over lost work, and any doubt skips the copy untouched.",
+      "invariant": "Refreshing a pooled launch base moves a copy only after a read-only proof that it is clean and idle, and only by a fast-forward that git itself refuses to complete over lost work; any doubt skips the copy with nothing written to it. One window is not excluded: an ignored file or a holder that appears after the proof and before the merge, which the second snapshot reports as a failed spawn after the fact.",
       "layer": "runtime-block",
       "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: site:bin/fm-spawn.sh:6eceab4636",
       "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the target tree tracks, has a live holder (any process in it that is not the spawn's own pane, a lock, a lease, or a contention row, readable or not), or has a stale submodule checkout; skips or refuses it with nothing written to it, and leases a skipped copy in place",
@@ -871,12 +871,12 @@
       "status": "active",
       "sites": [
         {
-          "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched\" >&2"
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target and a second snapshot shows no change ($(printf '%s' \"$merge_out\" | sed -n '1p'))\""
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target and a second snapshot shows no change ($(printf '%s' \"$merge_out\" | sed -n '1p'))\""
+          "match": "echo \"error: pooled copy '$slot' was detached from branch $FM_SLOT_PREVIOUS_BRANCH by this spawn's preparation, git refused the move, and the branch could not be put back; the copy stays detached and is kept as it is, and no worker is admitted\" >&2"
         },
         {
           "file": "bin/fm-spawn.sh",
