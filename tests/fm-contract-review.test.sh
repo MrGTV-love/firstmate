@@ -769,6 +769,8 @@ test_named_installed_skill_files_are_clean() {
     "$(tool_call read path "$d/CLI-EXAMPLE.md")"
     "$(tool_call read path skill://define-done-and-grading/CLI-EXAMPLE.md)"
     "$(tool_call read path skill://assess-done-and-grade/SKILL.md)"
+    "$(tool_call read path skill://define-done-and-grading/CLI-EXAMPLE.md:1-200)"
+    "$(tool_call read path skill://define-done-and-grading/OPERATIONAL-BOUNDARIES.md:raw)"
   )
   for call in "${calls[@]}"; do
     n=$((n + 1))
@@ -781,6 +783,7 @@ test_named_installed_skill_files_are_clean() {
   printf 'outside\n' >"$TMP_ROOT/outside-cli.md"
   ln -sf "$TMP_ROOT/outside-cli.md" "$d/CLI-EXAMPLE.md"
   for call in "$(tool_call read path "$d/MAINTAINERS.md")" "$(tool_call read path skill://define-done-and-grading/MAINTAINERS.md)" \
+    "$(tool_call read path skill://define-done-and-grading/MAINTAINERS.md:1-200)" \
     "$(tool_call read path "$d/CLI-EXAMPLE.md")" "$(tool_call read path skill://define-done-and-grading/CLI-EXAMPLE.md)" \
     "$(tool_call read path "$LEAK_ROOT/sources/raw-contract.md")"; do
     write_transcript "$log" "$LEAK_WORK" "$call"

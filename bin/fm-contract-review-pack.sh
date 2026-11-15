@@ -96,7 +96,7 @@
 #   or one of its .jsonl files) and judges every read it records. The report's own
 #   Inputs read list is the reviewer's declaration and is not evidence; a report
 #   (<work folder>/review.md) with no Inputs read list voids the round.
-#   Judged reads: read and edit paths (a trailing :selector such as :raw:1-11 or :-1 is
+#   Judged reads: read and edit paths and skill:// reads (a trailing :selector such as :raw:1-11 or :-1 is
 #   removed one segment at a time; the read is authorized when the path or one of these
 #   shorter forms is), every [<path>#...] target line of an edit with no path (an edit with
 #   neither is unverified), and grep, glob and find roots.
@@ -626,12 +626,15 @@ def judge_read(raw, cwd):
     if m:
         scheme, rest = m.group(1), m.group(2)
         if scheme == "skill":
-            name = rest.rstrip("/")
-            if name in named_skills:
-                name += "/SKILL.md"
-            if real(os.path.join(skills, name)) in skill_files:
-                return None
-            return "a skill path other than the named installed skill files"
+            name = rest
+            while True:
+                n = name.rstrip("/")
+                if real(os.path.join(skills, n + "/SKILL.md" if n in named_skills else n)) in skill_files:
+                    return None
+                head, sep, tail = name.rpartition(":")
+                if not sep or "/" in tail or not head:
+                    return "a skill path other than the named installed skill files"
+                name = head
         if scheme in ("http", "https"):
             pinned = ["https://raw.githubusercontent.com/%s/%s/docs/review-rubric.md" % (slug, rubric_rev),
                       "https://github.com/%s/blob/%s/docs/review-rubric.md" % (slug, rubric_rev)]
