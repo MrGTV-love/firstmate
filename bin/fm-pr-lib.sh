@@ -77,6 +77,7 @@ FM_PR_POLL_EXPECT_TEMPLATE_HASH=
 FM_PR_POLL_EXPECT_DATA_IDENTITY=
 FM_PR_POLL_EXPECT_CHECK_IDENTITY=
 FM_PR_POLL_TEMPLATE=
+FM_PR_POLL_CHECK_RENAMED=0
 FM_PR_POLL_STATE_DEVICE=
 FM_PR_POLL_SNAPSHOT_ID=
 FM_PR_POLL_SNAPSHOT_PROVIDER=
@@ -586,10 +587,14 @@ FM_PR_POLL_CHECK_CONFLICT=0
 fm_pr_poll_revoke_final() {
   local failed=0
   # Neutralize the runnable name first so a failed rearm cannot consume state
-  # whose transactional registration did not commit successfully. Another check
-  # in that name is never this publication's, so it is left in place.
+  # whose transactional registration did not commit successfully. Once this
+  # publication has renamed its check into the name, whatever the name holds
+  # is removed (a link or other file swapped in after the rename included).
+  # Before that rename, another check in that name is never this
+  # publication's, so it is left in place.
   if { [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; } \
-    && fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
+    && { [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] \
+      || fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; }; then
     rm -f -- "$FM_PR_POLL_CHECK_DEST" || failed=1
   fi
   if [ -e "$FM_PR_POLL_REG_DEST" ] || [ -L "$FM_PR_POLL_REG_DEST" ]; then
@@ -599,6 +604,7 @@ fm_pr_poll_revoke_final() {
     rm -f -- "$FM_PR_POLL_DATA_DEST" || failed=1
   fi
   if [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; then
+    [ "$FM_PR_POLL_CHECK_RENAMED" != 1 ] || failed=1
     ! fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE" || failed=1
   fi
   [ ! -e "$FM_PR_POLL_REG_DEST" ] && [ ! -L "$FM_PR_POLL_REG_DEST" ] || failed=1
@@ -682,6 +688,7 @@ fm_pr_poll_prepare() {
 # prepared generation, so no registration can name another generation's files.
 fm_pr_poll_publish_prepared() {
   FM_PR_POLL_CHECK_CONFLICT=0
+  FM_PR_POLL_CHECK_RENAMED=0
   [ -n "$FM_PR_POLL_DATA_TMP" ] && [ -n "$FM_PR_POLL_CHECK_TMP" ] \
     && [ -n "$FM_PR_POLL_REG_TMP" ] || return 1
   # Nothing is published over another check: refuse before the first rename.
@@ -744,6 +751,7 @@ fm_pr_poll_publish_prepared() {
     fm_pr_poll_revoke_final || true
     return 1
   fi
+  FM_PR_POLL_CHECK_RENAMED=1
   FM_PR_POLL_CHECK_TMP=
   if ! fm_pr_poll_artifacts_valid "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
     fm_pr_poll_revoke_final || true
