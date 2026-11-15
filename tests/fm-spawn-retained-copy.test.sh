@@ -148,7 +148,7 @@ test_unsupported_entry_paths_are_unproved() (
       expected=relative
     fi
     jq -n --arg held "$alias" --arg unsafe "$path" \
-      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "1", path: $unsafe}]}' \
+      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder", lease_id: "0123456789abcdef0123456789abcdef"}, {name: "1", path: $unsafe}]}' \
       > "${slot%/*/*}/treehouse-state.json" || fail "$shape: cannot build the pool state fixture"
     FM_TASK_COPY_POOL_STATE_FILE=
     FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -184,7 +184,7 @@ test_unleased_alias_beside_leased_entry_is_not_held() (
         dot) alias="$slot/./" ;;
         double-slash) alias="${slot%/*}//${slot##*/}" ;;
       esac
-      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s"}]}\n' \
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder","lease_id":"0123456789abcdef0123456789abcdef"},{"name":"1","path":"%s"}]}\n' \
         "$slot" "$alias" > "$dir/pool/treehouse-state.json"
       FM_TASK_COPY_POOL_STATE_FILE=
       FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -227,7 +227,7 @@ test_prefiltered_leased_alias_still_needs_repair() (
         ;;
     esac
     jq -n --arg slot "$slot" --arg alias "$alias" --arg leased_name "$leased_name" --arg order "$order" \
-      '{worktrees: ([{name: $leased_name, path: $alias, leased: ($order != "all-unleased"), lease_holder: "holder"}, {name: "1", path: $slot}] | if ($order | endswith("unleased-first")) then reverse else . end)}' \
+      '{worktrees: ([{name: $leased_name, path: $alias, leased: ($order != "all-unleased"), lease_holder: "holder", lease_id: "0123456789abcdef0123456789abcdef"}, {name: "1", path: $slot}] | if ($order | endswith("unleased-first")) then reverse else . end)}' \
       > "$dir/pool/treehouse-state.json" || fail "cannot build duplicate-name fixture"
     FM_TASK_COPY_POOL_STATE_FILE=
     FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -289,7 +289,7 @@ test_unleased_directory_identity_aliases_are_not_held() (
     esac
     [ "$alias" -ef "$slot" ] || fail "$spelling: fixture does not name the same directory"
     jq -n --arg held "$slot" --arg unleased "$alias" \
-      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "1", path: $unleased}]}' \
+      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder", lease_id: "0123456789abcdef0123456789abcdef"}, {name: "1", path: $unleased}]}' \
       > "${slot%/*/*}/treehouse-state.json"
     FM_TASK_COPY_POOL_STATE_FILE=
     FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -317,7 +317,7 @@ test_recovered_alias_beside_leased_entry_is_not_held() (
       dot) alias="$slot/./" ;;
       double-slash) alias="${slot%/*}//${slot##*/}" ;;
     esac
-    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder","lease_id":"0123456789abcdef0123456789abcdef"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
       "$slot" "$alias" "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" > "$dir/pool/treehouse-state.json"
     FM_TASK_COPY_POOL_STATE_FILE=
     FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -388,7 +388,7 @@ test_conflicting_unleased_alias_refuses_before_allocation() {
         double-slash) alias="${SLOT_DIR%/*}//${SLOT_DIR##*/}" ;;
       esac
       jq -n --arg slot "$SLOT_DIR" --arg alias "$alias" --arg order "$order" \
-        '{worktrees: ([{name: "1", path: $slot, leased: true, lease_holder: "holder"}, {name: "1", path: $alias}] | if $order == "unleased-first" then reverse else . end)}' \
+        '{worktrees: ([{name: "1", path: $slot, leased: true, lease_holder: "holder", lease_id: "0123456789abcdef0123456789abcdef"}, {name: "1", path: $alias}] | if $order == "unleased-first" then reverse else . end)}' \
         > "$CASE_DIR/pool/treehouse-state.json" || fail "cannot build conflicting-entry fixture"
       cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
       retained_fingerprint > "$CASE_DIR/before-copy"
@@ -422,7 +422,7 @@ test_conflicting_recovered_alias_refuses_before_allocation() {
       dot) alias="$SLOT_DIR/./" ;;
       double-slash) alias="${SLOT_DIR%/*}//${SLOT_DIR##*/}" ;;
     esac
-    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder","lease_id":"0123456789abcdef0123456789abcdef"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
       "$SLOT_DIR" "$alias" "$recovered" > "$CASE_DIR/pool/treehouse-state.json"
     cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
     assert_retained_refusal "$name" "carries Treehouse's recovered-state lease" \
@@ -442,7 +442,7 @@ test_unprovable_entry_path_refusal_names_no_lease() {
     path=1/project
     [ "$shape" != escaped ] || path="$CASE_DIR/pool/9/back\\slash"
     jq -n --arg held "$SLOT_DIR" --arg unsafe "$path" \
-      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "9", path: $unsafe}]}' \
+      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder", lease_id: "0123456789abcdef0123456789abcdef"}, {name: "9", path: $unsafe}]}' \
       > "$CASE_DIR/pool/treehouse-state.json" || fail "$shape: cannot build the pool state fixture"
     cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
     display_path=$(jq -rn --arg path "$path" '[$path] | @tsv') || fail "cannot encode the offending path"
@@ -576,6 +576,60 @@ test_recovered_slot_refuses_without_proven_capability() {
     cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$answer: refusal changed the pool state"
   done
   pass "a recovered lease keeps refusing allocation on a treehouse that does not prove persistent recovered leases, names the upgrade, and runs no pool command"
+}
+
+# Which leased entries need the capability proof (Main 1738). The consumer learns
+# the protected holder text only from a proven probe, so on a provider that did not
+# prove it, an entry is admitted as an ordinary lease only when it has a lease id,
+# no recovery reason and an ordinary holder. An entry with no lease id, with a
+# recovery reason, or whose holder begins with the recovered prefix has a
+# recovered shape (the live pools hold both: id-less, and with an id plus a
+# recovery reason) and is refused until the provider proves the capability. The
+# probe only runs for a recovered shape, and with the proof every shape is admitted
+# as before. A Firstmate home slot keeps its exemption and is not asked.
+test_unproven_provider_admits_only_ordinary_leases() {
+  local shape provider name entry out rc id=0123456789abcdef0123456789abcdef
+  for provider in unproven proven; do
+    for shape in ordinary idless idless-ordinary-holder reason-with-id recovered-prefix-with-id; do
+      name="shape-$provider-$shape"
+      make_retained_case "$name"
+      add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+      case "$shape" in
+        ordinary) entry=$(printf ',"leased":true,"lease_holder":"holder","lease_id":"%s"' "$id") ;;
+        idless) entry=$(printf ',"leased":true,"lease_holder":"%s"' "$PROTECTED_HOLDER") ;;
+        idless-ordinary-holder) entry=',"leased":true,"lease_holder":"holder"' ;;
+        reason-with-id) entry=$(printf ',"leased":true,"lease_holder":"holder","lease_id":"%s","recovery_reason":"state file was corrupt or truncated"' "$id") ;;
+        recovered-prefix-with-id) entry=$(printf ',"leased":true,"lease_holder":"recovered: another state file reason","lease_id":"%s"' "$id") ;;
+      esac
+      add_free_second_slot "$entry"
+      if [ "$provider" = proven ]; then install_capability_treehouse proven; else install_capability_treehouse failing; fi
+      retained_fingerprint > "$CASE_DIR/before-copy"
+      cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+      if [ "$provider" = unproven ] && [ "$shape" != ordinary ]; then
+        assert_retained_refusal "$name" "is not a Firstmate home and carries" \
+          "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true" \
+          "treehouse lease '"
+        assert_only_capability_probes "$provider/$shape"
+        grep -Fxq 'capabilities --json' "$CASE_DIR/treehouse-calls" || fail "$provider/$shape: the guard never probed the capability"
+        cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$provider/$shape: the refusal changed the pool state"
+        continue
+      fi
+      rc=0
+      out=$(run_retained_spawn "$name") || rc=$?
+      expect_code 0 "$rc" "$provider/$shape: the guard refused a slot it must admit"$'\n'"$out"
+      assert_not_contains "$out" "refusing allocation" "$provider/$shape: the guard still blocked allocation"
+      assert_contains "$out" "spawned new-$name" "$provider/$shape: spawn did not launch"
+      assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "$provider/$shape: spawn did not claim the free slot"
+      [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "$provider/$shape: spawn claimed the leased slot"
+      assert_only_capability_probes "$provider/$shape"
+      retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$provider/$shape: spawn changed the leased slot"
+      cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$provider/$shape: spawn wrote the pool state"
+      if [ "$provider" = unproven ]; then
+        ! grep -Fxq 'capabilities --json' "$CASE_DIR/treehouse-calls" || fail "$provider/$shape: an ordinary lease was probed although its shape needs no proof"
+      fi
+    done
+  done
+  pass "on a provider that did not prove the capability only an ordinary lease with a lease id is admitted; id-less, recovery-reason and recovered-prefix entries refuse and name the upgrade, and with the proof all are admitted"
 }
 
 # The capability-positive half: with the proof, a recovered slot on the
@@ -998,12 +1052,12 @@ test_nested_copy_in_leased_slot_allows_allocation() {
     name="leased-$spelling"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
-    add_free_second_slot ',"leased":true,"lease_holder":"holder"'
+    add_free_second_slot ',"leased":true,"lease_holder":"holder","lease_id":"0123456789abcdef0123456789abcdef"'
     if [ "$spelling" = alias ]; then
       # Treehouse state spelling the leased slot through a symlinked pool still
       # names that slot.
       ln -s "$CASE_DIR/pool" "$CASE_DIR/pool-alias"
-      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"2","path":"%s"}]}\n' \
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder","lease_id":"0123456789abcdef0123456789abcdef"},{"name":"2","path":"%s"}]}\n' \
         "$CASE_DIR/pool-alias/1/project" "$PANE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
     fi
     retained_fingerprint > "$CASE_DIR/before-copy"
@@ -1102,7 +1156,7 @@ test_secondmate_home_slot_with_other_project_copy_allows_allocation() {
     fm_git_init_commit "$other"
     add_nested_record "$sm_home/state/foreign.meta" "$other" "$other" "foreign-$name"
     if [ "$lease" = ordinary ]; then
-      entry=',"leased":true,"lease_holder":"sm"'
+      entry=',"leased":true,"lease_holder":"sm","lease_id":"0123456789abcdef0123456789abcdef"'
     else
       entry=$(printf ',"leased":true,"lease_holder":"%s"' "$recovered")
     fi
@@ -1164,6 +1218,7 @@ test_conflicting_recovered_alias_refuses_before_allocation
 test_unprovable_entry_path_refusal_names_no_lease
 test_unprovable_slot_hold_still_refuses
 test_recovered_slot_refuses_without_proven_capability
+test_unproven_provider_admits_only_ordinary_leases
 test_recovered_slot_allows_allocation_with_proven_capability
 test_proven_capability_does_not_relax_other_refusals
 test_old_holder_is_adopted_and_old_session_exit_cannot_sweep

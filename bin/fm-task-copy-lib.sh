@@ -740,24 +740,27 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 # legacy (leased, ordinary holder, no lease id), unleased, conflicting (more
 # than one entry names the slot), absent (no entry names it), or unreadable
 # (missing jq, unreadable state, or an unsupported entry path);
-# FM_TASK_COPY_LEASE_NAME, FM_TASK_COPY_LEASE_HOLDER and FM_TASK_COPY_LEASE_ID
-# to the matching entry's name, lease holder and lease id, or empty.
+# FM_TASK_COPY_LEASE_NAME, FM_TASK_COPY_LEASE_HOLDER, FM_TASK_COPY_LEASE_ID and
+# FM_TASK_COPY_LEASE_RECOVERY_REASON to the matching entry's name, lease holder,
+# lease id and recovery reason, or empty.
 # Returns 0 only for ordinary and recovered, the two states an exact conditional
 # treehouse return can release, 1 otherwise.
 FM_TASK_COPY_LEASE_STATE=
 FM_TASK_COPY_LEASE_NAME=
 FM_TASK_COPY_LEASE_HOLDER=
 FM_TASK_COPY_LEASE_ID=
+FM_TASK_COPY_LEASE_RECOVERY_REASON=
 fm_task_copy_pool_slot_lease() {  # <slot>
-  local slot=$1 state entries leased holder name path id matched=0
+  local slot=$1 state entries leased holder name path id reason matched=0
   state="${slot%/*/*}/treehouse-state.json"
   FM_TASK_COPY_LEASE_STATE=unreadable
   FM_TASK_COPY_LEASE_NAME=
   FM_TASK_COPY_LEASE_HOLDER=
   FM_TASK_COPY_LEASE_ID=
+  FM_TASK_COPY_LEASE_RECOVERY_REASON=
   command -v jq >/dev/null 2>&1 || return 1
-  entries=$(jq -r '.worktrees[]? | [("L" + (if .leased == true then "leased" else "unleased" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring)), ("I" + (.lease_id // "" | tostring))] | @tsv' "$state" 2>/dev/null) || return 1
-  while IFS=$'\t' read -r leased holder name path id; do
+  entries=$(jq -r '.worktrees[]? | [("L" + (if .leased == true then "leased" else "unleased" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring)), ("I" + (.lease_id // "" | tostring)), ("R" + (.recovery_reason // "" | tostring))] | @tsv' "$state" 2>/dev/null) || return 1
+  while IFS=$'\t' read -r leased holder name path id reason; do
     path=${path#P}
     [ -n "$path" ] || continue
     case "$path" in
@@ -770,6 +773,7 @@ fm_task_copy_pool_slot_lease() {  # <slot>
     FM_TASK_COPY_LEASE_NAME=${name#N}
     FM_TASK_COPY_LEASE_HOLDER=${holder#H}
     FM_TASK_COPY_LEASE_ID=${id#I}
+    FM_TASK_COPY_LEASE_RECOVERY_REASON=${reason#R}
     FM_TASK_COPY_LEASE_STATE=${leased#L}
   done <<< "$entries"
   if [ "$matched" -gt 1 ]; then
@@ -880,6 +884,28 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
   return 1
 }
 
+# Whether pool slot <slot>'s single leased entry has a recovered shape: no lease
+# id, a recovery reason, or a holder that begins with "recovered:". The live pools
+# hold two such shapes (recovered entries with no lease id, and recovered entries
+# with a lease id plus a recovery reason), and every ordinary lease carries a lease
+# id and no recovery reason, so a protected recovered entry cannot be told from an
+# ordinary one by its holder text, which a consumer learns only from a proven
+# capability probe. An entry that is not a single leased one (unleased, absent,
+# conflicting, unreadable) is not judged here. Returns 0 for a recovered shape.
+fm_task_copy_pool_slot_recovered_shape() {  # <slot>
+  fm_task_copy_pool_slot_lease "$1" || true
+  case "$FM_TASK_COPY_LEASE_STATE" in
+    ordinary|legacy|recovered) ;;
+    *) return 1 ;;
+  esac
+  [ -z "$FM_TASK_COPY_LEASE_ID" ] && return 0
+  [ -n "$FM_TASK_COPY_LEASE_RECOVERY_REASON" ] && return 0
+  case "$FM_TASK_COPY_LEASE_HOLDER" in
+    recovered:*) return 0 ;;
+  esac
+  return 1
+}
+
 # True when no pool slot of <project> that treehouse get could hand out strictly
 # contains the current copy (worktree=) of a task record in this home or any
 # locally registered Firstmate home. treehouse get resets and reassigns the slot
@@ -894,7 +920,9 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
 # holder: on a proven treehouse one treehouse status, run once per process
 # (fm_task_copy_current_pool_listing), adopts it under the protected holder at
 # its first state lock, lease kept and nothing moved, and the state is read
-# again; a slot still on the old holder refuses. Recovered leases are never
+# again; a slot still on the old holder refuses. A leased entry of a recovered
+# shape (fm_task_copy_pool_slot_recovered_shape) is admitted only on a proven
+# treehouse, probed before it is admitted. Recovered leases are never
 # converted to firm leases here. A uniquely recorded unleased slot names the treehouse
 # lease command that holds it in place without touching it; teardown's
 # treehouse return releases that lease with the slot. Conflicting records
@@ -904,7 +932,7 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
 # that cannot be read is named in one warning line and skipped: one broken home
 # must not stop every allocation for a project.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
-  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy
+  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy is_home
   local -a homes=()
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -922,6 +950,22 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
       slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
       fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
+      # A leased entry of a recovered shape is a durable exclusion only on a
+      # provider that proved the capability, which is probed here, before the entry
+      # is admitted; an unproven or failing provider leaves it refused. Only an
+      # entry with a lease id, no recovery reason and an ordinary holder is admitted
+      # without the proof, and a Firstmate home slot keeps its own exemption.
+      if [ "$FM_TASK_COPY_SLOT_STATE" = held ]; then
+        is_home=0
+        for home in ${homes[@]+"${homes[@]}"}; do
+          [ "$home" != "$slot" ] || is_home=1
+        done
+        if [ "$is_home" = 0 ] && fm_task_copy_pool_slot_recovered_shape "$slot" \
+            && ! fm_task_copy_treehouse_persists_recovered_leases; then
+          FM_TASK_COPY_SLOT_STATE=recovered
+          FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries a lease of a recovered shape in Treehouse state (no lease id, a recovery reason, or a recovered holder; holder '$FM_TASK_COPY_LEASE_HOLDER')"
+        fi
+      fi
       if [ "$FM_TASK_COPY_SLOT_STATE" = recovered ] && fm_task_copy_treehouse_persists_recovered_leases; then
         fm_task_copy_current_pool_listing "$project" || true
         FM_TASK_COPY_POOL_STATE_FILE=
