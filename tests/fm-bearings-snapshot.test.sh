@@ -1172,6 +1172,33 @@ test_toon_json_parity() {
   pass "TOON and JSON are parity representations of the same model"
 }
 
+# The opt-in actions surface carries the canonical snapshot's send choice beside
+# each flagless send/steer command (ship and secondmate alike), in JSON and in
+# TOON, so a sender reading only this surface learns the choice before the
+# refusal does (bin/fm-send.sh header, "Decision closure").
+test_actions_surface_carries_the_send_choice() {
+  local home fakebin json toon hdr id
+  home=$(make_home actions-choice); write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json --fields actions)
+  for id in ship-task mate; do
+    printf '%s' "$json" | jq -e --arg id "$id" '
+      [.actions[] | select(.id == $id)] | length == 1 and (.[0].choice
+        | contains("--resolve-key <key>") and contains("--answers-none") and contains("bin/fm-send.sh header"))
+    ' >/dev/null || fail "the actions surface must carry the send choice for $id: $(printf '%s' "$json" | jq -c '.actions')"
+  done
+  printf '%s' "$json" | jq -e '
+    (.actions[] | select(.id == "mate") | .steer) == "bin/fm-send.sh fm-mate \u0027<request>\u0027"
+    and (.actions[] | select(.id == "ship-task") | .steer) == "bin/fm-send.sh fm-ship-task \u0027<instruction>\u0027"
+  ' >/dev/null || fail "the projected send commands must stay the flagless canonical commands: $(printf '%s' "$json" | jq -c '.actions')"
+  toon=$(run_prepared "$home" "$fakebin" --fields actions)
+  hdr=$(printf '%s' "$toon" | grep -E '^actions\[[0-9]+\]\{' || true)
+  assert_contains "$hdr" "choice" "the TOON actions table must carry a choice column"
+  assert_contains "$toon" "--answers-none" "the TOON actions rows must carry the choice text"
+  assert_contains "$toon" "--resolve-key <key>" "the TOON actions rows must carry the choice text"
+  pass "the bearings actions surface carries the send choice beside each flagless send command"
+}
+
 test_open_decision_surfaces_end_to_end() {
   local home fakebin json
   home=$(make_home e2e-decision); write_fixture "$home"
@@ -3594,6 +3621,7 @@ test_underway_and_gate_rows_carry_the_durable_name_and_filed_date
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_main_captain_readiness_matches_secondmate_projection
 test_completed_scout_report_not_pending
+test_actions_surface_carries_the_send_choice
 test_open_decision_surfaces_end_to_end
 test_report_pointers_surface
 test_queued_item_prose_never_hides_it
