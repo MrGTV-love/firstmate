@@ -757,15 +757,8 @@ test_cached_success_does_not_wait_for_host_slots() {
   repo="$tmp/repo"
   fm_lint_small_repo "$repo"
   fakebin=$(fm_fakebin "$tmp/fake")
-  cat > "$fakebin/shellcheck" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = --version ]; then
-  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
-  exit 0
-fi
-exit 0
-SH
-  chmod +x "$fakebin/shellcheck"
+  # A native stand-in: a script is a wrapper and is probed every run.
+  fm_lint_native_version_stub "$fakebin" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): cached success does not wait for host slots"; return; }
   # The warm-up runs in the pool the hit run uses, as two runs of one user do in
   # the host pool: the pool then knows this ShellCheck binary's version and the
   # hit run starts no version probe, which would have to queue.
@@ -1779,14 +1772,14 @@ SH
     || fail "the probe of a run with an empty pool waited $(perl -e "printf '%.1f', $a_probe - $t0") s"
   perl -e 'exit(($ARGV[0] >= $ARGV[1] - 0.05) ? 0 : 1)' "$b_probe" "$a_end" \
     || fail "the probe of run b started at $b_probe, before run a's root ended at $a_end: a ShellCheck start outside the admission"
-  # A binary the pool already knows starts no probe: a third run of binary a
-  # leaves the probe log with its one earlier line.
+  # A script is a wrapper, whose version is not a function of its bytes, so it is
+  # probed every run: a third run of wrapper a adds a second line to the probe log.
   env HOME="$tmp/home.a" XDG_CACHE_HOME="$tmp/home.a/.cache" FM_HOME="$tmp/fm.a" \
     FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 FM_TEST_MEM_HOLD=1 \
     PATH="$tmp/bin.a:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/c.out" 2>&1 \
     || fail "the third run failed"$'\n'"$(cat "$tmp/c.out")"
-  [ "$(grep -c '^a ' "$tmp/probe.log")" -eq 1 ] || fail "a binary the pool knew started another probe: $(cat "$tmp/probe.log")"
-  grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/c.out" || fail "the third run did not print the remembered version"$'\n'"$(cat "$tmp/c.out")"
+  [ "$(grep -c '^a ' "$tmp/probe.log")" -eq 2 ] || fail "a wrapper script was not probed again on its third run: $(cat "$tmp/probe.log")"
+  grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/c.out" || fail "the third run did not print the probed version"$'\n'"$(cat "$tmp/c.out")"
   pass "the version probe waits for another run's root like a root does (probe b $(perl -e "printf '%.2f', $b_probe - $a_end") s after the root ended) and does not wait with an empty pool"
 }
 
@@ -1797,7 +1790,7 @@ fm_lint_max_overlap() {
 }
 
 test_every_mode_takes_its_budget_from_the_same_host_wide_bound() {
-  local tmp repo mode holder pid rc queued starts
+  local tmp repo mode holder pid rc queued starts elapsed started_at
   local -a modes
   tmp=$(fm_test_tmproot fm-lint-modes)
   repo="$tmp/repo"
@@ -1854,6 +1847,7 @@ SH
     [ "$mode" != partition ] || lint=$repo/bin/fm-lint.sh
     [ "$mode" != ci-bounds ] || require=1
     rc=0
+    started_at=$SECONDS
     env HOME="$tmp/home.$mode" XDG_CACHE_HOME="$tmp/home.$mode/.cache" FM_HOME="$tmp/fm.$mode" \
       FM_LINT_SLOT_DIR="$tmp/pool.$mode" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 \
       FM_LINT_ROOT_MEMORY_KIB=33554432 FM_LINT_REQUIRE_BOUNDS="$require" FM_LINT_TELEMETRY="$tmp/$mode.tsv" \
@@ -1862,8 +1856,11 @@ SH
     wait "$holder" || fail "the run that holds the budget failed ($mode)"
     [ "$rc" -eq 0 ] || fail "the $mode run failed behind a run that holds the budget (rc=$rc)"$'\n'"$(cat "$tmp/$mode.out")"
     queued=$(awk -F '\t' '$1 == "end" { if ($17 + 0 > m) m = $17 + 0 } END { print m + 0 }' "$tmp/$mode.roots.tsv")
-    [ "$queued" -ge 1000 ] \
-      || fail "$mode: no root waited for the budget that another run held (longest queue $queued ms)"$'\n'"$(cat "$tmp/$mode.roots.tsv")"
+    elapsed=$((SECONDS - started_at))
+    # The wait is a root's queue time, or, for a script ShellCheck (probed every
+    # run, in the same admission), the probe's own wait before any root begins.
+    { [ "$queued" -ge 1000 ] || [ "$elapsed" -ge 3 ]; } \
+      || fail "$mode: nothing waited for the budget that another run held (longest root queue $queued ms, run took $elapsed s)"$'\n'"$(cat "$tmp/$mode.roots.tsv")"
     [ "$(fm_lint_max_overlap "$tmp/mem.starts.spans")" -eq 1 ] \
       || fail "$mode: two stand-in analyses held their memory at once behind a charge above the budget"$'\n'"$(cat "$tmp/mem.starts.spans")"
   done
