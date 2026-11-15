@@ -5417,7 +5417,7 @@ test_the_exact_member_reader_counts_only_an_unchanged_identity() {
 # (Main 1791 item 2) The probe lane is a record naming the probe by its exact
 # identity; it frees only when that process has provably ended. A record left by a
 # run whose helper died, naming a probe that still runs (a test-owned process that
-# ends on its own after 4 s), holds the lane: the next run reports blocked, starts no
+# ends on its own after 8 s), holds the lane: the next run reports blocked, starts no
 # probe, and probes once that process has ended. The control: a record naming a
 # process that has ended frees the lane at once. The copy's bound is 1 s.
 test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends() {
@@ -5425,19 +5425,22 @@ test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends() {
     pass "SKIP (the libproc identity reader is macOS only): probe lane record"
     return
   fi
-  local tmp repo holder identity rc=0 probe_wait short short_id
+  local tmp repo holder identity rc=0 probe_wait short short_id waited
   tmp=$(fm_test_tmproot fm-lint-probe-record)
   repo=$(fm_lint_isolated_copy "$tmp" record)
   perl -pi -e 's{^PROBE_BOUND_SECONDS=.*$}{PROBE_BOUND_SECONDS=1}' "$repo/bin/fm-lint.sh"
   fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
-  sleep 5 > /dev/null 2>&1 &
+  sleep 8 > /dev/null 2>&1 &
   holder=$!
   identity=$(fm_lint_identity_of "$holder") || fm_lint_fail_settled "could not read the start time of the stand-in probe"
   printf '999999\t%s\t%s\t%s\t0\n' "$holder" "${identity%%:*}" "${identity##*:}" > "$tmp/record/host/admission.lock.probe.holder"
   : > "$tmp/starts.log"
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
       FM_LINT_TELEMETRY="$tmp/held.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/held.out" 2>&1 ) &
-  sleep 3
+  # The run needs a second or more to reach the lane (its census first, longer under
+  # load) and then waits past the 1 s bound: look for its report for up to 6 s.
+  waited=0
+  while ! grep -q 'blocked: the version probe lane' "$tmp/held.out" && [ "$waited" -lt 60 ]; do sleep 0.1; waited=$((waited + 1)); done
   [ ! -s "$tmp/starts.log" ] || fm_lint_fail_settled "a probe started while the lane record named a probe that still runs: $(cat "$tmp/starts.log")"
   grep -q 'blocked: the version probe lane' "$tmp/held.out" || fm_lint_fail_settled "the waiting run did not report it was blocked: $(cat "$tmp/held.out")"
   wait "$!" || rc=$?
