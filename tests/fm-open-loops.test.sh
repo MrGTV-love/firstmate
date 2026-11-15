@@ -2244,6 +2244,23 @@ git_('-C', land_wl, 'push', '-q', 'origin', 'main')
 git_('-C', work_landed, 'fetch', '-q', 'origin')
 v4_task('work-landed', copy=work_landed, verb='working', note='building', state='working', live=True)
 v4_task('work-empty', copy=v4_copy('work-empty', work=False), verb='working', note='starting', state='working', live=True)
+# Main 1968 (cov2-1): a pool copy that only synced to a newer origin/main has moved off its recorded slot base with
+# nothing of its own. While its worker reads working with no done report and no PR, it owes no cleanup; after a
+# done report the same shape is the done-reported delivery rule's, and it owes plain teardown.
+def v4_synced(name, verb):
+    copy = v4_copy(name, work=False)
+    slot_base = git_('-C', copy, 'rev-parse', 'HEAD')
+    mover = world / ('v4-move-' + name)
+    git_('clone', '-q', v4_origin, mover)
+    (mover / (name + '-main.txt')).write_text('main moved\n')
+    git_('-C', mover, 'add', '.'); git_('-C', mover, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'main moves under ' + name)
+    git_('-C', mover, 'push', '-q', 'origin', 'main')
+    git_('-C', copy, 'fetch', '-q', 'origin'); git_('-C', copy, 'reset', '-q', '--hard', 'origin/main')
+    v4_task(name, copy=copy, verb=verb, note='synced to main' if verb == 'working' else 'delivered', state='working', live=True)
+    with open(v4 / f'state/{name}.meta', 'a') as meta:
+        meta.write(f'slot_base_sha={slot_base}\n')
+v4_synced('work-synced', 'working')
+v4_synced('work-synced-done', 'done')
 # Round-4 F5.2: two PR-carried parents merged locally, with an extra change committed in the merge itself that
 # the merged PR never carried, is not landed. Control: the same local merge with no extra change is landed.
 def v4_local_merge(name, extra):
@@ -2462,8 +2479,14 @@ f4 = [
     ('prune-reason-labeled', 'fin-pending' in cleanup and 'merge-prune' in cleanup['fin-pending']['next_action']
      and 'plain bin/fm-teardown.sh fin-pending ended' not in cleanup['fin-pending']['next_action'], mine('fin-pending')),
     # Round-4 F5.1: landed content with no PR and no done report, worker still working: the cleanup row exists.
-    ('content-landed-working-no-pr', 'work-landed' in cleanup and 'bin/fm-teardown.sh work-landed' in cleanup['work-landed']['next_action'],
-     mine('work-landed')),
+    # Main 1968: landed content alone owes no cleanup while the worker reads working with no done report or PR;
+    # its check-in row stays.
+    ('content-landed-working-no-pr-keeps-check-in', 'work-landed' not in cleanup and 'work-landed' not in by_cat('pending_acceptance')
+     and 'work-landed' in by_cat('silent_report'), mine('work-landed')),
+    ('synced-working-no-cleanup', 'work-synced' not in cleanup and 'work-synced' not in by_cat('pending_acceptance')
+     and 'work-synced' in by_cat('silent_report'), mine('work-synced')),
+    ('synced-after-done-report-cleanup', 'work-synced-done' in cleanup
+     and cleanup['work-synced-done']['next_action'].startswith('run plain bin/fm-teardown.sh work-synced-done;'), mine('work-synced-done')),
     ('working-with-no-commits-no-cleanup', 'work-empty' not in cleanup and 'work-empty' not in by_cat('pending_acceptance'),
      mine('work-empty')),
     # Round-4 F5.2: a local merge with an extra change is not landed and keeps an unlanded row naming that merge.

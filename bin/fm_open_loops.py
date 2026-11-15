@@ -1306,12 +1306,9 @@ class Collector:
         # A merged PR is a finished deliverable whether or not the worker ever reported done.
         pr = self.source("completion PR " + ident, self.pr_state, pr_url) if pr_url else None
         merged = bool(pr and pr.get("merged_at"))
-        # Landed content with positive evidence of delivery is finished too, done report or not: a working ship
-        # with no PR whose own commits are already on the default branch owes its cleanup.
-        content = False
-        if not (closed or verb == "done" or state == "done" or merged) and task["kind"] == "ship" and state == "working":
-            content = bool(self.source("finished deliverable " + ident, self.delivered, task))
-        if not (closed or verb == "done" or state == "done" or merged or content):
+        # A worker still reading working owns its task: landed content alone cannot tell its own landed commit from
+        # a sync to main, so it owes cleanup only after a done report or a merged PR (Main 1968).
+        if not (closed or verb == "done" or state == "done" or merged):
             self.attach_refusal(ident, pr_url, refusal, refused)
             return
         if merged and not self.captain_dropped(task) and self.merged_cleanup_blocked(task, ident, pr, refusal, refused):
@@ -1319,9 +1316,7 @@ class Collector:
         if state in ("working", "paused", "blocked", "parked") and not closed and not done_refused:
             # A worker still reading working after its done report may be running its pipeline: that is
             # progress, not a stranded task. Once its deliverable is delivered, the cleanup is owed anyway.
-            if content:
-                landed = True
-            elif state == "working" and (verb == "done" or merged):
+            if state == "working" and (verb == "done" or merged):
                 landed = self.source("finished deliverable " + ident, self.delivered, task)
             if not landed:
                 self.attach_refusal(ident, pr_url, refusal, refused)
