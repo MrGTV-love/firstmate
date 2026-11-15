@@ -214,7 +214,7 @@ The watcher's own re-ring ladder for an unhandled inbox record is unchanged and 
 Unset, those expectations leave these scripts unchanged.
 It goes on only on the exact bytes `attribution=proceed` plus one newline with a zero transport status.
 A `remote_backend` other than herdr (omitted means herdr), a refusal, no answer, extra output, or a host whose code lacks the verb leaves the mate unreached with nothing sent.
-The verb validates the home before it loads anything beyond the backend dispatcher, loads nothing that writes when sourced, writes nothing, and creates no directory.
+The verb validates the home before it loads anything beyond the backend dispatcher, loads nothing that writes when sourced, writes no state and no record, and creates no directory; it validates the endpoint on a private temporary copy of the record, which it removes at once.
 
 ### Live Herdr task attribution
 
