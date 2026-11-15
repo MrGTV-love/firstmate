@@ -132,6 +132,17 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
             else:
                 real_sleep(seconds)
         time.sleep = barrier_sleep
+    if os.environ.get('CASE_SPILL_BARRIER'):
+        import subprocess, time, pathlib
+        real_run = subprocess.run
+        def barrier_run(args, *rest, **kw):
+            # Every gate of a burst reaches its wake append, then all of them run it at once.
+            if any('fm_wake_pending_settle' in str(part) for part in args):
+                gather = pathlib.Path(os.environ['CASE_SPILL_BARRIER'])
+                (gather / ('arrived-%d' % os.getpid())).touch()
+                while len(list(gather.glob('arrived-*'))) < int(os.environ['CASE_SPILL_COUNT']): time.sleep(0.005)
+            return real_run(args, *rest, **kw)
+        subprocess.run = barrier_run
     if os.environ.get('CASE_KILL_BEFORE_PID'):
         import signal
         real_write = os.write
@@ -730,6 +741,8 @@ def cleanup():
         file.touch()
     for folder in root.glob('*'):
         if folder.is_dir(): (folder / 'release-children').touch()
+    for marker in root.glob('*/*.escapee'):
+        marker.with_name(marker.name + '-release').touch()
     for pid_file in root.glob('*/nested.pid'):
         if (pid_file.parent / 'nested.started').exists(): continue
         try: os.killpg(int(pid_file.read_text()), signal.SIGKILL)

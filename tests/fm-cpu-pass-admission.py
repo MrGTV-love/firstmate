@@ -330,6 +330,13 @@ try:
             entry = 'holding_only=[x:ci-waiting:0:unseen' if not visible else 'reserved=[x:active:%d]' % held_now
             assert 'admitted: counted=1 projected=%d ' % (held_now + 8 * GIB) in log.read_text() and \
                 entry in log.read_text(), (label, log.read_text())
+        elif rows is None:
+            # An unreadable step table is an unknown fact: the start waits on it by name, with no projection.
+            pending(folder, 1)
+            wait_for(lambda: 'waiting: unknown: step table unreadable' in log.read_text(), label + ' waits on the unknown step')
+            assert not (folder / 'p2').exists(), (label, log.read_text())
+            os.killpg(child.pid, signal.SIGTERM)
+            finish(child, -signal.SIGTERM)
         else:
             pending(folder, 1)
             wait_for(lambda: 'waiting: counted=1 projected=%d ' % (11 * GIB) in log.read_text(), label + ' keeps its reservation')

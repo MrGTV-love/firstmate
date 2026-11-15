@@ -62,9 +62,11 @@ try:
         assert 'launch-gate-unmapped' in spilled and 'unmapped worktree' in spilled, spilled
         # Gates that spill at the same moment each keep their own spill file: none is overwritten.
         burst = []
+        (folder / 'spill-barrier').mkdir()
+        burst_env = dict(env, CASE_SPILL_BARRIER=str(folder / 'spill-barrier'), CASE_SPILL_COUNT='3')
         for i in range(3):
             (folder / ('elsewhere-%d' % i)).mkdir()
-            burst.append(gate(folder, env, 'nowhere', cwd=folder / ('elsewhere-%d' % i), log='unmapped-burst-%d' % i)[0])
+            burst.append(gate(folder, burst_env, 'nowhere', cwd=folder / ('elsewhere-%d' % i), log='unmapped-burst-%d' % i)[0])
         for child in burst:
             finish(child, 75)
         spills = [p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*')]
