@@ -31,10 +31,7 @@ def scope_coalition(info, registry, root):
     import time as _time
     real_coalition = info.coalition
     cache = {}
-    def scoped(pid):
-        value = real_coalition(pid)
-        if value is None:
-            return None
+    def in_case(pid):
         if _time.monotonic() - cache.get('at', -1.0) > 0.2:  # one table and registry read per snapshot, not per pid
             try:
                 cache['registered'] = {int(word) for word in open(registry).read().split()}
@@ -45,10 +42,34 @@ def scope_coalition(info, registry, root):
         cursor, steps = pid, 0
         while cursor not in (0, 1) and steps < 4096:
             if cursor == root or cursor in registered:
-                return value
+                return True
             cursor, steps = table.get(cursor, 1), steps + 1
-        return value + 1000000
+        return False
+    def scoped(pid):
+        # A case process keeps its real answer, unknown included; every other process is another coalition's.
+        if in_case(pid):
+            return real_coalition(pid)
+        return (real_coalition(pid) or 0) + 1000000
     info.coalition = scoped
+    # A process outside the case that exits between the table read and its confirming read stays another
+    # coalition's, as the scope reports every process outside the case (production pays that cost: the
+    # census-churn measurement in the task evidence); a case process gets the real confirming read.
+    real_table, real_exact, listed = getattr(info, 'kinfo_table', None), getattr(info, 'kinfo_exact', None), {}
+    if real_table and real_exact:
+        import struct as _struct
+        def table():
+            records = real_table()
+            listed.clear()
+            listed.update({_struct.unpack_from('i', r, info.P_PID)[0]: r for r in records})
+            return records
+        def exact(pid):
+            try:
+                return real_exact(pid)
+            except (info.NoSuchProcess, OSError):
+                if pid in listed and not in_case(pid):
+                    return listed[pid]
+                raise
+        info.kinfo_table, info.kinfo_exact = table, exact
 if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm-duration.py'):
     if os.environ.get('CASE_CORES'): os.cpu_count = lambda: int(os.environ['CASE_CORES'])
     if os.environ.get('CASE_LOAD'): os.getloadavg = lambda: tuple(json.load(open(os.environ['CASE_LOAD'])))
@@ -215,11 +236,23 @@ def write_json(path, value):
     temp.replace(path)
 
 
-def harm(condition, *detail):
-    """The assertion that guards the harm a case names; its message starts with "harm:", so a run against an earlier
-    engine can tell a red case (this assertion failed) from an error (anything else failed)."""
+class HarmError(AssertionError):
+    """The assertion that guards the harm a case names (a red), as against any other failure (an error)."""
+
+
+def harm(ident, condition, *detail):
+    """The assertion that guards the harm a case names; its message starts with "harm:<ident>:", so a run against an
+    earlier engine can tell this case's own red from any other failure."""
     if not condition:
-        raise AssertionError('harm: ' + repr(detail)[:1200])
+        raise HarmError(('harm:%s: %r' % (ident, detail))[:1200])
+
+
+def held_back(ident, marker, log, seconds=3.0):
+    """harm unless MARKER (a start's effect) stays absent for SECONDS: the start is held, not admitted."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline and not marker.exists():
+        time.sleep(0.05)
+    harm(ident, not marker.exists(), 'the start was admitted', log.read_text() if log.exists() else '')
 
 
 def group_done(results):
@@ -319,19 +352,31 @@ def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=No
         schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs, pressured=None))
 
 
-def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
+def activate(folder, at=None):
+    """The pinned gate's pool activation record (Main 1761): its time, before every run the case creates, and its sha256."""
+    (folder / 'pool').mkdir(exist_ok=True)
+    write_json(folder / 'pool' / 'gate-activation.json', dict(activated_at=int(time.time()) - 10 if at is None else at,
+                                                             gate_sha256='0' * 64))
+
+
+def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB, activated=True):
     folder = root / name
     folder.mkdir()
     db = folder / 'state.sqlite'
     with sqlite3.connect(db) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER, launch_nonce TEXT)')
+        # created_at defaults to the insert's second, as the daemon writes it (epoch seconds).
+        connection.execute("CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER)), launch_nonce TEXT)")
         # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
         connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
         connection.execute('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL)')
         # The daemon's agent_invocations columns this owner reads (PRAGMA table_info of the host database).
-        connection.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT,'
-                           ' started_at INTEGER, completed_at INTEGER, duration_ms INTEGER, exit_status TEXT, session_key TEXT)')
+        connection.execute("CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT,"
+                           " started_at INTEGER, completed_at INTEGER, duration_ms INTEGER, exit_status TEXT, session_key TEXT,"
+                           " agent TEXT DEFAULT 'claude')")
         connection.executemany('INSERT INTO runs (id, status) VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
+        # Each baseline run is at an agent step: a counted run with no open step row is unknown (Main 1759).
+        connection.executemany("INSERT INTO step_results (id, run_id, step_name, step_order, status) VALUES (?, ?, 'review', 1, 'running')",
+                               [('baseline-%d-s' % i, 'baseline-' + str(i)) for i in range(running)])
     load_file = folder / 'load.json'
     write_json(load_file, [0, load, 0])
     facts(folder, available=available)
@@ -339,6 +384,8 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     if measured:
         calibrate(folder)
     (folder / 'fmhome').mkdir(exist_ok=True)
+    if activated:
+        activate(folder)
     env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'),
                CASE_CORES=str(cores), CASE_PROCS=str(folder / 'procs.json'), FM_MEMORY_FIXTURE_DIR=str(folder / 'native'),
                FM_HOME=str(folder / 'fmhome'))
@@ -527,7 +574,7 @@ def prove(folder, db, run, key=None):
     (folder / 'pool').mkdir(exist_ok=True)
     write_json(folder / 'pool' / ('attempt-proof-%s.json' % run), dict(
         id='proof-' + run, run=run, repo='repo', step='ci', reserves=True, t0_us=1, root=[1, 0], gate=None, watcher=None,
-        coalition=None, session_key=key, members=[], ended_us=1))
+        coalition=None, session_key=key, members=[], quiet_us=1, ended_us=1))
 
 
 def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), timeout='240m', ci_ms=(60000,), round_age=0,
@@ -537,10 +584,11 @@ def gate_case(name, available=40 * GIB, runs=(('x', 'ci', 'running', None),), ti
     The daemon's columns this gate reads (PRAGMA table_info of the host database): agent_invocations
     run_id, step_name, started_at, completed_at, duration_ms, exit_status; step_results round_started_at
     (epoch seconds, written at the step's or fix round's start, round_age seconds ago here); repos working_path.
-    With proven, every earlier launch of each CI-step run is shown ended (prove); each gate launch then names its own
-    session and the daemon's row for it is written (gate).
+    With proven, the gate's activation record predates every run and every earlier launch of each CI-step run is shown
+    ended (prove); each gate launch then names its own session and the daemon's row for it is written (gate). Without
+    it, no activation record exists, so no run's history is shown complete.
     """
-    folder, db, env = case(name, measured=True, available=available)
+    folder, db, env = case(name, measured=True, available=available, activated=proven)
     home = folder / 'home'
     (home / '.no-mistakes').mkdir(parents=True)
     if timeout is not None:
@@ -648,6 +696,12 @@ def reserving_held(folder, runs):
     count = Held(len(held))
     count.reasons = held
     return count
+
+
+def settled_held(folder, runs):
+    """reserving_held after two censuses: an attempt with nothing left of it ends only at the second (Main 1759)."""
+    reserving_held(folder, runs)
+    return reserving_held(folder, runs)
 
 
 def start_us(pid):

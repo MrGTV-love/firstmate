@@ -96,14 +96,14 @@ try:
         child, log = gate(folder, env, run, mode='exit-0', session=False)  # an agent that prints nothing
         finish(child)
         assert log.with_suffix('.stderr').read_text() == '' and log.with_suffix('.stdout').read_text() == '', run
-        assert (folder / (run + '.agent')).exists() and reserving_held(folder, ['x', 'g']) == 0, run
+        assert (folder / (run + '.agent')).exists() and settled_held(folder, ['x', 'g']) == 0, run
 
     # Exit codes and signal deaths pass through; a signal sent to the gate reaches the agent.
     for mode, code in (('exit-0', 0), ('exit-1', 1), ('exit-75', 75), ('self-term', -signal.SIGTERM)):
         folder, db, env = gate_case('gate-exit-' + mode)
         child, log = gate(folder, env, 'x', mode=mode)
         finish(child, code)
-        held = reserving_held(folder, ['x'])
+        held = settled_held(folder, ['x'])
         assert held == 0, (mode, repr(held))
     folder, db, env = gate_case('gate-forward')
     child, log = gate(folder, env, 'x', mode='trap')
@@ -116,7 +116,7 @@ try:
     for missing, code in ((str(folder / 'no-such-agent'), 127), (str(folder / 'wt-x'), 126)):
         out = subprocess.run(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', missing], env=env, cwd=str(folder / 'wt-x'),
                              stdin=subprocess.DEVNULL, capture_output=True, text=True)
-        assert out.returncode == code and reserving_held(folder, ['x']) == 0, (out.returncode, out.stderr)
+        assert out.returncode == code and settled_held(folder, ['x']) == 0, (out.returncode, out.stderr)
 
     # Admission-to-launch order: the reservation is published under the start lock before the agent
     # starts and the lock is released after both; the agent's start waits on no observation.
@@ -220,7 +220,7 @@ try:
     me = engine().kernel_snapshot()[os.getpid()]
     (folder / 'pool' / 'attempt-dead.json').write_text(json.dumps(dict(
         id='dead', run='x', repo='repo', step='ci', reserves=True, t0_us=int(time.time() * 1000000), root=[gone.pid, 1],
-        gate=None, watcher=None, coalition=me[2], session_key='dead-key', members=[], ended_us=None)))
+        gate=None, watcher=None, coalition=me[2], session_key='dead-key', members=[], quiet_us=None, ended_us=None)))
     # The daemon's row for that launch, carrying its own key: once the record ends, the launch is shown ended.
     change(db, "INSERT INTO agent_invocations (id, run_id, step_name, purpose, started_at, completed_at, duration_ms, exit_status,"
                " session_key) VALUES ('dead', 'x', 'ci', 'ci', 1, 2, 1, 'launched', 'dead-key')")
@@ -255,7 +255,7 @@ try:
     assert 'next action: ' in text and 'auto_fix.ci' in text and 'ask-user decision' in text, text
     no_retry_phrase(text)
     assert 'refused: hold bound reached' in wakes(folder) and 'held for capacity' in wakes(folder)
-    assert not live_entries(folder) and reserving_held(folder, ['x', 'y']) == 0
+    assert not live_entries(folder) and settled_held(folder, ['x', 'y']) == 0
     # The real bound, driven by the clock: the host's 240-minute budget with a completed CI-fix p99 of 152.45 min
     # (9147000 ms) gives 14400 - 9147 = 5253 s; the omitted budget (30 min default) with a p99 of 10 min gives 1200 s.
     # Five seconds before the bound the gate still holds; a fit then is admitted; at the bound it refuses.
@@ -612,6 +612,14 @@ os.waitpid(child, 0)
         registered = (folder.parent / 'coalition.pids').read_text().split() if (folder.parent / 'coalition.pids').exists() else []
         assert pid in snapshot and snapshot[pid][1] == started and snapshot[pid][0] == 1 and str(pid) not in registered, (
             'control premise: the outside orphan lives at the decision', pid, snapshot.get(pid))
+        # Its coalition as the decision saw it: known, and outside X's launch coalition. Outside the case (lineage lost,
+        # not registered) the scope reports the real coalition moved by 1000000 (fm_cpu_pass_fixture scope_coalition);
+        # X's records carry the case's own, unmoved.
+        launch = {json.loads(path.read_text()).get('coalition') for path in (folder / 'pool').glob('attempt-*.json')
+                  if not path.name.startswith('attempt-proof-')}
+        seen = snapshot[pid][2]
+        assert seen is not None and launch and None not in launch and seen + 1000000 not in launch, (
+            'control premise: the orphan is in another coalition than the launch', seen, launch)
         os.kill(pid, signal.SIGKILL)
 
     def same_run_never_passes_its_live_attempt():
@@ -626,7 +634,7 @@ os.waitpid(child, 0)
         second, _ = gate(folder, env, 'x', log='second')
         wait_for(lambda: 'waiting' in (folder / 'second.stderr').read_text() or (folder / 'x.agent').exists(), 'the second decides')
         time.sleep(1)
-        harm(not (folder / 'x.agent').exists(), 'the second launch passed its own live first attempt', (folder / 'second.stderr').read_text())
+        harm('m1712-same-run-live', not (folder / 'x.agent').exists(), 'the second launch passed its own live first attempt', (folder / 'second.stderr').read_text())
         assert 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'second.stderr').read_text(), (folder / 'second.stderr').read_text()
         (folder / 'x.release').touch()
         finish(first)
@@ -642,8 +650,9 @@ os.waitpid(child, 0)
         child, log = gate(folder, env, 'x')
         wait_for(lambda: 'waiting' in log.with_suffix('.stderr').read_text() or (folder / 'x.agent').exists(), 'the launch decides')
         time.sleep(1)
-        harm(not (folder / 'x.agent').exists(), 'the launch passed its own unproven earlier launch', log.with_suffix('.stderr').read_text())
+        harm('m1727-same-run-unproven', not (folder / 'x.agent').exists(), 'the launch passed its own unproven earlier launch', log.with_suffix('.stderr').read_text())
         assert 'x:ci-unproven:%d' % (3 * GIB) in log.with_suffix('.stderr').read_text(), log.with_suffix('.stderr').read_text()
+        activate(folder, at=int(time.time()) - 1000)  # the activation record predates the run, and its launch is shown ended
         prove(folder, db, 'x')
         (folder / 'x.release').touch()
         finish(child)
@@ -659,7 +668,7 @@ os.waitpid(child, 0)
         facts(folder, available=10 * GIB)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
         time.sleep(3)
-        harm(not (folder / 'later').exists(), 'a live attempt was dropped when its run stopped', (folder / 'later.stderr').read_text())
+        harm('m1712-run-stopped', not (folder / 'later').exists(), 'a live attempt was dropped when its run stopped', (folder / 'later.stderr').read_text())
         assert 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), (folder / 'later.stderr').read_text()
         (folder / 'x.escapee-release').touch()
         finish(later)
@@ -676,8 +685,8 @@ os.waitpid(child, 0)
         held = reserving_held(folder, ['x'])
         assert held == 1 and 'could be its' in held.reasons[0], repr(held)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
+        held_back('m1656-escape', folder / 'later', folder / 'later.stderr')
         wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'X counted while its escapee lives')
-        assert not (folder / 'later').exists()
         (folder / 'x.escapee-release').touch()
         finish(later)
         wait_for(lambda: reserving_held(folder, ['x']) == 0, 'X ends once its escapee exits')
@@ -700,14 +709,14 @@ os.waitpid(child, 0)
             for index, key in enumerate(records):
                 (folder / 'pool' / ('attempt-r%d.json' % index)).write_text(json.dumps(dict(
                     id='r%d' % index, run='x', repo='repo', step='ci', reserves=True, t0_us=15000000 + index * 10000000,
-                    root=[gone.pid, 1], gate=None, watcher=None, coalition=0, session_key=key, members=[], ended_us=1)))
+                    root=[gone.pid, 1], gate=None, watcher=None, coalition=0, session_key=key, members=[], quiet_us=1, ended_us=1)))
             finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'm'), 0) if released else None
             if released:
                 assert 'x:ci-waiting:0' in (folder / 'm.stderr').read_text(), (label, (folder / 'm.stderr').read_text())
             else:
                 child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'm')
-                wait_for(lambda: 'x:ci-unproven:%d' % (3 * GIB) in (folder / 'm.stderr').read_text(), label + ': x stays counted at R')
-                assert not (folder / 'm').exists(), (label, (folder / 'm.stderr').read_text())
+                held_back('m1656-key-binding-' + label, folder / 'm', folder / 'm.stderr')
+                wait_for(lambda: 'x:ci-unproven' in (folder / 'm.stderr').read_text(), label + ': x stays counted, R per unproven launch')
                 os.killpg(child.pid, signal.SIGKILL); child.wait()
 
     def copied_identity_holds():
@@ -724,8 +733,8 @@ os.waitpid(child, 0)
         finish(gate_y)
         facts(folder, available=10 * GIB)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
+        held_back('m1683-copied-identity', folder / 'later', folder / 'later.stderr')
         wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'X counted while its orphan lives')
-        assert not (folder / 'later').exists(), (folder / 'later.stderr').read_text()
         (folder / 'x.escapee-release').touch()
         finish(later)
 
@@ -744,7 +753,7 @@ os.waitpid(child, 0)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
         wait_for(lambda: 'projected=%d ' % (14 * GIB) in (folder / 'later.stderr').read_text(), 'X and Y both counted')
         text = (folder / 'later.stderr').read_text()
-        harm(not (folder / 'later').exists() and 'x:launched:%d:unseen' % (3 * GIB) in text and 'y:launched:%d:unseen' % (3 * GIB) in text,
+        harm('m1683-foreign-in', not (folder / 'later').exists() and 'x:launched:%d:unseen' % (3 * GIB) in text and 'y:launched:%d:unseen' % (3 * GIB) in text,
              'each of X and Y holds its own R', text)
         (folder / 'y.escapee-release').touch()
         finish(later)
@@ -780,8 +789,8 @@ os.waitpid(child, 0)
             if admits:
                 finish(later)
             else:
+                held_back('m1683-pid-reuse', folder / 'later', folder / 'later.stderr')
                 wait_for(lambda: 'projected=%d ' % (21 * GIB) in (folder / 'later.stderr').read_text(), label + ': unseen, 21 GiB')
-                assert not (folder / 'later').exists(), (label, (folder / 'later.stderr').read_text())
                 os.killpg(later.pid, signal.SIGKILL); later.wait()
             (folder / 'x.release').touch()
             finish(child)
@@ -808,8 +817,8 @@ os.waitpid(child, 0)
                 assert 'x:ci-waiting:0' in (folder / 'later.stderr').read_text(), (folder / 'later.stderr').read_text()
                 orphan_present(folder, orphan)
             else:
+                held_back('m1683-p1f-own-live', folder / 'later', folder / 'later.stderr')
                 wait_for(lambda: 'x:launched:%d:unseen' % (3 * GIB) in (folder / 'later.stderr').read_text(), 'x counted while its orphan lives')
-                assert not (folder / 'later').exists()
                 (folder / 'x.escapee-release').touch()
                 finish(later)
 

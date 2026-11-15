@@ -194,6 +194,18 @@ def kinfos(*selector):
         yield data[offset:offset + KINFO_SIZE]
 
 
+def kinfo_table():
+    """Every process's kinfo_proc record from one read of the process table, or OSError when the read is not whole.
+
+    A trailing partial record is not a smaller table: the read is refused (bin/fm-cpu-pass.py then holds
+    every attempt), where kinfos() drops it.
+    """
+    data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_ALL)
+    if not data or len(data) % KINFO_SIZE:
+        raise OSError("process table read is not a whole number of records (%d bytes)" % len(data))
+    return [data[offset:offset + KINFO_SIZE] for offset in range(0, len(data), KINFO_SIZE)]
+
+
 def processes(*selector):
     for record in kinfos(*selector):
         yield struct.unpack_from("i", record, P_PID)[0], struct.unpack_from("i", record, E_PPID)[0]
@@ -279,6 +291,8 @@ def mem_tree(root):
 
 
 PROC_PIDCOALITIONINFO = 20
+# sizeof(struct proc_pidcoalitioninfo): coalition_id[COALITION_NUM_TYPES = 2] and three reserved, uint64 each.
+COALITION_INFO_SIZE = 40
 
 
 def coalition(pid):
@@ -289,8 +303,8 @@ def coalition(pid):
     attempt attribution).
     """
     buffer = ctypes.create_string_buffer(64)
-    if libc.proc_pidinfo(pid, PROC_PIDCOALITIONINFO, ctypes.c_uint64(0), buffer, 64) <= 0:
-        return None
+    if libc.proc_pidinfo(pid, PROC_PIDCOALITIONINFO, ctypes.c_uint64(0), buffer, 64) != COALITION_INFO_SIZE:
+        return None  # a short or failed answer is unknown, never a coalition
     return struct.unpack_from("Q", buffer.raw, 0)[0]
 
 
