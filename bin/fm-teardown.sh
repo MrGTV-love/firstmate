@@ -2421,6 +2421,11 @@ teardown_entry_preflight() {
       "$(status_daemon_seen_marker_path "$STATE" "$ID")"; do
     teardown_preflight_removable "$path" "status record" || return 1
   done
+  if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ] \
+     && ! fm_backlog_drop_record_writable "$DATA" "$ID" "$DROP_FILE"; then
+    TEARDOWN_PREFLIGHT_ERROR="the captain's words for $ID cannot be retained at $DATA/$ID/captain-drop.md"
+    return 1
+  fi
   [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse check || return 1
   [ "$KIND" = secondmate ] || teardown_docker_stacks_preflight "$ID" "$META" || return 1
 }
@@ -6584,14 +6589,6 @@ if ! teardown_entry_preflight; then
     || echo "REFUSED: $TEARDOWN_PREFLIGHT_ERROR; nothing was changed and every task record is retained. Fix what is named and re-run." >&2
   exit 1
 fi
-# The captain's words are retained only after the preflight, and before the
-# first step that can discard anything.
-if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
-  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
-    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
-    exit 1
-  }
-fi
 # Prepare the non-authoritative close record and retire any previous marker
 # outside presentation custody. The EXIT trap retires this stage on refusal;
 # the legacy stamp and authoritative publication wait for exact reacquisition.
@@ -6681,6 +6678,14 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   fi
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
+fi
+# The captain's words are retained only now: after the preflight and the
+# reservation's refusals, and before the first step that discards anything.
+if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
+  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
+    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
+    exit 1
+  }
 fi
 [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1
 if [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ]; then

@@ -144,6 +144,23 @@ fm_backlog_drop_words_file_valid() {  # <path>
   perl -0777 -e 'my $s = <>; exit(defined($s) && length($s) <= 8192 && $s =~ /\S/ && index($s, "\0") == -1 ? 0 : 1)' < "$1"
 }
 
+# Whether fm_backlog_drop_record below would succeed now, decided without
+# writing anything: the words are valid, the record's directory is absent with a
+# writable parent or is a writable directory that is not a link, and the record
+# is absent or a regular file that is not a link and can be replaced.
+fm_backlog_drop_record_writable() {  # <data> <id> <words-file>
+  local dir="$1/$2" target="$1/$2/captain-drop.md"
+  case "$2" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  fm_backlog_drop_words_file_valid "$3" || return 1
+  [ ! -L "$dir" ] && [ ! -L "$target" ] && { [ ! -e "$target" ] || [ -f "$target" ]; } || return 1
+  if [ -e "$dir" ]; then
+    [ -d "$dir" ] && [ -w "$dir" ] && [ -x "$dir" ] || return 1
+  else
+    [ -d "$1" ] && [ -w "$1" ] && [ -x "$1" ] || return 1
+  fi
+  fm_backlog_path_deletable "$target"
+}
+
 fm_backlog_drop_record() {  # <data> <id> <words-file>
   local dir="$1/$2" target="$1/$2/captain-drop.md" tmp
   case "$2" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
