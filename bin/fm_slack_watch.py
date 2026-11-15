@@ -325,7 +325,10 @@ SINK_WORD = '[redacted]'
 # Every constant that a wake line, the failed-row listing or the record pointer carries: a plane value that is part of any of
 # them could never be replaced for good, so a run that prints wake lines (poll, mirror, check) refuses it at its start (F1 of Main 2602). The diagnostic
 # prefixes are not in this list: redact_sink protects them.
-WAKE_FIXED_TEXT = (REQUEST_PREFIX, FOLLOWUP_PREFIX, FOLLOWUP_LABEL, FOLLOWUP_CUT, ' to request ', CHECK_EVENT_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
+# Main 1719: the reason a refusal row holds instead of an author id that equals a protected value, and the one owner notice that says so (no value in either).
+AUTHOR_WITHHELD = 'author id withheld: equals a protected value'
+AUTHOR_COLLISION_NOTICE = 'slack: second person id equals a protected value: their refusal rows withhold it'
+WAKE_FIXED_TEXT = (AUTHOR_COLLISION_NOTICE, REQUEST_PREFIX, FOLLOWUP_PREFIX, FOLLOWUP_LABEL, FOLLOWUP_CUT, ' to request ', CHECK_EVENT_PREFIX, ' from ', REQUEST_UNACKNOWLEDGED, REQUEST_UNKNOWN, REQUEST_LABEL, '; ' + SECRET_FLAG, '; full: ', '; +', ' queued',
                    SECRET_MARKER, SECRET_FLAG, SINK_WORD, 'slack: request ', ' not acknowledged (failed, owner Main)', 'slack: request finished')
 # The second person's own fixed text is their label for the id it names: it is part of a run's collision check only while it can reach a sink (their setting is
 # on, or a line of theirs is still journaled: Watch.second_fixed_texts), so that with their setting off a value that matches only their label cannot disable the
@@ -3884,7 +3887,13 @@ class Watch:
         row and of the event, so that a second attempt is its own row. Returns whether the attempt is on record."""
         item = safe_item(item)
         author = author or self.second
+        literal = author
         author = safe_author(author)
+        # Main 1719: a row names its author by the literal id; only when that id equals a protected value does it hold the id's one-way form, with the reason
+        # the id is withheld, and the owner is told once.
+        withheld = {'withheld': AUTHOR_WITHHELD} if author != literal else {}
+        if withheld:
+            self.notice_author_collision()
         # The event names the member, so that the same emoji or reply slot of another configured id is its own attempt (finding 5 of the review of d0b0c216).
         event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], item if attempt is None else '%s#%d' % (item, attempt), author,
                           'second-refused'])
@@ -3894,7 +3903,7 @@ class Watch:
         # The row names its event, so that a run that died between the append and the commit below does not append a second row for the same attempt.
         try:
             logged = self.refusal_logged(event) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=author, channel=self.state.get('channel'), thread=record['ts'],
-                                                                 item=item, event=event, **extra)
+                                                                 item=item, event=event, **withheld, **extra)
             if not logged:
                 raise SecretCollision('refusal_row_not_written')     # kept for a later run below, as a refused row is
         except SecretCollision:
@@ -3915,6 +3924,18 @@ class Watch:
                 pass                                                   # the log or the queue holds it; the next run does not count it twice
             return True
         return False
+
+    def notice_author_collision(self):
+        """Once per plane: tell the owner that an id the setting names or has named equals a protected value, so its refusal rows withhold it (Main 1719)."""
+        owner = getattr(self, 'owner', self)
+        if owner.state.get('author_collision_noticed'):
+            return
+        owner.say(AUTHOR_COLLISION_NOTICE)
+        owner.state['author_collision_noticed'] = True
+        try:
+            owner.commit()
+        except (SecretCollision, OSError):
+            pass
 
     def queue_refusal(self, entry):
         """Append one refusal to the queue file, once; whether it is now queued (or already logged)."""
