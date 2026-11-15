@@ -113,8 +113,9 @@ crew_state_ready_url() {  # <id>
 # writing pr= until it holds the poll publication lock, and that lock until its poll
 # is published (bin/fm-pr-check.sh); this pass tries both, in that order, and reads
 # pr= again under the first, so a registration in progress is left to it. A
-# check.sh that is not the poll template, or that has a custom-check trust record,
-# is another check and is never replaced; the pass names that conflict instead.
+# check.sh that has a custom-check trust record, or that is not a merge poll by its
+# bytes or its generator mark, is another check and is never replaced; the pass
+# names that conflict instead.
 pr_poll_lost() {  # <id> <recorded pr>
   local id=$1 pr=$2 suffix canonical lost=0 lock meta_lock current
   for suffix in pr-poll-retirement teardown-return-pending; do
@@ -151,10 +152,11 @@ pr_poll_lost() {  # <id> <recorded pr>
     && [ "$FM_PR_DATA_URL" = "$canonical" ]; then
     lost=1  # only the volume's device number moved: the watcher re-records it, so it is not lost
   elif { [ -e "$STATE/$id.check.sh" ] || [ -L "$STATE/$id.check.sh" ]; } \
-    && { [ -e "$STATE/$id.check-trust" ] || [ -L "$STATE/$id.check-trust" ] \
-      || ! cmp -s "$SCRIPT_DIR/fm-pr-poll.sh" "$STATE/$id.check.sh"; }; then
-    # A registered custom check (bin/fm-check-register.sh), or any check.sh that is not
-    # this poll's template, is another check: the registrar would replace it.
+    && ! fm_pr_poll_check_dest_replaceable "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh"; then
+    # A registered custom check (bin/fm-check-register.sh), or any check.sh that the
+    # publisher cannot prove is a merge poll by its bytes or its generator mark
+    # (bin/fm-pr-lib.sh fm_pr_poll_check_bytes_ours), is another check: the
+    # registrar would not replace it.
     printf 'pr-ready: %s: state/%s.check.sh is another check, not the merge poll for %s; the poll is not re-armed over it\n' "$id" "$id" "$pr"
     lost=1
   fi

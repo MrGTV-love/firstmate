@@ -125,8 +125,30 @@ SH
   pass "a prior check this run never replaced is left by the rollback, and a retry publishes over it"
 }
 
+# A poll from an older template is judged by its generator mark, never classed as a
+# custom check by default (Main 1871). The earliest version's header is the fixture. Controls:
+# a custom check without the mark, a marked check with a trust record, and the mark
+# below the first line are not merge polls.
+test_older_template_poll_is_judged_by_its_generator_mark() {
+  local state="$WORK/older/state"
+  mkdir -p "$state"
+  # The first two lines of the earliest template (commit 064aa67c2) and a body.
+  printf '%s\n' '#!/usr/bin/env bash' '# Static watcher program for a validated PR poll sidecar.' 'set -u' 'exit 0' > "$state/task-a.check.sh"
+  cmp -s "$POLL" "$state/task-a.check.sh" && fail "fixture: the earliest template equals the current one"
+  fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" || fail "an older template's poll was classed as another check"
+  printf '%s\n' '#!/usr/bin/env bash' 'echo custom check output' > "$state/task-a.check.sh"
+  ! fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" || fail "a custom check without the mark was taken for a poll"
+  printf '%s\n' '#!/usr/bin/env bash' 'echo first' '# Static watcher program for a validated PR poll sidecar.' > "$state/task-a.check.sh"
+  ! fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" || fail "a mark below the second line was taken for a poll"
+  printf '%s\n' '#!/usr/bin/env bash' '# Static watcher program for a validated PR poll sidecar.' 'set -u' 'exit 0' > "$state/task-a.check.sh"
+  printf 'trust\n' > "$state/task-a.check-trust"
+  ! fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" || fail "a marked check with a trust record was taken for a poll"
+  pass "an older template's poll is judged by its generator mark; an unmarked, misplaced or trusted check is not a poll"
+}
+
 test_in_place_rewrite_after_placement_is_left
 test_unchanged_failed_poll_is_revoked
 test_trusted_custom_check_is_left
 test_prior_poll_is_left_when_this_run_never_placed_its_check
+test_older_template_poll_is_judged_by_its_generator_mark
 exit "$FAILED"

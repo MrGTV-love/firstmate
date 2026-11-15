@@ -806,6 +806,15 @@ cp "$ROOT/bin/fm-pr-poll.sh" "$CASE/home/state/oldpoll.check.sh"
 chmod 600 "$CASE/home/state/oldpoll.check.sh"
 out=$(run_pass)
 assert_registered oldpoll
+# A poll from an older template version is judged by its generator mark, never as
+# another check (Main 1871): the first registration replaces it.
+make_case template-older
+write_ship olderpoll ship direct-PR
+printf '%s\n' '#!/usr/bin/env bash' '# Static watcher program for a validated PR poll sidecar.' 'set -u' 'exit 0' > "$CASE/home/state/olderpoll.check.sh"
+chmod 600 "$CASE/home/state/olderpoll.check.sh"
+out=$(run_pass)
+! printf '%s\n' "$out" | grep -q 'is another check' || fail "an older template's poll was named another check: $out"
+assert_registered olderpoll
 pass 'a first registration from either done-note form never replaces a registered custom check and names the conflict; an old template poll is replaced'
 
 # The stale-re-arm guard also holds at publication: when another registration

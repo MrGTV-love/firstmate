@@ -561,14 +561,19 @@ fm_pr_poll_cleanup() {
   FM_PR_POLL_REG_TMP=
 }
 
+# Every version of bin/fm-pr-poll.sh opens with these two lines; they are its
+# generator mark.
+FM_PR_POLL_GENERATOR_MARK='# Static watcher program for a validated '
+
 # 0 when <file> is a merge poll check that Firstmate wrote for task <id>, proven
 # by its bytes (Main 1820 F5): a regular file, not a link, with no custom-check
 # trust record for <id>, whose SHA-256 is the poll template's, or the template
-# hash that this task's poll registration or retirement receipt recorded (a poll
-# of an earlier template version). A receipt on record proves nothing by itself:
-# a check whose bytes match neither is another check.
+# hash that this task's poll registration or retirement receipt recorded, or whose
+# first two lines are the template's generator mark, as in a poll of an earlier
+# template version (Main 1871: never classed custom by default). A receipt on
+# record proves nothing by itself: a check matching none of these is another check.
 fm_pr_poll_check_bytes_ours() {  # <state> <id> <template> <file>
-  local state=$1 id=$2 template=$3 file=$4 hash expected
+  local state=$1 id=$2 template=$3 file=$4 hash expected first='' second=
   [ ! -e "$state/$id.check-trust" ] && [ ! -L "$state/$id.check-trust" ] || return 1
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   hash=$(fm_pr_sha256 "$file") || return 1
@@ -580,7 +585,11 @@ fm_pr_poll_check_bytes_ours() {  # <state> <id> <template> <file>
   [ -z "$expected" ] || [ "$hash" != "$expected" ] || return 0
   expected=$(fm_pr_poll_retirement_parse "$state/$id.pr-poll-retirement" >/dev/null 2>&1 \
     && [ "$FM_PR_RETIRE_ID" = "$id" ] && printf '%s' "$FM_PR_RETIRE_TEMPLATE_HASH") || expected=
-  [ -n "$expected" ] && [ "$hash" = "$expected" ]
+  [ -z "$expected" ] || [ "$hash" != "$expected" ] || return 0
+  { IFS= read -r first; IFS= read -r second; } < "$file" 2>/dev/null || true
+  [ "$first" = '#!/usr/bin/env bash' ] || return 1
+  case "$second" in "$FM_PR_POLL_GENERATOR_MARK"*) return 0 ;; esac
+  return 1
 }
 
 # 0 when state/<id>.check.sh may receive the merge poll: the name is free, or it
