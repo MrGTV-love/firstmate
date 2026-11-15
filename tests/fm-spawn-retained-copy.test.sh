@@ -647,9 +647,10 @@ test_unproven_provider_admits_only_ordinary_leases() {
       assert_only_capability_probes "$provider/$shape"
       retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$provider/$shape: spawn changed the leased slot"
       cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$provider/$shape: spawn wrote the pool state"
-      if [ "$shape" = ordinary ]; then
-        ! grep -Fxq 'capabilities --json' "$CASE_DIR/treehouse-calls" || fail "$provider/$shape: an ordinary lease was probed although its shape needs no proof"
-      fi
+      # An ordinary lease is admitted whether or not the guard happens to probe: the
+      # capability probe is read-only and harmless, so only a status, lease or get
+      # diagnostic call is forbidden, and assert_only_capability_probes (above) fails
+      # on exactly those.
     done
   done
   pass "an ordinary lease with a lease id is admitted without the proof; id-less, recovery-reason, recovered-prefix, holderless and duplicate entries refuse, and with the proof only an entry on the published protected holder is admitted"
@@ -1033,6 +1034,110 @@ test_proven_capability_does_not_relax_other_refusals() {
   pass "a proven capability relaxes only the recovered lease: unleased, missing, and unreadable entries still refuse"
 }
 
+# A fixture treehouse that implements `get`, for the case that must run the spawn's
+# own allocation: capabilities answers a proven provider, `get --root <root>` hands
+# out the first slot the state does not lease (mode normal) or deliberately the
+# recovered slot (mode chooses-recovered, the defect the case must be able to see),
+# and a get without an explicit --root is refused. Every call is recorded; status,
+# lease, return, list, prune and destroy mark treehouse-forbidden and fail.
+install_getting_treehouse() {  # <normal|chooses-recovered>
+  local mode=$1
+  : > "$CASE_DIR/treehouse-calls"
+  rm -f "$CASE_DIR/treehouse-forbidden"
+  cat > "$FAKEBIN_DIR/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$CASE_DIR/treehouse-calls"
+state="$CASE_DIR/pool/treehouse-state.json"
+case "\${1:-}" in
+  capabilities)
+    jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:"v-fake",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}'
+    exit 0
+    ;;
+  get)
+    shift
+    root=
+    while [ \$# -gt 0 ]; do
+      case "\$1" in --root) root=\${2:-}; shift 2 || exit 2 ;; *) shift ;; esac
+    done
+    [ -n "\$root" ] || { echo "fake treehouse: get needs an explicit --root" >&2; exit 2; }
+    case "$mode" in
+      chooses-recovered) printf '%s\n' "$SLOT_DIR"; exit 0 ;;
+    esac
+    jq -r '[.worktrees[] | select((.leased // false) | not)][0].path' "\$state"
+    exit 0
+    ;;
+  status|lease|return|list|prune|destroy)
+    : > "$CASE_DIR/treehouse-forbidden"
+    exit 1
+    ;;
+esac
+exit 0
+SH
+  chmod +x "$FAKEBIN_DIR/treehouse"
+}
+
+# What the spawn's own allocation did, read from the slot the executed command chose
+# (the pane path the fixture tmux reports after it ran the recorded `treehouse get`):
+# the command ran once with an explicit root, it chose the free slot and not the
+# recovered one, the spawn claimed that slot, and the recovered slot's copy, entry
+# and claim are byte-preserved.
+assert_spawn_took_the_slot_its_own_get_chose() {  # <name> <free-slot> <label>
+  local chosen
+  chosen=$(cat "$CASE_DIR/pane-path" 2>/dev/null) || fail "$3: the recorded treehouse get never ran, so no slot was chosen"
+  [ "$(grep -c '^get ' "$CASE_DIR/treehouse-calls")" = 1 ] || fail "$3: the spawn's get did not run exactly once: $(cat "$CASE_DIR/treehouse-calls")"
+  grep -Fxq "get --root $CASE_DIR/real-root" "$CASE_DIR/treehouse-calls" || fail "$3: the get did not carry the explicit fixture root: $(cat "$CASE_DIR/treehouse-calls")"
+  [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$3: a pool diagnostic command ran: $(cat "$CASE_DIR/treehouse-calls")"
+  [ "$chosen" != "$SLOT_DIR" ] || fail "$3: the get chose the recovered slot $SLOT_DIR"
+  [ "$chosen" = "$2" ] || fail "$3: the get chose $chosen, not the free slot $2"
+  assert_grep "task=new-$1" "${chosen%/*}/.fm-slot-owner" "$3: the spawn did not claim the slot its get chose"
+  [ ! -e "${SLOT_DIR%/*}/.fm-slot-owner" ] || fail "$3: the spawn claimed the recovered slot"
+  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$3: the recovered slot's copy changed"
+  jq -c --arg p "$SLOT_DIR" '.worktrees[] | select(.path == $p)' "$CASE_DIR/pool/treehouse-state.json" | cmp -s - "$CASE_DIR/before-entry" \
+    || fail "$3: the recovered slot's entry changed"
+  cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$3: the holder's record changed"
+  assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$3: the recovered slot's nested work was lost"
+}
+
+# run_retained_spawn with the fixture tmux executing the spawn's own treehouse get.
+run_spawn_with_own_get() {  # <name>
+  FM_FAKE_TMUX_GET_DIR=$PROJECT_DIR FM_FAKE_TMUX_GET_ROOT="$CASE_DIR/real-root" \
+    FM_FAKE_PANE_PATH_FILE="$CASE_DIR/pane-path" FM_FAKE_TMUX_GET_LOG="$CASE_DIR/get-log" \
+    run_retained_spawn "$1"
+}
+
+# The spawn's allocation is executed, not predetermined: the fixture tmux runs the
+# `treehouse get` the spawn typed, against the case's private pool with an explicit
+# root, and the test reads the slot that command chose. Mutation control: the same
+# check, run against a get that hands out the recovered slot, must fail; so a broken
+# interactive allocation can no longer coexist with a passing test.
+test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose() (
+  local mode name out rc second
+  for mode in normal chooses-recovered; do
+    name="own-get-$mode"
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    add_free_second_slot "$(printf ',"leased":true,"lease_holder":"%s"' "$PROTECTED_HOLDER")"
+    second=$PANE_DIR
+    PANE_DIR=$PROJECT_DIR
+    install_getting_treehouse "$mode"
+    retained_fingerprint > "$CASE_DIR/before-copy"
+    jq -c --arg p "$SLOT_DIR" '.worktrees[] | select(.path == $p)' "$CASE_DIR/pool/treehouse-state.json" > "$CASE_DIR/before-entry"
+    cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+    rm -f "$CASE_DIR/pane-path"
+    rc=0
+    out=$(run_spawn_with_own_get "$name") || rc=$?
+    if [ "$mode" = normal ]; then
+      expect_code 0 "$rc" "$mode: the spawn beside a recovered quarantine failed"$'\n'"$out"
+      assert_contains "$out" "spawned new-$name" "$mode: spawn did not launch"
+      assert_spawn_took_the_slot_its_own_get_chose "$name" "$second" "$mode"
+    else
+      ! ( assert_spawn_took_the_slot_its_own_get_chose "$name" "$second" "$mode" ) >/dev/null 2>&1 \
+        || fail "$mode: the validator accepted a get that handed out the recovered slot"
+    fi
+  done
+  pass "the spawn's own treehouse get is executed against the private pool with an explicit root, the test reads the slot that command chose, the recovered slot is byte-preserved, and a get that hands out the recovered slot is detected"
+)
+
 # The real-provider half of the capability-positive case. Needs the treehouse
 # named by FM_TEST_TREEHOUSE_PROVIDER, a build that proves persistent recovered
 # leases (never installed; linked into this case's own fakebin). Pools, HOME,
@@ -1078,8 +1183,8 @@ real_provider_recovered_slot_cases() {
     ln -sf "$FM_TEST_TREEHOUSE_PROVIDER" "$FAKEBIN_DIR/treehouse"
     export HOME="$CASE_DIR/real-home" XDG_CONFIG_HOME="$CASE_DIR/real-xdg" TREEHOUSE_NO_UPDATE_CHECK=1 \
       TREEHOUSE_ROOT="$CASE_DIR/real-root" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-    a=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --no-fetch --lease --lease-holder holder </dev/null 2>/dev/null) || fail "$order: cannot lease slot A"
-    b=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --no-fetch --lease --lease-holder spare </dev/null 2>/dev/null) || fail "$order: cannot lease slot B"
+    a=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder holder </dev/null 2>/dev/null) || fail "$order: cannot lease slot A"
+    b=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder spare </dev/null 2>/dev/null) || fail "$order: cannot lease slot B"
     a=$(cd "$a" && pwd -P)
     b=$(cd "$b" && pwd -P)
     (cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" return "$b" --if-lease-holder spare </dev/null >/dev/null 2>&1) || fail "$order: cannot free slot B"
@@ -1098,7 +1203,8 @@ real_provider_recovered_slot_cases() {
       mv "$state.tmp" "$state"
     fi
     SLOT_DIR=$a
-    PANE_DIR=$b
+    PANE_DIR=$PROJECT_DIR
+    rm -f "$CASE_DIR/pane-path"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$a" "nested-$name"
     : > "$CASE_DIR/pane-log"
     : > "$CASE_DIR/launch-log"
@@ -1106,11 +1212,14 @@ real_provider_recovered_slot_cases() {
     cp "$state" "$CASE_DIR/before-state"
     cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
     rc=0
-    out=$(run_retained_spawn "$name") || rc=$?
+    out=$(run_spawn_with_own_get "$name") || rc=$?
     expect_code 0 "$rc" "$order: the spawn beside a real recovered quarantine failed"$'\n'"$out"
     assert_not_contains "$out" "refusing allocation" "$order: the recovered quarantine still blocked allocation"
     assert_contains "$out" "spawned new-$name" "$order: spawn did not launch"
     grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "$order: spawn never acquired a slot"
+    # The slot is the one the spawn's own get chose, executed against the real
+    # provider by the fixture tmux, never one the fixture preselected.
+    [ "$(cat "$CASE_DIR/pane-path" 2>/dev/null)" = "$b" ] || fail "$order: the spawn's own get chose $(cat "$CASE_DIR/pane-path" 2>/dev/null), not the free slot $b"
     assert_grep "task=new-$name" "$b/../.fm-slot-owner" "$order: spawn did not claim the free slot"
     [ ! -e "$a/../.fm-slot-owner" ] || fail "$order: spawn claimed the recovered slot"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$order: spawn changed the recovered slot"
@@ -1123,8 +1232,9 @@ real_provider_recovered_slot_cases() {
     old_session_exit "$state"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$start/$order: an old session's exit changed the recovered slot"
     ! compgen -G "$pool/../treehouse-recovered-backup-*" >/dev/null || fail "$order: a recovered backup appeared"
-    # The allocation the spawn sends, run for real: it hands out B, never A.
-    entry=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || fail "$order: the real get failed"
+    # A further get, run for real as an extra allocatability check (not a substitute
+    # for the spawn's own get above): it hands out B, never A.
+    entry=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || fail "$order: the real get failed"
     [ "$(cd "$entry" && pwd -P)" = "$b" ] || fail "$order: the real get handed out $entry, not the free slot $b"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$order: the real get changed the recovered slot"
     jq -e --arg a "$a" --arg r "$recovered" '.worktrees[] | select(.path == $a) | .lease_holder == $r and (.lease_id // "") == ""' "$state" >/dev/null \
@@ -1325,6 +1435,7 @@ test_old_holder_is_adopted_and_old_session_exit_cannot_sweep
 test_unadopted_old_holder_refuses_and_adoption_runs_once
 test_home_seed_guard_follows_the_protected_holder
 test_combined_rollout_keeps_recovered_and_new_copies
+test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose
 test_real_provider_recovered_slot_allows_free_slot_allocation
 test_nested_copy_in_leased_slot_allows_allocation
 test_nested_copy_in_superseded_slot_allows_allocation

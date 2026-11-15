@@ -103,6 +103,15 @@ fm_test_fake_gh_axi() {
 # removal marker -NAME, any other value prints NAME=value, and an unset knob
 # fails like tmux's "unknown variable".
 #
+# Executing the allocation: when FM_FAKE_TMUX_GET_DIR is set, a text-line payload
+# that is exactly `treehouse get` (what bin/fm-spawn.sh types into the pane) is run
+# for real from that directory, with an explicit `--root "$FM_FAKE_TMUX_GET_ROOT"`
+# appended (every fixture allocation names its pool root), the command found first
+# on PATH, EOF on stdin. Its last output line is the slot the command itself chose:
+# it is written to FM_FAKE_PANE_PATH_FILE, which pane_current_path then reports, and
+# the call is appended to FM_FAKE_TMUX_GET_LOG. Without the variable the payload is
+# only recorded, as before, and the pane path stays the preselected one.
+#
 # The pane path defaults to empty when FM_FAKE_PANE_PATH is unset. Window
 # cleanup and option operations are no-ops. Launch logging is env-gated, so
 # suites that do not set FM_FAKE_LAUNCH_LOG keep a silent send-keys.
@@ -112,7 +121,14 @@ fm_test_fake_tmux_spawn() {
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*)
+    if [ -n "${FM_FAKE_PANE_PATH_FILE:-}" ] && [ -s "$FM_FAKE_PANE_PATH_FILE" ]; then
+      cat "$FM_FAKE_PANE_PATH_FILE"
+    else
+      printf '%s\n' "${FM_FAKE_PANE_PATH:-}"
+    fi
+    exit 0
+    ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
@@ -167,6 +183,15 @@ case "${1:-}" in
           ;;
       esac
     done
+    if [ -n "${FM_FAKE_TMUX_GET_DIR:-}" ]; then
+      for a in "$@"; do
+        if [ "$a" = "treehouse get" ]; then
+          printf 'treehouse get --root %s\n' "${FM_FAKE_TMUX_GET_ROOT:?FM_FAKE_TMUX_GET_ROOT is required with FM_FAKE_TMUX_GET_DIR}" >> "${FM_FAKE_TMUX_GET_LOG:-/dev/null}"
+          chosen=$(cd "$FM_FAKE_TMUX_GET_DIR" && treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null) || exit 1
+          printf '%s\n' "${chosen##*$'\n'}" > "${FM_FAKE_PANE_PATH_FILE:?FM_FAKE_PANE_PATH_FILE is required with FM_FAKE_TMUX_GET_DIR}"
+        fi
+      done
+    fi
     if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
       for a in "$@"; do

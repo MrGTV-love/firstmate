@@ -2248,7 +2248,8 @@
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME.\" >&2"
         },
-        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned", "count": 2},
+        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned"},
+        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot ${TEARDOWN_UNCLAIMED_SLOT:-$TEARDOWN_RECORD_SLOT}, which encloses task $ID's nested copy and carries no slot claim, was not returned"},
         {"file": "bin/fm-teardown.sh", "match": "teardown_unclaimed_note \"treehouse refused the exact conditional return"}
       ]
     },

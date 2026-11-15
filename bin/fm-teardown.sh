@@ -4467,25 +4467,70 @@ TEARDOWN_UNCLAIMED_KIND=
 TEARDOWN_UNCLAIMED_NAME=
 TEARDOWN_UNCLAIMED_HOLDER=
 TEARDOWN_UNCLAIMED_LEASE_ID=
-# The lease the planning saw (state|holder|lease id|name), for the retirement gate.
+# The lease the last planning saw (state|holder|lease id|name), and the one the early
+# proof saw, which is the binding record: the second planning, under project custody,
+# never overwrites it, and the retirement gate compares against it.
 TEARDOWN_UNCLAIMED_SEEN=
+TEARDOWN_UNCLAIMED_EARLY=
 
 TEARDOWN_UNCLAIMED_WHY=
 teardown_unclaimed_note() {  # <reason>
   TEARDOWN_UNCLAIMED_WHY=$1
 }
 
-# Ahead of every retirement, launch-agent and process-reaping helper (they run on the
-# recorded copy before project custody), the slot's lease is read fresh and must be
-# the one the planning saw. A successor, a changed holder or a new lease id means the
-# slot may no longer be this task's, so nothing is retired or signalled and the
-# teardown refuses with the record kept; a retry plans again from what it then reads.
-teardown_unclaimed_retire_gate() {
-  local now
+# Adopt an entry still on the old recovered holder, and prove it. One treehouse
+# status (fm_task_copy_current_pool_listing) rewrites it to the protected holder at
+# the provider's first state lock; the entry is then read fresh and must show the
+# protected holder form, the same id and the same name. A failed status, or a status
+# that rewrote nothing (including one that adopted a different pool), refuses, so an
+# old session's exit could never still sweep an entry this route binds.
+teardown_unclaimed_adopt_old_holder() {
+  local id=$FM_TASK_COPY_LEASE_ID name=$FM_TASK_COPY_LEASE_NAME
+  fm_task_copy_current_pool_listing "$PROJ" \
+    || { teardown_unclaimed_note "the treehouse status that adopts an entry on the old recovered holder failed"; return 1; }
   fm_task_copy_pool_slot_lease "$TEARDOWN_UNCLAIMED_SLOT" || true
-  now="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
-  [ "$now" = "$TEARDOWN_UNCLAIMED_SEEN" ] && return 0
-  echo "REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned: its lease changed since the route was planned (planned '$TEARDOWN_UNCLAIMED_SEEN', now '$now'), so a successor may hold it; no run, launch agent or process was retired or signalled on the recorded copy, and task $ID's record is kept for a retry." >&2
+  if [ "$FM_TASK_COPY_LEASE_STATE" = recovered ] && [ -n "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" ] \
+      && [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" ] \
+      && [ "$FM_TASK_COPY_LEASE_ID" = "$id" ] && [ "$FM_TASK_COPY_LEASE_NAME" = "$name" ]; then
+    return 0
+  fi
+  teardown_unclaimed_note "its holder was not rewritten to the protected holder after the adopting status (it reads '$FM_TASK_COPY_LEASE_HOLDER'), so an old session's exit could still sweep it"
+  return 1
+}
+
+# Ahead of every retirement, launch-agent and process-reaping helper (they run on the
+# recorded copy before project custody), the route must still be the one the early
+# proof planned. The early proof's tuple (state|holder|lease id|name) is the binding
+# record: the planning under project custody must have planned the route again, with
+# the same tuple, and the slot's lease read fresh must still be it. A successor, a
+# changed holder, a new lease id, or a planning that no longer selects the route
+# means the slot may no longer be this task's, so nothing is retired or signalled and
+# the teardown refuses with the record kept; a retry plans again from what it then
+# reads. An entry still on the old recovered holder is adopted here, before any
+# helper, and must then show the protected holder.
+teardown_unclaimed_retire_gate() {
+  local now why= state holder id name
+  if [ -z "$TEARDOWN_UNCLAIMED_SLOT" ]; then
+    why="the route the early proof planned was not planned again under project custody, so the lease it saw is gone"
+  elif [ "$TEARDOWN_UNCLAIMED_SEEN" != "$TEARDOWN_UNCLAIMED_EARLY" ]; then
+    why="its lease changed between the early proof ('$TEARDOWN_UNCLAIMED_EARLY') and the planning ('$TEARDOWN_UNCLAIMED_SEEN')"
+  else
+    fm_task_copy_pool_slot_lease "$TEARDOWN_UNCLAIMED_SLOT" || true
+    now="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
+    if [ "$now" != "$TEARDOWN_UNCLAIMED_EARLY" ]; then
+      why="its lease changed since the route was planned (planned '$TEARDOWN_UNCLAIMED_EARLY', now '$now'), so a successor may hold it"
+    elif [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ]; then
+      TEARDOWN_UNCLAIMED_WHY=
+      if teardown_unclaimed_adopt_old_holder; then
+        TEARDOWN_UNCLAIMED_EARLY="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
+        TEARDOWN_UNCLAIMED_SEEN=$TEARDOWN_UNCLAIMED_EARLY
+      else
+        why=$TEARDOWN_UNCLAIMED_WHY
+      fi
+    fi
+  fi
+  [ -n "$why" ] || return 0
+  echo "REFUSED: pool slot ${TEARDOWN_UNCLAIMED_SLOT:-$TEARDOWN_RECORD_SLOT}, which encloses task $ID's nested copy and carries no slot claim, was not returned: $why; no run, launch agent or process was retired or signalled on the recorded copy, and task $ID's record is kept for a retry." >&2
   return 1
 }
 
@@ -4503,8 +4548,7 @@ teardown_unclaimed_read_lease() {  # bind | verify
   local slot=$TEARDOWN_UNCLAIMED_SLOT
   fm_task_copy_pool_slot_lease "$slot" || true
   if [ "$1" = bind ] && [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ]; then
-    fm_task_copy_current_pool_listing "$PROJ" || true
-    fm_task_copy_pool_slot_lease "$slot" || true
+    teardown_unclaimed_adopt_old_holder || return 1
   fi
   case "$FM_TASK_COPY_LEASE_STATE" in
     ordinary)
@@ -4698,10 +4742,12 @@ teardown_unclaimed_candidate() {  # <slot>
 # cache. A refusal here is not final; the release step re-checks and refuses.
 teardown_unclaimed_early_proof() {
   local slot=$TEARDOWN_RECORD_SLOT
+  TEARDOWN_UNCLAIMED_EARLY=
   [ -n "$slot" ] && [ -z "$TEARDOWN_ENCLOSING_SLOT" ] || return 0
   fm_treehouse_slot_owner_state "$slot" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] || return 0
   teardown_unclaimed_candidate "$slot" || return 0
+  TEARDOWN_UNCLAIMED_EARLY=$TEARDOWN_UNCLAIMED_SEEN
   teardown_landed "$slot" HEAD "" || true
 }
 
@@ -5288,7 +5334,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       ;;
     retire)
-      [ -z "$TEARDOWN_UNCLAIMED_SLOT" ] || teardown_unclaimed_retire_gate || exit 1
+      [ -z "$TEARDOWN_UNCLAIMED_EARLY" ] || teardown_unclaimed_retire_gate || exit 1
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
       swept=("$WT")
       for root in ${TEARDOWN_RETURN_SLOT:+"$TEARDOWN_RETURN_SLOT"} \
