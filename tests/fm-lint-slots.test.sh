@@ -5594,6 +5594,7 @@ class Loader:
                 raise LookupError(pid)
             return record(43, 1, 200, 2) if SCENARIO == 'recycled' else CENSUS[1]
         module.kinfos = lambda *a: iter(CENSUS)
+        module.processes = lambda *a: iter([(42, 1), (43, 42)])
         module.kinfo = kinfo
         module.P_PID, module.E_PPID = 40, 560
         module.process_identity = lambda r: struct.unpack_from('qq', r, 0)
