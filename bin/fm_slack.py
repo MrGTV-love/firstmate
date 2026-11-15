@@ -252,7 +252,8 @@ class Slack:
 
     # A caller with a total deadline sets time_left to a function that gives the seconds left (the second person's pass, SECOND_BUDGET); None is no total bound.
     time_left = None
-    # The last call cut off at its deadline: {'ended': whether its reader ended after its socket was closed, 'closed_at': when (monotonic)} (_bounded).
+    # The last call cut off at its deadline: {'ended': whether its reader ended after its socket was closed, 'closed_at': when (monotonic), 'lookup_pending': whether a
+    # name lookup was still running, 'sent': whether a connection was made, 'begun': False for a call refused with no time left} (_bounded).
     last_cutoff = None
 
     def call(self, method, **fields):
@@ -296,6 +297,8 @@ class Slack:
         Returns the exchange's outcome, or raises DeadlineSpent."""
         left = self.time_left()
         if left <= 0:
+            # Not begun: nothing was looked up or sent. Recorded as every cut-off is (F9 of the review of c5868b6f).
+            self.last_cutoff = {'ended': True, 'closed_at': time.monotonic(), 'lookup_pending': False, 'sent': False, 'begun': False}
             raise DeadlineSpent(sent=False)
         fence = _Fence(self.time_left)
         opener = urllib.request.build_opener(_FencedHTTP(fence), _FencedHTTPS(fence))
@@ -307,12 +310,12 @@ class Slack:
             fence.release()
             if isinstance(outcome[0][3], DeadlineSpent):
                 # Cut off inside the reader (its lookup ran out of time, or another lookup was still alive): recorded as every cut-off is (F9).
-                self.last_cutoff = {'ended': True, 'closed_at': time.monotonic(), 'lookup_pending': fence.lookup_pending, 'sent': fence.connected}
+                self.last_cutoff = {'ended': True, 'closed_at': time.monotonic(), 'lookup_pending': fence.lookup_pending, 'sent': fence.connected, 'begun': True}
             return outcome[0]
         fence.close()
         closed_at = time.monotonic()
         reader.join(CUTOFF_JOIN)
-        self.last_cutoff = {'ended': not reader.is_alive(), 'closed_at': closed_at, 'lookup_pending': fence.lookup_pending, 'sent': fence.connected}
+        self.last_cutoff = {'ended': not reader.is_alive(), 'closed_at': closed_at, 'lookup_pending': fence.lookup_pending, 'sent': fence.connected, 'begun': True}
         raise DeadlineSpent(sent=fence.connected)
 
     def _exchange(self, request, timeout, opener=None):
