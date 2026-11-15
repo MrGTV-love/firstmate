@@ -442,7 +442,23 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: the final proof before its removal failed: $TEARDOWN_FINAL_WHY; teardown aborted\" >&2"
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: $TEARDOWN_FINAL_WHY. Land or move that content, then re-run teardown; teardown aborted\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: the final proof before its removal failed: $TEARDOWN_FINAL_WHY; re-run teardown for a fresh proof; teardown aborted\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: git worktree remove (without force) refused: $(fm_refuse_text \"$remove_err\"); teardown aborted\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy nonforced-removal \"foreign copy $copy was not removed: $TEARDOWN_FINAL_WHY.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "REFUSED: teardown did not run Vernant's closeout driver for %s copy %s, which keeps its lock: %s."
         },
         {
           "file": "bin/fm-copy-sweep.sh",

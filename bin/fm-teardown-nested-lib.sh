@@ -495,7 +495,7 @@ teardown_bundle_refuse() {  # <predicate> [hint]
 # registered worktree or live below a pool; neither makes its data disposable.
 # Resolve parents physically so aliases into actual removal roots still refuse.
 teardown_bundle_external() {  # <copy> <stored-bundle>
-  local copy=$1 bundle=$2 parent path field root
+  local copy=$1 bundle=$2 parent path
   case "$bundle" in /*) ;; *) TEARDOWN_BUNDLE_REASON='bundle path is not absolute'; return 1 ;; esac
   if [ ! -f "$bundle" ] || [ -L "$bundle" ]; then
     TEARDOWN_BUNDLE_REASON='bundle is not a regular nonsymlink file'
@@ -507,7 +507,27 @@ teardown_bundle_external() {  # <copy> <stored-bundle>
     TEARDOWN_BUNDLE_REASON='bundle parent cannot be resolved'; return 1;
   }
   path="$parent/${bundle##*/}"
+  if ! teardown_path_outside_removal_roots "$copy" "$path"; then
+    case "$TEARDOWN_ROOT_LABEL" in
+      state) TEARDOWN_BUNDLE_REASON="bundle is inside task state $TEARDOWN_ROOT_HIT" ;;
+      copy) TEARDOWN_BUNDLE_REASON="bundle is inside task copy $TEARDOWN_ROOT_HIT" ;;
+      *) TEARDOWN_BUNDLE_REASON="bundle is inside task scratch $TEARDOWN_ROOT_HIT" ;;
+    esac
+    return 1
+  fi
+}
+
+# Is the resolved <path> outside every root this teardown may remove for <copy>:
+# the copy, the task's worktree, slots, nested and foreign copies, scratch and
+# task state? Sets TEARDOWN_ROOT_LABEL (copy, scratch or state) and
+# TEARDOWN_ROOT_HIT when it is inside one.
+TEARDOWN_ROOT_LABEL=
+TEARDOWN_ROOT_HIT=
+teardown_path_outside_removal_roots() {  # <copy> <resolved-path>
+  local copy=$1 path=$2 root field
   local roots=() labels=() label i
+  TEARDOWN_ROOT_LABEL=
+  TEARDOWN_ROOT_HIT=
   # A missing task copy is proved through its surviving project ref store.
   # That project is not a removal target, even when it is the active home.
   if [ -z "${PROJ:-}" ] || ! [ "$copy" -ef "$PROJ" ]; then
@@ -527,12 +547,9 @@ teardown_bundle_external() {  # <copy> <stored-bundle>
     label=${labels[$i]}
     [ -e "$root" ] || continue
     field=$(fm_task_copy_canonical_dir "$root") || field=$root
-    case "$path" in "$root"/*|"$field"/*)
-      case "$label" in
-        state) TEARDOWN_BUNDLE_REASON="bundle is inside task state $root" ;;
-        copy) TEARDOWN_BUNDLE_REASON="bundle is inside task copy $root" ;;
-        *) TEARDOWN_BUNDLE_REASON="bundle is inside task scratch $root" ;;
-      esac
+    case "$path" in "$root"|"$root"/*|"$field"|"$field"/*)
+      TEARDOWN_ROOT_LABEL=$label
+      TEARDOWN_ROOT_HIT=$root
       return 1 ;;
     esac
   done
@@ -731,40 +748,43 @@ teardown_bundle_tips_cover() {  # <required> <tips> <advertised>
   done
 }
 
-# Each copy a bundle proof accepted in this run (canonical path), the stored
-# bundle it accepted and the SHA-256 of the preservation record file it read,
-# kept as parallel arrays (bash 3.2 has no associative arrays).
-TEARDOWN_BUNDLE_PROVED_DIRS=()
-TEARDOWN_BUNDLE_PROVED_STORED=()
-TEARDOWN_BUNDLE_PROVED_RECORD=()
-teardown_bundle_proved_add() {  # <copy> <stored>
-  local copy record
+# The proofs that admitted each copy's removal in this run, recorded in the
+# parent shell when they were taken (canonical copy path, kind, the HEAD the
+# proof held, and for a bundle the stored bundle and the SHA-256 of the
+# preservation record file it read), as parallel arrays (bash 3.2). Kinds:
+# anchor (an own copy's preservation anchor), landed (the landed-work rule) and
+# bundle (a verified recorded bundle). The final removal proof rechecks every
+# admission recorded for the copy, never a different proof in its place.
+TEARDOWN_ADMIT_DIRS=()
+TEARDOWN_ADMIT_KINDS=()
+TEARDOWN_ADMIT_HEADS=()
+TEARDOWN_ADMIT_STORED=()
+TEARDOWN_ADMIT_RECORD=()
+teardown_admit() {  # <copy> <anchor|landed|bundle> <head> [<stored-bundle>]
+  local copy record=''
   copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
-  record=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || record=
-  TEARDOWN_BUNDLE_PROVED_DIRS+=("$copy")
-  TEARDOWN_BUNDLE_PROVED_STORED+=("$2")
-  TEARDOWN_BUNDLE_PROVED_RECORD+=("$record")
+  if [ "$2" = bundle ]; then
+    record=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || record=''
+  fi
+  TEARDOWN_ADMIT_DIRS+=("$copy")
+  TEARDOWN_ADMIT_KINDS+=("$2")
+  TEARDOWN_ADMIT_HEADS+=("$3")
+  TEARDOWN_ADMIT_STORED+=("${4:-}")
+  TEARDOWN_ADMIT_RECORD+=("$record")
 }
 
-# Does the bundle a proof in this run accepted for <copy> still hold <head>,
-# with no forge or fetch work? The preservation record file is byte for byte the
-# one that proof read, the stored copy and any recorded source that still exists
-# pass the byte checks, and the record and the stored copy still cover every
-# unlanded tip of <head> and of the copy's removed branches. Fails with
-# TEARDOWN_BUNDLE_REASON; fails with it empty when no bundle proved <copy>.
-teardown_bundle_final_current() {  # <copy> <head>
-  local copy=$1 head=$2 canonical i stored='' record='' now source heads required side
-  TEARDOWN_BUNDLE_REASON=
-  canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=$copy
-  for i in ${TEARDOWN_BUNDLE_PROVED_DIRS[@]+"${!TEARDOWN_BUNDLE_PROVED_DIRS[@]}"}; do
-    if [ "${TEARDOWN_BUNDLE_PROVED_DIRS[$i]}" = "$canonical" ]; then
-      stored=${TEARDOWN_BUNDLE_PROVED_STORED[$i]}
-      record=${TEARDOWN_BUNDLE_PROVED_RECORD[$i]}
-    fi
-  done
-  [ -n "$stored" ] || return 1
-  now=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || now=
-  if [ -z "$record" ] || [ "$now" != "$record" ]; then
+# The SHA-256 of the record file the proof read for the bundle that admitted
+# this whole cleanup (TEARDOWN_BUNDLE_SWEEP_PROOF, work_is_landed_bundle): every
+# copy the cleanup removes rechecks that bundle, whatever else admitted it.
+TEARDOWN_SWEEP_RECORD=
+
+# Are the record file, the stored bundle <stored> and any recorded source still
+# the ones a proof read (record file SHA-256 <record-sha256>, byte checks)? No
+# forge or fetch work. Fails with TEARDOWN_BUNDLE_REASON.
+teardown_bundle_bytes_current() {  # <copy> <stored> <record-sha256>
+  local copy=$1 stored=$2 record=$3 now source
+  now=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || now=''
+  if [ -z "$record" ] || [ -z "$stored" ] || [ "$now" != "$record" ]; then
     TEARDOWN_BUNDLE_REASON='the preservation record changed after its proof'
     return 1
   fi
@@ -780,7 +800,17 @@ teardown_bundle_final_current() {  # <copy> <head>
     teardown_bundle_file_ok "$copy" "$source" "$TEARDOWN_BUNDLE_RECORD_HASH" \
       || { TEARDOWN_BUNDLE_REASON="recorded source $TEARDOWN_BUNDLE_REASON"; return 1; }
   fi
-  heads=$(git -C "$copy" bundle list-heads "$stored" 2>/dev/null | awk '{print $1}' | tr '\n' ' ') \
+}
+
+# Does the bundle admission (<stored>, <record-sha256>) still hold <head> of
+# <copy>? Its bytes are current (teardown_bundle_bytes_current) and the record
+# and the stored copy cover every unlanded tip of <head> and of the copy's
+# removed branches. Fails with TEARDOWN_BUNDLE_REASON.
+teardown_bundle_final_current() {  # <copy> <head> <stored> <record-sha256>
+  local copy=$1 head=$2 heads required side
+  TEARDOWN_BUNDLE_REASON=
+  teardown_bundle_bytes_current "$copy" "$3" "$4" || return 1
+  heads=$(git -C "$copy" bundle list-heads "$3" 2>/dev/null | awk '{print $1}' | tr '\n' ' ') \
     || { TEARDOWN_BUNDLE_REASON='stored bundle advertised tips cannot be read'; return 1; }
   side=$(teardown_bundle_removed_refs "$copy") \
     || { TEARDOWN_BUNDLE_REASON="copy's branches cannot be inspected: $copy"; return 1; }
@@ -789,93 +819,171 @@ teardown_bundle_final_current() {  # <copy> <head>
   teardown_bundle_tips_cover "$required" "$TEARDOWN_BUNDLE_RECORD_TIPS" "$heads"
 }
 
-# Is <head> of <copy> one a landing proof in this run held (work_is_landed's
-# proved directory and HEAD pairs)?
-teardown_landed_holds() {  # <copy> <head>
-  local canonical i dir
+# Every bundle admission recorded for <copy> still holds <head>
+# (teardown_bundle_final_current). Fails with TEARDOWN_BUNDLE_REASON.
+teardown_admitted_bundles_current() {  # <copy> <head>
+  local canonical i
   canonical=$(fm_task_copy_canonical_dir "$1") || canonical=$1
-  # shellcheck disable=SC2153 # bin/fm-teardown.sh's landed-proof arrays.
-  for i in ${TEARDOWN_LANDED_DIRS[@]+"${!TEARDOWN_LANDED_DIRS[@]}"}; do
-    [ "${TEARDOWN_LANDED_HEADS[$i]}" = "$2" ] || continue
-    dir=$(fm_task_copy_canonical_dir "${TEARDOWN_LANDED_DIRS[$i]}") || dir=${TEARDOWN_LANDED_DIRS[$i]}
-    [ "$dir" != "$canonical" ] || return 0
+  for i in ${TEARDOWN_ADMIT_DIRS[@]+"${!TEARDOWN_ADMIT_DIRS[@]}"}; do
+    [ "${TEARDOWN_ADMIT_DIRS[$i]}" = "$canonical" ] && [ "${TEARDOWN_ADMIT_KINDS[$i]}" = bundle ] || continue
+    teardown_bundle_final_current "$1" "$2" "${TEARDOWN_ADMIT_STORED[$i]}" "${TEARDOWN_ADMIT_RECORD[$i]}" || return 1
   done
-  return 1
 }
 
-# Every file the ignored-file preserve of <copy> holds still matches the copy:
-# each regular file under each preservable ignored entry has its SHA-256 line in
-# the preserve's SHA256SUMS. Compared by hash, never by name.
+# The removal dirt rule: every status line counts except the exact managed
+# files Firstmate writes into a copy (.claude/settings.local.json and the two
+# turn-end markers) and the exact untracked entry of each of the task's own
+# <nested-copy> paths inside <copy>, which are proved on their own. Unlike
+# fm_task_copy_dirty_status it never exempts the rest of the .claude tree.
+teardown_removal_dirty_status() {  # <porcelain-status> <copy> [<nested-copy>...]
+  local status=$1 copy=$2 line nested
+  shift 2
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ''|'?? .claude/settings.local.json'|'?? .fm-grok-turnend'|'?? .fm-kimi-turnend') continue ;;
+    esac
+    for nested in "$@"; do
+      case "$nested" in
+        "$copy"/*) [ "$line" != "?? ${nested#"$copy"/}/" ] || continue 2 ;;
+      esac
+    done
+    printf '%s\n' "$line"
+  done <<< "$status"
+}
+
+# The preserve of <copy> holds its ignored files: for each regular file under
+# each preservable ignored entry, the copy's file, the preserved payload file
+# and its SHA256SUMS line agree by SHA-256, and the preserve lies outside every
+# removal root. Reads the preserved payload itself, never only the manifest.
 teardown_ignored_preserved_current() {  # <copy>
-  local copy=$1 entries entry dest file sum
-  entries=$(teardown_preservable_ignored "$copy") || return 1
+  local copy=$1 entries entry dest file rel sum kept
+  entries=$(teardown_preservable_ignored "$copy") || { TEARDOWN_PRESERVE_WHY='the ignored files cannot be listed'; return 1; }
   [ -n "$entries" ] || return 0
-  dest="$DATA/$ID/nested-copy-preserved/$(printf '%s' "$copy" | teardown_ignored_sha256)" || return 1
-  [ -f "$dest/SHA256SUMS" ] || return 1
+  dest="$DATA/$ID/nested-copy-preserved/$(printf '%s' "$copy" | teardown_ignored_sha256)" \
+    || { TEARDOWN_PRESERVE_WHY='the preserve path cannot be named'; return 1; }
+  teardown_preserve_dest_outside "$copy" "$dest" || return 1
+  [ -f "$dest/SHA256SUMS" ] && [ ! -L "$dest/SHA256SUMS" ] || { TEARDOWN_PRESERVE_WHY='the preserve has no manifest'; return 1; }
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
     while IFS= read -r -d '' file; do
-      sum=$(teardown_ignored_sha256 "$file") || return 1
-      grep -qxF "$sum  ${file#"$copy/"}" "$dest/SHA256SUMS" || return 1
+      rel=${file#"$copy/"}
+      sum=$(teardown_ignored_sha256 "$file") || { TEARDOWN_PRESERVE_WHY="$rel cannot be hashed"; return 1; }
+      grep -qxF "$sum  $rel" "$dest/SHA256SUMS" || { TEARDOWN_PRESERVE_WHY="the manifest does not hold $rel as it is in the copy"; return 1; }
+      [ -f "$dest/$rel" ] && [ ! -L "$dest/$rel" ] || { TEARDOWN_PRESERVE_WHY="the preserved payload of $rel is missing"; return 1; }
+      kept=$(teardown_ignored_sha256 "$dest/$rel") && [ "$kept" = "$sum" ] \
+        || { TEARDOWN_PRESERVE_WHY="the preserved payload of $rel does not match the copy"; return 1; }
     done < <(find "$copy/$entry" -type f -print0 2>/dev/null)
   done <<< "$entries"
 }
 
+# Does the preserve directory <dest> resolve outside every removal root of
+# <copy> (teardown_path_outside_removal_roots)? Sets TEARDOWN_PRESERVE_WHY.
+teardown_preserve_dest_outside() {  # <copy> <dest>
+  local parent
+  parent=$(fm_task_copy_canonical_dir "${2%/*}") || { TEARDOWN_PRESERVE_WHY='the preserve directory cannot be resolved'; return 1; }
+  if ! teardown_path_outside_removal_roots "$1" "$parent/${2##*/}"; then
+    TEARDOWN_PRESERVE_WHY="the preserve directory resolves inside $TEARDOWN_ROOT_LABEL $TEARDOWN_ROOT_HIT"
+    return 1
+  fi
+}
+
 # The one final proof every removal route takes immediately before its remove
-# call (Main 010): the HEAD is one a proof in this run held (a preservation
-# anchor for an own copy, a landing proof, or the bundle a proof accepted, still
-# covering it), the status is clean, the copy's ignored files are preserved again
-# and match by hash (preserve) or none outside the allow-list exists (refuse),
-# and, for a locked copy, its launcher is gone by pid and start time against the
-# lock's time read before the unlock. Returns 1 with TEARDOWN_FINAL_WHY.
+# call (Main 010, 011, 1681). It refuses on any input it cannot prove; there is
+# no fast path and no proof stands in for another:
+#   - HEAD and status: the HEAD resolves and the status is clean under the
+#     removal dirt rule (teardown_removal_dirty_status);
+#   - admission: at least one proof admitted this copy in this run, and every
+#     admission recorded for it still holds the same HEAD (an anchor still points
+#     at it; a landing proof held that HEAD; a bundle's record file, stored and
+#     source bytes are unchanged and still cover HEAD's unlanded tips);
+#   - the bundle that admitted the whole cleanup, when one did, is unchanged;
+#   - ignored files: none outside the preserve allow-list (refuse), or all of
+#     them preserved again outside every removal root and the preserved payload
+#     matched by SHA-256 to the manifest and to the copy (preserve);
+#   - locked: the launcher <pid> is gone by pid and start time against the lock
+#     time read before the unlock; an empty or non-numeric pid or time refuses.
+# Returns 1 with TEARDOWN_FINAL_WHY and TEARDOWN_FINAL_STABLE (1 when the fact
+# stays until someone acts, such as dirt or unpreserved ignored files, so a
+# re-run cannot help; empty when a re-run for a fresh proof can).
 TEARDOWN_FINAL_WHY=
-teardown_removal_final_proof() {  # <copy> <preserve|refuse> <strict|own> [<launcher-pid> <lock-mtime>]
-  local copy=$1 ignored=$2 status_mode=$3 pid=${4:-} mtime=${5:-} head status unique rc=0
+TEARDOWN_FINAL_STABLE=
+teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [<launcher-pid> <lock-mtime>]
+  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} head status unique canonical i found=0 rc=0
   TEARDOWN_FINAL_WHY=
+  TEARDOWN_FINAL_STABLE=
   head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) \
     || { TEARDOWN_FINAL_WHY='its HEAD cannot be resolved at the removal'; return 1; }
   status=$(git -C "$copy" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) \
     || { TEARDOWN_FINAL_WHY='its status cannot be read at the removal'; return 1; }
-  # The same dirt rule the copy's first proof used (fm_task_copy_dirty_status);
-  # content Git still protects is left to the non-forced remove that follows,
-  # which refuses it with its own typed refusal.
-  if [ "$status_mode" = own ]; then
-    status=$(fm_task_copy_dirty_status "$status" "$copy" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"})
-  else
-    status=$(fm_task_copy_dirty_status "$status" "$copy")
-  fi
-  [ -z "$status" ] || { TEARDOWN_FINAL_WHY="it has uncommitted or untracked changes at the removal: $(printf '%s' "$status" | head -n 3 | paste -sd ' ' -)"; return 1; }
-  if [ "$status_mode" = own ] && fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 \
-      ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} && [ "$FM_TASK_COPY_HEAD" = "$head" ]; then
-    :
-  elif teardown_landed_holds "$copy" "$head"; then
-    :
-  elif teardown_bundle_final_current "$copy" "$head"; then
-    :
-  elif [ -n "$TEARDOWN_BUNDLE_REASON" ]; then
-    TEARDOWN_FINAL_WHY="its recorded bundle no longer holds HEAD ${head:0:12} ($TEARDOWN_BUNDLE_REASON)"
-    return 1
-  else
-    TEARDOWN_FINAL_WHY="no proof this run took holds its HEAD ${head:0:12}"
+  status=$(teardown_removal_dirty_status "$status" "$copy" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"})
+  if [ -n "$status" ]; then
+    TEARDOWN_FINAL_STABLE=1
+    TEARDOWN_FINAL_WHY="it holds uncommitted or untracked content nothing holds: $(printf '%s' "$status" | head -n 3 | paste -sd ' ' -)"
     return 1
   fi
-  if [ "$ignored" = refuse ]; then
-    unique=$(teardown_preservable_ignored "$copy") || { TEARDOWN_FINAL_WHY='its ignored files cannot be listed at the removal'; return 1; }
-    [ -z "$unique" ] || { TEARDOWN_FINAL_WHY="it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)"; return 1; }
-  else
-    if ! teardown_preserve_ignored "$copy" || ! teardown_ignored_preserved_current "$copy"; then
-      TEARDOWN_FINAL_WHY="its ignored files could not be preserved again in $DATA/$ID/nested-copy-preserved and matched by SHA-256"
+  canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=$copy
+  for i in ${TEARDOWN_ADMIT_DIRS[@]+"${!TEARDOWN_ADMIT_DIRS[@]}"}; do
+    [ "${TEARDOWN_ADMIT_DIRS[$i]}" = "$canonical" ] || continue
+    found=1
+    if [ "${TEARDOWN_ADMIT_HEADS[$i]}" != "$head" ]; then
+      TEARDOWN_FINAL_WHY="its HEAD ${head:0:12} is not the ${TEARDOWN_ADMIT_HEADS[$i]:0:12} its ${TEARDOWN_ADMIT_KINDS[$i]} proof admitted"
       return 1
     fi
-  fi
-  if [ -n "$pid" ]; then
-    teardown_launcher_live_since "$pid" "$mtime" || rc=$?
-    case "$rc" in
-      1) ;;
-      0) TEARDOWN_FINAL_WHY="its creation-lock launcher process $pid may still be running"; return 1 ;;
-      *) TEARDOWN_FINAL_WHY="the process table cannot be read, so launcher $pid is not proved gone"; return 1 ;;
+    case "${TEARDOWN_ADMIT_KINDS[$i]}" in
+      anchor)
+        if ! fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
+            || [ "$FM_TASK_COPY_HEAD" != "$head" ]; then
+          TEARDOWN_FINAL_WHY="the preservation anchor that admitted it no longer holds HEAD ${head:0:12}"
+          return 1
+        fi
+        ;;
+      landed) ;;
+      bundle)
+        if ! teardown_bundle_final_current "$copy" "$head" "${TEARDOWN_ADMIT_STORED[$i]}" "${TEARDOWN_ADMIT_RECORD[$i]}"; then
+          TEARDOWN_FINAL_WHY="the recorded bundle that admitted it no longer holds HEAD ${head:0:12} ($TEARDOWN_BUNDLE_REASON)"
+          return 1
+        fi
+        ;;
+      *) TEARDOWN_FINAL_WHY='it was admitted by an unknown proof'; return 1 ;;
     esac
+  done
+  [ "$found" = 1 ] || { TEARDOWN_FINAL_WHY="no proof in this run admitted its removal at HEAD ${head:0:12}"; return 1; }
+  if [ -n "${TEARDOWN_BUNDLE_SWEEP_PROOF:-}" ] \
+      && ! teardown_bundle_bytes_current "$copy" "$TEARDOWN_BUNDLE_SWEEP_PROOF" "$TEARDOWN_SWEEP_RECORD"; then
+    TEARDOWN_FINAL_WHY="the recorded bundle that admitted this cleanup changed ($TEARDOWN_BUNDLE_REASON)"
+    return 1
   fi
+  case "$ignored" in
+    refuse)
+      unique=$(teardown_preservable_ignored "$copy") || { TEARDOWN_FINAL_WHY='its ignored files cannot be listed at the removal'; return 1; }
+      if [ -n "$unique" ]; then
+        TEARDOWN_FINAL_STABLE=1
+        TEARDOWN_FINAL_WHY="it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)"
+        return 1
+      fi
+      ;;
+    preserve)
+      if ! teardown_preserve_ignored "$copy" || ! teardown_ignored_preserved_current "$copy"; then
+        TEARDOWN_FINAL_WHY="its ignored files could not be preserved and verified outside every removal root (${TEARDOWN_PRESERVE_WHY:-preservation failed})"
+        return 1
+      fi
+      ;;
+    *) TEARDOWN_FINAL_WHY="unknown ignored-file mode $ignored"; return 1 ;;
+  esac
+  case "$locked" in
+    unlocked) ;;
+    locked)
+      case "$pid" in ''|*[!0-9]*) TEARDOWN_FINAL_WHY='its lock launcher could not be read for the final launcher check'; return 1 ;; esac
+      case "$mtime" in ''|*[!0-9]*) TEARDOWN_FINAL_WHY='its lock time could not be read for the final launcher check'; return 1 ;; esac
+      teardown_launcher_live_since "$pid" "$mtime" || rc=$?
+      case "$rc" in
+        1) ;;
+        0) TEARDOWN_FINAL_WHY="its creation-lock launcher process $pid may still be running"; return 1 ;;
+        *) TEARDOWN_FINAL_WHY="the process table cannot be read, so launcher $pid is not proved gone"; return 1 ;;
+      esac
+      ;;
+    *) TEARDOWN_FINAL_WHY="unknown lock mode $locked"; return 1 ;;
+  esac
 }
 
 # <ref> itself must carry a locally-only commit, or delivery proof is still
@@ -952,14 +1060,19 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
 # anything cannot be listed, copied or hashed, after removing the one staging
 # directory it built, and the caller then refuses the copy rather than removing
 # unpreserved content.
+TEARDOWN_PRESERVE_WHY=
 teardown_preserve_ignored() {  # <copy> [all|releasable]
-  local copy=$1 root dest stage entries entry file hash
+  local copy=$1 root dest stage aside entries entry file hash
   entries=$(teardown_preservable_ignored "$copy" "${2:-}") || return 1
   [ -n "$entries" ] || return 0
+  TEARDOWN_PRESERVE_WHY=
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
   root="$DATA/$ID/nested-copy-preserved"
   dest="$root/$hash"
   stage="$root/.staging-$hash"
+  aside="$root/.aside-$hash"
+  mkdir -p "$root" || { TEARDOWN_PRESERVE_WHY='the preserve directory cannot be created'; return 1; }
+  teardown_preserve_dest_outside "$copy" "$dest" || return 1
   rm -rf "$stage" || return 1
   (
     mkdir -p "$stage" || return 1
@@ -976,13 +1089,48 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
       hash=$(teardown_ignored_sha256 "$file") || return 1
       printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
     done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
-    rm -rf "$dest" || return 1
-    mv "$stage" "$dest" || return 1
+    # Publish by renaming: the earlier preserve is set aside, the new one is
+    # renamed into place, and only then is the earlier one deleted; a failed
+    # rename puts the earlier preserve back.
+    rm -rf "$aside" || return 1
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      mv "$dest" "$aside" || return 1
+    fi
+    if ! mv "$stage" "$dest"; then
+      [ ! -e "$aside" ] || mv "$aside" "$dest"
+      return 1
+    fi
+    rm -rf "$aside" || return 1
   ) || {
     rm -rf "$stage"
+    [ -n "$TEARDOWN_PRESERVE_WHY" ] || TEARDOWN_PRESERVE_WHY='the preserve could not be copied, hashed or published'
     return 1
   }
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
+}
+
+# The lock reason first read for each copy in this run (canonical path), so a
+# later read can tell a changed lock from the one that was proved.
+TEARDOWN_LOCK_SEEN_DIRS=()
+TEARDOWN_LOCK_SEEN_TEXT=()
+teardown_lock_seen() {  # <copy> <lock-reason>
+  local copy i
+  copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  for i in ${TEARDOWN_LOCK_SEEN_DIRS[@]+"${!TEARDOWN_LOCK_SEEN_DIRS[@]}"}; do
+    [ "${TEARDOWN_LOCK_SEEN_DIRS[$i]}" != "$copy" ] || return 0
+  done
+  TEARDOWN_LOCK_SEEN_DIRS+=("$copy")
+  TEARDOWN_LOCK_SEEN_TEXT+=("$2")
+}
+teardown_lock_is_first_seen() {  # <copy> <lock-reason>
+  local copy i
+  copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  for i in ${TEARDOWN_LOCK_SEEN_DIRS[@]+"${!TEARDOWN_LOCK_SEEN_DIRS[@]}"}; do
+    [ "${TEARDOWN_LOCK_SEEN_DIRS[$i]}" = "$copy" ] || continue
+    [ "${TEARDOWN_LOCK_SEEN_TEXT[$i]}" = "$2" ]
+    return
+  done
+  return 1
 }
 
 # Does an active record, a process running in it or holding a file in it open,
@@ -1039,6 +1187,7 @@ teardown_foreign_copy_unowned() {  # <copy>
   teardown_copy_lock_file "$copy" || rc=$?
   case "$rc" in
     0)
+      teardown_lock_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"
       if ! pid=$(teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK"); then
         TEARDOWN_FOREIGN_RULE=creation-lock-owner
         TEARDOWN_FOREIGN_WHY="it is locked by something other than Vernant's creation lock (${TEARDOWN_FOREIGN_LOCK:-no reason given})"
@@ -1429,6 +1578,11 @@ teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
 # Successful closeouts never call this helper and create no durable output file.
 teardown_closeout_refusal() {  # <foreign|own nested> <copy> <driver-exit>
   local kind=$1 copy=$2 rc=$3 output_file line
+  if [ -n "${TEARDOWN_CLOSEOUT_NOT_RUN:-}" ]; then
+    printf "REFUSED: teardown did not run Vernant's closeout driver for %s copy %s, which keeps its lock: %s.\n" \
+      "$kind" "$(fm_refuse_text "$copy")" "$(fm_refuse_text "$TEARDOWN_CLOSEOUT_NOT_RUN")" >&2
+    return 0
+  fi
   if output_file=$(umask 077; mkdir -p "$DATA/$ID" && mktemp "$DATA/$ID/vernant-closeout.XXXXXX") \
       && printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$output_file"; then
     printf "REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output: %s\n" \
@@ -1589,7 +1743,7 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
 TEARDOWN_RELEASE_WHY=
 teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
-  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs stored mtime
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime
   TEARDOWN_RELEASE_WHY=
   teardown_copy_lock_file "$copy" || { TEARDOWN_RELEASE_WHY='its lock state cannot be read'; return 1; }
   lock=$TEARDOWN_FOREIGN_LOCK
@@ -1615,9 +1769,7 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     TEARDOWN_RELEASE_WHY=${TEARDOWN_FOREIGN_WHY:-its ownership cannot be proved}
     return 1
   fi
-  TEARDOWN_BUNDLE_ACCEPTED=
   teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
-  stored=$TEARDOWN_BUNDLE_ACCEPTED
   if teardown_copy_git_protects "$copy"; then
     TEARDOWN_RELEASE_WHY='it holds content Git would not remove without force'
     return 1
@@ -1632,17 +1784,20 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     TEARDOWN_RELEASE_WHY="process ${procs%%$'\t'*} runs in it or holds $(fm_refuse_text "${procs#*$'\t'}") open since the retire phase"
     return 1
   fi
-  # What the proofs above held must still hold at the unlock: the HEAD, and the
-  # stored bundle when a bundle proved the copy (cheap reads, no forge or fetch).
   now=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || now=
   [ -n "$now" ] && [ "$now" = "$head" ] || { TEARDOWN_RELEASE_WHY='its HEAD changed after the landing proof'; return 1; }
-  if [ -n "$stored" ] && ! teardown_bundle_final_current "$copy" "$head"; then
-    TEARDOWN_RELEASE_WHY="its recorded bundle no longer holds it (${TEARDOWN_BUNDLE_REASON:-no bundle proof is recorded for it})"
+  # A changed admitting bundle refuses here, before any unlock; the final proof
+  # after the unlock checks it again.
+  if ! teardown_admitted_bundles_current "$copy" "$head"; then
+    TEARDOWN_RELEASE_WHY="its recorded bundle no longer holds it ($TEARDOWN_BUNDLE_REASON)"
     return 1
   fi
-  # The lock and the launcher are read once more, immediately before the unlock.
-  teardown_copy_lock_file "$copy" && [ "$TEARDOWN_FOREIGN_LOCK" = "$lock" ] \
-    || { TEARDOWN_RELEASE_WHY='its lock changed before the release'; return 1; }
+  # The lock and the launcher are read once more, immediately before the unlock;
+  # the lock must be the one first proved for this copy.
+  if ! teardown_copy_lock_file "$copy" || [ "$TEARDOWN_FOREIGN_LOCK" != "$lock" ] || ! teardown_lock_is_first_seen "$copy" "$lock"; then
+    TEARDOWN_RELEASE_WHY='its lock changed before the release'
+    return 1
+  fi
   gone=0
   teardown_launcher_gone "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE" || gone=$?
   [ "$gone" = 0 ] || { TEARDOWN_RELEASE_WHY="its creation-lock launcher process $pid appeared, or could not be read, before the release"; return 1; }
@@ -1650,7 +1805,7 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   git -C "$slot" worktree unlock "$copy" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='git worktree unlock failed'; return 1; }
   # The final proof runs after the last unlock and the remove is the very next
   # action; a failed proof puts the lock back and refuses.
-  if ! teardown_removal_final_proof "$copy" preserve strict "$pid" "$mtime"; then
+  if ! teardown_removal_final_proof "$copy" preserve locked "$pid" "$mtime"; then
     git -C "$slot" worktree lock --reason "$lock" "$copy" >/dev/null 2>&1 || true
     if teardown_copy_lock_file "$copy" && [ "$TEARDOWN_FOREIGN_LOCK" = "$lock" ]; then
       TEARDOWN_RELEASE_WHY="$TEARDOWN_FINAL_WHY; its lock was restored"
@@ -1675,21 +1830,45 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
 # direct release of a dead launcher's lock. Returns the driver's exit code when
 # nothing released the copy; TEARDOWN_RELEASE_WHY then names why the direct
 # release did not apply.
+TEARDOWN_CLOSEOUT_NOT_RUN=
 teardown_closeout_release() {  # <slot> <copy> <foreign|own nested>
-  local slot=$1 copy=$2 kind=$3 rc=0 head pid mtime
+  local slot=$1 copy=$2 kind=$3 rc=0 head pid='' mtime='' lock_rc=0
   TEARDOWN_RELEASE_WHY=
+  TEARDOWN_CLOSEOUT_NOT_RUN=
+  # The driver never runs under the project lock (Main 011). When teardown keeps
+  # project custody because the slot's state cannot be proved, a locked copy is
+  # not released in this pass: it is deferred and named (Main 1681).
+  if [ "${TREEHOUSE_PROJECT_LOCK_HELD:-0}" = 1 ]; then
+    TEARDOWN_CLOSEOUT_NOT_RUN="deferred: teardown keeps project custody for this pass (the pool slot's state cannot be proved), and Vernant's closeout driver never runs under the project lock, so this locked copy is not released now"
+    TEARDOWN_CLOSEOUT_OUT=$TEARDOWN_CLOSEOUT_NOT_RUN
+    return 1
+  fi
   head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || head=
   teardown_closeout_credit "$copy"
+  # The lock is read again just before the driver: an absent, unreadable,
+  # unrecognized or changed lock (against the one first proved) refuses here.
+  teardown_copy_lock_file "$copy" || lock_rc=$?
+  case "$lock_rc" in
+    0)
+      if ! pid=$(teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK"); then
+        TEARDOWN_CLOSEOUT_NOT_RUN="its lock is no longer Vernant's creation lock (${TEARDOWN_FOREIGN_LOCK:-no reason given})"
+      elif ! teardown_lock_is_first_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"; then
+        TEARDOWN_CLOSEOUT_NOT_RUN="its lock changed since it was proved (now: $TEARDOWN_FOREIGN_LOCK)"
+      else
+        mtime=$(fm_lock_path_mtime "$TEARDOWN_FOREIGN_LOCK_FILE") || mtime=''
+      fi
+      ;;
+    1) TEARDOWN_CLOSEOUT_NOT_RUN='its lock is gone since it was proved' ;;
+    *) TEARDOWN_CLOSEOUT_NOT_RUN='its lock state cannot be read' ;;
+  esac
   # The same final proof as every removal, just before the driver's execute call
   # (the driver then removes the copy itself).
-  pid='' mtime=''
-  if teardown_copy_lock_file "$copy" && pid=$(teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK"); then
-    mtime=$(fm_lock_path_mtime "$TEARDOWN_FOREIGN_LOCK_FILE") || mtime=
+  if [ -z "$TEARDOWN_CLOSEOUT_NOT_RUN" ] && ! teardown_removal_final_proof "$copy" preserve locked "$pid" "$mtime"; then
+    TEARDOWN_CLOSEOUT_NOT_RUN="the final proof before the driver failed: $TEARDOWN_FINAL_WHY"
   fi
-  if ! teardown_removal_final_proof "$copy" preserve strict "$pid" "$mtime"; then
+  if [ -n "$TEARDOWN_CLOSEOUT_NOT_RUN" ]; then
     teardown_closeout_credit_discard
-    TEARDOWN_CLOSEOUT_OUT="teardown did not run the driver: the final proof before it failed: $TEARDOWN_FINAL_WHY"
-    TEARDOWN_RELEASE_WHY="the final proof before the driver failed: $TEARDOWN_FINAL_WHY"
+    TEARDOWN_CLOSEOUT_OUT="teardown did not run the driver: $TEARDOWN_CLOSEOUT_NOT_RUN"
     return 1
   fi
   teardown_run_closeout "$slot" "$copy" || rc=$?
@@ -1761,8 +1940,12 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
     1)
       remove_rc=0
       teardown_copy_git_protects "$copy" && protected=1 || protected=0
-      if ! teardown_removal_final_proof "$copy" preserve strict; then
-        teardown_refuse_copy final-removal-proof "foreign copy $copy was not removed: the final proof before its removal failed: $TEARDOWN_FINAL_WHY." "$copy"
+      if ! teardown_removal_final_proof "$copy" preserve unlocked; then
+        if [ -n "$TEARDOWN_FINAL_STABLE" ]; then
+          teardown_refuse_copy nonforced-removal "foreign copy $copy was not removed: $TEARDOWN_FINAL_WHY." "$copy"
+        else
+          teardown_refuse_copy final-removal-proof "foreign copy $copy was not removed: the final proof before its removal failed: $TEARDOWN_FINAL_WHY." "$copy"
+        fi
         return 1
       fi
       remove_err=$(git -C "$slot" worktree remove "$copy" 2>&1 >/dev/null) || remove_rc=$?

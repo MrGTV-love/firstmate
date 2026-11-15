@@ -3164,16 +3164,28 @@ test_bundle_sources_and_durable_home_locations() {
     record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create source fixture'
     rc=0
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
+    if [ "$shape" = source-copy ]; then
+      # The source left in the copy is an untracked file nothing else holds as
+      # it lies there, so the copy stays (Main 1681: removal refuses on any
+      # untracked byte); the stored copy is still durable and restores.
+      expect_code 1 "$rc" "bundle-location-$shape: an untracked source in the copy must keep it: $(grep -v '^●' "$case_dir/stderr" | tail -6)"
+      assert_present "$BUNDLE_PATH" "bundle-location-$shape: the untracked source in the copy was lost"
+      assert_present "$NESTED_COPY/.git" "bundle-location-$shape: the copy was removed"
+      restored="$case_dir/restored.git"
+      git init -q --bare "$restored"
+      git -C "$restored" fetch -q "$stored" "$head:refs/heads/recovered" || fail 'stored copy cannot restore while the copy stays'
+      continue
+    fi
     expect_code 0 "$rc" "bundle-location-$shape: safe storage must allow cleanup: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" 'copy not removed'
-    stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
     rm -f "$BUNDLE_PATH"
     restored="$case_dir/restored.git"
     git init -q --bare "$restored"
     git -C "$restored" fetch -q "$stored" "$head:refs/heads/recovered" || fail 'stored copy cannot restore after source removal'
     assert_equals 'recoverable work' "$(git -C "$restored" show "$head:work.txt")" 'restored commit lost bytes'
   done
-  pass 'temporary sources and durable homes inside other worktrees or pool folders retain recoverable commits'
+  pass 'temporary sources and durable homes inside other worktrees or pool folders retain recoverable commits; a source left untracked in the copy keeps the copy'
 }
 
 # A bundle whose pack passes bundle verify and a connectivity-only fsck can still

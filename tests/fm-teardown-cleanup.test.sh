@@ -4672,9 +4672,11 @@ SH
 # protection text on a copy it had no reason to protect is only a failure.
 test_nonforced_removal_is_decided_from_the_copy_not_from_gits_message() {
   local rc
+  # The copy is protected the way only Git's own removal can judge (a modules
+  # directory under its clean git directory); an untracked file would be
+  # refused by teardown's final removal proof before Git is asked.
   make_foreign_copy_case foreign-removal-translated
-  mkdir -p "$FOREIGN_COPY/.claude"
-  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  mkdir "$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)/modules"
   cat > "$FOREIGN_CASE/fakebin/git" <<SH
 #!/usr/bin/env bash
 case " \$* " in
@@ -4707,8 +4709,7 @@ SH
   assert_foreign_copy_untouched english-clean
 
   make_foreign_copy_case foreign-removal-protected-but-failed
-  mkdir -p "$FOREIGN_COPY/.claude"
-  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  mkdir "$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)/modules"
   cat > "$FOREIGN_CASE/fakebin/git" <<SH
 #!/usr/bin/env bash
 case " \$* " in
@@ -5156,10 +5157,15 @@ test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository() {
   held_foreign_unlanded "$second"
   held_snapshot "$FOREIGN_CASE" "$second"
   run_foreign_teardown rc
-  expect_code 0 "$rc" "held-submodule: a submodule of the own repository must not stop a held close: $(cat "$FOREIGN_CASE/stderr")"
-  held_assert_closed held-submodule
-  assert_absent "$FOREIGN_COPY" "held-submodule: the own nested copy survived"
-  pass "a submodule of the task's own repository does not stop a held close"
+  # Main 1681: the own nested copy is removed with a plain git worktree remove,
+  # and Git refuses a worktree with a checked-out submodule, so the held close
+  # stops with the copy, its submodule checkout and the task record intact.
+  expect_code 1 "$rc" "held-submodule: a checked-out submodule must keep the own nested copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_present "$FOREIGN_COPY/.git" "held-submodule: the own nested copy was removed"
+  assert_equals sub "$(cat "$FOREIGN_COPY/vendor/sub/file.txt" 2>/dev/null)" "held-submodule: the submodule checkout was lost"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-submodule: the task record was removed"
+  assert_grep 'git worktree remove (without force) refused' "$FOREIGN_CASE/stderr" "held-submodule: the refusal did not name Git's plain removal"
+  pass "a checked-out submodule of the task's own repository keeps the own nested copy: the plain removal refuses and nothing is lost"
 }
 
 test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal() {

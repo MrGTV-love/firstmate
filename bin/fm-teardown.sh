@@ -2712,7 +2712,10 @@ TEARDOWN_BUNDLE_PROOF=
 TEARDOWN_BUNDLE_SWEEP_PROOF=
 work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
   teardown_bundle_preserved "$2" "$3" "${4:-}" || return 1
-  teardown_bundle_proved_add "$2" "$TEARDOWN_BUNDLE_ACCEPTED"
+  teardown_admit "$2" bundle "$3" "$TEARDOWN_BUNDLE_ACCEPTED"
+  if [ -z "$TEARDOWN_BUNDLE_SWEEP_PROOF" ]; then
+    TEARDOWN_SWEEP_RECORD=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || TEARDOWN_SWEEP_RECORD=''
+  fi
   TEARDOWN_BUNDLE_SWEEP_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
   [ -z "$1" ] || TEARDOWN_BUNDLE_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
 }
@@ -2731,6 +2734,7 @@ work_is_landed() {
   TEARDOWN_PIPELINE_INPUT_REASON=
   for i in "${!TEARDOWN_LANDED_DIRS[@]}"; do
     if [ "${TEARDOWN_LANDED_DIRS[$i]}" = "$dir" ] && [ "${TEARDOWN_LANDED_HEADS[$i]}" = "$head" ]; then
+      teardown_admit "$dir" landed "$head"
       return 0
     fi
   done
@@ -2749,6 +2753,7 @@ work_is_landed() {
   if work_is_landed_proof "$branch"; then
     TEARDOWN_LANDED_DIRS+=("$dir")
     TEARDOWN_LANDED_HEADS+=("$head")
+    teardown_admit "$dir" landed "$head"
     return 0
   fi
   if [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ]; then
@@ -4821,7 +4826,7 @@ teardown_peer_claim_handoff() {
 # Removes this task's proven own nested copies that Vernant's creation lock does
 # not hold (those the closeout driver already removed are skipped).
 teardown_remove_own_nested_copies() {  # <slot-label>
-  local copy known root mode
+  local copy known root mode remove_err
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     known=0
     for root in ${TEARDOWN_OWN_RELEASED[@]+"${TEARDOWN_OWN_RELEASED[@]}"}; do
@@ -4829,22 +4834,33 @@ teardown_remove_own_nested_copies() {  # <slot-label>
     done
     [ "$known" = 0 ] || continue
     # A scout's or secondmate's copy is declared scratch and skips the
-    # landed-work rule (validate_worktree_teardown_safety), so it skips this too.
-    if [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
-      # The final proof, immediately before the removal: a copy admitted by a
-      # bundle or by default-branch history keeps a unique ignored file (refuse);
-      # any other copy's ignored files are preserved again first.
-      mode=preserve
-      if [ -n "$TEARDOWN_BUNDLE_SWEEP_PROOF" ] || teardown_history_admitted "$copy"; then mode=refuse; fi
-      if ! teardown_removal_final_proof "$copy" "$mode" own; then
-        echo "REFUSED: $ID's nested copy $copy was not removed $1: the final proof before its removal failed: $TEARDOWN_FINAL_WHY; teardown aborted" >&2
+    # landed-work rule (validate_worktree_teardown_safety), and an operator
+    # --force keeps its own meaning: both keep the forced removal.
+    if [ "$FORCE" = "--force" ] || [ "$KIND" = scout ] || [ "$KIND" = secondmate ]; then
+      git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
+        echo "error: could not remove $ID's nested copy $copy $1; teardown aborted" >&2
         exit 1
-      fi
+      }
+      continue
     fi
-    git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
-      echo "error: could not remove $ID's nested copy $copy $1; teardown aborted" >&2
+    # The final proof, immediately before a plain removal, so Git itself still
+    # refuses any untracked byte: a copy admitted by a bundle or by default-branch
+    # history keeps a unique ignored file (refuse); any other copy's ignored
+    # files are preserved again first.
+    mode=preserve
+    if [ -n "$TEARDOWN_BUNDLE_SWEEP_PROOF" ] || teardown_history_admitted "$copy"; then mode=refuse; fi
+    if ! teardown_removal_final_proof "$copy" "$mode" unlocked; then
+      if [ -n "$TEARDOWN_FINAL_STABLE" ]; then
+        echo "REFUSED: $ID's nested copy $copy was not removed $1: $TEARDOWN_FINAL_WHY. Land or move that content, then re-run teardown; teardown aborted" >&2
+      else
+        echo "REFUSED: $ID's nested copy $copy was not removed $1: the final proof before its removal failed: $TEARDOWN_FINAL_WHY; re-run teardown for a fresh proof; teardown aborted" >&2
+      fi
       exit 1
-    }
+    fi
+    if ! remove_err=$(git -C "$PROJ" worktree remove "$copy" 2>&1 >/dev/null); then
+      echo "REFUSED: $ID's nested copy $copy was not removed $1: git worktree remove (without force) refused: $(fm_refuse_text "$remove_err"); teardown aborted" >&2
+      exit 1
+    fi
   done
 }
 # A recorded bundle holds only commits: every own copy its cleanup removes
@@ -4918,7 +4934,7 @@ teardown_own_copy_disposable() {  # <canonical-copy>
   fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 \
     ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} || rc=$?
   case "$rc" in
-    0) return 0 ;;
+    0) teardown_admit "$copy" anchor "$FM_TASK_COPY_HEAD"; return 0 ;;
     2)
       TEARDOWN_BUNDLE_ACCEPTED=
       if teardown_landed "$copy" HEAD ""; then
