@@ -90,6 +90,7 @@ Verdict lines for the entrypoint: `EXIT: pass` is `VERDICT: PASS`.
 `EXIT: needs-revision` and `EXIT: conflicting` are `VERDICT: FAIL`.
 A criterion that cannot be judged from these inputs is `VERDICT: INCOMPLETE` with `EXIT: needs-revision`, and the report names the missing input.
 When a conflict stands and another criterion cannot be judged as well, the conflict decides: report `EXIT: conflicting` with `VERDICT: FAIL`, and name the unjudged criterion and its missing input under Checks not performed.
+When a fixable finding stands and another criterion cannot be judged as well, report `EXIT: needs-revision` with `VERDICT: FAIL`, and name the unjudged criterion and its missing input under Checks not performed.
 Report exactly one `EXIT:` line.
 The meaning of each exit is in the define-done-and-grading skill, section "Review exits and draft use".
 
@@ -206,7 +207,8 @@ No round number, finding count, word count or timer decides any exit.
 1. Reconcile the report: apply the finding test to every note, and set aside a finding the register shows closed by a recorded withdrawal or owner resolution.
    Record each criterion the review left unjudged and each needed check it did not perform; any one of them makes the review incomplete.
 2. Classify each remaining finding as new, a recurrence (equivalent requirement and failing result to a recorded one), or repair-induced (caused by the immediately preceding repair).
-3. Close each earlier finding that the fresh clean review no longer finds.
+3. Close each earlier finding whose criterion the fresh clean review judged and no longer finds failing.
+   An earlier finding on a criterion the review left unjudged stays open: silence is not a closure.
 4. The round has progress when at least one earlier finding closed by independent verification, or at least one finding is newly substantiated, not equivalent to a recorded one, and not repair-induced.
    A recurrence and a repair-induced failure are not progress.
 5. Take the first test that holds:
