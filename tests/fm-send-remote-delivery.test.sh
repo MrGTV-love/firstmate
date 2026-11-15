@@ -476,7 +476,7 @@ test_remote_printed_resend_survives_real_escalation() {
 # printed with its --resolve-key and closes that key when the resend lands; a
 # none-send is printed with its one --answers-none.
 test_remote_printed_resend_carries_the_original_choice() {
-  local dir fb ssh_log home rhome rc
+  local dir fb ssh_log home rhome rc blocker_row
   dir="$TMP_ROOT/remote-resend-choice"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
   rhome=$(setup_remote_secondmate_home remote-resend-choice)
@@ -488,12 +488,20 @@ test_remote_printed_resend_carries_the_original_choice() {
     *) fail "a keyed answer must be printed with its own --resolve-key and nothing added: $LOST_RESEND" ;;
   esac
   assert_contains "$(drain_out "$home")" "[key=metric-name]" "the unconfirmed keyed answer closed nothing"
+  # The fold before the resend: metric-name first (opened first), then the request's
+  # own blocker, whose row (written by the real escalation) is kept for the check after.
+  fm_test_fold "$home/state/rsm.status"
+  case "$FM_TEST_FOLD" in
+    "metric-name"$'\t'"needs-decision"$'\t'"which name for the metric"$'\n'"$LOST_KEY"$'\t'*) blocker_row=${FM_TEST_FOLD#*$'\n'} ;;
+    *) fail "setup: the fold before the resend is not metric-name then $LOST_KEY: $FM_TEST_FOLD" ;;
+  esac
+  case "$blocker_row" in *$'\n'*) fail "setup: more than two open decisions before the resend: $FM_TEST_FOLD" ;; esac
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/keyed" || rc=$?
   expect_code 0 "$rc" "the printed keyed resend is accepted: $(cat "$dir/keyed.err")"
   [ "$(remote_inbox_records "$rhome" | grep -c .)" = 1 ] || fail "the keyed resend must land one record"
   fm_test_fold "$home/state/rsm.status"
-  [ "$FM_TEST_FOLD_KEYS" = "$LOST_KEY" ] \
-    || fail "the keyed resend closed metric-name once delivered, and only the request's own blocker stays open: $FM_TEST_FOLD"
+  [ "$FM_TEST_FOLD" = "$blocker_row" ] \
+    || fail "the keyed resend closed metric-name once delivered, and only the request's own blocker stays open, unchanged: $FM_TEST_FOLD"
   assert_contains "$(drain_out "$home")" "[key=$LOST_KEY]" "the request's own blocker stays the library's to close"
 
   dir="$TMP_ROOT/remote-resend-none"; mkdir -p "$dir"

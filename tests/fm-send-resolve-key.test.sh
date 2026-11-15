@@ -438,8 +438,8 @@ test_multiple_keys_close_together() {
     "one answer covering both"; rc=$?
   expect_code 0 "$rc" "an answer resolving two keys should succeed"
   fm_test_fold "$home/state/t6.status"
-  [ "$FM_TEST_FOLD_KEYS" = k3 ] \
-    || fail "a multi-key answer must close k1 and k2 and leave only the unanswered k3 open: $FM_TEST_FOLD"
+  [ "$FM_TEST_FOLD" = "k3"$'\t'"needs-decision"$'\t'"third, unanswered" ] \
+    || fail "a multi-key answer must close k1 and k2 and leave only the unanswered k3 open, unchanged: $FM_TEST_FOLD"
   pass "fm-send --resolve-key: one answer closes each named key and only those"
 }
 
@@ -710,14 +710,10 @@ test_unrelated_writer_cannot_close_or_hijack_reserved_key() {
   } > "$home/state/mate.status"
 
   fm_test_fold "$home/state/mate.status"
-  [ "$FM_TEST_FOLD_KEYS" = "$key" ] || fail "an unrelated answered: resolution cleared a reserved decision: $FM_TEST_FOLD"
-  case "$FM_TEST_FOLD" in
-    *"pending-reply-id=$corr"*) ;;
-    *) fail "the reserved decision lost its own note: $FM_TEST_FOLD" ;;
-  esac
-  case "$FM_TEST_FOLD" in
-    *'shipping is blocked on infra'*) fail "an unrelated writer took over a reserved decision key: $FM_TEST_FOLD" ;;
-  esac
+  # The whole row: still open, still blocked, and still the library's own note (an
+  # unrelated writer neither closed it nor replaced its note).
+  [ "$FM_TEST_FOLD" = "$key"$'\t'"blocked"$'\t'"pending-reply-missed: task=mate pending-reply-id=$corr request=ship it" ] \
+    || fail "an unrelated writer closed or took over a reserved decision: $FM_TEST_FOLD"
 
   run_send "$fb" "$home" "$log" mate --resolve-key "$key" "dismiss the missed-reply hold"; rc=$?
   expect_code 0 "$rc" "the operator close should still succeed after foreign no-op lines"
@@ -1257,7 +1253,8 @@ test_double_dash_ends_options() {
   body=$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")
   assert_equals "--answers-none" "$body" "the literal keyed answer is delivered unchanged"
   fm_test_fold "$home/state/t1.status"
-  [ "$FM_TEST_FOLD_KEYS" = k2 ] || fail "the keyed answer closes k1 and leaves only k2 open: $FM_TEST_FOLD"
+  [ "$FM_TEST_FOLD" = "k2"$'\t'"blocked"$'\t'"need the staging token" ] \
+    || fail "the keyed answer closes k1 and leaves only k2 open, unchanged: $FM_TEST_FOLD"
   assert_contains "$(drain_out "$home")" "[key=k2]" "k2 stays open"
   send_capture "$fb" "$home" "$log" "$err" t1 -- "plain words"; rc=$?
   expect_code 1 "$rc" "-- states no choice: a bare body after -- still refuses while k2 is open"
@@ -1332,7 +1329,8 @@ test_answers_none_delivers_a_routine_steer() {
   send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "REST"; rc=$?
   expect_code 0 "$rc" "--resolve-key for one of two open keys needs no further flag"
   fm_test_fold "$home/state/t1.status"
-  [ "$FM_TEST_FOLD_KEYS" = k2 ] || fail "answering k1 closes k1 and leaves only k2 open: $FM_TEST_FOLD"
+  [ "$FM_TEST_FOLD" = "k2"$'\t'"blocked"$'\t'"need the staging token" ] \
+    || fail "answering k1 closes k1 and leaves only k2 open, unchanged: $FM_TEST_FOLD"
   pass "fm-send --answers-none: delivers a routine steer, appends nothing, and leaves every key open"
 }
 

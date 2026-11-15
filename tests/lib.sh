@@ -1601,26 +1601,22 @@ fm_test_inbox_records() {
 
 # fm_test_fold <status-file>: run the durable open-decision fold (status_open_decisions,
 # bin/fm-status-decision-lib.sh - the source of the drain's OPEN DECISIONS section) on a
-# fixture status log the test wrote itself, with pipefail; the test fails unless the fold
-# exits 0. FM_TEST_FOLD is its whole output ("<key> TAB <verb> TAB <note>" per open record,
-# empty when nothing is open); FM_TEST_FOLD_KEYS is its keys, one per line, in fold order.
-# Callers compare the whole output or the whole key list for exact equality. A fold that
-# reads a readable log and silently answers empty is a product question outside this PR
-# (named in the PR text), not something this helper tests around. Call it directly, not in
+# fixture status log the test wrote itself. The test fails unless the log is still a
+# readable regular file (the fold answers empty for a missing, unreadable or symlinked
+# log, so an empty answer would prove nothing) and the fold exits 0 with pipefail set in
+# the shell that runs it. FM_TEST_FOLD is its whole output: one "<key> TAB <verb> TAB
+# <note>" row per open decision, in fold order, empty when nothing is open. Callers
+# compare it with the complete expected rows for exact equality. A fold that reads a
+# readable log and silently answers empty is a product question outside this PR (named
+# in the PR text), not something this helper tests around. Call it directly, not in
 # $(...), so fail stops the test.
 fm_test_fold() {
-  local rc=0 line keys=''
-  # shellcheck disable=SC2016 # Expanded by the child shell.
-  FM_TEST_FOLD=$(set -o pipefail; bash -c '. "$1" && status_open_decisions "$2"' _ "$ROOT/bin/fm-status-decision-lib.sh" "$1") || rc=$?
+  local rc=0
+  [ -f "$1" ] && [ -r "$1" ] && [ ! -L "$1" ] \
+    || fail "the status log $1 is missing, unreadable or a symlink, so its fold proves nothing"
+  # shellcheck disable=SC2016,SC2034 # The child shell expands $1/$2; FM_TEST_FOLD is read by the calling suite.
+  FM_TEST_FOLD=$(bash -c 'set -o pipefail; . "$1" && status_open_decisions "$2"' _ "$ROOT/bin/fm-status-decision-lib.sh" "$1") || rc=$?
   [ "$rc" -eq 0 ] || fail "the fold of $1 exited $rc"
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    keys="$keys${keys:+$'\n'}${line%%$'\t'*}"
-  done <<EOF
-$FM_TEST_FOLD
-EOF
-  # shellcheck disable=SC2034 # Read by the calling suite.
-  FM_TEST_FOLD_KEYS=$keys
 }
 
 # fm_launch_holds <launch-text> <token>: the launch holds <token> as written or
