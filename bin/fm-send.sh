@@ -164,8 +164,10 @@
 # open key with its verb and both flags; the two flags together are refused as
 # contradictory. The pair is read from the raw arguments right after the
 # explicit-home check (an unset FM_HOME is refused first, as on base) and before
-# target resolution, so it wins over any option error, such as a malformed or
-# duplicate --resolve-key. Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
+# target resolution: --answers-none and any --resolve-key form anywhere before the
+# first lone -- are the pair, so it wins over any option error, such as a
+# malformed or duplicate --resolve-key, and --resolve-key --answers-none is the
+# pair too. Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
 # as a security guard, and may write its one guard event: to
 # state/guard-events.jsonl by default, or, with an explicit FM_GUARD_EVENT_LOG,
 # to that log, creating its directory when needed, as on base
@@ -278,23 +280,19 @@ fi
 
 # The contradictory pair (header: "Decision closure") is refused from the raw
 # arguments, before any side effect: before the explicit-home allow, the
-# supervision warning, the lease guard and target resolution. The scan walks the
-# same option grammar as the parse loop below but never stops at a bad value, so
-# --answers-none with any --resolve-key form (valid, malformed, duplicate, missing
-# or --resolve-key=) is the pair, even where an option error would come first.
+# supervision warning, the lease guard and target resolution. Every word before
+# the first lone -- counts: --answers-none anywhere there, together with any
+# --resolve-key form (--resolve-key, with or without a value, or --resolve-key=),
+# is the pair, even where --answers-none sits in a key's place
+# (--resolve-key --answers-none) and even where an option error would come first.
 fm_send_states_both_choices() { # <target> <args...>
-  local none=0 key=0
+  local none=0 key=0 word
   shift
-  while [ $# -gt 0 ]; do
-    case "$1" in
-    --resolve-key | --fire-and-forget)
-      [ "$1" != --resolve-key ] || key=1
-      if [ $# -ge 2 ]; then shift 2; else shift; fi
-      ;;
-    --resolve-key=*) key=1; shift ;;
-    --answers-none) none=1; shift ;;
-    --fire-and-forget=*) shift ;;
-    *) break ;;
+  for word in "$@"; do
+    case "$word" in
+    --) break ;;
+    --answers-none) none=1 ;;
+    --resolve-key | --resolve-key=*) key=1 ;;
     esac
   done
   [ "$none" = 1 ] && [ "$key" = 1 ]

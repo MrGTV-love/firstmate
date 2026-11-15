@@ -1158,13 +1158,15 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 "go"; rc=$?
   expect_code 1 "$rc" "the contradictory pair refuses"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "contradictory-pair refusal"
-  # The pair wins over an option error: with any --resolve-key form beside
-  # --answers-none, nothing but the gate event is recorded, no supervision warning
-  # is printed and the stale lease is untouched.
-  for pair in "--answers-none --resolve-key k1 --resolve-key k1" "--answers-none --resolve-key=bad@" \
-    "--resolve-key=bad@ --answers-none" "--answers-none --resolve-key"; do
-    # shellcheck disable=SC2086 # Word-split on purpose: each case is a flag list.
-    refusal_env_send "$fb" "$home" "$log" "$err" t1 $pair "go"; rc=$?
+  # The pair wins over an option error: with --answers-none anywhere before a lone --
+  # and any --resolve-key form, nothing but the gate event is recorded, no supervision
+  # warning is printed and the stale lease is untouched. Each case is the whole argument
+  # list after the target, so the last one really leaves --resolve-key without a value,
+  # and --resolve-key --answers-none (the none flag in a key's place) is the pair too.
+  for pair in "--answers-none --resolve-key k1 --resolve-key k1 go" "--answers-none --resolve-key=bad@ go" \
+    "--resolve-key=bad@ --answers-none go" "--resolve-key --answers-none answer" "--answers-none --resolve-key"; do
+    # shellcheck disable=SC2086 # Word-split on purpose: each case is an argument list.
+    refusal_env_send "$fb" "$home" "$log" "$err" t1 $pair; rc=$?
     expect_code 1 "$rc" "the pair with an option error ($pair) refuses with exit 1: $(cat "$err")"
     assert_contains "$(cat "$err")" "contradict each other" "the pair refusal is the one reported ($pair)"
     assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the pair refusal ($pair)"
