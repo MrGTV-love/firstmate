@@ -6862,8 +6862,8 @@ route_teardown_land_after() {  # <name>
 
 test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
   local cases rows num tip cls pr state kind own label rc counts released=0 refused=0 never=0 stub
-  cases=${FM_SUPERSEDENCE_CASES:-}
-  route_staged_cases_gate "$cases" || return 0
+  route_staged_cases_gate || return 0
+  cases=$FM_SUPERSEDENCE_CASES
   rows=$(route_table_rows "$cases")
   counts=$(route_table_counts "$rows")
   assert_equals "5/4/16/1" "$counts" "table: the staged table's class counts are not 5 twins, 4 ancestors, 16 closed-unmerged and 1 open"

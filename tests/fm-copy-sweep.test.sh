@@ -4059,8 +4059,8 @@ test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver() {
 # the sandbox commits are generated, not the original historical ones.
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers() {
   local cases rows counts num tip cls pr state kind own name line label expect_released=0 expect_never=0 merged_kept=0
-  cases=${FM_SUPERSEDENCE_CASES:-}
-  route_staged_cases_gate "$cases" || return 0
+  route_staged_cases_gate || return 0
+  cases=$FM_SUPERSEDENCE_CASES
   rows=$(route_table_rows "$cases")
   counts=$(route_table_counts "$rows")
   assert_equals "5/4/16/1" "$counts" "table: the staged table's class counts are not 5 twins, 4 ancestors, 16 closed-unmerged and 1 open"
@@ -5348,7 +5348,7 @@ test_the_r5_table_fails_when_the_staged_cases_variable_names_a_directory_or_tabl
   done
   # The control: both files present and readable pass the gate, with CI=true too.
   rc=0
-  ( export CI=true FM_SUPERSEDENCE_CASES="$TMP_ROOT/staged-case/present"; route_staged_cases_gate "$FM_SUPERSEDENCE_CASES" ) >/dev/null 2>&1 || rc=$?
+  ( export CI=true FM_SUPERSEDENCE_CASES="$TMP_ROOT/staged-case/present"; route_staged_cases_gate ) >/dev/null 2>&1 || rc=$?
   [ "$rc" = 0 ] || fail "the gate refused readable staged cases under CI=true ($rc)"
   pass "with FM_SUPERSEDENCE_CASES set to a missing directory, an empty directory, a directory with one table, a table that is a directory or an empty string the R5 table fails and names the variable, while a readable pair passes the gate"
 }

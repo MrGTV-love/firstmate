@@ -445,19 +445,23 @@ forge_reads_are_gone() {
   return 1
 }
 
-# route_staged_cases_gate <cases-dir>: 0 when both staged d7 files exist. When they are
-# absent the caller's case is skipped with a success line, unless
-# FM_SUPERSEDENCE_CASES_REQUIRED=1 (set by the test step that owns this change's recorded
-# cases) or CI=true (a CI run treats them as required, with no workflow edit), which turns
-# the skip into a failure so that a generic green run cannot hide them.
-# Returns 1 for a skip, and the caller then returns 0.
+# route_staged_cases_gate: the R5 recorded-cases tables read the captain-private staged d7
+# cases, which no CI run has, so FM_SUPERSEDENCE_CASES decides (Main 1919 F7).
+#   unset: prints one named skip line and returns 1; the caller then returns 0. The line
+#     starts with "skip:", never "ok -", so the table is not counted as a pass, and CI=true
+#     changes nothing: a CI run without the cases is not a failure. The grader runs the
+#     table with the variable set (R5 Verify).
+#   set (an empty value too): both staged files must be regular readable files in that
+#     directory, or the case fails and names the variable and the path; returns 0 when they are.
 route_staged_cases_gate() {
-  if [ -f "$1/d7-supersedence-table.md" ] && [ -f "$1/d7-closeout-driver-report.md" ]; then
-    return 0
+  local dir=${FM_SUPERSEDENCE_CASES-} name
+  if [ -z "${FM_SUPERSEDENCE_CASES+x}" ]; then
+    printf 'skip: R5 table owed to the grader: FM_SUPERSEDENCE_CASES unset\n'
+    return 1
   fi
-  if [ "${FM_SUPERSEDENCE_CASES_REQUIRED:-}" = 1 ] || [ "${CI:-}" = true ]; then
-    fail "the staged d7 cases are not available, and FM_SUPERSEDENCE_CASES_REQUIRED=1 or CI=true says this run must decide the 26 rows and the PR 3446 twin; set FM_SUPERSEDENCE_CASES to the staged cases directory"
-  fi
-  pass "SKIPPED (not run): the staged d7 cases are not available; set FM_SUPERSEDENCE_CASES to the staged cases directory to decide the 26 rows and the PR 3446 twin, and FM_SUPERSEDENCE_CASES_REQUIRED=1 to make their absence a failure (CI=true does)"
-  return 1
+  [ -d "$dir" ] && [ -r "$dir" ] || fail "FM_SUPERSEDENCE_CASES is set to '$dir', which is not a readable directory; it must name the staged d7 cases directory"
+  for name in d7-supersedence-table.md d7-closeout-driver-report.md; do
+    [ -f "$dir/$name" ] && [ -r "$dir/$name" ] || fail "FM_SUPERSEDENCE_CASES is set to '$dir', where $name is not a readable file; it must name the staged d7 cases directory"
+  done
+  return 0
 }
