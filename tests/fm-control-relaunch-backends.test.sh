@@ -2210,6 +2210,30 @@ prepare_claude_restore() { # <case-name>
   make_continuation_owner_fixture "$dir"
 }
 
+# Main 1637 (D1): a restored claude has no Firstmate launch token, so nothing can
+# authorize it: there is no claude adoption route, every consumer refuses with
+# the named reason, and none names adopt.
+test_claude_restore_has_no_adoption_route() {
+  local dir id out rc verb
+  prepare_claude_restore no-route
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  rc=0
+  out=$(run_continuation_control "$dir" "$id" adopt --session-id "$CLAUDE_RESTORE_UUID") || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopt --session-id was accepted: $out"
+  assert_contains "$out" "unexpected argument '--session-id'" "adopt has no --session-id statement"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "a refused statement writes no record"
+  rc=0
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopt authorized a restored claude: $out"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "adopt writes no claude record"
+  for verb in interrupt exit stay; do
+    claude_lifecycle_refusal "$dir" "$id" "$verb"
+    assert_contains "$CLAUDE_REFUSAL_OUT" "$CLAUDE_UNPINNED_CAUSE" "$verb names the unpinned native restore"
+    assert_not_contains "$CLAUDE_REFUSAL_OUT" "adopt" "$verb never names adopt"
+  done
+  pass "claude restore: no adoption route; every consumer refuses with the named reason and never names adopt"
+}
+
 # Sets CLAUDE_REFUSAL_OUT. It is called without command substitution: a fail inside
 # $(...) would exit only the subshell, and the guard assertions here must be able to
 # fail the test on their own.
@@ -2440,6 +2464,40 @@ test_remote_attribution_verb_reads_the_host_verdict() {
   assert_equals "attribution=refuse: no endpoint record for $id on this host" "$REMOTE_ATTRIBUTION_OUT" "a bare home refuses"
   after=$(find "$bare" -print | sort)
   [ "$before" = "$after" ] || fail "the attribution verb created a directory in a bare home: $(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+  # D5: the verb runs no mkdir under the host home in any decision, even with a
+  # claude adoption record on the host (a leftover record licenses nothing).
+  local shim="$dir/mkdir-shim" decision
+  mkdir -p "$shim"
+  cat > "$shim/mkdir" <<'SH'
+#!/usr/bin/env bash
+for a in "$@"; do case "$a" in "$FM_SHIM_HOME"*) printf '%s\n' "$*" >> "$FM_SHIM_LOG" ;; esac; done
+exec /bin/mkdir "$@"
+SH
+  chmod +x "$shim/mkdir"
+  jq -nc --arg gen "$(sed -n 's/^spawn_gen=//p' "$meta" | tail -1)" --arg window "$(sed -n 's/^window=//p' "$meta" | tail -1)" \
+    --arg uuid "$CLAUDE_RESTORE_UUID" \
+    '{version:1, harness:"claude", spawn_gen:$gen, window:$window, pid:2000000000, harness_pid:2000000000, session_id:$uuid, tie:"launch-brief"}' \
+    > "$dir/wt/state/parent-route/$id.claude-adoption.json"
+  : > "$dir/fake/herdr-agent-live"
+  for decision in unpinned pinned stopped other-target; do
+    case "$decision" in
+      unpinned) : > "$dir/fake/recovery-spawn-gen" ;;
+      pinned) printf old > "$dir/fake/recovery-spawn-gen" ;;
+      stopped) : > "$dir/fake/recovery-spawn-gen"; rm -f "$dir/fake/herdr-agent-live" ;;
+      other-target) : > "$dir/fake/herdr-agent-live" ;;
+    esac
+    local target
+    target=$(sed -n 's/^window=//p' "$meta" | tail -1)
+    [ "$decision" != other-target ] || target=fm-remote:w9:p99
+    # shellcheck disable=SC2031 # PATH is read here, not modified
+    REMOTE_ATTRIBUTION_OUT=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+      PATH="$shim:$dir/fakebin:$PATH" FM_HOME="$dir/wt" FM_FAKE_DIR="$dir/fake" FM_SHIM_HOME="$dir/wt" FM_SHIM_LOG="$dir/mkdir.log" \
+      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
+      "$ROOT/bin/fm-remote-secondmate-control.sh" attribution "$id" "$target" 2>/dev/null) || fail "the verb failed ($decision)"
+    [ ! -s "$dir/mkdir.log" ] || fail "the attribution verb ran mkdir under the host home ($decision): $(cat "$dir/mkdir.log")"
+    [ "$decision" != unpinned ] || assert_contains "$REMOTE_ATTRIBUTION_OUT" "unpinned native restore" \
+      "a leftover claude adoption record does not authorize an unpinned agent on its host"
+  done
   pass "remote attribution: the host verb prints one decision line from the one verdict owner"
 }
 
@@ -2744,6 +2802,7 @@ test_claude_restore_adoption_and_consumers
 test_claude_restore_adoption_refuses_a_personal_session
 test_claude_restore_adoption_refuses_the_teamclaude_wrapper
 test_claude_restore_adoption_caller_gate
+test_claude_restore_has_no_adoption_route
 test_claude_restore_restart_decides_attribution_before_its_first_effect
 test_claude_restore_relaunch_after_adoption
 test_claude_adoption_outlives_the_inbox_prune

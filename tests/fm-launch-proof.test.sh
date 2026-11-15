@@ -824,41 +824,27 @@ test_launch_proof_claude_adoption() (
 )
 
 test_launch_proof_claude_verdict_and_refusal() (
-  local T="$TMP/claude-verdict" UUID=5a3eec19-de12-4999-bed2-bbd561089154
-  local LANE="$T/lane/firstmate" OPERATOR="$T/operator" STATE="$T/main-state" META DOORBELL out
+  # Main 1637 (D1): the only proof is the launch record Firstmate wrote
+  # (launch_proof=env-v1 and spawn_gen) and the FM_SPAWN_GEN token it put in the
+  # agent's environment, each read once. There is no claude adoption route.
+  local T="$TMP/claude-verdict"
+  local LANE="$T/lane/firstmate" OPERATOR="$T/operator" STATE="$T/main-state" META out kind verdict
   mkdir -p "$T" "$LANE/state" "$STATE" "$OPERATOR"
   META="$STATE/vernant-t1.meta"
   PIN_GEN=s1793120312.10459.5003
   ps() {
     case "$*" in
-      '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733'; [ ! -f "$T/unrelated" ] || printf '%s\n' '56560 1 53733' ;;
+      '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733' ;;
       '-axo pid=,ppid=') printf '%s\n' '53733 1' ;;
       '-p 53733 -o comm=') echo 2.1.316 ;;
-      '-p 53733 -o args=') if [ -f "$T/argv" ]; then tr '\0' ' ' < "$T/argv" | sed 's/ $//'; echo; elif [ -f "$T/args" ]; then cat "$T/args"; else echo "claude --resume $UUID"; fi ;;
-      '-p 56557 -o args=') [ -f "$T/env-56557" ] && echo 'railway mcp' ;;
-      '-p 56557 -o ppid=') [ -f "$T/env-56557" ] && echo 53733 ;;
-      '-p 56557 -o lstart=') [ -f "$T/env-56557" ] && echo 'Sat Nov 14 10:00:00 2026' ;;
-      '-p 56560 -o args=') [ -f "$T/unrelated" ] && echo helper ;;
-      '-p 56560 -o ppid=') [ -f "$T/unrelated" ] && echo 1 ;;
-      '-p 56560 -o lstart=') [ -f "$T/unrelated" ] && echo 'Sat Nov 14 10:00:00 2026' ;;
-      *) fail "unexpected ps query: $*" ;;
+      '-p 53733 -o args=') echo 'claude --resume 5a3eec19-de12-4999-bed2-bbd561089154' ;;
+      *) return 1 ;;
     esac
   }
-  lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$4" "$LANE"; }
-  # The structured argv reader: $T/argv holds NUL-separated fields; otherwise the args text split on spaces.
-  fm_launch_proof_pid_argv() {
-    local f n=0
-    if [ "$1" = 53733 ] && [ -f "$T/argv" ]; then
-      while IFS= read -r -d '' f; do n=$((n + 1)); done < "$T/argv"
-      printf '%s\0' "$n"; cat "$T/argv"; return
-    fi
-    local -a words
-    read -r -a words <<< "$(ps -p "$1" -o args=)" || return 1
-    printf '%s\0' "${#words[@]}" "${words[@]}"
-  }
+  # Every environment read is counted per process.
   fm_remote_herdr_process_env() {
+    printf x >> "$T/reads-$1"
     [ "$1" != 56557 ] || { cat "$T/env-56557"; return; }
-    [ "$1" != 56560 ] || return 1
     [ -f "$T/env-unreadable" ] && return 1; printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
   fm_backend_herdr_cli() {
     case "$*" in
@@ -873,198 +859,87 @@ test_launch_proof_claude_verdict_and_refusal() (
       "$1" "${3:-secondmate}" "$PIN_GEN" "$LANE" "$LANE" > "$META"
     [ -z "${2:-}" ] || printf 'launch_proof=%s\n' "$2" >> "$META"
   }
-  fm_operational_record_write "$LANE/state" launch-brief 'task brief' DOORBELL
-  mkdir -p "$OPERATOR/.claude/projects/$(fm_launch_proof_claude_project_dir "$LANE")"
-  jq -nc --arg text "$DOORBELL" --arg ts "$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))')" \
-    '{type:"user",timestamp:$ts,message:{role:"user",content:$text}}' \
-    > "$OPERATOR/.claude/projects/$(fm_launch_proof_claude_project_dir "$LANE")/$UUID.jsonl"
+  # verdict_once <expected> <why>: the verdict, with the agent's environment read exactly once.
+  verdict_once() {
+    rm -f "$T"/reads-*
+    verdict=$(fm_launch_proof_herdr "$META")
+    assert_equals "$1" "$verdict" "$2"
+    [ "$(cat "$T/reads-53733" 2>/dev/null)" = x ] \
+      || fail "$2: the agent's environment was read $(wc -c < "$T/reads-53733" 2>/dev/null | tr -d ' ') times, not once"
+  }
 
-  # E1: a readable environment without a pin is an unpinned native restore, never "unreadable".
+  # The token matches the launch record: managed, with no adoption.
   meta_for claude env-v1
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a readable claude environment without a pin is unmanaged'
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unadopted unpinned claude was authorized'
+  printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
+  verdict_once managed 'a token matching the launch record is managed'
+  fm_launch_proof_herdr_authorizes "$META" || fail 'a pinned claude must authorize lifecycle input'
+
+  # The token is absent: an unpinned native restore, refused with its named reason.
+  rm -f "$T/env-extra"
+  verdict_once unmanaged 'a readable environment without the token is unmanaged'
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unpinned claude was authorized'
   assert_contains "$out" 'unpinned native restore' 'the cause names an unpinned native restore'
   assert_contains "$out" 'environment was readable and carries no launch pin' 'the cause says the environment was readable and had no pin'
-  assert_contains "$out" 'bin/fm-control.sh vernant-t1 adopt' 'the cause names the explicit route'
+  assert_contains "$out" 'no Firstmate launch record proves it' 'the cause says nothing Firstmate wrote proves it'
+  assert_not_contains "$out" 'adopt' 'an unpinned claude is never sent to adopt'
   assert_not_contains "$out" 'unreadable' 'the unpinned case is not called unreadable'
-  # adopt accepts only secondmates, so a ship or scout is never sent to it.
   for kind in ship scout; do
     meta_for claude env-v1 "$kind"
-    out=$(fm_launch_proof_herdr_refusal "$META") && fail "an unadopted unpinned claude $kind was authorized"
+    out=$(fm_launch_proof_herdr_refusal "$META") && fail "an unpinned claude $kind was authorized"
     assert_contains "$out" 'unpinned native restore' "the $kind cause names an unpinned native restore"
-    assert_contains "$out" 'unmanaged restored worker: adopt supports secondmates only; Main inspects the pane and decides' \
-      "the $kind next action says adopt supports secondmates only"
-    assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' "a $kind is never told to run adopt"
+    assert_not_contains "$out" 'adopt' "a $kind is never sent to adopt"
   done
+
+  # A claude adoption record licenses nothing, whatever it names.
   meta_for claude env-v1
-  # E1: an environment that cannot be read keeps the unreadable wording and its own next action.
-  : > "$T/env-unreadable"
-  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'an unreadable environment stays unknown'
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unreadable claude environment was authorized'
-  assert_contains "$out" 'launch settings are unreadable' 'the unreadable cause is kept'
-  assert_contains "$out" 'decide the lane by hand' 'the unreadable case has its own next action'
-  assert_not_contains "$out" 'unpinned native restore' 'the unreadable case is not reported as unpinned'
-  rm -f "$T/env-unreadable"
-  # E3 (e): a pin for another launch generation is its own verdict, cause and next step.
+  jq -nc --arg gen "$PIN_GEN" '{version:1, harness:"claude", spawn_gen:$gen, window:"lab:w1:p2", pid:53733, harness_pid:53733,
+    session_id:"5a3eec19-de12-4999-bed2-bbd561089154", tie:"recorded"}' > "$STATE/vernant-t1.claude-adoption.json"
+  verdict_once unmanaged 'a claude adoption record does not make an unpinned lane managed'
+  fm_launch_proof_herdr_authorizes "$META" && fail 'a claude adoption record authorized an unpinned lane'
+  rm -f "$STATE/vernant-t1.claude-adoption.json"
+
+  # The token differs: pinned to another launch, for the agent or a member of its group.
   printf 'FM_SPAWN_GEN=s9.9.9\n' > "$T/env-extra"
   for kind in secondmate ship; do
     meta_for claude env-v1 "$kind"
-    assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" "a $kind claude pinned to another generation has its own verdict"
+    verdict_once pinned-elsewhere "a $kind token for another launch is pinned-elsewhere"
     out=$(fm_launch_proof_herdr_refusal "$META") && fail "a $kind claude pinned to another generation was authorized"
     assert_contains "$out" 'live agent is pinned to another launch generation' "the $kind cause names the foreign pin"
-    assert_contains "$out" 'adopt cannot authorize it; Main inspects the pane and decides the lane by hand' "the $kind next step is not adopt"
-    assert_not_contains "$out" 'unpinned native restore' "a $kind pinned process is not called unpinned"
-    assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' "a $kind pinned process is never sent to adopt"
+    assert_not_contains "$out" 'adopt' "a $kind pinned process is never sent to adopt"
   done
-  # The anchor's own foreign pin counts even when the process table lacks the anchor.
   : > "$T/table-empty"
-  assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" 'the anchor pin is read even without a process-table row'
+  verdict_once pinned-elsewhere 'the agent token is judged even without a process-table row'
   rm -f "$T/table-empty" "$T/env-extra"
   meta_for claude env-v1
-  # A record without spawn_gen never had its environment compared, so it is not called readable.
+  printf 'PATH=/usr/bin\nHOME=%s\nFM_SPAWN_GEN=s9.9.9\n' "$OPERATOR" > "$T/env-56557"
+  verdict_once pinned-elsewhere 'a group member pinned to another generation is pinned-elsewhere'
+  [ "$(cat "$T/reads-56557" 2>/dev/null)" = x ] || fail 'the group member was not read exactly once'
+  rm -f "$T/env-56557"
+
+  # The environment cannot be read: unknown, with its own reason.
+  : > "$T/env-unreadable"
+  verdict_once unknown 'an unreadable environment is unknown'
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unreadable claude environment was authorized'
+  assert_contains "$out" 'launch settings are unreadable' 'the unreadable cause is kept'
+  assert_not_contains "$out" 'unpinned native restore' 'the unreadable case is not reported as unpinned'
+  rm -f "$T/env-unreadable"
+
+  # The launch record cannot be read: no spawn_gen, or an unknown launch_proof.
   grep -v '^spawn_gen=' "$META" > "$T/meta-nogen" && mv "$T/meta-nogen" "$META"
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a versioned claude record without spawn_gen is unknown'
   out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a versioned claude record without spawn_gen was authorized'
   assert_not_contains "$out" 'environment was readable' 'a record without spawn_gen does not claim a readable environment'
-  assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' 'a record without spawn_gen is not sent to adopt'
-  meta_for claude env-v1
-  # A short-lived child in the agent's process group pinned to another generation:
-  # adopt refuses that tree, so the verdict names the foreign pin, not adopt.
-  printf 'PATH=/usr/bin\nHOME=%s\nFM_SPAWN_GEN=s9.9.9\n' "$OPERATOR" > "$T/env-56557"
-  assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" 'a group child pinned to another generation is pinned-elsewhere'
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a claude with a foreign-pinned group child was authorized'
-  assert_contains "$out" 'live agent is pinned to another launch generation' 'the group child cause names the foreign pin'
-  assert_not_contains "$out" 'fm-control.sh vernant-t1 adopt' 'a foreign-pinned tree is never sent to adopt'
-  fm_launch_proof_claude_adoption "$META" >/dev/null 2>"$T/adopt-err" && fail 'adopt accepted a foreign-pinned tree'
-  assert_contains "$(cat "$T/adopt-err")" 'pinned to another launch generation' 'adopt refuses the same tree'
-  rm -f "$T/env-56557"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'without the pinned child the plain restore is unmanaged again'
-  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unadopted unpinned claude was authorized'
-  assert_contains "$out" 'unpinned native restore' 'the plain restore keeps its cause'
-  assert_contains "$out" 'bin/fm-control.sh vernant-t1 adopt' 'the plain restore keeps the adopt advice'
+  meta_for claude env-v9
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'an unknown launch_proof is unknown'
+  fm_launch_proof_herdr_authorizes "$META" && fail 'an unknown launch_proof authorized lifecycle input'
 
-  # Adoption is a second route: the record authorizes only while every proof still holds.
-  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null \
-    || fail 'could not build the adoption record'
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'an adopted record is managed while the proofs hold'
-  fm_launch_proof_herdr_authorizes "$META" || fail 'an adopted lane must authorize lifecycle input'
-  # (i) the pane changed hands: any contradicted proof makes the record inert again.
-  printf 'FM_SPAWN_GEN=s9.9.9\n' > "$T/env-extra"
-  assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" 'a harness pinned elsewhere voids the adoption at use'
-  rm -f "$T/env-extra"
-  jq '.session_id = "0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6"' "$STATE/vernant-t1.claude-adoption.json" > "$T/rec" && mv "$T/rec" "$STATE/vernant-t1.claude-adoption.json"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a record naming another session voids the adoption'
-  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null
-  jq '.pid = 4242' "$STATE/vernant-t1.claude-adoption.json" > "$T/rec" && mv "$T/rec" "$STATE/vernant-t1.claude-adoption.json"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a record naming another process voids the adoption'
-  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null
-  printf 'spawn_gen=s2.2.2\n' >> "$META"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a new launch generation leaves the old adoption inert'
-  rm -f "$STATE/vernant-t1.claude-adoption.json"
-  meta_for claude env-v1
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'without a record the lane is unmanaged again'
-
-  # (j) legacy and other harnesses keep their pre-proof rules; (k) a matching pin is managed.
+  # (j) legacy and other harnesses keep their pre-proof rules.
   meta_for claude ''
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a legacy claude record keeps the unknown verdict'
   fm_launch_proof_herdr_authorizes "$META" || fail 'a legacy record must keep its pre-proof authorization'
   meta_for codex env-v1
-  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'another harness without an adoption route keeps the unknown verdict'
-  meta_for claude env-v1
-  printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'a matching pin is managed without any adoption'
-  fm_launch_proof_herdr_authorizes "$META" || fail 'a pinned claude must authorize lifecycle input'
-  # Inbox retention never ends an adoption: the published tie stands while the transcript still opens with the doorbell.
-  rm -f "$T/env-extra"
-  meta_for claude env-v1
-  fm_launch_proof_claude_adoption "$META" > "$STATE/vernant-t1.claude-adoption.json" 2>/dev/null \
-    || fail 'could not adopt before the prune'
-  local BRIEF_RECORD LATER
-  fm_operational_doorbell_path "$DOORBELL" BRIEF_RECORD || fail 'the doorbell names no record'
-  touch -t "$(date -v-8d +%Y%m%d%H%M 2>/dev/null || date -d '8 days ago' +%Y%m%d%H%M)" "$BRIEF_RECORD"
-  fm_operational_record_write "$LANE/state" away-supervisor 'later input' LATER || fail 'a later inbox write failed'
-  [ -n "$LATER" ] || fail 'the later inbox write returned no doorbell'
-  [ ! -e "$BRIEF_RECORD" ] || fail 'the 7-day prune kept the launch brief'
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'an adoption outlives the pruned launch brief'
-  fm_launch_proof_herdr_authorizes "$META" || fail 'a pruned brief ended the adoption'
-  printf 'claude_session_id=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6\n' >> "$META"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'a differing recorded session id still vetoes a kept tie'
-  meta_for claude env-v1
-  : > "$T/env-unreadable"
-  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'a kept tie does not survive a contradicted live proof'
-  rm -f "$T/env-unreadable" "$STATE/vernant-t1.claude-adoption.json"
-  # A brief already past retention: only the owner's own statement of the live session ties it.
-  fm_launch_proof_claude_adoption "$META" >/dev/null 2>"$T/err" && fail 'a lane with a pruned brief adopted without a tie'
-  assert_contains "$(cat "$T/err")" 'no task-specific session tie' 'a pruned brief refuses with the missing tie'
-  out=$(fm_launch_proof_claude_adoption "$META" "$UUID" operator 2>/dev/null) || fail 'the owner statement of the live session must adopt'
-  assert_equals operator "$(printf '%s' "$out" | jq -r .tie)" 'the record names the operator tie'
-  fm_launch_proof_claude_adoption "$META" 0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6 operator >/dev/null 2>"$T/err" \
-    && fail 'a statement naming another session adopted'
-  assert_contains "$(cat "$T/err")" 'the live session is not the session this adoption names' 'a wrong statement names its cause'
-  printf 'claude_session_id=0b4c1d2e-3f40-4a51-8b62-7c83d94ea5f6\n' >> "$META"
-  fm_launch_proof_claude_adoption "$META" "$UUID" operator >/dev/null 2>"$T/err" && fail 'a statement overrode the recorded veto'
-  assert_contains "$(cat "$T/err")" 'recorded session id differs' 'the recorded veto wins over a statement'
-  meta_for claude env-v1
-  printf '%s\n' "$out" > "$STATE/vernant-t1.claude-adoption.json"
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'an operator adoption is managed while the proofs hold'
-  # The recheck rereads the transcript doorbell at every use, never only the record file.
-  local TRANSCRIPT ADOPTION="$STATE/vernant-t1.claude-adoption.json" tie
-  TRANSCRIPT="$OPERATOR/.claude/projects/$(fm_launch_proof_claude_project_dir "$LANE")/$UUID.jsonl"
-  cp "$TRANSCRIPT" "$T/task-transcript"
-  jq -nc --arg ts 2026-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:"help me with my own project"}}' > "$TRANSCRIPT"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'an operator adoption whose transcript no longer opens with the task doorbell is inert'
-  rm -f "$TRANSCRIPT"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'an operator adoption whose transcript is gone is inert'
-  # A hand-written record for a personal session licenses nothing, whatever tie it names.
-  jq -nc --arg ts 2026-01-01T00:00:00.000Z '{type:"user",timestamp:$ts,message:{role:"user",content:"help me with my own project"}}' > "$TRANSCRIPT"
-  for tie in operator launch-brief recorded; do
-    jq -nc --arg gen "$PIN_GEN" --arg uuid "$UUID" --arg tie "$tie" \
-      '{version:1, harness:"claude", spawn_gen:$gen, window:"lab:w1:p2", pid:53733, harness_pid:53733, session_id:$uuid, tie:$tie}' > "$ADOPTION"
-    assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" "a hand-written $tie record does not tie a personal session"
-  done
-  cp "$T/task-transcript" "$TRANSCRIPT"
-  rm -f "$STATE/vernant-t1.claude-adoption.json"
-  # A verdict read, recheck included, changes no file anywhere.
-  snapshot() { python3 -I -c 'import os,sys
-for root in sys.argv[1:]:
-    for d, dirs, files in os.walk(root):
-        dirs.sort()
-        for n in sorted(dirs + files):
-            st = os.lstat(os.path.join(d, n)); print(os.path.join(d, n), st.st_size, st.st_mtime_ns)' "$T" "$FM_HOME"; }
-  fm_launch_proof_claude_adoption "$META" "$UUID" operator > "$ADOPTION" 2>/dev/null || fail 'could not re-adopt on the statement'
-  local BEFORE
-  BEFORE=$(snapshot)
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'the stated adoption is managed while every proof holds'
-  [ "$BEFORE" = "$(snapshot)" ] || fail 'a verdict read created or changed a file'
-  # N1 at use: the same pane now runs a fork of the adopted session.
-  printf 'claude --resume %s --fork-session\n' "$UUID" > "$T/args"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N1 a forked resume voids the adoption at use'
-  rm -f "$T/args"
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N1 control: the ordinary resume is managed again'
-  # N6 at use: an unclassifiable line now precedes the doorbell.
-  { printf 'not json\n'; cat "$T/task-transcript"; } > "$TRANSCRIPT"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N6 an unclassifiable line before the doorbell voids the adoption at use'
-  cp "$T/task-transcript" "$TRANSCRIPT"
-  # F1 at use: the live argv now has the resume only inside a prompt operand.
-  printf 'claude\0--append-system-prompt\0discuss --resume %s\0' "$UUID" > "$T/argv"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'F1 a prompt operand that reads like --resume voids the adoption at use'
-  rm -f "$T/argv"
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'F1 control: the separate --resume is managed again'
-  # F4 at use: a malformed sidechain value now precedes the doorbell.
-  { printf '%s\n' '{"type":"user","isSidechain":"false","timestamp":"2026-01-01T00:00:00.000Z","message":{"role":"user","content":"mine"}}'; cat "$T/task-transcript"; } > "$TRANSCRIPT"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'F4 a non-boolean isSidechain before the doorbell voids the adoption at use'
-  cp "$T/task-transcript" "$TRANSCRIPT"
-  # N3 at use: an unreadable live member outside the harness descent voids the adoption;
-  # one descending from the harness (the caffeinate shape, Main 022) does not.
-  : > "$T/unrelated"
-  assert_equals unmanaged "$(fm_launch_proof_herdr "$META")" 'N3 an unreadable live member outside the harness descent voids the adoption at use'
-  rm -f "$T/unrelated"
-  : > "$T/env-56557"
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N3 an unreadable live child of the harness keeps the adoption at use'
-  rm -f "$T/env-56557"
-  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'N3 control: managed with no extra member'
-  rm -f "$STATE/vernant-t1.claude-adoption.json"
-  pass 'claude verdicts: unpinned is unmanaged, adoption is rechecked at use, legacy and other harnesses are unchanged'
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'another harness keeps the unknown verdict'
+  pass 'claude verdicts: only the launch record and its token prove an agent, each read once; no adoption record licenses anything'
 )
 
 fm_test_only
