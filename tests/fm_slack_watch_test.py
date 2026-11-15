@@ -7494,6 +7494,35 @@ class Round7Findings(InvariantScenario):
             self.assertEqual(len([r for r in home.refusals() if r['reason'] == 'second_intake_unplaced' and r.get('taken_in')]), 1)
             self.assertEqual(sum(r.out.count('second person unplaced') for r in passes), 1)
 
+    # ---- finding 6 part 1 (Main 1627 (1)): an A to B to A switch keeps A's unread request ----
+
+    B_USER, B_DM = 'U0SECONDBB01', 'D0SECONDBB01'
+
+    def test_r7_f6_a_request_typed_while_a_was_set_survives_a_switch_to_b_and_back_and_never_goes_to_b(self):
+        with self.home(history=False) as home:
+            home.trust_check()
+            home.add_member(self.B_USER, self.B_DM)
+            home.set_clock(100.0)
+            home.check_pass()                                                   # A's window is active
+            home.say('110.000000', 'request typed while A is set')
+            home.set_clock(130.0)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': self.B_USER}):
+                switched = home.check_pass()                                    # B's check, at a later Slack time, before A's request was read
+            home.set_clock(150.0)
+            back = [home.check_pass() for _ in range(3)]
+            self.assertEqual(self.woken([switched] + back), ['110.000000'], [r.out for r in [switched] + back])
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '110.000000')), 1)
+            self.assertEqual([p for p in home.posts() if p[0] == self.B_DM], [])
+
+    def test_r7_f6_control_without_the_switch_the_request_is_taken_in_once(self):
+        with self.home(history=False) as home:
+            home.trust_check()
+            home.set_clock(100.0)
+            home.check_pass()
+            home.say('110.000000', 'request typed while A is set')
+            passes = [home.check_pass() for _ in range(2)]
+            self.assertEqual(self.woken(passes), ['110.000000'])
+
     # ---- finding 7: the paged lookup finds an acknowledgement already posted ----
 
     def test_r7_f7_an_acknowledgement_posted_before_a_crash_is_found_on_a_later_page_and_not_posted_again(self):
