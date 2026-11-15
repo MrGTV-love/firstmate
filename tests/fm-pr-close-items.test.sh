@@ -2686,7 +2686,7 @@ SH
       [ "$(cx_state "$case_dir" "$id")" = queued ] || fail "r7-reads: $id closed from a parse result read $mode"
       case "$(cx_deps "$case_dir" "waits-$id")" in *"$id"*) ;; *) fail "r7-reads: the edge on $id changed ($mode)" ;; esac
     done
-    assert_grep "could not read the parse result of the body of $REPO_URL/192 whole" "$case_dir/$mode.err" "r7-reads: the $mode result read was not reported"
+    assert_grep "could not read the parse result of the body of $REPO_URL/192 whole, so no item closed, every edge kept" "$case_dir/$mode.err" "r7-reads: the $mode result read was not reported"
   done
   block 'Closes-backlog-item: r7-member' "Train-member: $REPO_URL/71" > "$case_dir/bodies/192"
   R7_FAIL=member run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/member.out" 2> "$case_dir/member.err" || true
@@ -2737,6 +2737,89 @@ SH
   [ "$(cx_state "$case_dir" pf-backend-guarded)" != "done" ] || fail "r8-f3: the --backend waive ran with no capture file"
   assert_match '^actionable: the waive of pf-backend-guarded did not run, so nothing changed' "$case_dir/e3" "r8-f3: the guard refusal was not reported"
   pass "a typed completion with --backend before the subcommand or after the id clears its finished edge and keeps the rest, its JSON stays valid, and the capture guard stops it"
+}
+
+# Main 1890, through the public entries (owed to CI): a Forgejo train member record without its
+# body field is a failed read, reported by URL; a task record that cannot be read while members
+# are matched is reported, never taken as no match; a byte count that fails is a failed parse,
+# reported with the ids it names; the train's own item still closes.
+test_r9_public_entry_reads_are_checked() {
+  local case_dir rc=0 base="https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls" key real_wc
+  case_dir=$(make_forgejo_case "r9-reads-${CLOSE_PRUNE:-off}")
+  key=$FJ_OWNER"_"$FJ_REPO
+  cx_add "$case_dir" r9-own docs
+  cx_add "$case_dir" r9-locked docs
+  cx_meta "$case_dir" r9-locked docs "$base/12"
+  printf '{"merged":true}\n' > "$case_dir/tea-body-$key-11.json"
+  printf '{"merged":true,"body":""}\n' > "$case_dir/tea-body-$key-12.json"
+  set_json_field "$case_dir/pr-post.json" body "$(block 'Closes-backlog-item: r9-own' "Train-member: $base/11" "Train-member: $base/12")"
+  chmod 000 "$case_dir/state/r9-locked.meta"
+  merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  chmod 600 "$case_dir/state/r9-locked.meta"
+  expect_code 0 "$rc" "r9-reads: the merge must succeed"
+  [ "$(cx_state "$case_dir" r9-own)" = "done" ] || fail "r9-reads: the train's own item did not close"
+  [ "$(cx_state "$case_dir" r9-locked)" = queued ] || fail "r9-reads: an item behind an unreadable task record closed"
+  assert_grep "could not read the body of train member $base/11 (the forge answered" "$case_dir/stderr" "r9-reads: a member record without a body field was not a failed read"
+  assert_grep "could not read the task record of r9-locked" "$case_dir/stderr" "r9-reads: the unreadable task record was not reported"
+  # A byte count that fails: the parse fails and is reported with the ids it names.
+  case_dir=$(gh_case r9-wc 194)
+  cx_add "$case_dir" r9-wc
+  block 'Closes-backlog-item: r9-wc' > "$case_dir/bodies/194"
+  real_wc=$(command -v wc)
+  printf '#!/usr/bin/env bash\necho "simulated count failure" >&2\nexit 42\n' > "$case_dir/fakebin/wc"
+  chmod +x "$case_dir/fakebin/wc"
+  run_close "$case_dir" task-x1 "$REPO_URL/194" > "$case_dir/out" 2> "$case_dir/err" || true
+  rm -f "$case_dir/fakebin/wc"
+  [ -n "$real_wc" ] || fail "r9-wc: wc is not installed"
+  [ "$(cx_state "$case_dir" r9-wc)" = queued ] || fail "r9-wc: an item closed after a failed byte count"
+  assert_grep "could not parse the body of $REPO_URL/194, .*could not count the bytes of its snapshot; it names item ids: r9-wc" "$case_dir/err" "r9-wc: the failed count was not reported with its id"
+  pass "a member record without a body field and an unreadable task record are reported, a failed byte count is a reported parse failure, and the train's own item still closes"
+}
+
+# Main 1890 (a) and Main 1875 F8, through the wrapper (owed to CI): a tasks-axi package of
+# another version is refused by the locked clear, so every edge and hold stays and the item is
+# reported; a failed replay of the kept output exits 1 and is reported, while the finished edge
+# still clears under the lock.
+test_r9_public_entry_pin_and_replay() {
+  local case_dir rc=0 pkg real_cat
+  command -v node >/dev/null 2>&1 || { printf 'ok - skipped (node is not installed)\n'; return 0; }
+  case_dir=$(make_case r9-pin)
+  wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
+  printf '%s' '{"request_id":"req-r9","platform":"x","context_binding":{"version":"ctx1","value":"ctx1_r9"},"public_safe_summary":"f","received_at":"2026-07-30T10:00:00Z","followup_expires_at":"2026-08-06T10:00:00Z","reservation_expires_at":"2026-08-06T10:00:00Z"}' > "$case_dir/request.json"
+  printf '%s' '{"type":"pr-merged","project":"f","required_deliverables":["pr_url"],"completion_policy":"all-required"}' > "$case_dir/expected.json"
+  for pf in pf-pinned pf-replay; do
+    wrapper public-followup add "$pf" --request-context-file "$case_dir/request.json" --purpose promised-final \
+      --expected-final-file "$case_dir/expected.json" --expires-at 2099-10-01T00:00:00Z >/dev/null 2>&1 || fail "r9-pin: could not add $pf"
+    cx_add "$case_dir" "waits-$pf" docs
+    cx "$case_dir" block "waits-$pf" --by "$pf" >/dev/null
+    cx_other_and_hold "$case_dir" "waits-$pf"
+  done
+  # A copy of the installed package that says it is 0.2.7, first on PATH.
+  pkg=$(bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; fm_tasks_axi_package_dir' _ "$ROOT") || fail "r9-pin: the tasks-axi package was not found"
+  mkdir -p "$case_dir/fakepkg/bin"
+  cp -R "$pkg" "$case_dir/fakepkg/tasks-axi"
+  sed 's/"version": *"[^"]*"/"version": "0.2.7"/' "$pkg/package.json" > "$case_dir/fakepkg/tasks-axi/package.json"
+  ln -s "$case_dir/fakepkg/tasks-axi/dist/bin/tasks-axi.js" "$case_dir/fakepkg/bin/tasks-axi"
+  (PATH="$case_dir/fakepkg/bin:$PATH" wrapper public-followup waive pf-pinned --reason r --approved-by captain) > "$case_dir/o1" 2> "$case_dir/e1" || rc=$?
+  expect_code 0 "$rc" "r9-pin: the waive itself must succeed"
+  [ "$(cx_state "$case_dir" pf-pinned)" = "done" ] || fail "r9-pin: the waive did not finish the obligation"
+  case "$(cx_deps "$case_dir" waits-pf-pinned | sed 's/blocked-by://g; s/[ "]//g')" in pf-pinned,waits-pf-pinned-other|waits-pf-pinned-other,pf-pinned) ;; *) fail "r9-pin: an edge changed under another tasks-axi version" ;; esac
+  assert_match '^actionable: pf-pinned: closed, edges kept: row unreadable; .*0\.2\.7' "$case_dir/e1" "r9-pin: the refused version was not reported"
+  # A replay of the kept output that fails.
+  real_cat=$(command -v cat)
+  mkdir -p "$case_dir/shim"
+  cat > "$case_dir/shim/cat" <<SH
+#!/usr/bin/env bash
+case "\${2:-}" in *fm-tasks-axi-pf.*) printf '{"ok":'; exit 74 ;; esac
+exec "$real_cat" "\$@"
+SH
+  chmod +x "$case_dir/shim/cat"
+  rc=0
+  (PATH="$case_dir/shim:$PATH" wrapper public-followup waive pf-replay --reason r --approved-by captain --json) > "$case_dir/o2" 2> "$case_dir/e2" || rc=$?
+  [ "$rc" -eq 1 ] || fail "r9-replay: a failed replay exited $rc, not 1"
+  assert_grep 'but the wrapper could not show its output' "$case_dir/e2" "r9-replay: the failed replay was not reported"
+  assert_only_other_and_hold "$case_dir" waits-pf-replay pf-replay "r9-replay: the finished edge after a failed replay"
+  pass "another tasks-axi version is refused by the locked clear and every edge stays, reported; a failed replay exits 1 and is reported while the finished edge clears"
 }
 
 pr_close_test_cases=(
@@ -2830,5 +2913,7 @@ test_r7_f3_an_unfinished_item_under_the_id_keeps_every_edge
 test_r7_f4_every_typed_form_clears_and_is_guarded
 test_r7_f1_f2_a_failed_read_of_the_parse_or_its_result_closes_nothing
 test_r8_f3_a_global_backend_flag_is_the_same_completion
+test_r9_public_entry_reads_are_checked
+test_r9_public_entry_pin_and_replay
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"

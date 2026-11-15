@@ -110,6 +110,11 @@ test_f5_an_unreadable_result_is_reported_never_silent() {
     builtin printf "left=%s lines=%s" "$LEFT" "$(grep -c . "$2/f5.err")"' _ \
     "$(defs fm-pr-close-items.sh got report_read joined report_refusal body_unread load_body loaded_for left_open)" "$TMP")
   case "$out" in 'left=0 '*|*' lines=0') not_ok "f5: an unreadable result gave no report: $out" ;; *) ok "f5: an unreadable result is reported and counted ($out)" ;; esac
+  # Main 1890 (d): with no readable result there are no ids to name; the one line names the body
+  # and says no item closed and every edge kept.
+  grep -q 'the body of the fixture.*no item closed, every edge kept' "$TMP/f5.err" \
+    && ok "f5: the line names the body and says no item closed, every edge kept" \
+    || not_ok "f5: the line does not say no item closed, every edge kept: $(cat "$TMP/f5.err")"
 }
 
 # Main 1875 F6: a forge answer without its body field is a failed read, never an empty body.
@@ -290,6 +295,35 @@ test_locked_clear_the_store_decides_under_its_lock() {
   case "$out" in *'pf-x: closed, edges kept: row unreadable'*) ok "locked clear: the held lock is reported as closed, edges kept: row unreadable" ;; *) not_ok "locked clear: the held lock was not reported: $(tr '\n' '|' <<< "$out")" ;; esac
 }
 
+# Main 1890 (a): the locked clear is pinned to the tasks-axi it was checked against (0.2.6). A
+# package of another version, or one whose internal modules cannot be loaded, is refused: exit
+# nonzero, every edge and hold kept. Control: the installed 0.2.6 package clears.
+test_locked_clear_refuses_another_tasks_axi() {
+  local root fake broken out rc
+  command -v node >/dev/null 2>&1 && [ -n "$TASKS_AXI_PKG" ] || { ok "skipped: node or the tasks-axi package is not installed"; return 0; }
+  [ -f "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" ] || { not_ok "locked clear: bin/fm-tasks-axi-locked-unblock.mjs is missing"; return 0; }
+  fake=$TMP/fake-tasks-axi broken=$TMP/broken-tasks-axi
+  mkdir -p "$fake" "$broken"
+  cp -R "$TASKS_AXI_PKG/dist" "$fake/dist"
+  [ ! -d "$TASKS_AXI_PKG/node_modules" ] || cp -R "$TASKS_AXI_PKG/node_modules" "$fake/node_modules"
+  sed 's/"version": *"[^"]*"/"version": "0.2.7"/' "$TASKS_AXI_PKG/package.json" > "$fake/package.json"
+  sed 's/"version": *"[^"]*"/"version": "0.2.6"/' "$TASKS_AXI_PKG/package.json" > "$broken/package.json"
+  for pkg in "$fake" "$broken"; do
+    root=$(new_store "lc-pin-${pkg##*/}") || { not_ok "locked clear: the fixture store could not be made"; return 0; }
+    store_node "$root" complete pf-x
+    rc=0
+    out=$(cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" "$pkg" "$root" "$root/data/backlog.md" pf-x 2>&1) || rc=$?
+    [ "$rc" -ne 0 ] && ok "locked clear: the ${pkg##*/} package is refused (status $rc)" || not_ok "locked clear: the ${pkg##*/} package was used: $out"
+    check "locked clear: the ${pkg##*/} package changes no edge" "pf-x - | pf-x,other future" \
+      "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
+  done
+  root=$(new_store lc-pin-real) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
+  store_node "$root" complete pf-x
+  out=$(cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" "$TASKS_AXI_PKG" "$root" "$root/data/backlog.md" pf-x 2>&1)
+  check "locked clear control: the installed tasks-axi clears" "- - | other future" \
+    "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
+}
+
 # A node warning on standard error is not the helper's answer: the clear is read from standard
 # output only, so a warning before `clear` neither hides the clear nor turns it into a false
 # "edges kept" report. A failing helper's standard error is its reason.
@@ -409,6 +443,7 @@ test_f7_an_unreadable_task_record_is_reported
 test_locked_clear_the_store_decides_under_its_lock
 test_locked_clear_holds_the_store_lock_writers_take
 test_locked_clear_reads_the_answer_from_stdout
+test_locked_clear_refuses_another_tasks_axi
 test_f8_a_failed_replay_is_not_success
 test_f4_a_call_with_no_arguments_runs
 test_f4_every_typed_form_resolves_its_id
