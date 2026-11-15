@@ -3565,7 +3565,7 @@ UNC_SUCCESSOR_ID=ffffffffffffffffffffffffffffffff
 # The holder the real provider publishes, or empty for a build without it.
 unc_real_protected_holder() {
   (cd / && TREEHOUSE_NO_UPDATE_CHECK=1 "$FM_TEST_TREEHOUSE_PROVIDER" capabilities --json </dev/null 2>/dev/null) \
-    | jq -r --arg old "$UNC_RECOVERED_HOLDER" 'select(.schema_version == 2 and .persistent_recovered_leases == true) | .recovered_quarantine_holder // "" | select(. != $old)' 2>/dev/null
+    | jq -r --arg old "$UNC_RECOVERED_HOLDER" 'select(.schema_version == 2 and (.version | type == "string" and length > 0) and .persistent_recovered_leases == true) | .recovered_quarantine_holder // "" | select(. != $old)' 2>/dev/null
 }
 
 unc_providers() {  # <case-label>; sets UNC_PROVIDERS
@@ -3669,8 +3669,9 @@ unc_pool_case() {
   # `return` fail before it runs, fail after the provider's return succeeded, or
   # change the entry's holder or lease id first (a successor taking the slot);
   # $case/capability-fail makes `capabilities` fail, $case/capability-old answers
-  # it as an older treehouse that has no such command, and $case/capability-no-holder
-  # answers it as a schema 1 build that publishes no protected holder.
+  # it as an older treehouse that has no such command, $case/capability-no-holder
+  # answers it as a schema 1 build that publishes no protected holder, and
+  # $case/capability-no-version answers it with no version field.
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$case_dir/treehouse.argv"
@@ -3681,6 +3682,10 @@ if [ "\${1:-}" = capabilities ] && [ -e "$case_dir/capability-old" ]; then
 fi
 if [ "\${1:-}" = capabilities ] && [ -e "$case_dir/capability-no-holder" ]; then
   printf '%s\n' '{"schema_version":1,"version":"v-fake","persistent_recovered_leases":true}'
+  exit 0
+fi
+if [ "\${1:-}" = capabilities ] && [ -e "$case_dir/capability-no-version" ]; then
+  jq -cn --arg h "$UNC_FAKE_PROTECTED_HOLDER" '{schema_version:2,persistent_recovered_leases:true,recovered_quarantine_holder:\$h}'
   exit 0
 fi
 if [ "\${1:-}" = return ] && [ -s "$case_dir/inject" ]; then
@@ -4048,7 +4053,7 @@ test_unclaimed_slot_on_unproven_provider_stays_inert() {
   local provider cond case_dir out rc before kind
   unc_providers "unclaimed-route gate on the real provider"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for cond in capability-old capability-old-recovered capability-failed capability-no-holder; do
+    for cond in capability-old capability-old-recovered capability-failed capability-no-holder capability-no-version; do
       kind=ordinary-old
       [ "$cond" != capability-old-recovered ] || kind="recovered-old"
       unc_pool_case "unclaimed-outside-$cond" "$kind" "$provider" || fail "$provider $cond: cannot build the pool"
@@ -4057,6 +4062,7 @@ test_unclaimed_slot_on_unproven_provider_stays_inert() {
         capability-old*) : > "$case_dir/capability-old" ;;
         capability-failed) : > "$case_dir/capability-fail" ;;
         capability-no-holder) : > "$case_dir/capability-no-holder" ;;
+        capability-no-version) : > "$case_dir/capability-no-version" ;;
       esac
       before=$(cat "$UNC_STATE")
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"

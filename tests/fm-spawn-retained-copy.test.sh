@@ -508,7 +508,7 @@ PROTECTED_HOLDER='quarantined: persistent recovered lease'
 # subcommand the guard might use as a diagnostic (status, lease, get, return)
 # marks $CASE_DIR/treehouse-forbidden and fails, so the case can prove the probe
 # is the only thing the guard ever runs.
-install_capability_treehouse() {  # <answer: proven|false|malformed|none|failing|unknown|wrong-schema|no-holder|empty-holder|old-holder>
+install_capability_treehouse() {  # <answer: proven|false|malformed|none|failing|unknown|wrong-schema|no-holder|empty-holder|old-holder|no-version|empty-version|number-version>
   local answer=$1
   : > "$CASE_DIR/treehouse-calls"
   rm -f "$CASE_DIR/treehouse-forbidden"
@@ -523,6 +523,9 @@ if [ "\${1:-}" = capabilities ]; then
     no-holder) printf '%s\n' '{"schema_version":1,"version":"v-fake","persistent_recovered_leases":true}' ;;
     empty-holder) printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":""}' ;;
     old-holder) jq -cn --arg h "$OLD_RECOVERED" '{schema_version:2,version:"v-fake",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
+    no-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
+    empty-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:"",persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
+    number-version) jq -cn --arg h "$PROTECTED_HOLDER" '{schema_version:2,version:3,persistent_recovered_leases:true,recovered_quarantine_holder:\$h}' ;;
     malformed) printf '%s\n' 'not json' ;;
     none) ;;
     failing) exit 3 ;;
@@ -555,7 +558,7 @@ assert_only_capability_probes() {  # <label>
 test_recovered_slot_refuses_without_proven_capability() {
   local answer name entry
   local recovered=$OLD_RECOVERED
-  for answer in unknown none malformed false failing wrong-schema no-holder empty-holder old-holder; do
+  for answer in unknown none malformed false failing wrong-schema no-holder empty-holder old-holder no-version empty-version number-version; do
     name="recovered-unproven-$answer"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
@@ -903,7 +906,7 @@ test_real_provider_recovered_slot_allows_free_slot_allocation() {
     return 0
   fi
   recovered=$(cd / && TREEHOUSE_NO_UPDATE_CHECK=1 "$FM_TEST_TREEHOUSE_PROVIDER" capabilities --json </dev/null 2>/dev/null \
-    | jq -r --arg old "$OLD_RECOVERED" 'select(.schema_version == 2 and .persistent_recovered_leases == true) | .recovered_quarantine_holder // "" | select(. != $old)' 2>/dev/null) || recovered=
+    | jq -r --arg old "$OLD_RECOVERED" 'select(.schema_version == 2 and (.version | type == "string" and length > 0) and .persistent_recovered_leases == true) | .recovered_quarantine_holder // "" | select(. != $old)' 2>/dev/null) || recovered=
   if [ -z "$recovered" ]; then
     printf 'skip - real-provider recovered-slot allocation: %s publishes no recovered_quarantine_holder; the case did NOT run\n' "$FM_TEST_TREEHOUSE_PROVIDER"
     return 0

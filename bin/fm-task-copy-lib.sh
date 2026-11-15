@@ -543,7 +543,8 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # keeps the verdict for the process. The command resolves no pool and takes no
 # lock, so it runs from a neutral directory with the update check disabled and no
 # stdin. It never calls status or lease as a diagnostic. Proven only when the
-# output is one JSON object with schema_version 2, persistent_recovered_leases
+# output is one JSON object with schema_version 2, version a non-empty string (the
+# version field the provider's contract requires), persistent_recovered_leases
 # true, and recovered_quarantine_holder a non-empty string that is not the old
 # holder; an unknown command (an older Treehouse), a failing run, malformed
 # output, a missing or false field, and a missing jq are all not proven. Never
@@ -573,14 +574,14 @@ fm_task_copy_treehouse_persists_recovered_leases() {
       FM_TASK_COPY_RECOVERED_CAPABILITY_REASON="cannot be probed for persistent recovered leases because jq is not installed"
     elif out=$(cd / && TREEHOUSE_NO_UPDATE_CHECK=1 "$bin" capabilities --json </dev/null 2>/dev/null) \
         && holder=$(jq -e -r -s --arg old "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" '
-          if length == 1 and (.[0] | type == "object" and .schema_version == 2 and .persistent_recovered_leases == true
+          if length == 1 and (.[0] | type == "object" and .schema_version == 2 and (.version | type == "string" and length > 0) and .persistent_recovered_leases == true
               and (.recovered_quarantine_holder | type == "string" and length > 0 and . != $old))
           then .[0].recovered_quarantine_holder else false end' <<<"$out" 2>/dev/null); then
       FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=yes
       FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=$holder
     else
       FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT=no
-      FM_TASK_COPY_RECOVERED_CAPABILITY_REASON="does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, persistent_recovered_leases: true and a protected recovered_quarantine_holder)"
+      FM_TASK_COPY_RECOVERED_CAPABILITY_REASON="does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder)"
     fi
   fi
   [ "$FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT" = yes ]
