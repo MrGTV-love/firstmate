@@ -464,22 +464,26 @@ if [ "$pf_form" != 1 ]; then
   elif [ "$pf_status" -eq 0 ] && [ "$pf_form" = 0 ]; then
     # tasks-axi 0.2.6 exits 0 from `public-followup waive` and `record-delivery` only when the row
     # it completed is Done (dist/src/backends/markdown.js:821-834; dist/src/public-followup.js:
-    # 877-887, checked for every row read at markdown-grammar.js:359). The edges clear only when
-    # the row reads done, or is no longer in the active backlog. Main 1875: when the row cannot be
-    # read, every edge and hold of that id is kept (the base behaviour) and the item is reported.
-    if fm_backlog_row_probe "$DATA" "$pf_id"; then
-      if [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ]; then
-        fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
-      else
-        printf 'actionable: tasks-axi accepted the %s of %s, but it reads %s, not done, so its blocked-by edges stay\n' \
-          "$pf_name" "$pf_id" "${FM_BACKLOG_ROW_STATE%% *}" >&2
-      fi
-    elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-      fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
-    else
-      printf 'actionable: %s: closed, edges kept: row unreadable; tasks-axi finished its %s, but its row could not be read back (%s), so every blocked-by edge and hold on %s is kept; once it reads done, clear its dependents with tasks-axi unblock <item> --by %s\n' \
-        "$pf_id" "$pf_name" "${FM_BACKLOG_ROW_ERROR:-unknown error}" "$pf_id" "$pf_id" >&2
-    fi
+    # 877-887, checked for every row read at markdown-grammar.js:359). That proves nothing about
+    # an item that holds the id later, so the clear is decided and written under tasks-axi's own
+    # store lock (Main 1873, 1882; fm_typed_completion_locked_clear): an item under that id that
+    # is not done keeps every edge and hold, and otherwise the finished edges clear in this run.
+    # Main 1875 containment: no read outside that lock clears anything (the row's `show` decides
+    # nothing here), and when the locked read cannot run every edge and hold is kept and the item
+    # is reported.
+    pf_clear=0
+    fm_typed_completion_locked_clear "$DATA" "$pf_id" >&2 || pf_clear=$?
+    case "$pf_clear" in
+      0) ;;
+      3)
+        printf 'actionable: tasks-axi accepted the %s of %s, but the backlog holds %s as %s, not done, so every blocked-by edge and hold on it is kept\n' \
+          "$pf_name" "$pf_id" "$pf_id" "$FM_TYPED_COMPLETION_KEPT" >&2
+        ;;
+      *)
+        printf 'actionable: %s: closed, edges kept: row unreadable; tasks-axi finished its %s, but the backlog could not be read under its own lock (%s), so every blocked-by edge and hold on %s is kept; once it reads done, clear its dependents with tasks-axi unblock <item> --by %s\n' \
+          "$pf_id" "$pf_name" "$FM_TYPED_COMPLETION_CLEAR_ERROR" "$pf_id" "$pf_id" >&2
+        ;;
+    esac
   fi
   rm -f -- "$pf_out"
   [ "$pf_replay" -eq 0 ] || exit 1
