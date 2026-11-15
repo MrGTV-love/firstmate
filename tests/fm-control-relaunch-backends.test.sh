@@ -829,6 +829,43 @@ test_managed_herdr_relaunch_refuses_unproven_replacement_env() {
   pass "ordinary managed relaunch requires matching readable replacement pin for alive confirmation, for omp and claude"
 }
 
+# Main 1937 O3, Main 1946: --recover-launch reports from the record its judge
+# read. The record's harness is rewritten at the agent-state read, after the
+# control plane's startup read and before the judge, in both orders, beside the
+# two stable controls; each report and exit status must follow the judged bytes.
+test_recovery_inspection_report_follows_the_judged_record() {
+  local dir id case first final out rc CONTROL="$ROOT/bin/fm-control.sh"
+  for case in stable-omp stable-claude omp-then-claude claude-then-omp; do
+    case "$case" in
+      stable-omp) first=omp final=omp ;;
+      stable-claude) first=claude final=claude ;;
+      omp-then-claude) first=omp final=claude ;;
+      claude-then-omp) first=claude final=omp ;;
+    esac
+    recovery_case_or_skip "report-$case" "report-$case" || fail "the recovery report case requires jq"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    prepare_herdr_recovery "$dir" "$id" ship
+    if [ "$first" = claude ]; then
+      printf 'harness=claude\nmodel=opus\n' >> "$dir/home/state/$id.meta"
+      printf claude > "$dir/fake/recovery-harness"
+    fi
+    [ "$first" = "$final" ] || printf '%s\t%s\n' "$dir/home/state/$id.meta" "$final" > "$dir/fake/rewrite-harness-on-agent-get"
+    rc=0
+    out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+    [ "$first" = "$final" ] || assert_absent "$dir/fake/rewrite-harness-on-agent-get" "$case: the record was not rewritten at the agent-state read"
+    if [ "$final" = claude ]; then
+      expect_code 1 "$rc" "$case: a judged claude record must refuse"$'\n'"$out"
+      assert_contains "$out" "launch recovery for $id found live agent is an unpinned native restore" "$case: the claude refusal names its cause"
+      assert_not_contains "$out" "recovery-skipped" "$case: a judged claude record was skipped"
+    else
+      expect_code 0 "$rc" "$case: a judged omp record must skip"$'\n'"$out"
+      assert_contains "$out" "recovery-skipped $id launch=unmanaged: live omp agent carries" "$case: the omp skip names its cause"
+    fi
+    assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "$case: the inspection sent lifecycle input"
+  done
+  pass "--recover-launch reports from the record its judge read, in both rewrite orders, with both stable controls"
+}
+
 test_reboot_recovery_inspects_without_native_attribution() {
   local dir id proof mode scenario out rc expected verdict expected_out before head_before log failures=0 gen suffix
   local personal personal_id personal_before personal_log CONTROL="$ROOT/bin/fm-control.sh"
@@ -2157,6 +2194,7 @@ test_restart_refuses_an_unproven_agent_state() {
 
 control_relaunch_test_cases=(
 test_omp_adoption_route_is_removed
+test_recovery_inspection_report_follows_the_judged_record
 test_claude_restore_has_no_adoption_route
 test_claude_restore_adopt_refuses_as_not_omp
 test_claude_restore_restart_decides_attribution_before_its_first_effect

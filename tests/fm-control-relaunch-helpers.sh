@@ -1009,6 +1009,15 @@ case "${1:-} ${2:-}" in
       '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}'
     exit 0 ;;
   'agent get')
+    # Main 1946: a one-shot record rewrite at the agent-state read, which the
+    # control plane makes after its startup read and before its launch judge.
+    # The file names the record and the harness line to append (last wins).
+    if [ -f "$D/rewrite-harness-on-agent-get" ]; then
+      IFS=$'\t' read -r rewrite_meta rewrite_harness < "$D/rewrite-harness-on-agent-get"
+      rm -f "$D/rewrite-harness-on-agent-get"
+      printf 'harness=%s\n' "$rewrite_harness" >> "$rewrite_meta"
+      printf '%s' "$rewrite_harness" > "$D/recovery-harness"
+    fi
     if [ -f "$D/recovery-inspection-interrupt" ]; then
       : > "$D/recovery-inspection-entered"
       kill -TERM "$(cat "$D/recovery-inspection-interrupt")"
