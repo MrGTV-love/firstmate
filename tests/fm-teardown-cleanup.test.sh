@@ -8269,6 +8269,89 @@ BODY
   pass "the final proof refuses what a plain git worktree remove refuses: an untracked managed hook file or turn-end marker keeps the copy, an excluded one is removed"
 }
 
+# Item 5 through bin/fm-teardown.sh's own code (Main 1783): work_is_landed is
+# taken out of bin/fm-teardown.sh and run alone, with the landing proof itself a
+# stub, so nothing reaches fm_run_timed, a kill or a backend. A cached landing
+# proof that is reused keeps the default ref and commit its proof read, so a ref
+# that moved between the proof and the reuse still refuses at the final proof.
+test_r5_landing_cache_reuse_keeps_the_proofs_default_ref() {
+  local body=$TMP_ROOT/r5-body-landing-cache.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+work_is_landed_proof() { return 0; }
+work_is_landed_bundle() { return 1; }
+TREEHOUSE_PROJECT_LOCK_HELD=0 TEARDOWN_SLOT_CUSTODY='' TEARDOWN_NM_RECORD_SILENT=0 FM_PROJECT_LOCK_BUSY_EXIT=75
+for shape in control moved; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  base=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  git -C "$repo" merge -q --ff-only "f-$shape"
+  head=$(git -C "$copy" rev-parse HEAD)
+  r5_reset "$copy"
+  TEARDOWN_LANDED_DIRS=() TEARDOWN_LANDED_HEADS=() TEARDOWN_LANDED_SNAPS=()
+  WT=$copy
+  work_is_landed "f-$shape" || echo "$shape first-proof=no"
+  [ "$shape" != moved ] || git -C "$repo" update-ref refs/heads/main "$base" "$head"
+  work_is_landed "f-$shape" || echo "$shape reuse=no"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+done
+BODY
+  r5_harness landing-cache "$body"
+  r5_expect 'control proof=0' 'r5-landing-cache: a reused proof with an unchanged default ref did not pass'
+  r5_expect 'moved proof=refused stable=none' 'r5-landing-cache: a reused landing proof passed after the default ref it read moved'
+  if grep -q 'first-proof=no\|reuse=no' "$R5_OUT"; then fail "r5-landing-cache: the landing rule did not answer: $(paste -sd '|' - < "$R5_OUT")"; fi
+  pass "a reused landing proof keeps the default ref it read: moved before the reuse, the final proof refuses as a retry; unchanged, it passes"
+}
+
+# Item 9 through bin/fm-teardown.sh's own code (Main 1783): the own nested
+# removal is taken out of bin/fm-teardown.sh and run alone. An untracked managed
+# hook file is refused by the final proof as content nothing holds, before Git
+# is asked; excluded, the copy is removed without force.
+test_r5_own_nested_removal_refuses_an_untracked_hook_before_git() {
+  local body=$TMP_ROOT/r5-body-own-nested-hook.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^teardown_remove_own_nested_copies\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^teardown_history_admitted\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+FORCE='' KIND=ship TEARDOWN_OWN_RELEASED=() TEARDOWN_HISTORY_ADMITTED=()
+for shape in clean hook hook-excluded; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  if [ "$shape" != clean ]; then
+    mkdir -p "$copy/.claude"
+    printf '{"hooks":{}}\n' > "$copy/.claude/settings.local.json"
+    if [ "$shape" = hook-excluded ]; then
+      exclude=$(git -C "$copy" rev-parse --git-path info/exclude)
+      mkdir -p "$(dirname "$exclude")"
+      printf '.claude/settings.local.json\n' >> "$exclude"
+    fi
+  fi
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  ( teardown_remove_own_nested_copies 'from the test slot' ) 2> "$R5_BASE/$shape.err" || rc=$?
+  if [ -e "$copy" ]; then where=kept; else where=removed; fi
+  why=none
+  if grep -q 'uncommitted or untracked content nothing holds' "$R5_BASE/$shape.err"; then why=final-proof
+  elif grep -q 'git worktree remove (without force) refused' "$R5_BASE/$shape.err"; then why=git; fi
+  echo "$shape rc=$rc copy=$where why=$why"
+done
+BODY
+  r5_harness own-nested-hook "$body"
+  r5_expect 'clean rc=0 copy=removed why=none' 'r5-own-nested-hook: a clean own nested copy was not removed'
+  r5_expect 'hook rc=1 copy=kept why=final-proof' 'r5-own-nested-hook: an untracked managed hook file was not refused by the final proof before Git'
+  r5_expect 'hook-excluded rc=0 copy=removed why=none' 'r5-own-nested-hook: an own nested copy whose hook file is excluded was not removed'
+  pass "the own nested removal refuses an untracked managed hook file at the final proof before Git is asked; clean or excluded, the copy is removed without force"
+}
+
 teardown_test_cases=(
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
@@ -8471,6 +8554,8 @@ test_r5_lock_changed_after_its_first_line_refuses
 test_r5_holder_after_retirement_refuses_before_the_driver
 test_r5_unreadable_task_record_is_owner_unknown
 test_r5_untracked_managed_hook_file_refuses_like_git
+test_r5_landing_cache_reuse_keeps_the_proofs_default_ref
+test_r5_own_nested_removal_refuses_an_untracked_hook_before_git
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
