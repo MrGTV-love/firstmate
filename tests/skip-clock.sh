@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # BASH_ENV file for the spawn cases that need a controlled clock (tests/fm-spawn-pool-base-freshen.test.sh).
 # It is a static file so a helper-level case can load the same seam and prove it fires (tests/fm-spawn-slot-move.test.sh).
 # Variables: FM_TEST_TICK_SECONDS, FM_TEST_MKDIR_JUMP(_PATH), FM_TEST_JUMP_AT_ACCEPT, FM_TEST_JUMP_AT_SCAN, and
@@ -21,6 +22,7 @@ mkdir() {
 # (the pass that would accept it). Nothing in the spawn is changed to make this possible.
 __fm_accept_seen=0
 __fm_clock_jump() {
+  # shellcheck disable=SC2016 # BASH_COMMAND is matched against the literal text of the spawn's command.
   case "$BASH_COMMAND" in
     'p_real=$(real_path_or_raw "$p")')
       __fm_accept_seen=$((__fm_accept_seen + 1))
