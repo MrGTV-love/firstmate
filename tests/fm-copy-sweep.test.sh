@@ -130,6 +130,19 @@ case " $* " in
   *" rev-parse --absolute-git-dir "*)
     [ -z "${FAKE_GIT_SLEEP_ABSDIR:-}" ] || sleep "$FAKE_GIT_SLEEP_ABSDIR"
     ;;
+  *" merge-base --all "*)
+    [ -z "${FAKE_GIT_MERGEBASE_HOOK:-}" ] || bash "$FAKE_GIT_MERGEBASE_HOOK" "$@"
+    if [ -n "${FAKE_GIT_FAIL_MERGEBASE:-}" ]; then
+      echo "fatal: injected merge-base failure" >&2
+      exit 128
+    fi
+    ;;
+  " version ")
+    if [ -n "${FAKE_GIT_VERSION:-}" ]; then
+      printf 'git version %s\n' "$FAKE_GIT_VERSION"
+      exit 0
+    fi
+    ;;
   *" ls-files "*)
     if [ -n "${FAKE_GIT_FAIL_LSFILES:-}" ]; then
       echo "fatal: injected ls-files failure" >&2
@@ -3094,9 +3107,17 @@ route_tip() { git -C "$(copy_path "$1")" rev-parse HEAD; }
 
 # A locked, pushed copy with a valid record, a profile for its tip and scripted
 # --pr answers (default: the plan allows and the execute succeeds).
+# A copy that sits at the merge commit itself, so the merge commit carries everything
+# the copy holds (an empty net change, R2(h)); a copy with changes of its own is
+# built by the content cases, which choose what the merge commit carries.
+route_bare_copy() {  # <name>
+  git -C "$SLOT" worktree add -q -b "fm/$1" "$(copy_path "$1")" "${ROUTE_COPY_AT:-$ROUTE_MERGE}"
+  git -C "$(copy_path "$1")" push -q origin "fm/$1"
+}
+
 route_copy() {  # <name> <pr> [<plan-kind> [<execute-kind>]]
   local name=$1 pr=${2:-7}
-  add_copy "$name"
+  route_bare_copy "$name"
   route_lock_dead "$name"
   route_write_profile "$W/profiles/$name.json" "$pr" "$(route_tip "$name")"
   route_record "$name" "$pr" "$(route_tip "$name")" "$W/profiles/$name.json"
@@ -3189,7 +3210,7 @@ test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driv
   route_copy ok 7
   for row in "${rows[@]}"; do
     n=$((n + 1))
-    add_copy "bad-$row"
+    route_bare_copy "bad-$row"
     route_lock_dead "bad-$row"
     route_script_row "$W" "bad-$row" allowed success "$((100 + n))"
     tip=$(route_tip "bad-$row")
@@ -3204,7 +3225,9 @@ test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driv
         route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
         # shellcheck disable=SC2016 # the hook expands its own $1 when it runs
         printf '#!/usr/bin/env bash\ngit -C "$1" -c user.name=t -c user.email=t@example.invalid commit --allow-empty -qm moved\n' > "$W/ans/bad-$row/plan.hook"
-        phrase="no longer proven after its plan"
+        # The copy sits at the merge commit, so the empty commit adds no content and the
+        # class still allows it; the sweep's own HEAD pin then refuses its execute.
+        phrase="changed HEAD or creation-lock bytes after its plan"
         expect=1
         ;;
       pr-not-integer) route_record "bad-$row" 8a "$tip" "$W/profiles/bad-$row.json"; phrase="'8a' is not a decimal integer" ;;
@@ -3467,7 +3490,7 @@ test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed() {
       unbound) phrase="cleanup_tip_unbound" ;;
       hang) phrase="did not answer within 2s" ;;
       retain) phrase="unique ignored files" ;;
-      *) phrase="the plan did not answer with exit 3 and the dry-run envelope" ;;
+      *) phrase="the plan did not answer with exit 3 and the driver's fifteen-key dry-run envelope" ;;
     esac
     route_assert_kept "plan-$kind" "plan $kind"
     line=$(route_line_of "plan-$kind")
@@ -3790,50 +3813,53 @@ test_a_decimal_pr_number_of_any_length_routes_and_a_zero_or_a_leading_zero_does_
   pass "a merged PR with ten or fifteen digits routes like PR 7, and PR 0 and PR 007 are held with no driver call"
 }
 
-# The landing branch is the one the clone's origin/HEAD names, or the task's base.
-# A local main or master is a guess: without origin/HEAD the branch is unknown and
-# the copy is held, however plausible main looks. Each world has one copy; the
-# controls route a merge on the default branch and a merge on a default of release.
-test_a_landing_branch_that_is_only_a_guess_holds_the_copy_and_the_actual_default_routes() {
+# The landing branch is the remote's own default (or the task's recorded base, when
+# it agrees), read from the remote itself. The clone's origin/HEAD is a local hint
+# that is never trusted: absent or pointing at release, it decides nothing. Each
+# world has one copy; the controls route a merge on the remote's default, and the
+# hold is a merge that is not on the remote's default release.
+test_a_local_origin_head_never_decides_the_landing_branch_and_the_remotes_default_does() {
   local variant line
-  for variant in main-control no-origin-head default-release-off-release default-release-on-release; do
+  for variant in main-control no-origin-head stale-hint-release default-release-on-release default-release-off-release; do
     route_world "route-landing-$variant"
     case "$variant" in
       main-control) ;;
       no-origin-head) git -C "$SLOT" remote set-head origin -d >/dev/null ;;
-      default-release-off-release)
+      stale-hint-release)
         git -C "$SLOT" push -q origin "$ROUTE_MERGE^:refs/heads/release"
         git -C "$SLOT" fetch -q origin
         git -C "$SLOT" remote set-head origin release >/dev/null
         ;;
+      default-release-off-release)
+        git -C "$SLOT" push -q origin "$ROUTE_MERGE^:refs/heads/release"
+        git -C "$SLOT" fetch -q origin
+        git -C "$W/origin.git" symbolic-ref HEAD refs/heads/release
+        ;;
       default-release-on-release)
         git -C "$SLOT" push -q origin "$ROUTE_MERGE:refs/heads/release"
         git -C "$SLOT" fetch -q origin
-        git -C "$SLOT" remote set-head origin release >/dev/null
+        git -C "$W/origin.git" symbolic-ref HEAD refs/heads/release
         ;;
     esac
     route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
     route_copy only 7
     route_sweep --apply
     case "$variant" in
-      main-control | default-release-on-release)
+      default-release-off-release)
+        route_assert_kept only "landing $variant"
+        line=$(route_line_of only)
+        assert_equals "" "$(route_calls_for only)" "landing $variant: the copy reached the driver: $(route_calls_for only)"
+        assert_contains "$line" "is not on origin/release (not landed)" "landing $variant: the off-default merge is not named"
+        printf 'landing %s: kept, no driver call; reason: %s\n' "$variant" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
+        ;;
+      *)
         route_assert_released only "landing $variant"
         route_assert_calls only 7 "landing $variant"
         printf 'landing %s: released by the route\n' "$variant"
         ;;
-      *)
-        route_assert_kept only "landing $variant"
-        line=$(route_line_of only)
-        assert_equals "" "$(route_calls_for only)" "landing $variant: the copy reached the driver: $(route_calls_for only)"
-        case "$variant" in
-          no-origin-head) assert_contains "$line" "the clone has no origin/HEAD, so the repository's default branch is unknown" "landing $variant: the unknown default branch is not named" ;;
-          *) assert_contains "$line" "is not on origin/release (not landed)" "landing $variant: the off-default merge is not named" ;;
-        esac
-        printf 'landing %s: kept, no driver call; reason: %s\n' "$variant" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
-        ;;
     esac
   done
-  pass "a merge commit counts as landed only on the branch origin/HEAD names (or the task's base): no origin/HEAD, or a merge that is off the actual default, holds the copy with no driver call, while a merge on main (default main) or on release (default release) routes"
+  pass "a merge commit counts as landed only on the branch the remote itself names as its default: no local origin/HEAD, or one that names release while the remote's default is main, changes nothing and a merge on main routes; a remote default of release routes a merge on release and holds a merge that is not on it, with no driver call"
 }
 
 # A forge read whose parent exits at once while a descendant keeps its output open
@@ -4044,9 +4070,34 @@ test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_an
   assert_equals 27 "$(printf '%s\n' "$rows" | grep -c .)" "table: the rows are not the 26 table rows and the PR 3446 twin"
   route_world route-table
   : > "$HOMED/data/supersedence-records.tsv"
+  # R2(h) decides the content of every merged row. The copies start from the world's
+  # merge commit: an ancestor row stays there (an empty net change), every other row
+  # adds its own file, and the final merge commit carries the file of each twin row
+  # (identical entry) and lacks the file of every other row.
+  local -a twins=()
+  local base_commit
+  base_commit=$ROUTE_MERGE
   while IFS=$'\t' read -r num tip cls pr state kind own; do
     name="row-$num"
-    add_copy "$name"
+    git -C "$SLOT" worktree add -q -b "fm/$name" "$(copy_path "$name")" "$base_commit"
+    if [ "$cls" != "other (history)" ]; then
+      printf '%s\n' "$name" > "$(copy_path "$name")/$name.txt"
+      git -C "$(copy_path "$name")" add "$name.txt"
+      git -C "$(copy_path "$name")" commit -qm "$name"
+      [ "$kind" != accept ] || twins+=("$name")
+    fi
+    git -C "$(copy_path "$name")" push -q origin "fm/$name"
+  done <<< "$rows"
+  for name in ${twins[@]+"${twins[@]}"}; do
+    printf '%s\n' "$name" > "$SLOT/$name.txt"
+    git -C "$SLOT" add -- "$name.txt"
+  done
+  git -C "$SLOT" commit -q --allow-empty -m "the merge commit the twin rows' PRs carry"
+  git -C "$SLOT" push -q origin main
+  git -C "$SLOT" fetch -q origin
+  ROUTE_MERGE=$(git -C "$SLOT" rev-parse HEAD)
+  while IFS=$'\t' read -r num tip cls pr state kind own; do
+    name="row-$num"
     route_lock_dead "$name"
     route_write_profile "$W/profiles/$name.json" "$pr" "$(route_tip "$name")"
     case "$state" in
@@ -4088,17 +4139,13 @@ test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_an
       printf 'table: %s: record -> released by the route (scripted allowing envelopes)\n' "$label"
     elif [ "$state" = MERGED ]; then
       route_assert_kept "$name" "$label with a record"
-      line=$(route_calls_for "$name")
-      assert_equals 1 "$(printf '%s\n' "$line" | wc -l | tr -d ' ')" "$label: the refused plan was followed by another call"
-      # shellcheck disable=SC2086
-      route_argv_check plan "$pr" "$W/profiles/$name.json" "$(copy_path "$name")" $line || fail "$label: argv: $ROUTE_ARGV_WHY"
-      assert_contains "$(route_line_of "$name")" "supersedence route (--pr $pr)" "$label: the refusal does not name the route"
-      assert_contains "$(route_line_of "$name")" "verification_stale_or_uncovered_paths" "$label: the driver's reason is missing"
+      assert_equals "" "$(route_calls_for "$name")" "$label: a copy whose lines the merge commit lacks reached the driver: $(route_calls_for "$name")"
+      assert_contains "$(route_line_of "$name")" "is not proved landed" "$label: the content proof's refusal is not named"
       merged_kept=$((merged_kept + 1))
       if [ "$own" = no ]; then
-        printf 'table: %s: record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept\n' "$label"
+        printf 'table: %s: record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called\n' "$label"
       else
-        printf 'table: %s: record -> route used, driver refused, kept\n' "$label"
+        printf 'table: %s: record -> kept by the content proof, driver never called\n' "$label"
       fi
     else
       route_assert_kept "$name" "$label with a record"
@@ -4109,9 +4156,787 @@ test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_an
     fi
   done <<< "$rows"
   assert_equals 10 "$expect_released" "table: not every twin and ancestor row was released"
-  assert_equals 9 "$merged_kept" "table: not every merged-nearest reject row reached the driver and was refused"
+  assert_equals 9 "$merged_kept" "table: not every merged-nearest reject row was kept by the content proof"
   assert_equals 8 "$expect_never" "table: not every closed or open reject row was kept before the driver"
-  pass "the staged cases: 5 twins, 4 ancestors and the PR 3446 twin are released through the route and 17 reject rows are kept with or without a record (reduced evidence: scripted driver answers, generated sandbox commits)"
+  pass "the staged cases: 5 twins, 4 ancestors and the PR 3446 twin are released through the route; 9 merged-nearest reject rows are kept by the content proof and 8 closed or open rows by the forge check, each with or without a record and none reaching the driver by the route (reduced evidence: scripted driver answers, generated sandbox commits)"
+}
+
+# --- contract r14 checks of the route (library-level and sweep-level) ---------
+# The owner (bin/fm-teardown-nested-lib.sh) is exercised in a bash of its own, with
+# the libraries it needs sourced, against throwaway repositories and the scripted
+# stand-ins above. FM_ROUTE_LIB_DIR points the cases at another bin/ tree (the base
+# tree, to show a case is red there); a sweep case does the same with FM_COPY_SWEEP_BIN.
+ROUTE_LIB_DIR=${FM_ROUTE_LIB_DIR:-$ROOT/bin}
+
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+route_lib() {  # <snippet>: runs under bash with the route libraries sourced
+  local pre='set -u; for f in fm-wake-lib fm-lock-lib fm-project-lock-lib fm-task-copy-lib fm-refuse-lib fm-teardown-nested-lib fm-pr-lib fm-timeout-lib; do . "$ROUTE_LIB_DIR/$f.sh" || exit 90; done;'
+  env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_DATA_OVERRIDE \
+    PATH="$FAKEBIN:$ORIGINAL_PATH" FAKE_REAL_GIT="$REAL_GIT" FAKE_REAL_RM="$REAL_RM" \
+    FAKE_GIT_LOG="${W:-$TMP_ROOT}/git.log" FAKE_RM_LOG="${W:-$TMP_ROOT}/rm.log" \
+    FM_HOME="${HOMED:-$TMP_ROOT/nohome}" ROUTE_LIB_DIR="$ROUTE_LIB_DIR" \
+    bash -c "$pre
+$1"
+}
+
+# route_content_fixture <name> <file> <base> <tip> <merge>: one repository with the
+# base commit B on main, the copy's tip T on branch tip and the merged result M on
+# branch merged, both made from B. Contents are printf %b strings. Sets CR, CT, CM.
+route_content_fixture() {
+  CR="$TMP_ROOT/content-$1"
+  rm -rf "$CR"
+  git init -q -b main "$CR"
+  [ -z "${ROUTE_FIX_ATTR:-}" ] || printf '%s\n' "$2 merge=liar" > "$CR/.gitattributes"
+  printf '%b' "$3" > "$CR/$2"
+  git -C "$CR" add -A
+  git -C "$CR" commit -qm base
+  git -C "$CR" checkout -q -b tip
+  printf '%b' "$4" > "$CR/$2"
+  git -C "$CR" commit -q --allow-empty -am tip
+  CT=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  git -C "$CR" checkout -q -b merged
+  printf '%b' "$5" > "$CR/$2"
+  git -C "$CR" commit -q --allow-empty -am merged
+  CM=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+}
+
+# route_prove <repo> <tip> <merge>: the content proof; sets PROVE_RC and PROVE_WHY.
+PROVE_RC=
+PROVE_WHY=
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+route_prove() {
+  local out
+  out=$(ROUTE_PROVE_REPO=$1 ROUTE_PROVE_TIP=$2 ROUTE_PROVE_MERGE=$3 route_lib 'rc=0; teardown_route_content_proven "$ROUTE_PROVE_REPO" "$ROUTE_PROVE_TIP" "$ROUTE_PROVE_MERGE" || rc=$?; printf "RC=%s\nWHY=%s\n" "$rc" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"' 2>&1)
+  PROVE_RC=$(printf '%s\n' "$out" | sed -n 's/^RC=//p' | head -n 1)
+  PROVE_WHY=$(printf '%s\n' "$out" | sed -n 's/^WHY=//p' | head -n 1)
+  [ -n "$PROVE_RC" ] || PROVE_RC="no answer: $out"
+}
+assert_proved() {  # <label>
+  [ "$PROVE_RC" = 0 ] || fail "$1: the content proof refused ($PROVE_RC: $PROVE_WHY)"
+}
+assert_unproved() {  # <label> [<text the reason must hold>]
+  [ "$PROVE_RC" = 1 ] || fail "$1: the content proof did not refuse (got: $PROVE_RC $PROVE_WHY)"
+  [ -z "${2:-}" ] || assert_contains "$PROVE_WHY" "$2" "$1: the reason does not name the failed condition"
+}
+
+test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the_merge_commit_lacks() {
+  local body
+  make_world world-content-proof
+  # A twin: the merge commit holds exactly the copy's change.
+  route_content_fixture twin f.txt 'a\n' 'a\nadded\n' 'a\nadded\n'
+  route_prove "$CR" "$CT" "$CM"; assert_proved "a twin"
+  # A squash onto a moved main: the files differ from the copy's, the merge into them changes nothing.
+  body='1\n2\n3\n4\n5\n6\n7\n8\n9\n'
+  route_content_fixture squash f.txt "$body" '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n10\n'
+  route_prove "$CR" "$CT" "$CM"; assert_proved "a squash onto a moved main"
+  # An ancestor: the copy's tip is inside the merge commit's history.
+  route_content_fixture ancestor f.txt 'a\n' 'a\nadded\n' 'a\nadded\n'
+  git -C "$CR" checkout -q merged
+  git -C "$CR" reset -q --hard "$CT"
+  printf 'a\nadded\nmore\n' > "$CR/f.txt"
+  git -C "$CR" commit -qam more
+  CM=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" merge-base --is-ancestor "$CT" "$CM" || fail "the ancestor fixture is not an ancestor"
+  route_prove "$CR" "$CT" "$CM"; assert_proved "an ancestor"
+  # An added line the merge commit lacks: kept, and the reason names the path.
+  route_content_fixture absent f.txt 'a\n' 'a\nadded\n' 'a\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "an added line the merge commit lacks" "f.txt"
+  # A misattributed row: a genuinely merged result that does not carry the copy's lines.
+  route_content_fixture misattributed f.txt 'a\n' 'a\nsecurity fix\n' 'a\nsomething else\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "a merged result that does not carry the copy's lines" "f.txt"
+  pass "the content proof proves a twin, a squash onto a moved main and an ancestor, and keeps an added line or a result that the merge commit lacks"
+}
+
+test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_changes_the_meaning() {
+  local comments
+  make_world world-content-lines
+  route_content_fixture exactline f.txt 'a\n' 'a\nrequire_tls=true\n' 'a\nrequire_tls=true\n'
+  route_prove "$CR" "$CT" "$CM"; assert_proved "the exact line"
+  route_content_fixture commented f.txt 'a\n' 'a\nrequire_tls=true\n' 'a\n# require_tls=true\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "the line only as a comment" "f.txt"
+  route_content_fixture suffixed f.txt 'a\n' 'a\nrequire_tls=true\n' 'a\nrequire_tls=true # note\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "the line with a suffix" "f.txt"
+  route_content_fixture adjacent policy.txt 'AUTH_DISABLED=true\n' 'AUTH_DISABLED=false\n' 'AUTH_DISABLED=false\nAUTH_DISABLED=true\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "the adjacent override" "policy.txt"
+  route_content_fixture secure policy.txt 'AUTH_DISABLED=true\n' 'AUTH_DISABLED=false\n' 'AUTH_DISABLED=false\n'
+  route_prove "$CR" "$CT" "$CM"; assert_proved "the secure result"
+  comments='# 1\n# 2\n# 3\n# 4\n# 5\n# 6\n# 7\n# 8\n# end\n'
+  route_content_fixture separated policy.txt "AUTH_DISABLED=true\n$comments" "AUTH_DISABLED=false\n$comments" "AUTH_DISABLED=false\n${comments}AUTH_DISABLED=true\n"
+  route_prove "$CR" "$CT" "$CM"; assert_proved "the separated later override (the copy's change is fully present in landed history)"
+  pass "the content proof compares whole lines: a commented or suffixed line and an adjacent override keep the copy, the exact line and a separated later override route"
+}
+
+test_the_content_proof_judges_mode_and_text_together_and_needs_identical_entries_for_removals_and_binaries() {
+  local sha
+  make_world world-content-modes
+  # Mixed: the copy turns the executable bit on and adds a line; the merge commit holds the text at the old mode.
+  route_content_fixture mixed f.txt 'base\n' 'base\nadded\n' 'base\nadded\n'
+  git -C "$CR" checkout -q tip
+  chmod +x "$CR/f.txt"
+  git -C "$CR" commit -qam exec
+  CT=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "a mode change with added text, merge commit at the old mode" "f.txt"
+  git -C "$CR" checkout -q merged
+  chmod +x "$CR/f.txt"
+  git -C "$CR" commit -qam exec
+  CM=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  route_prove "$CR" "$CT" "$CM"; assert_proved "a mode change with added text, the merge commit holding the copy's entry"
+  # A deleted file the merge commit still has, and one it deleted too.
+  route_content_fixture deleted f.txt 'a\n' 'a\n' 'a\n'
+  printf 'keep\n' > "$CR/gone.txt"
+  git -C "$CR" add gone.txt
+  git -C "$CR" commit -qm gone
+  git -C "$CR" branch -f tip main
+  git -C "$CR" branch -f merged main
+  git -C "$CR" checkout -q tip
+  git -C "$CR" rm -q gone.txt
+  git -C "$CR" commit -qm "delete gone"
+  CT=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  CM=$(git -C "$CR" rev-parse merged)
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "a file the copy deletes and the merge commit still has" "gone.txt"
+  git -C "$CR" checkout -q merged
+  git -C "$CR" rm -q gone.txt
+  git -C "$CR" commit -qm "delete gone"
+  CM=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  route_prove "$CR" "$CT" "$CM"; assert_proved "a file both deleted"
+  # A binary file: another binary in the merge commit keeps, the copy's own entry routes.
+  route_content_fixture binary b.bin 'start\0one\n' 'start\0two\n' 'start\0three\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "a binary change the merge commit holds differently" "b.bin"
+  route_content_fixture binarysame b.bin 'start\0one\n' 'start\0two\n' 'start\0two\n'
+  route_prove "$CR" "$CT" "$CM"; assert_proved "a binary change the merge commit holds identically"
+  # Lines removed only: the entry must be identical.
+  route_content_fixture removed f.txt '1\n2\n3\n' '1\n3\n' '1\n2\n3\n4\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "a change that only removes lines, the merge commit differing" "f.txt"
+  route_content_fixture removedsame f.txt '1\n2\n3\n' '1\n3\n' '1\n3\n'
+  sha=$CM
+  route_prove "$CR" "$CT" "$sha"; assert_proved "a change that only removes lines, the merge commit identical"
+  pass "the content proof judges mode and text together: a mode change, a deleted file, a binary file and a removal need an identical entry, and the copy's own entry routes"
+}
+
+test_the_content_proof_keeps_an_empty_change_that_is_not_an_ancestor_and_histories_without_one_merge_base() {
+  local x1 y1 m1 m2
+  make_world world-content-bases
+  # An empty change: proven, and not an ancestor.
+  route_content_fixture empty f.txt 'a\n' 'a\n' 'a\nchanged\n'
+  git -C "$CR" checkout -q tip
+  git -C "$CR" commit -q --allow-empty -m "empty"
+  CT=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  route_prove "$CR" "$CT" "$CM"; assert_proved "an empty commit on the merge base's tree"
+  ! git -C "$CR" merge-base --is-ancestor "$CT" "$CM" || fail "the empty-change fixture is an ancestor, so it does not discriminate"
+  # No merge base: unrelated histories.
+  route_content_fixture unrelated f.txt 'a\n' 'a\n' 'a\n'
+  git -C "$CR" checkout -q --orphan alien
+  git -C "$CR" rm -rfq . 2>/dev/null
+  printf 'z\n' > "$CR/z.txt"
+  git -C "$CR" add z.txt
+  git -C "$CR" commit -qm alien
+  CT=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "unrelated histories" "merge base"
+  # Two merge bases: a criss-cross.
+  route_content_fixture crisscross f.txt 'a\n' 'a\n' 'a\n'
+  git -C "$CR" checkout -q -b x1 main
+  printf 'x\n' > "$CR/x.txt"; git -C "$CR" add x.txt; git -C "$CR" commit -qm x1
+  x1=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q -b y1 main
+  printf 'y\n' > "$CR/y.txt"; git -C "$CR" add y.txt; git -C "$CR" commit -qm y1
+  y1=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q -b m1 "$x1"
+  git -C "$CR" merge -q --no-ff -m m1 "$y1"
+  m1=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q -b m2 "$y1"
+  git -C "$CR" merge -q --no-ff -m m2 "$x1"
+  m2=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  [ "$(git -C "$CR" merge-base --all "$m1" "$m2" | wc -l | tr -d ' ')" = 2 ] || fail "the criss-cross fixture does not have two merge bases"
+  route_prove "$CR" "$m1" "$m2"; assert_unproved "a pair with two merge bases" "merge base"
+  # A git command that fails proves nothing.
+  route_content_fixture failing f.txt 'a\n' 'a\nadded\n' 'a\nadded\n'
+  FAKE_GIT_FAIL_MERGEBASE=1 route_prove "$CR" "$CT" "$CM"; assert_unproved "a failing merge-base command" "merge base"
+  pass "the content proof proves an empty change without calling it an ancestor and keeps unrelated histories, two merge bases and a failing git"
+}
+
+test_the_content_proof_writes_nothing_to_the_clone_and_does_not_run_on_an_older_git() {
+  local before after objs_before objs_after
+  make_world world-content-readonly
+  route_content_fixture readonly f.txt '1\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n10\n'
+  before=$(git -C "$CR" for-each-ref | shasum -a 256; git -C "$CR" status --porcelain=v1 --ignored | shasum -a 256)
+  objs_before=$(find "$CR/.git/objects" -type f | LC_ALL=C sort | shasum -a 256)
+  mkdir -p "$W/proof-tmp"
+  TMPDIR="$W/proof-tmp" route_prove "$CR" "$CT" "$CM"; assert_proved "the text proof"
+  after=$(git -C "$CR" for-each-ref | shasum -a 256; git -C "$CR" status --porcelain=v1 --ignored | shasum -a 256)
+  objs_after=$(find "$CR/.git/objects" -type f | LC_ALL=C sort | shasum -a 256)
+  [ "$before" = "$after" ] || fail "the proof changed the clone's refs or status"
+  [ "$objs_before" = "$objs_after" ] || fail "the proof wrote an object into the clone's object store"
+  [ -z "$(ls -A "$W/proof-tmp")" ] || fail "the proof left a temporary directory behind: $(ls -A "$W/proof-tmp")"
+  # An older git: the text proof does not run and the text twin is kept; a change with no text line still proves.
+  FAKE_GIT_VERSION=2.39.5 route_prove "$CR" "$CT" "$CM"; assert_unproved "a text twin on a git older than 2.40" "2.40"
+  route_content_fixture empty2 f.txt 'a\n' 'a\n' 'a\nchanged\n'
+  git -C "$CR" checkout -q tip
+  git -C "$CR" commit -q --allow-empty -m "empty"
+  CT=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  FAKE_GIT_VERSION=2.39.5 route_prove "$CR" "$CT" "$CM"; assert_proved "a change with no text line on a git older than 2.40"
+  pass "the content proof writes no ref, status or object to the clone and leaves no temporary directory, and on a git older than 2.40 a text twin is kept while a change with no text line still proves"
+}
+
+test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed() {
+  local channel
+  make_world world-content-liar
+  for channel in attributes default info; do
+    # The reviewer's POLICY case: the copy sets required, the merge commit holds other.
+    if [ "$channel" = attributes ]; then ROUTE_FIX_ATTR=1; else ROUTE_FIX_ATTR=; fi
+    route_content_fixture "liar-$channel" policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
+    ROUTE_FIX_ATTR=
+    CMARK="$TMP_ROOT/liar-ran-$channel"
+    rm -f "$CMARK"
+    git -C "$CR" config merge.liar.name liar
+    git -C "$CR" config merge.liar.driver "touch '$CMARK'; true"
+    [ "$channel" != default ] || git -C "$CR" config merge.default liar
+    [ "$channel" != info ] || printf 'policy.txt merge=liar\n' > "$CR/.git/info/attributes"
+    route_prove "$CR" "$CT" "$CM"
+    assert_unproved "the POLICY case with a lying driver selected through $channel"
+    [ ! -e "$CMARK" ] || fail "the lying driver ran (channel $channel): the proof let a configured merge driver decide"
+    # The legitimate text twin under the same configuration: a real merge decides.
+    if [ "$channel" = attributes ]; then ROUTE_FIX_ATTR=1; else ROUTE_FIX_ATTR=; fi
+    route_content_fixture "liartwin-$channel" policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    ROUTE_FIX_ATTR=
+    git -C "$CR" config merge.liar.name liar
+    git -C "$CR" config merge.liar.driver "touch '$CMARK'; true"
+    [ "$channel" != default ] || git -C "$CR" config merge.default liar
+    [ "$channel" != info ] || printf 'policy.txt merge=liar\n' > "$CR/.git/info/attributes"
+    route_prove "$CR" "$CT" "$CM"
+    if [ "$channel" = info ]; then
+      assert_unproved "a text twin whose path info/attributes gives a custom merge driver" "info/attributes"
+    else
+      assert_proved "the legitimate text twin under a configured lying driver ($channel)"
+    fi
+    [ ! -e "$CMARK" ] || fail "the lying driver ran on the twin (channel $channel)"
+  done
+  pass "a lying merge driver selected through .gitattributes, merge.default or info/attributes never runs: the POLICY case is kept, the text twin routes under the same configuration, and info/attributes naming a driver keeps the copy"
+}
+
+# route_closeout <plan|execute> <name> [<before> [<after>]]: teardown_run_closeout in a
+# library bash for the copy <name> of the current world. <before> and <after> are
+# snippets run in that bash before and after the call. Sets CO_RC, CO_SWITCHED, CO_ROUTE,
+# CO_OUT (the owner's output on one line) and CO_ALL (everything it printed).
+CO_RC=
+CO_SWITCHED=
+CO_ROUTE=
+CO_OUT=
+CO_ALL=
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+route_closeout() {
+  CO_ALL=$(ROUTE_CO_SLOT=$SLOT ROUTE_CO_COPY=$(copy_path "$2") ROUTE_CO_STAGE=$1 ROUTE_CO_BEFORE="${3:-:}" ROUTE_CO_AFTER="${4:-:}" \
+    ROUTE_CO_DATA="$HOMED/data" FM_TEARDOWN_VERNANT_PYTHON="${ROUTE_CO_PYTHON:-$DRIVER_PY}" route_lib '
+      TEARDOWN_ROUTE_DATA=$ROUTE_CO_DATA
+      eval "$ROUTE_CO_BEFORE"
+      stage=; [ "$ROUTE_CO_STAGE" != plan ] || stage=plan
+      rc=0
+      teardown_run_closeout "$ROUTE_CO_SLOT" "$ROUTE_CO_COPY" $stage || rc=$?
+      eval "$ROUTE_CO_AFTER"
+      printf "RC=%s\nSWITCHED=%s\nROUTE=%s\nOUT=%s\n" "$rc" "${TEARDOWN_CLOSEOUT_SWITCHED:-}" "${TEARDOWN_CLOSEOUT_ROUTE:-}" "$(printf "%s" "${TEARDOWN_CLOSEOUT_OUT:-}" | tr "\n" " ")"
+    ' 2>&1)
+  CO_RC=$(printf '%s\n' "$CO_ALL" | sed -n 's/^RC=//p' | tail -n 1)
+  CO_SWITCHED=$(printf '%s\n' "$CO_ALL" | sed -n 's/^SWITCHED=//p' | tail -n 1)
+  CO_ROUTE=$(printf '%s\n' "$CO_ALL" | sed -n 's/^ROUTE=//p' | tail -n 1)
+  CO_OUT=$(printf '%s\n' "$CO_ALL" | sed -n 's/^OUT=//p' | tail -n 1)
+  [ -n "$CO_RC" ] || fail "route_closeout produced no answer: $CO_ALL"
+}
+
+# The number of calls the scripted driver logged for <name>.
+route_call_count() {
+  route_calls_for "$1" | sed '/^$/d' | wc -l | tr -d ' '
+}
+
+# A copy with changes of its own in the current world, built the way a real one is
+# (real git, no shim): the base commit on main, the copy's tip on its own branch from
+# the base, then the merge commit on main, pushed, with the PR merged at it and a
+# locked copy, a profile, a record and scripted driver answers for the copy.
+# route_content_copy <name> <pr> <file> <base> <tip> <merge>; contents are printf %b.
+route_content_copy() {
+  local name=$1 pr=$2 f=$3 base
+  printf '%b' "$4" > "$SLOT/$f"
+  git -C "$SLOT" add -- "$f"
+  [ ! -f "$SLOT/.gitattributes" ] || git -C "$SLOT" add -- .gitattributes
+  git -C "$SLOT" commit -qm "base of $name"
+  base=$(git -C "$SLOT" rev-parse HEAD)
+  git -C "$SLOT" worktree add -q -b "fm/$name" "$(copy_path "$name")" "$base"
+  printf '%b' "$5" > "$(copy_path "$name")/$f"
+  git -C "$(copy_path "$name")" commit -qam "tip of $name"
+  git -C "$(copy_path "$name")" push -q origin "fm/$name"
+  printf '%b' "$6" > "$SLOT/$f"
+  git -C "$SLOT" commit -qam "merge of $name"
+  git -C "$SLOT" push -q origin main
+  git -C "$SLOT" fetch -q origin
+  ROUTE_MERGE=$(git -C "$SLOT" rev-parse HEAD)
+  route_set_pr "$W/forge" "$pr" MERGED "$ROUTE_MERGE"
+  route_lock_dead "$name"
+  route_write_profile "$W/profiles/$name.json" "$pr" "$(route_tip "$name")"
+  route_record "$name" "$pr" "$(route_tip "$name")" "$W/profiles/$name.json"
+  route_script_row "$W" "$name" allowed success "$pr"
+}
+
+# The whole route on a real repository: a lying merge driver, selected through
+# .gitattributes, merge.default or info/attributes, never runs (the marker file stays
+# absent), the reviewer's POLICY copy (it sets required, the merge commit holds other)
+# is kept with an empty closeout argv, and the legitimate text twin under the same
+# configuration routes with the --pr options.
+test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_route() {
+  local channel marker
+  for channel in attributes default info; do
+    route_world "route-liar-$channel"
+    marker="$W/liar-ran"
+    rm -f "$marker"
+    [ "$channel" != attributes ] || printf 'policy.txt merge=liar\ntwin.txt merge=liar\n' > "$SLOT/.gitattributes"
+    route_content_copy policy 7 policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
+    route_content_copy twin 8 twin.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    git -C "$SLOT" config merge.liar.name liar
+    git -C "$SLOT" config merge.liar.driver "touch '$marker'; true"
+    [ "$channel" != default ] || git -C "$SLOT" config merge.default liar
+    [ "$channel" != info ] || printf 'policy.txt merge=liar\ntwin.txt merge=liar\n' > "$SLOT/.git/info/attributes"
+    route_closeout plan policy
+    [ "$CO_ROUTE" = invalid ] && [ "$CO_RC" != 0 ] || fail "the POLICY copy was not kept before the driver through $channel ($CO_RC $CO_ROUTE): $CO_OUT"
+    [ -z "$(route_calls_for policy)" ] || fail "the closeout driver was asked for the POLICY copy through $channel: $(route_calls_for policy)"
+    [ ! -e "$marker" ] || fail "the lying driver ran through $channel: the route let a configured merge driver decide"
+    route_closeout plan twin
+    if [ "$channel" = info ]; then
+      [ "$CO_ROUTE" = invalid ] && [ -z "$(route_calls_for twin)" ] || fail "a path whose info/attributes names a custom driver reached the driver ($CO_ROUTE): $(route_calls_for twin)"
+      assert_contains "$CO_OUT" "info/attributes" "the twin's refusal does not name info/attributes"
+    else
+      [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "the text twin under a configured lying driver ($channel) did not route ($CO_RC $CO_ROUTE): $CO_OUT"
+      [ "$(route_call_count twin)" = 1 ] || fail "the twin was not asked once: $(route_calls_for twin)"
+      assert_contains "$(route_calls_for twin)" "--pr 8" "the twin's plan was not asked by the --pr route"
+    fi
+    [ ! -e "$marker" ] || fail "the lying driver ran on the twin through $channel"
+    printf 'liar %s: POLICY copy kept with no driver call, twin %s, marker absent\n' "$channel" "$([ "$channel" = info ] && echo kept || echo routed)"
+  done
+  pass "through the whole route on real git, a lying merge driver selected by .gitattributes, merge.default or info/attributes never runs: the POLICY copy is kept with an empty closeout argv and the text twin under the same configuration routes (kept when info/attributes names a driver)"
+}
+
+test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an_unreachable_remote_keeps_the_copy() {
+  local topic
+  # A stale local origin/HEAD naming origin/topic while the remote's default is main.
+  route_world landing-stale
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  git -C "$SLOT" checkout -q -b topic
+  git -C "$SLOT" commit -q --allow-empty -m "merge of a pull request into topic"
+  git -C "$SLOT" push -q origin topic
+  topic=$(git -C "$SLOT" rev-parse HEAD)
+  git -C "$SLOT" checkout -q main
+  git -C "$SLOT" fetch -q origin
+  git -C "$SLOT" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/topic
+  route_set_pr "$W/forge" 8 MERGED "$topic"
+  route_copy control 7
+  ROUTE_COPY_AT=$topic route_copy stale 8
+  route_sweep --apply
+  route_assert_released control "a merge commit on the remote's default branch, a stale local origin/HEAD naming topic"
+  route_assert_kept stale "a merge commit only on origin/topic while the remote's default is main"
+  [ -z "$(route_calls_for stale)" ] || fail "the stale-hint copy reached the driver: $(route_calls_for stale)"
+  # An unreachable remote.
+  route_world landing-offline
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy offline 7
+  git -C "$SLOT" config --unset-all "url.file://$(cd "$W/origin.git" && pwd).insteadOf"
+  git -C "$SLOT" config "url.file://$W/no-such-remote.git.insteadOf" "$ROUTE_REMOTE_URL"
+  route_sweep --apply
+  route_assert_kept offline "a remote that cannot be read"
+  [ -z "$(route_calls_for offline)" ] || fail "the copy reached the driver although the remote's default branch could not be read"
+  # A remote default that names a branch the clone has no origin/<branch> for.
+  route_world landing-unfetched
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy unfetched 7
+  git -C "$W/origin.git" branch develop main
+  git -C "$W/origin.git" symbolic-ref HEAD refs/heads/develop
+  route_sweep --apply
+  route_assert_kept unfetched "a remote default branch with no origin/<branch> in the clone"
+  [ -z "$(route_calls_for unfetched)" ] || fail "the copy reached the driver although the clone has no origin/develop"
+  pass "the landing branch is the remote's own default: a stale origin/HEAD naming topic, an unreachable remote and a default the clone has no ref for each keep the copy before the driver, and a merge on the real default routes"
+}
+
+test_a_recorded_base_must_agree_with_the_remotes_default_and_its_own_origin_ref_decides_landing() {
+  route_world landing-base
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  git -C "$SLOT" branch release "$ROUTE_MERGE"
+  git -C "$SLOT" push -q origin release
+  git -C "$SLOT" fetch -q origin
+  route_copy based 7
+  route_closeout plan based 'TEARDOWN_ROUTE_BASE=main'
+  [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "a recorded base equal to the remote's default did not route ($CO_RC $CO_ROUTE): $CO_OUT"
+  route_closeout plan based 'TEARDOWN_ROUTE_BASE=release'
+  [ "$CO_RC" != 0 ] && [ "$CO_ROUTE" = invalid ] || fail "a recorded base that disagrees with the remote's default routed: $CO_RC $CO_ROUTE $CO_OUT"
+  assert_contains "$CO_OUT" "disagrees with the remote's default branch" "the refusal does not name the disagreement"
+  [ "$(route_call_count based)" = 1 ] || fail "the driver was called for the disagreeing base: $(route_calls_for based)"
+  # The remote's default is release too: the base now agrees and its own origin ref decides.
+  git -C "$W/origin.git" symbolic-ref HEAD refs/heads/release
+  route_closeout plan based 'TEARDOWN_ROUTE_BASE=release'
+  [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "a recorded base that agrees with the remote's default did not route ($CO_RC $CO_ROUTE): $CO_OUT"
+  pass "a recorded base routes only when it agrees with the remote's own default branch"
+}
+
+# The stated envelope, plan and execute: every document outside it keeps the copy.
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+test_the_routes_answer_must_be_the_stated_fifteen_key_envelope_for_the_plan_and_the_execute() {
+  local table keys k stage good rc out pr=7
+  make_world envelope-matrix
+  table=$W/answers.tsv
+  : > "$table"
+  add_answer() {  # <stage> <rc> <expect> <label> <document>
+    printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$(printf '%s' "$5" | tr '\n' '\001')" >> "$table"
+  }
+  for stage in plan execute; do
+    if [ "$stage" = plan ]; then good=$(route_plan_allowed_envelope "$pr"); rc=3; else good=$(route_execute_success_envelope "$pr"); rc=0; fi
+    add_answer "$stage" "$rc" yes "$stage: the stated envelope" "$good"
+    keys=$(printf '%s' "$good" | jq -r 'keys[]')
+    for k in $keys; do
+      add_answer "$stage" "$rc" no "$stage: key $k removed" "$(printf '%s' "$good" | jq -c "del(.$k)")"
+    done
+    add_answer "$stage" "$rc" no "$stage: a key added" "$(printf '%s' "$good" | jq -c '. + {"extra": 1}')"
+    add_answer "$stage" "$rc" no "$stage: not an object (array)" '[]'
+    add_answer "$stage" "$rc" no "$stage: not an object (string)" '"x"'
+    add_answer "$stage" "$rc" no "$stage: a second document" "$good"$'\n'"$good"
+    add_answer "$stage" "$rc" no "$stage: trailing text" "$good"$'\n''trailing words'
+    add_answer "$stage" "$rc" no "$stage: allowed document of the no-pr lane" '{"allowed": true}'
+    add_answer "$stage" "$rc" no "$stage: the three-field document" '{"state":"DONE_WITH_SUPERSEDENCE","predicates_failed":[],"worktree_removed":true}'
+    add_answer "$stage" "$rc" no "$stage: the PR is another" "$(printf '%s' "$good" | jq -c '.pr = 8')"
+    add_answer "$stage" "$rc" no "$stage: the PR is a string" "$(printf '%s' "$good" | jq -c '.pr = "7"')"
+    add_answer "$stage" "$rc" no "$stage: predicates_failed holds cleanup_gate" "$(printf '%s' "$good" | jq -c '.predicates_failed = ["cleanup_gate"]')"
+    add_answer "$stage" "$rc" no "$stage: cleanup_requested false" "$(printf '%s' "$good" | jq -c '.cleanup_requested = false')"
+    add_answer "$stage" "$rc" no "$stage: cleanup_requested the string true" "$(printf '%s' "$good" | jq -c '.cleanup_requested = "true"')"
+    add_answer "$stage" "$rc" no "$stage: worktree_removed the string" "$(printf '%s' "$good" | jq -c '.worktree_removed = "false"')"
+    add_answer "$stage" "$rc" no "$stage: worktree_removed null" "$(printf '%s' "$good" | jq -c '.worktree_removed = null')"
+  done
+  good=$(route_plan_allowed_envelope "$pr")
+  add_answer plan 3 no "plan: state DONE" "$(printf '%s' "$good" | jq -c '.state = "DONE"')"
+  add_answer plan 3 no "plan: a second predicate" "$(printf '%s' "$good" | jq -c '.predicates_failed = ["cleanup_not_executed","primary_checkout_repair"]')"
+  add_answer plan 3 no "plan: worktree_removed true" "$(printf '%s' "$good" | jq -c '.worktree_removed = true')"
+  add_answer plan 0 no "plan: the stated envelope at exit 0" "$good"
+  add_answer plan 1 no "plan: the stated envelope at exit 1" "$good"
+  good=$(route_execute_success_envelope "$pr")
+  add_answer execute 0 yes "execute: DONE" "$(printf '%s' "$good" | jq -c '.state = "DONE"')"
+  add_answer execute 0 no "execute: BLOCKED" "$(printf '%s' "$good" | jq -c '.state = "BLOCKED"')"
+  add_answer execute 0 no "execute: worktree_removed false" "$(printf '%s' "$good" | jq -c '.worktree_removed = false')"
+  add_answer execute 0 no "execute: a recovery reason" "$(printf '%s' "$good" | jq -c '.cleanup_recovery_reason = "cleanup_gate"')"
+  add_answer execute 3 no "execute: the stated envelope at exit 3" "$good"
+  add_answer execute 2 no "execute: the stated envelope at exit 2" "$good"
+  out=$(ROUTE_ANSWERS=$table route_lib '
+    bad=0
+    while IFS=$(printf "\t") read -r stage rc expect label doc; do
+      TEARDOWN_CLOSEOUT_ROUTE_PR=7
+      TEARDOWN_CLOSEOUT_STDOUT=$(printf "%s" "$doc" | tr "\001" "\n")
+      TEARDOWN_CLOSEOUT_OUT=
+      got=no
+      teardown_closeout_route_answer "$stage" "$rc" && got=yes
+      if [ "$got" = "$expect" ]; then printf "ok   %s\n" "$label"; else printf "WRONG %s (wanted %s, got %s)\n" "$label" "$expect" "$got"; bad=1; fi
+    done < "$ROUTE_ANSWERS"
+    exit "$bad"
+  ' 2>&1) || { printf '%s\n' "$out" | grep -E '^WRONG' | head -20; fail "the route reader judged some documents wrongly"; }
+  [ "$(printf '%s\n' "$out" | grep -c '^ok ')" -ge 70 ] || fail "the matrix ran fewer than 70 documents: $(printf '%s\n' "$out" | grep -c '^ok ')"
+  printf 'envelope matrix: %s documents judged as wanted\n' "$(printf '%s\n' "$out" | grep -c '^ok ')"
+  pass "the plan and the execute are judged on the stated fifteen-key envelope: any missing, added, wrong or wrong-typed field, a second document, trailing text and an exit that disagrees keep the copy, and the stated envelope proceeds or releases"
+}
+
+# --- the project lock the route holds (library-level) --------------------------
+# A probe the scripted driver runs while the route's call is in progress: is the
+# slot's project lock held, and is an actor that tries to take it told busy?
+route_install_lock_probe() {  # <name> <stage>
+  mkdir -p "$W/ans/$1"
+  cat > "$W/ans/$1/$2.hook" <<'SH'
+bash -c '
+  . "$ROUTE_LIB_DIR/fm-wake-lib.sh"; . "$ROUTE_LIB_DIR/fm-lock-lib.sh"; . "$ROUTE_LIB_DIR/fm-project-lock-lib.sh"
+  lock=$(fm_treehouse_project_lock_path "$1"); held=no; [ -d "$lock" ] && held=yes
+  rc=0; fm_project_lock_try "$lock" probe >/dev/null 2>&1 || rc=$?
+  printf "held=%s try_rc=%s\n" "$held" "$rc" > "$2"
+' _ "$PWD" "$ROUTE_PROBE_OUT"
+SH
+}
+
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+test_the_route_takes_and_releases_its_own_project_lock_when_its_caller_holds_none() {
+  route_world lock-own
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy owned 7
+  route_install_lock_probe owned exec
+  ROUTE_PROBE_OUT="$W/probe.out" route_closeout execute owned 'LOCK=$(fm_treehouse_project_lock_path "$ROUTE_CO_SLOT")' 'printf "LOCK_AFTER=%s\n" "$([ -d "$LOCK" ] && echo held || echo gone)"; rc2=0; fm_project_lock_try "$LOCK" later >/dev/null 2>&1 || rc2=$?; printf "LATER_TRY=%s\n" "$rc2"; fm_project_lock_release "$LOCK" || true'
+  [ "$CO_RC" = 0 ] || fail "the route did not release the copy while taking its own lock ($CO_RC): $CO_OUT"
+  assert_contains "$(cat "$W/probe.out")" "held=yes" "the project lock was not held during the driver call"
+  assert_contains "$(cat "$W/probe.out")" "try_rc=75" "an actor that tried the lock during the driver call was not told busy"
+  assert_contains "$CO_ALL" "LOCK_AFTER=gone" "the route did not release the lock it took"
+  assert_contains "$CO_ALL" "LATER_TRY=0" "a later try of the lock did not succeed after the route"
+  pass "a route whose caller holds no project lock takes it for the driver call, an actor that tries it meanwhile is told busy, and the route releases it"
+}
+
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+test_the_route_borrows_a_hold_its_caller_proves_and_leaves_it_held() {
+  route_world lock-borrow
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy borrowed 7
+  route_install_lock_probe borrowed exec
+  ROUTE_PROBE_OUT="$W/probe.out" route_closeout execute borrowed \
+    'LOCK=$(fm_treehouse_project_lock_path "$ROUTE_CO_SLOT"); fm_project_lock_try "$LOCK" outer-hold || exit 91; TEARDOWN_ROUTE_LOCK_HELD=$LOCK; PID_BEFORE=$(cat "$LOCK/pid"); ROLE_BEFORE=$(cat "$LOCK/role")' \
+    'printf "HELD_AFTER=%s PID_SAME=%s ROLE_SAME=%s\n" "$([ -d "$LOCK" ] && echo yes || echo no)" "$([ "$(cat "$LOCK/pid" 2>/dev/null)" = "$PID_BEFORE" ] && echo yes || echo no)" "$([ "$(cat "$LOCK/role" 2>/dev/null)" = "$ROLE_BEFORE" ] && echo yes || echo no)"'
+  [ "$CO_RC" = 0 ] || fail "the route did not release the copy under the caller's hold ($CO_RC): $CO_OUT"
+  assert_contains "$CO_ALL" "HELD_AFTER=yes PID_SAME=yes ROLE_SAME=yes" "the route let go of, retook or relabeled the caller's hold"
+  assert_contains "$(cat "$W/probe.out")" "held=yes" "the project lock was not held during the driver call"
+  assert_contains "$(cat "$W/probe.out")" "try_rc=75" "an actor that tried the lock during the driver call was not told busy"
+  [ "$(route_call_count borrowed)" = 1 ] || fail "the driver was not called exactly once under the borrowed hold: $(route_calls_for borrowed)"
+  pass "a route whose caller proves its hold borrows it: the lock is held during the call and the caller's hold is untouched afterwards"
+}
+
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+test_a_claimed_hold_the_pid_file_does_not_prove_and_a_busy_lock_keep_the_copy_before_the_driver() {
+  route_world lock-refuse
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy forged 7
+  route_copy busy 7
+  # A forged claim: the caller names the lock as held but its pid file names another process.
+  route_closeout execute forged \
+    'LOCK=$(fm_treehouse_project_lock_path "$ROUTE_CO_SLOT"); mkdir -p "$LOCK"; printf 1 > "$LOCK/pid"; printf outer > "$LOCK/role"; TEARDOWN_ROUTE_LOCK_HELD=$LOCK' \
+    'printf "LOCK_PID=%s LOCK_ROLE=%s\n" "$(cat "$LOCK/pid" 2>/dev/null)" "$(cat "$LOCK/role" 2>/dev/null)"'
+  [ "$CO_RC" != 0 ] && assert_equals invalid "$CO_ROUTE" "a forged claimed hold did not refuse the route ($CO_RC $CO_ROUTE): $CO_OUT"
+  assert_contains "$CO_OUT" "does not name this process" "the refusal does not say the hold is not proved"
+  assert_contains "$CO_ALL" "LOCK_PID=1 LOCK_ROLE=outer" "the route touched a lock it did not hold"
+  [ "$(route_call_count forged)" = 0 ] || fail "the driver was called under a forged claimed hold: $(route_calls_for forged)"
+  # A lock held by another live process, no claim: the route does not wait or take it.
+  route_closeout execute busy \
+    'LOCK=$(fm_treehouse_project_lock_path "$ROUTE_CO_SLOT"); rm -rf "$LOCK"; sleep 3 & holder=$!; mkdir -p "$LOCK"; printf "%s" "$holder" > "$LOCK/pid"; printf holder > "$LOCK/role"' \
+    'printf "LOCK_ROLE=%s\n" "$(cat "$LOCK/role" 2>/dev/null)"'
+  [ "$CO_RC" != 0 ] && assert_equals invalid "$CO_ROUTE" "a busy lock did not keep the copy ($CO_RC $CO_ROUTE): $CO_OUT"
+  assert_contains "$CO_OUT" "could not be taken" "the refusal does not name the lock"
+  assert_contains "$CO_ALL" "LOCK_ROLE=holder" "the route disturbed the other process's lock"
+  [ "$(route_call_count busy)" = 0 ] || fail "the driver was called while another process held the lock: $(route_calls_for busy)"
+  pass "a claimed hold the pid file does not prove and a lock held by another process each keep the copy before the driver, and neither lock is disturbed"
+}
+
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+test_the_lock_is_released_after_a_refusal_and_a_disabled_reflog_keeps_the_copy() {
+  route_world lock-after-refusal
+  route_set_pr "$W/forge" 7 CLOSED "$ROUTE_MERGE"
+  route_copy closed 7
+  route_closeout plan closed 'LOCK=$(fm_treehouse_project_lock_path "$ROUTE_CO_SLOT")' 'rc2=0; fm_project_lock_try "$LOCK" later >/dev/null 2>&1 || rc2=$?; printf "LATER_TRY=%s\n" "$rc2"; fm_project_lock_release "$LOCK" || true'
+  [ "$CO_RC" != 0 ] || fail "a CLOSED PR routed"
+  assert_contains "$CO_ALL" "LATER_TRY=0" "the route left the project lock held after a refusal"
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_closeout plan closed 'git -C "$ROUTE_CO_SLOT" config core.logAllRefUpdates false'
+  [ "$CO_RC" != 0 ] && assert_equals invalid "$CO_ROUTE" "a clone whose reflog is disabled was not refused ($CO_RC $CO_ROUTE): $CO_OUT"
+  assert_contains "$CO_OUT" "reflog" "the refusal does not name the reflog"
+  [ "$(route_call_count closed)" = 0 ] || fail "the driver was called on a clone whose reflog is disabled: $(route_calls_for closed)"
+  pass "the project lock is released after a refusal and a clone whose HEAD reflog is disabled is refused before the driver"
+}
+
+# --- the checkout of the slot across a route call -----------------------------
+# The actors below are the harness's stand-ins for an agent's direct git switch or a
+# person's: a hook that runs just before the driver's interpreter starts the driver
+# (so after the route's read made immediately before entry), and a restore step the
+# scripted driver runs before it answers (the named synchronization point: the driver
+# stays running until the checkout is back, so the restore lands before the route's
+# read after the call).
+route_late_world() {  # <name>
+  route_world "$1"
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  git -C "$SLOT" branch fm/pr-7-head "$ROUTE_MERGE"
+  mkdir -p "$W/late"
+  cat > "$W/late/prelaunch.sh" <<SH
+#!/usr/bin/env bash
+want=\$(cat "$W/late/switch" 2>/dev/null) || exit 0
+stage=plan; name=''; prev=''
+for a in "\$@"; do
+  [ "\$a" != --execute-cleanup ] || stage=execute
+  [ "\$prev" != --cleanup-worktree ] || name=\${a##*/}
+  prev=\$a
+done
+[ "\$want" = "\$stage \$name" ] || exit 0
+git -C "$SLOT" checkout -q fm/pr-7-head
+SH
+  printf '#!/usr/bin/env bash\nbash "%s/late/prelaunch.sh" "$@"\nexec bash "$@"\n' "$W" > "$W/late/python"
+  chmod +x "$W/late/python"
+  LATE_PY="$W/late/python"
+}
+route_late_restore() {  # <name> <plan|execute>: the restore step the driver runs before it answers
+  mkdir -p "$W/ans/$1"
+  printf 'git -C "%s" checkout -q main\n: > "%s/late/restored-%s"\n' "$SLOT" "$W" "$2" > "$W/ans/$1/$( [ "$2" = plan ] && echo plan || echo exec ).hook"
+}
+route_started_on() {  # <name> <stage> -> the branch the driver started on
+  awk -F '|' -v n="$1" -v s="$2" '$1 == n && $2 == s { print $3 }' "$W/startup.log" 2>/dev/null | head -n 1
+}
+
+test_the_read_made_just_before_the_driver_is_entered_refuses_a_checkout_on_the_prs_head_with_no_driver_call() {
+  route_late_world pre-entry
+  route_copy zz-a 7
+  printf 'git -C "%s" checkout -q fm/pr-7-head\n' "$SLOT" > "$W/late/mb.hook"
+  FAKE_GIT_MERGEBASE_HOOK="$W/late/mb.hook" route_closeout plan zz-a
+  [ "$CO_RC" != 0 ] || fail "a checkout switched to the PR head after the route's first read still reached the driver"
+  assert_equals 1 "$CO_SWITCHED" "the switch was not reported as a switch"
+  assert_contains "$CO_OUT" "just before the driver was entered" "the refusal does not name the pre-entry read"
+  [ "$(route_call_count zz-a)" = 0 ] || fail "the driver was called with the checkout on the PR head: $(route_calls_for zz-a)"
+  pass "a checkout found on the PR's head at the read made just before the driver is entered is refused with an empty driver log"
+}
+
+# The stable control of the case above: the same copy, no actor, routes with one driver call.
+test_the_stable_control_of_the_pre_entry_read_routes_with_one_driver_call() {
+  route_late_world pre-entry-control
+  route_copy zz-a 7
+  route_closeout plan zz-a
+  [ "$CO_RC" = 0 ] && [ "$CO_SWITCHED" != 1 ] || fail "the stable control did not route ($CO_RC $CO_SWITCHED): $CO_OUT"
+  [ "$(route_call_count zz-a)" = 1 ] || fail "the stable control did not call the driver once"
+  pass "with no actor the same copy routes and the driver is called once"
+}
+
+test_a_switch_and_restore_after_the_first_read_is_found_before_or_after_the_driver_call() {
+  route_late_world windows
+  route_copy zz-a 7
+  # Early: after the first read, before the read made just before entry.
+  printf 'git -C "%s" checkout -q fm/pr-7-head && git -C "%s" checkout -q main\n' "$SLOT" "$SLOT" > "$W/late/mb.hook"
+  FAKE_GIT_MERGEBASE_HOOK="$W/late/mb.hook" route_closeout plan zz-a
+  [ "$CO_RC" != 0 ] && assert_equals 1 "$CO_SWITCHED" "an early switch and restore was not found ($CO_RC $CO_SWITCHED): $CO_OUT"
+  assert_contains "$CO_OUT" "names the PR's head branch" "the report does not rest on the HEAD reflog"
+  # End: the driver switches and restores as its last act, after it printed its answer.
+  : > "$W/closeout.log"
+  mkdir -p "$W/ans/zz-a"
+  printf 'git -C "%s" checkout -q fm/pr-7-head && git -C "%s" checkout -q main\n' "$SLOT" "$SLOT" > "$W/ans/zz-a/plan.after"
+  route_closeout plan zz-a
+  [ "$CO_RC" != 0 ] && assert_equals 1 "$CO_SWITCHED" "a switch and restore at the end of the call was not found ($CO_RC $CO_SWITCHED): $CO_OUT"
+  [ "$(route_call_count zz-a)" = 1 ] || fail "the driver was not called once for the end placement"
+  pass "a switch and restore after the first read is found whether it falls before the read made just before entry or at the end of the call, from the HEAD reflog"
+}
+
+# The quiet control of the case above: no actor, the call is quiet and routes.
+test_a_quiet_call_with_no_actor_routes_and_reports_no_switch() {
+  route_late_world windows-control
+  route_copy zz-a 7
+  route_closeout plan zz-a
+  [ "$CO_RC" = 0 ] && [ "$CO_SWITCHED" != 1 ] || fail "the quiet control did not route ($CO_RC $CO_SWITCHED): $CO_OUT"
+  pass "a call with no actor routes and reports no switch"
+}
+
+test_a_switch_between_the_pre_entry_read_and_the_drivers_start_is_detected_at_a_plan_and_stops_the_run() {
+  route_late_world late-plan
+  route_copy zz-a 7
+  route_copy aa-b 7
+  printf 'plan zz-a\n' > "$W/late/switch"
+  route_late_restore zz-a plan
+  FM_TEARDOWN_VERNANT_PYTHON="$LATE_PY" run_sweep --apply
+  [ "$(route_started_on zz-a plan)" = fm/pr-7-head ] || fail "the fake driver did not start on the PR head: $(cat "$W/startup.log" 2>/dev/null)"
+  [ -e "$W/late/restored-plan" ] || fail "the restore step did not complete before the driver answered"
+  [ "$(route_call_count zz-a)" = 1 ] || fail "the driver was not called exactly once for the late-entry plan: $(route_calls_for zz-a)"
+  route_assert_kept zz-a "the copy whose plan saw the switch"
+  assert_contains "$OUT" "was switched during the plan of" "the run does not report the switch"
+  assert_contains "$OUT" "names the PR's head branch" "the report does not rest on the HEAD reflog"
+  [ "$(route_call_count aa-b)" = 0 ] || fail "a further copy reached the driver after the switch was found: $(route_calls_for aa-b)"
+  route_assert_kept aa-b "the copy that was still pending"
+  assert_contains "$OUT" "this run stopped after" "the pending copy is not reported as not released"
+  pass "a switch injected after the pre-entry read and before the driver starts (the fake started on the PR head, was called, then the checkout was restored) is reported at a plan from the reflog and the run releases no further copy"
+}
+
+test_a_late_entry_switch_at_an_execute_is_detected_and_a_pending_copy_gets_no_driver_call() {
+  route_late_world late-exec
+  route_copy zz-a 7
+  route_copy aa-b 7
+  # B is eligible, releasable and pending: the report-only scan classes both as driver candidates and nothing holds B.
+  FM_TEARDOWN_VERNANT_PYTHON="$LATE_PY" run_sweep
+  assert_class zz-a PENDING-DRIVER
+  assert_class aa-b PENDING-DRIVER
+  route_hold_receipt_exists aa-b && fail "a retention receipt holds the pending copy before the run"
+  # The late-entry execute: A is processed first (the sweep takes copies in reverse path order).
+  printf 'execute zz-a\n' > "$W/late/switch"
+  route_late_restore zz-a execute
+  FM_TEARDOWN_VERNANT_PYTHON="$LATE_PY" run_sweep --apply
+  [ "$(route_started_on zz-a plan)" = main ] || fail "A's plan did not start on main: $(cat "$W/startup.log" 2>/dev/null)"
+  [ "$(route_started_on zz-a execute)" = fm/pr-7-head ] || fail "A's execute fake did not start on the PR head: $(cat "$W/startup.log" 2>/dev/null)"
+  [ -e "$W/late/restored-execute" ] || fail "the restore step did not complete before A's execute answered"
+  [ "$(route_call_count zz-a)" = 2 ] || fail "A did not get one plan and one execute: $(route_calls_for zz-a)"
+  assert_contains "$OUT" "was switched during the execute of" "the run does not report the switch"
+  assert_contains "$OUT" "names the PR's head branch" "the report does not rest on the HEAD reflog"
+  [ ! -e "$(copy_path zz-a)" ] || fail "A's execute succeeded and removed the copy, which the run must not hide"
+  [ "$(route_call_count aa-b)" = 0 ] || fail "B reached the driver after the switch was found: $(route_calls_for aa-b)"
+  route_assert_kept aa-b "the copy that was pending at the detection"
+  assert_contains "$OUT" "this run stopped after" "B is not reported as not released"
+  pass "the late-entry execute (A first; B pending with capacity and no hold; A's fake started on the PR head and returned success) is reported from the reflog and B gets no driver call"
+}
+
+# The stable control of the case above: the same copies, no switch, release both in path order.
+test_the_late_entry_stable_control_releases_both_copies_with_a_before_b() {
+  route_late_world late-exec-control
+  route_copy zz-a 7
+  route_copy aa-b 7
+  FM_TEARDOWN_VERNANT_PYTHON="$LATE_PY" run_sweep --apply
+  route_assert_released zz-a "the stable control, copy A"
+  route_assert_released aa-b "the stable control, copy B (pending, under the cap)"
+  [ "$(route_call_count zz-a)" = 2 ] && [ "$(route_call_count aa-b)" = 2 ] || fail "the stable control did not give each copy one plan and one execute"
+  [ "$(grep -n -m1 'aa-b' "$W/closeout.log" | cut -d: -f1)" -gt "$(grep -n 'zz-a .*--execute-cleanup' "$W/closeout.log" | tail -n 1 | cut -d: -f1)" ] \
+    || fail "A was not processed before B"
+  pass "with no switch the same copies are both released, A before B, one plan and one execute each"
+}
+
+test_a_detected_switch_stops_the_run_even_when_the_first_executes_answer_is_a_refusal() {
+  route_late_world late-refusal
+  route_copy zz-a 7 allowed blocked
+  route_copy aa-b 7
+  printf 'execute zz-a\n' > "$W/late/switch"
+  route_late_restore zz-a execute
+  FM_TEARDOWN_VERNANT_PYTHON="$LATE_PY" run_sweep --apply
+  assert_contains "$OUT" "was switched during the execute of" "the switch is not reported when the execute refuses"
+  [ "$(route_call_count aa-b)" = 0 ] || fail "B reached the driver after a refused execute with a switch: $(route_calls_for aa-b)"
+  route_assert_kept zz-a "the copy whose execute refused"
+  route_assert_kept aa-b "the pending copy"
+  pass "a switch found during an execute whose answer is a refusal still stops the run"
+}
+
+# The no-switch control of the case above: the same refusal keeps A and the run goes on to B as before.
+test_an_ordinary_refusal_without_a_switch_keeps_the_copy_and_the_run_goes_on_to_the_next_copy() {
+  route_late_world late-refusal-control
+  route_copy zz-a 7 allowed blocked
+  route_copy aa-b 7
+  FM_TEARDOWN_VERNANT_PYTHON="$LATE_PY" run_sweep --apply
+  route_assert_kept zz-a "an ordinary refusal"
+  route_assert_released aa-b "the copy after an ordinary refusal"
+  pass "the same refusal without a switch keeps A and lets the run go on to the next copy"
+}
+
+test_a_switch_and_restore_between_the_plan_and_the_execute_is_found_from_the_plans_first_read() {
+  route_late_world between
+  route_copy zz-a 7
+  route_copy aa-b 7
+  # The actor acts once the plan of A is done, during the sweep's own work before A's execute.
+  cat > "$W/late/head.hook" <<SH
+[ ! -e "$W/late/fired" ] || exit 0
+grep -q 'zz-a' "$W/closeout.log" 2>/dev/null || exit 0
+grep -q 'zz-a .*--execute-cleanup' "$W/closeout.log" 2>/dev/null && exit 0
+: > "$W/late/fired"
+git -C "$SLOT" checkout -q fm/pr-7-head && git -C "$SLOT" checkout -q main
+SH
+  FAKE_GIT_HEAD_HOOK="$W/late/head.hook" FM_TEARDOWN_VERNANT_PYTHON="$LATE_PY" run_sweep --apply
+  [ -e "$W/late/fired" ] || fail "the harness actor never acted between the plan and the execute"
+  assert_contains "$OUT" "was switched during the" "a switch and restore between the plan and the execute was not found"
+  [ "$(route_call_count aa-b)" = 0 ] || fail "a further copy reached the driver after the switch was found: $(route_calls_for aa-b)"
+  route_assert_kept aa-b "the copy that was pending"
+  pass "a switch and restore between the plan and the execute is found from the first read made at the plan, so the window really runs to the end of the execute"
+}
+
+test_a_copy_with_no_record_is_asked_exactly_as_before_at_every_no_record_call() {
+  local copy plain_plan plain_exec
+  make_locked_copy_case r1d-plain dead
+  install_driver "$SLOT" "$W"
+  copy=$(copy_path locked)
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  plain_plan=$(sed -n 1p "$W/closeout.log")
+  plain_exec=$(sed -n 2p "$W/closeout.log")
+  assert_equals "$SLOT|--cleanup-worktree $copy" "$plain_plan" "the no-record plan call differs from the call before this change"
+  assert_equals "$SLOT|--cleanup-worktree $copy --execute-cleanup" "$plain_exec" "the no-record execute call differs from the call before this change"
+  make_locked_copy_case r1d-lib dead
+  install_driver "$SLOT" "$W"
+  copy=$(copy_path locked)
+  route_closeout plan locked
+  route_closeout execute locked
+  assert_equals "$(printf '%s\n%s' "$SLOT|--cleanup-worktree $copy" "$SLOT|--cleanup-worktree $copy --execute-cleanup")" "$(head -n 2 "$W/closeout.log")" "the owner's no-record plan and execute calls differ from the call before this change"
+  pass "a copy with no record is asked exactly as before: --cleanup-worktree <copy>, plus --execute-cleanup at the execute, and no --no-evidence-files"
 }
 
 # FM_TEST_ONLY=<function> runs one case, which keeps a mutation proof quick.
@@ -4220,10 +5045,35 @@ test_a_records_file_that_cannot_be_read_holds_every_locked_copy_before_the_drive
 test_a_row_for_another_tip_holds_the_copy_before_or_after_its_valid_row
 test_a_record_that_changes_while_the_forge_is_read_holds_the_copy
 test_a_decimal_pr_number_of_any_length_routes_and_a_zero_or_a_leading_zero_does_not
-test_a_landing_branch_that_is_only_a_guess_holds_the_copy_and_the_actual_default_routes
+test_a_local_origin_head_never_decides_the_landing_branch_and_the_remotes_default_does
 test_a_forge_read_whose_parent_exits_at_once_leaves_no_descendant_and_does_not_wait_for_one
 test_a_route_execute_that_claims_success_and_leaves_the_copy_uses_a_release_slot
 test_the_hold_matrix_checks_fail_without_a_receipt_and_after_any_driver_call
 test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers
+test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the_merge_commit_lacks
+test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_changes_the_meaning
+test_the_content_proof_judges_mode_and_text_together_and_needs_identical_entries_for_removals_and_binaries
+test_the_content_proof_keeps_an_empty_change_that_is_not_an_ancestor_and_histories_without_one_merge_base
+test_the_content_proof_writes_nothing_to_the_clone_and_does_not_run_on_an_older_git
+test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed
+test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_route
+test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an_unreachable_remote_keeps_the_copy
+test_a_recorded_base_must_agree_with_the_remotes_default_and_its_own_origin_ref_decides_landing
+test_the_routes_answer_must_be_the_stated_fifteen_key_envelope_for_the_plan_and_the_execute
+test_the_route_takes_and_releases_its_own_project_lock_when_its_caller_holds_none
+test_the_route_borrows_a_hold_its_caller_proves_and_leaves_it_held
+test_a_claimed_hold_the_pid_file_does_not_prove_and_a_busy_lock_keep_the_copy_before_the_driver
+test_the_lock_is_released_after_a_refusal_and_a_disabled_reflog_keeps_the_copy
+test_the_read_made_just_before_the_driver_is_entered_refuses_a_checkout_on_the_prs_head_with_no_driver_call
+test_the_stable_control_of_the_pre_entry_read_routes_with_one_driver_call
+test_a_switch_and_restore_after_the_first_read_is_found_before_or_after_the_driver_call
+test_a_quiet_call_with_no_actor_routes_and_reports_no_switch
+test_a_switch_between_the_pre_entry_read_and_the_drivers_start_is_detected_at_a_plan_and_stops_the_run
+test_a_late_entry_switch_at_an_execute_is_detected_and_a_pending_copy_gets_no_driver_call
+test_the_late_entry_stable_control_releases_both_copies_with_a_before_b
+test_a_detected_switch_stops_the_run_even_when_the_first_executes_answer_is_a_refusal
+test_an_ordinary_refusal_without_a_switch_keeps_the_copy_and_the_run_goes_on_to_the_next_copy
+test_a_switch_and_restore_between_the_plan_and_the_execute_is_found_from_the_plans_first_read
+test_a_copy_with_no_record_is_asked_exactly_as_before_at_every_no_record_call
 pass "fm-copy-sweep"

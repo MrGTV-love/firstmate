@@ -6548,6 +6548,8 @@ route_teardown_release_branch() {
   git -C "$tmp" push -q origin main
   MAIN_MERGE=$(git -C "$tmp" rev-parse HEAD)
   rm -rf "$tmp"
+  # The landing branch is the remote's own default, and a recorded base must agree with it.
+  git -C "$FOREIGN_CASE/origin.git" symbolic-ref HEAD refs/heads/release
   git -C "$FOREIGN_CASE/project" fetch -q origin
   printf '%s\n' 'base_branch=release' >> "$FOREIGN_CASE/state/task-x1.meta"
 }
@@ -6830,6 +6832,24 @@ SH
   chmod +x "$1/nohup"
 }
 
+# A merge commit on origin/main that adds <name>.txt (the line "<name>") for each name,
+# so a copy that adds the same file and bytes is a twin of it. Plumbing only: the primary
+# checkout, its index and its HEAD are not touched. Sets ROUTE_MERGE.
+route_teardown_merge_carrying() {  # <name>...
+  local project=$FOREIGN_CASE/project idx=$FOREIGN_CASE/merge.index name blob tree commit
+  rm -f "$idx"
+  GIT_INDEX_FILE=$idx git -C "$project" read-tree "$ROUTE_MERGE"
+  for name in "$@"; do
+    blob=$(printf '%s\n' "$name" | git -C "$project" hash-object -w --stdin)
+    GIT_INDEX_FILE=$idx git -C "$project" update-index --add --cacheinfo "100644,$blob,$name.txt"
+  done
+  tree=$(GIT_INDEX_FILE=$idx git -C "$project" write-tree)
+  commit=$(git -C "$project" -c user.name=t -c user.email=t@example.invalid commit-tree "$tree" -p "$ROUTE_MERGE" -m "the merge commit a twin row's PR carries")
+  git -C "$project" push -q origin "$commit:refs/heads/main"
+  git -C "$project" fetch -q origin
+  ROUTE_MERGE=$commit
+}
+
 test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
   local cases rows num tip cls pr state kind own label rc counts released=0 refused=0 never=0 stub
   cases=${FM_SUPERSEDENCE_CASES:-}
@@ -6845,6 +6865,15 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
   while IFS=$'\t' read -r num tip cls pr state kind own; do
     label="row $num (tip $tip, class $cls, PR $pr $state, $kind)"
     route_teardown_world "route-table-$num" foreign
+    # R2(h): an ancestor row's copy sits at the merge commit; every other row adds its
+    # own file, which the merge commit carries for a twin and lacks for a reject row.
+    if [ "$cls" != "other (history)" ]; then
+      printf '%s\n' "row-$num" > "$FOREIGN_COPY/row-$num.txt"
+      git -C "$FOREIGN_COPY" add -- "row-$num.txt"
+      git -C "$FOREIGN_COPY" -c user.name=t -c user.email=t@example.invalid commit -qm "row $num"
+      git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/heads/fm/row-$num"
+      [ "$kind" != accept ] || route_teardown_merge_carrying "row-$num"
+    fi
     route_set_pr "$FOREIGN_CASE/forge" "$pr" "$state" "$([ "$state" = MERGED ] && printf '%s' "$ROUTE_MERGE" || true)"
     if [ "$kind" = accept ]; then
       route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success "$pr"
@@ -6870,14 +6899,12 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
       released=$((released + 1))
       printf 'table: %s: teardown, record -> released by the route (scripted allowing envelope)\n' "$label"
     elif [ "$state" = MERGED ]; then
-      expect_code 1 "$rc" "$label: the driver refused, the copy must be kept: $(cat "$FOREIGN_CASE/stderr")"
-      route_teardown_assert_execute "$FOREIGN_COPY" "$pr" "$label"
-      assert_grep "supersedence route (--pr $pr)" "$FOREIGN_CASE/stderr" "$label: the refusal does not name the route"
-      assert_grep "cleanup_tip_unbound" "$FOREIGN_CASE/stderr" "$label: the scripted refusal envelope is not in the refusal text"
-      assert_no_grep "SCRIPTED-ANSWER-MISSING" "$FOREIGN_CASE/stderr" "$label: the scripted driver had no answer for the execute"
+      expect_code 1 "$rc" "$label: the merge commit lacks the copy's lines, the copy must be kept: $(cat "$FOREIGN_CASE/stderr")"
+      assert_absent "$FOREIGN_CASE/closeout.log" "$label: a copy whose lines the merge commit lacks reached the driver"
+      assert_grep "is not proved landed" "$FOREIGN_CASE/stderr" "$label: the content proof's refusal is not named"
       assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
       refused=$((refused + 1))
-      printf 'table: %s: teardown, record -> route used, driver refused, kept%s\n' "$label" "$([ "$own" = no ] && printf ' (misattributed-record negative)' || true)"
+      printf 'table: %s: teardown, record -> kept by the content proof, driver never called%s\n' "$label" "$([ "$own" = no ] && printf ' (misattributed-record negative)' || true)"
     else
       expect_code 1 "$rc" "$label: a $state PR must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
       assert_absent "$FOREIGN_CASE/closeout.log" "$label: a $state PR reached the driver"
@@ -6888,9 +6915,9 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
     fi
   done <<< "$rows"
   assert_equals 10 "$released" "table: not every twin and ancestor row was released"
-  assert_equals 9 "$refused" "table: not every merged-nearest reject row reached the driver and was refused"
+  assert_equals 9 "$refused" "table: not every merged-nearest reject row was kept by the content proof"
   assert_equals 8 "$never" "table: not every closed or open reject row was kept before the driver"
-  pass "the staged cases through teardown: 5 twins, 4 ancestors and the PR 3446 twin are released through the route and 17 reject rows are kept with or without a record (reduced evidence: scripted driver answers)"
+  pass "the staged cases through teardown: 5 twins, 4 ancestors and the PR 3446 twin are released through the route; 9 merged-nearest reject rows are kept by the content proof and 8 closed or open rows by the forge check, each with or without a record (reduced evidence: scripted driver answers; adapted by reading, not run on this host)"
 }
 
 # A teardown holds the copy, with no driver call and a reason that names what failed,
@@ -6927,7 +6954,6 @@ route_teardown_hold_rows() {  # <row>...
         printf '%s\t%s\t7\t%s\n' "$copy" "$other" "$FOREIGN_CASE/profiles/${copy##*/}.json" >> "$carrier"
         phrase="at tip $other but the copy is at $tip (a row for another tip of the same path holds the copy"
         ;;
-      no-origin-head) git -C "$FOREIGN_CASE/project" remote set-head origin -d >/dev/null; phrase="the clone has no origin/HEAD, so the repository's default branch is unknown" ;;
       record-moves)
         route_set_pr_append "$FOREIGN_CASE/forge" 7 1 "$carrier" "$(printf '%s\t%s\t\t' "$copy" "$tip")" "$ROUTE_MERGE"
         phrase="leaves the PR or the profile empty"
@@ -6943,7 +6969,6 @@ route_teardown_hold_rows() {  # <row>...
       records-directory) rmdir "$carrier"; cp "$saved" "$carrier" ;;
       records-unreadable) chmod 600 "$carrier" ;;
       stale-first | stale-after) cp "$saved" "$carrier" ;;
-      no-origin-head) git -C "$FOREIGN_CASE/project" remote set-head origin main >/dev/null ;;
       record-moves) cp "$saved" "$carrier"; route_set_pr "$FOREIGN_CASE/forge" 7 MERGED "$ROUTE_MERGE" ;;
     esac
     rm -f "$FOREIGN_CASE/closeout.log"
@@ -6964,9 +6989,21 @@ test_a_teardown_holds_a_copy_for_a_row_of_another_tip_before_or_after_its_valid_
   pass "a teardown holds a foreign copy with no driver call for a row of another tip before or after the valid row, and releases it by the route once the row is out"
 }
 
-test_a_teardown_holds_a_copy_when_the_clone_has_no_origin_head() {
-  route_teardown_hold_rows no-origin-head
-  pass "a teardown holds a foreign copy with no driver call when the clone has no origin/HEAD, and releases it by the route once origin/HEAD names the default branch"
+# The landing branch is the remote's own default, read from the remote: a clone with no
+# local origin/HEAD still routes a copy whose merge commit is on the remote's default
+# (the sweep suite holds the stale-hint case against a real second branch).
+test_a_teardown_routes_a_copy_when_the_clone_has_no_local_origin_head() {
+  local rc copy
+  route_teardown_world route-origin-head-absent foreign
+  copy=$FOREIGN_COPY
+  git -C "$FOREIGN_CASE/project" remote set-head origin -d >/dev/null
+  route_script_row "$FOREIGN_CASE" "${copy##*/}" allowed success 7
+  route_teardown_record "$copy" 7
+  run_foreign_teardown rc FM_TEARDOWN_FORGE_TIMEOUT=2
+  expect_code 0 "$rc" "no local origin/HEAD: the remote's default decides, so the copy must route: $(cat "$FOREIGN_CASE/stderr")"
+  route_teardown_assert_execute "$copy" 7 "no local origin/HEAD"
+  assert_absent "$copy" "no local origin/HEAD: the copy survived"
+  pass "a teardown routes a foreign copy whose merge commit is on the remote's default branch when the clone has no local origin/HEAD"
 }
 
 test_a_teardown_holds_a_copy_when_a_row_is_written_while_the_forge_is_read() {
@@ -7282,7 +7319,7 @@ test_a_valid_record_releases_no_foreign_copy_with_a_process_or_a_live_launcher
 test_the_recorded_cases_are_decided_by_their_records_in_teardown
 test_a_teardown_holds_every_locked_copy_for_a_records_file_that_cannot_be_read
 test_a_teardown_holds_a_copy_for_a_row_of_another_tip_before_or_after_its_valid_row
-test_a_teardown_holds_a_copy_when_the_clone_has_no_origin_head
+test_a_teardown_routes_a_copy_when_the_clone_has_no_local_origin_head
 test_a_teardown_holds_a_copy_when_a_row_is_written_while_the_forge_is_read
 test_a_teardown_routes_a_ten_digit_pr_and_ends_a_forge_read_whose_parent_exits_at_once
 test_a_missing_or_unknown_scripted_answer_is_seen_and_never_read_as_a_refusal

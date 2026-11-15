@@ -51,7 +51,7 @@ route_argv_check() {  # <plan|execute> <pr> <profile> <copy> <argument>...
   [ "$n_pr" = 1 ] && [ "$v_pr" = "$pr" ] || { ROUTE_ARGV_WHY="--pr is $n_pr time(s), value '$v_pr', want once as '$pr'"; return 1; }
   [ "$n_profile" = 1 ] && [ "$v_profile" = "$profile" ] || { ROUTE_ARGV_WHY="--supersedence-profile is $n_profile time(s), value '$v_profile'"; return 1; }
   [ "$n_copy" = 1 ] && [ "$v_copy" = "$copy" ] || { ROUTE_ARGV_WHY="--cleanup-worktree is $n_copy time(s), value '$v_copy'"; return 1; }
-  [ "$n_noev" -le 1 ] || { ROUTE_ARGV_WHY="--no-evidence-files is duplicated"; return 1; }
+  [ "$n_noev" = 1 ] || { ROUTE_ARGV_WHY="--no-evidence-files is $n_noev time(s), want once"; return 1; }
   if [ "$stage" = execute ]; then
     [ "$n_execute" = 1 ] || { ROUTE_ARGV_WHY="--execute-cleanup is $n_execute time(s) at the execute"; return 1; }
   else
@@ -63,42 +63,48 @@ route_argv_check() {  # <plan|execute> <pr> <profile> <copy> <argument>...
 # wrong. Runs once per suite, so a comparator that accepts anything fails here.
 route_argv_selftest() {
   local c=/w/copy p=/w/profile.json flag
-  route_argv_check execute 7 "$p" "$c" --pr 7 --supersedence-profile "$p" --cleanup-worktree "$c" --execute-cleanup \
+  # The route's call always carries --no-evidence-files once (Main 1745): chk adds it.
+  chk() { route_argv_check "$@" --no-evidence-files; }
+  chk execute 7 "$p" "$c" --pr 7 --supersedence-profile "$p" --cleanup-worktree "$c" --execute-cleanup \
     || fail "argv comparator: the canonical order was refused: $ROUTE_ARGV_WHY"
   route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" --no-evidence-files \
     || fail "argv comparator: the plain call's prefix order was refused: $ROUTE_ARGV_WHY"
-  route_argv_check plan 7 "$p" "$c" --cleanup-worktree "$c" --pr 7 --supersedence-profile "$p" \
+  chk plan 7 "$p" "$c" --cleanup-worktree "$c" --pr 7 --supersedence-profile "$p" \
     || fail "argv comparator: a plan without --execute-cleanup was refused: $ROUTE_ARGV_WHY"
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" --repair-primary-base \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" --repair-primary-base \
     || fail "argv comparator: an added --repair-primary-base passed"
   for flag in --reap-branch --recover-partial-removal --allow-remote-tip --emit-profile-template --publish-preflight --check-egress --verify-only; do
-    ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" "$flag" \
+    ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" "$flag" \
       || fail "argv comparator: an added $flag passed"
   done
   for flag in --bundle-record --base-strategy --capture; do
-    ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" "$flag" x \
+    ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" "$flag" x \
       || fail "argv comparator: an added $flag passed"
   done
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --supersedence-profile "$p" \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --supersedence-profile "$p" \
     || fail "argv comparator: a missing --pr passed"
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 8 --supersedence-profile "$p" \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 8 --supersedence-profile "$p" \
     || fail "argv comparator: a wrong --pr passed"
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile /w/other.json \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile /w/other.json \
     || fail "argv comparator: a wrong profile passed"
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree /w/other --execute-cleanup --pr 7 --supersedence-profile "$p" \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree /w/other --execute-cleanup --pr 7 --supersedence-profile "$p" \
     || fail "argv comparator: a wrong copy passed"
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --pr 7 --supersedence-profile "$p" \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --pr 7 --supersedence-profile "$p" \
     || fail "argv comparator: a duplicated --pr passed"
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --execute-cleanup --pr 7 --supersedence-profile "$p" \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --execute-cleanup --pr 7 --supersedence-profile "$p" \
     || fail "argv comparator: a duplicated --execute-cleanup passed"
-  ! route_argv_check execute 7 "$p" "$c" --cleanup-worktree "$c" --pr 7 --supersedence-profile "$p" \
+  ! chk execute 7 "$p" "$c" --cleanup-worktree "$c" --pr 7 --supersedence-profile "$p" \
     || fail "argv comparator: an execute without --execute-cleanup passed"
-  ! route_argv_check plan 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" \
+  ! chk plan 7 "$p" "$c" --cleanup-worktree "$c" --execute-cleanup --pr 7 --supersedence-profile "$p" \
     || fail "argv comparator: a plan with --execute-cleanup passed"
   ! route_argv_check plan 7 "$p" "$c" --cleanup-worktree "$c" --pr 7 --supersedence-profile "$p" --no-evidence-files --no-evidence-files \
     || fail "argv comparator: a duplicated --no-evidence-files passed"
   ! route_argv_check plan 7 "$p" "$c" --cleanup-worktree "$c" \
     || fail "argv comparator: the plain call passed as a route call"
+  ! route_argv_check execute 7 "$p" "$c" --pr 7 --supersedence-profile "$p" --cleanup-worktree "$c" --execute-cleanup \
+    || fail "argv comparator: a route call without --no-evidence-files passed"
+  ! route_argv_check plan 7 "$p" "$c" --cleanup-worktree "$c" --pr 7 --supersedence-profile "$p" \
+    || fail "argv comparator: a route plan without --no-evidence-files passed"
 }
 
 # The driver's compact envelopes, as the --pr lane prints them (Vernant
@@ -206,7 +212,9 @@ route_wait_for() {
 # verification_stale_or_uncovered_paths, exit 3); with --pr a plan answers
 # plan.out/plan.exit (after plan.hook, or hanging while plan.hang exists), an
 # execute answers exec.out/exec.exit (after exec.hook) after removing the copy
-# when exec.remove exists.
+# when exec.remove exists. Each call also logs "<copy>|<plan|execute>|<branch>" to
+# <log-dir>/startup.log, the slot's checkout when the driver started, and runs
+# plan.after or exec.after (when present) once its answer is printed.
 route_install_row_driver() {
   local slot=$1 log=$2
   mkdir -p "$log/ans"
@@ -215,6 +223,9 @@ export FAKE_DRIVER=1
 printf '%s|%s\n' "\$PWD" "\$*" >> "$log/closeout.log"
 printf '%s\n' "\$\$" >> "$log/driver.pids"
 dir="$log/ans/\${2##*/}"
+stage=plan
+for arg in "\$@"; do [ "\$arg" != --execute-cleanup ] || stage=execute; done
+printf '%s|%s|%s\n' "\${2##*/}" "\$stage" "\$(git -C "\$PWD" branch --show-current 2>/dev/null)" >> "$log/startup.log"
 route=0
 for arg in "\$@"; do [ "\$arg" != --pr ] || route=1; done
 if [ "\$route" = 0 ]; then
@@ -235,6 +246,7 @@ if [ "\${3:-}" != --execute-cleanup ]; then
     exit 99
   fi
   cat "\$dir/plan.out"
+  [ ! -e "\$dir/plan.after" ] || bash "\$dir/plan.after" "\$2"
   exit "\$(cat "\$dir/plan.exit")"
 fi
 [ ! -e "\$dir/exec.hook" ] || bash "\$dir/exec.hook" "\$2" || exit 4
@@ -251,6 +263,7 @@ if [ ! -f "\$dir/exec.out" ] || [ ! -f "\$dir/exec.exit" ]; then
   exit 99
 fi
 cat "\$dir/exec.out"
+[ ! -e "\$dir/exec.after" ] || bash "\$dir/exec.after" "\$2"
 exit "\$(cat "\$dir/exec.exit")"
 SH
 }
