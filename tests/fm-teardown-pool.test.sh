@@ -1592,10 +1592,15 @@ test_nested_return_pending_link_shapes() {
         assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
         [ -L "$marker" ] || fail "$label: the refusal replaced the link"
         [ "$form" != outside ] || assert_equals sentinel "$(cat "$target")" "$label: the outside target changed"
+        rm -f "$marker"
+        rc=0
+        nested_run "$case_dir" || rc=$?
+        expect_code 0 "$rc" "$label: the retry after the link is removed must close: $(tail -3 "$case_dir/stderr")"
+        assert_nested_closed "$case_dir" "$label"
       fi
     done
   done
-  pass "a return-pending link to a regular file in the state directory closes with its target unchanged; dangling, directory and outside links refuse before any mutation"
+  pass "a return-pending link to a regular file in the state directory closes with its target unchanged; dangling, directory and outside links refuse before any mutation, and each retry without the link closes"
 }
 
 # A forced drop whose slot lease fails at the reservation refuses with the
@@ -1624,6 +1629,141 @@ test_nested_forced_drop_record_follows_the_reservation() {
     cmp -s "$FM_TEST_DROP_WORDS" "$case_dir/data/task-x1/captain-drop.md" || fail "$label: the closing run did not retain the captain's words"
   done
   pass "a forced plain or prior-shape nested close whose lease fails leaves no drop record, and the working retry retains the words and closes"
+}
+
+# A record whose worktree= is an alias (a link outside the slot to the nested
+# copy) must recover exactly like one that names the copy's own path. The first
+# teardown removes the copy and then stops at the slot's late work; with that
+# work committed but not landed, a re-run proves the slot again and refuses,
+# keeping the record, the claim and the return-pending record and returning
+# nothing - with or without a recorded merged PR, which proves the copy but not
+# the slot; once the work lands, a re-run returns the slot and retires both.
+test_nested_alias_worktree_recovers_like_its_physical_path() {
+  local case_dir rc lock pr label alias
+  for pr in none merged; do
+    label="nested-alias-rerun-$pr"
+    nested_fixture "$label" plain mine landed
+    case_dir=$NESTED_CASE
+    alias=$case_dir/alias-copy
+    ln -s "$NESTED_COPY" "$alias"
+    sed -i.bak "s#^worktree=.*#worktree=$alias#" "$case_dir/state/task-x1.meta"
+    rm -f "$case_dir/state/task-x1.meta.bak"
+    if [ "$pr" = merged ]; then
+      printf '%s\n' 'pr=https://github.com/example/repo/pull/7' "pr_head=$(git -C "$NESTED_COPY" rev-parse HEAD)" >> "$case_dir/state/task-x1.meta"
+      add_gh_pr_merged_for_head "$case_dir" "$(git -C "$NESTED_COPY" rev-parse HEAD)"
+    fi
+    stale_lock_late_work_treehouse "$case_dir"
+    lock=$(git_index_lock_path "$NESTED_SLOT")
+    : > "$lock"
+    touch -t 200001010000 "$lock"
+    rc=0
+    FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$label: the first teardown must stop at the slot's late work: $(cat "$case_dir/stderr")"
+    assert_absent "$NESTED_COPY" "$label: the first teardown had not yet removed the nested copy"
+    assert_present "$case_dir/state/task-x1.teardown-return-pending" "$label: the first teardown left no return-pending record"
+
+    git -C "$NESTED_SLOT" add late.txt
+    git -C "$NESTED_SLOT" commit -qm "late slot work"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+    expect_code 1 "$rc" "$label: a re-run must prove the slot again: $(cat "$case_dir/stderr2")"
+    assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr2" "$label: the re-run refusal did not name the slot"
+    assert_present "$case_dir/state/task-x1.meta" "$label: the re-run retired the record with the slot unproved"
+    assert_present "$case_dir/state/task-x1.teardown-return-pending" "$label: the re-run retired the return-pending record"
+    assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the re-run dropped the slot claim"
+    assert_absent "$case_dir/treehouse.log" "$label: the re-run returned the unproved slot"
+
+    git -C "$NESTED_SLOT" push -q origin HEAD:main
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout3" 2> "$case_dir/stderr3" || rc=$?
+    expect_code 0 "$rc" "$label: a re-run with the slot's work landed must finish: $(cat "$case_dir/stderr3")"
+    assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the landed slot was not returned"
+    assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
+    assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+    assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$label: the return-pending record survived"
+  done
+  pass "a record naming the nested copy through an alias recovers like its physical path, with and without a recorded merged PR"
+}
+
+# The shared status manifest is rewritten when the task's status is retired,
+# after the endpoint close; a manifest that is a directory is decidable at entry
+# and refuses before any lease, removal, marker write or endpoint close, for
+# both record shapes; once it is removed the same teardown closes.
+test_nested_status_manifest_directory_refuses_at_entry() {
+  local shape case_dir rc label manifest
+  for shape in plain enclosing; do
+    label="nested-status-manifest-directory-$shape"
+    nested_fixture "$label" "$shape" mine landed
+    case_dir=$NESTED_CASE
+    held_plain_get_slot "$case_dir" "$NESTED_SLOT"
+    nested_place_leftovers "$case_dir"
+    manifest=$case_dir/state/.status-presentation-cursor
+    mkdir "$manifest"
+    nested_snapshot "$case_dir" "$case_dir/snapshot.before"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    assert_nested_refused_untouched "$case_dir" "$rc" "$label" "shared status manifest $manifest cannot be retired"
+    assert_absent "$case_dir/lease.log" "$label: the refused close took a lease"
+    assert_absent "$case_dir/endpoint.log" "$label: the refused close closed the endpoint"
+    rmdir "$manifest"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    expect_code 0 "$rc" "$label: the retry after the directory is removed must close: $(tail -3 "$case_dir/stderr")"
+    assert_nested_closed "$case_dir" "$label"
+  done
+  pass "a shared status manifest that is a directory refuses a plain and a prior-shape nested close before any mutation, and the retry closes"
+}
+
+# With no busy generation recorded or armed, retire_busy_state removes nothing,
+# so a directory at the busy-state path does not stop a prior-shape ship or a
+# scout: both close, as on the base.
+test_inactive_busy_state_path_does_not_refuse() {
+  local kind case_dir rc label
+  for kind in ship scout; do
+    label="inactive-busy-state-$kind"
+    nested_fixture "$label" enclosing mine landed
+    case_dir=$NESTED_CASE
+    if [ "$kind" = scout ]; then
+      sed -i.bak 's/^kind=ship$/kind=scout/' "$case_dir/state/task-x1.meta"
+      rm -f "$case_dir/state/task-x1.meta.bak"
+      prepare_scout_teardown "$case_dir"
+    fi
+    mkdir "$case_dir/state/task-x1.busy-state"
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    expect_code 0 "$rc" "$label: an inactive busy-state path must not refuse: $(tail -3 "$case_dir/stderr")"
+    assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+  done
+  pass "a busy-state path with no generation does not stop a prior-shape ship or a scout"
+}
+
+# A return-pending record from an earlier run that names a pool slot the task
+# still claims is never retired with the task record while that slot stays
+# claimed: here the record's copy is gone and its worktree= no longer leads to
+# the slot, and a recorded merged PR proves the copy, so nothing in this run
+# would return the slot. The teardown refuses before any mutation and keeps the
+# record, the return-pending record and the claim.
+test_owed_return_pending_slot_is_never_retired() {
+  local case_dir rc label=owed-return-pending-slot head
+  nested_fixture "$label" plain mine landed
+  case_dir=$NESTED_CASE
+  head=$(git -C "$NESTED_COPY" rev-parse HEAD)
+  git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
+  sed -i.bak "s#^worktree=.*#worktree=$case_dir/elsewhere/gone-copy#" "$case_dir/state/task-x1.meta"
+  rm -f "$case_dir/state/task-x1.meta.bak"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' "pr_head=$head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$head"
+  printf 'spawn_gen=teardown-test-task-x1\nslot=%s\n' "$NESTED_SLOT" > "$case_dir/state/task-x1.teardown-return-pending"
+  rc=0
+  nested_run "$case_dir" || rc=$?
+  expect_code 1 "$rc" "$label: a slot still owed its return must refuse: $(tail -3 "$case_dir/stderr")"
+  assert_grep "names pool slot $NESTED_SLOT, which the task still claims" "$case_dir/stderr" "$label: the refusal did not name the owed slot"
+  assert_present "$case_dir/state/task-x1.meta" "$label: the task record was retired"
+  assert_present "$case_dir/state/task-x1.teardown-return-pending" "$label: the return-pending record was retired"
+  assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim was dropped"
+  assert_absent "$case_dir/treehouse.log" "$label: the slot was returned"
+  pass "a return-pending record naming a slot the task still claims is kept with the task record when no route returns that slot"
 }
 
 # The plain shape gets the prior shape's disposition for every claim state and
@@ -4394,6 +4534,10 @@ test_nested_entry_preflight_refuses_before_any_mutation
 test_nested_lock_retry_ignores_its_own_tracked_hook
 test_nested_return_pending_link_shapes
 test_nested_forced_drop_record_follows_the_reservation
+test_nested_alias_worktree_recovers_like_its_physical_path
+test_nested_status_manifest_directory_refuses_at_entry
+test_inactive_busy_state_path_does_not_refuse
+test_owed_return_pending_slot_is_never_retired
 test_plain_nested_disposition_equals_the_prior_shape
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
 test_gate_409_recorded_case_tears_down
