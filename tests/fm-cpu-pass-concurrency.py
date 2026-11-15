@@ -1270,6 +1270,7 @@ def case_one_reservation():
         codes = wait_all([outer], timeout=180)
         seen = world.sample_stop()
         began = len(starts(world))
+        sampling_valid(case, seen, label)
         case.measure(**{label + '_exit': codes, label + '_workers_started': began, label + '_peak_workers': seen['peak_total'], label + '_peak_passes': seen['peak_held']})
         case.check(codes == [0], '%s: the outer gate failed: %s' % (label, world.text('outer')[-300:]))
         case.check(began == 2, '%s: %d of 2 sibling workers started' % (label, began))
@@ -1283,6 +1284,7 @@ def case_one_reservation():
     codes = wait_all([outer], timeout=180)
     seen = world.sample_stop()
     began = len(starts(world))
+    sampling_valid(case, seen, 'sibling proofs')
     case.measure(proofs_exit=codes, proofs_workers_started=began, proofs_peak_workers=seen['peak_total'], proofs_peak_passes=seen['peak_held'])
     case.check(codes == [0], 'sibling proofs: the outer holder failed: %s' % world.text('outer')[-300:])
     case.check(began == 2, 'sibling proofs: %d of 2 candidate workers started' % began)
@@ -1336,6 +1338,7 @@ def case_jobs_clamp():
     seen = world.sample_stop()
     recorded = json.loads(artifact.read_text()) if artifact.exists() else {}
     markers = proof_markers(world.text('proof', 'out'))
+    sampling_valid(case, seen, 'proof inside one held pass')
     case.measure(held_markers=markers, held_recorded=recorded.get('concurrency'), held_peak_workers=seen['peak_total'])
     case.check(code == [0], 'the proof inside one held pass failed: %s' % world.text('proof')[-300:])
     case.check(markers == ['FM_ISOLATION_BEGIN concurrency=1', 'FM_ISOLATION_SUMMARY concurrency=1'], 'inside one held pass the printed line is not the one worker that ran: %s' % markers)
