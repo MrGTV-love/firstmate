@@ -194,10 +194,12 @@ gate does nothing but wait for its one command (no timer, no other job), so it c
 until that command ends. A waiter's chain is proven when every gate in it is a gate (not a
 run, whose progress rule can stop its command) whose slot record names, as its command, the
 next gate in the chain, and for the last gate the waiter itself (the same process when the
-command exec'd into the nested gate). A waiter is stuck for good when every holder of its
-key is a gate of a proven chain. A waiter that sees, on two polls in a row, that its own
-chain is among the holders it transitively waits for has closed a proven wait cycle; the
-earliest queued waiter that closes one runs beside the limit, says so and takes no slot,
+command exec'd into the nested gate). A set of proven waiters is a closed wait cycle when
+every holder of every member's key is a gate in some member's chain, so none of them can end
+(with several slots per key, every holder counts: two keys whose holders all wait on each
+other are one cycle, and one holder that runs free leaves nobody in it). A waiter that sees,
+on two polls in a row, that it belongs to the largest such set has closed a proven wait
+cycle; the earliest queued member runs beside the limit, says so and takes no slot,
 so gates that each hold a key and reach each other's key through gates alone (directly or
 through exec) both finish. That is the one admission that is not a holder ending, and it
 is at most one extra copy of a key per cycle.
@@ -1188,13 +1190,16 @@ def admit(key, log_fd=2, queued=None, pass_label=None, passes=1, share=False, ki
     tokens = os.environ.get(TOKENS_ENV, '')
     held_key = key in os.environ.get(SLOT_HELD_ENV, '').split('\t')
     tool = pass_label is not None and (ROOT / 'bin' / 'fm-cpu-pass.py').is_file()
-    if tool and inherited and passes > inherited:
-        raise ValueError(f'--passes {passes} must not exceed {CPU_HELD_ENV} ({inherited})')
-    if tool:
-        # The count is a usage error before any work runs, fresh, nested or degraded alike (rule 5); an unloadable pool is said once and runs the work.
-        pool = load_pool(state, key, log_fd)
-        if pool is not None and passes > pool.pool_size():
-            raise ValueError(f'--passes {passes} must not exceed the pool size ({pool.pool_size()})')
+    if pass_label is not None:
+        # The count is a usage error before any work runs, fresh, nested or degraded alike (rule 5), so
+        # it does not depend on the pool helper: a missing or unloadable helper still refuses an invalid
+        # count, and only then is said once and runs the valid work without a pass.
+        if inherited and passes > inherited:
+            raise ValueError(f'--passes {passes} must not exceed {CPU_HELD_ENV} ({inherited})')
+        pool = load_pool(state, key, log_fd) if tool else None
+        size = pool.pool_size() if pool is not None else max(1, os.cpu_count() or 1)
+        if passes > size:
+            raise ValueError(f'--passes {passes} must not exceed the pool size ({size})')
     wanted = tool and inherited is None
     count = inherited if (share and held_key and inherited) else passes
     leasing = tool and inherited is not None and 0 < count <= inherited and bool(tokens) and os.path.isdir(tokens)
@@ -1408,27 +1413,33 @@ def key_holders(key, limit):
 
 
 def cycle_victim(waiters, me):
-    """True when this waiter closes a wait cycle and is the one the cycle admits.
+    """True when this waiter is in a wait cycle and is the one the cycle admits.
 
     Callers pass only the waiters whose chains are proven (proven_chain): every gate of such a chain is blocked by construction
-    on the next gate or on the waiter itself, so none of them can end while the waiter waits. A waiter is stuck for good when
-    every holder of its key is such a gate. A waiter whose own chain is among the holders it transitively waits for closes a
-    cycle; of the waiters that close one, the earliest queued is the victim. Any other shape is not a proven cycle and its
-    waiter starts only when a holder ends.
+    on the next gate or on the waiter itself, so none of them can end while the waiter waits. The cycle is the largest set of
+    such waiters in which every holder of each member's key is a gate in some member's chain: start from all of them and drop,
+    until nothing changes, every waiter with a holder outside the chains of those left (that holder can still end, so its
+    waiter can still start). That covers several holders per key (FM_TEST_KEY_SLOTS above 1): two keys whose holders all wait
+    on each other are one cycle, while one holder of the key running free leaves nobody in it. Of the members, the earliest
+    queued is the victim, and only it starts beside the limit; once it has, the rest are no longer a cycle and wait for a
+    holder to end. Any other shape is not a proven cycle and its waiter starts only when a holder ends.
     """
-    def closes(record):
-        stuck = set(record['chain'])
-        changed = True
-        while changed:
-            changed = False
-            for other in waiters:
-                holders = key_holders(other['key'], other['limit'])
-                if holders and holders <= stuck and not set(other['chain']) <= stuck:
-                    stuck |= set(other['chain'])
-                    changed = True
-        holders = key_holders(record['key'], record['limit'])
-        return bool(holders) and holders <= stuck
-    members = [record for record in waiters if closes(record)]
+    members = list(waiters)
+    holders = {}
+    changed = True
+    while changed:
+        stuck = set()
+        for record in members:
+            stuck |= set(record['chain'])
+        kept = []
+        for record in members:
+            ident = (record['key'], record['limit'])
+            if ident not in holders:
+                holders[ident] = key_holders(*ident)
+            if holders[ident] and holders[ident] <= stuck:
+                kept.append(record)
+        changed = len(kept) != len(members)
+        members = kept
     if not any(record['pid'] == me['pid'] and record['queued_ns'] == me['queued_ns'] for record in members):
         return False
     first = min(members, key=lambda record: (record['queued_ns'], record['pid']))

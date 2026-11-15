@@ -1583,6 +1583,139 @@ def case_pass_count_bounds():
     return case
 
 
+def case_missing_helper_counts():
+    """Main 1750 item 1: with the pool helper missing, fm-duration.py gate refuses invalid pass counts exactly as with it; valid counts still run."""
+    case = Case('R6-1 missing-helper counts', 'fm-duration.py alone (no fm-cpu-pass.py beside it): nested --passes 2 in a one-pass reservation and fresh --passes above the CPU count exit 125 and run nothing; --passes 1 runs')
+    world = World('missing-helper-counts', cores=2)
+    lone = world.folder / 'lone' / 'bin'
+    lone.mkdir(parents=True)
+    shutil.copy(repo / 'bin' / 'fm-duration.py', lone / 'fm-duration.py')
+    rows = (('nested-over-inherited', True, '2', 125), ('nested-valid', True, '1', 0), ('fresh-over-pool', False, '3', 125), ('fresh-valid', False, '2', 0))
+    for label, nested, count, expected in rows:
+        marker = world.folder / (label + '.ran')
+        command = [pyshim, str(lone / 'fm-duration.py'), 'gate', '--passes', count, 'test.lone.' + label, '--', '/usr/bin/touch', str(marker)]
+        if nested:
+            command = ['/bin/bash', tool('fm-cpu-pass.sh'), 'run', '--passes', '1', '--'] + command
+        code = wait_all([world.launch(label, command)], timeout=60)
+        case.measure(**{label + '_exit': code, label + '_ran': marker.exists()})
+        case.check(code == [expected], '%s: exit %s, expected %d: %s' % (label, code, expected, world.text(label)[-200:]))
+        case.check(marker.exists() is (expected == 0), '%s: command started = %s' % (label, marker.exists()))
+    return case
+
+
+def round6_proof_repo(world, bodies):
+    """A family repository with the real proof and pool, two candidates with the given bodies, and the stub runner."""
+    path = proof_family_repo(world, ['fm-fam-0.test.sh', 'fm-fam-1.test.sh'], body='true\n')
+    for index, body in enumerate(bodies):
+        (path / 'tests' / ('fm-fam-%d.test.sh' % index)).write_text('#!/bin/bash\n' + body)
+    return path
+
+
+def case_proof_own_interval():
+    """Main 1750 items 2-4: the proof's concurrency is measured over each candidate's own run, a lease notice never hides a skip, and an unusable lease is said."""
+    case = Case('R6-2/3/4 proof', 'serialized launch records 1 (concurrent control 2); a contended skip fails like an uncontended one; a nested proof without python3 says it cannot lease')
+    # Item 2: a bash launcher that holds candidate 1 back until candidate 0 has exited (a lock it holds), after the proof's own start.
+    launcher = ('#!' + python + '\nimport fcntl, os, sys, time\nfrom pathlib import Path\n'
+                'd = Path(os.environ["R6_SHARED"])\n'
+                'if os.environ.get("R6_MODE") == "serial" and sys.argv[1:2] == ["tests/fm-fam-1.test.sh"]:\n'
+                '    end = time.monotonic() + 20\n'
+                '    while not (d / "first-ready").exists() and time.monotonic() < end: time.sleep(.01)\n'
+                '    with open(d / "first.lock", "a+") as lock: fcntl.flock(lock, fcntl.LOCK_EX)\n'
+                'os.execv("/bin/bash", ["/bin/bash"] + sys.argv[1:])\n')
+    first = ('exec "$FM_CONC_PYTHON" -c \'import fcntl, os, sys, time\nd = os.environ["R6_SHARED"]\n'
+             'if os.environ["R6_MODE"] == "serial":\n    lock = open(d + "/first.lock", "a+"); fcntl.flock(lock, fcntl.LOCK_EX)\n'
+             'open(d + "/first-ready", "w").close()\nend = time.monotonic() + 20\n'
+             'if os.environ["R6_MODE"] != "serial":\n    while not os.path.exists(d + "/second-ready") and time.monotonic() < end: time.sleep(.01)\n'
+             'time.sleep(.35)\nos._exit(0)\'\n')
+    second = ': > "$R6_SHARED/second-ready"; while [ ! -e "$R6_SHARED/first-ready" ]; do sleep .01; done; sleep .35\n'
+    for mode, expected in (('concurrent', 2), ('serial', 1)):
+        world = World('r6-interval-' + mode, cores=2)
+        family = round6_proof_repo(world, [first, second])
+        bindir = world.folder / 'launcher'
+        bindir.mkdir()
+        (bindir / 'bash').write_text(launcher)
+        (bindir / 'bash').chmod(0o755)
+        shared = world.folder / 'shared'
+        shared.mkdir()
+        env = dict(PATH=str(bindir) + os.pathsep + world.env['PATH'], R6_SHARED=str(shared), R6_MODE=mode)
+        proof = world.launch('proof', ['/bin/bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--jobs', '2', '--json', str(world.folder / 'proof.json')], extra=env)
+        code = wait_all([proof], timeout=120)
+        artifact = json.loads((world.folder / 'proof.json').read_text()) if (world.folder / 'proof.json').exists() else {}
+        case.measure(**{mode + '_exit': code, mode + '_recorded': artifact.get('concurrency'), mode + '_jobs_enabled': artifact.get('fm_test_run_jobs_enabled')})
+        case.check(code == [0], '%s: the proof failed: %s' % (mode, world.text('proof')[-300:]))
+        case.check(artifact.get('concurrency') == expected, '%s: recorded concurrency %s, expected %d' % (mode, artifact.get('concurrency'), expected))
+        case.check(artifact.get('fm_test_run_jobs_enabled') is (expected == 2), '%s: jobs enabled = %s' % (mode, artifact.get('fm_test_run_jobs_enabled')))
+    # Item 2, inherited descriptor: candidate 0 leaves a background child and exits; candidate 1 can lease only after candidate 0
+    # has exited (one of two tokens is held by a blocker for the whole proof), so the candidates never ran together.
+    outer_bg = ('set -u\npass=$1 family=$2 shared=$3\n'
+                '"$pass" run --passes 1 -- /bin/bash -c \': > "$1/blocker-ready"; while [ ! -e "$1/release" ]; do sleep .05; done\' _ "$shared" & blocker=$!\n'
+                'while [ ! -e "$shared/blocker-ready" ]; do sleep .05; done\n'
+                'cd "$family" || exit 1\n'
+                '/bin/bash bin/fm-test-isolation-proof.sh --pool fam --jobs 2 --json "$shared/proof.json" > "$shared/proof.out" 2> "$shared/proof.err"\n'
+                'rc=$?\n: > "$shared/release"; wait "$blocker"; exit "$rc"\n')
+    world = World('r6-interval-background-child', cores=2)
+    family = round6_proof_repo(world, ['sleep 3 > /dev/null 2>&1 &\nsleep .3\n', 'sleep .3\n'])
+    shared = world.folder / 'shared'
+    shared.mkdir()
+    code = wait_all([world.launch('outer', ['/bin/bash', tool('fm-cpu-pass.sh'), 'run', '--passes', '2', '--', '/bin/bash', '-c', outer_bg, '_', tool('fm-cpu-pass.sh'), str(family), str(shared)])], timeout=120)
+    artifact = json.loads((shared / 'proof.json').read_text()) if (shared / 'proof.json').exists() else {}
+    case.measure(background_child_exit=code, background_child_recorded=artifact.get('concurrency'), background_child_jobs_enabled=artifact.get('fm_test_run_jobs_enabled'))
+    case.check(code == [0], 'background child: the proof failed: %s' % ((shared / 'proof.err').read_text()[-300:] if (shared / 'proof.err').exists() else ''))
+    case.check(artifact.get('concurrency') == 1 and artifact.get('fm_test_run_jobs_enabled') is False, 'background child: a serial run whose first candidate left a background child was recorded as concurrency %s, jobs enabled %s' % (artifact.get('concurrency'), artifact.get('fm_test_run_jobs_enabled')))
+    # Item 3: a skipped candidate whose lease waited first still fails the proof, contended exactly as uncontended.
+    outer = ('set -u\npass=$1 family=$2 shared=$3 mode=$4\n'
+             'if [ "$mode" = contended ]; then\n'
+             '  "$pass" run --passes 1 -- /bin/bash -c \': > "$1/blocker-ready"; sleep 4.5\' _ "$shared" & blocker=$!\n'
+             '  while [ ! -e "$shared/blocker-ready" ]; do sleep .05; done\nfi\n'
+             'cd "$family" || exit 1\n'
+             '/bin/bash bin/fm-test-isolation-proof.sh --pool fam --jobs 2 --json "$shared/proof.json" > "$shared/proof.out" 2> "$shared/proof.err"\n'
+             'rc=$?\nif [ "$mode" = contended ]; then wait "$blocker"; fi\nexit "$rc"\n')
+    # The skipped candidate's lease starts only once the other candidate runs, so with the blocker it must wait for the last token.
+    hold = ('#!' + python + '\nimport os, sys, time\n'
+            'if os.environ.get("R6_MODE") == "contended" and any("candidate 2" in a for a in sys.argv[1:]):\n'
+            '    end = time.monotonic() + 20\n'
+            '    while not os.path.exists(os.environ["R6_SHARED"] + "/first-started") and time.monotonic() < end: time.sleep(.01)\n'
+            'os.execv("/bin/bash", ["/bin/bash"] + sys.argv[1:])\n')
+    for mode in ('uncontended', 'contended'):
+        world = World('r6-skip-' + mode, cores=2)
+        family = round6_proof_repo(world, [': > "$R6_SHARED/first-started"; sleep 7\n',
+                                           'echo "skip: required synthetic dependency unavailable"\nsleep 1\n'])
+        shared = world.folder / 'shared'
+        shared.mkdir()
+        bindir = world.folder / 'launcher'
+        bindir.mkdir()
+        (bindir / 'bash').write_text(hold)
+        (bindir / 'bash').chmod(0o755)
+        run = world.launch('outer', ['/bin/bash', tool('fm-cpu-pass.sh'), 'run', '--passes', '2', '--', '/bin/bash', '-c', outer, '_', tool('fm-cpu-pass.sh'), str(family), str(shared), mode],
+                           extra=dict(R6_SHARED=str(shared), R6_MODE=mode, PATH=str(bindir) + os.pathsep + world.env['PATH']))
+        code = wait_all([run], timeout=120)
+        artifact = json.loads((shared / 'proof.json').read_text()) if (shared / 'proof.json').exists() else {}
+        err = (shared / 'proof.err').read_text() if (shared / 'proof.err').exists() else ''
+        case.measure(**{'skip_' + mode + '_exit': code, 'skip_' + mode + '_jobs_enabled': artifact.get('fm_test_run_jobs_enabled'), 'skip_' + mode + '_lease_notice_relayed': 'lease: fm-cpu-pass: waiting' in err})
+        case.check(code == [1], 'skip %s: the proof exited %s, expected 1 for a skipped candidate: %s' % (mode, code, err[-300:]))
+        case.check(artifact.get('fm_test_run_jobs_enabled') is False, 'skip %s: jobs were enabled for a proof with a skipped candidate' % mode)
+        case.check('gate-skipped without proving concurrency' in err, 'skip %s: the skip was not named: %s' % (mode, err[-300:]))
+        if mode == 'contended':
+            case.check('lease: fm-cpu-pass: waiting' in err, 'contended: the lease wait notice was not relayed to the proof stderr: %s' % err[-300:])
+    # Item 4: a nested proof that cannot lease (no python3) says so once instead of running silently.
+    world = World('r6-nopython-proof', cores=1)
+    family = round6_proof_repo(world, ['true\n', 'true\n'])
+    restricted = world.folder / 'restricted'
+    restricted.mkdir()
+    for name in ('bash', 'dirname', 'basename', 'date', 'awk', 'grep', 'sort', 'mktemp', 'chmod', 'find', 'stat', 'cat', 'seq', 'sleep', 'rm', 'mkdir', 'touch', 'wc', 'sed', 'head', 'tail', 'cut', 'id'):
+        found = shutil.which(name, path='/usr/bin:/bin:/usr/sbin:/sbin')
+        if found:
+            (restricted / name).symlink_to(found)
+    run = world.launch('outer', ['/bin/bash', tool('fm-cpu-pass.sh'), 'run', '--passes', '1', '--', '/usr/bin/env', 'PATH=' + str(restricted), '/bin/bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--jobs', '1'])
+    code = wait_all([run], timeout=120)
+    err = world.text('outer')
+    notices = err.count('without leasing from its reservation')
+    case.measure(nopython_exit=code, nopython_notices=notices)
+    case.check(code == [0], 'no python3: the nested proof failed: %s' % err[-300:])
+    case.check(notices == 1, 'no python3: the cannot-lease notice was said %d times (once expected): %s' % (notices, err[-300:]))
+    return case
+
+
 def case_gate_chain_cycle():
     """A-4 (Main 1723): a wait cycle whose every link is a gate, reached through exec, is proven from the gates' own registrations and drains."""
     case = Case('A-4 gate chain cycle', 'gate A -> (exec) gate mid.A -> gate B while gate B -> (exec) gate mid.B -> gate A: both finish, each link being a gate that waits only for its command')
@@ -1596,6 +1729,44 @@ def case_gate_chain_cycle():
     codes = wait_all([gate_a, gate_b], timeout=90)
     case.measure(exit_codes=codes, seconds=round(time.monotonic() - began, 1))
     case.check(codes == [0, 0] and a_done.exists() and b_done.exists(), 'the two gate chains did not both finish: %s %s %s' % (codes, world.text('a')[-200:], world.text('b')[-200:]))
+    return case
+
+
+def case_multiholder_cycle():
+    """A-4 (Main 1750 item 5): with two slots per key, four gate chains A1, A2 -> B and B1, B2 -> A are one proven cycle and drain, with exactly one copy admitted beside the limit; one A holder running free is no cycle, and everything waits for it."""
+    case = Case('A-4 multi-holder cycle', 'FM_TEST_KEY_SLOTS=2: gates A1, A2 each (exec) gate mid -> gate B while B1, B2 each (exec) gate mid -> gate A: all four finish and one waiter is admitted; control: A2 runs free, nobody is admitted until it ends')
+    two = dict(FM_TEST_KEY_SLOTS='2')
+    chain = ('touch "$1/$2"; while [ "$(ls "$1" | wc -l)" -lt "$3" ]; do sleep 0.05; done; '
+             'exec "$4" "$5" gate "$6" -- "$4" "$5" gate "$7" -- touch "$8"')
+    for shape in ('cycle', 'free-holder-control'):
+        world = World('multiholder-' + shape, cores=8)
+        ready = world.folder / 'ready'
+        ready.mkdir()
+        procs, done = [], []
+        names = [('A1', 'a', 'b'), ('A2', 'a', 'b'), ('B1', 'b', 'a'), ('B2', 'b', 'a')]
+        for name, own, peer in names:
+            target = world.folder / (name + '.done')
+            done.append(target)
+            if shape == 'free-holder-control' and name == 'A2':
+                # A2 holds a slot of test.mh.a, waits for the others, then runs free for a while without waiting on anything.
+                command = ['bash', '-c', 'touch "$1/A2"; while [ "$(ls "$1" | wc -l)" -lt 4 ]; do sleep 0.05; done; sleep 4; : > "$2"; touch "$3"', '_', str(ready), str(world.folder / 'A2.end'), str(target)]
+            else:
+                command = ['bash', '-c', chain, '_', str(ready), name, '4', pyshim, tool('fm-duration.py'), 'test.mh.mid.' + name, 'test.mh.' + peer, str(target)]
+            procs.append(world.launch(name, [pyshim, tool('fm-duration.py'), 'gate', 'test.mh.' + own, '--'] + command, extra=two))
+        began = time.monotonic()
+        codes = wait_all(procs, timeout=120)
+        seconds = round(time.monotonic() - began, 1)
+        texts = {name: world.text(name) for name, _, _ in names}
+        admitted = sorted(name for name, text in texts.items() if 'beside its limit' in text)
+        case.measure(**{shape + '_exit_codes': codes, shape + '_seconds': seconds, shape + '_admitted_beside_limit': admitted})
+        case.check(codes == [0, 0, 0, 0] and all(path.exists() for path in done), '%s: the four chains did not all finish: %s %s' % (shape, codes, {k: v[-160:] for k, v in texts.items()}))
+        if shape == 'cycle':
+            case.check(len(admitted) == 1, 'cycle: %d waiters were admitted beside the limit, expected exactly one: %s' % (len(admitted), admitted))
+        else:
+            case.check(admitted == [], 'free-holder control: a waiter was admitted beside the limit while A2 could still end: %s' % admitted)
+            ends = world.folder / 'A2.end'
+            later = [path for path in done if path.name != 'A2.done' and path.exists() and ends.exists() and path.stat().st_mtime_ns < ends.stat().st_mtime_ns]
+            case.check(later == [], 'free-holder control: a chain finished before A2 ended: %s' % [path.name for path in later])
     return case
 
 
@@ -1666,7 +1837,7 @@ def case_proof_contention():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_proof_contention, case_async_cycle, case_gate_chain_cycle, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_missing_helper_counts, case_proof_contention, case_proof_own_interval, case_async_cycle, case_gate_chain_cycle, case_multiholder_cycle, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():

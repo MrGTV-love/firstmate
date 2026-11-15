@@ -39,8 +39,15 @@
 # pool (docs/cpu-pass-pool.md) for its whole run and runs that many workers; a proof
 # already inside a pass takes none and runs at most that many. The concurrency it
 # prints and records as concurrency is the peak it OBSERVED: the most candidates that were running
-# together, measured from the start and end each candidate stamps inside its lease (the plan, which
-# is never more than the candidates, passes and --jobs, is printed as planned=). A one-candidate
+# together, measured over each candidate's OWN run: its start is stamped from inside the candidate's
+# own bash process (after any launcher or lease wait, through BASH_ENV, which is then restored), and
+# its end is the last moment a watcher saw that process itself still holding a POSIX record lock it
+# took before it started (such a lock survives exec, is never inherited by a child, and goes when
+# the process exits or closes the file), so neither stamp falls outside the candidate's own run and
+# a child it leaves behind extends nothing; a candidate with no such interval counts toward no
+# overlap (the plan, which is never more than the candidates,
+# passes and --jobs, is printed as planned=). Without python3 nothing is watched and the proof
+# claims no concurrency above one. A one-candidate
 # proof records one, a contended reservation records what really overlapped, and --jobs of any
 # length is clamped to the plan. When
 # the reservation it runs inside exports its tokens (FM_CPU_PASS_TOKENS), each worker leases
@@ -48,7 +55,11 @@
 # under one reservation never exceed the passes held and a candidate's nested runner does
 # not fan out; with only a marker (no tokens) each worker inherits that share as its marker.
 # A proof that holds no pass leaves its workers FM_CPU_PASS_HELD=0 (degraded) or unset, and
-# never invents a reservation.
+# never invents a reservation. A proof that cannot use the pool (its pool helper or python3
+# unusable, fresh or inside a reservation whose tokens it cannot lease) runs its candidates
+# without a pass or a lease and says so once (docs/cpu-pass-pool.md rule 7). The lease's own
+# notices (waits, degradation) are kept apart from the candidate's output and relayed to this
+# proof's stderr, so they never stand in front of a candidate's skip: line.
 #
 # Isolation contract for each concurrent worker:
 #   - distinct mode-0700 temporary root under a proof-owned parent
@@ -474,9 +485,14 @@ if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
     fi
     # A holder that exported the tokens of its reservation is the one reservation of every worker under it:
     # each candidate leases its share of those tokens, so the workers of sibling proofs never exceed the passes held.
-    if [ -n "${FM_CPU_PASS_TOKENS:-}" ] && [ -d "$FM_CPU_PASS_TOKENS" ] \
-      && [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] && command -v python3 >/dev/null 2>&1; then
-      LEASE_CANDIDATES=1
+    if [ -n "${FM_CPU_PASS_TOKENS:-}" ] && [ -d "$FM_CPU_PASS_TOKENS" ]; then
+      if [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
+        log "running its candidates without leasing from its reservation: the pool helper is missing beside this proof"
+      elif ! command -v python3 >/dev/null 2>&1; then
+        log "running its candidates without leasing from its reservation: python3 not found"
+      else
+        LEASE_CANDIDATES=1
+      fi
     fi
   fi
 elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] \
@@ -488,6 +504,12 @@ elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] \
   fi
   exec "$ROOT/bin/fm-cpu-pass.sh" run --passes "$passes" --label "fm-test-isolation-proof --pool $POOL" -- \
     "$ROOT/bin/fm-test-isolation-proof.sh" ${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}
+elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    log "running without a CPU pass: the pool helper did not report a usable pool size"
+  else
+    log "running without a CPU pass: python3 not found"
+  fi
 fi
 
 PROOF_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-isolation-proof.XXXXXX")
@@ -524,6 +546,9 @@ wait_one_slot() {
   set -e
   work="$PROOF_ROOT/w$idx"
   script=${CANDIDATES[$((idx - 1))]}
+  if [ -s "$work/out/lease" ]; then
+    sed "s|^|fm-test-isolation-proof: candidate $idx lease: |" "$work/out/lease" >&2 || true
+  fi
   rc=$(cat "$work/out/exit" 2>/dev/null || echo 1)
   duration=$(cat "$work/out/duration_ms" 2>/dev/null || echo 0)
   if [ "$rc" -eq 0 ] && gate_skip=$(detect_gate_skip "$work/out/output"); then
@@ -584,15 +609,121 @@ wait_one_completed_slot() {
   done
 }
 
+# Each candidate's own run interval (F3, Main 1750 item 2). The stamp shell execs a small python3 step that
+# takes a POSIX record lock (lockf) on the candidate's alive.lock and then execs the candidate's bash in the
+# same process: the lock survives exec, belongs to that process alone (a forked child never inherits it), and
+# goes when the process exits or closes the file. BASH_ENV, read by the candidate's own bash process before its
+# script, marks the start (only in that process, then restores the caller's BASH_ENV). One watcher per proof
+# records the start after it sees that mark, and as the end the last moment at which it read the clock and then
+# found the lock still held. Both stamps therefore lie inside the candidate process's own run; a candidate the
+# watcher never saw running gets no interval and no overlap, and a candidate that drops the lock early only
+# shortens its interval.
+WATCH=0
+if command -v python3 >/dev/null 2>&1; then
+  WATCH=1
+fi
+STAMP_ENV="$PROOF_ROOT/stamp-env.sh"
+cat >"$STAMP_ENV" <<'ENV'
+if [ "$$" = "${FM_ISOLATION_STAMP_PID:-}" ] && [ -n "${FM_ISOLATION_STAMP_DIR:-}" ] && [ ! -e "$FM_ISOLATION_STAMP_DIR/started" ]; then
+  : >"$FM_ISOLATION_STAMP_DIR/started"
+fi
+if [ -n "${FM_ISOLATION_PRIOR_BASH_ENV+x}" ]; then
+  BASH_ENV=$FM_ISOLATION_PRIOR_BASH_ENV
+else
+  unset BASH_ENV
+fi
+unset FM_ISOLATION_STAMP_DIR FM_ISOLATION_STAMP_PID FM_ISOLATION_PRIOR_BASH_ENV
+if [ -n "${BASH_ENV:-}" ]; then
+  # shellcheck disable=SC1090 # the caller's own BASH_ENV, read as bash would have read it
+  . "$BASH_ENV"
+fi
+ENV
+# $1 candidate, $2 its out directory, $3 the BASH_ENV stamp file, $4 1 when the run is watched.
 # shellcheck disable=SC2016 # The stamp shell is single-quoted on purpose: the inner bash, not this script, expands it.
-STAMP_SHELL="$(declare -f now_ms)"'
-start_ms=$(now_ms)
-bash "$1"
-rc=$?
-end_ms=$(now_ms)
-printf "%s\n" "$start_ms" >"$2/start_ms"
-printf "%s\n" "$end_ms" >"$2/end_ms"
-exit "$rc"'
+STAMP_SHELL='exec 3>&-
+if [ "$4" != 1 ]; then exec bash "$1"; fi
+if [ -n "${BASH_ENV+x}" ]; then export FM_ISOLATION_PRIOR_BASH_ENV="$BASH_ENV"; else unset FM_ISOLATION_PRIOR_BASH_ENV; fi
+export FM_ISOLATION_STAMP_DIR="$2" FM_ISOLATION_STAMP_PID=$$ BASH_ENV="$3"
+exec python3 -c "import fcntl, os, sys
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o600)
+fcntl.lockf(fd, fcntl.LOCK_EX)
+os.set_inheritable(fd, True)
+os.execvp(\"bash\", [\"bash\", sys.argv[2]])" "$2/alive.lock" "$1"'
+
+WATCHER_PID=
+start_watcher() {
+  [ "$WATCH" -eq 1 ] || return 0
+  python3 - "$PROOF_ROOT" "$TOTAL" <<'PY' &
+import errno, fcntl, os, sys, time
+root, total = sys.argv[1], int(sys.argv[2])
+state = {}  # idx -> dict(start, alive, done)
+def now_ms():
+    return time.time_ns() // 1000000
+def held(path):
+    """True while the candidate process itself holds its lock; probed without keeping it."""
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except OSError:
+        return False
+    try:
+        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as error:
+        if error.errno in (errno.EAGAIN, errno.EACCES):
+            return True
+        return False
+    else:
+        fcntl.lockf(fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(fd)
+def finish(idx, st):
+    st['done'] = True
+    if st.get('start') is not None and st.get('alive') is not None and st['alive'] > st['start']:
+        out = os.path.join(root, 'w%d' % idx, 'out')
+        for name, value in (('start_ms', st['start']), ('end_ms', st['alive'])):
+            tmp = os.path.join(out, name + '.tmp')
+            with open(tmp, 'w') as fh:
+                fh.write('%d\n' % value)
+            os.replace(tmp, os.path.join(out, name))
+stop = os.path.join(root, 'watch.stop')
+parent = os.getppid()
+while True:
+    if os.getppid() != parent or not os.path.isdir(root):
+        break  # the proof is gone (ended, killed or cleaned up): nothing is left to record
+    stopping = os.path.exists(stop)
+    for idx in range(1, total + 1):
+        st = state.setdefault(idx, {})
+        if st.get('done'):
+            continue
+        out = os.path.join(root, 'w%d' % idx, 'out')
+        if st.get('start') is None:
+            if os.path.exists(os.path.join(out, 'started')):
+                st['start'] = now_ms()  # taken after the mark exists, so never before the candidate began
+            elif os.path.exists(os.path.join(out, 'exit')) or stopping:
+                finish(idx, st)
+            continue
+        sampled = now_ms()  # the clock first, then the proof that the candidate process still holds its lock
+        if held(os.path.join(out, 'alive.lock')):
+            st['alive'] = sampled
+            if stopping:
+                finish(idx, st)
+        else:
+            finish(idx, st)
+    if all(state.get(i, {}).get('done') for i in range(1, total + 1)):
+        break
+    time.sleep(0.003)
+PY
+  WATCHER_PID=$!
+}
+
+stop_watcher() {
+  [ -n "$WATCHER_PID" ] || return 0
+  : >"$PROOF_ROOT/watch.stop"
+  wait "$WATCHER_PID" 2>/dev/null || true
+  WATCHER_PID=
+}
+
+start_watcher
 
 idx=0
 for script in "${CANDIDATES[@]}"; do
@@ -634,13 +765,14 @@ for script in "${CANDIDATES[@]}"; do
     fi
     cd "$ROOT" || exit 1
     begin_ms=$(now_ms)
-    # The candidate runs inside a small shell that stamps its own start and end, so the stamps lie inside the
-    # lease: two candidates that share one token can never overlap, and a real overlap is a real concurrency.
+    # The candidate runs inside a small shell that hands it the liveness descriptor and the start mark, so its
+    # interval lies inside its own run (and inside the lease). The lease's notices go to their own file on
+    # --log-fd, never into the candidate's output, so a wait notice cannot hide a skip: line.
     if [ "$LEASE_CANDIDATES" -eq 1 ]; then
-      "$ROOT/bin/fm-cpu-pass.sh" run --passes "$CANDIDATE_MARKER" --label "fm-test-isolation-proof $POOL candidate $idx" -- \
-        bash -c "$STAMP_SHELL" _ "$script" "$work/out" >"$work/out/output" 2>&1
+      "$ROOT/bin/fm-cpu-pass.sh" run --log-fd 3 --passes "$CANDIDATE_MARKER" --label "fm-test-isolation-proof $POOL candidate $idx" -- \
+        bash -c "$STAMP_SHELL" _ "$script" "$work/out" "$STAMP_ENV" "$WATCH" >"$work/out/output" 2>&1 3>"$work/out/lease"
     else
-      bash -c "$STAMP_SHELL" _ "$script" "$work/out" >"$work/out/output" 2>&1
+      bash -c "$STAMP_SHELL" _ "$script" "$work/out" "$STAMP_ENV" "$WATCH" >"$work/out/output" 2>&1
     fi
     rc=$?
     end_ms=$(now_ms)
@@ -686,6 +818,8 @@ if find "$PROOF_ROOT" -type f -name 'fm-arm-pretool-check-claude-stderr.*' 2>/de
   : # allowed only under proof roots; nothing to do
 fi
 
+stop_watcher
+
 RUN_FINISHED_ISO=$(now_iso)
 RUN_FINISHED_MS=$(now_ms)
 RUN_DURATION=$((RUN_FINISHED_MS - RUN_STARTED_MS))
@@ -693,7 +827,8 @@ if [ "$RUN_DURATION" -lt 0 ]; then
   RUN_DURATION=0
 fi
 
-# The peak the candidates actually reached: the most intervals [start, end) that contain one candidate's start.
+# The peak the candidates actually reached: the most of their own run intervals [start, end) that contain one
+# candidate's start. A candidate with no interval adds none; a proof that ran a candidate claims at least one.
 PEAK=$(
   for idx in $(seq 1 "$TOTAL"); do
     if [ -s "$PROOF_ROOT/w$idx/out/start_ms" ] && [ -s "$PROOF_ROOT/w$idx/out/end_ms" ]; then
@@ -705,6 +840,9 @@ PEAK=$(
       print peak }'
 )
 case "$PEAK" in ''|*[!0-9]*) PEAK=0 ;; esac
+if [ "$PEAK" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
+  PEAK=1
+fi
 printf 'FM_ISOLATION_SUMMARY total=%s failed=%s concurrency=%s planned=%s duration_ms=%s\n' \
   "$TOTAL" "$FAILED" "$PEAK" "$JOBS" "$RUN_DURATION"
 
