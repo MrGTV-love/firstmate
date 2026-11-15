@@ -4647,9 +4647,10 @@ teardown_unclaimed_prove_custody() {
 # an entry provably someone else's or already free with no interrupted release of
 # this task's (another holder, absent, unleased with no marker naming the slot)
 # keeps that same no-return behavior. Every other reading (this task's own lease,
-# with or without a lease id, a recovered quarantine, a conflicting or unreadable
-# entry, an interrupted release) is planned, so any refusal there keeps the record
-# and the retry obligation.
+# with or without a lease id, a legacy lease with no holder and no lease id, whose
+# owner cannot be told, a recovered quarantine, a conflicting or unreadable entry,
+# an interrupted release) is planned, so any refusal there keeps the record and
+# the retry obligation.
 teardown_unclaimed_candidate() {  # <slot>
   local slot=$1 marked
   [ "$FORCE" != --force ] || return 1
@@ -4658,7 +4659,8 @@ teardown_unclaimed_candidate() {  # <slot>
   fm_task_copy_treehouse_persists_recovered_leases || return 1
   fm_task_copy_pool_slot_lease "$slot" || true
   case "$FM_TASK_COPY_LEASE_STATE" in
-    ordinary|legacy) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
+    ordinary) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
+    legacy) [ -z "$FM_TASK_COPY_LEASE_HOLDER" ] || [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] ;;
     recovered|conflicting|unreadable) return 0 ;;
     unleased)
       fm_teardown_return_pending "$STATE" "$ID" || return 1
@@ -4699,7 +4701,7 @@ teardown_unclaimed_slot_forget() {
 teardown_unclaimed_slot_cleanup() {
   [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
   teardown_own_locked_copies_release || exit 1
-  teardown_remove_own_nested_copies "before returning pool slot $TEARDOWN_UNCLAIMED_SLOT"
+  teardown_remove_own_nested_copies "before returning pool slot $TEARDOWN_UNCLAIMED_SLOT" plain
 }
 
 # After own-copy cleanup, still under project custody.
@@ -5042,15 +5044,27 @@ teardown_peer_claim_handoff() {
 }
 
 # Removes this task's proven own nested copies that Vernant's creation lock does
-# not hold (those the closeout driver already removed are skipped).
-teardown_remove_own_nested_copies() {  # <slot-label>
-  local copy known root
+# not hold (those the closeout driver already removed are skipped). With "plain"
+# (the unclaimed-slot route, which never forces) the removal is a plain
+# `git worktree remove`: when Git refuses, because the copy gained untracked or
+# modified work or is locked, the copy stays, teardown refuses, and the task's
+# record and return-pending marker are kept for a retry.
+teardown_remove_own_nested_copies() {  # <slot-label> [plain]
+  local copy known root git_out
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     known=0
     for root in ${TEARDOWN_OWN_RELEASED[@]+"${TEARDOWN_OWN_RELEASED[@]}"}; do
       [ "$root" != "$copy" ] || known=1
     done
     [ "$known" = 0 ] || continue
+    if [ "${2:-}" = plain ]; then
+      git_out=$(git -C "$PROJ" worktree remove "$copy" 2>&1) || {
+        "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
+        echo "REFUSED: git would not remove task $ID's nested copy $copy $1 without --force${git_out:+: $(printf '%s' "$git_out" | tr '\n' ' ')}; the route never forces, so the copy, task $ID's record and its return-pending marker are kept for a retry." >&2
+        exit 1
+      }
+      continue
+    fi
     git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
       echo "error: could not remove $ID's nested copy $copy $1; teardown aborted" >&2
       exit 1

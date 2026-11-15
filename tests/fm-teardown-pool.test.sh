@@ -3714,6 +3714,29 @@ SH
   git -C "$case_dir/project" worktree add -q -b fm/task-x1-v2 "$UNC_NESTED" main || return 1
   UNC_B_COPY=$UNC_B/.claude/worktrees/b
   git -C "$case_dir/project" worktree add -q -b other-work "$UNC_B_COPY" main || return 1
+  # The git wrapper records every argv in $case/git.argv. A one-shot
+  # $case/cleanup-hook runs just before the first removal of the task's own nested
+  # copy, with or without --force, so a case can change the world after the route
+  # bound its checks; $case/cleanup-injected shows that it ran.
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/git.argv"
+case "\$*" in
+  *" worktree remove "*"$UNC_NESTED")
+    if [ -e "$case_dir/state/task-x1.teardown-return-pending" ]; then
+      printf 'marker-present\\n' >> "$case_dir/removal.order"
+    else
+      printf 'marker-absent\\n' >> "$case_dir/removal.order"
+    fi
+    if [ -x "$case_dir/cleanup-hook" ] && [ ! -e "$case_dir/cleanup-injected" ]; then
+      : > "$case_dir/cleanup-injected"
+      "$case_dir/cleanup-hook"
+    fi
+    ;;
+esac
+exec "$(command -v git)" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
   printf 'unlanded\n' > "$UNC_B_COPY/b.txt"
   git -C "$UNC_B_COPY" add b.txt
   git -C "$UNC_B_COPY" -c user.email=t@t -c user.name=t commit -q -m other-unlanded
@@ -3726,24 +3749,35 @@ SH
 }
 
 # A successor takes slot A while teardown removes the task's own nested copy,
-# after the route bound the lease and before it verifies it: git is wrapped for
-# that one removal. <mode> is successor-holder or successor-lease-id.
+# after the route bound the lease and before it verifies it. <mode> is
+# successor-holder or successor-lease-id.
 unc_successor_at_cleanup() {  # <case-dir> <mode>
-  local real_git
-  real_git=$(command -v git)
-  cat > "$1/fakebin/git" <<SH
-#!/usr/bin/env bash
-case "\$*" in
-  *" worktree remove --force $UNC_NESTED")
-    if [ ! -e "$1/cleanup-injected" ]; then
-      : > "$1/cleanup-injected"
-      "$1/successor" "$2" "$UNC_A"
-    fi
-    ;;
-esac
-exec "$real_git" "\$@"
-SH
-  chmod +x "$1/fakebin/git"
+  printf '#!/usr/bin/env bash\nexec "%s/successor" "%s" "%s"\n' "$1" "$2" "$UNC_A" > "$1/cleanup-hook"
+  chmod +x "$1/cleanup-hook"
+}
+
+# An untracked file appears in the task's own nested copy after the route bound
+# its checks and before the copy is removed.
+unc_untracked_at_cleanup() {  # <case-dir>
+  printf '#!/usr/bin/env bash\nprintf "late untracked work\\n" > "%s/late-untracked.txt"\n' "$UNC_NESTED" > "$1/cleanup-hook"
+  chmod +x "$1/cleanup-hook"
+}
+
+# The no-force gate covers git too: no git command of the run carries --force, -f
+# or --yes, and the nested copy is removed by a plain `git worktree remove` only
+# after the return-pending marker exists (the route's own cleanup, after its
+# proofs), never by the ordinary early cleanup.
+unc_assert_no_forced_git() {  # <case-dir> <label> [removal-expected]
+  local line
+  [ -e "$1/git.argv" ] || fail "$2: the git wrapper recorded no command"
+  line=$(grep -E -- '(^| )(--force|-f|--yes)( |$)' "$1/git.argv" | head -3 || true)
+  [ -z "$line" ] || fail "$2: a forced git command ran in the no-force route: $line"
+  if [ -n "${3:-}" ]; then
+    grep -E -- " worktree remove $UNC_NESTED\$" "$1/git.argv" >/dev/null \
+      || fail "$2: the nested copy was not removed by a plain git worktree remove: $(grep 'worktree remove' "$1/git.argv" | head -3)"
+    [ "$(sort -u "$1/removal.order")" = marker-present ] \
+      || fail "$2: the nested copy was removed before the return-pending marker existed: $(tr '\n' ' ' < "$1/removal.order")"
+  fi
 }
 
 # Teardown with no force, in the case's isolated provider environment.
@@ -3826,6 +3860,7 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
       assert_equals 1 "$(unc_return_count "$case_dir")" "$label: the slot was returned other than once: $(cat "$case_dir/treehouse.argv")"
       ! grep -E -- '--force|(^| )-f( |$)|--yes' "$case_dir/treehouse.argv" >/dev/null || fail "$label: a forced or answered return was issued: $(cat "$case_dir/treehouse.argv")"
       unc_assert_only_route_commands "$case_dir" "$label" "$UNC_B_HOLDER_AFTER"
+      unc_assert_no_forced_git "$case_dir" "$label" removal-expected
       grep -Fx "teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree $UNC_NESTED removed and its unclaimed pool slot $UNC_A returned by its exact lease)" <<<"$out" >/dev/null \
         || fail "$label: the completion line did not report the returned slot"$'\n'"$out"
       ! grep -F "prior copy $UNC_A " <<<"$out" >/dev/null || fail "$label: the returned slot was reported as a prior copy left untouched"$'\n'"$out"
@@ -3852,12 +3887,13 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
   local provider mode case_dir out rc
   unc_providers "R4 real-provider interruptions"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for mode in fail-before fail-after successor-holder successor-lease-id cleanup-successor-holder cleanup-successor-lease-id; do
+    for mode in fail-before fail-after successor-holder successor-lease-id cleanup-successor-holder cleanup-successor-lease-id cleanup-untracked; do
       unc_pool_case "unclaimed-interrupt-$mode" ordinary "$provider" || fail "$provider $mode: cannot build the pool"
       case_dir=$UNC_CASE
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
       jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/b-entry.before"
       case "$mode" in
+        cleanup-untracked) unc_untracked_at_cleanup "$case_dir" ;;
         cleanup-*) unc_successor_at_cleanup "$case_dir" "${mode#cleanup-}" ;;
         *) printf '%s\n' "$mode" > "$case_dir/inject" ;;
       esac
@@ -3867,7 +3903,7 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
       assert_present "$case_dir/state/task-x1.meta" "$provider $mode: the task record was retired despite the failure"
       assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $mode: the return-pending marker was dropped despite the failure"
       case "$mode" in
-        fail-before) jq -e '.[1] == true and .[2] == "task-x1"' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the lease moved: $(unc_a_entry)" ;;
+        fail-before|cleanup-untracked) jq -e '.[1] == true and .[2] == "task-x1"' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the lease moved: $(unc_a_entry)" ;;
         fail-after) jq -e '.[1] == null' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the provider's return did not run: $(unc_a_entry)" ;;
         *successor-holder)
           jq -e '.[1] == true and .[2] == "successor"' <<<"$(unc_a_entry)" >/dev/null || fail "$provider $mode: the successor's lease was cleared: $(unc_a_entry)" ;;
@@ -3876,6 +3912,14 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
             || fail "$provider $mode: the successor lease id was cleared: $(unc_a_entry)" ;;
       esac
       case "$mode" in
+        cleanup-untracked)
+          # Git itself refuses the plain removal of a copy that gained untracked work:
+          # the copy and that work stay, nothing is returned, and the refusal names git.
+          assert_present "$case_dir/cleanup-injected" "$provider $mode: the untracked file was not injected during the own-copy cleanup"
+          assert_present "$UNC_NESTED/late-untracked.txt" "$provider $mode: the late untracked work was removed with the copy"
+          assert_equals 0 "$(unc_return_count "$case_dir")" "$provider $mode: a return was issued after git refused the removal: $(cat "$case_dir/treehouse.argv")"
+          assert_contains "$out" "git would not remove task task-x1's nested copy $UNC_NESTED" "$provider $mode: the refusal did not name git's refusal"
+          ;;
         cleanup-*)
           assert_present "$case_dir/cleanup-injected" "$provider $mode: the successor was not injected during the own-copy cleanup"
           assert_equals 0 "$(unc_return_count "$case_dir")" "$provider $mode: a return was issued over the successor's lease: $(cat "$case_dir/treehouse.argv")"
@@ -3894,6 +3938,7 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
           ;;
       esac
       unc_assert_only_route_commands "$case_dir" "$provider $mode"
+      unc_assert_no_forced_git "$case_dir" "$provider $mode"
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
       cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $mode: sibling B's nested copy changed"
       jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" | cmp -s - "$case_dir/b-entry.before" \
@@ -3910,7 +3955,7 @@ test_unclaimed_release_refuses_each_custody_condition() {
   local provider cond case_dir out rc pid before
   unc_providers "R5 real-provider custody refusals"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for cond in other-copy other-prior-record unregistered-copy ignored-unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root live-process legacy-lease unreadable-state duplicate-entry; do
+    for cond in other-copy other-prior-record unregistered-copy ignored-unregistered-copy unsafe-claim unavailable-home dirty-root unlanded-root legacy-lease legacy-no-holder unreadable-state duplicate-entry live-process; do
       unc_pool_case "unclaimed-refuse-$cond" ordinary "$provider" || fail "$provider $cond: cannot build the pool"
       case_dir=$UNC_CASE
       pid=
@@ -3955,6 +4000,10 @@ test_unclaimed_release_refuses_each_custody_condition() {
         legacy-lease)
           jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= del(.lease_id)' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
           ;;
+        legacy-no-holder)
+          # Leased, but with neither a holder nor a lease id: whose it is cannot be told.
+          jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= del(.lease_id, .lease_holder)' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+          ;;
         unreadable-state) printf '{"worktrees":[{"name":"1"\n' > "$UNC_STATE" ;;
         duplicate-entry)
           jq --arg p "$UNC_A" '.worktrees += [(.worktrees[] | select(.path == $p) | .name = "9")]' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
@@ -3975,13 +4024,15 @@ test_unclaimed_release_refuses_each_custody_condition() {
         *) assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: the return-pending marker was dropped" ;;
       esac
       case "$cond" in
-        legacy-lease) assert_contains "$out" "its lease has no lease id" "$provider $cond: the refusal did not name its cause" ;;
+        legacy-lease|legacy-no-holder) assert_contains "$out" "its lease has no lease id" "$provider $cond: the refusal did not name its cause" ;;
         unreadable-state) assert_contains "$out" "its pool state cannot be read exactly" "$provider $cond: the refusal did not name its cause" ;;
         duplicate-entry) assert_contains "$out" "more than one pool-state entry names it" "$provider $cond: the refusal did not name its cause" ;;
       esac
       ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $cond: a return was issued: $(cat "$case_dir/treehouse.argv")"
       [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $cond: the pool state changed"
       unc_assert_only_route_commands "$case_dir" "$provider $cond"
+      unc_assert_no_forced_git "$case_dir" "$provider $cond"
+      assert_present "$UNC_NESTED" "$provider $cond: the task's nested copy was removed by a refused route"
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
       cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $cond: sibling B's nested copy changed"
     done
@@ -4025,6 +4076,34 @@ test_unclaimed_slot_on_unproven_provider_stays_inert() {
     done
   done
   pass 'on an unproven treehouse the unclaimed-slot route stays inert: teardown completes, keeps the reassociated copy, and writes no return-pending marker'
+}
+
+# Control for the holderless legacy refusal: a legacy lease (no lease id) whose
+# holder is provably another task's is not this task's to return or to keep a retry
+# obligation for. On a proven provider teardown completes outside the route, leaves
+# slot A and the reassociated copy as they are, writes no marker and issues no
+# return, exactly as for an ordinary lease held by someone else.
+test_unclaimed_legacy_lease_of_another_holder_stays_outside_the_route() {
+  local provider case_dir out rc before
+  unc_providers "legacy lease of another holder on the real provider"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    unc_pool_case unclaimed-legacy-other ordinary "$provider" || fail "$provider: cannot build the pool"
+    case_dir=$UNC_CASE
+    jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= (del(.lease_id) | .lease_holder = "someone-else")' "$UNC_STATE" > "$UNC_STATE.tmp" && mv "$UNC_STATE.tmp" "$UNC_STATE"
+    before=$(cat "$UNC_STATE")
+    unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.before"
+    rc=0
+    out=$(unc_run_teardown "$case_dir") || rc=$?
+    expect_code 0 "$rc" "$provider: teardown outside the route must complete as before"$'\n'"$out"
+    assert_absent "$case_dir/state/task-x1.meta" "$provider: the task record survived"
+    assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider: a return-pending marker was written outside the route"
+    ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider: a return was issued: $(cat "$case_dir/treehouse.argv")"
+    [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider: the pool state changed"
+    unc_assert_only_route_commands "$case_dir" "$provider legacy-other"
+    unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.after"
+    cmp -s "$case_dir/nested.before" "$case_dir/nested.after" || fail "$provider: the reassociated copy was not left in place"
+  done
+  pass 'a legacy lease held by another holder stays outside the unclaimed-slot route: no marker, no return, the copy and slot left as they were'
 }
 
 # The route retires what the claimed route retires before the slot goes back: the
@@ -4121,6 +4200,7 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return
 test_unclaimed_release_interruptions_converge_and_never_clear_a_successor
 test_unclaimed_release_refuses_each_custody_condition
 test_unclaimed_slot_on_unproven_provider_stays_inert
+test_unclaimed_legacy_lease_of_another_holder_stays_outside_the_route
 test_unclaimed_release_concludes_runs_and_agents_on_the_slot
 test_unclaimed_refusal_leaves_runs_and_agents_on_the_slot
 test_vernant_slot_manifest_retirement
