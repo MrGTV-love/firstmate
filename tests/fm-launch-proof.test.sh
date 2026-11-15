@@ -863,6 +863,111 @@ test_launch_proof_token_checks_every_harness() (
   pass 'every agent_name with a versioned record passes the refusal checks before a matching token is managed; a legacy record keeps its base outcome'
 )
 
+# Main 1856 F6, F7, F8 and (b): a NUL byte in a record or a peer refuses, a
+# failed peer read refuses the claim, a short group-table row or a parent read
+# that prints and then fails refuses, and a claude alias whose record carries
+# the token gets the same checks. Every reader is a stand-in.
+test_launch_proof_round8_reads() (
+  local T="$TMP/round8" META G=s8.1.1 TABLE LIVE_FAIL='' FOREIGN='' verdict
+  mkdir -p "$T/home/state" "$T/lane/state"
+  META="$T/home/state/lane.meta"
+  # The claim inventory reads only this state directory and the named home.
+  export FM_LAUNCH_PROOF_VERB_PATH=1
+  record() { # <harness> [no-proof]
+    printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=%s\nkind=ship\nspawn_gen=%s\nworktree=%s\nhome=%s\n' \
+      "$1" "$G" "$T/lane" "$T/lane" > "$META"
+    [ "${2:-}" = no-proof ] || printf 'launch_proof=env-v1\n' >> "$META"
+  }
+  TABLE=$(printf '7101 1 7101\n7102 7101 7101')
+  # shellcheck disable=SC2329 # the library's process readers call these stand-ins
+  ps() {
+    case "$*" in
+      '-axo pid=,ppid=,pgid=') printf '%s\n' "$TABLE" ;;
+      '-axo pid=,ppid=') printf '7101 1\n7102 7101\n' ;;
+      '-p 7102 -o ppid=') printf '7101\n'; [ -z "$LIVE_FAIL" ] || return 1 ;;
+      '-p 7101 -o ppid=') printf '1\n' ;;
+      *) return 1 ;;
+    esac
+  }
+  # shellcheck disable=SC2329
+  fm_remote_herdr_process_env() {
+    case "$1" in
+      7101) printf 'PATH=/x\nHOME=/y\nFM_SPAWN_GEN=%s\n' "$G" ;;
+      7102) printf 'PATH=/x\nHOME=/y\n'; [ -z "$FOREIGN" ] || printf 'FM_SPAWN_GEN=s9\n' ;;
+      *) return 1 ;;
+    esac
+  }
+  # shellcheck disable=SC2329
+  lsof() { printf 'p7101\0\nfcwd\0n%s\0\n' "$T/lane"; }
+  # shellcheck disable=SC2329
+  fm_agent_process_classify_name() { printf agent; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_cli() {
+    printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":7101,"foreground_processes":[{"pid":7101,"name":"agent","argv0":"agent"},{"pid":7102,"name":"helper","argv0":"helper"}]}}}'
+  }
+  record claude
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'F6 control: a clean versioned record is managed'
+  record claude no-proof
+  printf 'launch_proof=env-v1\000\n' >> "$META"
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'F6: a launch_proof value followed by a NUL byte is unknown'
+  fm_launch_proof_herdr_authorizes "$META" && fail 'F6: a NUL-bearing record was authorized'
+  record claude
+  printf 'window=lab:w9:p9\n' > "$T/home/state/peer.meta"
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'F7 control: a readable peer naming another pane'
+  printf 'window=lab:w1:p2\n' > "$T/home/state/peer.meta"
+  assert_equals contested "$(fm_launch_proof_herdr "$META")" 'F7 control: a readable peer claiming this pane'
+  printf 'window=lab:w9:p9\n' > "$T/home/state/peer.meta"
+  # shellcheck disable=SC2329
+  cat() { case "$*" in *peer.meta*) return 1 ;; *) command cat "$@" ;; esac; }
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'F7: a peer read that fails after its readability test is unknown'
+  unset -f cat
+  printf 'window=lab:w9\000\n' > "$T/home/state/peer.meta"
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'F7: a peer record holding a NUL byte is unknown'
+  rm -f "$T/home/state/peer.meta"
+  TABLE=$(printf '7101 1 7101\n7102 7101')
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'F8: a group table with a short row is unknown'
+  TABLE=$(printf '7101 1 7101\n7102 7101 7101')
+  LIVE_FAIL=1
+  assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'F8: a parent read that prints a parent and then fails is unknown'
+  LIVE_FAIL=
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" 'F8 control: a complete table and clean reads'
+  record claude-custom
+  assert_equals managed "$(fm_launch_proof_herdr "$META")" '(b) control: a claude alias with the token and a clean group'
+  FOREIGN=1
+  assert_equals pinned-elsewhere "$(fm_launch_proof_herdr "$META")" '(b): a claude alias with the token and a member pinned elsewhere'
+  pass 'records and peers are read as bytes, failed reads and short rows refuse, and a claude alias with the token gets the same checks'
+)
+
+# Main 1856 (a): the omp adoption proof rests on the bytes its caller read; a
+# record that is A, then B for the proof, then A again refuses.
+test_launch_proof_omp_adoption_reads_the_callers_bytes() (
+  local T="$TMP/omp-aba" META A B sha out
+  mkdir -p "$T/home/state" "$T/wt"
+  META="$T/home/state/om.meta"
+  A=$(printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=omp\nkind=ship\nspawn_gen=sA\nworktree=%s\nlaunch_proof=env-v1\n' "$T/wt")
+  B=$(printf '%s\nmodel=changed-between-reads' "$A")
+  printf '{"version":1,"spawn_gen":"sA","pid":4242,"task_session_file":"/x","current_session_file":"/x"}\n' > "$T/home/state/om.omp-session.json"
+  # shellcheck disable=SC2329
+  fm_backend_herdr_cli() { case "$*" in *'pane get'*) printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;; *) return 1 ;; esac; }
+  # shellcheck disable=SC2329
+  fm_launch_proof_herdr_pid() { printf 4242; }
+  # shellcheck disable=SC2329
+  fm_launch_proof_pid_is_omp() { return 0; }
+  # shellcheck disable=SC2329
+  fm_launch_proof_pid_pinned_elsewhere() { return 1; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_pane_agent_session_ref() { printf 'omp\t/x'; }
+  PATH=/usr/bin:/bin
+  sha=$(printf '%s\n' "$A" | shasum -a 256 | cut -d' ' -f1)
+  printf '%s\n' "$A" > "$META"
+  out=$(FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$sha fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null)
+  assert_not_contains "$out" 'same record bytes' 'control: the same bytes pass the record-bytes check'
+  printf '%s\n' "$B" > "$META"
+  out=$(FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$sha fm_launch_proof_omp_adoption "$META" 2>&1 >/dev/null)
+  assert_contains "$out" 'record proof needs the same record bytes the caller read' 'a record changed between the reads refuses'
+  pass 'the omp adoption proof refuses record bytes other than the ones its caller read'
+)
+
 fm_test_only
 test_launch_proof_omp_executable_identity
 test_launch_proof_recorded_native_identity
@@ -871,3 +976,5 @@ test_launch_proof_claude_verdict_and_refusal
 test_launch_proof_claude_refusal_checks
 test_launch_proof_selector_refuses_missing_or_failed_reads
 test_launch_proof_token_checks_every_harness
+test_launch_proof_round8_reads
+test_launch_proof_omp_adoption_reads_the_callers_bytes

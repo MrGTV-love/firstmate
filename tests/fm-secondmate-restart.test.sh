@@ -521,6 +521,15 @@ case "${rargs[1]:-}" in
     [ -z "${FM_FAKE_AFTER_ASK:-}" ] || "$FM_FAKE_AFTER_ASK"
     ;;
   send)
+    # Main 1856 F4, Main 1860: the host send verb re-reads the agent's
+    # attribution right before the write; a replaced agent refuses. Whether a
+    # pending-reply expectation existed at that refusal is logged.
+    if [ -f "$FM_FAKE_DIR/agent-replaced" ]; then
+      if [ -e "$FM_HOME/state/pending-replies" ]; then state=present; else state=absent; fi
+      printf 'send-refused pending-replies=%s\n' "$state" >> "$FM_FAKE_DIR/attribution-checks"
+      printf 'error: the agent at this host endpoint is no longer attributed to this task\n' >&2
+      exit 1
+    fi
     # The host verb refuses an expected target other than its own endpoint.
     for a in "${rargs[@]:2}"; do
       case "$a" in
@@ -763,7 +772,7 @@ test_remote_attribution_is_bound_to_the_recorded_route() {
 # endpoint; each delivery then refuses, with no request, record or relaunch.
 test_remote_delivery_uses_the_compared_route() {
   local dir out rc case
-  for case in control registry-after-ask meta-after-ask endpoint-after-ask placement-after-ask; do
+  for case in control registry-after-ask meta-after-ask endpoint-after-ask placement-after-ask agent-replaced-before-send; do
     dir=$(new_case remote-compared)
     setup_remote_case "$dir" sm2 ok
     export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
@@ -775,6 +784,12 @@ test_remote_delivery_uses_the_compared_route() {
       endpoint-after-ask)
         # The host's endpoint moves from its recorded target after the first ask.
         printf '#!/usr/bin/env bash\nprintf fm-remote:2ndmate-other > %q\n' "$dir/fake/host-target" > "$dir/after-ask" ;;
+      agent-replaced-before-send)
+        # Main 1860: after the check-only ask (the second host ask) passes, the
+        # agent is replaced at the same endpoint before the send.
+        # shellcheck disable=SC2016 # the expressions expand in the written script
+        printf '#!/usr/bin/env bash\nn=$(grep -c . %q 2>/dev/null || true)\n[ "${n:-0}" -lt 2 ] || : > %q\n' \
+          "$dir/fake/attribution-checks" "$dir/fake/agent-replaced" > "$dir/after-ask" ;;
       placement-after-ask)
         # Main 1807 (4): the parent record becomes a local task after the decision.
         printf '#!/usr/bin/env bash\nprintf %%s\\\\n backend=herdr window=lab:w1:p2 harness=claude kind=secondmate herdr_session=lab herdr_workspace_id=w1 herdr_tab_id=w1 herdr_pane_id=w1:p2 > %q\n' "$dir/home/state/sm2.meta" > "$dir/after-ask" ;;
@@ -782,10 +797,11 @@ test_remote_delivery_uses_the_compared_route() {
     if [ -f "$dir/after-ask" ]; then chmod +x "$dir/after-ask"; export FM_FAKE_AFTER_ASK="$dir/after-ask"; fi
     out=$(run_restart "$dir" sm2); rc=$?
     unset FM_FAKE_ANSWER_STATUS FM_FAKE_AFTER_ASK FM_FAKE_HOST_TARGET
-    # Main 1807 (7): every check ran while no pending-reply expectation existed.
+    # Main 1807 (7), Main 1860: every check before the send ran while no
+    # pending-reply expectation existed.
     [ -s "$dir/fake/attribution-checks" ] || fail "$case: the host was never asked"
-    assert_no_grep 'pending-replies=present' "$dir/fake/attribution-checks" \
-      "$case: a pending-reply expectation existed at a host check"
+    ! grep -v '^send-refused' "$dir/fake/attribution-checks" | grep -q 'pending-replies=present' \
+      || fail "$case: a pending-reply expectation existed at a check before the send"
     if [ "$case" = control ]; then
       [ "$(grep -c . "$dir/fake/attribution-checks")" -ge 2 ] \
         || fail "the check-only step did not ask the host again before the request"$'\n'"$(cat "$dir/fake/attribution-checks")"
@@ -799,6 +815,15 @@ test_remote_delivery_uses_the_compared_route() {
     [ "$rc" -ne 0 ] || fail "$case: the restart went on after the route changed"$'\n'"$out"
     assert_not_contains "$out" "restarted: sm2" "$case: the mate was reported restarted"
     assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "$case: the mate was relaunched"
+    if [ "$case" = agent-replaced-before-send ]; then
+      # Main 1860: the send verb's own re-check refuses after the expectation
+      # was created; the expectation is then discarded and no record exists.
+      assert_grep 'send-refused pending-replies=present' "$dir/fake/attribution-checks" \
+        "$case: the send-time refusal was not reached after the expectation"
+      [ -z "$(find "$dir/home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] \
+        || fail "$case: a pending-reply record remained after the send-time refusal"
+      continue
+    fi
     # Main 1777 (3), Main 1807 (7): the refusal comes from a check that ran
     # before any expectation, so none is ever created and nothing is sent.
     assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "$case: a request crossed a changed route"
