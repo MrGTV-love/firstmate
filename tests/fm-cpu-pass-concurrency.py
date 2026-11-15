@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Executable fixtures for fm-cpu-pass.test.sh: how many CPU-bound test workers run together.
+"""Executable concurrency proofs for the CPU pass pool: how many CPU-bound test workers run together.
 
 Usage: fm-cpu-pass-concurrency.py REPO TMPDIR PYTHON
 

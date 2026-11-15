@@ -4,9 +4,10 @@
 # degraded runs, and the behavior-test runner's use of the pool.
 #
 # Every case drives bin/fm-cpu-pass.sh or bin/fm-test-run.sh as a separate
-# process against a private pool directory (tests/fm-cpu-pass-concurrency.py
-# and tests/fm-cpu-pass-admission.py do the same for the concurrency and
-# pipeline-start proofs), so the host's real pool is never
+# process against a private pool directory (tests/fm-cpu-pass-admission.py
+# does the same for the pipeline-start proofs; the concurrency proofs in
+# tests/fm-cpu-pass-concurrency.py run as their own CI job, under the passes
+# they use), so the host's real pool is never
 # touched and no case reads implementation source.
 # Child commands are single-quoted on purpose: they expand in the child bash.
 # shellcheck disable=SC2016
