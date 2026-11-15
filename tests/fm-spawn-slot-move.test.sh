@@ -506,6 +506,7 @@ test_a_checkout_hook_cannot_change_a_slot_during_preparation() {
   local hooks
   hooks="$(git -C "$W_PROJ" rev-parse --path-format=absolute --git-common-dir)/hooks"
   mkdir -p "$hooks"
+  # shellcheck disable=SC2016 # The hook's own shell expands the command substitution.
   printf '#!/bin/sh\nprintf hooked >"$(git rev-parse --show-toplevel)/notes.local"\nexit 1\n' >"$hooks/post-checkout"
   chmod +x "$hooks/post-checkout"
   fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid >/dev/null 2>&1 || true
@@ -519,6 +520,7 @@ test_a_merge_hook_does_not_run_during_the_move() {
   local hooks
   hooks="$(git -C "$W_PROJ" rev-parse --path-format=absolute --git-common-dir)/hooks"
   mkdir -p "$hooks"
+  # shellcheck disable=SC2016 # The hook's own shell expands the command substitution.
   printf '#!/bin/sh\nprintf hooked >"$(git rev-parse --show-toplevel)/hook-ran.local"\n' >"$hooks/post-merge"
   chmod +x "$hooks/post-merge"
   expect_moved "a clean slot behind the target moves although a post-merge hook exists"

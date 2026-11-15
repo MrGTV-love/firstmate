@@ -1609,7 +1609,9 @@ case "\$*" in
   *send-keys*'treehouse get'*)
     n=\$(( \$(cat '$CASE_DIR/get-count') + 1 ))
     echo "\$n" > '$CASE_DIR/get-count'
-    sed -n "\${n}p" '$CASE_DIR/slots' > '$CASE_DIR/panepath'
+    line=\$(sed -n "\${n}p" '$CASE_DIR/slots')
+    # Once the slots run out the pane stays where it is, as a real pane does while a get finds no copy.
+    [ -z "\$line" ] || printf '%s\\n' "\$line" > '$CASE_DIR/panepath'
     exit 0 ;;
 esac
 exec '$real_tmux' "\$@"
