@@ -37,6 +37,11 @@ exit 0
 SH
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+# A lease-capable build that also proves persistent recovered leases, so
+# bootstrap's capability diagnostic stays quiet.
+if [ "${1:-}" = capabilities ]; then
+  printf '%s\n' '{"schema_version":2,"version":"v-fake","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: fixture"}'
+fi
 if [ "${1:-}" = get ] && [ "${2:-}" = --help ]; then
   printf '%s\n' 'Usage: treehouse get [--lease]'
 fi

@@ -984,7 +984,10 @@ test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
     copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail "$shape: reassociation changed unlanded work"
     git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
       || fail "$shape: reassociation changed branches"
-    [ ! -e "$dir/treehouse.log" ] || fail "$shape: reassociation invoked Treehouse"
+    # The scout's teardown may make Treehouse's read-only capability probe before it
+    # decides whether a conditional return is planned; anything else is a pool call.
+    [ ! -e "$dir/treehouse.log" ] || ! grep -qxv 'capabilities --json' "$dir/treehouse.log" \
+      || fail "$shape: reassociation invoked Treehouse: $(tr '\n' '|' < "$dir/treehouse.log")"
     cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: recovery changed Treehouse's lease"
 
   done
