@@ -1246,8 +1246,9 @@ teardown_marker_lease() {  # <slot>
 # (bin/fm-wake-lib.sh's fm_teardown_return_pending owns the contract). A
 # refusal from here on leaves the record for the retry. The unclaimed-slot route also
 # records the lease its gate proved (lease=, hex of state|holder|lease id|name), so a
-# retry compares the slot against that identity and never re-records the lease it then
-# finds; every other write of the same slot's marker carries the recorded lease along.
+# retry compares the slot against that identity and never re-records another lease it
+# then finds (only exactly the adoption of a recorded old-holder entry); every other
+# write of the same slot's marker carries the recorded lease along.
 teardown_mark_return_pending() {  # <slot> [child-id]
   local marker="$STATE/$ID.teardown-return-pending" tmp gen lease=
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
@@ -4680,12 +4681,13 @@ teardown_unclaimed_pass() {  # <what follows>
 # recorded copy before project custody), the route must still be the one the early
 # proof planned. The early proof's tuple (state|holder|lease id|name) is the binding
 # record: the planning under project custody must have planned the route again, with
-# the same tuple, and the slot's lease read fresh must still be it. A successor, a
-# changed holder, a new lease id, or a planning that no longer selects the route
-# means the slot may no longer be this task's, so nothing is retired or signalled and
-# the teardown refuses with the record kept; a retry plans again from what it then
-# reads, and compares it with the lease its marker recorded. An entry still on the old
-# recovered holder is adopted here, before any helper, and must then show the protected
+# the same tuple or exactly its adoption (teardown_unclaimed_lease_matches), and the
+# slot's lease read fresh must still be it; the adopted tuple then becomes the record.
+# A successor, a changed holder, a new lease id, or a planning that no longer selects
+# the route means the slot may no longer be this task's, so nothing is retired or
+# signalled and the teardown refuses with the record kept; a retry plans again from
+# what it then reads, and compares it with the lease its marker recorded (or exactly
+# its adoption). An entry still on the old recovered holder is adopted here, before any helper, and must then show the protected
 # holder. The gate checks the lease only; the marker follows it, and the full pass
 # (teardown_unclaimed_pass_checks: lease readable and unchanged, root landed, no live
 # process outside the own folders) runs before the first helper and again before each
@@ -4699,12 +4701,12 @@ teardown_unclaimed_retire_gate() {
   fi
   if [ -z "$TEARDOWN_UNCLAIMED_SLOT" ]; then
     why="the route the early proof planned was not planned again under project custody, so the lease it saw is gone"
-  elif [ "$TEARDOWN_UNCLAIMED_SEEN" != "$TEARDOWN_UNCLAIMED_EARLY" ]; then
+  elif ! teardown_unclaimed_lease_matches "$TEARDOWN_UNCLAIMED_EARLY" "$TEARDOWN_UNCLAIMED_SEEN"; then
     why="its lease changed between the early proof ('$TEARDOWN_UNCLAIMED_EARLY') and the planning ('$TEARDOWN_UNCLAIMED_SEEN')"
   else
     fm_task_copy_pool_slot_lease "$TEARDOWN_UNCLAIMED_SLOT" || true
     now="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
-    if [ "$now" != "$TEARDOWN_UNCLAIMED_EARLY" ]; then
+    if ! teardown_unclaimed_lease_matches "$TEARDOWN_UNCLAIMED_EARLY" "$now"; then
       why="its lease changed since the route was planned (planned '$TEARDOWN_UNCLAIMED_EARLY', now '$now'), so a successor may hold it"
     elif [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ]; then
       TEARDOWN_UNCLAIMED_WHY=
@@ -4714,6 +4716,9 @@ teardown_unclaimed_retire_gate() {
       else
         why=$TEARDOWN_UNCLAIMED_WHY
       fi
+    else
+      TEARDOWN_UNCLAIMED_EARLY=$now
+      TEARDOWN_UNCLAIMED_SEEN=$now
     fi
   fi
   [ -n "$why" ] || return 0
@@ -4729,6 +4734,21 @@ teardown_unclaimed_step() {  # prove | release
   return 1
 }
 
+# Whether lease <now> is lease <recorded> (state|holder|lease id|name): the same tuple,
+# or exactly the adoption of a recorded entry on the old recovered holder, read on the
+# protected holder the proven treehouse publishes with the same lease id and name.
+# Anything else differs: a new lease id, another holder, an unreadable or unleased
+# entry, an empty record, or an unproven treehouse.
+teardown_unclaimed_lease_matches() {  # <recorded> <now>
+  local old="recovered|$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER|"
+  [ -n "$1" ] || return 1
+  [ "$2" = "$1" ] && return 0
+  case "$1" in "$old"*) ;; *) return 1 ;; esac
+  fm_task_copy_treehouse_persists_recovered_leases || return 1
+  [ -n "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" ] \
+    && [ "$2" = "recovered|$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER|${1#"$old"}" ]
+}
+
 # The lease just read (FM_TASK_COPY_LEASE_*) must be the one the retirement gate
 # proved (TEARDOWN_UNCLAIMED_EARLY, the binding record): the same state, holder, lease
 # id and name, or exactly the adoption of that entry (an old recovered holder read as
@@ -4741,11 +4761,7 @@ teardown_unclaimed_lease_is_the_gated_one() {
     teardown_unclaimed_note "no lease was recorded by the retirement gate to bind against"
     return 1
   fi
-  [ "$now" = "$TEARDOWN_UNCLAIMED_EARLY" ] && return 0
-  if [ "$TEARDOWN_UNCLAIMED_EARLY" = "recovered|$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME" ] \
-      && [ "$now" = "recovered|$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME" ]; then
-    return 0
-  fi
+  teardown_unclaimed_lease_matches "$TEARDOWN_UNCLAIMED_EARLY" "$now" && return 0
   teardown_unclaimed_note "its lease changed since the retirement gate proved it (proved '$TEARDOWN_UNCLAIMED_EARLY', now '$now'), so a successor may hold it"
   return 1
 }
@@ -4978,12 +4994,14 @@ teardown_unclaimed_early_proof() {
   teardown_unclaimed_candidate "$slot" || return 0
   TEARDOWN_UNCLAIMED_EARLY=$TEARDOWN_UNCLAIMED_SEEN
   # A retry binds to the lease its interrupted attempt proved (the marker's), never to
-  # the lease it finds now: a difference then refuses at the gate. A slot already
-  # returned (unleased) has nothing to bind and converges.
+  # another lease it finds now: a difference then refuses at the gate. Only exactly the
+  # adoption of the marker's old-holder entry is taken as found (the adopted tuple). A
+  # slot already returned (unleased) has nothing to bind and converges.
   marked=$(teardown_marker_lease "$slot") || marked=
   case "$TEARDOWN_UNCLAIMED_SEEN" in
     unleased\|*) ;;
-    *) [ -z "$marked" ] || TEARDOWN_UNCLAIMED_EARLY=$marked ;;
+    *) [ -z "$marked" ] || teardown_unclaimed_lease_matches "$marked" "$TEARDOWN_UNCLAIMED_SEEN" \
+         || TEARDOWN_UNCLAIMED_EARLY=$marked ;;
   esac
   if teardown_landed "$slot" HEAD ""; then
     TEARDOWN_UNCLAIMED_LANDED=1
@@ -4992,10 +5010,11 @@ teardown_unclaimed_early_proof() {
   fi
 }
 
-# A retry refuses when the slot's lease is not the one its marker recorded (the lease
-# the interrupted attempt proved), in every shape, whether or not the route is planned
-# again: a successor, another holder, a new lease id for the same holder, an entry that
-# cannot be read. An unleased slot (the interrupted attempt returned it) converges. A
+# A retry refuses when the slot's lease is neither the one its marker recorded (the lease
+# the interrupted attempt proved) nor exactly its adoption under the protected holder
+# (teardown_unclaimed_lease_matches), in every other shape, whether or not the route
+# is planned again: a successor, another holder, a new lease id for the same holder,
+# an entry that cannot be read. An unleased slot (the interrupted attempt returned it) converges. A
 # marker with no recorded lease (another route's, or an older one) leaves nothing to
 # compare. Runs before any retirement helper.
 teardown_unclaimed_marker_refusal() {
@@ -5012,7 +5031,7 @@ teardown_unclaimed_marker_refusal() {
   fm_task_copy_pool_slot_lease "$(fm_task_copy_canonical_dir "$slot" 2>/dev/null || printf '%s' "$slot")" || true
   [ "$FM_TASK_COPY_LEASE_STATE" != unleased ] || return 0
   now="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
-  [ "$now" != "$proved" ] || return 0
+  ! teardown_unclaimed_lease_matches "$proved" "$now" || return 0
   echo "REFUSED: pool slot $slot is not in the state task $ID's interrupted teardown proved: its lease was '$proved' and is now '$now' (an unreadable entry reads 'unreadable'), so a successor may hold it; nothing was removed, returned, retired or signalled, and the record and marker are kept for the captain's decision." >&2
   return 1
 }

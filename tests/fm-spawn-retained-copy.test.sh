@@ -1533,35 +1533,32 @@ test_lease_entry_oracle_checks_every_field() (
   pass "the lease-entry oracle accepts the named holder rewrite and unrelated slots changing, and rejects a change to the lease id, lease time, leased flag, recovery reason, owner fields or a second entry"
 )
 
-# Every allocation a fixture makes with a real provider names its pool root with an
-# explicit --root (the contract's fixture hard gate; TREEHOUSE_ROOT in the environment
-# is not that argument). The scanner lists the provider `get` calls of a file that carry
-# none; the test runs it over both suites that drive a real provider and over a mutant
-# file with one root-less get, which it must catch.
-provider_gets_without_root() {  # <file>
-  # The pattern is literal text to find, never an expansion.
-  # shellcheck disable=SC2016
-  grep -n -E '("\$bin"|"\$UNC_PROVIDER"|"\$FM_TEST_TREEHOUSE_PROVIDER") get ' "$1" | grep -v -e '--root' || true
-}
-
+# Every allocation a real-provider fixture makes goes through fm_test_rooted_treehouse,
+# which refuses at run time a `get` that names no explicit --root (the contract's
+# fixture hard gate; TREEHOUSE_ROOT in the environment is not that argument). The
+# test drives that wrapper over a recording stand-in for the real binary: a root-less
+# get must fail before the binary runs, and a rooted get or another command must reach
+# it with its argv unchanged.
 test_fixture_provider_gets_name_a_root() (
-  local file found dir q d
-  for file in "$ROOT/tests/fm-teardown-pool.test.sh" "$ROOT/tests/fm-spawn-retained-copy.test.sh"; do
-    found=$(provider_gets_without_root "$file")
-    [ -z "$found" ] || fail "a real-provider fixture allocation names no --root in ${file##*/}: $found"
-  done
+  local dir rc out
   dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-gets.XXXXXX") || fail "cannot create a scratch directory"
-  # the sample lines are assembled from fragments so that this file carries no call
-  # the scanner itself would flag
-  q='"' d='$'
-  printf '%s\n' "a=${q}${d}bin${q} get --root r --no-fetch --lease" > "$dir/good.sh"
-  printf '%s\n' "a=${q}${d}bin${q} get --no-fetch --lease" > "$dir/bad.sh"
-  printf '%s\n' "x=${q}${d}UNC_PROVIDER${q} get --no-fetch --lease --lease-holder next" > "$dir/bad2.sh"
-  [ -z "$(provider_gets_without_root "$dir/good.sh")" ] || { rm -rf "$dir"; fail "the scanner flagged a get that names its root"; }
-  [ -n "$(provider_gets_without_root "$dir/bad.sh")" ] || { rm -rf "$dir"; fail "the scanner missed a root-less get (the mutant)"; }
-  [ -n "$(provider_gets_without_root "$dir/bad2.sh")" ] || { rm -rf "$dir"; fail "the scanner missed a root-less reuse get (the mutant)"; }
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\n' "$dir/argv" > "$dir/real"
+  chmod +x "$dir/real"
+  fm_test_rooted_treehouse "$dir/wrapper" "$dir/real"
+  for out in "get --no-fetch --lease" "get --no-fetch --lease --lease-holder next --root" "get --lease-holder root"; do
+    rc=0
+    # shellcheck disable=SC2086
+    "$dir/wrapper" $out </dev/null 2>/dev/null || rc=$?
+    [ "$rc" = 97 ] || { rm -rf "$dir"; fail "the wrapper let a root-less get through ($out, exit $rc)"; }
+  done
+  [ ! -e "$dir/argv" ] || { rm -rf "$dir"; fail "a root-less get reached the real binary: $(cat "$dir/argv")"; }
+  "$dir/wrapper" get --root "$dir/pool" --no-fetch --lease </dev/null || { rm -rf "$dir"; fail "the wrapper refused a get that names its root"; }
+  "$dir/wrapper" get "--root=$dir/pool" </dev/null || { rm -rf "$dir"; fail "the wrapper refused a get that names --root=<dir>"; }
+  "$dir/wrapper" return "$dir/pool/1" --if-lease-holder x </dev/null || { rm -rf "$dir"; fail "the wrapper refused a return"; }
+  printf '%s\n' "get --root $dir/pool --no-fetch --lease" "get --root=$dir/pool" "return $dir/pool/1 --if-lease-holder x" \
+    | cmp -s - "$dir/argv" || { rm -rf "$dir"; fail "the wrapper changed the argv it passed on: $(cat "$dir/argv")"; }
   rm -rf "$dir"
-  pass "every real-provider fixture get in the teardown and spawn suites names an explicit --root, and the scanner catches a get that does not"
+  pass "the real-provider fixture wrapper refuses a treehouse get with no explicit --root before the binary runs, and passes rooted gets and other commands through unchanged"
 )
 
 # The real-provider half of the capability-positive case. Needs the treehouse
@@ -1606,14 +1603,14 @@ real_provider_recovered_slot_cases() {
     fm_git_init_commit "$PROJECT_DIR"
     fm_git_add_origin "$PROJECT_DIR" "$CASE_DIR/origin.git"
     git -C "$PROJECT_DIR" remote set-head origin main 2>/dev/null || true
-    ln -sf "$FM_TEST_TREEHOUSE_PROVIDER" "$FAKEBIN_DIR/treehouse"
+    fm_test_rooted_treehouse "$FAKEBIN_DIR/treehouse" "$FM_TEST_TREEHOUSE_PROVIDER"
     export HOME="$CASE_DIR/real-home" XDG_CONFIG_HOME="$CASE_DIR/real-xdg" TREEHOUSE_NO_UPDATE_CHECK=1 \
       TREEHOUSE_ROOT="$CASE_DIR/real-root" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-    a=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder holder </dev/null 2>/dev/null) || fail "$order: cannot lease slot A"
-    b=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder spare </dev/null 2>/dev/null) || fail "$order: cannot lease slot B"
+    a=$(cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder holder </dev/null 2>/dev/null) || fail "$order: cannot lease slot A"
+    b=$(cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder spare </dev/null 2>/dev/null) || fail "$order: cannot lease slot B"
     a=$(cd "$a" && pwd -P)
     b=$(cd "$b" && pwd -P)
-    (cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" return "$b" --if-lease-holder spare </dev/null >/dev/null 2>&1) || fail "$order: cannot free slot B"
+    (cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" return "$b" --if-lease-holder spare </dev/null >/dev/null 2>&1) || fail "$order: cannot free slot B"
     pool=${a%/*/*}
     state=$pool/treehouse-state.json
     if [ "$start" = old ]; then
@@ -1672,7 +1669,7 @@ real_provider_recovered_slot_cases() {
     # staying alive and holding its allocation) is exercised for the FAKE provider only, in
     # test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose: the live mode needs
     # the beat file the fake writes, which a real provider never does.
-    entry=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || entry=
+    entry=$(cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || entry=
     if [ -n "$entry" ]; then
       entry=$(cd "$entry" && pwd -P)
       [ "$entry" != "$a" ] || fail "$order: a further get handed out the recovered slot $a"

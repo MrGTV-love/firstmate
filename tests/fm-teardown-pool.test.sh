@@ -3646,7 +3646,8 @@ unc_pool_case() {
     TREEHOUSE_ROOT="$case_dir/real-root" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
     GIT_AUTHOR_NAME=f GIT_AUTHOR_EMAIL=f@x.invalid GIT_COMMITTER_NAME=f GIT_COMMITTER_EMAIL=f@x.invalid)
   if [ "$provider" = real ]; then
-    bin=$FM_TEST_TREEHOUSE_PROVIDER
+    bin=$case_dir/real-provider
+    fm_test_rooted_treehouse "$bin" "$FM_TEST_TREEHOUSE_PROVIDER"
     UNC_PROTECTED_HOLDER=$(unc_real_protected_holder)
     UNC_A=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --root "$case_dir/real-root" --no-fetch --lease --lease-holder task-x1 </dev/null 2>/dev/null) || return 1
     UNC_B=$(cd "$case_dir/project" && env "${UNC_ENV[@]}" "$bin" get --root "$case_dir/real-root" --no-fetch --lease --lease-holder sib </dev/null 2>/dev/null) || return 1
@@ -4228,7 +4229,7 @@ optional = ('teardown_unclaimed_adopt_old_holder', 'teardown_unclaimed_pass', 't
 for name in ('teardown_nested_slot', 'teardown_unclaimed_candidate', 'teardown_unclaimed_early_proof',
              'teardown_unclaimed_retire_gate', 'teardown_unclaimed_adopt_old_holder', 'teardown_unclaimed_note',
              'teardown_unclaimed_pass', 'teardown_unclaimed_pass_checks', 'teardown_unclaimed_pass_refusal',
-             'teardown_unclaimed_foreign_live_pids'):
+             'teardown_unclaimed_foreign_live_pids', 'teardown_unclaimed_lease_matches'):
     m = re.search(r'^' + re.escape(name) + r'\(\) \{[^\n]*\n.*?^\}', text, re.M | re.S)
     if not m:
         # the adoption helper and the pass functions may be absent: the extraction then
@@ -4348,14 +4349,21 @@ test_unclaimed_successor_runs_no_retirement_helper() {
 # copy and slot A are untouched, nothing is returned, no git removal runs, the old
 # holder is still on slot A, and the record is kept. Control: an adopting status
 # binds the protected holder and the route completes (R3 recovered-old).
+# Retry after a failed status, with the return-pending marker an interrupted attempt
+# leaves when it proved the old-holder lease (the persisted marker format): when another
+# command adopted slot A in between (the protected holder, same lease id and name), the
+# retry converges with the conditional return of the protected holder; when slot A then
+# carries a new lease id or another holder, the retry refuses with the record, marker
+# and lease kept and nothing returned.
 test_unclaimed_old_holder_adoption_failure_refuses_before_cleanup() {
-  local provider mode case_dir out rc
+  local provider mode case_dir out rc retry filter gen proved
   unc_providers "old-holder adoption failure on the real provider"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for mode in status-fail status-noop; do
+    for mode in status-fail status-noop retry-adopted retry-new-id retry-other-holder; do
       unc_pool_case "unclaimed-adopt-$mode" recovered-old "$provider" || fail "$provider $mode: cannot build the pool"
       case_dir=$UNC_CASE
-      : > "$case_dir/$mode"
+      retry=
+      case "$mode" in retry-*) retry=${mode#retry-}; : > "$case_dir/status-fail" ;; *) : > "$case_dir/$mode" ;; esac
       unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.before"
       jq -c --arg p "$UNC_A" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/a-entry.before"
       rc=0
@@ -4370,13 +4378,55 @@ test_unclaimed_old_holder_adoption_failure_refuses_before_cleanup() {
       ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $mode: a return was issued: $(cat "$case_dir/treehouse.argv")"
       ! grep -q ' worktree remove ' "$case_dir/git.argv" 2>/dev/null || fail "$provider $mode: a copy was removed: $(grep ' worktree remove ' "$case_dir/git.argv")"
       case "$mode" in
-        status-fail) assert_contains "$out" "failed" "$provider $mode: the refusal did not name the failed status" ;;
         status-noop) assert_contains "$out" "was not rewritten to the protected holder" "$provider $mode: the refusal did not name the missing rewrite" ;;
+        *) assert_contains "$out" "failed" "$provider $mode: the refusal did not name the failed status" ;;
       esac
       assert_contains "$out" "record is kept for a retry" "$provider $mode: the refusal did not keep the record"
+      [ -n "$retry" ] || continue
+      gen=$(sed -n 's/^spawn_gen=//p' "$case_dir/state/task-x1.meta" | tail -1)
+      proved="recovered|$UNC_RECOVERED_HOLDER||$(jq -r --arg p "$UNC_A" '.worktrees[] | select(.path == $p) | .name' "$UNC_STATE")"
+      printf 'spawn_gen=%s\nslot=%s\nlease=%s\n' "$gen" "$UNC_A" "$(printf '%s' "$proved" | od -An -v -tx1 | tr -d ' \n')" \
+        > "$case_dir/state/task-x1.teardown-return-pending"
+      rm -f "$case_dir/status-fail"
+      # The filters are jq programs; $h and $i are jq variables, never shell expansions.
+      # shellcheck disable=SC2016
+      case "$retry" in
+        adopted) filter='.lease_holder = $h' ;;
+        new-id) filter='.lease_holder = $h | .lease_id = $i' ;;
+        other-holder) filter='.lease_holder = "successor" | .lease_id = $i' ;;
+      esac
+      if ! jq --arg p "$UNC_A" --arg h "$UNC_PROTECTED_HOLDER" --arg i "$UNC_SUCCESSOR_ID" \
+          "(.worktrees[] | select(.path == \$p)) |= ($filter)" "$UNC_STATE" > "$UNC_STATE.tmp" \
+          || ! mv "$UNC_STATE.tmp" "$UNC_STATE"; then
+        fail "$provider $mode: cannot change slot A between the attempts"
+      fi
+      jq -c --arg p "$UNC_A" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/a-entry.between"
+      : > "$case_dir/treehouse.argv"
+      rc=0
+      out=$(unc_run_teardown "$case_dir") || rc=$?
+      if [ "$retry" = adopted ]; then
+        expect_code 0 "$rc" "$provider $mode: the retry after the adoption did not converge"$'\n'"$out"
+        assert_absent "$case_dir/state/task-x1.meta" "$provider $mode: the record survived the converged retry"
+        assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $mode: the marker survived the converged retry"
+        grep -Fx "return $UNC_A --if-lease-holder $UNC_PROTECTED_HOLDER" "$case_dir/treehouse.argv" >/dev/null \
+          || fail "$provider $mode: the retry did not return slot A bound to the adopted holder: $(cat "$case_dir/treehouse.argv")"
+        [ "$(unc_return_count "$case_dir")" = 1 ] || fail "$provider $mode: the retry issued other than one return: $(cat "$case_dir/treehouse.argv")"
+        jq -e --arg p "$UNC_A" '.worktrees[] | select(.path == $p) | (.leased // false) == false' "$UNC_STATE" >/dev/null \
+          || fail "$provider $mode: slot A is still leased after the converged retry"
+        unc_assert_only_route_commands "$case_dir" "$provider $mode"
+      else
+        [ "$rc" -ne 0 ] || fail "$provider $mode: the retry completed although slot A changed to another lease"$'\n'"$out"
+        assert_contains "$out" "REFUSED: pool slot" "$provider $mode: the retry did not refuse by name"
+        assert_present "$case_dir/state/task-x1.meta" "$provider $mode: the retry retired the record"
+        assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $mode: the retry dropped the marker"
+        assert_present "$UNC_NESTED" "$provider $mode: the retry removed the task's copy"
+        ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $mode: the retry issued a return: $(cat "$case_dir/treehouse.argv")"
+        jq -c --arg p "$UNC_A" '.worktrees[] | select(.path == $p)' "$UNC_STATE" | cmp -s - "$case_dir/a-entry.between" \
+          || fail "$provider $mode: the retry changed slot A's successor lease"
+      fi
     done
   done
-  pass 'an old recovered holder that the adopting status does not rewrite (a failed status, or one that rewrites nothing) refuses before the own-copy cleanup and any retirement, with the copy, slot and record untouched'
+  pass 'an old recovered holder that the adopting status does not rewrite (a failed status, or one that rewrites nothing) refuses before the own-copy cleanup and any retirement, with the copy, slot and record untouched; a retry converges when slot A was adopted in between and refuses when it then carries a new lease id or another holder'
 }
 
 # A nested current copy whose record has no history that names its slot (Main 1817):
@@ -4524,6 +4574,7 @@ import re, sys
 text = open(sys.argv[1]).read()
 for name, required in (('teardown_unclaimed_note', True), ('teardown_unclaimed_adopt_old_holder', True),
         ('teardown_unclaimed_retire_gate', True), ('teardown_unclaimed_lease_is_the_gated_one', False),
+        ('teardown_unclaimed_lease_matches', True),
         ('teardown_unclaimed_read_lease', True), ('teardown_unclaimed_slot_prove', True),
         ('teardown_unclaimed_slot_forget', True), ('teardown_unclaimed_slot_cleanup', True),
         ('teardown_unclaimed_slot_release', True)):
@@ -4705,7 +4756,7 @@ unc6_retire_case() {  # <name> <inject> <successor-kind: id|holder|process> <pid
     set -u
     # shellcheck source=bin/fm-task-copy-lib.sh
     . "$ROOT/bin/fm-task-copy-lib.sh"
-    eval "$(unc6_functions teardown_nested_slot teardown_unclaimed_retire_gate teardown_unclaimed_pass \
+    eval "$(unc6_functions teardown_nested_slot teardown_unclaimed_retire_gate teardown_unclaimed_lease_matches teardown_unclaimed_pass \
       teardown_unclaimed_pass_checks teardown_unclaimed_pass_refusal teardown_unclaimed_foreign_live_pids \
       teardown_unclaimed_adopt_old_holder teardown_unclaimed_note)"
     ID=task-x1 KIND=ship FORCE='' PROJ=$dir/project WT=$dir/pool/1/proj/nested TASK_TMP=$dir/tmp META=$dir/state/meta STATE=$dir/state
@@ -4800,7 +4851,7 @@ unc6_marker_env() {  # <name>; prints the case dir
 
 unc6_marker_functions() {
   unc6_functions teardown_hex_encode teardown_hex_decode teardown_marker_lease teardown_mark_return_pending \
-    teardown_unclaimed_marker_refusal
+    teardown_unclaimed_marker_refusal teardown_unclaimed_lease_matches
   sed -n '/^fm_teardown_return_pending_gen() {/,/^}/p' "$ROOT/bin/fm-wake-lib.sh"
   sed -n '/^fm_teardown_return_pending() {/,/^}/p' "$ROOT/bin/fm-wake-lib.sh"
 }
