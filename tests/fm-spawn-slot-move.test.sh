@@ -1662,15 +1662,16 @@ test_an_ignored_file_whose_identity_changes_during_the_move_fails_it() {
 
 # --- R9-1: on a relaunch, the process tree rooted at the task's own recorded endpoint is this task's lineage ----------
 
-# start_recorded_endpoint [<inner-path> [<argv0>]]: the real treehouse shape. A pane shell standing in the project folder
-# runs a `treehouse` launcher, which opens a shell in the slot; that shell runs <inner-path> (a copy of sleep at that path
-# under the launcher directory; default sleep itself) with <argv0> (default: its own path).
+# start_recorded_endpoint [<inner-path> [<argv0>] [<arg>] [<source>]]: the real treehouse shape. A pane shell standing in
+# the project folder runs a `treehouse` launcher, which opens a shell in the slot; that shell runs <inner-path> (a copy of
+# <source>, default sleep, at that path under the launcher directory; default sleep itself) with <argv0> (default: its own
+# path) and the one argument <arg> (default 300).
 # The launcher started before the spawn (start_marker runs after), so only the recorded tree can excuse it.
 # Sets ENDPOINT_PID (the pane shell) and ENDPOINT_START (its start time, read by the probe).
 start_recorded_endpoint() {
-  local inner=${1:-sleep} dir="$W_DIR/launcher" bin argv0
+  local inner=${1:-sleep} dir="$W_DIR/launcher" bin argv0 arg=${3:-300}
   make_launcher "$dir" || return 1
-  bin=$(command -v sleep)
+  bin=${4:-$(command -v sleep)}
   if [ "$inner" != sleep ]; then
     mkdir -p "$(dirname "$dir/$inner")"
     cp "$bin" "$dir/$inner" || return 1
@@ -1679,7 +1680,7 @@ start_recorded_endpoint() {
   fi
   argv0=${2:-$bin}
   # shellcheck disable=SC2016 # The pane and launcher shells expand their own positional arguments.
-  (cd "$W_PROJ" && exec bash -c '"$1" -c "(cd \"\$1\" && exec -a \"\$3\" \"\$2\" 300) & wait" get "$2" "$3" "$4"; :' pane "$dir/treehouse" "$W_SLOT" "$bin" "$argv0") &
+  (cd "$W_PROJ" && exec bash -c '"$1" -c "(cd \"\$1\" && exec -a \"\$3\" \"\$2\" \"\$4\") & wait" get "$2" "$3" "$4" "$5"; :' pane "$dir/treehouse" "$W_SLOT" "$bin" "$argv0" "$arg") &
   ENDPOINT_PID=$!
   HELD_PIDS+=("$ENDPOINT_PID")
   sleep 0.5
@@ -1746,6 +1747,19 @@ test_a_node_named_agent_in_the_recorded_tree_holds_the_slot() {
   start_recorded_endpoint node "$W_DIR/launcher/codex/bin/codex" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
     expect_skip "a node process whose argv0 names a harness still holds the slot" live_holder
+  cleanup_held
+}
+
+# R11-1: an agent found only by its arguments (node running the Gemini CLI script) still holds the slot.
+test_a_node_running_a_gemini_script_in_the_recorded_tree_holds_the_slot() {
+  make_world r111-gemini
+  advance_origin advanced.txt
+  local script="$W_DIR/launcher/lib/node_modules/@google/gemini-cli/dist/index.js"
+  mkdir -p "$(dirname "$script")"
+  printf 'while :; do sleep 1; done\n' >"$script"
+  start_recorded_endpoint node "" "$script" "$(command -v bash)" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
+    expect_skip "a node process whose first argument is a Gemini CLI script still holds the slot" live_holder
   cleanup_held
 }
 
@@ -1880,6 +1894,7 @@ CASES=(
   test_an_agent_in_the_recorded_tree_holds_the_slot
   test_a_version_named_agent_in_the_recorded_tree_holds_the_slot
   test_a_node_named_agent_in_the_recorded_tree_holds_the_slot
+  test_a_node_running_a_gemini_script_in_the_recorded_tree_holds_the_slot
   test_an_unreadable_recorded_window_excuses_nobody
   test_a_recorded_endpoint_whose_start_time_does_not_match_refuses
 )
