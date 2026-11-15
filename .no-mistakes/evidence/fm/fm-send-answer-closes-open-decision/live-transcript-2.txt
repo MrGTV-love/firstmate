@@ -1,0 +1,16 @@
+head fm-send.sh t1 --answers-none --resolve-key k1 both -> exit=1
+head fm-send.sh t1 --resolve-key k1 --answers-none both -> exit=1
+head fm-send.sh t1 --resolve-key --answers-none both -> exit=1
+head fm-send.sh t1 go with REST -> exit=1
+state diff after the four refusals:
+2a3
+> f state/guard-events.jsonl 605382333 1184
+guard-events.jsonl lines:
+{"guard":"gate-agent-containment","rule":"gate-context","task":"t1","version":"1","system":"firstmate","session":"t1","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"ove
+{"guard":"gate-agent-containment","rule":"gate-context","task":"t1","version":"1","system":"firstmate","session":"t1","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"ove
+{"guard":"gate-agent-containment","rule":"gate-context","task":"t1","version":"1","system":"firstmate","session":"t1","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"ove
+{"guard":"gate-agent-containment","rule":"gate-context","task":"t1","version":"1","system":"firstmate","session":"t1","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"ove
+pane fm-t1 (expect empty):
+head explicit target exit=0 :: error: text not submitted to lab:fm-t2 (delivery unconfirmed; verdict=unknown; tried meta=
+base explicit target exit=0 :: error: text not submitted to lab:fm-t2 (delivery unconfirmed; verdict=unknown; tried meta=
+teardown: lab exists? no

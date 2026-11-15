@@ -1,0 +1,278 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.sPI9ZW  (tmux dir: /tmp/fml.opvTLI)
+
+##### S1 bare send, open k1+k2 (HEAD)
+
+=== head bare
+$ fm-send.sh t1 go with REST
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  stderr|   [key=k1] needs-decision
+  stderr|   [key=k2] blocked
+  stderr| Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+STATE CHANGED:
+2a3
+> f state/guard-events.jsonl 2664670503 296
+pane fm-t1:
+drain:
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+
+##### S1-base same bare send on BASE (the defect)
+
+=== base bare
+$ fm-send.sh t2 go with REST
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+inbox: 001.msg handled 
+pane fm-t2:
+: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+status log:
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+drain (keys still open after delivered answer):
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+t2 [key=k1] needs-decision: pick REST or RPC
+t2 [key=k2] blocked: need the staging token
+
+##### S2 --answers-none (HEAD)
+
+=== head none
+$ fm-send.sh t1 --answers-none unrelated nudge
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+record:
+  schema=fm-task-inbox.v1
+  at=2026-11-15T18:55:28Z
+  --
+  unrelated nudgeSTATUS: no line appended
+pane fm-t1:
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+drain:
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+
+##### S3 --resolve-key k1 (HEAD)
+
+=== head resolve k1
+$ fm-send.sh t1 --resolve-key k1 REST it is
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+status log:
+  needs-decision [key=k1]: pick REST or RPC
+  blocked [key=k2]: need the staging token
+  resolved [key=k1] [at=1794768931]: answered: REST it is
+drain:
+t1 [key=k2] blocked: need the staging token
+
+=== head bare after k1 closed (only k2 left)
+$ fm-send.sh t1 next
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  stderr|   [key=k2] blocked
+  stderr| Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+
+##### S4 contradictory pair (HEAD)
+
+=== head none+resolve
+$ fm-send.sh t1 --answers-none --resolve-key k1 both
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent.
+
+=== head resolve+none
+$ fm-send.sh t1 --resolve-key k1 --answers-none both
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent.
+
+=== head split-form value --answers-none
+$ fm-send.sh t1 --resolve-key --answers-none both
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent.
+STATE CHANGED
+
+=== head repeated --answers-none
+$ fm-send.sh t1 --answers-none --answers-none twice
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+##### S5 mistyped key refused as on base
+
+=== head mistyped
+$ fm-send.sh t1 --resolve-key nope answer
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| error: --resolve-key 'nope': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/t1.status, and no captain-held task 'nope' or 't1-decision-nope' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+
+=== base mistyped
+$ fm-send.sh t1 --resolve-key nope answer
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| error: --resolve-key 'nope': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/t1.status, and no captain-held task 'nope' or 't1-decision-nope' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+
+##### S6 no open decision: delivered, record same as base
+
+=== head bare, nothing open
+$ fm-send.sh t1 plain steer
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+=== base bare, nothing open
+$ fm-send.sh t1 plain steer
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+RECORD: head == base (at= line aside)
+
+=== head none, nothing open
+$ fm-send.sh t1 --answers-none plain steer
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+RECORD: none-flag == base (at= line aside)
+
+=== head flag-like message words, nothing open
+$ fm-send.sh t1 please run --resolve-key k1 later
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+record body:
+  schema=fm-task-inbox.v1
+  at=2026-11-15T18:55:49Z
+  --
+  please run --resolve-key k1 later
+=== base flag-like message words, nothing open
+$ fm-send.sh t1 please run --resolve-key k1 later
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+##### S7 dash key split form as base
+
+=== head --resolve-key -urgent
+$ fm-send.sh t1 --resolve-key -urgent go with the fix
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+drain:
+(no open decisions listed)
+
+##### S8 -- escape sends literal flag text
+
+=== head -- --answers-none
+$ fm-send.sh t1 --answers-none -- --answers-none is literal text
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+record body:
+  schema=fm-task-inbox.v1
+  at=2026-11-15T18:55:58Z
+  --
+  --answers-none is literal text
+=== head bare -- (no choice) still refuses
+$ fm-send.sh t1 -- --answers-none text
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  stderr|   [key=k1] needs-decision
+  stderr|   [key=k2] blocked
+  stderr| Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+
+##### S9 reserved pending-reply key
+
+=== head bare to reserved
+$ fm-send.sh mate carry on
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: mate has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/mate.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  stderr|   [key=pending-reply-abcdef0123456789] blocked
+  stderr| Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+
+=== head none to reserved
+$ fm-send.sh mate --answers-none carry on
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+drain:
+mate [key=pending-reply-abcdef0123456789] blocked: pending-reply-missed: task=mate pending-reply-id=abcdef0123456789 request=ship it
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+
+=== head resolve reserved
+$ fm-send.sh mate --resolve-key pending-reply-abcdef0123456789 ack, false escalation
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+status log:
+  blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: task=mate pending-reply-id=abcdef0123456789 request=ship it
+  resolved [key=pending-reply-abcdef0123456789] [at=1794768964]: pending-reply-resolved: task=mate pending-reply-id=abcdef0123456789 via=operator-resolve-key ack, false escalation
+drain:
+mate resolved [key=pending-reply-abcdef0123456789] [at=1794768964]: pending-reply-resolved: task=mate pending-reply-id=abcdef0123456789 via=operator-resolve-key ack, false escalation
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+
+##### S10 not subject: --key Enter and explicit backend target
+
+=== head --key Enter
+$ fm-send.sh t1 --key Enter
+exit=0
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+=== head explicit backend target
+$ fm-send.sh lab:fm-t2 typed text
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| error: text not submitted to lab:fm-t2 (delivery unconfirmed; verdict=unknown; tried meta=/Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/lab:fm-t2.meta; metadata window/terminal lookup; backend=tmux; endpoint=verified)
+pane fm-t2:
+: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+typed text
+typed text
+
+##### S11 promote's printed next: command run as-is (flagless) on a lane with open key
+
+=== head flagless promote-style send
+$ fm-send.sh t1 Promoted: ship it
+exit=1
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sPI9ZW
+  stderr| error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.sPI9ZW/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  stderr|   [key=ship-it] needs-decision
+  stderr| Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+
+##### pane transcript (worker stand-in fm-t1)
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+
+teardown done: lab exists? no

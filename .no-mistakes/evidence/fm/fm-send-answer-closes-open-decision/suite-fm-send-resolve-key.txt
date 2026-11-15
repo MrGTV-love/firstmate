@@ -1,4 +1,5 @@
 ok - fm-send --resolve-key: the answer send itself closes the open decision
+ok - fm-send --resolve-key: a key that starts with - is answered and closed with the = and split forms; a flag-like message word is text
 ok - fm-send --resolve-key: the close never re-wakes its own home, later lines still do
 ok - fm-send --resolve-key: separate answers do not each re-wake; later lines still do
 ok - fm-send --resolve-key: a colon-first stated key is open under that key and answerable
@@ -27,7 +28,8 @@ ok - fm-send --resolve-key: one task.answered per closed key, answered_by derive
 ok - fm-send --resolve-key: an unwritable ledger costs one stderr line and changes neither the close nor the output
 ok - fm-send: a send that states no choice refuses before anything durable and lists every open key
 ok - fm-send: the refusal happens before a secondmate target is marked or its reply expectation is created
-ok - fm-send: through real containment, only its one gate event precedes the no-choice, contradictory and unknown-open-set refusals; telemetry, banner and lease come after
+ok - fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error) and unknown-open-set refusals; telemetry, banner and lease come after
+ok - fm-send: a held lease answers 6 before an option error, as on base; with no lease the option error answers 1
 ok - fm-send: -- ends the options, so a literal body starting with -- is sent and the contradictory pair still refuses
 ok - fm-send: sends to tasks with no open keyed decision are delivered exactly as before
 ok - fm-send --answers-none: delivers a routine steer, appends nothing, and leaves every key open
@@ -38,3 +40,4 @@ ok - fm-send: --key sends and explicit backend targets are not subject to the ch
 ok - fm-send: an unreadable (past-the-limits) status log refuses a bare send rather than guessing
 ok - fm-send callers: the CONFIG_REREAD pointer reaches a mate that has an open keyed decision and leaves it open
 ok - fm-send: the three recorded cases of 2026-11-03 refuse a bare answer; the keyed answer leaves the drain's open set without the key
+bash tests/fm-send-resolve-key.test.sh  33.50s user 72.85s system 75% cpu 2:21.07 total
