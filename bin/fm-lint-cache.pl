@@ -28,9 +28,11 @@ use File::Basename qw(dirname basename);
 # after the root is reaped and its pid reused. It returns "sent", "gone" (no such
 # process), "mismatch" (another process, or another group: nothing sent),
 # "unreadable" (nothing sent) or "refused" (no launch record). There is no command
-# line route to it. Three own-child signals stay by pid, as on the base: the watch
-# ends its own reader with KILL when it has not exited 2 s after its input closed,
-# and the gate and the check mode forward TERM to their own unreaped child.
+# line route to it. Three own-child signals stay by pid: the gate and the check mode
+# forward TERM to their own unreaped child, as on the base; the watch ends its own
+# reader with KILL, which this change keeps but narrows (the base killed the reader
+# at once when it stopped it; now only a reader still running 2 s after its input
+# closed is killed).
 my $ROOT_SIGNAL_PY = <<'PYTHON';
 import importlib.util, os, signal, struct, sys
 LINUX = os.path.exists("/proc/self/stat")

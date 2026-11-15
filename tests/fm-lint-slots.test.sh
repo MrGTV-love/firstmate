@@ -877,7 +877,10 @@ test_host_budget_default_is_one_number_stated_by_both_docs() {
   case "$kib" in ''|*[!0-9]*) fail "the roots log did not publish the host budget: '$kib'" ;; esac
   bytes=$((kib * 1024))
   # The contract's rule: at or below the smallest ShellCheck aggregate in the
-  # pressure-level-2 readings of state/memory-readings.jsonl: 3673.8125 MiB.
+  # pressure-level-2 readings of state/memory-readings.jsonl. 3761984 KiB is that
+  # figure for the superseded 2026-11-06 window (1344 readings). The M1 snapshot of
+  # 2026-11-15 (3207 readings) has a smaller one, 692704 KiB, below the budget; by
+  # M3 (a) that goes to Main for a decision on the budget, which is not changed here.
   smallest_level_two_kib=3761984
   [ "$kib" -le "$smallest_level_two_kib" ] \
     || fail "the default budget $kib KiB is above the smallest level-2 aggregate $smallest_level_two_kib KiB"

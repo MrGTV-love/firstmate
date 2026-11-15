@@ -98,25 +98,32 @@
 # is ended at the per-root cap
 # (FM_LINT_ROOT_RSS_KIB, default 8388608 KiB = 8 GiB; a larger value is clamped
 # to that default, and stderr and the roots log name the requested and the applied
-# value). The residual host total of one lone root, R, is therefore that cap plus
-# the watch's sampling overshoot, set from this repository's measured runs: R =
-# 11227136 KiB = 11496587264 bytes (10.71 GiB), the largest peak of any root in the
-# real runs (10948657152 bytes, tests/fm-launch-prompt-signals-live-e2e.test.sh in
-# the head run) times 1.05, rounded up to a whole MiB. The peak is the watch's own
-# reading, the larger of resident size and physical footprint of the root's whole
-# tree, which is the figure the watch compares with the cap and writes to the
-# roots log; the per-process sampler read 10685235200 bytes for the same root.
-# The watch is not tightened to end a root that needs that memory.
+# value). R, the residual host total of one lone root, is the contract's
+# constant: R = 10353888 KiB = 10602381312 bytes. No code path compares a root
+# with R or with H_cal; a lone root is held only by the per-root cap above. H_cal,
+# the host memory calibration Main recorded (Main 1566/1572), is that cap plus the
+# watch's sampling overshoot measured in this repository's runs: H_cal = 11227136
+# KiB = 11496587264 bytes (10.71 GiB), the largest peak of any root in those runs
+# (10948657152 bytes, tests/fm-launch-prompt-signals-live-e2e.test.sh, in the
+# after-run of head f61015af on 2026-11-07, evidence m2) times 1.05, rounded up to
+# a whole MiB. The peak is the watch's own reading, the larger of resident size and
+# physical footprint of the root's whole tree, which is the figure the watch
+# compares with the cap and writes to the roots log; the per-process sampler read
+# 10685235200 bytes for the same root. The watch is not tightened to end a root
+# that needs that memory.
 # Measured basis (this repository's real full lint, sampled every 0.25 s, each
-# ShellCheck process attributed to its lint run by its parent chain):
-#   the lint before this change peaked at T = 13.31 GiB (14287716352 bytes) with
-#   two roots, above the budget;
-#   the lint with this budget had at most 3.05 GiB (3271426048 bytes) with two
-#   roots, and no sample above the budget;
-#   the smallest ShellCheck total among the memory-pressure level 2 readings in
-#   state/memory-readings.jsonl (processes among the ten largest) is
-#   3673.8125 MiB = 3761984 KiB (2026-11-02T21:11:32Z, 2 processes), 91968 KiB
-#   above the budget; the six other such readings are 10.4 to 12.8 GiB.
+# ShellCheck process attributed to its lint run by its parent chain). These are
+# figures of earlier runs, none of the delivered head:
+#   the before-run at base 37a733cba (2026-11-07T07:03Z, evidence m2) peaked at
+#   T = 13.31 GiB (14287716352 bytes) with two roots, above the budget;
+#   the real pair at head f61015af (2026-11-07T08:45Z, evidence m3/real-pair) had
+#   at most 3.05 GiB (3271426048 bytes) with two roots, and no sample above the
+#   budget;
+#   the smallest ShellCheck total among the memory-pressure level 2 readings of
+#   the readings snapshot of 2026-11-15T18:16:26Z (3207 lines of
+#   state/memory-readings.jsonl; processes among the ten largest) is 676.5 MiB =
+#   692704 KiB (2026-11-08T16:23:52Z, 1 process), below the budget; the 52 such
+#   readings hold 0.66 to 17.35 GiB of ShellCheck.
 # An unrecorded root is charged more than that budget (the 8 GiB watch bound
 # below), so with no history each root runs alone, and recorded roots share the
 # budget.
@@ -186,15 +193,15 @@
 # was measured on, the sum of the charges is at most the budget at every admission.
 # THE BOUND THIS GIVES, stated exactly (Main 1566, Design A; Main 1572): only
 # the charges taken at admission bound T, and only at admission, where T is at
-# most the budget; nothing after admission guarantees R. Afterwards, T is at
+# most the budget; nothing after admission guarantees R or H_cal. Afterwards, T is at
 # most the budget plus the sum, over
 # the running roots, of (actual peak minus charge) where that is positive, each
 # root being ended at the 8 GiB per-root cap (plus the watch's sampling overshoot,
-# R above). The 10 percent and 64 MiB margin covers the 8.5 percent run-to-run
+# H_cal above). The 10 percent and 64 MiB margin covers the 8.5 percent run-to-run
 # variation of one root's peak measured in this repository's runs (largest ratio
 # 1.085 over 463 common roots, 0 of 2632 samples with two or more roots above the
 # budget); it is not a proof for a root that grows past it. The ceiling of that
-# expression is not R: roots that all grow from their charges to the 8 GiB cap
+# expression is not R or H_cal: roots that all grow from their charges to the 8 GiB cap
 # together could hold the number of admitted roots times 8 GiB (an algebraic
 # ceiling, never measured here: with this host's 41 roots admissible at once it
 # is 352262914048 bytes, about 328 GiB. It is unmeasured, so no ceiling is
@@ -293,9 +300,11 @@
 # start time before the root executes and signals only that root's group, after
 # proving the group's leader unchanged (to end it, or to stop and resume it while
 # the growth guard holds it), and acts on every signal result. Three own-child
-# signals stay by pid, as on the base: the watch ends its own memory reader with
-# KILL when it has not exited 2 s after its input closed, and the gate and the check
-# helper forward TERM to their own unreaped child when they are signalled. A counted process that
+# signals stay by pid: the gate and the check helper forward TERM to their own
+# unreaped child when they are signalled, as on the base; and the watch ends its own
+# memory reader with KILL, which this change keeps but narrows (the base killed the
+# reader at once when it stopped it; now only a reader still running 2 s after its
+# input closed is killed). A counted process that
 # still runs after its root has ended, a normal success included, fails the root
 # (status 96), stops new admissions, and is named in the roots log's samples column
 # as escaped. Each reader reply is bound to the processes it measured: every member
