@@ -5991,13 +5991,17 @@ sys.exit(code)
     # ---- Round 3, finding 3: slow successful calls of theirs; finding 4: the owner's wake never waits for their work ----
 
     def test_r3_f3_a_journaled_request_of_theirs_is_delivered_once_while_every_call_of_theirs_stays_slow(self):
-        # Every call of theirs succeeds but takes delay seconds (fake clock), below the 10 s socket ceiling, in every run; the request must be woken and acknowledged
-        # exactly once within three fresh runs.
-        for delay in ('7.0', '9.9'):
-            with self.subTest(delay=delay), self.home() as home:
+        # Every call of theirs succeeds but takes delay seconds (fake clock). A request needs three calls of theirs (the DM proof, the read and the acknowledgement):
+        # under the total 12 s deadline of Main 1593 those fit when each takes 3.9 s, and the request is woken and acknowledged exactly once within three runs.
+        # When every call takes 7 s or 9.9 s no run can finish them (round 7: a call is not begun when it would end after the deadline): nothing is woken,
+        # posted or lost, and the request is delivered once as soon as the calls are faster.
+        for slow in ('7.0', '9.9'):
+            with self.subTest(slow=slow), self.home() as home:
                 home.cli('poll')                                          # their window starts
                 home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
-                captured = [self.run_check(home, 'slow', 'run%d' % n, delay=delay)[1] for n in range(3)]
+                stalled = [self.run_check(home, 'slow', 'slow%d' % n, delay=slow)[1] for n in range(2)]
+                self.assertEqual((sum(len(self.wakes_of(c, INV_SECOND)) for c in stalled), home.posts().count((INV_SECOND_DM, '200.000200'))), (0, 0), stalled)
+                captured = [self.run_check(home, 'slow', 'run%d' % n, delay='3.9')[1] for n in range(3)]
                 self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
                 self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
@@ -6042,8 +6046,11 @@ sys.exit(code)
             home.edit_replay(lambda data: data['failures'].update({'chat.postMessage:200.000200': {'status': 503, 'times': 1}}))
             self.run_check(home, 'normal', 'attempt')                       # the first post is ambiguous: the attempt mark stays
             self.assertTrue(any(r.get('attempted') for r in self.second_rows(home)), self.second_rows(home))
-            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='7.0')[1] for n in range(3)]
-            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
+            # 7 s calls: the DM proof, the lookup and the post cannot all end inside the total deadline (Main 1593); nothing is posted twice or lost meanwhile.
+            stalled = [self.run_check(home, 'slow', 'stall%d' % n, delay='7.0')[1] for n in range(2)]
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 0, stalled)
+            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='3.9')[1] for n in range(3)]
+            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in stalled + captured), 1, captured)
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
     def second_rows(self, home):
@@ -6098,7 +6105,10 @@ sys.exit(code)
             self.assertEqual(rc, 0)
             self.assertTrue(calls, 'their check makes their calls')
             self.assertEqual(self.wakes_of(second_run, INV_OWNER), [])
-            later = [self.run_check(home, 'normal', 'second-check-%d' % n, command='check-second')[1] for n in range(2)]
+            later = []
+            for n in range(2):                                   # later sweeps: the owner's check first, as the watcher runs them (finding 8 of round 7: a check of
+                self.run_check(home, 'normal', 'owner-check-%d' % n, command='check')        # theirs with no hand-over from an owner check takes nothing)
+                later.append(self.run_check(home, 'normal', 'second-check-%d' % n, command='check-second')[1])
             self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in [second_run] + later), 1, [second_run] + later)
 
     def test_r6_f6_one_shared_cap_with_the_owner_first(self):
@@ -6118,8 +6128,11 @@ sys.exit(code)
             self.run_check(home, 'normal', 'attempt')
             for n in range(101):
                 home.say('200.%06d' % (300 + n), 'a reply in their thread', user=INV_SECOND, dm=INV_SECOND_DM, thread_ts='200.000200')
-            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='7.0')[1] for n in range(4)]
-            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
+            # Two pages of lookup, the DM proof and the post need more than one run at 3.9 s a call: the kept page progress lets a later run post (Main 1593).
+            stalled = [self.run_check(home, 'slow', 'stall%d' % n, delay='7.0')[1] for n in range(2)]
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 0, stalled)
+            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='3.9')[1] for n in range(4)]
+            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in stalled + captured), 1, captured)
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
     def test_r6_f3_a_resumed_owner_row_that_uses_the_cap_never_moves_the_first_activation_past_their_request(self):
@@ -7124,7 +7137,10 @@ class Round6TotalBound(InvariantScenario):
                                  'the owner wake waited %.1f s for their check' % (sweep_end - owner_done))
             self.assertEqual(self.wakes_of(second_run, INV_SECOND), [])
             server.mode = 'fast'
-            later = [self.run_check(home, 'trickle', 'second-check-%d' % n, command='check-second', server=server.url)[1] for n in range(2)]
+            later = []
+            for n in range(2):                                   # later sweeps: the owner's check first, as the watcher runs them
+                self.run_check(home, 'trickle', 'owner-check-%d' % n, command='check', server=server.url)
+                later.append(self.run_check(home, 'trickle', 'second-check-%d' % n, command='check-second', server=server.url)[1])
             self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in later), 1, later)
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
             self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
@@ -7420,7 +7436,7 @@ class Round7Findings(InvariantScenario):
     # ---- finding 4: the second check keeps Slack's clock, and a held window recovers in the separate checks ----
 
     def test_r7_f4_with_the_host_clock_ahead_of_slack_the_separate_checks_record_slacks_time_and_take_the_request_in(self):
-        with self.home(scott=None) as home, patch.object(plane, 'host_now', lambda: 300.0):
+        with self.home(scott=None, history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
             home.trust_check()
             home.set_clock(100.0)
             home.check_pass()
@@ -7583,7 +7599,10 @@ class Round7Findings(InvariantScenario):
             self.assertIn('bounded-alive 0', log)
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)          # Slack accepted the post whose answer was cut off
             server.mode = 'fast'
-            later = [self.run_check(home, 'trickle', 'later-%d' % n, command='check-second', server=server.url)[1] for n in range(2)]
+            later = []
+            for n in range(2):                                # later sweeps: the owner's check, then theirs
+                self.run_check(home, 'normal', 'later-owner-%d' % n, command='check')
+                later.append(self.run_check(home, 'trickle', 'later-%d' % n, command='check-second', server=server.url)[1])
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
             posts = [cid for method, cid in server.received if method == 'chat.postMessage']
             self.assertEqual(len(posts), len(set(posts)), server.received)
@@ -7609,7 +7628,7 @@ class Round7Findings(InvariantScenario):
             holder.close()
             self.assertLessEqual(elapsed, plane.SECOND_BUDGET + 2.0, 'their check waited %.1f s for the lock' % elapsed)
             self.assertEqual(first.rc, 0, (first.out, first.err))
-            later = home.cli('check', action='check-second')
+            later = home.check_pass()                         # the next sweep: the owner's check, then theirs
             self.assertEqual(self.woken([first, later]), ['200.000200'])
 
 
