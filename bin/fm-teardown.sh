@@ -5633,9 +5633,12 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
     retire)
       [ -z "$TEARDOWN_UNCLAIMED_EARLY$TEARDOWN_UNCLAIMED_SLOT" ] || teardown_unclaimed_retire_gate || exit 1
       # The first step of the route proper, once the gate has proved the lease and before
-      # any helper acts: the return-pending marker, so a helper that fails after some
-      # of its work always leaves the retry obligation (Main 1817). Never earlier: the
-      # gate's refusals write none, since a marker on a task whose route could not even
+      # any helper acts: the return-pending marker is written again here, so a helper that
+      # fails after some of its work always leaves the retry obligation (Main 1817). The
+      # marker already exists from the slot reservation, which writes it before the gate
+      # runs (teardown_mark_return_pending after teardown_reserve_pool_slot), so a refusal
+      # by the gate keeps that marker. Only the early refusals of an unsafe claim and of an
+      # unavailable home write none, since a marker on a task whose route could not even
       # be bound would read as an interrupted teardown (Main 1780).
       [ -z "$TEARDOWN_UNCLAIMED_SLOT" ] || teardown_mark_return_pending "$TEARDOWN_UNCLAIMED_SLOT" || exit 1
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
