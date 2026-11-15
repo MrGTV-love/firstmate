@@ -220,9 +220,10 @@ The secondmate restart decides attribution before its pending-reply record, pers
 It reads the backend for that local decision from the mate's own record, so an early capability refusal still asks the verdict owner before a fallback nudge.
 For a mate whose record names a `remote_host`, the restart reads the same decision on its host through the read-only `fm-remote-secondmate-control.sh attribution` verb, whatever its capability verdict.
 The decision is bound to the route the parent recorded: the registry route for the id must name the recorded `remote_host`, `remote_root` and `home`, the record must name a `remote_target`, and the host refuses unless its own endpoint target is exactly that recorded target.
-The restart keeps that one compared route per mate and rechecks the registry row and record before it creates any pending-reply expectation, so a route that changed after the decision refuses with no expectation created.
-Every later effect on the mate, its persistence request, its fallback nudge and its relaunch, carries that compared route: `bin/fm-on.sh` refuses before ssh when `FM_ON_EXPECTED_HOST`, `FM_ON_EXPECTED_ROOT` and `FM_ON_EXPECTED_HOME` differ from the route it resolves, `bin/fm-send.sh` refuses before any pending-reply record when the record's route differs, and the host `send` verb refuses an endpoint other than its `expected-target`.
-Unset, those expectations leave both scripts unchanged.
+The restart keeps one compared route per mate, for a local mate its placement and endpoint and for a remote mate its host, root, home and target, also after an early capability refusal.
+Before it creates any pending-reply expectation it runs a check-only decision again, which for a remote mate asks the host again (its endpoint and its agent), and that decision must name the same route, so a route, placement or endpoint that changed after the first decision refuses with no expectation created.
+Every later effect on the mate, its persistence request, its fallback nudge and its relaunch, carries that compared route: `bin/fm-on.sh` refuses before ssh when `FM_ON_EXPECTED_HOST`, `FM_ON_EXPECTED_ROOT` and `FM_ON_EXPECTED_HOME` differ from the route it resolves, `bin/fm-send.sh` refuses before any pending-reply record when the resolved placement, endpoint or route differs (`FM_SEND_EXPECTED_PLACEMENT`, `FM_SEND_EXPECTED_ENDPOINT` for a local mate), and the host `send` and `relaunch` verbs refuse an endpoint other than the compared target (the relaunch through `FM_REMOTE_RELAUNCH_EXPECTED_TARGET` in `bin/fm-remote-secondmate-relaunch.sh`).
+Unset, those expectations leave these scripts unchanged.
 It goes on only on the exact bytes `attribution=proceed` plus one newline with a zero transport status.
 A `remote_backend` other than herdr (omitted means herdr), a refusal, no answer, extra output, or a host whose code lacks the verb leaves the mate unreached with nothing sent.
 The verb validates the home before it loads anything beyond the backend dispatcher, loads nothing that writes when sourced, writes nothing, and creates no directory.
@@ -234,13 +235,14 @@ A recorded endpoint or matching cwd alone never proves live task ownership; the 
 The stopped-agent exception requires process-backed absence even when Herdr has not registered an agent; a live process still requires launch attribution, and unreadable process evidence refuses recovery.
 Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch of a record with `launch_proof`.
 A record published before launch proofs existed (a readable record with no `launch_proof` line at all) keeps the earlier rule: its live agent at the validated endpoint is attributed without a pin, and its relaunch publishes a proven launch.
-A record that is missing or unreadable, or holds an empty `launch_proof` value, two or more `launch_proof` lines, or an unknown proof, is no legacy record and refuses.
+A record that is missing or unreadable, or holds an empty `launch_proof` value, two or more `launch_proof` lines, or any value that is not a known proof (the literal `legacy` included), is no legacy record and refuses.
+One decision reads the record once, and every field it uses comes from those bytes; a proof that reads the record again compares it byte for byte and refuses on a change.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.
 Every launch crosses an `env -i` boundary; without `config/launch-env-allowlist` a clean instance of the destination pane's own shell runs it, and an enabled allowlist still selects the POSIX-sh boundary.
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
-A process that Herdr lists but the later process table lacks is unaccounted for, so attribution refuses; a failed or partial table read, a broken chain, or two agents also read `unknown`.
+A process that Herdr lists but a later process table lacks is unaccounted for, so attribution refuses, and the refusal checks judge every listed process from their one process-group table; a failed or partial table read, a broken chain, or two agents also read `unknown`.
 On the ordinary launch-proof route, the kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
 That matching live pin proves the launch incarnation, including interpreter-based harnesses and older records without a launch-proof field.
 On a record with `launch_proof=env-v1`, for every harness, that pin is `managed` only after the refusal checks described in [A restored claude agent](#a-restored-claude-agent) pass; a legacy record keeps its pre-proof rule.
