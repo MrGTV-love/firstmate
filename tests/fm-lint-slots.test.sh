@@ -1401,16 +1401,21 @@ test_the_roots_log_keeps_the_time_reading_and_the_watch_peak_in_separate_columns
   local tmp row time_rss watch_peak
   [ -x /usr/bin/time ] || { pass "SKIP (no /usr/bin/time): roots log peak columns"; return; }
   tmp=$(fm_test_tmproot fm-lint-peak-columns)
+  # The worker runs under a lint run's entry (the owner stand-in), in a copy whose
+  # host-wide directory is the test's own.
+  local repo
+  repo=$(fm_lint_isolated_copy "$tmp" peaks)
+  fm_lint_write_owner_stand_in "$tmp/owner" "$repo" "$(command -v python3)"
   mkdir -p "$tmp/bin" "$tmp/w/out"
   fm_lint_write_barrier_shellcheck "$tmp/bin" 24 "$tmp/barrier.log"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/w/root.sh"
   printf '0\t%s\n' "$tmp/w/root.sh" > "$tmp/w/manifest"
-  env FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_CACHE=off FM_LINT_INTERNAL_SLOT_DIR="$tmp/w/slots" FM_LINT_INTERNAL_NCPU=18 \
-    FM_LINT_INTERNAL_RUN_ID=peaks FM_LINT_INTERNAL_BOUNDED=none FM_LINT_INTERNAL_MEMORY_KIB=2097152 \
-    FM_LINT_INTERNAL_RSS_KIB=2097152 FM_LINT_INTERNAL_ROOT_SECS=20 FM_LINT_INTERNAL_GRACE=1 \
+  FM_TEST_RUN_MEMORY_KIB=2097152 FM_TEST_RUN_RSS_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
+    env FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_CACHE=off FM_LINT_INTERNAL_SLOT_DIR="$tmp/w/slots" FM_LINT_INTERNAL_NCPU=18 \
+    FM_LINT_INTERNAL_RUN_ID=peaks FM_LINT_INTERNAL_ROOT_SECS=20 FM_LINT_INTERNAL_GRACE=1 \
     FM_LINT_INTERNAL_ROOTS_LOG="$tmp/roots.tsv" FM_LINT_SHELLCHECK="$tmp/bin/shellcheck" FM_TEST_MEM_HOLD=2.5 \
     PATH="$tmp/bin:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/w" \
-    bash "$LINT" --internal-worker "$tmp/w/manifest" "$tmp/w/out" 0 > "$tmp/worker.out" 2>&1 \
+    bash "$repo/bin/fm-lint.sh" --internal-worker "$tmp/w/manifest" "$tmp/w/out" 0 > "$tmp/worker.out" 2>&1 \
     || fail "the worker failed: $(cat "$tmp/worker.out")"
   row=$(awk -F '\t' '$1 == "end"' "$tmp/roots.tsv")
   [ -n "$row" ] || fail "the roots log has no end row: $(cat "$tmp/roots.tsv")"
@@ -2584,7 +2589,13 @@ test_slot_survives_gate_death() {
   local tmp bounded=none
   if fm_lint_bounds_supported; then bounded=perl; fi
   tmp=$(fm_test_tmproot fm-lint-slot-inheritance)
-  perl - "$LINT" "$ROOT/bin/fm-lint-cache.pl" "$tmp" "$bounded" <<'PL' || fail "slot lifetime regression failed"
+  # The worker runs under a lint run's entry, in a copy whose host-wide directory
+  # is the test's own.
+  local repo
+  repo=$(fm_lint_isolated_copy "$tmp" death)
+  fm_lint_write_owner_stand_in "$tmp/owner" "$repo" "$(command -v python3)"
+  FM_TEST_RUN_BOUNDED="$bounded" FM_TEST_RUN_MEMORY_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
+    perl - "$repo/bin/fm-lint.sh" "$repo/bin/fm-lint-cache.pl" "$tmp" "$bounded" <<'PL' || fail "slot lifetime regression failed"
 use strict;
 use warnings;
 use File::Path qw(make_path);
@@ -2715,7 +2726,13 @@ test_queued_roots_use_high_resolution_timings() {
   local tmp bounded=none
   if fm_lint_bounds_supported; then bounded=perl; fi
   tmp=$(fm_test_tmproot fm-lint-slot-clock)
-  perl - "$LINT" "$tmp" "$bounded" <<'PL' || fail "queued root clock regression failed"
+  # The worker runs under a lint run's entry, in a copy whose host-wide directory
+  # is the test's own.
+  local repo
+  repo=$(fm_lint_isolated_copy "$tmp" clock)
+  fm_lint_write_owner_stand_in "$tmp/owner" "$repo" "$(command -v python3)"
+  FM_TEST_RUN_BOUNDED="$bounded" FM_TEST_RUN_MEMORY_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
+    perl - "$repo/bin/fm-lint.sh" "$tmp" "$bounded" <<'PL' || fail "queued root clock regression failed"
 use strict;
 use warnings;
 use Fcntl qw(:flock);
@@ -3154,8 +3171,7 @@ SH
 test_cache_key_wait_preserves_root_retry_budget() {
   local tmp repo fakebin out
   tmp=$(fm_test_tmproot fm-lint-cache-retry-clock)
-  repo="$tmp/repo"
-  fm_lint_small_repo "$repo"
+  repo=$(fm_lint_isolated_copy "$tmp" retry)
   fakebin=$(fm_fakebin "$tmp/fake")
   cat > "$fakebin/shellcheck" <<'SH'
 #!/usr/bin/env bash
@@ -3188,7 +3204,10 @@ ulimit() {
 }
 SH
   fi
-  perl - "$repo/bin/fm-lint.sh" "$fakebin/shellcheck" "$tmp" <<'PL' || fail "cache queue consumed the memory retry budget"
+  # The worker runs under a lint run's entry (the owner stand-in).
+  fm_lint_write_owner_stand_in "$tmp/owner" "$repo" "$(command -v python3)"
+  FM_TEST_RUN_BOUNDED=perl FM_TEST_RUN_MEMORY_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
+    perl - "$repo/bin/fm-lint.sh" "$fakebin/shellcheck" "$tmp" <<'PL' || fail "cache queue consumed the memory retry budget"
 use strict;
 use warnings;
 use File::Path qw(make_path);
@@ -4413,7 +4432,9 @@ test_an_inherited_census_switch_never_turns_a_lint_into_a_success() {
 # fm-lint.sh (so it is recognised as a lint owner) that writes a run entry into the
 # copy's host ledger the way bin/fm-lint.sh does, holds its flock on descriptor 9,
 # and runs the rest of its arguments as its child with FM_LINT_INTERNAL_RUN_ENTRY
-# set. The run entry names the given python and the copy's default limits.
+# set. The run entry names the given python and the bound mechanism and limits in
+# FM_TEST_RUN_BOUNDED, FM_TEST_RUN_MEMORY_KIB and FM_TEST_RUN_RSS_KIB (none,
+# 12582912 and 262144 by default).
 fm_lint_write_owner_stand_in() {
   local dir=$1 repo=$2 python=$3 perl_bin
   perl_bin=$(command -v perl)
@@ -4423,7 +4444,7 @@ fm_lint_write_owner_stand_in() {
 ledger=\$(sed -n 's/^HOST_POOL_ROOT=//p' '$repo/bin/fm-lint.sh')/admission.lock.ledger
 mkdir -p "\$ledger"
 entry="\$ledger/run.\$\$.1"
-printf '%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' none 12582912 262144 > "\$entry"
+printf '%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' "\${FM_TEST_RUN_BOUNDED:-none}" "\${FM_TEST_RUN_MEMORY_KIB:-12582912}" "\${FM_TEST_RUN_RSS_KIB:-262144}" > "\$entry"
 exec 9>>"\$entry"
 '$perl_bin' -MFcntl=:flock -e 'open(my \$fh, ">>&=", 9) or exit 1; flock(\$fh, LOCK_EX | LOCK_NB) or exit 1' || exit 9
 rc=0
