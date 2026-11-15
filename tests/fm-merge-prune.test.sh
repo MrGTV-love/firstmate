@@ -270,9 +270,11 @@ exit 0
 SH
   cat > "$W/bin/tmux" <<'SH'
 #!/usr/bin/env bash
-# Stand-in for tmux: answers the question for the pane's shell pid, and a
-# capture with the content of PANE_TAIL_FILE.
+# Stand-in for tmux: answers the question for the pane's shell pid, a capture
+# with the content of PANE_TAIL_FILE, and the window inventory with the names in
+# LIVE_WINDOWS_FILE (one per line; none when it is absent).
 case "$*" in
+  list-windows*) [ -s "${LIVE_WINDOWS_FILE:-}" ] && cat "$LIVE_WINDOWS_FILE" ;;
   *'#{pane_pid}'*) [ -s "$PANE_PID_FILE" ] && cat "$PANE_PID_FILE" ;;
   capture-pane*) [ -s "${PANE_TAIL_FILE:-}" ] && cat "$PANE_TAIL_FILE" ;;
 esac
@@ -3844,7 +3846,8 @@ xl_env_list() {
     FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" CONTROL_LOG="$W/control.log"
     WORKER_PID_FILE="$W/worker.pid" PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal"
     SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" STOP_FAIL_FILE="$W/stop-fail"
-    BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh")
+    BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" LIVE_WINDOWS_FILE="$W/live-windows"
+    ${V5_GIT_ENV[@]+"${V5_GIT_ENV[@]}"})
 }
 xl_env() {
   xl_env_list
@@ -3854,6 +3857,8 @@ xl_env() {
 # make_xlane_world: lane O's world, then a second home for lane M.
 make_xlane_world() {
   local head
+  # Only the V5 world maps a GitHub origin URL to the local repository; every world starts without it.
+  V5_GIT_ENV=()
   NO_SQUASH=1 make_e2e_world
   head=$(git -C "$COPY" rev-parse HEAD)
   XL_HEAD=$head
@@ -3899,11 +3904,11 @@ SH
   cat > "$W/bin/forge-merge" <<SH
 #!/usr/bin/env bash
 set -e
-git -C "$COPY" fetch -q origin
-tree=\$(git -C "$COPY" merge-tree --write-tree refs/remotes/origin/main '$head' | head -1)
-squash=\$(git -C "$COPY" commit-tree "\$tree" -p "\$(git -C "$COPY" rev-parse refs/remotes/origin/main)" -m "task work (#7)")
-git -C "$COPY" push -q origin "\$squash:refs/heads/main"
-git -C "$COPY" fetch -q origin
+# Done inside the forge's own repository, as a forge merges: no copy's remote setup is involved.
+main=\$(git -C "$ORIGIN" rev-parse refs/heads/main)
+tree=\$(git -C "$ORIGIN" merge-tree --write-tree "\$main" '$head' | head -1)
+squash=\$(git -C "$ORIGIN" -c user.email=t@t -c user.name=t commit-tree "\$tree" -p "\$main" -m "task work (#7)")
+git -C "$ORIGIN" update-ref refs/heads/main "\$squash" "\$main"
 printf 'MERGED\n' > "$W/forge.state"
 SH
   chmod +x "$W/bin/gh" "$W/bin/gh-axi" "$W/bin/forge-merge"
@@ -4032,6 +4037,17 @@ xl_plain_teardown() {  # <stderr file>
   return "$rc"
 }
 
+# xl_assert_no_stray_wake_for_a <label>: discovery needed no wake or signal. Nothing
+# in these tests drains the queue, so a wake that fired stays in it. The only wake
+# that may name A is its own merge poll's report, which exists only after the pass
+# registered the PR; a status signal for the done note, or any other wake naming A,
+# fails (Main 1686 F6). The contributions observer's unrelated wake is not A's.
+xl_assert_no_stray_wake_for_a() {  # <label>
+  local stray
+  stray=$(grep -E 't1|pull/7' "$STATE/.wake-queue" 2>/dev/null | grep -v 'contributions' | grep -v 'check: merge landed: t1 ' || true)
+  [ -z "$stray" ] || fail "$1: a wake or signal named A outside its own merge report: $stray"
+}
+
 # xl_t1_rows: t1's rows in O's open-work ledger, one "category | owner | informational | next action" line each.
 xl_t1_rows() {
   xl_env "$ROOT/bin/fm-open-loops.sh" --json 2> "$W/ledger.err" \
@@ -4046,6 +4062,33 @@ xl_observe_stranded() {
   printf '%s: O ledger rows for t1: %s\n' "$1" "$(xl_t1_rows | paste -sd ';' - | sed 's/^$/none/')"
   xl_plain_teardown "$W/observe-teardown.txt" || true
   printf '%s: plain teardown of t1: %s\n' "$1" "$(grep -m1 -E 'REFUSED|refused|error|not landed' "$W/observe-teardown.txt" | sed 's/^$/no refusal line/')"
+}
+
+# The validators themselves can fail (Main 1686 F6): each is fed a state that
+# breaks its contract and must reject it, and a compliant state it must accept.
+test_xlane_validators_reject_what_their_contracts_reject() {
+  local before
+  make_xlane_world
+  # A closeout with no teardown call on record, or a forced one, is not a plain teardown.
+  : > "$W/stub.log"
+  ! ( assert_closed_by_plain_teardown "self-test empty" t1 ) 2>/dev/null || fail "an empty teardown call log passed as a plain teardown"
+  printf 't1 --force\n' > "$W/stub.log"
+  ! ( assert_closed_by_plain_teardown "self-test forced" t1 ) 2>/dev/null || fail "a forced teardown call passed as a plain teardown"
+  printf 't1\n' > "$W/stub.log"
+  ( assert_closed_by_plain_teardown "self-test plain" t1 ) || fail "one plain teardown call for t1 was rejected"
+  # A status signal naming A is a wake discovery did not need; A's own merge report is not.
+  printf '1\t1\tcheck\tmerged-t1-x\tcheck: merge landed: t1 %s external\n' "$XL_PR" > "$STATE/.wake-queue"
+  ( xl_assert_no_stray_wake_for_a "self-test merge report" ) || fail "A's own merge report was taken for a stray wake"
+  printf '2\t2\tsignal\tt1\tsignal: t1 done [key=close-evidence]\n' >> "$STATE/.wake-queue"
+  ! ( xl_assert_no_stray_wake_for_a "self-test signal" ) 2>/dev/null || fail "a status signal naming A passed as no wake"
+  rm -f "$STATE/.wake-queue"
+  # The V7 fingerprint covers the claimant's status file.
+  xl_protection_case conflicting-owner
+  before=$(xl_v7_fingerprint)
+  printf 'working [at=%s]: changed by the closeout\n' "$NOW" >> "$STATE/other-live.status"
+  [ "$before" != "$(xl_v7_fingerprint)" ] || fail "the V7 fingerprint did not change when the claimant's status file changed"
+  cleanup_workers
+  pass "the V3 and V7 validators reject an empty or forced teardown log, a stray signal for A, and a changed claimant status, and accept the compliant states"
 }
 
 test_xlane_merge_by_another_lane_reaches_safe_closeout() {
@@ -4082,11 +4125,7 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
     [ ! -e "$STATE/t1.check.sh" ] && [ ! -e "$STATE/t1.pr-poll" ] || fail "$variant: the poll file outlived the record"
     xl_events_in_order task.merged task.cleaned_up || fail "$variant: O's ledger lacks task.merged then task.cleaned_up for t1: $(xl_ledger_events)"
     assert_closed_by_plain_teardown "xlane $variant" t1
-    # Discovery needed no wake or signal: nothing in this test drains the queue, so a wake that fired stays
-    # in it. The only wake that may name A is its own merge poll's report, which exists only after the
-    # pass registered the PR; a status signal for the done note, or any other wake naming A, fails.
-    stray=$(grep -E 't1|pull/7' "$STATE/.wake-queue" 2>/dev/null | grep -v 'contributions' | grep -v 'check: merge landed: t1 ' || true)
-    [ -z "$stray" ] || fail "$variant: a wake or signal named A outside its own merge report: $stray"
+    xl_assert_no_stray_wake_for_a "$variant"
     [ ! -e "$XL_MC/state/t1.meta" ] || fail "$variant: lane M holds a record for t1"
     cleanup_workers
   done
@@ -4443,6 +4482,9 @@ make_v5_world() {
     "$(date -u -r "$((V5_NOW + 172800))" +%Y-%m-%dT%H:%MZ)" > "$STATE/t-c.status"
   printf 'done [at=%s]: PR %s checks green\n' "$((V5_NOW - 7200))" "$V5_E_PR" > "$STATE/t-e.status"
   printf 'working [at=%s]: idle\n' "$((V5_NOW - 90000))" > "$STATE/mate1.status"
+  # C's worker and D's secondmate are live: their windows are in the inventory, so the
+  # ledger classifies them as live endpoints instead of returning early on a missing one.
+  printf '%s\n' fm-t-c fm-mate1 > "$W/live-windows"
   for id in t-b t-c t-e mate1; do
     fm_touch_epoch "$(sed -n 's/^[a-z]* \[at=\([0-9]*\)\].*/\1/p' "$STATE/$id.status")" "$STATE/$id.status"
   done
@@ -4613,7 +4655,11 @@ test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
   # C keeps its wait and is not stranded.
   [ -e "$STATE/t-c.meta" ] || fail "C: the record was removed"
   grep -q 'waiting on Main decision d9' "$STATE/t-c.status" || fail "C: the wait was changed"
-  ! v5_rows "$W/l3.json" '^t-c' | awk -F'\t' '$4 == "true" || $1 ~ /^pending_/ {bad=1} END {exit !bad}' || fail "C: reported as stranded or overdue: $(v5_rows "$W/l3.json" '^t-c')"
+  # C's worker is live and waiting on a named decision: it is never stranded, missing or owed
+  # cleanup. The inherited long-wait check-in (silent_report after FM_PAUSE_RESURFACE_SECS; Main
+  # 038 ruling (b), a stated limit) may resurface it, and only that row may be overdue.
+  ! v5_rows "$W/l3.json" '^t-c' | awk -F'\t' '$1 ~ /^pending_/ || $1 == "stalled_worker" || $1 == "missing_worker" || ($4 == "true" && $1 != "silent_report") {bad=1} END {exit !bad}' \
+    || fail "C: a live declared wait reported as stranded, missing, owed cleanup or overdue: $(v5_rows "$W/l3.json" '^t-c')"
   # D is untouched and never stranded, actionable or overdue because it is quiet.
   [ -e "$STATE/mate1.meta" ] || fail "D: the secondmate record was removed"
   ! v5_rows "$W/l3.json" '^mate1$' | awk -F'\t' '$4 == "true" || $5 != "true" {bad=1} END {exit !bad}' \
@@ -4844,6 +4890,7 @@ ALL_TESTS=(
   test_e2e_unsafe_copies_are_never_removed
   test_unsafe_mutations_are_caught
   test_over_strict_mutations_are_caught
+  test_xlane_validators_reject_what_their_contracts_reject
   test_xlane_merge_by_another_lane_reaches_safe_closeout
   test_xlane_open_or_closed_pr_keeps_the_record
   test_xlane_same_lane_path_completes_as_before
