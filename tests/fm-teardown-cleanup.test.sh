@@ -7741,6 +7741,11 @@ for shape in control newline; do
   [ "$(cat "$dest/a" 2>/dev/null)" = ordinary-a ] && [ "$(cat "$dest/b" 2>/dev/null)" = ordinary-b ] || kept=no
   [ "$shape" != newline ] || [ "$(cat "$dest/"$'a\nb' 2>/dev/null)" = unique-newline ] || kept=no
   echo "$shape proof=$rc kept=$kept"
+  # The one-per-line list the sweep reads cannot tell a\nb from a and b, so it
+  # fails for that name and the sweep holds the copy.
+  lrc=0
+  teardown_preservable_ignored "$copy" >/dev/null || lrc=$?
+  echo "$shape line-list=$lrc"
   if [ "$shape" = newline ] && [ "$rc" = 0 ]; then
     # The same preserve with the newline file's payload changed must refuse.
     printf 'changed\n' > "$dest/"$'a\nb'
@@ -7754,7 +7759,9 @@ BODY
   r5_expect 'control proof=0 kept=yes' 'r5-newline: the ordinary ignored files were not preserved'
   r5_expect 'newline proof=0 kept=yes' 'r5-newline: an ignored file whose name holds a newline was not preserved'
   r5_expect 'newline-tampered verify=1' 'r5-newline: a changed payload of the newline file passed the readback'
-  pass "an ignored file whose name holds a newline is preserved byte for byte, and a changed payload of it refuses"
+  r5_expect 'control line-list=0' 'r5-newline: the one-per-line list failed for ordinary names'
+  r5_expect 'newline line-list=1' 'r5-newline: the one-per-line list printed a name that holds a newline'
+  pass "an ignored file whose name holds a newline is preserved byte for byte, a changed payload of it refuses, and the one-per-line list refuses that name"
 }
 
 # Finding 1, refuse route (falsifier history-ignored-newline.sh): a copy only the
