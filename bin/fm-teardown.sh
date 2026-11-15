@@ -2459,6 +2459,20 @@ teardown_task_runtime_paths() {
     "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity")
 }
 
+# A temporary path a later write in this process names by its pid, checked now:
+# absent, or a regular file that is not a link, that this user can write and
+# that the write's rename can replace. Anything else there would make that write
+# fail after the slot lease or another mutation. Sets TEARDOWN_PREFLIGHT_ERROR on
+# a refusal.
+teardown_preflight_temp_path() {  # <path> <label>
+  { [ -e "$1" ] || [ -L "$1" ]; } || return 0
+  if [ -f "$1" ] && [ ! -L "$1" ] && [ -w "$1" ] && fm_backlog_path_deletable "$1"; then
+    return 0
+  fi
+  TEARDOWN_PREFLIGHT_ERROR="task $ID's $2 temporary path $1 is occupied by something its write cannot replace"
+  return 1
+}
+
 # One state record teardown removes later with rm -f, checked now: absent, or an
 # entry that is not a directory and that fm_backlog_path_deletable says can be
 # deleted. Sets TEARDOWN_PREFLIGHT_ERROR on a refusal.
@@ -2491,6 +2505,16 @@ teardown_entry_preflight() {
   path=$(fm_backlog_close_marker_path "$STATE" "$ID") || return 1
   if ! fm_backlog_record_removable "$path" "pending-close record" "$STATE"; then
     TEARDOWN_PREFLIGHT_ERROR="the previous pending backlog $TEARDOWN_BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR)"
+    return 1
+  fi
+  # The fixed, pid-named temporary paths the later writes use: the return-pending
+  # record's write and refresh, and the new pending-close record's stage, which
+  # must not exist at all (fm_backlog_close_marker_stage).
+  teardown_preflight_temp_path "$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}" "return-pending record" || return 1
+  teardown_preflight_temp_path "$STATE/.$ID.teardown-return-pending.refresh.${BASHPID:-$$}" "return-pending refresh" || return 1
+  path="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    TEARDOWN_PREFLIGHT_ERROR="task $ID's pending-close staging path $path is already occupied"
     return 1
   fi
   if [ "$KIND" != secondmate ] && { [ -e "$META" ] || [ -L "$META" ]; } \
