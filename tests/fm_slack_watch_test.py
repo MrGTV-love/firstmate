@@ -7918,6 +7918,21 @@ class Round8Findings(InvariantScenario):
             self.assertLessEqual(len(found), 2, found)
             self.assertIn(('200.000100', INV_OWNER), found)
 
+    def test_r8_r5_an_undated_hand_over_with_no_watcher_mark_is_never_used(self):
+        # The reviewer's probe: a fresh hand-over left by an earlier owner check, with no date, and no end-of-sweep mark of the watcher: their check takes nothing.
+        with self.home(cap='2') as home:
+            home.trust_check()
+            home.cli('poll')
+            for n in range(3):
+                home.say('200.%06d' % (200 + n), 'second request %d' % n)
+            data = home.theirs()
+            data['cap_left'] = {'left': 2, 'fresh': True}
+            (home.state_dir / 'second.json').write_text(json.dumps(data))
+            result = home.cli('check', action='check-second')
+            self.assertEqual(self.REQ.findall(result.out), [], result.out)
+            later = [home.check_pass() for _ in range(3)]                       # later sweeps still take their requests in, at most the cap each
+            self.assertEqual(sorted(self.woken(later)), ['200.000200', '200.000201', '200.000202'])
+
     # ---- R6: time spent on the lock and start-up never costs their useful step ----
 
     DRIVER = Invariant4OwnerFirst.DRIVER
