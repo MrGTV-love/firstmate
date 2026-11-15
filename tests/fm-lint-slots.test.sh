@@ -20,9 +20,15 @@
 # sets the per-root bound itself, or seeds the pool's history with a larger
 # recorded peak.
 export FM_LINT_ROOT_RSS_KIB=262144
-# The gate tests below start the private gate helper directly, which takes its
-# budget from the private variable that bin/fm-lint.sh would pass it.
+# The gate tests below start the private gate helper directly, a direct test of
+# the private helper, which takes its budget and its host lock from the private
+# variables that bin/fm-lint.sh would pass it. The host lock is this process's own
+# (and so its ledger beside it), never the host's. bin/fm-lint.sh itself takes both
+# from its own constants and ignores these variables, even for a worker started
+# directly (test_a_worker_started_directly_takes_the_hosts_lock_and_budget_not_the_callers).
 export FM_LINT_INTERNAL_HOST_RSS_KIB=100000000
+FM_LINT_TEST_HOST_DIR=$(fm_test_tmproot fm-lint-test-host)
+export FM_LINT_INTERNAL_HOST_LOCK="$FM_LINT_TEST_HOST_DIR/host.lock"
 
 # fm_lint_gate_root <budget KiB> <pool> <run id> <root> -- <command...>: one root
 # through the private gate helper, the way bin/fm-lint.sh starts it. The helper's
@@ -810,53 +816,125 @@ PL
   pass "a content-identical cached success finishes while all host slots remain occupied"
 }
 
-test_a_warm_cache_hit_in_a_fresh_pool_starts_no_version_probe_and_waits_for_nothing() {
-  local tmp repo fakebin holder run deadline rc=0
-  tmp=$(fm_test_tmproot fm-lint-cache-fresh-pool)
-  repo="$tmp/repo"
+# fm_lint_native_version_stub <fakebin> <starts log> <version>: a native ShellCheck
+# stand-in (a compiled program, because a script is a wrapper and is probed every
+# run) that logs its arguments, answers --version and exits 0 for everything else.
+# Returns 1 when the host has no C compiler.
+fm_lint_native_version_stub() {
+  local fakebin=$1 log=$2 version=$3 src
+  command -v cc >/dev/null 2>&1 || return 1
+  src="$fakebin/stub.c"
+  cat > "$src" <<C
+#include <stdio.h>
+#include <string.h>
+int main(int argc, char **argv) {
+  FILE *f = fopen("$log", "a");
+  if (f) { for (int i = 1; i < argc; i++) fprintf(f, "%s%s", i > 1 ? " " : "", argv[i]); fprintf(f, "\n"); fclose(f); }
+  if (argc > 1 && strcmp(argv[1], "--version") == 0) { printf("ShellCheck - shell script analysis tool\nversion: $version\n"); return 0; }
+  return 0;
+}
+C
+  cc -o "$fakebin/shellcheck" "$src" 2>/dev/null || return 1
+  rm -f "$src"
+}
+
+# fm_lint_warm_hit_in_fresh_pool <tmp> <label> <version-dir-breaks>: warm the cache
+# from one local pool, then repeat the same root from a fresh local pool whose only
+# slot another run holds. A cache hit consumes no reservation and waits for
+# nothing, and the version is something the run already knows, so it starts no
+# ShellCheck at all. With <version-dir-breaks> = yes the host-wide version directory
+# (and, by the same path, the first pool's) cannot be written, so the version is
+# known only from the cache directory. Returns 0 when the hit started nothing.
+fm_lint_warm_hit_in_fresh_pool() {
+  local tmp=$1 label=$2 breaks=$3 repo fakebin holder run deadline rc=0
+  repo="$tmp/$label/repo"
+  mkdir -p "$tmp/$label"
   fm_lint_small_repo "$repo"
-  fakebin=$(fm_fakebin "$tmp/fake")
-  cat > "$fakebin/shellcheck" <<SH
-#!/usr/bin/env bash
-printf '%s\\n' "\$*" >> "$tmp/starts.log"
-if [ "\${1:-}" = --version ]; then
-  printf 'ShellCheck - shell script analysis tool\\nversion: 0.11.0\\n'
-  exit 0
-fi
-exit 0
-SH
-  chmod +x "$fakebin/shellcheck"
+  fakebin=$(fm_fakebin "$tmp/$label/fake")
+  fm_lint_native_version_stub "$fakebin" "$tmp/$label/starts.log" 0.11.0 || return 2
   # The host-wide directory of this copy of the lint is the test's own.
-  perl -pi -e "s{^HOST_POOL_ROOT=.*\$}{HOST_POOL_ROOT=$tmp/host}" "$repo/bin/fm-lint.sh"
-  grep -q "^HOST_POOL_ROOT=$tmp/host\$" "$repo/bin/fm-lint.sh" || fail "the copy's host-wide directory path was not replaced"
-  # Warm the analysis cache from one local pool ...
-  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_LINT_SLOT_DIR="$tmp/poolA" \
-    "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/warm.out" 2>&1 || fail "cache warm-up failed: $(cat "$tmp/warm.out")"
-  # ... then repeat the same root, binary and cache from a fresh local pool whose
-  # only slot another run holds. A cache hit consumes no reservation and waits
-  # for nothing, and the version probe is a start the pool already knows the
-  # answer to, so the run starts no ShellCheck at all.
-  mkdir -p "$tmp/poolB"
-  perl -MFcntl=:flock -e 'open(my $h, ">>", $ARGV[0]) or die; flock($h, LOCK_EX) or die; sleep 25' "$tmp/poolB/slot.0" &
+  perl -pi -e "s{^HOST_POOL_ROOT=.*\$}{HOST_POOL_ROOT=$tmp/$label/host}" "$repo/bin/fm-lint.sh"
+  grep -q "^HOST_POOL_ROOT=$tmp/$label/host\$" "$repo/bin/fm-lint.sh" || fail "the copy's host-wide directory path was not replaced"
+  mkdir -p "$tmp/$label/host"
+  # A plain file where the version directory belongs: nothing can be written there.
+  [ "$breaks" != yes ] || printf 'not a directory\n' > "$tmp/$label/host/version"
+  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/$label/cache" FM_LINT_SLOT_DIR="$tmp/$label/poolA" \
+    "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/$label/warm.out" 2>&1 || fail "cache warm-up failed: $(cat "$tmp/$label/warm.out")"
+  # The slot's pool directory must not hold a version record the hit could use.
+  mkdir -p "$tmp/$label/poolB"
+  perl -MFcntl=:flock -e 'open(my $h, ">>", $ARGV[0]) or die; flock($h, LOCK_EX) or die; sleep 25' "$tmp/$label/poolB/slot.0" &
   holder=$!
-  : > "$tmp/starts.log"
-  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_LINT_SLOT_DIR="$tmp/poolB" FM_LINT_HOST_SLOTS=1 \
-      "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/hit.out" 2>&1 ) &
+  : > "$tmp/$label/starts.log"
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/$label/cache" FM_LINT_SLOT_DIR="$tmp/$label/poolB" FM_LINT_HOST_SLOTS=1 \
+      "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/$label/hit.out" 2>&1 ) &
   run=$!
   deadline=$((SECONDS + 12))
   while kill -0 "$run" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1; done
   if kill -0 "$run" 2>/dev/null; then
     kill -TERM "$run" "$holder" 2>/dev/null || true
     wait "$run" 2>/dev/null || true
-    fail "a warm cache hit in a fresh pool queued behind an occupied slot: $(cat "$tmp/starts.log" 2>/dev/null)"
+    fail "a warm cache hit in a fresh pool queued behind an occupied slot ($label): $(cat "$tmp/$label/starts.log" 2>/dev/null)"
   fi
   wait "$run" || rc=$?
   kill -TERM "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
-  [ "$rc" -eq 0 ] || fail "the warm cache hit failed ($rc): $(cat "$tmp/hit.out")"
-  grep -q 'cache hit bin/consumer[.]sh' "$tmp/hit.out" || fail "the run did not reuse the cached success: $(cat "$tmp/hit.out")"
-  [ ! -s "$tmp/starts.log" ] || fail "a warm cache hit started ShellCheck: $(cat "$tmp/starts.log")"
-  pass "a warm cache hit in a fresh local pool starts no version probe and no analysis, and waits for nothing"
+  [ "$rc" -eq 0 ] || fail "the warm cache hit failed ($label, $rc): $(cat "$tmp/$label/hit.out")"
+  grep -q 'cache hit bin/consumer[.]sh' "$tmp/$label/hit.out" || fail "the run did not reuse the cached success ($label): $(cat "$tmp/$label/hit.out")"
+  [ ! -s "$tmp/$label/starts.log" ] || fail "a warm cache hit started ShellCheck ($label): $(cat "$tmp/$label/starts.log")"
+}
+
+test_a_warm_cache_hit_in_a_fresh_pool_starts_no_version_probe_and_waits_for_nothing() {
+  local tmp rc=0
+  tmp=$(fm_test_tmproot fm-lint-cache-fresh-pool)
+  fm_lint_warm_hit_in_fresh_pool "$tmp" shared no || rc=$?
+  if [ "$rc" -eq 2 ]; then pass "SKIP (no C compiler for a native ShellCheck stand-in): warm cache hit in a fresh pool"; return; fi
+  # The version record the hit relies on could not be written to the host-wide
+  # directory: the cache directory still knows the version, so the hit still waits
+  # for nothing.
+  fm_lint_warm_hit_in_fresh_pool "$tmp" unwritable yes
+  pass "a warm cache hit in a fresh local pool starts no version probe and no analysis and waits for nothing, also when the host-wide version directory cannot be written"
+}
+
+# A ShellCheck that is a script is probed every run: its version is not a
+# function of its bytes, and a remembered version would let a changed delegate
+# pass or fail the version policy wrongly.
+test_a_wrapper_around_shellcheck_is_probed_every_run_and_its_current_version_decides() {
+  local tmp repo fakebin rc out
+  tmp=$(fm_test_tmproot fm-lint-wrapper-version)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  cat > "$fakebin/shellcheck" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\\nversion: %s\\n' "\$(cat "$tmp/delegate.version")"
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+  perl -pi -e "s{^HOST_POOL_ROOT=.*\$}{HOST_POOL_ROOT=$tmp/host}" "$repo/bin/fm-lint.sh"
+  # The delegate reports the pinned version: strict mode accepts it.
+  printf '0.11.0\n' > "$tmp/delegate.version"
+  rc=0
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+      "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/first.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a wrapper whose delegate reports the pinned version was rejected ($rc): $(cat "$tmp/first.out")"
+  # The delegate changes; the wrapper's own bytes do not. The run must see the
+  # new version and refuse it under the strict policy.
+  printf '0.10.0\n' > "$tmp/delegate.version"
+  rc=0
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+      "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/second.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 1 ] || fail "a wrapper whose delegate changed to 0.10.0 passed the strict version policy on a remembered version ($rc): $(cat "$tmp/second.out")"
+  grep -q 'found 0.10.0' "$tmp/second.out" || fail "the refusal did not name the delegate's current version: $(cat "$tmp/second.out")"
+  # And back: the corrected delegate is accepted again, not rejected on the record of the bad one.
+  printf '0.11.0\n' > "$tmp/delegate.version"
+  rc=0
+  ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR="$tmp/pool" \
+      "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/third.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a corrected delegate was rejected on a remembered version ($rc): $(cat "$tmp/third.out")"
+  pass "a script ShellCheck is probed every run: a changed delegate is refused under the strict policy and a corrected one accepted, with the wrapper's bytes unchanged"
 }
 
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings() {
@@ -1313,6 +1391,188 @@ test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge()
   [ "$control_peak" -gt $(( budget + 2 * (top - charge) )) ] \
     || fail "four roots without a budget peaked at only $control_peak KiB, so this test cannot show the bound"
   pass "with trusted records two roots run at once; growth inside the charge never passes the budget ($budget KiB), and growth beyond it passes by at most the running roots' excess (limit $limit KiB, peak seen $peak KiB; no budget: $control_peak KiB)"
+}
+
+# fm_lint_two_pool_growth <tmp> <label> <budget KiB>: two gates in two pools
+# (one parent directory, so one host lock and one ledger). Pool A's root has no
+# record, so it is charged the 256 MiB per-root worst case; it holds almost
+# nothing when its turn is decided and grows to 200 MiB. Pool B's root has a
+# trusted 100 MiB record (charge 174 MiB) and grows to 100 MiB. Both wait for
+# each other to start (4 s at most) and then allocate at once. An independent
+# sampler reads every stand-in. Prints "<peak total KiB> <most at once> <starts>
+# <ends>".
+fm_lint_two_pool_growth() {
+  local tmp=$1 label=$2 budget=$3 rc=0 a b stop sampler bytes key pid_a pid_b
+  a="$tmp/$label.a.sh"
+  b="$tmp/$label.b.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$a"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$b"
+  : > "$tmp/barrier.log"
+  bytes=$(wc -c < "$b" | tr -d ' ')
+  key=$(printf 'full:%s' "$b" | perl -MDigest::SHA=sha256_hex -ne 'print sha256_hex($_)')
+  mkdir -p "$tmp/$label/poolB/history"
+  printf '102400 %s\n' "$bytes" > "$tmp/$label/poolB/history/$key"
+  stop="$tmp/$label.stop"
+  rm -f "$stop"
+  FM_TEST_SAMPLER_LOG="$tmp/barrier.log" fm_lint_sample_stand_ins "$tmp/bin/shellcheck" "$tmp/$label.samples" "$stop" &
+  sampler=$!
+  FM_TEST_BARRIER=2 FM_TEST_BARRIER_SECS=4 FM_TEST_MEM_MIB=200 FM_TEST_MEM_HOLD=3 PATH="$tmp/bin:$PATH" \
+    fm_lint_gate_root "$budget" "$tmp/$label/poolA" "${label}a" "$a" -- "$tmp/bin/shellcheck" --norc -- "$a" > "$tmp/$label.a.out" 2>&1 &
+  pid_a=$!
+  sleep 0.5
+  FM_TEST_BARRIER=2 FM_TEST_BARRIER_SECS=4 FM_TEST_MEM_MIB=100 FM_TEST_MEM_HOLD=3 PATH="$tmp/bin:$PATH" \
+    fm_lint_gate_root "$budget" "$tmp/$label/poolB" "${label}b" "$b" -- "$tmp/bin/shellcheck" --norc -- "$b" > "$tmp/$label.b.out" 2>&1 &
+  pid_b=$!
+  wait "$pid_a" || rc=$?
+  wait "$pid_b" || rc=$?
+  : > "$stop"
+  wait "$sampler" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "a two-pool run failed under budget $budget (rc=$rc)"$'\n'"$(cat "$tmp/$label".?.out)"
+  printf '%s %s %s\n' "$(perl -ane 'my ($p, $n) = (0, 0); push @r, [@F[1, 3]]; END { for (@r) { $p = $_->[0] if $_->[0] > $p; $n = $_->[1] if $_->[1] > $n } print "$p $n" }' "$tmp/$label.samples")" \
+    "$(grep -c '^start ' "$tmp/barrier.log")" "$(grep -c '^end ' "$tmp/barrier.log")"
+}
+
+# Two pools on one host share one ledger of charges: a root just admitted in
+# pool A is charged what its record names (its worst case here), not the few MiB
+# it holds when pool B decides, so pool B's root cannot share the budget with it.
+test_two_pools_charge_one_host_wide_ledger_so_the_budget_holds_across_them() {
+  local tmp budget peak most starts ends control_peak control_most
+  tmp=$(fm_test_tmproot fm-lint-two-pools)
+  mkdir -p "$tmp/bin"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 64 "$tmp/barrier.log"
+  budget=256000   # 250 MiB: below the 256 MiB worst case of pool A's unrecorded root
+  read -r peak most starts ends <<<"$(fm_lint_two_pool_growth "$tmp" ledger "$budget")"
+  { [ "$starts" -eq 2 ] && [ "$ends" -eq 2 ]; } || fail "$starts starts and $ends ends of the two roots (each must finish)"
+  [ "$peak" -gt 190000 ] || fail "the sampler saw only $peak KiB, so no stand-in grew to 200 MiB and this test measured nothing"
+  [ "$most" -eq 1 ] || fail "$most roots from two pools ran at once, but one is charged 256 MiB against a 250 MiB budget and must run alone"
+  [ "$peak" -le "$budget" ] || fail "two pools reached $peak KiB, above the $budget KiB budget, though neither root grew beyond its charge"
+  # The control: with no effective budget the same two roots run together and
+  # reach the 300 MiB the budget forbids, so the checks above can fail.
+  read -r control_peak control_most _ _ <<<"$(fm_lint_two_pool_growth "$tmp" unbounded 100000000)"
+  [ "$control_most" -eq 2 ] && [ "$control_peak" -gt "$budget" ] \
+    || fail "without a budget the two roots peaked at $control_peak KiB with $control_most at once, so this test cannot show the bound"
+  pass "a root admitted in one pool is charged in every pool: two pools never run roots whose charges exceed the budget together (peak $peak KiB, $most at once; no budget: $control_peak KiB, $control_most at once)"
+}
+
+# The private modes of bin/fm-lint.sh that run a command they are handed
+# (--internal-timed, --internal-root) are not a way to start ShellCheck outside the
+# host-wide admission: a caller that sets the private sentinel itself, or borrows
+# the ledger entry of a live admitted root, gets exit 2 and no command.
+test_the_private_modes_start_a_command_only_inside_an_admitted_root() {
+  local tmp mode rc starts holder entry waited
+  tmp=$(fm_test_tmproot fm-lint-private-modes)
+  mkdir -p "$tmp/bin"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 8 "$tmp/barrier.log"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  : > "$tmp/barrier.log"
+  # (1) Called directly with the sentinel: refused, and the command never starts.
+  for mode in timed root; do
+    rc=0
+    if [ "$mode" = timed ]; then
+      env FM_LINT_INTERNAL=1 bash "$LINT" --internal-timed 10 1 "$tmp/bin/shellcheck" --norc -- "$tmp/a.sh" > "$tmp/direct.$mode.out" 2>&1 || rc=$?
+    else
+      env FM_LINT_INTERNAL=1 bash "$LINT" --internal-root "$tmp/direct.rss" 2097152 "$tmp/bin/shellcheck" --norc -- "$tmp/a.sh" > "$tmp/direct.$mode.out" 2>&1 || rc=$?
+    fi
+    [ "$rc" -eq 2 ] || fail "--internal-$mode called directly exited $rc, expected the refusal (2): $(cat "$tmp/direct.$mode.out")"
+    [ ! -s "$tmp/barrier.log" ] || fail "--internal-$mode called directly started the supplied ShellCheck outside the admission"
+    grep -q 'only inside a root the host-wide admission has admitted' "$tmp/direct.$mode.out" \
+      || fail "--internal-$mode did not name the admission in its refusal: $(cat "$tmp/direct.$mode.out")"
+  done
+  # (2) Borrowing the ledger entry of a live admitted root does not admit a caller
+  # that is not inside that root's tree.
+  FM_TEST_MEM_HOLD=6 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool.holder" holder "$tmp/a.sh" -- \
+    "$tmp/bin/shellcheck" --norc -- "$tmp/a.sh" > "$tmp/holder.out" 2>&1 &
+  holder=$!
+  waited=0
+  while [ ! -s "$tmp/barrier.log" ] && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
+  entry=$(find "$tmp/host.lock.ledger" -name 'entry.*' -print 2>/dev/null | head -1)
+  [ -n "$entry" ] || { kill "$holder" 2>/dev/null; fail "the admitted root left no ledger entry to borrow"; }
+  starts=$(grep -c '^start ' "$tmp/barrier.log")
+  rc=0
+  env FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_ADMISSION="$entry" bash "$LINT" --internal-timed 10 1 "$tmp/bin/shellcheck" --norc -- "$tmp/a.sh" > "$tmp/forged.out" 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] || { wait "$holder" 2>/dev/null; fail "a borrowed ledger entry admitted a caller outside its tree (exit $rc): $(cat "$tmp/forged.out")"; }
+  [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq "$starts" ] || { wait "$holder" 2>/dev/null; fail "a borrowed ledger entry started ShellCheck outside the admitted tree"; }
+  wait "$holder" || fail "the holder root failed: $(cat "$tmp/holder.out")"
+  # (3) The control: the same mode inside a root the gate admitted runs its command.
+  rc=0
+  FM_TEST_MEM_HOLD=0.5 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool.control" control "$tmp/a.sh" -- \
+    env FM_LINT_INTERNAL=1 bash "$LINT" --internal-timed 20 1 "$tmp/bin/shellcheck" --norc -- "$tmp/a.sh" > "$tmp/control.out" 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] || fail "--internal-timed inside an admitted root exited $rc, so the refusal above cannot be told from a broken mode: $(cat "$tmp/control.out")"
+  [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq $((starts + 1)) ] || fail "--internal-timed inside an admitted root did not start its command"
+  rc=0
+  FM_TEST_MEM_HOLD=0.5 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool.control2" control2 "$tmp/a.sh" -- \
+    env FM_LINT_INTERNAL=1 bash "$LINT" --internal-root "$tmp/control.rss" 2097152 "$tmp/bin/shellcheck" --norc -- "$tmp/a.sh" > "$tmp/control2.out" 2>&1 || rc=$?
+  ! grep -q 'only inside a root the host-wide admission has admitted' "$tmp/control2.out" \
+    || fail "--internal-root inside an admitted root was refused for lack of admission: $(cat "$tmp/control2.out")"
+  pass "--internal-timed and --internal-root run a command only inside an admitted root: called directly or with a borrowed ledger entry they exit 2 and start nothing, and inside the gate they run"
+}
+
+# A worker started directly (the private mode the owner uses) takes the host's
+# lock, budget and per-root charge from the script, not from the caller: an
+# injected unwritable lock path or a huge budget changes nothing.
+test_a_worker_started_directly_takes_the_hosts_lock_and_budget_not_the_callers() {
+  local tmp run pid rc=0 peak
+  local -a pids
+  tmp=$(fm_test_tmproot fm-lint-direct-worker)
+  mkdir -p "$tmp/bin"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 8 "$tmp/barrier.log"
+  : > "$tmp/barrier.log"
+  pids=()
+  for run in 1 2; do
+    mkdir -p "$tmp/w$run/out"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/w$run/root.sh"
+    printf '0\t%s\n' "$tmp/w$run/root.sh" > "$tmp/w$run/manifest"
+    # Each root is charged its 2 GiB worst case (the per-root bound the worker is
+    # given); two of them do not fit the 3.5 GiB host budget, so they must not
+    # run together, whatever budget and lock the caller names.
+    ( env FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_CACHE=off FM_LINT_INTERNAL_SLOT_DIR="$tmp/w$run/slots" FM_LINT_INTERNAL_NCPU=18 \
+        FM_LINT_INTERNAL_RUN_ID="direct$run" FM_LINT_INTERNAL_BOUNDED=none FM_LINT_INTERNAL_MEMORY_KIB=2097152 \
+        FM_LINT_INTERNAL_RSS_KIB=2097152 FM_LINT_INTERNAL_ROOT_SECS=20 FM_LINT_INTERNAL_GRACE=1 \
+        FM_LINT_INTERNAL_HOST_RSS_KIB=100000000 FM_LINT_INTERNAL_HOST_LOCK=/nonexistent/lint/host.lock \
+        FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 FM_LINT_HOST_SLOTS=9 FM_LINT_SHELLCHECK="$tmp/bin/shellcheck" \
+        FM_TEST_MEM_HOLD=1.5 PATH="$tmp/bin:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/w" \
+        bash "$LINT" --internal-worker "$tmp/w$run/manifest" "$tmp/w$run/out" 0 > "$tmp/w$run/worker.out" 2>&1 ) &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+  [ "$rc" -eq 0 ] || fail "a directly started worker failed under an injected lock or budget (rc=$rc): $(cat "$tmp"/w?/worker.out)"
+  [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 2 ] || fail "the two workers did not each start their root: $(cat "$tmp/barrier.log")"
+  peak=$(perl -ane '$live++ if $F[0] eq "start"; $live-- if $F[0] eq "end"; $max = $live if $live > $max; END { print $max + 0 }' "$tmp/barrier.log")
+  [ "$peak" -eq 1 ] || fail "two roots charged 2 GiB each ran together ($peak at once): the worker took the caller's budget or per-root charge, not the host's"
+  pass "a directly started worker ignores an injected host lock, budget and per-root charge: two 2 GiB roots ran one at a time under the host's 3.5 GiB budget"
+}
+
+# The roots log keeps /usr/bin/time's reading of the analysis process and the
+# resident-memory watch's own peak of the whole tree in two columns, so a figure
+# taken from the log says which measurement it is.
+test_the_roots_log_keeps_the_time_reading_and_the_watch_peak_in_separate_columns() {
+  local tmp row time_rss watch_peak
+  [ -x /usr/bin/time ] || { pass "SKIP (no /usr/bin/time): roots log peak columns"; return; }
+  tmp=$(fm_test_tmproot fm-lint-peak-columns)
+  mkdir -p "$tmp/bin" "$tmp/w/out"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 24 "$tmp/barrier.log"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/w/root.sh"
+  printf '0\t%s\n' "$tmp/w/root.sh" > "$tmp/w/manifest"
+  env FM_LINT_INTERNAL=1 FM_LINT_INTERNAL_CACHE=off FM_LINT_INTERNAL_SLOT_DIR="$tmp/w/slots" FM_LINT_INTERNAL_NCPU=18 \
+    FM_LINT_INTERNAL_RUN_ID=peaks FM_LINT_INTERNAL_BOUNDED=none FM_LINT_INTERNAL_MEMORY_KIB=2097152 \
+    FM_LINT_INTERNAL_RSS_KIB=2097152 FM_LINT_INTERNAL_ROOT_SECS=20 FM_LINT_INTERNAL_GRACE=1 \
+    FM_LINT_INTERNAL_ROOTS_LOG="$tmp/roots.tsv" FM_LINT_SHELLCHECK="$tmp/bin/shellcheck" FM_TEST_MEM_HOLD=2.5 \
+    PATH="$tmp/bin:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/w" \
+    bash "$LINT" --internal-worker "$tmp/w/manifest" "$tmp/w/out" 0 > "$tmp/worker.out" 2>&1 \
+    || fail "the worker failed: $(cat "$tmp/worker.out")"
+  row=$(awk -F '\t' '$1 == "end"' "$tmp/roots.tsv")
+  [ -n "$row" ] || fail "the roots log has no end row: $(cat "$tmp/roots.tsv")"
+  time_rss=$(printf '%s\n' "$row" | awk -F '\t' '{ print $18 }')
+  watch_peak=$(printf '%s\n' "$row" | awk -F '\t' '{ print $19 }')
+  case "$time_rss" in ''|*[!0-9]*) fail "the end row has no numeric time_rss_kib field (18): '$time_rss' in: $row" ;; esac
+  [ "$time_rss" -gt 20000 ] || fail "time_rss_kib $time_rss KiB is below the 24 MiB the analysis held"
+  if [ "$(uname)" = Darwin ]; then
+    case "$watch_peak" in ''|*[!0-9]*) fail "the end row has no numeric watch_peak_kib field (19) from the macOS watch: '$watch_peak' in: $row" ;; esac
+    [ "$watch_peak" -gt 20000 ] || fail "watch_peak_kib $watch_peak KiB is below the 24 MiB the tree held"
+  else
+    [ "$watch_peak" = unavailable ] || fail "a host without the watch recorded a watch peak: '$watch_peak'"
+  fi
+  pass "the roots log keeps /usr/bin/time's reading ($time_rss KiB) and the watch's own peak ($watch_peak KiB) in separate fields"
 }
 
 test_an_unreadable_host_census_never_starts_a_root_in_any_pool() {
@@ -4311,6 +4571,7 @@ test_slow_ps_does_not_hold_admission_against_the_next_root
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
 test_a_warm_cache_hit_in_a_fresh_pool_starts_no_version_probe_and_waits_for_nothing
+test_a_wrapper_around_shellcheck_is_probed_every_run_and_its_current_version_decides
 test_slot_pool_cannot_be_disabled_and_refuses_bad_settings
 test_host_budget_default_is_one_number_stated_by_both_docs
 test_a_per_root_limit_above_the_default_is_clamped_and_a_lower_one_is_kept
@@ -4321,6 +4582,10 @@ test_an_unusable_host_wide_budget_directory_refuses_before_any_root_starts
 test_growing_roots_are_held_to_the_budget_across_pools
 test_simultaneous_growth_after_admission_is_brought_back_within_the_allowance
 test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge
+test_two_pools_charge_one_host_wide_ledger_so_the_budget_holds_across_them
+test_the_private_modes_start_a_command_only_inside_an_admitted_root
+test_a_worker_started_directly_takes_the_hosts_lock_and_budget_not_the_callers
+test_the_roots_log_keeps_the_time_reading_and_the_watch_peak_in_separate_columns
 test_an_unreadable_host_census_never_starts_a_root_in_any_pool
 test_a_host_that_loses_its_process_table_stops_the_run_after_one_refusal
 test_an_unreadable_census_fails_one_run_once_and_does_not_delay_another_in_the_pool

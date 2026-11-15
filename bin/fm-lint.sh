@@ -84,8 +84,10 @@
 # line of the roots log. Tests get no seam either: a test uses a private
 # FM_LINT_SLOT_DIR pool, and a test that starts ShellCheck counts against this same
 # host-wide budget and may queue on it.
-# T stays at or below the budget at every moment two or more roots run. A root
-# larger than the budget runs alone and is ended at the per-root cap
+# T is at most the budget at the moment a root is admitted, and the bound it keeps
+# afterwards is stated exactly under "THE BOUND THIS GIVES" below (it is not "at
+# most the budget at every moment"). A root larger than the budget runs alone and
+# is ended at the per-root cap
 # (FM_LINT_ROOT_RSS_KIB, default 8388608 KiB = 8 GiB; a larger value is clamped
 # to that default, and stderr and the roots log name the requested and the applied
 # value). The residual host total of one lone root, R, is therefore that cap plus
@@ -129,9 +131,10 @@
 # once on the worst-case charge, so the first lint after an edit that big runs
 # such roots one at a time.
 # A cold root takes its turn only when its charge, every held root's current
-# charge and the resident size outside the held roots (the running lint trees of
-# other pools and every other process named shellcheck) together fit the budget;
-# a held root's current charge is the larger
+# charge (every root admitted on this host, in any pool: the host-wide ledger
+# below) and the resident size outside the held roots (the lint trees of older
+# gates that name no ledger entry and every other process named shellcheck)
+# together fit the budget; a held root's current charge is the larger
 # of its charge at admission and what its tree holds now, read when the root
 # asks for its turn. That reading is the live process table (resident size
 # only, from ps or libproc) and, where the macOS watch runs, the watch's own
@@ -147,8 +150,8 @@
 # version probe (`shellcheck --version`, once per lint in every mode except
 # --list-files) is a ShellCheck start too, so it takes a turn in the same
 # admission, charged 64 MiB (it holds about 15 MB for 0.02 s), unless the pool
-# already holds the version of this binary (kept under the SHA-256 of its bytes),
-# when no probe starts. With nothing held
+# already holds the version of this native binary (kept under the SHA-256 of its
+# bytes), when no probe starts; a script wrapper is probed every run. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, a record whose input
@@ -170,7 +173,11 @@
 # R above). The 10 percent and 64 MiB margin covers the 8.5 percent run-to-run
 # variation of one root's peak measured in this repository's runs (largest ratio
 # 1.085 over 463 common roots, 0 of 2632 samples with two or more roots above the
-# budget); it is not a proof for a root that grows past it. A strict byte bound at
+# budget); it is not a proof for a root that grows past it. The ceiling of that
+# expression is not R: roots that all grow from their charges to the 8 GiB cap
+# together could hold the number of admitted roots times 8 GiB (an algebraic
+# ceiling, never measured here; whether it is acceptable is Main's decision, open).
+# A strict byte bound at
 # every moment is not available on this host without a kernel limit or killing
 # and re-running a grown root (a design Main withdrew), and SIGSTOP releases
 # nothing. The residual is a root that grows beyond its charge (analysis noise,
@@ -211,17 +218,19 @@
 # through this shared admission, and no setting opts out: FM_LINT_SLOT_DIR=off
 # is refused (exit 2). FM_LINT_SLOT_DIR set to another directory is only a
 # fixture seam for tests: that run keeps its own queue, count cap and history,
-# and is still bounded host-wide by the growth guard above and by the outside
-# count at admission, both of which read the lint trees of every pool and every
-# process named shellcheck. Every pool's admission decisions take one lock,
+# and shares the one host-wide ledger of charges below, so it is bounded host-wide
+# like every other pool. Every pool's admission decisions take one lock,
 # /var/tmp/firstmate-lint-<uid>/admission.lock beside the default pool, for the
 # reading they decide on, and an admitted gate keeps it until its root's command
 # has started, so two pools never admit on one reading and each sees the
-# other's started roots. What a run in another pool does not get is the
-# charges of this pool's held roots: its admission counts them at their current
-# resident size, so a root just admitted here with a large charge and little
-# resident memory counts as little there, and its own unrecorded roots are
-# charged the worst case. Host load
+# other's started roots. They also share one ledger beside that lock,
+# /var/tmp/firstmate-lint-<uid>/admission.lock.ledger/ (one path, independent of
+# any pool directory): an admitted gate writes its charge there under the lock
+# and keeps the entry's flock through its command, and every admission, in any
+# pool, charges every live entry what it names (or what the root holds now, if
+# more), so a root just admitted in another pool counts at its charge and not at
+# the few MiB it holds in the instant of the reading. A pool whose gates predate
+# the ledger is still counted through its slot files and its processes. Host load
 # average never changes admission, so unrelated machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty FM_LINT_HOST_SLOTS must be a positive decimal integer without
@@ -341,6 +350,13 @@ LOCAL_NOX_EXCLUDE=SC1091,SC2034,SC2153,SC2329
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SELF="$SELF_DIR/fm-lint.sh"
 ROOT="$(cd "$SELF_DIR/.." && pwd -P)"
+# The host-wide admission's two constants, here because every route that starts a
+# ShellCheck (the owner and its private worker mode) reads them, and no setting or
+# inherited variable replaces them: the host directory belongs to the user, not to
+# HOME or XDG_CACHE_HOME, and the budget has one value (see the header). The shell's
+# own UID, not the id command: no PATH entry can name another user.
+HOST_POOL_ROOT=/var/tmp/firstmate-lint-${UID:-0}
+HOST_RSS_KIB=3670016
 cd "$ROOT" || exit 1
 
 # The sibling timeout library supplies the shared group-kill watchdog that
@@ -392,6 +408,26 @@ fm_lint_root_rss() {  # <rss-file>
     END { if (found) print value }
   ' "$file" 2>/dev/null)
   printf '%s\n' "${kib:-unavailable}"
+}
+
+# The two peak readings a root can carry, kept apart in the roots log:
+# /usr/bin/time's maximum resident size of the analysis process (BSD "maximum
+# resident set size" in bytes; GNU max_rss_kib on a host without the watch), and
+# the macOS watch's own peak of the whole tree, the larger of resident size and
+# footprint (watch_peak_kib=). The older rss_kib column is whichever of the two the
+# file named last (the watch's, when it ended a root over its bound).
+fm_lint_root_time_rss() {  # <rss-file>...
+  cat "$@" 2>/dev/null | awk -v darwin="$([ "$(uname)" = Darwin ] && echo 1 || echo 0)" '
+    /maximum resident set size/ { v = int($1 / 1024); if (v > best) best = v; found = 1 }
+    darwin == 0 && /^max_rss_kib=/ { v = substr($0, 13) + 0; if (v > best) best = v; found = 1 }
+    END { if (found) print best; else print "unavailable" }
+  '
+}
+fm_lint_root_watch_peak() {  # <rss-file>...
+  cat "$@" 2>/dev/null | awk '
+    /^watch_peak_kib=/ { v = substr($0, 16) + 0; if (v > best) best = v; found = 1 }
+    END { if (found) print best; else print "unavailable" }
+  '
 }
 
 # Samples each source gave the macOS resident-memory watch across a root's
@@ -495,8 +531,20 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   gate_command=()
   wait_file="$rss_file.wait"
   rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait"
+  # The budget and the host lock are this script's own constants, not what the
+  # caller's environment says (a worker started directly gets the same ones), and a
+  # root's worst-case charge is the bound the root is held to, not a value the
+  # caller names.
+  local -a gate_cap=()
+  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
+    gate_cap=("FM_LINT_INTERNAL_ROOT_CAP_KIB=${FM_LINT_INTERNAL_MEMORY_KIB:-8388608}")
+  elif [ -n "${FM_LINT_INTERNAL_RSS_KIB:-}" ]; then
+    gate_cap=("FM_LINT_INTERNAL_ROOT_CAP_KIB=$FM_LINT_INTERNAL_RSS_KIB")
+  fi
   gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${FM_LINT_INTERNAL_MODE:-full}:${path#"$ROOT"/}" \
     "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
+    "FM_LINT_INTERNAL_HOST_RSS_KIB=$HOST_RSS_KIB" "FM_LINT_INTERNAL_HOST_LOCK=$HOST_POOL_ROOT/admission.lock" \
+    ${gate_cap[@]+"${gate_cap[@]}"} \
     "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
     "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
@@ -629,13 +677,17 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     calibration=1
   fi
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
-    # The last column, wait_ms, is the root's queue wait in the host-wide gate in
+    # Field 17 of this row, wait_ms, is the root's queue wait in the host-wide gate in
     # milliseconds (0 when it did not wait); duration_ms excludes it, so
     # end_ms - start_ms - duration_ms equals wait_ms.
-    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    # Fields 18 and 19 keep apart the two peak readings field 11 mixes:
+    # /usr/bin/time's reading of the analysis process (time_rss_kib) and the
+    # macOS watch's own reading of the whole tree (watch_peak_kib).
+    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" "$calibration" \
-      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" "$queued_ms" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" "$queued_ms" \
+      "$(fm_lint_root_time_rss "$rss_file" "$fallback_rss")" "$(fm_lint_root_watch_peak "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
   if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
     printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
@@ -694,6 +746,18 @@ if [ "${1:-}" = "--internal-worker" ]; then
   exit $?
 fi
 
+# The private modes that run a command they are handed (--internal-root and
+# --internal-timed) run it only inside an admitted root: the gate that admitted
+# the root names its ledger entry in FM_LINT_INTERNAL_ADMISSION, and that entry must
+# be live and belong to a gate that is an ancestor of this process. A caller that
+# sets FM_LINT_INTERNAL=1 itself gets exit 2 and no command.
+fm_lint_require_admission() {  # <mode>
+  "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" admitted "${FM_LINT_INTERNAL_ADMISSION:-}" || {
+    printf 'fm-lint.sh: %s starts a command only inside a root the host-wide admission has admitted.\n' "$1" >&2
+    exit 2
+  }
+}
+
 # Private per-root payload mode used only by the bounded runner above: apply
 # the per-process address-space limit (a positive KiB count), then exec
 # /usr/bin/time for the per-root peak-RSS record when it is available, else the
@@ -704,6 +768,7 @@ if [ "${1:-}" = "--internal-root" ]; then
     printf 'fm-lint.sh: --internal-root is private to the lint owner.\n' >&2
     exit 2
   }
+  fm_lint_require_admission --internal-root
   [ "$#" -ge 4 ] || exit 2
   internal_rss_file=$2
   internal_memory_kib=$3
@@ -738,6 +803,7 @@ if [ "${1:-}" = "--internal-timed" ]; then
     printf 'fm-lint.sh: --internal-timed is private to the lint owner.\n' >&2
     exit 2
   }
+  fm_lint_require_admission --internal-timed
   [ "$#" -ge 4 ] || exit 2
   declare -F fm_exec_timed >/dev/null 2>&1 || {
     printf 'fm-lint.sh: fm-timeout-lib.sh is required for bounded runs.\n' >&2
@@ -2013,8 +2079,6 @@ fi
 # Host-wide pool configuration; the header owns its public controls.
 # The default directory belongs to the user, not to HOME or XDG_CACHE_HOME, so
 # runs from different homes and sandboxes meet in one pool.
-# The shell's own UID, not the id command: no PATH entry can name another user.
-HOST_POOL_ROOT=/var/tmp/firstmate-lint-${UID:-0}
 HOST_POOL_DIR=$HOST_POOL_ROOT/lint-slots
 SLOT_DIR=$HOST_POOL_DIR
 if [ -n "${FM_LINT_SLOT_DIR:-}" ]; then
@@ -2025,9 +2089,9 @@ if [ -n "${FM_LINT_SLOT_DIR:-}" ]; then
   fi
   SLOT_DIR=$FM_LINT_SLOT_DIR
 fi
-# The host-wide ShellCheck memory budget in KiB. It has one value, the default
-# documented in the header; no environment variable or flag sets it.
-HOST_RSS_KIB=3670016
+# The host-wide ShellCheck memory budget (HOST_RSS_KIB, set at the top of this
+# script) has one value, the default documented in the header; no environment
+# variable or flag sets it.
 if [ -n "${FM_LINT_HOST_RSS_KIB:-}" ]; then
   printf 'fm-lint.sh: FM_LINT_HOST_RSS_KIB is not supported: the host-wide ShellCheck memory bound is fixed at %s KiB and no setting changes it. Unset FM_LINT_HOST_RSS_KIB.\n' \
     "$HOST_RSS_KIB" >&2
@@ -2150,26 +2214,32 @@ fi
 # the host-wide admission, charged a small fixed amount (64 MiB, above the 15 MB
 # measured for `shellcheck --version`) and never a recorded peak. It runs after
 # the pool and census checks above and before any root, in every mode except
-# --list-files (which starts no ShellCheck). What `--version` prints is a function
-# of the binary's bytes, so the pool keeps it under the SHA-256 of those bytes
-# (version/<digest>, written only after a probe the admission ran, in the local pool
-# and in the host-wide directory beside the default pool): a run whose
-# binary is already known to either starts no probe, as a cache hit starts no root, and so
-# never waits behind a pool that is full.
+# --list-files (which starts no ShellCheck). What `--version` prints of a native
+# executable is a function of its bytes, so the pool keeps it under the SHA-256 of
+# those bytes (version/<digest>, written only after a probe the admission ran, in the
+# local pool, in the host-wide directory beside the default pool and in the lint
+# cache directory): a run whose binary is already known to any of them starts no
+# probe, as a cache hit starts no root, and so never waits behind a pool that is
+# full. A ShellCheck that is a script (a wrapper) is never remembered: what it runs
+# can change, through its delegate or its environment, without its own bytes
+# changing, so every run probes it in the admission and applies the version policy
+# to what that probe printed.
 probe_rc=0
 resolved=
 # shellcheck disable=SC2016  # the single quotes are deliberate: $fh is a Perl variable in the -e program, not a shell expansion.
-version_digest=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; print Digest::SHA->new(256)->addfile($fh)->hexdigest' \
+version_digest=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; read($fh, my $magic, 2); exit 1 if ($magic // "") eq "#!"; seek($fh, 0, 0); print Digest::SHA->new(256)->addfile($fh)->hexdigest' \
   "$SHELLCHECK_BIN" 2>/dev/null) || version_digest=
 version_file=
 host_version_file=
+cache_version_file=
 if [ -n "$version_digest" ]; then
   version_file=$SLOT_DIR/version/$version_digest
   host_version_file=$HOST_POOL_ROOT/version/$version_digest
+  case "$CACHE_DIR" in ''|off) ;; *) cache_version_file=$CACHE_DIR/version/$version_digest ;; esac
   # The local pool's record first, then the host-wide one: a binary some run of
   # this user already probed is known to every pool, so a fresh local pool does
   # not start a probe that would queue ahead of a cache hit.
-  for known_file in "$version_file" "$host_version_file"; do
+  for known_file in "$version_file" "$host_version_file" ${cache_version_file:+"$cache_version_file"}; do
     if [ -f "$known_file" ] && [ ! -L "$known_file" ]; then
       read -r resolved < "$known_file" || resolved=
       case "$resolved" in ''|*[!0-9A-Za-z.+-]*) resolved= ;; esac
@@ -2190,6 +2260,12 @@ if [ -z "$resolved" ]; then
   if [ -n "$version_file" ] && [ -n "$resolved" ]; then
     ( umask 077; mkdir -p "$SLOT_DIR/version" && printf '%s\n' "$resolved" > "$version_file.$$" && mv -f "$version_file.$$" "$version_file" ) 2>/dev/null || true
     ( umask 077; mkdir -p "$HOST_POOL_ROOT/version" && printf '%s\n' "$resolved" > "$host_version_file.$$" && mv -f "$host_version_file.$$" "$host_version_file" ) 2>/dev/null || true
+    # The cache directory keeps one too: a warm cache hit then finds the version
+    # beside the results it reuses even when the pool and the host-wide directory
+    # could not keep it, so it starts no probe and waits for nothing.
+    if [ -n "$cache_version_file" ]; then
+      ( umask 077; mkdir -p "$CACHE_DIR/version" && printf '%s\n' "$resolved" > "$cache_version_file.$$" && mv -f "$cache_version_file.$$" "$cache_version_file" ) 2>/dev/null || true
+    fi
   fi
 fi
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2

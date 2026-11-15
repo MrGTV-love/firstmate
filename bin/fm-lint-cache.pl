@@ -89,6 +89,47 @@ if (($ARGV[0] // '') eq 'signal') {
     exit 0;
 }
 
+# Private mode: perl fm-lint-cache.pl admitted <ledger entry path>. Exit 0 only
+# when the entry is one a gate wrote under a host ledger, its flock is held (its
+# root is running) and the gate it names is an ancestor of the caller, so a command
+# that bin/fm-lint.sh's private modes (--internal-timed, --internal-root) are about
+# to run is inside an admitted root. Anything else exits 1 and starts nothing.
+if (($ARGV[0] // '') eq 'admitted') {
+    my (undef, $entry) = @ARGV;
+    exit 1 unless defined $entry && $entry =~ m{\A/\S*\.ledger/entry\.([0-9]+)\.[0-9]+\z} && -f $entry;
+    my $gate_pid = $1 + 0;
+    open(my $fh, '>>', $entry) or exit 1;
+    exit 1 if flock($fh, LOCK_EX | LOCK_NB);   # free: its root has ended
+    open(my $record, '<', $entry) or exit 1;
+    my $line = <$record> // '';
+    close $record;
+    exit 1 unless $line =~ /\A([0-9]+)\t[0-9]+\t/ && $1 + 0 == $gate_pid;
+    my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
+    my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
+    my $parent_of = sub {
+        my ($pid) = @_;
+        no warnings 'exec';
+        if (open(my $ps, '-|', 'ps', '-o', 'ppid=', '-p', $pid)) {
+            my $text = <$ps> // '';
+            close $ps;
+            return $1 + 0 if $text =~ /\A\s*([0-9]+)\s*\z/;
+        }
+        if (-r $helper && open(my $py, '-|', $python, $helper, 'ppid', $pid)) {
+            my $text = <$py> // '';
+            close $py;
+            return $1 + 0 if $text =~ /\A\s*([0-9]+)\s*\z/;
+        }
+        return undef;
+    };
+    my $pid = getppid();
+    for (1 .. 80) {
+        exit 0 if $pid == $gate_pid;
+        last unless $pid > 1;
+        $pid = $parent_of->($pid) // last;
+    }
+    exit 1;
+}
+
 # Private gate protocol; bin/fm-lint.sh's header owns the public pool controls.
 # Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <run-id> <wait-file> -- <command...>
 # Commands inherit the flock descriptor across exec, so killing the gate cannot
@@ -143,6 +184,15 @@ if (($ARGV[0] // '') eq 'signal') {
 # and exits 2.
 # Admission retains the slot.* protocol so in-flight older gates remain bounded;
 # their records name no charge and are charged the worst case.
+# One host-wide ledger: every admitted gate, in every pool, writes an entry in
+# <host lock path>.ledger/ (named by the one host lock, never by a pool directory)
+# holding its gate pid, its charge and the path of its peak file, under the host
+# lock that decides the admission, and keeps the entry's flock through its command
+# (the descriptor is inherited like the slot's), so an entry is live exactly while
+# some process of that root holds it. An admission in any pool reads every live
+# entry, not only its own pool's slots, so a root just admitted in another pool is
+# charged what its record names, not what it holds in the instant of the reading;
+# an entry whose flock is free belongs to an ended root and is removed.
 # The high-resolution wait is written in milliseconds to <wait-file> before
 # launch so the caller can account for queue time separately.
 if (($ARGV[0] // '') eq 'gate') {
@@ -380,8 +430,47 @@ if (($ARGV[0] // '') eq 'gate') {
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
     open($coordinator, '>>', "$slot_dir/admission.lock") or $refuse->("$slot_dir/admission.lock", $!);
+    # One host lock, always: bin/fm-lint.sh names it, and a gate with none would
+    # admit on a reading no other pool shares.
     my $host_lock = $ENV{FM_LINT_INTERNAL_HOST_LOCK} // '';
-    if (length $host_lock) { open($host, '>>', $host_lock) or $refuse->($host_lock, $!); }
+    length $host_lock
+        or die "fm-lint-gate: invalid private invocation: FM_LINT_INTERNAL_HOST_LOCK is the host-wide admission lock and bin/fm-lint.sh sets it\n";
+    open($host, '>>', $host_lock) or $refuse->($host_lock, $!);
+    my $ledger_dir = "$host_lock.ledger";
+    eval { make_path($ledger_dir, {mode => 0700}); 1 } or $refuse->($ledger_dir, $@);
+    -d $ledger_dir && -w _ or $refuse->($ledger_dir, 'not a writable directory');
+    my ($ledger_fh, $ledger_path);
+    # Every live ledger entry as [gate pid, charge KiB, peak file], and the ended
+    # ones removed. An empty entry is one being written by an admitting gate that
+    # has not yet filled it: it counts at the worst case for 5 s and is then
+    # removed.
+    my $ledger_entries = sub {
+        my @live;
+        opendir(my $listing, $ledger_dir) or $refuse->($ledger_dir, $!);
+        my @names = grep { /\Aentry\.[0-9]+\.[0-9]+\z/ } readdir $listing;
+        closedir $listing;
+        for my $name (sort @names) {
+            my $path = "$ledger_dir/$name";
+            open(my $fh, '>>', $path) or next;
+            my $free = flock($fh, LOCK_EX | LOCK_NB);
+            if ($free) {
+                my $age = Time::HiRes::time() - ((stat $path)[9] // 0);
+                my $filled = -s $path;
+                unlink $path if $filled || $age >= 5;
+                push @live, [undef, undef, undef] if !$filled && $age < 5;
+                close $fh;
+                next;
+            }
+            $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($path, $!);
+            close $fh;
+            open(my $record, '<', $path) or next;
+            my $line = <$record> // '';
+            close $record;
+            if ($line =~ /\A([0-9]+)\t([0-9]+)\t(.*)\n\z/) { push @live, [$1 + 0, $2 + 0, $3]; }
+            else { push @live, [undef, undef, undef]; }
+        }
+        return @live;
+    };
     $waited_from = Time::HiRes::time();
     ACQUIRE: while (!$slot && !$caught) {
         if (flock($coordinator, LOCK_EX | LOCK_NB)) {
@@ -487,6 +576,14 @@ if (($ARGV[0] // '') eq 'gate') {
                 # A trusted record's peak understates the next run by up to 8.5 percent
                 # in this repository's measured runs, so the charge is the record
                 # times 1.10 plus 64 MiB, never more than the per-root worst case.
+                # Every root admitted on this host, whatever its pool: this pool's held
+                # slots (older gates name no ledger entry) and the ledger's entries,
+                # one per gate pid.
+                my (%by_gate, @unnamed);
+                for my $held (@charges, $ledger_entries->()) {
+                    if (defined $held->[0]) { $by_gate{$held->[0]} = $held; } else { push @unnamed, $held; }
+                }
+                my @host_charges = (values %by_gate, @unnamed);
                 my $recorded = $in_band->($line);
                 $charge_kib = $recorded ? $min->($worst_kib, int($recorded * 1.10 + 0.999) + 65536) : $worst_kib;
                 my $now = Time::HiRes::time();
@@ -512,9 +609,9 @@ if (($ARGV[0] // '') eq 'gate') {
                     }
                 } elsif ($held || $host_bypass) {
                     undef $census_from;
-                    my $outside = $foreign->($table, @charges);
-                    $fits = !@charges && !$outside
-                        || $charged->($table, @charges) + $outside + $charge_kib <= $budget_kib;
+                    my $outside = $foreign->($table, @host_charges);
+                    $fits = !@host_charges && !$outside
+                        || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib;
                 }
                 flock($host, LOCK_UN) if $host && $held && !$fits;
                 if ($fits) {
@@ -523,6 +620,12 @@ if (($ARGV[0] // '') eq 'gate') {
                     unlink $peak_file;
                     truncate($slot, 0) && syswrite($slot, "$run\t$ticket_number\t$$\t$charge_kib\n")
                         or $refuse->($slot_path, $!);
+                    # The ledger entry is written while the host lock is still held,
+                    # so the next admission, in any pool, reads this root.
+                    $ledger_path = sprintf '%s/entry.%d.%d', $ledger_dir, $$, $ticket_number;
+                    open($ledger_fh, '>>', $ledger_path) && flock($ledger_fh, LOCK_EX | LOCK_NB)
+                        && truncate($ledger_fh, 0) && syswrite($ledger_fh, "$$\t$charge_kib\t$peak_file\n")
+                        or $refuse->($ledger_path, $!);
                 }
             } elsif (defined $next) {
                 my $now = Time::HiRes::time();
@@ -554,6 +657,11 @@ if (($ARGV[0] // '') eq 'gate') {
         close $slot;
         $refuse->($slot_path, $why);
     }
+    if ($ledger_fh && !defined fcntl($ledger_fh, F_SETFD, 0)) {
+        my $why = $!;
+        close $ledger_fh;
+        $refuse->($ledger_path, $why);
+    }
     if (open(my $fh, '>', $wait_file)) {
         # A root admitted on its first pass did not queue: it records 0, so the
         # roots log's wait_ms is the time a root spent queued, not the admission work.
@@ -562,6 +670,7 @@ if (($ARGV[0] // '') eq 'gate') {
     }
     exit 128 + $signal_number{$caught} if $caught;
     $ENV{FM_LINT_INTERNAL_SLOT_PEAK_FILE} = $peak_file;
+    $ENV{FM_LINT_INTERNAL_ADMISSION} = $ledger_path;
     # The host lock is held until the command has replaced the child's image,
     # which closes the child's close-on-exec end of this pipe, so the next
     # decision in any pool reads this root as running.
@@ -692,7 +801,10 @@ if (($ARGV[0] // '') eq 'gate') {
 # retry. Any other end passes the command's own status straight through.
 # Every end appends to
 # <rss-file> how many samples each source gave, as
-# rss_samples=libproc:<n>,ps:<n>, for the roots log. Each new peak is also
+# rss_samples=libproc:<n>,ps:<n>, for the roots log, and the peak the watch itself
+# read as watch_peak_kib=<KiB> (the larger of the tree's resident size and
+# footprint; /usr/bin/time's own figure is a different measurement and the roots log
+# keeps the two in separate columns). Each new peak is also
 # written to FM_LINT_INTERNAL_SLOT_PEAK_FILE when the host-slot gate names one,
 # so the gate's admission charges it. A signal to the watch, or
 # the loss of its parent, ends the group within about one tick (about 1 s, or
@@ -957,6 +1069,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     if (open(my $fh, '>>', $rss_file)) {
         printf {$fh} "rss_samples=libproc:%d,ps:%d\n", @samples{qw(libproc ps)};
         print {$fh} "rss_reader_unavailable=$reader_down\n" if $reader_down;
+        printf {$fh} "watch_peak_kib=%d\n", $peak if $peak;
         print {$fh} 'rss_signal_skipped=' . join(',', map { "$_:$skipped{$_}" } sort { $a <=> $b } keys %skipped) . "\n" if %skipped;
         close $fh;
     }
