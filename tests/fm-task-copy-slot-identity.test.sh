@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034,SC2329 # the library's globals are set by sourced functions and read by stubs
 # Helper-level coverage for the shared Treehouse lease scan and slot identity in
 # bin/fm-task-copy-lib.sh (Main 1864 R-B, R-C and F3): a failed lease scan is unreadable
 # everywhere, lease holders compare as raw values (never as @tsv text), and a path is a
