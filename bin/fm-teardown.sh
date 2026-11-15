@@ -367,23 +367,20 @@
 # it (this teardown's own included) still refuses. A copy the hold does not apply
 # to that holds unique ignored files has them preserved and is released like any
 # other proved copy. docs/agent-control.md owns the rule.
-# Kept own copies. An own nested copy that the driver keeps (exit 3 with
+# Kept own copies. When the driver keeps an own nested copy (exit 3 with
 # cleanup_ignored_payload_archived_tree_retained: it writes one more archive and
-# keeps the tree on every call) does not stop the close once teardown has judged
-# the harm itself: the clean and landed proof again, no other repository in the
-# copy, every ignored file the driver names or preservation selects held byte for
-# byte in data/<task>/nested-copy-preserved (with every other ignored entry of the payload
-# fingerprint, as independent bytes), the creation lock the one its launcher was proved
-# under, and the copy unchanged meanwhile; the same checks run once more immediately before
-# the task record is removed, and the receipt is then marked by the close.
-# The task then closes as a held copy does, the copy and its slot untouched under
-# a durable lease, and one record, the copy sweep's receipt
-# data/copy-sweep/retained/<sha256 of the copy path>, names it
-# (bin/fm-teardown-nested-lib.sh owns the mechanics and the fields). A retry asks
-# the driver nothing while that record still matches the copy, and a copy that
-# changed is proved afresh before any driver call. --force waives none of it, and
-# nothing here removes a kept copy: its release depends on Vernant's driver.
-# docs/agent-control.md owns the rule.
+# keeps the tree on every call), teardown runs no destructive step on that copy (no
+# removal, reset, checkout, signal or lock release). It records the driver's answer
+# in one record, the copy sweep's receipt data/copy-sweep/retained/<sha256 of the
+# copy path>, and closes the task as a held copy does, the slot under a durable
+# lease, only when the copy is landed and clean and its unique ignored files are in
+# the driver's verified archive and in the task's preserve; otherwise it refuses
+# with the named reason. A retry whose record still matches the copy asks the driver
+# nothing and judges the recorded answer again; the retire step then leaves that copy
+# out of its swept roots. A first run reaps as before, since the driver has not yet
+# answered. --force waives none of it, and nothing here removes a kept copy: its
+# release depends on Vernant's driver. bin/fm-teardown-nested-lib.sh ("Kept own
+# copies") owns the mechanics and docs/agent-control.md the rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -676,41 +673,7 @@
 #     missing or prunable, or a linked worktree git discovers from the cwd;
 #     outer-worktree discovery never proves custody.
 #     Only a cwd exactly equal to a live recorded scan root is
-#     eligible for signalling, and only when the process is proved the task's own
-#     without reading an Apple binary's environment (hidden on macOS): any one of
-#     the launch marker bin/fm-spawn.sh exports (FM_TASK_INBOX=<physical state
-#     dir>/<id>.inbox) as one whole entry of its readable environment (never as
-#     an argument or as text inside another value); a place in
-#     state/<id>.teardown-owned (pid AND birth identity), written at the start of
-#     the teardown, before any reaping or endpoint closure, from the live
-#     descendants of the marker-bearing worker, never extended from the process table
-#     once no bearer is alive (only the pane shell below is added, from its endpoint),
-#     kept by a refusal for its retry and removed by the successful close; or a
-#     live parent chain to either. Those three are the only proofs. The shell of the task's
-#     own terminal pane (the tmux or herdr pane this teardown validated against the task's
-#     record, its shell pid read from the backend) is one case of the record: the export
-#     that fm-spawn types into that shell reaches only its children, never its own
-#     environment, so the first time a process is not proved the shell is added to the
-#     record with its pid and birth identity, and a process below it is proved by its live
-#     chain (teardown_process_proved_own, teardown_owned_record_pane_shell). The pane is
-#     asked only then, never by a working directory, so a teardown that refuses first never
-#     touches the endpoint. Every proof is bound to the process it was made for: its birth
-#     identity is read before and after the proof, and the signal goes only to that identity
-#     (task_scan_identity, teardown_pid_own_bound).
-#     Freeze before the signal: the proved processes are first stopped (SIGSTOP, each
-#     audited like any signal) so none can fork, the scan is read again (a child a
-#     stopped process had already forked is proved by its live chain to that process)
-#     until a scan finds nothing left to stop, and only then does the TERM go out to the
-#     whole set, followed at once by SIGCONT so the stopped processes can act on it; the
-#     force-kill stage freezes again first. Without this a worker that forks while it is
-#     reaped leaves an orphan nothing proves, and the close would refuse on a process
-#     teardown itself made unprovable. A refusal, and every exit, resumes what was stopped.
-#     Anything else is not proved: teardown refuses by naming its pid and leaves it
-#     running, on every route; a foreign process is never ended. A process that
-#     has exited by the time it is checked (the kernel answers "no such process",
-#     task_pid_positively_gone) is dropped, never refused and never signalled; a
-#     read that merely fails does not make a live process gone.
-#     Every other descendant cwd, existing or deleted,
+#     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
 #     One exception: before this sweep, retire sends TERM to a creation-lock
@@ -1286,10 +1249,6 @@ teardown_descendant_slot_leased() {  # <slot>
 }
 teardown_release_locks() {
   local status=$? i
-  # A process the reaper froze never stays stopped when this teardown ends for any reason.
-  if declare -F reap_resume_frozen >/dev/null 2>&1; then
-    reap_resume_frozen || true
-  fi
   if [ -n "$BACKLOG_CLOSE_STAGE" ]; then
     fm_backlog_record_remove "$BACKLOG_CLOSE_STAGE" "pending-close staged record" "$STATE" || true
   fi
@@ -1348,17 +1307,6 @@ fm_refuse_if_gate_agent
 FM_LOCK_LOG_PREFIX=teardown
 
 fm_backlog_record_present "$META" "task record" "$STATE" || {
-  # A task that closed around a kept own copy has no record any more, and its retained
-  # record carries the mark of that close, so a retry is told so instead of a missing
-  # record. Only a record that is positively gone, under its authorized parent, counts as
-  # gone: a record that is not a regular file, or cannot be looked up, is damaged, not
-  # closed; and a retained record without the close's mark was written by an acceptance
-  # whose close may have refused afterwards.
-  if fm_backlog_record_parent_authorized "$META" "task record" "$STATE" parent-only \
-     && path_positively_gone "$META" && closed_by=$(teardown_retained_closed_by "$DATA" "$ID"); then
-    echo "teardown $ID: already closed; its own nested copy was kept by Vernant's closeout driver and stays recorded in $closed_by; nothing was changed and the driver was not asked."
-    exit 0
-  fi
   echo "error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
@@ -3913,22 +3861,13 @@ EOF
   done
 }
 
-# Is <pid> positively gone? Only the kernel's answer "no such process" counts (kill -0
-# failing with ESRCH). A process that cannot be read, or whose ps read failed, is not gone:
-# the caller keeps it and refuses by name. The same check ends the audited signal path
-# (task_record_process_signal) when a process exits between its listing and its signal.
-task_pid_positively_gone() {  # <pid>
-  perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$1"
-}
-
 task_pids_under_roots() {  # <dir>...
   TASK_PIDS=
   TASK_PIDS_FAILED_DIR=
   TASK_PIDS_ERROR="lsof failed"
   TASK_PID_CWDS=()
   TASK_SCAN_PIDS=()
-  TASK_SCAN_IDS=()
-  local dir dir_matches pid path lane identity root pids="" bound after
+  local dir dir_matches pid path lane identity root pids=""
   local -a scan_roots
   scan_roots=()
   for dir in "$@"; do
@@ -3977,29 +3916,8 @@ task_pids_under_roots() {  # <dir>...
         TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
         return 1
       fi
-      # The proof is bound to the process it was made for: the birth identity read before it
-      # must still be the process's after it, and that identity is the one every later
-      # stage signals (task_scan_identity), so a pid that belongs to another process by the
-      # end of the proof is not proved.
-      bound=
-      if bound=$(task_process_identity "$pid") && [ -n "$bound" ] && teardown_process_proved_own "$pid" \
-         && after=$(task_process_identity "$pid") && [ "$after" = "$bound" ]; then
-        :
-      else
-        # A process that exited after lsof listed it has no environment, record entry or
-        # parent chain left to prove; it is dropped, never signalled and never refused.
-        # Only a positive "no such process" counts: a live process whose ownership cannot
-        # be proved, or whose reads fail, still refuses by name below.
-        ! task_pid_positively_gone "$pid" || continue
-        identity=$(task_process_identity "$pid") || identity="identity unavailable"
-        echo "REFUSED: process $pid ($identity) is at scan root $dir but is not proved this task's own (no FM_TASK_INBOX launch marker in a readable environment, not in the owned record, no live parent chain to either), so its ownership by $ID is not proven; leaving it running and preserving task $ID without signalling." >&2
-        TASK_PIDS_FAILED_DIR=$path
-        TASK_PIDS_ERROR="process $pid at the scan root is not proven the task's own"
-        return 1
-      fi
       TASK_SCAN_PIDS+=("$pid")
       TASK_PID_CWDS+=("$path")
-      TASK_SCAN_IDS+=("$bound")
       pids="$pids
 $pid"
     done <<EOF
@@ -4007,16 +3925,6 @@ $dir_matches
 EOF
   done
   TASK_PIDS=$(printf '%s\n' "$pids" | grep -E '^[0-9]+$' | sort -un || true)
-}
-
-# The birth identity the last task_pids_under_roots proved <pid> for. Fails when that scan
-# did not prove it.
-task_scan_identity() {  # <pid>
-  local i
-  for i in "${!TASK_SCAN_PIDS[@]}"; do
-    [ "${TASK_SCAN_PIDS[$i]}" != "$1" ] || { [ -n "${TASK_SCAN_IDS[$i]:-}" ] || return 1; printf '%s\n' "${TASK_SCAN_IDS[$i]}"; return 0; }
-  done
-  return 1
 }
 
 task_record_process_signal() {  # <pid> <birth-identity> <signal>
@@ -4032,7 +3940,7 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
     if current=$(task_process_identity "$pid") && [ "$current" != "$identity" ]; then
       return 2
     fi
-    if task_pid_positively_gone "$pid"; then
+    if perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$pid"; then
       return 2
     fi
     return 1
@@ -4047,103 +3955,8 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
     "$start" "$cwd" "$cwd" >> "$record") || return 1
 }
 
-# Freeze before signalling. A proved process that forks while it is being reaped leaves a
-# fresh child behind: the parent dies, the child is orphaned, and nothing proves it the
-# task's own any more, so the whole close would refuse on a process teardown itself made
-# unprovable. A frozen process (SIGSTOP) cannot fork, and while it is only stopped its
-# descendants still prove their own chain to it. Every pid and birth identity frozen here
-# is listed in REAP_FROZEN_PIDS and REAP_FROZEN_IDS; each was recorded before the STOP,
-# as every signal is, and is resumed (SIGCONT) by reap_resume_frozen after the retire
-# signal, on every refusal and at exit, so a refusal never leaves a process stopped.
-REAP_TRACK_PIDS=()
-REAP_TRACK_IDS=()
-REAP_FROZEN_PIDS=()
-REAP_FROZEN_IDS=()
-
-reap_track_index() {  # <pid> -> prints the index in REAP_TRACK_PIDS, fails when absent
-  local i=0
-  while [ "$i" -lt "${#REAP_TRACK_PIDS[@]}" ]; do
-    [ "${REAP_TRACK_PIDS[$i]}" != "$1" ] || { printf '%s\n' "$i"; return 0; }
-    i=$((i + 1))
-  done
-  return 1
-}
-
-reap_is_frozen() {  # <pid> <identity>
-  local i=0
-  while [ "$i" -lt "${#REAP_FROZEN_PIDS[@]}" ]; do
-    if [ "${REAP_FROZEN_PIDS[$i]}" = "$1" ] && [ "${REAP_FROZEN_IDS[$i]}" = "$2" ]; then
-      return 0
-    fi
-    i=$((i + 1))
-  done
-  return 1
-}
-
-# Resumes every frozen process whose birth identity still matches, then forgets them.
-reap_resume_frozen() {
-  local i=0
-  while [ "$i" -lt "${#REAP_FROZEN_PIDS[@]}" ]; do
-    if task_process_identity_matches "${REAP_FROZEN_PIDS[$i]}" "${REAP_FROZEN_IDS[$i]}"; then
-      kill -CONT "${REAP_FROZEN_PIDS[$i]}" 2>/dev/null || true
-    fi
-    i=$((i + 1))
-  done
-  REAP_FROZEN_PIDS=()
-  REAP_FROZEN_IDS=()
-}
-
-# Freezes every process of REAP_TRACK_PIDS that the scan of <dir>... still finds, adds each
-# process a scan finds that is not tracked yet (the scan itself proved it the task's own,
-# by marker, record (the pane shell included) or live chain through a frozen parent), freezes it too, and scans
-# again until a scan finds nothing left to freeze. Leaves TASK_PIDS as of that last scan.
-reap_freeze_and_collect() {  # <dir>...
-  local pid identity idx froze round=0
-  while :; do
-    if ! task_pids_under_roots "$@"; then
-      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
-      return 1
-    fi
-    froze=0
-    while IFS= read -r pid; do
-      [ -n "$pid" ] || continue
-      if idx=$(reap_track_index "$pid"); then
-        identity=${REAP_TRACK_IDS[$idx]}
-      else
-        if ! identity=$(task_scan_identity "$pid"); then
-          ! task_pid_positively_gone "$pid" || continue
-          echo "REFUSED: cannot verify leaked process $pid identity for $ID; preserving the worktree/tasktmp for manual inspection or retry." >&2
-          return 1
-        fi
-        REAP_TRACK_PIDS+=("$pid")
-        REAP_TRACK_IDS+=("$identity")
-      fi
-      ! reap_is_frozen "$pid" "$identity" || continue
-      task_process_identity_matches "$pid" "$identity" || continue
-      if task_record_process_signal "$pid" "$identity" STOP; then
-        :
-      else
-        [ "$?" -ne 2 ] || continue
-        echo "REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without signalling it." >&2
-        return 1
-      fi
-      task_process_identity_matches "$pid" "$identity" || continue
-      kill -STOP "$pid" 2>/dev/null || continue
-      REAP_FROZEN_PIDS+=("$pid")
-      REAP_FROZEN_IDS+=("$identity")
-      froze=1
-    done <<REAP_SCAN
-$TASK_PIDS
-REAP_SCAN
-    [ "$froze" -eq 1 ] || return 0
-    round=$((round + 1))
-    # Everything the scan finds is frozen, so a further new process can only come from a
-    # source this teardown does not own; the next stage's scan refuses it by name.
-    [ "$round" -lt 16 ] || return 0
-  done
-}
-
-reap_task_worktree_processes_run() {  # <label> <dir>...
+# Fix 2 in the script header owns exact-root custody and pre-signal auditing.
+reap_task_worktree_processes() {  # <label> <dir>...
   local label=$1 pids pid identity current_pids i pass=1 max_passes=3
   local -a tracked_pids tracked_identities remaining_pids remaining_identities
   shift
@@ -4158,7 +3971,7 @@ reap_task_worktree_processes_run() {  # <label> <dir>...
     tracked_identities=()
     while IFS= read -r pid; do
       [ -n "$pid" ] || continue
-      if ! identity=$(task_scan_identity "$pid"); then
+      if ! identity=$(task_process_identity "$pid"); then
         if ! task_pids_under_roots "$@"; then
           echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
           return 1
@@ -4178,13 +3991,12 @@ EOF
       pass=$((pass + 1))
       continue
     fi
-    REAP_TRACK_PIDS=("${tracked_pids[@]}")
-    REAP_TRACK_IDS=("${tracked_identities[@]}")
-    reap_freeze_and_collect "$@" || return 1
-    tracked_pids=("${REAP_TRACK_PIDS[@]}")
-    tracked_identities=("${REAP_TRACK_IDS[@]}")
+    if ! task_pids_under_roots "$@"; then
+      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
+      return 1
+    fi
     current_pids=$TASK_PIDS
-    echo "teardown: reaping leaked $label process(es) for $ID: ${tracked_pids[*]}" >&2
+    echo "teardown: reaping leaked $label process(es) for $ID: $(printf '%s' "$pids" | tr '\n' ' ')" >&2
     for i in "${!tracked_pids[@]}"; do
       pid=${tracked_pids[$i]}
       identity=${tracked_identities[$i]}
@@ -4201,8 +4013,6 @@ EOF
         kill -TERM "$pid" 2>/dev/null || true
       fi
     done
-    # A stopped process acts on TERM only when it runs again.
-    reap_resume_frozen
     sleep 1
     if ! task_pids_under_roots "$@"; then
       echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
@@ -4222,11 +4032,10 @@ EOF
     done
     if [ "${#remaining_pids[@]}" -gt 0 ]; then
       echo "teardown: force-killing leaked $label process(es) for $ID: ${remaining_pids[*]}" >&2
-      REAP_TRACK_PIDS=("${remaining_pids[@]}")
-      REAP_TRACK_IDS=("${remaining_identities[@]}")
-      reap_freeze_and_collect "$@" || return 1
-      remaining_pids=("${REAP_TRACK_PIDS[@]}")
-      remaining_identities=("${REAP_TRACK_IDS[@]}")
+      if ! task_pids_under_roots "$@"; then
+        echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
+        return 1
+      fi
       current_pids=$TASK_PIDS
       for i in "${!remaining_pids[@]}"; do
         pid=${remaining_pids[$i]}
@@ -4254,18 +4063,6 @@ EOF
   [ -z "$TASK_PIDS" ] && return 0
   echo "REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2
   return 1
-}
-
-# Fix 2 in the script header owns exact-root custody and pre-signal auditing. This wrapper is
-# the last function of the reaper on purpose: tests/fm-backend-herdr-recovery-lock-e2e.test.sh
-# lifts everything from pids_with_cwd_under through the end of this function.
-reap_task_worktree_processes() {  # <label> <dir>...
-  local rc=0
-  REAP_FROZEN_PIDS=()
-  REAP_FROZEN_IDS=()
-  reap_task_worktree_processes_run "$@" || rc=$?
-  reap_resume_frozen
-  return "$rc"
 }
 
 # A Docker compose working directory inside a nested lane (a linked worktree
@@ -4880,7 +4677,7 @@ teardown_held_copies_report() {
   return_cmd="(cd $proj_q && treehouse return $slot_q --if-lease-holder $holder_q </dev/null)"
   if [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ]; then
     for copy in "${TEARDOWN_RETAINED[@]}"; do
-      echo "notice: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and stays untouched in pool slot $(fm_refuse_text "$slot") under a durable lease; its ignored files are verified byte for byte in $(fm_refuse_text "$(teardown_retained_preserve_of "$copy")") and it is recorded in $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$copy")")."
+      echo "notice: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and stays untouched in pool slot $(fm_refuse_text "$slot") under a durable lease; its unique ignored files are in the driver's verified archive and in $(fm_refuse_text "$DATA/$ID/nested-copy-preserved"), and it is recorded in $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$copy")")."
     done
     echo "notice: no command removes a creation-locked retained copy today: its release depends on Vernant's closeout driver (owner: the Vernant lane, through Main), and the driver's --execute-cleanup only writes another archive and keeps the tree, so do not run it for this copy; nothing returns the slot automatically."
     [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
@@ -4984,13 +4781,7 @@ teardown_remove_own_nested_copies() {  # <slot-label>
 # still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
-  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED} lock_rc=0
-  # A copy Vernant's creation lock holds is released or kept only through
-  # teardown_own_copy_dispose, which preserves and verifies its ignored files
-  # before the driver is asked; the bundle's ignored-file refusal is for a copy
-  # that would be removed with them unpreserved.
-  teardown_copy_lock_file "$1" || lock_rc=$?
-  [ "$lock_rc" != 0 ] || return 0
+  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}
   if unique=$(teardown_preservable_ignored "$1"); then
     [ -n "$unique" ] || return 0
     echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
@@ -5191,14 +4982,29 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
           ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
         [ "$root" -ef "$WT" ] || swept+=("$root")
       done
+      # An own nested copy whose record says the closeout driver kept it, unchanged since,
+      # is not a swept root: nothing here ends a run, retires an agent or signals a process
+      # in it. A process found in it through the slot's scan refuses by name instead.
+      still=()
       for root in "${swept[@]}"; do
+        for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+          if [ "$root" -ef "$copy" ] && teardown_retained_copy_held "$copy"; then
+            echo "teardown: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and is unchanged since; nothing in it is ended or signalled" >&2
+            continue 2
+          fi
+        done
+        still+=("$root")
+      done
+      swept=(${still[@]+"${still[@]}"})
+      still=()
+      for root in ${swept[@]+"${swept[@]}"}; do
         conclude_task_no_mistakes_run "$root" || exit 1
       done
-      for root in "${swept[@]}"; do
+      for root in ${swept[@]+"${swept[@]}"}; do
         retire_task_private_nm_launch_agents "$root" || exit 1
       done
       teardown_foreign_procs_retire || exit 1
-      reap_task_worktree_processes worktree "${swept[@]}" "$TASK_TMP" || exit 1
+      reap_task_worktree_processes worktree ${swept[@]+"${swept[@]}"} "$TASK_TMP" || exit 1
       ;;
     return)
       if [ -n "$TEARDOWN_PEER_SLOT" ] || [ -n "$TEARDOWN_HELD_SLOT" ]; then
@@ -6453,7 +6259,6 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
     && [ -d "$WT" ] && [ "$(fm_task_copy_canonical_dir "$WT")" != "$TEARDOWN_SHARED_SLOT" ]; then
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$WT" || exit 1
 fi
-[ "$KIND" = secondmate ] || teardown_owned_record_write
 teardown_nested_slot prove || exit 1
 [ "$KIND" = secondmate ] || teardown_prove_slot_manifest "${TEARDOWN_ENCLOSING_SLOT:-$WT}"
 
@@ -7064,9 +6869,6 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       teardown_nested_slot return
     fi
   fi
-  # A kept own copy is checked once more immediately before the task record goes: it still
-  # matches its retained record and its preserve still holds its bytes (bin/fm-teardown-nested-lib.sh).
-  teardown_retained_close_check || exit 1
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
   TEARDOWN_META_REMOVED=1
   teardown_release_project_lock || exit 1
@@ -7079,7 +6881,6 @@ fi
 # ordering, the row returns to Queued with its deliverable recorded.
 TEARDOWN_CLOSE_META=$META
 [ "$TEARDOWN_META_REMOVED" != 1 ] || TEARDOWN_CLOSE_META=
-[ -z "$TEARDOWN_CLOSE_META" ] || teardown_retained_close_check || exit 1
 if [ "$BACKLOG_CLOSED" = 1 ]; then
   if ! fm_backlog_atomic_transition "$BACKLOG_TRANSITION" "$TEARDOWN_CLOSE_META" "$BACKLOG_CLOSE_MARKER" \
       "$DATA" "$ID" "$STATE" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
@@ -7118,7 +6919,7 @@ esac
 if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ]; then
   fm_backlog_ledger_closed "$STATE" "$CONFIG" "$ID" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"
 fi
-rm -f "$STATE/$ID.teardown-return-pending" "$STATE/$ID.teardown-owned"
+rm -f "$STATE/$ID.teardown-return-pending"
 [ "$TEARDOWN_POOL_SLOT_LOST" != 0 ] || teardown_friction_outcome completed
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then

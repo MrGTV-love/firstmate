@@ -736,11 +736,23 @@ fm_mp_indexer_pid() {  # <pid>
 # backends that report it (tmux, herdr); nothing for any other backend or when
 # the pane cannot be read, which exempts nothing.
 fm_mp_pane_pid() {  # <meta-file>
-  local meta=$1 target backend
+  local meta=$1 target out pid=
   target=$(fm_backend_target_of_meta "$meta") || return 0
-  backend=$(fm_backend_of_meta "$meta")
-  teardown_pane_shell_pid_of "$backend" "$target" "$FM_MP_LIB_DIR" \
-    "$(fm_mp_limit merge-prune.pane-pid 15)" "$(fm_mp_limit merge-prune.pane-process-info 30)"
+  case "$(fm_backend_of_meta "$meta")" in
+    tmux)
+      pid=$(fm_run_timed "$(fm_mp_limit merge-prune.pane-pid 15)" tmux display-message -p -t "$target" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
+      ;;
+    herdr)
+      # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
+      out=$(fm_run_timed "$(fm_mp_limit merge-prune.pane-process-info 30)" bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
+        _ "$FM_MP_LIB_DIR" "${target%%:*}" "${target#*:}" 2>/dev/null </dev/null) || out=
+      pid=$(printf '%s' "$out" | jq -r --arg pane "${target#*:}" \
+        'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
+      ;;
+  esac
+  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$pid" -gt 1 ] || return 0
+  printf '%s' "$pid"
 }
 
 # Whether <pid> is the task's own pane shell: the idle shell that the pane keeps

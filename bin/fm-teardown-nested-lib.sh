@@ -47,8 +47,8 @@
 # and no other active record may name it; the driver then verifies the landing
 # again and refuses what it cannot prove. An own copy that is not locked is
 # removed as before. An own copy the driver keeps (exit 3, the retained reason)
-# is not removed either: teardown_retained_accept judges the harm itself and the
-# task closes around the untouched copy, recorded in the copy sweep's receipt
+# is not removed either and nothing in it is changed: "Kept own copies" below
+# judges it from the driver's recorded answer and closes the task around it
 # (bin/fm-teardown.sh's header owns the rule, docs/agent-control.md the detail).
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
 # own driver (closeout_pr.py --cleanup-worktree <copy> --execute-cleanup, run
@@ -84,34 +84,20 @@ TEARDOWN_FOREIGN_COPIES=()
 # Own nested copies teardown_own_locked_copies_release has removed already.
 TEARDOWN_OWN_RELEASED=()
 # Own nested copies Vernant's closeout driver kept (exit 3 with the retained
-# reason) and this teardown closes the task around, untouched (see
-# teardown_retained_accept), and the facts of the last record read or written.
+# reason) that this teardown closes the task around, untouched (see "Kept own
+# copies"), and the facts of the last record read or written.
 TEARDOWN_RETAINED=()
 TEARDOWN_RETAINED_REASON=cleanup_ignored_payload_archived_tree_retained
 TEARDOWN_RETAINED_RECORD=
-TEARDOWN_RETAINED_PRESERVE=
-TEARDOWN_RETAINED_DIR=
-TEARDOWN_RETAINED_SUFFIX=
-TEARDOWN_RETAINED_BUILD=0
-TEARDOWN_PRE_SNAPSHOT=
-TEARDOWN_RETAINED_UNHELD_REASON="the ignored files are not held byte for byte in a preserve"
-TEARDOWN_RETAINED_UNIQUE=
+TEARDOWN_RETAINED_ANSWER=
 TEARDOWN_RET_HEAD=
 TEARDOWN_RET_STATUS=
 TEARDOWN_RET_PAYLOAD=
-# The facts of the last matching record of a kept own copy that teardown refused
-# after the driver answered (see teardown_retained_refused_matches).
-TEARDOWN_REFUSED_RECORD=
-TEARDOWN_REFUSED_REASON=
-TEARDOWN_REFUSED_UNIQUE=
 # One "pid<TAB>birth identity<TAB>cwd" entry per live lock launcher or process
 # running in a copy that was proved to be this teardown's own; cwd is that of the
 # own process it was chosen through.
 TEARDOWN_FOREIGN_PROCS=()
 TEARDOWN_OWN_CWD=
-TEARDOWN_OWN_IDENTITY=
-TEARDOWN_PANE_SHELL_RECORDED=0
-TEARDOWN_LOCK_ID=
 TEARDOWN_OWN_SCAN=
 TEARDOWN_OWN_SCANNED=0
 TEARDOWN_FOREIGN_WHY=
@@ -269,263 +255,11 @@ teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
   [ "$age" -ge $(( now - mtime - 2 )) ]
 }
 
-# Is <entry> one complete entry of process <pid>'s environment? The environment is read
-# from a source that separates its entries with NUL bytes (/proc/<pid>/environ, or the
-# kernel's process-argument call on macOS, split by its argument count) and compared whole,
-# inside the reader, so an argument, or a value that holds a newline and then the entry,
-# is never taken for an entry. Succeeds when the entry is there; fails when it is not or
-# when the environment cannot be read.
-teardown_process_env_has() {  # <pid> <entry>
-  local env_file=${FM_PROC_ROOT_OVERRIDE:-/proc}/$1/environ
-  if [ -r "$env_file" ]; then
-    perl -e 'local $/ = "\0"; open(my $f, "<:raw", $ARGV[0]) or exit 1; while (<$f>) { chomp; exit 0 if $_ eq $ARGV[1] } exit 1' -- "$env_file" "$2"
-    return
-  fi
-  command -v python3 >/dev/null 2>&1 || return 1
-  # The kernel call exists only on macOS; elsewhere it fails quietly (not readable).
-  python3 - "$1" "$2" 2>/dev/null <<'PY'
-import sys, ctypes, ctypes.util, struct
-pid, want = int(sys.argv[1]), sys.argv[2].encode()
-libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
-mib = (ctypes.c_int * 3)(1, 49, pid)
-size = ctypes.c_size_t(0)
-if libc.sysctl(mib, 3, None, ctypes.byref(size), None, 0) != 0:
-    sys.exit(1)
-buf = ctypes.create_string_buffer(size.value)
-if libc.sysctl(mib, 3, buf, ctypes.byref(size), None, 0) != 0:
-    sys.exit(1)
-data = buf.raw[:size.value]
-argc = struct.unpack("i", data[:4])[0]
-parts = data[4:].split(b"\0")
-i = 0
-while i < len(parts) and parts[i] != b"": i += 1
-while i < len(parts) and parts[i] == b"": i += 1
-sys.exit(0 if want in parts[i + argc:] else 1)
-PY
-}
-
-# The marker value bin/fm-spawn.sh exports for this task's worker session:
-# FM_TASK_INBOX=<physical state directory>/<task-id>.inbox. Every process the
-# worker session starts inherits it.
-teardown_owner_marker() {
-  local state_real
-  state_real=$(cd "$STATE" 2>/dev/null && pwd -P) || return 1
-  printf 'FM_TASK_INBOX=%s/%s.inbox\n' "$state_real" "$ID"
-}
-
-# Does process <pid>'s own readable environment carry the marker as one whole entry?
-# The environment of an Apple platform binary (/bin/sleep, /bin/zsh, /usr/bin/git) is
-# hidden from other processes on macOS, so a missing marker proves nothing by itself.
-# The flat text `ps -E` prints is never used as proof: it cannot tell an argument from
-# an environment entry.
-teardown_process_env_marked() {  # <pid>
-  local expected
-  expected=$(teardown_owner_marker) || return 1
-  teardown_process_env_has "$1" "$expected"
-}
-
-# The record of the task's own processes, written once at the start of a teardown
-# while the worker is alive: one "<pid><TAB><birth identity>" line each.
-teardown_owned_record_path() {
-  printf '%s/%s.teardown-owned\n' "$STATE" "$ID"
-}
-
-# Is <pid> in the owned record with the same birth identity (pid AND start time)? A
-# recycled pid has another start time and proves nothing.
-teardown_process_recorded() {  # <pid>
-  local pid=$1 rec recorded current line
-  rec=$(teardown_owned_record_path)
-  { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || return 1
-  # The record is read first: a pid it does not name is never recorded, so the process
-  # table is asked for its birth identity only for a pid the record names (fewer ps
-  # calls for every other process at a root, same decision).
-  recorded=$(awk -F'\t' -v p="$pid" '$1 == p { print substr($0, length($1) + 2) }' "$rec")
-  [ -n "$recorded" ] || return 1
-  current=$(task_process_identity "$pid" 2>/dev/null) || return 1
-  [ -n "$current" ] || return 1
-  while IFS= read -r line; do
-    [ "$line" != "$current" ] || return 0
-  done <<< "$recorded"
-  return 1
-}
-
-# Is process <pid> proved to be this task's own, without reading an Apple binary's
-# environment? Exactly three proofs, any one of which suffices (Main 2005, Option B): its
-# readable environment carries the marker; it is in the owned record with a matching birth
-# identity; a live parent chain reaches such a process. The shell of the task's own terminal
-# pane counts only through the second proof: the first time a process is not proved, that
-# shell is added to the owned record with its pid and birth identity
-# (teardown_owned_record_pane_shell), and the walk is made once more, so a process below
-# the shell is proved by its live chain to a recorded process. Anything else is not proved,
-# a command another user typed into the pane included when it has no such chain: the caller
-# refuses by name and leaves it running, and a foreign process is never ended.
-teardown_process_proved_own() {  # <pid>
-  local cur=$1 hops=0
-  while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null && [ "$hops" -lt 64 ]; do
-    teardown_process_env_marked "$cur" && return 0
-    teardown_process_recorded "$cur" && return 0
-    cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || break
-    hops=$((hops + 1))
-  done
-  [ "${TEARDOWN_PANE_SHELL_RECORDED:-0}" = 0 ] || return 1
-  teardown_owned_record_pane_shell || return 1
-  teardown_process_proved_own "$1"
-}
-
-# Adds the shell of the task's own terminal pane to the owned record, once per teardown, as
-# "<pid><TAB><birth identity>": the pid the backend reports for the endpoint this teardown
-# validated, its birth identity read after it, and the pid read again, so the identity is the
-# shell's own (a pid recycled between the two reads would change the second answer). Fails
-# when nothing was added (no pane shell reported, an identity that cannot be read, a record
-# that is a symlink, or the pid already recorded with that identity), and is not tried again.
-teardown_owned_record_pane_shell() {
-  local rec pane again identity
-  TEARDOWN_PANE_SHELL_RECORDED=1
-  rec=$(teardown_owned_record_path)
-  pane=$(teardown_pane_shell_pid) || return 1
-  [ -n "$pane" ] || return 1
-  identity=$(task_process_identity "$pane" 2>/dev/null) || return 1
-  [ -n "$identity" ] || return 1
-  again=$(teardown_pane_shell_pid) || return 1
-  [ "$again" = "$pane" ] || return 1
-  [ ! -L "$rec" ] || return 1
-  if [ -e "$rec" ]; then
-    [ -f "$rec" ] || return 1
-    ! grep -Fxq -- "$pane"$'\t'"$identity" "$rec" 2>/dev/null || return 1
-  fi
-  printf '%s\t%s\n' "$pane" "$identity" >> "$rec" 2>/dev/null
-}
-
-# The pid of the shell the task's own terminal pane was started with, for the backends
-# that report it (tmux, herdr): the endpoint this teardown validated against the task's
-# record ($BACKEND, $T), read only through teardown_owned_record_pane_shell. That shell is
-# the task's by its endpoint, not by its place: the `export FM_TASK_INBOX=...` fm-spawn
-# types into it never reaches its own environment (only the processes it starts inherit
-# the marker), so after the worker has exited the shell and an idle shell below it carry
-# no marker at all. Prints nothing for any other backend, for an endpoint that cannot be
-# read and for anything that is not a pid above 1.
-teardown_pane_shell_pid() {
-  [ -n "${T:-}" ] || return 0
-  teardown_pane_shell_pid_of "${BACKEND:-}" "$T" "$FM_ROOT/bin" 15 30
-}
-
-# The one reader of a pane's shell pid, for <backend> <target>: tmux asks `display-message`,
-# herdr asks `pane process-info` through <bin-dir>/fm-backend.sh, each bounded by its own
-# seconds. bin/fm-merge-prune-lib.sh (fm_mp_pane_pid) reads the same pane through it, with
-# its own limits, so the two never disagree about what a pane's shell is.
-teardown_pane_shell_pid_of() {  # <backend> <target> <bin-dir> <tmux-seconds> <herdr-seconds>
-  local out pid=
-  case "$1" in
-    tmux)
-      pid=$(fm_run_timed "$4" tmux display-message -p -t "$2" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
-      ;;
-    herdr)
-      # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
-      out=$(fm_run_timed "$5" bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
-        _ "$3" "${2%%:*}" "${2#*:}" 2>/dev/null </dev/null) || out=
-      pid=$(printf '%s' "$out" | jq -r --arg pane "${2#*:}" \
-        'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
-      ;;
-  esac
-  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
-  [ "$pid" -gt 1 ] || return 0
-  printf '%s\n' "$pid"
-}
-
-# Writes the owned record from the live processes: every descendant (by live
-# parent chain) of a process whose environment carries the marker, the marker
-# bearers included, except this teardown's own process and its ancestors. Run once
-# at the start of a teardown, before anything is reaped or any endpoint is closed.
-# Entries already recorded stay; nothing is added when no bearer is alive, so the
-# record is never extended from the process table after the worker is gone (the task's
-# own pane shell is added from its endpoint, teardown_owned_record_pane_shell). Failure to read the process
-# table records nothing and is not an error (unrecorded processes stay unproved).
-teardown_owned_record_write() {
-  local rec expected table ancestors cur pids line pid identity tmp proc_root candidates bearers=" "
-  rec=$(teardown_owned_record_path)
-  expected=$(teardown_owner_marker) || return 0
-  # `ps -E` (the environment printed after the command) is a BSD option; procps (Linux) refuses
-  # it, and there /proc publishes every readable environment, so the plain table is enough.
-  table=$(LC_ALL=C ps -A -ww -E -o pid=,ppid=,command= 2>/dev/null) \
-    || table=$(LC_ALL=C ps -A -ww -o pid=,ppid=,command= 2>/dev/null) || return 0
-  [ -n "$table" ] || return 0
-  ancestors=" $$ "
-  cur=$$
-  while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null; do
-    cur=$(LC_ALL=C ps -o ppid= -p "$cur" 2>/dev/null | tr -d '[:space:]') || break
-    [ -z "$cur" ] || ancestors="$ancestors$cur "
-  done
-  # The flat text of `ps -E` only picks candidates (it cannot tell an argument from an
-  # environment entry); a candidate bears the marker only when the marker is one whole
-  # entry of its environment (teardown_process_env_has). Where /proc publishes
-  # environments, every process with a readable one is a candidate as well.
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
-  candidates=$(printf '%s\n' "$table" | awk -v mk="$expected" -v root="$proc_root" '
-    { if (index(" " $0 " ", " " mk " ") > 0) print $1
-      else if ((getline line < (root "/" $1 "/environ")) >= 0) print $1; close(root "/" $1 "/environ") }') || candidates=
-  while IFS= read -r pid; do
-    [ -n "$pid" ] || continue
-    ! teardown_process_env_has "$pid" "$expected" || bearers="$bearers$pid "
-  done <<< "$candidates"
-  [ "$bearers" != " " ] || return 0
-  pids=$(printf '%s\n' "$table" | awk -v bearers="$bearers" -v anc="$ancestors" '
-    BEGIN { n = split(bearers, b, " "); for (i = 1; i <= n; i++) mark[b[i]] = 1 }
-    { parent[$1] = $2 }
-    END {
-      changed = 1
-      while (changed) {
-        changed = 0
-        for (p in parent) if (!(p in mark) && (parent[p] in mark)) { mark[p] = 1; changed = 1 }
-      }
-      for (p in mark) if (index(anc, " " p " ") == 0) print p
-    }') || return 0
-  [ -n "$pids" ] || return 0
-  tmp=$(mktemp "${rec}.XXXXXX" 2>/dev/null) || return 0
-  { [ -f "$rec" ] && [ ! -L "$rec" ] && cat "$rec"; } > "$tmp" 2>/dev/null || true
-  # Each process is recorded only when the identity read is bound to the process that the
-  # snapshot above showed: a marker bearer is read again for its marker after its identity is
-  # read; any other process must still have, before and after its identity is read, a parent
-  # that is a bearer or an already recorded descendant. A pid that was recycled between the
-  # snapshot and these reads fails one of the two and is left out. Descendants are taken
-  # parent first, so passes repeat until none is added.
-  local accepted=" " pending="$pids" next added=1 before after
-  while [ "$added" = 1 ] && [ -n "$pending" ]; do
-    added=0
-    next=
-    while IFS= read -r pid; do
-      [ -n "$pid" ] || continue
-      case "$bearers" in *" $pid "*)
-        identity=$(task_process_identity "$pid" 2>/dev/null) || continue
-        [ -n "$identity" ] || continue
-        teardown_process_env_has "$pid" "$expected" || continue
-        ;;
-      *)
-        before=$(LC_ALL=C ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || continue
-        case "$accepted" in *" $before "*) ;; *) next+="$pid"$'\n'; continue ;; esac
-        identity=$(task_process_identity "$pid" 2>/dev/null) || continue
-        [ -n "$identity" ] || continue
-        after=$(LC_ALL=C ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || continue
-        [ "$before" = "$after" ] || continue
-        ;;
-      esac
-      printf '%s\t%s\n' "$pid" "$identity" >> "$tmp"
-      accepted="$accepted$pid "
-      added=1
-    done <<< "$pending"
-    pending=$next
-  done
-  LC_ALL=C sort -u "$tmp" > "$tmp.sorted" 2>/dev/null && mv -- "$tmp.sorted" "$rec" || true
-  rm -f -- "$tmp" "$tmp.sorted"
-}
-
-# Reads into TEARDOWN_OWN_SCAN the "pid<TAB>cwd<TAB>birth identity" lines of the processes
-# whose cwd is exactly a root the retire phase sweeps (the task's copy, the returned slot,
-# a nested copy of the task, its scratch directory) and that are proved the task's own. The
-# proof is bound to the process it was made for: the birth identity is read before and after
-# it and must not change, so a pid that belongs to another process by the end of the proof
-# is not taken. Fails when a scan fails.
+# Reads into TEARDOWN_OWN_SCAN the "pid<TAB>cwd" lines of the processes whose cwd
+# is exactly a root the retire phase sweeps (the task's copy, the returned slot,
+# a nested copy of the task, its scratch directory). Fails when a scan fails.
 teardown_own_scan() {
-  local root out owned_pid owned_path before after
+  local root out owned_pid owned_path
   TEARDOWN_OWN_SCAN=
   TEARDOWN_OWN_SCANNED=0
   for root in "$WT" "$TEARDOWN_RETURN_SLOT" "$TASK_TMP" \
@@ -534,32 +268,24 @@ teardown_own_scan() {
     root=$(cd "$root" && pwd -P) || return 1
     out=$(pids_with_cwd_under "$root") || return 1
     while IFS=$'\t' read -r owned_pid owned_path; do
-      [ -n "$owned_pid" ] && [ "$owned_path" = "$root" ] || continue
-      before=$(task_process_identity "$owned_pid" 2>/dev/null) && [ -n "$before" ] || continue
-      teardown_process_proved_own "$owned_pid" || continue
-      after=$(task_process_identity "$owned_pid" 2>/dev/null) || continue
-      [ "$after" = "$before" ] || continue
-      TEARDOWN_OWN_SCAN+="$owned_pid"$'\t'"$owned_path"$'\t'"$before"$'\n'
+      [ "$owned_path" != "$root" ] || TEARDOWN_OWN_SCAN+="$owned_pid"$'\t'"$owned_path"$'\n'
     done <<< "$out"
   done
   TEARDOWN_OWN_SCANNED=1
 }
 
-# Is <pid> a process this teardown ends itself: one in TEARDOWN_OWN_SCAN that still has the
-# birth identity its proof was made for, or a descendant of one by parent chain? Sets
-# TEARDOWN_OWN_CWD to the cwd of the process it was found through. A scan that fails says
-# no, so the process then counts as foreign. Callers reset TEARDOWN_OWN_SCANNED to read the
-# process table afresh.
+# Is <pid> a process this teardown ends itself: one in TEARDOWN_OWN_SCAN, or a
+# descendant of one by parent chain? Sets TEARDOWN_OWN_CWD to the cwd of the
+# process it was found through. A scan that fails says no, so the process then
+# counts as foreign. Callers reset TEARDOWN_OWN_SCANNED to read the process table
+# afresh.
 teardown_pid_is_task_own() {  # <pid>
-  local pid=$1 owned_pid owned_path owned_identity hops=0
+  local pid=$1 owned_pid owned_path hops=0
   TEARDOWN_OWN_CWD=
   [ "$TEARDOWN_OWN_SCANNED" = 1 ] || teardown_own_scan || return 1
   while [ -n "$pid" ] && [ "$pid" -gt 1 ] && [ "$hops" -lt 64 ]; do
-    while IFS=$'\t' read -r owned_pid owned_path owned_identity; do
-      [ "$owned_pid" = "$pid" ] || continue
-      task_process_identity_matches "$owned_pid" "$owned_identity" || return 1
-      TEARDOWN_OWN_CWD=$owned_path
-      return 0
+    while IFS=$'\t' read -r owned_pid owned_path; do
+      [ "$owned_pid" != "$pid" ] || { TEARDOWN_OWN_CWD=$owned_path; return 0; }
     done <<< "$TEARDOWN_OWN_SCAN"
     pid=$(LC_ALL=C ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || return 1
     hops=$((hops + 1))
@@ -567,24 +293,13 @@ teardown_pid_is_task_own() {  # <pid>
   return 1
 }
 
-# Is <pid> this teardown's own process, proved for the process that has the pid now? The
-# birth identity is read before and after teardown_pid_is_task_own and must not change; it
-# is left in TEARDOWN_OWN_IDENTITY for the queue, so the retire signal goes only to the
-# process the proof was made for.
-teardown_pid_own_bound() {  # <pid>
-  local before after
-  TEARDOWN_OWN_IDENTITY=
-  before=$(task_process_identity "$1" 2>/dev/null) && [ -n "$before" ] || return 1
-  teardown_pid_is_task_own "$1" || return 1
-  after=$(task_process_identity "$1" 2>/dev/null) || return 1
-  [ "$after" = "$before" ] || return 1
-  TEARDOWN_OWN_IDENTITY=$before
-}
-
-# Queues own process <pid>, just proved by teardown_pid_own_bound, for the retire phase to
-# signal, with the birth identity the proof was made for.
+# Records live own process <pid>, just found by teardown_pid_is_task_own, for the
+# retire phase to signal.
 teardown_foreign_proc_record() {  # <pid>
-  TEARDOWN_FOREIGN_PROCS+=("$1"$'\t'"$TEARDOWN_OWN_IDENTITY"$'\t'"$TEARDOWN_OWN_CWD")
+  local identity
+  if identity=$(task_process_identity "$1"); then
+    TEARDOWN_FOREIGN_PROCS+=("$1"$'\t'"$identity"$'\t'"$TEARDOWN_OWN_CWD")
+  fi
 }
 
 # Graft's generated output at the root of <copy>: the exact .ignore overlay graft
@@ -1212,14 +927,14 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
 # anything cannot be listed, copied or hashed, after removing the one staging
 # directory it built, and the caller then refuses the copy rather than removing
 # unpreserved content.
-teardown_preserve_ignored() {  # <copy> [all|releasable] [<directory suffix>] [no-replace]
-  local copy=$1 root dest stage entry hash suffix=${3:-} keep=${4:-} work
+teardown_preserve_ignored() {  # <copy> [all|releasable]
+  local copy=$1 root dest stage entry hash work
   teardown_ignored_list "$copy" "${2:-}" || return 1
   [ "${#TEARDOWN_IGNORED_LIST[@]}" -gt 0 ] || return 0
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
   root="$DATA/$ID/nested-copy-preserved"
-  dest="$root/$hash$suffix"
-  stage="$root/.staging-$hash$suffix"
+  dest="$root/$hash"
+  stage="$root/.staging-$hash"
   rm -rf "$stage" || return 1
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-preserve.XXXXXX") || return 1
   (
@@ -1234,13 +949,7 @@ teardown_preserve_ignored() {  # <copy> [all|releasable] [<directory suffix>] [n
     done
     find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0 > "$work/files" || return 1
     teardown_sums_write "$stage" "$work/files" "$stage/SHA256SUMS" || return 1
-    if [ "$keep" = no-replace ]; then
-      # An existing preserve is never removed or replaced: the new one is written
-      # beside it, and a name already taken is a failure, not an overwrite.
-      [ ! -e "$dest" ] && [ ! -L "$dest" ] || return 1
-    else
-      rm -rf "$dest" || return 1
-    fi
+    rm -rf "$dest" || return 1
     mv "$stage" "$dest" || return 1
   ) || {
     rm -rf "$stage" "$work"
@@ -1254,7 +963,7 @@ teardown_preserve_ignored() {  # <copy> [all|releasable] [<directory suffix>] [n
 # teardown own <copy>? Returns 1 with TEARDOWN_FOREIGN_WHY set when so or when
 # that cannot be told.
 teardown_foreign_copy_unowned() {  # <copy>
-  local copy=$1 rc=0 pids pid pid_cwd copy_root
+  local copy=$1 rc=0 pids pid
   TEARDOWN_OWN_SCANNED=0
   TEARDOWN_FOREIGN_PID=
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
@@ -1277,14 +986,9 @@ teardown_foreign_copy_unowned() {  # <copy>
     TEARDOWN_FOREIGN_WHY="a scan for processes running in it failed"
     return 1
   fi
-  # A process is judged by where it runs itself: only a process whose own cwd is the copy root
-  # can be this task's own through the proof (marker, record or a live chain to either). A process
-  # below the root is named and left running, even when its parent is the task's own: the sweep's
-  # below-root refusal would otherwise come after the retire step had already sent it TERM.
-  copy_root=$(cd "$copy" 2>/dev/null && pwd -P) || copy_root=$copy
-  while IFS=$'\t' read -r pid pid_cwd; do
+  while IFS=$'\t' read -r pid _; do
     [ -n "$pid" ] || continue
-    if [ "$pid_cwd" != "$copy_root" ] || ! teardown_pid_own_bound "$pid"; then
+    if ! teardown_pid_is_task_own "$pid"; then
       TEARDOWN_FOREIGN_RULE=process-cwd-owner
       TEARDOWN_FOREIGN_PID=$pid
       TEARDOWN_FOREIGN_WHY="process $pid is running in it"
@@ -1302,7 +1006,7 @@ teardown_foreign_copy_unowned() {  # <copy>
         return 1
       fi
       if teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
-        if ! teardown_pid_own_bound "$pid"; then
+        if ! teardown_pid_is_task_own "$pid"; then
           TEARDOWN_FOREIGN_RULE='lock-launcher-owner'
           TEARDOWN_FOREIGN_PID=$pid
           TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
@@ -1694,20 +1398,6 @@ copy_identity() {  # <copy>
   printf '%s\n' "$identity"
 }
 
-# The inode and birth time of <file> itself, "<inode>:<birth>", or failure when either
-# cannot be read: the identity of a creation-lock file, so a lock replaced by a new file
-# with the same bytes is a different lock.
-teardown_lock_identity() {  # <file>
-  local identity
-  if [ "$(uname)" = Darwin ]; then
-    identity=$(/usr/bin/stat -f %i:%B "$1" 2>/dev/null) || return 1
-  else
-    identity=$(stat -c %i:%W "$1" 2>/dev/null) || return 1
-  fi
-  [[ $identity =~ ^[0-9]+:[0-9]+$ ]] || return 1
-  printf '%s\n' "$identity"
-}
-
 # Is <path> positively gone? Only the kernel's answer ENOENT or ENOTDIR counts. A path that
 # exists, or that cannot be looked up (a parent it cannot search, any other error), is not
 # gone: an unknown is never answered as absent. Exit 0 gone, 1 present, 2 unknown.
@@ -1715,12 +1405,20 @@ path_positively_gone() {  # <path>
   perl -e 'exit(lstat($ARGV[0]) ? 1 : (($!{ENOENT} || $!{ENOTDIR}) ? 0 : 2))' -- "$1"
 }
 
+# Kept own copies. When Vernant's closeout driver keeps an own nested copy (exit 3 with
+# cleanup_ignored_payload_archived_tree_retained: it writes one more archive of the copy's
+# unique ignored files and keeps the tree on every --execute-cleanup call), teardown runs no
+# destructive step on that copy: no removal, reset, checkout, signal or lock release. It only
+# (a) proves the copy landed and clean (teardown_retained_copy_proved), (b) proves every
+# unique ignored file saved (teardown_retained_saved), (c) writes one record naming the kept
+# copy, the driver's answer and why (teardown_retained_write), and (d) closes the task when
+# (a) and (b) hold, refusing with the named reason otherwise (teardown_retained_judge).
+
 # The one record of a copy the closeout driver kept: data/copy-sweep/retained/
-# <sha256 of the copy path>. bin/fm-copy-sweep.sh writes it before an execute and
-# reads it to never run that copy again; teardown_retained_accept writes the
-# complete form (the same first four lines, then key=value lines) and
-# teardown_retained_matches reads it. Both readers treat a record that no longer
-# describes the copy as absent, and a rewrite replaces it in place.
+# <sha256 of the copy path>. bin/fm-copy-sweep.sh writes its own receipt there before an
+# execute and holds the copy while one applies; teardown_retained_write writes the
+# complete form (the same first four lines, then key=value lines) as soon as the driver
+# keeps an own copy, and teardown_retained_matches reads it.
 teardown_retained_receipt() {  # <data-dir> <copy>
   local hash
   hash=$(printf '%s' "$2" | teardown_ignored_sha256) || return 1
@@ -1748,14 +1446,10 @@ teardown_retained_files() {  # <root> <list> <entry>...
   done
 }
 
-# The fingerprint and the preserve comparison are built from NUL-delimited paths
-# and from records with an explicit type and explicit lengths, never from command
-# substitution or tab or newline framing: a link target keeps its trailing
-# newlines and a path keeps its tabs and its newlines.
-# teardown_retained_digest <root>: reads the NUL-separated "./<path>" list on stdin
-# and prints one SHA-256 over, for each path in byte order, its type (F file, L
-# symlink, P FIFO), the length and bytes of the path, and the file's own SHA-256
-# or the length and bytes of the link target.
+# teardown_retained_digest <root>: reads the NUL-separated "./<path>" list on stdin and
+# prints one SHA-256 over, for each path in byte order, its type (F file, L symlink, P
+# FIFO), the length and bytes of the path, and the file's own SHA-256 or the length and
+# bytes of the link target. Paths and link targets keep every byte (tabs, newlines).
 teardown_retained_digest() {  # <root>
   perl -e '
     use strict; use warnings; use Digest::SHA;
@@ -1772,58 +1466,6 @@ teardown_retained_digest() {  # <root>
     }
     print $d->hexdigest, "\n";
   ' "$1"
-}
-
-# teardown_retained_compare <strict|adopt> <copy> <dir>: reads the NUL-separated
-# "./<path>" list on stdin and checks that each object of <copy> is held in <dir>
-# as the same object: a regular file with the same SHA-256, no hard link outside the
-# compared preserved files (so not the copy's own file), and a line "<sha256>  <path>"
-# in <dir>/SHA256SUMS (adopt mode appends a missing line, never changes a file), a
-# symlink with byte-identical target bytes (trailing newlines included), a FIFO.
-# Exit 0 when all are held, 1 when one differs or is missing, 2 when none could be
-# compared (an unreadable file). A SHA256SUMS line is in sha256sum's form (a path with a
-# backslash or newline is escaped); a plain line an earlier run wrote for such a path is
-# accepted as well.
-teardown_retained_compare() {  # <strict|adopt> <copy> <dir>
-  perl -e '
-    use strict; use warnings; use Digest::SHA;
-    my ($mode, $copy, $dir) = @ARGV; local $/ = "\0";
-    my @p = <STDIN>; chomp @p;
-    my $sumsf = "$dir/SHA256SUMS"; my %have;
-    if (open(my $s, "<:raw", $sumsf)) { local $/ = "\n"; while (<$s>) { chomp; $have{$_} = 1 } close $s }
-    my @add;
-    sub fsha { my $f = shift; open(my $fh, "<:raw", $f) or return undef; my $h = Digest::SHA->new(256); $h->addfile($fh); close $fh; return $h->hexdigest }
-    # A preserved object must be reached through real directories of the preserve itself: a
-    # symlink anywhere above it would let bytes outside the preserve stand for the preserve.
-    sub anc_ok { my ($dir, $rel) = @_; my @c = split m{/}, $rel; pop @c; my $q = $dir; for my $x (@c) { $q .= "/$x"; return 0 if -l $q || !-d $q } return 1 }
-    # A preserved file holds independent bytes only when every hard link to it is one of the
-    # preserved files compared here: a link to the copy (or to anything else) would let an
-    # edit there change what was verified. Links among preserved members (tar keeps those)
-    # are counted, so they stay accepted.
-    my (%links, %seen);
-    @p = grep { !$seen{$_}++ } @p;
-    for my $p (@p) { my $rel = $p; $rel =~ s{^\./}{}; my @st = lstat("$dir/$rel"); $links{"$st[0]:$st[1]"}++ if @st && -f _ }
-    for my $p (@p) {
-      my $rel = $p; $rel =~ s{^\./}{};
-      my ($c, $d) = ("$copy/$rel", "$dir/$rel");
-      anc_ok($dir, $rel) or exit 1;
-      if (-l $c) { my $t = readlink $c; defined $t or exit 2; -l $d or exit 1; my $u = readlink $d; defined $u or exit 1; $t eq $u or exit 1 }
-      elsif (-f $c) {
-        (!-l $d && -f $d) or exit 1;
-        my @st = lstat($d); @st or exit 2;
-        $st[3] == ($links{"$st[0]:$st[1]"} // 0) or exit 1;
-        my $a = fsha($c); my $b = fsha($d); defined $a && defined $b or exit 2;
-        $a eq $b or exit 1;
-        my $plain = "$a  $rel"; my $e = $rel; $e =~ s/\\/\\\\/g; $e =~ s/\n/\\n/g;
-        my $line = ($e ne $rel ? "\\" : "") . "$a  $e";
-        push @add, $line unless $have{$line} || $have{$plain};
-      }
-      elsif (-p $c) { (!-l $d && -p $d) or exit 1 }
-      else { exit 1 }
-    }
-    if (@add) { exit 1 if $mode ne "adopt"; open(my $o, ">>:raw", $sumsf) or exit 2; print $o "$_\n" for @add; close $o or exit 2 }
-    exit 0;
-  ' "$1" "$2" "$3"
 }
 
 # One SHA-256 over every file, symlink and FIFO in <copy>'s ignored entries other
@@ -1848,8 +1490,8 @@ teardown_retained_payload() {  # <copy>
 }
 
 # Sets TEARDOWN_RET_HEAD, TEARDOWN_RET_STATUS (the SHA-256 of the copy's complete
-# porcelain status) and TEARDOWN_RET_PAYLOAD: what a retained record must still
-# match for the copy to count as unchanged. Fails when any cannot be read.
+# porcelain status) and TEARDOWN_RET_PAYLOAD: what a record must still match for the
+# driver's recorded answer to apply. Fails when any cannot be read.
 teardown_retained_snapshot() {  # <copy>
   local copy=$1 status
   TEARDOWN_RET_HEAD=
@@ -1861,151 +1503,8 @@ teardown_retained_snapshot() {  # <copy>
   TEARDOWN_RET_PAYLOAD=$(teardown_retained_payload "$copy") || return 1
 }
 
-# The directory teardown_preserve_ignored keeps <copy>'s ignored files in. The
-# first payload of a copy goes to <sha256 of the copy path>; a later payload that
-# the first directory does not hold goes to its own directory beside it, named by
-# the first 16 characters of that payload's fingerprint, so no preserved byte is
-# ever overwritten or removed.
-teardown_retained_preserve_dir() {  # <copy> [payload-sha256]
-  local hash
-  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
-  printf '%s/%s/nested-copy-preserved/%s%s\n' "$DATA" "$ID" "$hash" "${2:+.${2:0:16}}"
-}
-
-# The preserve directory a retained record of <copy> names, or the first
-# directory when there is no record.
-teardown_retained_preserve_of() {  # <copy>
-  local rec preserve=
-  rec=$(teardown_retained_receipt "$DATA" "$1") && [ -f "$rec" ] && preserve=$(teardown_retained_fields "$rec" preserve) || true
-  [ -n "$preserve" ] || preserve=$(teardown_retained_preserve_dir "$1") || return 1
-  printf '%s\n' "$preserve"
-}
-
-# A driver-named path travels through the lists, records and here-strings of this route as
-# one line: a backslash is written \\ and a newline \n (the driver's JSON array holds the
-# complete name, a newline included). teardown_name_dec sets TEARDOWN_NAME to the name itself,
-# trailing newlines included. A lone backslash before another character stays as it is.
-teardown_name_dec() {  # <encoded name>
-  TEARDOWN_NAME=
-  IFS= read -r -d '' TEARDOWN_NAME < <(perl -e 'my $s = shift; $s =~ s/\\(.)/$1 eq "n" ? "\n" : $1/ge; print $s, "\0"' -- "$1") || return 1
-}
-
-# Is <entry> a plain path inside <copy> that exists and is reached through no
-# symlink? Driver-named paths are never trusted to stay inside the copy. <entry> is the
-# name itself (decode a driver-named one first); a newline in it is part of the name.
-teardown_retained_entry_ok() {  # <copy> <entry>
-  local copy=$1 entry=$2 rest part prefix=
-  case "$entry" in ''|/*) return 1 ;; esac
-  rest=$entry
-  while :; do
-    part=${rest%%/*}
-    case "$part" in ''|.|..) return 1 ;; esac
-    prefix=${prefix:+$prefix/}$part
-    [ "$prefix" = "$entry" ] || [ ! -L "$copy/$prefix" ] || return 1
-    [ "$part" != "$rest" ] || break
-    rest=${rest#*/}
-  done
-  [ -e "$copy/$entry" ] || [ -L "$copy/$entry" ]
-}
-
-# Is the driver's own string <raw> a name of an object inside <copy>? Judged as the
-# driver wrote it, before any trimming: not empty, not absolute, no empty, "." or
-# ".." component (one trailing slash is allowed and marks a directory), no symlink
-# in any directory component, and the object exists. A final component that is a
-# symlink is accepted only without a trailing slash and only when it resolves to
-# a place inside the copy (a name written with a trailing slash must be a real
-# directory); one that resolves outside the copy, or nowhere, is refused.
-teardown_retained_named_ok() {  # <copy> <raw-name, encoded as the lists hold it>
-  local copy=$1 raw body slash=0 rest part prefix="" copy_real real
-  teardown_name_dec "$2" || return 1
-  raw=$TEARDOWN_NAME
-  case "$raw" in ''|/*) return 1 ;; esac
-  body=$raw
-  case "$raw" in */) body=${raw%/}; slash=1 ;; esac
-  case "$body" in ''|*/|*//*) return 1 ;; esac
-  rest=$body
-  while :; do
-    part=${rest%%/*}
-    case "$part" in ''|.|..) return 1 ;; esac
-    prefix=${prefix:+$prefix/}$part
-    [ "$prefix" = "$body" ] || [ ! -L "$copy/$prefix" ] || return 1
-    [ "$part" != "$rest" ] || break
-    rest=${rest#*/}
-  done
-  if [ -L "$copy/$body" ]; then
-    [ "$slash" = 0 ] || return 1
-    copy_real=$(cd "$copy" 2>/dev/null && pwd -P) || return 1
-    # It must resolve to something that exists: realpath of a dangling link can still name
-    # a place inside the copy, so the target's existence is tested on its own.
-    [ -e "$copy/$body" ] || return 1
-    real=$(perl -MCwd=realpath -e 'my $r = realpath($ARGV[0]); print $r if defined $r' -- "$copy/$body") || return 1
-    case "$real" in "$copy_real"/*) ;; *) return 1 ;; esac
-    return 0
-  fi
-  [ -e "$copy/$body" ] || return 1
-  [ "$slash" = 0 ] || [ -d "$copy/$body" ]
-}
-
-# Byte-checks every file, symlink and FIFO under <entry>... of <copy> against the
-# preserve in <dir>: a regular file needs a preserved file with the same SHA-256
-# and a line for it in SHA256SUMS, a symlink the same target. In strict mode a
-# missing or different preserved entry returns 1. In adopt mode an entry the
-# preserve lacks is copied in and hashed (the preserve skips the .claude tree that
-# the driver may still call unique); a different one still returns 1, so a
-# preserved byte is never overwritten. Returns 2 when anything cannot be listed,
-# copied, hashed or written, so no comparison was made.
-teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
-  local mode=$1 copy=$2 dir=$3 p rel work rc=0
-  shift 3
-  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-retained-cover.XXXXXX") || return 2
-  teardown_retained_files "$copy" "$work/all" "$@" || rc=2
-  : > "$work/reg"
-  : > "$work/missing"
-  if [ "$rc" = 0 ]; then
-    while IFS= read -r -d '' p; do
-      rel=${p#./}
-      if [ ! -e "$dir/$rel" ] && [ ! -L "$dir/$rel" ]; then
-        [ "$mode" = adopt ] || { rc=1; break; }
-        printf '%s\0' "$rel" >> "$work/missing" || { rc=2; break; }
-      fi
-    done < "$work/all"
-  fi
-  # Adopted entries are copied in one pass, only where the preserve has nothing.
-  if [ "$rc" = 0 ] && [ -s "$work/missing" ]; then
-    (set -o pipefail; cd "$copy" && tar -cf - --null -T "$work/missing" | tar -xpf - -C "$dir") || rc=2
-  fi
-  if [ "$rc" = 0 ]; then
-    teardown_retained_compare "$mode" "$copy" "$dir" < "$work/all" || rc=$?
-  fi
-  rm -rf "$work"
-  return "$rc"
-}
-
-# True when the closeout just run answered as the recorded retained case: exit 3
-# is the caller's, and its stdout is one JSON document that refuses with the
-# retained reason, names no uncovered path of any kind and, when it names the
-# tree it kept, names this copy. Anything else is an ordinary driver refusal. Prints the driver-named
-# unique ignored paths, one per line, and sets nothing else.
-teardown_closeout_retained_paths() {  # <copy>
-  local copy=$1 kept
-  command -v jq >/dev/null 2>&1 || return 1
-  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e --arg reason "$TEARDOWN_RETAINED_REASON" '
-    length == 1 and (.[0] | type == "object")
-    and (.[0].allowed == false) and (.[0].reason == $reason)
-    and (.[0].ignored_payload_disposition == "archive_then_retain_tree")
-    and (.[0].tracked_uncovered_paths == []) and (.[0].uncovered_paths == [])
-    and ((.[0].untracked_uncovered_paths // []) == [])
-    and ((.[0].unique_ignored_paths | type) == "array")
-    and (.[0].unique_ignored_paths | all(type == "string" and length > 0 and (contains("\u0000") | not)))
-  ' >/dev/null 2>&1 || return 1
-  kept=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r '.[0].retained_worktree_path // empty' 2>/dev/null) || return 1
-  if [ -n "$kept" ] && [ "$(fm_task_copy_canonical_dir "$kept" 2>/dev/null)" != "$(fm_task_copy_canonical_dir "$copy" 2>/dev/null)" ]; then
-    return 1
-  fi
-  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r '.[0].unique_ignored_paths[] | gsub("\\\\";"\\\\") | gsub("\n";"\\n")' 2>/dev/null
-}
-
-# Can the retained record of <copy> be written now? (A scratch file in its folder.)
+# Can the record of <copy> be written? Asked before the driver, so an answer that could not
+# be recorded is never asked for (each ask writes one more archive).
 teardown_retained_record_writable() {  # <copy>
   local rec tmp
   rec=$(teardown_retained_receipt "$DATA" "$1") || return 1
@@ -2014,53 +1513,76 @@ teardown_retained_record_writable() {  # <copy>
   rm -f "$tmp"
 }
 
-# Prints the first retained record that task <id>'s completed close marked
-# (task-closed=<id>, written by teardown_retained_close_check immediately before the task
-# record is removed) and succeeds; fails when none does. A record that only names the task
-# was written by an acceptance whose close may have refused afterwards, so it proves no close.
-teardown_retained_closed_by() {  # <data-dir> <task-id>
-  local rec
-  for rec in "$1"/copy-sweep/retained/*; do
-    { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || continue
-    [ "$(teardown_retained_fields "$rec" task)" = "$2" ] || continue
-    [ "$(teardown_retained_fields "$rec" task-closed)" = "$2" ] || continue
-    printf '%s\n' "$rec"
-    return 0
-  done
-  return 1
+# Did the driver's last answer (TEARDOWN_CLOSEOUT_STDOUT) keep the copy? True for exactly
+# one JSON object whose reason is the retained reason; whether the rest of the answer is
+# valid is judged later, from the record (teardown_retained_saved).
+teardown_closeout_kept() {
+  command -v jq >/dev/null 2>&1 || return 1
+  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e --arg reason "$TEARDOWN_RETAINED_REASON" \
+    'length == 1 and (.[0] | type == "object") and (.[0].reason == $reason)' >/dev/null 2>&1
 }
 
-# Writes the complete retained record for <copy> (see teardown_retained_receipt),
-# atomically, from the last teardown_retained_snapshot. The first four lines keep
-# the form bin/fm-copy-sweep.sh reads.
-teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity> <preserve-dir> <lock-identity>   (unique paths on stdin)
-  local rec tmp path
+# Writes the record of kept <copy>: the sweep receipt's first four lines, then the task, the
+# slot, the reason, the time, the state the driver answered for (TEARDOWN_RET_HEAD,
+# TEARDOWN_RET_STATUS, TEARDOWN_RET_PAYLOAD, read before the driver was asked) and the
+# driver's whole answer, base64 so any byte survives. Sets TEARDOWN_RETAINED_RECORD.
+teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity>
+  local rec tmp answer
   rec=$(teardown_retained_receipt "$DATA" "$2") || return 1
+  answer=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | perl -MMIME::Base64 -0777 -ne 'print encode_base64($_, "")') || return 1
+  [ -n "$answer" ] || return 1
   mkdir -p "${rec%/*}" || return 1
   tmp=$(mktemp "${rec%/*}/.retained.XXXXXX") || return 1
   {
     printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$3" "$2" "$4"
-    printf "the closeout driver kept this copy (exit 3, %s); task %s verified its ignored payload byte for byte in %s; the copy and its pool slot stay untouched and leased; the driver's --execute-cleanup keeps the tree and writes another archive, so it must not be run again for an unchanged copy; this record adds no disposal, unlock or force route, and removing the copy depends on Vernant's driver\n" \
-      "$TEARDOWN_RETAINED_REASON" "$ID" "$5"
-    printf 'task=%s\nslot=%s\npreserve=%s\nreason=%s\nclosed-at=%s\nhead=%s\nstatus-sha256=%s\npayload-sha256=%s\nlock-identity=%s\n' \
-      "$ID" "$1" "$5" "$TEARDOWN_RETAINED_REASON" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-      "$TEARDOWN_RET_HEAD" "$TEARDOWN_RET_STATUS" "$TEARDOWN_RET_PAYLOAD" "$6"
-    while IFS= read -r path; do
-      [ -z "$path" ] || printf 'unique=%s\n' "$path"
-    done
+    printf "the closeout driver kept this copy (exit 3, %s) for task %s; teardown changes nothing in it and closes the task only when the copy is landed and clean and the driver's verified archive and the task's preserve hold its unique ignored files; the driver's --execute-cleanup keeps the tree and writes another archive, so it is not run again for an unchanged copy; removing the copy depends on Vernant's driver\n" \
+      "$TEARDOWN_RETAINED_REASON" "$ID"
+    printf 'task=%s\nslot=%s\nreason=%s\nrecorded-at=%s\nhead=%s\nstatus-sha256=%s\npayload-sha256=%s\nanswer-base64=%s\n' \
+      "$ID" "$1" "$TEARDOWN_RETAINED_REASON" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      "$TEARDOWN_RET_HEAD" "$TEARDOWN_RET_STATUS" "$TEARDOWN_RET_PAYLOAD" "$answer"
   } > "$tmp" || { rm -f "$tmp"; return 1; }
   mv -- "$tmp" "$rec" || { rm -f "$tmp"; return 1; }
   TEARDOWN_RETAINED_RECORD=$rec
 }
 
-# The kept route's own clean and landed proof, never the anchor shortcut of
-# teardown_own_copy_disposable (an anchor lets a pool return sweep a copy away; here
-# nothing is swept, and closing the task over unlanded or uncommitted work is the
-# harm): every line of the copy's full porcelain status counts, with only
-# Firstmate's two turn-end hook files and the task's own nested copies left out,
-# and HEAD must pass teardown_landed (a landed commit, or the recorded verified
-# bundle that bin/fm-teardown.sh's header allows for an attended teardown). --force
-# does not waive it. Prints the cause and returns 1 when either fails.
+# Does this task's record of <copy> still apply: the same copy (identity), the same creation
+# lock bytes, and the same HEAD, status and ignored payload as when the driver answered?
+# Sets TEARDOWN_RETAINED_RECORD and TEARDOWN_RETAINED_ANSWER (the decoded answer) when so.
+teardown_retained_matches() {  # <copy>
+  local copy=$1 rec hash='' rcopy='' identity='' actual rc=0 answer
+  TEARDOWN_RETAINED_RECORD=
+  TEARDOWN_RETAINED_ANSWER=
+  rec=$(teardown_retained_receipt "$DATA" "$copy") || return 1
+  { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || return 1
+  { IFS= read -r hash && IFS= read -r rcopy && IFS= read -r identity; } < "$rec" || true
+  [ "$rcopy" = "copy=$copy" ] || return 1
+  actual=$(copy_identity "$copy") || return 1
+  [ "$actual" = "${identity#identity=}" ] || return 1
+  teardown_copy_lock_file "$copy" || rc=$?
+  [ "$rc" = 0 ] || return 1
+  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  [ "$actual" = "${hash#lock-sha256=}" ] || return 1
+  [ "$(teardown_retained_fields "$rec" task)" = "$ID" ] || return 1
+  [ "$(teardown_retained_fields "$rec" reason)" = "$TEARDOWN_RETAINED_REASON" ] || return 1
+  answer=$(teardown_retained_fields "$rec" answer-base64)
+  [ -n "$answer" ] || return 1
+  teardown_retained_snapshot "$copy" || return 1
+  [ "$(teardown_retained_fields "$rec" head)" = "$TEARDOWN_RET_HEAD" ] || return 1
+  [ "$(teardown_retained_fields "$rec" status-sha256)" = "$TEARDOWN_RET_STATUS" ] || return 1
+  [ "$(teardown_retained_fields "$rec" payload-sha256)" = "$TEARDOWN_RET_PAYLOAD" ] || return 1
+  TEARDOWN_RETAINED_ANSWER=$(printf '%s' "$answer" | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)'; printf '.') || return 1
+  TEARDOWN_RETAINED_ANSWER=${TEARDOWN_RETAINED_ANSWER%.}
+  TEARDOWN_RETAINED_RECORD=$rec
+}
+
+# (a) The kept route's clean and landed proof, never the anchor shortcut of
+# teardown_own_copy_disposable (an anchor lets a pool return sweep a copy away; here the
+# task closes, and closing it over unlanded or uncommitted work is the harm): every line
+# of the copy's full porcelain status counts, with only Firstmate's two turn-end hook
+# files and the task's own nested copies left out, and HEAD must pass teardown_landed
+# (a landed commit, or the recorded verified bundle that bin/fm-teardown.sh's header
+# allows for an attended teardown). --force does not waive it. Prints the cause and
+# returns 1 when either fails.
 teardown_retained_copy_proved() {  # <copy>
   local copy=$1 status line nested dirty="" head
   status=$(git -C "$copy" status --porcelain=v1 --untracked-files=all --ignore-submodules=none 2>/dev/null) || {
@@ -2092,41 +1614,110 @@ teardown_retained_copy_proved() {  # <copy>
   fi
 }
 
-# True when <copy> has a complete retained record that still describes it: the
-# same copy (path and identity), the same creation lock (bytes and file), written by this task,
-# and the HEAD, status and ignored payload it recorded. Anything else - no
-# record, an older sweep-form record, a different or changed copy, an unreadable
-# part - is a record that does not apply, and the copy is assessed afresh. Sets
-# TEARDOWN_RETAINED_RECORD, _PRESERVE and _UNIQUE for a record that applies.
-teardown_retained_matches() {  # <copy>
-  local copy=$1 rec hash='' rcopy='' identity='' actual rc=0 preserve
-  TEARDOWN_RETAINED_RECORD=
-  TEARDOWN_RETAINED_PRESERVE=
-  TEARDOWN_RETAINED_UNIQUE=
-  rec=$(teardown_retained_receipt "$DATA" "$copy") || return 1
-  { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || return 1
-  { IFS= read -r hash && IFS= read -r rcopy && IFS= read -r identity; } < "$rec" || true
-  [ "$rcopy" = "copy=$copy" ] || return 1
-  actual=$(copy_identity "$copy") || return 1
-  [ "$actual" = "${identity#identity=}" ] || return 1
-  teardown_copy_lock_file "$copy" || rc=$?
-  [ "$rc" = 0 ] || return 1
-  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
-  [ "$actual" = "${hash#lock-sha256=}" ] || return 1
-  actual=$(teardown_lock_identity "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
-  [ "$actual" = "$(teardown_retained_fields "$rec" lock-identity)" ] || return 1
-  [ "$(teardown_retained_fields "$rec" task)" = "$ID" ] || return 1
-  [ "$(teardown_retained_fields "$rec" reason)" = "$TEARDOWN_RETAINED_REASON" ] || return 1
-  teardown_retained_snapshot "$copy" || return 1
-  [ "$(teardown_retained_fields "$rec" head)" = "$TEARDOWN_RET_HEAD" ] || return 1
-  [ "$(teardown_retained_fields "$rec" status-sha256)" = "$TEARDOWN_RET_STATUS" ] || return 1
-  [ "$(teardown_retained_fields "$rec" payload-sha256)" = "$TEARDOWN_RET_PAYLOAD" ] || return 1
-  preserve=$(teardown_retained_fields "$rec" preserve)
-  [ "$preserve" = "$(teardown_retained_preserve_dir "$copy")" ] || [ "$preserve" = "$(teardown_retained_preserve_dir "$copy" "$TEARDOWN_RET_PAYLOAD")" ] || return 1
-  { [ -d "$preserve" ] && [ ! -L "$preserve" ]; } || return 1
-  TEARDOWN_RETAINED_RECORD=$rec
-  TEARDOWN_RETAINED_PRESERVE=$preserve
-  TEARDOWN_RETAINED_UNIQUE=$(teardown_retained_fields "$rec" unique)
+# (b) Is every unique ignored file of kept <copy> saved? The driver's <answer> must be the
+# kept answer in full (one object; not allowed; the retained reason; disposition
+# archive_then_retain_tree; no uncovered path of any kind; a non-empty list of non-empty
+# unique paths; this copy as the retained tree), and its last preservation entry must name
+# a restore-verified archive of exactly that many paths, at an absolute path outside the
+# copy, that is a regular file whose SHA-256 is the one the driver recorded. The driver
+# verified that archive's members against the live files before it answered
+# (closeout_pr.py _archive_and_verify_ignored_payload, _confirm_ignored_payload_custody).
+# Then the task's own preserve (teardown_preserve_ignored, written before the driver was
+# asked) must hold every selected ignored file of the copy byte for byte: a regular file
+# with the same SHA-256, a symlink with the same target bytes, a FIFO as a FIFO. Prints the
+# named cause and returns 1 when any of it fails.
+teardown_retained_saved() {  # <copy> <answer>
+  local copy=$1 answer=$2 archive sha copy_real archive_real preserve work rc=0
+  if ! command -v jq >/dev/null 2>&1 || ! printf '%s' "$answer" | jq -s -e \
+      --arg reason "$TEARDOWN_RETAINED_REASON" '
+    length == 1 and (.[0] | type == "object")
+    and (.[0].allowed == false) and (.[0].reason == $reason)
+    and (.[0].ignored_payload_disposition == "archive_then_retain_tree")
+    and (.[0].tracked_uncovered_paths == []) and (.[0].uncovered_paths == [])
+    and ((.[0].untracked_uncovered_paths // []) == [])
+    and ((.[0].unique_ignored_paths | type) == "array") and ((.[0].unique_ignored_paths | length) > 0)
+    and (.[0].unique_ignored_paths | all(type == "string" and length > 0 and (contains("\u0000") | not)))
+    and ((.[0].retained_worktree_path | type) == "string")
+    and ((.[0].ignored_payload_preservation | type) == "array")
+    and ((.[0].ignored_payload_preservation | length) > 0)
+    and (.[0].ignored_payload_preservation[-1] | type == "object"
+         and .restore_verified == true
+         and ((.archive_path | type) == "string") and (.archive_path | startswith("/"))
+         and ((.archive_sha256 | type) == "string") and (.archive_sha256 | test("^[0-9a-f]{64}$")))
+    and (.[0].ignored_payload_preservation[-1].path_count == (.[0].unique_ignored_paths | length))
+  ' >/dev/null 2>&1; then
+    echo "REFUSED: Vernant's closeout driver kept own nested copy $(fm_refuse_text "$copy"), but its recorded answer does not name a restore-verified archive of every unique ignored file it lists (or lists an empty, uncovered or non-string path); its unique ignored files are not proved saved, and the task was not closed." >&2
+    return 1
+  fi
+  copy_real=$(cd "$copy" 2>/dev/null && pwd -P) || copy_real=
+  if [ -z "$copy_real" ] \
+      || [ "$(fm_task_copy_canonical_dir "$(printf '%s' "$answer" | jq -r '.retained_worktree_path')" 2>/dev/null)" != "$(fm_task_copy_canonical_dir "$copy" 2>/dev/null)" ]; then
+    echo "REFUSED: Vernant's closeout driver's recorded answer keeps a tree other than own nested copy $(fm_refuse_text "$copy"); its unique ignored files are not proved saved, and the task was not closed." >&2
+    return 1
+  fi
+  archive=$(printf '%s' "$answer" | jq -r '.ignored_payload_preservation[-1].archive_path')
+  sha=$(printf '%s' "$answer" | jq -r '.ignored_payload_preservation[-1].archive_sha256')
+  archive_real=$(cd "$(dirname "$archive")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "${archive##*/}") || archive_real=
+  if [ -z "$archive_real" ] || [ ! -f "$archive" ] || [ -L "$archive" ]; then
+    echo "REFUSED: the archive $(fm_refuse_text "$archive") that Vernant's closeout driver recorded for own nested copy $(fm_refuse_text "$copy") is not a regular file; its unique ignored files are not proved saved, and the task was not closed." >&2
+    return 1
+  fi
+  case "$archive_real" in
+    "$copy_real"/*)
+      echo "REFUSED: the archive $(fm_refuse_text "$archive") that Vernant's closeout driver recorded for own nested copy $(fm_refuse_text "$copy") is inside the copy; its unique ignored files are not proved saved apart from it, and the task was not closed." >&2
+      return 1
+      ;;
+  esac
+  if [ "$(teardown_ignored_sha256 "$archive" 2>/dev/null)" != "$sha" ]; then
+    echo "REFUSED: the archive $(fm_refuse_text "$archive") that Vernant's closeout driver recorded for own nested copy $(fm_refuse_text "$copy") does not have the SHA-256 it recorded ($sha); its unique ignored files are not proved saved, and the task was not closed." >&2
+    return 1
+  fi
+  teardown_ignored_list "$copy" || {
+    echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") could not be listed, so the preserve cannot be checked; the task was not closed." >&2
+    return 1
+  }
+  [ "${#TEARDOWN_IGNORED_LIST[@]}" -gt 0 ] || return 0
+  preserve="$DATA/$ID/nested-copy-preserved/$(printf '%s' "$copy" | teardown_ignored_sha256)"
+  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-retained-saved.XXXXXX") || return 1
+  teardown_retained_files "$copy" "$work/list" "${TEARDOWN_IGNORED_LIST[@]}" || rc=2
+  if [ "$rc" = 0 ]; then
+    perl -e '
+      use strict; use warnings; use Digest::SHA;
+      my ($copy, $dir) = @ARGV; local $/ = "\0";
+      sub sum { my $f = shift; open(my $fh, "<:raw", $f) or return ""; my $h = Digest::SHA->new(256); $h->addfile($fh); close $fh; return $h->hexdigest; }
+      my @p = <STDIN>; chomp @p;
+      for my $p (@p) {
+        my $rel = $p; $rel =~ s{^\./}{};
+        my ($s, $d) = ("$copy/$rel", "$dir/$rel");
+        if (-l $s) { my $t = readlink $s; defined $t or exit 2; -l $d or exit 1; my $u = readlink $d; (defined $u && $u eq $t) or exit 1; }
+        elsif (-f $s) { my $a = sum($s); $a ne "" or exit 2; (-f $d && ! -l $d) or exit 1; sum($d) eq $a or exit 1; }
+        elsif (-p $s) { (-p $d && ! -l $d) or exit 1; }
+        else { exit 2 }
+      }
+      exit 0;
+    ' "$copy" "$preserve" < "$work/list" || rc=$?
+  fi
+  rm -rf "$work"
+  if [ "$rc" != 0 ]; then
+    echo "REFUSED: the preserve $(fm_refuse_text "$preserve") does not hold every selected ignored file of own nested copy $(fm_refuse_text "$copy") byte for byte (or one could not be read); the task was not closed." >&2
+    return 1
+  fi
+}
+
+# (a), (b) and (d) for kept <copy>, from the driver's recorded answer: closes around the
+# copy (adds it to TEARDOWN_RETAINED) when (a) and (b) hold, otherwise returns 1 after the
+# named refusal. Nothing in the copy is changed either way, and the driver is not asked:
+# the next run judges the same record again while it still matches the copy.
+teardown_retained_judge() {  # <copy> <answer>
+  local copy=$1
+  if ! teardown_own_nested_other_repos; then
+    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD")), but the task's nested copies hold another Git repository or could not be scanned for one; the task was not closed, and a retry asks the driver nothing." >&2
+    return 1
+  fi
+  teardown_retained_copy_proved "$copy" || return 1
+  teardown_retained_saved "$copy" "$2" || return 1
+  TEARDOWN_RETAINED+=("$copy")
+  echo "teardown: Vernant's closeout driver kept own nested copy $(fm_refuse_text "$copy"); it is landed and clean, its unique ignored files are in the driver's verified archive and in the task's preserve, and the copy is untouched (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD"))" >&2
 }
 
 # Is <copy> one this teardown keeps because the driver kept it?
@@ -2138,419 +1729,24 @@ teardown_copy_retained() {  # <copy>
   return 1
 }
 
-# Is <copy>'s preserve complete? Every entry teardown_preserve_ignored selects, every
-# driver-named path (given on stdin) and every other ignored entry of the payload
-# fingerprint (teardown_retained_payload's population: an unnamed root symlink, a .claude or
-# .opencode entry, anything elsewhere) must be there byte for byte. In adopt mode the
-# entries beyond the selected ones that the preserve lacks are copied in first; repair mode
-# copies in a missing selected entry as well, and is used only while a retained record
-# proves the copy unchanged since the driver answered. A different preserved byte is never
-# overwritten in any mode. Returns 3 when a driver-named path is not a plain path inside the
-# copy, 1 otherwise.
-teardown_retained_preserve_check() {  # <strict|adopt|repair> <copy> <dir>   (driver-named paths on stdin)
-  local mode=$1 copy=$2 dir=$3 entry paths chosen_mode=strict other=adopt
-  local -a named=() chosen=()
-  case "$mode" in
-    strict) other=strict ;;
-    adopt) ;;
-    repair) chosen_mode=adopt ;;
-    *) return 1 ;;
-  esac
-  paths=$(cat)
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || { teardown_name_dec "$entry" || return 1; named+=("$TEARDOWN_NAME"); }
-  done <<< "$paths"
-  for entry in ${named[@]+"${named[@]}"}; do
-    if ! teardown_retained_entry_ok "$copy" "$entry"; then
-      echo "REFUSED: Vernant's closeout driver names ignored path $(fm_refuse_text "$entry") of own nested copy $(fm_refuse_text "$copy"), which is not a plain path inside the copy or no longer exists; the task was not closed." >&2
-      return 3
-    fi
-  done
-  teardown_ignored_list "$copy" || return 1
-  chosen=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
-  if [ "${#chosen[@]}" -gt 0 ]; then
-    teardown_retained_cover "$chosen_mode" "$copy" "$dir" "${chosen[@]}" || return 1
-  fi
-  # Every ignored entry the payload fingerprint covers is payload too, named by the driver or
-  # not (the ordinary preservation skips the .claude and .opencode trees and symlinks): a
-  # newly appearing one is copied into this preserve, never over a different preserved byte.
-  # The fingerprint and the preserve are judged on that one population.
-  teardown_ignored_list "$copy" retained || return 1
-  for entry in ${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"}; do
-    teardown_entry_under_any "$entry" ${chosen[@]+"${chosen[@]}"} || named+=("$entry")
-  done
-  [ "${#named[@]}" -gt 0 ] || return 0
-  teardown_retained_cover "$other" "$copy" "$dir" "${named[@]}"
+# Does own nested <copy> hold Vernant's creation lock and a record of this task that still
+# applies to it? Such a copy is kept: the retire step leaves it out of its swept roots and
+# drops what the copy's proof queued, so no signal reaches it.
+teardown_retained_copy_held() {  # <copy>
+  local rc=0
+  [ -d "$1" ] || return 1
+  teardown_copy_lock_file "$1" || rc=$?
+  [ "$rc" = 0 ] || return 1
+  teardown_retained_matches "$1"
 }
 
-# Is <entry> one of <entry>... or below one of them?
-teardown_entry_under_any() {  # <entry> <entry>...
-  local entry=$1 top
-  shift
-  for top in "$@"; do
-    case "$entry" in "$top"|"$top"/*) return 0 ;; esac
-  done
-  return 1
-}
-
-# Does the preserve in <dir> hold <copy>'s current bytes: every entry
-# teardown_preserve_ignored selects, and every entry an earlier run adopted into
-# it (one under no selected entry), wherever the copy still has that entry?
-# Returns 1 when one is missing or differs and 2 when the check could not be made.
-teardown_retained_preserve_current() {  # <copy> <dir>
-  local copy=$1 dir=$2 p rel entry
-  local -a adopted_paths=() chosen=()
-  [ -d "$dir" ] || return 0
-  teardown_ignored_list "$copy" || return 2
-  chosen=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
-  while IFS= read -r -d '' p; do
-    rel=${p#"$dir/"}
-    case "$rel" in copy-path|SHA256SUMS) continue ;; esac
-    for entry in ${chosen[@]+"${chosen[@]}"}; do
-      case "$rel" in "$entry"|"$entry"/*) continue 2 ;; esac
-    done
-    [ -e "$copy/$rel" ] || [ -L "$copy/$rel" ] || continue
-    adopted_paths+=("$rel")
-  done < <(find -P "$dir" ! -type d -print0)
-  if [ "${#chosen[@]}" -gt 0 ]; then
-    teardown_retained_cover strict "$copy" "$dir" "${chosen[@]}" || return $?
-  fi
-  [ "${#adopted_paths[@]}" -gt 0 ] || return 0
-  teardown_retained_cover strict "$copy" "$dir" "${adopted_paths[@]}"
-}
-
-# Chooses where the ignored files of <copy> are preserved for this assessment and
-# sets TEARDOWN_RETAINED_DIR to it, and TEARDOWN_RETAINED_BUILD to 1 when that
-# directory does not exist yet and teardown_preserve_ignored must build it, else
-# 0. An existing preserve is never rebuilt, overwritten or removed: the first directory is kept when it already holds the
-# copy's current bytes, and a copy whose payload changed since is preserved in its
-# own directory beside it.
-# Returns 2 when the copy or a preserve could not be read.
-teardown_retained_preserve_choose() {  # <copy>
-  local copy=$1 base rc=0
-  TEARDOWN_RETAINED_DIR=
-  TEARDOWN_RETAINED_SUFFIX=
-  TEARDOWN_RETAINED_BUILD=0
-  base=$(teardown_retained_preserve_dir "$copy") || return 2
-  if [ ! -e "$base" ] && [ ! -L "$base" ]; then
-    TEARDOWN_RETAINED_DIR=$base
-    TEARDOWN_RETAINED_BUILD=1
-    return 0
-  fi
-  [ -d "$base" ] && [ ! -L "$base" ] || return 2
-  teardown_retained_preserve_current "$copy" "$base" || rc=$?
-  if [ "$rc" = 0 ]; then
-    TEARDOWN_RETAINED_DIR=$base
-    return 0
-  fi
-  [ "$rc" = 1 ] || return 2
-  teardown_retained_snapshot "$copy" || return 2
-  TEARDOWN_RETAINED_DIR=$(teardown_retained_preserve_dir "$copy" "$TEARDOWN_RET_PAYLOAD") || return 2
-  TEARDOWN_RETAINED_SUFFIX=.${TEARDOWN_RET_PAYLOAD:0:16}
-  if [ ! -e "$TEARDOWN_RETAINED_DIR" ] && [ ! -L "$TEARDOWN_RETAINED_DIR" ]; then
-    TEARDOWN_RETAINED_BUILD=1
-    return 0
-  fi
-  [ -d "$TEARDOWN_RETAINED_DIR" ] && [ ! -L "$TEARDOWN_RETAINED_DIR" ] || return 2
-}
-
-# Does any own nested copy of the task have a retained record that still applies?
+# Does any own nested copy of the task have a record that still applies?
 teardown_retained_own_present() {
-  local copy rc
+  local copy
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
-    [ -d "$copy" ] || continue
-    rc=0
-    teardown_copy_lock_file "$copy" || rc=$?
-    [ "$rc" = 0 ] || continue
-    ! teardown_retained_matches "$copy" || return 0
+    ! teardown_retained_copy_held "$copy" || return 0
   done
   return 1
-}
-
-# The route of a retry for a copy whose retained record still applies: it asks
-# the driver nothing, so the driver writes no further archive, and it proves
-# again that the preserve holds the copy's current bytes before the task closes.
-teardown_retained_confirm() {  # <slot> <copy>
-  local copy=$2 entry
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || teardown_retained_named_ok "$copy" "$entry" || {
-      echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is kept by Vernant's closeout driver (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD")), but the driver-named ignored path $(fm_refuse_text "$entry") no longer resolves to an object inside the copy; the task was not closed, and the driver was not asked again." >&2
-      return 1
-    }
-  done <<< "$TEARDOWN_RETAINED_UNIQUE"
-  # The record proves the copy unchanged since the driver answered, so an entry the preserve
-  # lost since is copied in again from the copy (never over a different preserved byte).
-  if ! teardown_retained_preserve_check repair "$copy" "$TEARDOWN_RETAINED_PRESERVE" <<< "$TEARDOWN_RETAINED_UNIQUE"; then
-    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is kept by Vernant's closeout driver (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD")), but its ignored files are not held byte for byte in $(fm_refuse_text "$TEARDOWN_RETAINED_PRESERVE"); the task was not closed, and the driver was not asked again." >&2
-    return 1
-  fi
-  ! teardown_copy_retained "$copy" || return 0
-  TEARDOWN_RETAINED+=("$copy")
-  echo "teardown: own nested copy $(fm_refuse_text "$copy") is unchanged since the driver kept it (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD")); the driver was not asked again" >&2
-}
-
-# The record of a kept own copy that teardown refused after the driver answered
-# for it: data/<task>/closeout-refused/<sha256 of the copy path>. Its first three
-# lines take the retained record's form (lock hash, copy, identity); key=value
-# lines add task, head, status-sha256, payload-sha256, named-sha256, reason,
-# refused-at and one unique line per driver-named path. A retry of the copy while
-# it still matches asks the driver nothing; any run that asks the driver first
-# deletes it.
-teardown_retained_refused_path() {  # <copy>
-  local hash
-  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
-  printf '%s/%s/closeout-refused/%s\n' "$DATA" "$ID" "$hash"
-}
-
-# One SHA-256 over each driver-named path (on stdin) and whether it is still a
-# plain path inside <copy>.
-teardown_retained_named_state() {  # <copy>
-  local entry
-  while IFS= read -r entry; do
-    [ -n "$entry" ] || continue
-    if teardown_name_dec "$entry" && teardown_retained_entry_ok "$1" "$TEARDOWN_NAME"; then
-      printf '%s\tok\n' "$entry"
-    else
-      printf '%s\tbad\n' "$entry"
-    fi
-  done | teardown_ignored_sha256
-}
-
-# Writes the refusal record of <copy> atomically, from a fresh
-# teardown_retained_snapshot, naming <reason>.
-teardown_retained_refused_write() {  # <copy> <lock-sha256> <identity> <paths> <reason>
-  local copy=$1 rec tmp named path
-  if ! teardown_retained_snapshot "$copy"; then
-    # The state can no longer be read (a file lost its permissions after the driver
-    # answered). The driver answered for the state read before it was asked; the record is
-    # keyed on that state, so an unchanged copy that becomes readable again matches it and
-    # the driver is not asked again.
-    [ -n "${TEARDOWN_PRE_SNAPSHOT:-}" ] || return 1
-    read -r TEARDOWN_RET_HEAD TEARDOWN_RET_STATUS TEARDOWN_RET_PAYLOAD <<< "$TEARDOWN_PRE_SNAPSHOT"
-    [ -n "$TEARDOWN_RET_HEAD" ] && [ -n "$TEARDOWN_RET_STATUS" ] && [ -n "$TEARDOWN_RET_PAYLOAD" ] || return 1
-  fi
-  named=$(printf '%s\n' "$4" | teardown_retained_named_state "$copy") || return 1
-  rec=$(teardown_retained_refused_path "$copy") || return 1
-  mkdir -p "${rec%/*}" || return 1
-  tmp=$(mktemp "${rec%/*}/.refused.XXXXXX") || return 1
-  {
-    printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$2" "$copy" "$3"
-    printf 'task=%s\nhead=%s\nstatus-sha256=%s\npayload-sha256=%s\nnamed-sha256=%s\nreason=%s\nrefused-at=%s\nlock-identity=%s\n' \
-      "$ID" "$TEARDOWN_RET_HEAD" "$TEARDOWN_RET_STATUS" "$TEARDOWN_RET_PAYLOAD" "$named" "$5" \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TEARDOWN_LOCK_ID"
-    while IFS= read -r path; do
-      [ -z "$path" ] || printf 'unique=%s\n' "$path"
-    done <<< "$4"
-  } > "$tmp" || { rm -f "$tmp"; return 1; }
-  mv -- "$tmp" "$rec" || { rm -f "$tmp"; return 1; }
-}
-
-teardown_retained_refused_note() {  # <copy> <lock-sha256> <identity> <paths> <reason>
-  teardown_retained_refused_write "$@" \
-    || echo "warning: the refusal record of own nested copy $(fm_refuse_text "$1") could not be written, so a retry asks Vernant's closeout driver again." >&2
-}
-
-# True when <copy> has a refusal record that still describes it: the same copy
-# (path and identity), the same creation lock, this task, the HEAD, status and
-# ignored payload it recorded, and the same state of each driver-named path.
-# Sets TEARDOWN_REFUSED_RECORD, _REASON and _UNIQUE for a record that applies.
-teardown_retained_refused_matches() {  # <copy>
-  local copy=$1 rec hash='' rcopy='' identity='' actual unique
-  TEARDOWN_REFUSED_RECORD=
-  TEARDOWN_REFUSED_REASON=
-  TEARDOWN_REFUSED_UNIQUE=
-  rec=$(teardown_retained_refused_path "$copy") || return 1
-  { [ -f "$rec" ] && [ ! -L "$rec" ] && [ -r "$rec" ]; } || return 1
-  { IFS= read -r hash && IFS= read -r rcopy && IFS= read -r identity; } < "$rec" || true
-  [ "$rcopy" = "copy=$copy" ] || return 1
-  actual=$(copy_identity "$copy") || return 1
-  [ "$actual" = "${identity#identity=}" ] || return 1
-  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
-  [ "$actual" = "${hash#lock-sha256=}" ] || return 1
-  actual=$(teardown_lock_identity "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
-  [ "$actual" = "$(teardown_retained_fields "$rec" lock-identity)" ] || return 1
-  [ "$(teardown_retained_fields "$rec" task)" = "$ID" ] || return 1
-  teardown_retained_snapshot "$copy" || return 1
-  [ "$(teardown_retained_fields "$rec" head)" = "$TEARDOWN_RET_HEAD" ] || return 1
-  [ "$(teardown_retained_fields "$rec" status-sha256)" = "$TEARDOWN_RET_STATUS" ] || return 1
-  [ "$(teardown_retained_fields "$rec" payload-sha256)" = "$TEARDOWN_RET_PAYLOAD" ] || return 1
-  unique=$(teardown_retained_fields "$rec" unique)
-  actual=$(printf '%s\n' "$unique" | teardown_retained_named_state "$copy") || return 1
-  [ "$(teardown_retained_fields "$rec" named-sha256)" = "$actual" ] || return 1
-  TEARDOWN_REFUSED_RECORD=$rec
-  TEARDOWN_REFUSED_REASON=$(teardown_retained_fields "$rec" reason)
-  TEARDOWN_REFUSED_UNIQUE=$unique
-}
-
-# Does the cause of a matching refusal record still hold? The driver-free proofs
-# of teardown_retained_accept run again, each printing its cause, so a copy whose
-# work has landed since is not refused on the record alone; only the driver's
-# answer is taken from the record.
-teardown_retained_refused_holds() {  # <copy>
-  local copy=$1 entry
-  teardown_own_nested_other_repos || return 0
-  teardown_retained_copy_proved "$copy" || return 0
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || teardown_retained_named_ok "$copy" "$entry" || return 0
-  done <<< "$TEARDOWN_REFUSED_UNIQUE"
-  # A refusal for an unwritable retained record holds while the record still
-  # cannot be written; once it can, the answer is asked for again.
-  case "$TEARDOWN_REFUSED_REASON" in
-    "the retained record could not be written"*) teardown_retained_record_writable "$copy" || return 0; return 1 ;;
-  esac
-  return 1
-}
-
-# The driver kept own nested copy <copy> (teardown_closeout_retained_paths held;
-# <paths> are the ignored paths it names unique). Judges the harm directly
-# instead of taking the refusal for unique work: the ordinary clean and landed
-# proof again now, no other repository inside the nested copies, every ignored
-# file byte for byte in the preserve (driver-named paths the preserve skips are
-# copied in, never over a different byte), and the copy unchanged while that was
-# checked. Only then does it write the retained record and return 0, leaving the
-# copy exactly as it was. Returns 1 after printing the cause; nothing is removed.
-teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
-  local slot=$1 copy=$2 lock_hash=$3 identity=$4 paths=$5 dir before rc raw
-  # The answer is the driver's for the creation lock it was asked under (its bytes and its
-  # file, TEARDOWN_LOCK_ID): a lock replaced or rewritten since, during the driver call
-  # included, may name a launcher no proof judged, so nothing is recorded and the next run
-  # proves the copy under its new lock.
-  if [ "$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE" 2>/dev/null)" != "$lock_hash" ] \
-     || [ "$(teardown_lock_identity "$TEARDOWN_FOREIGN_LOCK_FILE" 2>/dev/null)" != "${TEARDOWN_LOCK_ID:-}" ]; then
-    echo "REFUSED: the creation lock of own nested copy $(fm_refuse_text "$copy") changed after Vernant's closeout driver was asked, so its answer is not this lock's; nothing was recorded, the task was not closed, and a retry proves the copy under its new lock." >&2
-    return 1
-  fi
-  # Each named path is judged as the driver wrote it, before the trailing-slash
-  # trim below can turn it into a different object.
-  while IFS= read -r raw; do
-    [ -z "$raw" ] || teardown_retained_named_ok "$copy" "$raw" || {
-      teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
-        "the driver names an ignored path that is not a plain path inside the copy or no longer exists"
-      echo "REFUSED: Vernant's closeout driver names ignored path $(fm_refuse_text "$raw") of own nested copy $(fm_refuse_text "$copy"), which is not a plain path inside the copy, resolves outside it, or no longer exists; the task was not closed." >&2
-      return 1
-    }
-  done <<< "$paths"
-  paths=$(printf '%s\n' "$paths" | sed 's#/*$##')
-  if ! [[ $lock_hash =~ ^[0-9a-f]{64}$ ]] || ! [[ $identity =~ ^[0-9]+:[0-9]+$ ]]; then
-    echo "REFUSED: the creation lock and identity of own nested copy $(fm_refuse_text "$copy") could not be read, so its retained state cannot be recorded; the task was not closed." >&2
-    return 1
-  fi
-  if [ "$(copy_identity "$copy" 2>/dev/null)" != "$identity" ]; then
-    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is not the copy the driver was asked about any more; the task was not closed." >&2
-    return 1
-  fi
-  if ! teardown_own_nested_other_repos; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
-      "the task's nested copies hold another Git repository, or could not be scanned for one"
-    return 1
-  fi
-  if ! teardown_retained_copy_proved "$copy"; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
-      "the copy is not proved landed and clean"
-    return 1
-  fi
-  if ! dir=${TEARDOWN_RETAINED_DIR:-$(teardown_retained_preserve_dir "$copy")}; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
-    echo "REFUSED: the preserve directory of own nested copy $(fm_refuse_text "$copy") could not be named; the task was not closed, and a retry asks the driver nothing." >&2
-    return 1
-  fi
-  if ! teardown_retained_snapshot "$copy"; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
-    echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read after the driver answered; the answer is recorded for the state read before it was asked, the task was not closed, and a retry asks the driver nothing." >&2
-    return 1
-  fi
-  before="$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD"
-  # The state read before the driver was asked is the state the driver answered
-  # for: a change during its call (an ignored file the driver may not have
-  # archived) is a changed payload, assessed again, and records nothing.
-  if [ -n "${TEARDOWN_PRE_SNAPSHOT:-}" ] && [ "$before" != "$TEARDOWN_PRE_SNAPSHOT" ]; then
-    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") changed while Vernant's closeout driver ran; the task was not closed, and a retry assesses the changed copy again." >&2
-    return 1
-  fi
-  if [ ! -d "$dir" ]; then
-    { mkdir -p "$dir" && printf '%s\n' "$copy" > "$dir/copy-path" && : > "$dir/SHA256SUMS"; } || {
-      # The driver has answered: the refusal is recorded like every other post-answer
-      # refusal, so an unchanged retry asks the driver nothing and, once the preserve
-      # can be created, accepts the recorded answer again.
-      teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
-      echo "REFUSED: the preserve directory $(fm_refuse_text "$dir") could not be created; the task was not closed, and a retry asks the driver nothing." >&2
-      return 1
-    }
-  fi
-  rc=0
-  teardown_retained_preserve_check adopt "$copy" "$dir" <<< "$paths" || rc=$?
-  if [ "$rc" = 3 ]; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
-      "the driver names an ignored path that is not a plain path inside the copy or no longer exists"
-    return 1
-  fi
-  if [ "$rc" != 0 ]; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
-      "$TEARDOWN_RETAINED_UNHELD_REASON"
-    echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") that the driver names unique, or that preservation selects, are not held byte for byte in $(fm_refuse_text "$dir"); the task was not closed and the copy was not touched." >&2
-    return 1
-  fi
-  if ! teardown_retained_snapshot "$copy"; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" "$TEARDOWN_RETAINED_UNHELD_REASON"
-    echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read after its ignored files were verified; the answer is recorded for the state read before the driver was asked, the task was not closed, and a retry asks the driver nothing." >&2
-    return 1
-  fi
-  if [ "$before" != "$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD" ]; then
-    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") changed while its ignored files were verified; the task was not closed." >&2
-    return 1
-  fi
-  if ! teardown_retained_write "$slot" "$copy" "$lock_hash" "$identity" "$dir" "$TEARDOWN_LOCK_ID" <<< "$paths"; then
-    teardown_retained_refused_note "$copy" "$lock_hash" "$identity" "$paths" \
-      "the retained record could not be written"
-    echo "REFUSED: the retained record for own nested copy $(fm_refuse_text "$copy") could not be written; the task was not closed, and a retry asks the driver nothing while it still cannot be written." >&2
-    return 1
-  fi
-  rm -f -- "$(teardown_retained_refused_path "$copy")"
-  TEARDOWN_RETAINED+=("$copy")
-  echo "teardown: Vernant's closeout driver kept own nested copy $(fm_refuse_text "$copy"); its ignored files are verified byte for byte in $(fm_refuse_text "$dir") and the copy is untouched (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD"))" >&2
-}
-
-# The last check before the task record goes (bin/fm-teardown.sh runs it immediately before
-# that removal, on every route that keeps a copy): each kept copy still matches its retained
-# record (the same copy, creation lock, HEAD, status and payload) and its preserve still
-# holds the copy's bytes, strictly, with nothing copied in. Then the record is marked by this
-# close (task-closed=<id>, teardown_retained_closed_by). Returns 1 after printing the cause;
-# nothing is removed, and the unchanged retry asks the driver nothing (a preserved entry lost
-# since is copied in again from the unchanged copy, teardown_retained_confirm).
-teardown_retained_close_check() {
-  local copy rc
-  for copy in ${TEARDOWN_RETAINED[@]+"${TEARDOWN_RETAINED[@]}"}; do
-    rc=0
-    teardown_copy_lock_file "$copy" || rc=$?
-    if [ "$rc" != 0 ] || ! teardown_retained_matches "$copy"; then
-      echo "REFUSED: own nested copy $(fm_refuse_text "$copy") no longer matches its retained record (the copy or its creation lock changed, or could not be read) at the close; the task was not closed, and a retry assesses the copy again." >&2
-      return 1
-    fi
-    if ! teardown_retained_preserve_check strict "$copy" "$TEARDOWN_RETAINED_PRESERVE" <<< "$TEARDOWN_RETAINED_UNIQUE"; then
-      echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") are no longer held byte for byte in $(fm_refuse_text "$TEARDOWN_RETAINED_PRESERVE") at the close; the task was not closed, and the unchanged retry asks the driver nothing and makes the preserve whole from the unchanged copy." >&2
-      return 1
-    fi
-    teardown_retained_mark_closed "$TEARDOWN_RETAINED_RECORD" || {
-      echo "REFUSED: the retained record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD") of own nested copy $(fm_refuse_text "$copy") could not be marked by this close; the task was not closed, and a retry asks the driver nothing." >&2
-      return 1
-    }
-  done
-}
-
-# Rewrites <record> atomically with task-closed=<id> (and the time of the close in
-# closed-at), so a retry of the closed task finds the close, not only the acceptance.
-teardown_retained_mark_closed() {  # <record>
-  local rec=$1 tmp now
-  now=$(date -u +%Y-%m-%dT%H:%M:%SZ) || return 1
-  tmp=$(mktemp "${rec%/*}/.retained.XXXXXX") || return 1
-  awk -v id="$ID" -v now="$now" '
-    NR > 3 && index($0, "task-closed=") == 1 { next }
-    NR > 3 && index($0, "closed-at=") == 1 { print "closed-at=" now; next }
-    { print }
-    NR > 3 && index($0, "lock-identity=") == 1 { print "task-closed=" id }
-  ' "$rec" > "$tmp" || { rm -f "$tmp"; return 1; }
-  grep -qx "task-closed=$ID" "$tmp" || { rm -f "$tmp"; return 1; }
-  mv -- "$tmp" "$rec" || { rm -f "$tmp"; return 1; }
 }
 
 # A task that keeps a retained own nested copy never returns its pool slot: the
@@ -2560,11 +1756,11 @@ teardown_retained_mark_closed() {  # <record>
 teardown_retained_hold() {
   [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ] || return 0
   if [ -z "${TEARDOWN_RETURN_SLOT:-}" ]; then
-    echo "REFUSED: own nested copy $(fm_refuse_text "${TEARDOWN_RETAINED[0]}") was kept by Vernant's closeout driver (record $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "${TEARDOWN_RETAINED[0]}")")) in pool slot $(fm_refuse_text "${TEARDOWN_PEER_SLOT:-}"), which another live task still works in, so this task cannot hold the slot under its lease; the copy, the slot and the retained record stay as they are, the task was not closed, and a retry asks the driver nothing." >&2
+    echo "REFUSED: own nested copy $(fm_refuse_text "${TEARDOWN_RETAINED[0]}") was kept by Vernant's closeout driver (record $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "${TEARDOWN_RETAINED[0]}")")) in pool slot $(fm_refuse_text "${TEARDOWN_PEER_SLOT:-}"), which another live task still works in, so this task cannot hold the slot under its lease; the copy, the slot and the record stay as they are, the task was not closed, and a retry asks the driver nothing." >&2
     return 1
   fi
   if [ "${TEARDOWN_SLOT_CUSTODY:-}" != lease ]; then
-    echo "REFUSED: pool slot $(fm_refuse_text "$TEARDOWN_RETURN_SLOT") could not be durably leased, and a close that keeps own nested copy $(fm_refuse_text "${TEARDOWN_RETAINED[0]}") never leaves its slot without a durable lease, since a later treehouse get could reset it over the copy; the copy, the slot and the retained record stay as they are, and a retry asks the driver nothing." >&2
+    echo "REFUSED: pool slot $(fm_refuse_text "$TEARDOWN_RETURN_SLOT") could not be durably leased, and a close that keeps own nested copy $(fm_refuse_text "${TEARDOWN_RETAINED[0]}") never leaves its slot without a durable lease, since a later treehouse get could reset it over the copy; the copy, the slot and the record stay as they are, and a retry asks the driver nothing." >&2
     return 1
   fi
   TEARDOWN_HELD_SLOT=$TEARDOWN_RETURN_SLOT
@@ -2683,8 +1879,10 @@ teardown_foreign_copies_release() {
 # is not locked, or whose lock state cannot be read, is left to the plain removal.
 # Run it after teardown_foreign_copies_prove, which resets
 # TEARDOWN_FOREIGN_PROCS, so the live launchers it records reach the retire phase.
+# A copy this task's record says the driver kept, unchanged since, gets the same proof,
+# but nothing it would queue for the retire signal is kept: no signal reaches a kept copy.
 teardown_own_locked_copies_prove() {
-  local copy rc
+  local copy rc queued
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -d "$copy" ] || continue
     rc=0
@@ -2692,6 +1890,7 @@ teardown_own_locked_copies_prove() {
     [ "$rc" = 0 ] || continue
     TEARDOWN_FOREIGN_WHY=
     TEARDOWN_FOREIGN_RULE=creation-lock-owner
+    queued=${#TEARDOWN_FOREIGN_PROCS[@]}
     if ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
       TEARDOWN_FOREIGN_WHY="it is locked by something other than Vernant's creation lock (${TEARDOWN_FOREIGN_LOCK:-no reason given})"
     else
@@ -2705,103 +1904,71 @@ teardown_own_locked_copies_prove() {
       teardown_refuse_copy "${TEARDOWN_FOREIGN_RULE:-creation-lock-owner}" "own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." "$copy"
       return 1
     fi
-    teardown_lock_proved_note "$copy"
+    if [ "${#TEARDOWN_FOREIGN_PROCS[@]}" -gt "$queued" ] && teardown_retained_copy_held "$copy"; then
+      TEARDOWN_FOREIGN_PROCS=("${TEARDOWN_FOREIGN_PROCS[@]:0:$queued}")
+    fi
   done
 }
 
-# Notes, for teardown_own_copy_dispose, the creation lock of <copy> whose launcher the
-# proof just judged: its reason must still be the one judged, and its bytes and file are
-# kept, so a lock replaced between the proof and the driver call is not answered for.
-TEARDOWN_LOCK_PROVED=
-teardown_lock_proved_note() {  # <copy>
-  local judged=$TEARDOWN_FOREIGN_LOCK hash id rc=0
-  hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE" 2>/dev/null) || hash=
-  id=$(teardown_lock_identity "$TEARDOWN_FOREIGN_LOCK_FILE" 2>/dev/null) || id=
-  teardown_copy_lock_file "$1" || rc=$?
-  [ "$rc" = 0 ] && [ "$TEARDOWN_FOREIGN_LOCK" = "$judged" ] || { hash=; id=; }
-  TEARDOWN_LOCK_PROVED+="$1"$'\t'"$hash"$'\t'"$id"$'\n'
-}
-
-# Is the creation lock of <copy> (<hash> and <id>, read now) the one the last proof noted?
-teardown_lock_proved() {  # <copy> <hash> <id>   (the latest note of <copy> counts)
-  local copy hash id last=
-  while IFS=$'\t' read -r copy hash id; do
-    [ "$copy" = "$1" ] || continue
-    last="$hash $id"
-  done <<< "$TEARDOWN_LOCK_PROVED"
-  [ -n "$2" ] && [ "$last" = "$2 $3" ]
-}
-
 # Preserves the ignored files of one proved own nested copy that Vernant's
-# creation lock holds, then releases and removes it. Returns 1 after printing a
-# refusal.
+# creation lock holds, then releases and removes it through Vernant's driver, or,
+# when the driver keeps it, closes around it (see "Kept own copies" above).
+# Returns 1 after printing a refusal.
 teardown_own_copy_dispose() {  # <slot> <copy>
-  local slot=$1 copy=$2 rc=0 lock_hash='' identity='' paths record
+  local slot=$1 copy=$2 rc=0 lock_hash='' identity='' record before
   teardown_copy_lock_file "$copy" || rc=$?
   if [ "$rc" != 0 ] || ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is not locked by Vernant's creation lock any more; it was not removed." >&2
     return 1
   fi
-  # A record is absent only when the kernel says so. One that exists but cannot be read, or
-  # whose folder cannot be searched, says nothing: it is not "no record", and the driver is
-  # not asked while the answer it may hold is unknown.
-  for record in "$(teardown_retained_receipt "$DATA" "$copy")" "$(teardown_retained_refused_path "$copy")"; do
-    rc=0
-    path_positively_gone "$record" || rc=$?
-    case "$rc" in
-      0) ;;
-      1)
-        if ! { [ -f "$record" ] && [ ! -L "$record" ] && [ -r "$record" ]; }; then
-          echo "REFUSED: the record $(fm_refuse_text "$record") of own nested copy $(fm_refuse_text "$copy") exists but cannot be read, so what Vernant's closeout driver already answered is unknown; the driver was not asked, and the task was not closed." >&2
-          return 1
-        fi
-        ;;
-      *)
-        echo "REFUSED: whether the record $(fm_refuse_text "$record") of own nested copy $(fm_refuse_text "$copy") exists cannot be told (its folder cannot be searched), so what Vernant's closeout driver already answered is unknown; the driver was not asked, and the task was not closed." >&2
-        return 1
-        ;;
-    esac
-  done
-  # Every answer is recorded against the copy's identity and its creation lock (bytes and
-  # file): when one cannot be read, no answer could be recorded or matched, so the driver is
-  # not asked; and the lock must be the one whose launcher the proof judged.
-  lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || lock_hash=
-  TEARDOWN_LOCK_ID=$(teardown_lock_identity "$TEARDOWN_FOREIGN_LOCK_FILE") || TEARDOWN_LOCK_ID=
-  identity=$(copy_identity "$copy") || identity=
-  if [ -z "$lock_hash" ] || [ -z "$TEARDOWN_LOCK_ID" ] || [ -z "$identity" ]; then
-    echo "REFUSED: the identity or the creation lock of own nested copy $(fm_refuse_text "$copy") cannot be read, so no answer of Vernant's closeout driver could be recorded for it; the driver was not asked, and the task was not closed." >&2
+  teardown_preserve_ignored "$copy" || {
+    teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
-  fi
-  if ! teardown_lock_proved "$copy" "$lock_hash" "$TEARDOWN_LOCK_ID"; then
-    echo "REFUSED: the creation lock of own nested copy $(fm_refuse_text "$copy") changed after its launcher was proved; the driver was not asked, the task was not closed, and a retry proves the new lock." >&2
-    return 1
-  fi
+  }
+  # The driver already kept this unchanged copy: judge its recorded answer, never ask again.
   if teardown_retained_matches "$copy"; then
-    teardown_retained_confirm "$slot" "$copy"
+    teardown_retained_judge "$copy" "$TEARDOWN_RETAINED_ANSWER"
     return
   fi
-  if teardown_retained_refused_matches "$copy"; then
-    if [ "$TEARDOWN_REFUSED_REASON" = "$TEARDOWN_RETAINED_UNHELD_REASON" ]; then
-      # The driver already answered for this unchanged copy; only the preserve did
-      # not hold. A new preserve is written beside the others and the recorded
-      # answer is accepted again: no driver call, no further tar.
-      paths=$TEARDOWN_REFUSED_UNIQUE
-      teardown_retained_prepare_preserve "$copy" || return 1
-      teardown_retained_accept "$slot" "$copy" "$lock_hash" "$identity" "$paths" && return 0
-      return 1
-    fi
-    if teardown_retained_refused_holds "$copy"; then
-      echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is unchanged since Vernant's closeout driver last kept it and teardown refused it: $(fm_refuse_text "$TEARDOWN_REFUSED_REASON") (record $(fm_refuse_text "$TEARDOWN_REFUSED_RECORD")); the driver was not asked again, and the task was not closed." >&2
-      return 1
-    fi
+  # A record that exists but cannot be read, or whose folder cannot be searched, may hold
+  # an answer the driver already gave: the driver is not asked while it is unknown.
+  record=$(teardown_retained_receipt "$DATA" "$copy") || record=
+  rc=0
+  [ -z "$record" ] || path_positively_gone "$record" || rc=$?
+  if [ -z "$record" ] || [ "$rc" = 2 ] \
+      || { [ "$rc" = 1 ] && ! { [ -f "$record" ] && [ ! -L "$record" ] && [ -r "$record" ]; }; }; then
+    echo "REFUSED: the record $(fm_refuse_text "${record:-of own nested copy}") of own nested copy $(fm_refuse_text "$copy") cannot be read, so what Vernant's closeout driver already answered is unknown; the driver was not asked, and the task was not closed." >&2
+    return 1
   fi
-  teardown_retained_prepare_preserve "$copy" || return 1
-  rm -f -- "$(teardown_retained_refused_path "$copy")"
+  # Every ask of the driver can write one more archive, so it is asked only when its answer
+  # can be recorded against the copy's identity, its creation lock and its state.
+  lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || lock_hash=
+  identity=$(copy_identity "$copy") || identity=
+  if [ -z "$lock_hash" ] || [ -z "$identity" ] || ! teardown_retained_snapshot "$copy" \
+      || ! teardown_retained_record_writable "$copy"; then
+    echo "REFUSED: the identity, creation lock or state of own nested copy $(fm_refuse_text "$copy") cannot be read, or its record $(fm_refuse_text "$record") cannot be written, so an answer of Vernant's closeout driver could not be recorded; the driver was not asked, and the task was not closed." >&2
+    return 1
+  fi
+  before="$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD"
   rc=0
   teardown_run_closeout "$slot" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
-    if [ "$rc" = 3 ] && paths=$(teardown_closeout_retained_paths "$copy"); then
-      teardown_retained_accept "$slot" "$copy" "$lock_hash" "$identity" "$paths" && return 0
+    if [ "$rc" = 3 ] && teardown_closeout_kept; then
+      if ! teardown_retained_write "$slot" "$copy" "$lock_hash" "$identity"; then
+        echo "REFUSED: Vernant's closeout driver kept own nested copy $(fm_refuse_text "$copy"), but its record $(fm_refuse_text "$record") could not be written; the task was not closed." >&2
+        return 1
+      fi
+      echo "teardown: Vernant's closeout driver kept own nested copy $(fm_refuse_text "$copy"); its answer is recorded in $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD"), and the copy is not changed" >&2
+      # The answer is for the state read before the driver was asked: a copy that changed
+      # meanwhile (a file written during the call may be in no archive) is not closed over,
+      # and the next run, whose record no longer matches, assesses it afresh.
+      if ! teardown_retained_snapshot "$copy" \
+          || [ "$before" != "$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD" ]; then
+        echo "REFUSED: own nested copy $(fm_refuse_text "$copy") changed while Vernant's closeout driver ran (or its state could not be read again); the task was not closed, and a retry assesses the changed copy afresh." >&2
+        return 1
+      fi
+      teardown_retained_judge "$copy" "$TEARDOWN_CLOSEOUT_STDOUT"
+      return
     fi
     teardown_closeout_refusal 'own nested' "$copy" "$rc"
     return 1
@@ -2812,30 +1979,6 @@ teardown_own_copy_dispose() {  # <slot> <copy>
   fi
   echo "teardown: removed landed own nested copy $(fm_refuse_text "$copy") from pool slot $slot" >&2
   teardown_friction_outcome retry-succeeded "$copy"
-}
-
-# Before the driver is asked (or an answer is accepted again): chooses the preserve
-# directory, builds it beside any other (never over one), and takes the snapshot
-# the driver's answer will be compared with. Returns 1 after printing a refusal.
-teardown_retained_prepare_preserve() {  # <copy>
-  local copy=$1 rc=0
-  teardown_retained_preserve_choose "$copy" || rc=$?
-  if [ "$rc" != 0 ]; then
-    echo "REFUSED: the ignored files already preserved for own nested copy $(fm_refuse_text "$copy") in $(fm_refuse_text "$DATA/$ID/nested-copy-preserved") could not be read or checked against the copy; Vernant's closeout driver was not asked, and the task was not closed." >&2
-    return 1
-  fi
-  if [ "$TEARDOWN_RETAINED_BUILD" = 1 ]; then
-    teardown_preserve_ignored "$copy" "" "$TEARDOWN_RETAINED_SUFFIX" no-replace || {
-      teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
-      return 1
-    }
-  fi
-  TEARDOWN_PRE_SNAPSHOT=
-  if ! teardown_retained_snapshot "$copy"; then
-    echo "REFUSED: the state of own nested copy $(fm_refuse_text "$copy") could not be read before the driver was asked; the task was not closed." >&2
-    return 1
-  fi
-  TEARDOWN_PRE_SNAPSHOT="$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD"
 }
 
 # Releases every own nested copy of the task that Vernant's creation lock holds.
