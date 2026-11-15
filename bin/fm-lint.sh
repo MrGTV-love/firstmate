@@ -209,7 +209,7 @@
 # host, plus any other process named shellcheck, hold more than the budget, a
 # gate holds its own root unless it belongs to the oldest running gate (it writes
 # <peak file>.hold, and the root's resident watch stops the root's process group
-# with SIGSTOP; nothing is signalled by its pid), and releases it once the total
+# with SIGSTOP; no process of the root is signalled by its pid), and releases it once the total
 # fits again or its gate is the oldest. A root on a host without the resident
 # watch is not held. A stopped root keeps what it holds but cannot grow
 # further, and the oldest running gate is never stopped, so its growth is
@@ -288,11 +288,14 @@
 # it is ended and takes the memory retry described below, and the roots log's
 # last end-record column counts the libproc reader's samples and names any
 # attempt that gave up its reader, with the reason; the reader is the only source
-# of a sample, and a tick it cannot answer is a miss. Nothing is signalled by its
-# pid or by a group taken from input: the watch records its root's exact start
-# time before the root executes and signals only that root's group, after proving
-# the group's leader unchanged (to end it, or to stop and resume it while the
-# growth guard holds it), and acts on every signal result. A counted process that
+# of a sample, and a tick it cannot answer is a miss. The root is never signalled
+# by its pid or by a group taken from input: the watch records its root's exact
+# start time before the root executes and signals only that root's group, after
+# proving the group's leader unchanged (to end it, or to stop and resume it while
+# the growth guard holds it), and acts on every signal result. Three own-child
+# signals stay by pid, as on the base: the watch ends its own memory reader with
+# KILL when it has not exited 2 s after its input closed, and the gate and the check
+# helper forward TERM to their own unreaped child when they are signalled. A counted process that
 # still runs after its root has ended, a normal success included, fails the root
 # (status 96), stops new admissions, and is named in the roots log's samples column
 # as escaped. Each reader reply is bound to the processes it measured: every member

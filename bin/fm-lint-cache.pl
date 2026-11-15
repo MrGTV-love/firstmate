@@ -28,8 +28,9 @@ use File::Basename qw(dirname basename);
 # after the root is reaped and its pid reused. It returns "sent", "gone" (no such
 # process), "mismatch" (another process, or another group: nothing sent),
 # "unreadable" (nothing sent) or "refused" (no launch record). There is no command
-# line route to it. The gate and the check mode forward TERM to their own unreaped
-# child, as on the base.
+# line route to it. Three own-child signals stay by pid, as on the base: the watch
+# ends its own reader with KILL when it has not exited 2 s after its input closed,
+# and the gate and the check mode forward TERM to their own unreaped child.
 my $ROOT_SIGNAL_PY = <<'PYTHON';
 import importlib.util, os, signal, struct, sys
 LINUX = os.path.exists("/proc/self/stat")
@@ -1109,8 +1110,8 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     # gate becomes the oldest. The hold is <peak file>.hold: the root's resident
     # watch, which owns the root's process group, stops that group while the file
     # exists and resumes it when the file is gone. Only the group is signalled,
-    # by the process that created it and has not reaped its leader; no process is
-    # signalled by its pid. A root without a resident watch (outside macOS, or
+    # by the process that created it and has not reaped its leader; no process of
+    # the root is signalled by its pid. A root without a resident watch (outside macOS, or
     # under the enforced envelope) is not held. A stopped root keeps what it holds
     # but cannot grow further, and the oldest running gate is never held (unless
     # processes named shellcheck outside every gate alone hold the budget), so
@@ -1239,8 +1240,9 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # again next tick); a CONT that is not sent keeps the root held and is tried once
 # more, then the root's group is ended and the root fails (96, rss_cont_failed=1);
 # a TERM that is not sent brings the KILL forward; a KILL that is neither sent nor
-# finds the group gone fails the root (96, rss_kill_failed=1). No process is ever
-# signalled by its pid. After every end, a normal success included, each process
+# finds the group gone fails the root (96, rss_kill_failed=1). No process of the
+# root is ever signalled by its pid (the watch's own reader is the one exception,
+# ended by KILL when it has not exited 2 s after its input closed). After every end, a normal success included, each process
 # the watch counted that still runs (or cannot be proven ended) is a survivor: the
 # root fails (96), the run admits no further root, and <rss-file> records
 # rss_escaped=<pids>; survivors are never signalled.
