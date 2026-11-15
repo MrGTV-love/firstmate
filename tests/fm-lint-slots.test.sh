@@ -809,8 +809,9 @@ PL
 
 # fm_lint_native_version_stub <fakebin> <starts log> <version>: a native ShellCheck
 # stand-in (a compiled program, because a script is a wrapper and is probed every
-# run) that logs its arguments, answers --version and exits 0 for everything else,
-# after FM_TEST_ANALYSIS_SECS seconds when that is set.
+# run) that logs its arguments, answers --version (after 0.15 s, so the version
+# probe's delegate sampler sees it run) and exits 0 for everything else, after
+# FM_TEST_ANALYSIS_SECS seconds when that is set.
 # Returns 1 when the host has no C compiler.
 fm_lint_native_version_stub() {
   local fakebin=$1 log=$2 version=$3 src
@@ -824,7 +825,7 @@ fm_lint_native_version_stub() {
 int main(int argc, char **argv) {
   FILE *f = fopen("$log", "a");
   if (f) { for (int i = 1; i < argc; i++) fprintf(f, "%s%s", i > 1 ? " " : "", argv[i]); fprintf(f, "\n"); fclose(f); }
-  if (argc > 1 && strcmp(argv[1], "--version") == 0) { printf("ShellCheck - shell script analysis tool\nversion: $version\n"); return 0; }
+  if (argc > 1 && strcmp(argv[1], "--version") == 0) { usleep(150000); printf("ShellCheck - shell script analysis tool\nversion: $version\n"); return 0; }
   const char *secs = getenv("FM_TEST_ANALYSIS_SECS");
   if (secs) sleep((unsigned) atoi(secs));
   return 0;
@@ -4564,7 +4565,8 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
 # FM_TEST_READER=membersonce makes the first reader (marked by $FM_TEST_READER_MARK)
 # answer once, 1000 KiB with that one member, and every later reader exit at once.
 # FM_TEST_WATCH_TABLE=fail makes the watch's process table reading (the helper's
-# table with pgid) fail.
+# table with pgid) fail; FM_TEST_WATCH_TABLE=failuntil:<epoch> makes it fail until
+# that time.
 fm_lint_write_stub_python() {
   local dir=$1 real
   real=$("$2" -c 'import sys; print(sys.executable)') || fail "python3 cannot name its interpreter"
@@ -4628,7 +4630,9 @@ if len(args) >= 3 and args[1] == "rss-tree":
                 print(answer, flush=True)
                 answered += 1
             sys.exit(0)
-if os.environ.get("FM_TEST_WATCH_TABLE") == "fail" and len(args) >= 3 and args[1] == "table" and "pgid" in args[2]:
+_table_mode = os.environ.get("FM_TEST_WATCH_TABLE", "")
+if len(args) >= 3 and args[1] == "table" and "pgid" in args[2] and (
+        _table_mode == "fail" or _table_mode.startswith("failuntil:") and __import__("time").time() < int(_table_mode.split(":")[1])):
     sys.exit(1)
 os.execv(REAL, [REAL] + args)
 PY
@@ -5212,26 +5216,28 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   [ "$rc" -ne 2 ] && ! grep -q 'strict mode refuses' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run there was refused ($rc): $(cat "$tmp/plain.out")"
   grep -q 'are not enforced' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run did not warn that the caps are not enforced: $(cat "$tmp/plain.out")"
   grep -q -- '^--version$' "$tmp/starts.log" || fm_lint_fail_settled "the non-strict run did not go on to probe the version: $(cat "$tmp/starts.log")"
-  # An FM_LINT_STRICT_VERSION inherited from the environment is not strict mode:
-  # the run is not refused, and a version that differs from the pin is a warning.
+  # An FM_LINT_STRICT_VERSION=1 inherited from the environment still refuses a
+  # ShellCheck that differs from the pin (the version guard, as on the base), but is
+  # not the off-macOS memory-cap refusal, which keys only on --strict-version.
   printf '0.10.0\n' > "$tmp/version"
   fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log" "$tmp/version"
   rc=0
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_STRICT_VERSION=1 \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/inherited.out" 2>&1 ) || rc=$?
-  ! grep -q 'strict mode refuses\|required for CI parity' "$tmp/inherited.out" \
-    || fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION acted as strict mode: $(cat "$tmp/inherited.out")"
-  grep -q 'WARNING: ShellCheck 0.10.0 differs' "$tmp/inherited.out" || fm_lint_fail_settled "the differing version was not a warning: $(cat "$tmp/inherited.out")"
+  ! grep -q 'strict mode refuses' "$tmp/inherited.out" \
+    || fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION took the memory-cap refusal: $(cat "$tmp/inherited.out")"
+  [ "$rc" -eq 1 ] && grep -q 'ShellCheck 0.11.0 required for CI parity, found 0.10.0' "$tmp/inherited.out" \
+    || fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION=1 did not refuse a mismatched version ($rc): $(cat "$tmp/inherited.out")"
   # Whatever the bound mechanism: the refusal, taken from this script and run with the
   # enforced envelope's mechanism on a host that reports Linux, refuses a strict run.
   local branch
-  branch=$(perl -0ne 'print $1 if /\n(FM_LINT_STRICT_VERSION=\$STRICT_VERSION\n.*?\n)# The version probe is a ShellCheck start/s' "$repo/bin/fm-lint.sh")
+  branch=$(perl -0ne 'print $1 if /\n(if \[ "\$STRICT_VERSION" -eq 1 \] \|\| \[ "\$\{GITHUB_ACTIONS:-\}" = true \].*?\n)# The version probe is a ShellCheck start/s' "$repo/bin/fm-lint.sh")
   [ -n "$branch" ] || fm_lint_fail_settled "the strict-mode block was not found in the script"
   rc=0
   env PATH="$tmp/fake:$PATH" GITHUB_ACTIONS='' CI='' bash -c 'STRICT_VERSION=1 BOUND_MECH=perl ROOT_MEMORY_KIB=12582912; '"$branch"'; printf reached_probe' > "$tmp/envelope.out" 2>&1 || rc=$?
   [ "$rc" -eq 2 ] && grep -q 'strict mode refuses on Linux' "$tmp/envelope.out" \
     || fm_lint_fail_settled "a strict run under the enforced envelope on Linux was not refused ($rc): $(cat "$tmp/envelope.out")"
-  pass "where the resident cap and the probe lane are not enforced a strict run refuses before any ShellCheck starts and names why, also under the enforced envelope; a non-strict run warns and goes on; an inherited FM_LINT_STRICT_VERSION is not strict mode"
+  pass "where the resident cap and the probe lane are not enforced a strict run refuses before any ShellCheck starts and names why, also under the enforced envelope; a non-strict run warns and goes on; an inherited FM_LINT_STRICT_VERSION=1 refuses a mismatched version but not on memory caps"
 }
 
 # (Main 1775 N4) A root whose watch lost every reader fails: the run exits nonzero and
@@ -5374,7 +5380,14 @@ fm_lint_exact_reader() {  # <first usec> <second usec> <memory: ok|unreadable> <
   [ -n "$program" ] || { printf 'NO-READER\n'; return; }
   python3 -I -B -c "
 import importlib.util, sys, types
+import struct
 FIXTURE = (int(sys.argv[1]), int(sys.argv[2]), sys.argv[3] == 'ok', sys.argv[4] == 'yes')
+def kinfo_record(pid, ppid, sec, usec):
+    data = bytearray(648)
+    struct.pack_into('qq', data, 0, sec, usec)
+    struct.pack_into('i', data, 40, pid)
+    struct.pack_into('i', data, 560, ppid)
+    return bytes(data)
 class Loader:
     def exec_module(self, module):
         calls = []
@@ -5383,14 +5396,15 @@ class Loader:
             if not alive:
                 raise LookupError(pid)
             calls.append(pid)
-            return (100, first if len(calls) == 1 else second)
+            return kinfo_record(42, 1, 100, first if len(calls) == 1 else second)
         def memory(pid):
             if not memory_ok:
                 raise LookupError(pid)
             return (160 * 1048576, 160 * 1048576)
-        module.processes = lambda: [(42, 1)] if alive else [(7, 1)]
+        module.kinfos = lambda *a: iter([kinfo_record(42, 1, 100, first)] if alive else [kinfo_record(7, 1, 1, 1)])
         module.kinfo = kinfo
-        module.process_identity = lambda record: record
+        module.P_PID, module.E_PPID = 40, 560
+        module.process_identity = lambda record: struct.unpack_from('qq', record, 0)
         module.memory = memory
 importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=Loader())
 importlib.util.module_from_spec = lambda spec: types.SimpleNamespace()
@@ -5552,6 +5566,228 @@ test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root() {
   pass "a stop mark that could not be written still stopped the run: the unmeasured root failed, no second root was admitted, and the failure was said; with readers healthy both roots ran"
 }
 
+# (Main 1806 item 1) Descendants: the reader adopts a child only with the identity the
+# census listed it under its member. Scenarios (fake process table, the reader's own
+# program taken from bin/fm-lint-cache.pl): child 43 of member 42 now holds another
+# identity (a recycled pid) -> unknown; child 43's identity cannot be read -> unknown;
+# child 43 unchanged -> both counted (the control).
+fm_lint_descendant_reader() {  # <now: same|recycled|unreadable>
+  local program
+  program=$(perl -0ne 'print $1 if /my \$exact_members_py = <<.PYTHON.;\n(.*?)\nPYTHON\n/s' "$ROOT/bin/fm-lint-cache.pl")
+  [ -n "$program" ] || { printf 'NO-READER\n'; return; }
+  python3 -I -B -c "
+import importlib.util, struct, sys, types
+SCENARIO = sys.argv[1]
+def record(pid, ppid, sec, usec):
+    data = bytearray(648)
+    struct.pack_into('qq', data, 0, sec, usec)
+    struct.pack_into('i', data, 40, pid)
+    struct.pack_into('i', data, 560, ppid)
+    return bytes(data)
+CENSUS = [record(42, 1, 100, 1), record(43, 42, 200, 1)]
+class Loader:
+    def exec_module(self, module):
+        def kinfo(pid):
+            if pid == 42:
+                return CENSUS[0]
+            if SCENARIO == 'unreadable':
+                raise LookupError(pid)
+            return record(43, 1, 200, 2) if SCENARIO == 'recycled' else CENSUS[1]
+        module.kinfos = lambda *a: iter(CENSUS)
+        module.kinfo = kinfo
+        module.P_PID, module.E_PPID = 40, 560
+        module.process_identity = lambda r: struct.unpack_from('qq', r, 0)
+        module.memory = lambda pid: (160 * 1048576, 160 * 1048576)
+importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=Loader())
+importlib.util.module_from_spec = lambda spec: types.SimpleNamespace()
+sys.argv = ['reader', 'helper', '42:100:1']
+exec(compile(sys.stdin.read(), 'reader', 'exec'))
+" "$1" <<<"$program"
+}
+
+test_the_exact_member_reader_adopts_a_child_only_with_its_listed_identity() {
+  local out
+  out=$(fm_lint_descendant_reader recycled)
+  [ "$(printf '%s\n' "$out" | tail -n 1)" = unknown ] && ! printf '%s\n' "$out" | grep -q '^member 43 ' \
+    || fail "a child whose pid was recycled after the census was adopted: '$out'"
+  out=$(fm_lint_descendant_reader unreadable)
+  [ "$(printf '%s\n' "$out" | tail -n 1)" = unknown ] || fail "a listed child whose identity cannot be read did not make the tick unknown: '$out'"
+  out=$(fm_lint_descendant_reader same)
+  printf '%s\n' "$out" | grep -qx 'member 42 100 1 163840' && printf '%s\n' "$out" | grep -qx 'member 43 200 1 163840' \
+    || fail "an unchanged child of an unchanged member was not counted: '$out'"
+  pass "the reader adopts a child only with the identity the census listed it under its member; a recycled or unreadable child makes the tick unknown; an unchanged child is counted"
+}
+
+# (Main 1806 item 2) An empty or damaged lane record holds the lane: the next run
+# reports blocked and starts no probe; once the damaged record is removed (the repair
+# the message names) the run probes. The copy's bound is 1 s.
+test_an_empty_or_damaged_lane_record_holds_the_lane() {
+  local tmp repo kind rc waited run
+  tmp=$(fm_test_tmproot fm-lint-lane-damaged)
+  repo=$(fm_lint_isolated_copy "$tmp" damaged)
+  perl -pi -e 's{^PROBE_BOUND_SECONDS=.*$}{PROBE_BOUND_SECONDS=1}' "$repo/bin/fm-lint.sh"
+  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
+  for kind in empty damaged; do
+    if [ "$kind" = empty ]; then : > "$tmp/damaged/host/admission.lock.probe.holder"; else printf 'not a record\n' > "$tmp/damaged/host/admission.lock.probe.holder"; fi
+    : > "$tmp/starts.log"
+    rc=0
+    ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
+        bash bin/fm-lint.sh bin/consumer.sh > "$tmp/$kind.out" 2>&1 ) &
+    run=$!
+    waited=0
+    while ! grep -q 'blocked: the version probe lane' "$tmp/$kind.out" && [ "$waited" -lt 60 ]; do sleep 0.1; waited=$((waited + 1)); done
+    if [ -s "$tmp/starts.log" ] || ! grep -q 'blocked: the version probe lane' "$tmp/$kind.out"; then
+      rm -f "$tmp/damaged/host/admission.lock.probe.holder"
+      wait "$run" 2>/dev/null || true
+      fail "an $kind lane record did not hold the lane (probe started: $(cat "$tmp/starts.log"); output: $(cat "$tmp/$kind.out"))"
+    fi
+    rm -f "$tmp/damaged/host/admission.lock.probe.holder"
+    wait "$run" || rc=$?
+    [ "$rc" -eq 0 ] || fail "the run did not probe and finish once the $kind record was removed ($rc): $(cat "$tmp/$kind.out")"
+  done
+  pass "an empty or a damaged lane record holds the lane (the run reports blocked and starts no probe); once removed, the run probes and finishes"
+}
+
+# (Main 1806 item 3) Positive proof: a new root is admitted only while every watched
+# running root shows a fresh measurement record. A live ledger entry for a watched root
+# whose record is 60 s old keeps a new root out; once the record is renewed the root
+# is admitted. The control: with a fresh record the root is admitted at once.
+test_a_stale_measurement_record_admits_no_new_root() {
+  local tmp root pid waited
+  tmp=$(fm_test_tmproot fm-lint-stale-health)
+  FM_LINT_RELEASE_FILES="$tmp/release"
+  mkdir -p "$tmp/bin" "$tmp/host.lock.ledger"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 8 "$tmp/barrier.log"
+  root="$tmp/a.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$root"
+  : > "$tmp/barrier.log"
+  perl -MFcntl=:flock -MTime::HiRes=sleep,time -e '
+    my ($dir, $peak, $release, $ready) = @ARGV;
+    my $path = "$dir/entry.$$.1";
+    open(my $fh, ">>", $path) or die; flock($fh, LOCK_EX) or die;
+    truncate($fh, 0); syswrite($fh, "$$\t65536\t$peak\t1\n");
+    open(my $r, ">", $ready) or die; close $r;
+    my $u = time() + 60; sleep 0.05 until -e $release || time() > $u; unlink $path;' \
+    "$tmp/host.lock.ledger" "$tmp/peak" "$tmp/release" "$tmp/ready" &
+  waited=0
+  while [ ! -e "$tmp/ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
+  : > "$tmp/peak.health"
+  touch -t 200001010000 "$tmp/peak.health"
+  FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" stale "$root" -- \
+    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/stale.out" 2>&1 &
+  pid=$!
+  sleep 3
+  [ ! -s "$tmp/barrier.log" ] || fm_lint_fail_settled "a root was admitted beside a watched root whose measurement record is stale"
+  touch "$tmp/peak.health"
+  wait "$pid" || fm_lint_fail_settled "the root failed once the record was renewed: $(cat "$tmp/stale.out")"
+  [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root did not start once the record was renewed"
+  [ "$(cat "$tmp/pool.wait.stale")" -ge 2500 ] || fm_lint_fail_settled "the recorded wait $(cat "$tmp/pool.wait.stale") ms is shorter than the record stayed stale"
+  # The control: a fresh record admits at once.
+  touch "$tmp/peak.health"
+  FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" fresh "$root" -- \
+    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/fresh.out" 2>&1 || fm_lint_fail_settled "the root beside a fresh record failed: $(cat "$tmp/fresh.out")"
+  [ "$(cat "$tmp/pool.wait.fresh")" -lt 1000 ] || fm_lint_fail_settled "a root beside a fresh record waited $(cat "$tmp/pool.wait.fresh") ms"
+  : > "$tmp/release"
+  wait 2>/dev/null || true
+  pass "a watched running root whose measurement record is stale keeps every new root out; once renewed the root is admitted; beside a fresh record it is admitted at once"
+}
+
+# (Main 1806 item 4) Reader loss wins over an over-cap end: every reader fails for the
+# first ticks (the root is unmeasured), then the table recovers and the root grows past
+# the bound. The watch exits 96 (unmeasured), not 98, so no memory retry can follow.
+# The control: with the table working throughout, the same growth ends with 98.
+test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident watch runs on native macOS only): reader loss then over-cap"
+    return
+  fi
+  local tmp real_python rc label until_epoch
+  tmp=$(fm_test_tmproot fm-lint-loss-then-over)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  cat > "$tmp/root.sh" <<'SH'
+perl -e 'my $mib = shift; sleep 6; my $held = "x" x ($mib * 1024 * 1024); sleep 3' 160
+SH
+  for label in loss control; do
+    until_epoch=0
+    [ "$label" = loss ] && until_epoch=$(( $(date +%s) + 5 ))
+    rc=0
+    FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=exit \
+      FM_TEST_WATCH_TABLE="failuntil:$until_epoch" \
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- bash "$tmp/root.sh" > "$tmp/err.$label" 2>&1 || rc=$?
+    if [ "$label" = loss ]; then
+      [ "$rc" -eq 96 ] || fail "a root unmeasured for its first ticks and later over the bound exited $rc, expected 96: $(cat "$tmp/err.$label") $(cat "$tmp/rss.$label")"
+      grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" || fail "the unmeasured interval was not recorded: $(cat "$tmp/rss.$label")"
+    else
+      [ "$rc" -eq 98 ] || fail "the control over the bound exited $rc, expected 98: $(cat "$tmp/err.$label")"
+    fi
+  done
+  pass "a root unmeasured for an interval and later over the bound exits 96 (unmeasured), not 98; measured throughout, the same growth exits 98"
+}
+
+# (Main 1806 item 5) A compiled launcher that runs delegate A or B (one version, chosen
+# by a file) with the cache on: after A passed, B's run misses and reports B's finding;
+# back to A, A's success is reused (the control). The delegate is identified from what
+# the version probe was seen to run.
+fm_lint_compiled_launcher_with_delegates() {  # <dir> <choice file>; 1 without cc
+  local dir=$1 choice=$2 name
+  command -v cc >/dev/null 2>&1 || return 1
+  mkdir -p "$dir"
+  for name in a b; do
+    cat > "$dir/delegate-$name.c" <<C
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+int main(int argc, char **argv) {
+  if (argc > 1 && strcmp(argv[1], "--version") == 0) { usleep(150000); printf("ShellCheck - shell script analysis tool\\nversion: 0.11.0\\n"); return 0; }
+  if ("$name"[0] == 'b') { printf("In %s line 1:\\nSC9997 (warning): delegate B finding\\n", argv[argc - 1]); return 1; }
+  return 0;
+}
+C
+    cc -o "$dir/delegate-$name" "$dir/delegate-$name.c" 2>/dev/null || return 1
+  done
+  cat > "$dir/launcher.c" <<C
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+int main(int argc, char **argv) {
+  char which[8] = "a", path[4096];
+  FILE *f = fopen("$choice", "r");
+  if (f) { if (fscanf(f, "%7s", which) != 1) strcpy(which, "a"); fclose(f); }
+  snprintf(path, sizeof path, "$dir/delegate-%s", which);
+  argv[0] = path;
+  execv(path, argv);
+  return 127;
+}
+C
+  mkdir -p "$dir/bin"
+  cc -o "$dir/bin/shellcheck" "$dir/launcher.c" 2>/dev/null || return 1
+}
+
+test_a_compiled_launcher_switching_delegates_misses_the_cache_and_reuses_its_own() {
+  local tmp repo rc
+  tmp=$(fm_test_tmproot fm-lint-compiled-delegates)
+  repo=$(fm_lint_isolated_copy "$tmp" compiled)
+  printf 'a\n' > "$tmp/choice"
+  fm_lint_compiled_launcher_with_delegates "$tmp/c" "$tmp/choice" || { pass "SKIP (no C compiler): compiled launcher delegates"; return; }
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a1.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 0 ] || fail "delegate A's first run failed ($rc): $(cat "$tmp/a1.out")"
+  ! grep -q 'could not be positively identified' "$tmp/a1.out" || fail "delegate A was not identified, so the cache was off: $(cat "$tmp/a1.out")"
+  printf 'b\n' > "$tmp/choice"
+  rc=0
+  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/b.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 1 ] || fail "delegate B reused delegate A's success through the unchanged launcher (exit $rc): $(cat "$tmp/b.out")"
+  grep -q 'SC9997' "$tmp/b.out" || fail "delegate B's finding was not reported: $(cat "$tmp/b.out")"
+  printf 'a\n' > "$tmp/choice"
+  ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a2.out" 2>&1 ) || fail "delegate A's second run failed: $(cat "$tmp/a2.out")"
+  grep -q 'cache hit bin/consumer[.]sh' "$tmp/a2.out" || fail "delegate A did not reuse its own success: $(cat "$tmp/a2.out")"
+  pass "with the cache on, a compiled launcher switched to delegate B missed A's success and reported B's finding; back on A it reused A's own success"
+}
+
 fm_lint_test_cases=(
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
@@ -5633,6 +5869,11 @@ test_the_exact_member_reader_counts_only_an_unchanged_identity
 test_a_probe_lane_left_by_a_dead_run_stays_held_until_its_probe_ends
 test_a_launcher_switching_to_another_delegate_of_one_version_never_reuses_its_success
 test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root
+test_the_exact_member_reader_adopts_a_child_only_with_its_listed_identity
+test_an_empty_or_damaged_lane_record_holds_the_lane
+test_a_stale_measurement_record_admits_no_new_root
+test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
+test_a_compiled_launcher_switching_delegates_misses_the_cache_and_reuses_its_own
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
 test_resident_watch_samples_a_slow_later_reply_by_ps

@@ -189,6 +189,117 @@ except Exception:
     print("unknown")
 PYTHON
 
+# The delegate a version probe actually runs, for the analysis cache key: perl runs
+#   python -I -c $DELEGATE_SAMPLER_PY <fm-proc-info.py> <probe pid> <ShellCheck path>
+# beside the probe, from before the probe executes anything until it has ended. It
+# reads, as often as it can, the executable image of the probe and of every process
+# below it, and, for each process whose image is the ShellCheck file itself, the CPU
+# time of the children that process waited for. It prints "delegate <real path>"
+# only on positive identification: one image other than the ShellCheck file and the
+# interpreters (perl, python, shells, env, time) was seen, or none was seen, the
+# ShellCheck file itself was seen running, and it waited for no child. Anything else
+# (two candidates, an image that could not be read, a launcher that waited for a
+# child no sample saw, a ShellCheck never seen) prints "unresolved <reason>", and the
+# run keeps no analysis cache. Residual: a delegate the launcher executes in its own
+# process and that ends before one sample would be taken for the launcher itself.
+my $DELEGATE_SAMPLER_PY = <<'PYTHON';
+import ctypes, importlib.util, os, re, struct, sys, time
+LINUX = os.path.exists("/proc/self/stat")
+root, target = int(sys.argv[2]), os.path.realpath(sys.argv[3])
+INTERPRETERS = re.compile(r"^(perl|python|bash|sh|zsh|dash|ksh|env|time)[0-9.]*$")
+if not LINUX:
+    spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
+    fp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fp)
+    buffer = ctypes.create_string_buffer(4096)
+def snapshot():
+    # { pid: (ppid, zombie) }
+    table = {}
+    if LINUX:
+        for name in os.listdir("/proc"):
+            if name.isdigit():
+                try:
+                    with open("/proc/%s/stat" % name) as handle:
+                        fields = handle.read().rsplit(")", 1)[1].split()
+                    table[int(name)] = (int(fields[1]), fields[0] == "Z")
+                except OSError:
+                    pass
+        return table
+    for record in fp.kinfos():
+        pid = struct.unpack_from("i", record, fp.P_PID)[0]
+        table[pid] = (struct.unpack_from("i", record, fp.E_PPID)[0], record[fp.P_STAT] == fp.SZOMB)
+    return table
+def image(pid):
+    if LINUX:
+        return os.path.realpath(os.readlink("/proc/%d/exe" % pid))
+    if fp.libc.proc_pidpath(pid, buffer, 4096) <= 0:
+        raise LookupError(pid)
+    return os.path.realpath(buffer.value.decode())
+def child_time(pid):
+    if LINUX:
+        with open("/proc/%d/stat" % pid) as handle:
+            fields = handle.read().rsplit(")", 1)[1].split()
+        return int(fields[13]) + int(fields[14])
+    usage = fp.RusageInfoV2()
+    if fp.libc.proc_pid_rusage(pid, fp.RUSAGE_INFO_V2, ctypes.byref(usage)):
+        raise LookupError(pid)
+    return usage.ri_child_user_time + usage.ri_child_system_time
+images, unreadable, waited, target_seen = set(), False, 0, False
+try:
+    while True:
+        table = snapshot()
+        if root not in table or table[root][1]:
+            break
+        children = {}
+        for pid, (ppid, _) in table.items():
+            children.setdefault(ppid, []).append(pid)
+        queue = [root]
+        while queue:
+            pid = queue.pop()
+            queue.extend(children.get(pid, []))
+            if table[pid][1]:
+                continue
+            path = None
+            for attempt in range(5):
+                try:
+                    path = image(pid)
+                    break
+                except Exception:
+                    now = snapshot()
+                    if pid not in now or now[pid][1]:
+                        break
+                    time.sleep(0.001)
+            if path is None:
+                now = snapshot()
+                if pid in now and not now[pid][1]:
+                    unreadable = True
+                continue
+            images.add(path)
+            if path == target:
+                target_seen = True
+                try:
+                    waited = max(waited, child_time(pid))
+                except Exception:
+                    pass
+        time.sleep(0.0005)
+except Exception as error:
+    print("unresolved sampler-failed")
+    sys.exit(0)
+others = {path for path in images if path != target and not INTERPRETERS.match(os.path.basename(path))}
+if unreadable:
+    print("unresolved an-image-could-not-be-read")
+elif len(others) == 1:
+    print("delegate", others.pop())
+elif others:
+    print("unresolved several-candidates")
+elif not target_seen:
+    print("unresolved shellcheck-never-seen")
+elif waited:
+    print("unresolved launcher-waited-for-an-unseen-child")
+else:
+    print("delegate", target)
+PYTHON
+
 # Process facts for the admission checks below: the parent of a pid, and its
 # command line, from ps or, where ps is refused, from fm-proc-info.py.
 sub fm_process_fact {
@@ -276,7 +387,8 @@ if (($ARGV[0] // '') eq 'admitted-run') {
 # names has provably ended: its pid is no longer in the process table, or that pid
 # now holds another start time. A process the record names that still runs, or
 # whose identity cannot be read, holds the lane, whether or not the run that started
-# it is still alive; a record that cannot be parsed holds it too. So the death of a
+# it is still alive; a record that is empty, cannot be read or cannot be parsed holds
+# it too. Only an absent record is a free lane. So the death of a
 # probe's run, or of any descriptor, never frees the lane while its probe runs.
 # The probe is this process's direct child: it is forked, waits until its identity
 # is recorded, and only then executes the command; if this process dies first the
@@ -332,12 +444,23 @@ if (($ARGV[0] // '') eq 'probe') {
         exit 128 + $signal_number{$caught} if $caught;
         my $why;
         if (flock($lane, LOCK_EX | LOCK_NB)) {
-            $record = '';
-            if (open(my $fh, '<', $holder_path)) { local $/; $record = <$fh> // ''; close $fh; }
-            elsif (!$!{ENOENT}) { $why = "its record $holder_path cannot be read ($!)"; }
-            my $free = !defined $why && $record eq '';
+            # Free only when the record is genuinely absent; an empty, damaged or
+            # unreadable record holds the lane.
+            $record = undef;
+            my $absent;
+            if (open(my $fh, '<', $holder_path)) {
+                local $/;
+                $record = <$fh>;
+                $why = "its record $holder_path cannot be read ($!)" unless defined $record && close $fh;
+                $why //= "its record $holder_path is empty" if defined $record && $record eq '';
+            } elsif ($!{ENOENT}) {
+                $absent = 1;
+            } else {
+                $why = "its record $holder_path cannot be read ($!)";
+            }
+            my $free = !defined $why && $absent;
             if (!defined $why && !$free) {
-                if ($record =~ /\A([0-9]+)\t([0-9]+)\t([0-9]+)\t([0-9]+)\t[0-9.]+\n\z/) {
+                if (($record // '') =~ /\A([0-9]+)\t([0-9]+)\t([0-9]+)\t([0-9]+)\t[0-9.]+\n\z/) {
                     my $answer = $state->($2, $3, $4);
                     $free = $answer eq 'ended';
                     $why = $answer eq 'alive' ? "its probe (pid $2, started by pid $1) still runs"
@@ -376,6 +499,15 @@ if (($ARGV[0] // '') eq 'probe') {
                 }
                 flock($lane, LOCK_UN);
                 if (open(my $wf, '>', $wait_file)) { printf {$wf} "%d\n", (Time::HiRes::time() - $arrived) * 1000; close $wf; }
+                # The delegate sampler watches the probe from before it executes
+                # anything (FM_LINT_INTERNAL_PROBE_TARGET names the ShellCheck file).
+                my ($sampler, $sampler_pid);
+                my $target = $ENV{FM_LINT_INTERNAL_PROBE_TARGET} // '';
+                if (length $target) {
+                    no warnings 'exec';
+                    $sampler_pid = open($sampler, '-|', $python, '-I', '-c', $DELEGATE_SAMPLER_PY, $helper, $child, $target);
+                    Time::HiRes::sleep(0.2) if $sampler_pid;   # its interpreter starts before the probe executes
+                }
                 syswrite($go_write, 'g');
                 close $go_write;
                 # Read the probe's output and wait for the probe itself on one timer,
@@ -419,6 +551,12 @@ if (($ARGV[0] // '') eq 'probe') {
                     flock($lane, LOCK_UN);
                 }
                 print $output;
+                if (length $target) {
+                    my $found = $sampler_pid ? (<$sampler> // '') : '';
+                    close $sampler if $sampler_pid;
+                    chomp $found;
+                    print $found =~ /\Adelegate (\/.+)\z/ ? "delegate: $1\n" : "delegate: unresolved ($found)\n";
+                }
                 exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
             }
             flock($lane, LOCK_UN);
@@ -749,7 +887,7 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         return $found;
     };
     my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued);
+    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued, $stale_roots);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
@@ -795,7 +933,8 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
             unless (open($record, '<', $path)) { next if $!{ENOENT}; $refuse->($path, $!); }
             my $line = <$record> // '';
             close $record;
-            if ($line =~ /\A([0-9]+)\t([0-9]+)\t(.*)\n\z/) { push @live, [$1 + 0, $2 + 0, $3]; }
+            if ($line =~ /\A([0-9]+)\t([0-9]+)\t([^\t\n]*)\t([01])\n\z/) { push @live, [$1 + 0, $2 + 0, $3, $4 + 0]; }
+            elsif ($line =~ /\A([0-9]+)\t([0-9]+)\t(.*)\n\z/) { push @live, [$1 + 0, $2 + 0, $3, undef]; }
             else { push @live, [undef, undef, undef]; }
         }
         return @live;
@@ -956,9 +1095,22 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                         }
                     } else {
                         undef $census_from;
+                        # Positive proof, not a missing mark: a new root is admitted
+                        # only while every running root that has (or may have) a
+                        # resident watch shows a measurement record renewed within
+                        # the last 5 s. A root whose watch lost its readers, or could
+                        # not publish, stops renewing it, and nothing is admitted
+                        # anywhere until that root has ended.
+                        my $stale = grep {
+                            my ($gate_pid, undef, $peak, $watched) = @$_;
+                            defined $gate_pid && $gate_pid != $$ && ($watched // 1)
+                                && !(defined $peak && length $peak && -f "$peak.health"
+                                    && Time::HiRes::time() - ((stat _)[9] // 0) <= 5)
+                        } values %by_gate;
+                        $stale_roots = $stale;
                         my $outside = $foreign->($table, @host_charges);
-                        $fits = !@host_charges && !$outside
-                            || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib;
+                        $fits = !$stale && (!@host_charges && !$outside
+                            || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib);
                     }
                 }
                 if ($fits && $aborted->()) { flock($host, LOCK_UN); $refuse_aborted->(); }
@@ -967,13 +1119,17 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                     ($slot, $slot_path) = @{shift @free};
                     $peak_file = "$slot_path.peak";
                     unlink $peak_file;
+                    # The root's measurement record starts fresh at its admission;
+                    # its resident watch renews it at every measured tick.
+                    my $health;
+                    open($health, '>', "$peak_file.health") && close($health) or $refuse->("$peak_file.health", $!);
                     truncate($slot, 0) && syswrite($slot, "$run\t$ticket_number\t$$\t$charge_kib\n")
                         or $refuse->($slot_path, $!);
                     # The ledger entry is written while the host lock is still held,
                     # so the next admission, in any pool, reads this root.
                     $ledger_path = sprintf '%s/entry.%d.%d', $ledger_dir, $$, $ticket_number;
                     open($ledger_fh, '>>', $ledger_path) && flock($ledger_fh, LOCK_EX | LOCK_NB)
-                        && truncate($ledger_fh, 0) && syswrite($ledger_fh, "$$\t$charge_kib\t$peak_file\n")
+                        && truncate($ledger_fh, 0) && syswrite($ledger_fh, "$$\t$charge_kib\t$peak_file\t" . ($ENV{FM_LINT_INTERNAL_WATCHED} ? 1 : 0) . "\n")
                         or $refuse->($ledger_path, $!);
                 }
             } elsif (defined $next) {
@@ -1297,7 +1453,8 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # each "<pid>:<sec>:<usec>" is read through libproc twice, with every descendant
     # of those, each with its memory (the larger of resident size and footprint, KiB).
     # A member is counted only when both reads give exactly the identity the watch
-    # recorded; a descendant only when its two reads agree. A member whose pid is in
+    # recorded; a descendant only when its identity equals the one it had when the
+    # census listed it under that member and both of its reads agree. A member whose pid is in
     # neither libproc nor the kernel's process table has provably ended and is
     # dropped ("gone"). Anything else - a pid that now holds another start time (a
     # replacement, in the same second or not), reads that disagree, a member present
@@ -1306,18 +1463,23 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # { pid => [sec, usec, KiB] }, or undef for an unknown tick (the caller then keeps
     # its known set unchanged).
     my $exact_members_py = <<'PYTHON';
-import importlib.util, sys
+import importlib.util, struct, sys
 spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
 fp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fp)
 def unknown():
     print("unknown")
     sys.exit(0)
+# One census: every process with its parent and its identity, read in the same
+# snapshot, so a child is bound to the identity it had when it was listed.
 try:
-    children, present = {}, set()
-    for pid, ppid in fp.processes():
+    children, present, listed = {}, set(), {}
+    for record in fp.kinfos():
+        pid = struct.unpack_from("i", record, fp.P_PID)[0]
+        ppid = struct.unpack_from("i", record, fp.E_PPID)[0]
         children.setdefault(ppid, []).append(pid)
         present.add(pid)
+        listed[pid] = tuple(fp.process_identity(record))
 except Exception:
     unknown()
 def identity(pid):
@@ -1351,13 +1513,17 @@ while queue:
     if second != first:
         unknown()
     print("member", pid, second[0], second[1], max(resident, footprint) // 1024)
+    # A child is adopted only with the identity it had when the census listed it
+    # under this member; a child whose identity now differs (a recycled pid) or
+    # cannot be read makes the tick unknown.
     for child in children.get(pid, []):
         try:
-            queue.append((child, identity(child)))
-        except LookupError:
-            continue
+            now = identity(child)
         except Exception:
             unknown()
+        if now != listed.get(child):
+            unknown()
+        queue.append((child, now))
 PYTHON
     my $exact_members = sub {
         my @items = @_;
@@ -1484,7 +1650,7 @@ PYTHON
         %known = %next;
         return $total;
     };
-    my ($child, $caught, $term_at, $over, $warned, $mark_failed);
+    my ($child, $caught, $term_at, $over, $warned, $mark_failed, $unmeasured, @miss_times, $unpublished);
     # End the whole counted tree: the root's process group, and every member known
     # by pid and start time, which also reaches a descendant that moved to another
     # group or was orphaned. The group is signalled as a group only until the root
@@ -1529,6 +1695,10 @@ PYTHON
         # three misses in a row mean the sampler is failing.
         if (!defined $rss) {
             return if $child_reaped || !kill(0, $child);
+            # A miss in the root's last tick can be its own exit (a zombie no
+            # sampler reads); every other miss is an unmeasured interval. The
+            # times are judged once the root is reaped.
+            push @miss_times, Time::HiRes::time();
             return if ++$misses < 3 || $warned;
             # Every reader failed three ticks in a row: this root runs unmeasured.
             # The run admits no new root (the abort mark its workers check), and the
@@ -1558,6 +1728,17 @@ PYTHON
             return;
         }
         $misses = 0;
+        # Publish this measurement: the gates admit a new root only while every
+        # watched root's record is fresh. A record that cannot be renewed is an
+        # unmeasured interval for this root.
+        if (length $peak_file) {
+            my $health = "$peak_file.health";
+            my ($now, $hf) = (time);
+            unless (utime($now, $now, $health) || (open($hf, '>', $health) && close($hf))) {
+                warn "fm-lint: resident-memory watch could not publish its measurement at $health ($!); the root fails\n" unless $unpublished++;
+                push @miss_times, 0;
+            }
+        }
         if ($rss > $peak) {
             $peak = $rss;
             if (length $peak_file) {
@@ -1592,6 +1773,8 @@ PYTHON
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 1, 1);
     my $reaped = waitpid($child, 0);
     $child_reaped = 1 if $reaped == $child;
+    my $reaped_at = Time::HiRes::time();
+    $unmeasured = 1 if grep { $reaped_at - $_ > 1.5 } @miss_times;
     my $status = $reaped == $child ? $? : 127 << 8;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
     $end_tree->() if $over || $caught;
@@ -1601,15 +1784,17 @@ PYTHON
         print {$fh} "rss_reader_unavailable=$reader_down\n" if $reader_down;
         printf {$fh} "watch_peak_kib=%d\n", $peak if $peak;
         print {$fh} 'rss_signal_skipped=' . join(',', map { "$_:$skipped{$_}" } sort { $a <=> $b } keys %skipped) . "\n" if %skipped;
-        print {$fh} "rss_unmeasured=1\n" if $warned;
+        print {$fh} "rss_unmeasured=1\n" if $warned || $unmeasured;
         print {$fh} "rss_mark_failed=1\n" if $mark_failed;
         close $fh;
     }
+    # A root that ran unmeasured for any interval (a tick with no measurement while
+    # it ran, or every reader lost) is a failed root whatever else happened: 96
+    # comes before an over-cap end (98), so no memory retry or cached fallback can
+    # turn it into a success, and no success is recorded for it.
+    exit 96 if $warned || $unmeasured;
     exit 98 if $over;
     exit 128 + $signal_number{$caught} if $caught;
-    # A root that ran unmeasured (every reader lost) is a failed root whatever its
-    # own status: no success is recorded for it and the run fails.
-    exit 96 if $warned;
     exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
 }
 
@@ -1962,12 +2147,16 @@ sub fingerprint {
     closure($path, \%seen);
     return undef if grep { $unknown{$_} } keys %seen;
     my @key_args = map { my $arg = $_; $arg =~ s{^\Q$root\E/}{}; $arg } @args;
-    # The ShellCheck a result came from: the resolved file (its real path, and its
-    # bytes below), the HOME that can select a wrapper's delegate, and the version
-    # this run's own probe printed (bin/fm-lint.sh's run entry), so a result is never
-    # reused for another delegate.
-    my @parts = ('fm-lint-cache-v2', $^O, @key_args,
-        'shellcheck-real-path', abs_path($tool) // $tool, 'home', $ENV{HOME} // '',
+    # The ShellCheck a result came from: the delegate this run's own probe was seen
+    # to run (its real path and bytes; bin/fm-lint.sh's run entry), the HOME, and
+    # the version that probe printed, so a result is never reused for another
+    # delegate. Without a resolved delegate there is no key, so nothing is reused
+    # or recorded.
+    my $delegate = $ENV{FM_LINT_INTERNAL_SHELLCHECK_DELEGATE} // '';
+    return undef unless $delegate =~ m{\A/};
+    my $delegate_bytes = do { open(my $fh, '<', $delegate) or return undef; binmode $fh; local $/; <$fh> } // return undef;
+    my @parts = ('fm-lint-cache-v3', $^O, @key_args,
+        'shellcheck-delegate', $delegate, sha256_hex($delegate_bytes), 'home', $ENV{HOME} // '',
         'shellcheck-version', $ENV{FM_LINT_INTERNAL_SHELLCHECK_VERSION} // '');
     $seen{$_} = 1 for ($tool, 'bin/fm-lint.sh', 'bin/fm-lint-cache.pl');
     for my $name (sort keys %seen) {
