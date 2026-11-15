@@ -8391,6 +8391,50 @@ BODY
   pass "teardown's cleanup-target custody scan refuses when another task's record cannot be read; readable and elsewhere, or absent, it clears"
 }
 
+# Item 5 for a local-only landing (outside the review's falsifiers; same class):
+# work_is_landed and work_is_landed_proof are taken out of bin/fm-teardown.sh
+# and run alone, so nothing reaches fm_run_timed, a kill or a backend. A
+# local-only copy whose project also has an origin remote is landed by the local
+# branch, and its admission watches that branch: unchanged it passes, rewound
+# it refuses.
+test_r5_local_only_landing_watches_the_local_branch() {
+  local body=$TMP_ROOT/r5-body-local-only.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^work_is_landed_proof\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+pr_is_merged() { return 1; }
+work_is_landed_bundle() { return 1; }
+MODE=local-only TREEHOUSE_PROJECT_LOCK_HELD=0 TEARDOWN_SLOT_CUSTODY='' TEARDOWN_NM_RECORD_SILENT=0 FM_PROJECT_LOCK_BUSY_EXIT=75
+for shape in control rewound; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  base=$(git -C "$repo" rev-parse HEAD)
+  git init -q --bare "$R5_BASE/$shape-origin.git"
+  git -C "$repo" remote add origin "$R5_BASE/$shape-origin.git"
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  git -C "$repo" merge -q --ff-only "f-$shape"
+  head=$(git -C "$copy" rev-parse HEAD)
+  r5_reset "$copy"
+  TEARDOWN_LANDED_DIRS=() TEARDOWN_LANDED_HEADS=() TEARDOWN_LANDED_SNAPS=()
+  WT=$copy
+  work_is_landed "f-$shape" || echo "$shape landed=no"
+  [ "$shape" != rewound ] || git -C "$repo" update-ref refs/heads/main "$base" "$head"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+done
+BODY
+  r5_harness local-only "$body"
+  r5_expect 'control proof=0' 'r5-local-only: a local-only copy landed on the local branch did not pass with an origin remote present'
+  r5_expect 'rewound proof=refused stable=none' 'r5-local-only: a local-only landing passed after the local branch it read was rewound'
+  if grep -q 'landed=no' "$R5_OUT"; then fail "r5-local-only: the local-only landing rule did not answer: $(paste -sd '|' - < "$R5_OUT")"; fi
+  pass "a local-only landing with an origin remote present watches the local branch its proof read: unchanged it passes, rewound it refuses"
+}
+
 teardown_test_cases=(
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
@@ -8596,6 +8640,7 @@ test_r5_untracked_managed_hook_file_refuses_like_git
 test_r5_landing_cache_reuse_keeps_the_proofs_default_ref
 test_r5_own_nested_removal_refuses_an_untracked_hook_before_git
 test_r5_cleanup_clearance_refuses_an_unreadable_task_record
+test_r5_local_only_landing_watches_the_local_branch
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
