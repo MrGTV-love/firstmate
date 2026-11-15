@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Helper-level tests for the landing helpers in bin/fm-task-copy-lib.sh that
-# bin/fm-teardown.sh calls (Main 1820 F2, F3, F4(a); admitted by Main 1828):
-# fm_task_copy_refresh_default, fm_task_copy_pr_list_read and
-# fm_task_copy_archive_carried. Only that library is sourced; the fixtures are
+# bin/fm-teardown.sh calls (Main 1820 F2, F3, F4(a); admitted by Main 1828; Main
+# 1871 P-A, P-B and the renamed-default rule): fm_task_copy_refresh_default,
+# fm_task_copy_live_default, fm_task_copy_content_in_default (the blob proof),
+# fm_task_copy_pr_list_read and fm_task_copy_archive_carried. Only that library is sourced; the fixtures are
 # real git repositories and literal PR-list text. No teardown, no task process
 # and no timed or killed process runs here.
 set -u
@@ -66,10 +67,87 @@ test_refresh_reads_the_current_default_branch() {
   fi
   [ -z "$FM_TASK_COPY_DEFAULT_REF" ] || fail "a failed refresh still named a ref"
   case "$FM_TASK_COPY_UNASKED" in *"origin/main could not be refreshed"*) ;; *) fail "a failed refresh did not say why: $FM_TASK_COPY_UNASKED" ;; esac
+  # No readable origin is unknown, never a local branch (Main 1871 P-A).
   G -C "$w/seed" remote remove origin 2>/dev/null || true
-  fm_task_copy_refresh_default "$w/seed" main || fail "a copy without origin did not read its local branch"
-  [ "$FM_TASK_COPY_DEFAULT_REF" = refs/heads/main ] || fail "without origin the ref was $FM_TASK_COPY_DEFAULT_REF"
-  pass "refresh reads origin's current default branch, refuses when it cannot be fetched, and reads the local branch without origin"
+  if fm_task_copy_refresh_default "$w/seed" main; then
+    fail "a copy without origin was refreshed from its local branch ($FM_TASK_COPY_DEFAULT_REF)"
+  fi
+  case "$FM_TASK_COPY_UNASKED" in *"no readable origin"*) ;; *) fail "no origin did not say why: $FM_TASK_COPY_UNASKED" ;; esac
+  if fm_task_copy_content_in_default "$w/seed" "$w/seed" main HEAD; then
+    fail "the content check proved landing from a local branch with no origin"
+  fi
+  [ -n "$FM_TASK_COPY_UNASKED" ] || fail "the content check without origin was an answer, not unknown"
+  pass "refresh reads origin's current default branch and refuses when it cannot be fetched or no origin exists"
+}
+
+# The content proof compares blobs, never a merge (Main 1871 P-B). The copy edits a
+# line that the default branch later edited differently; a repository merge driver
+# that keeps "ours" makes git merge-tree return the default's own tree, so a merge
+# would call the copy landed. The blob proof refuses. Controls: a squash of the
+# copy's change on the default lands; a change the default made further on the same
+# path is unproved; a deletion lands only when the default lacks the path too.
+test_content_proof_is_by_blobs_not_by_merge() {
+  local w copy default_tree merged
+  w=$(new_world blobs)
+  copy="$w/clone"
+  printf 'one\n' > "$copy/base.txt"; G -C "$copy" commit -q -am "copy edits base"
+  printf 'two\n' > "$w/seed/base.txt"; G -C "$w/seed" commit -q -am "default edits base"
+  G -C "$w/seed" push -q "$w/origin.git" HEAD:main
+  printf '* merge=keep-default\n' > "$copy/.git/info/attributes"
+  G -C "$copy" config merge.keep-default.driver true
+  G -C "$copy" fetch -q origin
+  default_tree=$(G -C "$copy" rev-parse 'refs/remotes/origin/main^{tree}')
+  merged=$(G -C "$copy" merge-tree --write-tree refs/remotes/origin/main HEAD 2>/dev/null | head -1)
+  [ "$merged" = "$default_tree" ] || fail "fixture: the merge driver did not make merge-tree return the default's tree"
+  if fm_task_copy_content_in_default "$copy" "$copy" main HEAD; then
+    fail "a copy whose line the default changed differently was called landed (the merge driver decided it)"
+  fi
+  [ -z "$FM_TASK_COPY_UNASKED" ] || fail "a differing blob was unknown, not an answer: $FM_TASK_COPY_UNASKED"
+  # Control: the default lands the copy's change by a squash.
+  w=$(new_world blobs-squash)
+  copy="$w/clone"
+  printf 'feature\n' > "$copy/feature.txt"; G -C "$copy" add feature.txt; G -C "$copy" commit -q -m "copy adds feature"
+  G -C "$copy" rm -q base.txt; G -C "$copy" commit -q -m "copy deletes base"
+  printf 'feature\n' > "$w/seed/feature.txt"; G -C "$w/seed" add feature.txt; G -C "$w/seed" rm -q base.txt
+  G -C "$w/seed" commit -q -m "squash"; G -C "$w/seed" push -q "$w/origin.git" HEAD:main
+  fm_task_copy_content_in_default "$copy" "$copy" main HEAD || fail "control: a squash of the copy's change was not proved: $FM_TASK_COPY_UNASKED"
+  # A change made further on the default to the same path is unproved.
+  printf 'feature, edited later\n' > "$w/seed/feature.txt"; G -C "$w/seed" commit -q -am "later edit"
+  G -C "$w/seed" push -q "$w/origin.git" HEAD:main
+  if fm_task_copy_content_in_default "$copy" "$copy" main HEAD; then
+    fail "a path the default changed further was proved"
+  fi
+  # A deletion is proved only when the default lacks the path.
+  printf 'restored\n' > "$w/seed/base.txt"; G -C "$w/seed" add base.txt
+  printf 'feature\n' > "$w/seed/feature.txt"; G -C "$w/seed" commit -q -am "restore base, undo the later edit"
+  G -C "$w/seed" push -q "$w/origin.git" HEAD:main
+  if fm_task_copy_content_in_default "$copy" "$copy" main HEAD; then
+    fail "a deletion was proved although the default holds the path"
+  fi
+  pass "the content proof compares blobs: a merge driver cannot land a differing line; a squash lands; a further change or a kept path is unproved"
+}
+
+# A renamed remote default is refused rather than read (Main 1871): origin's live
+# HEAD names trunk, while the project's recorded origin/HEAD still names main, whose
+# old branch is still fetchable. Control: when both name trunk, it is read.
+test_renamed_remote_default_is_refused() {
+  local w
+  w=$(new_world renamed)
+  G -C "$w/clone" remote set-head origin main >/dev/null
+  G -C "$w/seed" push -q "$w/origin.git" HEAD:trunk
+  G --git-dir="$w/origin.git" symbolic-ref HEAD refs/heads/trunk
+  if fm_task_copy_live_default "$w/clone" "$w/clone"; then
+    fail "origin/HEAD naming main while origin's default is trunk was read as $FM_TASK_COPY_DEFAULT_NAME"
+  fi
+  case "$FM_TASK_COPY_UNASKED" in *"origin/HEAD names main but origin's default branch is trunk"*) ;; *) fail "the refusal did not name both: $FM_TASK_COPY_UNASKED" ;; esac
+  if fm_task_copy_content_in_default "$w/clone" "$w/clone" "" HEAD; then
+    fail "the content check proved landing against a renamed default"
+  fi
+  G -C "$w/clone" fetch -q origin
+  G -C "$w/clone" remote set-head origin trunk >/dev/null
+  fm_task_copy_live_default "$w/clone" "$w/clone" || fail "control: a matching live default was refused: $FM_TASK_COPY_UNASKED"
+  [ "$FM_TASK_COPY_DEFAULT_NAME" = trunk ] || fail "control: the live default was $FM_TASK_COPY_DEFAULT_NAME"
+  pass "a renamed remote default whose recorded origin/HEAD differs is refused; a matching one is read live"
 }
 
 # list_text <count-line> <n> [merged]: a gh-axi list with <n> rows, PR numbers n..1.
@@ -144,6 +222,8 @@ test_archive_tip_goes_only_when_the_default_branch_holds_it() {
 }
 
 test_refresh_reads_the_current_default_branch
+test_content_proof_is_by_blobs_not_by_merge
+test_renamed_remote_default_is_refused
 test_pr_list_is_complete_only_within_its_bound
 test_archive_tip_goes_only_when_the_default_branch_holds_it
 exit "$FAILED"

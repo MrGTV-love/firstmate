@@ -243,10 +243,10 @@
 # next run. Report mode reads the cache, receipts and waiting records and writes
 # no file of its own;
 # `check` writes only the size cache and the record (budgets and live copies).
-# Report, check and --apply prove content by the same merge-tree rule
+# Report, check and --apply prove content by the same blob rule
 # (fm_task_copy_content_in_default), so on the same refs a report line predicts
-# what --apply decides. That rule can add Git objects to the object store; it moves
-# no ref and touches no worktree.
+# what --apply decides. That rule reads trees with plumbing only; it writes no
+# object, moves no ref and touches no worktree.
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
 # only hold a copy back, never release one.
@@ -690,7 +690,7 @@ REASON=
 APPLY=0
 
 # True when the copy's content is already in the default branch, by the one
-# merge-tree rule of bin/fm-task-copy-lib.sh. Only --apply fetches; the others
+# blob rule of bin/fm-task-copy-lib.sh. Only --apply fetches; the others
 # read the refs that are already here.
 content_in_default() {  # <copy> <clone>
   if [ "$APPLY" = 1 ]; then

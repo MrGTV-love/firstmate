@@ -118,57 +118,117 @@ fm_task_copy_default_branch() {
 }
 
 # A failed content check is no verdict on the work while FM_TASK_COPY_UNASKED
-# names why: it is cleared only once the check compared the two trees, and a
-# merge conflict is that comparison's answer. With no-fetch the same rule reads
-# the refs already here: merge-tree adds objects only, and no ref or worktree moves.
+# names why: it is cleared only once the check read and compared every blob, and a
+# blob that differs is that comparison's answer ("not landed"). Landing is proved
+# only against origin's default branch (Main 1871 P-A): a copy with no readable
+# origin, or a fetch that fails, leaves the answer unknown, and the caller refuses;
+# a local branch is never taken in its place. With no-fetch the same rule reads the
+# origin refs already here, for a report. The proof itself is
+# fm_task_copy_blobs_in_default: no merge machinery runs (Main 1871 P-B).
 FM_TASK_COPY_UNASKED=
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>] [no-fetch]
-  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref default_tree merged_tree
+  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
-  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
-  if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
-    [ "$fetch" = no-fetch ] || git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
-      FM_TASK_COPY_UNASKED="origin/$name could not be fetched"
+  if [ "$fetch" = no-fetch ]; then
+    git -C "$worktree" remote get-url origin >/dev/null 2>&1 || {
+      FM_TASK_COPY_UNASKED="the copy has no readable origin, so its landing cannot be proved"
       return 1
     }
+    [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
     ref="refs/remotes/origin/$name"
-  elif git -C "$worktree" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
-    ref="refs/heads/$name"
+    git -C "$worktree" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || return 1
   else
-    return 1
+    if [ -z "$name" ]; then
+      fm_task_copy_live_default "$worktree" "$project" || return 1
+      name=$FM_TASK_COPY_DEFAULT_NAME
+    fi
+    fm_task_copy_refresh_default "$worktree" "$name" || return 1
+    ref=$FM_TASK_COPY_DEFAULT_REF
+    FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   fi
-  default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
-  [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || {
-    [ "$?" != 1 ] || FM_TASK_COPY_UNASKED=
-    return 1
-  }
-  FM_TASK_COPY_UNASKED=
-  merged_tree=${merged_tree%%$'\n'*}
-  [ "$merged_tree" = "$default_tree" ]
+  fm_task_copy_blobs_in_default "$worktree" "$ref" "$head"
 }
 
-# The default branch's current tip in <dir>, read fresh: with an origin remote,
-# refs/remotes/origin/<branch> is fetched first and a failed fetch is no answer, so
-# a cached ref is never taken as the default branch (Main 1820 F2); without one,
-# the local branch. FM_TASK_COPY_DEFAULT_REF names the ref on success, and on
-# failure FM_TASK_COPY_UNASKED says why.
+# 0 when the default branch at <default-ref> holds every change <head> made: for
+# each path that differs between <head> and the merge base of the two, the
+# default's tree entry (mode, type and object id) equals <head>'s, and a path
+# <head> deleted is absent there too (Main 1871 P-B). The paths come from
+# git diff-tree and the entries from git ls-tree, both plumbing, so no merge
+# driver, textconv or attribute can change the answer. A path the default branch
+# changed further is not equal, so it is unproved. Any read that fails leaves
+# FM_TASK_COPY_UNASKED set; an entry that differs clears it, as an answer.
+fm_task_copy_blobs_in_default() {  # <dir> <default-ref> <head>
+  local dir=$1 ref=$2 head=$3 base listed theirs ours
+  FM_TASK_COPY_UNASKED='the content check could not read the trees it compares'
+  [ -n "$ref" ] && [ -n "$head" ] || return 1
+  base=$(git -C "$dir" merge-base "$ref" "$head" 2>/dev/null) || return 1
+  [ -n "$base" ] || return 1
+  listed=$(mktemp "${TMPDIR:-/tmp}/fm-task-copy-paths.XXXXXX") || return 1
+  if ! git -C "$dir" diff-tree -r -z --no-renames --name-only "$base" "$head" -- > "$listed" 2>/dev/null; then
+    rm -f -- "$listed"
+    return 1
+  fi
+  if [ ! -s "$listed" ]; then
+    rm -f -- "$listed"
+    FM_TASK_COPY_UNASKED=
+    return 0
+  fi
+  theirs=$(xargs -0 git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$ref" -- < "$listed" 2>/dev/null) \
+    && ours=$(xargs -0 git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$head" -- < "$listed" 2>/dev/null) || {
+    rm -f -- "$listed"
+    return 1
+  }
+  rm -f -- "$listed"
+  FM_TASK_COPY_UNASKED=
+  [ "$(printf '%s\n' "$theirs" | LC_ALL=C sort)" = "$(printf '%s\n' "$ours" | LC_ALL=C sort)" ]
+}
+
+# The name of origin's default branch, read live: `git ls-remote --symref origin
+# HEAD` in <dir> answers, and when the project records origin/HEAD it must name
+# the same branch (Main 1871: a renamed remote default whose old name is still
+# fetchable is refused rather than read). FM_TASK_COPY_DEFAULT_NAME holds it on
+# success; on failure FM_TASK_COPY_UNASKED says why.
+FM_TASK_COPY_DEFAULT_NAME=
+fm_task_copy_live_default() {  # <dir> <project>
+  local dir=$1 project=$2 live recorded
+  FM_TASK_COPY_DEFAULT_NAME=
+  FM_TASK_COPY_UNASKED="the copy has no readable origin, so its landing cannot be proved"
+  git -C "$dir" remote get-url origin >/dev/null 2>&1 || return 1
+  live=$(git -C "$dir" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's|^ref: refs/heads/\([^[:space:]]*\)[[:space:]]*HEAD$|\1|p' | head -1)
+  [ -n "$live" ] || {
+    FM_TASK_COPY_UNASKED="origin's default branch could not be read"
+    return 1
+  }
+  recorded=$(git -C "$project" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [ -n "$recorded" ] && [ "${recorded#origin/}" != "$live" ]; then
+    FM_TASK_COPY_UNASKED="origin/HEAD names ${recorded#origin/} but origin's default branch is $live"
+    return 1
+  fi
+  FM_TASK_COPY_DEFAULT_NAME=$live
+  FM_TASK_COPY_UNASKED=
+}
+
+# The default branch's current tip in <dir>, read fresh: refs/remotes/origin/<branch>
+# is fetched first, and a failed fetch, or no readable origin, is no answer, so a
+# cached ref or a local branch is never taken as the default branch (Main 1820 F2,
+# Main 1871 P-A). FM_TASK_COPY_DEFAULT_REF names the ref on success, and on failure
+# FM_TASK_COPY_UNASKED says why.
 FM_TASK_COPY_DEFAULT_REF=
 fm_task_copy_refresh_default() {  # <dir> <default-branch>
   local dir=$1 name=$2
   FM_TASK_COPY_DEFAULT_REF=
   FM_TASK_COPY_UNASKED="the default branch of $dir could not be refreshed"
   [ -d "$dir" ] && [ -n "$name" ] || return 1
-  if git -C "$dir" remote get-url origin >/dev/null 2>&1; then
-    git -C "$dir" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
-      FM_TASK_COPY_UNASKED="origin/$name could not be refreshed"
-      return 1
-    }
-    FM_TASK_COPY_DEFAULT_REF="refs/remotes/origin/$name"
-  else
-    FM_TASK_COPY_DEFAULT_REF="refs/heads/$name"
-  fi
+  git -C "$dir" remote get-url origin >/dev/null 2>&1 || {
+    FM_TASK_COPY_UNASKED="the copy has no readable origin, so its landing cannot be proved"
+    return 1
+  }
+  git -C "$dir" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
+    FM_TASK_COPY_UNASKED="origin/$name could not be refreshed"
+    return 1
+  }
+  FM_TASK_COPY_DEFAULT_REF="refs/remotes/origin/$name"
   git -C "$dir" rev-parse --quiet --verify "$FM_TASK_COPY_DEFAULT_REF^{commit}" >/dev/null 2>&1 || {
     FM_TASK_COPY_DEFAULT_REF=
     return 1
@@ -208,19 +268,16 @@ fm_task_copy_pr_list_read() {  # <bound> <list-text>
 }
 
 # 0 when the archive tip <tip> may be reaped: it is in the history of <default-ref>,
-# or merging it into <default-ref> changes nothing, so its net change is in the
-# default branch's content (Main 1820 F3). Anything else, a conflict or an error
-# included, keeps it. The caller refreshes <default-ref> first
+# or the default branch holds every change it made by the blob proof
+# (fm_task_copy_blobs_in_default; Main 1820 F3, Main 1871 P-B). Anything else, an
+# error included, keeps it. The caller refreshes <default-ref> first
 # (fm_task_copy_refresh_default); a patch matched somewhere in history is never
 # enough, since a later commit can revert it.
 fm_task_copy_archive_carried() {  # <dir> <default-ref> <tip>
-  local dir=$1 ref=$2 tip=$3 default_tree merged_tree
+  local dir=$1 ref=$2 tip=$3
   [ -n "$ref" ] && [ -n "$tip" ] || return 1
   git -C "$dir" merge-base --is-ancestor "$tip" "$ref" 2>/dev/null && return 0
-  default_tree=$(git -C "$dir" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
-  merged_tree=$(git -C "$dir" merge-tree --write-tree "$ref" "$tip" 2>/dev/null) || return 1
-  merged_tree=${merged_tree%%$'\n'*}
-  [ -n "$default_tree" ] && [ "$merged_tree" = "$default_tree" ]
+  fm_task_copy_blobs_in_default "$dir" "$ref" "$tip"
 }
 
 # The porcelain status lines of <copy> that are its own uncommitted work:

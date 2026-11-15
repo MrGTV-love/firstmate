@@ -37,13 +37,16 @@
 # lack recorded bundle preservation below, because cleanup hard-resets/removes
 # the worktree and kills its processes.
 # A pushed branch is recoverable work, not a delivered result.
-# A ship has landed only when its content is in the default branch: its PR is
+# A ship has landed only when its content is in origin's default branch: its PR is
 # merged and the copy's HEAD is exactly the merged head and that head is in the
-# default branch's history, or the copy's content is already present in the
-# default branch (merging the copy into it changes nothing). Both read the
-# default branch fetched just before (Main 1820 F2): a cached ref is never used,
-# and a fetch that fails refuses. A head in the default branch's history stays
-# landed when a later commit drops its change (Main 1820 F1). A task whose meta
+# default branch's history, or, for every path the copy changed against its merge
+# base, the default branch holds the same blob (a deletion is absent there too),
+# read with plumbing only, so no merge driver can change the answer (Main 1871
+# P-B). Both read origin's default branch, named live and fetched just before
+# (Main 1820 F2): a cached ref or a local branch is never used, and no readable
+# origin, a renamed default or a failed fetch refuses (Main 1871 P-A). A head in
+# the default branch's history stays landed when a later commit drops its change
+# (Main 1820 F1). A local-only task lands on its local default branch, as below. A task whose meta
 # records base_branch= (bin/fm-spawn.sh) runs that content check against origin's
 # copy of its base branch instead of the default branch. Matching a commit
 # somewhere in the PR's history proves nothing (Main 1686 F1): a PR can replay a
@@ -56,8 +59,9 @@
 # list or a failed call is incomplete: no PR is judged from it, and its reason is
 # named in the refusal, never read as "no PR" (Main 1820 F4(a)). The content
 # check above still decides on its own, since it is independent proof (F4(c)).
-# A PR found this way is recorded as the completion PR only when its merged head
-# is the copy's HEAD; a copy landed by its content alone records none (F4(b)).
+# Every listed PR is judged. A PR, recorded in pr= or found this way, is named as
+# the completion PR only when its merged head is the copy's HEAD; a copy landed
+# by its content alone names none, and the close says why (F4(b), Main 1871 P-C).
 # A copy that was a
 # no-mistakes run's input is judged the same way: the run record alone does not
 # land it, because a merged pushed head can still have lost the change later in the
@@ -2442,23 +2446,31 @@ ensure_commit_object() {
 }
 
 # The default-branch ref that already-landed history is read from, refreshed
-# first (Main 1820 F2): fm_task_copy_refresh_default fetches origin's copy when the
-# copy has an origin remote, else reads the local branch, and a failed refresh is
-# no answer. TEARDOWN_DEFAULT_REF names it on success; on failure
-# TEARDOWN_LANDED_UNASKED says why, and no proof may use a cached ref.
+# first (Main 1820 F2): origin's default branch is named live
+# (fm_task_copy_live_default; a recorded base_branch= names it instead) and fetched
+# (fm_task_copy_refresh_default). No readable origin, a renamed default, or a
+# failed fetch is no answer (Main 1871 P-A): a local branch is never read in its
+# place. TEARDOWN_DEFAULT_REF and TEARDOWN_DEFAULT_NAME name it on success; on
+# failure TEARDOWN_LANDED_UNASKED says why, and no proof may use a cached ref.
 TEARDOWN_DEFAULT_REF=
+TEARDOWN_DEFAULT_NAME=
 landed_default_ref() {
   local name=${BASE_BRANCH:-} dir=${TEARDOWN_LANDED_DIR:-$WT}
   TEARDOWN_DEFAULT_REF=
-  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || {
-    TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-the default branch of $PROJ could not be named}
-    return 1
-  }
+  TEARDOWN_DEFAULT_NAME=
+  if [ -z "$name" ]; then
+    fm_task_copy_live_default "$dir" "$PROJ" || {
+      TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
+      return 1
+    }
+    name=$FM_TASK_COPY_DEFAULT_NAME
+  fi
   fm_task_copy_refresh_default "$dir" "$name" || {
     TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
     return 1
   }
   TEARDOWN_DEFAULT_REF=$FM_TASK_COPY_DEFAULT_REF
+  TEARDOWN_DEFAULT_NAME=$name
 }
 
 # One "<short sha> <subject>" line per commit whose change the default branch was
@@ -2500,9 +2512,12 @@ teardown_commits_beyond_default() {  # <dir> <ref> <default-ref|empty>
 # tea (fm_pr_forgejo_read_record), and everything else through GitHub. Returns
 # non-zero when the PR is not merged, the current work is not contained in the
 # PR head, no PR is found, or any forge read error occurs - the caller then
-# falls back to the content check.
+# falls back to the content check. Every candidate the branch lists is judged
+# (Main 1871 P-C): a candidate that lands the copy by its content alone does not
+# end the scan, so an older PR whose head is the copy's HEAD is still found and
+# becomes the completion PR (TEARDOWN_COMPLETION_PR).
 pr_is_merged() {
-  local branch=$1 target targets
+  local branch=$1 target targets landed=1
   [ -d "${TEARDOWN_LANDED_DIR:-$WT}" ] || return 1
   if [ -n "$PR_URL" ]; then
     pr_is_merged_target "$PR_URL"
@@ -2512,11 +2527,14 @@ pr_is_merged() {
   targets=$TEARDOWN_PR_NUMBERS
   while IFS= read -r target; do
     [ -n "$target" ] || continue
-    pr_is_merged_target "$target" && return 0
+    if pr_is_merged_target "$target"; then
+      landed=0
+      [ -z "$TEARDOWN_COMPLETION_PR" ] || return 0
+    fi
   done <<EOF
 $targets
 EOF
-  return 1
+  return "$landed"
 }
 
 # pr_is_merged for one PR (a URL or a number of the copy's repository).
@@ -2569,7 +2587,7 @@ pr_is_merged_target() {
     default_ref=$TEARDOWN_DEFAULT_REF
     if [ "$current" = "$head" ] && git -C "$dir" merge-base --is-ancestor "$head" "$default_ref" 2>/dev/null; then
       landed=1
-    elif fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" no-fetch; then
+    elif fm_task_copy_content_in_default "$dir" "$PROJ" "$TEARDOWN_DEFAULT_NAME" "$ref" no-fetch; then
       landed=1
     else
       [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
@@ -2579,14 +2597,16 @@ pr_is_merged_target() {
     TEARDOWN_UNPROVEN_COMMITS=$(teardown_commits_beyond_default "$dir" "$ref" "$default_ref")
     return 1
   fi
-  # A PR found by the branch is recorded as this copy's completion PR only when
-  # its merged head is the copy's HEAD (Main 1820 F4(b)); a copy that landed by
-  # its content alone records none. A recorded pr= stays as it is.
-  if [ -z "$PR_URL" ] && [ "$current" = "$head" ] && [ -n "$resolved_url" ]; then
-    PR_URL=$resolved_url
+  # A PR is this copy's completion PR only when its merged head is the copy's
+  # HEAD (Main 1820 F4(b), Main 1871 P-C); a copy that landed by its content alone
+  # records none, whatever pr= says (backlog_done_args names the reason).
+  if [ "$current" = "$head" ] && [ -n "$resolved_url" ]; then
+    TEARDOWN_COMPLETION_PR=$resolved_url
+    [ -n "$PR_URL" ] || PR_URL=$resolved_url
   fi
   return 0
 }
+TEARDOWN_COMPLETION_PR=
 
 
 # A successful landing proof binds to a directory and immutable commit, not
@@ -2779,7 +2799,9 @@ EOF
   default_ref=
   if [ -z "$reason" ]; then
     name=${BASE_BRANCH:-}
-    [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || name=
+    if [ -z "$name" ] && fm_task_copy_live_default "$PROJ" "$PROJ"; then
+      name=$FM_TASK_COPY_DEFAULT_NAME
+    fi
     if [ -n "$name" ] && fm_task_copy_refresh_default "$PROJ" "$name"; then
       default_ref=$FM_TASK_COPY_DEFAULT_REF
     else
@@ -2864,8 +2886,12 @@ backlog_done_args() {
         BACKLOG_DONE_ARGS=(--note "preserved in bundle $TEARDOWN_BUNDLE_PROOF, not landed")
       elif [ "$MODE" = local-only ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 0 ]; then
         BACKLOG_DONE_ARGS=(--note "local main")
+      elif [ -n "$TEARDOWN_COMPLETION_PR" ]; then
+        BACKLOG_DONE_ARGS=(--pr "$TEARDOWN_COMPLETION_PR")
       elif [ -n "$PR_URL" ]; then
-        BACKLOG_DONE_ARGS=(--pr "$PR_URL")
+        # The recorded PR is not proved to be this copy's: its merged head is not
+        # the copy's HEAD, or it did not merge. The close names no PR (Main 1871 P-C).
+        echo "notice: $ID's recorded PR $PR_URL is not recorded as its completion PR: its merged head is not the copy's HEAD, so no PR is named" >&2
       fi
       ;;
   esac
