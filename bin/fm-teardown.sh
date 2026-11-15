@@ -2914,7 +2914,7 @@ teardown_landed() {  # <dir> <ref> <branch>
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
 # whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
 teardown_skipped_copies() {
-  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs rc ok
+  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files ok
   local keep="$record.keep.${BASHPID:-$$}" changed=0
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
   : > "$keep" || return 0
@@ -2944,15 +2944,17 @@ teardown_skipped_copies() {
     ok=0
     if [ "${procs:-1}" != 0 ]; then
       echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it (skipped for: $reason)" >&2
-    elif fm_task_copy_preserve "$PROJ" "$ID" "$canonical" 0; then
-      ok=1
+    elif ! dirt=$(git -C "$canonical" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) || [ -n "$dirt" ]; then
+      echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2
+    elif ! ignored_files=$(git -C "$canonical" ls-files -o -i --exclude-standard 2>/dev/null) || [ -n "$ignored_files" ]; then
+      echo "warning: leaving $copy leased to $holder: it holds ignored files, or they cannot be listed, and a return could replace one that sits where the reset target tracks a file (skipped for: $reason)" >&2
     else
-      rc=$?
+      # Only the landed-work test releases a copy. An anchor makes a commit recoverable; it does not make it landed.
       TEARDOWN_BUNDLE_ACCEPTED=
-      if [ "$rc" = 2 ] && teardown_landed "$canonical" HEAD "" && [ -z "$TEARDOWN_BUNDLE_ACCEPTED" ]; then
+      if teardown_landed "$canonical" HEAD "" && [ -z "$TEARDOWN_BUNDLE_ACCEPTED" ]; then
         ok=1
       else
-        echo "warning: leaving $copy leased to $holder: it is not proved clean and landed (skipped for: $reason; ${FM_TASK_COPY_REASON:-its HEAD is neither landed nor anchored})" >&2
+        echo "warning: leaving $copy leased to $holder: its HEAD is not proved landed (skipped for: $reason)" >&2
       fi
     fi
     if [ "$ok" = 1 ] && (cd "$PROJ" && treehouse return "$canonical" --if-lease-holder "$holder" </dev/null) >/dev/null 2>&1; then

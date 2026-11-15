@@ -3600,6 +3600,57 @@ SH
   pass "teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease"
 }
 
+# D4 (review of 8c6c20ece): a skipped copy is released only on teardown_landed proof. An anchor makes a commit
+# recoverable; it does not make it landed. An ignored file at a path the copy's HEAD would be reset to is work.
+test_skipped_copies_with_an_anchor_or_ignored_work_are_kept() {
+  local case_dir anchored ignored busy_unknown log rec rc=0 canon short sha
+  case_dir=$(make_case skipped-copies-keep)
+  write_meta "$case_dir" no-mistakes ship
+  mkdir -p "$case_dir/data/task-x1"
+  anchored="$case_dir/skip-anchored" ignored="$case_dir/skip-ignored"
+  for dir in "$anchored" "$ignored"; do
+    git -C "$case_dir/project" worktree add -q --detach "$dir" main
+  done
+  printf 'work only in this copy\n' > "$anchored/only-here.txt"
+  git -C "$anchored" add only-here.txt
+  git -C "$anchored" -c user.email=t@t -c user.name=t commit -q -m 'work only here'
+  sha=$(git -C "$anchored" rev-parse HEAD)
+  short=$(git -C "$anchored" rev-parse --short "$sha")
+  git -C "$case_dir/project" update-ref "refs/fm/anchor/task-x1-$short" "$sha"
+  printf '*.local\n' >> "$case_dir/project/.git/info/exclude"
+  printf 'private ignored bytes\n' > "$ignored/notes.local"
+  log="$case_dir/treehouse.log"
+  rec="$case_dir/data/task-x1/skipped-copies.tsv"
+  : > "$rec"; : > "$log"
+  {
+    printf '['
+    sep=
+    for dir in "$anchored" "$ignored"; do
+      canon=$(cd "$dir" && pwd -P)
+      printf '%s{"path": "%s", "lease_holder": "firstmate-skipped:task-x1", "processes": []}' "$sep" "$canon"
+      sep=,
+      printf '%s\tskipped\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+    done
+    printf ']\n'
+  } > "$case_dir/pool.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$log'
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "skipped-copies-keep: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  for dir in "$anchored" "$ignored"; do
+    canon=$(cd "$dir" && pwd -P)
+    ! grep -Fq "return $canon" "$log" || fail "skipped-copies-keep: $dir was released although it is anchored-but-unlanded or holds ignored work"
+    grep -Fq "$dir" "$rec" || fail "skipped-copies-keep: the record of $dir was dropped"
+  done
+  grep -Fq 'private ignored bytes' "$ignored/notes.local" || fail "skipped-copies-keep: the ignored bytes changed"
+  pass "teardown keeps a skipped copy that is only anchored, and one holding ignored work"
+}
+
 teardown_test_cases=(
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
@@ -3667,6 +3718,7 @@ test_cleanup_roots_preserve_foreign_copy_git_storage
 test_tasktmp_preserves_reassociated_copy_git_storage
 test_subordinate_slot_cleanup_preserves_ancestor_custody
 test_skipped_copies_are_released_only_when_clean_and_landed
+test_skipped_copies_with_an_anchor_or_ignored_work_are_kept
 )
 
 # In the combined tests/fm-teardown.test.sh run,

@@ -19,9 +19,16 @@ SLOT_LIB=${FM_TEST_SLOT_LIB:-$ROOT/bin/fm-slot-provision-lib.sh}
 
 GITID=(-c user.name='Firstmate Tests' -c user.email='tests@example.invalid')
 HELD_PIDS=()
+# Stop only the processes this test recorded and everything below them (a pane, its launcher, the shell the launcher
+# opened), leaves first. Nothing else is signalled.
+kill_tree() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$child"; done
+  kill "$1" 2>/dev/null || true
+}
 cleanup_held() {
   local pid
-  for pid in ${HELD_PIDS[@]+"${HELD_PIDS[@]}"}; do pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; done
+  for pid in ${HELD_PIDS[@]+"${HELD_PIDS[@]}"}; do kill_tree "$pid"; done
   HELD_PIDS=()
 }
 trap cleanup_held EXIT
@@ -30,6 +37,7 @@ trap cleanup_held EXIT
 # (a detached worktree) at the first commit. Sets W_DIR W_PROJ W_SLOT W_PUB W_BASE.
 make_world() {
   local name=$1 governed=${2:-0}
+  FM_SLOT_LEFT_HEAD='' FM_SLOT_PREPARE_DETACHED=0 FM_SLOT_PREVIOUS_BRANCH='' FM_SLOT_PREVIOUS_HEAD=''
   W_DIR="$TMP_ROOT/$name"
   W_PROJ="$W_DIR/project"
   W_SLOT="$W_DIR/slot"
@@ -83,7 +91,9 @@ snapshot() {
     git -C "$slot" for-each-ref --format='%(refname) %(objectname)' || exit 1
     git -C "$slot" ls-files -s --debug || exit 1
     cd "$slot" || exit 1
-    find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256
+    # A regular file by its sha256, a symlink by where it points (a link to a same-content file is a change).
+    find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z |
+      xargs -0 -n1 sh -c 'if [ -L "$1" ]; then printf "LINK %s -> %s\n" "$1" "$(readlink "$1")"; else shasum -a 256 -- "$1"; fi' _
   ) >"$tmp" 2>&1 || { rm -f "$tmp"; return 1; }
   grep -q '^HEAD [0-9a-f]' "$tmp" || { rm -f "$tmp"; return 1; }
   mv -f "$tmp" "$out"
@@ -202,13 +212,14 @@ test_untracked_file_in_an_untracked_directory_is_skipped() {
 test_changed_bytes_under_equal_status_are_seen_by_the_comparison() {
   make_world witness
   printf 'one\n' >>"$W_SLOT/README.md"
-  git -C "$W_SLOT" status --porcelain >"$W_DIR/status.before"
-  snapshot "$W_SLOT" "$W_DIR/before"
+  git -C "$W_SLOT" status --porcelain >"$W_DIR/status.before" || fail "git status failed"
+  snapshot "$W_SLOT" "$W_DIR/before" || fail "the first snapshot could not be taken"
   printf 'two\n' >"$W_SLOT/README.md"
-  git -C "$W_SLOT" status --porcelain >"$W_DIR/status.after"
-  snapshot "$W_SLOT" "$W_DIR/after"
+  git -C "$W_SLOT" status --porcelain >"$W_DIR/status.after" || fail "git status failed"
+  snapshot "$W_SLOT" "$W_DIR/after" || fail "the second snapshot could not be taken"
+  [ -s "$W_DIR/before" ] && [ -s "$W_DIR/after" ] || fail "a snapshot file is missing or empty"
   cmp -s "$W_DIR/status.before" "$W_DIR/status.after" || fail "the witness changed the status"
-  ! cmp -s "$W_DIR/before" "$W_DIR/after" || fail "the comparison missed changed bytes under an equal status"
+  if cmp -s "$W_DIR/before" "$W_DIR/after"; then fail "the comparison missed changed bytes under an equal status"; fi
   pass "the before/after comparison sees changed bytes under an equal git status"
 }
 
@@ -550,15 +561,70 @@ test_a_younger_unrelated_process_in_the_slot_is_a_holder() {
   cleanup_held
 }
 
-test_the_panes_own_process_tree_is_not_a_holder() {
-  make_world f4-pane
-  advance_origin advanced.txt
-  bash -c 'cd "$1" && sleep 300 & wait' _ "$W_SLOT" &
+# start_pane <slot> <with-launcher 0|1>: a "pane" shell (a script, so it does not exec its last command). With a
+# launcher it runs a treehouse launcher (a renamed copy of bash) that opens a shell in the slot, as `treehouse get`
+# does; without one it runs a plain process in the slot, as a user's own tool in the same pane would. Sets PANE_PID.
+start_pane() {
+  local slot=$1 launcher=$2 dir="$W_DIR/launcher"
+  cat >"$W_DIR/pane.sh" <<'SH'
+#!/bin/bash
+if [ "$2" = 1 ]; then
+  "$3" -c 'cd "$1" && sleep 300 & wait' get "$1"
+else
+  (cd "$1" && exec sleep 300) &
+  wait
+fi
+: done
+SH
+  chmod +x "$W_DIR/pane.sh"
+  if [ "$launcher" = 1 ]; then make_launcher "$dir" || return 1; fi
+  "$W_DIR/pane.sh" "$slot" "$launcher" "$dir/treehouse" &
   PANE_PID=$!
   HELD_PIDS+=("$PANE_PID")
   sleep 0.5
+}
+
+test_the_panes_own_launcher_tree_is_not_a_holder() {
+  make_world f4-pane-launcher
+  advance_origin advanced.txt
   start_marker
-  FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_moved "the processes under the spawn's own pane are not holders"
+  sleep 0.4
+  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_moved "the shell a treehouse launcher under the spawn's own pane opened is not a holder"
+  cleanup_held
+}
+
+test_a_process_under_the_pane_but_not_under_the_launcher_is_a_holder() {
+  make_world f4-pane-sibling
+  advance_origin advanced.txt
+  start_marker
+  sleep 0.4
+  start_pane "$W_SLOT" 0
+  FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a process under the pane that no launcher of this spawn opened is a holder" live_holder
+  cleanup_held
+}
+
+test_a_process_under_the_pane_that_predates_the_spawn_is_a_holder() {
+  make_world f4-pane-old
+  advance_origin advanced.txt
+  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_marker
+  FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a launcher tree that started before the spawn is not its acquisition, even under the pane" live_holder
+  cleanup_held
+}
+
+test_a_lsof_row_without_a_working_directory_for_the_pane_is_a_holder() {
+  make_world f4-pane-row
+  advance_origin advanced.txt
+  start_marker
+  local bin="$W_DIR/panerow"
+  mkdir -p "$bin"
+  cat >"$bin/lsof" <<SH
+#!/bin/sh
+printf 'p$MARKER_PID\ncbash\n'
+SH
+  chmod +x "$bin/lsof"
+  MOVE_PATH="$bin:$PATH" FM_SLOT_PANE_PID=$MARKER_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "an lsof row with no working directory for the pane's own pid is a holder" live_holder
   cleanup_held
 }
 
@@ -706,7 +772,7 @@ test_the_snapshot_fails_when_git_cannot_be_read() {
 
 # forbidden_git_calls <log>: print every recorded git call that could discard or force work.
 forbidden_git_calls() {
-  grep -E '(^| )(reset( |$).*--hard|checkout .*(-f|--force)|clean( |$)|branch .*(-D|-f|--force)|worktree remove|stash( |$)|restore .*--worktree|update-ref -d)' "$1" || true
+  grep -E '(^| )(reset( .*)? --(hard|merge|keep)|checkout( .*)? (-f|--force|-B)( |$)|checkout( .*)? -- [^ ]|switch( .*)? (-C|-f|--force|--force-create|--discard-changes)( |$)|clean( |$)|branch( .*)? (-D|-d|-f|--force|-M)( |$)|worktree remove|stash( |$)|restore( |$)|update-ref( .*)? (-d|--delete)( |$))' "$1" || true
 }
 
 test_no_destroying_git_command_runs_on_any_move_path() {
@@ -732,6 +798,182 @@ SH
   printf 'reset --hard abc\ncheckout -f main\nclean -fd\n' >"$W_DIR/injected.log"
   [ "$(forbidden_git_calls "$W_DIR/injected.log" | wc -l | tr -d ' ')" = 3 ] || fail "the checker missed an injected destroying call"
   pass "no destroying git command runs on a clean move or a skip, and the checker flags one that does"
+}
+
+# --- review of 8c6c20ece (Main 027): the cases that review's falsifiers showed ------------------------------
+
+# 1. A refusal on the promotion route (fm_slot_provision with no prepared checkout) never orphans a late commit.
+late_commit_runner() {
+  git -C "$W_SLOT" -c core.hooksPath=/dev/null checkout -q --detach
+  printf 'late\n' >"$W_SLOT/late.txt"
+  git -C "$W_SLOT" add late.txt
+  git -C "$W_SLOT" "${GITID[@]}" commit -qm late
+  git -C "$W_SLOT" rev-parse HEAD >"$W_DIR/late-sha"
+  printf '{}\n' >"$2"
+  return 3
+}
+test_a_promotion_refusal_after_a_late_commit_keeps_the_commit() {
+  make_branch_slot m1-promotion
+  local rc=0 late
+  fm_slot_provision late_commit_runner "$W_PROJ" "$W_SLOT" tid fm/tid "$W_DIR/report.json" '' '' scripts >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the refused promotion reported success"
+  late=$(cat "$W_DIR/late-sha")
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$late" ] || [ -n "$(git -C "$W_SLOT" for-each-ref --contains "$late" refs/)" ] \
+    || fail "the late commit is neither HEAD nor held by any ref after the refusal"
+  pass "a refused promotion keeps a commit made after its branch setup"
+}
+
+# 2. A move refused after the preparation detached a governed copy never calls the changed copy untouched.
+test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched() {
+  make_branch_slot m2-refused
+  advance_origin advanced.txt
+  local bin="$W_DIR/refuse" real_git out rc=0 after
+  real_git=$(command -v git)
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
+  after=$(git -C "$W_SLOT" symbolic-ref -q HEAD || echo detached)
+  if [ "$after" != refs/heads/old-owner ]; then
+    [ "$rc" != 20 ] || fail "a copy this spawn detached was reported as an untouched skip: $out"
+    assert_not_contains "$out" "left untouched" "a detached copy was called untouched"
+    assert_contains "$out" "detached" "the output did not say the copy was detached"
+  fi
+  pass "a refused move after preparation either leaves the branch as found or says plainly that the copy was detached"
+}
+
+# 3. Tracked work hidden by an index flag, and a late edit inside a submodule, are work.
+test_tracked_work_hidden_by_an_index_flag_skips_the_copy() {
+  local flag label
+  for flag in --assume-unchanged --skip-worktree; do
+    label=m3${flag#--}
+    make_world "$label"
+    advance_origin advanced.txt
+    git -C "$W_SLOT" update-index "$flag" README.md
+    printf 'private tracked bytes\n' >"$W_SLOT/README.md"
+    expect_skip "a tracked edit hidden by $flag skips the copy" dirty_tree
+    grep -q 'private tracked bytes' "$W_SLOT/README.md" || fail "the hidden edit is gone"
+  done
+}
+
+make_submodule_world() { # <name>: a world whose slot has an initialised submodule `sub`; sets W_SUB (its source)
+  local name=$1 subsha
+  W_DIR="$TMP_ROOT/$name"; W_PROJ="$W_DIR/project"; W_SLOT="$W_DIR/slot"; W_SUB="$W_DIR/sub-source"
+  FM_SLOT_LEFT_HEAD='' FM_SLOT_PREPARE_DETACHED=0 FM_SLOT_PREVIOUS_BRANCH='' FM_SLOT_PREVIOUS_HEAD=''
+  mkdir -p "$W_DIR"
+  git init -q -b main "$W_SUB"; printf 'sub base\n' >"$W_SUB/file"; git -C "$W_SUB" add file; git -C "$W_SUB" "${GITID[@]}" commit -qm sub
+  subsha=$(git -C "$W_SUB" rev-parse HEAD)
+  git init -q -b main "$W_PROJ"; printf 'base\n' >"$W_PROJ/README.md"; git -C "$W_PROJ" add README.md
+  git -C "$W_PROJ" update-index --add --cacheinfo "160000,$subsha,sub"
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm base
+  W_BASE=$(git -C "$W_PROJ" rev-parse HEAD)
+  git -C "$W_PROJ" worktree add -q --detach "$W_SLOT" "$W_BASE"
+  mkdir -p "$W_SLOT/sub"; git init -q -b main "$W_SLOT/sub"
+  git -C "$W_SLOT/sub" remote add source "$W_SUB"; git -C "$W_SLOT/sub" fetch -q source main; git -C "$W_SLOT/sub" checkout -q --detach "$subsha"
+  printf 'advance\n' >"$W_PROJ/advanced.txt"; git -C "$W_PROJ" add advanced.txt; git -C "$W_PROJ" "${GITID[@]}" commit -qm advance
+  W_TARGET=$(git -C "$W_PROJ" rev-parse HEAD)
+}
+
+test_a_late_edit_inside_a_submodule_fails_the_move() {
+  make_submodule_world m3-submodule
+  local bin="$W_DIR/subedit" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) printf "late submodule edit\\n" >%s ;; esac\nexec %s "$@"\n' "'$W_SLOT/sub/file'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a late edit inside a submodule was admitted: $out"
+  grep -q 'late submodule edit' "$W_SLOT/sub/file" || fail "the late submodule edit is gone"
+  pass "a late edit inside a submodule fails the move and is kept"
+}
+
+test_a_move_that_changes_a_submodule_pin_is_not_called_dirty() {
+  make_submodule_world m3-pin
+  local sub2 out rc=0
+  printf 'sub two\n' >"$W_SUB/file"; git -C "$W_SUB" "${GITID[@]}" commit -qam sub2
+  sub2=$(git -C "$W_SUB" rev-parse HEAD)
+  git -C "$W_PROJ" fetch -q 2>/dev/null || true
+  git -C "$W_PROJ" update-index --add --cacheinfo "160000,$sub2,sub"
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm 'move the pin'
+  W_TARGET=$(git -C "$W_PROJ" rev-parse HEAD)
+  out=$(fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 0 ] || fail "a legitimate pin move was refused (rc $rc): $out"
+  pass "a move that changes a submodule pin succeeds; the stale checkout is for the next spawn to report"
+}
+
+# 6. A ref that changes after the proof and before the merge is a difference outside the expected move.
+test_a_ref_that_changes_after_the_proof_fails_the_move() {
+  make_world m6-late-ref
+  advance_origin advanced.txt
+  local bin="$W_DIR/lateref" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/review/custody %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a ref created after the proof was admitted: $out"
+  pass "a ref that appears after the proof fails the move"
+}
+
+# The HEAD-equals-target rule on its own: a target whose tree equals the slot's, so nothing else differs.
+test_a_move_that_ends_elsewhere_than_the_target_fails() {
+  make_world m9-head
+  git -C "$W_PUB" "${GITID[@]}" commit -q --allow-empty -m 'same tree'
+  git -C "$W_PUB" push --quiet origin main
+  git -C "$W_PROJ" fetch --quiet origin
+  W_TARGET=$(git -C "$W_PROJ" rev-parse origin/main)
+  local bin="$W_DIR/headback" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s "$@"; rc=$?; %s -C %s update-ref --no-deref HEAD %s; exit $rc ;; esac\nexec %s "$@"\n' "'$real_git'" "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "a move that left HEAD off the target was accepted: $out"
+  pass "a move that leaves HEAD somewhere other than the target fails"
+}
+
+# 8. The witnesses.
+test_the_changed_bytes_witness_fails_when_a_snapshot_cannot_be_taken() {
+  make_world m8-witness
+  local bin="$W_DIR/hashfail" out rc=0
+  mkdir -p "$bin"
+  printf '#!/bin/sh\nexit 1\n' >"$bin/shasum"
+  chmod +x "$bin/shasum"
+  out=$( (PATH="$bin:$PATH"; test_changed_bytes_under_equal_status_are_seen_by_the_comparison) 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "the changed-bytes witness passed with no snapshot to compare: $out"
+  assert_not_contains "$out" "ok - the before/after comparison" "the witness printed its pass line"
+  pass "the changed-bytes witness fails when a snapshot cannot be taken"
+}
+
+test_the_snapshot_sees_a_symlink_retarget() {
+  make_world m8-symlink
+  printf 'equal bytes\n' >"$W_SLOT/first.local"; cp "$W_SLOT/first.local" "$W_SLOT/second.local"
+  ln -s first.local "$W_SLOT/link.local"
+  snapshot "$W_SLOT" "$W_DIR/before" || fail "snapshot failed"
+  rm "$W_SLOT/link.local"; ln -s second.local "$W_SLOT/link.local"
+  snapshot "$W_SLOT" "$W_DIR/after" || fail "snapshot failed"
+  ! cmp -s "$W_DIR/before" "$W_DIR/after" || fail "a symlink retarget to a same-content file compared equal"
+  pass "the snapshot sees a symlink that now points at another file"
+}
+
+test_the_git_call_oracle_flags_every_forced_form() {
+  local row bad=0
+  : >"$TMP_ROOT/oracle.pos"; : >"$TMP_ROOT/oracle.neg"
+  for row in 'checkout -B owner' 'switch -C owner' 'checkout -f main' 'checkout --force main' 'switch --discard-changes main' 'switch -f main' \
+    'reset --hard abc' 'reset --merge abc' 'reset --keep abc' 'clean -fd' 'branch -D x' 'branch -f x abc' 'branch -M x y' 'update-ref -d refs/heads/x' \
+    'worktree remove w' 'stash' 'restore --worktree f' 'checkout -- f' 'checkout abc -- f'; do
+    printf -- '-C /slot %s\n' "$row" >>"$TMP_ROOT/oracle.pos"
+  done
+  for row in 'checkout --quiet --detach abc' 'merge --ff-only abc' 'symbolic-ref HEAD refs/heads/x' 'rev-parse HEAD' 'status --porcelain' 'branch --show-current' \
+    'checkout -b fm/x' 'switch --detach abc' 'for-each-ref' 'merge-base --is-ancestor a b' 'worktree list --porcelain' 'config --bool --get-regexp x'; do
+    printf -- '-C /slot %s\n' "$row" >>"$TMP_ROOT/oracle.neg"
+  done
+  [ "$(forbidden_git_calls "$TMP_ROOT/oracle.pos" | wc -l | tr -d ' ')" = "$(wc -l <"$TMP_ROOT/oracle.pos" | tr -d ' ')" ] \
+    || fail "the oracle missed forced forms: $(grep -vxFf <(forbidden_git_calls "$TMP_ROOT/oracle.pos") "$TMP_ROOT/oracle.pos" | tr '\n' ';')"
+  [ -z "$(forbidden_git_calls "$TMP_ROOT/oracle.neg")" ] || fail "the oracle flagged safe calls: $(forbidden_git_calls "$TMP_ROOT/oracle.neg" | tr '\n' ';')"
+  pass "the git-call oracle flags every forced form and none of the safe calls"
 }
 
 CASES=(
@@ -769,7 +1011,10 @@ CASES=(
   test_a_merge_hook_does_not_run_during_the_move
   test_a_holder_is_seen_when_the_slot_is_already_at_the_target
   test_a_younger_unrelated_process_in_the_slot_is_a_holder
-  test_the_panes_own_process_tree_is_not_a_holder
+  test_the_panes_own_launcher_tree_is_not_a_holder
+  test_a_process_under_the_pane_but_not_under_the_launcher_is_a_holder
+  test_a_process_under_the_pane_that_predates_the_spawn_is_a_holder
+  test_a_lsof_row_without_a_working_directory_for_the_pane_is_a_holder
   test_a_holder_row_without_a_working_directory_is_a_holder
   test_a_malformed_contention_row_counts_as_held
   test_a_treehouse_launcher_started_after_the_spawn_owns_its_shell
@@ -779,6 +1024,16 @@ CASES=(
   test_a_failed_head_read_after_the_move_is_not_reported_as_untouched
   test_the_snapshot_fails_when_git_cannot_be_read
   test_no_destroying_git_command_runs_on_any_move_path
+  test_a_promotion_refusal_after_a_late_commit_keeps_the_commit
+  test_a_refused_move_after_preparation_never_calls_a_changed_copy_untouched
+  test_tracked_work_hidden_by_an_index_flag_skips_the_copy
+  test_a_late_edit_inside_a_submodule_fails_the_move
+  test_a_move_that_changes_a_submodule_pin_is_not_called_dirty
+  test_a_ref_that_changes_after_the_proof_fails_the_move
+  test_a_move_that_ends_elsewhere_than_the_target_fails
+  test_the_changed_bytes_witness_fails_when_a_snapshot_cannot_be_taken
+  test_the_snapshot_sees_a_symlink_retarget
+  test_the_git_call_oracle_flags_every_forced_form
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

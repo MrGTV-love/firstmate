@@ -5041,8 +5041,11 @@ spawn_resolve_move_target() { # <worktree> [<base-branch>]
   }
   if [ -n "$status" ]; then
     if describe_stale_submodule_pins "$worktree" "$status"; then
-      echo "error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched" >&2
-      return 1
+      # Not uncommitted work, but not a copy to launch from either, and it may hold commits the pin check does not
+      # see: it is left exactly as found, leased, and another copy is taken (never abandoned after one get).
+      echo "error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work" >&2
+      fm_slot_skip "$worktree" stale_submodule "its submodule checkout is behind the base it records; it is not touched"
+      return
     fi
     fm_slot_skip "$worktree" dirty_tree "it is not clean, it holds uncommitted work ($(printf '%s' "$status" | sed -n '1,3p' | tr '\n' ';'))"
     return
@@ -5137,6 +5140,9 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     fm_slot_prove_idle "$worktree" "$SPAWN_MOVE_EXPECTED" "${PROJ_ABS:-}" || return $?
   fi
   SPAWN_PROVEN_COPY=
+  # The refs this spawn itself may change while it records the origin tip (Main 003): origin's default tracking ref
+  # and origin/HEAD. Any other ref that differs after the move fails the spawn.
+  FM_SLOT_REF_ALLOW="refs/remotes/origin/HEAD refs/remotes/origin/$SPAWN_MOVE_DEFAULT"
   spawn_record_origin_refs "$worktree"
   if [ -z "$SPAWN_MOVE_EXPECTED" ]; then
     fm_slot_proof_drop
@@ -6273,6 +6279,12 @@ spawn_acquire_pool_slot() {
   tick=0
   while :; do
     tick=$((tick + 1))
+    # The one absolute bound is read before a copy can be accepted, so a long jump between two agreeing reads
+    # still ends the spawn instead of admitting that copy.
+    if [ $((SECONDS - acquire_start)) -ge "$acquire_ceiling" ]; then
+      acquire_stop="absolute extreme ${acquire_ceiling}s reached"
+      break
+    fi
     p=$(spawn_current_path "$WT_TARGET" || true)
     if [ -n "$p" ] && [ "$p" != "$last_seen" ]; then
       acquire_progress=$SECONDS

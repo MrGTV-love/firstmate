@@ -12,6 +12,8 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-spawn-pool-base-freshen)
+# Every spawn in this file runs with its detached home-summary refresh stubbed (tests/fixtures.sh fm_test_spawn_script).
+export FM_TEST_STUB_SUMMARY_REFRESH=1
 
 make_case() {
   local name=$1 id=$2 default=${3:-main} case_dir home project origin pool publisher fakebin initial
@@ -570,7 +572,7 @@ test_stale_submodule_pin_explains_itself() {
   before=$(git -C "$POOL_DIR" rev-parse HEAD)
   before_sub=$(git -C "$POOL_DIR/ui" rev-parse HEAD)
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(run_spawn_skipping "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "the second spawn launched from a slot carrying a stale submodule pin"
   assert_contains "$out" "stale submodule checkout" \
@@ -1586,7 +1588,7 @@ PY
 # once the slots run out). The treehouse stub records its calls; FM_TEST_LEASE_RC makes `lease` fail.
 # Sets SKIP_SLOTS (the slot paths in hand-out order) and SKIP_LOG.
 make_skip_case() {
-  local name=$1 id=$2 count=$3 rec n slot real_tmux
+  local name=$1 id=$2 count=$3 rec n slot
   rec=$(make_case "$name" "$id")
   read_case_record "$rec"
   SKIP_SLOTS=("$POOL_DIR")
@@ -1595,6 +1597,13 @@ make_skip_case() {
     git -C "$PROJECT_DIR" worktree add --quiet --detach "$slot" "$INITIAL_SHA"
     SKIP_SLOTS+=("$slot")
   done
+  make_skip_transport
+}
+
+# make_skip_transport: with SKIP_SLOTS, CASE_DIR and FAKEBIN_DIR set, a tmux whose pane enters the next slot each time
+# `treehouse get` is typed into it (staying put once the slots run out), and a treehouse stub that logs its calls.
+make_skip_transport() {
+  local real_tmux
   printf '%s\n' "${SKIP_SLOTS[@]}" > "$CASE_DIR/slots"
   : > "$CASE_DIR/panepath"
   echo 0 > "$CASE_DIR/get-count"
@@ -1626,11 +1635,9 @@ SH
   chmod +x "$FAKEBIN_DIR/treehouse"
 }
 
-# slot_digest <slot>: HEAD, its branch, the index, every file outside .git (sha256) and every branch, tag and
-# remote-tracking ref except the exceptions below. It FAILS (prints nothing, returns nonzero) when any git read
-# fails, so a failed read can never compare equal to another. The exceptions are the refs a launch on the
-# second copy legitimately writes: its own task branch (refs/heads/fm/) and origin's default tip.
-DIGEST_REF_EXCEPT='^refs/(heads/fm/|remotes/origin/(HEAD|main)[ ])'
+# slot_digest <slot>: HEAD, its branch, EVERY ref of the repository (the refs are shared by every copy), the index, and
+# every file outside .git (a regular file by sha256, a symlink by its target). It FAILS (nonzero) when any read fails,
+# so a failed read can never compare equal to another.
 slot_digest() {
   local slot=$1 head sym refs
   (
@@ -1639,19 +1646,36 @@ slot_digest() {
     printf 'HEAD %s\n' "$head"
     sym=$(git -C "$slot" symbolic-ref -q HEAD) || { [ "$?" = 1 ] || exit 1; sym=detached; }
     printf 'SYMBOLIC %s\n' "$sym"
-    refs=$(git -C "$slot" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags refs/remotes) || exit 1
-    printf '%s\n' "$refs" | grep -Ev "$DIGEST_REF_EXCEPT" || [ "$?" = 1 ] || exit 1
+    refs=$(git -C "$slot" for-each-ref --format='%(refname) %(objectname)') || exit 1
+    printf 'REFS\n%s\nENDREFS\n' "$refs"
     git -C "$slot" ls-files -s --debug || exit 1
     cd "$slot" || exit 1
-    find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256
+    find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z |
+      xargs -0 -n1 sh -c 'if [ -L "$1" ]; then printf "LINK %s -> %s\n" "$1" "$(readlink "$1")"; else shasum -a 256 -- "$1"; fi' _
   ) 2>&1
 }
 
-# assert_digest_unchanged <slot> <before> <message>: the slot reads back exactly as it did.
+# The refs a spawn may change while it works in ANOTHER copy: origin's default tracking ref and origin/HEAD (Main 003).
+# New refs (the task's own branch, anchors) may appear. Nothing else that existed before may differ or vanish.
+DIGEST_REF_ALLOWED='^refs/remotes/origin/(HEAD|main) '
+
+# assert_digest_unchanged <slot> <before-digest> <message>: the copy reads back as it did, and every ref that existed
+# still has the same value, but for the two allowed ones.
 assert_digest_unchanged() {
-  local after
+  local after b_plain a_plain b_refs a_refs line
   after=$(slot_digest "$1") || fail "$3 (the slot could not be read)"
-  [ "$after" = "$2" ] || fail "$3"
+  b_plain=$(printf '%s\n' "$2" | awk '/^REFS$/{skip=1} !skip{print} /^ENDREFS$/{skip=0}')
+  a_plain=$(printf '%s\n' "$after" | awk '/^REFS$/{skip=1} !skip{print} /^ENDREFS$/{skip=0}')
+  [ "$b_plain" = "$a_plain" ] || fail "$3"
+  b_refs=$(printf '%s\n' "$2" | awk '/^REFS$/{on=1;next} /^ENDREFS$/{on=0} on')
+  a_refs=$(printf '%s\n' "$after" | awk '/^REFS$/{on=1;next} /^ENDREFS$/{on=0} on')
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    if printf '%s\n' "$line" | grep -Eq "$DIGEST_REF_ALLOWED"; then continue; fi
+    printf '%s\n' "$a_refs" | grep -Fxq -- "$line" || fail "$3 (ref changed or removed: ${line% *})"
+  done <<EOF
+$b_refs
+EOF
 }
 
 # assert_no_launch <launch-log>: no harness was launched (the fake launcher logs each launch).
@@ -1891,17 +1915,36 @@ test_skipped_copies_are_recorded_and_listed() {
 
 # --- finding 10 (validators) -----------------------------------------------------------------
 
-test_slot_digest_sees_a_changed_local_branch() {
-  local id before after
-  id='pool-digest-refs'
-  make_skip_case digest-refs "$id" 1
-  git -C "$POOL_DIR" branch -q keep-me
+test_slot_digest_sees_another_tasks_branch_move() {
+  local id first next before rc=0
+  id='pool-digest-foreign-ref'
+  make_skip_case digest-foreign-ref "$id" 1
   git -C "$POOL_DIR" fetch --quiet origin
-  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read before the spawn"
-  git -C "$POOL_DIR" branch -q -f keep-me "$(git -C "$POOL_DIR" rev-parse origin/main)"
-  after=$(slot_digest "$POOL_DIR") || fail "the slot could not be read after the branch moved"
-  [ "$before" != "$after" ] || fail "the digest missed a moved local branch"
-  pass "the slot digest covers local branch refs"
+  first=$(git -C "$POOL_DIR" rev-parse HEAD)
+  next=$(git -C "$POOL_DIR" rev-parse origin/main)
+  git -C "$POOL_DIR" branch -q fm/other "$first"
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
+  # control: a new ref and a move of origin's default tracking ref are allowed
+  git -C "$POOL_DIR" branch -q fm/new "$first"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$first"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "control") >/dev/null 2>&1 || fail "a new branch or the allowed tracking-ref move was refused"
+  git -C "$POOL_DIR" update-ref refs/heads/fm/other "$next"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "foreign branch moved") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "a move of another task's fm/ branch was accepted"
+  pass "the slot check sees another task's fm/ branch move and allows a new ref and the origin default moving"
+}
+
+test_slot_digest_sees_a_symlink_retarget() {
+  local id before after
+  id='pool-digest-symlink'
+  make_skip_case digest-symlink "$id" 1
+  printf 'equal\n' > "$POOL_DIR/first.txt"; cp "$POOL_DIR/first.txt" "$POOL_DIR/second.txt"
+  ln -s first.txt "$POOL_DIR/link.txt"
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
+  rm "$POOL_DIR/link.txt"; ln -s second.txt "$POOL_DIR/link.txt"
+  after=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
+  [ "$before" != "$after" ] || fail "a symlink retarget to a same-content file compared equal"
+  pass "the slot digest sees a symlink that now points at another file"
 }
 
 test_slot_digest_fails_when_git_cannot_be_read() {
@@ -1928,6 +1971,73 @@ test_the_no_launch_check_fails_when_a_launch_was_logged() {
   : > "$dir/empty.log"
   (assert_no_launch "$dir/empty.log") >/dev/null 2>&1 || fail "assert_no_launch rejected an empty launch log"
   pass "the no-launch check fails on a recorded launch and passes on none"
+}
+
+# --- review of 8c6c20ece (Main 027) -------------------------------------------------------------------------
+
+# 5a. A copy on a stale submodule pin that also holds an unlanded superproject commit is not abandoned after one get:
+# it is leased, left as found, and another copy is taken.
+test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_taken() {
+  local rec seed id out before slot2
+  seed='pool-stale-seed'
+  id='pool-stale-skip'
+  rec=$(make_submodule_case stale-skip "$seed")
+  read_submodule_case "$rec"
+  strand_submodule_pin_via_spawn "$seed"
+  printf 'unlanded superproject work\n' > "$POOL_DIR/mine.txt"
+  git -C "$POOL_DIR" add mine.txt
+  git -C "$POOL_DIR" -c user.name=T -c user.email=t@example.invalid commit -qm unlanded
+  slot2="$CASE_DIR/pool2"
+  git -C "$PROJECT_DIR" worktree add --quiet --detach "$slot2" HEAD
+  git -C "$slot2" -c protocol.file.allow=always submodule --quiet update --init
+  fm_test_spawn_brief "$HOME_DIR" "$id"
+  SKIP_SLOTS=("$POOL_DIR" "$slot2")
+  make_skip_transport
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read before the spawn"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn_skipping "$id" --mode no-mistakes --yolo off) || true
+  assert_grep "lease --path $POOL_DIR" "$SKIP_LOG" "the stale copy holding an unlanded commit was not leased"$'\n'"$out"
+  [ "$(cat "$CASE_DIR/get-count")" -ge 2 ] || fail "a second copy was not requested after the first was set aside"
+  assert_digest_unchanged "$POOL_DIR" "$before" "the stale copy changed"
+  pass "a stale-submodule copy with an unlanded commit is leased where it stands and another copy is requested"
+}
+
+# 5b. The absolute bound is checked before a copy is accepted: a jump of the whole bound between the two agreeing
+# reads must stop the spawn, not launch it.
+test_the_bound_is_checked_before_a_copy_is_accepted() {
+  local rec id out status
+  id='pool-bound-before-accept'
+  rec=$(make_case bound-before-accept "$id")
+  read_case_record "$rec"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn accepted a copy after the absolute bound was spent"$'\n'"$out"
+  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
+  assert_no_launch "$CASE_DIR/launch.log"
+  pass "the absolute bound is enforced before a copy is accepted"
+}
+
+# 2 (spawn level). A governed copy that git refuses to move after the preparation detached it is not reported as
+# untouched: its branch is as found, or the output says it was detached.
+test_a_governed_refusal_after_preparation_keeps_the_branch_or_says_it_was_detached() {
+  local id out status real_git after
+  id='pool-governed-refused-after-prep'
+  make_governed_skip_case governed-refused-prep "$id"
+  git -C "${SKIP_SLOTS[0]}" checkout --quiet -b previous-owner
+  real_git=$(command -v git)
+  cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *' merge --ff-only '*) exit 1 ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/git"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
+  assert_no_launch "$CASE_DIR/launch.log"
+  after=$(git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD || echo detached)
+  if [ "$after" != refs/heads/previous-owner ]; then
+    assert_not_contains "$out" "left untouched" "a copy this spawn detached was called untouched"
+    assert_contains "$out" "detached" "the output did not say the copy was detached"
+  fi
+  pass "a governed copy refused after preparation keeps its branch or the output says it was detached"
 }
 
 # Explicit selection keeps focused acquisition regressions independently runnable.
@@ -1997,8 +2107,12 @@ test_a_governed_attached_copy_keeps_its_branch_when_skipped
 test_a_dirty_governed_copy_is_skipped_and_another_is_taken
 test_the_loop_budget_is_one_bound_across_all_gets
 test_skipped_copies_are_recorded_and_listed
-test_slot_digest_sees_a_changed_local_branch
+test_slot_digest_sees_another_tasks_branch_move
+test_slot_digest_sees_a_symlink_retarget
 test_slot_digest_fails_when_git_cannot_be_read
 test_the_no_launch_check_fails_when_a_launch_was_logged
+test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_taken
+test_the_bound_is_checked_before_a_copy_is_accepted
+test_a_governed_refusal_after_preparation_keeps_the_branch_or_says_it_was_detached
 
 echo "# all fm-spawn-pool-base-freshen tests passed"

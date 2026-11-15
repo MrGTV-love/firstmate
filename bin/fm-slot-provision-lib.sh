@@ -167,6 +167,8 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
     fi
   fi
   FM_SLOT_PREPARED_HEAD=$old_head
+  # What this function leaves checked out is the commit it found. A refusal switches back only from exactly this.
+  FM_SLOT_LEFT_HEAD=$old_head
   local args=() path
   [ -z "$local_ref" ] || args+=(--base-source local-default)
   for path in "$@"; do args+=(--owned-path "$path"); done
@@ -313,20 +315,83 @@ def git(slot, *args, allow=(0,)):
 def enc(path):
     return path.decode("utf-8", "surrogateescape") if isinstance(path, bytes) else path
 
-# ---- snapshot: HEAD, branch, the branch and tag refs, the status, and every ignored file with its
-# size and sha256. Anything that cannot be read fails the whole snapshot. The proof reads the status with
-# every submodule counted (a changed submodule is work); the read after a move ignores submodule pins, because a
-# fast-forward that changes a pin leaves the submodule checkout where it was, which bin/fm-spawn.sh
-# describe_stale_submodule_pins reports on the next spawn.
-def snapshot(slot, out, submodules="none"):
+# ---- snapshot: HEAD, branch, EVERY ref, the status (submodules counted, hidden index flags checked), and every
+# ignored file with its size and sha256 (a symlink by its target). Anything that cannot be read fails the whole snapshot.
+def head_and_refs(slot):
     head = git(slot, "rev-parse", "--verify", "HEAD").stdout.decode().strip()
     sym = git(slot, "symbolic-ref", "-q", "HEAD", allow=(0, 1))
     symref = sym.stdout.decode().strip() if sym.returncode == 0 else "detached"
     refs = {}
-    for line in git(slot, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/tags").stdout.decode("utf-8", "replace").splitlines():
+    for line in git(slot, "for-each-ref", "--format=%(refname) %(objectname)").stdout.decode("utf-8", "replace").splitlines():
         name, _, sha = line.rpartition(" ")
         refs[name] = sha
-    status = [enc(e) for e in git(slot, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=" + submodules).stdout.split(b"\0") if e]
+    return head, symref, refs
+
+def blob_of(slot, rel):
+    """The blob id git would store for the worktree file (symlinks by their target text)."""
+    path = os.path.join(slot, rel)
+    if os.path.islink(path):
+        proc = subprocess.run(["git", "-C", slot, "hash-object", "--stdin"], input=os.readlink(path).encode("utf-8", "surrogateescape"),
+                              capture_output=True, env=dict(os.environ, GIT_OPTIONAL_LOCKS="0"))
+    else:
+        proc = subprocess.run(["git", "-C", slot, "hash-object", "--", rel], capture_output=True, stdin=subprocess.DEVNULL,
+                              env=dict(os.environ, GIT_OPTIONAL_LOCKS="0"))
+    if proc.returncode != 0:
+        fail("hash-object %r exit %d" % (rel, proc.returncode))
+    return proc.stdout.decode().strip()
+
+def hidden_changes(slot):
+    """Tracked files that status cannot report (assume-unchanged, skip-worktree) but whose bytes differ from the index."""
+    flagged = {}
+    for raw in git(slot, "ls-files", "-v", "-z").stdout.split(b"\0"):
+        if not raw:
+            continue
+        tag, path = raw[:1].decode(), raw[2:]
+        if tag.islower() or tag == "S":
+            flagged[enc(path)] = tag
+    if not flagged:
+        return []
+    staged = {}
+    for raw in git(slot, "ls-files", "-s", "-z").stdout.split(b"\0"):
+        if not raw:
+            continue
+        meta, _, path = raw.partition(b"\t")
+        mode, sha = meta.split(b" ")[0:2]
+        staged[enc(path)] = (mode.decode(), sha.decode())
+    out = []
+    for rel, tag in sorted(flagged.items()):
+        mode, sha = staged.get(rel, ("", ""))
+        if mode == "160000":
+            continue
+        path = os.path.join(slot, rel)
+        if not os.path.lexists(path):
+            if tag != "S":
+                out.append(" D %s (hidden by an index flag)" % rel)
+            continue
+        if blob_of(slot, rel) != sha:
+            out.append(" M %s (hidden by an index flag)" % rel)
+    return out
+
+def submodule_pin_only(slot, entry):
+    """A ' M <path>' entry for a gitlink whose own worktree is clean: only the pin differs (a move that changes a pin)."""
+    if not entry.startswith(" M "):
+        return False
+    path = entry[3:]
+    stage = git(slot, "ls-files", "-s", "--", path).stdout.decode()
+    if not stage.startswith("160000"):
+        return False
+    inner = subprocess.run(["git", "-C", os.path.join(slot, path), "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"],
+                           capture_output=True, stdin=subprocess.DEVNULL, env=dict(os.environ, GIT_OPTIONAL_LOCKS="0"))
+    if inner.returncode != 0:
+        fail("submodule %r status exit %d" % (path, inner.returncode))
+    return not inner.stdout.strip(b"\0 \n")
+
+def snapshot(slot, out, after_move="0"):
+    head, symref, refs = head_and_refs(slot)
+    status = [enc(e) for e in git(slot, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none").stdout.split(b"\0") if e]
+    if after_move == "1":
+        status = [e for e in status if not submodule_pin_only(slot, e)]
+    status += hidden_changes(slot)
     ignored = {}
     for raw in git(slot, "ls-files", "-o", "-i", "--exclude-standard", "-z").stdout.split(b"\0"):
         if not raw:
@@ -349,34 +414,51 @@ def snapshot(slot, out, submodules="none"):
         except OSError as exc:
             fail("ignored entry %r cannot be read: %s" % (enc(raw), exc))
         ignored[enc(raw)] = entry
+    # The refs are read LAST here, and FIRST in the read after a move, so the window in which another writer's
+    # ref change can look like ours is the move itself.
+    head, symref, refs = head_and_refs(slot)
     with open(out, "w", encoding="utf-8") as handle:
         json.dump({"head": head, "symref": symref, "refs": refs, "status": status, "ignored": ignored}, handle, sort_keys=True)
+
+def refresh(slot, path):
+    """Re-read HEAD, the branch and every ref into an existing snapshot (the last read before the move)."""
+    data = json.load(open(path, encoding="utf-8"))
+    data["head"], data["symref"], data["refs"] = head_and_refs(slot)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, sort_keys=True)
 
 def load(path):
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
 
-# ---- compare two snapshots. same: nothing differs. moved <target> <attached-ref>: HEAD is the target,
-# the attached branch (if any) is the target and the rest of the refs are as they were, the status is
-# clean, and every ignored entry is exactly as it was.
-def compare(before, after, mode, target, attached, detached=""):
+# ---- compare two snapshots. same: nothing differs. moved <target> <attached-ref>: HEAD is the target, the attached
+# branch (if any) is the target, every other ref is as it was (but for the named exceptions), the status is clean,
+# and every ignored entry is exactly as it was.
+def compare(before, after, mode, target, attached, detached="", allow=""):
     a, b, diffs = load(before), load(after), []
+    allowed = set(allow.split())
     if detached == "1":
         a["symref"] = "detached"
+    def refs_of(snap):
+        return {k: v for k, v in snap["refs"].items() if k not in allowed}
     if mode == "same":
-        for key in ("head", "symref", "refs", "status", "ignored"):
+        for key in ("head", "symref", "status", "ignored"):
             if a[key] != b[key]:
                 diffs.append("%s changed" % key)
+        if refs_of(a) != refs_of(b):
+            changed = sorted(k for k in set(refs_of(a)) | set(refs_of(b)) if refs_of(a).get(k) != refs_of(b).get(k))
+            diffs.append("refs changed: %s" % ", ".join(changed[:3]))
     else:
         if b["head"] != target:
             diffs.append("HEAD is %s, not %s" % (b["head"], target))
         if b["symref"] != a["symref"]:
             diffs.append("the checked-out branch changed from %s to %s" % (a["symref"], b["symref"]))
-        want = dict(a["refs"])
+        want = refs_of(a)
         if attached:
             want[attached] = target
-        if b["refs"] != want:
-            changed = sorted(k for k in set(want) | set(b["refs"]) if want.get(k) != b["refs"].get(k))
+        have = refs_of(b)
+        if have != want:
+            changed = sorted(k for k in set(want) | set(have) if want.get(k) != have.get(k))
             diffs.append("refs changed beyond the move: %s" % ", ".join(changed[:3]))
         if b["status"]:
             diffs.append("the tree is not clean after the move: %s" % "; ".join(b["status"][:3]))
@@ -447,16 +529,26 @@ def chain(pid):
         cur = info[0]
     return out, True
 
-# A process is the spawn's own acquisition when it runs under the spawn's own pane (the pane's shell pid
-# is given) or, where the backend reports no pane pid, under a `treehouse` launcher that started after
-# the spawn began. A process that started after the spawn, but under neither, is somebody else's.
+# A process is the spawn's own acquisition only when it is PROVEN so: its parent chain holds a `treehouse` launcher that
+# started after the spawn began and, when the backend names the pane's shell, that launcher runs under that pane. A
+# process that merely shares a parent with the pane, started earlier, or has no launcher above it is somebody else's.
 def is_own(pid, pane, began):
-    path, complete = chain(pid)
-    if pane:
-        return any(p == pane for p, _ in path)
-    for p, info in path:
-        if os.path.basename(info[1]) == "treehouse" and info[2] >= began:
+    launcher = False
+    pane_seen = not pane
+    cur = pid
+    for _ in range(64):
+        info = proc_info(cur)
+        if info is None:
+            return False
+        if os.path.basename(info[1]) == "treehouse" and info[2] is not None and info[2] >= began:
+            launcher = True
+        if cur == pane:
+            pane_seen = True
+        if launcher and pane_seen:
             return True
+        if info[0] <= 1 or info[0] == cur:
+            return False
+        cur = info[0]
     return False
 
 def holders(slot, real, spawn, common, governed, pane):
@@ -499,7 +591,8 @@ def holders(slot, real, spawn, common, governed, pane):
             continue
         if cwd is not None and not any(cwd == base or cwd.startswith(base + "/") for base in inside):
             continue
-        if is_own(pid, pane, began):
+        # An lsof row with no working directory proves nothing about where the process is: it is never excused.
+        if cwd is not None and is_own(pid, pane, began):
             continue
         if cwd is None:
             print("H\ta live process (pid %d, %s) has no readable working directory in the lsof listing" % (pid, row["cmd"]))
@@ -581,6 +674,8 @@ def holders(slot, real, spawn, common, governed, pane):
 mode, args = sys.argv[1], sys.argv[2:]
 if mode == "snapshot":
     snapshot(*args)
+elif mode == "refresh":
+    refresh(*args)
 elif mode == "compare":
     compare(*args)
 elif mode == "collide":
@@ -596,7 +691,7 @@ FMPROBEPY
 fm_slot_probe() { python3 -I -c "$FM_SLOT_PROBE_PY" "$@"; }
 
 # fm_slot_snapshot <slot> <out-file>: fails (nonzero) when any read fails.
-fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" "${3:-none}" 2>&1; }
+fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" "${3:-0}" 2>&1; }
 
 # The one holder rule. A process with its working directory in the slot, or an lsof row that names a
 # process and no working directory, is a holder unless it runs under this spawn's own pane
@@ -697,6 +792,8 @@ fm_slot_prove_idle() {
       fi
     fi
   fi
+  fm_slot_probe refresh "$slot" "$snap" >/dev/null 2>&1 ||
+    { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_git_read "HEAD and the refs cannot be read once more before the move"; return; }
   FM_SLOT_PROOF_SNAPSHOT=$snap
 }
 
@@ -719,14 +816,27 @@ fm_slot_apply_move() {
       mode=moved
     fi
   fi
-  if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo all || echo none)"); then
+  if [ "$mode" = refused ] && [ "$FM_SLOT_PREPARE_DETACHED" = 1 ] && [ -n "$FM_SLOT_PREVIOUS_BRANCH" ]; then
+    # The preparation detached this copy from its branch. The merge was refused, so the commit is where it was left:
+    # put the symbolic HEAD back (no file is touched) before the skip is called untouched. If that is not possible
+    # the copy is kept as it now is and the failure says so.
+    if fm_slot_attach "$slot" "$FM_SLOT_PREVIOUS_BRANCH" "$FM_SLOT_PREVIOUS_HEAD" >/dev/null 2>&1; then
+      detached_flag=0
+      FM_SLOT_PREPARE_DETACHED=0
+    else
+      fm_slot_proof_drop
+      echo "error: pooled copy '$slot' was detached from branch $FM_SLOT_PREVIOUS_BRANCH by this spawn's preparation, git refused the move, and the branch could not be put back; the copy stays detached and is kept as it is, and no worker is admitted" >&2
+      return 1
+    fi
+  fi
+  if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo 1 || echo 0)"); then
     fm_slot_proof_drop
     echo "error: pooled copy '$slot' could not be read after the move ($(printf '%s' "$out" | sed -n '1p')); its state is unknown, so it is kept as it is and no worker is admitted" >&2
     return 1
   fi
   case "$mode" in
-    moved) out=$(fm_slot_probe compare "$snap" "$after" moved "$target" "$attached" "$detached_flag" 2>&1) || rc=$? ;;
-    *) out=$(fm_slot_probe compare "$snap" "$after" same "" "" "$detached_flag" 2>&1) || rc=$? ;;
+    moved) out=$(fm_slot_probe compare "$snap" "$after" moved "$target" "$attached" "$detached_flag" "${FM_SLOT_REF_ALLOW:-}" 2>&1) || rc=$? ;;
+    *) out=$(fm_slot_probe compare "$snap" "$after" same "" "" "$detached_flag" "${FM_SLOT_REF_ALLOW:-}" 2>&1) || rc=$? ;;
   esac
   fm_slot_proof_drop
   if [ "$rc" != 0 ]; then
@@ -764,8 +874,8 @@ fm_slot_attach() {
   fi
   head=$(git -C "$slot" rev-parse --verify --quiet HEAD 2>/dev/null) || { echo "error: HEAD of '$slot' cannot be read; the copy is not switched" >&2; return 1; }
   if [ "$head" != "$sha" ]; then
-    if [ -n "$FM_SLOT_LEFT_HEAD" ] && [ "$head" != "$FM_SLOT_LEFT_HEAD" ]; then
-      echo "error: HEAD of '$slot' is $head, not the $FM_SLOT_LEFT_HEAD this spawn left; the copy is not switched, so no commit is orphaned" >&2
+    if [ "$head" != "$FM_SLOT_LEFT_HEAD" ]; then
+      echo "error: HEAD of '$slot' is $head, not the '${FM_SLOT_LEFT_HEAD:-nothing recorded}' this spawn left; the copy is not switched, so no commit is orphaned" >&2
       return 1
     fi
     fm_slot_prove_idle "$slot" "$sha" "" noancestry >/dev/null 2>&1 || {
