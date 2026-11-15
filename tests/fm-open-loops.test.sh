@@ -517,6 +517,7 @@ for name in ('a', 'b'):
     (home / f'state/{name}.meta').write_text(f'kind=scout\nspawn_gen={name}-generation\n')
 a_meta = home / 'state/a.meta'
 lost_meta, pr_meta = home / 'state/lost.meta', home / 'state/review-author.meta'
+pr_meta_text = pr_meta.read_text()
 for refresh in (False, True):
     if refresh:
         ledger('--heartbeat')
@@ -547,6 +548,7 @@ for refresh in (False, True):
     for path in (a_meta, lost_meta, pr_meta):
         path.unlink()
     a_meta.write_text('kind=scout\nspawn_gen=a-generation\n')
+    pr_meta.write_text(pr_meta_text)
 a_meta.chmod(0)
 degraded = ledger('--heartbeat')
 assert not degraded['complete'], degraded
@@ -726,8 +728,11 @@ double['single']['5']['head']['sha'] = present_head
 (world / 'gh.json').write_text(json.dumps(double))
 assert ledger()['complete'] is True
 
-# Failed deliverables actually landed in the current PR head, in default, or dropped are not owed.
+# Failed deliverables actually landed in the current PR head, in default, or dropped are not owed. The forge merged
+# PR 5 at the copy's HEAD into the default branch, so that head is in the default branch's history.
 double['single']['5']['head']['sha'] = git(merged, 'rev-parse', 'HEAD')
+git(merged, 'update-ref', 'refs/remotes/origin/main', git(merged, 'commit-tree', 'HEAD^{tree}', '-p', 'refs/remotes/origin/main',
+                                                           '-p', 'HEAD', '-m', 'merge PR 5'))
 (world / 'gh.json').write_text(json.dumps(double))
 default_failed = task_copy('default-failed')
 squashed = task_copy('squashed', commit_age=2)
@@ -806,6 +811,9 @@ try:
         (home / 'projects').chmod(projects_mode)
     double['pulls_by_repo']['/repos/delivery/project'] = [fork_pulls[0]]
     (world / 'gh.json').write_text(json.dumps(double))
+    # The forge merged PR 18 at fork-green's HEAD into the default branch.
+    git(fork_green, 'update-ref', 'refs/remotes/origin/main', git(fork_green, 'commit-tree', 'HEAD^{tree}', '-p',
+                                                                  'refs/remotes/origin/main', '-p', 'HEAD', '-m', 'merge PR 18'))
     fork_merged = ledger()
     assert set(rows(fork_merged, 'failed_task')) == {'fork-red'}, fork_merged
     assert not rows(fork_merged, 'unlanded_commit'), fork_merged
@@ -1838,7 +1846,7 @@ PY
 
 # Report silence through the real snapshot, ledger, inbox send and pending-reply store.
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
-import datetime as dt, json, os, runpy, shutil, subprocess, sys, time
+import datetime as dt, json, os, runpy, shutil, sqlite3, subprocess, sys, time
 from pathlib import Path
 root, world = map(Path, sys.argv[1:])
 code, home, fake = (world / name for name in ('silence-code', 'silence-home', 'silence-fake'))
@@ -2274,12 +2282,52 @@ git_('-C', merge_open, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q
 v4_prs['27'] = dict(number=27, html_url=V4_PR + '27', state='open', merged_at=None,
                     head=dict(sha=git_('-C', merge_open, 'rev-parse', 'HEAD')))
 v4_task('merge-open', copy=merge_open, pr=27, verb='working', note='PR open', state='working', live=True)
-# Main 1907 (R4): a merged PR alone put this task here (no done report, state unknown, backlog open). Its copy is the
-# PR head, whose content the default branch does not hold, so no other row covers it; its evidence names the PR.
+# Main 1929 (N1): a merged PR alone put this task here (no done report, state idle, backlog open). The PR was
+# squash-merged and main then rewrote the same file, so the default branch's content no longer matches the copy;
+# the copy's HEAD is the merged PR head and the forge's merge commit is on main, so teardown's landed rule lands it.
 src_merged = v4_copy('src-merged')
+land_sm = world / 'v4-land-src-merged'
+git_('clone', '-q', v4_origin, land_sm)
+(land_sm / 'src-merged.txt').write_text('src-merged\n')
+git_('-C', land_sm, 'add', '.'); git_('-C', land_sm, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'squash src-merged (#26)')
+squash_sm = git_('-C', land_sm, 'rev-parse', 'HEAD')
+(land_sm / 'src-merged.txt').write_text('src-merged, reworded on main\n')
+git_('-C', land_sm, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-am', 'main rewords src-merged')
+git_('-C', land_sm, 'push', '-q', 'origin', 'main')
+git_('-C', src_merged, 'fetch', '-q', 'origin')
 v4_prs['26'] = dict(number=26, html_url=V4_PR + '26', state='closed', merged_at=iso(now - 3600),
-                    head=dict(sha=git_('-C', src_merged, 'rev-parse', 'HEAD')))
-v4_task('src-merged', copy=src_merged, pr=26, verb='working', note='building', state='unknown')
+                    head=dict(sha=git_('-C', src_merged, 'rev-parse', 'HEAD')), merge_commit_sha=squash_sm)
+v4_task('src-merged', copy=src_merged, pr=26, verb='working', note='building', state='idle')
+# Main 1929 (N1): a GitHub no-mistakes copy that stayed the pipeline's input. The pipeline rewrote its file, pushed
+# that head, and the PR merged it; the run record names this copy's HEAD as that run's input, so it is landed.
+pipe_input = v4_copy('pipe-input')
+pipe_run = world / 'v4-pipeline-pipe-input'
+git_('clone', '-q', v4_origin, pipe_run)
+(pipe_run / 'pipe-input.txt').write_text('pipe-input, reviewed by the pipeline\n')
+git_('-C', pipe_run, 'add', '.'); git_('-C', pipe_run, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'work pipe-input')
+pipe_head = git_('-C', pipe_run, 'rev-parse', 'HEAD')
+git_('-C', pipe_run, 'push', '-q', 'origin', 'HEAD:main')
+git_('-C', pipe_input, 'fetch', '-q', 'origin')
+v4_prs['28'] = dict(number=28, html_url=V4_PR + '28', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=pipe_head), merge_commit_sha=pipe_head)
+v4_task('pipe-input', copy=pipe_input, pr=28, note=f'{V4_PR}28 merged')
+v4_nm = world / 'v4-nm'
+v4_nm.mkdir()
+with sqlite3.connect(v4_nm / 'state.sqlite') as db:
+    db.execute('CREATE TABLE runs (id, branch, pr_url, submitted_head_sha, last_pushed_sha, created_at)')
+    db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?)',
+               ('01RUNPIPE', 'fm/pipe-input', V4_PR + '28', git_('-C', pipe_input, 'rev-parse', 'HEAD'), pipe_head, 1))
+# Main 1907 (R4): a merged PR alone put this task here, and no landing route proves its copy (the merged head is not
+# on main and the forge names no merge commit), so no other row covers it; its evidence names the merged PR.
+src_unproven = v4_copy('src-unproven')
+v4_prs['29'] = dict(number=29, html_url=V4_PR + '29', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=git_('-C', src_unproven, 'rev-parse', 'HEAD')))
+v4_task('src-unproven', copy=src_unproven, pr=29, verb='working', note='building', state='idle')
+# The same unproven merged PR with a done report and a done state: the evidence names each source that holds.
+src_both = v4_copy('src-both')
+v4_prs['30'] = dict(number=30, html_url=V4_PR + '30', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=git_('-C', src_both, 'rev-parse', 'HEAD')))
+v4_task('src-both', copy=src_both, pr=30, note=f'{V4_PR}30 merged')
 mate_home = world / 'v4-mate'
 for name in ('state', 'data', 'config', 'projects'):
     (mate_home / name).mkdir(parents=True)
@@ -2311,7 +2359,7 @@ script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\ns=$(sed -n "s/^$1=//
        'printf "state: %s · source: pane · %s\\n" "${s:-working}" "${d:-recorded}"\n')
 (world / 'v4-states.txt').write_text(''.join(f'{n}={st}\n' for n, st in v4_states.items()))
 (world / 'v4-details.txt').write_text(''.join(f'{n}={d}\n' for n, d in v4_details.items()))
-env4 = dict(env, FM_HOME=str(v4), V4_GH=str(world / 'v4-gh.json'), V4_LIVE=str(world / 'v4-live.txt'),
+env4 = dict(env, FM_HOME=str(v4), NM_HOME=str(v4_nm), V4_GH=str(world / 'v4-gh.json'), V4_LIVE=str(world / 'v4-live.txt'),
             V4_STATES=str(world / 'v4-states.txt'), V4_DETAILS=str(world / 'v4-details.txt'), FM_SILENCE_TEST_LIVENESS='alive',
             GIT_CONFIG_COUNT='1', GIT_CONFIG_KEY_0=f'url.{v4_origin}.insteadOf', GIT_CONFIG_VALUE_0='https://github.com/test/project.git')
 def ledger4(**extra):
@@ -2446,15 +2494,21 @@ for name in ('pend-ship', 'pend-scout', 'src-state', 'src-report'):
 sources = {'last report was done': 'the last report was done', 'task state is done': 'the task state is done',
            'backlog item is closed': 'its backlog item is closed'}
 expected = {'src-backlog': {'backlog item is closed'},
-            'fin-dirty': {'last report was done', 'task state is done'},
-            'src-merged': set()}
+            'src-both': {'last report was done', 'task state is done'},
+            'src-unproven': set()}
 for name, held in expected.items():
     row = acceptance.get(name)
     assert row and row['owner'] == 'home:firstmate', ('each source needs its own owned row', name, mine(name))
     named = {key for key, words in sources.items() if words in row['evidence']}
     assert named == held, ('the evidence must name exactly the sources that hold', name, held, row['evidence'])
     assert 'no accepted or landed deliverable is on record' in row['evidence'], row
-assert acceptance['src-merged']['evidence'].startswith(f'its PR merged: {V4_PR}26, and no accepted'), acceptance['src-merged']
+assert acceptance['src-unproven']['evidence'].startswith(f'its PR merged: {V4_PR}29, and no accepted'), acceptance['src-unproven']
+# Teardown's landed rule lands these merged PRs, so the ledger owes their cleanup, never acceptance or landing.
+for name in ('src-merged', 'pipe-input'):
+    assert [r['category'] for r in obligations(name)] == ['pending_cleanup'], (name, mine(name))
+    assert cleanup[name]['owner'] == 'home:firstmate', cleanup[name]
+    assert cleanup[name]['next_action'].startswith(f'run plain bin/fm-teardown.sh {name};'), cleanup[name]
+    assert name not in by_cat('unlanded_commit'), (name, mine(name))
 assert 'its PR merged' not in acceptance['src-backlog']['evidence'], acceptance['src-backlog']
 # A done claim the ship-done gate refused is firstmate's to resolve; one refused only because the no-mistakes daemon
 # is down is a wait and adds no row. A refusal because no run exists or the run is otherwise unreadable keeps its row,

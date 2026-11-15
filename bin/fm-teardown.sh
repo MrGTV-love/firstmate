@@ -2541,16 +2541,8 @@ teardown_commits_beyond_default() {  # <dir> <ref> <default-ref|empty>
 # refusal names the missing or mismatched record rather than guessing.
 TEARDOWN_PIPELINE_INPUT_REASON=
 
-# The pipeline's own review and document steps rewrite and add commits on the
-# branch it pushes, so a copy that was the pipeline's INPUT is neither an
-# ancestor of the merged PR head nor made of patches the PR head replays
-# unchanged. Such a copy is proven landed from the no-mistakes run record, never
-# from commit content: a recorded run for the merged PR pushed exactly the merged
-# PR head, that run started from a recorded input head (submitted_head_sha), and
-# this copy's HEAD is exactly that input head. The copy is then the input of the
-# run whose pushed head merged. A copy at any other commit refuses, as does a run
-# that pushed some other head; each missing record is named. Commit subjects and
-# times never count.
+# The run-record route of the landed rule (fm_task_copy_pipeline_input in
+# bin/fm-task-copy-lib.sh), read here under teardown's silence bound.
 pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
   local pr_head=$1 pr_url=$2 current db rows kind id submitted pushed
   local stall=${NM_TEARDOWN_STALL_SECS:-} runs=0 tied=0 reasons='' read_rc=0
@@ -2580,87 +2572,18 @@ pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
   # host does, so how long it takes says nothing about whether it is hung. The
   # 30 s is SQLite's busy wait for a writer's lock, the one wait this reader cannot
   # watch; running out of it is answered as busy, an unknown like silence.
-  FM_NM_READ_STALLED=0 teardown_nm_read rows fm_nm_bounded "$dir" "$stall" python3 -I - "$db" "$pr_url" <<'PY' || read_rc=$?
-import re
-import sqlite3
-import sys
-from contextlib import closing
-from pathlib import Path
-
-database, pr_url = sys.argv[1:]
-needed = ("id", "pr_url", "submitted_head_sha", "last_pushed_sha")
-try:
-    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
-        have = {row[1] for row in db.execute("PRAGMA table_info(runs)")}
-        missing = [name for name in needed if name not in have]
-        if missing:
-            print("missing-column|" + ",".join(missing))
-        else:
-            rows = db.execute(
-                "SELECT id, submitted_head_sha, last_pushed_sha FROM runs WHERE pr_url = ? "
-                "ORDER BY created_at, id", (pr_url,)
-            ).fetchall()
-            for row in rows:
-                values = ["" if value is None else str(value) for value in row]
-                if re.fullmatch(r"[A-Za-z0-9_-]+", values[0]):
-                    print("run|" + "|".join(values))
-except sqlite3.OperationalError as error:
-    print("busy|" if "locked" in str(error) else "unreadable|")
-except (OSError, ValueError, sqlite3.Error):
-    print("unreadable|")
-PY
+  FM_NM_READ_STALLED=0 teardown_nm_read rows fm_nm_bounded "$dir" "$stall" python3 -I - "$db" "$pr_url" \
+    <<<"$FM_TASK_COPY_RUN_RECORD_PY" || read_rc=$?
   if [ "$read_rc" -ne 0 ]; then
     # Silence is not an answer: work_is_landed reports the proof unknown.
     [ "$read_rc" -ne 124 ] || TEARDOWN_NM_RECORD_SILENT=1
     TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
     return 1
   fi
-  while IFS='|' read -r kind id submitted pushed; do
-    case "$kind" in
-      missing-column)
-        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run table in $db is missing column(s) $id, so no run record ties this copy to $pr_url"
-        return 1
-        ;;
-      unreadable)
-        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
-        return 1
-        ;;
-      busy)
-        TEARDOWN_NM_RECORD_SILENT=1
-        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
-        return 1
-        ;;
-      run) ;;
-      *) continue ;;
-    esac
-    runs=$((runs + 1))
-    if [ -z "$pushed" ]; then
-      reasons="${reasons}run $id records no pushed head (last_pushed_sha), so it cannot be tied to the merged PR head ${pr_head:0:12}"$'\n'
-      continue
-    fi
-    if [ "$pushed" != "$pr_head" ]; then
-      reasons="${reasons}run $id pushed ${pushed:0:12}, not the merged PR head ${pr_head:0:12}"$'\n'
-      continue
-    fi
-    tied=$((tied + 1))
-    if ! fm_pr_head_valid "$submitted"; then
-      reasons="${reasons}run $id records no input head (submitted_head_sha), so this copy's HEAD cannot be placed in what the run started from"$'\n'
-      continue
-    fi
-    if [ "$submitted" = "$current" ]; then
-      return 0
-    fi
-    reasons="${reasons}run $id started from ${submitted:0:12}; this copy's HEAD ${current:0:12} is not that head, so this copy is not the input the run started from"$'\n'
-  done <<EOF
-$rows
-EOF
-  if [ "$runs" -eq 0 ]; then
-    reasons="no no-mistakes run record names the merged PR $pr_url"$'\n'
-  elif [ "$tied" -eq 0 ]; then
-    reasons="${reasons}no recorded run pushed the merged PR head ${pr_head:0:12}"$'\n'
-  fi
-  TEARDOWN_PIPELINE_INPUT_REASON=${reasons%$'\n'}
-  return 1
+  fm_task_copy_pipeline_input "$current" "$pr_head" "$pr_url" "$db" "$rows" || read_rc=$?
+  TEARDOWN_PIPELINE_INPUT_REASON=$FM_TASK_COPY_PIPELINE_REASON
+  [ "$read_rc" -ne 2 ] || TEARDOWN_NM_RECORD_SILENT=1
+  return "$read_rc"
 }
 
 # Is the worktree's PR merged for local work contained in that PR? Resolves the
@@ -2745,21 +2668,17 @@ pr_is_merged_target() {
   # cached ref (Main 1820 F2), and a failed refresh refuses. The copy is landed
   # when it is exactly the merged head and that head is in the default branch's
   # history (Main 1688 Q1; a later commit that drops its change does not undo
-  # that, Main 1820 F1), or when merging the copy into the default branch changes
-  # nothing (fm_task_copy_content_in_default). Two forge-and-record proofs also
-  # land it (Main 1907): the copy's HEAD is an ancestor of the merged head and the
-  # forge's merge commit for the PR is in the default branch's history, or the
-  # copy's HEAD is the recorded input of the no-mistakes run that pushed the
-  # merged head (pipeline_input_is_local_head). Anything else refuses.
+  # that, Main 1820 F1), or when the default branch holds every change it made.
+  # Two forge-and-record proofs also land it (Main 1907): the copy's HEAD is an
+  # ancestor of the merged head and the forge's merge commit for the PR is in
+  # the default branch's history, or the copy's HEAD is the recorded input of the
+  # no-mistakes run that pushed the merged head. fm_task_copy_landed and
+  # fm_task_copy_pipeline_input in bin/fm-task-copy-lib.sh own the rule, which
+  # bin/fm_open_loops.py reads too. Anything else refuses.
   default_ref=
   if landed_default_ref; then
     default_ref=$TEARDOWN_DEFAULT_REF
-    if [ "$current" = "$head" ] && git -C "$dir" merge-base --is-ancestor "$head" "$default_ref" 2>/dev/null; then
-      landed=1
-    elif fm_task_copy_content_in_default "$dir" "$PROJ" "$TEARDOWN_DEFAULT_NAME" "$ref" no-fetch; then
-      landed=1
-    elif git -C "$dir" merge-base --is-ancestor "$current" "$head" 2>/dev/null \
-      && pr_merge_commit_in_default "$dir" "$merge_commit" "$default_ref"; then
+    if fm_task_copy_landed "$dir" "$default_ref" "$current" "$head" "$merge_commit"; then
       landed=1
     elif pipeline_input_is_local_head "$head" "$resolved_url"; then
       landed=1
@@ -2782,12 +2701,6 @@ pr_is_merged_target() {
   return 0
 }
 TEARDOWN_COMPLETION_PR=
-
-# The forge's merge commit <merge> is reachable from the refreshed <default-ref>.
-# An empty or malformed merge commit proves nothing.
-pr_merge_commit_in_default() {  # <dir> <merge> <default-ref>
-  fm_pr_head_valid "$2" && git -C "$1" merge-base --is-ancestor "$2" "$3" 2>/dev/null
-}
 
 
 # A successful landing proof binds to a directory and immutable commit, not

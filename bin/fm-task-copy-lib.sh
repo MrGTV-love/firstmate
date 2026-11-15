@@ -14,6 +14,9 @@
 #   - bin/fm-control.sh reassociate re-points a record at a replacement copy only
 #     when both hold for that copy and it shares the project's repository
 #     (fm_task_copy_same_repository).
+# The landed rule for a copy lives here once too (fm_task_copy_landed and
+# fm_task_copy_pipeline_input): bin/fm-teardown.sh acts on it and
+# bin/fm_open_loops.py reports it.
 # A record's prior_worktree= lines name copies the task worked in before a
 # reassociation that stay its preserved custody, so the record scan counts them
 # exactly like worktree= and home=. A pool slot the task left entirely is
@@ -277,6 +280,135 @@ fm_task_copy_archive_carried() {  # <dir> <default-ref> <tip>
   [ -n "$ref" ] && [ -n "$tip" ] || return 1
   git -C "$dir" merge-base --is-ancestor "$tip" "$ref" 2>/dev/null && return 0
   fm_task_copy_blobs_in_default "$dir" "$ref" "$tip"
+}
+
+# The landed rule for a task copy, owned here so bin/fm-teardown.sh, which acts
+# on it, and bin/fm_open_loops.py, which reports it, read one rule (AGENTS.md hard
+# rule 3). <head> in <dir> is landed on <default-ref> when the default branch
+# holds every change it made (fm_task_copy_blobs_in_default), or, for a PR the
+# forge reports merged at <merged-pr-head>, when <head> is exactly that merged
+# head and the head is in the default branch's history (Main 1688 Q1), or when
+# <head> is an ancestor of the merged head and the forge's <merge-commit> for
+# the PR is in the default branch's history (Main 1907). The caller confirms the
+# merge and names <default-ref>; with no merged PR, pass no PR fields. The other
+# Main 1907 route, the no-mistakes run record, is fm_task_copy_pipeline_input.
+# FM_TASK_COPY_UNASKED keeps the content check's reason when nothing proved it.
+fm_task_copy_landed() {  # <dir> <default-ref> <head> [<merged-pr-head> <merge-commit>]
+  local dir=$1 ref=$2 head=$3 pr_head=${4:-} merge=${5:-} current
+  FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
+  [ -n "$ref" ] || return 1
+  current=$(git -C "$dir" rev-parse --verify --quiet "$head^{commit}" 2>/dev/null) || return 1
+  if fm_task_copy_sha_valid "$pr_head" && [ "$current" = "$pr_head" ] \
+    && git -C "$dir" merge-base --is-ancestor "$pr_head" "$ref" 2>/dev/null; then
+    FM_TASK_COPY_UNASKED=
+    return 0
+  fi
+  fm_task_copy_blobs_in_default "$dir" "$ref" "$current" && return 0
+  if fm_task_copy_sha_valid "$pr_head" && fm_task_copy_sha_valid "$merge" \
+    && git -C "$dir" merge-base --is-ancestor "$current" "$pr_head" 2>/dev/null \
+    && git -C "$dir" merge-base --is-ancestor "$merge" "$ref" 2>/dev/null; then
+    FM_TASK_COPY_UNASKED=
+    return 0
+  fi
+  return 1
+}
+
+fm_task_copy_sha_valid() {  # <sha>
+  local LC_ALL=C
+  [[ "${1-}" =~ ^[0-9a-f]{40}$|^[0-9a-f]{64}$ ]]
+}
+
+# The pipeline's own review and document steps rewrite and add commits on the
+# branch it pushes, so a copy that was the pipeline's INPUT is neither an
+# ancestor of the merged PR head nor content the default branch holds. Such a
+# copy is proven landed from the no-mistakes run record, never from commit
+# content: a recorded run for the merged PR pushed exactly the merged PR head,
+# that run started from a recorded input head (submitted_head_sha), and the
+# copy's HEAD <current> is exactly that input head. A copy at any other commit is
+# not landed, as is one whose run pushed some other head; each missing record is
+# named in FM_TASK_COPY_PIPELINE_REASON. Commit subjects and times never count.
+# <rows> is what FM_TASK_COPY_RUN_RECORD_PY printed for <db> and <pr-url>; the
+# caller bounds that read-only query. Returns 0 landed, 1 not landed, 2 unknown
+# (the database was locked past SQLite's busy wait).
+FM_TASK_COPY_PIPELINE_REASON=
+FM_TASK_COPY_RUN_RECORD_PY=
+read -r -d '' FM_TASK_COPY_RUN_RECORD_PY <<'PY' || :
+import re
+import sqlite3
+import sys
+from contextlib import closing
+from pathlib import Path
+
+database, pr_url = sys.argv[1:]
+needed = ("id", "pr_url", "submitted_head_sha", "last_pushed_sha")
+try:
+    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
+        have = {row[1] for row in db.execute("PRAGMA table_info(runs)")}
+        missing = [name for name in needed if name not in have]
+        if missing:
+            print("missing-column|" + ",".join(missing))
+        else:
+            rows = db.execute(
+                "SELECT id, submitted_head_sha, last_pushed_sha FROM runs WHERE pr_url = ? "
+                "ORDER BY created_at, id", (pr_url,)
+            ).fetchall()
+            for row in rows:
+                values = ["" if value is None else str(value) for value in row]
+                if re.fullmatch(r"[A-Za-z0-9_-]+", values[0]):
+                    print("run|" + "|".join(values))
+except sqlite3.OperationalError as error:
+    print("busy|" if "locked" in str(error) else "unreadable|")
+except (OSError, ValueError, sqlite3.Error):
+    print("unreadable|")
+PY
+fm_task_copy_pipeline_input() {  # <current> <merged-pr-head> <pr-url> <db> <rows>
+  local current=$1 pr_head=$2 pr_url=$3 db=$4 rows=$5 kind id submitted pushed runs=0 tied=0 reasons=''
+  FM_TASK_COPY_PIPELINE_REASON=
+  while IFS='|' read -r kind id submitted pushed; do
+    case "$kind" in
+      missing-column)
+        FM_TASK_COPY_PIPELINE_REASON="the no-mistakes run table in $db is missing column(s) $id, so no run record ties this copy to $pr_url"
+        return 1
+        ;;
+      unreadable)
+        FM_TASK_COPY_PIPELINE_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 1
+        ;;
+      busy)
+        FM_TASK_COPY_PIPELINE_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 2
+        ;;
+      run) ;;
+      *) continue ;;
+    esac
+    runs=$((runs + 1))
+    if [ -z "$pushed" ]; then
+      reasons="${reasons}run $id records no pushed head (last_pushed_sha), so it cannot be tied to the merged PR head ${pr_head:0:12}"$'\n'
+      continue
+    fi
+    if [ "$pushed" != "$pr_head" ]; then
+      reasons="${reasons}run $id pushed ${pushed:0:12}, not the merged PR head ${pr_head:0:12}"$'\n'
+      continue
+    fi
+    tied=$((tied + 1))
+    if ! fm_task_copy_sha_valid "$submitted"; then
+      reasons="${reasons}run $id records no input head (submitted_head_sha), so this copy's HEAD cannot be placed in what the run started from"$'\n'
+      continue
+    fi
+    if [ "$submitted" = "$current" ]; then
+      return 0
+    fi
+    reasons="${reasons}run $id started from ${submitted:0:12}; this copy's HEAD ${current:0:12} is not that head, so this copy is not the input the run started from"$'\n'
+  done <<EOF
+$rows
+EOF
+  if [ "$runs" -eq 0 ]; then
+    reasons="no no-mistakes run record names the merged PR $pr_url"$'\n'
+  elif [ "$tied" -eq 0 ]; then
+    reasons="${reasons}no recorded run pushed the merged PR head ${pr_head:0:12}"$'\n'
+  fi
+  FM_TASK_COPY_PIPELINE_REASON=${reasons%$'\n'}
+  return 1
 }
 
 # The porcelain status lines of <copy> that are its own uncommitted work:

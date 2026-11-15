@@ -711,8 +711,8 @@ class Collector:
     def unproven_merges(self, worktree, base, cover=None):
         """Every merge commit on HEAD beyond base that the PR head cover lacks (Main 1871 P-B, Main 1907).
 
-        No merge machinery proves a merge commit. unlanded() asks this only after the blob proof found the copy's
-        content not in base, so a merge commit whose change base holds never reaches here; one the open or merged
+        No merge machinery proves a merge commit. unlanded() asks this only after the landed rule found the copy
+        not landed, so a merge commit whose change base holds never reaches here; one the open or merged
         PR head carries is that PR's row to own.
         """
         return self.git(worktree, "rev-list", "--merges", base + "..HEAD", *(["^" + cover] if cover else [])).split()
@@ -751,27 +751,27 @@ class Collector:
             self.missing_heads[task["id"]] = str(missing)
             return None
 
-    def content_in_default(self, worktree, base):
-        """The blob proof of bin/fm-task-copy-lib.sh fm_task_copy_blobs_in_default (Main 1871 P-B).
+    def landed(self, worktree, base, pr):
+        """The landed rule bin/fm-teardown.sh acts on, read from its one owner (AGENTS.md hard rule 3).
 
-        For every path HEAD changed against its merge base with base, base's tree entry (mode, type and object
-        id) equals HEAD's, and a path HEAD deleted is absent there too. Only plumbing reads run, so no merge
-        driver can change the answer; any read that fails is not landed.
+        bin/fm-task-copy-lib.sh fm_task_copy_landed decides by the default branch's content, or for a merged PR
+        by its exact head in the default branch's history or by the forge's merge commit there over a head that
+        carries this copy; fm_task_copy_pipeline_input decides by the no-mistakes run record. Only a PR the forge
+        reports merged lends its head, merge commit and URL. A record read that cannot answer raises, so the
+        task's row says landing could not be read; it is never landed.
         """
-        try:
-            merge_base = self.git(worktree, "merge-base", base, "HEAD").strip()
-            listed = self.run(["git", "-C", worktree, "diff-tree", "-r", "-z", "--no-renames", "--name-only",
-                               merge_base, "HEAD", "--"])
-            paths = [p for p in listed.split("\0") if p]
-            if not paths:
-                return True
-            def entries(rev):
-                out = self.run(["git", "-C", worktree, "--literal-pathspecs", "ls-tree", "-r", "--full-tree",
-                                rev, "--"] + paths)
-                return sorted(line for line in out.splitlines() if line)
-            return entries(base) == entries("HEAD")
-        except RuntimeError:
-            return False
+        merged = pr if pr and pr.get("merged_at") else {}
+        out = self.run(["bash", "-c",
+            '. "$1/fm-task-copy-lib.sh"; . "$1/fm-nm-run-lib.sh"; '
+            'if fm_task_copy_landed "$2" "$3" HEAD "$4" "$5"; then echo landed; exit 0; fi; '
+            'if [ -z "$6" ] || ! fm_task_copy_sha_valid "$4" || ! command -v python3 >/dev/null; then exit 1; fi; '
+            'db=$(fm_nm_state_db "$2"); [ -f "$db" ] || exit 1; '
+            'rows=$(python3 -I - "$db" "$6" <<<"$FM_TASK_COPY_RUN_RECORD_PY") || exit 3; '
+            'rc=0; fm_task_copy_pipeline_input "$(git -C "$2" rev-parse HEAD)" "$4" "$6" "$db" "$rows" || rc=$?; '
+            'if [ "$rc" -eq 0 ]; then echo landed; exit 0; fi; [ "$rc" -ne 2 ] || exit 3; exit 1',
+            "open-loops", BIN, worktree, base, (merged.get("head") or {}).get("sha") or "",
+            merged.get("merge_commit_sha") or "", merged.get("html_url") or ""], missing_ok=True)
+        return out.strip() == "landed"
 
     def captain_dropped(self, task):
         return any(record.get("id") == task["id"] and record.get("captain_drop") for record in self.backlog)
@@ -815,12 +815,7 @@ class Collector:
             return bool(pr and pr.get("merged_at"))
         if self.git(worktree, "status", "--porcelain"):
             return False
-        # Landed means present in the default branch's content, the rule bin/fm-teardown.sh applies: merging the
-        # copy into the default branch changes nothing. A PR's history is not consulted (a PR can replay a change
-        # and revert it), and a local merge commit that carries a change of its own is not landed. A merge that
-        # conflicts or cannot be computed is not landed.
-        base = self.default_ref(worktree, task.get("mode"))
-        return self.content_in_default(worktree, base)
+        return self.landed(worktree, self.default_ref(worktree, task.get("mode")), pr)
 
     def unlanded(self, task):
         if task["kind"] != "ship" or self.captain_dropped(task):
@@ -829,10 +824,10 @@ class Collector:
         if not worktree:
             return
         base = self.default_ref(worktree, task.get("mode"))
-        if self.content_in_default(worktree, base):
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if self.landed(worktree, base, pr):
             return
         pending = self.pending_commits(worktree, base)
-        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
         if pending and pr and (pr.get("merged_at") or pr.get("state") == "open"):
             covered = self.pr_head_pending(task, worktree, pending, pr)
             if covered is not None:

@@ -666,8 +666,9 @@ assert_pipeline_input_copy_allowed_by_record() {
 }
 
 # Write one row of the no-mistakes state database at $case_dir/nm/state.sqlite
-# (run_teardown points NM_HOME there). Teardown no longer reads it as landing
-# proof; fixtures write it so a copy is exactly a recorded run's input. An empty
+# (run_teardown points NM_HOME there). It is the pipeline-input landing proof
+# (fm_task_copy_pipeline_input): a copy that is exactly the recorded input of the
+# run that pushed the merged PR head is landed. An empty
 # submitted or pushed value is stored as NULL; omit-column leaves that column out
 # of the table entirely. Calling it again appends another run row.
 # Args: case_dir run_id pr_url submitted pushed [omit-column]
