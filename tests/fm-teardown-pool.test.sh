@@ -1453,7 +1453,8 @@ SH
 # these fixed conditions refuses before any lease, endpoint close, removal or
 # drop-record write, for both record shapes, and once only that condition is
 # repaired the same teardown closes. busy-state-directory and
-# merge-notified-directory put a directory where cleanup removes a file;
+# merge-notified-directory and turn-ended-directory put a directory where
+# cleanup removes a file;
 # immutable-meta and immutable-return-pending make that record undeletable;
 # forced runs the immutable return-pending case with the drop words, whose
 # record must stay absent.
@@ -1472,6 +1473,9 @@ nested_preflight_case() {  # <plain|enclosing> <cause>
     merge-notified-directory)
       path=$case_dir/state/task-x1.pr-poll-merge-notified; mkdir "$path"; fragment="merge-notified record at $path is not a regular file"
       ;;
+    turn-ended-directory)
+      path=$case_dir/state/task-x1.turn-ended; mkdir "$path"; fragment="runtime record at $path is a directory"
+      ;;
     immutable-meta)
       path=$case_dir/state/task-x1.meta; fragment="record could not be removed"
       ;;
@@ -1489,7 +1493,7 @@ nested_preflight_case() {  # <plain|enclosing> <cause>
   assert_absent "$case_dir/endpoint.log" "$label: the refused close closed the endpoint"
   assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: the refused close wrote the drop record"
   case "$cause" in
-    busy-state-directory|merge-notified-directory) rmdir "$path" ;;
+    busy-state-directory|merge-notified-directory|turn-ended-directory) rmdir "$path" ;;
   esac
   rc=0
   nested_run "$case_dir" $force || rc=$?
@@ -1498,7 +1502,7 @@ nested_preflight_case() {  # <plain|enclosing> <cause>
 }
 
 test_nested_entry_preflight_refuses_before_any_mutation() {
-  local shape cause causes="busy-state-directory merge-notified-directory"
+  local shape cause causes="busy-state-directory merge-notified-directory turn-ended-directory"
   pending_close_immutable_supported "$TMP_ROOT" && causes="$causes immutable-meta immutable-return-pending forced"
   for shape in plain enclosing; do
     for cause in $causes; do
@@ -1742,29 +1746,42 @@ test_inactive_busy_state_path_does_not_refuse() {
 # still claims is never retired with the task record while that slot stays
 # claimed: here the record's copy is gone and its worktree= no longer leads to
 # the slot, and a recorded merged PR proves the copy, so nothing in this run
-# would return the slot. The teardown refuses before any mutation and keeps the
-# record, the return-pending record and the claim.
+# would return the slot. The teardown refuses and keeps the record, the
+# return-pending record and the claim, whether that record is a regular file or
+# a symbolic link to one, which does not prove the slot settled. Plain record
+# only; it checks those records and the claim, not a full snapshot.
 test_owed_return_pending_slot_is_never_retired() {
-  local case_dir rc label=owed-return-pending-slot head
-  nested_fixture "$label" plain mine landed
-  case_dir=$NESTED_CASE
-  head=$(git -C "$NESTED_COPY" rev-parse HEAD)
-  git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
-  sed -i.bak "s#^worktree=.*#worktree=$case_dir/elsewhere/gone-copy#" "$case_dir/state/task-x1.meta"
-  rm -f "$case_dir/state/task-x1.meta.bak"
-  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' "pr_head=$head" >> "$case_dir/state/task-x1.meta"
-  add_gh_pr_merged_for_head "$case_dir" "$head"
-  printf 'spawn_gen=teardown-test-task-x1\nslot=%s\n' "$NESTED_SLOT" > "$case_dir/state/task-x1.teardown-return-pending"
-  rc=0
-  nested_run "$case_dir" || rc=$?
-  expect_code 1 "$rc" "$label: a slot still owed its return must refuse: $(tail -3 "$case_dir/stderr")"
-  assert_grep "names pool slot $NESTED_SLOT, which the task still claims" "$case_dir/stderr" "$label: the refusal did not name the owed slot"
-  assert_present "$case_dir/state/task-x1.meta" "$label: the task record was retired"
-  assert_present "$case_dir/state/task-x1.teardown-return-pending" "$label: the return-pending record was retired"
-  assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim was dropped"
-  assert_absent "$case_dir/treehouse.log" "$label: the slot was returned"
-  pass "a return-pending record naming a slot the task still claims is kept with the task record when no route returns that slot"
+  local case_dir rc label head form
+  for form in regular link; do
+    label="owed-return-pending-slot-$form"
+    nested_fixture "$label" plain mine landed
+    case_dir=$NESTED_CASE
+    head=$(git -C "$NESTED_COPY" rev-parse HEAD)
+    git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
+    sed -i.bak "s#^worktree=.*#worktree=$case_dir/elsewhere/gone-copy#" "$case_dir/state/task-x1.meta"
+    rm -f "$case_dir/state/task-x1.meta.bak"
+    printf '%s\n' 'pr=https://github.com/example/repo/pull/7' "pr_head=$head" >> "$case_dir/state/task-x1.meta"
+    add_gh_pr_merged_for_head "$case_dir" "$head"
+    if [ "$form" = regular ]; then
+      printf 'spawn_gen=teardown-test-task-x1\nslot=%s\n' "$NESTED_SLOT" > "$case_dir/state/task-x1.teardown-return-pending"
+    else
+      printf 'spawn_gen=teardown-test-task-x1\nslot=%s\n' "$NESTED_SLOT" > "$case_dir/state/return-pending-target"
+      ln -s return-pending-target "$case_dir/state/task-x1.teardown-return-pending"
+    fi
+    rc=0
+    nested_run "$case_dir" || rc=$?
+    expect_code 1 "$rc" "$label: a slot still owed its return must refuse: $(tail -3 "$case_dir/stderr")"
+    assert_grep "names pool slot $NESTED_SLOT, which task task-x1 still claims" "$case_dir/stderr" "$label: the refusal did not name the owed slot"
+    [ "$form" = regular ] || assert_grep "is a symbolic link, which does not prove the slot settled" "$case_dir/stderr" "$label: the refusal did not name the linked record"
+    assert_present "$case_dir/state/task-x1.meta" "$label: the task record was retired"
+    { [ -e "$case_dir/state/task-x1.teardown-return-pending" ] || [ -L "$case_dir/state/task-x1.teardown-return-pending" ]; } \
+      || fail "$label: the return-pending record was retired"
+    assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim was dropped"
+    assert_absent "$case_dir/treehouse.log" "$label: the slot was returned"
+  done
+  pass "a return-pending record, regular or a link, naming a slot the task still claims is kept with the task record when no route returns that slot"
 }
+
 
 # The plain shape gets the prior shape's disposition for every claim state and
 # fixture: the same exit class, the same removals, the same number of slot
