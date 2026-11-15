@@ -129,25 +129,27 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
   esac
   born=''
   if pid=$(fm_launch_proof_herdr_pid "$meta"); then
-    proof=$(fm_launch_proof_herdr_verdict "$meta" "$pid")
+    judged=$(fm_launch_proof_herdr_verdict_judge "$meta" "$pid")
+    proof=${judged%%$'\t'*}
+    detail=${judged#*$'\t'}
     born=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null | awk '{$1=$1; print}') || born=''
   else
-    pid='' proof=unknown
+    pid='' proof=unknown detail=''
   fi
   identity="$target $pid $born"
   case "$proof" in
     managed) forget "$id"; continue ;;
     unknown)
-      if [ -z "$(fm_meta_get "$meta" launch_proof)" ]; then
+      if fm_launch_proof_record_legacy "$meta"; then
         forget "$id"
         continue
       fi
       notice "$id" "launch-unreadable $identity" \
-        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$meta")" && result=1
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$meta")" && result=1
       continue
       ;;
     unmanaged)
-      if [ -z "$(fm_meta_get "$meta" launch_proof)" ]; then
+      if fm_launch_proof_record_legacy "$meta"; then
         notice "$id" "legacy $identity" \
           "REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" || true
         continue
@@ -162,9 +164,9 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
       notice "$id" "unmanaged $identity" \
         "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" || true
       ;;
-    pinned-elsewhere)
-      notice "$id" "pinned-elsewhere $identity" \
-        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause pinned-elsewhere); no lifecycle action taken; $(fm_launch_proof_refusal_next pinned-elsewhere "$meta")" && result=1
+    pinned-elsewhere|contested)
+      notice "$id" "$proof $identity" \
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause "$proof" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$proof" "$meta")" && result=1
       continue
       ;;
     *) result=1 ;;

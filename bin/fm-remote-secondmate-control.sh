@@ -192,7 +192,7 @@ cmd_attribution() { # <id> <recorded-target>
   if cause=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" \
-    bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" && fm_launch_proof_herdr_refusal "$2"' \
+    FM_LAUNCH_PROOF_VERB_PATH=1 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" && fm_launch_proof_herdr_refusal "$2"' \
     _ "$SCRIPT_DIR" "$meta" 2>/dev/null); then
     printf 'attribution=proceed\n'
   else

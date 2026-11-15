@@ -2662,11 +2662,13 @@ do_relaunch() {
       alive) ;;
       *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
     esac
-    state=$(fm_launch_proof_herdr "$META")
+    judged=$(fm_launch_proof_herdr_judge "$META")
+    state=${judged%%$'\t'*}
+    detail=${judged#*$'\t'}
     case "$state" in
       managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
       unmanaged)
-        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+        if fm_launch_proof_record_legacy "$META"; then
           echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
           return 0
         fi
@@ -2677,15 +2679,15 @@ do_relaunch() {
         echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
         return 0
         ;;
-      pinned-elsewhere)
-        die "launch recovery for $ID found $(fm_launch_proof_refusal_cause pinned-elsewhere); no lifecycle action taken; $(fm_launch_proof_refusal_next pinned-elsewhere "$META")"
+      pinned-elsewhere|contested)
+        die "launch recovery for $ID found $(fm_launch_proof_refusal_cause "$state" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$state" "$META")"
         ;;
       unknown)
-        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+        if fm_launch_proof_record_legacy "$META"; then
           echo "recovery-skipped $ID launch=legacy-unproven"
           return 0
         fi
-        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown); $(fm_launch_proof_refusal_next unknown "$META"))"
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown "$detail"); $(fm_launch_proof_refusal_next unknown "$META"))"
         ;;
       *) die "invalid launch proof for $ID: $state" ;;
     esac
