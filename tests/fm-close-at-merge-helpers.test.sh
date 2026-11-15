@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015,SC2016,SC2329  # ok only prints, so not_ok never runs after a passing check; the child bash expands each case's library code; cases run by name from CASES.
 # Helper-level tests for close at merge and typed completions (Main 1851; Main 1850 limits).
 # Each case sources only bin/ libraries and calls their functions on fixture text: no case runs
 # tasks-axi, a merge, a timed or progress runner, a kill, a process group, a spawn or a

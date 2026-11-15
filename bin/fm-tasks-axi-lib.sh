@@ -225,6 +225,7 @@ fm_typed_completion_resolve() {
     record-delivery) vflags=(--receipt-file) ;;
     *) return 1 ;;
   esac
+  # shellcheck disable=SC2034  # bin/fm-tasks-axi.sh reads it.
   FM_TYPED_COMPLETION=${a[1]}
   a=("${a[@]:2}")
   for tok in ${a[@]+"${a[@]}"}; do
@@ -258,6 +259,7 @@ fm_typed_completion_resolve() {
     esac
   done
   [ "$count" -eq 1 ] && [[ "$positional" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] || return 2
+  # shellcheck disable=SC2034  # bin/fm-tasks-axi.sh reads it.
   FM_TYPED_COMPLETION_ID=$positional
   return 0
 }

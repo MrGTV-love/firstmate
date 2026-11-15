@@ -2564,7 +2564,7 @@ SH
   chmod +x "$case_dir/shim/tasks-axi"
   (PATH="$case_dir/shim:$PATH" wrapper public-followup waive pf-open --reason r --approved-by captain) > "$case_dir/out" 2> "$case_dir/err" || rc=$?
   expect_code 0 "$rc" "r7-f3: the wrapper must keep the completion's exit status"
-  [ "$(cx_state "$case_dir" pf-open)" != done ] || fail "r7-f3: the fixture finished the obligation"
+  [ "$(cx_state "$case_dir" pf-open)" != "done" ] || fail "r7-f3: the fixture finished the obligation"
   deps=$(cx_deps "$case_dir" waits-pf-open | sed 's/blocked-by://g; s/[ "]//g')
   case "$deps" in pf-open,waits-pf-open-other|waits-pf-open-other,pf-open) ;; *) fail "r7-f3: an edge changed while an unfinished item holds the id ($deps)" ;; esac
   cx "$case_dir" show waits-pf-open | grep -q 'hold_kind: future' || fail "r7-f3: the hold was lost"
@@ -2606,7 +2606,7 @@ SH
   chmod +x "$case_dir/shim/mktemp"
   (PATH="$case_dir/shim:$PATH" wrapper task public-followup waive --reason r --approved-by captain pf-guarded) > "$case_dir/o4" 2> "$case_dir/e4" || rc=$?
   [ "$rc" -ne 0 ] || fail "r7-f4: a flags-first waive with no capture file reported success"
-  [ "$(cx_state "$case_dir" pf-guarded)" != done ] || fail "r7-f4: the flags-first waive ran with no capture file"
+  [ "$(cx_state "$case_dir" pf-guarded)" != "done" ] || fail "r7-f4: the flags-first waive ran with no capture file"
   assert_match '^actionable: the waive of pf-guarded did not run, so nothing changed' "$case_dir/e4" "r7-f4: the guard refusal was not reported"
   pass "a typed completion with its flags first, with the task noun or with --flag=value clears its finished edge and keeps the rest, and the capture guard stops every form"
 }

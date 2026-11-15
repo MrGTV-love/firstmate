@@ -282,11 +282,13 @@ fm_pr_closes_values() {  # <parse-result-text> <type>
 # when any of them cannot be read, so a caller acts on all of a body's items or on none.
 fm_pr_closes_load() {  # <parse-result-file>
   local status ids members
-  FM_PR_CLOSES_STATUS= FM_PR_CLOSES_IDS= FM_PR_CLOSES_MEMBERS=
+  # shellcheck disable=SC2034  # The callers read these.
+  FM_PR_CLOSES_STATUS='' FM_PR_CLOSES_IDS='' FM_PR_CLOSES_MEMBERS=''
   status=$(fm_pr_closes_get "$1" status) || return 1
   ids=$(fm_pr_closes_get "$1" id) || return 1
   members=$(fm_pr_closes_get "$1" member) || return 1
   case "$status" in block|refused|none|failed) ;; *) return 1 ;; esac
+  # shellcheck disable=SC2034  # The callers read these.
   FM_PR_CLOSES_STATUS=$status FM_PR_CLOSES_IDS=$ids FM_PR_CLOSES_MEMBERS=$members
   return 0
 }
