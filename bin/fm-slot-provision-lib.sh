@@ -263,6 +263,15 @@ FM_SLOT_PREPARE_DETACHED=0
 
 fm_slot_skip() { # <slot> <reason-code> <detail>
   FM_SLOT_SKIP_REASON=$2
+  # A check that fails AFTER this spawn prepared the copy (a detach, an anchor ref) is a failure, never a skip: something was
+  # written to it. It names what was written and leaves the copy exactly as it is (Main 1925 F1, Main 1939 N-2).
+  if [ "${FM_SLOT_PREPARED:-0}" = 1 ]; then
+    local written=
+    [ -z "${FM_SLOT_EXPECT_REFS:-}" ] || written="the anchor ${FM_SLOT_EXPECT_REFS%%=*} was created; "
+    [ "${FM_SLOT_PREPARE_DETACHED:-0}" != 1 ] || written="${written}the copy was detached from its branch; "
+    echo "error: pooled copy '$1' failed a check ($2: $3) after this spawn had prepared it (${written}it is $(fm_slot_where "$1")); nothing is switched back, the copy is left exactly as it is, and no worker is admitted" >&2
+    return 1
+  fi
   echo "skip: pooled copy '$1' was not moved ($2): $3" >&2
   if fm_slot_skip_is_known "$2"; then return "$FM_SLOT_SKIP_RC"; fi
   return "$FM_SLOT_REFUSE_RC"
@@ -791,6 +800,9 @@ fm_slot_proof_drop() {
 # (an origin-less copy): only the clean tree and the holder rule apply.
 fm_slot_prove_idle() {
   local slot=$1 target=$2 project=${3:-} no_ancestry=${4:-} snap out head status settings tracked colliding reason=unknown_git_read
+  # A proof is of one copy. The reason of an earlier copy's skip must not survive into a record written for this one
+  # (Main 1939 N-1); a skip in this proof sets it again.
+  FM_SLOT_SKIP_REASON=
   # The proof never clears what the preparation recorded (FM_SLOT_PREPARED, FM_SLOT_PREPARE_DETACHED): a copy is re-proved
   # after it was prepared on the relaunch and freshen routes, and a refusal after that is still a failure. The state is
   # cleared where a new copy is acquired (spawn_skip_copy) and starts at zero for the process (Main 1925 F1).
