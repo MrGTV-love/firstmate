@@ -2216,6 +2216,20 @@ test_claude_restore_has_no_adoption_route() {
   pass "claude restore: no adoption route; every consumer refuses with the named reason and never names adopt"
 }
 
+# The lock-owning main Firstmate's adopt of a claude task is refused as not omp,
+# exactly as on base. The lock-owner check needs /bin/ps, so a sandbox that
+# denies it stops earlier; this case needs a native run.
+test_claude_restore_adopt_refuses_as_not_omp() {
+  local dir id out rc=0
+  prepare_claude_restore adopt-not-omp
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopt authorized a restored claude: $out"
+  assert_contains "$out" "adopt needs a local Herdr omp task; no session record was changed" "adopt refuses a claude task as not omp"
+  assert_absent "$dir/home/state/$id.claude-adoption.json" "adopt writes no claude record"
+  pass "claude restore: the owner's adopt of a claude task is refused as not omp"
+}
+
 # Sets CLAUDE_REFUSAL_OUT. It is called without command substitution: a fail inside
 # $(...) would exit only the subshell, and the guard assertions here must be able to
 # fail the test on their own.
@@ -2570,6 +2584,7 @@ test_restart_refuses_an_unproven_agent_state() {
 control_relaunch_test_cases=(
 test_omp_adoption
 test_claude_restore_has_no_adoption_route
+test_claude_restore_adopt_refuses_as_not_omp
 test_claude_restore_restart_decides_attribution_before_its_first_effect
 test_claude_restore_stopped_by_hand_relaunches_with_a_new_pin
 test_claude_restart_rechecks_attribution_before_its_fallback_nudge

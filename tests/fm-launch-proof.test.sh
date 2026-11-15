@@ -360,15 +360,39 @@ test_launch_proof_claude_verdict_and_refusal() (
   # Every environment read is counted per process.
   fm_remote_herdr_process_env() {
     printf x >> "$T/reads-$1"
-    [ "$1" != 56557 ] || { cat "$T/env-56557"; return; }
-    [ -f "$T/env-unreadable" ] && return 1; printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
+    [ "$1" != 56557 ] || { [ -f "$T/env-56557" ] && [ -s "$T/env-56557" ] || return 1; cat "$T/env-56557"; return; }
+    [ -f "$T/env-unreadable" ] && return 1
+    [ ! -f "$T/env-bare" ] || { printf 'ONLY=1\n'; return; }
+    printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
+  # The working directory is never proof: any cwd read is recorded.
+  # shellcheck disable=SC2329 # a stub the verdict must never call
+  lsof() { : > "$T/lsof-called"; return 1; }
   fm_backend_herdr_cli() {
     case "$*" in
-      'lab pane get w1:p2') printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
+      'lab pane get w1:p2') [ ! -f "$T/pane-missing" ] || return 1; printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
       'lab pane process-info --pane w1:p2')
-        printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":53733,"foreground_processes":[{"pid":53733,"name":"2.1.316","argv0":"claude"}]}}}' ;;
+        [ ! -f "$T/pane-missing" ] || return 1
+        if [ -f "$T/fg-none" ]; then
+          printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_processes":[]}}}'
+        elif [ -f "$T/fg-two" ]; then
+          printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_processes":[{"pid":53733,"name":"2.1.316","argv0":"claude"},{"pid":53740,"name":"2.1.316","argv0":"claude"}]}}}'
+        elif [ -f "$T/fg-shell" ]; then
+          printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":53733,"foreground_processes":[{"pid":53733,"name":"zsh","argv0":"-zsh"}]}}}'
+        else
+          printf '%s' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":53733,"foreground_processes":[{"pid":53733,"name":"2.1.316","argv0":"claude"}]}}}'
+        fi ;;
       *) return 1 ;;
     esac
+  }
+  row() { [ -z "${FM_TEST_ROWS:-}" ] || printf 'ROW %-90s | %s\n' "$1" "$2"; }
+  # refused_row <expected-verdict> <row>: the verdict, a refusal, and its ROW line.
+  refused_row() {
+    local got cause
+    got=$(fm_launch_proof_herdr "$META")
+    assert_equals "$1" "$got" "$2"
+    cause=$(fm_launch_proof_herdr_refusal "$META") && fail "$2: authorized"
+    assert_not_contains "$cause" 'adopt' "$2: never names adopt"
+    row "$2" "verdict $got; refused: ${cause%%;*}"
   }
   meta_for() { # <harness> <launch_proof> [<kind>]
     printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=%s\nkind=%s\nspawn_gen=%s\nworktree=%s\nhome=%s\n' \
@@ -448,6 +472,30 @@ test_launch_proof_claude_verdict_and_refusal() (
   meta_for claude env-v9
   assert_equals unknown "$(fm_launch_proof_herdr "$META")" 'an unknown launch_proof is unknown'
   fm_launch_proof_herdr_authorizes "$META" && fail 'an unknown launch_proof authorized lifecycle input'
+
+  # E3 rows, as amended by Main 1637: each refuses; nothing but the token is proof.
+  meta_for claude env-v1
+  : > "$T/pane-missing"; refused_row unknown '(a) the recorded pane does not exist'; rm -f "$T/pane-missing"
+  : > "$T/fg-none"; refused_row unknown '(b) no foreground process'; rm -f "$T/fg-none"
+  : > "$T/fg-two"; refused_row unknown '(b) two foreground processes and no group'; rm -f "$T/fg-two"
+  : > "$T/fg-shell"; refused_row unknown '(c) the foreground is a shell, not the harness'; rm -f "$T/fg-shell"
+  rm -f "$T/lsof-called"
+  refused_row unmanaged '(d) the working directory is never read: an unpinned restore refuses whatever its cwd'
+  [ ! -e "$T/lsof-called" ] || fail '(d) the verdict read a working directory'
+  printf 'window=lab:w1:p2\nharness=claude\nhome=%s\n' "$LANE" > "$STATE/other.meta"
+  refused_row unmanaged '(f) another record claims the same pane: still refused, never adopted'
+  rm -f "$STATE/other.meta"
+  : > "$T/env-bare"; refused_row unknown '(g) the environment carries neither PATH nor HOME'; rm -f "$T/env-bare"
+  printf 'claude_session_id=5a3eec19-de12-4999-bed2-bbd561089154\n' >> "$META"
+  refused_row unmanaged '(h) T1: a recorded claude_session_id equal to the live id is no proof'
+  meta_for claude env-v1
+  : > "$T/env-56557"
+  refused_row unmanaged 'Main 022: an unreadable live group member of an unpinned agent still refuses'
+  printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
+  verdict_once managed '(k) with a matching token the managed path keeps its base outcome, members unread'
+  [ ! -e "$T/reads-56557" ] || fail '(k) the managed path read a group member'
+  row '(k) a matching token, with an unreadable member present' "verdict $verdict"
+  rm -f "$T/env-56557" "$T/env-extra"
 
   # (j) legacy and other harnesses keep their pre-proof rules.
   meta_for claude ''

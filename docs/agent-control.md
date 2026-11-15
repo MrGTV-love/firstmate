@@ -242,7 +242,8 @@ Without the matching pin, an omp process is unmanaged, including Herdr-native `o
 Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for current-session proof on their own.
 For a launch-pinned omp process, an in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
 An adopted process has no pin, so this switch protection does not cover it; see the [residual risk](#repairing-a-restored-omp-session-record).
-A versioned claude launch without a pin is also unmanaged, and nothing can authorize it (see [A restored claude agent](#a-restored-claude-agent)); one whose attributed process or process group carries a pin for another generation is `pinned-elsewhere`, and one whose record has no `spawn_gen` is unknown. A legacy claude record and every other recorded harness remain unknown with missing or mismatched pins.
+A versioned claude launch without a pin is also unmanaged, and nothing can authorize it (see [A restored claude agent](#a-restored-claude-agent)); one whose attributed process or process group carries a pin for another generation is `pinned-elsewhere`, and one whose record has no `spawn_gen` is unknown.
+A legacy claude record and every other recorded harness remain unknown with missing or mismatched pins.
 Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
 No unmanaged, `pinned-elsewhere`, or unknown proof authorizes lifecycle action for a record with `launch_proof`.
 Every Herdr replacement must have matching managed-launch proof, including current-session proof for omp, before transaction completion.
