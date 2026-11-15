@@ -220,6 +220,7 @@ The next action for an `unmanaged` claude is to stop it by hand in its pane and 
 A process pinned to another generation belongs to another launch, and Main inspects the pane and decides the lane by hand.
 The secondmate restart decides attribution before its pending-reply record, persistence request, or fallback nudge, and decides it again on the mate's own record right before a fallback nudge, since the persistence wait can last minutes.
 Each decision reads the mate's record once: its fields, its endpoint validation (on a private copy of those bytes) and its launch proof, which is bound to the endpoint the route keeps, all rest on those bytes, so a decision never keeps one endpoint while proving another.
+The capability check reads the record once as well, and the capability decision, the first attribution decision and the check-only decision must have read the same bytes, so the placement the relaunch branches on is the route the attribution compared.
 It reads the backend for that local decision from the mate's own record, so an early capability refusal still asks the verdict owner before a fallback nudge.
 For a mate whose record names a `remote_host`, the restart reads the same decision on its host through the read-only `fm-remote-secondmate-control.sh attribution` verb, whatever its capability verdict.
 The decision is bound to the route the parent recorded: the registry route for the id must name the recorded `remote_host`, `remote_root` and `home`, the record must name a `remote_target`, and the host refuses unless its own endpoint target is exactly that recorded target.
@@ -230,6 +231,8 @@ The relaunch reaches `bin/fm-control.sh` with `FM_CONTROL_EXPECTED_ENDPOINT` set
 Right before the request or nudge is written, the send re-checks the agent now at the compared endpoint: the host `send` verb reads its attribution decision again, and `bin/fm-send.sh` re-runs the restart's own decision for a local mate; a replaced agent refuses, and the pending-reply expectation is then discarded with no record written (Main 1860).
 A send that refuses or fails is the mate's final outcome for that pass: it is reported unreached and sent nothing more, not even a fallback nudge, and a pending-reply expectation that cannot be discarded is reported with its path.
 After the write, the doorbell rings only while the record bytes and the attribution decision the send was checked on still hold; otherwise the ring is withheld and reported, and the steer stays in the inbox for the next agent that reads it.
+The host `send` verb reads its record's digest once, and its check before the write and its check before the doorbell must each rest on record bytes with that digest.
+The watcher's own re-ring ladder for an unhandled inbox record is unchanged and does not consult the launch proof.
 Unset, those expectations leave these scripts unchanged.
 It goes on only on the exact bytes `attribution=proceed` plus one newline with a zero transport status.
 A `remote_backend` other than herdr (omitted means herdr), a refusal, no answer, extra output, or a host whose code lacks the verb leaves the mate unreached with nothing sent.
@@ -245,7 +248,7 @@ A record published before launch proofs existed (a readable record with no `laun
 A record that is missing or unreadable, or holds an empty `launch_proof` value, two or more `launch_proof` lines, or any value that is not a known proof (the literal `legacy` included), is no legacy record and refuses.
 One decision reads the record once, and every field it uses comes from those bytes; a proof that reads the record again compares it byte for byte and refuses on a change.
 Every caller of the authorization owner names the endpoint it will act on, and the owner refuses when no endpoint is named or when the record it read names another; a recovery inspection of another endpoint is `unknown`.
-The omp adoption proof takes its window and generation from the decision's bytes and refuses a task record or session record whose bytes differ from the ones the caller read, and the claim inventory follows secondmate homes from the same read that judged each peer record.
+The omp adoption proof takes its window and generation from the decision's bytes and refuses a task record or session record whose bytes differ from the ones the caller read (every caller passes both digests), and the claim inventory follows secondmate homes from the same read that judged each peer record.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.
 Every launch crosses an `env -i` boundary; without `config/launch-env-allowlist` a clean instance of the destination pane's own shell runs it, and an enabled allowlist still selects the POSIX-sh boundary.
