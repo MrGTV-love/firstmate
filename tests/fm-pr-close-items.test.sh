@@ -2014,6 +2014,36 @@ test_r4_the_top_level_reader() {
   pass "the reader refuses a block below opener text, accepts one above it, ignores tag-like words, and keeps malformed lines in the prose"
 }
 
+# A body as large as a PR body allows (and larger) must be read whole with no write error. Under
+# bash 3.2 a builtin printf that is blocked on a full pipe fails with "Interrupted system call" when
+# a child exits; the reader once printed every line from bash loops and hit that on large bodies
+# (logs/main044/eintr). Each reader call here runs ten times on a 300 KB body and a 60 KB body.
+test_r4_a_large_body_is_read_with_no_write_error() {
+  local body n=0 size fn out want i
+  for size in 300000 60000; do
+    body=$TMP_ROOT/r4-large-$size.md
+    { block 'Closes-backlog-item: large-a'
+      awk -v size="$size" 'BEGIN { for (i = 0; t < size; i++) { l = sprintf("Closes-backlog-item: out-%06d\nCloses: legacy-%06d\nplain prose line %06d with words", i, i, i); print l; t += length(l) + 1 } }'
+    } > "$body"
+    for fn in fm_pr_closes_legacy_ids fm_pr_closes_outside fm_pr_closes_ids; do
+      case "$fn" in
+        fm_pr_closes_legacy_ids) want=$(grep -c '^Closes: ' "$body") ;;
+        fm_pr_closes_outside) want=$(grep -c '^Closes-backlog-item: out-' "$body") ;;
+        fm_pr_closes_ids) want=1 ;;
+      esac
+      for i in 1 2 3 4 5 6 7 8 9 10; do
+        out=$(lib_call "$fn" "$body" 2>"$TMP_ROOT/r4-large.err" | wc -l | tr -d ' ')
+        [ "$out" = "$want" ] || fail "r4-large: $fn on a $size-byte body printed $out lines, not $want"
+        if grep -q 'write error' "$TMP_ROOT/r4-large.err"; then
+          fail "r4-large: $fn on a $size-byte body printed a write error: $(head -1 "$TMP_ROOT/r4-large.err")"
+        fi
+        n=$((n + 1))
+      done
+    done
+  done
+  pass "the reader reads a 300 KB and a 60 KB body whole, $n calls, with no write error"
+}
+
 test_r3_the_closes_block_reader() {
   local body=$TMP_ROOT/r3-reader.md out
   {
@@ -2125,6 +2155,7 @@ test_r4_f3_a_malformed_line_outside_the_block_reports_each_id_and_link
 test_r4_a_commit_message_block_closes_nothing
 test_r4_the_ship_brief_block_closes_a_train
 test_r4_the_top_level_reader
+test_r4_a_large_body_is_read_with_no_write_error
 test_r3_the_closes_block_reader
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
