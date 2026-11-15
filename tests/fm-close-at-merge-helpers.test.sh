@@ -190,6 +190,24 @@ typed_branch() {  # <probe: done|missing|unreadable> <replay: ok|cut> [args...]
     eval "$branch"' _ "$ROOT" "$probe" "$replay" "$@"
 }
 
+# The installed tasks-axi package, found by this test itself (not by the code under test), from
+# the real path of each tasks-axi on PATH.
+test_tasks_axi_package() {
+  local bin real dir
+  for bin in $(type -ap tasks-axi); do
+    real=$bin
+    while [ -L "$real" ]; do
+      case "$(readlink "$real")" in /*) real=$(readlink "$real") ;; *) real=${real%/*}/$(readlink "$real") ;; esac
+    done
+    dir=$(cd "${real%/*}/../.." 2>/dev/null && pwd -P) || continue
+    [ -f "$dir/dist/src/context.js" ] && grep -q '"name": *"tasks-axi"' "$dir/package.json" 2>/dev/null || continue
+    printf '%s\n' "$dir"
+    return 0
+  done
+  return 1
+}
+TASKS_AXI_PKG=$(test_tasks_axi_package) || TASKS_AXI_PKG=''
+
 # A real markdown store under $TMP, built and read with the installed tasks-axi library (no
 # tasks-axi command, no live backlog). HOME and the working directory are under $TMP, the
 # environment overrides are unset, and every store path is checked to be under its root.
@@ -213,7 +231,7 @@ store_node() {  # <root> <mode> [args...]: setup | state <id> | edges <id> | com
     else if (mode === "edges") { console.log(await edges(id)); }
     else if (mode === "complete") { await store.transition(id, "done"); await store.prune({ state: "done", keep: 0 }); }
     else if (mode === "recreate") { await store.create({ id, title: "new unfinished work under the same id", kind: "docs" }); }
-  ' "$(bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; fm_tasks_axi_package_dir' _ "$ROOT")" "$root" "$@")
+  ' "$TASKS_AXI_PKG" "$root" "$@")
 }
 new_store() {  # <name>: a fresh store root with the fixture items
   local root=$TMP/$1
@@ -232,7 +250,7 @@ new_store() {  # <name>: a fresh store root with the fixture items
 typed_branch_store() {  # <root> <writer: none|recreate> <lock: free|held>
   bash -c 'branch=$(awk "/^pf_form=0\$/ {copy=1} /^exec tasks-axi / {exit} copy {print}" "$1/bin/fm-tasks-axi.sh")
     . "$1/bin/fm-backlog-transition-lib.sh"; . "$1/bin/fm-tasks-axi-lib.sh"; set -u
-    ROOT=$1 STORE=$2 WRITER=$3 LOCK=$4 HELPERS=$5 TMP=$6/..
+    ROOT=$1 STORE=$2 WRITER=$3 LOCK=$4 HELPERS=$5 TMP=$6/.. TASKS_AXI_PKG=$7
     export HOME=$6; unset TASKS_AXI_FILE TASKS_AXI_BACKEND FM_TASKS_AXI_TIMEOUT
     eval "$HELPERS"
     ARGS=(public-followup waive pf-x --reason r --approved-by captain) DATA=$STORE/data
@@ -245,7 +263,7 @@ typed_branch_store() {  # <root> <writer: none|recreate> <lock: free|held>
     }
     fm_backlog_row_probe() { FM_BACKLOG_ROW_RESULT=error FM_BACKLOG_ROW_ERROR="simulated read failure"; return 1; }
     fm_backlog_row_states() { builtin printf "other:queued\nwaits-pf-x:queued\nheld-pf-x:queued\n"; }
-    cd "$STORE" && eval "$branch"' _ "$ROOT" "$1" "$2" "$3" "$(declare -f store_node)" "$TMP/home" 2>&1
+    cd "$STORE" && eval "$branch"' _ "$ROOT" "$1" "$2" "$3" "$(declare -f store_node)" "$TMP/home" "$TASKS_AXI_PKG" 2>&1
 }
 
 # Main 1882 and 1873: the clear is decided and written under tasks-axi's own store lock. An
@@ -254,7 +272,7 @@ typed_branch_store() {  # <root> <writer: none|recreate> <lock: free|held>
 # hold; a lock held by another writer changes nothing and is reported.
 test_locked_clear_the_store_decides_under_its_lock() {
   local root out
-  command -v node >/dev/null 2>&1 || { ok "skipped: node is not installed"; return 0; }
+  command -v node >/dev/null 2>&1 && [ -n "$TASKS_AXI_PKG" ] || { ok "skipped: node or the tasks-axi package is not installed"; return 0; }
   root=$(new_store lc-control) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
   out=$(typed_branch_store "$root" none free)
   check "locked clear control: an archived completion clears the finished edge in the same run" "- - | other future" \
@@ -277,10 +295,10 @@ test_locked_clear_the_store_decides_under_its_lock() {
 # the edge removal.
 test_locked_clear_holds_the_store_lock_writers_take() {
   local root pkg out
-  command -v node >/dev/null 2>&1 || { ok "skipped: node is not installed"; return 0; }
+  command -v node >/dev/null 2>&1 && [ -n "$TASKS_AXI_PKG" ] || { ok "skipped: node or the tasks-axi package is not installed"; return 0; }
   [ -f "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" ] || { not_ok "locked clear: bin/fm-tasks-axi-locked-unblock.mjs is missing"; return 0; }
   root=$(new_store lc-inside) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
-  pkg=$(bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; fm_tasks_axi_package_dir' _ "$ROOT")
+  pkg=$TASKS_AXI_PKG
   out=$(cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node --input-type=module -e '
     import { pathToFileURL } from "node:url";
     const [helper, pkg, root] = process.argv.slice(1);
