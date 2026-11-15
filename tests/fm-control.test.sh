@@ -978,6 +978,27 @@ make_herdr_claude_stub() {  # <case-dir>
   fm_test_track_process "$1/fake/probe-process" "time.sleep(600)"
   printf '%s' "$probe_pid" > "$1/fake/probe-pid"
   printf 'launch_proof=env-v1\nspawn_gen=%s\n' "$gen" >> "$1/home/state/t1.meta"
+  # The claude refusal checks (Main 1709 ruling 1) read the probe's process group
+  # and kernel working directory. The probe shares the test runner's group, so
+  # these synthetic readers answer for the probe alone: it leads its own group
+  # and runs in the task's recorded worktree. Every other query is the real one.
+  cat > "$fb/ps" <<'SH'
+#!/usr/bin/env bash
+probe=$(cat "$FM_FAKE_DIR/probe-pid")
+[ "$*" != '-axo pid=,ppid=,pgid=' ] || { printf '%s 1 %s\n' "$probe" "$probe"; exit 0; }
+exec /bin/ps "$@"
+SH
+  cat > "$fb/lsof" <<'SH'
+#!/usr/bin/env bash
+probe=$(cat "$FM_FAKE_DIR/probe-pid")
+case " $* " in
+  *" -p $probe "*"-d cwd "*)
+    printf 'p%s\0\nfcwd\0n%s\0\n' "$probe" "$(sed -n 's/^worktree=//p' "$FM_HOME/state/t1.meta" | tail -1)"
+    exit 0 ;;
+esac
+exec /usr/sbin/lsof "$@"
+SH
+  chmod +x "$fb/ps" "$fb/lsof"
   cat > "$fb/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u

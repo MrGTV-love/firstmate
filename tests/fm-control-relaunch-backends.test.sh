@@ -568,7 +568,7 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
           || fail "live lifecycle ownership regression requires jq"
         dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
         prepare_herdr_recovery "$dir" "$id" "$kind"
-        [ "$proof" != legacy ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        [ "$proof" != legacy ] || drop_launch_proof "$dir/home/state/$id.meta"
         case "$scenario" in
           missing-registration) : > "$dir/fake/recovery-registration-missing" ;;
           different-cwd|same-cwd-personal)
@@ -650,7 +650,7 @@ test_legacy_herdr_record_keeps_prior_lifecycle_rule() {
       || fail "legacy lifecycle regression requires jq"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
     prepare_herdr_recovery "$dir" "$id" ship
-    printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+    drop_launch_proof "$dir/home/state/$id.meta"
     gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" \
       --state idle --source omp-ext --event agent-start) || fail "could not arm legacy lifecycle fixture"
     printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
@@ -724,7 +724,7 @@ test_live_herdr_lifecycle_accepts_managed_launches() {
           || fail "positive lifecycle ownership regression requires jq"
         dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
         prepare_herdr_recovery "$dir" "$id" ship
-        [ "$proof" != legacy ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        [ "$proof" != legacy ] || drop_launch_proof "$dir/home/state/$id.meta"
         if [ "$launch" = managed ]; then
           printf old > "$dir/fake/recovery-spawn-gen"
           printf node > "$dir/fake/recovery-harness"
@@ -826,7 +826,7 @@ test_reboot_recovery_inspects_without_native_attribution() {
           || fail "native identity regression requires jq"
         dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
         prepare_herdr_recovery "$dir" "$id" ship
-        [ "$proof" != legacy ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        [ "$proof" != legacy ] || drop_launch_proof "$dir/home/state/$id.meta"
         : > "$dir/fake/recovery-pending"
         gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") || fail "could not arm native identity fixture"
         printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
@@ -1063,7 +1063,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
   local preserved=()
   for kind in ship scout secondmate; do
     for mode in direct sweep; do
-      for pin in missing mismatched unreadable ambiguous-record; do
+      for pin in missing mismatched unreadable ambiguous; do
         id="reboot-claude-$kind-$mode-$pin"
         recovery_case_or_skip "$id" "$id" || return 0
         id=$HERDR_CASE_ID
@@ -1075,7 +1075,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
         [ "$pin" != unreadable ] || : > "$dir/fake/recovery-env-unreadable"
         # Main 1709 ruling 2: a versioned proof followed by an empty duplicate is
         # no record at all, never the legacy shortcut.
-        [ "$pin" != ambiguous-record ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        [ "$pin" != ambiguous ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
         gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") || fail "could not arm retained non-omp fixture"
         printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
         printf 'working: preserve the retained launch\n' > "$dir/home/state/$id.status"
@@ -1093,7 +1093,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           # environment that cannot be read is "unreadable". No input and no mutation are
           # still asserted below.
           # A pin for another generation is not an unpinned restore: it names its own cause.
-          if [ "$pin" = ambiguous-record ]; then
+          if [ "$pin" = ambiguous ]; then
             assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
             assert_contains "$out" "its launch record is not one readable record" "$kind/$pin direct refusal must name the record"
           elif [ "$pin" = unreadable ]; then
@@ -1112,7 +1112,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           CONTROL="$ROOT/bin/fm-reboot-recover.sh"
           out=$(run_control "$dir" recover) || rc=$?
           CONTROL="$ROOT/bin/fm-control.sh"
-          if [ "$pin" = ambiguous-record ]; then
+          if [ "$pin" = ambiguous ]; then
             assert_contains "$out" "REBOOT_RECOVERY: $id: its launch record is not one readable record" \
               "$kind/$pin sweep refusal must name the record"
           elif [ "$pin" = unreadable ]; then

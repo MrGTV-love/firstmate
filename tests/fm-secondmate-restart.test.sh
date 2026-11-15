@@ -804,6 +804,9 @@ test_remote_role_restart_resolves_the_pair_selected_after_persist() {
     mkdir -p "$dir/sm2-home/config" "$dir/sm2-home/state" "$dir/codex"
     printf -- '- sm2 - remote domain (host: remote-mac; root: %s; home: %s; scope: things; projects: p; added 2026-09-03)\n' \
       "$ROOT" "$dir/sm2-home" > "$dir/home/data/secondmates.md"
+    # The record names the same route the registry row does (Main 1713 (7)).
+    sed -e "s|^remote_root=.*|remote_root=$ROOT|" -e "s|^home=.*|home=$dir/sm2-home|" \
+      "$dir/home/state/sm2.meta" > "$dir/sm2.meta.next" && mv "$dir/sm2.meta.next" "$dir/home/state/sm2.meta"
     printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"before-model","stand_in":"before-stand-in"}}},"retired":[]}' \
       > "$dir/home/config/model-index.json"
     printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"after-model","stand_in":"after-stand-in"}}},"retired":[]}' \

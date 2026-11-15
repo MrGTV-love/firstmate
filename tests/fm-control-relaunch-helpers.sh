@@ -58,6 +58,12 @@ relaunch_cleanup() {
 # The same lifecycle-modelling tmux stub as tests/fm-control.test.sh: the
 # harness's exit command stops the agent, and a launch-brief literal starts the
 # harness named in `becomes`.
+# A legacy record (published before launch proofs existed) has no launch_proof
+# line at all; an empty value is no record (Main 1709 ruling 2).
+drop_launch_proof() { # <meta>
+  grep -v '^launch_proof=' "$1" > "$1.next" && mv "$1.next" "$1"
+}
+
 make_process_table_stub() { # <case-dir>
   local real_python
   real_python=$(command -v python3)
@@ -89,6 +95,18 @@ if [ -f "$D/claude-restore" ]; then
       '-p 2000000000 -o lstart=') printf 'Mon Oct 27 16:58:42 2026\n'; exit 0 ;;
     esac
   fi
+fi
+# The process-group table a claude refusal check reads: each fake agent leads
+# its own group, then whatever the real table lists (Main 1709 ruling 1).
+if [ "$*" = '-axo pid=,ppid=,pgid=' ]; then
+  [ ! -f "$D/recovery-pid" ] || printf '%s 1 %s\n' "$(cat "$D/recovery-pid")" "$(cat "$D/recovery-pid")"
+  [ -f "$D/recovery-pid" ] || [ ! -f "$D/recovery-case-id" ] || printf '2000000000 1 2000000000\n'
+  for env_file in "$D"/herdr-managed-env-*; do
+    [ -f "$env_file" ] || continue
+    printf '%s 1 %s\n' "${env_file##*-}" "${env_file##*-}"
+  done
+  /bin/ps -axo pid=,ppid=,pgid= 2>/dev/null
+  exit 0
 fi
 # The one process a case stages as holding the task's worktree.
 if [ -f "$D/holder-pid" ] && [ "${1:-}" = -p ] && [ "${2:-}" = "$(cat "$D/holder-pid")" ]; then
@@ -160,7 +178,8 @@ if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
 fi
 # The kernel cwd a claude refusal check reads for a fake agent (Main 1709
 # ruling 1): agent-cwd-<pid> when a case stages one, else the recovery case's
-# recorded worktree, else the directory the fake Herdr opened the agent's pane in.
+# recorded worktree, else the directory the fake Herdr opened the agent's pane
+# in, else the case's staged fake/cwd.
 if [ "${*: -1}" = pn0 ]; then
   agent=
   record=
@@ -181,6 +200,8 @@ if [ "${*: -1}" = pn0 ]; then
     for f in "$D"/herdr-cwd-*; do
       [ -f "$f" ] && [ "${f##*[!0-9]}" = "$((agent - 2100000000))" ] && cwd=$(cat "$f")
     done
+    # A case without a pane directory stages the agent's directory as fake/cwd.
+    [ -n "$cwd" ] || [ ! -f "$D/cwd" ] || cwd=$(cat "$D/cwd")
   fi
   [ -n "$cwd" ] || exit 1
   printf 'p%s\0\nfcwd\0n%s\0\n' "$agent" "$cwd"
