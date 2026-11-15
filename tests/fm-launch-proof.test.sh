@@ -180,15 +180,28 @@ test_launch_proof_recorded_native_identity() {
     esac
   }
   PARENTS=
+  # The process-group table the refusal checks read (pid ppid pgid rows); by
+  # default the probe alone. Its parent links answer the live ppid reads, and
+  # the synthetic helpers it names have synthetic readable environments, so no
+  # real process other than the probe is read (Main 1807 (3)).
+  GROUP_TABLE=
   ps() {
     if [ "$*" = '-axo pid=,ppid=' ] && [ -n "$PARENTS" ]; then
       printf '%s\n' "$PARENTS"
     elif [ "$*" = '-axo pid=,ppid=,pgid=' ]; then
-      # A claude refusal check reads the agent's process group: the probe alone.
-      printf '%s 1 %s\n' "$PID" "$PID"
+      if [ -n "$GROUP_TABLE" ]; then printf '%s\n' "$GROUP_TABLE"; else printf '%s 1 %s\n' "$PID" "$PID"; fi
+    elif [ "${1:-}" = -p ] && [ "${3:-} ${4:-}" = '-o ppid=' ]; then
+      awk -v p="$2" '$1 == p {print $2}' <<< "${GROUP_TABLE:-$PID 1 $PID}"
     else
       command ps "$@"
     fi
+  }
+  eval "$(declare -f fm_remote_herdr_process_env | sed '1s/fm_remote_herdr_process_env/probe_process_env/')"
+  fm_remote_herdr_process_env() {
+    case "$1" in
+      2|999) printf 'PATH=/synthetic\nHOME=/synthetic\n' ;;
+      *) probe_process_env "$1" ;;
+    esac
   }
   # The probe's kernel working directory, as the claude refusal check reads it.
   lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$PID" "$WORKTREE"; }
@@ -229,14 +242,20 @@ test_launch_proof_recorded_native_identity() {
     .result.process_info.foreground_process_group_id = $pid
     | .result.process_info.foreground_processes =
       [{argv:["helper"],pid:2}] + .result.process_info.foreground_processes')
-  assert_proof managed 'kernel pin must support interpreter-based agents with foreground helpers'
+  # Main 1807 (3): the helper Herdr listed must be in the one group table the
+  # checks read; a later table that lacks it leaves it unjudged, so it refuses.
+  assert_proof unknown 'a listed foreground helper the later group table lacks is not judged, so it refuses'
+  GROUP_TABLE=$(printf '%s 1 %s\n2 %s %s\n' "$PID" "$PID" "$PID" "$PID")
+  assert_proof managed 'kernel pin must support interpreter-based agents with foreground helpers the group table lists'
   INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_process_group_id = 999
     | .result.process_info.foreground_processes += [{pid:999,name:"bash",argv0:"sh",argv:["sh"]}]')
   PARENTS=$(printf '%s 999\n999 1\n2 %s\n' "$PID" "$PID")
+  GROUP_TABLE=$(printf '999 1 999\n%s 999 999\n2 %s 999\n' "$PID" "$PID")
   assert_proof managed 'a launcher shell must not hide the pinned primary agent'
   INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_process_group_id = 2')
   assert_proof unknown 'a marked child must not authenticate an unreadable foreground leader'
   PARENTS=
+  GROUP_TABLE=
   process '["omp","--resume=recorded"]' 2000000000
   assert_proof unknown 'pin evidence from another live PID must never authenticate the foreground process'
   stop_probe
@@ -560,7 +579,9 @@ test_launch_proof_claude_refusal_checks() (
         [ ! -f "$T/w/ps-fail" ] || return 1 ;;
       '-axo pid=,ppid=,pgid=')
         [ ! -f "$T/w/pgid-fail" ] || { head -1 "$T/w/table"; return 1; }
-        if [ -f "$T/w/no-agent" ]; then grep -v '^53539 ' "$T/w/table"; else cat "$T/w/table"; fi ;;
+        if [ -f "$T/w/no-agent" ]; then grep -v '^53539 ' "$T/w/table"
+        elif [ -f "$T/w/pg-drop" ]; then grep -v "^$(cat "$T/w/pg-drop") " "$T/w/table"
+        else cat "$T/w/table"; fi ;;
       '-p '*' -o ppid=')
         local p=$2
         if [ -f "$T/w/live-ppid-$p" ]; then cat "$T/w/live-ppid-$p"; else awk -v p="$p" '$1 == p {print $2}' "$T/w/table"; fi ;;
@@ -581,6 +602,8 @@ test_launch_proof_claude_refusal_checks() (
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane process-info --pane w1:p2')
+        # A record replaced while the decision runs (Main 1807 (2)).
+        if [ -f "$T/w/rewrite" ]; then cp "$T/w/rewrite" "$META"; rm -f "$T/w/rewrite"; fi
         jq -nc --argjson fg "$(cat "$T/w/fg")" --argjson group "$(cat "$T/w/group")" \
           '{result:{type:"pane_process_info",process_info:{pane_id:"w1:p2",foreground_process_group_id:$group,foreground_processes:$fg}}}' ;;
       *) return 1 ;;
@@ -637,6 +660,24 @@ test_launch_proof_claude_refusal_checks() (
   judged unknown 'a process-group table that is partial or fails' 'process table could not be read'
   world; : > "$T/w/no-agent"
   judged unknown 'a process-group table that does not list the attributed agent' 'does not list the attributed agent'
+
+  # Main 1807 (3): a process Herdr listed must be in the one group table the
+  # checks read; the earlier parent table still lists it, the group table not.
+  world; printf '56557' > "$T/w/pg-drop"
+  judged unknown 'a listed foreground process missing from the later group table' 'is missing from the process-group table'
+
+  # Main 1807 (2): the record is read once; a replacement while the decision
+  # runs (here, to a record with no launch_proof line) does not change it.
+  # The replacement happens inside the one authorization decision.
+  world; printf '%s' "$T/elsewhere" > "$T/w/cwd"
+  grep -v '^launch_proof=' "$META" > "$T/w/rewrite"
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a record replaced by a legacy one during the decision was authorized'
+  assert_contains "$out" 'working directory is not this task' 'the first bytes decide: the versioned checks refuse'
+  row 'a versioned record replaced by a legacy one during the decision' "refused: ${out%%;*}"
+  world; printf '%s' "$T/elsewhere" > "$T/w/cwd"
+  fm_launch_proof_herdr_authorizes "$META" && fail 'control: a stable versioned record with a foreign cwd was authorized'
+  world; grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"; printf '%s' "$T/elsewhere" > "$T/w/cwd"
+  fm_launch_proof_herdr_authorizes "$META" || fail 'control: a genuine legacy record lost its authorization'
 
   # The agent's kernel working directory.
   world; printf '%s' "$T/elsewhere" > "$T/w/cwd"
@@ -701,7 +742,7 @@ test_launch_proof_claude_refusal_checks() (
   grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"
   fm_launch_proof_herdr_authorizes "$META" || fail '(j) control: a record with no launch_proof line keeps its legacy authorization'
   fm_launch_proof_record_legacy "$META" || fail '(j) control: a record with no launch_proof line is legacy'
-  for shape in 'env-v1,' ',' 'env-v1,env-v1' 'env-v9'; do
+  for shape in 'env-v1,' ',' 'env-v1,env-v1' 'env-v9' 'legacy' 'absent'; do
     grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"
     printf '%s\n' "$shape" | tr ',' '\n' | sed '/^$/d;s/^/launch_proof=/' >> "$META"
     case "$shape" in ','|'env-v1,') printf 'launch_proof=\n' >> "$META" ;; esac

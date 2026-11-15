@@ -1077,7 +1077,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
   local preserved=()
   for kind in ship scout secondmate; do
     for mode in direct sweep; do
-      for pin in missing mismatched unreadable ambiguous; do
+      for pin in missing mismatched unreadable ambiguous sentinel; do
         id="reboot-claude-$kind-$mode-$pin"
         recovery_case_or_skip "$id" "$id" || return 0
         id=$HERDR_CASE_ID
@@ -1090,6 +1090,11 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
         # Main 1709 ruling 2: a versioned proof followed by an empty duplicate is
         # no record at all, never the legacy shortcut.
         [ "$pin" != ambiguous ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        # Main 1807 (1): only an absent line is legacy; the literal value refuses.
+        if [ "$pin" = sentinel ]; then
+          drop_launch_proof "$dir/home/state/$id.meta"
+          printf 'launch_proof=legacy\n' >> "$dir/home/state/$id.meta"
+        fi
         gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") || fail "could not arm retained non-omp fixture"
         printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
         printf 'working: preserve the retained launch\n' > "$dir/home/state/$id.status"
@@ -1107,7 +1112,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           # environment that cannot be read is "unreadable". No input and no mutation are
           # still asserted below.
           # A pin for another generation is not an unpinned restore: it names its own cause.
-          if [ "$pin" = ambiguous ]; then
+          if [ "$pin" = ambiguous ] || [ "$pin" = sentinel ]; then
             assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
             assert_contains "$out" "its launch record is not one readable record" "$kind/$pin direct refusal must name the record"
           elif [ "$pin" = unreadable ]; then
@@ -1126,7 +1131,7 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
           CONTROL="$ROOT/bin/fm-reboot-recover.sh"
           out=$(run_control "$dir" recover) || rc=$?
           CONTROL="$ROOT/bin/fm-control.sh"
-          if [ "$pin" = ambiguous ]; then
+          if [ "$pin" = ambiguous ] || [ "$pin" = sentinel ]; then
             assert_contains "$out" "REBOOT_RECOVERY: $id: its launch record is not one readable record" \
               "$kind/$pin sweep refusal must name the record"
           elif [ "$pin" = unreadable ]; then
