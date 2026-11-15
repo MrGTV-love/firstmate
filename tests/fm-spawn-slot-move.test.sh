@@ -1477,6 +1477,62 @@ test_the_clock_seam_stays_quiet_when_no_jump_is_asked_for() {
   pass "the clock seam does nothing when no jump is asked for"
 }
 
+# --- Main 1939 (review of 4489b7fa3): N-1 a stale reason, N-2 a proof skip after a preparation ---------------------------------
+
+# N-1: the reason of an earlier copy's skip must not survive into the next copy. A proof of a new copy starts without a reason, so a
+# governed refusal record written later (slot_refusal_reason=${FM_SLOT_SKIP_REASON:-provisioner_refused}) never carries it.
+test_a_new_copys_proof_clears_the_reason_of_an_earlier_skip() {
+  make_world n1-stale-reason
+  advance_origin advanced.txt
+  printf 'dirty\n' >>"$W_SLOT/README.md"
+  local rc=0
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 20 ] || fail "the dirty copy was not skipped (rc $rc)"
+  [ "$FM_SLOT_SKIP_REASON" = dirty_tree ] || fail "the skip did not record its reason"
+  git -C "$W_SLOT" checkout -q -- README.md
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" >/dev/null 2>&1 || fail "the clean copy was not proven"
+  [ -z "$FM_SLOT_SKIP_REASON" ] || fail "the next copy's proof kept the earlier reason: $FM_SLOT_SKIP_REASON"
+  pass "a new copy's proof clears the reason of an earlier skip"
+}
+
+# N-2: a proof (not a merge) that fails after this spawn prepared the copy is a failure that names what was written; it is not
+# "nothing was written". Dirty tree after a detach, and a holder-free unreadable target after an anchor, are the shapes.
+test_a_proof_skip_after_a_detach_is_a_failure_that_names_the_detach() {
+  make_branch_slot n2-detach
+  advance_origin advanced.txt
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the first proof did not pass"
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+  printf 'dirty\n' >>"$W_SLOT/README.md"
+  local out rc=0
+  out=$(fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 1 ] || fail "a proof skip after a detach returned $rc, not the failure code 1: $out"
+  assert_contains "$out" "detached" "the output did not name the detach"
+  assert_not_contains "$out" "was not moved" "the failure was reported as a plain skip"
+  pass "a proof skip after a detach is a failure that names the detach"
+}
+
+test_a_proof_skip_after_an_anchor_is_a_failure_that_names_the_anchor() {
+  anchor_world n2-anchor
+  printf 'dirty\n' >>"$W_SLOT/README.md"
+  local out rc=0
+  out=$(fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  anchor_world_done
+  [ "$rc" = 1 ] || fail "a proof skip after an anchor returned $rc, not the failure code 1: $out"
+  assert_contains "$out" "refs/fm/anchor/tid-" "the output did not name the anchor"
+  pass "a proof skip after an anchor is a failure that names the anchor"
+}
+
+# The control: the same dirty tree with NO preparation is still a skip (20), so skip-and-continue is unchanged.
+test_a_dirty_copy_nothing_was_written_to_is_still_a_skip_after_the_n2_change() {
+  make_world n2-control
+  advance_origin advanced.txt
+  printf 'dirty\n' >>"$W_SLOT/README.md"
+  local rc=0
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 20 ] || fail "a dirty copy nothing was written to returned $rc, not the skip code 20"
+  pass "a dirty copy nothing was written to is still skipped"
+}
+
 # D-E: any initialized submodule with an index flag (assume-unchanged, skip-worktree) is doubt, whatever its files hold.
 test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy() {
   make_submodule_world e1-assume
@@ -1594,6 +1650,10 @@ CASES=(
   test_a_refusal_with_no_preparation_through_move_forward_is_still_a_skip
   test_the_clock_seam_fires_on_the_spawns_custody_scan_line
   test_the_clock_seam_stays_quiet_when_no_jump_is_asked_for
+  test_a_new_copys_proof_clears_the_reason_of_an_earlier_skip
+  test_a_proof_skip_after_a_detach_is_a_failure_that_names_the_detach
+  test_a_proof_skip_after_an_anchor_is_a_failure_that_names_the_anchor
+  test_a_dirty_copy_nothing_was_written_to_is_still_a_skip_after_the_n2_change
   test_a_ref_that_changes_after_the_proof_fails_the_move
   test_a_move_that_ends_elsewhere_than_the_target_fails
   test_the_changed_bytes_witness_fails_when_a_snapshot_cannot_be_taken

@@ -2007,7 +2007,6 @@ SH
   pass "an unknown refuses the whole spawn and the copy is leased and recorded"
 }
 
-# Main 1886 N7: a record that cannot be written refuses the spawn; there is no warn-and-go-on.
 # Main 1925 O2: a failed read of origin/HEAD after a successful move is unknown, never "absent". The spawn refuses.
 test_a_failed_origin_head_read_after_a_move_refuses() {
   local id out real_git
@@ -2026,6 +2025,7 @@ SH
   pass "a failed origin/HEAD read after a successful move refuses the spawn"
 }
 
+# Main 1886 N7: a record that cannot be written refuses the spawn; there is no warn-and-go-on.
 test_a_failed_record_write_refuses_the_spawn() {
   local id out
   id='pool-record-fails'
