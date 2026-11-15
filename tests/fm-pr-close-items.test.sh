@@ -1975,6 +1975,7 @@ SH
 # Main 044 F6: the block a real ship brief teaches is the block the reader closes from. The
 # brief text comes from the real bin/fm-dod-lib.sh generator (direct-PR mode); the body is built
 # from the exact marker and directive forms it names, for a merge train.
+# shellcheck disable=SC2016 # The backticks are the literal Markdown code marks the brief prints.
 test_r4_the_ship_brief_block_closes_a_train() {
   local case_dir brief begin end item member
   brief=$(bash -c '. "$1/bin/fm-dod-lib.sh"; fm_dod_block direct-PR task-x1' _ "$ROOT") || fail "r4-brief: the brief generator failed"
