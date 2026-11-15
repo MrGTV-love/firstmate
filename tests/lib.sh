@@ -1589,53 +1589,84 @@ assert_not_contains() {
 
 # fm_test_drain_presented <state-dir> [<drain>]: run the real wake drain over a
 # fixture state dir for an ABSENCE check ("this key is no longer open"), and
-# fail the test unless the drain gives positive evidence that it ran and
-# presented its open-decision view in full. Absence of a key in the output of a
-# drain that failed, took the zero-exit queue-lock skip (WAKE DRAIN SKIPPED),
-# skipped or cut its status presentation (STATUS PRESENTATION SKIPPED or
-# INCOMPLETE, the byte-cap "more omitted" line), or skipped a status log past
-# its read limits is not a closed key. The positive evidence is a canary: a
-# separate fixture task with one open decision, written just before the drain
-# and removed after it, which a complete presentation must list. On success it
-# sets FM_TEST_DRAIN_OUT to the drain's stdout without the canary's lines, and
-# FM_TEST_DRAIN_OPEN to the OPEN DECISIONS item lines without the canary's (empty
-# when nothing else is open). Call it directly, not in $(...), so fail stops
-# the test.
+# fail the test unless the drain's own complete open-decision view is proven.
+# The wake drain prints no end-of-output line on stdout for the whole run (its
+# WAKE_ACK_REQUIRED line goes to stderr, before the status presentation), so the
+# proof is the open-decision view's own terminal line: the "OPEN DECISIONS: close
+# one by answering it" hint that bin/fm-wake-drain.sh prints after every row of
+# that view. Required: exit 0; no WAKE DRAIN SKIPPED, STATUS PRESENTATION SKIPPED
+# or INCOMPLETE, or byte-cap "more omitted" line; no status log skipped past its
+# read limits (stderr is read); exactly one view header and one terminal hint,
+# with only rows between them; and among those rows a canary decision on a
+# separate fixture task, written just before the drain, so a view exists at all.
+# Nothing is filtered: FM_TEST_DRAIN_OUT is the drain's whole stdout (the canary's
+# row included) and FM_TEST_DRAIN_ROWS its view rows (the canary's included);
+# FM_TEST_DRAIN_ONLY_CANARY is 1 when the canary's row is the view's only row.
+# Before return the canary's status file, its cursor files, its row in the
+# presentation cursor and the helper's stderr file are removed. Call it directly,
+# not in $(...), so fail stops the test.
 fm_test_drain_presented() {
-  local state=$1 drain=${2:-$ROOT/bin/fm-wake-drain.sh} canary err out rc=0 bad
-  canary="$state/fm-test-drain-canary.status"
-  err="$state/../.fm-test-drain-presented.err"
+  local state=$1 drain=${2:-$ROOT/bin/fm-wake-drain.sh} task=fm-test-drain-canary canary err out rc=0 bad=''
+  local row_prefix='fm-test-drain-canary [key=fm-test-drain-canary] needs-decision: ' pc had_pc=0 rows only
+  canary="$state/$task.status"
+  err="$state/../.fm-test-drain-presented.err.$$"
+  pc="$state/.status-presentation-cursor"
   [ ! -e "$canary" ] || fail "fm_test_drain_presented: $canary already exists"
-  printf 'needs-decision [key=fm-test-drain-canary]: canary for a complete drain presentation\n' > "$canary" \
-    || fail "fm_test_drain_presented: could not write $canary"
+  [ ! -e "$pc" ] || had_pc=1
+  if ! printf 'needs-decision [key=%s]: canary for a complete drain presentation\n' "$task" > "$canary"; then
+    rm -f -- "$canary"
+    fail "fm_test_drain_presented: could not write $canary"
+  fi
   out=$(FM_STATE_OVERRIDE="$state" "$drain" 2>"$err") || rc=$?
-  rm -f -- "$canary"
-  [ "$rc" -eq 0 ] || fail "the drain failed (exit $rc) before an absence check: $(cat "$err" 2>/dev/null)"
-  bad=''
-  case "$out" in
-    *'WAKE DRAIN SKIPPED'*) bad='the drain skipped (queue lock held elsewhere)' ;;
-    *'STATUS PRESENTATION SKIPPED'*) bad='the status presentation was skipped' ;;
-    *'STATUS PRESENTATION INCOMPLETE'*) bad='the status presentation was incomplete' ;;
-    *'more omitted (byte cap)'*) bad='the open-decision view was cut at its byte cap' ;;
-  esac
+  if [ "$rc" -ne 0 ]; then bad="the drain exited $rc"
+  else
+    case "$out" in
+      *'WAKE DRAIN SKIPPED'*) bad='the drain skipped (queue lock held elsewhere)' ;;
+      *'STATUS PRESENTATION SKIPPED'*) bad='the status presentation was skipped' ;;
+      *'STATUS PRESENTATION INCOMPLETE'*) bad='the status presentation was incomplete' ;;
+      *'more omitted (byte cap)'*) bad='the open-decision view was cut at its byte cap' ;;
+    esac
+  fi
   if [ -z "$bad" ] && grep -E 'past the read limits|could not be acquired safely' "$err" >/dev/null 2>&1; then
     bad="the drain skipped part of its scan: $(grep -E 'past the read limits|could not be acquired safely' "$err" | head -3)"
   fi
   if [ -z "$bad" ]; then
-    printf '%s\n' "$out" | awk '
-      /^OPEN DECISIONS \(still open/ { on = 1; next }
-      on && /^OPEN DECISIONS:/ { on = 0 }
-      on && /^fm-test-drain-canary \[key=fm-test-drain-canary\] needs-decision: / { found = 1 }
-      END { exit !found }' || bad='the canary decision was not listed, so the open-decision view was not shown in full'
+    # The view: one header, then rows only, then the drain's terminal hint for the view.
+    bad=$(printf '%s\n' "$out" | awk -v canary="$row_prefix" '
+      /^OPEN DECISIONS \(still open/ { headers++; if (state == 0) state = 1; else bad = "a second view header"; next }
+      /^OPEN DECISIONS: close one by answering it: / { hints++; if (state == 1) state = 2; else if (!bad) bad = "the terminal hint outside the view"; next }
+      state == 1 {
+        if ($0 ~ /^OPEN DECISIONS/ || $0 == "") { if (!bad) bad = "a non-row line inside the view: " $0 }
+        else if (index($0, canary) == 1) canaries++
+        next
+      }
+      END {
+        if (!bad && headers != 1) bad = "no open-decision view header"
+        if (!bad && hints != 1) bad = "no terminal hint after the view rows: the view was not shown to its end"
+        if (!bad && canaries != 1) bad = "the canary row is not in the view"
+        print bad
+      }')
   fi
-  [ -z "$bad" ] || fail "no positive evidence of a complete drain before an absence check: $bad"$'\n'"--- drain stdout ---"$'\n'"$out"
-  # shellcheck disable=SC2034 # Both results are read by the calling suite.
-  FM_TEST_DRAIN_OUT=$(printf '%s\n' "$out" | grep -v 'fm-test-drain-canary')
-  # shellcheck disable=SC2034 # Both results are read by the calling suite.
-  FM_TEST_DRAIN_OPEN=$(printf '%s\n' "$out" | awk '
+  # Restore the fixture before any return or fail.
+  rm -f -- "$canary" "$state/.$task".* "$err"
+  if [ -f "$pc" ]; then
+    awk -F '\t' -v t="$task" '$1 != t' "$pc" > "$pc.fm-test.$$" && mv -f "$pc.fm-test.$$" "$pc"
+    if [ "$had_pc" = 0 ] && [ ! -s "$pc" ]; then rm -f -- "$pc"; fi
+  fi
+  [ ! -e "$canary" ] || fail "fm_test_drain_presented: could not remove $canary"
+  [ -z "$bad" ] || fail "no proof of a complete drain view before an absence check: $bad"$'\n'"--- drain stdout ---"$'\n'"$out"
+  rows=$(printf '%s\n' "$out" | awk '
     /^OPEN DECISIONS \(still open/ { on = 1; next }
-    on && /^OPEN DECISIONS:/ { on = 0 }
-    on && !/^fm-test-drain-canary / { print }')
+    on && /^OPEN DECISIONS: close one by answering it: / { on = 0 }
+    on { print }')
+  # shellcheck disable=SC2034 # The results are read by the calling suite.
+  FM_TEST_DRAIN_OUT=$out
+  # shellcheck disable=SC2034 # The results are read by the calling suite.
+  FM_TEST_DRAIN_ROWS=$rows
+  only=0
+  case "$rows" in "$row_prefix"*) [ "$(printf '%s\n' "$rows" | grep -c .)" != 1 ] || only=1 ;; esac
+  # shellcheck disable=SC2034 # The results are read by the calling suite.
+  FM_TEST_DRAIN_ONLY_CANARY=$only
 }
 
 # fm_launch_holds <launch-text> <token>: the launch holds <token> as written or

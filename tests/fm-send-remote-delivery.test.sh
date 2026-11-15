@@ -681,7 +681,7 @@ test_remote_resolve_key_closes_at_enqueue() {
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/rsm.status" | grep -qF 'resolved [key=upgrade-window]: answered: the weekend, freeze Friday' \
     || fail "a recorded remote answer must close the decision at enqueue: $(cat "$home/state/rsm.status")"
   fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
-  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
+  if [ "$FM_TEST_DRAIN_ONLY_CANARY" != 1 ]; then
     fail "the answered decision still lists as open after a recorded remote answer: $out"
   fi
   grep -rqF 'the weekend, freeze Friday' "$rhome/state/parent-route/rsm.inbox" \
