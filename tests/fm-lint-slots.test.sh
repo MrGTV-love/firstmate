@@ -1376,6 +1376,9 @@ test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge()
   [ "$top" -gt 90000 ] || fail "the sampler saw no 92 MiB stand-in (largest $top KiB), so this test measured nothing"
   { [ "$starts" -eq 4 ] && [ "$ends" -eq 4 ]; } || fail "$starts starts and $ends ends of 4 roots with trusted records (budget $budget KiB)"
   [ "$most" -eq 2 ] || fail "$most roots ran at once, expected the two whose charges fit the budget"
+  # The invariant the stated bound rests on, and the one an over-admitting gate
+  # breaks: the charges of the roots running together fit the budget.
+  [ $((most * charge)) -le "$budget" ] || fail "$most roots ran at once with charges $((most * charge)) KiB, above the $budget KiB budget"
   [ "$peak" -le "$budget" ] || fail "roots growing inside their charge reached $peak KiB, above the $budget KiB budget"
   # (2) Growth beyond the charge (200 MiB held against 108 MiB): the total may
   # pass the budget by what the running roots hold beyond their charges, and no
@@ -1383,6 +1386,7 @@ test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge()
   read -r peak top most starts ends _ <<<"$(fm_lint_trusted_growth "$tmp" beyond "$budget" "$record" 200 4 6)"
   { [ "$starts" -eq 4 ] && [ "$ends" -eq 4 ]; } || fail "$starts starts and $ends ends of 4 roots growing beyond their charge"
   [ "$most" -le 2 ] || fail "$most roots ran at once, more than the charges admit"
+  [ $((most * charge)) -le "$budget" ] || fail "$most roots ran at once with charges $((most * charge)) KiB, above the $budget KiB budget"
   limit=$(( budget + most * (top - charge) ))
   [ "$peak" -le "$limit" ] || fail "roots growing beyond their charge reached $peak KiB, above the stated bound $limit KiB (budget $budget plus $most roots times ($top minus charge $charge))"
   # (3) The controls: with the admission broken (no effective budget) the same
@@ -1390,6 +1394,8 @@ test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge()
   read -r control_peak top most starts ends _ <<<"$(fm_lint_trusted_growth "$tmp" unbounded 100000000 "$record" 200 4)"
   [ "$control_peak" -gt $(( budget + 2 * (top - charge) )) ] \
     || fail "four roots without a budget peaked at only $control_peak KiB, so this test cannot show the bound"
+  [ $((most * charge)) -gt "$budget" ] \
+    || fail "four roots without a budget ran only $most at once (charges $((most * charge)) KiB), so the charge-fit check above cannot fail"
   pass "with trusted records two roots run at once; growth inside the charge never passes the budget ($budget KiB), and growth beyond it passes by at most the running roots' excess (limit $limit KiB, peak seen $peak KiB; no budget: $control_peak KiB)"
 }
 
