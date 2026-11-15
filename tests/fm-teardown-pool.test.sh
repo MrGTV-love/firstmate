@@ -3662,6 +3662,8 @@ skipped_unknown_custody_case() {
   mkdir -p "$CASE_DIR_X/data/task-x1"
   git -C "$CASE_DIR_X/project" worktree add -q --detach "$CASE_DIR_X/skip-copy" main
   CANON_X=$(cd "$CASE_DIR_X/skip-copy" && pwd -P)
+  # An optional step that shapes the copy (a hidden edit, a vanished directory) before the pool listing is written.
+  [ -z "${SKIPPED_CASE_PREP:-}" ] || "$SKIPPED_CASE_PREP" "$CASE_DIR_X/skip-copy"
   LOG_X="$CASE_DIR_X/treehouse.log"
   REC_X="$CASE_DIR_X/data/task-x1/skipped-copies.tsv"
   : > "$LOG_X"
@@ -3715,6 +3717,46 @@ test_a_skipped_copy_with_an_explicit_empty_process_list_is_released() {
   skipped_unknown_custody_case unknown-control '[]'
   grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "unknown-control: a clean, landed copy with an explicit empty process list was not released"$'\n'"$(cat "$CASE_DIR_X/stderr")"
   pass "an explicit empty process list still releases a clean, landed skipped copy"
+}
+
+# Main 1886 N1: the release runs the same index-flag check the spawn's proof runs (fm_slot_hidden_work). A tracked edit hidden
+# from status by assume-unchanged or skip-worktree, by blob or by mode, keeps the copy leased and recorded.
+hide_blob_edit() { local f; f=$(git -C "$1" ls-files | head -n 1); git -C "$1" update-index --assume-unchanged "$f"; printf 'hidden private edit\n' >> "$1/$f"; }
+hide_skip_worktree_edit() { local f; f=$(git -C "$1" ls-files | head -n 1); git -C "$1" update-index --skip-worktree "$f"; printf 'hidden private edit\n' >> "$1/$f"; }
+hide_mode_edit() { local f; f=$(git -C "$1" ls-files | head -n 1); git -C "$1" update-index --assume-unchanged "$f"; chmod +x "$1/$f"; }
+vanish_copy() { rm -rf "$1"; }
+
+test_a_skipped_copy_with_an_assume_unchanged_edit_stays_leased() {
+  SKIPPED_CASE_PREP=hide_blob_edit skipped_unknown_custody_case hidden-blob '[]'
+  assert_skipped_copy_kept hidden-blob
+  pass "an edit hidden by assume-unchanged keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_with_a_skip_worktree_edit_stays_leased() {
+  SKIPPED_CASE_PREP=hide_skip_worktree_edit skipped_unknown_custody_case hidden-skipwt '[]'
+  assert_skipped_copy_kept hidden-skipwt
+  pass "an edit hidden by skip-worktree keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_with_a_hidden_mode_change_stays_leased() {
+  SKIPPED_CASE_PREP=hide_mode_edit skipped_unknown_custody_case hidden-mode '[]'
+  assert_skipped_copy_kept hidden-mode
+  pass "a mode change hidden by an index flag keeps the skipped copy leased and recorded"
+}
+
+# Main 1886 N7: a row whose path holds a NUL cannot name a file; the listing is not trusted and every record stays.
+test_a_skipped_copy_stays_leased_when_another_pool_row_path_holds_a_nul() {
+  skipped_unknown_custody_case unknown-nul '[]' '{"path": "/x\u0000y", "lease_holder": "someone", "processes": []}'
+  assert_skipped_copy_kept unknown-nul
+  pass "a pool row whose path holds a NUL keeps every skipped copy leased and recorded"
+}
+
+# Main 1886 N7: a recorded path that cannot be resolved proves nothing about the lease. The copy stays leased and its record stays.
+test_a_skipped_copy_whose_path_cannot_be_resolved_keeps_its_record() {
+  SKIPPED_CASE_PREP=vanish_copy skipped_unknown_custody_case unknown-canon '[]'
+  ! grep -Fq "return $CANON_X" "$LOG_X" || fail "unknown-canon: a copy whose path cannot be resolved was released"
+  grep -Fq "$CASE_DIR_X/skip-copy" "$REC_X" 2>/dev/null || fail "unknown-canon: the record was dropped"
+  pass "a path that cannot be resolved keeps the record"
 }
 
 teardown_test_cases=(
@@ -3790,6 +3832,11 @@ test_a_skipped_copy_whose_process_list_is_null_stays_leased
 test_a_skipped_copy_whose_process_list_is_an_object_stays_leased
 test_a_skipped_copy_stays_leased_when_another_pool_row_has_no_path
 test_a_skipped_copy_with_an_explicit_empty_process_list_is_released
+test_a_skipped_copy_with_an_assume_unchanged_edit_stays_leased
+test_a_skipped_copy_with_a_skip_worktree_edit_stays_leased
+test_a_skipped_copy_with_a_hidden_mode_change_stays_leased
+test_a_skipped_copy_stays_leased_when_another_pool_row_path_holds_a_nul
+test_a_skipped_copy_whose_path_cannot_be_resolved_keeps_its_record
 )
 
 # In the combined tests/fm-teardown.test.sh run,

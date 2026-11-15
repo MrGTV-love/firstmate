@@ -88,13 +88,18 @@ __fm_clock_jump() {
   case "$BASH_COMMAND" in
     'p_real=$(real_path_or_raw "$p")')
       __fm_accept_seen=$((__fm_accept_seen + 1))
-      if [ "$__fm_accept_seen" = 2 ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
+      if [ -n "${FM_TEST_JUMP_AT_ACCEPT:-}" ] && [ "$__fm_accept_seen" = 2 ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
         SECONDS=$((SPAWN_ACQUIRE_T0 + FM_TEST_JUMP_AT_ACCEPT))
+      fi ;;
+    # The custody scan that runs before every get: a jump here is time spent in the scan, between the two bound reads.
+    'fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1')
+      if [ -n "${FM_TEST_JUMP_AT_SCAN:-}" ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
+        SECONDS=$((SPAWN_ACQUIRE_T0 + FM_TEST_JUMP_AT_SCAN))
       fi ;;
   esac
   return 0
 }
-if [ -n "${FM_TEST_JUMP_AT_ACCEPT:-}" ]; then
+if [ -n "${FM_TEST_JUMP_AT_ACCEPT:-}" ] || [ -n "${FM_TEST_JUMP_AT_SCAN:-}" ]; then
   set -T
   trap '__fm_clock_jump' DEBUG
 fi
@@ -1041,8 +1046,8 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
         removed)
           assert_contains "$out" 'slot provisioner is missing' 'removed owner silently downgraded governance'
           [ ! -e "$case_dir/provisioner.called" ] || fail 'removed owner was invoked'
-          # Main 1829/1842: the move to the target had already succeeded and the refusal runs no file-rewriting checkout, so
-          # the copy stays on the target (detached); the previous owner's branch is where it was and nothing is lost.
+          # Main 1886 CUT: the move to the target had already succeeded and a refusal does nothing, so the copy stays on the
+          # target (on the task branch the provisioning step set, if it got that far); the previous owner's branch is where it was.
           [ "$(git -C "$pool" rev-parse HEAD)" = "$advanced" ] || fail 'early governed refusal moved the copy off the target it was moved to'
           ;;
         *)
@@ -1060,13 +1065,13 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
   esac
   if [ "$shape" = present ] || [ "$shape" = removed ]; then
     [ "$(git -C "$pool" rev-parse refs/heads/previous-owner)" = "$before" ] || fail 'freshness moved the previous owner branch'
-    # Main 1829/1842: a refusal after a move that succeeded does not run the checkout that would rewrite the files of the
-    # target back to the previous commit. The copy stays on the target, detached; the branch holds the old commit.
-    [ -z "$(git -C "$pool" branch --show-current)" ] || fail 'a refusal after a successful move switched the copy onto a branch'
+    # Main 1886 CUT: a refusal after a move that succeeded runs nothing that would rewrite the files of the target back to
+    # the previous commit. The copy stays on the target; the previous owner's branch holds the old commit and is not checked out.
+    [ "$(git -C "$pool" branch --show-current)" != previous-owner ] || fail 'a refusal after a successful move switched the copy back onto the previous owner'
     [ "$(git -C "$pool" rev-parse HEAD)" = "$advanced" ] || fail 'a refusal after a successful move changed the commit the copy was moved to'
     [ -f "$pool/advanced.txt" ] && [ -f "$pool/README.md" ] || fail 'a refusal after a successful move lost a file of the copy'
     assert_contains "$out" "$pool" 'the refusal did not name the copy it left as it was'
-    assert_contains "$out" 'would change files' 'the refusal did not say why it left the copy as it was'
+    assert_contains "$out" 'retained; no worker admitted' 'the refusal did not say the copy is retained'
   fi
   [ ! -d "$pool/.claude/worktrees" ] || fail 'governance created nested isolation'
   pass "final revision governance: $shape $kind"
@@ -1680,7 +1685,8 @@ slot_digest() {
     printf 'HEAD %s\n' "$head"
     sym=$(git -C "$slot" symbolic-ref -q HEAD) || { [ "$?" = 1 ] || exit 1; sym=detached; }
     printf 'SYMBOLIC %s\n' "$sym"
-    refs=$(git -C "$slot" for-each-ref --format='%(refname) %(objectname)') || exit 1
+    # A symbolic ref is recorded with its target, so a retarget between two refs at one commit is a difference.
+    refs=$(git -C "$slot" for-each-ref --format='%(refname)%09%(objectname)%09%(symref)') || exit 1
     printf 'REFS\n%s\nENDREFS\n' "$refs"
     git -C "$slot" ls-files -s --debug || exit 1
     cd "$slot" || exit 1
@@ -1693,24 +1699,25 @@ slot_digest() {
 # The refs a spawn may change while it works in ANOTHER copy: origin's default tracking ref and origin/HEAD (Main 003).
 # New refs (the task's own branch, anchors) may appear. Nothing else that existed before may differ or vanish.
 
-# second_copy_refs <id> [governed]: the "<ref>=<sha>" pairs that a spawn which skipped one copy and then MOVED another
+# second_copy_refs <id> [governed]: the "<ref>=<old>><new>" pairs that a spawn which skipped one copy and then MOVED another
 # copy of the same repository legitimately writes into the shared ref set: origin's default tracking ref and origin/HEAD
 # at origin's tip (recorded after the move succeeded) and, for a governed task, its branch and the preservation anchor
 # of the detached copy it started from. The skipped copy's own digest may differ by exactly these and nothing else.
 second_copy_refs() {
   local id=$1 tip
   tip=$(git -C "$CASE_DIR/origin.git" rev-parse --verify "refs/heads/$DEFAULT_BRANCH") || fail "origin's tip cannot be read"
-  printf '%s\n' "refs/remotes/origin/$DEFAULT_BRANCH=$tip" "refs/remotes/origin/HEAD=$tip"
+  printf '%s\n' "refs/remotes/origin/$DEFAULT_BRANCH=absent>$tip" "refs/remotes/origin/HEAD=absent>$tip@refs/remotes/origin/$DEFAULT_BRANCH"
   if [ "${2:-}" = governed ]; then
-    printf '%s\n' "refs/heads/fm/$id=$tip" "refs/fm/anchor/$id-$(git -C "$PROJECT_DIR" rev-parse --short "$INITIAL_SHA")=$INITIAL_SHA"
+    printf '%s\n' "refs/heads/fm/$id=absent>$tip" "refs/fm/anchor/$id-$(git -C "$PROJECT_DIR" rev-parse --short "$INITIAL_SHA")=absent>$INITIAL_SHA"
   fi
 }
 
 # assert_digest_unchanged <slot> <before-digest> <message>: the copy reads back as it did, and every ref that existed
 # still has the same value, but for the two allowed ones.
-# assert_digest_unchanged <slot> <before-digest> <label> [<ref>=<sha>...]: the digest now equals <before-digest> in HEAD,
-# the branch, the index and every file, and the SET of refs is identical in both directions (a ref that is new, gone or
-# moved fails). The only exception is a ref named as <ref>=<sha>, which may be created or moved, and only to exactly <sha>.
+# assert_digest_unchanged <slot> <before-digest> <label> [<ref>=<old>><new>...]: the digest now equals <before-digest> in HEAD,
+# the branch, the index and every file, and the SET of refs, each with its symbolic target, is identical in both directions
+# (a ref that is new, gone, moved or retargeted fails). The only exception is a ref named as <ref>=<old>><new> ("absent"
+# for a ref that did not exist), which must go from exactly <old> to exactly <new>.
 assert_digest_unchanged() {
   local slot=$1 before=$2 label=$3 after b_plain a_plain b_refs a_refs why
   shift 3
@@ -1726,18 +1733,25 @@ def parse(text):
     out = {}
     for line in text.splitlines():
         if line.strip():
-            name, _, sha = line.rpartition(" ")
-            out[name] = sha
+            name, sha, target = (line.split("\t") + ["", ""])[:3]
+            out[name] = sha + ("@" + target if target else "")
     return out
 before, after = parse(sys.argv[1]), parse(sys.argv[2])
-allowed = dict(spec.split("=", 1) for spec in sys.argv[3:])
+# A named change is "<ref>=<old>><new>" ("absent" for a ref that did not exist): the OLD value must be what the digest held
+# and the NEW value must be exactly the one named. Anything else, or any unnamed difference, is a failure.
+allowed = {}
+for spec in sys.argv[3:]:
+    name, _, rest = spec.partition("=")
+    old, _, new = rest.partition(">")
+    allowed[name] = (old, new)
 bad = []
 for name in sorted(set(before) | set(after)):
-    if before.get(name) == after.get(name):
+    old, new = before.get(name, "absent"), after.get(name, "absent")
+    if old == new:
         continue
-    if name in allowed and after.get(name) == allowed[name]:
+    if name in allowed and allowed[name] == (old, new):
         continue
-    bad.append("%s: %s -> %s" % (name, before.get(name, "absent"), after.get(name, "absent")))
+    bad.append("%s: %s -> %s" % (name, old, new))
 print("; ".join(bad))
 sys.exit(1 if bad else 0)
 PY
@@ -1983,6 +1997,67 @@ test_no_get_is_typed_once_the_bound_was_spent_between_two_gets() {
   pass "no get is typed once the bound was spent between two gets"
 }
 
+# Main 1886 N9: the absolute bound is read immediately before each get, AFTER the custody scan. The clock jumps while the scan
+# runs for the second get: at 1799 of 1800 the get is sent (control); at 1800 no get is sent and nothing is launched.
+test_a_get_is_sent_when_the_scan_ends_at_1799() {
+  local id out
+  id='pool-bound-scan-1799'
+  make_skip_case skip-bound-scan-1799 "$id" 3
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1799 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  [ "$(cat "$CASE_DIR/get-count")" -ge 2 ] || fail "no second get was sent although the scan ended inside the bound"$'\n'"$out"
+  pass "a get is sent when the custody scan ends at 1799 of 1800"
+}
+
+test_no_get_is_sent_when_the_scan_crosses_the_bound() {
+  local id out
+  id='pool-bound-scan-1800'
+  make_skip_case skip-bound-scan-1800 "$id" 3
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was sent after the custody scan crossed the bound: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
+  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
+  pass "no get is sent when the custody scan crosses the bound"
+}
+
+# Main 1886 rule Q: a copy that fails an unknown check (here a failed git status) refuses the whole spawn. It is leased where it
+# stands and recorded; a second copy is NOT taken and nothing is launched.
+test_an_unreadable_copy_refuses_the_whole_spawn_and_is_leased() {
+  local id out real_git
+  id='pool-unknown-refuses'
+  make_skip_case unknown-refuses "$id" 2
+  real_git=$(command -v git)
+  cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *"${SKIP_SLOTS[0]}"*' status '*) exit 1 ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/git"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn_skipping "$id" --mode no-mistakes --yolo off) || true
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a second copy was taken after an unknown: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" "the copy in doubt was not leased"
+  assert_grep "${SKIP_SLOTS[0]}" "$HOME_DIR/data/$id/skipped-copies.tsv" "the copy in doubt was not recorded"
+  assert_contains "$out" "refused" "the spawn did not say it was refused"
+  pass "an unknown refuses the whole spawn and the copy is leased and recorded"
+}
+
+# Main 1886 N7: a record that cannot be written refuses the spawn; there is no warn-and-go-on.
+test_a_failed_record_write_refuses_the_spawn() {
+  local id out
+  id='pool-record-fails'
+  make_skip_case record-fails "$id" 2
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  # A directory where the record file must be makes every write to it fail.
+  mkdir -p "$HOME_DIR/data/$id/skipped-copies.tsv"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn_skipping "$id" --mode no-mistakes --yolo off) || true
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a second copy was taken although the record could not be written"$'\n'"$out"
+  assert_contains "$out" "could not write and read back the record" "the failed record write was not reported"
+  pass "a failed record write refuses the spawn"
+}
+
 test_skipped_copies_are_recorded_and_listed() {
   local id out
   id='pool-skip-listed'
@@ -2049,11 +2124,30 @@ test_slot_digest_accepts_only_the_named_ref_change() {
   next=$(git -C "$POOL_DIR" rev-parse origin/main)
   before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
   git -C "$POOL_DIR" update-ref refs/review/named "$first"
-  (assert_digest_unchanged "$POOL_DIR" "$before" "named ref" "refs/review/named=$first") >/dev/null 2>&1 || fail "the named ref change was refused"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "named ref" "refs/review/named=absent>$first") >/dev/null 2>&1 || fail "the named ref change was refused"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "named ref, wrong old value" "refs/review/named=$next>$first") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the named ref was accepted although its old value was not the one named"
+  rc=0
   git -C "$POOL_DIR" update-ref refs/review/named "$next"
-  (assert_digest_unchanged "$POOL_DIR" "$before" "named ref, other value" "refs/review/named=$first") >/dev/null 2>&1 || rc=$?
-  [ "$rc" != 0 ] || fail "the named ref was accepted at a value other than the one named"
-  pass "the slot check accepts a named ref only at its named value"
+  (assert_digest_unchanged "$POOL_DIR" "$before" "named ref, other new value" "refs/review/named=absent>$first") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the named ref was accepted at a new value other than the one named"
+  pass "the slot check accepts a named ref only from its named old value to its named new value"
+}
+
+# A symbolic ref retargeted between two branches at one commit is a difference.
+test_slot_digest_sees_a_symbolic_ref_retarget() {
+  local id first before rc=0
+  id='pool-digest-symref'
+  make_skip_case digest-symref "$id" 1
+  first=$(git -C "$POOL_DIR" rev-parse HEAD)
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/main "$first"
+  git -C "$POOL_DIR" update-ref refs/remotes/origin/alt "$first"
+  git -C "$POOL_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read"
+  git -C "$POOL_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/alt
+  (assert_digest_unchanged "$POOL_DIR" "$before" "symbolic ref retargeted") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "a symbolic ref retargeted between same-commit branches was accepted"
+  pass "the slot check sees a symbolic ref retarget"
 }
 
 test_slot_digest_sees_a_symlink_retarget() {
@@ -2209,10 +2303,15 @@ SH
   GOV_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn_skipping "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
 }
 
-test_a_governed_refusal_after_preparation_puts_the_branch_back() {
+# Main 1886 CUT: git refuses the move after the preparation detached a governed copy. The spawn stops, writes nothing more,
+# leaves HEAD and refs as they are, holds the copy (the refusal record and the open endpoint) and refuses. No undo runs.
+test_a_governed_refusal_after_preparation_holds_the_copy_and_refuses() {
   refuse_governed_after_preparation governed-refused-prep pool-governed-refused-after-prep
-  [ "$(git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD)" = refs/heads/previous-owner ] || fail "the previous owner's branch was not put back"$'\n'"$GOV_OUT"
-  pass "a governed copy refused after preparation has its branch back"
+  assert_no_launch "$CASE_DIR/launch.log"
+  ! git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD >/dev/null || fail "the copy was switched back onto a branch"$'\n'"$GOV_OUT"
+  assert_contains "$GOV_OUT" "left exactly as it is" "the refusal did not say the copy is left as it is"
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/pool-governed-refused-after-prep.meta" "the copy was not recorded as held"
+  pass "a governed copy refused after preparation is held as it is and the spawn is refused"
 }
 
 test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
@@ -2295,6 +2394,7 @@ test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_new_foreign_ref
 test_slot_digest_sees_a_removed_ref
 test_slot_digest_accepts_only_the_named_ref_change
+test_slot_digest_sees_a_symbolic_ref_retarget
 test_slot_digest_sees_a_symlink_retarget
 test_slot_digest_fails_when_git_cannot_be_read
 test_the_no_launch_check_fails_when_a_launch_was_logged
@@ -2304,7 +2404,11 @@ test_the_bound_is_rechecked_just_before_a_copy_is_accepted
 test_the_bound_refusal_at_accept_launches_nothing
 test_a_copy_accepted_inside_the_bound_is_launched
 test_a_refused_move_leaves_every_ref_unchanged
-test_a_governed_refusal_after_preparation_puts_the_branch_back
+test_a_get_is_sent_when_the_scan_ends_at_1799
+test_no_get_is_sent_when_the_scan_crosses_the_bound
+test_an_unreadable_copy_refuses_the_whole_spawn_and_is_leased
+test_a_failed_record_write_refuses_the_spawn
+test_a_governed_refusal_after_preparation_holds_the_copy_and_refuses
 test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was
 
 echo "# all fm-spawn-pool-base-freshen tests passed"

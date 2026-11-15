@@ -780,7 +780,8 @@ PY
     assert_contains "$out" 'its helper is stopped and no worker admitted' "$shape refusal did not confirm its helper stopped"
     assert_grep 'recovery=slot-provision-refused' "$FM_HOME/state/$wid.meta" "$shape refusal lost recovery metadata"
     [ "$(git -C "$wcopy" rev-parse HEAD)" = "$before" ] || fail "$shape refusal did not restore the assigned checkout"
-    [ "$(git -C "$wcopy" branch --show-current)" = "slot-wait-$shape-before" ] || fail "$shape refusal changed the prior branch"
+    # Main 1886 CUT: nothing is switched back. The preparation detached the copy at the same commit; the prior branch is where it was.
+    [ "$(git -C "$wcopy" rev-parse "refs/heads/slot-wait-$shape-before")" = "$before" ] || fail "$shape refusal moved the prior branch"
     [ -e "$wcase/lease" ] || fail "$shape refusal released its assigned copy lease"
     "$REAL_TMUX" list-windows -t firstmate -F '#{window_name}' | grep -qx "fm-$wid" || fail "$shape refusal closed its retained endpoint"
     "$REAL_TMUX" list-windows -t firstmate -F '#{window_id}' | grep -qx "$SENTINEL_WINDOW" || fail "$shape refusal closed the unrelated sentinel"
