@@ -7674,6 +7674,589 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
   pass "a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place"
 }
 
+# Round 5 (Main 1774): each case below ports one falsifier of the outside review
+# of b6786352 (data/<task>/r4-review/falsifiers/) and keeps its control. Each runs
+# the real library helpers on throwaway repositories in its own bash process,
+# as the falsifiers do: no full teardown, no process is started or signalled,
+# and the driver, launcher and process observations are recording stubs.
+# r5_harness <case> <body> runs <body> after a preamble that sources the
+# libraries of the tree under test and prints its output; r5_expect checks one
+# line of it.
+r5_harness() {  # <case-name> <body-file>
+  local base=$TMP_ROOT/r5-$1
+  mkdir -p "$base/home" "$base/tmp" "$base/fakebin"
+  cat > "$base/pre.sh" <<'PRE'
+set -u
+R5_BIN=$1 R5_BASE=$2
+export HOME="$R5_BASE/home" TMPDIR="$R5_BASE/tmp" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+export PATH="$R5_BASE/fakebin:$PATH"
+secondmate_registry_parse_line() { :; }
+fm_refuse_text() { printf '%s' "$1"; }
+[ "${R5_BACKEND:-0}" != 1 ] || . "$R5_BIN/fm-backend.sh"
+. "$R5_BIN/fm-task-copy-lib.sh"
+. "$R5_BIN/fm-teardown-nested-lib.sh"
+r5_repo() {  # <shape>: sets repo copy PROJ DATA STATE WT ID and makes the project
+  repo="$R5_BASE/$1-project" copy="$R5_BASE/$1-copy"
+  PROJ=$repo DATA="$R5_BASE/$1-data/data" STATE="$R5_BASE/$1-state" WT=$copy ID=r5-fixture
+  mkdir -p "$DATA/$ID" "$STATE"
+  git init -q -b main "$repo"
+}
+r5_reset() {  # <copy>
+  TEARDOWN_ADMIT_DIRS=() TEARDOWN_ADMIT_KINDS=() TEARDOWN_ADMIT_HEADS=() TEARDOWN_ADMIT_STORED=() TEARDOWN_ADMIT_RECORD=()
+  TEARDOWN_LOCK_SEEN_DIRS=() TEARDOWN_LOCK_SEEN_TEXT=() TEARDOWN_FOREIGN_PROCS=()
+  TEARDOWN_NESTED_COPIES=("$1") TEARDOWN_FOREIGN_COPIES=() TEARDOWN_BUNDLE_SWEEP_PROOF=
+}
+r5_dest() { printf '%s/nested-copy-preserved/%s' "$DATA/$ID" "$(printf '%s' "$1" | teardown_ignored_sha256)"; }
+PRE
+  # The body's own exit status is not the verdict: r5_expect reads its output.
+  bash -c '. "$1/pre.sh" "$2" "$1"; . "$3"' _ "$base" "$ROOT/bin" "$2" > "$base/out" 2>"$base/err" || true
+  R5_OUT=$base/out
+  R5_ERR=$base/err
+}
+r5_expect() {  # <exact-line> <message>
+  grep -qxF -- "$1" "$R5_OUT" || fail "$2 (want '$1'; output: $(paste -sd '|' - < "$R5_OUT"); stderr: $(tail -n 5 "$R5_ERR" | paste -sd '|' -))"
+}
+
+# Finding 1, preserve route (falsifier ignored-newline.sh): an ignored file whose
+# name holds a newline is preserved byte for byte beside ordinary names, and the
+# manifest cannot be satisfied by the lines of two other files.
+test_r5_ignored_newline_name_is_preserved() {
+  local body=$TMP_ROOT/r5-body-ignored-newline.sh
+  cat > "$body" <<'BODY'
+for shape in control newline; do
+  r5_repo "$shape"
+  printf '/a*\n/b\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'ordinary-a\n' > "$copy/a"
+  printf 'ordinary-b\n' > "$copy/b"
+  [ "$shape" != newline ] || printf 'unique-newline\n' > "$copy/"$'a\nb'
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  dest=$(r5_dest "$copy")
+  kept=yes
+  [ "$(cat "$dest/a" 2>/dev/null)" = ordinary-a ] && [ "$(cat "$dest/b" 2>/dev/null)" = ordinary-b ] || kept=no
+  [ "$shape" != newline ] || [ "$(cat "$dest/"$'a\nb' 2>/dev/null)" = unique-newline ] || kept=no
+  echo "$shape proof=$rc kept=$kept"
+  if [ "$shape" = newline ] && [ "$rc" = 0 ]; then
+    # The same preserve with the newline file's payload changed must refuse.
+    printf 'changed\n' > "$dest/"$'a\nb'
+    rc=0
+    teardown_ignored_preserved_current "$copy" || rc=$?
+    echo "newline-tampered verify=$rc"
+  fi
+done
+BODY
+  r5_harness ignored-newline "$body"
+  r5_expect 'control proof=0 kept=yes' 'r5-newline: the ordinary ignored files were not preserved'
+  r5_expect 'newline proof=0 kept=yes' 'r5-newline: an ignored file whose name holds a newline was not preserved'
+  r5_expect 'newline-tampered verify=1' 'r5-newline: a changed payload of the newline file passed the readback'
+  pass "an ignored file whose name holds a newline is preserved byte for byte, and a changed payload of it refuses"
+}
+
+# Finding 1, refuse route (falsifier history-ignored-newline.sh): a copy only the
+# history rule admits keeps a unique ignored file named by one newline.
+test_r5_history_copy_keeps_a_newline_named_ignored_file() {
+  local body=$TMP_ROOT/r5-body-history-newline.sh
+  cat > "$body" <<'BODY'
+for shape in clean ordinary newline; do
+  r5_repo "$shape"
+  printf '*\n' > "$repo/.gitignore"
+  printf 'base\n' > "$repo/tracked.txt"
+  git -C "$repo" add -f .gitignore tracked.txt && git -C "$repo" commit -qm base
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'landed content\n' > "$copy/tracked.txt"
+  git -C "$copy" add tracked.txt && git -C "$copy" commit -qm task
+  printf 'landed content\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm squash
+  printf 'later default edit\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm later
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch && echo "$shape fixture-wrong"
+  fm_task_copy_content_in_default_history "$copy" HEAD || echo "$shape fixture-wrong"
+  case "$shape" in ordinary) name=ordinary.dat ;; newline) name=$'\n' ;; *) name= ;; esac
+  [ -z "$name" ] || printf 'only ignored bytes\n' > "$copy/$name"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  teardown_removal_final_proof "$copy" refuse unlocked || rc=$?
+  [ "$rc" = 0 ] || rc=refused
+  if [ -n "$name" ] && [ -f "$copy/$name" ]; then echo "$shape proof=$rc file=kept"; else echo "$shape proof=$rc file=none"; fi
+done
+BODY
+  r5_harness history-newline "$body"
+  r5_expect 'clean proof=0 file=none' 'r5-history-newline: a clean history-admitted copy did not pass'
+  r5_expect 'ordinary proof=refused file=kept' 'r5-history-newline: an ordinary unique ignored file did not refuse'
+  r5_expect 'newline proof=refused file=kept' 'r5-history-newline: a newline-named unique ignored file did not refuse'
+  pass "a history-admitted copy keeps a unique ignored file whose name is a newline, as it keeps an ordinary one; clean, it passes"
+}
+
+# Finding 2, ignored payload (falsifier preserve-leaf-retarget.sh): a preserve
+# whose published leaf is moved into the copy and replaced by a symlink refuses.
+test_r5_preserve_leaf_moved_into_the_copy_refuses() {
+  local body=$TMP_ROOT/r5-body-leaf.sh
+  mkdir -p "$TMP_ROOT/r5-leaf/fakebin"
+  cat > "$TMP_ROOT/r5-leaf/fakebin/mv" <<'SH'
+#!/bin/bash
+/bin/mv "$@" || exit $?
+case "${1:-}:${R5_REDIRECT:-0}" in
+  */.staging-*:1)
+    mkdir -p "$R5_COPY/.claude/held" || exit 1
+    /bin/mv "$2" "$R5_COPY/.claude/held/preserve" || exit 1
+    ln -s "$R5_COPY/.claude/held/preserve" "$2" || exit 1
+    ;;
+esac
+SH
+  chmod +x "$TMP_ROOT/r5-leaf/fakebin/mv"
+  cat > "$body" <<'BODY'
+for shape in control retarget; do
+  r5_repo "$shape"
+  printf '/.claude/\n/unique.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'unique original bytes\n' > "$copy/unique.dat"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  R5_REDIRECT=0 R5_COPY=$copy
+  [ "$shape" != retarget ] || R5_REDIRECT=1
+  export R5_REDIRECT R5_COPY
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  R5_REDIRECT=0
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape proof=$rc original=$(cat "$copy/unique.dat" 2>/dev/null)"
+  if [ "$rc" = 0 ]; then
+    git -C "$repo" worktree remove "$copy" && echo "$shape after-remove=$(cat "$(r5_dest "$copy")/unique.dat" 2>/dev/null)"
+  fi
+done
+BODY
+  r5_harness leaf "$body"
+  r5_expect 'control proof=0 original=unique original bytes' 'r5-leaf: an external intact preserve did not pass'
+  r5_expect 'control after-remove=unique original bytes' 'r5-leaf: the external preserve did not survive the removal'
+  r5_expect 'retarget proof=refused original=unique original bytes' 'r5-leaf: a preserve leaf moved into the copy passed the final proof'
+  pass "a preserve whose leaf resolves inside the copy refuses and the original stays; an external preserve passes and survives the removal"
+}
+
+# Finding 2, recorded bundle (falsifier bundle-parent-retarget.sh): a stored
+# bundle whose directory is moved into the copy after admission refuses.
+test_r5_stored_bundle_moved_into_the_copy_refuses() {
+  local body=$TMP_ROOT/r5-body-bundle-parent.sh
+  cat > "$body" <<'BODY'
+for shape in control retarget; do
+  r5_repo "$shape"
+  source_bundle="$R5_BASE/$shape-source.bundle"
+  printf '/.claude/\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'unique commit\n' > "$copy/work.txt"
+  git -C "$copy" add work.txt && git -C "$copy" commit -qm unique
+  tip=$(git -C "$copy" rev-parse HEAD)
+  git -C "$copy" bundle create -q "$source_bundle" --all 2>/dev/null
+  printf '%s\t%s\t%s\n' "$source_bundle" "$(teardown_ignored_sha256 "$source_bundle")" "$tip" > "$DATA/$ID/preservation-bundles.tsv"
+  r5_reset "$copy"
+  teardown_bundle_preserved "$copy" "$tip" 2>/dev/null || echo "$shape fixture-wrong"
+  stored=$TEARDOWN_BUNDLE_ACCEPTED
+  teardown_admit "$copy" bundle "$tip" "$stored"
+  TEARDOWN_BUNDLE_SWEEP_PROOF=$stored
+  TEARDOWN_SWEEP_RECORD=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv")
+  rm "$source_bundle"
+  if [ "$shape" = retarget ]; then
+    mkdir -p "$copy/.claude/held"
+    mv "$DATA/$ID/preserved-bundles" "$copy/.claude/held/"
+    ln -s "$copy/.claude/held/preserved-bundles" "$DATA/$ID/preserved-bundles"
+  fi
+  rc=0
+  teardown_removal_final_proof "$copy" refuse unlocked || rc=$?
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape proof=$rc"
+  if [ "$rc" = 0 ]; then
+    git -C "$repo" worktree remove "$copy"
+    git init -q --bare "$R5_BASE/recovered-$shape.git"
+    git -C "$R5_BASE/recovered-$shape.git" fetch -q "$stored" "$tip:refs/heads/recovered" 2>/dev/null
+    [ "$(git -C "$R5_BASE/recovered-$shape.git" rev-parse refs/heads/recovered 2>/dev/null)" = "$tip" ] && echo "$shape restored=yes"
+  fi
+done
+BODY
+  r5_harness bundle-parent "$body"
+  r5_expect 'control proof=0' 'r5-bundle-parent: an intact external bundle did not pass'
+  r5_expect 'control restored=yes' 'r5-bundle-parent: the external bundle did not restore the tip after removal'
+  r5_expect 'retarget proof=refused' 'r5-bundle-parent: a stored bundle moved into the copy passed the final proof'
+  pass "a stored bundle whose directory resolves inside the copy refuses at the final proof; an external one passes and restores"
+}
+
+# Finding 3 (falsifier preserve-scan-failure.sh): a failed scan of the staged
+# preserve or of the copy refuses, alone or with a changed payload.
+test_r5_failed_preserve_scan_refuses() {
+  local body=$TMP_ROOT/r5-body-scan.sh
+  mkdir -p "$TMP_ROOT/r5-scan/fakebin"
+  cat > "$TMP_ROOT/r5-scan/fakebin/find" <<'SH'
+#!/bin/bash
+case "${R5_FAIL_FIND:-}" in
+  '') ;;
+  all) echo 'simulated find failure' >&2; exit 1 ;;
+  *) case "${1:-}" in "$R5_FAIL_FIND"*) echo 'simulated find failure' >&2; exit 1 ;; esac ;;
+esac
+exec /usr/bin/find "$@"
+SH
+  cat > "$TMP_ROOT/r5-scan/fakebin/mv" <<'SH'
+#!/bin/bash
+/bin/mv "$@" || exit $?
+case "${1:-}:${R5_TAMPER:-0}" in */.staging-*:1) printf 'corrupted\n' > "$2/unique.dat" ;; esac
+SH
+  chmod +x "$TMP_ROOT/r5-scan/fakebin/find" "$TMP_ROOT/r5-scan/fakebin/mv"
+  cat > "$body" <<'BODY'
+for shape in control tampered build readback all-tampered; do
+  r5_repo "$shape"
+  printf '/unique.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'only original copy\n' > "$copy/unique.dat"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  R5_FAIL_FIND= R5_TAMPER=0
+  case "$shape" in
+    tampered) R5_TAMPER=1 ;;
+    build) R5_FAIL_FIND="$DATA/$ID/nested-copy-preserved/.staging-" ;;
+    readback) R5_FAIL_FIND="$copy/" ;;
+    all-tampered) R5_FAIL_FIND=all R5_TAMPER=1 ;;
+  esac
+  export R5_FAIL_FIND R5_TAMPER
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  R5_FAIL_FIND= R5_TAMPER=0
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape proof=$rc original=$(cat "$copy/unique.dat" 2>/dev/null)"
+done
+BODY
+  r5_harness scan "$body"
+  r5_expect 'control proof=0 original=only original copy' 'r5-scan: an intact preserve with working scans did not pass'
+  r5_expect 'tampered proof=refused original=only original copy' 'r5-scan: a changed payload passed with working scans'
+  r5_expect 'build proof=refused original=only original copy' 'r5-scan: a failed scan of the staged preserve passed'
+  r5_expect 'readback proof=refused original=only original copy' 'r5-scan: a failed scan of the copy at the readback passed'
+  r5_expect 'all-tampered proof=refused original=only original copy' 'r5-scan: failed scans hid a changed payload'
+  pass "a failed scan of the staged preserve or of the copy refuses, alone or hiding a changed payload; working scans pass an intact preserve"
+}
+
+# Finding 4 (falsifier preserve-interrupted-retry.sh): no start state of an
+# earlier preserve (only set aside, set aside beside a newer one, or in place)
+# loses it to a failed publication, and a successful one replaces it only after
+# the new preserve is verified.
+test_r5_interrupted_preserve_keeps_the_earlier_one() {
+  local body=$TMP_ROOT/r5-body-retry.sh
+  mkdir -p "$TMP_ROOT/r5-retry/fakebin"
+  cat > "$TMP_ROOT/r5-retry/fakebin/mv" <<'SH'
+#!/bin/bash
+if [ "${R5_FAIL_PUBLISH:-0}" = 1 ]; then
+  case "${1:-}" in */.staging-*) echo 'simulated publication failure' >&2; exit 1 ;; esac
+fi
+exec /bin/mv "$@"
+SH
+  chmod +x "$TMP_ROOT/r5-retry/fakebin/mv"
+  cat > "$body" <<'BODY'
+seed() {  # <dir> <payload>
+  mkdir -p "$1"
+  printf '%s\n' "$2" > "$1/earlier.dat"
+  printf '%s\n' "$copy" > "$1/copy-path"
+  printf '%s  earlier.dat\n' "$(teardown_ignored_sha256 "$1/earlier.dat")" > "$1/SHA256SUMS"
+}
+for shape in dest-only aside-only dest-and-aside success; do
+  r5_repo "$shape"
+  printf '/current.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'new payload\n' > "$copy/current.dat"
+  r5_reset "$copy"
+  root="$DATA/$ID/nested-copy-preserved"
+  hash=$(printf '%s' "$copy" | teardown_ignored_sha256)
+  dest="$root/$hash" aside="$root/.aside-$hash"
+  mkdir -p "$root"
+  case "$shape" in
+    dest-only) seed "$dest" 'payload-in-place' ;;
+    aside-only|success) seed "$aside" 'payload-set-aside' ;;
+    dest-and-aside) seed "$dest" 'payload-in-place'; seed "$aside" 'payload-set-aside' ;;
+  esac
+  mkdir -p "$root/.staging-$hash"
+  printf 'staged before interruption\n' > "$root/.staging-$hash/current.dat"
+  R5_FAIL_PUBLISH=1
+  [ "$shape" != success ] || R5_FAIL_PUBLISH=0
+  export R5_FAIL_PUBLISH
+  rc=0
+  teardown_preserve_ignored "$copy" 2>/dev/null || rc=$?
+  R5_FAIL_PUBLISH=0
+  [ "$rc" = 0 ] || rc=refused
+  found=
+  for payload in payload-in-place payload-set-aside; do
+    grep -rqxF "$payload" "$root" 2>/dev/null && found="$found $payload"
+  done
+  echo "$shape preserve=$rc kept:${found:- none}"
+  if [ "$shape" = success ]; then
+    echo "success new=$(cat "$dest/current.dat" 2>/dev/null)"
+    v=0; teardown_ignored_preserved_current "$copy" || v=$?
+    echo "success verify=$v"
+  fi
+done
+BODY
+  r5_harness retry "$body"
+  r5_expect 'dest-only preserve=refused kept: payload-in-place' 'r5-retry: a failed publication lost the earlier preserve in place'
+  r5_expect 'aside-only preserve=refused kept: payload-set-aside' 'r5-retry: a retry after an interruption lost the earlier preserve that was set aside'
+  r5_expect 'dest-and-aside preserve=refused kept: payload-in-place payload-set-aside' 'r5-retry: a failed retry lost one of two earlier preserves'
+  r5_expect 'success new=new payload' 'r5-retry: a successful retry did not publish the new preserve'
+  r5_expect 'success verify=0' 'r5-retry: the published preserve does not verify'
+  pass "a failed or interrupted preserve publication keeps every earlier preserve; a successful one is published and verified"
+}
+
+# Finding 5, landing (falsifier landing-ref-changed.sh): a landing admission is
+# bound to the default ref it read, and a moved or unreadable ref refuses.
+test_r5_landing_admission_rechecks_the_default_ref() {
+  local body=$TMP_ROOT/r5-body-landing.sh
+  cat > "$body" <<'BODY'
+for shape in control moved gone; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  base=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  git -C "$repo" merge -q --ff-only "f-$shape"
+  head=$(git -C "$copy" rev-parse HEAD)
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch || echo "$shape fixture-wrong"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$head"
+  case "$shape" in
+    moved) git -C "$repo" update-ref refs/heads/main "$base" "$head" ;;
+    gone) git -C "$repo" checkout -q --detach && git -C "$repo" update-ref -d refs/heads/main ;;
+  esac
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+done
+BODY
+  r5_harness landing "$body"
+  r5_expect 'control proof=0' 'r5-landing: an unchanged default ref did not pass'
+  r5_expect 'moved proof=refused stable=none' 'r5-landing: a default ref moved after the landing proof passed, or refused as stable'
+  r5_expect 'gone proof=refused stable=none' 'r5-landing: an unreadable default ref passed, or refused as stable'
+  pass "a landing admission refuses at the removal when the default ref it read moved or cannot be read, as a retry; unchanged, it passes"
+}
+
+# Finding 5, driver credit (falsifier driver-credit-stale.sh): bundle credit
+# teardown built for the driver is an admission, so a bundle truncated after the
+# credit keeps the copy before the driver runs.
+test_r5_stale_bundle_credit_stops_before_the_driver() {
+  local body=$TMP_ROOT/r5-body-credit.sh
+  cat > "$body" <<'BODY'
+teardown_launcher_live_since() { return 1; }
+fm_lock_path_mtime() {
+  if [ "$shape" = changed ]; then : > "$source_bundle"; : > "$stored"; fi
+  printf '1\n'
+}
+teardown_run_closeout() {
+  [ "${TEARDOWN_CLOSEOUT_CREDIT[0]-}" = --bundle-record ] || { echo "$shape driver=no-bundle-credit"; return 91; }
+  echo "$shape driver=called"
+  return 0
+}
+for shape in control changed; do
+  r5_repo "$shape"
+  source_bundle="$R5_BASE/$shape-source.bundle"
+  TREEHOUSE_PROJECT_LOCK_HELD=0
+  printf 'base\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm base
+  git -C "$repo" update-ref refs/remotes/origin/main "$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'landed content\n' > "$copy/tracked.txt"
+  git -C "$copy" add tracked.txt && git -C "$copy" commit -qm task
+  tip=$(git -C "$copy" rev-parse HEAD)
+  printf 'landed content\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm squash
+  git -C "$repo" worktree lock --reason 'vernant-session-active owner=launcher:4194305 launcher=4194305' "$copy"
+  git -C "$copy" bundle create -q "$source_bundle" --all 2>/dev/null
+  hash=$(teardown_ignored_sha256 "$source_bundle")
+  printf '%s\t%s\t%s\n' "$source_bundle" "$hash" "$tip" > "$DATA/$ID/preservation-bundles.tsv"
+  stored="$DATA/$ID/preserved-bundles/$hash.bundle"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$tip"
+  teardown_copy_lock_file "$copy"
+  teardown_lock_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"
+  rc=0
+  teardown_closeout_release "$repo" "$copy" 'own nested' 2>/dev/null || rc=$?
+  [ "$rc" = 0 ] || echo "$shape release=refused"
+  [ -f "$copy/.git" ] && echo "$shape copy=present"
+done
+BODY
+  r5_harness credit "$body"
+  r5_expect 'control driver=called' 'r5-credit: an intact bundle credit did not reach the driver'
+  r5_expect 'changed release=refused' 'r5-credit: a truncated credited bundle did not refuse'
+  r5_expect 'changed copy=present' 'r5-credit: the copy is gone'
+  if grep -qxF 'changed driver=called' "$R5_OUT"; then fail 'r5-credit: the driver ran with bundle credit whose bundle was truncated after the credit'; fi
+  pass "bundle credit for the driver is rechecked at the final proof: a credited bundle truncated after the credit keeps the copy and the driver never runs; intact, it runs"
+}
+
+# Finding 6 (falsifier lock-extra-line.sh): the whole lock file is compared, so
+# a line appended after the first read refuses before the driver, and a lock
+# file with more than Vernant's one line is never read as Vernant's.
+test_r5_lock_changed_after_its_first_line_refuses() {
+  local body=$TMP_ROOT/r5-body-lock.sh
+  cat > "$body" <<'BODY'
+teardown_closeout_credit() { TEARDOWN_CLOSEOUT_CREDIT=(); TEARDOWN_CLOSEOUT_CREDIT_FILE=; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_launcher_live_since() { return 1; }
+teardown_run_closeout() { echo "$shape driver=called"; return 0; }
+for shape in control appended; do
+  r5_repo "$shape"
+  TREEHOUSE_PROJECT_LOCK_HELD=0
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  git -C "$repo" worktree lock --reason 'vernant-session-active owner=launcher:4194305 launcher=4194305' "$copy"
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch || echo "$shape fixture-wrong"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  teardown_copy_lock_file "$copy"
+  teardown_lock_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"
+  file=$TEARDOWN_FOREIGN_LOCK_FILE
+  [ "$shape" != appended ] || printf 'changed lock content\n' >> "$file"
+  teardown_copy_lock_file "$copy"
+  if teardown_lock_is_first_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"; then echo "$shape first-seen=yes"; else echo "$shape first-seen=no"; fi
+  if teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then echo "$shape vernant=yes"; else echo "$shape vernant=no"; fi
+  rc=0
+  teardown_closeout_release "$repo" "$copy" 'own nested' 2>/dev/null || rc=$?
+  [ "$rc" = 0 ] || echo "$shape release=refused"
+done
+BODY
+  r5_harness lock "$body"
+  r5_expect 'control first-seen=yes' 'r5-lock: an unchanged lock was not the one first seen'
+  r5_expect 'control vernant=yes' "r5-lock: an unchanged lock was not read as Vernant's"
+  r5_expect 'control driver=called' 'r5-lock: an unchanged lock did not reach the driver'
+  r5_expect 'appended first-seen=no' 'r5-lock: a lock with a line appended was taken for the one first seen'
+  r5_expect 'appended vernant=no' "r5-lock: a lock file with more than one line was read as Vernant's creation lock"
+  r5_expect 'appended release=refused' 'r5-lock: a lock with a line appended did not refuse'
+  if grep -qxF 'appended driver=called' "$R5_OUT"; then fail 'r5-lock: the driver ran after a line was appended to the lock'; fi
+  pass "a lock changed after its first line, or holding more than Vernant's one line, refuses before the driver; unchanged, the driver runs"
+}
+
+# Finding 7 (falsifier post-retire-holder.sh): a holder found after the retire
+# phase refuses before the driver; no process is signalled to get past it.
+test_r5_holder_after_retirement_refuses_before_the_driver() {
+  local body=$TMP_ROOT/r5-body-holder.sh
+  cat > "$body" <<'BODY'
+fm_task_copy_other_record() { return 1; }
+pids_with_cwd_under() { [ "$shape" != holder ] || printf '4194304\t%s\n' "$1"; }
+pids_with_open_file_under() { [ "$shape" != holder ] || printf '4194304\t%s/tracked.txt\n' "$1"; }
+teardown_pid_is_task_own() { TEARDOWN_OWN_CWD=$copy; return 0; }
+task_process_identity() { printf 'synthetic-identity\n'; }
+task_record_process_signal() { echo "$shape signalled=$1"; return 0; }
+teardown_lock_launcher_may_be_live() { return 1; }
+teardown_launcher_live_since() { return 1; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_closeout_credit() { TEARDOWN_CLOSEOUT_CREDIT=(); TEARDOWN_CLOSEOUT_CREDIT_FILE=; }
+teardown_run_closeout() { echo "$shape driver=called"; return 0; }
+for shape in control holder; do
+  r5_repo "$shape"
+  TREEHOUSE_PROJECT_LOCK_HELD=0 META="$R5_BASE/$shape.meta" TEARDOWN_RETURN_SLOT=$repo
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  git -C "$repo" worktree lock --reason 'vernant-session-active owner=launcher:4194305 launcher=4194305' "$copy"
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch || echo "$shape fixture-wrong"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  teardown_own_locked_copies_prove 2>/dev/null
+  rc=0
+  teardown_closeout_release "$repo" "$copy" 'own nested' 2>/dev/null || rc=$?
+  [ "$rc" = 0 ] || echo "$shape release=refused"
+  case "${TEARDOWN_CLOSEOUT_NOT_RUN:-}" in *4194304*) echo "$shape named=yes" ;; esac
+done
+BODY
+  r5_harness holder "$body"
+  r5_expect 'control driver=called' 'r5-holder: a copy with no holder did not reach the driver'
+  r5_expect 'holder release=refused' 'r5-holder: a holder found after retirement did not refuse'
+  r5_expect 'holder named=yes' 'r5-holder: the refusal does not name the holder'
+  if grep -qxF 'holder driver=called' "$R5_OUT"; then fail 'r5-holder: the driver ran with a holder found after retirement'; fi
+  if grep -q 'signalled=' "$R5_OUT"; then fail 'r5-holder: a holder was signalled'; fi
+  pass "a process found in or holding a file of a locked copy after the retire phase refuses before the driver, named and unsignalled; with none, the driver runs"
+}
+
+# Finding 8 (falsifier unreadable-owner-record.sh): an active task record that
+# cannot be read means the owner is unknown, never that there is none.
+test_r5_unreadable_task_record_is_owner_unknown() {
+  local body=$TMP_ROOT/r5-body-owner.sh
+  cat > "$body" <<'BODY'
+fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$1"); }
+pids_with_cwd_under() { return 0; }
+pids_with_open_file_under() { return 0; }
+teardown_copy_lock_file() { return 1; }
+copy="$R5_BASE/copy" STATE="$R5_BASE/state" META="$R5_BASE/state/retiring.meta"
+mkdir -p "$copy" "$STATE"
+printf 'kind=ship\n' > "$META"
+other="$STATE/other.meta"
+printf 'kind=ship\nworktree=%s\n' "$copy" > "$other"
+rc=0; fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
+echo "readable other=$rc"
+chmod 000 "$other"
+if [ -r "$other" ]; then echo 'fixture-wrong'; fi
+rc=0; fm_task_copy_other_record "$META" "$STATE" "$copy" 2>/dev/null || rc=$?
+echo "unreadable other=$rc"
+rc=0; teardown_foreign_copy_unowned "$copy" 2>/dev/null || rc=$?
+echo "unreadable unowned=$rc rule=${TEARDOWN_FOREIGN_RULE:-}"
+chmod 600 "$other"
+rm "$other"
+rc=0; fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
+echo "absent other=$rc"
+BODY
+  R5_BACKEND=1 r5_harness owner "$body"
+  r5_expect 'readable other=0' 'r5-owner: a readable record naming the copy was not found'
+  r5_expect 'unreadable other=2' 'r5-owner: an unreadable record was read as no owner'
+  r5_expect 'unreadable unowned=1 rule=inspection-unavailable' 'r5-owner: the ownership guard accepted a copy whose owner record cannot be read'
+  r5_expect 'absent other=1' 'r5-owner: no record was not read as no owner'
+  pass "an unreadable active task record means its owner is unknown and the copy is refused; readable it owns the copy, absent it does not"
+}
+
+# Finding 9 (falsifier managed-hook-removal.sh): the final proof matches Git. A
+# managed hook file Git would refuse as untracked keeps the copy with a stable
+# refusal; excluded as Firstmate's spawn excludes it, the copy is removed.
+test_r5_untracked_managed_hook_file_refuses_like_git() {
+  local body=$TMP_ROOT/r5-body-hook.sh
+  cat > "$body" <<'BODY'
+for shape in clean hook hook-excluded turnend; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  case "$shape" in
+    hook|hook-excluded)
+      mkdir -p "$copy/.claude"
+      printf '{"hooks":{}}\n' > "$copy/.claude/settings.local.json"
+      if [ "$shape" = hook-excluded ]; then
+        exclude=$(git -C "$copy" rev-parse --git-path info/exclude)
+        mkdir -p "$(dirname "$exclude")"
+        printf '.claude/settings.local.json\n' >> "$exclude"
+      fi
+      ;;
+    turnend) : > "$copy/.fm-grok-turnend" ;;
+  esac
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+  if [ "$rc" = 0 ]; then
+    if git -C "$repo" worktree remove "$copy" 2>/dev/null; then echo "$shape git=removed"; else echo "$shape git=refused"; fi
+  fi
+done
+BODY
+  r5_harness hook "$body"
+  r5_expect 'clean proof=0' 'r5-hook: a clean copy did not pass'
+  r5_expect 'clean git=removed' 'r5-hook: Git did not remove the clean copy'
+  r5_expect 'hook proof=refused stable=1' 'r5-hook: an untracked managed hook file Git refuses passed the final proof'
+  r5_expect 'turnend proof=refused stable=1' 'r5-hook: an untracked turn-end marker Git refuses passed the final proof'
+  r5_expect 'hook-excluded proof=0' 'r5-hook: an excluded managed hook file did not pass'
+  r5_expect 'hook-excluded git=removed' 'r5-hook: Git did not remove a copy whose hook file is excluded'
+  pass "the final proof refuses what a plain git worktree remove refuses: an untracked managed hook file or turn-end marker keeps the copy, an excluded one is removed"
+}
+
 teardown_test_cases=(
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
@@ -7864,6 +8447,18 @@ test_r4_own_nested_untracked_claude_file_refuses
 test_r4_late_lock_change_refuses_before_the_driver
 test_r4_ignored_preserve_storage_and_payload_are_proved
 test_r4_locked_copy_is_deferred_under_project_custody
+test_r5_ignored_newline_name_is_preserved
+test_r5_history_copy_keeps_a_newline_named_ignored_file
+test_r5_preserve_leaf_moved_into_the_copy_refuses
+test_r5_stored_bundle_moved_into_the_copy_refuses
+test_r5_failed_preserve_scan_refuses
+test_r5_interrupted_preserve_keeps_the_earlier_one
+test_r5_landing_admission_rechecks_the_default_ref
+test_r5_stale_bundle_credit_stops_before_the_driver
+test_r5_lock_changed_after_its_first_line_refuses
+test_r5_holder_after_retirement_refuses_before_the_driver
+test_r5_unreadable_task_record_is_owner_unknown
+test_r5_untracked_managed_hook_file_refuses_like_git
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
