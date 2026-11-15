@@ -2295,6 +2295,15 @@ validate_pr_poll_cleanup() {
       return 1
     fi
   done
+  # Before anything is removed, a merge-notified marker under either name must be
+  # one that could be written back (Main 1871 F8).
+  for artifact in "$state_dir/$id.pr-poll-merge-notified" "$state_dir/$id.pr-poll-merge-notified.retiring"; do
+    [ -f "$artifact" ] || continue
+    if ! merge_marker_bytes_valid "$(cat -- "$artifact" 2>/dev/null && printf x)" x; then
+      echo "error: the merge-notified marker $artifact is empty or malformed; nothing was removed and the task record stays, so a later teardown retries once it is repaired" >&2
+      return 1
+    fi
+  done
   if [ -e "$state_dir/$id.pr-poll-retirement" ] \
     || [ -L "$state_dir/$id.pr-poll-retirement" ]; then
     fm_pr_poll_retirement_state_valid "$state_dir" "$id" || {
@@ -2318,6 +2327,18 @@ validate_pr_poll_cleanup() {
 # fails, teardown refuses and names both paths (Main 1820 F8, Main 1827 Q2 (B)).
 TEARDOWN_MARKER_PATH=
 TEARDOWN_MARKER_BYTES=
+# 0 when <bytes> are a merge-notified marker: the version line and the provider,
+# host, path and number lines of bin/fm-pr-lib.sh fm_pr_poll_merge_marker_matches,
+# each nonempty, and nothing else.
+merge_marker_bytes_valid() {  # <bytes> [x: <bytes> end with a sentinel x to strip]
+  local version provider host path number extra bytes=$1
+  [ "${2:-}" != x ] || bytes=${bytes%x}
+  set -- "$bytes"
+  { IFS= read -r version; IFS= read -r provider; IFS= read -r host; IFS= read -r path; IFS= read -r number
+    IFS= read -r extra; } <<< "$1"
+  [ "$version" = fm-pr-poll-merge-notified-v1 ] && [ -n "$provider" ] && [ -n "$host" ] && [ -n "$path" ] \
+    && [[ "$number" =~ ^[1-9][0-9]*$ ]] && [ -z "$extra" ] && [ "${1: -1}" = $'\n' ]
+}
 merge_marker_retire_begin() {  # <state> <id>
   local marker="$1/$2.pr-poll-merge-notified" source='' bytes
   TEARDOWN_MARKER_PATH=
@@ -2333,6 +2354,12 @@ merge_marker_retire_begin() {  # <state> <id>
       echo "error: the merge-notified marker $source could not be read; the task record stays, so a later teardown retries" >&2
       return 1
     }
+    # Validated before anything is removed (Main 1871 F8): an empty or malformed
+    # marker could not be written back, so it stops teardown with the record intact.
+    if ! merge_marker_bytes_valid "${bytes%x}"; then
+      echo "error: the merge-notified marker $source is empty or malformed; nothing was removed and the task record stays, so a later teardown retries once it is repaired" >&2
+      return 1
+    fi
     TEARDOWN_MARKER_PATH=$marker
     TEARDOWN_MARKER_BYTES=${bytes%x}
   fi

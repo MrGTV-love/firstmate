@@ -698,6 +698,33 @@ SH
   pass "a set-aside marker whose removal fails after the rename keeps the record for a retry, and the retry removes both"
 }
 
+# Main 1871 F8: the marker is read and validated before anything is removed. An
+# empty or malformed marker, under either name, stops teardown with the record and
+# the marker as they were; a valid one goes with the record (the unlink-only case
+# above is the control).
+test_empty_or_malformed_marker_refuses_before_anything_is_removed() {
+  local case_dir rc shape name marker bytes
+  for name in pr-poll-merge-notified pr-poll-merge-notified.retiring; do
+    for shape in empty malformed; do
+      case_dir=$(detached_copy_case "marker-$shape-${name##*.}" - no own)
+      marker="$case_dir/state/task-x1.$name"
+      case "$shape" in
+        empty) : > "$marker" ;;
+        malformed) printf 'fm-pr-poll-merge-notified-v1\ngithub\n' > "$marker" ;;
+      esac
+      chmod 600 "$marker"
+      bytes=$(shasum -a 256 < "$marker")
+      rc=0
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      [ "$rc" -ne 0 ] || fail "$shape $name: teardown succeeded over an unusable marker"
+      assert_present "$case_dir/state/task-x1.meta" "$shape $name: the record was touched"
+      [ "$(shasum -a 256 < "$marker" 2>/dev/null)" = "$bytes" ] || fail "$shape $name: the marker was moved or changed"
+      assert_grep 'empty or malformed' "$case_dir/stderr" "$shape $name: the refusal does not name the marker"
+    done
+  done
+  pass "an empty or malformed merge-notified marker, under either name, stops teardown before anything is removed"
+}
+
 # Main 1820 F8, Main 1827 Q2 (B): the marker is retired first, then the record. When
 # removing the record fails, the marker is written back, so the record never stays
 # without it; a retry then removes both. When even that write fails, teardown
@@ -4506,6 +4533,7 @@ test_unsafe_merge_notified_marker_keeps_the_record
 test_unremovable_merge_notified_marker_leaves_a_retry
 test_marker_unlink_failure_after_the_rename_leaves_a_retry
 test_record_removal_failure_restores_the_marker
+test_empty_or_malformed_marker_refuses_before_anything_is_removed
 test_detached_copy_finds_the_merged_pr_among_several
 test_empty_recorded_slot_nested_drop
 test_recorded_slot_lost_lease_still_refuses
