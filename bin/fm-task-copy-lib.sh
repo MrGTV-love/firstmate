@@ -125,7 +125,7 @@ FM_TASK_COPY_UNASKED=
 # The ref and commit the last content check compared with, for the caller to print.
 FM_TASK_COPY_COMPARED=
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>] [no-fetch]
-  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref default_tree merged_tree
+  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref commit default_tree merged_tree
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
@@ -140,10 +140,14 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   else
     return 1
   fi
-  default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
+  # The ref is read once: the tree, the comparison and FM_TASK_COPY_COMPARED all
+  # use that one commit, so a ref that moves during the check cannot mix two.
+  commit=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null) || return 1
+  [ -n "$commit" ] || return 1
+  default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$commit^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
-  FM_TASK_COPY_COMPARED="${ref#refs/} $(git -C "$worktree" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null)"
-  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || {
+  FM_TASK_COPY_COMPARED="${ref#refs/} $commit"
+  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$commit" "$head" 2>/dev/null) || {
     [ "$?" != 1 ] || FM_TASK_COPY_UNASKED=
     return 1
   }
@@ -197,18 +201,33 @@ fm_task_copy_indexer_pid() {  # <pid>
   return 1
 }
 
-# The porcelain status lines of <copy> that are its own uncommitted work:
-# Firstmate's hook files do not count, and neither does the untracked entry of
-# each of the task's own <nested-copy> paths inside <copy>, since each of those
-# is preserved or proved on its own.
+# The files Firstmate itself writes into a task copy (bin/fm-spawn.sh writes and
+# git-excludes them; teardown removes the turn-end plugin), by exact path. They
+# are the only untracked entries that are not the task's own work.
+FM_TASK_COPY_MANAGED_FILES=(
+  .claude/settings.local.json
+  .fm-busy-stop
+  .fm-grok-turnend
+  .fm-kimi-turnend
+  .opencode/plugins/fm-busy-state.js
+  .opencode/plugins/fm-turn-end.js
+)
+
+# The porcelain status lines of <copy> that are its own uncommitted work, read
+# from a status taken with --untracked-files=all: only an untracked entry that is
+# exactly one of FM_TASK_COPY_MANAGED_FILES does not count, and neither does the
+# untracked entry of each of the task's own <nested-copy> paths inside <copy>,
+# since each of those is preserved or proved on its own. Any other untracked
+# file, under .claude or anywhere else, is the copy's own work.
 fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
-  local status=$1 copy=${2:-} line nested
+  local status=$1 copy=${2:-} line nested managed
   shift
   [ "$#" -eq 0 ] || shift
   while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      ''|'?? .claude/'*|'?? .fm-grok-turnend'|'?? .fm-kimi-turnend') continue ;;
-    esac
+    [ -n "$line" ] || continue
+    for managed in "${FM_TASK_COPY_MANAGED_FILES[@]}"; do
+      [ "$line" != "?? $managed" ] || continue 2
+    done
     for nested in "$@"; do
       case "$nested" in
         "$copy"/*) [ "$line" != "?? ${nested#"$copy"/}/" ] || continue 2 ;;

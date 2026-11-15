@@ -917,6 +917,19 @@ teardown_bundle_final_current() {  # <copy> <head> <stored> <record-sha256>
   teardown_bundle_tips_cover "$required" "$TEARDOWN_BUNDLE_RECORD_TIPS" "$heads"
 }
 
+# The stored field of the latest admission of <kind> recorded for <copy>: the
+# snapshot of a landing proof ("<ref> <commit>" or "pr <url>"), or a bundle's
+# stored path. Empty when there is none.
+teardown_latest_admission() {  # <copy> <anchor|landed|bundle>
+  local canonical i value=''
+  canonical=$(fm_task_copy_canonical_dir "$1") || canonical=$1
+  for i in ${TEARDOWN_ADMIT_DIRS[@]+"${!TEARDOWN_ADMIT_DIRS[@]}"}; do
+    [ "${TEARDOWN_ADMIT_DIRS[$i]}" = "$canonical" ] && [ "${TEARDOWN_ADMIT_KINDS[$i]}" = "$2" ] || continue
+    value=${TEARDOWN_ADMIT_STORED[$i]:-$2}
+  done
+  printf '%s' "$value"
+}
+
 # Every bundle admission recorded for <copy> still holds <head>
 # (teardown_bundle_final_current). Fails with TEARDOWN_BUNDLE_REASON.
 teardown_admitted_bundles_current() {  # <copy> <head>
@@ -1072,8 +1085,11 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [
         fi
         ;;
       landed)
-        # The default branch the landing proof read must be the one it read.
+        # A merged pull request rests on the forge's answer, not on a local ref.
+        # Any other landing rests on the default-branch commit its proof read,
+        # which must still be where that ref points.
         snap=${TEARDOWN_ADMIT_STORED[$i]}
+        case "$snap" in 'pr '?*) continue ;; esac
         ref=${snap%% *}
         now=''
         [ -z "$snap" ] || now=$(git -C "$copy" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null) || now=''
@@ -1159,6 +1175,12 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
     teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
   }
+  # Main 1843: an Orca-backed task keeps base behaviour; the bundle route without
+  # a captain hold that this change adds is not admitted for it.
+  if [ "${BACKEND:-}" = orca ] && [ -n "$own" ]; then
+    teardown_bundle_refuse "the bundle route without a captain hold is not admitted for an Orca-backed task (Main 1843); land the commits or hold the task for the captain"
+    return 1
+  fi
   if [ -z "$own" ]; then
     teardown_bundle_refuse "copy has no unlanded tips of its own; existing delivery proof is still required"
     return 1
@@ -1375,14 +1397,42 @@ teardown_preserve_recover_aside() {  # <root> <hash>
   mv "$newest" "$1/$2" || { TEARDOWN_PRESERVE_WHY="the earlier preserve set aside at $newest cannot be put back"; return 1; }
 }
 
-# Deletes every earlier preserve of copy hash <hash> set aside in <root>, once a
-# newer one has verified.
+# Deletes an earlier preserve of copy hash <hash> set aside in <root> only when
+# the newer preserve in <root>/<hash>, already verified, holds every regular file
+# the earlier one holds, at the same path with the same bytes
+# (teardown_preserve_covers). An earlier preserve with any file the newer one
+# lacks or holds differently, or one that cannot be read, stays where it is.
 teardown_preserve_drop_asides() {  # <root> <hash>
   local entry rc=0
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
-    rm -rf "$entry" || rc=1
+    if teardown_preserve_covers "$1/$2" "$entry"; then
+      rm -rf "$entry" || rc=1
+    else
+      echo "teardown: kept earlier preserve $entry: it holds a file the new preserve $1/$2 does not hold with the same bytes" >&2
+    fi
   done < <(teardown_preserve_asides "$1" "$2")
+  return "$rc"
+}
+
+# Does preserve <new> hold every regular file of preserve <old> (its copy-path and
+# manifest aside) at the same relative path with the same SHA-256? A symlink or
+# other non-regular entry in <old>, or a scan that fails, answers no.
+teardown_preserve_covers() {  # <new> <old>
+  local new=$1 old=$2 list file rel sum rc=0
+  [ -d "$old" ] && [ ! -L "$old" ] || return 1
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  if ! find "$old" ! -type d ! -path "$old/copy-path" ! -path "$old/SHA256SUMS" -print0 >"$list" 2>/dev/null; then
+    rm -f "$list"
+    return 1
+  fi
+  while IFS= read -r -d '' file; do
+    rel=${file#"$old/"}
+    if [ -L "$file" ] || [ ! -f "$file" ] || [ -L "$new/$rel" ] || [ ! -f "$new/$rel" ]; then rc=1; break; fi
+    sum=$(teardown_ignored_sha256 "$file") || { rc=1; break; }
+    [ "$(teardown_ignored_sha256 "$new/$rel")" = "$sum" ] || { rc=1; break; }
+  done <"$list"
+  rm -f "$list"
   return "$rc"
 }
 
@@ -1400,6 +1450,17 @@ teardown_lock_seen() {  # <copy> <lock-reason>
   done
   TEARDOWN_LOCK_SEEN_DIRS+=("$copy")
   TEARDOWN_LOCK_SEEN_TEXT+=("$2"$'\n'"${TEARDOWN_FOREIGN_LOCK_SHA:-}")
+}
+# Was a lock read on <copy> earlier in this run (teardown_lock_seen)? A copy whose
+# lock was proved is a locked copy for the rest of the run: a later read that
+# finds no lock, or cannot read one, refuses; it never selects the unlocked route.
+teardown_lock_was_seen() {  # <copy>
+  local copy i
+  copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  for i in ${TEARDOWN_LOCK_SEEN_DIRS[@]+"${!TEARDOWN_LOCK_SEEN_DIRS[@]}"}; do
+    [ "${TEARDOWN_LOCK_SEEN_DIRS[$i]}" != "$copy" ] || return 0
+  done
+  return 1
 }
 teardown_lock_is_first_seen() {  # <copy> <lock-reason>
   local copy i
@@ -1715,7 +1776,7 @@ teardown_foreign_copies_prove() {  # <slot>
 # proved on their own. Prints a refusal and returns 1 for the first repository
 # found, or when the scan cannot be completed; changes nothing.
 teardown_own_nested_other_repos() {
-  local own hit dir common own_common rc status
+  local own hit hits found dir common own_common rc status
   for own in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -d "$own" ] || continue
     if ! own_common=$(git -C "$own" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
@@ -1723,18 +1784,29 @@ teardown_own_nested_other_repos() {
       return 1
     fi
     status=0
-    hit=$(find -P "$own" -mindepth 2 -name .git ! -path "$own/.git/*" -print 2>/dev/null) || status=$?
-    while IFS= read -r hit; do
-      [ -n "$hit" ] || continue
-      dir=$(dirname "$hit")
-      rc=0
-      common=$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || rc=$?
-      case "$rc:$common" in
-        0:"$own_common"|0:"$own_common"/modules/*|0:"$own_common"/worktrees/*/modules/*) continue ;;
-      esac
+    found=
+    # NUL-framed, so a path that holds a newline stays one path.
+    if hits=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-repos.XXXXXX"); then
+      find -P "$own" -mindepth 2 -name .git ! -path "$own/.git/*" -print0 >"$hits" 2>/dev/null || status=$?
+      while IFS= read -r -d '' hit; do
+        [ -n "$hit" ] || continue
+        dir=${hit%/.git}
+        rc=0
+        common=$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || rc=$?
+        case "$rc:$common" in
+          0:"$own_common"|0:"$own_common"/modules/*|0:"$own_common"/worktrees/*/modules/*) continue ;;
+        esac
+        found=1
+        break
+      done <"$hits"
+      rm -f "$hits"
+    else
+      status=1
+    fi
+    if [ -n "$found" ]; then
       teardown_refuse_copy registered-copy-proven "pool slot ${TEARDOWN_RETURN_SLOT:-$own} would lose Git repository $dir inside task $ID's nested copy $own, which holds work no task record proves landed; its commits would have no ref left; nothing was removed." "$dir"
       return 1
-    done <<< "$hit"
+    fi
     if [ "$status" != 0 ]; then
       teardown_refuse_copy inspection-unavailable "task $ID's nested copy $own could not be scanned for other Git repositories, so what it holds cannot be proved; nothing was removed." "$own"
       return 1
@@ -2033,8 +2105,13 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
 TEARDOWN_RELEASE_WHY=
 teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
-  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap
   TEARDOWN_RELEASE_WHY=
+  # Main 1843: an Orca-backed task keeps base behaviour, which has no direct release.
+  if [ "${BACKEND:-}" = orca ]; then
+    TEARDOWN_RELEASE_WHY='the direct release of a dead launcher'"'"'s lock is not admitted for an Orca-backed task (Main 1843)'
+    return 1
+  fi
   teardown_copy_lock_file "$copy" || { TEARDOWN_RELEASE_WHY='its lock state cannot be read'; return 1; }
   lock=$TEARDOWN_FOREIGN_LOCK
   lock_file=$TEARDOWN_FOREIGN_LOCK_FILE
@@ -2060,6 +2137,19 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     return 1
   fi
   teardown_landed "$copy" HEAD "" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='its landed-work proof no longer holds'; return 1; }
+  # Main 1843: a merged pull request on a forge the driver cannot read (Forgejo)
+  # is no credit, so a copy that only such a pull request admits, with no content
+  # proof and no bundle, is held rather than released here.
+  landed_snap=$(teardown_latest_admission "$copy" landed)
+  case "$landed_snap" in
+    'pr https://'*)
+      if ! [[ "${landed_snap#pr }" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]] \
+          && [ -z "$(teardown_latest_admission "$copy" bundle)" ]; then
+        TEARDOWN_RELEASE_WHY="only merged pull request ${landed_snap#pr } admits it, which the closeout driver cannot credit (it reads --pr from GitHub only), and no content proof or bundle holds it (Main 1843)"
+        return 1
+      fi
+      ;;
+  esac
   if teardown_copy_git_protects "$copy"; then
     TEARDOWN_RELEASE_WHY='it holds content Git would not remove without force'
     return 1
@@ -2067,11 +2157,10 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   # The retire phase has already ended this teardown's own processes, so any
   # process found running in the copy or holding a file in it open now, even one
   # of this teardown's own, appeared since: none may be there at the unlock, so
-  # this scan runs after the landed and Git proofs, next to the unlock.
-  procs=$(pids_with_open_file_under "$copy") || { TEARDOWN_RELEASE_WHY='a scan for processes holding its files open failed'; return 1; }
-  if [ -n "$procs" ]; then
-    procs=${procs%%$'\n'*}
-    TEARDOWN_RELEASE_WHY="process ${procs%%$'\t'*} runs in it or holds $(fm_refuse_text "${procs#*$'\t'}") open since the retire phase"
+  # this scan, of working directories and open files alike, runs after the landed
+  # and Git proofs, next to the unlock (teardown_copy_holder_free).
+  if ! teardown_copy_holder_free "$copy"; then
+    TEARDOWN_RELEASE_WHY=$TEARDOWN_HOLDER_WHY
     return 1
   fi
   now=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || now=
@@ -2179,12 +2268,15 @@ teardown_closeout_release() {  # <slot> <copy> <foreign|own nested>
   return "$rc"
 }
 
-# Does no process run in <copy> or hold a file in it open (the search indexer
-# exempt, as in every holder scan)? Returns 1 with TEARDOWN_HOLDER_WHY naming the
-# first holder, or the scan that failed.
+# The last holder check before a locked copy is unlocked or handed to the driver:
+# does no process run in <copy>, whatever its name, and does no process hold a
+# file in it open? A search indexer (fm_task_copy_indexer_pid) that only holds a
+# file open is exempt, unless this teardown recorded that process as its own
+# (TEARDOWN_FOREIGN_PROCS), which nothing exempts. Returns 1 with
+# TEARDOWN_HOLDER_WHY naming the first holder, or the scan that failed.
 TEARDOWN_HOLDER_WHY=
 teardown_copy_holder_free() {  # <copy>
-  local copy=$1 procs
+  local copy=$1 procs pid path
   TEARDOWN_HOLDER_WHY=
   procs=$(pids_with_cwd_under "$copy") || { TEARDOWN_HOLDER_WHY='a scan for processes running in it failed'; return 1; }
   if [ -n "$procs" ]; then
@@ -2192,12 +2284,24 @@ teardown_copy_holder_free() {  # <copy>
     TEARDOWN_HOLDER_WHY="process ${procs%%$'\t'*} runs in it after the retire phase"
     return 1
   fi
-  procs=$(pids_with_open_file_under "$copy") || { TEARDOWN_HOLDER_WHY='a scan for processes holding its files open failed'; return 1; }
-  if [ -n "$procs" ]; then
-    procs=${procs%%$'\n'*}
-    TEARDOWN_HOLDER_WHY="process ${procs%%$'\t'*} holds $(fm_refuse_text "${procs#*$'\t'}") open after the retire phase"
+  procs=$(pids_with_open_file_under_all "$copy") || { TEARDOWN_HOLDER_WHY='a scan for processes holding its files open failed'; return 1; }
+  while IFS=$'\t' read -r pid path; do
+    [ -n "$pid" ] || continue
+    if ! teardown_pid_recorded_own "$pid" && fm_task_copy_indexer_pid "$pid"; then
+      continue
+    fi
+    TEARDOWN_HOLDER_WHY="process $pid holds $(fm_refuse_text "$path") open after the retire phase"
     return 1
-  fi
+  done <<< "$procs"
+}
+
+# Did this teardown record <pid> as one of its own processes (TEARDOWN_FOREIGN_PROCS)?
+teardown_pid_recorded_own() {  # <pid>
+  local record
+  for record in ${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]}"}; do
+    [ "${record%%$'\t'*}" != "$1" ] || return 0
+  done
+  return 1
 }
 
 # Is <copy> still on disk or registered in <slot>? Failure to list counts as yes.
@@ -2254,6 +2358,10 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
       fi
       ;;
     1)
+      if teardown_lock_was_seen "$copy"; then
+        teardown_refuse_copy creation-lock-owner "foreign copy $copy was locked when it was proved and now reads unlocked; a lock that vanishes is not proof the copy is free, so it was not removed." "$copy"
+        return 1
+      fi
       remove_rc=0
       teardown_copy_git_protects "$copy" && protected=1 || protected=0
       if ! teardown_removal_final_proof "$copy" preserve unlocked; then
@@ -2304,9 +2412,10 @@ teardown_foreign_copies_release() {
       return 1
     fi
   done
-  while IFS= read -r copy; do
+  # NUL-framed, so a path that holds a newline stays one path.
+  while IFS= read -r -d '' copy; do
     ordered+=("$copy")
-  done < <(printf '%s\n' "${TEARDOWN_FOREIGN_COPIES[@]}" | LC_ALL=C sort -r)
+  done < <(printf '%s\0' "${TEARDOWN_FOREIGN_COPIES[@]}" | LC_ALL=C sort -z -r)
   for copy in "${ordered[@]}"; do
     teardown_foreign_copy_dispose "$slot" "$copy" || return 1
   done
@@ -2388,14 +2497,29 @@ teardown_own_locked_copies_release() {
     echo "REFUSED: an own nested copy in pool slot $slot is no longer provable; nothing was removed." >&2
     return 1
   }
-  while IFS= read -r copy; do
+  # NUL-framed, so a path that holds a newline stays one path.
+  while IFS= read -r -d '' copy; do
     ordered+=("$copy")
-  done < <(printf '%s\n' "${TEARDOWN_NESTED_COPIES[@]}" | LC_ALL=C sort -r)
+  done < <(printf '%s\0' "${TEARDOWN_NESTED_COPIES[@]}" | LC_ALL=C sort -z -r)
   for copy in "${ordered[@]}"; do
     [ -d "$copy" ] || continue
     rc=0
     teardown_copy_lock_file "$copy" || rc=$?
-    [ "$rc" = 0 ] || continue
+    case "$rc" in
+      0) ;;
+      1)
+        # Unlocked: left to the plain removal, unless it was locked when proved.
+        if teardown_lock_was_seen "$copy"; then
+          teardown_refuse_copy creation-lock-owner "own nested copy $copy was locked when it was proved and now reads unlocked; a lock that vanishes is not proof the copy is free, so it was not removed." "$copy"
+          return 1
+        fi
+        continue
+        ;;
+      *)
+        teardown_refuse_copy inspection-unavailable "the lock state of own nested copy $copy cannot be read; it was not removed." "$copy"
+        return 1
+        ;;
+    esac
     teardown_own_copy_dispose "$slot" "$copy" || return 1
     TEARDOWN_OWN_RELEASED+=("$copy")
   done

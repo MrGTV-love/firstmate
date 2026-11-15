@@ -2770,7 +2770,7 @@ work_is_landed() {
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
   TEARDOWN_NM_RECORD_SILENT=0
   if work_is_landed_proof "$branch"; then
-    snap=$(teardown_default_ref_snapshot "$dir" "${TEARDOWN_LANDED_PROOF_REF:-}") || snap=''
+    snap=${TEARDOWN_LANDED_PROOF_SNAP:-}
     TEARDOWN_LANDED_DIRS+=("$dir")
     TEARDOWN_LANDED_HEADS+=("$head")
     TEARDOWN_LANDED_SNAPS+=("$snap")
@@ -2786,34 +2786,46 @@ work_is_landed() {
 
 # A pushed branch proves recoverability, not delivery: require the landing
 # proofs documented in this script's header even when every commit is pushed.
-# The default-branch ref the last successful landing proof read (empty for a
-# merged pull request, which the forge answers): work_is_landed snapshots that
-# ref, so the final proof watches the ref the proof actually read.
-TEARDOWN_LANDED_PROOF_REF=
+# What the last successful landing proof rests on, for the final recheck:
+# "<ref> <commit>" for a proof that read the default branch (the commit it read,
+# resolved once inside the proof), or "pr <url>" for a merged pull request, which
+# the forge answers and which needs no default-branch ref.
+TEARDOWN_LANDED_PROOF_SNAP=
 work_is_landed_proof() {
   local branch=$1
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   # Each call reports on its own directory and ref, never on an earlier call's.
   TEARDOWN_UNPROVEN_COMMITS=
   TEARDOWN_PIPELINE_INPUT_REASON=
-  TEARDOWN_LANDED_PROOF_REF=
+  TEARDOWN_LANDED_PROOF_SNAP=
   if [ "$MODE" = local-only ]; then
-    local name
+    local name local_commit
     name=$(fm_task_copy_default_branch "$PROJ") || name=
-    if [ -n "$name" ] && git -C "$dir" merge-base --is-ancestor "$ref" "refs/heads/$name" 2>/dev/null; then
-      TEARDOWN_LANDED_PROOF_REF="refs/heads/$name"
+    local_commit=
+    [ -z "$name" ] || local_commit=$(git -C "$dir" rev-parse --quiet --verify "refs/heads/$name^{commit}" 2>/dev/null) || local_commit=
+    if [ -n "$local_commit" ] && git -C "$dir" merge-base --is-ancestor "$ref" "$local_commit" 2>/dev/null; then
+      TEARDOWN_LANDED_PROOF_SNAP="refs/heads/$name $local_commit"
       return 0
     fi
   fi
-  pr_is_merged "$branch" && return 0
-  if fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"; then
-    echo "teardown: landed by content: every change of $dir at ${ref:0:12} is already in ${FM_TASK_COPY_COMPARED%% *} (${FM_TASK_COPY_COMPARED##* })" >&2
-    TEARDOWN_LANDED_PROOF_REF="refs/${FM_TASK_COPY_COMPARED%% *}"
+  if pr_is_merged "$branch"; then
+    TEARDOWN_LANDED_PROOF_SNAP="pr ${PR_URL:-$branch}"
     return 0
   fi
-  if [ -z "$FM_TASK_COPY_UNASKED" ] && fm_task_copy_content_in_default_history "$dir" "$ref"; then
+  local content_snap
+  if fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"; then
+    echo "teardown: landed by content: every change of $dir at ${ref:0:12} is already in ${FM_TASK_COPY_COMPARED%% *} (${FM_TASK_COPY_COMPARED##* })" >&2
+    TEARDOWN_LANDED_PROOF_SNAP="refs/${FM_TASK_COPY_COMPARED%% *} ${FM_TASK_COPY_COMPARED##* }"
+    return 0
+  fi
+  # The history rule reads the same commit the content check read; record it
+  # before the history rule rewrites FM_TASK_COPY_COMPARED to name the merge base.
+  content_snap="refs/${FM_TASK_COPY_COMPARED%% *} ${FM_TASK_COPY_COMPARED##* }"
+  if [ -z "$FM_TASK_COPY_UNASKED" ] && [ "${BACKEND:-}" = orca ]; then
+    echo "teardown: landing by default-branch history is not admitted for an Orca-backed task (Main 1843); $dir needs a merged pull request or content equal to the default branch" >&2
+  elif [ -z "$FM_TASK_COPY_UNASKED" ] && fm_task_copy_content_in_default_history "$dir" "$ref"; then
     echo "teardown: landed by content: every change of $dir at ${ref:0:12} is in a commit of ${FM_TASK_COPY_COMPARED%% *} after merge base ${FM_TASK_COPY_COMPARED##* }" >&2
-    TEARDOWN_LANDED_PROOF_REF="refs/${FM_TASK_COPY_COMPARED%% *}"
+    TEARDOWN_LANDED_PROOF_SNAP=$content_snap
     teardown_history_admit "$dir"
     return 0
   fi
@@ -3250,6 +3262,12 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
     echo "teardown: $label return failed with transient git lock ($lock_desc); waiting ${TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS}s and retrying ($attempt/${max_retries})" >&2
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
+    # The copy may have changed while the return waited: the same safety check
+    # the stale-lock cleanup below runs is taken again before every retry.
+    if [ -n "$post_cleanup_check" ] && ! "$post_cleanup_check"; then
+      echo "teardown: $label return retry aborted because safety checks failed" >&2
+      return 1
+    fi
     [ "$check_custody" = 0 ] || require_registered_slot_copies "$owner" "$dir" \
       || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
     if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
@@ -3759,11 +3777,17 @@ pids_with_cwd_under() {  # <dir>
 # (fm_task_copy_indexer_pid).
 pids_with_open_file_under() {  # <dir>
   local out pid path
-  out=$(lsof_pids_under "$1" -nP -Fpfn) || return 1
+  out=$(pids_with_open_file_under_all "$1") || return 1
   while IFS=$'\t' read -r pid path; do
     [ -n "$pid" ] || continue
     fm_task_copy_indexer_pid "$pid" || printf '%s\t%s\n' "$pid" "$path"
   done <<< "$out"
+}
+
+# The same listing with no process left out, the search indexer included, for a
+# caller that decides the exemption itself (teardown_copy_holder_free).
+pids_with_open_file_under_all() {  # <dir>
+  lsof_pids_under "$1" -nP -Fpfn
 }
 
 lsof_pids_under() {  # <dir> <lsof-arguments...>
@@ -4862,7 +4886,7 @@ teardown_peer_claim_handoff() {
 # Removes this task's proven own nested copies that Vernant's creation lock does
 # not hold (those the closeout driver already removed are skipped).
 teardown_remove_own_nested_copies() {  # <slot-label>
-  local copy known root mode remove_err
+  local copy known root mode remove_err lock_rc lock_state
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     known=0
     for root in ${TEARDOWN_OWN_RELEASED[@]+"${TEARDOWN_OWN_RELEASED[@]}"}; do
@@ -4883,6 +4907,19 @@ teardown_remove_own_nested_copies() {  # <slot-label>
     # refuses any untracked byte: a copy admitted by a bundle or by default-branch
     # history keeps a unique ignored file (refuse); any other copy's ignored
     # files are preserved again first.
+    # Only a copy that is unlocked now and was never seen locked in this run takes
+    # the plain removal: a lock that vanished, or one that cannot be read, refuses.
+    lock_rc=0
+    teardown_copy_lock_file "$copy" || lock_rc=$?
+    if [ "$lock_rc" != 1 ] || teardown_lock_was_seen "$copy"; then
+      case "$lock_rc" in
+        0) lock_state='is still held' ;;
+        1) lock_state='was held when it was proved and now reads absent' ;;
+        *) lock_state='cannot be read' ;;
+      esac
+      echo "REFUSED: $ID's nested copy $copy was not removed $1: its lock $lock_state; teardown aborted" >&2
+      exit 1
+    fi
     mode=preserve
     if [ -n "$TEARDOWN_BUNDLE_SWEEP_PROOF" ] || teardown_history_admitted "$copy"; then mode=refuse; fi
     if ! teardown_removal_final_proof "$copy" "$mode" unlocked; then
