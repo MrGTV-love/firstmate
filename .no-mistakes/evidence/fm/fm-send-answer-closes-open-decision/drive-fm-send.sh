@@ -1,89 +1,96 @@
 #!/usr/bin/env bash
-# Live driver: runs the real bin/fm-send.sh (head, and base for comparison)
-# against a disposable marked lab home with a REAL tmux server on the lab's
-# private socket. Usage: drive-fm-send.sh <head-root> <base-root>
+# Live driver: real bin/fm-send.sh (head and base) against a disposable marked
+# lab FM_HOME, delivering to real panes on a private fm-lab tmux socket.
+# Usage: drive-fm-send.sh <head-root> <base-root>
 set -u
 HEAD_ROOT=$1 BASE_ROOT=$2
-eval "$("$HEAD_ROOT/bin/fm-lab-home.sh" env 2>/dev/null)"
+eval "$("$HEAD_ROOT/bin/fm-lab-home.sh" env 2>/tmp/fm-lab-env.$$)"
+TEARDOWN=$(grep -o '[^ ]*/bin/fm-lab-home.sh teardown .*' /tmp/fm-lab-env.$$ | head -1)
+rm -f /tmp/fm-lab-env.$$
 LAB=$FM_HOME
-trap 'tmux -L fm-lab kill-server 2>/dev/null; "$HEAD_ROOT/bin/fm-lab-home.sh" teardown "$LAB" >/dev/null 2>&1; rm -rf "$LAB"' EXIT
-unset NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
-echo "lab home: $LAB"
-tmux -L fm-lab new-session -d -s lab -n fm-placeholder -x 200 -y 50 'cat >/dev/null'
-SOCK=$(tmux -L fm-lab display-message -p '#{socket_path}')
+echo "lab FM_HOME=$LAB"
+SOCK="$TMUX_TMPDIR/tmux-$(id -u)/fm-lab"
+tmux -L fm-lab new-session -d -s lane -n fm-t1 'cat'
+tmux -L fm-lab new-window -t lane -n fm-t2 'cat'
 export TMUX="$SOCK,0,0"
-export FM_SEND_SETTLE=0
-S=$LAB/state
-mkwin() { tmux -L fm-lab new-window -d -t lab -n "fm-$1" 'cat >/dev/null'; printf 'window=lab:fm-%s\nkind=ship\n' "$1" > "$S/$1.meta"; }
-pane() { tmux -L fm-lab capture-pane -p -t "lab:fm-$1" | sed '/^$/d'; }
-ledger() { [ -d "$S/$1.inbox" ] && find "$S/$1.inbox" -type f | sort | sed "s|$S/||" || echo "(no inbox dir)"; }
-drain() { FM_STATE_OVERRIDE="$S" "$HEAD_ROOT/bin/fm-wake-drain.sh" 2>/dev/null | grep -E 'OPEN DECISIONS|\[key=' || echo "(drain lists no open decision)"; }
-run() { # <label> <root> <args...>
-  local label=$1 root=$2; shift 2
-  echo
-  echo "===== $label"
-  echo "\$ fm-send.sh $*   [$( [ "$root" = "$HEAD_ROOT" ] && echo head || echo base )]"
-  "$root/bin/fm-send.sh" "$@" >"$LAB/out" 2>"$LAB/err"; local rc=$?
-  echo "exit=$rc"; echo "--- stdout"; cat "$LAB/out"; echo "--- stderr"; cat "$LAB/err"
+mkdir -p "$LAB/config"; : > "$LAB/config/fleet-ledger"
+
+reset_task() {  # <id> <status-content-or-empty>
+  rm -rf "$LAB/state/$1".inbox "$LAB/state/$1".status
+  printf 'window=lane:fm-%s\nkind=ship\n' "$1" > "$LAB/state/$1.meta"
+  [ -n "$2" ] && printf '%s' "$2" > "$LAB/state/$1.status"
+  tmux -L fm-lab send-keys -t "lane:fm-$1" C-l 2>/dev/null
+  tmux -L fm-lab clear-history -t "lane:fm-$1"
 }
-state() { # <id>
-  echo "--- status file $1"; sed -E 's/ \[at=[0-9]+\]//' "$S/$1.status" 2>/dev/null || echo "(none)"
-  echo "--- inbox records"; ledger "$1"
-  echo "--- pane text"; pane "$1"
-  echo "--- pending-replies"; ls "$S/pending-replies" 2>/dev/null || echo "(none)"
-  echo "--- drain"; drain
+snap() { (cd "$LAB/state" && find . -type f ! -name 'guard-events.jsonl' ! -name '.guard-*' -print | LC_ALL=C sort | while read -r f; do printf '%s %s\n' "$f" "$(cksum < "$f")"; done); }
+run() {  # <root> <args...>
+  local root=$1; shift
+  (cd "$LAB" && env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
+     FM_HOME="$LAB" FM_SEND_SETTLE=0 "$root/bin/fm-send.sh" "$@") >"$LAB/out" 2>"$LAB/err"
+  echo "rc=$?"; echo "--- stdout:"; cat "$LAB/out"; echo "--- stderr:"; cat "$LAB/err"
 }
-open2() { printf 'needs-decision [key=k1]: pick REST or RPC\nblocked [key=k2]: need the staging token\n' > "$S/$1.status"; }
+drain() { echo "--- drain OPEN DECISIONS:"; FM_STATE_OVERRIDE="$LAB/state" "$HEAD_ROOT/bin/fm-wake-drain.sh" 2>/dev/null | grep -A6 'OPEN DECISIONS' || echo "(no OPEN DECISIONS section)"; }
+pane() { echo "--- pane lane:fm-$1:"; tmux -L fm-lab capture-pane -p -t "lane:fm-$1" | grep -v '^$' || echo "(pane empty)"; }
+inbox() { echo "--- inbox records:"; find "$LAB/state/$1.inbox" -type f 2>/dev/null | sort | while read -r f; do echo "[$f]"; cat "$f"; echo; done; [ -d "$LAB/state/$1.inbox" ] || echo "(no inbox)"; }
+status() { echo "--- status file:"; cat "$LAB/state/$1.status" 2>/dev/null || echo "(none)"; }
+hdr() { echo; echo "==================== $* ===================="; }
+TWO=$'needs-decision [key=k1]: pick REST or RPC\nblocked [key=k2]: need the staging token\n'
 
-echo "################ D1 base reproduces the defect"
-mkwin b1; open2 b1
-run "BASE bare send to task with open k1,k2" "$BASE_ROOT" b1 "go with REST"; state b1
+for which in BASE HEAD; do
+  root=$HEAD_ROOT; [ "$which" = BASE ] && root=$BASE_ROOT
+  hdr "S1 [$which] bare send to lane with open k1+k2"
+  reset_task t1 "$TWO"; b=$(snap); run "$root" t1 "go with REST"; sleep 1
+  a=$(snap); [ "$b" = "$a" ] && echo "STATE: unchanged" || { echo "STATE: changed"; diff <(echo "$b") <(echo "$a"); }
+  inbox t1; pane t1; drain
+done
 
-echo; echo "################ D1(a) head bare send refuses"
-mkwin t1; open2 t1
-run "HEAD bare send to task with open k1,k2" "$HEAD_ROOT" t1 "go with REST"; state t1
-run "HEAD bare send via legacy fm-<id> label" "$HEAD_ROOT" fm-t1 "go with REST"; state t1
+hdr "S2 [HEAD] --resolve-key k1"
+reset_task t1 "$TWO"; run "$HEAD_ROOT" t1 --resolve-key k1 "go with REST"; sleep 1; status t1; inbox t1; pane t1; drain
 
-echo; echo "################ D2(c) contradictory pair"
-run "HEAD --answers-none + --resolve-key" "$HEAD_ROOT" t1 --answers-none --resolve-key k1 "go with REST"; state t1
+hdr "S3 [HEAD] --answers-none"
+reset_task t1 "$TWO"; run "$HEAD_ROOT" t1 --answers-none "routine nudge: keep going"; sleep 1; status t1; inbox t1; pane t1; drain
 
-echo; echo "################ D2(e) mistyped key, head vs base"
-run "HEAD mistyped --resolve-key" "$HEAD_ROOT" t1 --resolve-key k9 "go with REST"
-run "BASE mistyped --resolve-key" "$BASE_ROOT" t1 --resolve-key k9 "go with REST"; state t1
+hdr "S4 [HEAD] --answers-none with --resolve-key (contradictory)"
+reset_task t1 "$TWO"; b=$(snap); run "$HEAD_ROOT" t1 --answers-none --resolve-key k1 "go"; a=$(snap)
+[ "$b" = "$a" ] && echo "STATE: unchanged" || echo "STATE: changed"; inbox t1
 
-echo; echo "################ D2(b) none-flag delivers, keys stay open"
-run "HEAD --answers-none" "$HEAD_ROOT" t1 --answers-none "routine check-in: please post status"; state t1
-echo "--- record body"; cat "$S"/t1.inbox/*.msg 2>/dev/null || find "$S/t1.inbox" -type f -exec cat {} \;
+for which in BASE HEAD; do
+  root=$HEAD_ROOT; [ "$which" = BASE ] && root=$BASE_ROOT
+  hdr "S5 [$which] bare send to task with no open decision"
+  reset_task t2 ""; run "$root" t2 "hello there"; sleep 1
+  find "$LAB/state/t2.inbox" -type f | sort | while read -r f; do sed -E 's/[0-9]{10,}/<TS>/g' "$f" ; echo; done > "$LAB/t2-$which.rec"
+  inbox t2; pane t2
+done
+hdr "S5 compare inbox record bytes (timestamps masked)"
+diff "$LAB/t2-BASE.rec" "$LAB/t2-HEAD.rec" && echo "RECORDS IDENTICAL"
+cat "$LAB/t2-HEAD.rec"
 
-echo; echo "################ D2(a) --resolve-key k1 closes k1 only"
-run "HEAD --resolve-key k1" "$HEAD_ROOT" t1 --resolve-key k1 "go with REST"; state t1
+hdr "S6 [HEAD] --answers-none on task with no open decision"
+reset_task t2 ""; run "$HEAD_ROOT" t2 --answers-none "hello there"; inbox t2
 
-echo; echo "################ repeated --answers-none accepted"
-run "HEAD --answers-none --answers-none" "$HEAD_ROOT" t1 --answers-none --answers-none "second routine steer"; state t1
+for which in BASE HEAD; do
+  root=$HEAD_ROOT; [ "$which" = BASE ] && root=$BASE_ROOT
+  hdr "S7 [$which] mistyped --resolve-key k9"
+  reset_task t1 "$TWO"; b=$(snap); run "$root" t1 --resolve-key k9 "answer"; a=$(snap)
+  [ "$b" = "$a" ] && echo "STATE: unchanged" || echo "STATE: changed"
+done
 
-echo; echo "################ D3(c) --key and explicit backend target not subject"
-run "HEAD --key Enter to task with open k2" "$HEAD_ROOT" t1 --key Enter
-run "HEAD explicit backend target lab:fm-t1 (matches meta) text" "$HEAD_ROOT" lab:fm-t1 "explicit endpoint text"; state t1
+RES=$'blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: no reply from secondmate\n'
+hdr "S8a [HEAD] bare send, only open entry is reserved pending-reply key"
+reset_task t1 "$RES"; run "$HEAD_ROOT" t1 "status please"; inbox t1
+hdr "S8b [HEAD] --resolve-key pending-reply key"
+reset_task t1 "$RES"; run "$HEAD_ROOT" t1 --resolve-key pending-reply-abcdef0123456789 "here is the reply"; status t1; drain
+hdr "S8c [HEAD] --answers-none on reserved key"
+reset_task t1 "$RES"; run "$HEAD_ROOT" t1 --answers-none "status please"; status t1; drain
 
-echo; echo "################ typed plane (leading /) subject to the rule"
-run "HEAD bare /help to task with open k2" "$HEAD_ROOT" t1 "/help"
-run "HEAD --answers-none /help" "$HEAD_ROOT" t1 --answers-none "/help"; state t1
+hdr "S9 [HEAD] --key Enter to lane with open keys (not subject)"
+reset_task t1 "$TWO"; run "$HEAD_ROOT" t1 --key Enter; drain
 
-echo; echo "################ D1(e) reserved pending-reply key"
-mkwin r1
-printf 'blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: secondmate reply overdue\n' > "$S/r1.status"
-run "HEAD bare send to task with open reserved key" "$HEAD_ROOT" r1 "reply now"; state r1
-run "HEAD --answers-none to reserved key task" "$HEAD_ROOT" r1 --answers-none "reply now"; state r1
-run "HEAD --resolve-key reserved key" "$HEAD_ROOT" r1 --resolve-key pending-reply-abcdef0123456789 "reply now"; state r1
+hdr "S10 [HEAD] -- ends options: literal text starting with --answers-none"
+reset_task t1 "$TWO"; run "$HEAD_ROOT" t1 --answers-none -- "--answers-none is literal here"; inbox t1
 
-echo; echo "################ D1 paired: no open decision, byte-identical record head vs base"
-mkwin n1; mkwin n2
-printf 'working: busy\nresolved [key=old]: answered: done\n' > "$S/n1.status"
-cp "$S/n1.status" "$S/n2.status"
-run "HEAD bare send, no open decision" "$HEAD_ROOT" n1 "plain steer text"
-run "BASE bare send, no open decision" "$BASE_ROOT" n2 "plain steer text"
-h=$(find "$S/n1.inbox" -name '*.msg' | sort | head -1); b=$(find "$S/n2.inbox" -name '*.msg' | sort | head -1)
-echo "--- head record: $h"; od -c "$h" | head -20
-echo "--- base record: $b"; od -c "$b" | head -20
-if cmp -s "$h" "$b"; then echo "RECORDS BYTE-IDENTICAL: yes"; else echo "RECORDS BYTE-IDENTICAL: no"; diff "$h" "$b"; fi
-run "HEAD --answers-none, no open decision" "$HEAD_ROOT" n1 --answers-none "plain steer text 2"; state n1
+hdr "S11 [HEAD] printed resend, legacy fm-t1 label selector, bare"
+reset_task t1 "$TWO"; run "$HEAD_ROOT" fm-t1 "go"
+
+tmux -L fm-lab kill-server
+eval "$TEARDOWN" && rm -rf "$LAB" && echo "lab torn down"

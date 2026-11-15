@@ -1,0 +1,2 @@
+ok - a routed handoff wakes once and a successful rerun stays idempotent
+ok - a cwd .tasks.toml for another backend does not redirect a markdown handoff

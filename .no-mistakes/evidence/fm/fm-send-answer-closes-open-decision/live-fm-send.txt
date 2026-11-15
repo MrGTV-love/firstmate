@@ -1,0 +1,268 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.QOZj95
+
+==================== S1 [BASE] bare send to lane with open k1+k2 ====================
+rc=0
+--- stdout:
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base.pgOCIR/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STATE: changed
+1a2
+> ./t1.inbox/001.msg 1971516595 63
+--- inbox records:
+[/Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.inbox/001.msg]
+schema=fm-task-inbox.v1
+at=2026-11-15T01:53:37Z
+--
+go with REST
+--- pane lane:fm-t1:
+^L: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+--- drain OPEN DECISIONS:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+==================== S1 [HEAD] bare send to lane with open k1+k2 ====================
+rc=1
+--- stdout:
+--- stderr:
+error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=k1] needs-decision
+  [key=k2] blocked
+Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+STATE: unchanged
+--- inbox records:
+(no inbox)
+--- pane lane:fm-t1:
+^L: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+^L
+--- drain OPEN DECISIONS:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+==================== S2 [HEAD] --resolve-key k1 ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file:
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+resolved [key=k1] [at=1794707638]: answered: go with REST
+--- inbox records:
+[/Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.inbox/001.msg]
+schema=fm-task-inbox.v1
+at=2026-11-15T01:53:58Z
+--
+go with REST
+--- pane lane:fm-t1:
+^L: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+^L^L: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - af
+ter earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+--- drain OPEN DECISIONS:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+==================== S3 [HEAD] --answers-none ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file:
+needs-decision [key=k1]: pick REST or RPC
+blocked [key=k2]: need the staging token
+--- inbox records:
+[/Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.inbox/001.msg]
+schema=fm-task-inbox.v1
+at=2026-11-15T01:54:08Z
+--
+routine nudge: keep going
+--- pane lane:fm-t1:
+^L: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+^L^L: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - af
+ter earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+^L: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't1.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+--- drain OPEN DECISIONS:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+==================== S4 [HEAD] --answers-none with --resolve-key (contradictory) ====================
+rc=1
+--- stdout:
+--- stderr:
+error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent.
+STATE: unchanged
+--- inbox records:
+(no inbox)
+
+==================== S5 [BASE] bare send to task with no open decision ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- inbox records:
+[/Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t2.inbox/001.msg]
+schema=fm-task-inbox.v1
+at=2026-11-15T01:54:21Z
+--
+hello there
+--- pane lane:fm-t2:
+^L: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+
+==================== S5 [HEAD] bare send to task with no open decision ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- inbox records:
+[/Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t2.inbox/001.msg]
+schema=fm-task-inbox.v1
+at=2026-11-15T01:54:32Z
+--
+hello there
+--- pane lane:fm-t2:
+^L: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+^L: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - afte
+r earlier acks read only it, omp :raw - act, mv handled/.
+: Firstmate instruction waiting: 't2.inbox/001.msg' in "$FM_TASK_INBOX" - after
+earlier acks read only it, omp :raw - act, mv handled/.
+
+==================== S5 compare inbox record bytes (timestamps masked) ====================
+2c2
+< at=2026-11-15T01:54:21Z
+---
+> at=2026-11-15T01:54:32Z
+schema=fm-task-inbox.v1
+at=2026-11-15T01:54:32Z
+--
+hello there
+
+==================== S6 [HEAD] --answers-none on task with no open decision ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- inbox records:
+[/Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t2.inbox/001.msg]
+schema=fm-task-inbox.v1
+at=2026-11-15T01:54:44Z
+--
+hello there
+
+==================== S7 [BASE] mistyped --resolve-key k9 ====================
+rc=1
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --resolve-key 'k9': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.status, and no captain-held task 'k9' or 't1-decision-k9' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+STATE: unchanged
+
+==================== S7 [HEAD] mistyped --resolve-key k9 ====================
+rc=1
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --resolve-key 'k9': no open decision or blocker with that key in /Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.status, and no captain-held task 'k9' or 't1-decision-k9' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+STATE: unchanged
+
+==================== S8a [HEAD] bare send, only open entry is reserved pending-reply key ====================
+rc=1
+--- stdout:
+--- stderr:
+error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=pending-reply-abcdef0123456789] blocked
+Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+--- inbox records:
+(no inbox)
+
+==================== S8b [HEAD] --resolve-key pending-reply key ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file:
+blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: no reply from secondmate
+resolved [key=pending-reply-abcdef0123456789] [at=1794707713]: pending-reply-resolved: task=t1 pending-reply-id=abcdef0123456789 via=operator-resolve-key here is the reply
+--- drain OPEN DECISIONS:
+(no OPEN DECISIONS section)
+
+==================== S8c [HEAD] --answers-none on reserved key ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- status file:
+blocked [key=pending-reply-abcdef0123456789]: pending-reply-missed: no reply from secondmate
+--- drain OPEN DECISIONS:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+t1 [key=pending-reply-abcdef0123456789] blocked: pending-reply-missed: no reply from secondmate
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+==================== S9 [HEAD] --key Enter to lane with open keys (not subject) ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- drain OPEN DECISIONS:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+t1 [key=k1] needs-decision: pick REST or RPC
+t1 [key=k2] blocked: need the staging token
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'; a send that answers none of them passes --answers-none instead (rule: bin/fm-send.sh header)
+
+==================== S10 [HEAD] -- ends options: literal text starting with --answers-none ====================
+rc=0
+--- stdout:
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+--- inbox records:
+[/Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.inbox/001.msg]
+schema=fm-task-inbox.v1
+at=2026-11-15T01:55:58Z
+--
+--answers-none is literal here
+
+==================== S11 [HEAD] printed resend, legacy fm-t1 label selector, bare ====================
+rc=1
+--- stdout:
+--- stderr:
+error: t1 has open keyed decisions in /Users/charlesabrooker/tmp/fm-lab.QOZj95/state/t1.status, and this send states no choice. Refusing it; nothing was sent. Open keys:
+  [key=k1] needs-decision
+  [key=k2] blocked
+Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, "Decision closure".
+lab torn down

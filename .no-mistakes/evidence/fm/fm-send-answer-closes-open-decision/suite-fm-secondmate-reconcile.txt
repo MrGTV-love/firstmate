@@ -1,0 +1,4 @@
+ok - reconcile requests stop oversized streams at the capture bound
+ok - reconcile requests require exactly one snapshot document
+ok - reconcile requests coalesce per target and retire independently after delivery
+not ok - Bearings and request publication waited past the collector budget behind remote delivery (8s)
