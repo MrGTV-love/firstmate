@@ -1650,6 +1650,7 @@ slot_digest() {
     printf 'REFS\n%s\nENDREFS\n' "$refs"
     git -C "$slot" ls-files -s --debug || exit 1
     cd "$slot" || exit 1
+    # shellcheck disable=SC2016 # The inner sh expands its own $1.
     find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z |
       xargs -0 -n1 sh -c 'if [ -L "$1" ]; then printf "LINK %s -> %s\n" "$1" "$(readlink "$1")"; else shasum -a 256 -- "$1"; fi' _
   ) 2>&1

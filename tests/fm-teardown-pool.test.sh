@@ -3603,7 +3603,7 @@ SH
 # D4 (review of 8c6c20ece): a skipped copy is released only on teardown_landed proof. An anchor makes a commit
 # recoverable; it does not make it landed. An ignored file at a path the copy's HEAD would be reset to is work.
 test_skipped_copies_with_an_anchor_or_ignored_work_are_kept() {
-  local case_dir anchored ignored busy_unknown log rec rc=0 canon short sha
+  local case_dir anchored ignored log rec rc=0 canon short sha
   case_dir=$(make_case skipped-copies-keep)
   write_meta "$case_dir" no-mistakes ship
   mkdir -p "$case_dir/data/task-x1"

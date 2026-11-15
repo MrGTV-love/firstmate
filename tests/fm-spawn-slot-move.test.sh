@@ -92,6 +92,7 @@ snapshot() {
     git -C "$slot" ls-files -s --debug || exit 1
     cd "$slot" || exit 1
     # A regular file by its sha256, a symlink by where it points (a link to a same-content file is a change).
+    # shellcheck disable=SC2016 # The inner sh expands its own $1.
     find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z |
       xargs -0 -n1 sh -c 'if [ -L "$1" ]; then printf "LINK %s -> %s\n" "$1" "$(readlink "$1")"; else shasum -a 256 -- "$1"; fi' _
   ) >"$tmp" 2>&1 || { rm -f "$tmp"; return 1; }
@@ -927,6 +928,7 @@ test_a_move_that_ends_elsewhere_than_the_target_fails() {
   local bin="$W_DIR/headback" real_git out rc=0
   real_git=$(command -v git)
   mkdir -p "$bin"
+  # shellcheck disable=SC2016 # The shim's own shell expands $* and $@.
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s "$@"; rc=$?; %s -C %s update-ref --no-deref HEAD %s; exit $rc ;; esac\nexec %s "$@"\n' "'$real_git'" "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
@@ -959,7 +961,7 @@ test_the_snapshot_sees_a_symlink_retarget() {
 }
 
 test_the_git_call_oracle_flags_every_forced_form() {
-  local row bad=0
+  local row
   : >"$TMP_ROOT/oracle.pos"; : >"$TMP_ROOT/oracle.neg"
   for row in 'checkout -B owner' 'switch -C owner' 'checkout -f main' 'checkout --force main' 'switch --discard-changes main' 'switch -f main' \
     'reset --hard abc' 'reset --merge abc' 'reset --keep abc' 'clean -fd' 'branch -D x' 'branch -f x abc' 'branch -M x y' 'update-ref -d refs/heads/x' \

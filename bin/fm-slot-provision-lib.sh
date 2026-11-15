@@ -436,11 +436,13 @@ def load(path):
 # and every ignored entry is exactly as it was.
 def compare(before, after, mode, target, attached, detached="", allow=""):
     a, b, diffs = load(before), load(after), []
-    allowed = set(allow.split())
+    entries = allow.split()
+    exact = set(e for e in entries if not e.endswith("*"))
+    prefixes = tuple(e[:-1] for e in entries if e.endswith("*"))
     if detached == "1":
         a["symref"] = "detached"
     def refs_of(snap):
-        return {k: v for k, v in snap["refs"].items() if k not in allowed}
+        return {k: v for k, v in snap["refs"].items() if k not in exact and not (prefixes and k.startswith(prefixes))}
     if mode == "same":
         for key in ("head", "symref", "status", "ignored"):
             if a[key] != b[key]:

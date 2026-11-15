@@ -5140,9 +5140,10 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     fm_slot_prove_idle "$worktree" "$SPAWN_MOVE_EXPECTED" "${PROJ_ABS:-}" || return $?
   fi
   SPAWN_PROVEN_COPY=
-  # The refs this spawn itself may change while it records the origin tip (Main 003): origin's default tracking ref
-  # and origin/HEAD. Any other ref that differs after the move fails the spawn.
-  FM_SLOT_REF_ALLOW="refs/remotes/origin/HEAD refs/remotes/origin/$SPAWN_MOVE_DEFAULT"
+  # The refs this spawn itself may write between the proof and the move: origin's default tracking ref and origin/HEAD
+  # (Main 003), and the preservation anchor of this task's own detached copy (refs/fm/anchor/<task>-<sha>, written by
+  # fm_slot_prepare_base). Any other ref that differs after the move fails the spawn.
+  FM_SLOT_REF_ALLOW="refs/remotes/origin/HEAD refs/remotes/origin/$SPAWN_MOVE_DEFAULT refs/fm/anchor/$ID-*"
   spawn_record_origin_refs "$worktree"
   if [ -z "$SPAWN_MOVE_EXPECTED" ]; then
     fm_slot_proof_drop
