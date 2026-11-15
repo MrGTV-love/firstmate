@@ -143,12 +143,6 @@ case " $* " in
   *" ls-tree "*)
     if [ -n "${FAKE_GIT_LSTREE_FILE:-}" ]; then cat "$FAKE_GIT_LSTREE_FILE"; exit 0; fi
     ;;
-  " version ")
-    if [ -n "${FAKE_GIT_VERSION:-}" ]; then
-      printf 'git version %s\n' "$FAKE_GIT_VERSION"
-      exit 0
-    fi
-    ;;
   *" ls-files "*)
     if [ -n "${FAKE_GIT_FAIL_LSFILES:-}" ]; then
       echo "fatal: injected ls-files failure" >&2
@@ -4387,7 +4381,7 @@ test_the_content_proof_keeps_an_empty_change_that_is_not_an_ancestor_and_histori
   pass "the content proof proves an empty change without calling it an ancestor and keeps unrelated histories, two merge bases and a failing git"
 }
 
-test_the_content_proof_writes_nothing_to_the_clone_runs_no_merge_and_needs_no_newer_git() {
+test_the_content_proof_writes_nothing_to_the_clone_and_runs_no_merge() {
   local before after objs_before objs_after
   make_world world-content-readonly
   route_content_fixture readonly f.txt '1\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n'
@@ -4402,9 +4396,7 @@ test_the_content_proof_writes_nothing_to_the_clone_runs_no_merge_and_needs_no_ne
   [ "$before" = "$after" ] || fail "the proof changed the clone's refs or status"
   [ "$objs_before" = "$objs_after" ] || fail "the proof wrote an object into the clone's object store"
   [ -z "$(ls -A "$W/proof-tmp")" ] || fail "the proof left a temporary directory behind: $(ls -A "$W/proof-tmp")"
-  # No merge, no git floor: a git that reports an older version proves the same twin.
-  FAKE_GIT_VERSION=2.39.5 route_prove "$CR" "$CT" "$CM"; assert_proved "a text twin on a git older than 2.40"
-  pass "the content proof writes no ref, status or object to the clone, leaves no temporary directory, never runs git merge-tree and proves a text twin on any git version"
+  pass "the content proof writes no ref, status or object to the clone, leaves no temporary directory and never runs git merge-tree"
 }
 
 test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed() {
@@ -5303,35 +5295,62 @@ test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty(
 }
 
 
-# Main 1869 R5 note: a missing staged-cases directory skips the table cases with a success
-# line, unless FM_SUPERSEDENCE_CASES_REQUIRED=1, which makes the skip a failure.
-test_a_missing_staged_cases_skip_with_a_notice_unless_this_prs_cases_are_required() {
-  local none present rc out
-  make_world world-staged-gate
-  none=$TMP_ROOT/staged-none
-  present=$TMP_ROOT/staged-present
-  rm -rf "$none" "$present"
-  mkdir -p "$none" "$present"
-  : > "$present/d7-supersedence-table.md"
-  : > "$present/d7-closeout-driver-report.md"
-  rc=0; ( route_staged_cases_gate "$present" ) >/dev/null 2>&1 || rc=$?
-  [ "$rc" = 0 ] || fail "the gate refused staged cases that are present ($rc)"
-  rc=0; ( FM_SUPERSEDENCE_CASES_REQUIRED=1 route_staged_cases_gate "$present" ) >/dev/null 2>&1 || rc=$?
-  [ "$rc" = 0 ] || fail "the gate refused present staged cases when they are required ($rc)"
-  rc=0; out=$( ( unset CI FM_SUPERSEDENCE_CASES_REQUIRED; route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
-  [ "$rc" = 1 ] || fail "absent staged cases did not skip (rc $rc): $out"
-  assert_contains "$out" "SKIPPED" "the skip does not say it skipped"
-  assert_contains "$out" "FM_SUPERSEDENCE_CASES_REQUIRED" "the skip does not name the setting that makes it a failure"
-  rc=0; out=$( ( FM_SUPERSEDENCE_CASES_REQUIRED=1 route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
-  [ "$rc" != 0 ] || fail "absent staged cases passed although they are required: $out"
-  assert_contains "$out" "FM_SUPERSEDENCE_CASES_REQUIRED" "the failure does not name the setting"
-  # A CI run treats the cases as required (Main 1887): CI=true fails the skip, with no workflow edit.
-  rc=0; out=$( ( unset FM_SUPERSEDENCE_CASES_REQUIRED; CI=true route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
-  [ "$rc" != 0 ] || fail "absent staged cases passed under CI=true: $out"
-  assert_contains "$out" "CI" "the failure under CI=true does not name CI"
-  rc=0; ( unset FM_SUPERSEDENCE_CASES_REQUIRED; CI=true route_staged_cases_gate "$present" ) >/dev/null 2>&1 || rc=$?
-  [ "$rc" = 0 ] || fail "the gate refused present staged cases under CI=true ($rc)"
-  pass "absent staged cases skip with a notice that names how to require them, and fail when FM_SUPERSEDENCE_CASES_REQUIRED=1 or CI=true, while present staged cases pass the gate either way"
+# Main 1919 F7: FM_SUPERSEDENCE_CASES names a captain-private table that CI never has, so
+# an unset variable is one named skip line (never an "ok" line, so never a pass, and never
+# a failure, whatever CI is set to); a variable that is set but names a directory or a table
+# that cannot be read fails. The grader runs the table with the variable set (R5 Verify).
+test_the_r5_table_prints_one_named_skip_and_no_pass_when_the_staged_cases_variable_is_unset() {
+  local out rc ci req lines
+  make_world world-staged-unset
+  for ci in unset true; do
+    for req in unset 1; do
+      rc=0
+      out=$( (
+        unset FM_SUPERSEDENCE_CASES CI FM_SUPERSEDENCE_CASES_REQUIRED
+        [ "$ci" = unset ] || export CI=$ci
+        [ "$req" = unset ] || export FM_SUPERSEDENCE_CASES_REQUIRED=$req
+        test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers
+      ) 2>&1 ) || rc=$?
+      [ "$rc" = 0 ] || fail "the R5 table failed with FM_SUPERSEDENCE_CASES unset (CI=$ci, REQUIRED=$req): it is a skip, not a failure: $out"
+      lines=$(printf '%s\n' "$out" | grep -c .)
+      [ "$lines" = 1 ] || fail "the R5 table printed $lines lines with FM_SUPERSEDENCE_CASES unset (CI=$ci, REQUIRED=$req), not one named skip: $out"
+      assert_equals "skip: R5 table owed to the grader: FM_SUPERSEDENCE_CASES unset" "$out" "the skip line is not the named skip (CI=$ci, REQUIRED=$req)"
+      case "$out" in 'ok - '*) fail "the skip counted as a pass: $out" ;; esac
+    done
+  done
+  pass "with FM_SUPERSEDENCE_CASES unset the R5 table prints the one named skip line 'R5 table owed to the grader: FM_SUPERSEDENCE_CASES unset', prints no ok line and does not fail, with CI=true or the older required setting changing nothing"
+}
+
+test_the_r5_table_fails_when_the_staged_cases_variable_names_a_directory_or_table_that_cannot_be_read() {
+  local dir rc out label
+  make_world world-staged-unreadable
+  rm -rf "$TMP_ROOT/staged-case"
+  mkdir -p "$TMP_ROOT/staged-case/empty" "$TMP_ROOT/staged-case/only-table" "$TMP_ROOT/staged-case/table-is-dir/d7-supersedence-table.md" "$TMP_ROOT/staged-case/present"
+  : > "$TMP_ROOT/staged-case/only-table/d7-supersedence-table.md"
+  : > "$TMP_ROOT/staged-case/table-is-dir/d7-closeout-driver-report.md"
+  : > "$TMP_ROOT/staged-case/present/d7-supersedence-table.md"
+  : > "$TMP_ROOT/staged-case/present/d7-closeout-driver-report.md"
+  for label in missing empty only-table table-is-dir empty-string; do
+    case "$label" in
+      missing) dir=$TMP_ROOT/staged-case/no-such-directory ;;
+      empty-string) dir= ;;
+      *) dir=$TMP_ROOT/staged-case/$label ;;
+    esac
+    rc=0
+    out=$( (
+      unset CI FM_SUPERSEDENCE_CASES_REQUIRED
+      export FM_SUPERSEDENCE_CASES=$dir
+      test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers
+    ) 2>&1 ) || rc=$?
+    [ "$rc" != 0 ] || fail "the R5 table passed or skipped with FM_SUPERSEDENCE_CASES set to an unreadable value ($label): $out"
+    assert_contains "$out" "FM_SUPERSEDENCE_CASES" "the failure does not name the variable ($label)"
+    case "$out" in *'owed to the grader'*) fail "an unreadable value was reported as the unset skip ($label): $out" ;; esac
+  done
+  # The control: both files present and readable pass the gate, with CI=true too.
+  rc=0
+  ( export CI=true FM_SUPERSEDENCE_CASES="$TMP_ROOT/staged-case/present"; route_staged_cases_gate "$FM_SUPERSEDENCE_CASES" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 0 ] || fail "the gate refused readable staged cases under CI=true ($rc)"
+  pass "with FM_SUPERSEDENCE_CASES set to a missing directory, an empty directory, a directory with one table, a table that is a directory or an empty string the R5 table fails and names the variable, while a readable pair passes the gate"
 }
 
 # --- code round 4 (Main 1887): helper-level cases, libraries only -------------------
@@ -5755,7 +5774,7 @@ test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the
 test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_changes_the_meaning
 test_the_content_proof_judges_mode_and_text_together_and_needs_identical_entries_for_removals_and_binaries
 test_the_content_proof_keeps_an_empty_change_that_is_not_an_ancestor_and_histories_without_one_merge_base
-test_the_content_proof_writes_nothing_to_the_clone_runs_no_merge_and_needs_no_newer_git
+test_the_content_proof_writes_nothing_to_the_clone_and_runs_no_merge
 test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed
 test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_route
 test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an_unreachable_remote_keeps_the_copy
@@ -5782,7 +5801,8 @@ test_the_checkout_check_reads_the_reflog_once_and_stops_on_a_read_error_an_inter
 test_a_reflog_read_error_a_masked_interleaving_or_a_rewritten_anchor_sets_the_stop_flag
 test_a_refusal_is_temporary_only_when_it_is_the_called_prs_complete_envelope
 test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty
-test_a_missing_staged_cases_skip_with_a_notice_unless_this_prs_cases_are_required
+test_the_r5_table_prints_one_named_skip_and_no_pass_when_the_staged_cases_variable_is_unset
+test_the_r5_table_fails_when_the_staged_cases_variable_names_a_directory_or_table_that_cannot_be_read
 test_the_content_proof_refuses_git_output_it_cannot_parse_and_accepts_a_genuine_empty_change
 test_the_route_publishes_its_checkout_window_while_proving_and_reports_a_switch_when_a_proof_refuses
 test_a_plan_killed_while_proving_is_read_for_a_checkout_change_by_the_parent
