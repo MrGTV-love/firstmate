@@ -1,0 +1,5 @@
+fm-on exit=0
+fm-launch-proof exit=0
+fm-control-relaunch-backends exit=1
+fm-remote-secondmate-relaunch exit=0
+fm-secondmate-restart exit=0

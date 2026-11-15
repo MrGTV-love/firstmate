@@ -1,0 +1,13 @@
+ok - omp: adopt refuses and changes nothing, and an unpinned omp agent refuses with its named cause, with or without a once-adopted session record
+ok - --recover-launch reports from the record its judge read, in both rewrite orders, with both stable controls
+ok - claude restore: no adoption route; every consumer refuses with the named reason and never names adopt
+ok - claude restore: the owner's adopt of a claude task is refused, since no adoption route remains
+ok - claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge
+ok - claude restore: a lane stopped by hand relaunches with a new pin and reads managed
+ok - claude restart: the attribution is decided again right before the fallback nudge
+ok - remote attribution: the host verb prints one decision line from the one verdict owner
+ok - restart: a backend load failure, an invalid endpoint or an unreadable state refuses as unreached
+not ok - a raw-command mate with an unattributed live pane names its cause (missing: 'unreached: rcv-48830-AkAxuX-claude-restore-raw-command-live: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it')
+--- output ---
+unreached: rcv-48830-AkAxuX-claude-restore-raw-command-live: its worker runtime 'mytool' has no verified restart mechanics for a second mate; its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it
+summary: 0 of 1 restarted, 0 nudged, 1 unreached

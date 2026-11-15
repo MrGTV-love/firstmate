@@ -1,0 +1,54 @@
+installed omp integration to /Users/charlesabrooker/tmp/fm-omp-reboot.QosK71/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+native child captured: pid=18310 start=Sun Nov 15 15:28:23 2026    
+after interrupt: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71 launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+after interrupt: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71 launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+after interrupt: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71 launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+after interrupt: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71 cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71 launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+native child captured: pid=18946 start=Sun Nov 15 15:29:36 2026    
+after interrupt: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71-secondmate launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71-secondmate: live launch is unmanaged; no lifecycle action taken
+REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+after interrupt: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71-secondmate launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71-secondmate: live launch is unmanaged; no lifecycle action taken
+REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+after interrupt: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71-secondmate launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71-secondmate: live launch is unmanaged; no lifecycle action taken
+REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+after interrupt: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after exit: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+after relaunch: error: task reboot-fm-omp-reboot.QosK71-secondmate cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+after direct: recovery-skipped reboot-fm-omp-reboot.QosK71-secondmate launch=unmanaged; no lifecycle action taken
+after sweep: REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71-secondmate: live launch is unmanaged; no lifecycle action taken
+REBOOT_RECOVERY: reboot-fm-omp-reboot.QosK71: live launch is unmanaged; no lifecycle action taken
+Herdr lab runtime: {"client":{"version":"0.9.5","channel":"stable","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"remote_host_bridge":true,"remote_bridge_idle_timeout":true,"binary":"/opt/homebrew/bin/herdr","session":"fm-lab-omp-reboot-13724-27400"},"server":{"status":"running","running":true,"version":"0.9.5","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true,"ssh_agent_registration":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-reboot-13724-27400/herdr.sock","session":"fm-lab-omp-reboot-13724-27400","restart_needed":false,"server_binary_stale":false},"update":{"restart_needed":false,"server_binary_stale":false}}
+ok - native omp: task and local secondmate remain unmanaged and unchanged for empty/pending interrupt, exit, relaunch, direct recovery and reboot sweep
+guarded teardown completed for session 'fm-lab-omp-reboot-13724-27400'; waiting for native child exit
+native child exit confirmed: pid=18310 start=Sun Nov 15 15:28:23 2026    
+native child exit confirmed: pid=18946 start=Sun Nov 15 15:29:36 2026    
+private fixture tree removed: /Users/charlesabrooker/tmp/fm-omp-reboot.QosK71
+base-exit=0

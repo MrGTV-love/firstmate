@@ -1,0 +1,80 @@
+lab home: /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+== live panes: unpin-ship=w1:p1 unpin-mate=w2:p1 pinned-ship=w3:p1
+unpin-ship pane=w1:p1 claude_pid=26332 argv=/Users/charlesabrooker/.local/bin/claude env_readable_keys=2 FM_SPAWN_GEN_lines=0
+unpin-ship head verdict: unmanaged  agent_state=alive
+unpin-mate pane=w2:p1 claude_pid=26911 argv=/Users/charlesabrooker/.local/bin/claude env_readable_keys=2 FM_SPAWN_GEN_lines=0
+unpin-mate head verdict: unmanaged  agent_state=alive
+pinned-ship pane=w3:p1 claude_pid=27519 argv=/Users/charlesabrooker/.local/bin/claude env_readable_keys=2 FM_SPAWN_GEN_lines=1
+pinned-ship head verdict: managed  agent_state=alive
+== screen of unpin-ship before consumers
+ Accessing workspace:
+
+ /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/wt-unpin-ship
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+[head][unpin-ship][interrupt] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: task unpin-ship cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh unpin-ship relaunch", or decide the lane by hand
+[head][unpin-ship][exit] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: task unpin-ship cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh unpin-ship relaunch", or decide the lane by hand
+[head][unpin-ship][relaunch] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: task unpin-ship cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh unpin-ship relaunch", or decide the lane by hand
+[head][unpin-ship][recover-launch] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: launch recovery for unpin-ship found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh unpin-ship relaunch", or decide the lane by hand
+[head][unpin-ship][sweep] exit=1 :: REBOOT_RECOVERY: unpin-ship: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh unpin-ship relaunch", or decide the lane by hand
+[head][unpin-ship][adopt] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh unpin-ship relaunch"; nothing was changed
+[head][unpin-ship] UNCHANGED: meta cksum, state files (ignoring reboot bookkeeping), worktree files, claude PID
+[head][unpin-ship] screen unchanged (no keys reached the pane)
+[base][unpin-ship][interrupt] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: task unpin-ship cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+[base][unpin-ship][exit] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: task unpin-ship cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+[base][unpin-ship][relaunch] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: task unpin-ship cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+[base][unpin-ship][recover-launch] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: launch recovery for unpin-ship cannot prove its live launch settings; no lifecycle action taken
+[base][unpin-ship][sweep] exit=1 :: REBOOT_RECOVERY: unpin-ship: live launch settings are unreadable; no lifecycle action taken
+[base][unpin-ship][adopt] exit=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+error: session record adoption requires the actual lock-owning main Firstmate
+[base][unpin-ship] UNCHANGED: meta cksum, state files (ignoring reboot bookkeeping), worktree files, claude PID
+[base][unpin-ship] screen unchanged (no keys reached the pane)
+[head][pinned-ship][recover-launch] exit=0 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+recovery-skipped pinned-ship launch=managed
+[head][pinned-ship][sweep] exit=1 :: 
+[head][pinned-ship] UNCHANGED: meta cksum, state files (ignoring reboot bookkeeping), worktree files, claude PID
+[head][pinned-ship] screen unchanged (no keys reached the pane)
+[base][pinned-ship][recover-launch] exit=0 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home
+recovery-skipped pinned-ship launch=managed
+[base][pinned-ship][sweep] exit=1 :: 
+[base][pinned-ship] UNCHANGED: meta cksum, state files (ignoring reboot bookkeeping), worktree files, claude PID
+[base][pinned-ship] screen unchanged (no keys reached the pane)
+== restart of unpinned claude secondmate (head then base)
+[head][unpin-mate][restart] exit=3 :: unreached: unpin-mate: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh unpin-mate relaunch", or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+[head][unpin-mate] no inbox/pending-reply/state file created or changed
+[head][unpin-mate] screen unchanged
+[head][unpin-mate] claude PID unchanged (26911)
+[base][unpin-mate][restart] exit=3 :: nudged: unpin-mate: it did not confirm within 5s that its open work is written down, so its conversation was not spent
+summary: 0 of 1 restarted, 1 nudged, 0 unreached
+[base][unpin-mate] STATE CHANGED
+0a1,3
+> 226804325 13 /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home/state/.guard-watcher-stale-banner
+> 241752832 860 /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home/state/pending-replies/663f6df86649a761
+> 3170489818 833 /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home/state/pending-replies/9fda5b93751c4628
+1a5,6
+> 1590680336 835 /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home/state/unpin-mate.inbox/001.msg
+> 3721772063 195 /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo/home/state/unpin-mate.inbox/002.msg
+[base][unpin-mate] screen unchanged
+[base][unpin-mate] claude PID unchanged (26911)
+guarded teardown done: fm-lab-claude-unpin-24452-29400
+removed /Users/charlesabrooker/tmp/fm-claude-unpin.jwZLMo
