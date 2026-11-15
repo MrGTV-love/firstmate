@@ -1644,10 +1644,12 @@ test_ship_scaffolds_teach_the_closes_line() {
       assert_grep '<!-- firstmate-backlog-closes:end -->' "$brief" "$mode/$forge ship brief did not teach the closes block's end line"
       assert_grep 'exactly one closes block' "$brief" "$mode/$forge ship brief did not say the body holds exactly one closes block"
       assert_no_grep 'in a paragraph of directive lines alone' "$brief" "$mode/$forge ship brief still teaches the old paragraph rule"
-      # Main 044: the block sits at the top level, above any text that can open an example.
-      assert_grep 'at the top of the PR body, above any code fence' "$brief" "$mode/$forge ship brief did not say the block goes above every code fence and element"
-      assert_grep 'a quoted example closes nothing' "$brief" "$mode/$forge ship brief did not say a quoted example closes nothing"
-      assert_grep 'if any of that text sits above the block' "$brief" "$mode/$forge ship brief's body check does not cover text above the block"
+      # Main 045: the block opens the body, in the strict line forms; a quoted copy refuses the body.
+      assert_grep "its begin line must be the body's first non-empty line" "$brief" "$mode/$forge ship brief did not say the block opens the body"
+      assert_grep 'one space after the colon, nothing after the value, plain printable ASCII' "$brief" "$mode/$forge ship brief did not teach the strict line forms"
+      assert_grep 'a second or quoted copy of the block' "$brief" "$mode/$forge ship brief did not say a quoted copy refuses the body"
+      assert_grep 'if it is not the first thing in the body' "$brief" "$mode/$forge ship brief's body check does not cover a block that is not first"
+      assert_no_grep 'a quoted example closes nothing even with its marker lines' "$brief" "$mode/$forge ship brief still claims a quoted block closes nothing"
       if [ "$mode" = no-mistakes ]; then
         # The pipeline writes the PR body after the handoff, so the check belongs after the
         # CI-ready return point and before the CI-ready done, never before the handoff done.

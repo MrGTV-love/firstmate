@@ -39,6 +39,20 @@ cx_deps() {  # <case-dir> <id>
   cx "$1" show "$2" 2>&1 | sed -n 's/^  deps: *//p' | head -1
 }
 
+# Main 045 F4: a route test gives a dependent another blocker and a hold, and reads both back.
+cx_other_and_hold() {  # <case-dir> <dependent>
+  cx_add "$1" "$2-other" docs
+  cx "$1" block "$2" --by "$2-other" >/dev/null || fail "fixture: could not block $2 on $2-other"
+  cx "$1" hold "$2" --reason "wait for a date" --kind future >/dev/null || fail "fixture: could not hold $2"
+}
+assert_only_other_and_hold() {  # <case-dir> <dependent> <finished-id> <label>
+  local deps
+  deps=$(cx_deps "$1" "$2" | sed 's/blocked-by://g; s/[ "]//g')
+  case ",$deps," in *",$3,"*) fail "$4: the stored edge on $3 stayed ($deps)" ;; esac
+  [ "$deps" = "$2-other" ] || fail "$4: the other blocker of $2 was not kept alone ($deps)"
+  cx "$1" show "$2" | grep -q 'hold_kind: future' || fail "$4: the hold on $2 was lost"
+}
+
 cx_meta() {  # <case-dir> <id> <kind> [pr-url]
   local case_dir=$1 id=$2 kind=$3 pr=${4:-}
   fm_write_meta "$case_dir/state/$id.meta" \
@@ -101,6 +115,12 @@ CLOSES_END='<!-- firstmate-backlog-closes:end -->'
 block() {  # <line...>
   printf '%s\n' "$CLOSES_BEGIN" "$@" "$CLOSES_END"
 }
+prepend_block() {  # <body-file> <line...>: put one block first, above the body already in the file
+  local file=$1 old
+  shift
+  old=$(cat "$file")
+  { block "$@"; printf '\n%s\n' "$old"; } > "$file"
+}
 block_json() {  # <line...>: the same block as one JSON string
   block "$@" | "$JQ_BIN" -Rs .
 }
@@ -124,9 +144,9 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   cx_meta "$case_dir" docs-twin docs
   # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
   {
-    printf '%s\n' 'Fixes things; fm-fixture-prose-5 is related.' ''
     block 'Closes-backlog-item: fm-fixture-alpha-1' 'Closes-backlog-item: fm-fixture-beta-2' 'Closes-backlog-item: fm-fixture-live-3' \
       'Closes-backlog-item: ship-a' 'Closes-backlog-item: docs-live-4' 'Closes-backlog-item: ship-a'
+    printf '%s\n' '' 'Fixes things; fm-fixture-prose-5 is related.'
     printf '%s\n' '' 'Mentions Closes-backlog-item: fm-fixture-prose-5 inline.' 'closes: fm-fixture-prose-5' \
       '  Closes-backlog-item: fm-fixture-prose-5' 'Closes-backlog-item: fm-fixture-prose-5 # comment' \
       'Closes: fm-fixture-legacy-6'
@@ -232,7 +252,7 @@ test_an_old_form_line_never_blocks_another_source_for_the_same_id() {
 
   case_dir=$(gh_case c2-old-b 95)
   cx_add "$case_dir" b-item
-  { printf '%s\n' 'Closes: b-item' ''; block "Train-member: $base/72"; } > "$case_dir/bodies/95"
+  { block "Train-member: $base/72"; printf '%s\n' '' 'Closes: b-item'; } > "$case_dir/bodies/95"
   block 'Closes-backlog-item: b-item' > "$case_dir/bodies/72"
   gh_merge "$case_dir" 95
   [ "$(cx_state "$case_dir" b-item)" = "done" ] || fail "c2-old-b: the train's old line kept a member's named item open"
@@ -484,7 +504,10 @@ test_a_hand_run_with_an_open_pr_closes_nothing() {
 train_body() {
   local layout=$1 excluded=$2 extra=$3 member n=0 lines=()
   shift 3
-  printf '%s\n' '## Intent' '' "Context: see $excluded, which stays out of this train." '' '## Train' ''
+  for member in "$@"; do lines+=("Train-member: $member"); done
+  [ -z "$extra" ] || lines+=("$extra")
+  block "${lines[@]}"
+  printf '%s\n' '' '## Intent' '' "Context: see $excluded, which stays out of this train." '' '## Train' ''
   case "$layout" in
     url-first-table)
       printf '%s\n' '| Component | Unchanged component head | Train merge commit |' '| --- | --- | --- |'
@@ -499,10 +522,7 @@ train_body() {
       for member in "$@"; do printf -- '- %s at unchanged head `aaaa`.\n' "$member"; done ;;
     plain) ;;
   esac
-  printf '%s\n' '' "Also see $excluded again." ''
-  for member in "$@"; do lines+=("Train-member: $member"); done
-  [ -z "$extra" ] || lines+=("$extra")
-  block "${lines[@]}"
+  printf '%s\n' '' "Also see $excluded again."
 }
 
 # The train fixture: four members, as the contract lists them.
@@ -626,7 +646,7 @@ test_r4_f2_an_invalid_train_member_value_refuses_the_whole_block() {
     case "$(cx_deps "$case_dir" waits-member)" in *member-item*) ;; *) fail "r4-f2: the member item's dependent lost its edge" ;; esac
     case "$(cx_deps "$case_dir" waits-meta)" in *member-meta-item*) ;; *) fail "r4-f2: the pr= task's dependent lost its edge" ;; esac
     assert_no_grep '^close-at-merge: closed ' "$case_dir/stdout" "r4-f2: something closed from a refused block"
-    assert_match "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/84: its closes block names Train-member $bad, which is" "$case_dir/stderr" \
+    assert_match "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/84: (its closes block names Train-member $bad, which is|line [0-9]+ inside its closes block names the merged pull request itself as a Train-member: Train-member: $bad)" "$case_dir/stderr" \
       "r4-f2: the block with Train-member $bad was not refused by name"
     assert_no_grep "^pr view $REPO_URL/71 --json body" "$case_dir/gh.log" "r4-f2: a refused block's member body was read"
     n=$((n + 1))
@@ -772,8 +792,8 @@ test_a_forgejo_train_closes_each_listed_member_source_and_reports_the_prose_link
   printf '{"merged":true,"body":""}\n' > "$case_dir/tea-body-$key-12.json"
   printf '{"merged":true,"body":"No item here."}\n' > "$case_dir/tea-body-$key-13.json"
   printf '{"merged":true,"body":%s}\n' "$(block_json 'Closes-backlog-item: fj-prose')" > "$case_dir/tea-body-$key-14.json"
-  set_json_field "$case_dir/pr-post.json" body "$(printf '%s\n' "Context: $base/14 stays out." ''; \
-    block "Train-member: $base/11" "Train-member: $base/12" "Train-member: $base/13")"
+  set_json_field "$case_dir/pr-post.json" body "$(block "Train-member: $base/11" "Train-member: $base/12" "Train-member: $base/13"; \
+    printf '%s\n' '' "Context: $base/14 stays out.")"
   merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "c2-forgejo-train: the merge must succeed"
   [ "$(cx_state "$case_dir" fj-m1)" = "done" ] || fail "c2-forgejo-train: the item named in a member body was not closed"
@@ -806,8 +826,8 @@ test_a_gitlab_train_reads_each_listed_member_and_reports_the_prose_link() {
   printf '{"state":"merged","description":""}\n' > "$case_dir/mr-body-$key-22.json"
   printf '{"state":"merged","description":"No item here."}\n' > "$case_dir/mr-body-$key-23.json"
   printf '{"state":"merged","description":%s}\n' "$(block_json 'Closes-backlog-item: gl-prose')" > "$case_dir/mr-body-$key-24.json"
-  set_json_field "$case_dir/mr-post.json" description "$(printf '%s\n' "Context: $base/24 stays out." ''; \
-    block "Train-member: $base/21" "Train-member: $base/22" "Train-member: $base/23")"
+  set_json_field "$case_dir/mr-post.json" description "$(block "Train-member: $base/21" "Train-member: $base/22" "Train-member: $base/23"; \
+    printf '%s\n' '' "Context: $base/24 stays out.")"
   merge_call "$case_dir" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "c2-gitlab-train: the merge must succeed"
   assert_match 'not closed gl-m1: .*canonical pull request URL|not closed gl-m1: bin/fm-tasks-axi.sh done did not close it' "$case_dir/stderr" \
@@ -857,9 +877,6 @@ run_close() {
     FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" "$CLOSE_SH" "$@"
 }
 
-lib_call() {  # <function> [args...]; the body comes on standard input
-  bash -c '. "$1"; shift; "$@"' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$@"
-}
 
 test_completion_clears_the_finished_blocker_on_every_route() {
   local case_dir out deps
@@ -911,13 +928,13 @@ test_the_task_noun_forms_and_typed_completions_clear_the_edge() {
   command -v jq >/dev/null 2>&1 || { printf 'ok - skipped (jq is not installed)\n'; return 0; }
   case_dir=$(make_case c4-more-routes)
   wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
-  for id in noun-done noun-close; do cx_add "$case_dir" "$id" docs; cx_add "$case_dir" "dep-of-$id"; cx "$case_dir" block "dep-of-$id" --by "$id" >/dev/null; done
+  for id in noun-done noun-close; do cx_add "$case_dir" "$id" docs; cx_add "$case_dir" "dep-of-$id"; cx "$case_dir" block "dep-of-$id" --by "$id" >/dev/null; cx_other_and_hold "$case_dir" "dep-of-$id"; done
   wrapper task "done" noun-done --note finished >/dev/null 2>"$case_dir/e1" || fail "c4-routes: task done failed"
   wrapper task close noun-close --note finished >/dev/null 2>"$case_dir/e2" || fail "c4-routes: task close failed"
   assert_grep 'unblocked: dep-of-noun-done no longer waits on noun-done' "$case_dir/e1" "c4-routes: the task done form did not clear"
   assert_grep 'unblocked: dep-of-noun-close no longer waits on noun-close' "$case_dir/e2" "c4-routes: the task close form did not clear"
-  [ "$(cx_deps "$case_dir" dep-of-noun-done)" = none ] || fail "c4-routes: task done left the stored edge"
-  [ "$(cx_deps "$case_dir" dep-of-noun-close)" = none ] || fail "c4-routes: task close left the stored edge"
+  assert_only_other_and_hold "$case_dir" dep-of-noun-done noun-done "c4-routes: task done"
+  assert_only_other_and_hold "$case_dir" dep-of-noun-close noun-close "c4-routes: task close"
   # A typed completion: waiving a public follow-up obligation finishes its row.
   jq -n '{request_id:"req-1", platform:"x", context_binding:{version:"ctx1", value:"ctx1_req-1"}, public_safe_summary:"s",
           received_at:"2026-07-30T10:00:00Z", followup_expires_at:"2026-08-06T10:00:00Z", reservation_expires_at:"2026-08-06T10:00:00Z"}' \
@@ -928,12 +945,12 @@ test_the_task_noun_forms_and_typed_completions_clear_the_edge() {
     || fail "c4-routes: could not create the obligation"
   cx_add "$case_dir" dep-of-pf
   cx "$case_dir" block dep-of-pf --by pf-1 >/dev/null
+  cx_other_and_hold "$case_dir" dep-of-pf
   wrapper public-followup waive pf-1 --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e3" \
     || fail "c4-routes: the waive failed"
   assert_grep 'unblocked: dep-of-pf no longer waits on pf-1' "$case_dir/e3" "c4-routes: a waived obligation did not clear its dependents"
-  deps=$(cx_deps "$case_dir" dep-of-pf)
-  [ "$deps" = none ] || fail "c4-routes: the stored edge stayed after the waive ($deps)"
-  pass "the task noun forms and a typed public-followup completion clear the finished edge"
+  assert_only_other_and_hold "$case_dir" dep-of-pf pf-1 "c4-routes: the waive"
+  pass "the task noun forms and a typed public-followup completion clear the finished edge and keep the dependent's other blocker and hold"
 }
 
 test_a_typed_completion_that_archives_or_cannot_be_read_back() {
@@ -947,7 +964,7 @@ test_a_typed_completion_that_archives_or_cannot_be_read_back() {
   jq -n '{type:"pr-merged", project:"alpha", required_deliverables:["pr_url"], completion_policy:"all-required"}' > "$case_dir/expected.json"
   sed 's/^done_keep = .*/done_keep = 0/' "$case_dir/home/.tasks.toml" > "$case_dir/tasks.toml"
   cat "$case_dir/tasks.toml" > "$case_dir/home/.tasks.toml"
-  for id in pf-archived pf-unread; do
+  for id in pf-archived pf-unread pf-silent; do
     wrapper public-followup add "$id" --request-context-file "$case_dir/request.json" --purpose promised-final \
       --expected-final-file "$case_dir/expected.json" --expires-at 2026-10-01T00:00:00Z >/dev/null 2>&1 \
       || fail "c4-pf: could not create $id"
@@ -964,17 +981,30 @@ test_a_typed_completion_that_archives_or_cannot_be_read_back() {
   mkdir -p "$bin_dir"
   cat > "$bin_dir/tasks-axi" <<SH
 #!/usr/bin/env bash
-if [ "\${1:-}" = show ] && [ "\${2:-}" = pf-unread ]; then
+if [ "\${1:-}" = show ] && { [ "\${2:-}" = pf-unread ] || [ "\${2:-}" = pf-silent ]; }; then
   echo "error: simulated read failure" >&2
   exit 1
+fi
+# A completion that prints nothing about its state: the wrapper cannot tell whether it finished.
+if [ "\${1:-} \${2:-} \${3:-}" = "public-followup waive pf-silent" ]; then
+  "$real" "\$@" >/dev/null
+  exit
 fi
 exec "$real" "\$@"
 SH
   chmod +x "$bin_dir/tasks-axi"
   PATH="$bin_dir:$PATH" wrapper public-followup waive pf-unread --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e2" \
     || fail "c4-pf: a failed read back changed the waive's exit status"
-  assert_match '^actionable: .*pf-unread.*simulated read failure.*--by pf-unread' "$case_dir/e2" "c4-pf: a failed read back was not reported as actionable"
-  pass "a typed completion clears the edge when the row is archived at once and reports a failed read back"
+  # Main 045 F4: tasks-axi reported the waive done, so the edge is cleared though the read failed.
+  [ "$(cx_deps "$case_dir" dep-of-pf-unread)" = none ] || fail "c4-pf: a waive reported done left its edge after a failed read ($(cx_deps "$case_dir" dep-of-pf-unread))"
+  assert_match '^note: the state of pf-unread could not be read after its waive .*simulated read failure.*tasks-axi reported it done' "$case_dir/e2" "c4-pf: the failed read was not noted"
+  # A completion whose output does not say its state, with a failed read: the edge stays and the
+  # manual clear is reported.
+  PATH="$bin_dir:$PATH" wrapper public-followup waive pf-silent --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e3" \
+    || fail "c4-pf: the silent waive changed its exit status"
+  assert_match '^actionable: .*pf-silent.*simulated read failure.*--by pf-silent' "$case_dir/e3" "c4-pf: an unknown state after a failed read was not reported as actionable"
+  case "$(cx_deps "$case_dir" dep-of-pf-silent)" in *pf-silent*) ;; *) fail "c4-pf: an edge was cleared with no proof the item finished" ;; esac
+  pass "a typed completion clears the edge when the row is archived at once, and when tasks-axi reported it done though the read back failed; with no proof of its state it keeps the edge and reports the manual clear"
 }
 
 test_a_typed_completion_help_call_reports_nothing_to_act_on() {
@@ -1027,14 +1057,15 @@ test_an_answered_captain_call_clears_the_edge() {
   cx_add "$case_dir" waits-on-call
   cx "$case_dir" hold call-q --reason "owner decides" --kind captain >/dev/null
   cx "$case_dir" block waits-on-call --by call-q >/dev/null
+  cx_other_and_hold "$case_dir" waits-on-call
   printf '%s\n' 'Go ahead.' > "$case_dir/decision.md"
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" FM_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/fm-captain-hold.sh" answer call-q --decision-file "$case_dir/decision.md" > "$case_dir/ans.out" 2> "$case_dir/ans.err" \
     || { cat "$case_dir/ans.err" >&2; fail "c4-captain: the answer failed"; }
   [ "$(cx_state "$case_dir" call-q)" = "done" ] || fail "c4-captain: the answered call did not close"
   assert_grep 'unblocked: waits-on-call no longer waits on call-q' "$case_dir/ans.err" "c4-captain: the dependent was not reported"
-  [ "$(cx_deps "$case_dir" waits-on-call)" = none ] || fail "c4-captain: the stored edge stayed"
-  pass "answering a captain call clears the call's edge from its dependents"
+  assert_only_other_and_hold "$case_dir" waits-on-call call-q "c4-captain"
+  pass "answering a captain call clears the call's edge from its dependents and keeps their other blocker and hold"
 }
 
 test_a_withdrawn_captain_call_clears_the_edge() {
@@ -1047,6 +1078,7 @@ test_a_withdrawn_captain_call_clears_the_edge() {
   hold_env hold call-w --reason "owner decides" >/dev/null 2>&1 || fail "c4-withdraw: could not hold call-w"
   cx_add "$case_dir" waits-on-w
   cx "$case_dir" block waits-on-w --by call-w >/dev/null
+  cx_other_and_hold "$case_dir" waits-on-w
   hold_env hold ruling-r --reason "owner rules on call-w" >/dev/null 2>&1 || fail "c4-withdraw: could not hold the ruling"
   printf '%s\n' 'The owner rules on call-w: proceed.' > "$case_dir/ruling.md"
   hold_env answer ruling-r --decision-file "$case_dir/ruling.md" >/dev/null 2>&1 || fail "c4-withdraw: could not record the ruling"
@@ -1055,8 +1087,8 @@ test_a_withdrawn_captain_call_clears_the_edge() {
     > "$case_dir/w.out" 2> "$case_dir/w.err" || { cat "$case_dir/w.err" >&2; fail "c4-withdraw: the withdrawal failed"; }
   [ "$(cx_state "$case_dir" call-w)" = "done" ] || fail "c4-withdraw: the withdrawn call did not close"
   assert_grep 'unblocked: waits-on-w no longer waits on call-w' "$case_dir/w.err" "c4-withdraw: the dependent was not reported"
-  [ "$(cx_deps "$case_dir" waits-on-w)" = none ] || fail "c4-withdraw: the stored edge stayed"
-  pass "withdrawing a captain call clears the call's edge from its dependents"
+  assert_only_other_and_hold "$case_dir" waits-on-w call-w "c4-withdraw"
+  pass "withdrawing a captain call clears the call's edge from its dependents and keeps their other blocker and hold"
 }
 
 test_an_explicit_data_root_gets_the_same_clear() {
@@ -1100,7 +1132,7 @@ test_f1_an_excluded_component_table_under_a_subheading_closes_nothing_and_is_rep
   assert_match "^actionable: close-at-merge: mentioned $REPO_URL/71 in the prose of $REPO_URL/80: no item was closed for it" "$case_dir/stderr" "f1: the unlisted legitimate link was not reported"
   assert_no_grep 'close-at-merge: closed' "$case_dir/stdout" "f1: something closed without a directive line"
   # Control: the same body with the legitimate member on a Train-member line closes it, and only it.
-  { printf '\n'; block "Train-member: $REPO_URL/71"; } >> "$case_dir/bodies/80"
+  prepend_block "$case_dir/bodies/80" "Train-member: $REPO_URL/71"
   gh_merge "$case_dir" 80
   [ "$(cx_state "$case_dir" actually-landed)" = "done" ] || fail "f1 control: a Train-member line did not close the member's item"
   [ "$(cx_state "$case_dir" explicitly-excluded)" = queued ] || fail "f1 control: the excluded item closed"
@@ -1144,7 +1176,7 @@ test_f3_a_component_table_with_a_negated_exclusion_heading_closes_nothing_withou
   assert_match "^actionable: close-at-merge: mentioned $REPO_URL/71 in the prose of $REPO_URL/80: no item was closed for it; list it as a Train-member: line" "$case_dir/stderr" \
     "f3: the unlisted member was silent"
   # Control: the Train-member line closes it, whatever the heading says.
-  { printf '\n'; block "Train-member: $REPO_URL/71"; } >> "$case_dir/bodies/80"
+  prepend_block "$case_dir/bodies/80" "Train-member: $REPO_URL/71"
   gh_merge "$case_dir" 80
   [ "$(cx_state "$case_dir" included-item)" = "done" ] || fail "f3 control: the Train-member line did not close the member's item"
   pass "F3: a negated exclusion heading no longer decides anything; the unlisted member is reported and a Train-member line closes it"
@@ -1277,7 +1309,7 @@ test_a_train_members_prose_only_mention_is_reported_and_never_closed() {
   cx_add "$case_dir" member-prose-only
   cx_add "$case_dir" unrelated-item
   block "Train-member: $REPO_URL/71" > "$case_dir/bodies/95"
-  { printf '%s\n' 'This also fixes member-prose-only.' ''; block 'Closes-backlog-item: member-directive'; printf '%s\n' '' 'The member-directive item is the main one.'; } > "$case_dir/bodies/71"
+  { block 'Closes-backlog-item: member-directive'; printf '%s\n' '' 'This also fixes member-prose-only.' '' 'The member-directive item is the main one.'; } > "$case_dir/bodies/71"
   printf '%s\n' 71 >> "$case_dir/merged-prs"
   gh_merge "$case_dir" 95
   [ "$(cx_state "$case_dir" member-directive)" = "done" ] || fail "f2: the member's directive did not close its item"
@@ -1507,7 +1539,7 @@ f1_witness_case() {  # <name> <number> <example-id> <example lines...>
   cx_add "$case_dir" "$example"
   cx_add "$case_dir" "$name-waiter"
   cx "$case_dir" block "$name-waiter" --by "$example" >/dev/null
-  { printf '%s\n' 'Real block:' ''; block "Closes-backlog-item: $name-control"; printf '%s\n' '' "$@"; } > "$case_dir/bodies/$number"
+  { block "Closes-backlog-item: $name-control"; printf '%s\n' '' 'The real block is above; examples follow.' '' "$@"; } > "$case_dir/bodies/$number"
   gh_merge "$case_dir" "$number"
   [ "$(cx_state "$case_dir" "$name-control")" = "done" ] || fail "$name: the real directive did not close its item"
   assert_match "^close-at-merge: closed $name-control with $REPO_URL/$number " "$case_dir/stdout" "$name: the real directive's close was not reported with the merged URL"
@@ -1654,6 +1686,11 @@ refused_case() {
   assert_match "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/$number: $reason" "$case_dir/stderr" \
     "$name: the refusal was not reported with its reason"
   assert_match 'left open' "$case_dir/stdout" "$name: the refusal was not counted as left open"
+  # Main 045 F3: the one refusal line names every item id the body names.
+  for id in "$@"; do
+    grep "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/$number: " "$case_dir/stderr" \
+      | grep -qE "; it names item ids: ([^;]*, )?$id(, [^;]*)?; " || fail "$name: the refusal did not name $id"
+  done
 }
 
 # shellcheck disable=SC2016 # Backticks in the reviewer's body are literal Markdown.
@@ -1680,7 +1717,7 @@ test_r3_f1_a_closing_tag_inside_a_multiline_code_span_closes_no_example() {
   # Main 044: the <details> text above the block refuses the whole body, so the block below it
   # closes nothing either; the second merge below puts the block first and it closes.
   [ "$(cx_state "$case_dir" reviewer-control-two)" = queued ] || fail "r3-f1-code-tag: a block below a <details> line closed"
-  assert_match "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/110: line 1, above its closes block, holds <details>" "$case_dir/stderr" \
+  assert_match "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/110: its first non-empty line, line 1, is not the closes block begin line" "$case_dir/stderr" \
     "r3-f1-code-tag: the body was not refused for the <details> text above its block"
   [ "$(cx_state "$case_dir" reviewer-example-two)" = queued ] || fail "r3-f1-code-tag: an example line closed its item"
   [ "$(cx_state "$case_dir" reviewer-member-two)" = queued ] || fail "r3-f1-code-tag: an example Train-member line closed its member's item"
@@ -1716,7 +1753,7 @@ test_r4_a_block_below_opener_text_in_a_code_span_is_refused_by_name() {
   local case_dir
   { printf '%s\n' 'To document markup, write `example' 'write <details> here' 'and finish the code span`.' ''
     block 'Closes-backlog-item: reviewer-legitimate-three'; } > "$TMP_ROOT/r4-open-tag.md"
-  refused_case r4-open-tag 111 'line 2, above its closes block, holds <details>' "$TMP_ROOT/r4-open-tag.md" reviewer-legitimate-three
+  refused_case r4-open-tag 111 'its first non-empty line, line 1, is not the closes block begin line' "$TMP_ROOT/r4-open-tag.md" reviewer-legitimate-three
   case_dir=$(gh_case r4-open-tag-first 129)
   cx_add "$case_dir" reviewer-legitimate-first
   { block 'Closes-backlog-item: reviewer-legitimate-first'
@@ -1760,24 +1797,24 @@ test_r3_f2_a_member_line_after_a_pre_end_reports_its_link_and_id() {
 
 test_r3_two_blocks_refuse_the_whole_close() {
   { block 'Closes-backlog-item: two-a'; printf '\n'; block 'Closes-backlog-item: two-b'; } > "$TMP_ROOT/r3-two.md"
-  refused_case r3-two-blocks 113 'it holds more than one closes block' "$TMP_ROOT/r3-two.md" two-a two-b
+  refused_case r3-two-blocks 113 'line 5 holds the closes block marker text outside its one block' "$TMP_ROOT/r3-two.md" two-a two-b
   pass "a body with two closes blocks refuses the whole close, names why and closes nothing"
 }
 
 test_r3_a_missing_or_misplaced_end_line_refuses_the_whole_close() {
-  printf '%s\n' '## Backlog items' '' "$CLOSES_BEGIN" 'Closes-backlog-item: no-end-a' > "$TMP_ROOT/r3-no-end.md"
+  printf '%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: no-end-a' '' '## Backlog items' > "$TMP_ROOT/r3-no-end.md"
   refused_case r3-no-end 114 'its closes block has no end line' "$TMP_ROOT/r3-no-end.md" no-end-a
   printf '%s\n' "$CLOSES_END" 'Closes-backlog-item: end-first-a' "$CLOSES_BEGIN" > "$TMP_ROOT/r3-end-first.md"
-  refused_case r3-end-first 115 'it has a closes block end line with no begin line before it' "$TMP_ROOT/r3-end-first.md" end-first-a
+  refused_case r3-end-first 115 'its first non-empty line, line 1, holds the closes block marker text but is not exactly the begin line' "$TMP_ROOT/r3-end-first.md" end-first-a
   pass "a block with no end line, or an end line before its begin line, refuses the whole close and closes nothing"
 }
 
 # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
 test_r3_marker_text_inside_other_text_refuses_the_whole_close() {
   { printf '%s\n' "Write \`$CLOSES_BEGIN\` above the lines." ''; block 'Closes-backlog-item: marker-text-a'; } > "$TMP_ROOT/r3-marker-text.md"
-  refused_case r3-marker-text 116 'line 1 holds the closes block marker text inside other text' "$TMP_ROOT/r3-marker-text.md" marker-text-a
+  refused_case r3-marker-text 116 'its first non-empty line, line 1, holds the closes block marker text but is not exactly the begin line' "$TMP_ROOT/r3-marker-text.md" marker-text-a
   printf '%s\n' "  $CLOSES_BEGIN" 'Closes-backlog-item: indented-marker-a' "$CLOSES_END" > "$TMP_ROOT/r3-indented-marker.md"
-  refused_case r3-indented-marker 117 'line 1 holds the closes block marker text inside other text' "$TMP_ROOT/r3-indented-marker.md" indented-marker-a
+  refused_case r3-indented-marker 117 'its first non-empty line, line 1, holds the closes block marker text but is not exactly the begin line' "$TMP_ROOT/r3-indented-marker.md" indented-marker-a
   pass "marker text inside other text, an indented marker included, refuses the whole close"
 }
 
@@ -1786,7 +1823,7 @@ test_r3_a_line_in_the_block_that_is_no_directive_refuses_the_whole_close() {
   for line in 'Some prose.' 'Closes: old-in-block' 'Closes-backlog-item: two words' '  Closes-backlog-item: indented-in-block' '```' \
     'closes-backlog-item: lower-in-block' 'Closes-backlog-item: .hidden'; do
     block 'Closes-backlog-item: tainted-a' "$line" > "$TMP_ROOT/r3-tainted-$n.md"
-    refused_case "r3-tainted-$n" "$n" "line 3 inside its closes block is neither a Closes-backlog-item: line, a Train-member: line nor blank" \
+    refused_case "r3-tainted-$n" "$n" "line 3 inside its closes block (is not exactly a Closes-backlog-item: <item-id> line, a Train-member: <url> line or an empty line|holds a tab)" \
       "$TMP_ROOT/r3-tainted-$n.md" tainted-a
     n=$((n + 1))
   done
@@ -1804,7 +1841,7 @@ test_r3_a_member_body_is_read_only_inside_its_own_block() {
   cx_add "$case_dir" m2-meta docs
   cx_meta "$case_dir" m2-meta docs "$REPO_URL/72"
   block "Train-member: $REPO_URL/71" "Train-member: $REPO_URL/72" 'Closes-backlog-item: train-own-r3' > "$case_dir/bodies/126"
-  { printf '%s\n' 'Closes-backlog-item: m-outside' ''; block 'Closes-backlog-item: m-inside'; } > "$case_dir/bodies/71"
+  { block 'Closes-backlog-item: m-inside'; printf '%s\n' '' 'Closes-backlog-item: m-outside'; } > "$case_dir/bodies/71"
   { block 'Closes-backlog-item: m2-a'; printf '\n'; block 'Closes-backlog-item: m2-b'; } > "$case_dir/bodies/72"
   printf '%s\n' 71 72 >> "$case_dir/merged-prs"
   gh_merge "$case_dir" 126 --merge
@@ -1818,7 +1855,7 @@ test_r3_a_member_body_is_read_only_inside_its_own_block() {
   assert_grep "closed m2-meta with $REPO_URL/126" "$case_dir/stdout" "r3-member-block: the refused member's pr= task did not close with the train as proof"
   assert_match "^actionable: close-at-merge: ignored a directive line outside a directive block in the body of train member $REPO_URL/71: Closes-backlog-item: m-outside\$" "$case_dir/stderr" \
     "r3-member-block: the member line outside its block was not reported"
-  assert_match "^actionable: close-at-merge: refused to close anything named by the body of train member $REPO_URL/72: it holds more than one closes block" "$case_dir/stderr" \
+  assert_match "^actionable: close-at-merge: refused to close anything named by the body of train member $REPO_URL/72: line 5 holds the closes block marker text outside its one block" "$case_dir/stderr" \
     "r3-member-block: the member body with two blocks was not refused by name"
   pass "a member body is read only inside its own block; a member body with two blocks closes none of its own items and is refused by name, while the train's block and the member's pr= task close"
 }
@@ -1828,7 +1865,7 @@ test_r3_one_block_with_blank_lines_and_crlf_closes_each_line() {
   case_dir=$(gh_case r3-crlf 127)
   cx_add "$case_dir" crlf-a
   cx_add "$case_dir" crlf-b
-  printf '%s\r\n' 'Intro.' '' "$CLOSES_BEGIN" 'Closes-backlog-item: crlf-a' '' 'Closes-backlog-item: crlf-b' "$CLOSES_END" > "$case_dir/bodies/127"
+  printf '%s\r\n' '' "$CLOSES_BEGIN" 'Closes-backlog-item: crlf-a' '' 'Closes-backlog-item: crlf-b' "$CLOSES_END" '' 'Intro after the block.' > "$case_dir/bodies/127"
   gh_merge "$case_dir" 127
   [ "$(cx_state "$case_dir" crlf-a)" = "done" ] || fail "r3-crlf: crlf-a did not close"
   [ "$(cx_state "$case_dir" crlf-b)" = "done" ] || fail "r3-crlf: crlf-b did not close"
@@ -1840,10 +1877,10 @@ test_r3_one_block_with_blank_lines_and_crlf_closes_each_line() {
 # inside a code fence, a pre, code, blockquote or details element, an HTML comment or a Markdown
 # quote is an example: it closes nothing and its item's dependent keeps its stored edge.
 test_r4_f1_a_whole_block_inside_an_example_closes_nothing_and_keeps_its_edge() {
-  local n=130 open close what
-  while IFS='|' read -r what open close; do
+  local n=130 open close
+  while IFS='|' read -r _ open close; do
     { printf '%s\n' 'A quoted example only, not an instruction:' "$open"; block "Closes-backlog-item: example-$n"; printf '%s\n' "$close"; } > "$TMP_ROOT/r4-example-$n.md"
-    refused_case "r4-example-$n" "$n" "line 2, above its closes block, holds $what" "$TMP_ROOT/r4-example-$n.md" "example-$n"
+    refused_case "r4-example-$n" "$n" "its first non-empty line, line 1, is not the closes block begin line" "$TMP_ROOT/r4-example-$n.md" "example-$n"
     n=$((n + 1))
   done <<'CASES'
 ```|```|```
@@ -1857,7 +1894,7 @@ CASES
   # A Markdown quote: the marker lines carry the quote prefix, so they are marker text inside
   # other text (Main 043); this one was refused before Main 044 too.
   { printf '%s\n' 'Quoted:'; block "Closes-backlog-item: example-$n" | sed 's/^/> /'; } > "$TMP_ROOT/r4-example-$n.md"
-  refused_case "r4-example-$n" "$n" 'line 2 holds the closes block marker text inside other text' "$TMP_ROOT/r4-example-$n.md" "example-$n"
+  refused_case "r4-example-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$TMP_ROOT/r4-example-$n.md" "example-$n"
   pass "a whole block inside a fence, a pre, code, blockquote or details element, an HTML comment or a quote closes nothing and keeps its edge"
 }
 
@@ -1870,25 +1907,25 @@ test_r4_opener_text_above_the_block_refuses_whatever_seems_to_close_it() {
   body=$TMP_ROOT/r4-probe
   # 1. A fence line inside an HTML block, then a real fence around the block.
   { printf '%s\n' '<div>' '```' '</div>' '' '```'; block "Closes-backlog-item: probe-$n"; printf '%s\n' '```'; } > "$body-$n.md"
-  refused_case "r4-probe-$n" "$n" 'line 2, above its closes block, holds ```' "$body-$n.md" "probe-$n"; n=$((n + 1))
+  refused_case "r4-probe-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$body-$n.md" "probe-$n"; n=$((n + 1))
   # 2. A list-item fence that a column-0 line ends, then a real fence around the block.
   { printf '%s\n' '- item' '  ```' '  code' 'text' '```'; block "Closes-backlog-item: probe-$n"; printf '%s\n' '```'; } > "$body-$n.md"
-  refused_case "r4-probe-$n" "$n" 'line 2, above its closes block, holds ```' "$body-$n.md" "probe-$n"; n=$((n + 1))
+  refused_case "r4-probe-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$body-$n.md" "probe-$n"; n=$((n + 1))
   # 3. A closing tag inside a code span after an opening tag.
   { printf '%s\n' '<details>' 'Write `</details>` in the text.' ''; block "Closes-backlog-item: probe-$n"; } > "$body-$n.md"
-  refused_case "r4-probe-$n" "$n" 'line 1, above its closes block, holds <details>' "$body-$n.md" "probe-$n"; n=$((n + 1))
+  refused_case "r4-probe-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$body-$n.md" "probe-$n"; n=$((n + 1))
   # 4. A pre element opened in the middle of a paragraph.
   { printf '%s\n' 'A paragraph with <pre> inside it.' ''; block "Closes-backlog-item: probe-$n"; } > "$body-$n.md"
-  refused_case "r4-probe-$n" "$n" 'line 1, above its closes block, holds <pre>' "$body-$n.md" "probe-$n"; n=$((n + 1))
+  refused_case "r4-probe-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$body-$n.md" "probe-$n"; n=$((n + 1))
   # 5. A fence closed by a longer fence, and a tilde line inside it.
   { printf '%s\n' '````' '~~~' '`````' ''; block "Closes-backlog-item: probe-$n"; } > "$body-$n.md"
-  refused_case "r4-probe-$n" "$n" 'line 1, above its closes block, holds ```' "$body-$n.md" "probe-$n"; n=$((n + 1))
+  refused_case "r4-probe-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$body-$n.md" "probe-$n"; n=$((n + 1))
   # 6. An HTML comment that never closes.
   { printf '%s\n' 'Intro <!-- never closed' ''; block "Closes-backlog-item: probe-$n"; } > "$body-$n.md"
-  refused_case "r4-probe-$n" "$n" 'line 1, above its closes block, holds <!--' "$body-$n.md" "probe-$n"; n=$((n + 1))
+  refused_case "r4-probe-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$body-$n.md" "probe-$n"; n=$((n + 1))
   # 7. An inline code element, opened and closed on one line.
   { printf '%s\n' 'Use <CODE>x</CODE> here.' ''; block "Closes-backlog-item: probe-$n"; } > "$body-$n.md"
-  refused_case "r4-probe-$n" "$n" 'line 1, above its closes block, holds <CODE>' "$body-$n.md" "probe-$n"
+  refused_case "r4-probe-$n" "$n" 'its first non-empty line, line 1, is not the closes block begin line' "$body-$n.md" "probe-$n"
   pass "opener text above the block refuses the whole body whatever seems to close it: an HTML block, a list fence, a code span, an inline tag, a longer fence or an open comment"
 }
 
@@ -1900,8 +1937,8 @@ test_r4_a_block_above_every_example_closes_and_the_examples_close_nothing() {
   cx_add "$case_dir" first-a
   cx_add "$case_dir" below-fence
   cx_add "$case_dir" below-details
-  { printf '%s\n' '## Backlog items' ''; block 'Closes-backlog-item: first-a'
-    printf '%s\n' '' '```' 'Closes-backlog-item: below-fence' '```' '' '<details>' '' 'Closes-backlog-item: below-details' '' '</details>' \
+  { block 'Closes-backlog-item: first-a'
+    printf '%s\n' '' '## Backlog items' '' '```' 'Closes-backlog-item: below-fence' '```' '' '<details>' '' 'Closes-backlog-item: below-details' '' '</details>' \
       '<pre>example</pre> <!-- a comment -->'; } > "$case_dir/bodies/150"
   gh_merge "$case_dir" 150
   [ "$(cx_state "$case_dir" first-a)" = "done" ] || fail "r4-block-first: the block above the examples did not close"
@@ -1996,28 +2033,13 @@ test_r4_the_ship_brief_block_closes_a_train() {
   pass "the block the real ship brief teaches, built for a merge train, closes the train's and its member's items"
 }
 
-# The top-level check and the mention reader, through the library.
-test_r4_the_top_level_reader() {
-  local body=$TMP_ROOT/r4-reader.md out
-  { printf '%s\n' 'Text with a <BlockQuote cite="x"> tag.'; block 'Closes-backlog-item: tl-a'; } > "$body"
-  out=$(lib_call fm_pr_closes_refusal "$body")
-  case "$out" in 'line 1, above its closes block, holds <BlockQuote '*) ;; *) fail "r4-reader: refusal: $out" ;; esac
-  [ -z "$(lib_call fm_pr_closes_ids "$body")" ] || fail "r4-reader: a refused body gave ids"
-  { block 'Closes-backlog-item: tl-b'; printf '%s\n' '```' '<pre>' '<!--'; } > "$body"
-  [ -z "$(lib_call fm_pr_closes_refusal "$body")" ] || fail "r4-reader: opener text below the block refused it"
-  [ "$(lib_call fm_pr_closes_ids "$body")" = tl-b ] || fail "r4-reader: the block above opener text gave no id"
-  printf '%s\n' 'Text with <precise> and <codex> words.' "$(block 'Closes-backlog-item: tl-c')" > "$body"
-  [ "$(lib_call fm_pr_closes_ids "$body")" = tl-c ] || fail "r4-reader: a tag-like word that is no opener refused the block"
-  printf '%s\n' 'Closes-backlog-item: m-a m-b' 'Closes-backlog-item: ok-line' 'Closes: legacy-ok' > "$body"
-  out=$(lib_call fm_pr_closes_prose "$body")
-  [ "$out" = 'Closes-backlog-item: m-a m-b' ] || fail "r4-reader: the prose kept the wrong lines: $out"
-  pass "the reader refuses a block below opener text, accepts one above it, ignores tag-like words, and keeps malformed lines in the prose"
-}
+# Main 045 cases for tests/fm-pr-close-items.test.sh (inserted before the case list by
+# edit-tests-045.py). Each fails at 6a3422eae and passes at the fix, with a control.
 
 # A body as large as a PR body allows (and larger) must be read whole with no write error. Under
 # bash 3.2 a builtin printf that is blocked on a full pipe fails with "Interrupted system call" when
 # a child exits; the reader once printed every line from bash loops and hit that on large bodies
-# (logs/main044/eintr). Each reader call here runs ten times on a 300 KB body and a 60 KB body.
+# (logs/main044/eintr). The one parse runs ten times per record type on a 300 KB and a 60 KB body.
 test_r4_a_large_body_is_read_with_no_write_error() {
   local body n=0 size fn out want run
   for size in 300000 60000; do
@@ -2025,14 +2047,15 @@ test_r4_a_large_body_is_read_with_no_write_error() {
     { block 'Closes-backlog-item: large-a'
       awk -v size="$size" 'BEGIN { for (i = 0; t < size; i++) { l = sprintf("Closes-backlog-item: out-%06d\nCloses: legacy-%06d\nplain prose line %06d with words", i, i, i); print l; t += length(l) + 1 } }'
     } > "$body"
-    for fn in fm_pr_closes_legacy_ids fm_pr_closes_outside fm_pr_closes_ids; do
+    for fn in legacy outside id; do
       case "$fn" in
-        fm_pr_closes_legacy_ids) want=$(grep -c '^Closes: ' "$body") ;;
-        fm_pr_closes_outside) want=$(grep -c '^Closes-backlog-item: out-' "$body") ;;
-        fm_pr_closes_ids) want=1 ;;
+        legacy) want=$(grep -c '^Closes: ' "$body") ;;
+        outside) want=$(grep -c '^Closes-backlog-item: out-' "$body") ;;
+        id) want=1 ;;
       esac
       for run in 1 2 3 4 5 6 7 8 9 10; do
-        out=$(lib_call "$fn" "$body" 2>"$TMP_ROOT/r4-large.err" | wc -l | tr -d ' ')
+        out=$(bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/example/repo/pull/1 > "$2.parse" && fm_pr_closes_get "$2.parse" "$3"' \
+          _ "$ROOT/bin/fm-pr-closes-lib.sh" "$body" "$fn" 2>"$TMP_ROOT/r4-large.err" | wc -l | tr -d ' ')
         [ "$out" = "$want" ] || fail "r4-large: $fn on a $size-byte body printed $out lines, not $want"
         if grep -q 'write error' "$TMP_ROOT/r4-large.err"; then
           fail "r4-large: $fn on a $size-byte body printed a write error: $(head -1 "$TMP_ROOT/r4-large.err")"
@@ -2045,42 +2068,234 @@ test_r4_a_large_body_is_read_with_no_write_error() {
   pass "the reader reads a 300 KB and a 60 KB body whole, $n calls, with no write error"
 }
 
-test_r3_the_closes_block_reader() {
-  local body=$TMP_ROOT/r3-reader.md out
-  {
-    printf '%s\n' '## Backlog items' 'Prose with fm-prose-id and https://github.com/o/r/pull/9.' 'Closes: legacy-outside' \
-      'Closes-backlog-item: outside-line' 'Closes-backlog-item: bad # x' ''
-    block 'Closes-backlog-item: in-a' '' 'Train-member: https://github.com/o/r/pull/5' 'Closes-backlog-item: in-a' 'Closes-backlog-item:   in-b   '
-    printf '%s\n' 'After the block: fm-after-id.'
-  } > "$body"
-  out=$(lib_call fm_pr_closes_ids "$body")
-  [ "$out" = "$(printf '%s\n' in-a in-b)" ] || fail "reader: ids: $(printf '%s' "$out" | tr '\n' ' ')"
-  out=$(lib_call fm_pr_closes_members "$body")
-  [ "$out" = https://github.com/o/r/pull/5 ] || fail "reader: members: $out"
-  out=$(lib_call fm_pr_closes_refusal "$body")
-  [ -z "$out" ] || fail "reader: a compliant body was refused: $out"
-  out=$(lib_call fm_pr_closes_outside "$body")
-  [ "$out" = 'Closes-backlog-item: outside-line' ] || fail "reader: outside: $out"
-  out=$(lib_call fm_pr_closes_malformed "$body")
-  [ "$out" = 'Closes-backlog-item: bad # x' ] || fail "reader: malformed: $out"
-  out=$(lib_call fm_pr_closes_legacy_ids "$body")
-  [ "$out" = legacy-outside ] || fail "reader: legacy: $out"
-  out=$(lib_call fm_pr_closes_prose_words "$body" | grep -E '^fm-|^in-' | tr '\n' ' ')
-  [ "$out" = 'fm-prose-id fm-after-id. fm-after-id ' ] || fail "reader: prose words: $out"
-  out=$(lib_call fm_pr_closes_prose_prs "$body")
-  [ "$out" = https://github.com/o/r/pull/9 ] || fail "reader: prose links: $out"
-  # Refused: nothing is read from the block, and every directive line is reported as outside.
-  { block 'Closes-backlog-item: r-a'; block 'Closes-backlog-item: r-b'; } > "$body"
-  [ -z "$(lib_call fm_pr_closes_ids "$body")" ] || fail "reader: a refused body gave ids"
-  out=$(lib_call fm_pr_closes_refusal "$body")
-  [ "$out" = 'it holds more than one closes block' ] || fail "reader: refusal reason: $out"
-  out=$(lib_call fm_pr_closes_outside "$body")
-  [ "$out" = "$(printf '%s\n' 'Closes-backlog-item: r-a' 'Closes-backlog-item: r-b')" ] || fail "reader: a refused body's lines were not reported: $out"
-  printf '%s\n' 'No block here.' 'Closes-backlog-item: loose' > "$body"
-  [ -z "$(lib_call fm_pr_closes_ids "$body")" ] && [ -z "$(lib_call fm_pr_closes_refusal "$body")" ] \
-    || fail "reader: a body with no block gave ids or a refusal"
-  [ "$(lib_call fm_pr_closes_outside "$body")" = 'Closes-backlog-item: loose' ] || fail "reader: a loose line in a body with no block was not reported"
-  pass "the reader takes only the one block's lines, reports every directive line outside it, and refuses a body with two blocks"
+# r5_refused <name> <number> <reason-start> <body-file> <item...>: refused_case, run on a body
+# file, for the Main 045 cases.
+r5_refused() { refused_case "$@"; }
+
+# Main 045 F1: a block that is not the first thing in the body is never honored, whatever
+# surrounds it: a code span, a div, a details element, a table, a comment. Control: the same
+# block first closes.
+# shellcheck disable=SC2016 # Backticks in the fixture bodies are literal Markdown.
+test_r5_f1_a_block_that_does_not_open_the_body_refuses_it() {
+  local case_dir body=$TMP_ROOT/r5-f1
+  printf '%s\n' 'This is an illustrative code span, not a closing instruction: `example' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-span' "$CLOSES_END" 'end of example`.' > "$body-span.md"
+  r5_refused r5-span 160 'its first non-empty line, line 1, is not the closes block begin line' "$body-span.md" r5-span
+  printf '%s\n' 'This is an illustrative example inside a div, not a closing instruction:' '<div>' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-div' "$CLOSES_END" '</div>' > "$body-div.md"
+  r5_refused r5-div 161 'its first non-empty line, line 1, is not the closes block begin line' "$body-div.md" r5-div
+  printf '%s\n' '| example | block |' '| --- | --- |' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-table' "$CLOSES_END" > "$body-table.md"
+  r5_refused r5-table 162 'its first non-empty line, line 1, is not the closes block begin line' "$body-table.md" r5-table
+  printf '%s\n' '<!-- an example' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-comment' "$CLOSES_END" '-->' > "$body-comment.md"
+  r5_refused r5-comment 163 'its first non-empty line, line 1, is not the closes block begin line' "$body-comment.md" r5-comment
+  { block 'Closes-backlog-item: r5-first-real'; printf '%s\n' '' 'Quoted below as an example:' '`'; block 'Closes-backlog-item: r5-quoted-copy'; printf '%s\n' '`'; } > "$body-copy.md"
+  r5_refused r5-copy 164 'line 7 holds the closes block marker text outside its one block' "$body-copy.md" r5-first-real r5-quoted-copy
+  # Control: the block first, then anything, closes.
+  case_dir=$(gh_case r5-f1-control 165)
+  cx_add "$case_dir" r5-control
+  cx_add "$case_dir" r5-control-waiter
+  cx "$case_dir" block r5-control-waiter --by r5-control >/dev/null
+  { block 'Closes-backlog-item: r5-control'; printf '%s\n' '' '<div>' '`code` and <details> and ```' '</div>'; } > "$case_dir/bodies/165"
+  gh_merge "$case_dir" 165
+  [ "$(cx_state "$case_dir" r5-control)" = "done" ] || fail "r5-f1: the block that opens the body did not close"
+  [ "$(cx_deps "$case_dir" r5-control-waiter)" = none ] || fail "r5-f1: the control's edge was not cleared"
+  pass "a block in a code span, a div, a table or a comment, or a quoted second copy, refuses the whole body and keeps every edge; a block that opens the body closes"
+}
+
+# Main 045 F1 for trains: a train block inside a code span selects no member, and a member body
+# whose block is inside a code span closes none of its items; the member's pr= task still goes
+# through the completion. Control: a train whose block opens both bodies closes.
+# shellcheck disable=SC2016 # Backticks in the fixture bodies are literal Markdown.
+test_r5_f1_a_quoted_train_or_member_block_selects_nothing() {
+  local case_dir
+  case_dir=$(gh_case r5-train-quoted 166)
+  cx_add "$case_dir" r5-quoted-member-item
+  cx_add "$case_dir" r5-quoted-waiter
+  cx "$case_dir" block r5-quoted-waiter --by r5-quoted-member-item >/dev/null
+  printf '%s\n' 'Example of a train block inside a code span: `illustration' "$CLOSES_BEGIN" "Train-member: $REPO_URL/70" "$CLOSES_END" 'end of example`.' > "$case_dir/bodies/166"
+  block 'Closes-backlog-item: r5-quoted-member-item' > "$case_dir/bodies/70"
+  printf '%s\n' 70 >> "$case_dir/merged-prs"
+  gh_merge "$case_dir" 166
+  [ "$(cx_state "$case_dir" r5-quoted-member-item)" = queued ] || fail "r5-train: a member listed only in a quoted block closed its item"
+  case "$(cx_deps "$case_dir" r5-quoted-waiter)" in *r5-quoted-member-item*) ;; *) fail "r5-train: the dependent lost its edge" ;; esac
+  assert_no_grep "pr view $REPO_URL/70 --json body" "$case_dir/gh.log" "r5-train: a refused train body's member was read"
+  assert_match "refused to close anything named by the body of $REPO_URL/166: .*pull request links: $REPO_URL/70" "$case_dir/stderr" "r5-train: the refusal did not name the member link"
+  case_dir=$(gh_case r5-member-quoted 167)
+  cx_add "$case_dir" r5-member-quoted-item
+  cx_add "$case_dir" r5-member-quoted-waiter
+  cx "$case_dir" block r5-member-quoted-waiter --by r5-member-quoted-item >/dev/null
+  cx_add "$case_dir" r5-member-meta docs
+  cx_meta "$case_dir" r5-member-meta docs "$REPO_URL/71"
+  block "Train-member: $REPO_URL/71" > "$case_dir/bodies/167"
+  printf '%s\n' 'An example only, not authority: `illustration' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-member-quoted-item' "$CLOSES_END" 'end of example`.' > "$case_dir/bodies/71"
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  gh_merge "$case_dir" 167
+  [ "$(cx_state "$case_dir" r5-member-quoted-item)" = queued ] || fail "r5-member: an item quoted in a member body closed"
+  case "$(cx_deps "$case_dir" r5-member-quoted-waiter)" in *r5-member-quoted-item*) ;; *) fail "r5-member: the dependent lost its edge" ;; esac
+  [ "$(cx_state "$case_dir" r5-member-meta)" = "done" ] || fail "r5-member: the member's pr= docs task did not close"
+  assert_match "refused to close anything named by the body of train member $REPO_URL/71: .*item ids: r5-member-quoted-item" "$case_dir/stderr" "r5-member: the member refusal did not name its item"
+  pass "a quoted train block selects no member and reads none; a quoted member block closes none of its items while the member's pr= task closes"
+}
+
+# Main 045 F2 and Main 047: every block line is checked by the one grammar before any close. A
+# vertical tab, a Gerrit URL, a non-canonical URL (leading zero), the train itself, a two-space
+# directive, a trailing space, a tab and a non-ASCII byte each refuse the whole body; the direct item and its edge stay. A retry after the
+# repair closes.
+test_r5_f2_the_strict_grammar_refuses_every_doubtful_block() {
+  local case_dir body=$TMP_ROOT/r5-f2 n=170 name
+  { printf '%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-vtab'; printf 'Train-member: not-a-url\013extra\n'; printf '%s\n' "$CLOSES_END"; } > "$body-vtab.md"
+  r5_refused r5-vtab 170 'line 3 inside its closes block holds a tab, a control byte or a byte that is not printable ASCII' "$body-vtab.md" r5-vtab
+  block 'Closes-backlog-item: r5-gerrit' 'Train-member: https://gerrit.example.com/c/project/+/12345' > "$body-gerrit.md"
+  r5_refused r5-gerrit 171 'its closes block names Train-member https://gerrit[.]example[.]com/c/project/[+]/12345, a gerrit URL' "$body-gerrit.md" r5-gerrit
+  block 'Closes-backlog-item: r5-leading-zero' "Train-member: $REPO_URL/05" > "$body-zero.md"
+  r5_refused r5-leading-zero 172 "its closes block names Train-member $REPO_URL/05, which is not a GitHub, GitLab or Forgejo pull request URL" "$body-zero.md" r5-leading-zero
+  block 'Closes-backlog-item: r5-self' "Train-member: $REPO_URL/173" > "$body-self.md"
+  r5_refused r5-self 173 'line 3 inside its closes block names the merged pull request itself as a Train-member' "$body-self.md" r5-self
+  block 'Closes-backlog-item:  r5-two-spaces' > "$body-two.md"
+  r5_refused r5-two-spaces 174 'line 2 inside its closes block is not exactly' "$body-two.md" r5-two-spaces
+  block 'Closes-backlog-item: r5-trailing ' > "$body-trail.md"
+  r5_refused r5-trailing 175 'line 2 inside its closes block is not exactly' "$body-trail.md" r5-trailing
+  { printf '%s\n' "$CLOSES_BEGIN"; printf 'Closes-backlog-item: r5-tab\t\n'; printf '%s\n' "$CLOSES_END"; } > "$body-tab.md"
+  r5_refused r5-tab 176 'line 2 inside its closes block holds a tab' "$body-tab.md" r5-tab
+  { printf '%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-ascii'; printf 'Closes-backlog-item: caf\303\251\n'; printf '%s\n' "$CLOSES_END"; } > "$body-ascii.md"
+  r5_refused r5-ascii 177 'line 3 inside its closes block holds a tab, a control byte or a byte that is not printable ASCII' "$body-ascii.md" r5-ascii
+  # Retry after the repair: the same case closes.
+  case_dir=$(gh_case r5-f2-retry 178)
+  cx_add "$case_dir" r5-retry
+  block 'Closes-backlog-item: r5-retry' 'Train-member: https://gerrit.example.com/c/project/+/12345' > "$case_dir/bodies/178"
+  gh_merge "$case_dir" 178
+  [ "$(cx_state "$case_dir" r5-retry)" = queued ] || fail "r5-f2: the Gerrit block closed its item"
+  block 'Closes-backlog-item: r5-retry' > "$case_dir/bodies/178"
+  run_close "$case_dir" task-x1 "$REPO_URL/178" > "$case_dir/retry.out" 2> "$case_dir/retry.err" || true
+  [ "$(cx_state "$case_dir" r5-retry)" = "done" ] || fail "r5-f2: the retry after the repair did not close"
+  pass "a vertical tab, a Gerrit or non-canonical member, the train itself, two spaces, a trailing space, a tab or a non-ASCII byte refuses the whole block and keeps its edge; the retry after the repair closes"
+}
+
+# Main 045 F3: a refusal names each direct item id and each pull request link it saw, and a
+# one-token malformed Train-member line outside any block reports its id and its link.
+test_r5_f3_every_refusal_and_malformed_line_names_its_ids_and_links() {
+  local case_dir
+  case_dir=$(gh_case r5-f3-refusal 180)
+  cx_add "$case_dir" r5-direct-a
+  cx_add "$case_dir" r5-direct-b
+  block 'Closes-backlog-item: r5-direct-a' 'Closes-backlog-item: r5-direct-b' "Train-member: $REPO_URL/71" 'Train-member: https://example.com/not-a-pr' > "$case_dir/bodies/180"
+  gh_merge "$case_dir" 180
+  assert_match "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/180: .*; it names item ids: r5-direct-a, r5-direct-b; pull request links: $REPO_URL/71, https://example.com/not-a-pr; " "$case_dir/stderr" \
+    "r5-f3: the refusal did not name every direct item and link"
+  [ "$(cx_state "$case_dir" r5-direct-a)" = queued ] && [ "$(cx_state "$case_dir" r5-direct-b)" = queued ] || fail "r5-f3: a refused body closed an item"
+  case_dir=$(gh_case r5-f3-outside 181)
+  cx_add "$case_dir" r5-outside
+  printf '%s\n' "Train-member: r5-outside,$REPO_URL/51" > "$case_dir/bodies/181"
+  gh_merge "$case_dir" 181
+  [ "$(cx_state "$case_dir" r5-outside)" = queued ] || fail "r5-f3: an outside line closed its item"
+  assert_match "^actionable: close-at-merge: mentioned r5-outside in the prose of $REPO_URL/181: nothing was closed for it" "$case_dir/stderr" "r5-f3: the one-token line's id was not reported"
+  assert_match "^actionable: close-at-merge: mentioned $REPO_URL/51 in the prose of $REPO_URL/181: no item was closed for it" "$case_dir/stderr" "r5-f3: the one-token line's link was not reported"
+  # Control: ordinary prose still reports its id once.
+  assert_match "ignored a directive line outside a directive block in the body of $REPO_URL/181: Train-member: r5-outside,$REPO_URL/51" "$case_dir/stderr" "r5-f3: the line itself was not reported"
+  pass "a refusal names every direct item id and pull request link; a one-token malformed outside line reports its id and its link"
+}
+
+# Main 045 F5, the intended cost: a real block below closed example text is refused by name and
+# closes nothing; the same block first closes.
+test_r5_f5_a_real_block_below_closed_example_text_is_refused_by_name() {
+  local case_dir
+  printf '%s\n' 'An earlier, closed example:' '```' 'ordinary example text' '```' 'A genuine block follows.' "$CLOSES_BEGIN" 'Closes-backlog-item: r5-below' "$CLOSES_END" > "$TMP_ROOT/r5-below.md"
+  r5_refused r5-below 182 'its first non-empty line, line 1, is not the closes block begin line' "$TMP_ROOT/r5-below.md" r5-below
+  case_dir=$(gh_case r5-first 183)
+  cx_add "$case_dir" r5-first
+  { block 'Closes-backlog-item: r5-first'; printf '%s\n' '' 'An earlier, closed example:' '```' 'ordinary example text' '```'; } > "$case_dir/bodies/183"
+  gh_merge "$case_dir" 183
+  [ "$(cx_state "$case_dir" r5-first)" = "done" ] || fail "r5-f5: the block that opens the body did not close"
+  pass "a real block below closed example text is refused by name (the intended cost); the same block first closes"
+}
+
+# Main 046: one parse. The library offers only the parse (with its one structural pass) and the
+# reader of its result, and the close step reads each body exactly once through it.
+test_r5_one_parse_owns_the_block() {
+  local fns case_dir
+  fns=$(bash -c '. "$1"; declare -F | awk "{print \$3}" | grep "^fm_pr_closes_" | sort | tr "\n" " "' _ "$ROOT/bin/fm-pr-closes-lib.sh")
+  [ "$fns" = 'fm_pr_closes_get fm_pr_closes_parse fm_pr_closes_pass ' ] || fail "r5-one-parse: the library defines more than the parse, its pass and its result reader: $fns"
+  ! grep -nE 'fm_pr_closes_(scan|lines|ids|members|outside|malformed|legacy_ids|prose|seen|refusal)' "$ROOT/bin/fm-pr-close-items.sh" >/dev/null \
+    || fail "r5-one-parse: the close step calls a second reader"
+  case_dir=$(gh_case r5-one-parse 184)
+  cx_add "$case_dir" r5-one
+  block 'Closes-backlog-item: r5-one' "Train-member: $REPO_URL/71" > "$case_dir/bodies/184"
+  block 'Closes-backlog-item: r5-one-member' > "$case_dir/bodies/71"
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  cx_add "$case_dir" r5-one-member
+  gh_merge "$case_dir" 184
+  [ "$(grep -c "pr view $REPO_URL/184 --json body" "$case_dir/gh.log")" = 1 ] || fail "r5-one-parse: the merged body was read more than once"
+  [ "$(grep -c "pr view $REPO_URL/71 --json body" "$case_dir/gh.log")" = 1 ] || fail "r5-one-parse: the member body was read more than once"
+  [ "$(cx_state "$case_dir" r5-one)" = "done" ] && [ "$(cx_state "$case_dir" r5-one-member)" = "done" ] || fail "r5-one-parse: the control did not close"
+  pass "one parse: the library offers only fm_pr_closes_parse, its pass and fm_pr_closes_get, the close step calls no other reader, and each body is read once"
+}
+
+# The parse result, through the library.
+test_r5_the_parse_result() {
+  local body=$TMP_ROOT/r5-parse.md out
+  { block 'Closes-backlog-item: p-a' '' "Train-member: https://github.com/o/r/pull/5" 'Closes-backlog-item: p-a'
+    printf '%s\n' 'Prose with fm-prose-id and https://github.com/o/r/pull/9.' 'Closes: legacy-outside' 'Closes-backlog-item: outside-line' 'Closes-backlog-item: bad # x'; } > "$body"
+  out=$(bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/o/r/pull/1' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$body") || fail "r5-parse: the parse failed"
+  [ "$(printf '%s\n' "$out" | sed -n '1p')" = "$(printf 'status\tblock')" ] || fail "r5-parse: status: $(printf '%s\n' "$out" | sed -n '1p')"
+  [ "$(printf '%s\n' "$out" | awk -F '\t' '$1 == "id" {print $2}' | tr '\n' ' ')" = 'p-a ' ] || fail "r5-parse: ids"
+  [ "$(printf '%s\n' "$out" | awk -F '\t' '$1 == "member" {print $2}')" = https://github.com/o/r/pull/5 ] || fail "r5-parse: members"
+  [ "$(printf '%s\n' "$out" | awk -F '\t' '$1 == "legacy" {print $2}')" = legacy-outside ] || fail "r5-parse: legacy"
+  [ "$(printf '%s\n' "$out" | awk -F '\t' '$1 == "outside" {print $2}')" = 'Closes-backlog-item: outside-line' ] || fail "r5-parse: outside"
+  [ "$(printf '%s\n' "$out" | awk -F '\t' '$1 == "malformed" {print $2}')" = 'Closes-backlog-item: bad # x' ] || fail "r5-parse: malformed"
+  printf '%s\n' "$out" | grep -qx "$(printf 'word\tfm-prose-id')" || fail "r5-parse: prose word"
+  printf '%s\n' "$out" | grep -qx "$(printf 'link\thttps://github.com/o/r/pull/9')" || fail "r5-parse: prose link"
+  printf '%s\n' 'No marker here.' 'Closes-backlog-item: loose' > "$body"
+  out=$(bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/o/r/pull/1' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$body")
+  [ "$(printf '%s\n' "$out" | sed -n '1p')" = "$(printf 'status\tnone')" ] || fail "r5-parse: a body with no marker is not status none"
+  printf '\r\n%s\r\n%s\r\n%s\r\n' "$CLOSES_BEGIN" 'Closes-backlog-item: crlf-a' "$CLOSES_END" > "$body"
+  out=$(bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/o/r/pull/1' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$body")
+  [ "$(printf '%s\n' "$out" | awk -F '\t' '$1 == "id" {print $2}')" = crlf-a ] || fail "r5-parse: a CRLF block after an empty line gave no id"
+  pass "the parse gives status, ids, members, outside, malformed and legacy lines, words and links in one result; no marker is status none; CRLF and a leading empty line are fine"
+}
+
+# Main 045 F4: a typed completion that tasks-axi reports done clears the finished edge even when
+# the row cannot be read back afterwards; the other blocker and the hold stay. Control: a plain
+# waive with a readable row.
+test_r5_f4_a_waive_whose_state_read_fails_still_clears_the_edge() {
+  local case_dir rc=0 deps read_fail
+  case_dir=$(make_case r5-f4-waive)
+  read_fail=$case_dir/read-fail
+  wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
+  cat > "$case_dir/request.json" <<'JSON'
+{"request_id":"req-r5","platform":"x","context_binding":{"version":"ctx1","value":"ctx1_r5"},"public_safe_summary":"fixture","received_at":"2026-07-30T10:00:00Z","followup_expires_at":"2026-08-06T10:00:00Z","reservation_expires_at":"2026-08-06T10:00:00Z"}
+JSON
+  cat > "$case_dir/expected.json" <<'JSON'
+{"type":"pr-merged","project":"fixture","required_deliverables":["pr_url"],"completion_policy":"all-required"}
+JSON
+  for pf in pf-read-fails pf-control; do
+    wrapper public-followup add "$pf" --request-context-file "$case_dir/request.json" --purpose promised-final \
+      --expected-final-file "$case_dir/expected.json" --expires-at 2099-10-01T00:00:00Z >/dev/null 2>&1 || fail "r5-f4: could not add $pf"
+    cx_add "$case_dir" "waits-$pf" docs
+    cx_add "$case_dir" "other-$pf" docs
+    cx "$case_dir" block "waits-$pf" --by "$pf" >/dev/null
+    cx "$case_dir" block "waits-$pf" --by "other-$pf" >/dev/null
+    cx "$case_dir" hold "waits-$pf" --reason "fixture hold" --kind future >/dev/null
+  done
+  # A tasks-axi in front of the real one fails only the read of pf-read-fails, once the waive ran.
+  mkdir -p "$case_dir/shim"
+  real=$(command -v tasks-axi)
+  cat > "$case_dir/shim/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ -e "$read_fail" ] && [ "\${1:-}" = show ] && [ "\${2:-}" = pf-read-fails ]; then echo 'error: simulated read failure' >&2; exit 1; fi
+exec "$real" "\$@"
+SH
+  chmod +x "$case_dir/shim/tasks-axi"
+  touch "$read_fail"
+  (PATH="$case_dir/shim:$PATH" wrapper public-followup waive pf-read-fails --reason r --approved-by captain) > "$case_dir/out" 2> "$case_dir/err" || rc=$?
+  rm -f "$read_fail"
+  expect_code 0 "$rc" "r5-f4: the waive itself must succeed"
+  [ "$(cx_state "$case_dir" pf-read-fails)" = "done" ] || fail "r5-f4: the waive did not finish the obligation"
+  deps=$(cx_deps "$case_dir" waits-pf-read-fails | sed 's/blocked-by://g; s/[ "]//g')
+  [ "$deps" = other-pf-read-fails ] || fail "r5-f4: after a failed read the stored list is not the other blocker alone ($deps)"
+  cx "$case_dir" show waits-pf-read-fails | grep -q 'hold_kind: future' || fail "r5-f4: the hold was lost"
+  # Control: the readable waive clears its edge the same way.
+  wrapper public-followup waive pf-control --reason r --approved-by captain > "$case_dir/out2" 2> "$case_dir/err2" || fail "r5-f4: the control waive failed"
+  deps=$(cx_deps "$case_dir" waits-pf-control | sed 's/blocked-by://g; s/[ "]//g')
+  [ "$deps" = other-pf-control ] || fail "r5-f4: the control's stored list is not the other blocker alone ($deps)"
+  pass "a waive that tasks-axi reports done clears the finished edge even when the row cannot be read back; the other blocker and the hold stay; the readable control clears too"
 }
 
 pr_close_test_cases=(
@@ -2155,8 +2370,14 @@ test_r4_a_block_above_every_example_closes_and_the_examples_close_nothing
 test_r4_f3_a_malformed_line_outside_the_block_reports_each_id_and_link
 test_r4_a_commit_message_block_closes_nothing
 test_r4_the_ship_brief_block_closes_a_train
-test_r4_the_top_level_reader
 test_r4_a_large_body_is_read_with_no_write_error
-test_r3_the_closes_block_reader
+test_r5_f1_a_block_that_does_not_open_the_body_refuses_it
+test_r5_f1_a_quoted_train_or_member_block_selects_nothing
+test_r5_f2_the_strict_grammar_refuses_every_doubtful_block
+test_r5_f3_every_refusal_and_malformed_line_names_its_ids_and_links
+test_r5_f5_a_real_block_below_closed_example_text_is_refused_by_name
+test_r5_one_parse_owns_the_block
+test_r5_the_parse_result
+test_r5_f4_a_waive_whose_state_read_fails_still_clears_the_edge
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
