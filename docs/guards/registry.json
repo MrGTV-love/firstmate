@@ -716,17 +716,17 @@
       "id": "omp-adopt-launch-proof",
       "version": "1",
       "owner": "bin/fm-launch-proof-lib.sh",
-      "invariant": "Omp adoption changes a session binding only after proving the exact unpinned replacement process.",
+      "invariant": "No session record is repaired and no agent without its launch pin is adopted: the adopt verb refuses every task and changes nothing (Main 1874, Main 1901).",
       "layer": "runtime-block",
-      "source": "the recorded task endpoint, unique foreground PID, process identity, launch generation and absolute session-file registration, each from one read of the task record and of the session record whose bytes the proof must find again, with NUL-bearing peer records unknown (Main 1874 rule S); existing decision points: site:bin/fm-control.sh:0dfe8ac0db, site:bin/fm-launch-proof-lib.sh:d457d36dad",
-      "trigger": "adopt (rewrite an omp session record) unless the recorded PID is not the live one, not a live omp, and the live process is provably unpinned / fm-control adopt of a live omp process as a task's agent unless all proofs hold: one recorded window, readable pane, one unique foreground pid, pid is omp, not pinned to another spawn_gen, readable absolute session-file registration matching the task session",
+      "source": "the adopt verb itself, which has no adoption route left for any harness (Main 1637 for claude, Main 1874 and Main 1901 for omp); an unpinned omp agent is unmanaged in bin/fm-launch-proof-lib.sh and every lifecycle consumer refuses it with its named cause",
+      "trigger": "fm-control <task> adopt, for any task",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Preserve both session records; establish the exact unpinned live omp process before retrying FM_HOME=<home> bash bin/fm-control.sh <task> adopt.",
+      "remedy": "Stop the agent by hand in its pane and relaunch it with bin/fm-control.sh <task> relaunch, or decide the lane by hand.",
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
-      "test": "tests/fm-control-relaunch-recovery.test.sh",
+      "test": "tests/fm-control-relaunch-backends.test.sh",
       "tier": "B",
       "harm": "irreversible",
       "proxy": false,
@@ -738,55 +738,7 @@
       "sites": [
         {
           "file": "bin/fm-control.sh",
-          "match": "echo \"adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed\" >&2"
-        },
-        {
-          "file": "bin/fm-control.sh",
-          "match": "|| die \"adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates\""
-        },
-        {
-          "file": "bin/fm-control.sh",
-          "match": "|| die \"adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed\""
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "*) echo 'adopt refused: session proof needs an absolute omp session-file registration' >&2; return 1 ;;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: record proof needs one readable task record without NUL bytes' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: record proof needs the digest of the task record it read' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: endpoint proof needs the recorded pane to exist and be readable' >&2; return 1"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: generation proof needs the live process not to be pinned to another launch generation' >&2; return 1"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: process proof needs the resolved foreground process to be a readable omp process' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: session proof needs a readable omp session-file registration on the recorded pane' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "print(f\"adopt refused: {message}\", file=sys.stderr)"
+          "match": "die \"adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted;"
         }
       ]
     },
