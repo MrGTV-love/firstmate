@@ -121,6 +121,8 @@ SECOND_SETTING = 'FM_SLACK_SECOND_USER'
 # (30 s by default) and discards its result, and one Slack call can wait up to its 10 s socket ceiling, so a call begun by 12 s ends by about 22 s: a blocked
 # call of theirs can cost the owner's wake at most this much time and never the wake itself (a wake line leaves the journal only when it is printed, at the end).
 SECOND_BUDGET = 12.0
+# How often the second person's check tries again for a journal lock another run holds (take_lock).
+LOCK_POLL = 0.05
 REFUSAL_FILE = 'refusals.jsonl'
 # Why a reply or a tap of the second person's on a decision card is refused: the plane's own decision text names the role whose call a held decision is `captain`
 # (hold_kind == 'captain' in the mirror, "open captain calls" in its help); only that person answers it.
@@ -937,6 +939,14 @@ def parse_fields(lines, remainder=None, multiline=False, loose=None, removed=Non
             if value.strip() and value.strip().lower() != 'none recorded'}
 
 
+def safe_item(item):
+    """An item of a refused attempt (an emoji name, or a reply's slot) as the plane keeps it: itself, or, when a plane value is inside it, `sha256:` and its
+    digest, so that the attempt is still logged and journaled and the value is never written (finding 3 of the review of d9861b24)."""
+    if isinstance(item, str) and value_hits(item):
+        return 'sha256:' + hashlib.sha256(item.encode()).hexdigest()
+    return item
+
+
 def option_from_board(card):
     result = []
     for item in card.get('options', []) if isinstance(card, dict) else []:
@@ -949,8 +959,38 @@ def option_from_board(card):
     return result
 
 
+def record_setting_id():
+    """Record the id a valid second-person setting names (its one-way hash, in the append-only `second-ids` record) before anything else a command does: a run
+    that its own fixed-text check refuses still read the setting, and the id it read must never answer later (finding 1 of the review of d9861b24). Only the
+    hash is written, never the id. A run that cannot write it refuses (second_id_unrecorded), as a Watch does when both of its records fail."""
+    second, _ = second_user()
+    if not second:
+        return
+    digest = id_hash(second)
+    root = path_setting('FM_STATE_OVERRIDE', home_dir().resolve() / 'state') / STATE_KEY
+    path = root / SECOND_ID_FILE
+    try:
+        if root.is_symlink() or path.is_symlink():
+            raise OSError('unsafe')
+        root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        existing = path.read_text() if path.exists() else ''
+        if digest in existing.split('\n'):
+            return
+        lead = '' if not existing or existing.endswith('\n') else '\n'
+        if value_hits(existing + lead + digest + '\n'):
+            raise OSError('collides')
+        with open(path, 'a') as out:
+            out.write(lead + digest + '\n')
+            out.flush()
+            os.fsync(out.fileno())
+    except OSError:
+        raise SlackError('second_id_unrecorded') from None
+
+
 class Watch:
-    def __init__(self, replay=None, token=None):
+    def __init__(self, replay=None, token=None, lock_wait=None):
+        # The monotonic time this run began, before its journal lock: the second person's check counts the wait for the lock inside its own time budget.
+        self.run_started = monotonic()
         self.home = home_dir().resolve()
         self.root = path_setting('FM_STATE_OVERRIDE', self.home / 'state') / STATE_KEY
         if self.root.is_symlink():
@@ -961,7 +1001,7 @@ class Watch:
         if self.path.is_symlink() or self.lock_path.is_symlink():
             raise SlackError('unsafe_state_path')
         self.lock = open(self.lock_path, 'a')
-        fcntl.flock(self.lock, fcntl.LOCK_EX)
+        self.take_lock(lock_wait)
         self.replay = replay
         self.state = self.start_state()
         self.token = token or ''
@@ -1018,8 +1058,9 @@ class Watch:
         self.window_reads = 0
         self.second_reads = 0
         self.ran_unbound = False
-        # The end of the second person's time budget while one is in force (second_budget), else None.
+        # The end of the second person's time budget while one is in force (second_budget), else None, and the longest call of theirs this run has made.
         self.budget_deadline = None
+        self.slowest_call = 0.0
         # The printer the caller runs between the owner's pass and the second person's (poll), and the owner's failure of this poll, raised after both.
         self.before_second = None
         # Which part of the plane this run is (poll): 'both', the owner's check 'owner', or the second person's check 'second'.
@@ -1039,6 +1080,22 @@ class Watch:
         self.posted_fresh = False
         # The history page that take_in has read and take_requests takes in, as (plan,); None when nothing is read ahead.
         self.request_plan = None
+
+    def take_lock(self, wait):
+        """The journal lock. With wait (the second person's check, Main 1621 (10)): only while their time budget lasts, counted from the start of the run; a
+        lock still held then ends their check with nothing done and nothing lost (SecondBudgetSpent), so another holder never keeps the sweep past their budget."""
+        if wait is None:
+            fcntl.flock(self.lock, fcntl.LOCK_EX)
+            return
+        while True:
+            try:
+                fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return
+            except BlockingIOError:
+                if monotonic() - self.run_started >= wait:
+                    self.lock.close()
+                    raise SecondBudgetSpent() from None
+                time.sleep(LOCK_POLL)
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -1399,13 +1456,19 @@ class Watch:
             deadline = min(deadline, self.budget_deadline)
 
         def guarded(method, **fields):
-            if monotonic() >= deadline:
+            # A call is not begun when the slowest call of theirs in this run shows it would end after the deadline (finding 5 of the review of d9861b24): a
+            # call cut off at the deadline is wasted, and a cut-off post leaves an attempt that a later run must look up first, so runs whose calls are all slow
+            # would otherwise cut the same third call for ever.
+            begun = monotonic()
+            if begun >= deadline or begun + self.slowest_call > deadline:
                 raise SecondBudgetSpent()
             try:
                 return bound(method, **fields)
             except DeadlineSpent:
                 # The real transport cut the call off at the deadline (Main 1593): a deferral like a call that could not begin, never a failure.
                 raise SecondBudgetSpent() from None
+            finally:
+                self.slowest_call = max(self.slowest_call, monotonic() - begun)
 
         # The time left is passed to every call of theirs, and the real transport ends a call at it however slowly its reply arrives (Slack._bounded): the
         # budget is a total bound on their network I/O, not only on when a call may begin.
@@ -1503,7 +1566,7 @@ class Watch:
             if row is not None and (not row.get('attempted') or row.get('clear')):
                 # Inside the second person's budget, a post that could not begin is no attempt: the budget is checked before the mark, so a deferral never leaves
                 # a mark that would make every later run look the acknowledgement up again (finding 3 of the review of d0b0c216).
-                if self.budget_deadline is not None and monotonic() >= self.budget_deadline:
+                if self.budget_deadline is not None and (monotonic() >= self.budget_deadline or monotonic() + self.slowest_call > self.budget_deadline):
                     raise SecondBudgetSpent()
                 row['attempted'] = True
                 row.pop('clear', None)
@@ -1518,10 +1581,13 @@ class Watch:
         read without it (row['clear'] is set). Each page read is kept (row['looked_after']), so a run whose calls are slow continues where the last one stopped
         instead of reading the first page again (finding 5 of the review of fca2a73d). A page that says more exists with no way to it is a failed lookup."""
         cursor = ''
+        # One starting point for the whole paged read of this run, with Slack's cursor between its pages (finding 7 of the review of d9861b24): the progress kept
+        # in looked_after is the starting point of a later run only, never mixed with this run's cursor.
+        oldest = row.get('looked_after')
         while True:
             fields = dict(channel=channel, ts=thread, limit=100, include_all_metadata=True)
-            if row.get('looked_after'):
-                fields['oldest'] = row['looked_after']
+            if oldest:
+                fields['oldest'] = oldest
             if cursor:
                 fields['cursor'] = cursor
             data = self.api.call('conversations.replies', **fields)
@@ -2616,7 +2682,18 @@ class Watch:
     def card_key(self, record):
         return '%s/%s' % (self.state.get('channel', ''), record['ts'])
 
-    def observe_second_cards(self):
+    def refuse_cached_reactions(self):
+        """The owner's check read card reactions (reaction_choices): every reaction on them of an id without answer authority is refused and logged now, from that
+        read, with no Slack call; their check, a separate run, cannot see a reaction removed in between (finding 2 of the review of d9861b24). A failure here never
+        touches the owner; their check observes the cards again."""
+        if not self.reaction_cache:
+            return
+        try:
+            self.second_view().observe_second_cards(cached_only=True)
+        except (SecretCollision, SlackError, OSError, ValueError):
+            pass
+
+    def observe_second_cards(self, cached_only=False):
         """The reactions of every id without answer authority (the configured one, and each id the setting has named) on every card the owner's DM holds, still tracked
         or closed but not yet looked at since it closed, whatever the setting is now: each new reaction is one refused attempt. A card the owner's path read in this
         run is not read again (the reaction cache), so a reaction that came with the owner's closing answer is seen even if it is removed before the next poll; a
@@ -2631,6 +2708,8 @@ class Watch:
             if record.get('retired') and entry.get('final'):
                 continue
             reactions = self.reaction_cache.get(record['ts'])
+            if reactions is None and cached_only:
+                continue
             if reactions is None:
                 try:
                     reactions = self.reactions_for(record['ts'])
@@ -2645,7 +2724,7 @@ class Watch:
             members = sorted({u for r in reactions if isinstance(r, dict) for u in r.get('users', []) if self.owner.without_authority(u)}
                              | set(entry.get('taps', {})) | self.logged_reaction_members(record['ts']))
             recorded = [self.observe_second_taps(record, reactions, member) for member in members]
-            if record.get('retired') and all(recorded):
+            if record.get('retired') and all(recorded) and not cached_only:
                 cards.setdefault(self.card_key(record), {})['final'] = True
                 self.commit()
 
@@ -2663,7 +2742,7 @@ class Watch:
         entry = self.state.setdefault('cards', {}).setdefault(self.card_key(record), {})
         taps = entry.setdefault('taps', {})
         attempts = entry.setdefault('attempts', {})
-        now = {r.get('name') for r in reactions if isinstance(r, dict) and member in r.get('users', []) and isinstance(r.get('name'), str)}
+        now = {safe_item(r.get('name')) for r in reactions if isinstance(r, dict) and member in r.get('users', []) and isinstance(r.get('name'), str)}
         before = {e for e in taps.get(member, []) if isinstance(e, str)}
         counts = {e: n for e, n in (attempts.get(member) or {}).items() if isinstance(n, int) and not isinstance(n, bool)}
         kept = before & now
@@ -2955,11 +3034,21 @@ class Watch:
             pass
 
     def leave_cap(self, left):
-        """The owner's check leaves what it left of the one shared cap (SC4) for the second person's check of the same watcher pass, in their journal; a failure
-        here never touches the owner."""
+        """The owner's check leaves what it left of the one shared cap (SC4) for the second person's check of the same watcher pass, in their journal, with the
+        Slack clock its replies reported (the time of the sweep, finding 4 of the review of d9861b24); a failure here never touches the owner. The owner's check
+        first leaves 0 (start_cap_hand_over), so a failed or interrupted hand-over leaves them nothing this sweep and never widens the cap (finding 8)."""
         try:
             view = self.second_view()
-            view.state['cap_left'] = {'left': max(0, left), 'fresh': True}
+            view.state['cap_left'] = {'left': max(0, left), 'fresh': True, 'clock_first': self.clock_first, 'clock_last': self.clock_last}
+            view.commit()
+        except (SecretCollision, SlackError, OSError, ValueError):
+            pass
+
+    def start_cap_hand_over(self):
+        """Before any owner work of the owner's check: their check of this sweep is left 0 until the owner's work ends and leave_cap records what it left."""
+        try:
+            view = self.second_view()
+            view.state['cap_left'] = {'left': 0, 'fresh': True}
             view.commit()
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
@@ -2970,11 +3059,20 @@ class Watch:
         the run's time (record_run)."""
         view = self.second_view()
         ledger = view.state.get('cap_left') if isinstance(view.state.get('cap_left'), dict) else {}
-        left = ledger.get('left') if ledger.get('fresh') and isinstance(ledger.get('left'), int) else self.cap
+        # Fail closed (finding 8 of the review of d9861b24): only a hand-over the owner's check of this sweep recorded gives them part of the cap; with none on
+        # record, or one this check cannot mark as used, they take nothing this sweep, and what waits is taken by a later one.
+        left = ledger.get('left') if ledger.get('fresh') and isinstance(ledger.get('left'), int) and not isinstance(ledger.get('left'), bool) else 0
         if ledger.get('fresh'):
             view.state['cap_left'] = dict(ledger, fresh=False)
+            try:
+                view.commit()
+            except (SecretCollision, SlackError, OSError, ValueError):
+                left = 0
+            # The Slack clock of the owner's check of this sweep is this run's clock too (finding 4): their activation and a held window use it.
+            for value in (ledger.get('clock_first'), ledger.get('clock_last')):
+                self.note_date(value)
         try:
-            view.second_poll(max(0, left))
+            view.second_poll(max(0, left), start=self.started)
         except (SlackError, OSError, ValueError, KeyError, TypeError):
             pass
         self.record_run_safely()
@@ -2988,7 +3086,8 @@ class Watch:
         check in their journal. part='second' is the second person's standing check: their pass only, with that remainder. part='both' (the manual poll) runs
         the owner's work, prints the owner's lines, then the second person's pass."""
         self.part = part
-        self.started = monotonic()
+        # Their check's budget starts with the run, its wait for the journal lock included (take_lock); the owner's and the manual poll's start here.
+        self.started = self.run_started if part == 'second' else monotonic()
         self.begin_clock()
         self.reaction_cache = {}
         self.window_reads = 0
@@ -3005,6 +3104,8 @@ class Watch:
             self.second_check()
             return
         try:
+            if part == 'owner':
+                self.start_cap_hand_over()
             reserved = self.reserved = self.reserve_for_second()
             try:
                 owner_left = self.poll_work()
@@ -3013,6 +3114,7 @@ class Watch:
             self.pass_turn(reserved, owner_left)
             left = owner_left + reserved
             if part == 'owner':
+                self.refuse_cached_reactions()
                 self.leave_cap(left)
                 if self.owner_deferred:
                     raise self.owner_deferred
@@ -3248,7 +3350,7 @@ class Watch:
             remaining -= self.advanced - advanced
         return remaining
 
-    def second_poll(self, remaining):
+    def second_poll(self, remaining, start=None):
         """The second person's pass, after all of the owner's work in the same poll, with its own journal and its own cap (remaining): it reads and writes only
         their journal, record store and refusal log, so the owner's state is what it is without them. A failure of any Slack call of it is logged once per episode
         with one notice line naming only the error, never raised; a plane value that collides with something of theirs ends only this pass. With the setting off or
@@ -3268,9 +3370,12 @@ class Watch:
             return
         held = False
         try:
-            with self.second_budget(start=monotonic()):
+            with self.second_budget(start=monotonic() if start is None else start):
                 self.retry_unlogged()
                 if self.second:
+                    if self.second_window().get('hold') and self.second_window().get('user') == self.second and self.clock_first is None:
+                        # A held window needs a Slack Date of this run (finding 4 of the review of d9861b24): one call that reads nothing of theirs.
+                        self.api.call('auth.test')
                     self.resolve_hold()
                     self.start_second()
                     remaining = self.resume_second(remaining)
@@ -3324,26 +3429,30 @@ class Watch:
         count = 0
         if isinstance(after, str) and isinstance(before, str) and SLACK_TS.fullmatch(after) and SLACK_TS.fullmatch(before):
             channel = self.second_channel()
-            cursor = ''
+            # Every page of the span, newest first, until Slack says there is no more: a span is named and cleared only once it has been read in full (finding 2
+            # of the review of 4e0b1bd4). Each page read is kept in the span itself (walk: the oldest ts read, which is the next page's exclusive `latest`;
+            # counted: the requests counted so far), so a run cut off by its deadline goes on where the last stopped (finding 5 of the review of d9861b24).
+            count = span.get('counted') if isinstance(span.get('counted'), int) and not isinstance(span.get('counted'), bool) else 0
             while True:
-                # Every page of the span, until Slack says there is no more: a span is named and cleared only once it has been read in full (finding 2 of the
-                # review of 4e0b1bd4); a failed read leaves it for the next run.
-                fields = dict(oldest=after, latest=before, limit=200, **({'cursor': cursor} if cursor else {}))
-                data = self.read_window(channel, second=True, **fields)
+                walk = span.get('walk') if isinstance(span.get('walk'), str) and SLACK_TS.fullmatch(span.get('walk')) else before
+                data = self.read_window(channel, second=True, oldest=after, latest=walk, limit=200)
                 messages = data.get('messages')
                 if not isinstance(messages, list):
                     raise SlackError('unreadable_dm_history')
-                count += sum(1 for m in messages if isinstance(m, dict) and m.get('user') == self.second and self.human(m) and self.top_level(m)
-                             and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts']) and ts_key(after) <= ts_key(m['ts']) < ts_key(before))
-                cursor = (data.get('response_metadata') or {}).get('next_cursor') if data.get('has_more') else ''
-                if data.get('has_more') and not cursor:
+                page = [m for m in messages if isinstance(m, dict) and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts'])
+                        and ts_key(after) <= ts_key(m['ts']) < ts_key(walk)]
+                count += sum(1 for m in page if m.get('user') == self.second and self.human(m) and self.top_level(m))
+                if not data.get('has_more'):
+                    break
+                if not page:
                     # More is said to exist with no way to it: the span is not read in full, so it is kept, and named once as read in part (Main 1547 (3)).
                     if not span.get('incomplete') and self.second_log('second_intake_unplaced', complete=False, after=after, before=before):
                         span['incomplete'] = True
                         self.commit()
                     return
-                if not cursor:
-                    break
+                span['walk'] = min((m['ts'] for m in page), key=ts_key)
+                span['counted'] = count
+                self.commit()
         if count and not self.second_log('second_intake_unplaced', count=count, after=after, before=before, taken_in=True):
             return
         if count:
@@ -3438,6 +3547,7 @@ class Watch:
         plane's own decision text) and their id. A log that cannot be written leaves the
         attempt unmarked, so the next poll writes it. A retarget's own read (staging_only) logs nothing. attempt (a reaction's number of tries) is part of the
         row and of the event, so that a second attempt is its own row. Returns whether the attempt is on record."""
+        item = safe_item(item)
         author = author or self.second
         # The event names the member, so that the same emoji or reply slot of another configured id is its own attempt (finding 5 of the review of d0b0c216).
         event = '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], item if attempt is None else '%s#%d' % (item, attempt), author,
@@ -4005,7 +4115,8 @@ def parse_flags(argv, names, usage, out, switches=None):
 
 def plane_watch(name, options, out):
     """The plane of a command that runs outside the poll: an unconfigured or refused plane stops it with the reason, a plane value inside the command's own
-    fixed text stops it, and the owner must be the stored one."""
+    fixed text stops it, and the owner must be the stored one. The id the setting names is recorded before any of these checks (record_setting_id)."""
+    record_setting_id()
     refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT[name])
     state, reason = mode()
     if state != 'on':
@@ -4130,6 +4241,12 @@ def main(argv, out=None):
     except SlackError as error:
         out.diagnostic(refusals, 'error: slack ' + str(error))
         return 2
+    try:
+        # Before any check that can refuse the run: the id the setting names is recorded first (finding 1 of the review of d9861b24).
+        record_setting_id()
+    except SlackError as error:
+        out.diagnostic(refusals, 'slack: refused: ' + str(error))
+        return 1
     if command not in ('mirror', 'poll', 'check'):
         out.diagnostic('out', 'error: unknown command; use --help')
         return 2
@@ -4155,7 +4272,12 @@ def main(argv, out=None):
     try:
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
-        watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
+        try:
+            watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip(), lock_wait=SECOND_BUDGET if action == 'check-second' else None)
+        except SecondBudgetSpent:
+            # Their check could not take the journal lock inside its budget (finding 10 of the review of d9861b24): nothing was read or written; the next sweep
+            # takes their work.
+            return 0
         watch.out = out
         if action in ('check', 'check-second'):
             watch.api.on_reply = lambda: note_progress(out)

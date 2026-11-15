@@ -2,8 +2,10 @@
 """Slack Web API transport only. Shell entry points own environment resolution."""
 import datetime
 import email.utils
+import http.client
 import json
 import os
+import socket
 import threading
 import urllib.error
 import urllib.parse
@@ -16,6 +18,63 @@ class SlackError(Exception):
 
 class SecretCollision(SlackError):
     """A plane value that no replacement of request text can remove: it holds no request-text character."""
+
+
+# How long a call cut off at its deadline waits for its reader to end once the reader's socket is closed (Slack._bounded).
+CUTOFF_JOIN = 1.0
+
+
+class _Fence:
+    """The sockets of one bounded exchange: closing it shuts down and closes each of them, and refuses any connection made after that."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.sockets = []
+        self.closed = False
+
+    def opened(self, sock):
+        with self.lock:
+            if self.closed:
+                raise OSError('deadline_spent')
+            self.sockets.append(sock)
+
+    def close(self):
+        with self.lock:
+            self.closed = True
+            sockets = list(self.sockets)
+        for sock in sockets:
+            for end in (lambda: sock.shutdown(socket.SHUT_RDWR), sock.close):
+                try:
+                    end()
+                except OSError:
+                    pass
+
+
+def _fenced(base, fence):
+    class Fenced(base):
+        def connect(self):
+            super().connect()
+            fence.opened(self.sock)
+
+    return Fenced
+
+
+class _FencedHTTP(urllib.request.HTTPHandler):
+    def __init__(self, fence):
+        super().__init__()
+        self.fence = fence
+
+    def http_open(self, req):
+        return self.do_open(_fenced(http.client.HTTPConnection, self.fence), req)
+
+
+class _FencedHTTPS(urllib.request.HTTPSHandler):
+    def __init__(self, fence):
+        super().__init__()
+        self.fence = fence
+
+    def https_open(self, req):
+        return self.do_open(_fenced(http.client.HTTPSConnection, self.fence), req, context=self._context)
 
 
 class DeadlineSpent(Exception):
@@ -112,6 +171,8 @@ class Slack:
 
     # A caller with a total deadline sets time_left to a function that gives the seconds left (the second person's pass, SECOND_BUDGET); None is no total bound.
     time_left = None
+    # The last call cut off at its deadline: {'ended': whether its reader ended after its socket was closed} (_bounded).
+    last_cutoff = None
 
     def call(self, method, **fields):
         if not self.token:
@@ -145,26 +206,34 @@ class Slack:
         return data
 
     def _bounded(self, request):
-        """One exchange under the caller's total deadline (Main 1593): the socket timeout bounds each wait, so a reply that trickles in byte by byte never hits it;
-        the exchange therefore runs in a worker thread that this call waits for only as long as time_left() allows. A call with no time left is not begun. A
-        cut-off exchange is abandoned to its daemon thread, which changes nothing of the transport (_exchange touches no state), and raises DeadlineSpent."""
+        """One exchange under the caller's total deadline (Main 1593, 1621 (9) and 1623 (1)): the socket timeout bounds each wait, so a reply that trickles in byte by
+        byte never hits it; the exchange therefore runs in a reader thread, with the time left as its socket timeout, that this call waits for only as long as
+        time_left() allows. At the deadline the caller ends the exchange itself: it shuts down and closes the exchange's socket, which unblocks the reader with no
+        signal, and joins the reader for at most CUTOFF_JOIN seconds; whether it ended is kept in last_cutoff. A reader that had not yet connected (name lookup)
+        cannot send after that: its connection is refused at once (_Fence). A call with no time left is not begun. The reader changes nothing of the transport.
+        Returns the exchange's outcome, or raises DeadlineSpent."""
         left = self.time_left()
         if left <= 0:
             raise DeadlineSpent()
+        fence = _Fence()
+        opener = urllib.request.build_opener(_FencedHTTP(fence), _FencedHTTPS(fence))
         outcome = []
-        worker = threading.Thread(target=lambda: outcome.append(self._exchange(request, min(10, left))), daemon=True)
-        worker.start()
-        worker.join(max(0.0, self.time_left()))
-        if not outcome:
-            raise DeadlineSpent()
-        return outcome[0]
+        reader = threading.Thread(target=lambda: outcome.append(self._exchange(request, min(10, left), opener)), name='fm-slack-bounded', daemon=True)
+        reader.start()
+        reader.join(max(0.0, self.time_left()))
+        if outcome:
+            return outcome[0]
+        fence.close()
+        reader.join(CUTOFF_JOIN)
+        self.last_cutoff = {'ended': not reader.is_alive()}
+        raise DeadlineSpent()
 
-    def _exchange(self, request, timeout):
+    def _exchange(self, request, timeout, opener=None):
         """One HTTP exchange: (the reply's Date header or None, its x-oauth-scopes header, the parsed body or None, the error to raise or None). It reads and writes
         no state of the transport, so that _bounded() can run it in a thread it may abandon; call() applies what it returns."""
         date, header = None, ''
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with (opener.open if opener else urllib.request.urlopen)(request, timeout=timeout) as response:
                 date = response.headers.get('Date', '')
                 header = response.headers.get('x-oauth-scopes', '')
                 raw = response.read(4 * 1024 * 1024 + 1)
