@@ -1,0 +1,62 @@
+ok - empty recorded slot retires only the owner-authorized record, keeps the nested copy in the other task's slot, and preserves its bundled commits and enclosing owner
+ok - a real recorded slot whose reserved lease is lost still refuses with its slot named
+ok - a real recorded slot with an intact lease completes and releases only its owned slot
+ok - local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed
+ok - teardown does not wait for the home summary refresh
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.otvkvP/tasks-axi-close/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - teardown closes its own backlog item before reporting success
+ok - ledger on: a completed teardown records one task.closed with the PR, and a repeat records none
+ok - ledger on: the closed record names local main and a captain's drop as its evidence
+ok - a refused teardown records nothing, and an unwritable ledger costs one stderr line without changing teardown
+ok - teardown closes a landed Gerrit task with its change URL as a note and a GitHub task with --pr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.otvkvP/tasks-axi-manual-optout/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - teardown honors config/backlog-backend=manual and still finishes cleanly
+ok - local-only worktree with truly unpushed work is refused (safety preserved)
+ok - local main landing succeeds independently of pushed and remote availability
+ok - a pushed but unmerged ship refuses, and only the captain's own words discard it
+ok - a data folder on another filesystem refuses a drop record at entry and lets a plain landed close through
+ok - --drop-file needs --force and a readable words file
+ok - forced dirty ships record dropped and scouts retain delivered reports, with exact captain words retained for both
+ok - a scout completes only with a regular non-empty report
+ok - no-mistakes worktree with genuinely unlanded work is refused (safety preserved)
+ok - squash-merged + deleted-branch worktree (PR merged) is torn down (the fix)
+ok - teardown reaps only this task's ancestor and patch-equivalent archives carried by the squash
+ok - teardown judges only the task's exact custody archive names, never another task's
+ok - unlanded edits, cherry-invisible merge edits, and checked-out archives stay named and intact
+ok - archives that link to another ref stay named and never reap the linked branch
+ok - even ancestor archives stay when squash content differs or the merge object is unproven
+ok - archive merge proof includes deleted paths and treats pathspec-like filenames literally
+ok - landing refusal and forced discard never reap recovery archives
+ok - content-only landing with an unreachable forge keeps and names recovery archives
+ok - squash-merged PR accepts a local HEAD that is an ancestor of the final PR head
+ok - teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded
+ok - squash-merged PR accepts replayed unpushed local patches contained in the PR head
+ok - the landed-patch proof ignores an unresolvable git directory in the caller's working directory
+ok - merged PR does not allow teardown after a later local commit
+ok - squash-merged task whose local branch followed the pipeline rebase is torn down
+ok - teardown proves a Forgejo task landed from the merged pull request when the content check is inconclusive
+ok - squash-merged same-path different content still refuses
+ok - squash-merged rebased local still refuses a genuinely unlanded follow-up commit
+ok - squash-merged stale local still refuses when the forge is unreachable
+ok - squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head
+ok - squash-pushed-missing subject match ignores a commit ID ending in add and detects a genuine add a
+ok - squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR still refuses a merge commit that carries a change of its own
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR accepts a pre-rebase copy that merged a later main commit the PR head lacks
+ok - merged PR accepts a diverged earlier iteration that the recorded run started from
+ok - merged PR accepts the local input that the recorded run rewrote and extended
+ok - a slow but working run-record read still proves the copy was the pipeline's input
