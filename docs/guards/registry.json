@@ -7374,7 +7374,7 @@
       "owner": "bin/fm-secondmate-restart.sh",
       "invariant": "The secondmate restart sends no request, record or nudge to a live Herdr agent that is not positively attributed to the task.",
       "layer": "runtime-block",
-      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a mate whose record names a remote_host, the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb whatever its capability verdict, whose exact bytes attribution=proceed plus one newline with a zero transport status are the only accepted answer, and a remote_backend other than herdr refuses; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
+      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read from the mate's own record (even after an early capability refusal) before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a mate whose record names a remote_host, the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb whatever its capability verdict, only when the registry route names the recorded remote_host and the host's own endpoint target equals the recorded remote_target, whose exact bytes attribution=proceed plus one newline with a zero transport status are the only accepted answer, and a remote_backend other than herdr refuses; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
       "trigger": "restart of a local Herdr secondmate whose live agent is unmanaged or unreadable by the launch-proof owner, or whose Herdr backend does not load, endpoint does not validate, or agent state is neither alive nor positively dead or missing, at the first effect or at a later fallback nudge; and restart of a remote Herdr secondmate whose host answers anything but attribution=proceed (a refusal, no answer, an unreachable host, or a code root without the verb)",
       "decision": "deny",
       "fail_direction": "closed",
@@ -7400,6 +7400,14 @@
         {
           "file": "bin/fm-remote-secondmate-control.sh",
           "match": "printf 'attribution=refuse: no endpoint record for %s on this host\\n' \"$id\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: the recorded target is empty or not printable\\n'"
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf \"attribution=refuse: this host's endpoint for %s is '%s', not the recorded route's '%s'\\n\""
         },
         {
           "file": "bin/fm-remote-secondmate-control.sh",

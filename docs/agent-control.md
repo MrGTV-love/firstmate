@@ -253,6 +253,8 @@ The record is bound to the task's `spawn_gen`, so a relaunch makes it inert, and
 A teardown does not yet remove a leftover record, which stays inert.
 A genuinely unproven agent, including a personal session in the same pane, home, and directory, keeps its refusal on every consumer, and the secondmate restart decides that before its pending-reply record, persistence request, or fallback nudge, and decides it again on the mate's own record right before a fallback nudge, since the persistence wait can last minutes.
 For a mate whose record names a `remote_host`, the restart reads the same decision on its host through the read-only `fm-remote-secondmate-control.sh attribution` verb, whatever its capability verdict.
+The decision is bound to the route the parent recorded: the registry route for the id must name the recorded `remote_host`, the record must name a `remote_target`, and the host refuses unless its own endpoint target is exactly that recorded target.
+The restart reads the backend for its local decision from the mate's own record, so an early capability refusal still asks the verdict owner before a fallback nudge.
 It goes on only on the exact bytes `attribution=proceed` plus one newline with a zero transport status.
 A `remote_backend` other than herdr (omitted means herdr), a refusal, no answer, extra output, or a host whose code lacks the verb leaves the mate unreached with nothing sent.
 The verb writes nothing and creates no directory.
