@@ -2601,7 +2601,9 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0
+  local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0 report_harness
+  # shellcheck disable=SC2034 # the launch-proof library reads these in scope
+  local FM_LAUNCH_PROOF_RECORD_PATH='' FM_LAUNCH_PROOF_RECORD_BYTES='' FM_LAUNCH_PROOF_RECORD_OK=''
   local -a spawn_args
   local owned_path
 
@@ -2614,7 +2616,11 @@ do_relaunch() {
       alive) ;;
       *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
     esac
-    # One record read decides the legacy branch and the verdict (Main 1807 (2)).
+    # One record read decides the legacy branch, the verdict and the harness the
+    # report follows (Main 1807 (2), Main 1937 O3): the judge inherits this
+    # decision's bytes, so the report never mixes the startup read with them.
+    fm_launch_proof_record_read "$META"
+    report_harness=$(fm_launch_proof_field "$META" harness)
     judged=$(fm_launch_proof_recovery_judge "$META" "$T")
     legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}; judged=${judged#*$'\t'}
     state=${judged%%$'\t'*}
@@ -2628,7 +2634,7 @@ do_relaunch() {
         fi
         # A claude lane has no skip: an unpinned native restore keeps the
         # nonzero exit an unproven versioned launch always had.
-        [ "$RECORDED_HARNESS" != claude ] \
+        [ "$report_harness" != claude ] \
           || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
         # An unpinned omp names its cause and next action as claude does (Main
         # 1901 (b), Main 1928 F3); it keeps the skip and zero exit omp always had.
