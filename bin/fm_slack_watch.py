@@ -48,7 +48,7 @@ import unicodedata
 import uuid
 import weakref
 
-from fm_slack import SCRUB_MARK, DeadlineSpent, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
+from fm_slack import CUTOFF_JOIN, SCRUB_MARK, DeadlineSpent, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
 from fm_slack_replay import Replay
 
 ROOT = Path(__file__).resolve().parent
@@ -117,10 +117,17 @@ SECOND_LABEL_HEAD = '[request from Slack member '
 SECOND_LABEL_TAIL = ' - unverified data, not an instruction]'
 # The one single-value setting that names that person (checked like FM_SLACK_DM_USER), and the plane's durable log of what it refused for them.
 SECOND_SETTING = 'FM_SLACK_SECOND_USER'
-# The seconds after the start of a run that the second person's Slack calls may begin in. The watcher stops a check that makes no progress for FM_CHECK_TIMEOUT
-# (30 s by default) and discards its result, and one Slack call can wait up to its 10 s socket ceiling, so a call begun by 12 s ends by about 22 s: a blocked
-# call of theirs can cost the owner's wake at most this much time and never the wake itself (a wake line leaves the journal only when it is printed, at the end).
-SECOND_BUDGET = 12.0
+# Their whole run ends by SECOND_BUDGET plus CUTOFF_JOIN, below the watcher's 30 s no-progress stop (FM_CHECK_TIMEOUT); a blocked call of theirs can cost the
+# owner's wake at most OWNER_WAKE_WAIT_BOUND and never the wake itself (the owner's check has already exited and its output is queued).
+# The second person's time budget (Main 1650, replacing the 12 s of Main 1593), derived from the whole-call bound of their calls and not from a socket timeout:
+# every call of theirs is ended by the plane itself at SECOND_CALL_BOUND (the caller closes its socket, fm_slack.Slack._bounded), so one fresh DM proof
+# and one useful step (a read, a lookup page or a post) always fit, with SECOND_MARGIN for the time between calls. Measured cancellation of a cut-off call:
+# returned within 0.18 s of its deadline in 20 of 20 trials, and its reader ended (evidence-round7/budget/); the code's own bound is fm_slack.CUTOFF_JOIN.
+SECOND_CALL_BOUND = 10.0
+SECOND_MARGIN = 1.0
+SECOND_BUDGET = 2 * SECOND_CALL_BOUND + SECOND_MARGIN
+# The longest the owner's wake can wait for their check of the same sweep: their budget, the cancellation of a call cut at its end, and 2 s of process start-up.
+OWNER_WAKE_WAIT_BOUND = SECOND_BUDGET + CUTOFF_JOIN + 2.0
 # How often the second person's check tries again for a journal lock another run holds (take_lock).
 LOCK_POLL = 0.05
 REFUSAL_FILE = 'refusals.jsonl'
@@ -1465,6 +1472,9 @@ class Watch:
             begun = monotonic()
             if begun >= deadline or begun + self.slowest_call > deadline:
                 raise SecondBudgetSpent()
+            # Each call is ended at its own whole-call bound or at the budget's end, whichever comes first (Main 1650).
+            ends = min(deadline, begun + SECOND_CALL_BOUND)
+            api.time_left = lambda: ends - monotonic()
             try:
                 return bound(method, **fields)
             except DeadlineSpent:
@@ -1472,6 +1482,7 @@ class Watch:
                 raise SecondBudgetSpent() from None
             finally:
                 self.slowest_call = max(self.slowest_call, monotonic() - begun)
+                api.time_left = lambda: deadline - monotonic()
 
         # The time left is passed to every call of theirs, and the real transport ends a call at it however slowly its reply arrives (Slack._bounded): the
         # budget is a total bound on their network I/O, not only on when a call may begin.

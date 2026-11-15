@@ -5971,7 +5971,7 @@ sys.exit(code)
             rc, captured, calls = self.run_check(home, 'stall', 'stalled')
             self.assertEqual(rc, 0)
             self.assertEqual(len(self.wakes_of(captured, INV_OWNER)), 1, captured)
-            self.assertLessEqual(len(calls), 2, calls)         # the third call would have begun at 20 s, after the 12 s budget
+            self.assertLessEqual(len(calls), 2, calls)         # a third 10 s call, begun at 20 s, could not end inside the 21 s budget
             recovery, again, _ = self.run_check(home, 'normal', 'recovered')
             self.assertEqual(self.wakes_of(again, INV_OWNER), [])                          # the owner wake is delivered once, never twice
             self.assertEqual(len(self.wakes_of(again, INV_SECOND)), 1, again)              # their request, deferred by the budget, is taken in by the next run
@@ -6014,17 +6014,14 @@ sys.exit(code)
     # ---- Round 3, finding 3: slow successful calls of theirs; finding 4: the owner's wake never waits for their work ----
 
     def test_r3_f3_a_journaled_request_of_theirs_is_delivered_once_while_every_call_of_theirs_stays_slow(self):
-        # Every call of theirs succeeds but takes delay seconds (fake clock). A request needs three calls of theirs (the DM proof, the read and the acknowledgement):
-        # under the total 12 s deadline of Main 1593 those fit when each takes 3.9 s, and the request is woken and acknowledged exactly once within three runs.
-        # When every call takes 7 s or 9.9 s no run can finish them (round 7: a call is not begun when it would end after the deadline): nothing is woken,
-        # posted or lost, and the request is delivered once as soon as the calls are faster.
-        for slow in ('7.0', '9.9'):
-            with self.subTest(slow=slow), self.home() as home:
+        # Every call of theirs succeeds but takes delay seconds (fake clock), in every run. A request needs a fresh DM proof, a read and an acknowledgement; the
+        # budget of Main 1650 always fits one proof and one more call of up to 10 s, and staging is kept between runs, so the request is woken and acknowledged
+        # exactly once within three fresh runs at each speed.
+        for delay in ('3.9', '7.0', '9.9'):
+            with self.subTest(delay=delay), self.home() as home:
                 home.cli('poll')                                          # their window starts
                 home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
-                stalled = [self.run_check(home, 'slow', 'slow%d' % n, delay=slow)[1] for n in range(2)]
-                self.assertEqual((sum(len(self.wakes_of(c, INV_SECOND)) for c in stalled), home.posts().count((INV_SECOND_DM, '200.000200'))), (0, 0), stalled)
-                captured = [self.run_check(home, 'slow', 'run%d' % n, delay='3.9')[1] for n in range(3)]
+                captured = [self.run_check(home, 'slow', 'run%d' % n, delay=delay)[1] for n in range(3)]
                 self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
                 self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
@@ -6069,11 +6066,9 @@ sys.exit(code)
             home.edit_replay(lambda data: data['failures'].update({'chat.postMessage:200.000200': {'status': 503, 'times': 1}}))
             self.run_check(home, 'normal', 'attempt')                       # the first post is ambiguous: the attempt mark stays
             self.assertTrue(any(r.get('attempted') for r in self.second_rows(home)), self.second_rows(home))
-            # 7 s calls: the DM proof, the lookup and the post cannot all end inside the total deadline (Main 1593); nothing is posted twice or lost meanwhile.
-            stalled = [self.run_check(home, 'slow', 'stall%d' % n, delay='7.0')[1] for n in range(2)]
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 0, stalled)
-            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='3.9')[1] for n in range(3)]
-            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in stalled + captured), 1, captured)
+            # 7 s calls: each run proves the DM and makes one more call; the lookup's result and the attempt are kept between runs (Main 1650).
+            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='7.0')[1] for n in range(3)]
+            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
     def second_rows(self, home):
@@ -6151,11 +6146,9 @@ sys.exit(code)
             self.run_check(home, 'normal', 'attempt')
             for n in range(101):
                 home.say('200.%06d' % (300 + n), 'a reply in their thread', user=INV_SECOND, dm=INV_SECOND_DM, thread_ts='200.000200')
-            # Two pages of lookup, the DM proof and the post need more than one run at 3.9 s a call: the kept page progress lets a later run post (Main 1593).
-            stalled = [self.run_check(home, 'slow', 'stall%d' % n, delay='7.0')[1] for n in range(2)]
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 0, stalled)
-            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='3.9')[1] for n in range(4)]
-            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in stalled + captured), 1, captured)
+            # Two pages of lookup, the DM proof and the post need more than one run at 7 s a call: the kept page progress lets a later run post (Main 1650).
+            captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='7.0')[1] for n in range(4)]
+            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
 
     def test_r6_f3_a_resumed_owner_row_that_uses_the_cap_never_moves_the_first_activation_past_their_request(self):
@@ -7156,7 +7149,7 @@ class Round6TotalBound(InvariantScenario):
             sweep_end = time.monotonic()                     # the watcher raises the sweep's one wake when this, its last check, has exited
             self.assertEqual(rc, 0)
             self.assertTrue(calls, 'their check made a call of theirs on the real transport')
-            self.assertLessEqual(sweep_end - owner_done, plane.SECOND_BUDGET + self.MARGIN,
+            self.assertLessEqual(sweep_end - owner_done, plane.OWNER_WAKE_WAIT_BOUND,
                                  'the owner wake waited %.1f s for their check' % (sweep_end - owner_done))
             self.assertEqual(self.wakes_of(second_run, INV_SECOND), [])
             server.mode = 'fast'
@@ -7731,7 +7724,7 @@ class Round7Findings(InvariantScenario):
         self.assertGreaterEqual(plane.SECOND_BUDGET, 2 * plane.SECOND_CALL_BOUND)
         self.assertEqual(plane.OWNER_WAKE_WAIT_BOUND, plane.SECOND_BUDGET + fm_slack_module().CUTOFF_JOIN + 2.0)
 
-    # ---- finding 10: the journal lock is taken inside their 12 s budget ----
+    # ---- finding 10: the journal lock is taken inside their budget ----
 
     def test_r7_f10_a_held_journal_lock_never_keeps_their_check_past_its_budget_and_their_request_is_kept(self):
         with self.home() as home:
@@ -7740,7 +7733,7 @@ class Round7Findings(InvariantScenario):
             home.say('200.000200', 'second person request')
             holder = open(home.state_dir / 'lock', 'a')
             fcntl.flock(holder, fcntl.LOCK_EX)
-            release = threading.Timer(15.0, holder.close)
+            release = threading.Timer(plane.SECOND_BUDGET + 3.0, holder.close)     # held past their whole budget
             release.start()
             self.addCleanup(release.cancel)
             self.addCleanup(holder.close)
