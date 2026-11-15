@@ -105,16 +105,28 @@ def epoch(value):
 
 
 def read_with_ctime(path):
-    """(status-change time in nanoseconds, text) of one regular file, both read from the same open handle."""
-    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise OSError(f"{path} is not a regular file")
-        with os.fdopen(os.dup(fd), "r", encoding="utf-8", errors="replace") as handle:
-            return info.st_ctime_ns, handle.read()
-    finally:
-        os.close(fd)
+    """(status-change time in nanoseconds, text) of one regular file, both read from the same open handle.
+
+    Replacing or removing a file also changes the replaced file's status-change time, so the read is accepted
+    only when, afterwards, the path still names the same linked file with the same time; otherwise it is read
+    again, and a file that keeps changing is an OSError (Main 1871: unknown is never a value).
+    """
+    for _ in range(3):
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise OSError(f"{path} is not a regular file")
+            with os.fdopen(os.dup(fd), "r", encoding="utf-8", errors="replace") as handle:
+                text = handle.read()
+            after = os.fstat(fd)
+        finally:
+            os.close(fd)
+        current = os.stat(path, follow_symlinks=False)
+        if (after.st_nlink > 0 and after.st_ctime_ns == info.st_ctime_ns
+                and (current.st_dev, current.st_ino, current.st_ctime_ns) == (info.st_dev, info.st_ino, info.st_ctime_ns)):
+            return info.st_ctime_ns, text
+    raise OSError(f"{path} changed while it was read")
 
 def mtime(path):
     try:
@@ -697,25 +709,12 @@ class Collector:
                         "--no-merges", base + "...HEAD").splitlines()
 
     def unproven_merges(self, worktree, base):
-        """Merge commits on HEAD beyond base that are not exactly git's merge of their two parents."""
-        unproven = []
-        for line in self.git(worktree, "rev-list", "--merges", "--parents", base + "..HEAD").splitlines():
-            commit, *parents = line.split()
-            if len(parents) != 2:
-                unproven.append(commit)
-                continue
-            try:
-                objects = self.git(worktree, "rev-parse", "--path-format=absolute", "--git-path", "objects")
-                with tempfile.TemporaryDirectory(prefix="fm-open-loops-objects-") as temporary:
-                    env = dict(self.env, GIT_OBJECT_DIRECTORY=temporary, GIT_ALTERNATE_OBJECT_DIRECTORIES=objects)
-                    merged = self.run(["git", "-C", worktree, "merge-tree", "--write-tree", parents[0], parents[1]],
-                                      env=env).splitlines()[0]
-            except RuntimeError:
-                unproven.append(commit)
-                continue
-            if merged != self.git(worktree, "rev-parse", commit + "^{tree}"):
-                unproven.append(commit)
-        return unproven
+        """Every merge commit on HEAD beyond base: no merge machinery proves one (Main 1871 P-B).
+
+        unlanded() asks this only after the blob proof found the copy's content not in base, so a merge commit
+        whose change base holds never reaches here.
+        """
+        return self.git(worktree, "rev-list", "--merges", base + "..HEAD").split()
 
     def pr_pending(self, worktree, pending, pr):
         head = pr["head"]["sha"]
@@ -742,17 +741,26 @@ class Collector:
             return None
 
     def content_in_default(self, worktree, base):
-        default_tree = self.git(worktree, "rev-parse", base + "^{tree}")
+        """The blob proof of bin/fm-task-copy-lib.sh fm_task_copy_blobs_in_default (Main 1871 P-B).
+
+        For every path HEAD changed against its merge base with base, base's tree entry (mode, type and object
+        id) equals HEAD's, and a path HEAD deleted is absent there too. Only plumbing reads run, so no merge
+        driver can change the answer; any read that fails is not landed.
+        """
         try:
-            objects = self.git(worktree, "rev-parse", "--path-format=absolute", "--git-path", "objects")
-            with tempfile.TemporaryDirectory(prefix="fm-open-loops-objects-") as temporary:
-                env = dict(self.env, GIT_OBJECT_DIRECTORY=temporary,
-                           GIT_ALTERNATE_OBJECT_DIRECTORIES=objects)
-                merged_tree = self.run(["git", "-C", worktree, "merge-tree", "--write-tree",
-                                        base, "HEAD"], env=env).splitlines()[0]
+            merge_base = self.git(worktree, "merge-base", base, "HEAD").strip()
+            listed = self.run(["git", "-C", worktree, "diff-tree", "-r", "-z", "--no-renames", "--name-only",
+                               merge_base, "HEAD", "--"])
+            paths = [p for p in listed.split("\0") if p]
+            if not paths:
+                return True
+            def entries(rev):
+                out = self.run(["git", "-C", worktree, "--literal-pathspecs", "ls-tree", "-r", "--full-tree",
+                                rev, "--"] + paths)
+                return sorted(line for line in out.splitlines() if line)
+            return entries(base) == entries("HEAD")
         except RuntimeError:
             return False
-        return merged_tree == default_tree
 
     def captain_dropped(self, task):
         return any(record.get("id") == task["id"] and record.get("captain_drop") for record in self.backlog)
@@ -1203,14 +1211,17 @@ class Collector:
         record's reason with another file's time (Main 1820 F7).
         """
         found = []
+        unreadable = []
         prune = self.state / (task_id + ".merge-prune")
         try:
             published, text = read_with_ctime(prune)
             fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
             if fields.get("state") in ("retained", "pending") and fields.get("reason"):
                 found.append((published, 0, fields["reason"], "recorded by bin/fm-merge-prune.sh"))
-        except OSError:
+        except FileNotFoundError:
             pass
+        except OSError as error:
+            unreadable.append(f"{prune} ({error.strerror or error})")
         memo_path = self.state / ".idle-reap" / (task_id + ".refused")
         try:
             published, text = read_with_ctime(memo_path)
@@ -1218,8 +1229,16 @@ class Collector:
             if len(memo) >= 4 and memo[0] == "fm-idle-reap-refused-v1" and memo[3] and memo[1].isdigit():
                 found.append((published, 1, memo[3],
                               "a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh"))
-        except OSError:
+        except FileNotFoundError:
             pass
+        except OSError as error:
+            unreadable.append(f"{memo_path} ({error.strerror or error})")
+        if unreadable:
+            # An unreadable record may hold the newest refusal, so no older one stands in for it (Main 1871
+            # P-A): the reason says what could not be read, and the ledger's coverage is degraded.
+            self.degraded.append("refusal record of " + task_id + ": " + "; ".join(unreadable))
+            return ("the last recorded refusal is unknown: " + "; ".join(unreadable) + " could not be read",
+                    "unreadable refusal record")
         if not found:
             return "", ""
         newest = max(published for published, _, _, _ in found)
@@ -1287,6 +1306,8 @@ class Collector:
             content = bool(self.source("finished deliverable " + ident, self.delivered, task))
         if not (closed or verb == "done" or state == "done" or merged or content):
             self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        if merged and not self.captain_dropped(task) and self.merged_cleanup_blocked(task, ident, pr, refusal, refused):
             return
         if state in ("working", "paused", "blocked", "parked") and not closed and not done_refused:
             # A worker still reading working after its done report may be running its pipeline: that is
@@ -1369,6 +1390,26 @@ class Collector:
                  evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
                           + " and ".join(holds) + ", and no accepted or landed deliverable is on record"
                           + ("; landing could not be read" if landed is None else ""))
+
+    def merged_cleanup_blocked(self, task, ident, pr, refusal, refused):
+        """A merged task whose cleanup is refused is an owned, overdue-eligible pending_cleanup row (Main 1871 P-D).
+
+        Refused means its copy holds uncommitted work, or a teardown refusal is recorded while its deliverable is
+        not landed. The row carries the recorded refusal, or names the dirty copy; it is never informational, and
+        the dirty bytes stay where they are. True when this row was added.
+        """
+        worktree = self.task_worktree(task)
+        dirty = bool(worktree) and bool(self.source("copy status " + ident, self.git, worktree, "status", "--porcelain"))
+        if not dirty and not (refusal and not self.source("finished deliverable " + ident, self.delivered, task)):
+            return False
+        action = refused or (f"the copy of {ident} holds uncommitted work after its PR merged: commit and land it, "
+                             f"or obtain the captain's drop, then run plain bin/fm-teardown.sh {ident}; "
+                             "the record stays open until it succeeds")
+        self.add("pending_cleanup", ident, action, epoch(pr.get("merged_at")) or mtime(self.state / (ident + ".status")),
+                 "home:" + self.home_label(),
+                 evidence=(f"last recorded cleanup refusal: {refusal}; " if refusal else "")
+                          + f"its PR merged: {task['pr']['url']}; " + ("its copy is dirty" if dirty else "its deliverable is not landed"))
+        return True
 
     def attach_refusal(self, ident, pr_url, refusal, refused):
         """A recorded teardown refusal stays on every row that already covers the task.
