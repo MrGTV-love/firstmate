@@ -540,14 +540,27 @@ record_copy_returns() {
   cat > "$1/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\\n' "\$*" >> "$1/treehouse.calls"
+# A return of this case's own copy really removes it, so a test sees it go.
+if [ "\${1:-}" = return ] && [ "\${!#}" = "$1/wt" ]; then
+  rm -rf -- "$1/wt"
+fi
 exit 0
 SH
   chmod +x "$1/fakebin/treehouse"
 }
 
 # assert_copy_returned <case_dir> <message>: teardown returned the task copy.
+# assert_copy_returned <case_dir> <message> <completion PR URL | none>: teardown
+# returned the copy, the copy is gone, and the closed backlog item names exactly
+# that completion PR, or none (Main 1871).
 assert_copy_returned() {
   grep -E '^return( |$)' "$1/treehouse.calls" 2>/dev/null | grep -qF "$1/wt" || fail "$2: $(cat "$1/treehouse.calls" 2>/dev/null)"
+  [ ! -e "$1/wt" ] || fail "$2: the copy is still on disk after its return"
+  if [ "$3" = none ]; then
+    ! grep -q 'https://github.com/[^ ]*/pull/' "$1/data/backlog.md" || fail "$2: a completion PR was named: $(grep -o 'https://github.com/[^ ]*/pull/[0-9]*' "$1/data/backlog.md")"
+  else
+    grep -qF "$3" "$1/data/backlog.md" || fail "$2: the completion PR $3 was not named: $(grep -o 'https://github.com/[^ ]*/pull/[0-9]*' "$1/data/backlog.md")"
+  fi
 }
 
 detached_copy_case() {  # <name> <recorded-branch|-> <extra-commit yes|no> <pr-head own|base>
@@ -588,7 +601,7 @@ test_detached_copy_is_judged_through_the_record_branch() {
     expect_code 0 "$rc" "$variant: a detached copy whose merged PR holds its work was refused: $(cat "$case_dir/stderr")"
     ! grep -q REFUSED "$case_dir/stderr" || fail "$variant: teardown printed a REFUSED line"
     assert_absent "$case_dir/state/task-x1.meta" "$variant: the record stayed open"
-    assert_copy_returned "$case_dir" "$variant: the copy stayed"
+    assert_copy_returned "$case_dir" "$variant: the copy stayed" https://github.com/example/repo/pull/7
     grep -q -- "--head ${recorded/#-/fm/task-x1}" "$case_dir/gh-axi.calls" \
       || fail "$variant: the PR was not looked up by the record's branch: $(cat "$case_dir/gh-axi.calls")"
   done
@@ -909,6 +922,67 @@ test_branch_pr_lookup_reads_every_pr() {
   expect_code 0 "$rc" "one PR control: refused: $(tail -3 "$case_dir/stderr")"
   assert_grep 'https://github.com/example/repo/pull/10' "$case_dir/data/backlog.md" "one PR control: the merged PR was not recorded"
   pass "the branch PR lookup reads every PR (a merged PR behind twenty newer ones is found), and a list shown cut short records no PR"
+}
+
+# Main 1871 P-C: a PR is named as the completion PR only when its merged head is the
+# copy's HEAD. (a) The record's pr= names PR 7, merged at another head, while the
+# copy's change reached the default branch another way: the copy lands by its
+# content, and the close names no PR and says why. (b) The branch lists a newer
+# PR 8 merged at another head before an older PR 7 merged at the copy's HEAD: the
+# scan does not stop at PR 8, and PR 7 is named.
+test_completion_pr_is_named_only_on_head_equality() {
+  local case_dir rc head other
+  case_dir=$(make_case attribution-recorded-mismatch)
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  other=$(git -C "$case_dir/project" rev-parse main)
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  land_on_origin_main "$case_dir" feature.txt hello
+  git -C "$case_dir/project" fetch -q origin main
+  add_gh_pr_merged_for_head "$case_dir" "$other"
+  append_pr_meta_url "$case_dir"
+  record_copy_returns "$case_dir"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "recorded mismatch: a copy whose change the default branch holds was refused: $(cat "$case_dir/stderr")"
+  assert_copy_returned "$case_dir" "recorded mismatch: the copy stayed" none
+  assert_grep 'is not recorded as its completion PR' "$case_dir/stderr" "recorded mismatch: the close did not say why no PR is named"
+  case_dir=$(make_case attribution-ordered)
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  other=$(git -C "$case_dir/project" rev-parse main)
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  merge_head_into_origin_main "$case_dir" "$head"
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$case_dir/gh-axi.calls"
+case "\${1:-} \${2:-}" in
+  "pr list") printf '%s\\n' "count: 2" "pull_requests[2]{number,state}:" "  8,merged" "  7,merged"; exit 0 ;;
+esac
+exit 0
+SH
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-} \${2:-}" = "pr view" ]; then
+  case "\${3:-}:\$*" in
+    8:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' MERGED '$other' https://github.com/example/repo/pull/8; exit 0 ;;
+    7:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' MERGED '$head' https://github.com/example/repo/pull/7; exit 0 ;;
+  esac
+fi
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
+  git -C "$case_dir/wt" checkout -q --detach
+  git -C "$case_dir/project" branch -q -D fm/task-x1
+  record_copy_returns "$case_dir"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "ordered: refused: $(cat "$case_dir/stderr")"
+  assert_copy_returned "$case_dir" "ordered: the copy stayed" https://github.com/example/repo/pull/7
+  ! grep -q 'https://github.com/example/repo/pull/8' "$case_dir/data/backlog.md" || fail "ordered: the newer PR at another head was named"
+  pass "a recorded PR at another head is not named and the close says why; a newer merged PR at another head does not hide the older one at the copy's HEAD"
 }
 
 # Main 1820 F4(a): the lookup asks for one PR more than its bound and treats a full
@@ -1446,7 +1520,7 @@ test_detached_reverted_replay_without_pr_meta_is_not_landed() {
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "control: a detached replay the default branch carries was refused: $(cat "$case_dir/stderr")"
   assert_absent "$case_dir/state/task-x1.meta" "control: the record stayed open"
-  assert_copy_returned "$case_dir" "control: the copy stayed"
+  assert_copy_returned "$case_dir" "control: the copy stayed" none
   pass "a detached copy with no pr= whose merged PR replayed and reverted its change is refused and kept; a carried one is torn down"
 }
 
@@ -1484,7 +1558,7 @@ test_true_merge_of_a_pipeline_head_that_dropped_the_change_lands_by_ancestry() {
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "a copy whose commit is in the default branch's history was refused: $(cat "$case_dir/stderr")"
   assert_absent "$case_dir/state/task-x1.meta" "the record stayed open"
-  assert_copy_returned "$case_dir" "the copy stayed"
+  assert_copy_returned "$case_dir" "the copy stayed" none
   git -C "$case_dir/project" merge-base --is-ancestor "$copy_head" refs/remotes/origin/main \
     || fail "the copy's commit is no longer reachable from the default branch"
   pass "a copy whose commit a true merge put in the default branch's history lands, although a later pipeline commit dropped its change (Main 1820)"
@@ -1537,7 +1611,7 @@ test_exact_head_proof_reads_a_refreshed_default_branch() {
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "control: a head the refreshed default branch holds was refused: $(cat "$case_dir/stderr")"
-  assert_copy_returned "$case_dir" "control: the copy stayed"
+  assert_copy_returned "$case_dir" "control: the copy stayed" https://github.com/example/repo/pull/7
   pass "the exact-head proof refuses when the refreshed default branch lacks the head or cannot be refreshed; an intact one lands"
 }
 
@@ -1553,7 +1627,7 @@ test_completion_pr_is_recorded_only_for_the_copys_own_head() {
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "a copy whose change the default branch holds was refused: $(cat "$case_dir/stderr")"
-  assert_copy_returned "$case_dir" "the copy stayed"
+  assert_copy_returned "$case_dir" "the copy stayed" none
   ! grep -q 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
     || fail "a merged PR whose head is not the copy's HEAD was recorded as its completion PR"
   case_dir=$(detached_copy_case attribution-own fm/recorded-x no own)
@@ -4526,6 +4600,7 @@ test_exact_head_proof_reads_a_refreshed_default_branch
 test_completion_pr_is_recorded_only_for_the_copys_own_head
 test_branch_pr_lookup_reads_every_pr
 test_branch_pr_lookup_treats_a_full_page_as_incomplete
+test_completion_pr_is_named_only_on_head_equality
 test_detached_copy_is_judged_through_the_record_branch
 test_detached_copy_unlanded_work_is_still_refused
 test_named_branch_copy_without_pr_meta_behaves_as_before
