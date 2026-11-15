@@ -13,8 +13,10 @@
 // CLI's working directory and --file), then, inside one withLock(store.path), loads the backlog
 // (MarkdownStore loadForUpdate, markdown.js:231-234), decides from it and writes the edge changes
 // with persist (markdown.js:345-348, which also refuses a file changed on disk). The store
-// methods it calls are not a public tasks-axi API (the package has no exports map); a tasks-axi
-// without them fails closed here.
+// methods it calls are not a public tasks-axi API (the package has no exports map), so it is
+// pinned (Main 1890): it refuses, changing nothing, unless the package is tasks-axi at exactly
+// the version it was checked against (CHECKED_VERSION) and its modules load with these
+// functions.
 //
 // Inside the lock: when an item with <id> is in the active backlog and is not done, nothing is
 // changed and the first line is `keep <state>`. Otherwise (no such item, or it is done) every
@@ -24,9 +26,27 @@
 // standard error and exits 1.
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
+import { readFileSync } from "node:fs";
+
+export const CHECKED_VERSION = "0.2.6";
 
 export async function lockedUnblock({ pkg, root, file, id, inside }) {
-  const load = (rel) => import(pathToFileURL(join(pkg, "dist", "src", rel)).href);
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(join(pkg, "package.json"), "utf8"));
+  } catch (error) {
+    throw new Error(`the tasks-axi package manifest at ${pkg} cannot be read`);
+  }
+  if (manifest.name !== "tasks-axi" || manifest.version !== CHECKED_VERSION) {
+    throw new Error(`the package at ${pkg} is ${manifest.name} ${manifest.version}, not tasks-axi ${CHECKED_VERSION}, the version this clear was checked against`);
+  }
+  const load = async (rel) => {
+    try {
+      return await import(pathToFileURL(join(pkg, "dist", "src", rel)).href);
+    } catch (error) {
+      throw new Error(`the tasks-axi module ${rel} cannot be loaded`);
+    }
+  };
   const { resolveTasksContext } = await load("context.js");
   const { withLock } = await load(join("backends", "lock.js"));
   if (typeof resolveTasksContext !== "function" || typeof withLock !== "function") {

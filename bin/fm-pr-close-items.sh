@@ -298,7 +298,7 @@ MERGED=$(cat "$WORK/body.merged" 2>/dev/null) || MERGED=false
 # left open.
 body_unread() {
   LEFT=$((LEFT + 1))
-  printf 'actionable: close-at-merge: could not read the parse result of %s whole, so nothing named by it was closed, no member was read from it and no blocked-by edge changed; the item ids it names are not known without that result; retry: %s %s %s\n' \
+  printf 'actionable: close-at-merge: could not read the parse result of %s whole, so no item closed, every edge kept, and no member was read from it; the item ids it names are not known without that result; retry: %s %s %s\n' \
     "$1" "$0" "$TASK_ID" "$URL" >&2
 }
 # load_body <body-file> <where>: Main 1851 F2 and 1875 rule P. Loads the body's parse result
