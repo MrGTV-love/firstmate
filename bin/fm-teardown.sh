@@ -373,14 +373,21 @@
 # every removal: after the direct release's last unlock, just before the
 # driver's execute call (after the lock is read again and found unchanged), and
 # just before each foreign and own nested git worktree remove. It refuses on any
-# input it cannot prove: the HEAD; the status, under a dirt rule that exempts
-# only .claude/settings.local.json and the turn-end markers; every proof that
-# admitted the copy in this run (anchor, landing or bundle, recorded where it was
-# taken) and the bundle that admitted the cleanup, rechecked, never replaced by
-# another; the ignored files, preserved again outside every removal root with
-# the preserved payload hashed against its manifest and the copy (or, for a copy
-# only a bundle or default-branch history admitted, none outside the
-# allow-list); and a locked copy's launcher by pid and start time. A scout's or
+# input it cannot prove: the HEAD; the status, under the dirt rule a plain git
+# worktree remove applies (an untracked managed hook file or turn-end marker
+# counts, as it does for Git; only the task's own nested copies, removed first,
+# are left out); every proof that admitted the copy in this run, rechecked,
+# never replaced by another: an anchor, a landing proof together with the
+# default-branch ref and commit it read, a bundle (the driver's bundle credit
+# included) with its record, stored bytes and real location; the bundle that
+# admitted the cleanup; the ignored files, listed NUL-framed so any name keeps
+# its bytes, preserved again outside every removal root, with every scan
+# checked, the published preserve verified before an earlier one is deleted, and
+# the preserved payload hashed against its one manifest line each and the copy
+# (or, for a copy only a bundle or default-branch history admitted, none outside
+# the allow-list); and a locked copy's launcher by pid and start time. Before
+# the driver the whole lock file is compared by SHA-256 with the one first proved
+# and the copy is scanned again for any holder. A scout's or
 # secondmate's copy, declared scratch, and an operator --force keep the forced
 # removal and skip that proof, as they skip the landed-work rule.
 # Apart from the held-copy rule below, every other case, including a half-removed
