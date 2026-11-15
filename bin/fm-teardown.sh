@@ -4530,12 +4530,17 @@ PY
   }
 }
 
-# The Supabase refusal of teardown_docker_stacks below, which the project's
-# config at entry already decides, checked read-only before the first lease,
-# marker or endpoint close. Docker cleanup itself still runs, and still
-# refuses, in its place.
+# The refusals of teardown_docker_stacks below that the state at entry already
+# decides, checked read-only before the first lease, marker or endpoint close:
+# the project's Supabase config, and the list of local Firstmate homes whose
+# task records the cleanup must read. Docker cleanup itself still runs, and
+# still refuses, in its place.
 teardown_docker_stacks_preflight() {  # <task-id> <meta>
   command -v docker >/dev/null 2>&1 || return 0
+  if ! fm_local_firstmate_state_dirs "$STATE"; then
+    TEARDOWN_PREFLIGHT_ERROR=$FM_LOCAL_FIRSTMATE_ERROR
+    return 1
+  fi
   teardown_supabase_project_id "$1" "$(meta_value "$2" project)" >/dev/null
 }
 
