@@ -145,8 +145,10 @@ fm_secondmate_restart_attribution() {  # <meta-file>
     FM_SECONDMATE_RESTART_REASON="its remote agent on $remote_host was not attributed to this task, so no request, record or nudge was sent to it: $cause"
     return 1
   fi
-  [ "$FM_SECONDMATE_RESTART_BACKEND" = herdr ] || return 0
-  [ "$FM_SECONDMATE_RESTART_PLACEMENT" = local ] || return 0
+  # Read the backend from the record itself, never from the capability check's
+  # globals: an early capability refusal leaves those empty, and the verdict
+  # owner must still be asked (Main 1634 D3).
+  [ "$(fm_backend_of_meta "$meta")" = herdr ] || return 0
   # shellcheck source=bin/fm-launch-proof-lib.sh disable=SC1091
   . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-launch-proof-lib.sh"
   if ! fm_backend_source herdr; then
