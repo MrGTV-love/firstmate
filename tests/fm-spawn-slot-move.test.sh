@@ -1062,6 +1062,20 @@ test_a_commit_on_the_task_branch_that_changes_a_file_is_not_undone_and_is_report
   pass "a tree that differs by one file is not undone, and the refusal says why"
 }
 
+# A detached copy gets a late commit with the SAME tree. Only the rule "a detached HEAD must be exactly the commit this
+# code left" stops the undo, which would otherwise detach to the old commit and leave the late commit with no ref.
+test_a_late_detached_commit_with_an_equal_tree_is_not_orphaned_by_the_undo() {
+  make_world a4-late-detached 1
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+  git -C "$W_SLOT" "${GITID[@]}" commit -q --allow-empty -m late
+  local late rc=0
+  late=$(git -C "$W_SLOT" rev-parse HEAD)
+  fm_slot_restore_base "$W_SLOT" >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "an undo ran from a commit this code did not leave"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$late" ] || fail "the late commit is no longer HEAD"
+  pass "an undo never moves HEAD off a late detached commit that no ref holds"
+}
+
 test_a_refusal_returns_a_detached_copy_to_detached() {
   make_world a3-detached 1
   local rc=0
@@ -1229,6 +1243,7 @@ make_attach_world() {
   rm -f "$W_SLOT/notes.local"
   git -C "$W_SLOT" "${GITID[@]}" commit -qm 'untrack notes.local'
   A_HEAD=$(git -C "$W_SLOT" rev-parse HEAD)
+  git -C "$W_SLOT" branch attach-target "$A_OLD"
 }
 
 # attach_with_late_file: a writer drops private bytes at notes.local just before any checkout runs.
@@ -1240,7 +1255,7 @@ attach_with_late_file() {
   printf '#!/bin/sh\ncase " $* " in *" checkout "*) printf "private late work\\n" >%s ;; esac\nexec %s "$@"\n' "'$W_SLOT/notes.local'" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   ATTACH_RC=0
-  ATTACH_OUT=$(FM_SLOT_LEFT_HEAD=$A_HEAD PATH="$bin:$PATH" fm_slot_attach "$W_SLOT" '' "$A_OLD" 2>&1) || ATTACH_RC=$?
+  ATTACH_OUT=$(FM_SLOT_LEFT_HEAD=$A_HEAD PATH="$bin:$PATH" fm_slot_attach "$W_SLOT" attach-target "$A_OLD" 2>&1) || ATTACH_RC=$?
 }
 
 test_attach_never_rewrites_a_late_ignored_file() {
@@ -1458,6 +1473,7 @@ CASES=(
   test_a_refused_move_after_preparation_leaves_a_detached_copy_where_it_is_when_the_undo_fails
   test_a_refusal_undo_runs_no_checkout
   test_a_refusal_returns_a_detached_copy_to_detached
+  test_a_late_detached_commit_with_an_equal_tree_is_not_orphaned_by_the_undo
   test_a_commit_on_the_task_branch_with_an_equal_tree_is_undone_by_ref
   test_a_commit_on_the_task_branch_with_an_equal_tree_keeps_the_task_branch
   test_a_commit_on_the_task_branch_that_changes_a_file_is_not_undone_and_is_reported
