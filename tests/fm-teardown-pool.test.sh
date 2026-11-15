@@ -828,7 +828,8 @@ test_reverse_nested_prior_outside_claude_tears_down() {
 # A stale index.lock in the enclosing slot makes the first return fail; while
 # teardown waits, the slot gains work. Once the stale lock is removed the slot is
 # proved again before the reset, with or without --force, so the late work stops
-# teardown, nothing is returned, and the slot keeps it.
+# teardown, nothing is returned, and the slot keeps it. No lock retries run, so
+# the stale-lock cleanup is the first proof after the late work appears.
 test_nested_slot_stale_lock_cleanup_reproves_the_slot() {
   local case_dir rc lock force label
   for force in normal force; do
@@ -855,10 +856,10 @@ SH
     touch -t 200001010000 "$lock"
     rc=0
     if [ "$force" = force ]; then
-      FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+      FM_HOME="$case_dir/home" FM_TREEHOUSE_RETURN_LOCK_RETRIES=0 FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
         run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     else
-      FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+      FM_HOME="$case_dir/home" FM_TREEHOUSE_RETURN_LOCK_RETRIES=0 FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
         run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     expect_code 1 "$rc" "$label: the slot's late work must stop the reset: $(cat "$case_dir/stderr")"

@@ -3168,13 +3168,15 @@ test_bundle_sources_and_durable_home_locations() {
     if [ "$shape" = source-copy ]; then
       # The source left in the copy is an untracked file nothing else holds as
       # it lies there, so the copy stays (Main 1681: removal refuses on any
-      # untracked byte); the stored copy is still durable and restores.
+      # untracked byte; the copy proof counts it as work); the source bundle
+      # it keeps still restores the commits.
       expect_code 1 "$rc" "bundle-location-$shape: an untracked source in the copy must keep it: $(grep -v '^●' "$case_dir/stderr" | tail -6)"
       assert_present "$BUNDLE_PATH" "bundle-location-$shape: the untracked source in the copy was lost"
       assert_present "$NESTED_COPY/.git" "bundle-location-$shape: the copy was removed"
       restored="$case_dir/restored.git"
       git init -q --bare "$restored"
-      git -C "$restored" fetch -q "$stored" "$head:refs/heads/recovered" || fail 'stored copy cannot restore while the copy stays'
+      git -C "$restored" fetch -q "$BUNDLE_PATH" "$head:refs/heads/recovered" || fail 'the kept source bundle cannot restore while the copy stays'
+      assert_equals 'recoverable work' "$(git -C "$restored" show "$head:work.txt")" 'the kept source bundle lost bytes'
       continue
     fi
     expect_code 0 "$rc" "bundle-location-$shape: safe storage must allow cleanup: $(cat "$case_dir/stderr")"

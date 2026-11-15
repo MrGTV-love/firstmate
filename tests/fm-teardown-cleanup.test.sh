@@ -4529,12 +4529,15 @@ test_legacy_preservation_refusal_prints_no_completing_command() {
 
 # A refusal is typed only when Git or the forge answered and the answer was no.
 # Git protecting the copy's contents is that answer; a removal that fails for any
-# other reason is a plain error with Git's own text and no event.
+# other reason is a plain error with Git's own text and no event. The untracked
+# file is Firstmate's managed hook file, not excluded: the copy proof does not
+# count it as work, but Git would refuse the copy for it, so the final removal
+# proof keeps the copy with that typed refusal.
 test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal() {
   local rc
   make_foreign_copy_case foreign-git-protects
   mkdir -p "$FOREIGN_COPY/.claude"
-  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  printf '{"hooks":{}}\n' > "$FOREIGN_COPY/.claude/settings.local.json"
   run_foreign_teardown rc
   expect_code 1 "$rc" "git-protects: a copy Git refuses to remove must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
   assert_grep 'REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal ' "$FOREIGN_CASE/stderr" 'git-protects: the refusal is not typed'
@@ -4542,7 +4545,7 @@ test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal() {
   jq -es 'length == 1 and .[0].rule_id == "nonforced-removal" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only"' \
     "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'git-protects: expected exactly one typed human-only event'
   assert_foreign_copy_untouched git-protects
-  assert_present "$FOREIGN_COPY/.claude/untracked.txt" 'git-protects: the untracked file was lost'
+  assert_present "$FOREIGN_COPY/.claude/settings.local.json" 'git-protects: the untracked file was lost'
   pass 'a foreign copy whose contents Git protects is refused as a typed nonforced-removal with its question'
 }
 
