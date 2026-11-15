@@ -208,7 +208,7 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
             sys.modules['fm_proc_info'] = info
             spec.loader.exec_module(info)
             def unreadable(*selector): raise OSError('injected: process table unreadable')
-            info.processes = unreadable
+            info.kinfo_table = unreadable
         except Exception:
             sys.modules.pop('fm_proc_info', None)
         real_listdir = os.listdir
