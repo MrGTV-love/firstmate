@@ -204,7 +204,7 @@ fm_tasks_axi_backend_available() {
 # it must name the same id tasks-axi completed, in every form tasks-axi 0.2.6 accepts.
 #
 # fm_typed_completion_resolve <tasks-axi args...>: reads the arguments with tasks-axi's own
-# grammar: an optional leading `task` noun (dist/src/cli.js:80-82); then for the handler,
+# grammar: an optional leading `task` noun (dist/src/cli.js:82-83); then for the handler,
 # takeBoolFlag --json, then takeFlag for each value flag in the handler's order (waive: --reason,
 # --approved-by; record-delivery: --receipt-file), each as `--flag value` (a value may not start
 # with `--`) or `--flag=value` (dist/src/args.js:7-15, 52-80; commands/public-followup.js:589-594,
@@ -228,8 +228,11 @@ fm_typed_completion_resolve() {
   # shellcheck disable=SC2034  # bin/fm-tasks-axi.sh reads it.
   FM_TYPED_COMPLETION=${a[1]}
   a=("${a[@]:2}")
+  # Help: the runner prints a command's help and runs nothing when any argument after the command
+  # is exactly `--help` (axi-sdk-js 0.1.12 dist/cli.js:77-82; tasks-axi dist/src/cli.js:84), even
+  # where a flag would take it as a value. `-h` is no help flag there.
   for tok in ${a[@]+"${a[@]}"}; do
-    case "$tok" in -h|--help) return 3 ;; esac
+    [ "$tok" != --help ] || return 3
   done
   # takeBoolFlag: remove the first --json.
   rest=() found=0
