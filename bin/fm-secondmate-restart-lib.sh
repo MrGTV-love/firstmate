@@ -117,10 +117,19 @@ fm_secondmate_restart_capable() {  # <meta-file>
 # is herdr) refuses, and only the exact bytes "attribution=proceed" plus one
 # newline, with a zero transport status, let the restart go on; a transport
 # failure, any other or extra output, or a host whose code lacks the verb refuses.
+# The remote route is compared field by field (Main 1709 ruling 3, Main 1713
+# (7)): the registry host, root and home must equal the record's remote_host,
+# remote_root and home, and the record must name a remote_target. A remote
+# proceed leaves that compared route in FM_SECONDMATE_RESTART_ROUTE_HOST, _ROOT,
+# _HOME and _TARGET, and every later delivery to the mate passes it through
+# (fm_secondmate_restart_route_env), so bin/fm-on.sh, bin/fm-send.sh and the
+# host send verb refuse a route or endpoint that changed after the decision.
 # Returns 1 with FM_SECONDMATE_RESTART_REASON set when the agent is unproven.
 fm_secondmate_restart_attribution() {  # <meta-file>
-  local meta=$1 id cause state out rc remote_host remote_backend remote_target
+  local meta=$1 id cause state out rc remote_host remote_backend remote_target remote_root remote_home
   id=${meta##*/}; id=${id%.meta}
+  FM_SECONDMATE_RESTART_ROUTE_HOST='' FM_SECONDMATE_RESTART_ROUTE_ROOT=''
+  FM_SECONDMATE_RESTART_ROUTE_HOME='' FM_SECONDMATE_RESTART_ROUTE_TARGET=''
   remote_host=$(fm_meta_get "$meta" remote_host 2>/dev/null)
   if [ -n "$remote_host" ]; then
     remote_backend=$(fm_meta_get "$meta" remote_backend 2>/dev/null)
@@ -140,20 +149,29 @@ fm_secondmate_restart_attribution() {  # <meta-file>
       FM_SECONDMATE_RESTART_REASON="its record names no remote_target, so its host decision cannot be bound to its recorded route; its host was not asked and no request, record or nudge was sent to it"
       return 1
     fi
+    remote_root=$(fm_meta_get "$meta" remote_root 2>/dev/null)
+    remote_home=$(fm_meta_get "$meta" home 2>/dev/null)
     if ! secondmate_registry_line_for_id "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" \
-      || [ "$SECONDMATE_REGISTRY_REMOTE" != 1 ] || [ "$SECONDMATE_REGISTRY_HOST" != "$remote_host" ]; then
-      FM_SECONDMATE_RESTART_REASON="its registry route (host '${SECONDMATE_REGISTRY_HOST:-none}') is not its recorded route (host '$remote_host'); its host was not asked and no request, record or nudge was sent to it"
+      || [ "$SECONDMATE_REGISTRY_REMOTE" != 1 ] || [ "$SECONDMATE_REGISTRY_HOST" != "$remote_host" ] \
+      || [ -z "$remote_root" ] || [ "$SECONDMATE_REGISTRY_ROOT" != "$remote_root" ] \
+      || [ -z "$remote_home" ] || [ "$SECONDMATE_REGISTRY_HOME" != "$remote_home" ]; then
+      FM_SECONDMATE_RESTART_REASON="its registry route (host '${SECONDMATE_REGISTRY_HOST:-none}', root '${SECONDMATE_REGISTRY_ROOT:-none}', home '${SECONDMATE_REGISTRY_HOME:-none}') is not its recorded route (host '$remote_host', root '${remote_root:-none}', home '${remote_home:-none}'); its host was not asked and no request, record or nudge was sent to it"
       return 1
     fi
     # The trailing marker keeps every byte of the reply, trailing newlines too,
     # and carries the transport status. Bash drops NUL bytes from a command
     # substitution, so each is turned into another byte first: a reply with a NUL
     # can then never equal the exact token.
-    out=$(FM_HOME="$FM_HOME" "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-on.sh" "$id" \
+    out=$(FM_HOME="$FM_HOME" FM_ON_EXPECTED_HOST="$remote_host" FM_ON_EXPECTED_ROOT="$remote_root" \
+      FM_ON_EXPECTED_HOME="$remote_home" "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-on.sh" "$id" \
       fm-remote-secondmate-control.sh attribution "$id" "$remote_target" < /dev/null 2>/dev/null | LC_ALL=C tr '\000' '\001'
       printf 'x%d' "${PIPESTATUS[0]}")
     rc=${out##*x}; out=${out%x*}
-    [ "$rc" != 0 ] || [ "$out" != $'attribution=proceed\n' ] || return 0
+    if [ "$rc" = 0 ] && [ "$out" = $'attribution=proceed\n' ]; then
+      FM_SECONDMATE_RESTART_ROUTE_HOST=$remote_host FM_SECONDMATE_RESTART_ROUTE_ROOT=$remote_root
+      FM_SECONDMATE_RESTART_ROUTE_HOME=$remote_home FM_SECONDMATE_RESTART_ROUTE_TARGET=$remote_target
+      return 0
+    fi
     case "$rc:$out" in
       '0:attribution=refuse: '*) cause=${out#attribution=refuse: }; cause=${cause%%$'\n'*} ;;
       *) cause="its host returned no attribution decision in the exact form (unreachable, extra output, or its code lacks the attribution verb until it is synced)" ;;
@@ -189,6 +207,17 @@ fm_secondmate_restart_attribution() {  # <meta-file>
   fi
   FM_SECONDMATE_RESTART_REASON="its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it${cause:+: $cause}"
   return 1
+}
+
+# The environment assignments that bind a delivery to the route the last
+# remote decision compared, one per line for `env`; none for a local mate.
+fm_secondmate_restart_route_env() {
+  [ -n "${FM_SECONDMATE_RESTART_ROUTE_HOST:-}" ] || return 0
+  printf '%s\n' "FM_ON_EXPECTED_HOST=$FM_SECONDMATE_RESTART_ROUTE_HOST" \
+    "FM_ON_EXPECTED_ROOT=$FM_SECONDMATE_RESTART_ROUTE_ROOT" \
+    "FM_ON_EXPECTED_HOME=$FM_SECONDMATE_RESTART_ROUTE_HOME" \
+    "FM_SEND_EXPECTED_REMOTE_HOST=$FM_SECONDMATE_RESTART_ROUTE_HOST" \
+    "FM_SEND_EXPECTED_REMOTE_TARGET=$FM_SECONDMATE_RESTART_ROUTE_TARGET"
 }
 
 # The same decision, re-derived from <meta-file> alone at the moment of a later

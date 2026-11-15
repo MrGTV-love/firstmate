@@ -150,14 +150,17 @@ first_reported_line() {  # <text>
 # Send the ordinary re-read steer to a mate this pass will not restart, and say
 # plainly which it was. A nudge is a partial reload and is never reported as more.
 fall_back_to_nudge() {  # <id> <reason>
-  local id=$1 reason=$2 out
+  local id=$1 reason=$2 out line
+  local -a route_env=()
   # The pane may have changed hands since the first decision (the persistence
   # wait can last minutes): decide again on this mate's own record right now.
   if ! fm_secondmate_restart_attribution_now "$STATE/$id.meta"; then
     report_unreached "$id" "$reason; at the fallback nudge, $FM_SECONDMATE_RESTART_REASON"
     return
   fi
-  if out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  # A remote nudge travels only over the route this decision compared.
+  while IFS= read -r line; do route_env+=("$line"); done < <(fm_secondmate_restart_route_env)
+  if out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
     nudged_count=$((nudged_count + 1))
     printf 'nudged: %s: %s\n' "$id" "$reason"
@@ -324,7 +327,10 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
-  if ! send_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  # A remote request travels only over the route this mate's decision compared.
+  route_env=()
+  while IFS= read -r route_line; do route_env+=("$route_line"); done < <(fm_secondmate_restart_route_env)
+  if ! send_out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
     fm_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true

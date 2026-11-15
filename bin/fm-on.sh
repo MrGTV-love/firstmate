@@ -37,6 +37,11 @@
 # is doing, so a legitimately long-but-alive remote command is never falsely
 # killed. FM_SSH_ALIVE_INTERVAL and FM_SSH_ALIVE_COUNT_MAX override the
 # defaults; the worst-case detection window is roughly interval * count.
+#
+# A caller that already compared a route sets FM_ON_EXPECTED_HOST,
+# FM_ON_EXPECTED_ROOT and FM_ON_EXPECTED_HOME (Main 1714 (a)): when any is set,
+# the route resolved here must equal all three exactly, or this refuses before
+# ssh, so the delivery uses the route that was compared. Unset, nothing changes.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -104,6 +109,12 @@ for configured_path in "$ROOT" "$HOME_PATH"; do
   case "/$configured_path/" in */../*|*/./*) die "configured remote root or home contains traversal components" ;; esac
   case "$configured_path" in *'//'*) die "configured remote root or home contains an empty path component" ;; esac
 done
+
+if [ -n "${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}" ]; then
+  [ "$HOST" = "${FM_ON_EXPECTED_HOST:-}" ] && [ "$ROOT" = "${FM_ON_EXPECTED_ROOT:-}" ] \
+    && [ "$HOME_PATH" = "${FM_ON_EXPECTED_HOME:-}" ] \
+    || die "remote route '$ROUTE' resolves to host '$HOST', root '$ROOT', home '$HOME_PATH', not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); nothing was sent"
+fi
 
 ROOT_B64=$(printf '%s' "$ROOT" | encode_base64)
 HOME_B64=$(printf '%s' "$HOME_PATH" | encode_base64)

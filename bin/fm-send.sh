@@ -146,7 +146,12 @@
 # semantic callers may set FM_SEND_EXPECTED_SPAWN_GEN or
 # FM_SEND_EXPECTED_REMOTE_HOST to require that sampled identity to still match
 # during the final locked remote-route validation; unset or empty guards do not
-# change ordinary sends.
+# change ordinary sends. A caller that compared a remote route (Main 1714 (b))
+# also sets FM_ON_EXPECTED_HOST, FM_ON_EXPECTED_ROOT and FM_ON_EXPECTED_HOME,
+# which bin/fm-on.sh enforces, and FM_SEND_EXPECTED_REMOTE_TARGET: the send then
+# refuses before any pending-reply record, and again at the locked validation,
+# when its record's remote_host, remote_root or home differ, and passes the
+# target to the host send verb, which refuses another endpoint.
 #
 # Decision closure (answerer-closes): pass --resolve-key <key> (repeatable,
 # before the message) when this send answers an open keyed needs-decision: or
@@ -453,6 +458,19 @@ fm_send_resolve_target() { # <raw-target>
 RAW_TARGET=$1
 fm_send_resolve_target "$RAW_TARGET" || exit 1
 T=$RESOLVED_TARGET
+
+# The record of an expected remote route (Main 1714 (b)) must be the compared
+# one before anything is recorded; the locked validation below repeats it.
+fm_send_remote_route_expected() { # <meta>
+  [ -n "${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}" ] || return 0
+  [ -f "$1" ] && [ "$(fm_meta_get "$1" remote_host)" = "${FM_ON_EXPECTED_HOST:-}" ] \
+    && [ "$(fm_meta_get "$1" remote_root)" = "${FM_ON_EXPECTED_ROOT:-}" ] \
+    && [ "$(fm_meta_get "$1" home)" = "${FM_ON_EXPECTED_HOME:-}" ]
+}
+if [ "$TARGET_BACKEND" = remote ] && ! fm_send_remote_route_expected "$TARGET_META"; then
+  echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID: its record's remote route is not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); nothing was recorded or sent" >&2
+  exit 1
+fi
 shift
 
 # Supervision lease guard: a steer is overlap territory between the two Pi
@@ -948,7 +966,8 @@ else
       { [ -n "${FM_SEND_EXPECTED_REMOTE_HOST:-}" ] &&
         [ "$CURRENT_REMOTE_HOST" != "$FM_SEND_EXPECTED_REMOTE_HOST" ]; } ||
       [ -z "$CURRENT_REMOTE_HOST" ] ||
-      [ "$CURRENT_REMOTE_HOST" != "$TARGET_REMOTE_HOST" ]; then
+      [ "$CURRENT_REMOTE_HOST" != "$TARGET_REMOTE_HOST" ] ||
+      ! fm_send_remote_route_expected "$TARGET_META"; then
       fm_lock_release "$REMOTE_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
@@ -960,6 +979,8 @@ else
     remote_completion_unknown=0
     REMOTE_SEND_ARGS=("$TARGET_REMOTE_ID" "$MESSAGE")
     [ -z "$FIRE_AND_FORGET_ID" ] || REMOTE_SEND_ARGS+=(fire-and-forget)
+    [ -z "${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] \
+      || REMOTE_SEND_ARGS+=("expected-target=$FM_SEND_EXPECTED_REMOTE_TARGET")
     # Each transport attempt is bounded by FM_SEND_REMOTE_BUDGET seconds.
     # fm_run_timed's 124 means the attempt was killed at the bound with remote
     # completion unknown - the enqueue may have landed - so it exits through

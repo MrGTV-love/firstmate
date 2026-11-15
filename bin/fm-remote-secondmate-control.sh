@@ -8,7 +8,7 @@
 #   fm-remote-secondmate-control.sh attribution <id> <recorded-target>
 #   fm-remote-secondmate-control.sh route <id>
 #   fm-remote-secondmate-control.sh stay <id>
-#   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
+#   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget] [expected-target=<target>]
 #   fm-remote-secondmate-control.sh key <id> <key>
 #   fm-remote-secondmate-control.sh capture <id> [lines]
 #   fm-remote-secondmate-control.sh observe <id>
@@ -387,9 +387,18 @@ cmd_stay() {
 }
 
 cmd_send() {
-  local id=$1 message=$2 delivery_mode=${3:-} rec ring_rc=0 meta meta_lock
+  local id=$1 message=$2 delivery_mode='' expected='' arg rec ring_rc=0 meta meta_lock
+  shift 2
   validate_id "$id"
-  [ -z "$delivery_mode" ] || [ "$delivery_mode" = fire-and-forget ] || die "invalid send delivery mode"
+  # An expected target (Main 1714 (c)) binds this delivery to the endpoint the
+  # parent compared: any other endpoint here refuses before the record.
+  for arg in "$@"; do
+    case "$arg" in
+      fire-and-forget) [ -z "$delivery_mode" ] || die "invalid send delivery mode"; delivery_mode=$arg ;;
+      expected-target=?*) [ -z "$expected" ] || die "invalid send expected target"; expected=${arg#expected-target=} ;;
+      *) die "invalid send delivery mode" ;;
+    esac
+  done
   validate_home "$id"
   meta=$(meta_path "$id")
   meta_lock=$(fm_meta_lock_path "$meta") || die "remote secondmate metadata lock path is invalid"
@@ -398,6 +407,10 @@ cmd_send() {
   if ! remote_endpoint_load "$id"; then
     fm_lock_release "$meta_lock"
     die "$REMOTE_ENDPOINT_ERROR"
+  fi
+  if [ -n "$expected" ] && [ "$REMOTE_ENDPOINT_TARGET" != "$expected" ]; then
+    fm_lock_release "$meta_lock"
+    die "this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected'; nothing was recorded"
   fi
   # A remote steer is delivered by durable record, never by typing its payload
   # into the pane: write it into this secondmate's host-local steering inbox,
@@ -555,7 +568,7 @@ case "${1:-}" in
   attribution) shift; [ "$#" -eq 2 ] || usage; cmd_attribution "$1" "$2" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;
   stay) shift; [ "$#" -eq 1 ] || usage; cmd_stay "$1" ;;
-  send) shift; [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage; cmd_send "$@" ;;
+  send) shift; [ "$#" -ge 2 ] && [ "$#" -le 4 ] || usage; cmd_send "$@" ;;
   key) shift; [ "$#" -eq 2 ] || usage; cmd_key "$@" ;;
   capture) shift; [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage; cmd_capture "$@" ;;
   observe) shift; [ "$#" -eq 1 ] || usage; cmd_observe "$@" ;;
