@@ -135,6 +135,18 @@ fi
 HISTFILE='$TMP_ROOT/get-history' /bin/bash --noprofile --norc -i
 SH
 chmod +x "$FAKEBIN/treehouse"
+# The real `treehouse` is a native program, so the kernel names its process `treehouse` and the slot rules can tell a
+# launcher this spawn opened from any other process in a copy. A bare shell script would be named `bash`, so the fake
+# runs its script body under a renamed copy of bash and shows `treehouse get` as its own command line.
+mv "$FAKEBIN/treehouse" "$FAKEBIN/treehouse.body"
+mkdir -p "$FAKEBIN/real"
+cp /bin/bash "$FAKEBIN/real/treehouse"
+[ "$(uname)" != Darwin ] || codesign -f -s - "$FAKEBIN/real/treehouse" >/dev/null 2>&1 || true
+cat > "$FAKEBIN/treehouse" <<SH
+#!/usr/bin/env bash
+exec -a treehouse '$FAKEBIN/real/treehouse' -c "\$(cat '$FAKEBIN/treehouse.body')" treehouse "\$@"
+SH
+chmod +x "$FAKEBIN/treehouse"
 fm_test_fake_no_mistakes "$FAKEBIN"
 fm_test_fake_gh "$FAKEBIN"
 fm_test_fake_gh_axi "$FAKEBIN"
