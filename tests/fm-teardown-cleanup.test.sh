@@ -4969,7 +4969,7 @@ test_closeout_plan_refusal_refuses_at_entry() {
       assert_absent "$FOREIGN_CASE/closeout.log" "$label: the release ran after a plan refusal"
     done
   done
-  label=foreign-plan-refuse
+  label='foreign-plan-refuse'
   dead_launcher_pid
   make_foreign_copy_case "$label" "$FOREIGN_DEAD_PID"
   run_foreign_teardown rc FM_STUB_PLAN=refuse
@@ -4977,7 +4977,7 @@ test_closeout_plan_refusal_refuses_at_entry() {
   assert_grep "Vernant's closeout driver would not release it" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the plan"
   assert_foreign_copy_untouched "$label"
   assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$label: a return-pending record was written before the refusal"
-  label=own-plan-allows
+  label='own-plan-allows'
   dead_launcher_pid
   make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
   run_foreign_teardown rc
