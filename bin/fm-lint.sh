@@ -102,8 +102,8 @@
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # A cold root takes one pass of the host-wide CPU pool before its host slot
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), so ShellChecks and
-# test scripts together never exceed the pool. The changed-root dependency scan
-# takes one pass too. A run already inside a pass
+# test scripts together never exceed the pool. The changed-root dependency scan and
+# the backend-purity audit take one pass each. A run already inside a pass
 # (FM_CPU_PASS_HELD above 0) takes none and runs at most that many workers.
 # Waiting roots queue rather than fail; cache-key, host-slot and CPU-pass queue time
 # consume neither the root deadline nor its retry budget.
@@ -707,7 +707,7 @@ fm_lint_run_backend_purity() {
     python3 "$SELF_DIR/fm-duration.py" check-literals || return $?
   fi
   local findings path canonical
-  local -a purity_roots
+  local -a purity_roots audit_command
   purity_roots=()
   if [ "$EXPLICIT_PATHS" -eq 0 ]; then
     purity_roots=(bin/*.sh bin/backends/*.sh)
@@ -728,7 +728,13 @@ fm_lint_run_backend_purity() {
     done
   fi
   [ "${#purity_roots[@]}" -gt 0 ] || return 0
-  findings=$(LC_ALL=C awk '
+  # The audit is one CPU-bound awk process over every script under bin/ (measured 2.9 CPU seconds over 3.3), so it takes a pass too.
+  audit_command=(awk)
+  if [ -x "$SELF_DIR/fm-cpu-pass.sh" ] && [ -r "$SELF_DIR/fm-cpu-pass.py" ]; then
+    audit_command=("$SELF_DIR/fm-cpu-pass.sh" run --label "fm-lint backend purity" --log-fd 8 -- awk)
+  fi
+  # shellcheck disable=SC2016 # The awk program is single-quoted on purpose: awk, not the shell, expands it.
+  findings=$(LC_ALL=C "${audit_command[@]}" '
     function hex_value(character) {
       return index("0123456789abcdef", tolower(character)) - 1
     }

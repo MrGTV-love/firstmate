@@ -55,11 +55,15 @@ Running:
   - Only this owner retains slot descriptors; close-on-exec/close_fds prevents
     COMMAND and its descendants retaining passes after COMMAND exits. The passes
     (and leased tokens) stay held until COMMAND itself ends: a guard process
-    forked after COMMAND starts keeps the descriptors open, ignores TERM, INT and
+    started before COMMAND keeps the descriptors open, ignores TERM, INT and
     HUP, polls COMMAND's pid at the waiters' own poll cap, and exits when it is
     gone, so killing only this owner does not free a pass for a second worker.
     COMMAND's other descendants hold nothing; a reused pid keeps the pass a
     little longer. ordinary TERM/INT/HUP still keep the owner until COMMAND ends.
+    The guard is started before COMMAND, never after: no moment exists in which
+    COMMAND runs and nothing but its starter holds the passes. When the guard
+    cannot be started, or the token directory cannot be created, the passes are
+    returned and COMMAND runs without one with FM_CPU_PASS_HELD=0, said once.
     The log fd is closed; stdout and stderr carry only COMMAND's own output.
   - A degraded run (the protocol's rule 7) writes one notice to the log fd.
 
@@ -307,39 +311,96 @@ def drop_tokens(path: str) -> None:
         shutil.rmtree(path, ignore_errors=True)
 
 
-def start_guard(fds: List[int], pid: int, tokens: str = "") -> int:
-    """Fork a process that keeps the descriptors FDS open until process PID ends, even if this process is killed.
+class Guard:
+    """The guard process that keeps a command's passes (and its token directory) until that command ends.
 
-    The passes follow the command that uses them, not the process that started it. The guard has no other
-    open descriptor, ignores TERM, INT and HUP, and is stopped by stop_guard when the command ends normally.
-    When it outlives its starter it also removes TOKENS, the reservation's token directory, once the command is gone.
+    It is created BEFORE the command, so no moment exists in which a command runs and nothing but its starter
+    holds the passes. The command inherits the write end of a pipe the guard reads (inherit); bind tells the
+    guard the command's pid once the command exists, and the guard then polls that pid. A starter that dies
+    before bind leaves the guard reading a pipe only the command still holds, so the guard keeps the passes
+    until the command, and any process that inherited the pipe, ends: never shorter than the command lives.
+    """
+
+    def __init__(self, child: "subprocess.Popen", write_fd: int) -> None:
+        self.child = child
+        self.write_fd = write_fd
+
+    def inherit(self) -> Tuple[int, ...]:
+        return (self.write_fd,) if self.write_fd >= 0 else ()
+
+    def close_write(self) -> None:
+        if self.write_fd >= 0:
+            try:
+                os.close(self.write_fd)
+            except OSError:
+                pass
+            self.write_fd = -1
+
+    def bind(self, pid: int) -> None:
+        if self.write_fd >= 0:
+            try:
+                os.write(self.write_fd, ("%d\n" % pid).encode())
+            except OSError:
+                pass
+            self.close_write()
+
+    def stop(self) -> None:
+        self.close_write()
+        try:
+            self.child.kill()
+        except OSError:
+            pass
+        try:
+            self.child.wait()
+        except OSError:
+            pass
+
+
+def _ignore_signals() -> None:
+    for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(signum, signal.SIG_IGN)
+
+
+def start_guard(fds: List[int], tokens: str = "") -> Optional[Guard]:
+    """Start the guard of the passes FDS before their command exists; None when there is nothing to hold.
+
+    The guard is `fm-cpu-pass.py guard`: a fresh interpreter that inherits only FDS and its pipe, ignores
+    TERM, INT and HUP, and removes TOKENS (the reservation's token directory) once the command is gone.
+    It raises OSError when the guard cannot be started; the caller then does not run the command under the
+    passes (the protocol's degrade rule) and never leaves the command running with nothing keeping them.
     """
     if not fds:
-        return 0
+        return None
+    read_fd, write_fd = os.pipe()
     try:
-        guard = os.fork()
-    except OSError:
-        return 0
-    if guard:
-        return guard
-    try:  # pragma: no cover - runs in the forked guard
-        for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-            signal.signal(signum, signal.SIG_IGN)
-        keep = set(fds)
-        try:
-            open_fds = [int(name) for name in os.listdir("/dev/fd")]
-        except OSError:
-            open_fds = list(range(3, 256))
-        null = os.open(os.devnull, os.O_RDWR)
-        for stream in (0, 1, 2):
-            os.dup2(null, stream)
-        for fd in open_fds:
-            if fd > 2 and fd not in keep and fd != null:
-                try:
-                    os.close(fd)
-                except OSError:
-                    pass
-        os.close(null)
+        child = subprocess.Popen(
+            [sys.executable or "python3", os.path.abspath(__file__), "guard", "--fd", str(read_fd), "--tokens", tokens],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            close_fds=True, pass_fds=tuple(fds) + (read_fd,), preexec_fn=_ignore_signals)
+    except BaseException:
+        os.close(read_fd)
+        os.close(write_fd)
+        raise
+    os.close(read_fd)
+    return Guard(child, write_fd)
+
+
+def stop_guard(guard: Optional[Guard]) -> None:
+    if guard is not None:
+        guard.stop()
+
+
+def cmd_guard(args: argparse.Namespace) -> int:
+    """Internal: hold the inherited pass descriptors until the command named on the pipe ends."""
+    pid_text = b""
+    while not pid_text.endswith(b"\n"):
+        chunk = os.read(args.fd, 64)
+        if not chunk:
+            break
+        pid_text += chunk
+    os.close(args.fd)
+    if pid_text.endswith(b"\n"):
+        pid = int(pid_text)
         while True:
             try:
                 os.kill(pid, 0)
@@ -348,22 +409,8 @@ def start_guard(fds: List[int], pid: int, tokens: str = "") -> int:
             except PermissionError:
                 pass
             time.sleep(POLL_MAX_SECS)  # no faster than the waiters it releases the pass to poll for it
-        drop_tokens(tokens)
-    finally:
-        os._exit(0)
-    return 0  # pragma: no cover
-
-
-def stop_guard(guard: int) -> None:
-    if guard:
-        try:
-            os.kill(guard, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        try:
-            os.waitpid(guard, 0)
-        except ChildProcessError:
-            pass
+    drop_tokens(args.tokens)
+    return 0
 
 
 def exit_code_for(returncode: int) -> int:
@@ -372,15 +419,15 @@ def exit_code_for(returncode: int) -> int:
     return returncode
 
 
-def run_child(command: List[str], env: dict, log_fd: int, on_poll=None, keep: Optional[List[int]] = None, tokens: str = "") -> int:
+def run_child(command: List[str], env: dict, log_fd: int, on_poll=None, guard: Optional[Guard] = None) -> int:
     previous = {}
-    guard = 0
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         previous[signum] = signal.signal(signum, signal.SIG_IGN)
     try:
         try:
             child = subprocess.Popen(
                 command, env=env, close_fds=True,
+                pass_fds=guard.inherit() if guard is not None else (),
                 preexec_fn=_restore_default_signals)
         except FileNotFoundError:
             log(log_fd, "command not found: %s" % command[0])
@@ -388,7 +435,8 @@ def run_child(command: List[str], env: dict, log_fd: int, on_poll=None, keep: Op
         except PermissionError:
             log(log_fd, "command not executable: %s" % command[0])
             return 126
-        guard = start_guard(list(keep or ()), child.pid, tokens)
+        if guard is not None:
+            guard.bind(child.pid)
         while True:
             if on_poll is not None and on_poll():
                 on_poll = None
@@ -434,6 +482,14 @@ def write_wait(path: str, started: float) -> None:
         Path(path).write_text("%d\n" % round((time.monotonic() - started) * 1000), encoding="utf-8")
     except OSError:
         pass
+
+
+def release_fds(fds: List[int]) -> None:
+    for fd in fds:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -486,18 +542,27 @@ def cmd_run(args: argparse.Namespace) -> int:
         write_wait(args.wait_file, queued_at)
         return exec_direct(command, env, log_fd)
     write_wait(args.wait_file, queued_at)
+    tokens = ""
+    guard = None
+    try:
+        tokens = make_tokens()
+        guard = start_guard(held, tokens)
+    except OSError as exc:
+        # The pass is returned and the command runs without one, said once: never stop the work, and never run it
+        # under a pass nothing keeps (rule 7).
+        release_fds(held)
+        drop_tokens(tokens)
+        log(log_fd, "running %s without a CPU pass: cannot set up what keeps it: %s" % (label, exc))
+        env[HELD_ENV] = "0"
+        env.pop(TOKENS_ENV, None)
+        return exec_direct(command, env, log_fd)
     env[HELD_ENV] = str(passes)
-    tokens = make_tokens()
     env[TOKENS_ENV] = tokens
     try:
-        return run_child(command, env, log_fd, keep=held, tokens=tokens)
+        return run_child(command, env, log_fd, guard=guard)
     finally:
         drop_tokens(tokens)
-        for fd in held:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
+        release_fds(held)
 
 
 def lease_tokens(command: List[str], env: dict, log_fd: int, tokens: str, held_count: int, passes: int, label: str, wait_file: str) -> int:
@@ -518,18 +583,23 @@ def lease_tokens(command: List[str], env: dict, log_fd: int, tokens: str, held_c
         write_wait(wait_file, queued_at)
         return exec_direct(command, env, log_fd)
     write_wait(wait_file, queued_at)
-    sub = make_tokens()
+    sub = ""
+    guard = None
+    try:
+        sub = make_tokens()
+        guard = start_guard(leased, sub)
+    except OSError as exc:
+        release_fds(leased)
+        drop_tokens(sub)
+        log(log_fd, "running %s without leasing from its reservation: cannot set up what keeps the lease: %s" % (label, exc))
+        return exec_direct(command, env, log_fd)
     env[HELD_ENV] = str(passes)
     env[TOKENS_ENV] = sub
     try:
-        return run_child(command, env, log_fd, keep=leased, tokens=sub)
+        return run_child(command, env, log_fd, guard=guard)
     finally:
         drop_tokens(sub)
-        for fd in leased:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
+        release_fds(leased)
 
 
 PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
@@ -854,6 +924,9 @@ def build_parser() -> argparse.ArgumentParser:
     status = sub.add_parser("status", help="report held and free passes")
     status.add_argument("--json", action="store_true", help="print one JSON object")
     sub.add_parser("size", help="print the pool size")
+    guard = sub.add_parser("guard", help=argparse.SUPPRESS)  # internal: the process that keeps a command's passes
+    guard.add_argument("--fd", type=int, required=True)
+    guard.add_argument("--tokens", default="")
     return parser
 
 
@@ -871,6 +944,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_status(args)
     if args.action == "size":
         return cmd_size(args)
+    if args.action == "guard":
+        return cmd_guard(args)
     parser.print_help(sys.stderr)
     return 125
 

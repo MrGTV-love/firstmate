@@ -78,6 +78,25 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                 raise AssertionError('unexpected database ' + str(database))
             return connect(pathlib.Path(os.environ['CASE_DB']).resolve().as_uri() + separator + query, *args, **kwargs)
         sqlite3.connect = isolated
+    if os.environ.get('CASE_GUARD_FAIL'):
+        import subprocess as _sp
+        _popen = _sp.Popen
+        class _Popen(_popen):
+            def __init__(self, args, *a, **k):
+                if isinstance(args, (list, tuple)) and 'guard' in args and any(str(x).endswith('fm-cpu-pass.py') for x in args):
+                    raise OSError(35, 'injected: the guard cannot be started')
+                super().__init__(args, *a, **k)
+        _sp.Popen = _Popen
+    if os.environ.get('CASE_BIND_HOLD'):
+        import time as _t
+        _write = os.write
+        def _hold(fd, data):
+            if data.endswith(b'\\n') and data[:-1].isdigit():
+                open(os.environ['CASE_BIND_HOLD'] + '.reached', 'w').close()
+                while not os.path.exists(os.environ['CASE_BIND_HOLD'] + '.release'):
+                    _t.sleep(0.05)
+            return _write(fd, data)
+        os.write = _hold
     sys.executable = __file__
     sys.argv = sys.argv[1:]
     runpy.run_path(sys.argv[0], run_name='__main__')
@@ -100,6 +119,8 @@ with open(os.path.join(alive, 'starts.log'), 'a') as log:
 end = time.process_time() + seconds
 while time.process_time() < end:
     pass
+with open(os.path.join(alive, 'ends.log'), 'a') as log:
+    log.write('%s %d %.6f\\n' % (group, os.getpid(), time.time()))
 os.unlink(final)
 ''')
 
@@ -252,6 +273,21 @@ def sampling_valid(case, seen, label):
     # point where the sampler is declared invalid (a worker lives at least 300 ms), reported as invalid sampling, not a product failure.
     case.check(seen['gap_p99_ms'] <= 50 and seen['gap_max_ms'] <= 250,
                '%s: the sampler skipped too long (p99 gap %d ms, max gap %d ms): it may have missed a short-lived worker' % (label, seen['gap_p99_ms'], seen['gap_max_ms']))
+
+
+def ends(world):
+    log = world.alive / 'ends.log'
+    rows = [line.split() for line in log.read_text().splitlines()] if log.exists() else []
+    return [(group, int(pid), float(stamp)) for group, pid, stamp in rows]
+
+
+# A case that sends kill signals or injects faults into a pass holder is CI-only: no host runs it (Main 1288, 1292).
+ON_CI = bool(os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS') or os.environ.get('FM_CONC_RUN_CI_ONLY'))
+
+
+def ci_only(factory):
+    factory.ci_only = True
+    return factory
 
 
 def starts(world):
@@ -777,6 +813,7 @@ def case_waiting():
     return case
 
 
+@ci_only
 def case_drain():
     """H5: a burst three or more times the pool drains by itself; a killed holder or waiter leaves nothing stuck."""
     case = Case('H5', 'burst of 3 x pool size + 2 one-pass requests drains; SIGKILLed holder and waiters free the queue')
@@ -1113,6 +1150,7 @@ def case_lease_slot_cycle():
     return case
 
 
+@ci_only
 def case_holder_killed():
     """F6: a pass stays held until its command ends, so killing only the holder frees nothing for a second worker."""
     case = Case('F6 holder kill', 'SIGKILL of only the gate / pass-holder process: a queued request does not start until the worker ends')
@@ -1138,10 +1176,11 @@ def case_holder_killed():
         seen = world.sample_stop()
         queued_start = [stamp for group, _, stamp in starts(world) if group == 'queued']
         first_start = [stamp for group, _, stamp in starts(world) if group == 'first']
+        first_end = [stamp for group, _, stamp in ends(world) if group == 'first']
         rows[label] = dict(queued_started_before_the_worker_ended=queued_early, sampled_max_workers_total=seen['peak_total'], queued_exit=codes)
         case.check(codes == [0], '%s: the queued request never ran: %s' % (label, world.text('queued')[-200:]))
         case.check(not queued_early and seen['peak_total'] <= 1, '%s: killing only the holder let %d workers run under one pass (queued started early: %s)' % (label, seen['peak_total'], queued_early))
-        case.check(queued_start and first_start and queued_start[0] >= first_start[0] + 4.5, '%s: the queued worker started before the first worker could have ended' % label)
+        case.check(queued_start and first_end and queued_start[0] >= first_end[0], '%s: the queued worker started (%s) before the first worker actually ended (%s)' % (label, queued_start[:1], first_end[:1]))
     case.measure(**rows)
     return case
 
@@ -1333,14 +1372,73 @@ def case_duration_sample():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_async_cycle, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+@ci_only
+def case_guard_unavailable():
+    """R6a/b: a guard that cannot be started, or token storage that cannot be created, degrades and says so once; the work still runs."""
+    case = Case('R6 guard and token faults', 'injected: the guard cannot start / the token directory cannot be created: the command runs without a pass, once-said, and the pass is free')
+    blocker = root / 'r6-not-a-directory'
+    blocker.write_text('x')
+    notice = 'without a CPU pass: cannot'
+    for label, extra in (('guard-fork', dict(CASE_GUARD_FAIL='1')), ('token-storage', dict(TMPDIR=str(blocker)))):
+        for route, make in (('gate', lambda w, m: [pyshim, tool('fm-duration.py'), 'gate', 'test.r6.' + label, '--', 'bash', '-c', 'printf "%s\\n" "${FM_CPU_PASS_HELD-unset}" > "$1"', '_', str(m)]),
+                            ('run', lambda w, m: ['bash', tool('fm-cpu-pass.sh'), 'run', '--', 'bash', '-c', 'printf "%s\\n" "${FM_CPU_PASS_HELD-unset}" > "$1"', '_', str(m)])):
+            world = World('r6-%s-%s' % (label, route), cores=1)
+            marker = world.folder / 'marker'
+            codes = wait_all([world.launch('probe', make(world, marker), extra=extra)], timeout=120)
+            text = world.text('probe')
+            held = marker.read_text().strip() if marker.exists() else None
+            status = subprocess.run(['bash', tool('fm-cpu-pass.sh'), 'status', '--json'], env=world.env, capture_output=True, text=True, timeout=30)
+            case.measure(**{'%s_%s_exit' % (label, route): codes, '%s_%s_marker' % (label, route): held})
+            case.check(codes == [0], '%s %s: the command did not run to the end: %s' % (label, route, text[-300:]))
+            case.check(held == '0', '%s %s: the command saw FM_CPU_PASS_HELD=%s, but it holds no pass' % (label, route, held))
+            case.check(text.count(notice) == 1, '%s %s: the degrade notice (%r) was said %d times: %s' % (label, route, notice, text.count(notice), text[-300:]))
+            case.check(json.loads(status.stdout or '{}').get('held') == 0, '%s %s: a pass is still held after the command ended: %s' % (label, route, status.stdout[-200:]))
+    return case
+
+
+@ci_only
+def case_holder_dies_at_guard_creation():
+    """R6a: the holder killed after the command started and before it named the command: the pass stays held until that worker ends."""
+    case = Case('R6 holder death at guard creation', 'SIGKILL of the holder between starting the command and naming it to the guard: a queued request starts only after the worker ended')
+    rows = {}
+    for label, make in (('gate', lambda w: [pyshim, tool('fm-duration.py'), 'gate', '--cpu-pass', 'bind-gate', 'test.bind', '--'] + w.work('first', 3)),
+                        ('fm-cpu-pass.sh run', lambda w: ['bash', tool('fm-cpu-pass.sh'), 'run', '--label', 'bind-run', '--'] + w.work('first', 3))):
+        world = World('bind-' + label.split()[0].replace('.', ''), cores=1)
+        hold = world.folder / 'bind'
+        first = world.launch('first', make(world), extra=dict(CASE_BIND_HOLD=str(hold), FM_TEST_KEY_SLOTS='1'))
+        for _ in range(2400):
+            if (world.folder / 'bind.reached').exists() and any(group == 'first' for group, _, _ in starts(world)):
+                break
+            time.sleep(0.05)
+        queued = world.launch('queued', ['bash', tool('fm-cpu-pass.sh'), 'run', '--label', 'queued', '--'] + world.work('queued', 0.3))
+        time.sleep(0.5)
+        try:
+            os.kill(first.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        codes = wait_all([queued], timeout=240)
+        first_end = [stamp for group, _, stamp in ends(world) if group == 'first']
+        queued_start = [stamp for group, _, stamp in starts(world) if group == 'queued']
+        rows[label] = dict(queued_exit=codes, first_end=first_end[:1], queued_start=queued_start[:1])
+        case.check(codes == [0], '%s: the queued request never ran: %s' % (label, world.text('queued')[-200:]))
+        case.check(first_end and queued_start and queued_start[0] >= first_end[0], '%s: the queued worker started (%s) before the worker whose holder was killed ended (%s)' % (label, queued_start[:1], first_end[:1]))
+    case.measure(**rows)
+    return case
+
+
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_guard_unavailable, case_holder_dies_at_guard_creation, case_async_cycle, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():
     failed = []
+    skipped = []
     selected = [name for name in sys.argv[4:]]
     for factory in CASES:
         if selected and factory.__name__ not in selected:
+            continue
+        if getattr(factory, 'ci_only', False) and not ON_CI:
+            print('CASE %s: SKIPPED - CI-only: it sends kill signals or injects faults, which no host runs (set CI, GITHUB_ACTIONS or FM_CONC_RUN_CI_ONLY to run it)' % factory.__name__)
+            skipped.append(factory.__name__)
             continue
         try:
             case = factory()
@@ -1354,7 +1452,7 @@ def main():
     for child in children:
         if child.poll() is None:
             kill_group(child)
-    print('SUMMARY: %d cases, %d failed%s' % (len(results), len(failed), (': ' + ', '.join(failed)) if failed else ''))
+    print('SUMMARY: %d cases, %d failed%s%s' % (len(results), len(failed), (': ' + ', '.join(failed)) if failed else '', ', %d CI-only skipped (%s)' % (len(skipped), ', '.join(skipped)) if skipped else ''))
     return 1 if failed else 0
 
 

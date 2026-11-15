@@ -15,8 +15,10 @@ This page owns the cross-repository protocol.
 
 The pool uses Python's standard-library `fcntl.flock` over one lock file per pass, not GNU parallel's `sem`.
 A kernel file lock is released when its last owning descriptor closes, including on `SIGKILL`.
-Only the pool owner and a guard process it forks retain slot descriptors; commands and their exec children never inherit them, so surviving worker descendants cannot hold a master's reservation after its command ends.
+Only the pool owner and a guard process it starts before the command retain slot descriptors; commands and their exec children never inherit them, so surviving worker descendants cannot hold a master's reservation after its command ends.
 Ordinary termination signals keep that owner until its command exits, and the guard keeps the passes until the command process itself is gone even if the owner is killed with `SIGKILL`, so killing only the owner never frees a pass for a second worker; descendants that outlive the command hold nothing.
+The guard exists before the command does, so no moment exists in which a command runs and nothing but its starter holds the passes: an owner killed after it started the command but before it named it leaves the guard waiting on a pipe the command inherited, which holds the passes at least as long as the command lives.
+A guard that cannot be started returns the passes and the command runs without one, said once (rule 7).
 The pool has no stale slot state to repair; `sem` keeps its own bookkeeping that must notice dead holders.
 A token directory (rule 6) is a private temporary directory that its holder, or the holder's guard, removes when the command ends; a holder killed together with its guard leaves only that empty directory in the temporary directory.
 `python3` is already a runtime dependency of Firstmate's runner and of the Python projects that will join the pool, so the pool adds no new install, while `sem` would add Perl-based GNU parallel and its citation prompt to every host and CI image.
@@ -44,6 +46,7 @@ Every participant on a host follows these rules, so one pool is shared by every 
    With a positive inherited count, nested work never runs more concurrent CPU-bound workers than that count; a caller needing parallel nested work reserves enough passes before starting the outer work.
    Firstmate's reference holder also exports `FM_CPU_PASS_TOKENS`, a private directory that is a mini pool of that many tokens: a participant that starts a CPU-bound worker under a positive count leases the worker's passes from those tokens and waits while sibling work holds them, so workers started by independent descendants, such as two runners started by one test script, together never exceed the count.
    The leased worker gets a token directory of exactly the leased count, so every level of nesting stays within what the outermost holder took.
+   A same-key nested request, whose slot belongs to an ancestor, leases its tokens like any other: the slot exemption never makes CPU work free.
    A holder that exports only the marker (an outside participant, or a hand-set marker) cannot be leased from and is trusted; a participant that runs several nested workers at once then gives each its share of the count, the count divided by the workers and rounded down, never the whole count.
    An explicit pass request above a positive inherited count is a usage error; the [`fm-test-run.sh` header](../bin/fm-test-run.sh) owns the runner's concurrency-reduction behavior.
    The marker must be a nonnegative decimal integer in both Python and no-Python execution; a malformed marker is a usage error, while `0` denotes degraded work with no reservation or concurrency limit.
@@ -72,9 +75,9 @@ Firstmate's own heavy entry points take passes outside their timing and bounds; 
 
 - `bin/fm-test-run.sh` takes one per executed script, and one for a whole `--check-coverage` scan.
 - `bin/fm-duration.py run test.<key>`, the route the generated worker instructions name for an individual suite, takes one together with its per-key slot, before its clock.
-- `bin/fm-lint.sh` takes one per cold ShellCheck root and one for the changed-root dependency scan.
+- `bin/fm-lint.sh` takes one per cold ShellCheck root, one for the changed-root dependency scan and one for the backend-purity audit.
 - `bin/fm-test-isolation-proof.sh` takes min(`--jobs`, candidates, pool size) for its whole run; its header owns how it counts and records concurrency.
-- `.github/workflows/ci.yml` routes the long single-worker stock-bash tests (fleet snapshot view, bearings snapshot) and the two guard-lint scans through `bin/fm-cpu-pass.sh run`, so they are named in the runner machine's holder list.
+- `.github/workflows/ci.yml` routes the long single-worker stock-bash tests (fleet snapshot view, bearings snapshot), the two guard-lint scans and the stock-Bash parse sweep through `bin/fm-cpu-pass.sh run`, so they are named in the runner machine's holder list.
 
 A command that takes a per-key slot through `fm-duration.py gate` or `run` takes its pass in the same acquisition and waits holding neither ([configuration.md](configuration.md#test-slots-per-key-fm_test_key_slots)); inside a pass whose holder exported tokens it leases tokens in the same acquisition instead, so a process that took its slot through `gate` or `run` never waits for a pass or a lease while it holds that slot.
 Waiting for a pass or a slot is by capacity alone: no elapsed time admits a waiter.

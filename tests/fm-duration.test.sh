@@ -1007,6 +1007,10 @@ queued.communicate(timeout=60)
 assert queued.returncode == 0 and 1900 <= int(waited_file.read_text()) < 60000, (queued.returncode, waited_file.read_text())
 subprocess.run([sys.executable, str(helper), 'gate', '--wait-file', str(unwaited_file), 'test.slot.wait', '--', 'true'], env=wait_env, cwd=workrepo, check=True, capture_output=True, timeout=60)
 assert unwaited_file.read_text() == '0\n', unwaited_file.read_text()
+# --pass-wait-file reports the milliseconds spent waiting for a pass or a token lease, apart from the slot wait.
+pass_wait_file = tmp / 'passwait.ms'
+subprocess.run([sys.executable, str(helper), 'gate', '--pass-wait-file', str(pass_wait_file), 'test.slot.passwait', '--', 'true'], env=wait_env, cwd=workrepo, check=True, capture_output=True, timeout=60)
+assert pass_wait_file.read_text().strip().isdigit(), pass_wait_file.read_text()
 unwritable = subprocess.run([sys.executable, str(helper), 'gate', '--wait-file', str(tmp / 'no-such-dir/waited.ms'), 'test.slot.wait', '--', 'echo', 'ran'], env=wait_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
 assert unwritable.returncode == 0 and unwritable.stdout == 'ran\n', unwritable
 

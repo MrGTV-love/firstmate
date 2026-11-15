@@ -38,10 +38,13 @@
 # pool (docs/cpu-pass-pool.md) for its whole run and runs that many workers; a proof
 # already inside a pass takes none and runs at most that many. The concurrency it
 # prints and records is the number of workers it ran, which is never more than the number of
-# candidates, so a one-candidate proof records one. Each worker inherits the proof's
-# own marker divided among the workers (1 when the proof holds one pass per worker), so a
-# candidate's nested runner does not fan out; a proof that holds no pass leaves its workers
-# FM_CPU_PASS_HELD=0 (degraded) or unset, and never invents a reservation.
+# candidates, so a one-candidate proof records one, for a --jobs value of any length. When
+# the reservation it runs inside exports its tokens (FM_CPU_PASS_TOKENS), each worker leases
+# its share of them (the marker divided among the workers), so the workers of sibling proofs
+# under one reservation never exceed the passes held and a candidate's nested runner does
+# not fan out; with only a marker (no tokens) each worker inherits that share as its marker.
+# A proof that holds no pass leaves its workers FM_CPU_PASS_HELD=0 (degraded) or unset, and
+# never invents a reservation.
 #
 # Isolation contract for each concurrent worker:
 #   - distinct mode-0700 temporary root under a proof-owned parent
@@ -358,7 +361,12 @@ done
 case "$JOBS" in
   ''|*[!0-9]*) die "--jobs must be a positive integer" ;;
 esac
-[ "$JOBS" -ge 1 ] || die "--jobs must be >= 1"
+# A decimal string of any length: leading zeros are dropped and every later comparison is a length-then-text
+# comparison (smaller_number), so a huge --jobs never reaches shell arithmetic.
+while [ "${JOBS#0}" != "$JOBS" ]; do
+  JOBS=${JOBS#0}
+done
+[ -n "$JOBS" ] || die "--jobs must be >= 1"
 
 if [ "$LIST_EXCLUSIONS" -eq 1 ]; then
   list_exclusions_for_report
@@ -419,12 +427,24 @@ done
 # already inside a pass takes none and runs at most that many workers; without the
 # pool tool or python3 it runs without a pass.
 REQUESTED_JOBS=$JOBS
+
+# The smaller of two non-negative decimal strings, whatever their length: no shell arithmetic, so no overflow.
+smaller_number() {  # <a> <b>
+  local a=$1 b=$2
+  while [ "${a#0}" != "$a" ]; do a=${a#0}; done
+  while [ "${b#0}" != "$b" ]; do b=${b#0}; done
+  if [ "${#a}" -lt "${#b}" ] || { [ "${#a}" -eq "${#b}" ] && [[ "x$a" < "x$b" ]]; }; then
+    printf '%s\n' "${a:-0}"
+  else
+    printf '%s\n' "${b:-0}"
+  fi
+}
+
 # The proof never claims more concurrency than it can run: with fewer candidates than --jobs it runs, takes passes for,
-# prints and records one worker per candidate.
-if [ "${#JOBS}" -le 6 ] && [ "$JOBS" -gt "${#CANDIDATES[@]}" ]; then
-  JOBS=${#CANDIDATES[@]}
-fi
+# prints and records one worker per candidate, for a --jobs value of any length.
+JOBS=$(smaller_number "$JOBS" "${#CANDIDATES[@]}")
 CANDIDATE_MARKER=
+LEASE_CANDIDATES=0
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
   case "$FM_CPU_PASS_HELD" in
     ''|*[!0-9]*)
@@ -438,13 +458,19 @@ if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
   if [ -z "$inherited_passes" ]; then
     CANDIDATE_MARKER=0
   else
-    if [ "${#inherited_passes}" -le "${#JOBS}" ] && [ "$inherited_passes" -lt "$JOBS" ]; then
+    if [ "$(smaller_number "$JOBS" "$inherited_passes")" != "$JOBS" ]; then
       log "reducing --jobs $JOBS to inherited FM_CPU_PASS_HELD=$inherited_passes"
       JOBS=$inherited_passes
     fi
     CANDIDATE_MARKER=$inherited_passes
     if [ "${#inherited_passes}" -le 6 ] && [ "${#JOBS}" -le 6 ]; then
       CANDIDATE_MARKER=$((inherited_passes / JOBS))
+    fi
+    # A holder that exported the tokens of its reservation is the one reservation of every worker under it:
+    # each candidate leases its share of those tokens, so the workers of sibling proofs never exceed the passes held.
+    if [ -n "${FM_CPU_PASS_TOKENS:-}" ] && [ -d "$FM_CPU_PASS_TOKENS" ] \
+      && [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] && command -v python3 >/dev/null 2>&1; then
+      LEASE_CANDIDATES=1
     fi
   fi
 elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] \
@@ -583,14 +609,21 @@ for script in "${CANDIDATES[@]}"; do
       FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
     # Each worker inherits the proof's own marker divided among the workers (0 stays 0 for degraded
     # work, and a proof that holds no pass and was given none leaves its candidates with none).
-    if [ -n "$CANDIDATE_MARKER" ]; then
+    if [ "$LEASE_CANDIDATES" -eq 1 ]; then
+      :  # the lease below hands the candidate its share and its own tokens
+    elif [ -n "$CANDIDATE_MARKER" ]; then
       export FM_CPU_PASS_HELD=$CANDIDATE_MARKER
     else
       unset FM_CPU_PASS_HELD
     fi
     cd "$ROOT" || exit 1
     begin_ms=$(now_ms)
-    bash "$script" >"$work/out/output" 2>&1
+    if [ "$LEASE_CANDIDATES" -eq 1 ]; then
+      "$ROOT/bin/fm-cpu-pass.sh" run --passes "$CANDIDATE_MARKER" --label "fm-test-isolation-proof $POOL candidate $idx" -- \
+        bash "$script" >"$work/out/output" 2>&1
+    else
+      bash "$script" >"$work/out/output" 2>&1
+    fi
     rc=$?
     end_ms=$(now_ms)
     duration=$((end_ms - begin_ms))
@@ -654,7 +687,7 @@ if [ -n "$JSON_PATH" ]; then
   if "$ROOT/bin/fm-test-run.sh" --list-concurrent-safe-families | grep -Fxq "$POOL"; then
     jobs_max=$("$ROOT/bin/fm-test-run.sh" --concurrent-safe-family-jobs-max "$POOL")
   fi
-  if [ "$AGG_RC" -eq 0 ] && [ "$JOBS" -gt 1 ] && [ "$JOBS" -eq "$REQUESTED_JOBS" ] \
+  if [ "$AGG_RC" -eq 0 ] && [ "$JOBS" -gt 1 ] && [ "$JOBS" = "$REQUESTED_JOBS" ] \
     && [ "$JOBS" -le "$jobs_max" ]; then
     jobs_enabled=1
   fi

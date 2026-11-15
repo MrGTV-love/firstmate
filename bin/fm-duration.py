@@ -5,7 +5,7 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END<TAB>TIMED_OUT lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run [--pipeline-priority CLASS] KEY -- COMMAND [ARGS...]
-       fm-duration.py gate [--log-fd N] [--wait-file PATH] [--cpu-file PATH] [--cpu-pass LABEL] KEY -- COMMAND [ARGS...]
+       fm-duration.py gate [--log-fd N] [--wait-file PATH] [--pass-wait-file PATH] [--cpu-file PATH] [--cpu-pass LABEL] [--passes N] KEY -- COMMAND [ARGS...]
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
@@ -181,21 +181,28 @@ docs/configuration.md "Test slots per key" owns the sizing rationale.
 Nesting and wait cycles. A command run under a slot exports FM_TEST_SLOT_HELD (the
 keys the processes above it hold, tab separated) and FM_TEST_SLOT_PIDS (their gate
 pids). The same key nested inside it takes no second slot: that is the only
-exemption, and it is the holder's own ancestry. Every other key counts all holders
+exemption, and it is the holder's own ancestry (it still takes its CPU tokens, below).
+Every other key counts all holders
 of that key at any nesting depth, so a gate test.K under another key waits for an
 unnested test.K holder as it does when nothing is nested. A nested waiter publishes
 a locked record naming its key and its chain of gate pids in FM_TEST_SLOT_DIR/waiters
 (the lock is its liveness; a dead waiter's record is removed by the next reader). A
-gate cannot end while its command tree waits, so every gate in a waiter's chain is
-stuck while it waits, and a waiter is stuck for good when every holder of its key is
-a stuck gate. A waiter that sees, on two polls in a row, that its own chain is
-among the holders it transitively waits for has closed a wait cycle; the earliest
-queued waiter that closes one runs beside the limit, says so and takes no slot, so
-two gates that each hold one key and nest the other both finish. Nothing else but a
-holder ending admits a waiter. Only gates that export FM_TEST_SLOT_PIDS can be seen:
-a chain broken by a process that scrubs the environment is waited out, as it would be
-without the detection. FM_CPU_PASS_HELD, which a caller can claim without holding any
-pass, never lets a command skip a slot.
+gate is stuck only when its command is blocked on that waiter alone: in the process
+table, every process between the gate and the waiter has exactly one child that is
+not a pass guard or a process-table reader (the next process toward the waiter) and
+is not running. A command that also sleeps, runs another job or has a second
+background job is doing something of its own, so a request that a background job of
+it registered is not a cycle and waits for a holder to end. A waiter is stuck for
+good when every holder of its key is such a gate. A waiter that sees, on two polls in
+a row, that its own chain is among the holders it transitively waits for has closed a
+proven wait cycle; the earliest queued waiter that closes one runs beside the limit,
+says so and takes no slot, so two gates that each hold one key and block on a request
+for the other both finish. That is the one admission that is not a holder ending, and
+it is at most one extra copy of a key per cycle. Only gates that export
+FM_TEST_SLOT_PIDS can be seen, and a shape the process table cannot prove blocked (a
+shell that waits with a builtin timer beside its background job, a runner with two
+workers) is waited out: the detection never admits on a guess. FM_CPU_PASS_HELD,
+which a caller can claim without holding any pass, never lets a command skip a slot.
 
 CPU pass for test.* keys. run, and gate (which takes the pass by default; --cpu-pass
 LABEL names the holder in the pool's holder list), take one pass of the host-wide CPU
@@ -211,15 +218,23 @@ took its slot through gate or run therefore holds a pass in the same moment, unl
 pool cannot be used, and never waits for a pass while it holds a slot. Inside a pass whose
 holder exported tokens, gate (--passes N, default 1) and run lease N of those tokens in the
 same acquisition with their slot, again waiting holding neither, unless an ancestor gate
-holds this very key; the command then gets the leased count as its own reservation. A
-command nested under a holder takes no pass of the pool. The pass stays held until COMMAND itself ends: a
-guard process forked after COMMAND starts keeps the pass descriptors open and exits when
-COMMAND's pid is gone, so killing only this process does not free the pass for a second
-worker (COMMAND's own descendants do not hold it; a reused pid keeps it a little longer,
-which is the safe direction). --wait-file counts only the time spent waiting for the
-slot. A pool that cannot be used (no bin/fm-cpu-pass.py beside this helper is silent; no
-flock, no pool directory or a foreign-owned one is reported once) runs COMMAND without a
-pass.
+holds this very key (that gate's slot is its own, but the CPU work still takes its
+tokens; run, which is the same worker as the gate above it, leases that gate's whole
+count); the command then gets the leased count as its own reservation. A request for more
+than a positive inherited count is a usage error (exit 125). A command nested under a
+holder takes no pass of the pool. The pass stays held until COMMAND itself ends: a guard
+process, started BEFORE COMMAND so no moment exists in which COMMAND runs and nothing but
+this process holds the pass, keeps the pass descriptors open and exits when COMMAND's pid
+is gone (COMMAND inherits the write end of the pipe the guard reads, so a holder killed
+before it named the command leaves the guard holding the pass until the command ends), so
+killing only this process does not free the pass for a second worker (COMMAND's own
+descendants do not hold it; a reused pid keeps it a little longer, which is the safe
+direction). --wait-file receives the milliseconds spent waiting for the slot and
+--pass-wait-file the milliseconds spent waiting for a pass or a token lease, so a caller can
+leave each out of its sample. A pool that cannot be used (no bin/fm-cpu-pass.py beside this
+helper is silent; no flock, no pool directory or a foreign-owned one, a token directory
+that cannot be created, or a guard that cannot be started is reported once) runs COMMAND
+without a pass, and COMMAND sees FM_CPU_PASS_HELD=0.
 
 A timeout is a real limit that stopped a command, reported by the owner of that
 limit (run's no-progress or absolute stop, fm_run_timed, the lint root bound, the
@@ -1074,18 +1089,50 @@ class Admission:
 
     def __init__(self, slot=None, passes=None, tokens=''):
         self.slot, self.passes, self.tokens = slot, passes or [], tokens
-        self.guard = 0
+        self.guard = None
         self.pool = None
+        self.pass_wait = 0.0  # seconds spent waiting in the pool or for a lease, which no sample counts
+        self.fallback = {}  # environment the command gets when its pass is given up: name -> value, None to unset
 
-    def guard_passes(self, pid):
-        """Keep the passes open until the command PID ends, even if this process is killed first."""
-        if self.passes and self.pool is not None:
-            self.guard = self.pool.start_guard(self.passes, pid, self.tokens)
+    def start_guard(self, log_fd, key):
+        """Start the pass guard BEFORE the command exists; returns the descriptors the command must inherit.
+
+        When the guard cannot be started the pass is returned and the command runs without one, said once
+        (docs/cpu-pass-pool.md rule 7): a command is never left running under a pass that nothing keeps.
+        """
+        if not (self.passes and self.pool is not None):
+            return ()
+        try:
+            self.guard = self.pool.start_guard(self.passes, self.tokens)
+        except OSError as error:
+            slot_log(log_fd, f'running {key} without a CPU pass: cannot start the guard that keeps it: {error}')
+            self.give_up_pass()
+            return ()
+        return self.guard.inherit() if self.guard is not None else ()
+
+    def bind_guard(self, pid):
+        """Tell the guard which process it keeps the passes for, once that process exists."""
+        if self.guard is not None:
+            self.guard.bind(pid)
+
+    def give_up_pass(self):
+        """Return the pass and its tokens and give the command the environment of work that holds none."""
+        for fd in self.passes:
+            os.close(fd)
+        self.passes = []
+        if self.pool is not None:
+            self.pool.drop_tokens(self.tokens)
+        self.tokens = ''
+        for name, value in self.fallback.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
     def release(self):
         if self.pool is not None:
             self.pool.stop_guard(self.guard)
-            self.guard = 0
+            self.guard = None
             self.pool.drop_tokens(self.tokens)
         for fd in self.passes:
             os.close(fd)
@@ -1094,32 +1141,38 @@ class Admission:
         self.slot = None
 
 
-def admit(key, log_fd=2, queued=None, pass_label=None, passes=1):
+def admit(key, log_fd=2, queued=None, pass_label=None, passes=1, share=False):
     """(slot fd, CPU pass fds, token directory) as an Admission for KEY; each is empty when this key takes none.
 
     With PASS_LABEL a test.* key also takes one pass of the host-wide pool, as one acquisition with the
     slot: the caller waits holding neither. FM_CPU_PASS_HELD is set for the command when a pass was
     taken (1) or the pool cannot be used (0). A command that already runs inside a pass whose holder
     exported tokens (FM_CPU_PASS_TOKENS) instead leases PASSES of those tokens in the same acquisition
-    with its slot, unless an ancestor gate holds this very key, and its command gets that many as its
-    own reservation. A list passed as QUEUED receives the seconds spent queued behind busy slots,
-    leaving out the time spent waiting in the pool or for tokens.
+    with its slot, and its command gets that many as its own reservation. That includes a key held by an
+    ancestor gate: the slot is the ancestor's, but the CPU work is not free, so it still takes its
+    tokens (with SHARE, the whole inherited count, for a wrapper that is the same worker as the gate above
+    it). A request for more than a positive inherited count is a usage error (ValueError). A list passed as
+    QUEUED receives the seconds spent queued behind busy slots, leaving out the time spent waiting in the
+    pool or for tokens (the Admission's pass_wait).
     """
     admission = Admission()
     if not key.startswith(SLOT_PREFIX):
         return admission
     limit = slot_limit()
     inherited = cpu_passes_held()
-    state = dict(degraded=False, module=None)
+    state = dict(degraded=False, module=None, pass_wait=0.0)
 
     tokens = os.environ.get(TOKENS_ENV, '')
     held_key = key in os.environ.get(SLOT_HELD_ENV, '').split('\t')
     tool = pass_label is not None and (ROOT / 'bin' / 'fm-cpu-pass.py').is_file()
+    if tool and inherited and passes > inherited:
+        raise ValueError(f'--passes {passes} must not exceed {CPU_HELD_ENV} ({inherited})')
     wanted = tool and inherited is None
-    leasing = tool and inherited is not None and 0 < passes <= inherited and bool(tokens) and os.path.isdir(tokens) and not held_key
+    count = inherited if (share and held_key and inherited) else passes
+    leasing = tool and inherited is not None and 0 < count <= inherited and bool(tokens) and os.path.isdir(tokens)
 
     def take():
-        return take_cpu_pass(key, pass_label, log_fd, state, (tokens, inherited, passes) if leasing else None)
+        return take_cpu_pass(key, pass_label, log_fd, state, (tokens, inherited, count) if leasing else None)
 
     if limit == 0 or held_key:
         pass
@@ -1132,15 +1185,23 @@ def admit(key, log_fd=2, queued=None, pass_label=None, passes=1):
             slot_log(log_fd, f'running {key} without a slot: {error}')
     if (wanted or leasing) and admission.slot is None and not admission.passes:
         admission.passes = take()
+    admission.pass_wait = state['pass_wait']
     if wanted or leasing:
         admission.pool = state['module']
         if wanted:
+            admission.fallback = {CPU_HELD_ENV: '0', TOKENS_ENV: None}
             os.environ[CPU_HELD_ENV] = '1' if admission.passes else '0'
         elif admission.passes:
-            os.environ[CPU_HELD_ENV] = str(passes)
+            admission.fallback = {CPU_HELD_ENV: str(inherited), TOKENS_ENV: tokens}
+            os.environ[CPU_HELD_ENV] = str(count)
         if admission.passes and admission.pool is not None:
-            admission.tokens = admission.pool.make_tokens()
-            os.environ[TOKENS_ENV] = admission.tokens
+            try:
+                admission.tokens = admission.pool.make_tokens()
+            except OSError as error:
+                slot_log(log_fd, f'running {key} without a CPU pass: cannot create the token directory of its reservation: {error}')
+                admission.give_up_pass()
+            else:
+                os.environ[TOKENS_ENV] = admission.tokens
     return admission
 
 
@@ -1246,12 +1307,79 @@ def key_holders(key, limit):
     return pids
 
 
+def process_rows():
+    """{pid: (ppid, state, command)} for every process, or None when the table cannot be read."""
+    try:
+        result, _ = proc_read(['ps', '-axo', 'pid=,ppid=,stat=,command='], ['table', 'pid,ppid,stat,command'],
+                              env=dict(os.environ, LC_ALL='C', COLUMNS='10000'))
+    except OSError:
+        return None
+    if result.returncode:
+        return None
+    rows = {}
+    for line in result.stdout.splitlines():
+        words = line.split(None, 3)
+        if len(words) >= 3 and words[0].isdigit() and words[1].isdigit():
+            rows[int(words[0])] = (int(words[1]), words[2], words[3] if len(words) > 3 else '')
+    return rows
+
+
+def is_helper(command):
+    """True for a process the pool or this helper runs beside a command: the pass guard and a process-table reader."""
+    words = command.split()
+    if any(word.endswith('fm-proc-info.py') for word in words) or (words and os.path.basename(words[0]) == 'ps'):
+        return True
+    return any(word.endswith('fm-cpu-pass.py') and words[index + 1:index + 2] == ['guard'] for index, word in enumerate(words))
+
+
+def blocks_on(upper, lower, rows):
+    """True when process UPPER can only be waiting for process LOWER: the foreground chain between them is closed.
+
+    LOWER must be a descendant of UPPER. Every process strictly between them must have exactly one child that is
+    not a helper (the next process toward LOWER) and must not be running; a shell that also sleeps, runs another
+    command or has a second background job is doing something of its own and is not blocked on LOWER. UPPER itself
+    is the gate (or run) that holds the slot, whose only work is waiting for its command.
+    """
+    below = [lower]
+    pid = lower
+    while len(below) <= 256:
+        entry = rows.get(pid)
+        if entry is None or entry[0] <= 1:
+            return False
+        pid = entry[0]
+        if pid == upper:
+            break
+        below.append(pid)
+    else:
+        return False
+    below.reverse()  # outermost first: the command of UPPER ... LOWER
+    children = collections.defaultdict(set)
+    for child, (parent, _, command) in rows.items():
+        if not is_helper(command):
+            children[parent].add(child)
+    for index, member in enumerate(below[:-1]):
+        if rows[member][1].startswith('R') or children[member] != {below[index + 1]}:
+            return False
+    return True
+
+
+def foreground_blocked(record, rows):
+    """True when every gate in a waiter's chain is waiting on that waiter alone, so none of them can end first."""
+    lower = record['pid']
+    for upper in reversed(record['chain']):
+        if not blocks_on(upper, lower, rows):
+            return False
+        lower = upper
+    return True
+
+
 def cycle_victim(waiters, me):
     """True when this waiter closes a wait cycle and is the one the cycle admits.
 
-    A gate cannot end while its command tree waits, so every gate in a waiter's chain is stuck while the waiter waits.
-    A waiter is stuck for good when every holder of its key is stuck. A waiter whose own chain is among the holders
-    it transitively waits for closes a cycle; of the waiters that close one, the earliest queued is the victim.
+    A gate whose command is blocked on a waiter (foreground_blocked: nothing else runs under it) cannot end while
+    that waiter waits. A waiter is stuck for good when every holder of its key is such a gate. A waiter whose own
+    chain is among the holders it transitively waits for closes a cycle; of the waiters that close one, the
+    earliest queued is the victim. Callers pass only the waiters whose chains are foreground blocked.
     """
     def closes(record):
         stuck = set(record['chain'])
@@ -1317,7 +1445,14 @@ def queue_for_slot(key, directory, limit, log_fd, queued=None, take=None):
             if chain:
                 if registered is None:
                     registered = register_waiter(key, limit, chain)
-                cycle_hits = cycle_hits + 1 if cycle_victim(live_waiters(), registered[2]) else 0
+                waiting = live_waiters()
+                closed = cycle_victim(waiting, registered[2])
+                if closed:
+                    # Only a chain that is blocked on its waiter is stuck: a holder whose command sleeps, or runs
+                    # another job, beside a background waiter ends by itself and admits nobody.
+                    rows = process_rows()
+                    closed = rows is not None and cycle_victim([record for record in waiting if foreground_blocked(record, rows)], registered[2])
+                cycle_hits = cycle_hits + 1 if closed else 0
                 if cycle_hits >= CYCLE_CONFIRMATIONS:
                     slot_log(log_fd, f'running {key} beside its limit: every holder of its slots waits on a slot held above this command (a wait cycle), and this is the waiter it admits')
                     return None, []
@@ -1347,6 +1482,7 @@ def take_cpu_pass(key, label, log_fd, state, lease=None):
     """
     if state['degraded']:
         return []
+    began = time.monotonic()
     try:
         if state['module'] is None:
             spec = importlib.util.spec_from_file_location('fm_cpu_pass', ROOT / 'bin' / 'fm-cpu-pass.py')
@@ -1369,9 +1505,11 @@ def take_cpu_pass(key, label, log_fd, state, lease=None):
         slot_log(log_fd, f'running {key} without {"leasing from its reservation" if lease is not None else "a CPU pass"}: {error}')
         state['degraded'] = True
         return []
+    finally:
+        state['pass_wait'] += time.monotonic() - began
 
 
-def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None, passes=1):
+def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None, passes=1, pass_wait_file=None):
     """Run COMMAND while holding one of KEY's slots (and one CPU pass with PASS_LABEL); exit with its status.
 
     With cpu_file, write the command tree's CPU milliseconds there after it
@@ -1405,6 +1543,11 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None, p
             Path(wait_file).write_text(f'{round(queued[0] * 1000) if queued else 0}\n')
         except OSError as error:
             slot_log(log_fd, f'cannot report the slot wait to {wait_file}: {error}')
+    if pass_wait_file:
+        try:
+            Path(pass_wait_file).write_text(f'{round(admission.pass_wait * 1000)}\n')
+        except OSError as error:
+            slot_log(log_fd, f'cannot report the pass wait to {pass_wait_file}: {error}')
     posix = os.name == 'posix'
     guarded = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP) if posix else ()
     ignored = {}
@@ -1415,7 +1558,8 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None, p
         # A group signal reaches COMMAND directly; this process keeps the slot until it exits.
         for sig in guarded:
             ignored[sig] = signal.signal(sig, signal.SIG_IGN)
-        options = dict(pass_fds=kept, preexec_fn=restore_defaults) if posix else {}
+        # The guard of the pass exists before the command does; the command inherits only the pipe it reads.
+        options = dict(pass_fds=kept + admission.start_guard(log_fd, key), preexec_fn=restore_defaults) if posix else {}
         try:
             child = subprocess.Popen(command, close_fds=True, **options)
         except FileNotFoundError:
@@ -1424,7 +1568,7 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None, pass_label=None, p
         except PermissionError:
             slot_log(log_fd, f'command not executable: {command[0]}')
             return 126
-        admission.guard_passes(child.pid)
+        admission.bind_guard(child.pid)
         code = child.wait()
         if cpu_file:
             try:
@@ -1454,15 +1598,16 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
     # Operational reads have no wall-clock cutoff: this mode owns only a
     # no-output/no-CPU bound, to recover a genuinely stalled command.
     absolute = positive_override('FM_DURATION_ABSOLUTE_SECS', ABSOLUTE_LIMIT) if inactivity is None else math.inf
+    pass_fds = admission.start_guard(2, key) if admission is not None else ()
     started = time.monotonic()
     load_start = load_now()
     child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key)
     owner = os.getppid()
     if calibration_file is not None:
         child_env['FM_DURATION_CALIBRATION_FILE'] = str(calibration_file)
-    child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=pass_fds)
     if admission is not None:
-        admission.guard_passes(child.pid)
+        admission.bind_guard(child.pid)
     streams = selectors.DefaultSelector()
     streams.register(child.stdout, selectors.EVENT_READ, sys.stdout.buffer)
     streams.register(child.stderr, selectors.EVENT_READ, sys.stderr.buffer)
@@ -1756,7 +1901,7 @@ def main():
     observer.add_argument('paths', nargs='*')
     observer.add_argument('--while-alive', action='store_true')
     gater = commands.add_parser('gate')
-    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('--cpu-file'); gater.add_argument('--cpu-pass', metavar='LABEL'); gater.add_argument('--passes', type=int, default=1); gater.add_argument('command', nargs=argparse.REMAINDER)
+    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('--pass-wait-file'); gater.add_argument('--cpu-file'); gater.add_argument('--cpu-pass', metavar='LABEL'); gater.add_argument('--passes', type=int, default=1); gater.add_argument('command', nargs=argparse.REMAINDER)
     nm = commands.add_parser('import-nm')
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
@@ -1811,7 +1956,7 @@ def main():
                 'pipeline-start', '--priority', args.pipeline_priority, '--',
                 sys.executable, str(Path(__file__).resolve()), 'run', '--pipeline-admitted'] + sys.argv[2:])
         try:
-            admission = admit(args.key, 2, None, f'fm-duration run {args.key}')
+            admission = admit(args.key, 2, None, f'fm-duration run {args.key}', share=True)
         except ValueError as error:
             scalar('error', str(error))
             return 125
@@ -1826,7 +1971,7 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('gate requires -- COMMAND')
-        return gate(args.key, command, args.log_fd, args.wait_file, args.cpu_file, args.cpu_pass or f'fm-duration gate {args.key}', args.passes)
+        return gate(args.key, command, args.log_fd, args.wait_file, args.cpu_file, args.cpu_pass or f'fm-duration gate {args.key}', args.passes, args.pass_wait_file)
     return 0
 
 

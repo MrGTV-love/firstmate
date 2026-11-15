@@ -163,13 +163,14 @@
 # the slots on the CPU-pass log descriptor and waits until a holder ends, never admitted
 # by elapsed time; a nested run of a key already held by its own ancestry
 # (FM_TEST_SLOT_HELD) takes none, every other key counts all of its holders at any depth,
-# FM_CPU_PASS_HELD never skips a slot, and only a detected wait cycle admits a waiter
+# FM_CPU_PASS_HELD never skips a slot, and only a proven closed wait cycle admits a waiter
 # early (bin/fm-duration.py's header owns the rule). The time a script queued for its
 # slot is left out of its recorded duration and its FM_TEST_END duration_ms; the time it
-# queued for a pass or a token lease is part of them (as it was before the gate took the
-# pass), and both are left out of its test.<script> sample, which records no start load
-# (the load was read before the queue); the run's own wall time (--max-wall-ms,
-# FM_TEST_SUMMARY) counts both. bin/fm-duration.py's header owns the protocol.
+# queued for a pass or a token lease stays in its FM_TEST_END duration_ms (as it did before
+# the gate took the pass) but is left out of its test.<script> sample, which measures the
+# script's own execution and records no start load (the load was read before the queue);
+# the run's own wall time (--max-wall-ms, FM_TEST_SUMMARY) counts both.
+# bin/fm-duration.py's header owns the protocol.
 # FM_TEST_KEY_SLOTS=0, no python3 or helper beside this script, or a native
 # Windows bash (uname MINGW, MSYS or CYGWIN) runs scripts without a slot.
 #
@@ -3125,7 +3126,7 @@ family_bump() {
 
 record_script_result() {
   local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
-  local base family expected gate_skip gate_reason fail_delta token timed_out=0 cpu_ms=
+  local base family expected gate_skip gate_reason fail_delta token sample timed_out=0 cpu_ms=
   # CPU comes from the slot gate's single process-tree sample, so it is present
   # when that wrapper ran and empty otherwise. See docs "Timing artifacts":
   # this is measurement evidence, not a verdict on why a suite took as long as
@@ -3176,10 +3177,16 @@ record_script_result() {
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
     fi
-    if [ "$(slot_wait_ms "$out")" -gt 0 ]; then
+    # The sample measures the script's own execution: the time it waited for a pass or a lease is left out
+    # of it as the slot wait already is (the FM_TEST_END duration above keeps the pass wait).
+    sample=$((duration - $(pass_wait_ms "$out")))
+    if [ "$sample" -lt 0 ]; then
+      sample=0
+    fi
+    if [ "$(slot_wait_ms "$out")" -gt 0 ] || [ "$(pass_wait_ms "$out")" -gt 0 ]; then
       load_start=
     fi
-    fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start" "$timed_out"
+    fm_duration_record "test.$script" "$sample" "$rc" '' 1 "$load_start" "$timed_out"
   fi
   family_bump "$family" "$duration" "$fail_delta"
   TOTAL=$((TOTAL + 1))
@@ -3204,6 +3211,19 @@ slot_wait_ms() {  # <out>
   local waited=0
   if [ -r "$1.slotwait" ]; then
     read -r waited <"$1.slotwait" || true
+  fi
+  case "$waited" in
+    ''|*[!0-9]*) waited=0 ;;
+  esac
+  printf '%s\n' "$waited"
+}
+
+# Milliseconds the script that wrote <out> waited for a CPU pass or a token lease, 0 when it did not (the
+# gate's --pass-wait-file).
+pass_wait_ms() {  # <out>
+  local waited=0
+  if [ -r "$1.passwait" ]; then
+    read -r waited <"$1.passwait" || true
   fi
   case "$waited" in
     ''|*[!0-9]*) waited=0 ;;
@@ -3309,7 +3329,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       lease=
     fi
     cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
-      --wait-file "$out.slotwait" --cpu-file "$out.cpu" ${pass_option[@]+"${pass_option[@]}"} \
+      --wait-file "$out.slotwait" --pass-wait-file "$out.passwait" --cpu-file "$out.cpu" ${pass_option[@]+"${pass_option[@]}"} \
       "test.$script" -- "${cmd[@]}")
   elif [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
