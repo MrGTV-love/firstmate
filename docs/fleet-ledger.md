@@ -57,7 +57,7 @@ An absent value is `null`.
 A captain-hold item that `fm-captain-hold.sh hold` creates is recorded with `kind` `captain` and no `priority`.
 An `add` of an id that already exists changes nothing, so `tasks-axi` reports it as already present and no record is written.
 
-`task.closed` members: `evidence` is what the close used, one of `merged_pr` (the recorded PR), `local_main` (a local-only landing), `report` (a scout's report), `drop_file` (the captain's recorded drop), or `none`.
+`task.closed` members: `evidence` is what the close used, one of `merged_pr` (the recorded PR, or the merged train PR that landed a closed member PR), `local_main` (a local-only landing), `report` (a scout's report), `drop_file` (the captain's recorded drop), or `none`.
 `pr` is the merged PR URL when `evidence` is `merged_pr`, and `null` otherwise.
 The record is written once, after the backlog item is Done: a close is written once for each task, evidence, and `pr` since the task's latest `task.dispatched`, however many of these paths reach it, so a task that is reopened and dispatched again records its next close.
 A refused teardown, a captain-held item that returns to Queued, and a `fm-tasks-axi.sh done` of an item that was already Done write none.
