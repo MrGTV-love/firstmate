@@ -4387,7 +4387,8 @@ test_an_inherited_census_switch_never_turns_a_lint_into_a_success() {
 # and runs the rest of its arguments as its child with FM_LINT_INTERNAL_RUN_ENTRY
 # set. The run entry names the given python and the bound mechanism and limits in
 # FM_TEST_RUN_BOUNDED, FM_TEST_RUN_MEMORY_KIB, FM_TEST_RUN_RSS_KIB and
-# FM_TEST_RUN_VERSION (none, 12582912, 262144 and 0.11.0 by default).
+# FM_TEST_RUN_VERSION (none, 12582912, 262144 and 0.11.0 by default); its delegate
+# is "unresolved", so its workers keep no analysis cache.
 fm_lint_write_owner_stand_in() {
   local dir=$1 repo=$2 python=$3 perl_bin
   perl_bin=$(command -v perl)
@@ -4397,7 +4398,7 @@ fm_lint_write_owner_stand_in() {
 ledger=\$(sed -n 's/^HOST_POOL_ROOT=//p' '$repo/bin/fm-lint.sh')/admission.lock.ledger
 mkdir -p "\$ledger"
 entry="\$ledger/run.\$\$.1"
-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' "\${FM_TEST_RUN_BOUNDED:-none}" "\${FM_TEST_RUN_MEMORY_KIB:-12582912}" "\${FM_TEST_RUN_RSS_KIB:-262144}" "\${FM_TEST_RUN_VERSION:-0.11.0}" > "\$entry"
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "\$\$" '$perl_bin' '$python' "\${FM_TEST_RUN_BOUNDED:-none}" "\${FM_TEST_RUN_MEMORY_KIB:-12582912}" "\${FM_TEST_RUN_RSS_KIB:-262144}" "\${FM_TEST_RUN_VERSION:-0.11.0}" unresolved > "\$entry"
 exec 9>>"\$entry"
 '$perl_bin' -MFcntl=:flock -e 'open(my \$fh, ">>&=", 9) or exit 1; flock(\$fh, LOCK_EX | LOCK_NB) or exit 1' || exit 9
 rc=0
