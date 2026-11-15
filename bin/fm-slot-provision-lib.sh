@@ -905,7 +905,7 @@ fm_slot_pool_rows_valid() {
 # There is no age exemption. A live lease, a contention row
 # (or one that cannot be read) and a git worktree lock count too. A holder list that cannot be read skips.
 fm_slot_holders_or_skip() { # <slot> [<project>]
-  local slot=$1 project=${2:-} real common governed=0 out locked path line name tree
+  local slot=$1 project=${2:-} real common governed=0 out locked path line name tree exe
   real=$(CDPATH='' cd -- "$slot" 2>/dev/null && pwd -P) || { fm_slot_skip "$slot" unknown_holders "the slot directory cannot be entered"; return; }
   common=$(git -C "$slot" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     { fm_slot_skip "$slot" unknown_holders "the git common directory cannot be read"; return; }
@@ -923,10 +923,11 @@ fm_slot_holders_or_skip() { # <slot> [<project>]
         IFS=$'\x1f' read -r -a tree <<<"${line#T$'\t'}"
         declare -F fm_agent_process_classify_name fm_agent_process_classify >/dev/null ||
           { fm_slot_skip "$slot" unknown_holders "the agent classifier is not loaded, so the recorded endpoint's tree cannot be judged"; return; }
-        for ((name = 1; name + 3 < ${#tree[@]}; name += 4)); do
-          if [ "$(fm_agent_process_classify_name "${tree[name + 1]}" "${tree[name + 2]:-}")" = agent ] ||
-            [ "$(fm_agent_process_classify "${tree[name + 1]##*/}" "${tree[name + 2]:-}" "${tree[name + 3]:-}" "${tree[name]}")" = agent ]; then
-            fm_slot_skip "$slot" live_holder "an agent (pid ${tree[name]}, ${tree[name + 1]}, args ${tree[name + 3]:-none}) in the recorded endpoint's tree has the slot (holder pid ${tree[0]})"
+        for ((name = 1; name < ${#tree[@]}; name += 4)); do
+          exe=${tree[name + 1]:-}
+          if [ "$(fm_agent_process_classify_name "$exe" "${tree[name + 2]:-}")" = agent ] ||
+            [ "$(fm_agent_process_classify "${exe##*/}" "${tree[name + 2]:-}" "${tree[name + 3]:-}" "${tree[name]}")" = agent ]; then
+            fm_slot_skip "$slot" live_holder "an agent (pid ${tree[name]}, ${tree[name + 1]:-no path}, args ${tree[name + 3]:-none}) in the recorded endpoint's tree has the slot (holder pid ${tree[0]})"
             return
           fi
         done

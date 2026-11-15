@@ -1763,6 +1763,26 @@ test_a_node_running_a_gemini_script_in_the_recorded_tree_holds_the_slot() {
   cleanup_held
 }
 
+# R12-1: a read of the tree row drops trailing empty fields, so a last member with an empty argv arrives without its argv0
+# and args. That member is still judged by its executable path. The probe is stood in for at its own interface: it prints
+# exactly that row for the holder mode.
+test_a_tree_member_with_an_empty_argv_is_still_judged_by_its_path() {
+  make_world r121-empty
+  advance_origin advanced.txt
+  local out rc=0
+  out=$(
+    # shellcheck disable=SC2329 # Called by fm_slot_holders_or_skip.
+    fm_slot_probe() {
+      if [ "$1" = holders ]; then printf 'T\t4242\0374242\037/opt/claude/versions/2.1.220\037\037\n'; return 0; fi
+      python3 -I -c "$FM_SLOT_PROBE_PY" "$@"
+    }
+    fm_slot_holders_or_skip "$W_SLOT" "$W_PROJ" 2>&1
+  ) || rc=$?
+  [ "$rc" = 20 ] || fail "a tree member with an empty argv and an agent path was not refused (rc $rc): $out"
+  assert_contains "$out" "(live_holder)" "the refusal did not name the agent in the tree"
+  pass "a tree member with an empty argv is still judged by its executable path"
+}
+
 test_an_unreadable_recorded_window_excuses_nobody() {
   make_world r91-unreadable
   advance_origin advanced.txt
@@ -1895,6 +1915,7 @@ CASES=(
   test_a_version_named_agent_in_the_recorded_tree_holds_the_slot
   test_a_node_named_agent_in_the_recorded_tree_holds_the_slot
   test_a_node_running_a_gemini_script_in_the_recorded_tree_holds_the_slot
+  test_a_tree_member_with_an_empty_argv_is_still_judged_by_its_path
   test_an_unreadable_recorded_window_excuses_nobody
   test_a_recorded_endpoint_whose_start_time_does_not_match_refuses
 )
