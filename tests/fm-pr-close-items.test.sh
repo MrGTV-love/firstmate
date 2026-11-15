@@ -995,17 +995,17 @@ SH
   chmod +x "$bin_dir/tasks-axi"
   PATH="$bin_dir:$PATH" wrapper public-followup waive pf-unread --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e2" \
     || fail "c4-pf: a failed read back changed the waive's exit status"
-  # Main 045 F4: tasks-axi reported the waive done, so the edge is cleared though the read failed.
-  [ "$(cx_deps "$case_dir" dep-of-pf-unread)" = none ] || fail "c4-pf: a waive reported done left its edge after a failed read ($(cx_deps "$case_dir" dep-of-pf-unread))"
-  assert_match '^note: the state of pf-unread could not be read after its waive .*simulated read failure.*tasks-axi exits 0 from that completion only when the row is Done' "$case_dir/e2" "c4-pf: the failed read was not noted"
+  # Main 1875: the row could not be read, so every edge is kept and the item is reported.
+  case "$(cx_deps "$case_dir" dep-of-pf-unread)" in *pf-unread*) ;; *) fail "c4-pf: an unreadable row lost its edge ($(cx_deps "$case_dir" dep-of-pf-unread))" ;; esac
+  assert_match '^actionable: pf-unread: closed, edges kept: row unreadable; .*simulated read failure' "$case_dir/e2" "c4-pf: the kept edges were not reported"
   # A completion whose output does not say its state, with a failed read: the edge stays and the
   # manual clear is reported.
   PATH="$bin_dir:$PATH" wrapper public-followup waive pf-silent --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e3" \
     || fail "c4-pf: the silent waive changed its exit status"
-  # Main 1795: exit 0 of the waive proves the row is Done, so the edge clears in the same run.
-  [ "$(cx_deps "$case_dir" dep-of-pf-silent)" = none ] || fail "c4-pf: a waive whose output named no state left its edge after a failed read"
-  assert_match '^note: the state of pf-silent could not be read after its waive .*simulated read failure.*tasks-axi exits 0 from that completion only when the row is Done' "$case_dir/e3" "c4-pf: the same-run clear was not reported"
-  pass "a typed completion clears the edge when the row is archived at once, when tasks-axi reported it done though the read back failed, and when its output named no state, because exit 0 of the completion proves Done"
+  # Main 1875: the same, whatever the completion printed.
+  case "$(cx_deps "$case_dir" dep-of-pf-silent)" in *pf-silent*) ;; *) fail "c4-pf: an unreadable row lost its edge after a silent waive" ;; esac
+  assert_match '^actionable: pf-silent: closed, edges kept: row unreadable; .*simulated read failure' "$case_dir/e3" "c4-pf: the kept edges of the silent waive were not reported"
+  pass "a typed completion clears the edge when the row is archived at once; when the row cannot be read back, every edge is kept and the item is reported as closed, edges kept: row unreadable (Main 1875)"
 }
 
 test_a_typed_completion_help_call_reports_nothing_to_act_on() {
@@ -1861,17 +1861,23 @@ test_r3_a_member_body_is_read_only_inside_its_own_block() {
   pass "a member body is read only inside its own block; a member body with two blocks closes none of its own items and is refused by name, while the train's block and the member's pr= task close"
 }
 
+# Main 1875 (Main 1741 stands): a carriage return is a control byte, so a block with CRLF line
+# ends refuses the whole body by name; the same block with LF line ends closes each item.
 test_r3_one_block_with_blank_lines_and_crlf_closes_each_line() {
   local case_dir
   case_dir=$(gh_case r3-crlf 127)
   cx_add "$case_dir" crlf-a
   cx_add "$case_dir" crlf-b
-  printf '%s\r\n' '' "$CLOSES_BEGIN" 'Closes-backlog-item: crlf-a' '' 'Closes-backlog-item: crlf-b' "$CLOSES_END" '' 'Intro after the block.' > "$case_dir/bodies/127"
+  printf '%s\r\n' "$CLOSES_BEGIN" 'Closes-backlog-item: crlf-a' '' 'Closes-backlog-item: crlf-b' "$CLOSES_END" '' 'Intro after the block.' > "$case_dir/bodies/127"
   gh_merge "$case_dir" 127
-  [ "$(cx_state "$case_dir" crlf-a)" = "done" ] || fail "r3-crlf: crlf-a did not close"
-  [ "$(cx_state "$case_dir" crlf-b)" = "done" ] || fail "r3-crlf: crlf-b did not close"
-  assert_no_grep 'refused' "$case_dir/stderr" "r3-crlf: a compliant block was refused"
-  pass "one block with a blank line inside and CRLF line ends closes each named item"
+  [ "$(cx_state "$case_dir" crlf-a)" = queued ] || fail "r3-crlf: a CRLF block closed crlf-a"
+  [ "$(cx_state "$case_dir" crlf-b)" = queued ] || fail "r3-crlf: a CRLF block closed crlf-b"
+  assert_grep "refused to close anything named by the body of $REPO_URL/127" "$case_dir/stderr" "r3-crlf: the CRLF block was not refused by name"
+  printf '%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: crlf-a' '' 'Closes-backlog-item: crlf-b' "$CLOSES_END" '' 'Intro after the block.' > "$case_dir/bodies/127"
+  gh_merge "$case_dir" 127
+  [ "$(cx_state "$case_dir" crlf-a)" = "done" ] || fail "r3-crlf: crlf-a did not close with LF line ends"
+  [ "$(cx_state "$case_dir" crlf-b)" = "done" ] || fail "r3-crlf: crlf-b did not close with LF line ends"
+  pass "a block with CRLF line ends is refused by name; the same block with LF line ends and a blank line inside closes each named item"
 }
 
 # Main 044 (A8, F1): the one real block sits at the top level of the body. A whole, valid block
@@ -2254,15 +2260,21 @@ test_r5_the_parse_result() {
   printf '%s\n' 'No marker here.' 'Closes-backlog-item: loose' > "$body"
   out=$(bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/o/r/pull/1' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$body")
   [ "$(printf '%s\n' "$out" | sed -n '1p')" = "$(printf 'status\tnone')" ] || fail "r5-parse: a body with no marker is not status none"
+  # Main 1875 (Main 1741 stands): a carriage return is a control byte, so a CRLF block refuses;
+  # a leading empty line before an LF block is fine.
   printf '\r\n%s\r\n%s\r\n%s\r\n' "$CLOSES_BEGIN" 'Closes-backlog-item: crlf-a' "$CLOSES_END" > "$body"
   out=$(bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/o/r/pull/1' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$body")
-  [ "$(printf '%s\n' "$out" | awk -F '\t' '$1 == "id" {print $2}')" = crlf-a ] || fail "r5-parse: a CRLF block after an empty line gave no id"
-  pass "the parse gives status, ids, members, outside, malformed and legacy lines, words and links in one result; no marker is status none; CRLF and a leading empty line are fine"
+  [ "${out%%$'\n'*}" = "$(printf 'status\trefused')" ] || fail "r5-parse: a CRLF block was not refused"
+  printf '\n%s\n%s\n%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: lf-a' "$CLOSES_END" > "$body"
+  out=$(bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/o/r/pull/1' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$body")
+  [ "$(awk -F '\t' '$1 == "id" {print $2}' <<< "$out")" = lf-a ] || fail "r5-parse: an LF block after an empty line gave no id"
+  [ "${out##*$'\n'}" = "$(printf 'end\tcomplete')" ] || fail "r5-parse: the result does not end with its end record"
+  pass "the parse gives status, ids, members, outside, malformed and legacy lines, words and links in one result, ending with its end record; no marker is status none; a CRLF block refuses and a leading empty line is fine"
 }
 
-# Main 045 F4: a typed completion that tasks-axi reports done clears the finished edge even when
-# the row cannot be read back afterwards; the other blocker and the hold stay. Control: a plain
-# waive with a readable row.
+# Main 1875 (replacing Main 045 F4 and Main 1795 here): when the row cannot be read back after a
+# typed completion, every edge and hold of that id is kept and the item is reported. Control: a
+# plain waive with a readable row clears its finished edge and keeps the rest.
 test_r5_f4_a_waive_whose_state_read_fails_still_clears_the_edge() {
   local case_dir rc=0 deps read_fail
   case_dir=$(make_case r5-f4-waive)
@@ -2298,13 +2310,14 @@ SH
   expect_code 0 "$rc" "r5-f4: the waive itself must succeed"
   [ "$(cx_state "$case_dir" pf-read-fails)" = "done" ] || fail "r5-f4: the waive did not finish the obligation"
   deps=$(cx_deps "$case_dir" waits-pf-read-fails | sed 's/blocked-by://g; s/[ "]//g')
-  [ "$deps" = other-pf-read-fails ] || fail "r5-f4: after a failed read the stored list is not the other blocker alone ($deps)"
+  case "$deps" in pf-read-fails,other-pf-read-fails|other-pf-read-fails,pf-read-fails) ;; *) fail "r5-f4: after a failed read an edge changed ($deps)" ;; esac
   cx "$case_dir" show waits-pf-read-fails | grep -q 'hold_kind: future' || fail "r5-f4: the hold was lost"
+  assert_match '^actionable: pf-read-fails: closed, edges kept: row unreadable' "$case_dir/err" "r5-f4: the kept edges were not reported"
   # Control: the readable waive clears its edge the same way.
   wrapper public-followup waive pf-control --reason r --approved-by captain > "$case_dir/out2" 2> "$case_dir/err2" || fail "r5-f4: the control waive failed"
   deps=$(cx_deps "$case_dir" waits-pf-control | sed 's/blocked-by://g; s/[ "]//g')
   [ "$deps" = other-pf-control ] || fail "r5-f4: the control's stored list is not the other blocker alone ($deps)"
-  pass "a waive that tasks-axi reports done clears the finished edge even when the row cannot be read back; the other blocker and the hold stay; the readable control clears too"
+  pass "a waive whose row cannot be read back keeps every edge and the hold and is reported; the readable control clears its finished edge"
 }
 
 
@@ -2484,10 +2497,10 @@ SH
   pass "a waive whose capture file cannot be made does not run, changes nothing and says so; with the file it runs and clears the finished edge"
 }
 
-# Main 1795: tasks-axi exits 0 from a waive only when the row is Done, so when the completion's
-# output is lost and the row cannot be read back, the wrapper still clears the finished edge in
-# the same run, keeping the other blocker and the hold; TOON and JSON. Controls: a readable waive
-# clears; a waive tasks-axi refuses (genuinely not done) keeps every edge.
+# Main 1875 (replacing Main 1795 here): when the completion's output is lost and the row cannot
+# be read back, every edge and hold of that id is kept and the item is reported, TOON and JSON.
+# Controls: a readable waive clears its finished edge; a waive tasks-axi refuses keeps every
+# edge.
 test_r6_f5_a_completion_whose_output_is_lost_still_clears_in_the_same_run() {
   local case_dir rc=0 real
   case_dir=$(make_case r6-f5-lost)
@@ -2521,9 +2534,10 @@ SH
     expect_code 0 "$rc" "r6-lost: the $pf waive must succeed"
     [ ! -s "$case_dir/$pf.out" ] || fail "r6-lost: the fixture did not lose the $pf output"
     [ "$(cx_state "$case_dir" "$pf")" = "done" ] || fail "r6-lost: the $pf waive did not finish its row"
-    assert_only_other_and_hold "$case_dir" "waits-$pf" "$pf" "r6-lost: $pf in the same run"
-    assert_match "^note: the state of $pf could not be read after its waive .*tasks-axi exits 0 from that completion only when the row is Done, and the active backlog holds no unfinished item with that id, so its blocked-by edges are cleared now" "$case_dir/$pf.err" "r6-lost: the same-run clear of $pf was not reported"
-    assert_grep "unblocked: waits-$pf no longer waits on $pf; it still waits on waits-$pf-other" "$case_dir/$pf.err" "r6-lost: the cleared edge of $pf was not reported"
+    case "$(cx_deps "$case_dir" "waits-$pf" | sed 's/blocked-by://g; s/[ "]//g')" in "$pf,waits-$pf-other"|"waits-$pf-other,$pf") ;; *) fail "r6-lost: an edge of waits-$pf changed ($(cx_deps "$case_dir" "waits-$pf"))" ;; esac
+    cx "$case_dir" show "waits-$pf" | grep -q 'hold_kind: future' || fail "r6-lost: the hold on waits-$pf was lost"
+    assert_match "^actionable: $pf: closed, edges kept: row unreadable" "$case_dir/$pf.err" "r6-lost: the kept edges of $pf were not reported"
+    assert_no_grep "unblocked: waits-$pf" "$case_dir/$pf.err" "r6-lost: an edge of $pf was reported cleared"
   done
   # Control: a waive tasks-axi refuses is genuinely not done; every edge stays.
   rc=0
@@ -2534,14 +2548,13 @@ SH
   # Control: a readable waive clears in the same run.
   wrapper public-followup waive pf-readable --reason r --approved-by captain > "$case_dir/readable.out" 2> "$case_dir/readable.err" || fail "r6-lost: the readable waive failed"
   assert_only_other_and_hold "$case_dir" waits-pf-readable pf-readable "r6-lost: the readable waive"
-  pass "a waive whose output is lost and whose row cannot be read back still clears its finished edge in the same run, TOON and JSON, keeping the other blocker and hold; a refused waive keeps every edge; a readable waive clears"
+  pass "a waive whose output is lost and whose row cannot be read back keeps every edge and hold and is reported, TOON and JSON; a refused waive keeps every edge; a readable waive clears"
 }
 
-# Main 1853: exit 0 of a typed completion proves only that the row it completed is Done. When
-# the row cannot be read back, the wrapper reads the active backlog again; an item with that id
-# that is not done keeps every edge and the hold, and the wrapper says so. The fake completion
-# exits 0 and changes nothing, so the obligation still reads open. The lost-output cases above
-# are the controls for the finished case.
+# Main 1875 (replacing Main 1853 F3): exit 0 of a typed completion proves only that the row it
+# completed is Done, so when the row cannot be read back every edge and hold of that id is kept
+# and the item is reported. The fake completion exits 0 and changes nothing, so the obligation
+# still reads open, as an item recreated under the id would.
 test_r7_f3_an_unfinished_item_under_the_id_keeps_every_edge() {
   local case_dir rc=0 real deps
   case_dir=$(make_case r7-f3-store)
@@ -2568,9 +2581,9 @@ SH
   deps=$(cx_deps "$case_dir" waits-pf-open | sed 's/blocked-by://g; s/[ "]//g')
   case "$deps" in pf-open,waits-pf-open-other|waits-pf-open-other,pf-open) ;; *) fail "r7-f3: an edge changed while an unfinished item holds the id ($deps)" ;; esac
   cx "$case_dir" show waits-pf-open | grep -q 'hold_kind: future' || fail "r7-f3: the hold was lost"
-  assert_match '^actionable: tasks-axi accepted the waive of pf-open, but the active backlog now holds an item with that id that is [a-z_]+, not done, so no blocked-by edge or hold was changed' "$case_dir/err" "r7-f3: the kept edges were not reported"
+  assert_match '^actionable: pf-open: closed, edges kept: row unreadable' "$case_dir/err" "r7-f3: the kept edges were not reported"
   assert_no_grep 'unblocked:' "$case_dir/err" "r7-f3: an edge was reported cleared"
-  pass "after exit 0 and an unreadable row, an unfinished item under the id in the active backlog keeps every edge and the hold, and the wrapper says so"
+  pass "after exit 0 and an unreadable row, every edge and the hold are kept and the item is reported (Main 1875)"
 }
 
 # Main 1851 F4: the wrapper resolves the id with tasks-axi's own grammar, so a completion with
@@ -2611,57 +2624,98 @@ SH
   pass "a typed completion with its flags first, with the task noun or with --flag=value clears its finished edge and keeps the rest, and the capture guard stops every form"
 }
 
-# Main 1851 F1 and F2, the reviewer's injections: a fake awk fails one reader of the parse or
-# of its result. A member-value read that fails during validation refuses the whole block; an id
-# read that gives the first id and then fails closes nothing from that body and names each item;
-# a report read that fails is reported, never dropped. Control: the same bodies close without
-# the fake.
+# Main 1851 F1 and F2, Main 1875 rule P, the reviewers' injections through the real close step:
+# a fake awk fails the member extractor, and a fake cat cuts or fails the one read of a body's
+# parse result. A member read that fails refuses the whole block; a parse result read in part,
+# or not at all, closes nothing from that body, reads no member and keeps every edge, with one
+# line naming the body. Control: the same body closes both items without the fakes.
 test_r7_f1_f2_a_failed_read_of_the_parse_or_its_result_closes_nothing() {
-  local case_dir real_awk mode
+  local case_dir real_awk real_cat id
   case_dir=$(gh_case r7-reads 192)
-  for id in r7-first r7-second r7-member r7-legacy-block; do
+  for id in r7-first r7-second r7-member; do
     cx_add "$case_dir" "$id"
     cx_add "$case_dir" "waits-$id"
     cx "$case_dir" block "waits-$id" --by "$id" >/dev/null
   done
-  cx_add "$case_dir" r7-legacy-named
   real_awk=$(command -v awk)
+  real_cat=$(command -v cat)
   cat > "$case_dir/fakebin/awk" <<SH
 #!/usr/bin/env bash
-# Each mode fails one reader: \$1 -v, \$2 t=<record type>; a parse-result read also names the file.
-case "\${R7_FAIL:-}:\${1:-}:\${2:-}:\$#:\${4:-}" in
-  id:-v:t=id:4:*.parse) "$real_awk" "\$@" | sed -n '1p'; echo 'simulated partial id read' >&2; exit 42 ;;
-  member:-v:t=member:3:*) echo 'simulated member read failure' >&2; exit 42 ;;
-  legacy:-v:t=legacy:4:*.parse) echo 'simulated report read failure' >&2; exit 42 ;;
+# The member extractor: awk -v t=member <program>, its text on standard input.
+case "\${R7_FAIL:-}:\${1:-}:\${2:-}:\$#" in
+  member:-v:t=member:3) echo 'simulated member read failure' >&2; exit 42 ;;
 esac
 exec "$real_awk" "\$@"
 SH
-  chmod +x "$case_dir/fakebin/awk"
-  block 'Closes-backlog-item: r7-first' 'Closes-backlog-item: r7-second' > "$case_dir/bodies/192"
-  R7_FAIL=id run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/id.out" 2> "$case_dir/id.err" || true
-  for id in r7-first r7-second; do
-    [ "$(cx_state "$case_dir" "$id")" = queued ] || fail "r7-reads: $id closed from a parse result read in part"
-    case "$(cx_deps "$case_dir" "waits-$id")" in *"$id"*) ;; *) fail "r7-reads: the edge on $id changed" ;; esac
-    assert_grep "not closed $id: the parse result of the body of $REPO_URL/192 could not be read" "$case_dir/id.err" "r7-reads: $id was not named"
+  cat > "$case_dir/fakebin/cat" <<SH
+#!/usr/bin/env bash
+# The one read of a parse result: cat -- <body>.parse. "cut" gives all but the last record and
+# exits 0; "fail" gives the first two records and exits 42.
+case "\${R7_FAIL:-}:\${2:-}" in
+  cut:*.parse) "$real_cat" -- "\$2" | sed '\$d'; exit 0 ;;
+  fail:*.parse) sed -n '1,2p' "\$2"; echo 'simulated result read failure' >&2; exit 42 ;;
+esac
+exec "$real_cat" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/awk" "$case_dir/fakebin/cat"
+  for mode in cut fail; do
+    block 'Closes-backlog-item: r7-first' 'Closes-backlog-item: r7-second' > "$case_dir/bodies/192"
+    R7_FAIL=$mode run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/$mode.out" 2> "$case_dir/$mode.err" || true
+    for id in r7-first r7-second; do
+      [ "$(cx_state "$case_dir" "$id")" = queued ] || fail "r7-reads: $id closed from a parse result read $mode"
+      case "$(cx_deps "$case_dir" "waits-$id")" in *"$id"*) ;; *) fail "r7-reads: the edge on $id changed ($mode)" ;; esac
+    done
+    assert_grep "could not read the parse result of the body of $REPO_URL/192 whole" "$case_dir/$mode.err" "r7-reads: the $mode result read was not reported"
   done
-  assert_grep "could not read the parse result of the body of $REPO_URL/192" "$case_dir/id.err" "r7-reads: the failed result read was not reported"
   block 'Closes-backlog-item: r7-member' "Train-member: $REPO_URL/71" > "$case_dir/bodies/192"
   R7_FAIL=member run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/member.out" 2> "$case_dir/member.err" || true
   [ "$(cx_state "$case_dir" r7-member)" = queued ] || fail "r7-reads: a block closed though its member values could not be read"
   assert_grep 'Train-member values could not be read' "$case_dir/member.err" "r7-reads: the member read failure was not the refusal reason"
-  { block 'Closes-backlog-item: r7-legacy-block'; printf '%s\n' '' 'Closes: r7-legacy-named'; } > "$case_dir/bodies/192"
-  R7_FAIL=legacy run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/legacy.out" 2> "$case_dir/legacy.err" || true
-  [ "$(cx_state "$case_dir" r7-legacy-block)" = "done" ] || fail "r7-reads: a report read failure stopped the valid block"
-  [ "$(cx_state "$case_dir" r7-legacy-named)" = queued ] || fail "r7-reads: the old line closed its item"
-  assert_grep "could not read the old Closes: lines of the body of $REPO_URL/192" "$case_dir/legacy.err" "r7-reads: a failed report read was dropped without a word"
-  # Control: the two-item body closes both without the fake.
-  rm -f "$case_dir/fakebin/awk"
+  assert_no_grep "^pr view $REPO_URL/71 --json body" "$case_dir/gh.log" "r7-reads: a refused block's member body was read"
+  # Control: the two-item body closes both without the fakes.
+  rm -f "$case_dir/fakebin/awk" "$case_dir/fakebin/cat"
   block 'Closes-backlog-item: r7-first' 'Closes-backlog-item: r7-second' > "$case_dir/bodies/192"
   run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/ctl.out" 2> "$case_dir/ctl.err" || true
-  for mode in r7-first r7-second; do
-    [ "$(cx_state "$case_dir" "$mode")" = "done" ] || fail "r7-reads control: $mode did not close"
+  for id in r7-first r7-second; do
+    [ "$(cx_state "$case_dir" "$id")" = "done" ] || fail "r7-reads control: $id did not close"
   done
-  pass "a failed member read refuses the block; a parse result read in part closes nothing and names each item; a failed report read is reported; the control closes"
+  pass "a failed member read refuses the block; a parse result read cut or failed closes nothing and keeps every edge, with one line naming the body; the control closes"
+}
+
+# Main 1875 F3, through the real wrapper: a typed completion with the global --backend flag
+# before the subcommand or after the id is the same completion: the capture guard stops it, and
+# with its capture file it clears the finished edge and keeps the rest.
+test_r8_f3_a_global_backend_flag_is_the_same_completion() {
+  local case_dir rc=0 real_mktemp pf
+  case_dir=$(make_case r8-f3-backend)
+  wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
+  printf '%s' '{"request_id":"req-r8","platform":"x","context_binding":{"version":"ctx1","value":"ctx1_r8"},"public_safe_summary":"f","received_at":"2026-07-30T10:00:00Z","followup_expires_at":"2026-08-06T10:00:00Z","reservation_expires_at":"2026-08-06T10:00:00Z"}' > "$case_dir/request.json"
+  printf '%s' '{"type":"pr-merged","project":"f","required_deliverables":["pr_url"],"completion_policy":"all-required"}' > "$case_dir/expected.json"
+  for pf in pf-backend-first pf-backend-last pf-backend-guarded; do
+    wrapper public-followup add "$pf" --request-context-file "$case_dir/request.json" --purpose promised-final \
+      --expected-final-file "$case_dir/expected.json" --expires-at 2099-10-01T00:00:00Z >/dev/null 2>&1 || fail "r8-f3: could not add $pf"
+    cx_add "$case_dir" "waits-$pf" docs
+    cx "$case_dir" block "waits-$pf" --by "$pf" >/dev/null
+    cx_other_and_hold "$case_dir" "waits-$pf"
+  done
+  wrapper public-followup --backend=markdown waive pf-backend-first --reason r --approved-by captain > "$case_dir/o1" 2> "$case_dir/e1" || fail "r8-f3: the --backend-first waive failed"
+  assert_only_other_and_hold "$case_dir" waits-pf-backend-first pf-backend-first "r8-f3: --backend before the subcommand"
+  wrapper public-followup waive pf-backend-last --reason r --approved-by captain --json --backend markdown > "$case_dir/o2" 2> "$case_dir/e2" || fail "r8-f3: the --backend-last waive failed"
+  assert_only_other_and_hold "$case_dir" waits-pf-backend-last pf-backend-last "r8-f3: --backend after the id"
+  jq -e . "$case_dir/o2" >/dev/null 2>&1 || fail "r8-f3: the JSON output of the --backend-last waive is not valid JSON"
+  real_mktemp=$(command -v mktemp)
+  mkdir -p "$case_dir/shim"
+  cat > "$case_dir/shim/mktemp" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in *fm-tasks-axi-pf.*) echo 'simulated capture failure' >&2; exit 1 ;; esac
+exec "$real_mktemp" "\$@"
+SH
+  chmod +x "$case_dir/shim/mktemp"
+  (PATH="$case_dir/shim:$PATH" wrapper public-followup --backend markdown waive pf-backend-guarded --reason r --approved-by captain) > "$case_dir/o3" 2> "$case_dir/e3" || rc=$?
+  [ "$rc" -ne 0 ] || fail "r8-f3: a --backend waive with no capture file reported success"
+  [ "$(cx_state "$case_dir" pf-backend-guarded)" != "done" ] || fail "r8-f3: the --backend waive ran with no capture file"
+  assert_match '^actionable: the waive of pf-backend-guarded did not run, so nothing changed' "$case_dir/e3" "r8-f3: the guard refusal was not reported"
+  pass "a typed completion with --backend before the subcommand or after the id clears its finished edge and keeps the rest, its JSON stays valid, and the capture guard stops it"
 }
 
 pr_close_test_cases=(
@@ -2754,5 +2808,6 @@ test_r6_f5_a_completion_whose_output_is_lost_still_clears_in_the_same_run
 test_r7_f3_an_unfinished_item_under_the_id_keeps_every_edge
 test_r7_f4_every_typed_form_clears_and_is_guarded
 test_r7_f1_f2_a_failed_read_of_the_parse_or_its_result_closes_nothing
+test_r8_f3_a_global_backend_flag_is_the_same_completion
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
