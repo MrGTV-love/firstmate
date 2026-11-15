@@ -1,0 +1,84 @@
+# live scenario D-copy-dirty: teardown=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh variant=copy-dirty claim=mine shape=plain
+## world
+SLOT=/private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project
+COPY=/private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project/.claude/worktrees/task-x1-v2
+## BEFORE
+dir state
+file state/task-x1.backlog-close a193e928754831cd
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta 5cffb59cfe601b32
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.XbXF/D-copy-dirty/tasktmp
+file /tmp/fm-live-w.XbXF/D-copy-dirty/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: e517252391efc4b97d3ff9c7d0b071828da67934 dirty=1
+slot-head: e517252391efc4b97d3ff9c7d0b071828da67934
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.o1Mb9P 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## COMMAND: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh task-x1 --force --drop-file /tmp/fm-live-w.XbXF/D-copy-dirty/drop.txt
+exit=0
+## STDOUT
+🌳 Worktree returned to pool.
+/tmp/fm-live-w.XbXF/D-copy-dirty/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project/.claude/worktrees/task-x1-v2 removed and its pool slot /private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project returned)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.o1Mb9P/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+## STDERR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.o1Mb9P
+## AFTER
+dir state
+file state/.treehouse-project-34ae645a103b8b3c74e6896c3108bf0b5b9bcb40.lock.holds 08ce3f75dfe0abb4
+dir state/.treehouse-project-34ae645a103b8b3c74e6896c3108bf0b5b9bcb40.lock.queue
+file state/.treehouse-project-34ae645a103b8b3c74e6896c3108bf0b5b9bcb40.lock.queue/sequence 1121cfccd5913f0a
+file state/guard-events.jsonl e1a3fd8831ebe4e0
+dir state/terminal-outcomes
+dir data
+file data/backlog.md 0989d4ce326b222c
+dir data/task-x1
+file data/task-x1/captain-drop.md 9ffc923d6195d158
+copy: ABSENT dirty=
+slot-head: e517252391efc4b97d3ff9c7d0b071828da67934
+claim: 
+treehouse status:
+  base  main  (repository default)
+  1     available    /private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project  (detached)
+tmux windows: 
+## DIFF before->after
+2,7c2,6
+< file state/task-x1.backlog-close a193e928754831cd
+< dir state/task-x1.inbox
+< file state/task-x1.inbox/001.msg f17d0901cfc94e01
+< file state/task-x1.meta 5cffb59cfe601b32
+< file state/task-x1.status 0e442b07e3772e8f
+< file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+---
+> file state/.treehouse-project-34ae645a103b8b3c74e6896c3108bf0b5b9bcb40.lock.holds 08ce3f75dfe0abb4
+> dir state/.treehouse-project-34ae645a103b8b3c74e6896c3108bf0b5b9bcb40.lock.queue
+> file state/.treehouse-project-34ae645a103b8b3c74e6896c3108bf0b5b9bcb40.lock.queue/sequence 1121cfccd5913f0a
+> file state/guard-events.jsonl e1a3fd8831ebe4e0
+> dir state/terminal-outcomes
+9,12c8,11
+< file data/backlog.md 36e95a528b2e5a96
+< dir /tmp/fm-live-w.XbXF/D-copy-dirty/tasktmp
+< file /tmp/fm-live-w.XbXF/D-copy-dirty/tasktmp/scratch.txt cbc80bb5c0c0f894
+< copy: e517252391efc4b97d3ff9c7d0b071828da67934 dirty=1
+---
+> file data/backlog.md 0989d4ce326b222c
+> dir data/task-x1
+> file data/task-x1/captain-drop.md 9ffc923d6195d158
+> copy: ABSENT dirty=
+14c13
+< claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.o1Mb9P 
+---
+> claim: 
+17,18c16,17
+<   1     leased       /private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project  (detached)
+< tmux windows: firstmate:fm-task-x1 
+---
+>   1     available    /private/tmp/fm-live-w.XbXF/D-copy-dirty/pool/.treehouse/project-e0f842/1/project  (detached)
+> tmux windows: 

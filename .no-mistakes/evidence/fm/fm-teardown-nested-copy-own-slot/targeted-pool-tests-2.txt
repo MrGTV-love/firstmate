@@ -1,0 +1,6 @@
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands, for a prior and a plain record
+ok - with the pool on another filesystem, a teardown routes when the claim names the peer and refuses at entry when it must hand its own claim over
+ok - a data folder on another filesystem does not stop a clean nested close that writes nothing there
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.ewxZhh/xdev-clean-nested-enclosing: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.ewxZhh: Directory not empty
+exit=1

@@ -1,0 +1,2 @@
+ok - a data folder on another filesystem does not stop a clean nested close that writes nothing there
+exit=0

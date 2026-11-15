@@ -1,0 +1,60 @@
+# live scenario D2-copy-dirty-noforce: teardown=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh variant=copy-dirty claim=mine shape=plain
+## world
+SLOT=/private/tmp/fm-live-w.wthE/D2-copy-dirty-noforce/pool/.treehouse/project-503211/1/project
+COPY=/private/tmp/fm-live-w.wthE/D2-copy-dirty-noforce/pool/.treehouse/project-503211/1/project/.claude/worktrees/task-x1-v2
+## BEFORE
+dir state
+file state/task-x1.backlog-close 8b0f32f92a0d41ae
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta e9c9b69b3a7229a6
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.wthE/D2-copy-dirty-noforce/tasktmp
+file /tmp/fm-live-w.wthE/D2-copy-dirty-noforce/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: 0d0e25671bdabccfaa9dd1e02d8a273b6dc46728 dirty=1
+slot-head: 0d0e25671bdabccfaa9dd1e02d8a273b6dc46728
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.lJFd2j 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.wthE/D2-copy-dirty-noforce/pool/.treehouse/project-503211/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## COMMAND: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh task-x1 
+exit=1
+## STDOUT
+## STDERR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.lJFd2j
+REFUSED: worktree /private/tmp/fm-live-w.wthE/D2-copy-dirty-noforce/pool/.treehouse/project-503211/1/project/.claude/worktrees/task-x1-v2 has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+## AFTER
+dir state
+file state/.treehouse-project-49d5bd21bad9c0007df53a2db738bd84fa6e5f3d.lock.holds 272099795cb05634
+dir state/.treehouse-project-49d5bd21bad9c0007df53a2db738bd84fa6e5f3d.lock.queue
+file state/.treehouse-project-49d5bd21bad9c0007df53a2db738bd84fa6e5f3d.lock.queue/sequence 4355a46b19d348dc
+file state/guard-events.jsonl cb66fc437d6bbfa9
+file state/task-x1.backlog-close 8b0f32f92a0d41ae
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta e9c9b69b3a7229a6
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.wthE/D2-copy-dirty-noforce/tasktmp
+file /tmp/fm-live-w.wthE/D2-copy-dirty-noforce/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: 0d0e25671bdabccfaa9dd1e02d8a273b6dc46728 dirty=1
+slot-head: 0d0e25671bdabccfaa9dd1e02d8a273b6dc46728
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.lJFd2j 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.wthE/D2-copy-dirty-noforce/pool/.treehouse/project-503211/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## DIFF before->after
+1a2,5
+> file state/.treehouse-project-49d5bd21bad9c0007df53a2db738bd84fa6e5f3d.lock.holds 272099795cb05634
+> dir state/.treehouse-project-49d5bd21bad9c0007df53a2db738bd84fa6e5f3d.lock.queue
+> file state/.treehouse-project-49d5bd21bad9c0007df53a2db738bd84fa6e5f3d.lock.queue/sequence 4355a46b19d348dc
+> file state/guard-events.jsonl cb66fc437d6bbfa9

@@ -1,0 +1,76 @@
+# live scenario C-claim-other: teardown=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh variant=landed claim=other shape=plain
+## world
+SLOT=/private/tmp/fm-live-w.IKEq/C-claim-other/pool/.treehouse/project-71792e/1/project
+COPY=/private/tmp/fm-live-w.IKEq/C-claim-other/pool/.treehouse/project-71792e/1/project/.claude/worktrees/task-x1-v2
+## BEFORE
+dir state
+file state/task-x1.backlog-close a7f391831686f22f
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta aab7eb999371dcf6
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.IKEq/C-claim-other/tasktmp
+file /tmp/fm-live-w.IKEq/C-claim-other/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: 3c3a6ee07e55e0bf6e998b7d0aa4ee6afffa9ddd dirty=0
+slot-head: 3c3a6ee07e55e0bf6e998b7d0aa4ee6afffa9ddd
+claim: task=other-task home=/Users/charlesabrooker/tmp/fm-lab.7L8u7A 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.IKEq/C-claim-other/pool/.treehouse/project-71792e/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## COMMAND: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh task-x1 --force --drop-file /tmp/fm-live-w.IKEq/C-claim-other/drop.txt
+exit=0
+## STDOUT
+/tmp/fm-live-w.IKEq/C-claim-other/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /private/tmp/fm-live-w.IKEq/C-claim-other/pool/.treehouse/project-71792e/1/project/.claude/worktrees/task-x1-v2 left in place, since it is not a pool slot)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.7L8u7A/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+## STDERR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7L8u7A
+warning: task task-x1's recorded worktree /private/tmp/fm-live-w.IKEq/C-claim-other/pool/.treehouse/project-71792e/1/project was reassigned to task other-task (home /Users/charlesabrooker/tmp/fm-lab.7L8u7A), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+## AFTER
+dir state
+file state/.treehouse-project-046f8b1db7a4383019950dd1532becd54bf7f705.lock.holds ac40973f40b61e9f
+dir state/.treehouse-project-046f8b1db7a4383019950dd1532becd54bf7f705.lock.queue
+file state/.treehouse-project-046f8b1db7a4383019950dd1532becd54bf7f705.lock.queue/sequence 53c234e5e8472b6a
+file state/guard-events.jsonl 638e990418b72f3a
+dir state/terminal-outcomes
+dir data
+file data/backlog.md 0989d4ce326b222c
+dir data/task-x1
+file data/task-x1/captain-drop.md 9ffc923d6195d158
+copy: 3c3a6ee07e55e0bf6e998b7d0aa4ee6afffa9ddd dirty=0
+slot-head: 3c3a6ee07e55e0bf6e998b7d0aa4ee6afffa9ddd
+claim: task=other-task home=/Users/charlesabrooker/tmp/fm-lab.7L8u7A 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.IKEq/C-claim-other/pool/.treehouse/project-71792e/1/project  (detached)
+tmux windows: 
+## DIFF before->after
+2,7c2,6
+< file state/task-x1.backlog-close a7f391831686f22f
+< dir state/task-x1.inbox
+< file state/task-x1.inbox/001.msg f17d0901cfc94e01
+< file state/task-x1.meta aab7eb999371dcf6
+< file state/task-x1.status 0e442b07e3772e8f
+< file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+---
+> file state/.treehouse-project-046f8b1db7a4383019950dd1532becd54bf7f705.lock.holds ac40973f40b61e9f
+> dir state/.treehouse-project-046f8b1db7a4383019950dd1532becd54bf7f705.lock.queue
+> file state/.treehouse-project-046f8b1db7a4383019950dd1532becd54bf7f705.lock.queue/sequence 53c234e5e8472b6a
+> file state/guard-events.jsonl 638e990418b72f3a
+> dir state/terminal-outcomes
+9,11c8,10
+< file data/backlog.md 36e95a528b2e5a96
+< dir /tmp/fm-live-w.IKEq/C-claim-other/tasktmp
+< file /tmp/fm-live-w.IKEq/C-claim-other/tasktmp/scratch.txt cbc80bb5c0c0f894
+---
+> file data/backlog.md 0989d4ce326b222c
+> dir data/task-x1
+> file data/task-x1/captain-drop.md 9ffc923d6195d158
+18c17
+< tmux windows: firstmate:fm-task-x1 
+---
+> tmux windows: 

@@ -1,0 +1,91 @@
+# live scenario A-gate409-landed: variant=landed claim=mine shape=plain args=--force --drop-file DROP
+## world
+SLOT=/private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project
+COPY=/private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project/.claude/worktrees/task-x1-v2
+## BEFORE
+dir state
+file state/task-x1.backlog-close 5b189d013ba85c1b
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta e81485d16d1834fd
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.zbTE/A-gate409-landed/tasktmp
+file /tmp/fm-live-w.zbTE/A-gate409-landed/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: 6b13aca62e1cd41b11db94275190b4ef775278e0 dirty=0
+slot-head: 6b13aca62e1cd41b11db94275190b4ef775278e0
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.1UY9eR 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## COMMAND: bin/fm-teardown.sh task-x1 --force --drop-file DROP
+exit=0
+## STDOUT
+🌳 Worktree returned to pool.
+/tmp/fm-live-w.zbTE/A-gate409-landed/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project/.claude/worktrees/task-x1-v2 removed and its pool slot /private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project returned)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.1UY9eR/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+## STDERR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.1UY9eR
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## AFTER
+dir state
+file state/.treehouse-project-96adf99b42b531dc3a5997993f73ccee68acfb12.lock.holds 7e13b6493b3c4f75
+dir state/.treehouse-project-96adf99b42b531dc3a5997993f73ccee68acfb12.lock.queue
+file state/.treehouse-project-96adf99b42b531dc3a5997993f73ccee68acfb12.lock.queue/sequence 1121cfccd5913f0a
+file state/guard-events.jsonl a2ab2bc02f13d6ca
+dir state/terminal-outcomes
+dir data
+file data/backlog.md 0989d4ce326b222c
+dir data/task-x1
+file data/task-x1/captain-drop.md 9ffc923d6195d158
+copy: ABSENT dirty=
+slot-head: 6b13aca62e1cd41b11db94275190b4ef775278e0
+claim: 
+treehouse status:
+  base  main  (repository default)
+  1     available    /private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project  (detached)
+tmux windows: 
+## DIFF before->after
+2,7c2,6
+< file state/task-x1.backlog-close 5b189d013ba85c1b
+< dir state/task-x1.inbox
+< file state/task-x1.inbox/001.msg f17d0901cfc94e01
+< file state/task-x1.meta e81485d16d1834fd
+< file state/task-x1.status 0e442b07e3772e8f
+< file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+---
+> file state/.treehouse-project-96adf99b42b531dc3a5997993f73ccee68acfb12.lock.holds 7e13b6493b3c4f75
+> dir state/.treehouse-project-96adf99b42b531dc3a5997993f73ccee68acfb12.lock.queue
+> file state/.treehouse-project-96adf99b42b531dc3a5997993f73ccee68acfb12.lock.queue/sequence 1121cfccd5913f0a
+> file state/guard-events.jsonl a2ab2bc02f13d6ca
+> dir state/terminal-outcomes
+9,12c8,11
+< file data/backlog.md 36e95a528b2e5a96
+< dir /tmp/fm-live-w.zbTE/A-gate409-landed/tasktmp
+< file /tmp/fm-live-w.zbTE/A-gate409-landed/tasktmp/scratch.txt cbc80bb5c0c0f894
+< copy: 6b13aca62e1cd41b11db94275190b4ef775278e0 dirty=0
+---
+> file data/backlog.md 0989d4ce326b222c
+> dir data/task-x1
+> file data/task-x1/captain-drop.md 9ffc923d6195d158
+> copy: ABSENT dirty=
+14c13
+< claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.1UY9eR 
+---
+> claim: 
+17,18c16,17
+<   1     leased       /private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project  (detached)
+< tmux windows: firstmate:fm-task-x1 
+---
+>   1     available    /private/tmp/fm-live-w.zbTE/A-gate409-landed/pool/.treehouse/project-6d100a/1/project  (detached)
+> tmux windows: 

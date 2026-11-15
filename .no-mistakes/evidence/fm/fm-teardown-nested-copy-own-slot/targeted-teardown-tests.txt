@@ -1,0 +1,6 @@
+ok - a data folder on another filesystem refuses a drop record at entry and lets a plain landed close through
+ok - ordinary teardown removes a copy with one or two unpublished tips preserved in a verified recorded bundle
+ok - a plain nested record whose commits a verified recorded bundle holds finishes as the prior shape does
+ok - a bundle stored again after the entry preflight is published 0600 whatever the source bundle mode
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.3nPlxv: Directory not empty
+exit=0

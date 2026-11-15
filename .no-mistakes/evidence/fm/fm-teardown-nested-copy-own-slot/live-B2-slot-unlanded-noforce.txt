@@ -1,0 +1,61 @@
+# live scenario B2-slot-unlanded-noforce: teardown=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh variant=slot-unlanded claim=mine shape=plain
+## world
+SLOT=/private/tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/pool/.treehouse/project-a187e9/1/project
+COPY=/private/tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/pool/.treehouse/project-a187e9/1/project/.claude/worktrees/task-x1-v2
+## BEFORE
+dir state
+file state/task-x1.backlog-close f033bbc89b6ac2a6
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta 2fff2f1b9d639cd3
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/tasktmp
+file /tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: f486d96bb8d3e8ffd44884ed6e14038cdda9841d dirty=0
+slot-head: 15ac8a271ed7cee72d563033af4607f60bfb4571
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.LfqKjE 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/pool/.treehouse/project-a187e9/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## COMMAND: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GMMRYE7XV1A1TDF4RBH4WC/bin/fm-teardown.sh task-x1 
+exit=1
+## STDOUT
+## STDERR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LfqKjE
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.LfqKjE/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.LfqKjE/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: returning pool slot /private/tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/pool/.treehouse/project-a187e9/1/project would sweep away task task-x1's claimed pool slot /private/tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/pool/.treehouse/project-a187e9/1/project, whose HEAD 15ac8a271ed7cee72d563033af4607f60bfb4571 is neither landed nor held by a refs/fm/anchor/task-x1-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+## AFTER
+dir state
+file state/.treehouse-project-5af468e7c1654cdb6af8a5da4653ea96b7e97f8a.lock.holds 645d6abc3a0fc055
+dir state/.treehouse-project-5af468e7c1654cdb6af8a5da4653ea96b7e97f8a.lock.queue
+file state/.treehouse-project-5af468e7c1654cdb6af8a5da4653ea96b7e97f8a.lock.queue/sequence 4355a46b19d348dc
+file state/guard-events.jsonl 50e97ecf526debf2
+file state/task-x1.backlog-close f033bbc89b6ac2a6
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta 2fff2f1b9d639cd3
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/tasktmp
+file /tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: f486d96bb8d3e8ffd44884ed6e14038cdda9841d dirty=0
+slot-head: 15ac8a271ed7cee72d563033af4607f60bfb4571
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.LfqKjE 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.Pf72/B2-slot-unlanded-noforce/pool/.treehouse/project-a187e9/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## DIFF before->after
+1a2,5
+> file state/.treehouse-project-5af468e7c1654cdb6af8a5da4653ea96b7e97f8a.lock.holds 645d6abc3a0fc055
+> dir state/.treehouse-project-5af468e7c1654cdb6af8a5da4653ea96b7e97f8a.lock.queue
+> file state/.treehouse-project-5af468e7c1654cdb6af8a5da4653ea96b7e97f8a.lock.queue/sequence 4355a46b19d348dc
+> file state/guard-events.jsonl 50e97ecf526debf2

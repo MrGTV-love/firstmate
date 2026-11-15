@@ -1,0 +1,68 @@
+# live scenario BASE-B-gate409-slot-unlanded-force: teardown=/tmp/fm-base/bin/fm-teardown.sh variant=slot-unlanded claim=mine shape=plain
+## world
+SLOT=/private/tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/pool/.treehouse/project-c54d1b/1/project
+COPY=/private/tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/pool/.treehouse/project-c54d1b/1/project/.claude/worktrees/task-x1-v2
+## BEFORE
+dir state
+file state/task-x1.backlog-close cdcc5d06911b0819
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta 31c6d39ea3b261ce
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir /tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/tasktmp
+file /tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: 79635b58efdba3e5f33755cf627af191426811ff dirty=0
+slot-head: 2c04f51e847baf78d0a2f769d0185f71d96746ac
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.V9yeCI 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/pool/.treehouse/project-c54d1b/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## COMMAND: /tmp/fm-base/bin/fm-teardown.sh task-x1 --force --drop-file /tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/drop.txt
+exit=1
+## STDOUT
+## STDERR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.V9yeCI
+worktree /private/tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/pool/.treehouse/project-c54d1b/1/project/.claude/worktrees/task-x1-v2 is not managed by treehouse
+error: treehouse return failed for worktree /private/tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/pool/.treehouse/project-c54d1b/1/project/.claude/worktrees/task-x1-v2; teardown aborted
+## AFTER
+dir state
+file state/.treehouse-project-212644e5bb05d2f856fd7ed023a44fff0f2a1dc9.lock.holds 96473bb57944a995
+dir state/.treehouse-project-212644e5bb05d2f856fd7ed023a44fff0f2a1dc9.lock.queue
+file state/.treehouse-project-212644e5bb05d2f856fd7ed023a44fff0f2a1dc9.lock.queue/sequence 53c234e5e8472b6a
+file state/guard-events.jsonl 565d2c37a3d75b58
+file state/task-x1.backlog-close cdcc5d06911b0819
+dir state/task-x1.inbox
+file state/task-x1.inbox/001.msg f17d0901cfc94e01
+file state/task-x1.meta 31c6d39ea3b261ce
+file state/task-x1.status 0e442b07e3772e8f
+file state/task-x1.teardown-return-pending 3d4d5acabdb2f3cf
+dir data
+file data/backlog.md 36e95a528b2e5a96
+dir data/task-x1
+file data/task-x1/captain-drop.md 9ffc923d6195d158
+dir /tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/tasktmp
+file /tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/tasktmp/scratch.txt cbc80bb5c0c0f894
+copy: 79635b58efdba3e5f33755cf627af191426811ff dirty=0
+slot-head: 2c04f51e847baf78d0a2f769d0185f71d96746ac
+claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.V9yeCI 
+treehouse status:
+  base  main  (repository default)
+  1     leased       /private/tmp/fm-live-w.1Or8/BASE-B-gate409-slot-unlanded-force/pool/.treehouse/project-c54d1b/1/project  (detached)
+tmux windows: firstmate:fm-task-x1 
+## DIFF before->after
+1a2,5
+> file state/.treehouse-project-212644e5bb05d2f856fd7ed023a44fff0f2a1dc9.lock.holds 96473bb57944a995
+> dir state/.treehouse-project-212644e5bb05d2f856fd7ed023a44fff0f2a1dc9.lock.queue
+> file state/.treehouse-project-212644e5bb05d2f856fd7ed023a44fff0f2a1dc9.lock.queue/sequence 53c234e5e8472b6a
+> file state/guard-events.jsonl 565d2c37a3d75b58
+7c11
+< file state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+---
+> file state/task-x1.teardown-return-pending 3d4d5acabdb2f3cf
+9a14,15
+> dir data/task-x1
+> file data/task-x1/captain-drop.md 9ffc923d6195d158
