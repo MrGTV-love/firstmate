@@ -824,6 +824,48 @@ gap_events=$({ grep -h '"task":"gap"' "$CASE/home/state/fleet-ledger.jsonl" 2>/d
 rm -f "$FAKEBIN/rm"
 pass 'a pass that runs while a first registration is between pr= and its poll leaves the poll to it'
 
+# The same holds at the earliest point pr= can be read: right after the registrar
+# moves its new record into place, while it still holds the metadata lock. The
+# pass runs in the background there; a pass that tried to re-arm would wait on
+# that metadata lock, so the registrar goes on after a bounded wait either way,
+# and the pass's own output decides.
+make_case registrar-commit-gap
+: > "$CASE/home/config/fleet-ledger"
+write_ship cgap ship direct-PR
+cat > "$FAKEBIN/mv" <<SH
+#!/usr/bin/env bash
+/bin/mv "\$@"
+rc=\$?
+case " \$* " in
+  *"/cgap.meta "*)
+    if [ -e "$CASE/run-pass-at-commit" ] && grep -q '^pr=' "$CASE/home/state/cgap.meta"; then
+      /bin/rm -f "$CASE/run-pass-at-commit"
+      ( FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+          FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" PATH="$FAKEBIN:\$PATH" \
+          bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/commit-pass.out" 2>&1
+        : > "$CASE/commit-pass.done" ) </dev/null >/dev/null 2>&1 &
+      i=0
+      while [ ! -e "$CASE/commit-pass.done" ] && [ "\$i" -lt 200 ]; do sleep 0.1; i=\$((i + 1)); done
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/mv"
+: > "$CASE/run-pass-at-commit"
+FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+  FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" \
+  bash "$ROOT/bin/fm-pr-check.sh" cgap "$URL" > "$CASE/first.out" 2>&1 || fail "the first registration failed: $(cat "$CASE/first.out")"
+[ ! -e "$CASE/run-pass-at-commit" ] || fail 'the pass at the registration commit was never run'
+i=0
+while [ ! -e "$CASE/commit-pass.done" ] && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
+rm -f "$FAKEBIN/mv"
+[ -e "$CASE/commit-pass.done" ] || fail 'the pass at the registration commit never finished'
+! grep -q 're-armed' "$CASE/commit-pass.out" || fail "a pass at the registration commit re-armed a live first registration: $(cat "$CASE/commit-pass.out")"
+assert_registered cgap
+cgap_events=$({ grep -h '"task":"cgap"' "$CASE/home/state/fleet-ledger.jsonl" 2>/dev/null || true; } | grep -c '"event":"task.pr_ready"' || true)
+[ "$cgap_events" -eq 1 ] || fail "the first registration wrote $cgap_events pr_ready events, not one"
+pass 'a pass that runs right after a first registration makes pr= readable leaves the poll to it'
+
 # A merge-notified marker counts only for the PR it names: a record whose pr= is
 # a newer PR than the marker's is re-armed, a marker naming the recorded PR is not.
 B_URL=https://github.com/example/project/pull/44
