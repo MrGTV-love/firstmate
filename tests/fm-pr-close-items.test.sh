@@ -997,14 +997,15 @@ SH
     || fail "c4-pf: a failed read back changed the waive's exit status"
   # Main 045 F4: tasks-axi reported the waive done, so the edge is cleared though the read failed.
   [ "$(cx_deps "$case_dir" dep-of-pf-unread)" = none ] || fail "c4-pf: a waive reported done left its edge after a failed read ($(cx_deps "$case_dir" dep-of-pf-unread))"
-  assert_match '^note: the state of pf-unread could not be read after its waive .*simulated read failure.*tasks-axi reported it done' "$case_dir/e2" "c4-pf: the failed read was not noted"
+  assert_match '^note: the state of pf-unread could not be read after its waive .*simulated read failure.*tasks-axi exits 0 from that completion only when the row is Done' "$case_dir/e2" "c4-pf: the failed read was not noted"
   # A completion whose output does not say its state, with a failed read: the edge stays and the
   # manual clear is reported.
   PATH="$bin_dir:$PATH" wrapper public-followup waive pf-silent --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e3" \
     || fail "c4-pf: the silent waive changed its exit status"
-  assert_match '^actionable: .*pf-silent.*simulated read failure.*--by pf-silent' "$case_dir/e3" "c4-pf: an unknown state after a failed read was not reported as actionable"
-  case "$(cx_deps "$case_dir" dep-of-pf-silent)" in *pf-silent*) ;; *) fail "c4-pf: an edge was cleared with no proof the item finished" ;; esac
-  pass "a typed completion clears the edge when the row is archived at once, and when tasks-axi reported it done though the read back failed; with no proof of its state it keeps the edge and reports the manual clear"
+  # Main 1795: exit 0 of the waive proves the row is Done, so the edge clears in the same run.
+  [ "$(cx_deps "$case_dir" dep-of-pf-silent)" = none ] || fail "c4-pf: a waive whose output named no state left its edge after a failed read"
+  assert_match '^note: the state of pf-silent could not be read after its waive .*simulated read failure.*tasks-axi exits 0 from that completion only when the row is Done' "$case_dir/e3" "c4-pf: the same-run clear was not reported"
+  pass "a typed completion clears the edge when the row is archived at once, when tasks-axi reported it done though the read back failed, and when its output named no state, because exit 0 of the completion proves Done"
 }
 
 test_a_typed_completion_help_call_reports_nothing_to_act_on() {
@@ -2212,7 +2213,7 @@ test_r5_f5_a_real_block_below_closed_example_text_is_refused_by_name() {
 test_r5_one_parse_owns_the_block() {
   local fns case_dir
   fns=$(bash -c '. "$1"; declare -F | awk "{print \$3}" | grep "^fm_pr_closes_" | sort | tr "\n" " "' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ "$fns" = 'fm_pr_closes_get fm_pr_closes_parse fm_pr_closes_pass ' ] || fail "r5-one-parse: the library defines more than the parse, its pass and its result reader: $fns"
+  [ "$fns" = 'fm_pr_closes_failed fm_pr_closes_get fm_pr_closes_parse fm_pr_closes_pass ' ] || fail "r5-one-parse: the library defines more than the parse, its pass, its failure result and its result reader: $fns"
   ! grep -nE 'fm_pr_closes_(scan|lines|ids|members|outside|malformed|legacy_ids|prose|seen|refusal)' "$ROOT/bin/fm-pr-close-items.sh" >/dev/null \
     || fail "r5-one-parse: the close step calls a second reader"
   case_dir=$(gh_case r5-one-parse 184)
@@ -2225,7 +2226,14 @@ test_r5_one_parse_owns_the_block() {
   [ "$(grep -c "pr view $REPO_URL/184 --json body" "$case_dir/gh.log")" = 1 ] || fail "r5-one-parse: the merged body was read more than once"
   [ "$(grep -c "pr view $REPO_URL/71 --json body" "$case_dir/gh.log")" = 1 ] || fail "r5-one-parse: the member body was read more than once"
   [ "$(cx_state "$case_dir" r5-one)" = "done" ] && [ "$(cx_state "$case_dir" r5-one-member)" = "done" ] || fail "r5-one-parse: the control did not close"
-  pass "one parse: the library offers only fm_pr_closes_parse, its pass and fm_pr_closes_get, the close step calls no other reader, and each body is read once"
+  # Main 1785 F4: the close and the report read each exact directive line with one token: on a
+  # valid block the seenid records equal the id records, trailing dot included.
+  printf '%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: agree-a' 'Closes-backlog-item: agree-b.' "$CLOSES_END" > "$TMP_ROOT/r5-agree.md"
+  bash -c '. "$1"; fm_pr_closes_parse "$2" https://github.com/o/r/pull/1' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$TMP_ROOT/r5-agree.md" > "$TMP_ROOT/r5-agree.parse" \
+    || fail "r5-one-parse: the agreement parse failed"
+  [ "$(awk -F '\t' '$1 == "id" {print $2}' "$TMP_ROOT/r5-agree.parse")" = "$(awk -F '\t' '$1 == "seenid" {print $2}' "$TMP_ROOT/r5-agree.parse")" ] \
+    || fail "r5-one-parse: the close and the report read the ids differently: $(tr '\n' ' ' < "$TMP_ROOT/r5-agree.parse")"
+  pass "one parse: the library offers only fm_pr_closes_parse, its pass and fm_pr_closes_get, the close step calls no other reader, each body is read once, and the close and the report read ids alike"
 }
 
 # The parse result, through the library.
@@ -2296,6 +2304,236 @@ SH
   deps=$(cx_deps "$case_dir" waits-pf-control | sed 's/blocked-by://g; s/[ "]//g')
   [ "$deps" = other-pf-control ] || fail "r5-f4: the control's stored list is not the other blocker alone ($deps)"
   pass "a waive that tasks-axi reports done clears the finished edge even when the row cannot be read back; the other blocker and the hold stay; the readable control clears too"
+}
+
+
+# Main 1785 F1: a body file that a read step writes only in part, then fails, is no read. The
+# fake sed and tail write only the first block of a two-block body and then fail, so a reader
+# that trusts the cut file would close its item. Controls: the complete two-block body refuses;
+# a valid single block closes.
+test_r6_f1_a_partial_body_write_refuses_the_whole_body() {
+  local case_dir real_sed rc=0
+  case_dir=$(gh_case r6-partial 190)
+  cx_add "$case_dir" r6-partial
+  cx_add "$case_dir" r6-partial-waiter
+  cx "$case_dir" block r6-partial-waiter --by r6-partial >/dev/null
+  cx_add "$case_dir" r6-missing
+  { block 'Closes-backlog-item: r6-partial'; block 'Closes-backlog-item: r6-missing'; } > "$case_dir/bodies/190"
+  real_sed=$(command -v sed)
+  cat > "$case_dir/fakebin/sed" <<SH
+#!/usr/bin/env bash
+# Only the close step's body extraction (sed 1d on the forge answer) is cut short.
+if [ "\$#" -eq 1 ] && [ "\$1" = 1d ]; then "$real_sed" -n '2,4p'; echo 'simulated body write failure' >&2; exit 1; fi
+exec "$real_sed" "\$@"
+SH
+  cat > "$case_dir/fakebin/tail" <<SH
+#!/usr/bin/env bash
+case "\${3:-}" in *.raw) if [ "\$1" = -n ] && [ "\$2" = +2 ]; then "$real_sed" -n '2,4p' "\$3"; echo 'simulated body write failure' >&2; exit 1; fi ;; esac
+exec /usr/bin/tail "\$@"
+SH
+  chmod +x "$case_dir/fakebin/sed" "$case_dir/fakebin/tail"
+  run_close "$case_dir" task-x1 "$REPO_URL/190" > "$case_dir/out" 2> "$case_dir/err" || rc=$?
+  rm -f "$case_dir/fakebin/sed" "$case_dir/fakebin/tail"
+  [ "$(cx_state "$case_dir" r6-partial)" = queued ] || fail "r6-partial: a cut body closed its first block's item"
+  case "$(cx_deps "$case_dir" r6-partial-waiter)" in *r6-partial*) ;; *) fail "r6-partial: the dependent lost its edge" ;; esac
+  assert_match "^actionable: close-at-merge could not read the body of $REPO_URL/190 \\(.*simulated body write failure" "$case_dir/err" "r6-partial: the failed read was not reported with the PR and the reason"
+  # Controls: the complete body refuses; a valid single block closes.
+  run_close "$case_dir" task-x1 "$REPO_URL/190" > "$case_dir/out2" 2> "$case_dir/err2" || true
+  assert_match "refused to close anything named by the body of $REPO_URL/190: line 4 holds the closes block marker text outside its one block" "$case_dir/err2" "r6-partial: the complete two-block body was not refused"
+  [ "$(cx_state "$case_dir" r6-partial)" = queued ] || fail "r6-partial: the complete two-block body closed an item"
+  block 'Closes-backlog-item: r6-partial' > "$case_dir/bodies/190"
+  run_close "$case_dir" task-x1 "$REPO_URL/190" > "$case_dir/out3" 2> "$case_dir/err3" || true
+  [ "$(cx_state "$case_dir" r6-partial)" = "done" ] || fail "r6-partial: the valid single block did not close"
+  pass "a body that a read step writes only in part refuses the whole body with the PR and the reason; the complete two-block body refuses and a valid block closes"
+}
+
+# Main 1785 F2: a NUL byte in a member value refuses the whole body before any parse or effect,
+# however a tool on the way would treat it. Controls: a vertical tab refuses; a compliant block
+# closes. Real-forge transport of a NUL byte is not exercised here.
+test_r6_f2_a_nul_byte_refuses_the_whole_body() {
+  local case_dir
+  case_dir=$(gh_case r6-nul 191)
+  for id in r6-nul r6-nul-member; do cx_add "$case_dir" "$id"; cx_add "$case_dir" "$id-waiter"; cx "$case_dir" block "$id-waiter" --by "$id" >/dev/null; done
+  { printf '%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: r6-nul'; printf 'Train-member: https://github.com/example/re\000po/pull/70\n'; printf '%s\n' "$CLOSES_END"; } > "$case_dir/bodies/191"
+  block 'Closes-backlog-item: r6-nul-member' > "$case_dir/bodies/70"
+  printf '%s\n' 70 >> "$case_dir/merged-prs"
+  gh_merge "$case_dir" 191
+  for id in r6-nul r6-nul-member; do
+    [ "$(cx_state "$case_dir" "$id")" = queued ] || fail "r6-nul: $id closed from a body that holds a NUL byte"
+    case "$(cx_deps "$case_dir" "$id-waiter")" in *"$id"*) ;; *) fail "r6-nul: $id's dependent lost its edge" ;; esac
+  done
+  assert_match "refused to close anything named by the body of $REPO_URL/191: the body holds a NUL byte" "$case_dir/stderr" "r6-nul: the NUL body was not refused by name"
+  assert_no_grep "pr view $REPO_URL/70 --json body" "$case_dir/gh.log" "r6-nul: a member of the NUL body was read"
+  # Controls: a vertical tab refuses; a compliant block closes.
+  { printf '%s\n' "$CLOSES_BEGIN" 'Closes-backlog-item: r6-nul'; printf 'Train-member: https://github.com/example/re\013po/pull/70\n'; printf '%s\n' "$CLOSES_END"; } > "$case_dir/bodies/191"
+  run_close "$case_dir" task-x1 "$REPO_URL/191" > "$case_dir/out2" 2> "$case_dir/err2" || true
+  assert_match "refused to close anything named by the body of $REPO_URL/191: line 3 inside its closes block holds a tab, a control byte" "$case_dir/err2" "r6-nul: the vertical-tab control was not refused"
+  block 'Closes-backlog-item: r6-nul' > "$case_dir/bodies/191"
+  run_close "$case_dir" task-x1 "$REPO_URL/191" > "$case_dir/out3" 2> "$case_dir/err3" || true
+  [ "$(cx_state "$case_dir" r6-nul)" = "done" ] || fail "r6-nul: the compliant block did not close"
+  pass "a NUL byte in a member value refuses the whole body and reads no member; a vertical tab refuses; a compliant block closes"
+}
+
+# Main 1785 F3: a parse that fails is an actionable non-close that names the PR, the body and
+# the reason, with the ids the same pass can read; for the merged body and for a member body.
+# Controls: the normal parse closes; an unreadable body is reported (test_an_unreadable_body_...).
+# fake_parse_mktemp <case-dir>: a mktemp in the case's fakebin that fails the Nth parse snapshot
+# (N in <case-dir>/fail-at; 1 is the merged body, 2 the first member body).
+fake_parse_mktemp() {
+  local real_mktemp
+  real_mktemp=$(command -v mktemp)
+  cat > "$1/fakebin/mktemp" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  */fm-pr-closes.*)
+    n=\$(( \$(cat "$1/mktemp-count" 2>/dev/null || echo 0) + 1 )); echo "\$n" > "$1/mktemp-count"
+    [ "\$n" != "\$(cat "$1/fail-at")" ] || { echo 'simulated snapshot failure' >&2; exit 1; } ;;
+esac
+exec "$real_mktemp" "\$@"
+SH
+  chmod +x "$1/fakebin/mktemp"
+}
+
+test_r6_f3_a_parse_failure_is_reported_and_closes_nothing() {
+  local case_dir
+  case_dir=$(gh_case r6-parse 192)
+  cx_add "$case_dir" r6-parse
+  cx_add "$case_dir" r6-parse-waiter
+  cx "$case_dir" block r6-parse-waiter --by r6-parse >/dev/null
+  block 'Closes-backlog-item: r6-parse' > "$case_dir/bodies/192"
+  fake_parse_mktemp "$case_dir"
+  echo 1 > "$case_dir/fail-at"
+  run_close "$case_dir" task-x1 "$REPO_URL/192" > "$case_dir/out" 2> "$case_dir/err" || true
+  [ "$(cx_state "$case_dir" r6-parse)" = queued ] || fail "r6-parse: an item closed from a body whose parse failed"
+  case "$(cx_deps "$case_dir" r6-parse-waiter)" in *r6-parse*) ;; *) fail "r6-parse: the dependent lost its edge" ;; esac
+  assert_match "^actionable: close-at-merge: could not parse the body of $REPO_URL/192, so nothing named by it was closed and no blocked-by edge changed: the parse could not make its snapshot; it names item ids: r6-parse; " "$case_dir/err" \
+    "r6-parse: the merged body's parse failure was not reported with the PR, the reason and its id"
+  # A member body whose parse fails: the train's own item closes, the member's does not.
+  case_dir=$(gh_case r6-parse-member 193)
+  fake_parse_mktemp "$case_dir"
+  echo 2 > "$case_dir/fail-at"
+  cx_add "$case_dir" r6-train-own
+  cx_add "$case_dir" r6-member-item
+  block 'Closes-backlog-item: r6-train-own' "Train-member: $REPO_URL/71" > "$case_dir/bodies/193"
+  block 'Closes-backlog-item: r6-member-item' > "$case_dir/bodies/71"
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  run_close "$case_dir" task-x1 "$REPO_URL/193" > "$case_dir/out" 2> "$case_dir/err" || true
+  [ "$(cx_state "$case_dir" r6-train-own)" = "done" ] || fail "r6-parse-member: the train's own item did not close"
+  [ "$(cx_state "$case_dir" r6-member-item)" = queued ] || fail "r6-parse-member: an item closed from a member body whose parse failed"
+  assert_match "^actionable: close-at-merge: could not parse the body of train member $REPO_URL/71, .*: the parse could not make its snapshot; it names item ids: r6-member-item; " "$case_dir/err" \
+    "r6-parse-member: the member body's parse failure was not reported"
+  # Control: with no failure the member's item closes.
+  rm -f "$case_dir/fakebin/mktemp"
+  run_close "$case_dir" task-x1 "$REPO_URL/193" > "$case_dir/out2" 2> "$case_dir/err2" || true
+  [ "$(cx_state "$case_dir" r6-member-item)" = "done" ] || fail "r6-parse-member: the normal parse did not close the member's item"
+  pass "a failed parse of the merged body or of a member body closes nothing from it and is reported with the PR, the body, the reason and its ids; the normal parse closes"
+}
+
+# Main 1785 F4: one token reading for closes and reports. A refused block names each accepted id
+# exactly as written, trailing dot included; a valid block with that id closes it.
+test_r6_f4_a_refusal_spells_each_id_exactly() {
+  local case_dir out
+  case_dir=$(gh_case r6-dot 194)
+  for id in 'r6-dot.' r6-plain; do cx_add "$case_dir" "$id"; cx_add "$case_dir" "w-$id"; cx "$case_dir" block "w-$id" --by "$id" >/dev/null; done
+  block 'Closes-backlog-item: r6-dot.' 'Closes-backlog-item: r6-plain' 'Train-member: https://example.com/not-a-pr' > "$case_dir/bodies/194"
+  gh_merge "$case_dir" 194
+  out=$(grep "^actionable: close-at-merge: refused to close anything named by the body of $REPO_URL/194: " "$case_dir/stderr")
+  case "$out" in *"its closes block names Train-member https://example.com/not-a-pr, which is not"*"; it names item ids: r6-dot., r6-plain; "*) ;; *) fail "r6-dot: the refusal did not spell each id exactly with the invalid-member reason: $out" ;; esac
+  for id in 'r6-dot.' r6-plain; do
+    [ "$(cx_state "$case_dir" "$id")" = queued ] || fail "r6-dot: $id closed from a refused block"
+    case "$(cx_deps "$case_dir" "w-$id")" in *"$id"*) ;; *) fail "r6-dot: $id's dependent lost its edge" ;; esac
+  done
+  # Control: the valid block closes the trailing-dot id.
+  block 'Closes-backlog-item: r6-dot.' > "$case_dir/bodies/194"
+  run_close "$case_dir" task-x1 "$REPO_URL/194" > "$case_dir/out2" 2> "$case_dir/err2" || true
+  [ "$(cx_state "$case_dir" 'r6-dot.')" = "done" ] || fail "r6-dot: the valid block did not close the trailing-dot id"
+  pass "a refused block names each accepted id exactly, trailing dot included, with its reason and no edge change; a valid block closes that id"
+}
+
+# Main 1785 F5: the waiver's capture file exists before the waiver runs. When it cannot be made,
+# the waiver does not run, nothing changes, and the caller is told why. Control: with the file,
+# the waiver runs and clears the edge.
+test_r6_f5_a_waive_whose_capture_file_cannot_be_made_does_not_run() {
+  local case_dir rc=0 real_mktemp
+  case_dir=$(make_case r6-f5-capture)
+  wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
+  printf '%s' '{"request_id":"req-r6","platform":"x","context_binding":{"version":"ctx1","value":"ctx1_r6"},"public_safe_summary":"f","received_at":"2026-07-30T10:00:00Z","followup_expires_at":"2026-08-06T10:00:00Z","reservation_expires_at":"2026-08-06T10:00:00Z"}' > "$case_dir/request.json"
+  printf '%s' '{"type":"pr-merged","project":"f","required_deliverables":["pr_url"],"completion_policy":"all-required"}' > "$case_dir/expected.json"
+  wrapper public-followup add pf-cap --request-context-file "$case_dir/request.json" --purpose promised-final \
+    --expected-final-file "$case_dir/expected.json" --expires-at 2099-10-01T00:00:00Z >/dev/null 2>&1 || fail "r6-f5: could not add pf-cap"
+  cx_add "$case_dir" waits-pf-cap docs
+  cx "$case_dir" block waits-pf-cap --by pf-cap >/dev/null
+  cx_other_and_hold "$case_dir" waits-pf-cap
+  real_mktemp=$(command -v mktemp)
+  mkdir -p "$case_dir/shim"
+  cat > "$case_dir/shim/mktemp" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in *fm-tasks-axi-pf.*) echo 'simulated capture failure' >&2; exit 1 ;; esac
+exec "$real_mktemp" "\$@"
+SH
+  chmod +x "$case_dir/shim/mktemp"
+  (PATH="$case_dir/shim:$PATH" wrapper public-followup waive pf-cap --reason r --approved-by captain) > "$case_dir/out" 2> "$case_dir/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "r6-f5: a waive that did not run reported success"
+  [ "$(cx_state "$case_dir" pf-cap)" != "done" ] || fail "r6-f5: the waiver ran though its capture file could not be made"
+  case "$(cx_deps "$case_dir" waits-pf-cap)" in *pf-cap,*|*pf-cap\"*|*pf-cap) ;; *) fail "r6-f5: an edge changed though nothing ran" ;; esac
+  assert_match '^actionable: the waive of pf-cap did not run, so nothing changed' "$case_dir/err" "r6-f5: the refusal was not reported"
+  # Control: with the file the waiver runs, clears the finished edge and keeps the rest.
+  wrapper public-followup waive pf-cap --reason r --approved-by captain > "$case_dir/out2" 2> "$case_dir/err2" || fail "r6-f5: the control waive failed"
+  assert_only_other_and_hold "$case_dir" waits-pf-cap pf-cap "r6-f5 control"
+  pass "a waive whose capture file cannot be made does not run, changes nothing and says so; with the file it runs and clears the finished edge"
+}
+
+# Main 1795: tasks-axi exits 0 from a waive only when the row is Done, so when the completion's
+# output is lost and the row cannot be read back, the wrapper still clears the finished edge in
+# the same run, keeping the other blocker and the hold; TOON and JSON. Controls: a readable waive
+# clears; a waive tasks-axi refuses (genuinely not done) keeps every edge.
+test_r6_f5_a_completion_whose_output_is_lost_still_clears_in_the_same_run() {
+  local case_dir rc=0 real
+  case_dir=$(make_case r6-f5-lost)
+  wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
+  printf '%s' '{"request_id":"req-r6l","platform":"x","context_binding":{"version":"ctx1","value":"ctx1_r6l"},"public_safe_summary":"f","received_at":"2026-07-30T10:00:00Z","followup_expires_at":"2026-08-06T10:00:00Z","reservation_expires_at":"2026-08-06T10:00:00Z"}' > "$case_dir/request.json"
+  printf '%s' '{"type":"pr-merged","project":"f","required_deliverables":["pr_url"],"completion_policy":"all-required"}' > "$case_dir/expected.json"
+  for pf in pf-lost pf-lost-json pf-refused pf-readable; do
+    wrapper public-followup add "$pf" --request-context-file "$case_dir/request.json" --purpose promised-final \
+      --expected-final-file "$case_dir/expected.json" --expires-at 2099-10-01T00:00:00Z >/dev/null 2>&1 || fail "r6-lost: could not add $pf"
+    cx_add "$case_dir" "waits-$pf" docs
+    cx "$case_dir" block "waits-$pf" --by "$pf" >/dev/null
+    cx_other_and_hold "$case_dir" "waits-$pf"
+  done
+  real=$(command -v tasks-axi)
+  mkdir -p "$case_dir/shim"
+  # The read of each obligation fails, and each waive runs for real but its output is lost.
+  cat > "$case_dir/shim/tasks-axi" <<SH
+#!/usr/bin/env bash
+case "\${1:-}:\${2:-}" in show:pf-*) echo 'error: simulated read failure' >&2; exit 1 ;; esac
+case "\${1:-} \${2:-}" in "public-followup waive") "$real" "\$@" >/dev/null; exit ;; esac
+exec "$real" "\$@"
+SH
+  chmod +x "$case_dir/shim/tasks-axi"
+  for pf in pf-lost pf-lost-json; do
+    rc=0
+    if [ "$pf" = pf-lost-json ]; then
+      (PATH="$case_dir/shim:$PATH" wrapper public-followup waive "$pf" --reason r --approved-by captain --json) > "$case_dir/$pf.out" 2> "$case_dir/$pf.err" || rc=$?
+    else
+      (PATH="$case_dir/shim:$PATH" wrapper public-followup waive "$pf" --reason r --approved-by captain) > "$case_dir/$pf.out" 2> "$case_dir/$pf.err" || rc=$?
+    fi
+    expect_code 0 "$rc" "r6-lost: the $pf waive must succeed"
+    [ ! -s "$case_dir/$pf.out" ] || fail "r6-lost: the fixture did not lose the $pf output"
+    [ "$(cx_state "$case_dir" "$pf")" = "done" ] || fail "r6-lost: the $pf waive did not finish its row"
+    assert_only_other_and_hold "$case_dir" "waits-$pf" "$pf" "r6-lost: $pf in the same run"
+    assert_match "^note: the state of $pf could not be read after its waive .*tasks-axi exits 0 from that completion only when the row is Done, so its blocked-by edges are cleared now" "$case_dir/$pf.err" "r6-lost: the same-run clear of $pf was not reported"
+    assert_grep "unblocked: waits-$pf no longer waits on $pf; it still waits on waits-$pf-other" "$case_dir/$pf.err" "r6-lost: the cleared edge of $pf was not reported"
+  done
+  # Control: a waive tasks-axi refuses is genuinely not done; every edge stays.
+  rc=0
+  (PATH="$case_dir/shim:$PATH" wrapper public-followup waive pf-refused --reason r --approved-by owner) > "$case_dir/refused.out" 2> "$case_dir/refused.err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "r6-lost: a refused waive reported success"
+  [ "$(cx_state "$case_dir" pf-refused)" != "done" ] || fail "r6-lost: the refused waive finished its row"
+  case "$(cx_deps "$case_dir" waits-pf-refused | sed 's/blocked-by://g; s/[ "]//g')" in pf-refused,waits-pf-refused-other|waits-pf-refused-other,pf-refused) ;; *) fail "r6-lost: a refused waive changed an edge ($(cx_deps "$case_dir" waits-pf-refused))" ;; esac
+  # Control: a readable waive clears in the same run.
+  wrapper public-followup waive pf-readable --reason r --approved-by captain > "$case_dir/readable.out" 2> "$case_dir/readable.err" || fail "r6-lost: the readable waive failed"
+  assert_only_other_and_hold "$case_dir" waits-pf-readable pf-readable "r6-lost: the readable waive"
+  pass "a waive whose output is lost and whose row cannot be read back still clears its finished edge in the same run, TOON and JSON, keeping the other blocker and hold; a refused waive keeps every edge; a readable waive clears"
 }
 
 pr_close_test_cases=(
@@ -2379,5 +2617,11 @@ test_r5_f5_a_real_block_below_closed_example_text_is_refused_by_name
 test_r5_one_parse_owns_the_block
 test_r5_the_parse_result
 test_r5_f4_a_waive_whose_state_read_fails_still_clears_the_edge
+test_r6_f1_a_partial_body_write_refuses_the_whole_body
+test_r6_f2_a_nul_byte_refuses_the_whole_body
+test_r6_f3_a_parse_failure_is_reported_and_closes_nothing
+test_r6_f4_a_refusal_spells_each_id_exactly
+test_r6_f5_a_waive_whose_capture_file_cannot_be_made_does_not_run
+test_r6_f5_a_completion_whose_output_is_lost_still_clears_in_the_same_run
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
