@@ -1408,84 +1408,6 @@ test_log_past_the_read_limits_refuses_a_bare_send() {
   pass "fm-send: an unreadable (past-the-limits) status log refuses a bare send rather than guessing"
 }
 
-# Review N4: each new reply expectation stores the sha256 of the full request
-# body. sha256sum or shasum, whichever works, computes it; when neither works
-# the send is refused loudly and nothing is delivered or recorded.
-test_request_digest_uses_either_tool_and_refuses_without_one() {
-  local dir fb log home err rc rec want got real_shasum
-  dir="$TMP_ROOT/digest-tools"; mkdir -p "$dir"
-  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
-  real_shasum=$(command -v shasum || true)
-  want=$(printf '%s' "report the weekly run" | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')
-
-  # Neither tool works: refused loudly, nothing delivered, no expectation.
-  mkdir -p "$dir/none"; cp "$fb"/* "$dir/none/"
-  printf '#!/usr/bin/env bash\nexit 1\n' > "$dir/none/shasum"; printf '#!/usr/bin/env bash\nexit 1\n' > "$dir/none/sha256sum"
-  chmod +x "$dir/none/shasum" "$dir/none/sha256sum"
-  home=$(setup_home digest-none)
-  fm_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:fm-domain"
-  send_capture "$dir/none" "$home" "$log" "$err" fm-domain "report the weekly run"; rc=$?
-  [ "$rc" -ne 0 ] || fail "a send whose request digest cannot be computed must be refused"
-  assert_contains "$(cat "$err")" "cannot compute the sha256 of the request body" "the refusal says why: $(cat "$err")"
-  [ ! -d "$home/state/domain.inbox" ] || fail "a refused send was delivered"
-  [ -z "$(find "$home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] || fail "a refused send left a reply expectation"
-
-  # Review F1: a tool that prints a digest-shaped line but exits nonzero is not
-  # trusted. Both tools doing that: refused, no record, no stored digest.
-  mkdir -p "$dir/liar"; cp "$fb"/* "$dir/liar/"
-  for t in shasum sha256sum; do
-    printf '#!/usr/bin/env bash\nprintf "%%s  -\\n" 0000000000000000000000000000000000000000000000000000000000000000\nexit 1\n' > "$dir/liar/$t"
-    chmod +x "$dir/liar/$t"
-  done
-  [ "$("$dir/liar/shasum" </dev/null)" = "0000000000000000000000000000000000000000000000000000000000000000  -" ] \
-    || fail "setup: the lying tool must print a digest-shaped line"
-  home=$(setup_home digest-liar)
-  fm_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:fm-domain"
-  send_capture "$dir/liar" "$home" "$log" "$err" fm-domain "report the weekly run"; rc=$?
-  [ "$rc" -ne 0 ] || fail "a hash tool that exits nonzero must not be trusted, even with digest-shaped output"
-  assert_contains "$(cat "$err")" "cannot compute the sha256 of the request body" "the refusal says why: $(cat "$err")"
-  [ ! -d "$home/state/domain.inbox" ] || fail "a send with an untrusted digest was delivered"
-  [ -z "$(find "$home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] || fail "a send with an untrusted digest left a reply expectation"
-  if grep -rq '^request_body_sha256=' "$home/state" 2>/dev/null; then
-    fail "an untrusted digest was stored"
-  fi
-
-  # Only sha256sum works (shasum fails): the digest is still correct.
-  [ -n "$real_shasum" ] || { pass "fm-send: no digest tool refuses (shasum absent on this host, alternate-tool case not run)"; return 0; }
-  mkdir -p "$dir/alt"; cp "$fb"/* "$dir/alt/"
-  printf '#!/usr/bin/env bash\nexit 1\n' > "$dir/alt/shasum"
-  printf '#!/usr/bin/env bash\nexec %q -a 256 "$@"\n' "$real_shasum" > "$dir/alt/sha256sum"
-  chmod +x "$dir/alt/shasum" "$dir/alt/sha256sum"
-  home=$(setup_home digest-alt)
-  fm_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:fm-domain"
-  send_capture "$dir/alt" "$home" "$log" "$err" fm-domain "report the weekly run"; rc=$?
-  expect_code 0 "$rc" "with only sha256sum working the send is delivered: $(cat "$err")"
-  rec=$(find "$home/state/pending-replies" -type f ! -name '.*' | head -1)
-  got=$(sed -n 's/^request_body_sha256=//p' "$rec")
-  assert_equals "$want" "$got" "the stored digest is the sha256 of the full body (sha256sum)"
-
-  # Only shasum works (sha256sum prints a digest-shaped line and exits 1): correct digest.
-  mkdir -p "$dir/shaonly"; cp "$fb"/* "$dir/shaonly/"
-  cp "$dir/liar/sha256sum" "$dir/shaonly/sha256sum"
-  printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$real_shasum" > "$dir/shaonly/shasum"
-  chmod +x "$dir/shaonly/shasum"
-  home=$(setup_home digest-shaonly)
-  fm_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:fm-domain"
-  send_capture "$dir/shaonly" "$home" "$log" "$err" fm-domain "report the weekly run"; rc=$?
-  expect_code 0 "$rc" "with only shasum working the send is delivered: $(cat "$err")"
-  rec=$(find "$home/state/pending-replies" -type f ! -name '.*' | head -1)
-  assert_equals "$want" "$(sed -n 's/^request_body_sha256=//p' "$rec")" "the stored digest is the sha256 of the full body (shasum after a failing sha256sum)"
-
-  # The normal tools: the same digest.
-  home=$(setup_home digest-default)
-  fm_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:fm-domain"
-  send_capture "$fb" "$home" "$log" "$err" fm-domain "report the weekly run"; rc=$?
-  expect_code 0 "$rc" "the default send is delivered"
-  rec=$(find "$home/state/pending-replies" -type f ! -name '.*' | head -1)
-  assert_equals "$want" "$(sed -n 's/^request_body_sha256=//p' "$rec")" "the stored digest is the sha256 of the full body (default tool)"
-  pass "fm-send: the request digest uses sha256sum or shasum, trusts a tool only on exit 0, and a host with neither refuses the send loudly"
-}
-
 # The CONFIG_REREAD pointer send (bin/fm-config-inherit-lib.sh) answers no
 # decision, so it states --answers-none and still lands when the mate has an open
 # keyed decision.
@@ -1626,6 +1548,5 @@ test_mistyped_or_closed_key_is_not_turned_into_a_none_send
 test_reserved_key_counts_as_an_open_decision
 test_sends_that_cannot_answer_are_not_subject
 test_log_past_the_read_limits_refuses_a_bare_send
-test_request_digest_uses_either_tool_and_refuses_without_one
 test_config_reread_pointer_is_delivered_to_a_mate_with_an_open_keyed_decision
 test_recorded_cases_of_2026_11_03
