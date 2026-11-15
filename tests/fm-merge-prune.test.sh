@@ -4595,6 +4595,11 @@ v5_install_review_reads() {
   cat > "$W/bin/gh" <<SH
 #!/usr/bin/env bash
 printf '%s\\n' "\$*" >> "$W/gh-v5.calls"
+# The no-answer case (Main 1808 (2)): every PR view of PR 9 gets no answer.
+if [ "\${1:-} \${2:-}" = "pr view" ] && [ "\${3##*/}" = 9 ] && [ -e "$W/no-answer.9" ]; then
+  echo "error: the forge did not answer (test)" >&2
+  exit 1
+fi
 if [ "\${1:-} \${2:-}" = "pr view" ] && [[ " \$* " = *mergeStateStatus* ]]; then
   number=\${3##*/}
   case "\$number" in
@@ -4776,6 +4781,28 @@ v5e_pass() {  # <mc>: one reconcile pass in the merge harness
     export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE" FM_TEST_CODE_ROOT="$ROOT" FM_PR_AUTO_REVIEW_INTERVAL=0
     PR_MERGE="$ROOT/bin/fm-pr-ready-reconcile.sh" run_pr_merge "$1" > "$W/reconcile.out" 2>&1 ) \
     || fail "reconcile failed: $(cat "$W/reconcile.out")"
+}
+
+# Main 1808 (2), Main 1849: the forge gives no answer to the review step's PR read
+# for E. E stays unmerged and open, nothing asks for its merge, no wake names it,
+# and the review step's state says why.
+v5_e_no_answer_recorded() {
+  [ "$(v5_e_review_state)" = "waiting: the forge did not answer the PR read" ]
+}
+
+test_v5_e_with_no_forge_answer_stays_unmerged_and_says_why() {
+  make_v5_world
+  v5_record_review
+  : > "$W/no-answer.9"
+  XL_BOUND=20 xl_supervise_until v5_e_no_answer_recorded \
+    || fail "E: the review step did not say the forge did not answer: $(v5_e_review_state)"
+  [ "$(cat "$W/forge9.state")" = OPEN ] || fail "E: PR 9 changed state with no forge answer: $(cat "$W/forge9.state")"
+  ! grep -q '^pr merge' "$W/gh-v5.calls" 2>/dev/null || fail "E: a merge was asked with no forge answer"
+  [ -e "$STATE/t-e.meta" ] || fail "E: the record was closed with no forge answer"
+  ! grep -q 'pull/9' "$STATE/.wake-queue" 2>/dev/null || fail "E: a wake named PR 9 with no forge answer: $(grep 'pull/9' "$STATE/.wake-queue")"
+  assert_nothing_forced "v5 no answer" any
+  cleanup_workers
+  pass "with no forge answer to its PR read, E stays open and unmerged, no wake names it, and the review step says the forge did not answer"
 }
 
 test_v5_e_without_its_hold_reaches_the_merge() {
@@ -4988,6 +5015,7 @@ ALL_TESTS=(
   test_xlane_refused_prune_keeps_its_reason_on_the_ledger_row
   test_v5_missing_updates_restart_and_completed_review_cannot_strand_work
   test_v5_e_without_its_hold_reaches_the_merge
+  test_v5_e_with_no_forge_answer_stays_unmerged_and_says_why
 )
 if [ "$#" -gt 0 ]; then
   fm_test_run_cases -- "$@"

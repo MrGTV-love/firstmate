@@ -13,7 +13,8 @@ head and never waits: a read runs detached and a later pass collects it.
 
 A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitHub pr=:
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
-     changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head is
+     merges nothing and only records the step state `waiting: the forge did not answer the PR read`
+     (a queued, held, failed or merged state stands), and a new head starts a new sequence, so a PASS recorded for an older head is
      never counted (bin/fm-review-record.py binds every record to its exact head);
   2. collects the reads it requested earlier for the live head: a finished report is recorded through
      `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
@@ -201,6 +202,21 @@ class Sidecar:
 
 def phase(side, sha, name, detail=""):
     side.data["phase"] = {"head": sha, "state": name, "detail": detail}
+
+
+UNANSWERED = "the forge did not answer the PR read"
+
+
+def unanswered(side):
+    """An unanswered `gh pr view` says so in the step state (Main 1849), with no merge and no wake.
+
+    A queued, held, failed or merged phase stands: the next pass that the forge answers reads it.
+    """
+    current = side.data.get("phase") or {}
+    if current.get("state") in ("queued", "held", "fail", "merged"):
+        return
+    phase(side, current.get("head"), "waiting", UNANSWERED)
+    side.save()
 
 
 def emit(home, task, side, sha, key, text, wake=None):
@@ -810,6 +826,7 @@ def advance(home, task, url, meta, side):
     side.data["next_at"] = int(time.time()) + INTERVAL
     view = gh_view(url)
     if view is None:
+        unanswered(side)
         return
     sha, base = view["headRefOid"], view["baseRefOid"]
     side.data["base"] = base
