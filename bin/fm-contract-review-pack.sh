@@ -1,114 +1,74 @@
 #!/usr/bin/env bash
 # Build the clean reviewer input for an independent review of a definition-of-done
-# contract, and check afterwards that the reviewer read only what it was given.
-# The rules live in .agents/skills/contract-review/SKILL.md (the one owner); this
-# script is the only code path that assembles contract-review reviewer input.
+# contract, and check afterwards, from the run's session transcript, that the reviewer
+# read only what it was given. The review rules live in .agents/skills/contract-review/SKILL.md;
+# this script owns the allow-list of known contract sections (CONTRACT_SECTIONS,
+# CONTRACT_SUBSECTIONS and QUALIFIER_WORDS below) and is the only code path in this
+# repository that assembles contract-review reviewer input.
 #
 # usage:
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
-#       [--context <file>]... --root <repo-root>
-#       [--exclude <path>]...
-#       [--register <path>] [--history <path>] [--policy <file>]
-#       [--out-root <dir>]
-#   fm-contract-review-pack.sh check --pack <dir> --report <file>
-#       --log <session-transcript> [--manifest <file>]
+#       [--context <file>]... --root <repo-root> [--exclude <path>]...
+#       [--register <path>] [--history <path>] [--policy <file>] [--out-root <dir>]
+#   fm-contract-review-pack.sh check --pack <dir> --log <session-transcript>
+#       [--manifest <file>]
 #
 # build: prints the pack directory on stdout, and nothing else there.
-#   The pack is <out-root>/pack. <out-root> is a fresh mktemp -d unless --out-root
-#   names a directory that does not exist or is empty. A non-empty --out-root, or
-#   one that already holds a pack or a review.md, is refused.
-#   The pack holds contract.md (a short header plus the policy's reviewer block,
-#   copied byte for byte between its two marker lines), target.md (the contract
-#   without the author's sections), request.md and context-<name> for each
-#   --request and --context file, head.txt, ci-evidence.md and an empty diff.patch,
+#   The pack is <out-root>/pack. <out-root> is a fresh mktemp -d unless --out-root names a
+#   directory that does not exist or is empty; a non-empty --out-root is refused.
+#   The pack holds contract.md (a short header plus the policy's reviewer block, copied byte
+#   for byte between its two marker lines), target.md, request.md and context-<name> for
+#   each --request and --context file, head.txt, ci-evidence.md and an empty diff.patch,
 #   which is the layout data/review-lane/run-review.sh takes (pass diff.patch).
-#   The author's sections are dropped by heading: a title that starts with an author
-#   section name names that section. Two exact rulings: the title "Contract review scope"
-#   is neutral (Main 034), and a level 3 section titled exactly "Responses" under the
-#   Definition Of Done that holds a mandatory criterion is kept and listed (Main 050),
-#   unless that criterion carries a status claim (its text starts with fixed, passes, met
-#   and the like), which stops the build with exit 3 (Main 053).
-#   In a contract's request or context section, a line that uses an author term as a
-#   label (Self-check:, All-green:, Author:) is dropped and listed.
-#   A level 1 or 2 heading (ATX `#`/`##` or setext, a title line over `===` or `---`)
-#   the builder does not recognise stops
-#   the build with exit 3 naming it, and nothing is written. So does a recognised title or
-#   level 1 to 3 heading outside a dropped section that names author history (findings,
-#   answered, response, self-check, all-green, revision log, or prior followed by findings,
-#   review, round, response, report, revision or answers), and a code fence that never
-#   closes.
-#   Under a kept section, a sub-heading the builder does not recognise (an unknown
-#   level 3 heading, a level 4 or deeper heading or a bold-only line) stays in
-#   target.md where it is, and so does a preamble line it does not drop; each is
-#   listed in the manifest as unrecognised. Such a sub-heading that names author history
-#   (as above, but "response" only as "response(s) to"), or a level 4 or bold-only line
-#   that names an author section, stops the build with exit 3 instead. No contract text is dropped without a dropped
-#   line in the manifest.
-#   A first level 1 heading that names an author section drops with its text, and one
-#   counts as a section of its own only when it is exactly a kept section name.
-#   The request and each context file go through the same filter and are copied
-#   whole; one with an author section under any heading (its title, a level 1 to 4
-#   heading, setext or bold-only) or an author line anywhere in it (an author term used
-#   as a label, or attributed to an author or worker) is refused with exit 2, and
-#   one with any such heading that names author history is refused with exit 3.
-#   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
-#   It always holds the real path of every input file (the contract, the request,
-#   each context file), the register and history paths when given, and every
-#   --exclude path. The policy is --policy, else the skill next to this script.
-# check: reads the report's `Inputs read` list and the run's session transcript (--log,
-#   required: the entrypoint's omp-session folder or one of its .jsonl files; a log that
-#   records no tool call exits 2, because the run's reads cannot be audited from it), and
-#   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing, a listed path
-#   is not an authorized input, or the transcript records a read that is not one; prints
-#   INPUT CLEAN (exit 0) otherwise. From the transcript, every read path, every grep, glob
-#   or find root, and every path the shared tokenizer finds in shell or eval text is judged
-#   by the same rules as the list, and none of them is counted as a listed input. A path
-#   that no longer exists is skipped, and so is a shell or eval path in a system or tool
-#   folder (/usr, /bin, /opt, /dev, /etc and the like). A folder read or search is
-#   authorized inside the pack; inside the run's work folder (the session's folder) unless
-#   it holds the entrypoint's OPERATIONAL-BOUNDARIES.md copy; and under the root when the
-#   folder is not ignored and the search honours .gitignore. The run's own subagent,
-#   artifact, background-job and session reads (agent://, artifact://, proc://,
-#   history://) and the two named skills by skill:// are authorized; another skill, any
-#   other scheme (pr://, ssh://) and any other tool that can read are leaks.
-#   Each report field sits under a Markdown heading of its own (ATX, or setext at level 1
-#   or 2). An `Inputs read` bold line, `Label:` line or inline list with no heading voids
-#   the round (REPORT STRUCTURE, not INPUT LEAK) when it holds a path or the next
-#   non-blank line starts with a path, and is a mere mention otherwise; so does a bold
-#   or plain label inside the list that starts with a report field name (identity,
-#   criterion, escape, exit basis, Checks not performed, Findings, Notes); a bare
-#   VERDICT:, EXIT:, Basis: or Protected class: line is neither. The list runs to the next
-#   heading of its own level or higher; text inside a code fence is never a heading.
-#   In the list, a line that starts with a path is checked when that path is one full
-#   path and nothing else on the line is path-like; a line with any other path-like text
-#   voids the round (REPORT STRUCTURE). The rest of each list line is cut into pieces at
-#   every character that cannot be part of a path (anything but letters, digits, spaces
-#   and _ . / ~ @ + % -) and at a dot that ends a word; every word in a piece that holds a
-#   "/" or a ".", and every run of words in the same piece that starts with one, is judged
-#   when the pack or the root holds that path (a file or folder, with or without an
-#   extension, spaced, wrapped or mid-line); other text is skipped. Such a judged word is
-#   never a listed input: a list with no leading path is no list. Three shape rules
-#   remain, because a root lookup cannot replace them: a leading path is judged even when it does not exist; an
-#   absolute, `~`, http(s), <rev>:<path> or dir/file.ext text that is not the leading
-#   path voids the round, because it may point outside the root; and a word with no "/"
-#   or "." is never a candidate, because prose words would match top-level root names.
-#   A relative path is a pack file when the pack holds it, else a root path.
-#   An authorized input is judged by what it is: a file inside the pack, the
-#   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (no other
-#   file in either skill folder), the review rubric, or a file the manifest's root tracks (git ls-files, or
-#   <rev>:<path> that git can read), and <pinned rubric revision>:docs/review-rubric.md.
-#   A path in the manifest's excluded set is
-#   refused even when it is tracked. A gitignored file is not tracked.
-#   Two exact exemptions: the pinned rubric read by URL (raw.githubusercontent.com or
-#   github.com blob URL of this repository's origin at exactly the rubric revision the
-#   entrypoint pins; any other URL, repository or revision is a leak), and the run's own
-#   report, transcript and work folder (--report, --log and anything below it, the
-#   entrypoint's work-root review.md for this pack, and the session's own folder except its
-#   OPERATIONAL-BOUNDARIES.md copy; no other review.md).
-#   Skill directory: $REVIEW_SKILLS_DIR, default ~/.agents/skills. Rubric:
-#   $REVIEW_RUBRIC, else $REVIEW_FM_ROOT/docs/review-rubric.md (the entrypoint's
-#   own variables), else this repository's docs/review-rubric.md.
-# Exit codes: 0 ok, 2 usage or bad input, 3 unrecognised section, unclosed fence or input leak.
+#   target.md is built only from the contract's known sections, each copied byte for byte.
+#   A heading is known when its name, after lower-casing, is on CONTRACT_SECTIONS, alone or
+#   followed by a qualifier made only of QUALIFIER_WORDS, numbers, short ids such as a2 or
+#   r19, corr=<hex> and the punctuation ( ) , ; : and dashes. Inside a known section a
+#   sub-heading must be on CONTRACT_SUBSECTIONS or, inside the Definition Of Done, have the
+#   one owned criterion-title form "<title> - mandatory" or "<title> - supporting" (any dash).
+#   Headings are ATX (# to ######), setext (a line over === or ---) and bold-only lines
+#   (**Name** or __Name__), which count as the deepest sub-heading; text in a code fence is
+#   never a heading.
+#   Dropped and listed by heading in the excluded record (dropped lines): the file's first
+#   level 1 heading when it is not exactly a known name (the title); every section whose
+#   heading is not known, with everything below it; and text outside any known section.
+#   Refused with exit 3, nothing written: an unknown sub-heading inside a known section
+#   (dropping it could drop part of a criterion), and a code fence that never closes.
+#   A contract with no Definition Of Done section exits 2.
+#   The request and each context file are admitted whole by role (Main or the owner supplies
+#   them), with no filter, and the excluded record lists each as admitted-whole-by-role.
+#   Known limit: who wrote a text cannot be proven from the text, so author text placed in a
+#   request, a context file or a known contract section reaches the reviewer. It must never
+#   be put there.
+#   The excluded record is <out-root>.excluded-paths, outside the pack. It always holds the
+#   real path of every input file (the contract, the request, each context file), the
+#   register and history paths when given, and every --exclude path. The policy is
+#   --policy, else the skill next to this script.
+# check: reads the run's session transcript (--log: the entrypoint's omp-session folder,
+#   or one of its .jsonl files) and judges every read it records. The report's own
+#   Inputs read list is the reviewer's declaration and is not evidence.
+#   Judged reads: read and edit paths (a trailing :selector such as :raw:1-11 or :-1 is
+#   removed one segment at a time; the read is authorized when the path or one of these
+#   shorter forms is), and grep, glob and find roots.
+#   Authorized: anything inside the pack; the run's work folder (the session's folder),
+#   except the entrypoint's OPERATIONAL-BOUNDARIES.md copy there; the transcript itself;
+#   the SKILL.md of assess-done-and-grade or define-done-and-grading, by path or as
+#   skill://<name>; the review rubric, by path or by the pinned raw.githubusercontent.com
+#   or github.com blob URL of this repository's origin; a file the manifest's root tracks;
+#   a search root under the root whose search reaches no untracked file (and, unless the
+#   call sets gitignore true, no ignored file); and the run's own agent://, artifact://,
+#   proc:// and history:// records. A path in the excluded record is refused even when
+#   tracked. Every other read, search or scheme is an INPUT LEAK.
+#   Not provable, so never clean: a bash or eval call, any other tool that can read, and a
+#   subagent whose transcript the log does not hold (a single-file log never holds one).
+#   Prints INPUT LEAK lines and ROUND VOID (exit 3) on any leak; otherwise INPUT UNVERIFIED
+#   lines and ROUND UNVERIFIED (exit 4) when a read cannot be proven; otherwise INPUT CLEAN
+#   (exit 0). A log that records no tool call exits 2.
+#   Skill directory: $REVIEW_SKILLS_DIR, default ~/.agents/skills. Rubric: $REVIEW_RUBRIC,
+#   else $REVIEW_FM_ROOT/docs/review-rubric.md (the entrypoint's own variables), else this
+#   repository's docs/review-rubric.md; its pinned revision is $REVIEW_RUBRIC_REV, else the
+#   last commit that touched it.
+# Exit codes: 0 ok, 2 usage or bad input, 3 refused build or input leak, 4 unverified reads.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -139,77 +99,66 @@ sha_of() {
 BLOCK_BEGIN='<!-- reviewer-block:begin -->'
 BLOCK_END='<!-- reviewer-block:end -->'
 
-# Section filter. Reads the contract on stdin, writes the kept text to the file
-# named by KEEP_OUT, the dropped section names to DROPPED_OUT, the unrecognised
-# level 1 and 2 headings to UNKNOWN_OUT, the kept but unrecognised sub-headings
-# and preamble lines to UNREC_OUT, the normalised title of every kept section heading to
-# TITLES_OUT and the text of every heading-shaped line outside a fence to HEADS_OUT.
-# The file's first level 1 heading is its title: a title that names an author section
-# drops like any author section, and a title counts as a section only when it is exactly a
-# kept section name. With STRICT (a request or context file), a level 4 or bold-only
-# heading that names an author section is written to DROPPED_OUT too.
-# Headings of level 1 and 2, ATX or setext, start a
-# section and must be recognised; a level 3 heading is dropped when it names an
-# author section. Text inside a code fence is never a heading, a backtick fence opens
-# only when no backtick follows its marker run on that line, a fence closes only
-# on a run of its own marker at least as long as the opening one, and a fence still
-# open at the end exits 3.
+# The allow-list of known contract sections. A change here changes what every reviewer sees.
+CONTRACT_SECTIONS="request|context|captain's intent|captain intent|rulings|rulings on this contract|terms|amendment|definition of done|how you're graded|how you are graded|assumptions|decisive scenario|out of scope|known limits|hard gates|execution constraints|honesty rule|mandatory items|supporting items"
+CONTRACT_SUBSECTIONS="mandatory|mandatory items|supporting|supporting items|hard gates|honesty rule|out of scope"
+QUALIFIER_WORDS="verbatim from main steer task neutral facts with sources disclosed not criteria execution constraints withdrawn and revision"
+
+# Section filter, run under LC_ALL=C so byte escapes match. Reads the contract and writes the
+# admitted text to KEEP_OUT, one excluded-record line per drop to DROP_OUT, one line per
+# refusal to REFUSE_OUT, and the base name of every admitted section to NAMES_OUT.
 # shellcheck disable=SC2016 # awk program, not shell
 SECTION_AWK='
 function norm(t) {
   t = tolower(t)
   gsub(/\342\200\231/, "'"'"'", t)
-  gsub(/^[ \t]+|[ \t]+$/, "", t)
+  gsub(/[ \t]+#+[ \t]*$/, "", t)
+  gsub(/^[ \t]+|[ \t:]+$/, "", t)
   return t
 }
-# A title that starts with an author section name names that section. The one exact title Main
-# ruled neutral (Main 034: "Contract review scope") is not one.
-function classify(t,   i, n, parts) {
-  if (t == "contract review scope") return "unknown"
-  n = split(DROP, parts, "|")
-  for (i = 1; i <= n; i++) if (parts[i] != "" && index(t, parts[i]) == 1) return "drop"
-  n = split(KEEP, parts, "|")
-  for (i = 1; i <= n; i++) if (parts[i] != "" && index(t, parts[i]) == 1) return "keep"
-  return "unknown"
+function qual_ok(q,   n, i, w, ws) {
+  gsub(/\342\200\224|\342\200\223/, " ", q)
+  gsub(/[(),;:]/, " ", q)
+  n = split(q, ws, /[ \t]+/)
+  for (i = 1; i <= n; i++) {
+    w = ws[i]
+    if (w == "" || w == "-" || w ~ /^[0-9]+$/ || w ~ /^corr=[0-9a-f]+$/ || w ~ /^[a-z][0-9]+$/) continue
+    if (index(" " QW " ", " " w " ") == 0) return 0
+  }
+  return 1
 }
-function exact(t,   i, n, parts) {
-  n = split(KEEP, parts, "|")
-  for (i = 1; i <= n; i++) if (t == parts[i]) return 1
-  return 0
+# The allow-listed base name a heading carries, or "".
+function known(t, list,   n, i, parts, b, q) {
+  t = norm(t)
+  n = split(list, parts, "|")
+  for (i = 1; i <= n; i++) {
+    b = parts[i]
+    if (b == "") continue
+    if (t == b) return b
+    if (index(t, b) == 1) {
+      q = substr(t, length(b) + 1)
+      if (q ~ /^[ \t(,:]/ && qual_ok(q)) return b
+    }
+  }
+  return ""
+}
+function criterion(t) {
+  t = norm(t)
+  gsub(/\342\200\224|\342\200\223/, "-", t)
+  return t ~ /[^ \t][ \t]+-[ \t]*(mandatory|supporting)$/
 }
 function runlen(s, ch,   n) {
   n = 0
   while (substr(s, n + 1, 1) == ch) n++
   return n
 }
-# True when the section that starts after line i holds a mandatory criterion before the next
-# heading of level 1 to 3.
-function mandatory_below(i,   j) {
-  for (j = i + 1; j <= N; j++) {
-    if (L[j] ~ /^ ? ? ?#[#]?[#]?[ \t]/) return 0
-    if (tolower(L[j]) ~ /\(mandatory\)/) return 1
-  }
-  return 0
-}
-# True when the section that starts after line i holds a mandatory criterion whose text, right
-# after "(mandatory)", starts with a status word (fixed, passes, met, closed and the like).
-function status_below(i,   j, t) {
-  for (j = i + 1; j <= N; j++) {
-    if (L[j] ~ /^ ? ? ?#[#]?[#]?[ \t]/) return 0
-    t = tolower(L[j])
-    if (!sub(/^.*\(mandatory\)[*_ \t]*[:.,-]?[ \t]*/, "", t)) continue
-    if (t ~ /^(fixed|passes|passed|pass|fails|failed|fail|met|unmet|done|closed|resolved|verified|answered|addressed|green|red|open)([^a-z]|$)/) return 1
-  }
-  return 0
-}
-function keep_heading(s) {
-  print s > KEEP_OUT
-  print norm(title) > TITLES_OUT
-  if (ul != "") print ul > KEEP_OUT
+function outside_flush(where) {
+  if (outside) print "dropped\ttext outside a known section (" outside " line(s) " where ")" > DROP_OUT
+  outside = 0
 }
 { L[++N] = $0 }
 END {
-  mode = "keep"; parent = "keep"; ptitle = "preamble"; seen_heading = 0; fence = 0; pre = 1
+  fence = 0; titled = 0; insec = 0; seclv = 0; dropto = 0; outside = 0; secname = ""
   for (i = 1; i <= N; i++) {
     line = L[i]
     match(line, /^ ? ? ?/)
@@ -222,132 +171,70 @@ END {
       fch = substr(rest, 1, 1); flen = runlen(rest, fch); fence = 1; fline = i
     }
     body = infence || fence
-    level = 0; title = ""; ul = ""
+    lv = 0; t = ""; two = 0
     if (!body) {
-      if (rest ~ /^####+[ \t]/) level = 4
-      else if (rest ~ /^###[ \t]/) { level = 3; title = rest; sub(/^###[ \t]+/, "", title) }
-      else if (rest ~ /^##[ \t]/) { level = 2; title = rest; sub(/^##[ \t]+/, "", title) }
-      else if (rest ~ /^#[ \t]/) { level = 1; title = rest; sub(/^#[ \t]+/, "", title) }
-      else if (i < N && L[i + 1] ~ /^ ? ? ?(=+|-+)[ \t]*$/ && line !~ /^[ \t]*$/ && line !~ /^(    |\t)/ &&
+      if (rest ~ /^#+([ \t]|$)/ && runlen(rest, "#") <= 6) {
+        lv = runlen(rest, "#"); t = substr(rest, lv + 1)
+      } else if (i < N && L[i + 1] ~ /^ ? ? ?(=+|-+)[ \t]*$/ && line !~ /^[ \t]*$/ && line !~ /^(    |\t)/ &&
         line !~ /^[ \t]*([-*+>|]|[0-9]+[.)])([ \t]|$)/) {
-        ul = L[++i]
-        level = (ul ~ /=/) ? 1 : 2
-        title = line
+        lv = (L[i + 1] ~ /=/) ? 1 : 2; t = line; two = 1
+      } else if (line ~ /^[ \t]*(\*\*[^*]+\*\*|__[^_]+__):?[ \t]*$/) {
+        lv = 7; t = line; gsub(/^[ \t]*(\*\*|__)|(\*\*|__):?[ \t]*$/, "", t)
       }
     }
-    bold = !body && (line ~ /^[ \t]*\*\*[^*]+\*\*:?[ \t]*$/ || line ~ /^[ \t]*__[^_]+__:?[ \t]*$/)
-    if (level || bold) {
-      ht = title
-      if (ht == "") { ht = line; sub(/^[ \t]*#+[ \t]*/, "", ht); gsub(/\*\*|__/, "", ht); sub(/:[ \t]*$/, "", ht) }
-      print ht > HEADS_OUT
-      if (STRICT && (level == 4 || bold) && classify(norm(ht)) == "drop") print ht > DROPPED_OUT
-      # In a contract, a level 4 or bold-only line under a kept section that names an author
-      # section or author history has no known end, so it stops the build.
-      if (!STRICT && mode == "keep" && (level == 4 || bold) && (classify(norm(ht)) == "drop" || norm(ht) ~ HIST_SUB)) {
-        print ht " (under: " ptitle ")" > UNKNOWN_OUT
-        mode = "refused"
-      }
-    }
-    if (level == 1 && !seen_heading) {
-      seen_heading = 1
-      c = classify(norm(title))
-      if (c == "drop") { pre = 0; parent = "drop"; ptitle = title; mode = "drop"; print title > DROPPED_OUT; continue }
-      if (c == "keep" && norm(title) ~ HIST) print title > UNKNOWN_OUT
-      if (exact(norm(title))) { print norm(title) > TITLES_OUT; if (!STRICT) pre = 0; ptitle = title }
-      print line > KEEP_OUT
-      if (ul != "") print ul > KEEP_OUT
+    if (!lv) {
+      if (dropto) continue
+      if (insec) { print line > KEEP_OUT; continue }
+      if (line !~ /^[ \t]*$/) outside++
       continue
     }
-    if (level == 1 || level == 2) {
-      seen_heading = 1
-      pre = 0
-      c = classify(norm(title))
-      if (c == "keep" && norm(title) ~ HIST) c = "unknown"
-      parent = c
-      ptitle = title
-      ctxsec = norm(title) ~ /^(context|request|captain)/
-      if (c == "keep") mode = "keep"
-      else if (c == "drop") { mode = "drop"; print title > DROPPED_OUT }
-      else { mode = "drop"; print title > UNKNOWN_OUT }
-      if (mode == "keep") keep_heading(line)
-      continue
-    }
-    if (level == 3) {
-      c = classify(norm(title))
-      # Main 050 F2: a section titled exactly Responses under the Definition Of Done that holds a
-      # mandatory criterion is contract text, so it is kept and listed.
-      if (c == "drop" && norm(title) == "responses" && parent == "keep" && norm(ptitle) ~ /^definition of done/ && mandatory_below(i)) {
-        # Main 053: a mandatory criterion there that carries a status claim is author self-grading.
-        if (status_below(i)) {
-          print title " (under: " ptitle "): a mandatory criterion with a status claim is author self-grading; put the criterion under the mandatory items and the status in the author report" > UNKNOWN_OUT
-          mode = "drop"
-          continue
-        }
-        mode = "keep"
-        print line " (under: " ptitle "; kept: holds a mandatory criterion)" > UNREC_OUT
-        keep_heading(line)
+    head = line
+    if (two) head = line "\n" L[i + 1]
+    t2 = t; gsub(/^[ \t]+|[ \t]+$/, "", t2)
+    if (!titled && lv == 1) {
+      titled = 1
+      if (known(t, SECTIONS) != norm(t)) {
+        outside_flush("before the title")
+        print "dropped\ttitle: " t2 > DROP_OUT
+        if (two) i++
         continue
       }
-      if (parent != "drop" && c == "keep" && norm(title) ~ HIST) { mode = "drop"; print title > UNKNOWN_OUT; continue }
-      if (parent == "keep" && c == "unknown" && norm(title) ~ HIST_SUB) { mode = "drop"; print title " (under: " ptitle ")" > UNKNOWN_OUT; continue }
-      if (parent == "keep" && c != "drop") mode = "keep"
-      else mode = "drop"
-      if (c == "drop") print title > DROPPED_OUT
-      if (mode == "keep") {
-        if (c == "unknown") print line " (under: " ptitle ")" > UNREC_OUT
-        keep_heading(line)
+    }
+    titled = 1
+    if (dropto && lv <= dropto) dropto = 0
+    if (dropto) { if (two) i++; continue }
+    if (insec && lv > seclv) {
+      if (known(t, SUBS) != "" || (secname == "definition of done" && criterion(t))) {
+        print head > KEEP_OUT
+        if (two) i++
+        continue
       }
+      print "unknown heading inside a known section: " t2 " (under: " sectitle ")" > REFUSE_OUT
+      dropto = lv
+      if (two) i++
       continue
     }
-    if (mode == "keep") {
-      if ((pre || STRICT) && tolower(line) ~ PREAMBLE_DROP) { print (pre ? "preamble line: " : "author line: ") line > DROPPED_OUT; continue }
-      # In a contract'"'"'s request or context section, a line that uses an author term as a label
-      # (Self-check:, All-green:, Author:) is author material: dropped and listed.
-      if (!STRICT && ctxsec && tolower(line) ~ LABEL) { print "author line: " line > DROPPED_OUT; continue }
-      if (level == 4 || bold) print line " (under: " ptitle ")" > UNREC_OUT
-      else if (pre && line !~ /^[ \t]*$/) print "preamble line: " line > UNREC_OUT
-      print line > KEEP_OUT
+    b = known(t, SECTIONS)
+    outside_flush("before \"" t2 "\"")
+    if (b != "") {
+      insec = 1; seclv = lv; secname = b; sectitle = t2
+      print b > NAMES_OUT
+      print head > KEEP_OUT
+    } else {
+      insec = 0; dropto = lv
+      print "dropped\t" t2 > DROP_OUT
     }
+    if (two) i++
   }
-  if (fence) {
-    print "fm-contract-review-pack: " SRC ": the code fence opened at line " fline " never closes; no pack written" > "/dev/stderr"
-    exit 3
-  }
+  outside_flush("at the end")
+  if (fence) print "the code fence opened at line " fline " never closes" > REFUSE_OUT
 }
 '
 
-SECTION_KEEP="request|context|captain's intent|captain intent|rulings|terms|amendment|definition of done|how you're graded|how you are graded|assumptions|decisive scenario|out of scope|known limits|hard gates|execution constraints|honesty rule|supporting"
-SECTION_DROP="author self-check|author's all-green|author all-green|all-green|author's|author notes|boundary dispositions|contract review|review history|revision log|revision history|self-check|prior findings|prior review|responses|response to|suggested attack|open findings|finding register|register"
-# A preamble line that holds author text. Whole words only, so Authority, Authorized and
-# Authoritative stay. The contract drops such a line wherever the word sits in it. A request
-# or context file is the captain's or Main's text, which may name these terms as its subject
-# ("Run a contract review"), so it is refused only for the author shapes: a term used as a
-# label (`Self-check:`, `Author:`), or a term attributed to an author or worker
-# (`Author's analysis`, `Worker self-check`).
-PREAMBLE_DROP='(^|[^a-z0-9])(authors?|contract review|all-green|self-check|review exit|prior findings?|revision log)([^a-z0-9]|$)|reviewed:'
-PREAMBLE_TERMS='self-checks?|all-green|contract reviews?|review exits?|prior findings?|revision logs?'
-AUTHOR_LABEL="(^|[^a-z0-9])(authors?|$PREAMBLE_TERMS)[ ]*:|reviewed:"
-PREAMBLE_REFUSE="(^|[^a-z0-9])((authors?|workers?)[^a-z0-9]*s?[ ]+($PREAMBLE_TERMS|analysis|notes?|candidates?|dispositions?|findings?|responses?)([^a-z0-9]|\$)|(authors?|$PREAMBLE_TERMS)[ ]*:)|reviewed:"
-
-# A heading that names author history anywhere in its text. "Prior" counts only before a
-# history noun, so free owner headings ("Current review authority", "Context (prior art)")
-# hold none of these terms.
-HISTORY_HEADING='(^|[^a-z0-9])(findings?|answered|responses?|self-checks?|all-green|revision logs?|prior (findings?|reviews?|rounds?|responses?|reports?|revisions?|answers?))([^a-z0-9]|$)'
-# The same test for a sub-heading under a kept contract section, without bare "response": an
-# interface's responses are contract text there, while "responses to" names author history.
-HISTORY_SUBHEADING='(^|[^a-z0-9])(findings?|answered|responses? to|self-checks?|all-green|revision logs?|prior (findings?|reviews?|rounds?|responses?|reports?|revisions?|answers?))([^a-z0-9]|$)'
-
-filter_sections() { # <in> <keep-out> <dropped-out> <unknown-out> <unrecognised-out> <titles-out> <heads-out> [preamble-pattern for a request or context file]
-  local pre=${8:-$PREAMBLE_DROP}
-  : >"$2"
-  : >"$3"
-  : >"$4"
-  : >"$5"
-  : >"$6"
-  : >"$7"
-  awk -v SRC="$1" -v KEEP_OUT="$2" -v DROPPED_OUT="$3" -v UNKNOWN_OUT="$4" -v UNREC_OUT="$5" -v TITLES_OUT="$6" -v HEADS_OUT="$7" \
-    -v KEEP="$SECTION_KEEP" -v DROP="$SECTION_DROP" -v PREAMBLE_DROP="$pre" -v LABEL="$AUTHOR_LABEL" \
-    -v HIST="$HISTORY_HEADING" -v HIST_SUB="$HISTORY_SUBHEADING" -v STRICT="${8:+1}" \
+filter_sections() { # <file> <keep> <drop> <refuse> <names>
+  : >"$2"; : >"$3"; : >"$4"; : >"$5"
+  LC_ALL=C awk -v KEEP_OUT="$2" -v DROP_OUT="$3" -v REFUSE_OUT="$4" -v NAMES_OUT="$5" \
+    -v SECTIONS="$CONTRACT_SECTIONS" -v SUBS="$CONTRACT_SUBSECTIONS" -v QW="$QUALIFIER_WORDS" \
     "$SECTION_AWK" <"$1"
 }
 
@@ -377,7 +264,7 @@ cmd_build() {
     esac
   done
   [ -n "$contract" ] || die "--contract is required"
-  [ -n "$root" ] || die "--root is required: the repository checkout the reviewer reads, so the check can judge every listed path against it"
+  [ -n "$root" ] || die "--root is required: the repository checkout the reviewer reads, so the check can judge every read against it"
   [ -f "$contract" ] && [ -r "$contract" ] || die "contract file not readable: $contract"
   [ -z "$request" ] || { [ -f "$request" ] && [ -r "$request" ] || die "request file not readable: $request"; }
   local f
@@ -396,29 +283,16 @@ cmd_build() {
   policy_block "$policy" >"$scratch/block" || die "policy must hold exactly one reviewer block between its marker lines: $policy"
   [ -s "$scratch/block" ] || die "policy reviewer block is empty: $policy"
 
-  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/unknown" "$scratch/unrec" "$scratch/titles" "$scratch/heads" || exit 3
-  if [ -s "$scratch/unknown" ]; then
-    local name
-    while IFS= read -r name; do
-      echo "fm-contract-review-pack: unrecognised section: $name" >&2
-    done <"$scratch/unknown"
-    echo "fm-contract-review-pack: no pack written; rename the section to a recognised one, move any author history out of it, or add it to the builder" >&2
+  filter_sections "$contract" "$scratch/keep" "$scratch/dropped" "$scratch/refused" "$scratch/names" || die "section filter failed on $contract"
+  if [ -s "$scratch/refused" ]; then
+    local why
+    while IFS= read -r why; do
+      echo "fm-contract-review-pack: refused: $why" >&2
+    done <"$scratch/refused"
+    echo "fm-contract-review-pack: no pack written; give the text a known heading (CONTRACT_SECTIONS or CONTRACT_SUBSECTIONS in this script) or move it out of the contract" >&2
     exit 3
   fi
-  grep -q '^definition of done' "$scratch/titles" || die "contract has no Definition Of Done section: $contract"
-
-  for f in ${request:+"$request"} ${contexts[@]+"${contexts[@]}"}; do
-    filter_sections "$f" "$scratch/ctx.keep" "$scratch/ctx.dropped" "$scratch/ctx.unknown" "$scratch/ctx.unrec" "$scratch/ctx.titles" "$scratch/ctx.heads" "$PREAMBLE_REFUSE" || exit 3
-    [ ! -s "$scratch/ctx.dropped" ] || die "request or context file holds author text the builder would drop ($(head -1 "$scratch/ctx.dropped")): $f"
-    grep -iE "$HISTORY_HEADING" "$scratch/ctx.heads" >"$scratch/ctx.history"
-    if [ -s "$scratch/ctx.history" ]; then
-      while IFS= read -r name; do
-        echo "fm-contract-review-pack: unrecognised section: $name (author history in $f)" >&2
-      done <"$scratch/ctx.history"
-      echo "fm-contract-review-pack: no pack written; move the author history out of the request or context file" >&2
-      exit 3
-    fi
-  done
+  grep -qx 'definition of done' "$scratch/names" || die "contract has no Definition Of Done section: $contract"
 
   # Out root: fresh mktemp -d unless a nonexistent or empty directory is named.
   local created_root=0 pack manifest
@@ -463,7 +337,7 @@ cmd_build() {
     if [ -n "$request" ]; then
       # shellcheck disable=SC2016 # literal backticks in generated Markdown
       printf 'The request is `request.md`.\n'
-    elif grep -q '^request' "$scratch/titles"; then
+    elif grep -qx 'request' "$scratch/names"; then
       # shellcheck disable=SC2016 # literal backticks in generated Markdown
       printf 'There is no separate request file: the request is the REQUEST section of `target.md`.\n'
     fi
@@ -475,7 +349,7 @@ cmd_build() {
   } >"$pack/contract.md"
 
   {
-    echo "# fm-contract-review-pack manifest: paths the reviewer must never read"
+    echo "# fm-contract-review-pack excluded record: paths the reviewer must never read, and contract text it was not given"
     printf 'pack\t%s\n' "$(real "$pack")"
     printf 'root\t%s\n' "$(real "$root")"
     printf 'exclude\t%s\n' "$(real "$contract")"
@@ -483,12 +357,11 @@ cmd_build() {
     for f in ${contexts[@]+"${contexts[@]}"} ${excludes[@]+"${excludes[@]}"}; do
       printf 'exclude\t%s\n' "$(real "$f")"
     done
-    while IFS= read -r f; do
-      printf 'dropped\t%s\n' "$f"
-    done <"$scratch/dropped"
-    while IFS= read -r f; do
-      printf 'unrecognised\t%s\n' "$f"
-    done <"$scratch/unrec"
+    cat "$scratch/dropped"
+    [ -z "$request" ] || printf 'admitted-whole-by-role\trequest\t%s\n' "$(real "$request")"
+    for f in ${contexts[@]+"${contexts[@]}"}; do
+      printf 'admitted-whole-by-role\tcontext\t%s\n' "$(real "$f")"
+    done
   } >"$manifest"
 
   # shellcheck disable=SC2064
@@ -497,209 +370,138 @@ cmd_build() {
   printf '%s\n' "$pack"
 }
 
-# The one candidate tokenizer, shared by the report's list and the transcript's shell text.
-# shellcheck disable=SC2016 # awk program, not shell
-PIECES_AWK='
-# The path candidates in s: cut s at every character that cannot be part of a path, and
-# at a dot that ends a word; then every word of a piece that holds a "/" or a ".", and
-# every run of words in the same piece that starts with one. Prints each new candidate,
-# or with mark set only records it as seen.
-function pieces(s, mark,   np, seg, p, n, tok, k, m, run) {
-  gsub(/\.+([ \t]|$)/, " ", s)
-  np = split(s, seg, /[^A-Za-z0-9_.\/~@+% \t-]/)
-  for (p = 1; p <= np; p++) {
-    n = split(seg[p], tok, /[ \t]+/)
-    for (k = 1; k <= n; k++) {
-      if (tok[k] !~ /[\/.]/) continue
-      run = ""
-      for (m = k; m <= n; m++) {
-        if (tok[m] == "") break
-        run = (m == k) ? tok[m] : run " " tok[m]
-        if (!(run in seen)) { seen[run] = 1; if (!mark) print "?\t" run }
-      }
-    }
-  }
-}
-'
-
-# Print the entries of the report's `Inputs read` list, one per line.
-inputs_read() { # <report>
-  awk "$PIECES_AWK"'
-    function entry(s,   t) {
-      sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
-      gsub(/^[ \t]+/, "", s)
-      quoted = substr(s, 1, 1) == "`"
-      if (quoted) {
-        t = substr(s, 2)
-        sub(/`.*/, "", t)
-      } else {
-        t = s
-        sub(/[ \t].*/, "", t)
-      }
-      gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", t)
-      return t
-    }
-    # The text after the leading entry of a line that starts with a path.
-    function rest_of(s,   r) {
-      sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
-      sub(/^[ \t]+/, "", s)
-      if (substr(s, 1, 1) == "`") {
-        r = substr(s, 2)
-        r = index(r, "`") ? substr(r, index(r, "`") + 1) : ""
-      } else {
-        r = match(s, /[ \t]/) ? substr(s, RSTART) : ""
-      }
-      return r
-    }
-    # Text that holds an absolute, `~`, http(s), <rev>:<path> or relative dir/file.ext path.
-    function pathlike(s) {
-      return s ~ /(^|[^A-Za-z0-9_.-])~?\/[A-Za-z0-9._-]/ || s ~ /[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+/ ||
-        s ~ /https?:\/\// || s ~ /(^|[^A-Za-z0-9])([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]+|HEAD):[^ \t:]/
-    }
-    function hlevel(s,   n) {
-      n = 0
-      while (substr(s, n + 1, 1) == "#") n++
-      return n
-    }
-    function runlen(s, ch,   n) {
-      n = 0
-      while (substr(s, n + 1, 1) == ch) n++
-      return n
-    }
-    function strip3(s) {
-      sub(/^ ? ? ?/, "", s)
-      return s
-    }
-    function is_path(s) {
-      sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", s)
-      return s ~ /^[`*"(<]*(\/|\.\.?\/|~|https?:\/\/)/ || s ~ /^[`*"(<]*([A-Za-z0-9_.\/-]+:)?[A-Za-z0-9_.\/-]*\.[A-Za-z0-9]+([`*">]|[ \t:,;)#]|$)/
-    }
-    # The level of a setext heading whose title is line i, else 0.
-    function setext(i,   s) {
-      if (i >= N || body[i] || body[i + 1]) return 0
-      s = L[i]
-      if (s ~ /^[ \t]*$/ || s ~ /^(    |\t)/ || s ~ /^[ \t]*([-*+>|]|[0-9]+[.)])([ \t]|$)/ || strip3(s) ~ /^#+([ \t]|$)/) return 0
-      if (L[i + 1] ~ /^ ? ? ?=+[ \t]*$/) return 1
-      if (L[i + 1] ~ /^ ? ? ?-+[ \t]*$/) return 2
-      return 0
-    }
-    { L[++N] = $0 }
-    END {
-      name = "[*]*([0-9]+[.)][ \t]*)?[*]*inputs read[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*"
-      label = "^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?[*]*inputs read[*]*(:|[*[:space:]]*(\\([^)]*\\))?[*:[:space:]]*$)"
-      field = "(identity|criteri(on|a)|(outcome-|evidence-)?escape|exit basis|checks not performed|findings|notes)"
-      fieldlabel = "^[ \t]*([-*+][ \t]+)?((\\*\\*|__)" field "[^*_]*(\\*\\*|__)|" field "([a-z ()-]*:|[ \t]*$))"
-      for (i = 1; i <= N; i++) {
-        l = strip3(L[i])
-        inf = fence
-        if (fence) {
-          n = runlen(l, fch)
-          if (n >= flen && substr(l, n + 1) ~ /^[ \t]*$/) fence = 0
-        } else if (l ~ /^~~~/ || (l ~ /^```/ && substr(l, runlen(l, "`") + 1) !~ /`/)) {
-          fch = substr(l, 1, 1); flen = runlen(l, fch); fence = 1
-        }
-        body[i] = inf || fence
-      }
-      for (i = 1; i <= N; i++) {
-        l = strip3(L[i])
-        low = tolower(l)
-        # Inside the list, a line that starts with a path names exactly one full path and
-        # nothing else path-like; any other line holds no path. Else the round voids (exit 6).
-        lead = state == 1 && is_path(L[i])
-        if (lead) {
-          t = entry(L[i])
-          # Inside backticks a full path may hold spaces; elsewhere a space ends it.
-          if (t !~ (quoted ? "^[A-Za-z0-9_.~/:#@+% -]+$" : "^[A-Za-z0-9_.~/:#@+%-]+$") || pathlike(rest_of(L[i]))) badpath = 1
-          else print t
-        }
-        if (!body[i]) {
-          sl = setext(i)
-          # The list starts at a heading of its own, ATX or setext.
-          if (low ~ ("^#+[ \t]+" name "$")) { start = hlevel(l); state = 1; continue }
-          if (sl && low ~ ("^" name "$")) { start = sl; state = 1; i++; continue }
-          # Any other `Inputs read` label is a list with no heading and voids the round
-          # (exit 4) when nothing follows it on its line, so the list is what comes next, or
-          # when what follows names a path (a leading path, or a word with a "/" or a "." once
-          # a dot that ends a word is dropped). Only a label followed by prose is a mention.
-          if (low ~ label) {
-            rest = low
-            sub(/^.*inputs read[*]*:?[*]*[ \t]*/, "", rest)
-            words = rest
-            gsub(/\.+([ \t]|$)/, " ", words)
-            if (rest ~ /^[ \t]*$/ || is_path(rest) || words ~ /[\/.]/) noheading = 1
-            continue
-          }
-          if (state == 1 && ((l ~ /^#+([ \t]|$)/ && hlevel(l) <= start) || (sl && sl <= start))) { state = 2; continue }
-          # A bold or plain label that starts with a report field name, not a heading of its
-          # own, leaves the end of the list unknown and voids the round (exit 5).
-          if (state == 1 && !lead && low ~ fieldlabel) unheaded = 1
-        }
-        if (state == 1 && !lead && pathlike(L[i])) badpath = 1
-        # A list line is cut into pieces at every character that cannot be part of a path,
-        # and at a dot that ends a word. Every word in a piece that holds a "/" or a ".",
-        # and every run of words in the same piece that starts with one, is a candidate: the
-        # check judges it when the pack or the root holds that path, and skips it otherwise.
-        if (state == 1) {
-          w = L[i]
-          sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", w)
-          delete seen
-          if (lead) pieces(t, 1)
-          pieces(w, 0)
-        }
-      }
-      exit noheading ? 4 : unheaded ? 5 : badpath ? 6 : 0
-    }
-  ' "$1"
-}
-
-# Read the run's session transcript (the entrypoint's omp-session folder, or one of its .jsonl
-# files) and print one line per recorded read, all tab-separated:
-#   R <path>          a file or folder the run read (absolute; relative ones resolve against the
-#                     session's own folder); judged when it exists
-#   U <url>           a URL the run read
-#   L <what> <why>    a read that is never an authorized input
-#   D <flag> <path>   a search root (grep, glob, find); flag is the call's gitignore setting
-#   W <path>          the session's own folder (the reviewer's work folder)
-# Shell and eval text goes to the file named by the first argument, one call per line as
-# "<folder the call ran in><tab><text>", for the shared candidate tokenizer. A subagent call in a
-# single-file log is a leak line, because its reads are in a transcript the log does not hold.
-# Exit 4 when no session record holds a tool call.
+# The transcript judge. Arguments: pack, log, manifest, skills dir, rubric path, rubric
+# revision, origin slug. Prints the verdict lines and exits 0, 2, 3 or 4 (see the header).
 # shellcheck disable=SC2016 # python program, not shell
-TRANSCRIPT_PY='
-import json, os, re, sys
-code_out = open(sys.argv[1], "w")
+CHECK_PY='
+import json, os, re, subprocess, sys
+
+pack, log, manifest, skills, rubric, rubric_rev, slug = sys.argv[1:8]
+real = os.path.realpath
+pack = real(pack)
+root = None
+excludes = []
+for line in open(manifest, encoding="utf-8", errors="replace"):
+    f = line.rstrip("\n").split("\t")
+    if f[0] == "root" and len(f) > 1 and root is None:
+        root = real(f[1])
+    elif f[0] == "exclude" and len(f) > 1:
+        excludes.append(real(f[1]))
+if root is None:
+    print("fm-contract-review-pack: manifest has no root; rebuild the pack with --root: " + manifest, file=sys.stderr)
+    sys.exit(2)
+named_skills = ("assess-done-and-grade", "define-done-and-grading")
+skill_files = {real(os.path.join(skills, s, "SKILL.md")) for s in named_skills}
+rubric_real = real(rubric) if rubric else ""
+log_real = real(log)
+
+def under(p, d):
+    return p == d or p.startswith(d.rstrip("/") + "/")
+
+genv = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")}
+def git(*args):
+    return subprocess.run(["git", "-C", root] + list(args), env=genv, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+def tracked(rel):
+    return git("ls-files", "--error-unmatch", "--", rel).returncode == 0
+def untracked_below(rel, ignored_too):
+    args = ["ls-files", "--others", "--directory"] + ([] if ignored_too else ["--exclude-standard"]) + ["--", rel or "."]
+    r = git(*args)
+    return r.returncode != 0 or r.stdout.strip() != ""
+
 files = []
-for a in sys.argv[2:]:
-    if os.path.isdir(a):
-        for d, _, names in os.walk(a):
-            files += [os.path.join(d, n) for n in sorted(names) if n.endswith(".jsonl")]
-    else:
-        files.append(a)
-NAMED = ("assess-done-and-grade", "define-done-and-grading")
-SKIP = {"todo", "wait", "write", "edit", "task", "ask", "notebook_edit"}
+if os.path.isdir(log):
+    for d, _, names in os.walk(log):
+        files += [os.path.join(d, n) for n in sorted(names) if n.endswith(".jsonl")]
+else:
+    files.append(log)
+child_names = set()
+if os.path.isdir(log):
+    child_names = {os.path.basename(f)[:-6] for f in files if os.path.dirname(real(f)) != log_real}
+
+work = None
 calls = 0
-out = set()
-def emit(*f):
-    out.add("\t".join(str(x).replace("\t", " ").replace("\n", " ") for x in f))
-def read_path(p, cwd):
-    p = re.sub(r"(:raw)?(:L?[0-9]+(-L?[0-9]+)?)?(:raw)?$", "", p)
-    m = re.match(r"^([a-z][a-z0-9+.-]*)://(.*)$", p)
+judged = 0
+leaks = []
+unverified = []
+NOT_READS = {"write", "todo", "wait", "ask", "notebook_edit"}
+OWN = ("agent", "artifact", "proc", "history")
+
+def excluded(p):
+    for x in excludes:
+        if under(p, x) or (os.path.isdir(p) and under(x, p)):
+            return x
+    return None
+
+def why_file(p):
+    x = excluded(p)
+    if x:
+        return "excluded path " + x
+    if under(p, pack) or under(p, log_real):
+        return None
+    if work and under(p, work):
+        if p == os.path.join(work, "OPERATIONAL-BOUNDARIES.md"):
+            return "the entrypoint copy of OPERATIONAL-BOUNDARIES.md, which is not an authorized input"
+        return None
+    if p in skill_files or (rubric_real and p == rubric_real):
+        return None
+    if under(p, root):
+        if p != root and tracked(os.path.relpath(p, root)):
+            return None
+        return "untracked or gitignored file under the root"
+    return "outside the allowed inputs"
+
+def why_search(p, ignored_too):
+    x = excluded(p)
+    if x:
+        return "a search that reaches excluded path " + x
+    if under(p, pack) or under(p, log_real):
+        return None
+    if work and under(p, work):
+        opb = os.path.join(work, "OPERATIONAL-BOUNDARIES.md")
+        if under(opb, p) and os.path.exists(opb):
+            return "a search of the work folder, which holds the entrypoint copy of OPERATIONAL-BOUNDARIES.md"
+        return None
+    if os.path.isfile(p):
+        return why_file(p)
+    if under(p, root):
+        rel = "" if p == root else os.path.relpath(p, root)
+        if untracked_below(rel, ignored_too):
+            return "a search that reaches untracked " + ("or ignored " if ignored_too else "") + "files under the root"
+        return None
+    return "a search outside the allowed inputs"
+
+def judge_read(raw, cwd):
+    m = re.match(r"^([a-z][a-z0-9+.-]*)://(.*)$", raw)
     if m:
         scheme, rest = m.group(1), m.group(2)
+        if scheme == "skill":
+            name = rest.rstrip("/")
+            if name in named_skills or (name.endswith("/SKILL.md") and name[:-9] in named_skills):
+                return None
+            return "a skill path other than the SKILL.md of the two named skills"
         if scheme in ("http", "https"):
-            emit("U", p)
-        elif scheme == "skill":
-            if rest.split("/")[0] not in NAMED:
-                emit("L", p, "a skill other than the two named references")
-        elif scheme not in ("agent", "artifact", "proc", "history"):
-            # agent, artifact, proc and history are the subagents, tool output,
-            # background jobs and session of this run; anything else (pr, ssh) is outside the inputs.
-            emit("L", p, "a " + scheme + ":// read outside the allowed inputs")
-        return
-    if p:
-        emit("R", os.path.normpath(os.path.join(cwd, os.path.expanduser(p))))
-def search_root(p, cwd, flag):
-    for part in [x.strip() for x in str(p).split(";")]:
+            pinned = ["https://raw.githubusercontent.com/%s/%s/docs/review-rubric.md" % (slug, rubric_rev),
+                      "https://github.com/%s/blob/%s/docs/review-rubric.md" % (slug, rubric_rev)]
+            if slug and rubric_rev and raw in pinned:
+                return None
+            return "a URL other than the pinned rubric revision of this repository"
+        if scheme in OWN:
+            return None
+        return "a " + scheme + ":// read outside the allowed inputs"
+    p = os.path.normpath(os.path.join(cwd, os.path.expanduser(raw)))
+    first = None
+    while True:
+        w = why_file(real(p))
+        if w is None:
+            return None
+        first = first or w
+        head, sep, tail = p.rpartition(":")
+        if not sep or "/" in tail or not head:
+            return first
+        p = head
+
+def search_roots(raw, cwd):
+    for part in [x.strip() for x in str(raw).split(";")]:
         if not part:
             continue
         comps = []
@@ -707,13 +509,15 @@ def search_root(p, cwd, flag):
             if re.search(r"[*?\[{]", c):
                 break
             comps.append(c)
-        root = "/".join(comps) or "."
-        emit("D", flag, os.path.normpath(os.path.join(cwd, root)))
+        yield os.path.normpath(os.path.join(cwd, "/".join(comps) or "."))
+
 for f in files:
+    top = os.path.dirname(real(f)) == log_real if os.path.isdir(log) else True
     cwd = "/"
     try:
         lines = open(f, encoding="utf-8", errors="replace").read().splitlines()
-    except OSError:
+    except OSError as e:
+        unverified.append((f, "transcript file cannot be read: " + str(e)))
         continue
     for line in lines:
         try:
@@ -724,7 +528,8 @@ for f in files:
             continue
         if o.get("type") == "session" and o.get("cwd"):
             cwd = o["cwd"]
-            emit("W", os.path.normpath(cwd))
+            if top and work is None:
+                work = real(cwd)
         msg = o.get("message")
         content = msg.get("content") if isinstance(msg, dict) else None
         if not isinstance(content, list):
@@ -736,66 +541,62 @@ for f in files:
             name = c.get("name") or ""
             a = c.get("arguments") if isinstance(c.get("arguments"), dict) else {}
             here = a.get("cwd") or cwd
-            if name == "read":
-                read_path(str(a.get("path", "")), here)
+            if name in ("read", "edit"):
+                p = str(a.get("path") or "")
+                if not p:
+                    continue
+                judged += 1
+                w = judge_read(p, here)
+                if w:
+                    leaks.append((p, w))
             elif name in ("grep", "glob", "find"):
+                # Only an explicit gitignore setting proves a search skips ignored files.
                 g = a.get("gitignore")
-                search_root(a.get("path") or ".", here, "false" if g is False or str(g).lower() == "false" else "true")
-            elif name in ("bash", "eval"):
-                text = str(a.get("command") or a.get("code") or "")
-                code_out.write(here + "\t" + text.replace("\t", " ").replace("\n", " ") + "\n")
-            elif name == "task" and not os.path.isdir(sys.argv[2]):
-                emit("L", "task", "a subagent whose transcript is not in --log; pass the session folder")
-            elif name not in SKIP:
-                emit("L", name, "an unaudited tool call")
-code_out.close()
-print("\n".join(sorted(out)))
-sys.exit(0 if calls else 4)
+                ignored_too = not (g is True or str(g).lower() == "true")
+                for d in search_roots(a.get("path") or ".", here):
+                    judged += 1
+                    w = why_search(real(d), ignored_too)
+                    if w:
+                        leaks.append((d, w))
+            elif name == "task":
+                for t in a.get("tasks") or []:
+                    n = (t or {}).get("name") or "?"
+                    if n not in child_names:
+                        unverified.append(("subagent " + n, "its transcript is not in the log, so its reads cannot be audited"))
+            elif name in NOT_READS:
+                continue
+            else:
+                unverified.append((name + " call", "its reads are not recorded as paths, so they cannot be audited"))
+
+if calls == 0:
+    print("fm-contract-review-pack: log records no tool call, so it is not a session transcript and the run reads cannot be audited: " + log, file=sys.stderr)
+    sys.exit(2)
+
+def uniq(xs):
+    seen = []
+    for x in xs:
+        if x not in seen:
+            seen.append(x)
+    return seen
+
+if leaks:
+    for p, w in uniq(leaks):
+        print("INPUT LEAK: %s: %s" % (p, w))
+    print("ROUND VOID: %d input leak(s); rerun on a fresh pack, and do not count this round" % len(uniq(leaks)))
+    sys.exit(3)
+if unverified:
+    for p, w in uniq(unverified):
+        print("INPUT UNVERIFIED: %s: %s" % (p, w))
+    print("ROUND UNVERIFIED: the transcript holds reads that cannot be proven; the round is not clean")
+    sys.exit(4)
+print("INPUT CLEAN: %d recorded read(s), all authorized" % judged)
 '
 
-manifest_lines() { # <manifest> <kind>
-  awk -F '\t' -v k="$2" '$1 == k { print $2 }' "$1"
-}
-
-path_under() { # <path> <dir>: true when path equals dir or lies below it
-  [ "$1" = "$2" ] && return 0
-  case "$1" in "$2"/*) return 0 ;; esac
-  return 1
-}
-
-# Why a search or folder read is a leak, or nothing when it is authorized: inside the pack;
-# inside the work folder when that holds no copy of OPERATIONAL-BOUNDARIES.md below it; or a
-# folder under the root that is not ignored, by a search that honours .gitignore.
-search_leak() { # <dir> <gitignore-flag> <pack> <root> <work> <opb> <manifest>
-  local d=$1 x
-  while IFS= read -r x; do
-    [ -n "$x" ] || continue
-    if path_under "$d" "$x" || path_under "$x" "$d"; then echo "a search that reaches excluded path $x"; return; fi
-  done <<EOF
-$(manifest_lines "$7" exclude)
-EOF
-  if path_under "$d" "$3"; then return; fi
-  if [ -n "$5" ] && path_under "$d" "$5"; then
-    if [ -e "$6" ] && path_under "$6" "$d"; then echo "a search of the work folder, which holds the entrypoint's copy of OPERATIONAL-BOUNDARIES.md"; fi
-    return
-  fi
-  if path_under "$d" "$4"; then
-    if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$4" check-ignore -q -- "$d" 2>/dev/null; then
-      echo "a search of an ignored folder under the root"
-    elif [ "$2" = false ]; then
-      echo "a search under the root that reads ignored files"
-    fi
-    return
-  fi
-  echo "a search or folder read outside the allowed inputs"
-}
-
 cmd_check() {
-  local pack='' report='' log='' manifest=''
+  local pack='' log='' manifest=''
   while [ $# -gt 0 ]; do
     case "$1" in
       --pack) [ $# -ge 2 ] || die "--pack needs a directory"; pack=$2; shift 2 ;;
-      --report) [ $# -ge 2 ] || die "--report needs a file"; report=$2; shift 2 ;;
       --log) [ $# -ge 2 ] || die "--log needs the run's session transcript"; log=$2; shift 2 ;;
       --manifest) [ $# -ge 2 ] || die "--manifest needs a file"; manifest=$2; shift 2 ;;
       -h | --help) usage; exit 0 ;;
@@ -803,209 +604,21 @@ cmd_check() {
     esac
   done
   [ -d "$pack" ] || die "pack is not a directory: $pack"
-  [ -f "$report" ] && [ -r "$report" ] || die "report not readable: $report"
   [ -n "$log" ] || die "--log is required: the run's session transcript (the entrypoint's omp-session folder or one of its .jsonl files)"
   { [ -f "$log" ] || [ -d "$log" ]; } && [ -r "$log" ] || die "log not readable: $log"
   pack=$(real "$pack")
   [ -n "$manifest" ] || manifest="$(dirname "$pack").excluded-paths"
   [ -f "$manifest" ] && [ -r "$manifest" ] || die "manifest not readable: $manifest"
-  [ "$(manifest_lines "$manifest" pack | head -1)" = "$pack" ] || die "manifest does not belong to this pack: $manifest"
+  [ "$(awk -F '\t' '$1 == "pack" { print $2; exit }' "$manifest")" = "$pack" ] || die "manifest does not belong to this pack: $manifest"
 
-  local root skills fmroot rubric rubric_real
-  root=$(manifest_lines "$manifest" root | head -1)
-  [ -n "$root" ] || die "manifest has no root; rebuild the pack with --root: $manifest"
+  local skills fmroot rubric rubric_rev origin slug
   skills=${REVIEW_SKILLS_DIR:-$HOME/.agents/skills}
   fmroot=${REVIEW_FM_ROOT:-$FM_ROOT}
   rubric=${REVIEW_RUBRIC:-$fmroot/docs/review-rubric.md}
-  rubric_real=$(real "$rubric")
-  local assess_dir define_dir
-  assess_dir=$(real "$skills/assess-done-and-grade")
-  define_dir=$(real "$skills/define-done-and-grading")
-
-  local rubric_rev slug origin report_real log_real work_report
   rubric_rev=${REVIEW_RUBRIC_REV:-$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$fmroot" log -1 --format=%H -- docs/review-rubric.md 2>/dev/null)}
   origin=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$fmroot" remote get-url origin 2>/dev/null || true)
   slug=$(printf '%s' "$origin" | sed -nE 's#^(https?://[^/]*github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\2#p' | sed -E 's#\.git$##')
-  report_real=$(real "$report")
-  log_real=$(real "$log")
-  work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
-  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why mention work='' opb='' flag
-  local list raw rc=0
-  raw=$(inputs_read "$report") || rc=$?
-  case $rc in
-    4 | 5)
-      if [ "$rc" = 4 ]; then
-        echo "REPORT STRUCTURE: the Inputs read list in $report is not under its own heading"
-      else
-        echo "REPORT STRUCTURE: a report field label inside the Inputs read list of $report is not under its own heading"
-      fi
-      echo "ROUND VOID: report field not under its own heading; each report field needs a Markdown heading of its own at the level of Inputs read"
-      exit 3
-      ;;
-    6)
-      echo "REPORT STRUCTURE: a line in the Inputs read list of $report holds a path that is not its one leading full path"
-      echo "ROUND VOID: list one full path per line under Inputs read, with nothing else path-like on the line"
-      exit 3
-      ;;
-  esac
-  list=$(printf '%s\n' "$raw" | grep -e '/' -e '\.' || true)
-  if [ -z "$list" ]; then
-    echo "INPUT LEAK: no Inputs read list in $report"
-    echo "ROUND VOID: the report must list every file the reviewer opened under Inputs read"
-    exit 3
-  fi
-  # The transcript is the record of what the run opened: every read, search root and path in
-  # shell or eval text it records is judged by the same rules as the list, and never counted.
-  local tx code txrc=0
-  code=$(mktemp) || die "cannot create a scratch file"
-  # shellcheck disable=SC2064
-  trap "rm -f '$code'" EXIT
-  tx=$(python3 -I -c "$TRANSCRIPT_PY" "$code" "$log") || txrc=$?
-  [ "$txrc" = 0 ] || die "log records no tool call, so it is not a session transcript and the run's reads cannot be audited: $log"
-  work=$(printf '%s\n' "$tx" | awk -F '\t' '$1 == "W" { print $2; exit }')
-  if [ -n "$work" ]; then
-    work=$(real "$work")
-    # The entrypoint copies OPERATIONAL-BOUNDARIES.md into the work folder; it is not an
-    # authorized input, so the work folder authorizes everything but that copy.
-    opb="$work/OPERATIONAL-BOUNDARIES.md"
-  fi
-  list=$(
-    printf '%s\n' "$list"
-    printf '%s\n' "$tx" | grep -v '^W	' || true
-    awk "$PIECES_AWK"'{ cwd = $0; sub(/\t.*/, "", cwd); sub(/^[^\t]*\t/, ""); print "@\t" cwd; delete seen; pieces($0, 0) }' "$code" | awk -F '\t' '
-      $1 == "@" { cwd = $2; next }
-      # A shell or eval path outside the places inputs live (system and tool folders) is no input.
-      $2 ~ /^(\/(usr|bin|sbin|opt|System|Library|dev|etc|private\/etc|Applications|nix|proc)(\/|$)|\/?$)/ { next }
-      $2 ~ /^(\/|~\/)/ { print "R\t" $2; next }
-      # A relative path resolves against the folder the call ran in, as a read does.
-      { print "R\t" cwd "/" $2 }' | sort -u
-  )
-  while IFS= read -r entry; do
-    [ -n "$entry" ] || continue
-    rev=''
-    mention=0
-    case $entry in
-      "?	"*)
-        # A candidate from the rest of a line is judged for leaks but is never a listed input.
-        mention=1
-        entry=${entry#"?	"}
-        [ -e "$pack/$entry" ] || [ -e "$root/$entry" ] || [ -L "$root/$entry" ] || continue
-        ;;
-      "L	"*)
-        entry=${entry#"L	"}
-        leaks=$((leaks + 1))
-        echo "INPUT LEAK: ${entry%%	*}: ${entry#*	} (session transcript)"
-        continue
-        ;;
-      "U	"*)
-        mention=1
-        entry=${entry#"U	"}
-        ;;
-      "R	"* | "D	"*)
-        mention=1
-        flag=true
-        case $entry in "D	"*) entry=${entry#"D	"}; flag=${entry%%	*}; entry=${entry#*	} ;; *) entry=${entry#"R	"} ;; esac
-        [ -e "$entry" ] || [ -L "$entry" ] || continue
-        if [ -d "$entry" ]; then
-          why=$(search_leak "$(real "$entry")" "$flag" "$pack" "$root" "$work" "$opb" "$manifest")
-          if [ -n "$why" ]; then
-            leaks=$((leaks + 1))
-            echo "INPUT LEAK: $entry: $why (session transcript)"
-          fi
-          continue
-        fi
-        ;;
-    esac
-    # A trailing line reference (path:12, path:12-40, path:L10-L40, path#L10) names the same file.
-    prev=''
-    while [ "$prev" != "$entry" ]; do
-      prev=$entry
-      entry=$(printf '%s' "$entry" | sed -E 's/(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$//')
-    done
-    [ "$mention" = 1 ] || count=$((count + 1))
-    case "$entry" in
-      http://* | https://*)
-        if [ -n "$slug" ] && [ -n "$rubric_rev" ] &&
-          { [ "$entry" = "https://raw.githubusercontent.com/$slug/$rubric_rev/docs/review-rubric.md" ] ||
-            [ "$entry" = "https://github.com/$slug/blob/$rubric_rev/docs/review-rubric.md" ]; }; then
-          continue
-        fi
-        leaks=$((leaks + 1))
-        echo "INPUT LEAK: $entry: a URL other than the pinned rubric revision of this repository"
-        continue
-        ;;
-    esac
-    path=$entry
-    revpath=''
-    if printf '%s' "$entry" | grep -Eq '^[0-9A-Za-z_./-]+:[^:]+$' && ! printf '%s' "$entry" | grep -Eq '^(/|~|\./|\.\./)' &&
-      printf '%s' "${entry%%:*}" | grep -Eq '^([0-9a-fA-F]{7,40}|HEAD|[A-Za-z][A-Za-z0-9_./-]*)$' && [ ! -e "$entry" ]; then
-      rev=${entry%%:*}
-      path=${entry#*:}
-      revpath=${path#./}
-    fi
-    case "$path" in
-      /* | "~"*) ;;
-      *)
-        if [ -z "$rev" ] && [ -e "$pack/$path" ]; then path="$pack/$path"
-        else path="$root/$path"
-        fi
-        ;;
-    esac
-    path=$(real "$path")
-    ok=0
-    why='not an authorized input (not in the pack, not a named reference, not tracked by the root)'
-    excluded=''
-    while IFS= read -r x; do
-      [ -n "$x" ] || continue
-      if path_under "$path" "$x"; then excluded=$x; break; fi
-    done <<EOF
-$(manifest_lines "$manifest" exclude)
-EOF
-    if [ "$path" = "$report_real" ] || path_under "$path" "$log_real" || [ "$path" = "$work_report" ]; then
-      ok=1
-    elif [ -n "$excluded" ]; then
-      why="excluded path $excluded"
-    elif [ -n "$work" ] && [ "$path" = "$opb" ]; then
-      why="the entrypoint's copy of OPERATIONAL-BOUNDARIES.md, which is not an authorized input"
-    elif [ -n "$work" ] && path_under "$path" "$work"; then
-      ok=1
-    elif [ -z "$rev" ] && path_under "$path" "$pack"; then
-      ok=1
-    elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || [ "$path" = "$assess_dir/SKILL.md" ] || [ "$path" = "$define_dir/SKILL.md" ]; }; then
-      ok=1
-    elif [ -n "$rev" ] && [ -n "$rubric_rev" ] && [ "$rev" = "$rubric_rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
-      ok=1
-    elif [ -n "$rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
-      why="the review rubric at a revision other than the pinned one"
-    else
-      if [ -n "$rev" ]; then
-        if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$root" cat-file -e "$rev:$revpath" 2>/dev/null; then ok=1; fi
-      elif path_under "$path" "$root"; then
-        rel=${path#"$root"/}
-        if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$root" ls-files --error-unmatch -- "$rel" >/dev/null 2>&1; then
-          ok=1
-        else
-          why="untracked or gitignored file under the root"
-        fi
-      fi
-    fi
-    if [ "$ok" = 0 ]; then
-      leaks=$((leaks + 1))
-      echo "INPUT LEAK: $entry: $why"
-    fi
-  done <<EOF
-$list
-EOF
-  if [ "$leaks" -gt 0 ]; then
-    echo "ROUND VOID: $leaks input leak(s); rerun on a fresh pack, and do not count this round"
-    exit 3
-  fi
-  if [ "$count" = 0 ]; then
-    echo "INPUT LEAK: no Inputs read list in $report"
-    echo "ROUND VOID: the report must list every file the reviewer opened under Inputs read"
-    exit 3
-  fi
-  echo "INPUT CLEAN: $count listed input(s), all authorized"
+  python3 -I -c "$CHECK_PY" "$pack" "$log" "$manifest" "$skills" "$rubric" "$rubric_rev" "$slug"
 }
 
 case "${1:-}" in

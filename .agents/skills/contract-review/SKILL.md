@@ -26,11 +26,13 @@ Run `bin/fm-contract-review-pack.sh` for every contract review.
 It is the only code path that builds reviewer input.
 Its header owns the arguments, the section rules and the exit codes.
 It copies the reviewer block below byte for byte into the pack's `contract.md`, so a rule changes in this file and nowhere else.
-It builds the pack in a directory it creates fresh, drops the author's sections, refuses a top-level section it does not recognise, and writes a manifest of excluded paths outside the pack.
-It never drops contract text without listing it: a sub-heading or preamble line it does not recognise stays in the pack where it is, and the manifest lists it as unrecognised.
-A sub-heading that names author history or an author section stops the build instead, because its end is unknown.
-It refuses a contract whose code fence never closes, and a request or context file that holds author text.
-Read those lines before the run, and move any author text they show out of the contract.
+It builds the pack in a directory it creates fresh, and writes an excluded record outside the pack.
+The reviewer gets only the contract sections whose headings are on the builder's allow-list of known contract sections (`CONTRACT_SECTIONS` and `CONTRACT_SUBSECTIONS` in the script), each copied byte for byte.
+Every other section, the title and any text outside a known section are dropped, and the excluded record lists each by heading.
+An unknown sub-heading inside a known section stops the build, because dropping it could drop part of a criterion: give that text a known heading.
+The request and each context file are admitted whole by role, because Main or the owner supplies them.
+Who wrote a text cannot be proven from the text, so never put author text (self-checks, prior findings, responses, all-green analysis) in a request, a context file or a known contract section.
+Read the excluded record before the run.
 Keep the register and every earlier report, review history and `truth` file outside the pack, and pass them to the builder with `--exclude` so the leak check refuses them.
 
 Run the review through the existing entrypoint, `REVIEW_AUTHOR_FAMILY=<family> data/review-lane/run-review.sh <pack> no-pr <head> <diff-file> <repo-root> [model]`, with the pack's `head.txt` value as the head and the pack's empty diff file.
@@ -40,14 +42,12 @@ Use a reviewer model outside the author's family.
 Never retry a model that failed; switch to another allowed model.
 Never run a review in a pack folder that already holds a report.
 
-After the run, run `bin/fm-contract-review-pack.sh check` with `--log <pack>/omp-session`, the session transcript the entrypoint writes into the pack folder.
-The transcript is the record of what the run opened: the check judges every read, search and shell path it records by the same rules as the list, and refuses a log that records no tool call.
-A report with no `Inputs read` list, or a listed path that is not an authorized input, is an `INPUT LEAK`.
-A report field under a bold or plain label instead of a heading of its own (an `Inputs read` list with no heading, or a bold or plain label inside the list that starts with a report field name), and a list line that holds a path other than its one leading full path, are `REPORT STRUCTURE` faults, and each voids the round the same way.
-A leaked round is void: it is not a round, it is not recorded in the register, and it is rerun on a fresh pack.
-An authorized input is judged by what it is, not by the folder it sits in: the pack's own files, the three named references, and a file tracked by the passed repository root.
-An excluded path is refused even when it is tracked or sits under the root.
-A gitignored file is not tracked context.
+After the run, run `bin/fm-contract-review-pack.sh check --pack <pack> --log <pack>/omp-session`, the session transcript the entrypoint writes into the pack folder.
+The transcript is the only evidence of what the run read; the report's `Inputs read` list is the reviewer's declaration, not evidence.
+The check judges every recorded read and search against the authorized inputs: the pack's own files, the three named references, a file tracked by the passed repository root, and the run's own work folder.
+An excluded path is refused even when it is tracked or sits under the root, and a gitignored file is not tracked context.
+`INPUT LEAK` means a recorded read that is not authorized: the round is void, it is not a round, it is not recorded in the register, and it is rerun on a fresh pack.
+`ROUND UNVERIFIED` means the transcript holds a read the check cannot prove (a shell or eval call, another tool, or a subagent with no transcript): the round is not clean, and Main decides whether to rerun it or accept its findings as notes.
 
 ## Reviewer block
 
@@ -107,6 +107,7 @@ Allowed inputs, and only these:
 - A file that the repository root named in your instructions tracks, read only to check that a criterion can run.
 
 Open nothing else.
+Open inputs with the read and search tools, not with shell or code commands, so the run's record shows each file you opened.
 Do not search or list a skill folder: no file in it other than its `SKILL.md` is an input.
 Any helper or subagent you start is bound by this list, and what it opens belongs in your `Inputs read`.
 A report, review, register, history, earlier folder, sibling folder, transcript or copy of the contract from elsewhere is not an input.
@@ -127,9 +128,7 @@ A documentary or record-only stage is judged on code, written specification or r
 A worker declaration, an author's analysis and a green self-run are context, never verification.
 
 Report these fields.
-Put every field below under a Markdown heading of its own, all at the level of `Inputs read`; a bold or plain label is not a heading.
-- `Inputs read`: every file you opened, one full path per line and nothing else path-like on the line, under a Markdown heading of its own named `Inputs read`.
-  Do not name an unopened file under `Inputs read`; list it under Checks not performed.
+- `Inputs read`: every file you opened, one full path per line.
 - Your identity, model and session ID when known.
 - Each criterion by id with its judgment.
 - Outcome-escape and evidence-escape candidates, each with its disposition.
