@@ -3355,7 +3355,7 @@ test_rss_shim_that_resolves_to_itself_is_refused() {
 }
 
 test_resident_watch_reads_only_its_own_tree() {
-  local tmp shims real_ps real_python refuse rc decoy_pid count samples
+  local tmp shims real_ps real_python refuse rc decoy_pid samples
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the resident-memory watch runs only on macOS): own-tree sampling check"
     return
@@ -3379,7 +3379,8 @@ test_resident_watch_reads_only_its_own_tree() {
   # The decoy is a process that is not the command's: it is started here, in a
   # process group of its own, holds 160 MiB, over the 100 MiB bound, and lives
   # while the command runs. The command is a short sleep.
-  # The libproc reader samples first; refusing it leaves ps as the fallback.
+  # Refusing every python call also refuses the watch's launch record: the root is
+  # never started and the watch exits 96 (no table is ever read instead).
   for refuse in 0 1; do
     : > "$tmp/ps.log"
     : > "$tmp/py.log"
@@ -3396,23 +3397,20 @@ test_resident_watch_reads_only_its_own_tree() {
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
       sleep 3 > /dev/null 2>&1 || rc=$?
     kill -KILL "$decoy_pid" 2>/dev/null || true
-    if [ "$rc" -ne 0 ] || grep -q '^max_rss_kib=' "$tmp/rss"; then
-      fail "the watch counted a process outside its command's tree (exit $rc, libproc refused=$refuse)"
-    fi
-    samples=$(sed -n 's/^rss_samples=//p' "$tmp/rss")
-    [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 1 ] \
-      || fail "the watch did not start exactly one libproc reader"$'\n'"$(cat "$tmp/py.log")"
+    grep -q '^max_rss_kib=' "$tmp/rss" 2>/dev/null \
+      && fail "the watch counted a process outside its command's tree (exit $rc, python refused=$refuse)"
+    [ ! -s "$tmp/ps.log" ] || fail "the watch ran ps (python refused=$refuse)"
     if [ "$refuse" = 0 ]; then
-      [ ! -s "$tmp/ps.log" ] || fail "the watch ran ps while the libproc reader answered"
-      case "$samples" in libproc:[1-9]*,ps:0) ;; *) fail "the libproc samples were not recorded: $samples" ;; esac
+      [ "$rc" -eq 0 ] || fail "the watch of a small command exited $rc"
+      samples=$(sed -n 's/^rss_samples=//p' "$tmp/rss")
+      [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 1 ] \
+        || fail "the watch did not start exactly one libproc reader"$'\n'"$(cat "$tmp/py.log")"
+      case "$samples" in libproc:[1-9]*) ;; *) fail "the libproc samples were not recorded: $samples" ;; esac
     else
-      [ -s "$tmp/ps.log" ] || fail "the watch never fell back to ps when libproc was refused"
-      while read -r count; do
-        [ "$count" -le 5 ] || fail "a ps sample listed $count processes, not only the watched tree"
-      done < "$tmp/ps.log"
-      case "$samples" in libproc:0,ps:[1-9]*) ;; *) fail "the ps fallback samples were not recorded: $samples" ;; esac
-      [ "$(sed -n 's/^rss_reader_unavailable=//p' "$tmp/rss")" = exited-at-start ] \
-        || fail "the refused reader was not recorded once as exited at start"$'\n'"$(cat "$tmp/rss")"
+      { [ "$rc" -eq 96 ] && grep -q '^rss_launch_unrecorded=1$' "$tmp/rss"; } \
+        || fail "a watch that could not read its root's start time did not refuse the launch (exit $rc): $(cat "$tmp/rss" 2>/dev/null)"
+      [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 0 ] \
+        || fail "a reader started for a root that never launched"$'\n'"$(cat "$tmp/py.log")"
     fi
   done
   # A descendant of the command that leaves its process group is still the
@@ -3507,9 +3505,10 @@ test_resident_watch_bounds_footprint_beyond_resident() {
   pass "a root whose footprint crosses the bound while its resident size does not is ended and retried narrower"
 }
 
-# A reader that answers one tick past the deadline costs only that tick: ps
-# samples it, a new reader takes over, and the footprint it reports on the next
-# tick still ends the root.
+# A reader that answers one tick past the deadline makes that tick a miss (no other
+# source samples it); a new reader takes over and answers the next tick, so the miss
+# is followed by a later tick and the root fails unmeasured (96): no narrower retry
+# follows, and the run fails.
 test_resident_watch_replaces_a_stalled_reader() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-stall)
@@ -3519,19 +3518,19 @@ test_resident_watch_replaces_a_stalled_reader() {
     return
   fi
   out=$(cat "$tmp/out")
-  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root over the bound after a stalled reply did not pass its narrower retry (exit $(cat "$tmp/rc"))"$'\n'"$out"
-  [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nno')" ] \
-    || fail "a root over the bound by footprint after one stalled reply was not ended and retried narrower"$'\n'"$(cat "$tmp/flags.log")"
+  [ "$(cat "$tmp/rc")" -ne 0 ] || fail "a root with a stalled reply followed by later ticks passed"$'\n'"$out"
+  assert_contains "$out" "reason=unmeasured" "the stalled tick did not fail the root as unmeasured"
+  [ "$(cat "$tmp/flags.log")" = yes ] \
+    || fail "an unmeasured root took a narrower retry"$'\n'"$(cat "$tmp/flags.log")"
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
-  [ "$samples" = libproc:1,ps:1 ] \
-    || fail "the stalled tick did not fall back to ps alone with footprint used on the next tick: $samples"
+  case "$samples" in libproc:[1-9]*,unmeasured) ;; *) fail "the stalled tick was not recorded as an unmeasured interval: $samples" ;; esac
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the stalled reader was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
-  pass "a reader that misses one deadline is replaced and footprint ends the root on the next tick"
+  pass "a reader that misses one deadline is replaced, and the missed tick followed by a later one fails the root unmeasured with no narrower retry"
 }
 
 # A reader's first reply has its own longer deadline, so a reader that starts
-# slowly on a busy host still has its footprint used, with no ps fallback.
+# slowly on a busy host still has its footprint used, with no miss.
 test_resident_watch_waits_for_a_slow_first_reply() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-slow-start)
@@ -3545,16 +3544,17 @@ test_resident_watch_waits_for_a_slow_first_reply() {
   [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nno')" ] \
     || fail "a root over the bound by footprint after a slow first reply was not ended and retried narrower"$'\n'"$(cat "$tmp/flags.log")"
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
-  [ "$samples" = libproc:1,ps:0 ] \
+  [ "$samples" = libproc:1 ] \
     || fail "a first reply 1 s late was not used as the footprint sample: $samples"
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 1 ] \
     || fail "a reader whose first reply was 1 s late was replaced"$'\n'"$(cat "$tmp/py.log")"
   pass "a reader whose first reply is 1 s late keeps footprint in use"
 }
 
-# A later reply keeps the short deadline: one 1 s late costs only that tick,
-# which ps samples, and a new reader answers every tick after it.
-test_resident_watch_samples_a_slow_later_reply_by_ps() {
+# A later reply keeps the short deadline: one 1 s late is a miss for that tick, a
+# new reader answers every tick after it, and the miss followed by later ticks
+# fails the root unmeasured (96).
+test_resident_watch_fails_a_root_whose_later_reply_was_late() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-slow-later)
   printf 'slow-later\n' > "$tmp/plan"
@@ -3563,22 +3563,23 @@ test_resident_watch_samples_a_slow_later_reply_by_ps() {
     return
   fi
   out=$(cat "$tmp/out")
-  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root under the bound with one slow reply did not pass (exit $(cat "$tmp/rc"))"$'\n'"$out"
+  [ "$(cat "$tmp/rc")" -ne 0 ] || fail "a root with a late later reply followed by later ticks passed"$'\n'"$out"
+  assert_contains "$out" "reason=unmeasured" "the late reply did not fail the root as unmeasured"
   [ "$(cat "$tmp/flags.log")" = yes ] \
-    || fail "a root under the bound with one slow reply was not left to its one attempt"$'\n'"$(cat "$tmp/flags.log")"
+    || fail "an unmeasured root took a narrower retry"$'\n'"$(cat "$tmp/flags.log")"
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
   case "$samples" in
-    libproc:[2-9],ps:1) ;;
-    *) fail "a later reply 1 s late was not sampled by ps for that tick alone: $samples" ;;
+    libproc:[1-9]*,unmeasured) ;;
+    *) fail "the late later reply was not recorded as an unmeasured interval: $samples" ;;
   esac
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the reader with a slow later reply was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
-  pass "a later reply 1 s late is sampled by ps for that tick only"
+  pass "a later reply 1 s late is a miss, and with later ticks it fails the root unmeasured"
 }
 
 # A replacement reader that exits before its first reply is one failed restart,
-# not a reader that exited at start: the next replacement answers and the
-# footprint it reports still ends the root.
+# not a reader that exited at start: the next replacement answers again. The two
+# missed ticks were followed by later ones, so the root fails unmeasured (96).
 test_resident_watch_retries_a_replacement_that_exits() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-replacement-exit)
@@ -3588,15 +3589,15 @@ test_resident_watch_retries_a_replacement_that_exits() {
     return
   fi
   out=$(cat "$tmp/out")
-  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root over the bound after a failed replacement did not pass its narrower retry (exit $(cat "$tmp/rc"))"$'\n'"$out"
-  [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nno')" ] \
-    || fail "a replacement that exited before replying gave the footprint up for the root"$'\n'"$(cat "$tmp/flags.log")"
+  [ "$(cat "$tmp/rc")" -ne 0 ] || fail "a root with missed ticks followed by later ones passed"$'\n'"$out"
+  assert_contains "$out" "reason=unmeasured" "the missed ticks did not fail the root as unmeasured"
+  [ "$(cat "$tmp/flags.log")" = yes ] \
+    || fail "an unmeasured root took a narrower retry"$'\n'"$(cat "$tmp/flags.log")"
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
-  [ "$samples" = libproc:1,ps:2 ] \
-    || fail "the failed replacement's tick did not fall back to ps alone with footprint used after it: $samples"
+  case "$samples" in libproc:[1-9]*,unmeasured) ;; *) fail "the failed replacement's ticks were not recorded as an unmeasured interval: $samples" ;; esac
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 3 ] \
     || fail "the failed replacement was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
-  pass "a replacement reader that exits before replying is retried and footprint still ends the root"
+  pass "a replacement reader that exits before replying is retried, and the missed ticks fail the root unmeasured"
 }
 
 # Three failed replacements in a row give the reader up for the rest of the
@@ -3610,17 +3611,18 @@ test_resident_watch_gives_up_after_three_failed_restarts() {
     return
   fi
   out=$(cat "$tmp/out")
-  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root whose readers kept failing did not pass (exit $(cat "$tmp/rc"))"$'\n'"$out"
+  [ "$(cat "$tmp/rc")" -ne 0 ] || fail "a root no reader measured passed"$'\n'"$out"
+  assert_contains "$out" "reason=unmeasured" "a root no reader measured was not failed as unmeasured"
   [ "$(cat "$tmp/flags.log")" = yes ] \
     || fail "a root no reader answered for was not left to its one attempt"$'\n'"$(cat "$tmp/flags.log")"
   samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
   case "$samples" in
-    libproc:0,ps:[1-9]*,reader-unavailable:restarts-failed) ;;
+    libproc:0,reader-unavailable:restarts-failed,unmeasured) ;;
     *) fail "three failed replacements did not give the reader up as restarts-failed: $samples" ;;
   esac
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 4 ] \
     || fail "the watch did not stop starting readers after three failed replacements"$'\n'"$(cat "$tmp/py.log")"
-  pass "three failed replacement readers in a row give the reader up as restarts-failed"
+  pass "three failed replacement readers in a row give the reader up as restarts-failed, and the root fails unmeasured"
 }
 
 test_a_per_root_limit_above_the_default_is_clamped_and_a_lower_one_is_kept() {
@@ -4384,20 +4386,21 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
   pass "a worker started directly refuses (exit 2) and starts nothing for an oversized, omitted or self-checked bound; the owner's run with the same values injected analyzes its root under its own entry and constants"
 }
 
-# fm_lint_write_stub_python <dir> <real python>: a python3 stand-in. Every
-# send in the identity helper's program (os.kill and os.killpg) is replaced by a
-# line in $FM_TEST_SIGNAL_LOG ("kill|killpg <pid> <signal number>"); a program with
-# any other kill call is refused (exit 3, nothing run). The lint's resolution of
-# python3 (sys.executable) answers with this stand-in. FM_TEST_READER=exit makes
-# every libproc reader exit at once; FM_TEST_READER=dieafter:<n> makes the first
-# reader (marked by $FM_TEST_READER_MARK) answer <n> requests and then exit, and
-# later readers run normally; FM_TEST_READER=members makes every reader answer
-# 300000 KiB with the one member $FM_TEST_MEMBER ("<pid>:<sec>:<usec>");
+# fm_lint_write_stub_python <dir> <real python>: a python3 stand-in. The one send
+# in the root signal program (os.killpg) is replaced by a line in
+# $FM_TEST_SIGNAL_LOG ("killpg <pgid> <signal number>"), never delivered; a program
+# with any other kill call is refused (exit 3, nothing run). FM_TEST_SEND_FAIL=<NAME>
+# makes that send fail for that signal (after it is logged). FM_TEST_IDENTITY=fail
+# makes the start-time read of the watch's launch answer "unknown". The lint's
+# resolution of python3 (sys.executable) answers with this stand-in.
+# FM_TEST_READER=exit makes every libproc reader exit at once;
+# FM_TEST_READER=dieafter:<n> makes the first reader (marked by $FM_TEST_READER_MARK)
+# answer <n> requests and then exit, and later readers run normally;
+# FM_TEST_READER=members makes every reader answer 300000 KiB naming the root (by
+# its real identity) and the member $FM_TEST_MEMBER ("<pid>:<sec>:<usec>");
 # FM_TEST_READER=membersonce makes the first reader (marked by $FM_TEST_READER_MARK)
-# answer once, 1000 KiB with that one member, and every later reader exit at once.
-# FM_TEST_WATCH_TABLE=fail makes the watch's process table reading (the helper's
-# table with pgid) fail; FM_TEST_WATCH_TABLE=failuntil:<epoch> makes it fail until
-# that time.
+# answer once, 1000 KiB with the root and that member, and every later reader exit
+# at once.
 fm_lint_write_stub_python() {
   local dir=$1 real
   real=$("$2" -c 'import sys; print(sys.executable)') || fail "python3 cannot name its interpreter"
@@ -4414,24 +4417,39 @@ if args[:2] == ["-c", "import sys; print(sys.executable)"]:
 if "-c" in args:
     i = args.index("-c")
     program = args[i + 1]
+    if os.environ.get("FM_TEST_IDENTITY") == "fail" and args[i + 3:i + 4] == ["identity"]:
+        print("unknown")
+        sys.exit(0)
     if "os.kill" in program:
-        program = program.replace("os.killpg(pid, number)", "_fm_test_send('killpg', pid, number)")
-        program = program.replace("os.kill(pid, number)", "_fm_test_send('kill', pid, number)")
+        program = program.replace("os.killpg(pgid, number)", "_fm_test_send('killpg', pgid, number)")
         if "os.kill" in program:
             sys.stderr.write("stub python: a send it does not recognise; nothing was run\n")
             sys.exit(3)
         log = os.environ.get("FM_TEST_SIGNAL_LOG", os.path.join(os.path.dirname(HERE), "signals.log"))
-        program = ("def _fm_test_send(kind, pid, number):\n    open(%r, 'a').write('%%s %%d %%d\\\\n' %% (kind, pid, number))\n" % log) + program
+        program = ("def _fm_test_send(kind, pid, number):\n"
+                   "    open(%r, 'a').write('%%s %%d %%d\\\\n' %% (kind, pid, number))\n"
+                   "    import signal as _s\n"
+                   "    if %r and number == getattr(_s, 'SIG' + %r, None):\n"
+                   "        raise PermissionError('stub: send fails')\n"
+                   % (log, os.environ.get("FM_TEST_SEND_FAIL", ""), os.environ.get("FM_TEST_SEND_FAIL", ""))) + program
         args[i + 1] = program
     os.execv(REAL, [REAL] + args)
 mode = os.environ.get("FM_TEST_READER", "")
+def root_member():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("fp", args[0])
+    fp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fp)
+    root = int(args[2])
+    return "[%d,%d,%d]" % ((root,) + tuple(fp.process_identity(fp.kinfo(root))))
 if len(args) >= 3 and args[1] == "rss-tree":
     if mode == "exit":
         sys.exit(1)
     if mode == "members":
         pid, sec, usec = os.environ["FM_TEST_MEMBER"].split(":")
+        root = root_member()
         while sys.stdin.readline():
-            print('{"rss_kib":300000,"members":[[%s,%s,%s]],"uncounted":[]}' % (pid, sec, usec), flush=True)
+            print('{"rss_kib":300000,"members":[%s,[%s,%s,%s]],"uncounted":[]}' % (root, pid, sec, usec), flush=True)
         sys.exit(0)
     if mode == "membersonce":
         mark = os.environ["FM_TEST_READER_MARK"]
@@ -4439,8 +4457,9 @@ if len(args) >= 3 and args[1] == "rss-tree":
             sys.exit(1)
         open(mark, "w").close()
         pid, sec, usec = os.environ["FM_TEST_MEMBER"].split(":")
+        root = root_member()
         if sys.stdin.readline():
-            print('{"rss_kib":1000,"members":[[%s,%s,%s]],"uncounted":[]}' % (pid, sec, usec), flush=True)
+            print('{"rss_kib":1000,"members":[%s,[%s,%s,%s]],"uncounted":[]}' % (root, pid, sec, usec), flush=True)
         sys.exit(0)
     if mode.startswith("dieafter:"):
         mark = os.environ["FM_TEST_READER_MARK"]
@@ -4461,10 +4480,6 @@ if len(args) >= 3 and args[1] == "rss-tree":
                 print(answer, flush=True)
                 answered += 1
             sys.exit(0)
-_table_mode = os.environ.get("FM_TEST_WATCH_TABLE", "")
-if len(args) >= 3 and args[1] == "table" and "pgid" in args[2] and (
-        _table_mode == "fail" or _table_mode.startswith("failuntil:") and __import__("time").time() < int(_table_mode.split(":")[1])):
-    sys.exit(1)
 os.execv(REAL, [REAL] + args)
 PY
   chmod +x "$dir/python3"
@@ -4474,36 +4489,75 @@ fm_lint_live() {  # <pid>: 0 while the process exists (read through libproc; no 
   python3 "$ROOT/bin/fm-proc-info.py" ppid "$1" > /dev/null 2>&1
 }
 
-# (Main 1846 F5) The signal helper sends only to a process group: every per-process
-# form (a pid with a start time, a pid under an ancestor, a bare pid) and a malformed
-# group are refused before anything runs, and a group item goes through the one
-# send. Every send is recorded by the stub, none delivered, and the group named is
-# one no process leads.
-test_the_signal_helper_sends_only_to_a_process_group() {
-  local tmp real_python log out item stop
-  tmp=$(fm_test_tmproot fm-lint-group-signal)
+# (Main 1885 rule O) No signal route takes a group from input. The former command
+# line signal mode is gone: `signal KILL group:0` and a foreign group are refused
+# before anything runs. fm_signal_root refuses without a launch record, before any
+# process starts. The root signal program, given a fake process reader, sends only
+# when the group leader still has exactly the recorded start time and still leads
+# that group; group 0, another start time, another group and a gone leader are
+# refused (its send is a recorder; nothing is delivered).
+test_no_signal_route_takes_a_group_from_input() {
+  local tmp real_python log out rc item program sub
+  tmp=$(fm_test_tmproot fm-lint-rule-o)
   real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
   log="$tmp/signals.log"
-  sig() { FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" perl "$ROOT/bin/fm-lint-cache.pl" signal "$@" 2>&1; }
   : > "$log"
-  for item in "123:1:2" "under:1:123" 123 group:abc "group:"; do
-    sig KILL "$item" > /dev/null && fm_lint_fail_settled "the signal helper accepted the item '$item'"
+  for item in group:0 group:999999990 123:1:2 under:1:123; do
+    rc=0
+    FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" \
+      perl "$ROOT/bin/fm-lint-cache.pl" signal KILL "$item" > "$tmp/out" 2>&1 || rc=$?
+    [ "$rc" -ne 0 ] || fm_lint_fail_settled "a signal mode accepted the item '$item': $(cat "$tmp/out")"
   done
   [ ! -s "$log" ] || fm_lint_fail_settled "a refused item was sent: $(cat "$log")"
-  stop=$(kill -l STOP)
-  out=$(sig STOP group:999999990)
-  [ "$out" = "sent 999999990" ] && grep -qx "killpg 999999990 $stop" "$log" \
-    || fm_lint_fail_settled "a group item was not sent as a group: $out / $(cat "$log")"
-  ! grep -q '^kill ' "$log" || fm_lint_fail_settled "the helper sent a signal to a single process: $(cat "$log")"
-  pass "the signal helper refuses every per-process form and sends a group item only as a group (sends recorded by the stub, none delivered)"
+  sub=$(perl -0ne 'print $1 if /^(sub fm_signal_root \{\n.*?^\}\n)/ms' "$ROOT/bin/fm-lint-cache.pl")
+  [ -n "$sub" ] || fm_lint_fail_settled "fm_signal_root is missing"
+  out=$(FM_LINT_INTERNAL_PYTHON=/nonexistent perl -e 'use strict; use warnings; our $ROOT_SIGNAL_PY = ""; '"$sub"'
+print join(",", fm_signal_root("KILL", undef), fm_signal_root("KILL", {pgid => 0, sec => 1, usec => 1}),
+  fm_signal_root("KILL", {pgid => 1, sec => 1, usec => 1}), fm_signal_root("KILL", {pgid => "1 2", sec => 1, usec => 1}),
+  fm_signal_root("HUP", {pgid => 4242, sec => 1, usec => 1})), "\n";' 2>&1)
+  [ "$out" = refused,refused,refused,refused,refused ] || fm_lint_fail_settled "fm_signal_root did not refuse a missing or malformed launch record: $out"
+  program=$(perl -0ne 'print $1 if /my \$ROOT_SIGNAL_PY = <<.PYTHON.;\n(.*?)\nPYTHON\n/s' "$ROOT/bin/fm-lint-cache.pl")
+  [ -n "$program" ] || fm_lint_fail_settled "the root signal program is missing"
+  out=$(python3 -I -c '
+import os, sys, types
+program = sys.argv[1]
+sent = []
+fake = types.ModuleType("fmproc")
+fake.E_PGID = 0
+LEADERS = {4242: (100, 7, 4242), 4343: (100, 7, 1)}
+def kinfo(pid):
+    if pid not in LEADERS:
+        raise LookupError(pid)
+    return LEADERS[pid]
+fake.kinfo = kinfo
+fake.process_identity = lambda record: record[:2]
+import importlib.util, struct
+importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=types.SimpleNamespace(exec_module=lambda m: m.__dict__.update(fake.__dict__)))
+importlib.util.module_from_spec = lambda spec: types.ModuleType("fmproc")
+struct.unpack_from = lambda fmt, record, offset: (record[2],)
+os.path.exists = lambda path: False
+os.killpg = lambda pgid, number: sent.append(pgid)
+os.kill = lambda pid, number: sent.append(("kill", pid))
+for argv in (["x", "-", "KILL", "0", "100", "7"], ["x", "-", "KILL", "4242", "100", "8"], ["x", "-", "KILL", "4343", "100", "7"],
+             ["x", "-", "KILL", "4444", "100", "7"], ["x", "-", "KILL", "4242", "100", "7"]):
+    sys.argv = argv
+    try:
+        exec(compile(program, "root-signal", "exec"), {"__name__": "__main__"})
+    except SystemExit:
+        pass
+print("sent", sent)
+' "$program" 2>&1)
+  [ "$out" = "$(printf 'mismatch\nmismatch\nmismatch\ngone\nsent\nsent [4242]')" ] \
+    || fm_lint_fail_settled "the root signal program did not send only to the recorded, unchanged group leader: $out"
+  pass "no signal route takes a group from input: the command line mode is gone, a missing launch record is refused, and only the recorded, unchanged group leader's group is sent to (group 0, another start time, another group and a gone leader refused)"
 }
-# (F11, Main 1846 F5) While the libproc reader is down the watch follows the tree
-# through the process table, whose start times are whole seconds: a descendant that
-# left the root's group is counted and the root's group is ended over the bound, but
-# that descendant is never signalled; it outlives the root, so the root fails (96)
-# and records it (rss_escaped=<pid>). The stub records every send.
-test_the_watch_never_signals_a_member_known_only_by_its_start_second() {
+# (Main 1885 item 2) The reader is the only source of a sample: with no reader
+# (every reader exits at once) the watch never samples a process table, so a
+# descendant that left the root's group and holds 160 MiB is not measured; the root
+# is unmeasured (96), nothing is sent, and no peak is recorded. The stub records
+# every send.
+test_a_root_with_no_reader_is_unmeasured_and_never_sampled_from_a_table() {
   if [ "$(uname)" != Darwin ]; then
     wait 2>/dev/null || true
     pass "SKIP (the libproc helper table is macOS only): seconds-only member"
@@ -4529,12 +4583,12 @@ SH
   pid=$(cat "$tmp/leaver.pid" 2>/dev/null || true)
   [ -n "$pid" ] || fm_lint_fail_settled "the group-leaving descendant did not start"
   grep -q '^rss_reader_unavailable=exited-at-start$' "$tmp/rss" || fm_lint_fail_settled "the test did not run with the reader down: $(cat "$tmp/rss")"
-  [ "$rc" -eq 96 ] || fm_lint_fail_settled "the watch exited $rc with its reader down, expected 96: a counted descendant outside the group outlived the root: $(cat "$tmp/err")"
-  grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group was not ended over the bound (recorded): $(cat "$log")"
-  ! grep -q " $pid " "$log" || fm_lint_fail_settled "the watch signalled the descendant outside the root's group (pid $pid): $(cat "$log")"
-  grep -q "^rss_escaped=.*$pid" "$tmp/rss" || fm_lint_fail_settled "the descendant that outlived the root was not recorded: $(cat "$tmp/rss")"
+  { [ "$rc" -eq 96 ] && grep -q '^rss_unmeasured=1$' "$tmp/rss"; } || fm_lint_fail_settled "a root with no reader exited $rc, expected 96 unmeasured: $(cat "$tmp/err") $(cat "$tmp/rss")"
+  ! grep -q '^max_rss_kib=' "$tmp/rss" || fm_lint_fail_settled "the watch recorded a peak with no reader (a table was sampled): $(cat "$tmp/rss")"
+  grep -q '^rss_samples=libproc:0$' "$tmp/rss" || fm_lint_fail_settled "the watch counted a sample with no reader: $(cat "$tmp/rss")"
+  [ ! -s "$log" ] || fm_lint_fail_settled "the watch sent a signal for a tree it never measured: $(cat "$log")"
   wait 2>/dev/null || true
-  pass "with its reader down the watch counts a descendant found by the process table and ends the root's group over the bound; the descendant is never signalled, and because it outlives the root the root fails and records it"
+  pass "with no reader the watch samples nothing else: the root is unmeasured (96), nothing is sent and no peak is recorded"
 }
 
 # (F11) A restarted reader starts with an empty set of members; the watch keeps
@@ -4606,7 +4660,7 @@ test_a_watch_that_loses_every_reader_starts_no_further_root_and_fails_the_run() 
   chmod +x "$tmp/fake/ps"
   : > "$tmp/starts.log"
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_JOBS=1 \
-      FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
+      FM_TEST_READER=exit FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
       FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh bin/consumer.sh bin/library.sh > "$tmp/out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose watch lost every reader exited 0 with a root not analyzed: $(cat "$tmp/out")"
   [ "$(grep -c -- '-- bin/' "$tmp/starts.log")" -eq 1 ] || fm_lint_fail_settled "the run started another root after its watch lost every reader: $(cat "$tmp/starts.log")"
@@ -5005,7 +5059,7 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
   fm_lint_native_version_stub "$tmp/native" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): reader loss fails the root"; return; }
   : > "$tmp/starts.log"
   ( cd "$repo" && env PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-      FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
+      FM_TEST_READER=exit FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
       FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/only.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose only root ran unmeasured exited 0: $(cat "$tmp/only.out")"
   grep -q 'reason=unmeasured' "$tmp/only.out" || fm_lint_fail_settled "the run did not name the unmeasured root: $(cat "$tmp/only.out")"
@@ -5014,7 +5068,7 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
   : > "$tmp/starts.log"
   rc=0
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_HOST_SLOTS=1 \
-      FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
+      FM_TEST_READER=exit FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
       FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/queued.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run with an unmeasured root exited 0: $(cat "$tmp/queued.out")"
   [ "$(grep -c -- '-- bin/' "$tmp/starts.log")" -eq 1 ] || fm_lint_fail_settled "a root waiting at the gate was admitted after the run's watch lost every reader: $(cat "$tmp/starts.log")"
@@ -5022,15 +5076,13 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
   pass "a root that ran unmeasured fails the run and records no success, also as the only root; a root already waiting at the gate is not admitted"
 }
 
-# (Main 1775 N4) A member the watch knows whose pid now belongs to a process that
-# started in the same second but not at the same instant (a replacement) is not
-# counted, so the root's group is not ended for it; the tree is unknown, so the root
-# ends unmeasured (96). The reader names the member once,
-# with a start time 1 microsecond off, then is down; the process table shows that
-# pid with the same second and 160 MiB. The control: named with its true start time,
-# the same process is counted and the root's group is ended over the bound; the
-# process, outside that group, is never signalled and outlives the root, so the root
-# fails (96) and records it (sends recorded).
+# (Main 1775 N4) A reply that names a member whose pid now belongs to a process that
+# started in the same second but not at the same instant (a replacement) is unknown,
+# so the root's group is not ended for it and the root ends unmeasured (96). Every
+# reply names the member with a start time 1 microsecond off. The control: named
+# with its true start time, the process is counted and the root's group is ended
+# over the bound; the process, outside that group, is never signalled and outlives
+# the root, so the root fails (96) and records it (sends recorded).
 test_a_same_second_replacement_is_not_counted_against_the_root() {
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the libproc identity reader is macOS only): same-second replacement"
@@ -5050,10 +5102,9 @@ test_a_same_second_replacement_is_not_counted_against_the_root() {
     [ "$label" = replacement ] && usec=$(( usec == 999999 ? usec - 1 : usec + 1 ))
     log="$tmp/signals.$label"
     : > "$log"
-    rm -f "$tmp/mark.$label"
     rc=0
-    FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=membersonce \
-      FM_TEST_READER_MARK="$tmp/mark.$label" FM_TEST_MEMBER="$big:$sec:$usec" \
+    FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=members \
+      FM_TEST_MEMBER="$big:$sec:$usec" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- sleep 6 > "$tmp/err.$label" 2>&1 || rc=$?
     wait "$big" 2>/dev/null || true
     if [ "$label" = replacement ]; then
@@ -5073,11 +5124,13 @@ test_a_same_second_replacement_is_not_counted_against_the_root() {
   pass "a same-second replacement of a known member is not counted, so the root is not ended for it; the member with its true start time is counted, the root's group ended over the bound, and the member it never signals fails the root (sends recorded, none delivered)"
 }
 
-# (F5, Main 1846 F5) A counted descendant that left the process group is never
-# signalled: over the bound the watch ends the root's group, and the descendant,
-# which outlives it, fails the root (96, rss_escaped=<pid>); an under-bound tree is
-# left alone. Every send is recorded by the stub, none delivered; the processes end
-# on their own.
+# (F5, Main 1846 F5, Main 1885 item 4) A counted descendant that left the process
+# group is never signalled. Over the bound the watch ends the root's group, and the
+# descendant, which outlives it, fails the root (96, rss_escaped=<pid>). Under the
+# bound the same survivor of a normally ending root fails it too, with nothing sent.
+# The control: a descendant that ends before its root is a completed tree, and the
+# root passes. Every send is recorded by the stub, none delivered; the processes
+# end on their own.
 test_a_descendant_that_left_the_group_and_outlives_the_root_fails_it_unsignalled() {
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the libproc tree reader is macOS only): group-leaving descendant termination"
@@ -5088,17 +5141,17 @@ test_a_descendant_that_left_the_group_and_outlives_the_root_fails_it_unsignalled
   real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
   cat > "$tmp/leaver-parent.sh" <<'SH'
-perl -MPOSIX -e 'my $mib = shift; POSIX::setpgid(0, 0); my $held = "x" x ($mib * 1024 * 1024); sleep 10' "$2" &
+perl -MPOSIX -e 'my ($mib, $secs) = @ARGV; POSIX::setpgid(0, 0); my $held = "x" x ($mib * 1024 * 1024); sleep $secs' "$2" "$3" &
 echo "$!" > "$1"
 sleep 5
 SH
-  for label in over under; do
-    if [ "$label" = over ]; then mib=160; else mib=8; fi
+  for label in over under ended; do
+    case "$label" in over) mib=160 secs=10 ;; under) mib=8 secs=10 ;; ended) mib=8 secs=2 ;; esac
     : > "$tmp/signals.$label"
     rc=0
     FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- \
-      bash "$tmp/leaver-parent.sh" "$tmp/leaver.$label.pid" "$mib" > "$tmp/err.$label" 2>&1 || rc=$?
+      bash "$tmp/leaver-parent.sh" "$tmp/leaver.$label.pid" "$mib" "$secs" > "$tmp/err.$label" 2>&1 || rc=$?
     pid=$(cat "$tmp/leaver.$label.pid" 2>/dev/null || true)
     [ -n "$pid" ] || fm_lint_fail_settled "the group-leaving descendant did not start ($label)"
     if [ "$label" = over ]; then
@@ -5106,13 +5159,18 @@ SH
       grep -q '^killpg ' "$tmp/signals.over" || fm_lint_fail_settled "the root's group over the bound was not ended (recorded): $(cat "$tmp/signals.over")"
       ! grep -q " $pid " "$tmp/signals.over" || fm_lint_fail_settled "the watch signalled the descendant outside the root's group: $(cat "$tmp/signals.over")"
       grep -q "^rss_escaped=.*$pid" "$tmp/rss.over" || fm_lint_fail_settled "the descendant that outlived the root was not recorded: $(cat "$tmp/rss.over")"
-    else
-      [ "$rc" -eq 0 ] || fm_lint_fail_settled "a root whose tree stays under the bound exited $rc: $(cat "$tmp/err.$label")"
+    elif [ "$label" = under ]; then
+      [ "$rc" -eq 96 ] || fm_lint_fail_settled "a normally ending root whose counted descendant outlived it exited $rc, expected 96: $(cat "$tmp/err.$label")"
+      grep -q "^rss_escaped=.*$pid" "$tmp/rss.under" || fm_lint_fail_settled "the survivor of a normally ending root was not recorded: $(cat "$tmp/rss.under")"
       [ ! -s "$tmp/signals.under" ] || fm_lint_fail_settled "the watch signalled a tree under the bound: $(cat "$tmp/signals.under")"
+    else
+      [ "$rc" -eq 0 ] || fm_lint_fail_settled "a completed tree under the bound exited $rc: $(cat "$tmp/err.$label")"
+      ! grep -q '^rss_escaped=' "$tmp/rss.ended" || fm_lint_fail_settled "a descendant that ended before its root was recorded as a survivor: $(cat "$tmp/rss.ended")"
+      [ ! -s "$tmp/signals.ended" ] || fm_lint_fail_settled "the watch signalled a completed tree: $(cat "$tmp/signals.ended")"
     fi
   done
   wait 2>/dev/null || true
-  pass "over the bound the watch ends only the root's group, never the counted descendant that left it, and that descendant fails the root it outlives; an under-bound tree gets nothing (sends recorded, none delivered)"
+  pass "over the bound the watch ends only the root's group, never the counted descendant that left it; a survivor fails the root after an over-cap end and after a normal end alike, with nothing sent to it; a completed tree passes (sends recorded, none delivered)"
 }
 
 # (Main 1791 item 1) The watch's exact-member reader, run as the watch runs it (its
@@ -5287,7 +5345,7 @@ test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root() {
   chmod +x "$tmp/fake/ps"
   : > "$tmp/starts.log"
   ( cd "$repo" && env TMPDIR="$tmp/tmpdir" PATH="$tmp/native:$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_HOST_SLOTS=1 \
-      FM_TEST_READER=exit FM_TEST_WATCH_TABLE=fail FM_TEST_ANALYSIS_SECS=6 FM_TEST_SIGNAL_LOG="$tmp/signals.log" \
+      FM_TEST_READER=exit FM_TEST_ANALYSIS_SECS=6 FM_TEST_SIGNAL_LOG="$tmp/signals.log" \
       bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/out" 2>&1 ) &
   run=$!
   waited=0
@@ -5446,18 +5504,17 @@ test_a_stale_measurement_record_admits_no_new_root() {
   pass "a watched running root whose record is absent, empty, invalidated or names an old sample keeps every new root out; once it names a fresh sample the root is admitted; beside a fresh sample it is admitted at once"
 }
 
-# (Main 1806 item 4) Reader loss wins over an over-cap end: every reader fails for the
-# first ticks (the root is unmeasured), then the table recovers and the root grows past
-# the bound. The watch exits 96 (unmeasured), not 98, so no memory retry can follow.
-# (Main 1846 F3) A short loss counts the same: readers fail for about 2 s only, the
-# table recovers, and the root still exits 96.
-# The control: with the table working throughout, the same growth ends with 98.
+# (Main 1806 item 4, Main 1846 F3) Reader loss wins over an over-cap end. Every
+# reader fails (loss): the root is never measured and exits 96. A short loss: the
+# first reader answers once and exits, a new reader then answers every tick and the
+# root grows past the bound: still 96, not 98, so no memory retry can follow.
+# The control: with a reader throughout, the same growth ends with 98.
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured() {
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the resident watch runs on native macOS only): reader loss then over-cap"
     return
   fi
-  local tmp real_python rc label until_epoch
+  local tmp real_python rc label reader
   tmp=$(fm_test_tmproot fm-lint-loss-then-over)
   real_python=$(command -v python3) || fail "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
@@ -5465,12 +5522,10 @@ test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured() {
 perl -e 'my $mib = shift; sleep 6; my $held = "x" x ($mib * 1024 * 1024); sleep 3' 160
 SH
   for label in loss short control; do
-    until_epoch=0
-    [ "$label" = loss ] && until_epoch=$(( $(date +%s) + 5 ))
-    [ "$label" = short ] && until_epoch=$(( $(date +%s) + 2 ))
     rc=0
-    FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=exit \
-      FM_TEST_WATCH_TABLE="failuntil:$until_epoch" \
+    case "$label" in loss) reader='exit' ;; short) reader='dieafter:1' ;; control) reader='' ;; esac
+    FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER="$reader" \
+      FM_TEST_READER_MARK="$tmp/mark.$label" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss.$label" -- bash "$tmp/root.sh" > "$tmp/err.$label" 2>&1 || rc=$?
     if [ "$label" != control ]; then
       [ "$rc" -eq 96 ] || fail "a root unmeasured for its first ticks ($label) and later over the bound exited $rc, expected 96: $(cat "$tmp/err.$label") $(cat "$tmp/rss.$label")"
@@ -5542,19 +5597,270 @@ test_a_compiled_launcher_switching_delegates_is_analysed_every_run() {
   ! grep -q 'cache hit' "$tmp/a1.out" "$tmp/b.out" "$tmp/a2.out" || fail "a run reported a reused analysis result"
   pass "a compiled launcher switched to delegate B reported B's finding, and every run, back on A included, was analysed"
 }
-# (Main 1846 F1-F3, F5; Main 1862) The watch's, the gate's and the signal helper's
-# decisions on synthetic input: tests/fm-lint-watch-decisions.py takes each rule out
-# of bin/fm-lint-cache.pl and runs it in a foreground interpreter; it starts no lint,
-# watch, gate or background process and sends no signal.
-test_watch_gate_and_signal_decisions_hold_on_synthetic_input() {
-  local out rc=0
-  out=$(python3 -I "$ROOT/tests/fm-lint-watch-decisions.py" "$ROOT" 2>&1) || rc=$?
-  [ "$rc" -eq 0 ] || fail "a watch, gate or signal decision failed:"$'\n'"$out"
-  pass "the watch's tick and exit rules, the measurement record, reply binding, group-only signals and the removed cache hold on synthetic input ($(printf '%s\n' "$out" | grep -c '^ok - ') cases)"
+# fm_lint_source_sub <name>: the text of sub <name> in bin/fm-lint-cache.pl.
+fm_lint_source_sub() {
+  perl -0ne 'BEGIN { $name = shift } print $1 if /^(sub \Q$name\E \{\n.*?^\}\n)/ms' "$1" "$ROOT/bin/fm-lint-cache.pl"
+}
+
+# (Main 1846 F3, Main 1885) The watch's tick and exit rules on synthetic ticks: a
+# miss followed by any later tick is unmeasured, a miss on the last tick alone is
+# not; 96 (unmeasured, a survivor, a failed publication, a lost signal or record)
+# comes before 98.
+test_the_watch_tick_and_exit_rules_hold_on_synthetic_ticks() {
+  local subs out
+  subs="$(fm_lint_source_sub fm_watch_unmeasured)$(fm_lint_source_sub fm_watch_exit)"
+  [ -n "$subs" ] || fail "fm_watch_unmeasured or fm_watch_exit is missing"
+  out=$(perl -e 'use strict; use warnings; '"$subs"'
+print join(",", map { fm_watch_unmeasured(split / /, $_) } ("m s", "s m s s", "m m", "s s m", "s s", "")), "\n";
+print join(",", fm_watch_exit(unmeasured => 1, status => 0), fm_watch_exit(unmeasured => 1, over => 1),
+  fm_watch_exit(warned => 1, over => 1), fm_watch_exit(escaped => 1, status => 0), fm_watch_exit(unpublished => 1),
+  fm_watch_exit(lost => 1, over => 1), fm_watch_exit(over => 1), fm_watch_exit(signal => 15), fm_watch_exit(status => 256),
+  fm_watch_exit(status => 0)), "\n";' 2>&1)
+  [ "$out" = "$(printf '1,1,1,0,0,0\n96,96,96,96,96,96,98,143,1,0')" ] || fail "the watch's tick or exit rule changed: $out"
+  pass "a miss followed by a later tick is unmeasured and a last-tick miss is not; 96 comes before 98 for every unmeasured, survivor, publication or lost-signal end"
+}
+
+# (Main 1846 F2, Main 1885 item 3) The measurement record: only a sample at most 5 s
+# old is proof; a published sample is read back; an invalidated record is not proof
+# at once; a publication into a directory that takes no file fails, and the record
+# is then invalidated in place; a record that cannot be invalidated at all (file and
+# directory unwritable) is reported, which the watch answers by keeping the host
+# admission lock (its header).
+test_the_measurement_record_rules_hold_on_synthetic_records() {
+  local subs tmp out
+  if [ "$(id -u)" -eq 0 ]; then pass "SKIP (a read-only directory still takes files as root): measurement record rules"; return; fi
+  subs="$(fm_lint_source_sub fm_health_publish)$(fm_lint_source_sub fm_health_invalidate)$(fm_lint_source_sub fm_health_fresh)"
+  [ -n "$subs" ] || fail "a measurement record sub is missing"
+  tmp=$(fm_test_tmproot fm-lint-record-rules)
+  out=$(perl -e 'use strict; use warnings; '"$subs"'
+my ($dir) = @ARGV;
+my $path = "$dir/slot.1.peak.health";
+my $now = time;
+sub write_record { open(my $fh, ">", $path) or die; print {$fh} @_; close $fh; }
+my @r;
+push @r, fm_health_fresh($path, $now);
+write_record(""); push @r, fm_health_fresh($path, $now);
+write_record("failed a sample was missed\n"); push @r, fm_health_fresh($path, $now);
+write_record(sprintf("sample %.6f\n", $now - 6)); push @r, fm_health_fresh($path, $now);
+write_record(sprintf("sample %.6f\n", $now + 5)); push @r, fm_health_fresh($path, $now);
+write_record(sprintf("sample %.6f\n", $now - 1)); push @r, fm_health_fresh($path, $now);
+print join(",", @r), "\n";
+unlink $path;
+print join(",", fm_health_publish($path, $now), fm_health_fresh($path, $now), fm_health_invalidate($path, "a sample was missed"), fm_health_fresh($path, $now)), "\n";
+write_record(sprintf("sample %.6f\n", $now));
+chmod 0500, $dir;
+my @f = (fm_health_publish($path, $now), fm_health_invalidate($path, "the sample could not be published"), fm_health_fresh($path, $now));
+chmod 0700, $dir;
+write_record(sprintf("sample %.6f\n", $now));
+chmod 0400, $path; chmod 0500, $dir;
+push @f, fm_health_invalidate($path, "x"), fm_health_fresh($path, $now);
+chmod 0700, $dir; chmod 0600, $path;
+print join(",", @f), "\n";' "$tmp" 2>&1)
+  [ "$out" = "$(printf '0,0,0,0,0,1\n1,1,1,0\n0,1,0,0,1')" ] || fail "a measurement record rule changed: $out"
+  pass "only a fresh sample is proof; a published sample is read back and invalidated at once; a failed publication is invalidated in place; a record that cannot be invalidated is reported (and stays fresh, which the watch answers with the host lock)"
+}
+
+# (Main 1846 F1, Main 1885 item 2) The reply check, run on a fake process reader:
+# unchanged identities are bound; a recycled member (another second or the same
+# second), an ended or unreadable member, and a zombie or exiting root are unknown.
+test_the_reply_check_binds_members_and_refuses_a_zombie_root() {
+  local program out
+  program=$(perl -0ne 'print $1 if /my \$verify_members_py = <<.PYTHON.;\n(.*?)\nPYTHON\n/s' "$ROOT/bin/fm-lint-cache.pl")
+  [ -n "$program" ] || fail "the reply check program is missing"
+  out=$(python3 -I -c '
+import sys, types, importlib.util, struct
+program = sys.argv[1]
+fake = types.ModuleType("fmproc")
+fake.P_STAT, fake.SZOMB, fake.P_FLAG, fake.P_WEXIT = 0, 5, 1, 0x2000
+state = {}
+def kinfo(pid):
+    if pid not in state:
+        raise LookupError(pid)
+    if state[pid] == "unreadable":
+        raise OSError("unreadable")
+    return state[pid]
+fake.kinfo = kinfo
+fake.process_identity = lambda record: record[2:4]
+importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=types.SimpleNamespace(exec_module=lambda m: m.__dict__.update(fake.__dict__)))
+importlib.util.module_from_spec = lambda spec: types.ModuleType("fmproc")
+struct.unpack_from = lambda fmt, record, offset: (record[1],)
+def run(table, items):
+    state.clear(); state.update(table)
+    sys.argv = ["x", "-", "10"] + items
+    try:
+        exec(compile(program, "reply-check", "exec"), {"__name__": "__main__"})
+    except SystemExit:
+        pass
+live = (0, 0, 100, 1)
+run({10: live, 43: (0, 0, 100, 5)}, ["10:100:1", "43:100:5"])
+run({10: live, 43: (0, 0, 100, 6)}, ["10:100:1", "43:100:5"])
+run({10: live, 43: (0, 0, 101, 5)}, ["10:100:1", "43:100:5"])
+run({10: live}, ["10:100:1", "43:100:5"])
+run({10: live, 43: "unreadable"}, ["10:100:1", "43:100:5"])
+run({10: (5, 0, 100, 1)}, ["10:100:1"])
+run({10: (0, 0x2000, 100, 1)}, ["10:100:1"])
+' "$program" 2>&1)
+  [ "$out" = "$(printf 'same\nunknown\nunknown\nunknown\nunknown\nunknown\nunknown')" ] || fail "the reply check changed: $out"
+  pass "a reply is bound only when every member keeps its identity and the root is neither a zombie nor exiting"
+}
+
+# (Main 1885 items 2 and 7) Source facts: the watch reads no process table (no ps,
+# no helper table or memory listing), signals only through the launch record, and
+# no analysis result is reused anywhere.
+test_the_watch_reads_no_table_and_no_result_is_reused() {
+  local watch src lint
+  src=$(cat "$ROOT/bin/fm-lint-cache.pl")
+  lint=$(cat "$ROOT/bin/fm-lint.sh")
+  watch=$(printf '%s\n' "$src" | awk '/^# Private resident-memory watch/ { on = 1 } /^my \(\$mode, \$root, @args\) = @ARGV;/ { on = 0 } on')
+  [ -n "$watch" ] || fail "the watch block was not found"
+  ! printf '%s\n' "$watch" | grep -q -e "'ps'" -e "'table'" -e "'memory'" -e 'read_table' || fail "the watch still reads a process table"
+  ! printf '%s\n' "$watch" | grep -q -e 'fm_signal_items' -e 'group:' -e "kill(0" || fail "the watch signals by another route"
+  [ "$(printf '%s\n' "$src" | grep -c 'os\.killpg(')" -eq 1 ] || fail "the one root signal send is missing or repeated"
+  ! printf '%s\n' "$src" | grep -q 'os\.kill(' || fail "a send to a single process remains"
+  ! printf '%s\n' "$src" | grep -q -e 'sub fingerprint' -e '\.passed' -e 'DELEGATE_SAMPLER_PY' -e 'cache hit' || fail "a reuse path remains in the helper"
+  ! printf '%s\n' "$lint" | grep -q -e 'FM_LINT_INTERNAL_CACHE' -e 'CACHE_DIR=' -e 'SHELLCHECK_DELEGATE' || fail "the lint still passes or reads a cache setting"
+  pass "the watch reads no process table and signals only through its launch record, and no analysis result is reused"
+}
+
+# (Main 1885 item 4) A hold is counted only on a sent STOP; a CONT that is not sent
+# keeps the root held, is tried once more, and then the root's group is ended and
+# the root fails (96, rss_cont_failed=1). The control: a STOP that is never sent
+# leaves the root unheld, no CONT is sent, and the root passes. Sends are recorded
+# by the stub, never delivered.
+test_a_failed_resume_ends_the_held_root_and_fails_it() {
+  if [ "$(uname)" != Darwin ]; then pass "SKIP (the resident watch runs on native macOS only): failed resume"; return; fi
+  local tmp real_python label rc pid waited stop cont kill_number
+  tmp=$(fm_test_tmproot fm-lint-failed-resume)
+  real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  stop=$(kill -l STOP); cont=$(kill -l CONT); kill_number=$(kill -l KILL)
+  for label in cont stop; do
+    : > "$tmp/signals.$label"
+    : > "$tmp/peak.$label.hold"
+    rc=0
+    FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_SEND_FAIL="$([ "$label" = cont ] && echo CONT || echo STOP)" \
+      FM_LINT_INTERNAL_SLOT_PEAK_FILE="$tmp/peak.$label" \
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$label" -- sleep 7 > "$tmp/err.$label" 2>&1 &
+    pid=$!
+    waited=0
+    while ! grep -q "^killpg [0-9]* $stop\$" "$tmp/signals.$label" && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
+    rm -f "$tmp/peak.$label.hold"
+    wait "$pid" || rc=$?
+    if [ "$label" = cont ]; then
+      { [ "$rc" -eq 96 ] && grep -q '^rss_cont_failed=1$' "$tmp/rss.cont"; } \
+        || fm_lint_fail_settled "a root whose resume failed twice exited $rc, expected 96 with rss_cont_failed: $(cat "$tmp/err.cont") $(cat "$tmp/rss.cont")"
+      [ "$(grep -c "^killpg [0-9]* $cont\$" "$tmp/signals.cont")" -eq 2 ] || fm_lint_fail_settled "a failed resume was not tried exactly twice: $(cat "$tmp/signals.cont")"
+      grep -q "^killpg [0-9]* $kill_number\$" "$tmp/signals.cont" || fm_lint_fail_settled "the root left held was not ended: $(cat "$tmp/signals.cont")"
+    else
+      [ "$rc" -eq 0 ] || fm_lint_fail_settled "a root whose hold was never sent exited $rc: $(cat "$tmp/err.stop")"
+      ! grep -q "^killpg [0-9]* $cont\$" "$tmp/signals.stop" || fm_lint_fail_settled "a root never held was sent a resume: $(cat "$tmp/signals.stop")"
+    fi
+  done
+  pass "a failed resume keeps the root held, is retried once, then ends the root, which fails (96); a hold that was never sent is not counted and needs no resume"
+}
+
+# (Main 1885 rule O) A watch that cannot record its root's start time never lets the
+# root execute: it exits 96 with rss_launch_unrecorded=1 and the command never ran.
+test_a_root_whose_start_time_cannot_be_recorded_never_runs() {
+  if [ "$(uname)" != Darwin ]; then pass "SKIP (the resident watch runs on native macOS only): launch record"; return; fi
+  local tmp real_python rc=0
+  tmp=$(fm_test_tmproot fm-lint-launch-record)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_IDENTITY=fail FM_TEST_SIGNAL_LOG="$tmp/signals.log" \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- touch "$tmp/ran" > "$tmp/err" 2>&1 || rc=$?
+  { [ "$rc" -eq 96 ] && grep -q '^rss_launch_unrecorded=1$' "$tmp/rss"; } || fail "a watch without its root's start time exited $rc: $(cat "$tmp/err")"
+  [ ! -e "$tmp/ran" ] || fail "the root executed before its start time was recorded"
+  [ ! -s "$tmp/signals.log" ] || fail "a signal was sent without a launch record: $(cat "$tmp/signals.log")"
+  rc=0
+  FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_SIGNAL_LOG="$tmp/signals.log" \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.control" -- touch "$tmp/ran" > "$tmp/err.control" 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && [ -e "$tmp/ran" ] || fail "the control watch with a readable start time did not run its root ($rc): $(cat "$tmp/err.control")"
+  pass "a root whose start time cannot be recorded never executes (96); with the record the same root runs"
+}
+
+# (Main 1885 item 3) A live host-ledger entry that cannot be read as an entry names
+# no root, charge or record: it is never charged at the requester's worst case and
+# refuses every admission while it is held, and the gate says so; once its holder
+# ends, the root is admitted.
+test_a_live_malformed_ledger_entry_admits_no_root() {
+  local tmp root pid waited
+  tmp=$(fm_test_tmproot fm-lint-malformed-entry)
+  FM_LINT_RELEASE_FILES="$tmp/release"
+  mkdir -p "$tmp/bin" "$tmp/host.lock.ledger"
+  fm_lint_write_barrier_shellcheck "$tmp/bin" 8 "$tmp/barrier.log"
+  root="$tmp/a.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$root"
+  : > "$tmp/barrier.log"
+  perl -MFcntl=:flock -MTime::HiRes=sleep,time -e '
+    my ($dir, $release, $ready) = @ARGV;
+    my $path = "$dir/entry.$$.1";
+    open(my $fh, ">>", $path) or die; flock($fh, LOCK_EX) or die;
+    truncate($fh, 0); syswrite($fh, "not an entry\n");
+    open(my $r, ">", $ready) or die; close $r;
+    my $u = time() + 60; sleep 0.05 until -e $release || time() > $u; unlink $path;' \
+    "$tmp/host.lock.ledger" "$tmp/release" "$tmp/ready" &
+  waited=0
+  while [ ! -e "$tmp/ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
+  FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" malformed "$root" -- \
+    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/malformed.out" 2>&1 &
+  pid=$!
+  sleep 3
+  [ ! -s "$tmp/barrier.log" ] || fm_lint_fail_settled "a root was admitted beside a live ledger entry that cannot be read"
+  grep -q 'cannot be read as an entry' "$tmp/malformed.out" || fm_lint_fail_settled "the gate did not name the unreadable entry: $(cat "$tmp/malformed.out")"
+  : > "$tmp/release"
+  wait "$pid" || fm_lint_fail_settled "the root failed once the entry was freed: $(cat "$tmp/malformed.out")"
+  [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root did not start once the entry was freed"
+  wait 2>/dev/null || true
+  pass "a live ledger entry that cannot be read refuses every admission and is named; once freed, the root is admitted"
+}
+
+# (Main 1885 item 3) A measurement record that cannot be invalidated (its file and
+# directory made unwritable after the first samples, then a missed sample): the
+# watch keeps the host admission lock, so no gate anywhere can decide, ends its
+# root (recorded, not delivered) and fails it (96, rss_invalidation_failed=1), and
+# releases the lock only after the root is reaped.
+test_a_record_that_cannot_be_invalidated_keeps_the_host_lock_until_the_root_ends() {
+  if [ "$(uname)" != Darwin ]; then pass "SKIP (the resident watch runs on native macOS only): invalidation failure"; return; fi
+  if [ "$(id -u)" -eq 0 ]; then pass "SKIP (a read-only directory still takes files as root): invalidation failure"; return; fi
+  local tmp real_python rc=0 pid waited held_during held_after kill_number
+  tmp=$(fm_test_tmproot fm-lint-invalidation-failure)
+  real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  kill_number=$(kill -l KILL)
+  mkdir -p "$tmp/rec"
+  : > "$tmp/host.lock"
+  FM_TEST_SIGNAL_LOG="$tmp/signals.log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=dieafter:2 FM_TEST_READER_MARK="$tmp/mark" \
+    FM_LINT_INTERNAL_SLOT_PEAK_FILE="$tmp/rec/peak" FM_LINT_INTERNAL_HOST_LOCK="$tmp/host.lock" \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- sleep 9 > "$tmp/err" 2>&1 &
+  pid=$!
+  waited=0
+  while ! grep -q '^sample ' "$tmp/rec/peak.health" 2>/dev/null && [ "$waited" -lt 100 ]; do sleep 0.05; waited=$((waited + 1)); done
+  chmod 0400 "$tmp/rec/peak.health"; chmod 0500 "$tmp/rec"
+  waited=0
+  while ! grep -q 'keeps the host admission lock' "$tmp/err" && [ "$waited" -lt 150 ]; do sleep 0.1; waited=$((waited + 1)); done
+  held_during=0
+  perl -MFcntl=:flock -e 'open(my $f, ">>", $ARGV[0]) or exit 2; exit(flock($f, LOCK_EX | LOCK_NB) ? 0 : 1)' "$tmp/host.lock" || held_during=$?
+  chmod 0700 "$tmp/rec"; chmod 0600 "$tmp/rec/peak.health"
+  wait "$pid" || rc=$?
+  held_after=0
+  perl -MFcntl=:flock -e 'open(my $f, ">>", $ARGV[0]) or exit 2; exit(flock($f, LOCK_EX | LOCK_NB) ? 0 : 1)' "$tmp/host.lock" || held_after=$?
+  [ "$held_during" -eq 1 ] || fm_lint_fail_settled "the host admission lock was free while the record could not be invalidated ($held_during): $(cat "$tmp/err")"
+  { [ "$rc" -eq 96 ] && grep -q '^rss_invalidation_failed=1$' "$tmp/rss"; } || fm_lint_fail_settled "the root exited $rc, expected 96 with rss_invalidation_failed: $(cat "$tmp/err") $(cat "$tmp/rss")"
+  grep -q "^killpg [0-9]* $kill_number\$" "$tmp/signals.log" || fm_lint_fail_settled "the root was not ended: $(cat "$tmp/signals.log")"
+  [ "$held_after" -eq 0 ] || fm_lint_fail_settled "the host admission lock stayed held after the root was reaped"
+  pass "a record that cannot be invalidated keeps the host admission lock until its root is reaped; the root is ended and fails (96)"
 }
 
 fm_lint_test_cases=(
-test_watch_gate_and_signal_decisions_hold_on_synthetic_input
+test_the_watch_tick_and_exit_rules_hold_on_synthetic_ticks
+test_the_measurement_record_rules_hold_on_synthetic_records
+test_the_reply_check_binds_members_and_refuses_a_zombie_root
+test_the_watch_reads_no_table_and_no_result_is_reused
+test_a_failed_resume_ends_the_held_root_and_fails_it
+test_a_root_whose_start_time_cannot_be_recorded_never_runs
+test_a_live_malformed_ledger_entry_admits_no_root
+test_a_record_that_cannot_be_invalidated_keeps_the_host_lock_until_the_root_ends
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
 test_oversubscribed_runs_share_the_cap_and_all_finish
@@ -5622,9 +5928,9 @@ test_resident_watch_reads_only_its_own_tree
 test_resident_watch_bounds_footprint_beyond_resident
 test_resident_watch_ends_a_tree_whose_memory_sits_in_descendants_and_an_orphan
 test_a_descendant_that_left_the_group_and_outlives_the_root_fails_it_unsignalled
-test_the_signal_helper_sends_only_to_a_process_group
+test_no_signal_route_takes_a_group_from_input
 test_the_watch_never_ends_an_unrelated_process_that_holds_a_members_old_pid
-test_the_watch_never_signals_a_member_known_only_by_its_start_second
+test_a_root_with_no_reader_is_unmeasured_and_never_sampled_from_a_table
 test_a_restarted_reader_keeps_a_member_that_left_the_group_and_was_orphaned
 test_a_watch_that_loses_every_reader_starts_no_further_root_and_fails_the_run
 test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted
@@ -5640,7 +5946,7 @@ test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
 test_a_compiled_launcher_switching_delegates_is_analysed_every_run
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
-test_resident_watch_samples_a_slow_later_reply_by_ps
+test_resident_watch_fails_a_root_whose_later_reply_was_late
 test_resident_watch_retries_a_replacement_that_exits
 test_resident_watch_gives_up_after_three_failed_restarts
 )

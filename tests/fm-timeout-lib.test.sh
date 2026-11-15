@@ -676,7 +676,7 @@ repo = fixture / 'repo'
 (repo / 'bin').mkdir(parents=True)
 (repo / 'tests').mkdir()
 (repo / 'bin/backends').mkdir()
-for name in ('fm-lint.sh', 'fm-lint-cache.pl', 'fm-timeout-lib.sh', 'fm-duration-lib.sh', 'fm-duration.py'):
+for name in ('fm-lint.sh', 'fm-lint-cache.pl', 'fm-proc-info.py', 'fm-timeout-lib.sh', 'fm-duration-lib.sh', 'fm-duration.py'):
     shutil.copyfile(root / 'bin' / name, repo / 'bin' / name)
 (repo / 'bin/fm-lint-workflows.sh').write_text('#!/bin/bash\nexit 0\n')
 (repo / 'bin/consumer.sh').write_text('#!/bin/bash\nprintf cold\n')

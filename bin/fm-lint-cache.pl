@@ -18,62 +18,72 @@ use Fcntl qw(:flock F_SETFD);
 use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
 
-# Signalling. The watch signals only the process group of its own root, which it
-# created and whose leader it has not reaped (so that group cannot belong to another
-# process), and the gate and the watch signal only their own unreaped child. No
-# process is ever signalled by its pid: a counted process outside the root's group
-# is never signalled; a root that cannot be ended without signalling one fails
-# (status 96) instead. Group signals go through fm_signal_items, in one python
-# process, through the one send() below, so a test can record them instead of
-# sending them. An item is "group:<pgid>"; any other form is refused. Each result
-# line is "<sent|gone|unreadable|refused> <pgid>".
-my $IDENTITY_SIGNAL_PY = <<'PYTHON';
-import os, signal, sys
-number = getattr(signal, "SIG" + sys.argv[2])
-def send(pid, group):
-    if group:
-        os.killpg(pid, number)
-for item in sys.argv[3:]:
-    kind, _, value = item.partition(":")
-    if kind != "group" or not value.isdigit():
-        print("refused", value if value.isdigit() else 0)
-        continue
-    pid = int(value)
+# Signalling (rule O, Main 1885). A signal goes only to the process group the watch
+# itself created for its root and recorded at launch: the root's pid, which leads
+# that group, and the root's exact start time, read before the root executes
+# anything. fm_signal_root takes only that launch record, never a group from
+# input; group 0 and 1 are refused. In one python step it reads the group leader
+# again and sends only when the leader still has exactly the recorded start time
+# and still leads that group, so no other process's group is ever signalled, also
+# after the root is reaped and its pid reused. It returns "sent", "gone" (no such
+# process), "mismatch" (another process, or another group: nothing sent),
+# "unreadable" (nothing sent) or "refused" (no launch record). There is no command
+# line route to it. The gate and the check mode forward TERM to their own unreaped
+# child, as on the base.
+my $ROOT_SIGNAL_PY = <<'PYTHON';
+import importlib.util, os, signal, struct, sys
+LINUX = os.path.exists("/proc/self/stat")
+def leader(pgid):
+    # (exact start identity, the group it leads); LookupError when there is none.
+    if LINUX:
+        try:
+            with open("/proc/%d/stat" % pgid) as handle:
+                fields = handle.read().rsplit(")", 1)[1].split()
+        except FileNotFoundError:
+            raise LookupError(pgid)
+        return (int(fields[19]), 0), int(fields[2])
+    spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
+    fp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fp)
+    record = fp.kinfo(pgid)
+    return tuple(fp.process_identity(record)), struct.unpack_from("i", record, fp.E_PGID)[0]
+try:
+    number = getattr(signal, "SIG" + sys.argv[2])
+    pgid, recorded = int(sys.argv[3]), (int(sys.argv[4]), int(sys.argv[5]))
+    if pgid <= 1:
+        print("mismatch")
+        sys.exit(0)
     try:
-        send(pid, True)
-        print("sent", pid)
+        identity, group = leader(pgid)
+    except LookupError:
+        print("gone")
+        sys.exit(0)
+    if identity != recorded or group != pgid:
+        print("mismatch")
+        sys.exit(0)
+    try:
+        os.killpg(pgid, number)
     except ProcessLookupError:
-        print("gone", pid)
-    except Exception:
-        print("unreadable", pid)
+        print("gone")
+        sys.exit(0)
+    print("sent")
+except SystemExit:
+    raise
+except Exception:
+    print("unreadable")
 PYTHON
-sub fm_signal_items {
-    my ($name, @items) = @_;
-    my %result = (gone => [], unreadable => [], refused => [], sent => []);
-    return \%result unless @items;
+sub fm_signal_root {
+    my ($name, $launch) = @_;
+    return 'refused' unless ref $launch eq 'HASH' && ($name // '') =~ /\A(?:TERM|KILL|STOP|CONT)\z/
+        && ($launch->{pgid} // '') =~ /\A[0-9]+\z/ && $launch->{pgid} > 1
+        && ($launch->{sec} // '') =~ /\A[0-9]+\z/ && ($launch->{usec} // '') =~ /\A[0-9]+\z/;
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
-    my %seen;
-    if (open(my $py, '-|', $python, '-I', '-c', $IDENTITY_SIGNAL_PY, '-', $name, @items)) {
-        while (my $line = <$py>) {
-            next unless $line =~ /\A(gone|unreadable|refused|sent) ([0-9]+)\n\z/;
-            push @{$result{$1}}, $2 + 0;
-            $seen{$2 + 0} = 1;
-        }
-        close $py;
-    }
-    push @{$result{unreadable}}, grep { !$seen{$_} } map { /([0-9]+)\z/ ? $1 + 0 : () } @items;
-    return \%result;
-}
-# Private mode: perl fm-lint-cache.pl signal <HUP|INT|TERM|KILL|CONT|STOP> group:<pgid>...
-# prints "<sent|gone|unreadable|refused> <pgid>" for each and exits 0. Any item that
-# is not a group is refused by this invocation and nothing runs.
-if (($ARGV[0] // '') eq 'signal') {
-    my (undef, $name, @items) = @ARGV;
-    die "fm-lint-signal: invalid private invocation\n"
-        unless ($name // '') =~ /\A(?:HUP|INT|TERM|KILL|CONT|STOP)\z/ && @items && !grep { !/\Agroup:[0-9]+\z/ } @items;
-    my $result = fm_signal_items($name, @items);
-    for my $kind (qw(sent gone unreadable refused)) { print "$kind $_\n" for @{$result->{$kind}}; }
-    exit 0;
+    no warnings 'exec';
+    open(my $py, '-|', $python, '-I', '-c', $ROOT_SIGNAL_PY, $launch->{helper} // '', $name, @{$launch}{qw(pgid sec usec)})
+        or return 'unreadable';
+    my $answer = <$py> // '';
+    close $py;
+    return $answer =~ /\A(sent|gone|mismatch|unreadable)\n\z/ ? $1 : 'unreadable';
 }
 
 # The state of one process, for the probe lane: perl runs
@@ -87,16 +97,25 @@ if (($ARGV[0] // '') eq 'signal') {
 # watch's last successful sample, as one line "sample <epoch seconds>". The gate
 # never creates it: it removes any old record when it admits the root, so a root
 # has no record until its watch has taken a sample. The watch writes the record
-# after each successful sample, and at its first miss or failed publication it
-# invalidates the record at once (rewritten as "failed <why>" by a staged rename,
-# else in place, else removed), and never publishes for that root again. A gate
-# counts a record as proof only when its line is a sample at most 5 s old.
+# after each successful sample and reads it back (fm_health_publish succeeds only
+# when the record now holds exactly that line). At its first miss or failed
+# publication it invalidates the record at once, under the host admission lock
+# (rewritten as "failed <why>" by a staged rename, else in place, else removed),
+# and never publishes for that root again; if even that fails it keeps the host
+# lock until its root has ended (the watch's header). A gate counts a record as
+# proof only when its line is a sample at most 5 s old.
 sub fm_health_publish {
     my ($path, $time) = @_;
-    my ($staged, $fh) = ("$path.tmp.$$");
-    return 1 if open($fh, '>', $staged) && printf({$fh} "sample %.6f\n", $time) && close($fh) && rename($staged, $path);
-    unlink $staged;
-    return 0;
+    my $line = sprintf "sample %.6f\n", $time;
+    my ($staged, $fh, $back) = ("$path.tmp.$$");
+    unless (open($fh, '>', $staged) && print({$fh} $line) && close($fh) && rename($staged, $path)) {
+        unlink $staged;
+        return 0;
+    }
+    return 0 unless open($fh, '<', $path);
+    { local $/; $back = <$fh> // ''; }
+    close $fh;
+    return $back eq $line ? 1 : 0;
 }
 sub fm_health_invalidate {
     my ($path, $why) = @_;
@@ -124,10 +143,11 @@ sub fm_watch_unmeasured {
     my @ticks = @_;
     return (grep { $ticks[$_] eq 'm' } 0 .. $#ticks - 1) ? 1 : 0;
 }
-# The watch's exit status: unmeasured (96) comes before an over-cap end (98).
+# The watch's exit status: unmeasured, a survivor, a failed publication, or a lost
+# signal or record (96) comes before an over-cap end (98).
 sub fm_watch_exit {
     my (%end) = @_;
-    return 96 if $end{warned} || $end{unmeasured} || $end{escaped} || $end{unpublished};
+    return 96 if $end{warned} || $end{unmeasured} || $end{escaped} || $end{unpublished} || $end{lost};
     return 98 if $end{over};
     return 128 + $end{signal} if $end{signal};
     my $status = $end{status} // 0;
@@ -759,7 +779,7 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         return $found;
     };
     my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued, $stale_roots);
+    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued, $stale_roots, $malformed_said);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
@@ -807,7 +827,10 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
             close $record;
             if ($line =~ /\A([0-9]+)\t([0-9]+)\t([^\t\n]*)\t([01])\n\z/) { push @live, [$1 + 0, $2 + 0, $3, $4 + 0]; }
             elsif ($line =~ /\A([0-9]+)\t([0-9]+)\t(.*)\n\z/) { push @live, [$1 + 0, $2 + 0, $3, undef]; }
-            else { push @live, [undef, undef, undef]; }
+            # A live entry this gate cannot read as an entry names no root, no charge
+            # and no record: it is never charged at this request's worst case; it
+            # refuses every admission until its holder ends (the admission below).
+            else { push @live, [undef, undef, undef, undef, $path]; }
         }
         return @live;
     };
@@ -982,6 +1005,14 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                             defined $gate_pid && $gate_pid != $$ && ($watched // 1)
                                 && !(defined $peak && length $peak && fm_health_fresh("$peak.health", Time::HiRes::time()))
                         } values %by_gate;
+                        # A live ledger entry that cannot be read as an entry refuses
+                        # admission: its root, charge and record are unknown.
+                        my @malformed = map { $_->[4] } grep { defined $_->[4] } @unnamed;
+                        if (@malformed && !$malformed_said++) {
+                            print STDERR "fm-lint: host ledger entry " . join(', ', @malformed) . " is held by a live process but cannot be read as an entry; "
+                                . "no root is admitted on this host until it is freed\n";
+                        }
+                        $stale += @malformed;
                         $stale_roots = $stale;
                         my $outside = $foreign->($table, @host_charges);
                         $fits = !$stale && (!@host_charges && !$outside
@@ -1151,79 +1182,71 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 
 # Private resident-memory watch. Usage: perl fm-lint-cache.pl rsswatch <limit-kib> <rss-file> -- <command...>
 # fm-lint.sh runs this only on native macOS, which cannot apply ulimit -v and so
-# has no other memory bound on a root. It runs the command in a process group
-# of its own and samples once a second that command's process tree within that
-# group, reading only the tree's own processes and never the whole host's: the
-# command, its descendants in any group or session, and each process the reader
-# has seen in the tree that was later orphaned (its parent left it to the init
-# process), so a memory-holding grandchild cannot leave the count by outliving
-# its parent. Each sample is the larger of the tree's resident size and its
-# physical footprint, which also counts the compressed pages jetsam counts, both
-# read by a long-lived libproc reader (fm-proc-info.py rss-tree) started at the
-# first tick, so a command that ends sooner starts none. Each reader runs under the
-# interpreter fm-lint.sh resolved once (FM_LINT_INTERNAL_PYTHON), or python3
-# when that is unset. A reader's first reply may take 2 s, which covers its
-# start-up; each later reply has 0.5 s. A tick whose reply is late or malformed
-# is sampled by ps, which gives resident size alone; that reply is discarded
-# and a new reader starts for the next tick. A replacement that cannot start,
-# or that fails before it replies, is one failed restart, and the next tick
-# tries again. The reader is given up for the rest
-# of the command, with ps sampling every later tick, only when libproc cannot
-# read the command, the command's first reader exits before its first reply,
-# or three restarts in a row fail; a good reply resets that count. The reason
-# is then appended to <rss-file> once as rss_reader_unavailable=<reason>. Crossing the limit ends the group with
-# KILL, records the peak sampled as max_rss_kib=<KiB> in <rss-file> (the file
-# /usr/bin/time would have written), names the bound on stderr, and exits 98,
-# which fm-lint.sh reports as a memory failure so the root takes its narrower
-# retry. Any other end passes the command's own status straight through.
-# Every end appends to
-# <rss-file> how many samples each source gave, as
-# rss_samples=libproc:<n>,ps:<n>, for the roots log, and the peak the watch itself
-# read as watch_peak_kib=<KiB> (the larger of the tree's resident size and
-# footprint; /usr/bin/time's own figure is a different measurement and the roots log
-# keeps the two in separate columns). Each new peak is also
-# written to FM_LINT_INTERNAL_SLOT_PEAK_FILE when the host-slot gate names one,
-# so the gate's admission charges it. A signal to the watch, or
-# the loss of its parent, ends the group within about one tick (about 1 s, or
-# about 6 s if the command ignores TERM) after the lint that started it ends;
-# the watch itself sits in a group of its own, out of reach of its owner's
-# group sweep. When every reader fails three ticks in a row (libproc and the
-# process table), or stays unknown, the watch warns once, writes
-# FM_LINT_INTERNAL_ABORT_FILE so the run's gates admit no further root, records
-# rss_unmeasured=1 in <rss-file>, goes on sampling each later tick, and exits 96
-# (unmeasured) when the root ends, whatever the root's own status, so no success
-# is recorded for it. A process the memory reading does not name makes the
-# tick a miss, never a zero. Any miss while the root runs that is followed by a
-# later tick, even one, makes the root exit 96 the same way (fm_watch_unmeasured);
-# only a miss on the root's very last tick, its own exit, is exempt. The watch
-# publishes each sample to <peak file>.health and invalidates that record at its
-# first miss or failed publication (fm_health_publish, fm_health_invalidate), and a
-# publication that fails also makes the root exit 96.
-# After each reader reply, every member the reply names is read again through
-# libproc: the reply's identity (read in the census before the memory read) must
-# equal the identity read after it, or the tick is a miss; a member that has ended
-# meanwhile also makes the tick a miss.
-# The watch never signals a process by its pid. It signals only its root's process
-# group, before it reaps the root: TERM or KILL to end it, and STOP or CONT while
-# the gate's growth guard holds it (<peak file>.hold). A counted process outside the
-# group is never signalled: if one still runs (or cannot be proven ended) when a root
-# ended over the bound or on a signal, the root fails (96), the run admits no
-# further root, and <rss-file> records rss_escaped=<pids>.
-# A restarted reader knows only the root's group and its descendants, so after
-# each reply the watch reads again through libproc, by its exact start time, every
-# member it already knew that the reply does not name, with its descendants: one
-# that still runs with exactly that start time is kept and counted, a pid that now
-# holds another start time is a replacement and is not counted, and a member known
-# only to the whole second makes the tick unknown. While the reader is down the
-# same rule holds for every member outside the root's group and its descendants. The root's own process group
-# is signalled as a group only while the watch has not yet reaped the root,
-# because that pid cannot be reused until then. While the reader is down, each tick
-# is sampled from the process table (ps, or the helper's table and memory when ps
-# is refused): the root's group, every member the watch already knew whose start
-# time still matches, and the descendants of all of them, so a descendant that
-# left the group is still counted (and, if it outlives an ended root, fails it).
-# The table proves start times only to the whole second, so every member it
-# selects is then known to the second only.
+# has no other memory bound on a root. It runs the command in a process group of
+# its own and samples once a second that command's process tree: the command, its
+# descendants in any group or session, and each process the reader has seen in the
+# tree that was later orphaned, so a memory-holding grandchild cannot leave the
+# count by outliving its parent. Each sample is the larger of the tree's resident
+# size and its physical footprint, read by a long-lived libproc reader
+# (fm-proc-info.py rss-tree) started at the first tick, under the interpreter
+# fm-lint.sh resolved once (FM_LINT_INTERNAL_PYTHON, else python3). A reader's first
+# reply may take 2 s; each later reply has 0.5 s.
+# The reader is the only source of a sample. A tick whose reply is late,
+# malformed or cannot be bound to the processes it measured is a miss, never a
+# zero and never a guess from another table: the reply is discarded and a new
+# reader starts for the next tick. A replacement that cannot start, or fails before
+# it replies, is one failed restart; the reader is given up for the rest of the
+# command (every later tick a miss) when libproc cannot read the command, the
+# command's first reader exits before its first reply, or three restarts in a row
+# fail; a good reply resets that count. The reason is appended to <rss-file> once
+# as rss_reader_unavailable=<reason>.
+# Binding a reply: the reader lists the tree in one census and then reads each
+# member's memory by pid, so after each reply every member it names is read again
+# through libproc. A member whose identity differs from the reply's, cannot be read
+# or has ended, a reply without a whole member list, one that measured memory but
+# names no process, and one whose root is a zombie or exiting (its memory is no
+# longer read) are misses. A member the watch already knew by its exact identity
+# that the reply does not name (one that left the tree) is read again by that
+# identity, with its descendants, and counted, or the tick is a miss.
+# Crossing the limit ends the root's group with KILL, records the peak sampled as
+# max_rss_kib=<KiB> in <rss-file>, names the bound on stderr, and exits 98, which
+# fm-lint.sh reports as a memory failure so the root takes its narrower retry.
+# Every end appends rss_samples=libproc:<n> and watch_peak_kib=<KiB>. Each new
+# peak is written to FM_LINT_INTERNAL_SLOT_PEAK_FILE when the gate names one, so
+# the gate's admission charges it.
+# Any miss while the root runs that is followed by a later tick makes the root exit
+# 96 (fm_watch_unmeasured); only a miss on its very last tick is exempt. Three misses
+# in a row also write FM_LINT_INTERNAL_ABORT_FILE so the run's gates admit no
+# further root. 96 comes before 98, so no unmeasured root is retried or recorded as
+# a success.
+# The measurement record (<peak file>.health): after each sample the watch writes
+# it and reads it back (fm_health_publish); a publication or read-back that fails
+# fails the root (96) and invalidates the record. The first miss invalidates it
+# too. Every invalidation is made under the host admission lock
+# (FM_LINT_INTERNAL_HOST_LOCK), which every gate holds for its decision, so a gate
+# decides either before the invalidation, on a record that was then true, or after
+# it. If the record cannot be invalidated, the watch keeps holding that lock, so no
+# root is admitted anywhere, ends its root, and releases the lock only after the
+# root is reaped; if the lock cannot be taken either, it ends its root and marks
+# the run.
+# Signalling follows rule O (fm_signal_root): the watch records its root's exact
+# start time before the root executes anything (the root waits on a pipe until the
+# record exists; a root whose start time cannot be read never executes and the
+# watch exits 96 with rss_launch_unrecorded=1), and every signal goes only to that
+# root's group after the leader is proven unchanged. TERM or KILL end the root's
+# group; STOP and CONT hold it while the gate's growth guard asks (<peak file>.hold).
+# Every result is acted on: a STOP that is not sent leaves the root unheld (tried
+# again next tick); a CONT that is not sent keeps the root held and is tried once
+# more, then the root's group is ended and the root fails (96, rss_cont_failed=1);
+# a TERM that is not sent brings the KILL forward; a KILL that is neither sent nor
+# finds the group gone fails the root (96, rss_kill_failed=1). No process is ever
+# signalled by its pid. After every end, a normal success included, each process
+# the watch counted that still runs (or cannot be proven ended) is a survivor: the
+# root fails (96), the run admits no further root, and <rss-file> records
+# rss_escaped=<pids>; survivors are never signalled.
+# A signal to the watch, or the loss of its parent, ends the root's group within
+# about one tick (about 6 s if the command ignores TERM); the watch sits in a group
+# of its own, out of reach of its owner's group sweep.
 if (($ARGV[0] // '') eq 'rsswatch') {
     require POSIX;
     require Time::HiRes;
@@ -1240,11 +1263,11 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     POSIX::setpgid(0, 0);
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
     my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
-    my ($reader_failures, %samples) = (0, libproc => 0, ps => 0);
-    my %known;    # pid => [start seconds, start microseconds or undef], every member seen
+    my ($reader_failures, $libproc_samples) = (0, 0);
+    my %known;    # pid => [start seconds, start microseconds], every member counted
     my ($child_reaped);
     # A reader exits when its input closes; only a reader still running 2 s later,
-    # the watch's own unreaped child, is ended by a signal.
+    # the watch's own unreaped child, is ended by a signal (as on the base).
     my $stop_reader = sub {
         return unless $reader_pid;
         close $to_reader;
@@ -1274,55 +1297,41 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         return if $reader_pid;
         $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
     };
-    # One read of the host's process table for the tick the reader cannot answer:
-    # { pid => [ppid, pgid, resident KiB, start seconds] } from ps, or, where ps is
-    # refused, from fm-proc-info.py (table for the ids and start, memory for the
-    # sizes); undef when neither answers.
-    my %month = (Jan => 0, Feb => 1, Mar => 2, Apr => 3, May => 4, Jun => 5, Jul => 6, Aug => 7, Sep => 8, Oct => 9, Nov => 10, Dec => 11);
-    my $start_seconds = sub {
-        my ($text) = @_;
-        return undef unless ($text // '') =~ /\A\w{3}\s+(\w{3})\s+([0-9]+)\s+([0-9]+):([0-9]+):([0-9]+)\s+([0-9]{4})\z/ && exists $month{$1};
-        return POSIX::mktime($5, $4, $3, $2, $month{$1}, $6 - 1900);
-    };
-    my $read_table = sub {
-        my %table;
-        {
-            no warnings 'exec';
-            local $ENV{LC_ALL} = 'C';
-            if (open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,ppid=,pgid=,rss=,lstart=')) {
-                while (my $line = <$ps>) {
-                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(\S+\s+\S+\s+[0-9]+\s+[0-9:]+\s+[0-9]+)\s*\z/;
-                    my $started = $start_seconds->($5) // next;
-                    $table{$1} = [$2 + 0, $3 + 0, $4 + 0, $started];
-                }
-                close $ps;
-            }
-        }
-        return \%table if %table;
-        return undef unless -r $helper;
+    # The reply check: the root must be neither a zombie nor exiting, and every
+    # member the reply names must still have exactly the identity the reply gave
+    # (read in the census before its memory read; an equal read after it proves the
+    # same process lived through the read, since a pid is not reused while its
+    # process lives, zombies included). Anything else, or any failed read, is
+    # "unknown".
+    my $verify_members_py = <<'PYTHON';
+import importlib.util, struct, sys
+spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
+fp = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fp)
+try:
+    root = fp.kinfo(int(sys.argv[2]))
+    if root[fp.P_STAT] == fp.SZOMB or struct.unpack_from("i", root, fp.P_FLAG)[0] & fp.P_WEXIT:
+        print("unknown")
+        sys.exit(0)
+    for item in sys.argv[3:]:
+        pid, sec, usec = (int(part) for part in item.split(":"))
+        if tuple(fp.process_identity(fp.kinfo(pid))) != (sec, usec):
+            print("unknown")
+            sys.exit(0)
+except Exception:
+    print("unknown")
+    sys.exit(0)
+print("same")
+PYTHON
+    my $verify_members = sub {
+        my ($root_pid, %members) = @_;
+        return 0 unless $members{$root_pid} && -r $helper;
         no warnings 'exec';
-        my %rss;
-        if (open(my $py, '-|', $python, $helper, 'memory')) {
-            local $/;
-            my $json = <$py>;
-            close $py;
-            require JSON::PP;
-            my $rows = eval { JSON::PP::decode_json($json // '') };
-            for my $row (ref $rows eq 'ARRAY' ? @$rows : ()) {
-                $rss{$row->{pid}} = int($row->{rss_bytes} / 1024) if ref $row eq 'HASH' && defined $row->{pid} && defined $row->{rss_bytes};
-            }
-        }
-        if (open(my $py, '-|', $python, $helper, 'table', 'pid,ppid,pgid,lstart')) {
-            while (my $line = <$py>) {
-                next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(\S+\s+\S+\s+[0-9]+\s+[0-9:]+\s+[0-9]+)\s*\z/;
-                my $started = $start_seconds->($4) // next;
-                # A process the memory reading did not name has no size: a sample
-                # that needs it is a miss, never a zero.
-                $table{$1} = [$2 + 0, $3 + 0, $rss{$1}, $started];
-            }
-            close $py;
-        }
-        return %table ? \%table : undef;
+        open(my $py, '-|', $python, '-I', '-c', $verify_members_py, $helper, $root_pid,
+            map { "$_:$members{$_}[0]:$members{$_}[1]" } sort { $a <=> $b } keys %members) or return 0;
+        my $answer = <$py> // '';
+        close $py;
+        return !$? && $answer eq "same\n" ? 1 : 0;
     };
     # Members the watch knows by exact identity but cannot reach through the root:
     # each "<pid>:<sec>:<usec>" is read through libproc twice, with every descendant
@@ -1337,41 +1346,6 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # never adopted, never signalled, and the tick is unknown. Returns
     # { pid => [sec, usec, KiB] }, or undef for an unknown tick (the caller then keeps
     # its known set unchanged).
-    # The reader (fm-proc-info.py rss-tree) lists the tree in one census and then
-    # reads each member's memory by pid, so a member that ends between the two, and
-    # whose pid is reused, could be measured as its replacement. After each reply
-    # the watch reads every member the reply names again through libproc: the
-    # reply's identity is the census identity from before the memory read, and an
-    # equal identity read after it proves the same process lived through the read
-    # (a pid cannot be reused while its process lives, zombies included). A member
-    # whose identity differs, cannot be read, or is gone makes the sample unknown.
-    my $verify_members_py = <<'PYTHON';
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
-fp = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fp)
-try:
-    for item in sys.argv[2:]:
-        pid, sec, usec = (int(part) for part in item.split(":"))
-        if tuple(fp.process_identity(fp.kinfo(pid))) != (sec, usec):
-            print("unknown")
-            sys.exit(0)
-except Exception:
-    print("unknown")
-    sys.exit(0)
-print("same")
-PYTHON
-    my $verify_members = sub {
-        my (%members) = @_;
-        return 1 unless %members;
-        return 0 unless -r $helper;
-        no warnings 'exec';
-        open(my $py, '-|', $python, '-I', '-c', $verify_members_py, $helper,
-            map { "$_:$members{$_}[0]:$members{$_}[1]" } sort { $a <=> $b } keys %members) or return 0;
-        my $answer = <$py> // '';
-        close $py;
-        return !$? && $answer eq "same\n" ? 1 : 0;
-    };
     my $exact_members_py = <<'PYTHON';
 import importlib.util, struct, sys
 spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
@@ -1449,166 +1423,127 @@ PYTHON
         close $py;
         return $? || $unknown ? undef : \%found;
     };
-    # KiB of the group leader <pid>, its live descendants and the members of its
-    # tree orphaned since the reader saw them, the larger of footprint and
-    # resident size, or undef when unreadable.
+    # KiB of the root's tree as the reader measured it (the larger of footprint and
+    # resident size), plus each member the watch knows by exact identity that left
+    # the tree, or undef (a miss) when the reader cannot give a bound reply.
     my $tree_rss = sub {
         my ($root_pid) = @_;
         $start_reader->($root_pid) unless $reader_pid || $reader_down;
-        if ($reader_pid) {
-            local $SIG{PIPE} = 'IGNORE';
-            my ($answer, $ready) = ('', '');
-            vec($ready, fileno($from_reader), 1) = 1;
-            my $gone = !syswrite($to_reader, "\n");
-            my $wait = $reader_answered ? 0.5 : 2;
-            while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
-                $gone = !sysread($from_reader, $answer, 64, length $answer);
-            }
-            if ($answer =~ /\A\{"rss_kib":([0-9]+),[^\n]*\}\n\z/) {
-                my $kib = $1 + 0;
-                ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
-                $samples{libproc}++;
-                # The reader names every member of the tree it counted, including a
-                # descendant that left the root's process group: those are the
-                # processes this watch ends along with the group.
-                my $named = eval { require JSON::PP; JSON::PP::decode_json($answer)->{members} };
-                # A reply that names no member list, or a member without a whole
-                # identity, cannot be bound to the processes it measured: unknown.
-                return undef unless ref $named eq 'ARRAY'
-                    && !grep { ref $_ ne 'ARRAY' || @$_ < 3 || grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
-                # Memory measured with no process named cannot be bound to any: unknown.
-                return undef if !@$named && $kib;
-                {
-                    my %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) } @$named;
-                    return undef unless $verify_members->(%reply);
-                    # A reader that was restarted knows only the root's group and its
-                    # descendants; a member the watch already knew that left the group
-                    # and was orphaned is not among them. Every known member the reply
-                    # does not name is read again by its exact identity (libproc), with
-                    # its descendants: one that still runs with exactly that start time
-                    # is kept and counted; a pid that now holds another start time is a
-                    # replacement and is not counted. A member known only to the whole
-                    # second (found by the process table) cannot be told from a
-                    # replacement: while it still runs with that second, the tick is
-                    # unknown, never counted on a guess. Any unreadable step makes the
-                    # tick unknown.
-                    my @missing = grep { !$reply{$_} } keys %known;
-                    if (@missing) {
-                        my @inexact = grep { !defined $known{$_}[1] } @missing;
-                        if (@inexact) {
-                            # Only a pid absent from the table has provably ended; one
-                            # still listed, with that second or another, is unknown.
-                            my $table = $read_table->() or return undef;
-                            return undef if grep { $table->{$_} } @inexact;
-                        }
-                        my $found = $exact_members->(map { "$_:$known{$_}[0]:$known{$_}[1]" } grep { defined $known{$_}[1] } @missing)
-                            or return undef;
-                        for my $pid (keys %$found) {
-                            next if $reply{$pid};
-                            $kib += $found->{$pid}[2];
-                            $reply{$pid} = [@{$found->{$pid}}[0, 1]];
-                        }
-                    }
-                    %known = %reply;
+        return undef unless $reader_pid;
+        local $SIG{PIPE} = 'IGNORE';
+        my ($answer, $ready) = ('', '');
+        vec($ready, fileno($from_reader), 1) = 1;
+        my $gone = !syswrite($to_reader, "\n");
+        my $wait = $reader_answered ? 0.5 : 2;
+        while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
+            $gone = !sysread($from_reader, $answer, 64, length $answer);
+        }
+        if ($answer =~ /\A\{"rss_kib":([0-9]+),[^\n]*\}\n\z/) {
+            my $kib = $1 + 0;
+            ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
+            my $named = eval { require JSON::PP; JSON::PP::decode_json($answer)->{members} };
+            return undef unless ref $named eq 'ARRAY' && @$named
+                && !grep { ref $_ ne 'ARRAY' || @$_ < 3 || grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
+            my %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) } @$named;
+            return undef unless $verify_members->($root_pid, %reply);
+            # A restarted reader knows only the root's group and its descendants: a
+            # member the watch already knew that left the tree is read again by its
+            # exact identity, with its descendants; one that still runs with that
+            # identity is counted, any other answer is a miss.
+            my @missing = grep { !$reply{$_} } keys %known;
+            if (@missing) {
+                my $found = $exact_members->(map { "$_:$known{$_}[0]:$known{$_}[1]" } @missing) or return undef;
+                for my $pid (keys %$found) {
+                    next if $reply{$pid};
+                    $kib += $found->{$pid}[2];
+                    $reply{$pid} = [@{$found->{$pid}}[0, 1]];
                 }
-                return $kib;
             }
-            my $fresh = $reader_fresh;
-            $stop_reader->();
-            $reader_down = $answer eq "-\n" || $answer =~ /\A\{"rss_kib":null,/ ? 'libproc-unreadable'
-                : $gone && $fresh ? 'exited-at-start'
-                : ++$reader_failures > 3 ? 'restarts-failed' : undef;
-            $start_reader->($root_pid) unless $reader_down;
+            %known = %reply;
+            $libproc_samples++;
+            return $kib;
         }
-        # The reader is down for this tick: sample the process table and select the
-        # tree by identity, not only the root's group.
-        my $table = $read_table->();
-        return undef unless $table && exists $table->{$root_pid};
-        $samples{ps}++;
-        my %children;
-        push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
-        # Certainly this tree: the root's group (the root is not yet reaped while this
-        # runs, so its pid and group are ours) and the descendants of its members.
-        # Every other member the watch knew is either gone (no longer in the table
-        # with its start second) and dropped, or still runs: then it is read again by
-        # its exact identity with its descendants, and a member known only to the
-        # whole second makes the tick unknown, never counted on a guess.
-        my @queue = grep { $table->{$_}[1] == $root_pid } keys %$table;
-        my %selected;
-        while (defined(my $member = shift @queue)) {
-            next if $selected{$member}++ || !$table->{$member} || $member == $$;
-            push @queue, @{$children{$member} // []};
-        }
-        delete $selected{$$};
-        my (@exact, %next);
-        for my $pid (grep { !$selected{$_} && $_ != $$ } keys %known) {
-            # Absent from the table: provably ended, dropped. Listed with another
-            # start second (a replacement) or known only to the second: unknown.
-            next unless $table->{$pid};
-            return undef unless defined $known{$pid}[1] && $table->{$pid}[3] == $known{$pid}[0];
-            push @exact, "$pid:$known{$pid}[0]:$known{$pid}[1]";
-        }
-        my $found = $exact_members->(@exact) or return undef;
-        # The table proves a start time only to the whole second, so a selected
-        # member is known to the second only, never by an exact identity carried
-        # over from an earlier read (a same-second replacement cannot be told from it).
-        $next{$_} = [$table->{$_}[3], undef] for keys %selected;
-        my $total = 0;
-        for my $pid (keys %selected) {
-            return undef unless defined $table->{$pid}[2];
-            $total += $table->{$pid}[2];
-        }
-        for my $pid (keys %$found) {
-            next if $selected{$pid};
-            $total += $found->{$pid}[2];
-            $next{$pid} = [@{$found->{$pid}}[0, 1]];
-        }
-        %known = %next;
-        return $total;
+        my $fresh = $reader_fresh;
+        $stop_reader->();
+        $reader_down = $answer eq "-\n" || $answer =~ /\A\{"rss_kib":null,/ ? 'libproc-unreadable'
+            : $gone && $fresh ? 'exited-at-start'
+            : ++$reader_failures > 3 ? 'restarts-failed' : undef;
+        $start_reader->($root_pid) unless $reader_down;
+        return undef;
     };
-    my ($child, $caught, $term_at, $over, $warned, $mark_failed, $unmeasured, @ticks, $unpublished, $held, $escaped, $invalidated);
-    # The root's measurement record: published after each sample until the first miss
-    # or failed publication, which invalidates it at once and for good.
+    my ($child, $launch, $caught, $term_at, $over, $warned, $mark_failed, $unmeasured, @ticks, $unpublished, $held,
+        $escaped, $invalidated, $invalidation_failed, $cont_failures, $cont_failed, $kill_failed, $host_held, $hold_said);
     my $health = length $peak_file ? "$peak_file.health" : '';
+    my $lock_path = $ENV{FM_LINT_INTERNAL_HOST_LOCK} // '';
+    # The host admission lock: the one the watch already keeps, or a new hold on it;
+    # undef when there is none or it cannot be taken.
+    my $take_host = sub {
+        return $host_held if $host_held;
+        my $lock;
+        return length $lock_path && open($lock, '>>', $lock_path) && flock($lock, LOCK_EX) ? $lock : undef;
+    };
     # The run's stop mark (FM_LINT_INTERNAL_ABORT_FILE) is written under the host
-    # lock that every gate holds for its last check, so no gate admits between this
-    # mark and its own check; a mark that cannot be written is said, and the root
-    # still fails (the worker then marks the run itself).
+    # lock, so no gate admits between this mark and its own check; a mark that
+    # cannot be written is said, and the root still fails (the worker then marks
+    # the run itself).
     my $mark_run = sub {
         my ($text) = @_;
         my $abort = $ENV{FM_LINT_INTERNAL_ABORT_FILE} // '';
-        my $lock_path = $ENV{FM_LINT_INTERNAL_HOST_LOCK} // '';
         return unless length $abort;
-        my ($lock, $mark, $published);
-        if (!length $lock_path || (open($lock, '>>', $lock_path) && flock($lock, LOCK_EX))) {
+        my $lock = $take_host->();
+        my ($mark, $published);
+        if ($lock || !length $lock_path) {
             $published = open($mark, '>>', $abort) && print({$mark} "$text\n") && close($mark);
         }
         my $why = $!;
-        close $lock if $lock;
+        close $lock if $lock && !$host_held;
         return if $published;
         warn "fm-lint: resident-memory watch could not mark the run at $abort ($why); the root fails and the worker stops the run\n";
         $mark_failed = 1;
     };
+    # End the root's group (rule O). A KILL that is neither sent nor finds the group
+    # gone fails the root.
+    my $end_tree = sub {
+        return if !$launch || $child_reaped;
+        my $result = fm_signal_root('KILL', $launch);
+        return if $result eq 'sent' || $result eq 'gone';
+        warn "fm-lint: resident-memory watch could not end its root's group ($result); the root fails\n" unless $kill_failed++;
+    };
+    # Invalidate the measurement record, once, under the host lock. If it cannot be
+    # invalidated, keep the host lock (no gate anywhere admits) and end the root;
+    # the lock is released only after the root is reaped.
     my $invalidate = sub {
         my ($why) = @_;
         return if $invalidated++ || !length $health;
-        fm_health_invalidate($health, $why)
-            or warn "fm-lint: resident-memory watch could not invalidate its measurement record $health ($!)\n";
-    };
-    # End the root: its process group, signalled as a group only until the root is
-    # reaped (its pid cannot be reused before that). No counted process outside the
-    # group is signalled; one that still runs once the root has ended makes the
-    # root fail (status 96) instead.
-    my $end_tree = sub {
-        fm_signal_items('KILL', "group:$child") if $child && !$child_reaped;
+        my $lock = $take_host->();
+        if (fm_health_invalidate($health, $why)) {
+            close $lock if $lock && !$host_held;
+            return;
+        }
+        my $failure = $!;
+        $invalidation_failed = 1;
+        if ($lock) {
+            $host_held = $lock;
+            warn "fm-lint: resident-memory watch could not invalidate its measurement record $health ($failure); it keeps the host admission lock, so no root is admitted anywhere, and ends its root\n";
+        } else {
+            warn "fm-lint: resident-memory watch could not invalidate its measurement record $health ($failure) nor take the host admission lock; it ends its root and marks the run\n";
+        }
+        $end_tree->();
+        $mark_run->("the resident-memory watch could not invalidate a root's measurement record");
     };
     my ($peak, $misses) = (0, 0);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
+    # TERM to the root's group; one that is not sent brings the KILL forward.
+    my $term_root = sub {
+        return if !$launch || $child_reaped;
+        my $result = fm_signal_root('TERM', $launch);
+        $term_at = Time::HiRes::time() - 5 unless $result eq 'sent' || $result eq 'gone';
+    };
     for my $name (keys %signal_number) {
         $SIG{$name} = sub {
             $caught = $name;
             $term_at //= Time::HiRes::time();
-            fm_signal_items('TERM', "group:$child") if $child && !$child_reaped;
+            $term_root->();
         };
     }
     # Perl restarts waitpid after a handled signal, so the sampling runs in the
@@ -1618,46 +1553,52 @@ PYTHON
         if (!$caught && getppid() != $owner) {
             $caught = 'TERM';
             $term_at = Time::HiRes::time();
-            fm_signal_items('TERM', "group:$child") unless $child_reaped;
+            $term_root->();
         }
         $end_tree->() if $caught && Time::HiRes::time() - $term_at >= 5;
-        return if $caught || $over;
+        return if $caught || $over || $cont_failed;
         # The gate's growth guard holds the root through <peak file>.hold: stop the
-        # root's group while it exists, resume it when it is gone.
+        # root's group while it exists, resume it when it is gone. Held only on a
+        # sent STOP; a CONT that is not sent keeps it held and is tried once more,
+        # then the root is ended and fails.
         if (length $peak_file && !$child_reaped) {
             my $want = -e "$peak_file.hold";
-            if ($want && !$held) { fm_signal_items('STOP', "group:$child"); $held = 1; }
-            elsif (!$want && $held) { fm_signal_items('CONT', "group:$child"); $held = 0; }
+            if ($want && !$held) {
+                my $result = fm_signal_root('STOP', $launch);
+                if ($result eq 'sent') { $held = 1; }
+                elsif (!$hold_said++) { warn "fm-lint: resident-memory watch could not hold its root's group ($result); it tries again next tick\n"; }
+            } elsif (!$want && $held) {
+                my $result = fm_signal_root('CONT', $launch);
+                if ($result eq 'sent') {
+                    ($held, $cont_failures) = (0, 0);
+                } elsif (++$cont_failures >= 2) {
+                    $cont_failed = 1;
+                    warn "fm-lint: resident-memory watch could not resume its held root's group twice ($result); it ends the root, which fails (status 96)\n";
+                    $end_tree->();
+                    $mark_run->("the resident-memory watch could not resume a held root");
+                    return;
+                }
+            }
         }
         my $rss = $tree_rss->($child);
-        # A root that exits mid-sample is a zombie no sampler can read, so only
-        # three misses in a row mean the sampler is failing.
         if (!defined $rss) {
-            return if $child_reaped || !kill(0, $child);
-            # A miss in the root's last tick can be its own exit (a zombie no
-            # sampler reads); a miss followed by any later tick is an unmeasured
-            # interval (fm_watch_unmeasured, judged once the root is reaped). The
-            # measurement record is invalidated at the first miss.
+            return if $child_reaped;
+            # A miss in the root's last tick can be its own exit (a zombie no reader
+            # measures); a miss followed by any later tick is an unmeasured interval
+            # (fm_watch_unmeasured, judged once the root is reaped). The measurement
+            # record is invalidated at the first miss.
             push @ticks, 'm';
             $invalidate->('a sample was missed');
             return if ++$misses < 3 || $warned;
-            # Every reader failed three ticks in a row: this root runs unmeasured.
-            # The run admits no new root (the abort mark its workers check), and the
-            # loss is recorded on stderr and in <rss-file>.
-            # The mark is written under the host lock that every gate holds for its
-            # last check, so no gate admits between this mark and its own check;
-            # every step is checked, and a mark that cannot be written is said
-            # (the root still fails, and the worker marks the run itself).
-            $mark_run->("the resident-memory watch lost every reader of a running root's memory (libproc and the process table)");
+            $mark_run->("the resident-memory watch lost every reader of a running root's memory");
             warn "fm-lint: resident-memory watch cannot sample this root (no reader answers); the root fails (status 96), and the run admits no further root\n";
             $warned = 1;
             return;
         }
         $misses = 0;
         push @ticks, 's';
-        # Publish this sample: the gates admit a new root only while every watched
-        # root's record names a sample at most 5 s old. A record that cannot be
-        # published fails the root and is invalidated at once.
+        # Publish this sample and read it back: the gates admit a new root only while
+        # every watched root's record names a sample at most 5 s old.
         if (length $health && !$invalidated && !fm_health_publish($health, Time::HiRes::time())) {
             warn "fm-lint: resident-memory watch could not publish its measurement at $health ($!); the root fails\n";
             $unpublished = 1;
@@ -1679,74 +1620,95 @@ PYTHON
     };
     $SIG{ALRM} = sub {
         local ($?, $!);
-        return if $busy || !$child;
+        return if $busy || !$launch;
         $busy = 1;
         $sample->();
         $busy = 0;
     };
+    # Launch: the root waits on a pipe until its exact start time is recorded.
+    pipe(my $go_read, my $go_write) or die "fm-lint-rsswatch: pipe: $!\n";
     $child = fork();
     die "fm-lint-rsswatch: fork: $!\n" unless defined $child;
     if (!$child) {
+        close $go_write;
         POSIX::setpgid(0, 0);
+        my $go = '';
+        1 while !defined sysread($go_read, $go, 1) && $!{EINTR};
+        POSIX::_exit(127) unless $go eq 'g';
         exec {$command[0]} @command;
         warn "fm-lint-rsswatch: exec $command[0]: $!\n";
         POSIX::_exit(127);
     }
+    close $go_read;
     POSIX::setpgid($child, $child);
-    fm_signal_items('TERM', "group:$child") if $caught;
+    my $identity = '';
+    if (-r $helper) {
+        no warnings 'exec';
+        if (open(my $py, '-|', $python, '-I', '-c', $PROCESS_STATE_PY, $helper, 'identity', $child)) {
+            $identity = <$py> // '';
+            close $py;
+        }
+    }
+    unless ($identity =~ /\A([0-9]+) ([0-9]+)\n\z/) {
+        close $go_write;
+        waitpid($child, 0);
+        warn "fm-lint: resident-memory watch could not record its root's start time, so the root was not started (status 96)\n";
+        if (open(my $fh, '>>', $rss_file)) { print {$fh} "rss_launch_unrecorded=1\nrss_unmeasured=1\n"; close $fh; }
+        exit 96;
+    }
+    $launch = { pgid => $child, sec => $1 + 0, usec => $2 + 0, helper => $helper };
+    syswrite($go_write, 'g');
+    close $go_write;
+    $term_root->() if $caught;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 1, 1);
     my $reaped = waitpid($child, 0);
     $child_reaped = 1 if $reaped == $child;
-    fm_signal_items('CONT', "group:$child") if $held && !$child_reaped;
     $unmeasured = fm_watch_unmeasured(@ticks);
     my $status = $reaped == $child ? $? : 127 << 8;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
-    $end_tree->() if $over || $caught;
     $stop_reader->();
-    # A root ended over the bound or on a signal, with a counted process outside
-    # its group still running (or not provably ended), could not be ended without a
-    # per-process signal, which the watch never sends: the root fails (96) and the
-    # run admits no further root.
+    # After every end, a normal success included: each process the watch counted
+    # that still runs (or cannot be proven ended) is a survivor. Survivors are never
+    # signalled; the root fails (96) and the run admits no further root. Processes
+    # of the root's group ended with it get up to about 1 s to be proven ended.
     my @escaped;
-    if ($over || $caught) {
-        # Group members killed with the root take a moment to be gone: each counted
-        # process gets up to about 1 s to be proven ended.
-        for my $pid (sort { $a <=> $b } grep { $_ != $$ && $_ != $child } keys %known) {
-            my ($sec, $usec) = @{$known{$pid}};
-            no warnings 'exec';
-            my $answer = '';
-            for (1 .. 10) {
-                if (open(my $py, '-|', $python, '-I', '-c', $PROCESS_STATE_PY, $helper, 'state', $pid, $sec, defined $usec ? $usec : '-')) {
-                    $answer = <$py> // '';
-                    close $py;
-                }
-                last if $answer eq "ended\n";
-                Time::HiRes::sleep(0.1);
+    for my $pid (sort { $a <=> $b } grep { $_ != $$ && $_ != $child } keys %known) {
+        my ($sec, $usec) = @{$known{$pid}};
+        no warnings 'exec';
+        my $answer = '';
+        for (1 .. 10) {
+            if (open(my $py, '-|', $python, '-I', '-c', $PROCESS_STATE_PY, $helper, 'state', $pid, $sec, $usec)) {
+                $answer = <$py> // '';
+                close $py;
             }
-            push @escaped, $pid unless $answer eq "ended\n";
+            last if $answer eq "ended\n";
+            Time::HiRes::sleep(0.1);
         }
-        if (@escaped) {
-            $escaped = 1;
-            warn "fm-lint: resident-memory watch: counted process(es) " . join(',', @escaped)
-                . " outside the root's group still run (or cannot be proven ended); they are never signalled, so the root fails and the run admits no further root\n";
-            $invalidate->('a counted process outside the group could not be ended');
-            $mark_run->("a root's counted process outside its group could not be ended without a per-process signal");
-        }
+        push @escaped, $pid unless $answer eq "ended\n";
+    }
+    if (@escaped) {
+        $escaped = 1;
+        warn "fm-lint: resident-memory watch: counted process(es) " . join(',', @escaped)
+            . " still run (or cannot be proven ended) after the root ended; they are never signalled, so the root fails and the run admits no further root\n";
+        $invalidate->('a counted process outlived the root');
+        $mark_run->("a root's counted process outlived it");
     }
     if (open(my $fh, '>>', $rss_file)) {
-        printf {$fh} "rss_samples=libproc:%d,ps:%d\n", @samples{qw(libproc ps)};
+        printf {$fh} "rss_samples=libproc:%d\n", $libproc_samples;
         print {$fh} "rss_reader_unavailable=$reader_down\n" if $reader_down;
         printf {$fh} "watch_peak_kib=%d\n", $peak if $peak;
         print {$fh} 'rss_escaped=' . join(',', @escaped) . "\n" if @escaped;
+        print {$fh} "rss_cont_failed=1\n" if $cont_failed;
+        print {$fh} "rss_kill_failed=1\n" if $kill_failed;
+        print {$fh} "rss_invalidation_failed=1\n" if $invalidation_failed;
         print {$fh} "rss_unmeasured=1\n" if $warned || $unmeasured || $unpublished;
         print {$fh} "rss_mark_failed=1\n" if $mark_failed;
         close $fh;
     }
-    # A root that ran unmeasured for any interval (a tick with no measurement while
-    # it ran, or every reader lost) is a failed root whatever else happened: 96
-    # comes before an over-cap end (98), so no memory retry or fallback can
-    # turn it into a success, and no success is recorded for it.
+    # The host lock the watch kept is released only now, after its root is reaped.
+    close $host_held if $host_held;
     exit fm_watch_exit(warned => $warned, unmeasured => $unmeasured, escaped => $escaped, unpublished => $unpublished,
+        lost => ($cont_failed || $kill_failed || $invalidation_failed) ? 1 : 0,
         over => $over, signal => $caught ? $signal_number{$caught} : 0, status => $status);
 }
 

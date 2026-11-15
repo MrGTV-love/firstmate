@@ -11,8 +11,8 @@
 # excluded (see the memory fallback in fm_lint_run_root); the roots log marks
 # the retry, and CI still checks those codes on every source-following attempt.
 # --fast remains an explicit local-only opt-out from extended dataflow.
-# Selection and cache reuse retain the roots' source directives and call-site
-# context; checking a library separately cannot replace joint source analysis.
+# Selection retains the roots' source directives and call-site context; checking
+# a library separately cannot replace joint source analysis.
 # The default (no explicit-path) path also runs bin/fm-lint-workflows.sh so a
 # malformed GitHub workflow, including a self-broken ci.yml, fails locally
 # before merge instead of only failing to run as CI.
@@ -33,41 +33,42 @@
 #     contains a path changed since the merge-base, including staged, unstaged,
 #     untracked, deleted and renamed paths. An unchanged imported library is not
 #     a separate root; its callers analyze it through their sources. Runtime
-#     backend imports participate in selection and cache invalidation even when
-#     their static source annotations intentionally isolate adapter analysis.
+#     backend imports participate in selection even when their static source
+#     annotations intentionally isolate adapter analysis.
 #     Unresolved runtime imports select possible callers on changed/deleted shell
-#     or known source inputs and disable cache reuse, regardless of annotations.
+#     or known source inputs, regardless of annotations.
 #     Discovery recognizes source/. command words, balanced substitutions, and
 #     executable bash/sh -c and program-stdin heredocs. Source annotations remain
 #     inputs; ordinary comments, inert quoted programs, and heredoc data do not.
 #     Quoted child positional arguments are resolved; <<- strips leading tabs.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
-#     changed widely sourced library still costs a cold source-aware analysis
-#     of every caller; the cache only reuses identical inputs.
+#     changed widely sourced library still costs a source-aware analysis of
+#     every caller.
 # Explicit paths bypass changed-file selection and are linted as given, without
 # the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
 # backend-purity check. The backend-purity check rejects direct Beads CLI
 # invocations in the core bin/ and bin/backends/ scripts so every configured
 # backlog backend follows the same tasks-axi lifecycle path.
-# Every selected root is analysed: no successful result is reused. No sampled
-# reading can prove which ShellCheck a launcher at the resolved path runs for an
-# analysis, and a success reused for another ShellCheck could hide a diagnostic, so
-# the analysis cache was removed until a non-sampled proof exists.
+# No analysis result is reused between or within runs: every root a run starts is
+# analysed by ShellCheck. A run that refuses or stops (a pool or table refusal, an
+# abort mark, a version refusal) starts no further root, and --list-files starts
+# none. No sampled reading can prove which ShellCheck a launcher at the resolved
+# path runs for an analysis, and a success reused for another ShellCheck could hide
+# a diagnostic, so the analysis cache was removed until a non-sampled proof exists.
 # FM_LINT_CACHE_DIR is no longer read; files an earlier version left in
 # ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint are unused and may be removed by hand.
 #
-# Dependency selection and caching are private Perl helpers using the Perl
-# runtime already required for worker cleanup; no extra tool is installed.
+# Dependency selection is a private Perl helper using the Perl runtime already
+# required for worker cleanup; no extra tool is installed.
 # Lint defaults to two concurrency-limited workers over two stable logical
 # shards, and each worker runs ONE canonical root per ShellCheck process, so a
 # run holds at most JOBS concurrent ShellCheck processes. Diagnostics replay
 # in stable shard/root order. FM_LINT_JOBS=1 changes concurrency, not diagnostics
 # or exit selection.
-# That bound is per run; only cold checks enter the host-wide pool, after cache
-# lookup and identical-miss serialization, so hits and duplicate waiters consume
-# no host slots and no memory budget. Cold roots share the pool per lint run, not
+# That bound is per run; every root enters the host-wide pool. Roots share the
+# pool per lint run, not
 # per worker: a free slot goes to the waiting run holding the fewest slots, then
 # the run served least recently, so a two-worker run cannot take two turns for
 # each turn of a one-worker run. Within a run, roots stay FIFO and newer roots
@@ -124,8 +125,7 @@
 # physical footprint over its earlier complete analyses, kept per analysis mode
 # (full or fast) and repo-relative root path in the pool's history/ directory
 # together with the input size that peak was measured on: the root file plus
-# every file the analysis follows, as the cache's dependency walk finds them,
-# computed whether or not the cache is on.
+# every file the analysis follows, as the dependency walk finds them.
 # The history lives in the pool, the one directory every run of this user shares.
 # A record is trusted only when the root's input now is more than 90 and less
 # than 110 percent of the input it was measured on. A root with no record, a
@@ -315,8 +315,8 @@
 # ShellCheck started outside this script (an agent or a test running it
 # directly) holds no slot and is not bounded by the pool; each admission counts
 # it at its current resident size.
-# Waiting roots queue rather than fail; both cache-key and host-slot queue time
-# consume neither the root deadline nor its retry budget.
+# Waiting roots queue rather than fail; host-slot queue time consumes neither the
+# root deadline nor its retry budget.
 # A pool that cannot be used (its directory, lock, ticket, slot or queue file)
 # never lets a root run unbounded: lint exits 2 before any root starts, or a gate
 # exits 2 for its root, naming the path and the fix.
@@ -508,7 +508,7 @@ fm_lint_root_watch_peak() {  # <rss-file>...
 }
 
 # Samples each source gave the macOS resident-memory watch across a root's
-# attempts, as libproc:<n>,ps:<n>, followed by ,reader-unavailable:<reason>
+# attempts, as libproc:<n>, followed by ,reader-unavailable:<reason>
 # for each attempt that gave up its libproc reader, or none when no watch
 # sampled the root.
 fm_lint_root_rss_samples() {  # <rss-file>...
@@ -517,7 +517,9 @@ fm_lint_root_rss_samples() {  # <rss-file>...
     /^rss_reader_unavailable=/ { reasons = reasons ",reader-unavailable:" $2 }
     /^rss_escaped=/ { line = $0; sub(/^rss_escaped=/, "", line); gsub(/,/, ";", line); reasons = reasons ",escaped:" line }
     /^rss_unmeasured=1$/ { reasons = reasons ",unmeasured" }
-    END { if (found) printf "libproc:%d,ps:%d%s\n", count["libproc"], count["ps"], reasons; else print "none" }
+    /^rss_(cont|kill|invalidation)_failed=1$/ { line = $1; sub(/^rss_/, "", line); gsub(/_/, "-", line); reasons = reasons "," line }
+    /^rss_launch_unrecorded=1$/ { reasons = reasons ",launch-unrecorded" }
+    END { if (found) printf "libproc:%d%s\n", count["libproc"], reasons; else print "none" }
   '
 }
 
@@ -536,7 +538,7 @@ fm_lint_max_root_rss() {  # <rss-kib> <rss-kib>
 # pretending every signal or nonzero exit is a memory kill: only process-level
 # memory-failure evidence earns the memory reason - GHC's heap-exhaustion
 # status 251, the resident-memory watch's own status 98, or a complete runtime
-# memory-error line on the root's stderr, including the cache wrapper's Perl
+# memory-error line on the root's stderr, including the check helper's Perl
 # "Out of memory!" exit 1 - and that
 # evidence is checked before a generic findings or signal reason.
 # Diagnostics and their echoed source excerpts are on stdout and never count,
@@ -1413,7 +1415,7 @@ if [ "$LIST_FILES" -eq 0 ] && ! command -v shellcheck >/dev/null 2>&1; then
   exit 1
 fi
 if ! PERL_BIN=$(command -v perl); then
-  printf 'fm-lint.sh: perl is required for source selection, caching and worker cleanup.\n' >&2
+  printf 'fm-lint.sh: perl is required for source selection, admission and worker cleanup.\n' >&2
   exit 127
 fi
 [ -r "$SELF_DIR/fm-lint-cache.pl" ] || {
