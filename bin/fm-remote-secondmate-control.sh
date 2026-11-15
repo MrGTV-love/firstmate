@@ -358,6 +358,8 @@ cmd_relaunch() {
   # (Main 1807 (5), Main 1809): any other live endpoint refuses before dispatch.
   if [ -n "$expected_target" ] && [ "$REMOTE_ENDPOINT_TARGET" != "$expected_target" ]; then
     die "this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected_target'; refusing before the relaunch is dispatched"
+    # shellcheck disable=SC2317 # die exits; this stops a stand-in die that returns
+    return 1
   fi
   [ "$model" != - ] || model=default
   [ "$effort" != - ] || effort=default
@@ -419,6 +421,8 @@ cmd_send() {
   if [ -n "$expected" ] && [ "$REMOTE_ENDPOINT_TARGET" != "$expected" ]; then
     fm_lock_release "$meta_lock"
     die "this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected'; refusing before the record is written"
+    # shellcheck disable=SC2317 # die exits; this stops a stand-in die that returns
+    return 1
   fi
   # A remote steer is delivered by durable record, never by typing its payload
   # into the pane: write it into this secondmate's host-local steering inbox,
