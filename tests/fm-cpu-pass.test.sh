@@ -606,6 +606,10 @@ python3 "$ROOT/tests/fm-cpu-pass-admission.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON
   || fail "pipeline admission and child-descriptor regression failed"
 pass "pipeline admission follows measured reservations, the fallback count, the pause-only backstop, priority, start registration, timing and descriptor ownership"
 
+python3 "$ROOT/tests/fm-cpu-pass-attribution.py" "$ROOT" "$TMP_ROOT" \
+  || fail "attempt attribution decision cases failed"
+pass "attempt attribution holds on every unreadable fact, keeps every owner, and keeps an unproven launch counted while a later one waits"
+
 python3 "$ROOT/tests/fm-cpu-pass-gate.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
   || fail "launch-gate regression failed"
 pass "the launch gate maps its run, scopes by step, holds inside its bound, records its holds and refusals, and passes its agent's streams, signals and exit through"

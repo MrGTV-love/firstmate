@@ -310,7 +310,7 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     folder.mkdir()
     db = folder / 'state.sqlite'
     with sqlite3.connect(db) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER)')
+        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER, launch_nonce TEXT)')
         # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
         connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
         connection.execute('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL)')
@@ -432,7 +432,7 @@ def client_start(folder, db, env, name):
         (bin_dir / 'no-mistakes').write_text('#!' + python + '\n' + 'import runpy, sys\nrunpy.run_path(%r, run_name="__main__")\n' % str(worker))
         (bin_dir / 'no-mistakes').chmod(0o700)
         env.update(PATH=str(bin_dir) + os.pathsep + env['PATH'])
-    return ['no-mistakes', 'axi', 'run', '--intent', name], checkout
+    return ['no-mistakes', 'axi', 'run', '--intent', name, '--launch-nonce', 'nonce-' + name], checkout
 
 
 worker = root / 'start.py'
@@ -444,8 +444,9 @@ else:
 # Test-only: a delay before this fake start registers, while the admission lock is held.
 time.sleep(float(os.environ.get('CASE_LAUNCH_DELAY', '0')))
 with sqlite3.connect(folder / 'state.sqlite') as db:
-    db.execute('INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-               (name, 'running', 'repo', 'main', name, int(time.time())))
+    nonce = sys.argv[sys.argv.index('--launch-nonce') + 1] if '--launch-nonce' in sys.argv else None
+    db.execute('INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)',
+               (name, 'running', 'repo', 'main', name, int(time.time()), nonce))
 with (folder / 'order').open('a') as out: out.write(name + '\\n')
 (folder / (name + '.started')).touch()
 while not (folder / (name + '.release')).exists(): time.sleep(0.025)
@@ -462,6 +463,9 @@ agent.write_text("""import json, os, pathlib, signal, sys, time
 folder, run = pathlib.Path(os.environ['CASE_FOLDER']), sys.argv[1]
 with open(os.environ['CASE_COALITION_FILE'], 'a') as registry: registry.write(str(os.getpid()) + ' ')
 mode = os.environ.get('CASE_AGENT', 'wait')
+if os.environ.get('CASE_SESSION_ID'):  # a Claude-shaped first stream-json line naming this launch's session
+    sys.stdout.write(json.dumps(dict(type='system', subtype='init', session_id=os.environ['CASE_SESSION_ID'])) + chr(10))
+    sys.stdout.flush()
 if mode == 'trap':  # installed before the marker that tells the test to signal
     signal.signal(signal.SIGTERM, lambda *a: (folder / (run + '.got-term')).touch() or sys.exit(0))
 (folder / (run + '.agent')).write_text(json.dumps(dict(pid=os.getpid(), pgid=os.getpgid(0), started_ns=time.time_ns(),
@@ -471,8 +475,10 @@ if mode == 'escape':  # an orphaned descendant: own session, every descriptor cl
         os.setsid()
         os.closerange(3, 65536)
         os.chdir('/')
+        # An empty environment, or (CASE_COPIED_IDENTITY) one carrying another attempt's identity copied into it.
+        copied = {'FM_LAUNCH_ATTEMPT': os.environ['CASE_COPIED_IDENTITY']} if os.environ.get('CASE_COPIED_IDENTITY') else {}
         os.execve(sys.executable, [sys.executable, '-I', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'escapee.py'),
-                                   str(folder), run, os.environ['CASE_COALITION_FILE']], {})
+                                   str(folder), run, os.environ['CASE_COALITION_FILE']], copied)
     while not (folder / (run + '.escapee')).exists(): time.sleep(0.02)
     sys.exit(0)
 if mode.startswith('exit-'): sys.exit(int(mode[5:]))

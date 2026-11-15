@@ -1176,8 +1176,9 @@ if intent.startswith('hold'):
     while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
 if intent.startswith('reg'):
     with sqlite3.connect(folder / 'state.sqlite') as db:
-        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, 'running', 'repo', 'main', ?, ?)",
-                   ('run-%s-%d' % (intent, os.getpid()), intent, int(time.time())))
+        nonce = args[args.index('--launch-nonce') + 1] if '--launch-nonce' in args else None
+        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, 'running', 'repo', 'main', ?, ?, ?)",
+                   ('run-%s-%d' % (intent, os.getpid()), intent, int(time.time()), nonce))
 """)
         (nest / 'no-mistakes').chmod(0o700)
         env.update(PATH=str(nest) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
@@ -1207,7 +1208,9 @@ if intent.startswith('reg'):
                 ('path-unregistered', 18, 'no-mistakes axi run --intent a; no-mistakes axi run --intent b', 2),
                 ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
                 ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
-                ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x; no-mistakes axi run --intent reg-x', 2),
+                # The first created a run proven its own by its launch nonce (Main 1683): its reservation ended, so the
+                # second, same arguments, is decided as another start.
+                ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x --launch-nonce n-x; no-mistakes axi run --intent reg-x --launch-nonce n-x', 2),
                 ('abs-first-same-args-unregistered', 18, '{abs} axi run --intent x; no-mistakes axi run --intent x', 1),
                 ('both-register', 18, 'no-mistakes axi run --intent reg-a; no-mistakes axi run --intent reg-b', 2),
                 ('reviewer-two-repositories', 18, 'cd {r1} && no-mistakes axi run --intent first; cd {r2} && no-mistakes axi run --intent second', 2)):
@@ -1272,7 +1275,7 @@ if intent.startswith('reg'):
         folder, db, env = case('nested-class-order', cores=18)
         client = nest_client(folder, env)
         go = folder / 'go'
-        line = '{abs} axi run --intent reg-first; while [ ! -e {go} ]; do sleep 0.05; done; no-mistakes axi run --intent second'
+        line = '{abs} axi run --intent reg-first --launch-nonce n-first; while [ ! -e {go} ]; do sleep 0.05; done; no-mistakes axi run --intent second'
         outer = launch(mem_guard + ['bash', '-c', line.format(abs=client, go=go)], env, folder / 'outer', cwd=registered_checkout(folder, db))
         wait_for(lambda: calls(folder) == ['reg-first'], 'the first client ran')
         lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
@@ -1296,7 +1299,7 @@ if intent.startswith('reg'):
             fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
         assert ended(elsewhere, folder, 'the elsewhere start') == 0
         assert ended(outer, folder, 'the outer command') == 0
-        assert calls(folder) == ['reg-first', 'elsewhere', 'second'], calls(folder)
+        assert calls(folder) == ['reg-first', 'elsewhere', 'second'], calls(folder)  # the nonce row proved reg-first's run its own
 
     def nested_parallel_counted():
         # Two nested clients started together: the second is decided with the first, admitted and not registered,
@@ -1543,20 +1546,21 @@ exec /bin/ln "$@"
         (nest / 'no-mistakes').write_text('#!' + python + '\n' + """import os, pathlib, sqlite3, sys, time
 folder = pathlib.Path(os.environ['CASE_FOLDER']); args = sys.argv[1:]
 intent = args[args.index('--intent') + 1] if '--intent' in args else ''
+nonce = args[args.index('--launch-nonce') + 1] if '--launch-nonce' in args else None
 (folder / ('pid-' + intent)).write_text(str(os.getpid()))
 if intent.startswith('reg'):
     with sqlite3.connect(folder / 'state.sqlite') as db:
-        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, 'running', 'repo', 'main', ?, ?)",
-                   ('run-' + intent, intent, int(time.time())))
+        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, 'running', 'repo', 'main', ?, ?, ?)",
+                   ('run-' + intent, intent, int(time.time()), nonce))
 while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
 """)
         (nest / 'no-mistakes').chmod(0o700)
         env.update(PATH=str(nest) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
         return checkout
 
-    def row(db, run, intent, branch='main', repo_id='repo'):
-        change(db, "INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, 'running', ?, ?, ?, ?)",
-               (run, repo_id, branch, intent, int(time.time())))
+    def row(db, run, intent, branch='main', repo_id='repo', nonce=None):
+        change(db, "INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, 'running', ?, ?, ?, ?, ?)",
+               (run, repo_id, branch, intent, int(time.time()), nonce))
 
     def launch_in(command, env, log, cwd):
         out, err = open(str(log) + '.stdout', 'w'), open(str(log) + '.stderr', 'w')
@@ -1573,14 +1577,14 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         # ends the probe is admitted by itself while A's client is still alive.
         folder, db, env = case('bind-own-row', cores=6)
         checkout = bound_repo(folder, db, env)
-        a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], env, folder / 'a', checkout)
+        a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a', '--launch-nonce', 'nonce-a'], env, folder / 'a', checkout)
         wait_for(lambda: (folder / 'pid-hold-a').exists(), 'A runs')
         row(db, 'stranger', 'something else')
         probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
         wait_for(lambda: 'waiting: counted=1 limit=2 basis=fallback launched=0 pending=1' in (folder / 'probe.stderr').read_text(),
                  'a stranger row of the same repository and branch ends no reservation')
         assert not (folder / 'probe').exists()
-        row(db, 'own', 'hold-a')
+        row(db, 'own', 'hold-a', nonce='nonce-a')
         time.sleep(1.0)
         assert not (folder / 'probe').exists(), 'two counted runs (the stranger, A own row) hold the probe'
         change(db, "UPDATE runs SET status = 'completed' WHERE id = 'stranger'")
@@ -1599,13 +1603,13 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         b = launch_in(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent hold-b; sleep 60'], env, folder / 'b', checkout)
         wait_for(lambda: (folder / 'pid-hold-b').exists(), 'B claims and runs')
         os.kill(int((folder / 'pid-hold-b').read_text()), signal.SIGKILL)
-        a = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', 'sleep 30; no-mistakes axi run --intent hold-a'], env, folder / 'a', checkout)
+        a = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', 'sleep 30; no-mistakes axi run --intent hold-a --launch-nonce nonce-a'], env, folder / 'a', checkout)
         wait_for(lambda: 'pipeline-start admitted' in (folder / 'a.stderr').read_text(), 'A admitted, not claimed')
         row(db, 'run-hold-b', 'hold-b')
         probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
         wait_for(lambda: 'projected=%d ' % (14 * GIB) in (folder / 'probe.stderr').read_text(), 'B row and A both counted')
         assert not (folder / 'probe').exists(), (folder / 'probe.stderr').read_text()
-        row(db, 'run-hold-a', 'hold-a')
+        row(db, 'run-hold-a', 'hold-a', nonce='nonce-a')
         os.killpg(a.pid, signal.SIGKILL); a.wait()
         change(db, "UPDATE runs SET status = 'completed' WHERE id IN ('run-hold-a', 'run-hold-b')")
         finish(probe)
@@ -1763,6 +1767,27 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                              env=lean, capture_output=True, text=True, timeout=30)
         assert out.returncode == 0 and (folder / 'ran').exists(), (out.returncode, out.stderr)
 
+    def row_never_releases_another():
+        # Main 1683 / review F3: starts A and B, both admitted, live and unregistered, with the same repository, branch
+        # and intent; B's row appears. With launch nonces B's row ends B only; with none it ends neither. A stays counted
+        # either way (6 cores, limit 2: a probe waits while A's reservation and B's run are counted).
+        for label, use_nonce in (('nonces', True), ('no-nonces', False)):
+            folder, db, env = case('m1683-owner-' + label, cores=6)
+            checkout = bound_repo(folder, db, env)
+            starts = {}
+            for who in ('a', 'b'):
+                extra = ['--launch-nonce', 'nonce-' + who] if use_nonce else []
+                starts[who] = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-same'] + extra,
+                                        env, folder / who, checkout)
+                wait_for(lambda: 'pipeline-start admitted' in (folder / (who + '.stderr')).read_text(), who + ' admitted')
+            row(db, 'run-b', 'hold-same', nonce='nonce-b' if use_nonce else None)
+            probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+            expected = 'pending=%d' % (1 if use_nonce else 2)
+            wait_for(lambda: expected in (folder / 'probe.stderr').read_text(), label + ': A stays counted (' + expected + ')')
+            assert not (folder / 'probe').exists(), (label, (folder / 'probe.stderr').read_text())
+            for child in [probe] + list(starts.values()):
+                os.killpg(child.pid, signal.SIGKILL); child.wait()
+
     for name, body in (('P5.errors.fallback no A counts visible runs at R', no_term_counts_r),
                        ('P5.preempt.cancel a cancel before COMMAND begins', cancel_before_command),
                        ('P5.lock a reservation ends by its own row only', own_row_binding),
@@ -1773,7 +1798,8 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                        ('P5.lock case (i): a nested first client uses the reservation', nested_first_uses_reservation),
                        ('B2Q1 a script start under any key is admitted', script_under_any_key),
                        ('B2Q2 an unplaceable interception runs other commands and says so', unplaceable_other_command),
-                       ('B2Q2 mem-guard off macOS without python3 execs directly', mem_guard_without_python_off_macos)):
+                       ('B2Q2 mem-guard off macOS without python3 execs directly', mem_guard_without_python_off_macos),
+                       ('Main 1683 a row never releases another start', row_never_releases_another)):
         r28_case(name, body)
     (root / 'r28-admission.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)
