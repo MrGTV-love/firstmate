@@ -179,8 +179,12 @@ test_slot_identity_needs_positive_proof() {
 }
 
 
-test_a_failed_lease_scan_is_unreadable_everywhere
-test_lease_holders_compare_raw_never_tsv_escaped
-test_slot_identity_needs_positive_proof
+# The first case to fail ends the file with a nonzero status (fm_test_run_cases), also for
+# the cases above that run in a subshell.
+fm_test_run_cases \
+  test_a_failed_lease_scan_is_unreadable_everywhere \
+  test_lease_holders_compare_raw_never_tsv_escaped \
+  test_slot_identity_needs_positive_proof \
+  -- "$@"
 
 echo '# all fm-task-copy-slot-identity tests passed'
