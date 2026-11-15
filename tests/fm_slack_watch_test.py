@@ -5856,6 +5856,7 @@ class Invariant4OwnerFirst(InvariantScenario):
 
     DRIVER = r"""
 import os, subprocess, sys
+from pathlib import Path
 sys.path.insert(0, os.environ['INV4_BIN'])
 import fm_slack_watch as plane
 from fm_slack_replay import Replay
@@ -5911,6 +5912,28 @@ if order:
 plane.Watch.bound = lambda self: True
 plane.Watch.backlog = lambda self: []
 plane.run = lambda script, *args, text=None: subprocess.CompletedProcess([], 0, stdout='x\n', stderr='')
+if os.environ.get('INV4_CARD'):
+    # One held decision card (the ordered event model): the board's open row, live; each answer handed to the intake is logged, and the stand-in closes it.
+    import json as _json
+    card = _json.loads(os.environ['INV4_CARD'])
+    plane.Watch.backlog = lambda self: card
+    plane.Watch.board = lambda self: (None, {})
+    plane.Watch.probe = lambda self, key: (0, 'live')
+    def answering(script, *args, text=None):
+        if args[:1] == ('answers',):
+            with open(os.environ['INV4_ANSWERS'], 'a') as log:
+                log.write('answer\n')
+        out = 'answers: 1\nclosed: card-a\n' if args[:1] == ('answers',) else '0\n' if args[:1] == ('open',) else 'x\n'
+        return subprocess.CompletedProcess([], 0, stdout=out, stderr='')
+    plane.run = answering
+if os.environ.get('INV4_FAIL_SAVE'):
+    # A storage failure in this process: every save of the named journal fails.
+    real_save = plane.save
+    def failing_save(path, value):
+        if Path(path).name == os.environ['INV4_FAIL_SAVE']:
+            raise OSError('synthetic storage failure')
+        return real_save(path, value)
+    plane.save = failing_save
 code = plane.main(sys.argv[1:])
 import threading
 with open(os.environ['INV4_LOG'] + '.threads', 'a') as log:
@@ -7711,6 +7734,228 @@ class Round7Findings(InvariantScenario):
 def fm_slack_module():
     import fm_slack
     return fm_slack
+
+
+class ScottOrderedModelTest(InvariantScenario):
+    """The ordered event model of Main 1308/1553, as Main 1627 (3) and finding 12 of the review of d9861b24 require: each falsifier of the review of 4e0b1bd4 is
+    driven as ORDERED transitions, each step a FRESH PROCESS of the production entry point (`plane.main` behind fm-slack-check.sh: arm, the owner's check, the
+    second person's check, mirror, poll), with only the durable state on disk between steps, and with the events setting change, failed read, frozen clock,
+    storage failure and restart (a process stopped mid-call, then a fresh one). Each sequence runs plain and again with a storage failure of their journal in one
+    named step, followed by recovery sweeps. After the sequence: no request lost or woken twice, one acknowledgement each in its own DM, no answer by an id the
+    setting has named, one refusal row per attempt, never more than the cap in a sweep. Controls: owner only, a duplicate-free persistent reaction, a secret."""
+
+    DRIVER = Invariant4OwnerFirst.DRIVER
+    run_check = Invariant4OwnerFirst.run_check
+    CARD = Round6Findings.CARD
+    B_USER, B_DM = 'U0SECONDBB01', 'D0SECONDBB01'
+    REQ = re.compile(r'slack request (\S+) from (U[A-Z0-9]+)')
+
+    def proc(self, home, command, mode='normal', env=None, delay='0', card=False):
+        """One fresh process of the entry point, as the watcher runs a check (output to a private file, read after the process ended); returns (rc, output).
+        command: 'arm', 'check', 'check-second', 'mirror' or 'poll'."""
+        n = len(self.outputs)
+        log, captured = home.dir / ('p%d.calls' % n), home.dir / ('p%d.out' % n)
+        action = {'arm': 'arm', 'check': 'check', 'check-second': 'check-second'}.get(command, '')
+        child = {**os.environ, 'INV4_MODE': mode, 'INV4_LOG': str(log), 'INV4_SECOND_DM': INV_SECOND_DM, 'INV4_SECOND': INV_SECOND, 'INV4_DELAY': delay,
+                 'INV4_ORDER': '', 'INV4_SERVER': '', 'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': action, **(env or {})}
+        if card:
+            child.update(INV4_CARD=json.dumps(self.CARD), INV4_ANSWERS=str(home.dir / 'answers.log'))
+        argv = ['check' if action else command, '--replay', str(home.transcript)]
+        with open(captured, 'w') as out:
+            done = subprocess.run([sys.executable, '-c', self.DRIVER, *argv], stdout=out, stderr=subprocess.PIPE, env=child, text=True, timeout=120)
+        result = (command, done.returncode, captured.read_text())
+        self.outputs.append(result)
+        return result[1], result[2]
+
+    def sweep(self, home, mode='normal', env=None, fail_save=False, card=False, delay='0'):
+        failing = dict(env or {}, INV4_FAIL_SAVE='second.json') if fail_save else env
+        self.proc(home, 'check', env=failing, card=card)
+        return self.proc(home, 'check-second', mode=mode, env=failing, card=card, delay=delay)
+
+    def woken(self):
+        return [m for _, _, out in self.outputs for m in self.REQ.findall(out)]
+
+    def answers(self, home):
+        path = home.dir / 'answers.log'
+        return len(path.read_text().split()) if path.is_file() else 0
+
+    def finish(self, home, expect, card=False, cap=20):
+        for _ in range(4):
+            self.sweep(home, card=card)                       # recovery sweeps: fresh processes, normal speed, no fault
+        woken = self.woken()
+        self.assertEqual(sorted(woken), sorted(expect), self.outputs)                 # every request woken, none twice
+        for ts, who in expect:
+            dm = INV_OWNER_DM if who == INV_OWNER else (self.B_DM if who == self.B_USER else INV_SECOND_DM)
+            self.assertEqual(home.posts().count((dm, ts)), 1, (ts, who, home.posts()))
+        self.assertEqual([p for p in home.posts() if p[0] == self.B_DM and p[1] not in {ts for ts, who in expect if who == self.B_USER}], [])
+
+    def setUp(self):
+        self.outputs = []
+
+    def each(self):
+        """The plain sequence, then the same sequence with their journal failing to save in one step."""
+        return (False, True)
+
+    # ---- the eight falsifiers of the review of 4e0b1bd4, ordered ----
+
+    def test_f1_activation_after_a_completed_run_takes_the_first_request_in_once_including_a_same_timestamp(self):
+        for fail in self.each():
+            with self.subTest(storage_failure=fail), self.home(scott=None, history=False) as home:
+                self.outputs = []
+                home.trust_check()
+                home.set_clock(100.0)
+                self.sweep(home)                                                  # a completed run, setting off
+                with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):   # setting change: on
+                    home.set_clock(120.0)
+                    home.say('110.000000', 'their first request')
+                    home.say('110.000000', 'owner request, same ts', user=INV_OWNER, dm=INV_OWNER_DM)
+                    self.sweep(home, fail_save=fail)
+                    self.finish(home, [('110.000000', INV_SECOND), ('110.000000', INV_OWNER)])
+
+    def test_f2_a_failed_arm_with_a_frozen_clock_delivers_the_request_typed_after_it(self):
+        for fail in self.each():
+            with self.subTest(storage_failure=fail), self.home(history=False, arm=False) as home:
+                self.outputs = []
+                home.trust_check()
+                home.set_clock(150.0)                                             # frozen clock: never moves
+                self.proc(home, 'arm', mode='fail')                               # failed read of their DM during the arm
+                home.say('150.900000', 'typed after the arm')
+                self.sweep(home, fail_save=fail)
+                self.finish(home, [('150.900000', INV_SECOND)])
+
+    def test_f3_a_previously_attempted_acknowledgement_is_delivered_once_under_slow_calls_and_a_restart(self):
+        for fail in self.each():
+            with self.subTest(storage_failure=fail), self.home() as home:
+                self.outputs = []
+                home.trust_check()
+                self.sweep(home)
+                home.say('200.000200', 'their request')
+                home.edit_replay(lambda data: data['failures'].update({'chat.postMessage:200.000200': {'status': 503, 'times': 1}}))
+                self.sweep(home)                                                  # the post is ambiguous: the attempt stays marked
+                self.sweep(home, mode='die')                                      # restart: stopped inside a call of theirs
+                self.sweep(home, mode='slow', delay='3.9', fail_save=fail)
+                self.finish(home, [('200.000200', INV_SECOND)])
+
+    def test_f4_owner_load_at_the_cap_and_a_change_to_b_and_back_lose_nothing(self):
+        for fail in self.each():
+            with self.subTest(storage_failure=fail), self.home(cap='3', history=False) as home:
+                self.outputs = []
+                home.trust_check()
+                home.add_member(self.B_USER, self.B_DM)
+                home.set_clock(100.0)
+                self.sweep(home)
+                expect = []
+                home.say('110.000200', 'A request')
+                expect.append(('110.000200', INV_SECOND))
+                for k in range(3):                                                # owner load at the cap: three a sweep
+                    for j in range(3):
+                        ts = '%d.000100' % (120 + 3 * k + j)
+                        home.say(ts, 'owner %d' % j, user=INV_OWNER, dm=INV_OWNER_DM)
+                        expect.append((ts, INV_OWNER))
+                    if k == 1:
+                        home.say('124.000200', 'A request typed just before the switch, not yet read')
+                        expect.append(('124.000200', INV_SECOND))
+                        home.set_clock(130.0)                                     # B's sweeps run at a later Slack time than A's request
+                        with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': self.B_USER}):    # setting change: A to B
+                            home.say('125.000300', 'B request', user=self.B_USER, dm=self.B_DM)
+                            expect.append(('125.000300', self.B_USER))
+                            self.sweep(home, fail_save=fail)
+                            self.sweep(home)
+                    else:
+                        self.sweep(home)
+                self.finish(home, expect)                                         # and back to A
+
+    def test_f5_an_id_named_only_during_a_mirror_never_answers_after_it_is_unset(self):
+        for fail in self.each():
+            with self.subTest(storage_failure=fail), self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home:
+                self.outputs = []
+                home.trust_check()
+                self.proc(home, 'poll', card=True)                                # the card is mirrored
+                with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                    self.proc(home, 'mirror', card=True, env={'INV4_FAIL_SAVE': 'second.json'} if fail else None)
+                ts = next(iter(home.state()['threads'].values()))['ts']
+                home.say('9900.000100', '1', user=INV_SECOND, dm=INV_OWNER_DM, thread_ts=ts)
+                for _ in range(3):
+                    self.sweep(home, card=True)
+                self.assertEqual(self.answers(home), 0)
+                self.assertEqual([(r['reason'], r.get('author')) for r in home.refusals() if r['reason'].startswith('decision_held')],
+                                 [('decision_held_for_captain_reply', INV_SECOND)])
+
+    def test_f6_a_reaction_read_by_the_owner_check_and_removed_before_theirs_is_refused_once_across_restarts(self):
+        for fail in self.each():
+            with self.subTest(storage_failure=fail), self.home(authors=','.join([INV_OWNER, INV_SECOND])) as home:
+                self.outputs = []
+                home.trust_check()
+                self.proc(home, 'poll', card=True)
+                ts = next(iter(home.state()['threads'].values()))['ts']
+                home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).extend([{'name': 'one', 'users': [INV_OWNER]}, {'name': 'two', 'users': [INV_SECOND]}]))
+                self.proc(home, 'check', card=True)                               # the owner's check reads the reactions and takes the owner's answer
+                home.edit_replay(lambda data: data['reactions'].__setitem__(ts, [r for r in data['reactions'][ts] if INV_SECOND not in r['users']]))
+                self.proc(home, 'check-second', card=True, env={'INV4_FAIL_SAVE': 'second.json'} if fail else None)
+                for _ in range(3):
+                    self.sweep(home, card=True)
+                self.assertEqual(self.answers(home), 1)
+                self.assertEqual([(r['reason'], r.get('author')) for r in home.refusals() if r['reason'].startswith('decision_held')],
+                                 [('decision_held_for_captain_reaction', INV_SECOND)])
+
+    def test_f7_a_protected_value_equal_to_a_state_name_of_theirs_never_stops_the_owner_arm_or_wake(self):
+        for value in ('second.json', 'cap_left', INV_SECOND):
+            with self.subTest(value=value), self.home(history=False, arm=False) as home:
+                self.outputs = []
+                home.trust_check()
+                rc, out = self.proc(home, 'arm', env={'SLACK_SIGNING_SECRET': value})
+                self.assertEqual(rc, 0, out)
+                home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+                self.sweep(home, env={'SLACK_SIGNING_SECRET': value})
+                self.assertEqual(self.woken().count(('200.000100', INV_OWNER)), 1, self.outputs)
+                self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
+
+    def test_f8_a_request_of_theirs_staged_by_a_run_that_crashed_is_delivered_once_after_a_restart(self):
+        for fail in self.each():
+            with self.subTest(storage_failure=fail), self.home() as home:
+                self.outputs = []
+                home.trust_check()
+                self.sweep(home)
+                home.say('200.000200', 'their request')
+                self.proc(home, 'check')
+                self.proc(home, 'check-second', env={'FM_SLACK_FAULT': 'after-stage'})   # crash after staging: restart
+                self.sweep(home, fail_save=fail)
+                self.finish(home, [('200.000200', INV_SECOND)])
+
+    # ---- controls ----
+
+    def test_control_owner_only_every_owner_request_is_woken_once_in_its_sweep(self):
+        with self.home(scott=None) as home:
+            home.trust_check()
+            self.sweep(home)
+            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            self.sweep(home)
+            self.assertEqual(self.REQ.findall(self.outputs[-2][2]), [('200.000100', INV_OWNER)])
+            self.finish(home, [('200.000100', INV_OWNER)])
+
+    def test_control_a_reaction_that_stays_is_refused_once_over_several_sweeps(self):
+        with self.home(authors=','.join([INV_OWNER, INV_SECOND])) as home:
+            home.trust_check()
+            self.proc(home, 'poll', card=True)
+            ts = next(iter(home.state()['threads'].values()))['ts']
+            home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).append({'name': 'two', 'users': [INV_SECOND]}))
+            for _ in range(3):
+                self.sweep(home, card=True)
+            self.assertEqual(len([r for r in home.refusals() if r['reason'] == 'decision_held_for_captain_reaction']), 1)
+
+    def test_control_a_secret_in_a_request_of_theirs_is_never_printed_or_written(self):
+        value = 'zz-synthetic-secret-r7'
+        with self.home() as home:
+            home.trust_check()
+            self.sweep(home, env={'SLACK_SIGNING_SECRET': value})
+            home.say('200.000200', 'their request ' + value)
+            for _ in range(2):
+                self.sweep(home, env={'SLACK_SIGNING_SECRET': value})
+            self.assertNotIn(value, ''.join(out for _, _, out in self.outputs))
+            for name in ('state.json', 'second.json', 'second-requests.jsonl', 'refusals.jsonl'):
+                path = home.state_dir / name
+                if path.is_file():
+                    self.assertNotIn(value, path.read_text(), name)
 
 
 class ScottPassModelTest(InvariantScenario):
