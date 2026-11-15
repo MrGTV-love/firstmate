@@ -154,20 +154,28 @@
 # PR's head branch or any change since the first read; after a call it refuses when the
 # branch or HEAD differs, when any reflog entry above the anchor names the PR's head,
 # when the anchor no longer stands where it stood (a rewritten or expired log), when
-# the anchor is missing, or when the reflog cannot be read or is disabled. The window is
+# the anchor is missing, when the reflog cannot be read or is disabled, or when it gained
+# any entry at all since the first read (a switch to an unrelated branch and back counts;
+# an entry naming the PR's head branch is only named as such). The window is
 # published in the route file as soon as it opens, so a plan killed while it is still
 # proving leaves it, and a proof that refuses still ends with the same read. In the sweep
 # a switch it sees stops the run: the copies still pending are not called or released and
 # are reported SKIPPED (teardown_driver_release exits 4). A plan killed at its timeout is
 # followed by the parent's own read against that window, in any state, with any new entry
-# in the HEAD reflog counting while the PR's head branch is not known yet, and by the
+# in the HEAD reflog counting, and by the
 # release of the plan's project lock only when its record names the killed plan's pid and
 # that pid is gone (teardown_route_lock_reap_killed); otherwise the lock is left for the
 # lock library's dead-owner recovery and the reason says so. This detects and does not prevent a switch by an
 # actor that does not take the lock (an agent's direct git switch, a person, the
 # pipeline's axi sync): a switch after the pre-entry read can reach the driver and is
 # reported after the fact, and a switch and restore that wholly precedes the first read
-# is not seen.
+# is not seen. Two narrow kill windows are named residuals (Main 1900), and in both the
+# safety property holds and the lock is left for dead-owner recovery: (a) a plan killed
+# after it took its project lock and before it published the lock path leaves the lock
+# for the lock library's dead-owner recovery, and the parent has no path to record it; (b)
+# a plan killed before it opened its own window may leave the parent holding the previous
+# copy's window, and a stale window is conservative (a different anchor or branch refuses,
+# a quiet one passes) with no driver called.
 #
 # The route's call is closeout_pr.py --cleanup-worktree <copy> [--execute-cleanup]
 # --pr <PR> --supersedence-profile <profile> --no-evidence-files, run from the
@@ -1643,7 +1651,7 @@ teardown_route_checkout_close() {
 # the switch. <prhead> is the PR's head branch (forge headRefName).
 TEARDOWN_CKO_WHY=
 teardown_route_checkout_check() {  # <slot> <prhead>
-  local slot=$1 prhead=$2 delta entries entry subject word at
+  local slot=$1 prhead=$2 delta entries entry subject word at first
   local -a words=()
   TEARDOWN_CKO_WHY=
   if [ "$TEARDOWN_CKO_OPEN" != 1 ] || [ -z "$TEARDOWN_CKO_ANCHOR" ] || ! teardown_route_checkout_state "$slot"; then
@@ -1668,29 +1676,31 @@ teardown_route_checkout_check() {  # <slot> <prhead>
     return 1
   fi
   [ "$delta" -gt 0 ] || return 0
-  if [ -z "$prhead" ]; then
-    # The PR's head branch is not known yet (the route is still proving): any new entry in
-    # the HEAD reflog is a change in the window, so it counts.
-    TEARDOWN_CKO_WHY="the HEAD reflog of the clone's primary checkout gained $delta entries since the route's first read and the PR's head branch is not known yet, so a switch could not be ruled out"
-    return 1
-  fi
   entries=$(sed -n "1,${delta}p" <<< "$TEARDOWN_CKO_NOW_LOG") || {
     TEARDOWN_CKO_WHY="the entries of the clone's HEAD reflog made since the route's first read cannot be read, so a switch could not be ruled out"
     return 1
   }
+  # Any new entry in the HEAD reflog is a change in the window (Main 1887, Main 1900): one
+  # that names the PR's head branch is named as such; any other, a switch to an unrelated
+  # branch and back included, is a change all the same, whether or not the PR's head branch
+  # is known yet.
+  first=
   while IFS= read -r entry; do
     subject=${entry#*|}
     subject=${subject#*|}
+    [ -n "$first" ] || first=$subject
     words=()
     read -r -a words <<< "$subject"
     for word in ${words[@]+"${words[@]}"}; do
-      if [ "$word" = "$prhead" ]; then
+      if [ -n "$prhead" ] && [ "$word" = "$prhead" ]; then
         TEARDOWN_CKO_WHY="a HEAD reflog entry of the clone's primary checkout since the route's first read names the PR's head branch $prhead ($subject)"
         return 1
       fi
     done
   done <<< "$entries"
-  return 0
+  TEARDOWN_CKO_WHY="the HEAD reflog of the clone's primary checkout gained $delta entries since the route's first read (the newest: $first), a change in the window, so a switch could not be ruled out"
+  [ -n "$prhead" ] || TEARDOWN_CKO_WHY="$TEARDOWN_CKO_WHY (the PR's head branch is not known yet)"
+  return 1
 }
 # The read made immediately before the driver is entered: the checkout must not be on
 # the PR's head branch, and must still be as the first read left it.
@@ -1713,7 +1723,8 @@ teardown_route_checkout_pre_entry() {  # <slot> <prhead>
 # diff, so nothing configured in the repository can decide the proof. A path that the
 # merge commit changed further, a mode or type change, any git command that fails and any
 # git output that cannot be parsed (a record with no path, one cut short, one without the
-# raw shape) prove nothing: only a clean end of the stream is the end of the changes. Sets
+# raw shape, its leading colon included) prove nothing: only a clean end of the stream is
+# the end of the changes. Sets
 # WHY naming the first unproven path.
 teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
   local tmp=$1 slot=$2 tip=$3 merge=$4 base bases raw meta path om nm osha nsha st
@@ -1748,12 +1759,12 @@ teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
       TEARDOWN_CLOSEOUT_ROUTE_WHY=$unparsable
       return 1
     fi
-    meta=${meta#:}
-    if [[ ! $meta =~ ^[0-7]{6}\ [0-7]{6}\ [0-9a-f]{40,64}\ [0-9a-f]{40,64}\ [ADMT]$ ]]; then
+    if [[ ! $meta =~ ^:[0-7]{6}\ [0-7]{6}\ [0-9a-f]{40,64}\ [0-9a-f]{40,64}\ [ADMT]$ ]]; then
       exec 3<&-
       TEARDOWN_CLOSEOUT_ROUTE_WHY=$unparsable
       return 1
     fi
+    meta=${meta#:}
     read -r om nm osha nsha st <<< "$meta"
     git -C "$slot" --literal-pathspecs ls-tree -z "$merge" -- "$path" > "$tmp/ls" 2>/dev/null || {
       exec 3<&-
