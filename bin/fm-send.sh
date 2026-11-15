@@ -170,7 +170,10 @@
 # open set cannot be read (a log past the status read limits), come before any
 # other guard telemetry, the supervision warning (bin/fm-guard.sh), the lease
 # guard, and anything marked, locked, recorded, or typed, so a refused send
-# changes nothing else. A --key send and
+# changes nothing else. Every other path keeps the base order: the explicit-home
+# guard's allow event is recorded and the lease guard runs before an option error
+# (a malformed, duplicate or missing --resolve-key or --fire-and-forget value) is
+# reported, so a send under the other actor's live lease still exits 6. A --key send and
 # a send to an explicit backend target cannot answer a decision, so the rule
 # does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
 # resend of an unconfirmed secondmate request re-delivers that same request and
@@ -268,12 +271,29 @@ if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
   exit 1
 fi
 
+# The explicit-home guard admitted this send: its allow is recorded exactly once, so the
+# guard's deny/allow sequence (bin/fm-guard-metrics.sh) reads as it does on base, where the
+# allow was written right here. It is written at the first point the send leaves this
+# guard's path: on every early exit below (home dir, state dir, target resolution, option
+# errors) and before the lease guard on the normal path. Only the two choice refusals
+# (header: "Decision closure") record nothing but the gate-agent containment event, as
+# Main's 2026-11-14 D1 ruling requires, so they do not call it.
+FM_SEND_HOME_GUARD_TASK=${1:-}
+FM_SEND_HOME_ALLOW_RECORDED=0
+fm_send_record_home_allow() {
+  [ "$FM_SEND_HOME_ALLOW_RECORDED" = 0 ] || return 0
+  FM_SEND_HOME_ALLOW_RECORDED=1
+  "$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed allow --rule explicit-home --task "$FM_SEND_HOME_GUARD_TASK" 2>/dev/null || true
+}
+
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 if [ ! -d "$FM_HOME" ]; then
+  fm_send_record_home_allow
   echo "error: FM_HOME '$FM_HOME' is not a directory; fm-send cannot resolve this home's state" >&2
   exit 1
 fi
 if [ ! -d "$STATE" ]; then
+  fm_send_record_home_allow
   echo "error: state dir '$STATE' is missing; fm-send cannot resolve targets for FM_HOME '$FM_HOME'" >&2
   exit 1
 fi
@@ -477,9 +497,35 @@ fm_send_resolve_target() { # <raw-target>
 }
 
 RAW_TARGET=$1
-fm_send_resolve_target "$RAW_TARGET" || exit 1
+fm_send_resolve_target "$RAW_TARGET" || {
+  fm_send_record_home_allow
+  exit 1
+}
 T=$RESOLVED_TARGET
 shift
+
+# Supervision lease guard: a steer is overlap territory between the two Pi
+# supervision actors, so refuse (exit 6) while the OTHER actor holds this task's
+# live lease. A home with no supervision branch has no lease files and passes
+# untouched (contract: bin/fm-lease-lib.sh). It runs once, at one of two points:
+# before an option error is reported (as on base, where it ran before option
+# parsing, so a held lease answers 6 for any key, valid or malformed), or after the
+# choice checks on the normal path (Main 015 ordering: a no-choice refusal comes
+# first and takes no lease lock).
+# shellcheck source=bin/fm-lease-lib.sh
+. "$SCRIPT_DIR/fm-lease-lib.sh"
+FM_SEND_LEASE_GUARDED=0
+fm_send_lease_guard() {
+  [ "$FM_SEND_LEASE_GUARDED" = 0 ] || return 0
+  FM_SEND_LEASE_GUARDED=1
+  if [ -n "$TARGET_META" ]; then
+    LEASE_GUARD_TASK=$(fm_send_id_from_meta "$TARGET_META")
+    if [ -n "$LEASE_GUARD_TASK" ]; then
+      fm_lease_guard "$LEASE_GUARD_TASK" "steer (fm-send)"
+      trap 'fm_lease_guard_release' EXIT
+    fi
+  fi
+}
 
 # Collect --resolve-key flags (answerer-closes; see the header contract). They
 # must precede --key or the message text; everything after the last flag is the
@@ -488,17 +534,20 @@ RESOLVE_KEYS=
 FIRE_AND_FORGET_ID=
 ANSWERS_NONE=0
 END_OF_OPTIONS=0
+# An option error is held, not printed, until the explicit-home allow, the supervision
+# warning and the lease guard have run in base order (see the lease guard above).
+FM_SEND_OPTION_ERROR=
 fm_send_add_resolve_key() { # <key>
   local k=$1
   case "$k" in
   '' | *[!A-Za-z0-9._-]*)
-    echo "error: --resolve-key '$k' is not a valid decision key (allowed: A-Z a-z 0-9 . _ -)" >&2
+    FM_SEND_OPTION_ERROR="error: --resolve-key '$k' is not a valid decision key (allowed: A-Z a-z 0-9 . _ -)"
     return 1
     ;;
   esac
   case " $RESOLVE_KEYS " in
   *" $k "*)
-    echo "error: duplicate --resolve-key '$k'" >&2
+    FM_SEND_OPTION_ERROR="error: duplicate --resolve-key '$k'"
     return 1
     ;;
   esac
@@ -508,14 +557,14 @@ while :; do
   case "${1:-}" in
   --resolve-key)
     [ $# -ge 2 ] || {
-      echo "error: --resolve-key requires a key" >&2
-      exit 1
+      FM_SEND_OPTION_ERROR="error: --resolve-key requires a key"
+      break
     }
-    fm_send_add_resolve_key "$2" || exit 1
+    fm_send_add_resolve_key "$2" || break
     shift 2
     ;;
   --resolve-key=*)
-    fm_send_add_resolve_key "${1#--resolve-key=}" || exit 1
+    fm_send_add_resolve_key "${1#--resolve-key=}" || break
     shift
     ;;
   --answers-none)
@@ -531,20 +580,20 @@ while :; do
     ;;
   --fire-and-forget)
     [ $# -ge 2 ] || {
-      echo "error: --fire-and-forget requires a delivery id" >&2
-      exit 1
+      FM_SEND_OPTION_ERROR="error: --fire-and-forget requires a delivery id"
+      break
     }
     [ -z "$FIRE_AND_FORGET_ID" ] || {
-      echo "error: duplicate --fire-and-forget" >&2
-      exit 1
+      FM_SEND_OPTION_ERROR="error: duplicate --fire-and-forget"
+      break
     }
     FIRE_AND_FORGET_ID=$2
     shift 2
     ;;
   --fire-and-forget=*)
     [ -z "$FIRE_AND_FORGET_ID" ] || {
-      echo "error: duplicate --fire-and-forget" >&2
-      exit 1
+      FM_SEND_OPTION_ERROR="error: duplicate --fire-and-forget"
+      break
     }
     FIRE_AND_FORGET_ID=${1#--fire-and-forget=}
     shift
@@ -552,6 +601,16 @@ while :; do
   *) break ;;
   esac
 done
+
+if [ -n "$FM_SEND_OPTION_ERROR" ]; then
+  # Base order for an option error: the explicit-home allow, the supervision warning,
+  # the lease guard (exit 6 while the other actor holds the lease), then the error.
+  fm_send_record_home_allow
+  FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/fm-guard.sh" || true
+  fm_send_lease_guard
+  printf '%s\n' "$FM_SEND_OPTION_ERROR" >&2
+  exit 1
+fi
 
 if [ "$ANSWERS_NONE" = 1 ] && [ -n "$RESOLVE_KEYS" ]; then
   echo "error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent." >&2
@@ -589,23 +648,11 @@ CHOICE_OPEN_SET
   fi
 fi
 
-"$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed allow --rule explicit-home --task "$RAW_TARGET" 2>/dev/null || true
+fm_send_record_home_allow
 
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/fm-guard.sh" || true
 
-# Supervision lease guard: a steer is overlap territory between the two Pi
-# supervision actors, so refuse while the OTHER actor holds this task's live
-# lease. A home with no supervision branch has no lease files and passes
-# untouched (contract: bin/fm-lease-lib.sh).
-# shellcheck source=bin/fm-lease-lib.sh
-. "$SCRIPT_DIR/fm-lease-lib.sh"
-if [ -n "$TARGET_META" ]; then
-  LEASE_GUARD_TASK=$(fm_send_id_from_meta "$TARGET_META")
-  if [ -n "$LEASE_GUARD_TASK" ]; then
-    fm_lease_guard "$LEASE_GUARD_TASK" "steer (fm-send)"
-    trap 'fm_lease_guard_release' EXIT
-  fi
-fi
+fm_send_lease_guard
 
 if [ "$TARGET_BACKEND" != remote ]; then
   fm_backend_validate "$TARGET_BACKEND" || exit 1

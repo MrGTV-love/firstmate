@@ -1089,6 +1089,35 @@ refusal_env_send() {
     "$SEND" "$@" 2>"$err")
 }
 
+# A held lease answers 6 for any --resolve-key, valid or malformed: on base the lease
+# guard ran before option parsing (base bin/fm-send.sh: fm_lease_guard, then the
+# --resolve-key loop), so a malformed key under the other actor's live lease exited 6
+# there, and it must here too. With no live lease the malformed key is refused with 1.
+test_held_lease_answers_6_before_an_option_error() {
+  local dir fb log home err rc
+  dir="$TMP_ROOT/lease-first"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home lease-first)
+  printf '%s\n' "$$" > "$home/state/.lock"
+  printf 'branch\t%s\t1\n' "$$" > "$home/state/.lease-t1"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key=bad@ "answer"; rc=$?
+  expect_code 6 "$rc" "a malformed key under the other actor's live lease exits 6, as on base: $(cat "$err")"
+  assert_contains "$(cat "$err")" "leased to the branch" "the lease refusal is the one reported"
+  assert_not_contains "$(cat "$err")" "not a valid decision key" "the option error is not reported while the lease refuses"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 --resolve-key k1 "answer"; rc=$?
+  expect_code 6 "$rc" "a duplicate key under the live lease exits 6: $(cat "$err")"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "answer"; rc=$?
+  expect_code 6 "$rc" "a valid key under the live lease exits 6 (control): $(cat "$err")"
+  [ ! -e "$home/state/t1.inbox" ] || fail "a lease-refused send was delivered"
+
+  home=$(setup_two_key_home lease-first-free)
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key=bad@ "answer"; rc=$?
+  expect_code 1 "$rc" "with no live lease a malformed key is refused with 1 (control)"
+  assert_contains "$(cat "$err")" "not a valid decision key" "the option error names the bad key"
+  [ ! -e "$home/state/t1.inbox" ] || fail "a malformed-key send was delivered"
+  pass "fm-send: a held lease answers 6 before an option error, as on base; with no lease the option error answers 1"
+}
+
 # assert_only_gate_event <before-state> <home> <expected-gate-line-jq> <label>:
 # the home changed in exactly one way - state/guard-events.jsonl now exists and
 # holds exactly one gate-agent-containment event matching the jq filter - and
@@ -1569,6 +1598,7 @@ test_unwritable_ledger_leaves_the_send_alone
 test_bare_send_with_open_keys_refuses
 test_bare_send_refuses_before_marking_a_secondmate
 test_no_choice_refusal_precedes_telemetry_banner_and_lease
+test_held_lease_answers_6_before_an_option_error
 test_double_dash_ends_options
 test_bare_send_unchanged_without_open_decisions
 test_answers_none_delivers_a_routine_steer
