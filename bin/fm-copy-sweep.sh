@@ -1456,7 +1456,7 @@ driver_plan_allows() {  # <clone> <copy>
     # for the execute of this copy (TEARDOWN_CKO_*); a switch found by the plan stops the run.
     { IFS= read -r TEARDOWN_CLOSEOUT_ROUTE; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_PR; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_WHY
       IFS= read -r TEARDOWN_CKO_COPY; IFS= read -r TEARDOWN_CKO_BRANCH; IFS= read -r TEARDOWN_CKO_HEAD; IFS= read -r TEARDOWN_CKO_POS
-      IFS= read -r TEARDOWN_ROUTE_HEADREF; IFS= read -r PLAN_SWITCHED; } < "$dir/route" || true
+      IFS= read -r TEARDOWN_ROUTE_HEADREF; IFS= read -r PLAN_SWITCHED; IFS= read -r TEARDOWN_CKO_ANCHOR; } < "$dir/route" || true
     [ "$PLAN_SWITCHED" = 1 ] || PLAN_SWITCHED=0
     if [ -n "$TEARDOWN_CKO_COPY" ] && [ "$TEARDOWN_CLOSEOUT_ROUTE" = pr ]; then TEARDOWN_CKO_OPEN=1; else TEARDOWN_CKO_OPEN=0; fi
   fi
@@ -1511,7 +1511,9 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
 # predicates_failed array that holds cleanup_gate, cleanup_requested true (the call
 # asked for cleanup), worktree_removed the boolean false (it must not claim a
 # removal), no branch delete or reap decision (a BLOCKED answer has none), and the
-# recovery reason. A string for predicates_failed, a removal
+# recovery reason. The document is also the called PR's complete envelope: exactly the
+# fifteen keys of the driver's compact envelope and a pr equal to the PR the call named,
+# so another PR's answer or a document with a key missing or added is not temporary. A string for predicates_failed, a removal
 # claim, a false cleanup_requested, a null or missing flag or any other shape
 # contradicts "nothing was released" and is not temporary, so the retention
 # receipt stays. A retained-tree signal on stdout or stderr beats all of it.
@@ -1522,7 +1524,7 @@ execute_refusal_is_temporary() {  # <exit>
     case "$TEARDOWN_CLOSEOUT_STDOUT$TEARDOWN_CLOSEOUT_OUT" in
       *cleanup_ignored_payload_archived_tree_retained* | *archive_then_retain_tree*) return 1 ;;
     esac
-    printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and .cleanup_requested == true and (.predicates_failed | type) == "array" and (.predicates_failed | index("cleanup_gate")) != null and .worktree_removed == false and (.branch_delete // null) == null and (.branch_reap // null) == null and (.cleanup_recovery_reason == "cleanup_lease_conflict" or .cleanup_recovery_reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
+    printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e --argjson keys "$TEARDOWN_ROUTE_ENVELOPE_KEYS" --argjson pr "${TEARDOWN_CLOSEOUT_ROUTE_PR:-null}" 'length == 1 and (.[0] | type == "object" and (keys | sort) == $keys and (.pr | type) == "number" and .pr == $pr and .state == "BLOCKED" and .cleanup_requested == true and (.predicates_failed | type) == "array" and (.predicates_failed | index("cleanup_gate")) != null and .worktree_removed == false and (.branch_delete // null) == null and (.branch_reap // null) == null and (.cleanup_recovery_reason == "cleanup_lease_conflict" or .cleanup_recovery_reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
     return
   fi
   printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1

@@ -103,7 +103,9 @@
 # guess. A recorded base_branch= (TEARDOWN_ROUTE_BASE) must name that same branch or
 # the copy is kept. A remote that cannot be read, names no branch, or names one the
 # clone has no ref for holds the copy. A forge read that
-# fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 by default) or cannot be
+# fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 by default; a value that is
+# not a whole number of seconds from 1 to 999999999, written without a leading zero,
+# refuses the route with the value named and is never read as 60) or cannot be
 # parsed is unknown, never merged. The read is bounded by fm_timeout_perl_bound: gh
 # runs under a small perl wrapper that leads the bound's process group, waits for gh,
 # prints one trailer line with gh's status and kills the whole group, so a descendant
@@ -127,8 +129,13 @@
 # core.attributesFile, GIT_ATTR_NOSYSTEM, GIT_CONFIG_NOSYSTEM, GIT_CONFIG_GLOBAL=/dev/null),
 # writes only into a temporary object directory (the clone's objects are an alternate)
 # and needs git 2.40 (--attr-source); on an older git a copy that adds text is kept,
-# and a change with no added text line is still proved. git check-attr merge, under
-# the same settings, runs first for each such path: the clone's info/attributes is
+# and a change with no added text line is still proved. The proof refuses first when
+# the repository's configuration defines a merge driver of any name (git config
+# --get-regexp '^merge\..*\.driver$' under the same settings: the repository's own and
+# worktree files, an included file, the command line and GIT_CONFIG_*), because
+# merge.default=text does not reach a driver that is itself named text; a
+# configuration it cannot read refuses too. git check-attr merge, under
+# the same settings, runs next for each such path: the clone's info/attributes is
 # not closed by --attr-source, so a path it gives a custom driver keeps the copy before
 # any merge runs. An empty net change is proved; it is not a claim that T is an
 # ancestor of M.
@@ -140,13 +147,15 @@
 # caller's hold (TEARDOWN_ROUTE_LOCK_HELD, proved by the lock's pid file naming this
 # process), never takes it a second time and never releases it. A claim the pid file
 # does not prove, a busy lock or one that cannot be taken keeps the copy before any
-# driver call. The checkout is read as its branch, HEAD and the number of entries in
-# its HEAD reflog at the route's first step (the sweep's plan, teardown's call),
-# immediately before the driver is entered, and after each driver call. Before the
-# driver the route refuses when the pre-entry read shows the PR's head branch or any
-# change since the first read; after a call it refuses when the branch or HEAD
-# differs, when any reflog entry since the first read names the PR's head, or when the
-# reflog cannot be read or is disabled. In the sweep a switch it sees stops the run:
+# driver call. The checkout is read as its branch, HEAD and its HEAD reflog (one
+# read, so the count, the entries and the anchor come from one snapshot) at the
+# route's first step (the sweep's plan, teardown's call), immediately before the driver
+# is entered, and after each driver call. The first read keeps the newest reflog entry
+# as the anchor. Before the driver the route refuses when the pre-entry read shows the
+# PR's head branch or any change since the first read; after a call it refuses when the
+# branch or HEAD differs, when any reflog entry above the anchor names the PR's head,
+# when the anchor no longer stands where it stood (a rewritten or expired log), when
+# the anchor is missing, or when the reflog cannot be read or is disabled. In the sweep a switch it sees stops the run:
 # the copies still pending are not called or released and are reported SKIPPED
 # (teardown_driver_release exits 4). This detects and does not prevent a switch by an
 # actor that does not take the lock (an agent's direct git switch, a person, the
@@ -1514,32 +1523,42 @@ teardown_route_lock_release() {
 
 # The primary checkout is read at the route's first step (the sweep's plan; a
 # teardown's call), once more immediately before the driver is entered, and after
-# each call. A read is the checkout's branch, HEAD and the number of entries in its
-# HEAD reflog. The route refuses when the branch or HEAD differs from the first read,
-# when any reflog entry since the first read names the PR's head branch, when the
-# branch is the PR's head at the pre-entry read, or when the reflog cannot be read or
-# is disabled. The window is held in TEARDOWN_CKO_* for one copy; the sweep carries
-# it from its plan to its execute through the route file.
+# each call. A read is the checkout's branch, HEAD and its HEAD reflog, taken in one
+# git call; the first read keeps the newest reflog entry as the anchor
+# (TEARDOWN_CKO_ANCHOR). The route refuses when the branch or HEAD differs from the
+# first read, when any reflog entry above the anchor names the PR's head branch, when
+# the anchor no longer stands where it stood or is missing, when the branch is the PR's
+# head at the pre-entry read, or when the reflog cannot be read or is disabled. The
+# window is held in TEARDOWN_CKO_* for one copy; the sweep carries it from its plan to
+# its execute through the route file.
 TEARDOWN_CKO_OPEN=0
 TEARDOWN_CKO_COPY=
 TEARDOWN_CKO_BRANCH=
 TEARDOWN_CKO_HEAD=
 TEARDOWN_CKO_POS=
+TEARDOWN_CKO_ANCHOR=
 TEARDOWN_CKO_NOW_BRANCH=
 TEARDOWN_CKO_NOW_HEAD=
 TEARDOWN_CKO_NOW_POS=
+TEARDOWN_CKO_NOW_ANCHOR=
+TEARDOWN_CKO_NOW_LOG=
 TEARDOWN_CLOSEOUT_SWITCHED=0
 TEARDOWN_ROUTE_HEADREF=
 TEARDOWN_ROUTE_MERGE=
 teardown_route_checkout_state() {  # <slot>
-  local slot=$1 cfg log
+  local slot=$1 cfg
   cfg=$(git -C "$slot" config --get core.logAllRefUpdates 2>/dev/null) || cfg=
   case "$cfg" in false | never | 0 | no | off) return 1 ;; esac
   git -C "$slot" reflog exists HEAD >/dev/null 2>&1 || return 1
   TEARDOWN_CKO_NOW_BRANCH=$(git -C "$slot" symbolic-ref --quiet --short HEAD 2>/dev/null) || TEARDOWN_CKO_NOW_BRANCH='(detached)'
   TEARDOWN_CKO_NOW_HEAD=$(git -C "$slot" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || return 1
-  log=$(git -C "$slot" reflog show --format=%gs HEAD 2>/dev/null) || return 1
-  if [ -z "$log" ]; then TEARDOWN_CKO_NOW_POS=0; else TEARDOWN_CKO_NOW_POS=$(printf '%s\n' "$log" | wc -l | tr -d ' '); fi
+  # One read: the count, the newest entry (the anchor) and every entry come from the
+  # same snapshot, so nothing that lands later can displace an entry, and a failed read
+  # is a failed state. A line is the selector (a timestamp), the commit and the subject.
+  TEARDOWN_CKO_NOW_LOG=$(git -C "$slot" reflog show --date=raw --format='%gd|%H|%gs' HEAD 2>/dev/null) || return 1
+  [ -n "$TEARDOWN_CKO_NOW_LOG" ] || return 1
+  TEARDOWN_CKO_NOW_POS=$(printf '%s\n' "$TEARDOWN_CKO_NOW_LOG" | wc -l | tr -d ' ')
+  TEARDOWN_CKO_NOW_ANCHOR=${TEARDOWN_CKO_NOW_LOG%%$'\n'*}
 }
 teardown_route_checkout_open() {  # <slot> <copy>
   if [ "$TEARDOWN_CKO_OPEN" = 1 ] && [ "$TEARDOWN_CKO_COPY" = "$2" ]; then
@@ -1554,6 +1573,7 @@ teardown_route_checkout_open() {  # <slot> <copy>
   TEARDOWN_CKO_BRANCH=$TEARDOWN_CKO_NOW_BRANCH
   TEARDOWN_CKO_HEAD=$TEARDOWN_CKO_NOW_HEAD
   TEARDOWN_CKO_POS=$TEARDOWN_CKO_NOW_POS
+  TEARDOWN_CKO_ANCHOR=$TEARDOWN_CKO_NOW_ANCHOR
 }
 teardown_route_checkout_close() {
   TEARDOWN_CKO_OPEN=0
@@ -1563,11 +1583,11 @@ teardown_route_checkout_close() {
 # the switch. <prhead> is the PR's head branch (forge headRefName).
 TEARDOWN_CKO_WHY=
 teardown_route_checkout_check() {  # <slot> <prhead>
-  local slot=$1 prhead=$2 delta entries entry word
-  local -a words
+  local slot=$1 prhead=$2 delta entries entry subject word at
+  local -a words=()
   TEARDOWN_CKO_WHY=
-  if [ "$TEARDOWN_CKO_OPEN" != 1 ] || ! teardown_route_checkout_state "$slot"; then
-    TEARDOWN_CKO_WHY="the clone's primary checkout or its HEAD reflog cannot be read, so a switch could not be ruled out"
+  if [ "$TEARDOWN_CKO_OPEN" != 1 ] || [ -z "$TEARDOWN_CKO_ANCHOR" ] || ! teardown_route_checkout_state "$slot"; then
+    TEARDOWN_CKO_WHY="the clone's primary checkout or its HEAD reflog cannot be read, or the first read left no anchor, so a switch could not be ruled out"
     return 1
   fi
   if [ "$TEARDOWN_CKO_NOW_BRANCH" != "$TEARDOWN_CKO_BRANCH" ] || [ "$TEARDOWN_CKO_NOW_HEAD" != "$TEARDOWN_CKO_HEAD" ]; then
@@ -1579,13 +1599,27 @@ teardown_route_checkout_check() {  # <slot> <prhead>
     TEARDOWN_CKO_WHY="the HEAD reflog of the clone's primary checkout shrank during the route, so a switch could not be ruled out"
     return 1
   fi
+  # The newest entry of the first read must still stand <delta> entries from the top of
+  # this one; if it does not, the log was rewritten, expired or reordered and the entries
+  # made since cannot be told apart from older ones. The entries since are the lines above it.
+  at=$(sed -n "$((delta + 1))p" <<< "$TEARDOWN_CKO_NOW_LOG") || at=
+  if [ "$at" != "$TEARDOWN_CKO_ANCHOR" ]; then
+    TEARDOWN_CKO_WHY="the newest HEAD reflog entry of the route's first read no longer holds its place in the reflog (it was rewritten, expired or reordered), so the entries made since cannot be told apart from older ones"
+    return 1
+  fi
   [ "$delta" -gt 0 ] || return 0
-  entries=$(git -C "$slot" reflog show --format=%gs HEAD 2>/dev/null | head -n "$delta") || entries=
+  entries=$(sed -n "1,${delta}p" <<< "$TEARDOWN_CKO_NOW_LOG") || {
+    TEARDOWN_CKO_WHY="the entries of the clone's HEAD reflog made since the route's first read cannot be read, so a switch could not be ruled out"
+    return 1
+  }
   while IFS= read -r entry; do
-    read -r -a words <<< "$entry"
-    for word in "${words[@]}"; do
+    subject=${entry#*|}
+    subject=${subject#*|}
+    words=()
+    read -r -a words <<< "$subject"
+    for word in ${words[@]+"${words[@]}"}; do
       if [ "$word" = "$prhead" ]; then
-        TEARDOWN_CKO_WHY="a HEAD reflog entry of the clone's primary checkout since the route's first read names the PR's head branch $prhead ($entry)"
+        TEARDOWN_CKO_WHY="a HEAD reflog entry of the clone's primary checkout since the route's first read names the PR's head branch $prhead ($subject)"
         return 1
       fi
     done
@@ -1710,6 +1744,22 @@ teardown_route_content_prove_in() {  # <tmpdir> <slot> <tip> <merge>
   fi
   mt=(env GIT_OBJECT_DIRECTORY="$tmp/objects" GIT_ALTERNATE_OBJECT_DIRECTORIES="$objdir" GIT_ATTR_NOSYSTEM=1 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
     git -C "$slot" "--attr-source=$empty" -c "core.attributesFile=$tmp/empty" -c merge.default=text)
+  # A merge driver defined in the repository's configuration (any name, any scope git
+  # reads here: the repository's own file, a worktree file, an included file, the
+  # command line and GIT_CONFIG_*) could decide the text merge in place of the built-in
+  # one, and -c merge.default=text does not reach a driver that is named text. The
+  # proof does not try to neutralise every such name: it refuses, and so does a
+  # configuration it cannot read.
+  rc=0
+  res=$("${mt[@]}" config --get-regexp '^merge\..*\.driver$' 2>/dev/null) || rc=$?
+  if [ "$rc" = 0 ]; then
+    res=$(printf '%s\n' "$res" | awk '{ print $1 }' | sort -u | tr '\n' ' ')
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the repository's configuration defines the custom merge driver ${res% } (merge.<name>.driver), which could decide the text merge in place of the built-in one, so the text proof cannot be trusted and ${textpaths[0]} is not proved landed"
+    return 1
+  elif [ "$rc" != 1 ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the repository's configuration could not be read (git config exit $rc), so a custom merge driver is not ruled out and ${textpaths[0]} is not proved landed"
+    return 1
+  fi
   for path in "${textpaths[@]}"; do
     res=$("${mt[@]}" --literal-pathspecs check-attr merge -- "$path" 2>/dev/null) || res=
     res=${res##*: }
@@ -1869,7 +1919,10 @@ teardown_route_pr_landed() {  # <slot> <pr>
     return 1
   fi
   limit=${FM_TEARDOWN_FORGE_TIMEOUT:-60}
-  [[ $limit =~ ^[1-9][0-9]{0,3}$ ]] || limit=60
+  if [[ ! $limit =~ ^[1-9][0-9]{0,8}$ ]]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="FM_TEARDOWN_FORGE_TIMEOUT is '$limit', not a whole number of seconds from 1 to 999999999 written without a leading zero, so the forge read of PR $pr is not made and the copy is kept"
+    return 1
+  fi
   if ! command -v gh >/dev/null 2>&1; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="gh is not available, so PR $pr cannot be read on the forge (unknown, not merged)"
     return 1
@@ -1998,16 +2051,19 @@ teardown_closeout_route() {  # <slot> <copy>
 # A caller that bounds the call from outside (the sweep's plan) names a file in
 # TEARDOWN_CLOSEOUT_ROUTE_FILE to learn the route and its reason, even when the
 # bound kills the call before it returns. The file also carries the first read of the
-# checkout (copy, branch, HEAD, reflog position), the PR's head branch and whether a
-# switch was found, nine lines in all, so the sweep's execute keeps the plan's window.
+# checkout (copy, branch, HEAD, reflog position), the PR's head branch, whether a
+# switch was found and the newest reflog entry of the first read (the anchor), ten
+# lines in all, so the sweep's execute keeps the plan's window.
 teardown_closeout_route_publish() {
   [ -n "${TEARDOWN_CLOSEOUT_ROUTE_FILE:-}" ] || return 0
-  printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$TEARDOWN_CLOSEOUT_ROUTE" "$TEARDOWN_CLOSEOUT_ROUTE_PR" \
+  printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$TEARDOWN_CLOSEOUT_ROUTE" "$TEARDOWN_CLOSEOUT_ROUTE_PR" \
     "$(printf '%s' "$TEARDOWN_CLOSEOUT_ROUTE_WHY" | tr '\n\t' '  ')" \
     "$TEARDOWN_CKO_COPY" "$TEARDOWN_CKO_BRANCH" "$TEARDOWN_CKO_HEAD" "$TEARDOWN_CKO_POS" "$TEARDOWN_ROUTE_HEADREF" \
-    "$TEARDOWN_CLOSEOUT_SWITCHED" > "$TEARDOWN_CLOSEOUT_ROUTE_FILE" 2>/dev/null || true
+    "$TEARDOWN_CLOSEOUT_SWITCHED" "$TEARDOWN_CKO_ANCHOR" > "$TEARDOWN_CLOSEOUT_ROUTE_FILE" 2>/dev/null || true
 }
 
+# TEARDOWN_ROUTE_ENVELOPE_KEYS is the driver's fifteen-key compact envelope, the one
+# key set that this reader and the sweep's temporary-refusal classifier both require.
 # The one reader of the route's answer, in the shape the driver's --pr lane
 # prints (its compact envelope, with no top-level "allowed"). A plan allows only
 # on exit 3 with state BLOCKED, predicates_failed exactly ["cleanup_not_executed"],
@@ -2016,9 +2072,10 @@ teardown_closeout_route_publish() {
 # worktree_removed true. Any other exit, shape, silence or parse failure, and any
 # answer that shows the driver keeping a tree for its unique ignored files, does
 # not allow. WHY names what the answer lacked.
+TEARDOWN_ROUTE_ENVELOPE_KEYS='["base_ref","base_strategy","branch_delete","branch_reap","cleanup_recovery_reason","cleanup_requested","evidence_digest","launch_cwd","next_command","owner","pr","predicates_failed","primary_checkout_repair","state","worktree_removed"]'
 teardown_closeout_route_answer() {  # <plan|execute> <driver-exit>
   local stage=$1 rc=$2 want contradiction
-  local keys='["base_ref","base_strategy","branch_delete","branch_reap","cleanup_recovery_reason","cleanup_requested","evidence_digest","launch_cwd","next_command","owner","pr","predicates_failed","primary_checkout_repair","state","worktree_removed"]'
+  local keys=$TEARDOWN_ROUTE_ENVELOPE_KEYS
   case "$TEARDOWN_CLOSEOUT_STDOUT$TEARDOWN_CLOSEOUT_OUT" in
     *cleanup_ignored_payload_archived_tree_retained* | *archive_then_retain_tree*)
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the driver keeps a tree with unique ignored files after archiving them and never removes it automatically"
