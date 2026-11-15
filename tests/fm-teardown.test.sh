@@ -1606,7 +1606,7 @@ test_exact_head_proof_reads_a_refreshed_default_branch() {
     assert_present "$case_dir/state/task-x1.meta" "$shape: the record was closed"
     [ -d "$case_dir/wt" ] || fail "$shape: the copy was removed"
   done
-  assert_grep 'could not be refreshed' "$TMP_ROOT/stale-default-unreachable/stderr" "unreachable: the refusal does not say the default branch could not be refreshed"
+  assert_grep "origin's default branch could not be read" "$TMP_ROOT/stale-default-unreachable/stderr" "unreachable: the refusal does not say origin's default branch could not be read"
   case_dir=$(stale_default_case stale-default-intact intact)
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?

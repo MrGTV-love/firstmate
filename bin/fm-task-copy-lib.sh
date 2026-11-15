@@ -293,29 +293,26 @@ fm_task_copy_archive_carried() {  # <dir> <default-ref> <tip>
 # merge and names <default-ref>; with no merged PR, pass no PR fields. The other
 # Main 1907 route, the no-mistakes run record, is fm_task_copy_pipeline_input.
 # FM_TASK_COPY_UNASKED keeps the content check's reason when nothing proved it.
+# This rule and fm_task_copy_pipeline_input need bin/fm-pr-lib.sh (fm_pr_head_valid)
+# sourced first.
 fm_task_copy_landed() {  # <dir> <default-ref> <head> [<merged-pr-head> <merge-commit>]
   local dir=$1 ref=$2 head=$3 pr_head=${4:-} merge=${5:-} current
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -n "$ref" ] || return 1
   current=$(git -C "$dir" rev-parse --verify --quiet "$head^{commit}" 2>/dev/null) || return 1
-  if fm_task_copy_sha_valid "$pr_head" && [ "$current" = "$pr_head" ] \
+  if fm_pr_head_valid "$pr_head" && [ "$current" = "$pr_head" ] \
     && git -C "$dir" merge-base --is-ancestor "$pr_head" "$ref" 2>/dev/null; then
     FM_TASK_COPY_UNASKED=
     return 0
   fi
   fm_task_copy_blobs_in_default "$dir" "$ref" "$current" && return 0
-  if fm_task_copy_sha_valid "$pr_head" && fm_task_copy_sha_valid "$merge" \
+  if fm_pr_head_valid "$pr_head" && fm_pr_head_valid "$merge" \
     && git -C "$dir" merge-base --is-ancestor "$current" "$pr_head" 2>/dev/null \
     && git -C "$dir" merge-base --is-ancestor "$merge" "$ref" 2>/dev/null; then
     FM_TASK_COPY_UNASKED=
     return 0
   fi
   return 1
-}
-
-fm_task_copy_sha_valid() {  # <sha>
-  local LC_ALL=C
-  [[ "${1-}" =~ ^[0-9a-f]{40}$|^[0-9a-f]{64}$ ]]
 }
 
 # The pipeline's own review and document steps rewrite and add commits on the
@@ -391,7 +388,7 @@ fm_task_copy_pipeline_input() {  # <current> <merged-pr-head> <pr-url> <db> <row
       continue
     fi
     tied=$((tied + 1))
-    if ! fm_task_copy_sha_valid "$submitted"; then
+    if ! fm_pr_head_valid "$submitted"; then
       reasons="${reasons}run $id records no input head (submitted_head_sha), so this copy's HEAD cannot be placed in what the run started from"$'\n'
       continue
     fi

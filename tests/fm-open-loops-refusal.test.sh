@@ -228,10 +228,10 @@ g(repo, "checkout", "-q", "main")
 default_tree = g(repo, "rev-parse", "default^{tree}").strip()
 merged = g(repo, "merge-tree", "--write-tree", "default", "HEAD").splitlines()[0]
 case_ok &= check(merged == default_tree, "fixture: the merge driver did not make merge-tree return the default's tree")
-case_ok &= check(not c.content_in_default(str(repo), "default"), "a differing line was landed by the merge driver")
+case_ok &= check(not c.landed(str(repo), "default", None), "a differing line was landed by the merge driver")
 g(repo, "checkout", "-q", "default"); (repo / "base.txt").write_text("one\n"); g(repo, "commit", "-q", "-am", "squash the copy's edit")
 g(repo, "checkout", "-q", "main")
-case_ok &= check(c.content_in_default(str(repo), "default"), "control: the default's squash of the copy's edit was not landed")
+case_ok &= check(c.landed(str(repo), "default", None), "control: the default's squash of the copy's edit was not landed")
 if case_ok:
     print("ok - the ledger's landing check compares blobs: a merge driver cannot land a differing line; a squash is landed")
 

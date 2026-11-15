@@ -2544,8 +2544,8 @@ TEARDOWN_PIPELINE_INPUT_REASON=
 # The run-record route of the landed rule (fm_task_copy_pipeline_input in
 # bin/fm-task-copy-lib.sh), read here under teardown's silence bound.
 pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
-  local pr_head=$1 pr_url=$2 current db rows kind id submitted pushed
-  local stall=${NM_TEARDOWN_STALL_SECS:-} runs=0 tied=0 reasons='' read_rc=0
+  local pr_head=$1 pr_url=$2 current db rows
+  local stall=${NM_TEARDOWN_STALL_SECS:-} read_rc=0
   case "$stall" in ''|*[!0-9]*|0*) stall=$(fm_progress_quiet_secs) ;; esac
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   TEARDOWN_PIPELINE_INPUT_REASON=
