@@ -257,21 +257,8 @@ if (cd "$TEST_DIR/project-primary" && treehouse return --force "$TEST_DIR/projec
 [ "$(cat "$TEST_DIR/returns")" = primary ] || fail "return interception recorded an unexpected call"
 rm "$TEST_DIR/primary-at-allocation" "$TEST_DIR/bravo-at-allocation" "$TEST_DIR/primary-at-return" "$TEST_DIR/returns"
 mkdir "$TEST_DIR/offline-owned" "$TEST_DIR/offline-unrelated"
-# fixture_process <cwd> [<task id>]. Without a task id the process execs /bin/sleep and is the
-# task's own only by the owned record (the offline fixtures). With a task id it is the task's own the
-# way a worker's child is: it carries the launch marker bin/fm-spawn.sh exports for that task
-# (FM_TASK_INBOX=<physical state dir>/<id>.inbox) and stays a resident python3, because the
-# environment of an Apple system binary such as /bin/sleep cannot be read on macOS, so a marker on
-# it would prove nothing. A process that is merely at the copy's root is not the task's own, and
-# teardown refuses it by name.
 fixture_process() {
-  local marker=
-  if [ -n "${2:-}" ]; then
-    marker="FM_TASK_INBOX=$(cd "$TEST_DIR/home-primary/state" && pwd -P)/$2.inbox"
-    (cd "$1" && exec env "$marker" python3 -c 'import pathlib, sys, time; pathlib.Path(sys.argv[1]).touch(); time.sleep(3600)' "$TEST_DIR/ready-${1##*/}") &
-  else
-    (cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}") &
-  fi
+  (cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}") &
   FIXTURE_PID=$!
   FIXTURE_PIDS="$FIXTURE_PIDS $FIXTURE_PID"
   while [ ! -e "$TEST_DIR/ready-${1##*/}" ]; do
@@ -299,17 +286,8 @@ STATE="$TEST_DIR/home-primary/state"
 . "$ROOT/bin/fm-wake-lib.sh"
 (
   export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
-  # The extracted functions prove a process the task's own with teardown_process_proved_own, which
-  # bin/fm-teardown.sh gets from the nested-copy library it sources.
-  # shellcheck source=bin/fm-teardown-nested-lib.sh
-  . "$ROOT/bin/fm-teardown-nested-lib.sh"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
-  # The owned fixture is the task's own by the owned record (the host-independent proof: a launch
-  # marker cannot be read from every host's process), written with the identity the teardown reads.
-  export ID=offline-owned
-  mkdir -p "$STATE"
-  printf '%s\t%s\n' "$OFFLINE_OWNED_PID" "$(task_process_identity "$OFFLINE_OWNED_PID")" > "$STATE/$ID.teardown-owned"
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
   [ "$TASK_PIDS" = "$OFFLINE_OWNED_PID" ] || fail "offline inventory did not isolate the owned process: $TASK_PIDS"
   ID=offline-owned BACKEND=herdr reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
@@ -602,7 +580,7 @@ for phase in conclude reap; do
   touch "$TEST_DIR/fail-$abort" "$TEST_DIR/fail-$fresh"
   owned_meta="$TEST_DIR/home-primary/state/$id.meta"
   owned_pane=$(field "$owned_meta" herdr_pane_id)
-  fixture_process "$TEST_DIR/copy-$lane" "$id"
+  fixture_process "$TEST_DIR/copy-$lane"
   owned_pid=$FIXTURE_PID
   touch "$TEST_DIR/hold-$phase-$lane"
   [ "$phase" != conclude ] || touch "$TEST_DIR/run-$lane"

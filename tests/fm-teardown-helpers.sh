@@ -77,79 +77,16 @@ teardown_fixture_track() {
   printf '%s\t%s\n' "$signal" "$birth" > "$TEARDOWN_FIXTURE_PROCESSES/$pid"
 }
 
-# The task's own leftover has the production shape (Main 2054): a process of an Apple
-# binary (/bin/sleep, /bin/zsh) hides its environment, so a bare one carrying the
-# marker proves nothing and is refused. A fixture for the task's own process
-# therefore (1) keeps the launch marker (FM_TASK_INBOX=<physical state dir>/<id>.inbox,
-# read where the binary is not an Apple one) and (2) is recorded in the case's
-# state/task-x1.teardown-owned (pid and birth identity), the shape the product's own
-# record has for a live descendant of the worker. teardown_fixture_start_foreign
-# starts one with neither. The real process shapes (a marked non-Apple parent with
-# Apple children; live, orphaned, daemonised) are in tests/fm-teardown-real-treehouse.test.sh,
-# and the product's own recording, with no fixture-written entry, is exercised by the
-# recorded-orphan-apple state of test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own
-# (a real marked python parent; the record is written by the product at the start of run 1)
-# and by the table-driven test_a_process_is_proved_the_tasks_own_by_marker_record_or_live_chain_never_by_place.
-teardown_fixture_case_dir() {  # <cwd>
-  local d=$1
-  while [ -n "$d" ] && [ "$d" != / ]; do
-    if [ -d "$d/state" ] && [ -d "$d/fakebin" ]; then
-      printf '%s\n' "$d"
-      return 0
-    fi
-    d=$(dirname "$d")
-  done
-  return 1
-}
-
-teardown_fixture_marker() {  # <cwd>
-  local d
-  d=$(teardown_fixture_case_dir "$1") || return 1
-  printf 'FM_TASK_INBOX=%s/task-x1.inbox\n' "$(cd "$d/state" && pwd -P)"
-}
-
-# Adds <pid> with its birth identity to the case's owned record, as the product writes it.
-teardown_fixture_record_owned() {  # <cwd> <pid>
-  local d birth start
-  d=$(teardown_fixture_case_dir "$1") || return 0
-  birth=$(teardown_fixture_birth "$2") || fail "cannot read the identity of fixture process $2"
-  printf '%s\t%s\n' "$2" "$birth" >> "$d/state/task-x1.teardown-owned"
-  # A case that sets FM_PROC_ROOT_OVERRIDE to a directory without /proc makes the teardown read
-  # identities through `ps` (an `lstart=` identity), whatever the host. Where /proc is readable the
-  # entry above is a start-tick identity, which that teardown would never match; the entry for the
-  # same process in the form `ps` reports lets the same fixture be the task's own on every host.
-  case "$birth" in
-    starttime=*)
-      start=$(LC_ALL=C "$REAL_PS_FOR_TEST" -p "$2" -o lstart= 2>/dev/null) || start=
-      start=${start#"${start%%[![:space:]]*}"}
-      start=${start%"${start##*[![:space:]]}"}
-      [ -z "$start" ] || printf '%s\tlstart=%s\n' "$2" "$start" >> "$d/state/task-x1.teardown-owned"
-      ;;
-  esac
-}
-
-teardown_fixture_start_foreign() {
-  TEARDOWN_FIXTURE_FOREIGN=1 teardown_fixture_start "$@"
-}
-
 teardown_fixture_start() {
-  local cwd=$1 signal=$2 interrupted=0 marker=
+  local cwd=$1 signal=$2 interrupted=0
   shift 2
-  [ -n "${TEARDOWN_FIXTURE_FOREIGN:-}" ] || marker=$(teardown_fixture_marker "$cwd") || marker=""
   trap 'interrupted=130' INT
   trap 'interrupted=143' TERM
   trap 'interrupted=129' HUP
   trap 'interrupted=131' QUIT
-  if [ -n "$marker" ]; then
-    (cd "$cwd" && exec env "$marker" "$@") &
-  elif [ -n "${TEARDOWN_FIXTURE_FOREIGN:-}" ]; then
-    (cd "$cwd" && exec env -u FM_TASK_INBOX "$@") &
-  else
-    (cd "$cwd" && exec "$@") &
-  fi
+  (cd "$cwd" && exec "$@") &
   TEARDOWN_FIXTURE_PID=$!
   teardown_fixture_track "$TEARDOWN_FIXTURE_PID" "$signal"
-  [ -n "${TEARDOWN_FIXTURE_FOREIGN:-}" ] || teardown_fixture_record_owned "$cwd" "$TEARDOWN_FIXTURE_PID"
   [ "$signal" != KILL ] || disown "$TEARDOWN_FIXTURE_PID"
   trap 'exit 130' INT
   trap 'exit 143' TERM
@@ -2725,7 +2662,12 @@ SH
 tardir=$SLOT/.claude/bug-evidence/worktree-preservation
 mkdir -p "$tardir"
 n=$(find "$tardir" -name '*.tar' | wc -l | tr -d ' ')
-printf 'archive %s\n' "$n" > "$tardir/stub-ordinary_cleanup-$((n + 1)).tar"
+tar=$tardir/stub-ordinary_cleanup-$((n + 1)).tar
+printf 'archive %s\n' "$n" > "$tar"
+# The answer names the tar it wrote and that tar's SHA-256, as the real driver does;
+# FM_STUB_ARCHIVE_SHA replaces the recorded hash, to name an archive that does not match.
+sha=$(perl -MDigest::SHA -e 'open(my $f, "<:raw", $ARGV[0]) or exit 1; print Digest::SHA->new(256)->addfile($f)->hexdigest' "$tar")
+[ -z "${FM_STUB_ARCHIVE_SHA:-}" ] || sha=$FM_STUB_ARCHIVE_SHA
 [ -z "${FM_STUB_AFTER:-}" ] || eval "$FM_STUB_AFTER"
 unique=$(printf '%s\n' ${FM_STUB_UNIQUE-.claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl} | jq -R . | jq -s -c .)
 # FM_STUB_UNIQUE_JSON: the driver's array as JSON text, for a name no space-separated list
@@ -2738,7 +2680,7 @@ case "${FM_STUB_JSON:-one}" in
   uniquestring) printf '{"allowed": false, "ignored_payload_disposition": "archive_then_retain_tree", "reason": "%s", "tracked_uncovered_paths": [], "uncovered_paths": [], "unique_ignored_paths": ".claude/channel-outbox/a.jsonl"}\n' "$reason" ;;
   two) printf '{"allowed": false}\n{"allowed": false, "reason": "%s"}\n' "$reason" ;;
   *)
-    jq -n -c --arg copy "$2" --arg reason "$reason" --argjson unique "$unique" '{allowed: false, ignored_payload_disposition: "archive_then_retain_tree", ignored_payload_preservation: [{archive_path: "stub.tar", archive_sha256: ("ab" * 32), path_count: ($unique | length), restore_verified: true, stage: "ordinary_cleanup"}], reason: $reason, retained_worktree_path: $copy, target: $copy, tracked_uncovered_paths: [], uncovered_paths: [], untracked_uncovered_paths: [], unique_ignored_paths: $unique}'
+    jq -n -c --arg copy "$2" --arg reason "$reason" --arg archive "$tar" --arg sha "$sha" --argjson unique "$unique" '{allowed: false, ignored_payload_disposition: "archive_then_retain_tree", ignored_payload_preservation: [{archive_path: $archive, archive_sha256: $sha, path_count: ($unique | length), restore_verified: true, stage: "ordinary_cleanup"}], reason: $reason, retained_worktree_path: $copy, target: $copy, tracked_uncovered_paths: [], uncovered_paths: [], untracked_uncovered_paths: [], unique_ignored_paths: $unique}'
     ;;
 esac
 exit "${FM_STUB_EXIT:-3}"
@@ -2787,18 +2729,16 @@ run_foreign_teardown() {
 # directory (path and SHA-256 of every tar), and the task, copy and record state.
 retained_observe() {  # <status> [env...]
   [ -n "${FM_RETAINED_EVIDENCE:-}" ] || return 0
-  local fn test_name=unknown tars rec refused slot survivors cause
+  local fn test_name=unknown tars rec slot survivors cause
   for fn in "${FUNCNAME[@]}"; do
     case "$fn" in test_*) test_name=$fn; break ;; esac
   done
   tars=$(find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" -name '*.tar' -type f -exec shasum -a 256 {} + 2>/dev/null | LC_ALL=C sort | shasum -a 256 | awk '{print substr($1,1,16)}')
   rec=absent
   [ ! -e "$(retained_record_path 2>/dev/null)" ] || rec=present
-  # Beyond the contract's four fields: whether the slot went back to the pool, whether
-  # the closeout-refused record exists, which top-level paths survive in the copy, and
-  # the first REFUSED line teardown printed (absolute paths cut to their last name).
-  refused=absent
-  [ ! -e "$(retained_refused_record_path 2>/dev/null)" ] || refused=present
+  # Beyond the contract's four fields: whether the slot went back to the pool, which
+  # top-level paths survive in the copy, and the first REFUSED line teardown printed
+  # (absolute paths cut to their last name).
   slot=held
   [ ! -s "$FOREIGN_CASE/treehouse.log" ] || slot=returned
   ! grep -q '|return ' "$FOREIGN_CASE/treehouse.calls.log" 2>/dev/null || slot=returned
@@ -2806,10 +2746,10 @@ retained_observe() {  # <status> [env...]
   [ ! -d "$FOREIGN_COPY" ] || survivors=$(find "$FOREIGN_COPY" -mindepth 1 -maxdepth 1 ! -name .git -exec basename {} \; 2>/dev/null | LC_ALL=C sort | paste -sd, -)
   cause=none
   [ ! -f "$FOREIGN_CASE/stderr" ] || cause=$(grep -m1 '^REFUSED' "$FOREIGN_CASE/stderr" 2>/dev/null | sed -E 's# (/[^ /]+)+/([^ /]+)# \2#g' | tr '|' '/' | cut -c1-220)
-  printf '%s | case=%s | args=%s | exit=%s | driver-calls=%s | tar-files=%s tar-listing-sha256=%s | task-record=%s | copy=%s | retained-record=%s | slot=%s | refused-record=%s | survivors=%s | cause=%s\n' \
+  printf '%s | case=%s | args=%s | exit=%s | driver-calls=%s | tar-files=%s tar-listing-sha256=%s | task-record=%s | copy=%s | retained-record=%s | slot=%s | survivors=%s | cause=%s\n' \
     "$test_name" "${FOREIGN_CASE##*/}" "${FOREIGN_TEARDOWN_ARGS[*]:-none}" "$1" "$(retained_call_count)" "$(retained_tar_count)" "${tars:-none}" \
     "$([ -e "$FOREIGN_CASE/state/task-x1.meta" ] && echo kept || echo gone)" "$([ -e "$FOREIGN_COPY/.git" ] && echo kept || echo gone)" "$rec" \
-    "$slot" "$refused" "${survivors:-none}" "${cause:-none}" >> "$FM_RETAINED_EVIDENCE"
+    "$slot" "${survivors:-none}" "${cause:-none}" >> "$FM_RETAINED_EVIDENCE"
 }
 
 # Nothing moved: the copy, its branch and the slot are intact and no closeout
@@ -3207,12 +3147,6 @@ retained_record_path() {
   printf '%s/data/copy-sweep/retained/%s\n' "$FOREIGN_CASE" "$hash"
 }
 
-retained_refused_record_path() {
-  local hash
-  hash=$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
-  printf '%s/data/task-x1/closeout-refused/%s\n' "$FOREIGN_CASE" "$hash"
-}
-
 # A refused teardown of an own copy changed nothing: the copy is still locked and
 # registered, its branch, the task record, the slot claim and Treehouse's lease are
 # intact, and no pool return ran.
@@ -3534,49 +3468,6 @@ SH
 }
 
 
-# teardown_diag_report <case-dir> <rc> [<pid>...]: one line that says what a close did, for a
-# failure message. It carries the exit code; for each given pid its ps state, parent, command
-# and the number of launch-marker words `ps -E` shows (the marker read the product relies on);
-# the signals the teardown audited for it (state/*.teardown-processes); the owned record; the
-# close's stderr with the test home's watcher banner removed; the last 40 stderr lines that
-# say REFUSED, refus, skip or error; and the pid and command of every process a REFUSED line
-# names. It reads only; callers use it before they stop any process.
-teardown_diag_report() {
-  local case_dir=$1 rc=$2 err pid line named out="" audited rec
-  shift 2
-  err=$case_dir/stderr
-  out="rc=$rc"
-  for pid in "$@"; do
-    [ -n "$pid" ] || continue
-    out+="; pid $pid: ps(stat ppid comm)=$(ps -o stat=,ppid=,comm= -p "$pid" 2>&1 | tr -s ' ')"
-    out+=", marker words in ps -E=$(LC_ALL=C ps -ww -E -p "$pid" -o command= 2>/dev/null | tr ' ' '\n' | grep -c '^FM_TASK_INBOX=')"
-    audited=$(cat "$case_dir"/state/*.teardown-processes 2>/dev/null | awk -F'\t' -v p="$pid" '$3 == p { printf "%s ", $2 }')
-    out+=", signals audited=${audited:-NONE}"
-  done
-  rec=$(cat "$case_dir"/state/*.teardown-owned 2>/dev/null | tr '\t\n' '  |')
-  out+="; owned record=${rec:-EMPTY}"
-  if [ -r "$err" ]; then
-    out+="; stderr without banner="
-    out+=$(grep -v -e '^●' -e '^━' -e 'WATCHER DOWN' -e 'fm-claude-stop-autoarm' "$err" | tail -n 40 | tail -c 3000 | tr '\n' '|')
-    out+="; stderr REFUSED/refus/skip/error lines="
-    out+=$(grep -i -e 'REFUSED' -e 'refus' -e 'skip' -e 'error' "$err" | tail -n 40 | tail -c 3000 | tr '\n' '|')
-    named=$(grep 'REFUSED' "$err" | grep -o 'process [0-9][0-9]*' | awk '{ print $2 }' | sort -un)
-    for pid in $named; do
-      out+="; refused process $pid=$(ps -o pid=,comm= -p "$pid" 2>&1 | tr -s ' ')"
-    done
-  fi
-  printf '%s' "$out"
-}
-
-# teardown_nonapple_python: prints the path of a python3 that is not an Apple platform binary
-# (its environment is readable by ps -E on macOS), or fails when there is none.
-teardown_nonapple_python() {
-  local py
-  py=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null) || return 1
-  case "$py" in /usr/bin/*|/System/*|/Library/Developer/*|'') return 1 ;; esac
-  printf '%s\n' "$py"
-}
-
 # retained_add_inventory: extends the retained-copy fixture with the ignored populations the
 # acceptance text names beyond the driver-named files: unnamed files under .claude and
 # .opencode (one below a regenerable-looking .cache), root files `a`, `b` and `a<newline>b`
@@ -3585,31 +3476,3 @@ teardown_nonapple_python() {
 # printf %b form; retained_inventory_name decodes one. The builder's own bytes are the
 # expected values: nothing is read back from the product.
 RETAINED_INVENTORY=()
-retained_inventory_name() {  # <inventory item>
-  local n=${1%%|*}
-  printf '%b' "$n"
-}
-retained_add_inventory() {
-  local exclude item name bytes
-  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
-  printf '%s\n' '.claude/' '.opencode/' '/a' '/b' '/a?b' 'notes/t?x' >> "$exclude"
-  mkdir -p "$FOREIGN_COPY/.claude/.cache" "$FOREIGN_COPY/.opencode" "$FOREIGN_COPY/notes"
-  RETAINED_INVENTORY=(
-    '.claude/channel-outbox/a.jsonl|one'
-    '.claude/channel-outbox/b.jsonl|two'
-    'notes/unique.dat|only here'
-    '.claude/unnamed.txt|unnamed claude'
-    '.claude/.cache/unique.txt|claude cache'
-    '.opencode/unnamed.txt|unnamed opencode'
-    'a|A'
-    'b|B'
-    'a\nb|AB'
-    'notes/t\tx|tabbed'
-  )
-  for item in "${RETAINED_INVENTORY[@]}"; do
-    name=$(retained_inventory_name "$item")
-    bytes=${item#*|}
-    printf '%s\n' "$bytes" > "$FOREIGN_COPY/$name"
-  done
-  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-}

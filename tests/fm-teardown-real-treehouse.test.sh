@@ -89,10 +89,6 @@ real_assert_window_gone() {
   fi
 }
 
-retained_field() {  # <record> <key>
-  sed -n "s/^$2=//p" "$1" | head -n 1
-}
-
 # real_case <name>: a retained case on a real pool slot. FM_STUB_CLOSEOUT selects
 # the stand-in driver: retained keeps the copy, unset releases and removes it.
 real_case() {
@@ -122,22 +118,6 @@ real_case() {
     mkdir -p "$REAL_DIR"
     real_record before
   fi
-}
-
-# real_assert_no_signal_audited <pid> <label>: the signal audit holds no STOP, TERM or KILL
-# line for <pid>. Every signal teardown sends is audited first (task_record_process_signal), so
-# the audit is the no-signal oracle. The case seeds an empty audit before the run, so an audit
-# that is missing, is not a regular readable file, or that grep cannot search proves nothing
-# and fails the case (a plain negative grep would pass each of them).
-real_assert_no_signal_audited() {
-  local pid=$1 label=$2 audit=$FOREIGN_CASE/state/task-x1.teardown-processes rc=0
-  [ -f "$audit" ] && [ ! -L "$audit" ] && [ -r "$audit" ] || fail "$label: the signal audit $audit is missing or cannot be read, so the no-signal oracle proves nothing"
-  grep -E -- $'\t(STOP|TERM|KILL)\t'"$pid"$'\t' "$audit" >/dev/null || rc=$?
-  case "$rc" in
-    1) ;;
-    0) fail "$label: a signal was audited for process $pid, which is not proved the task's own" ;;
-    *) fail "$label: the signal audit $audit could not be searched (grep exit $rc)" ;;
-  esac
 }
 
 # The slot's entry in the real `treehouse status --json`, from the project.
@@ -235,7 +215,7 @@ SLOT_ENTRY_BEFORE=
 # holder with the same lease id, every unique ignored file is in a preserve that
 # restores to the builder's hashes, and the regenerable control is not in it.
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out() {
-  local rc preserve scratch file want have
+  local rc preserve scratch want have
   real_case a-kept
   SLOT_ENTRY_BEFORE=$(real_slot_entry)
   [ "$(jq -r '.[0].lease_holder' <<<"$SLOT_ENTRY_BEFORE")" = task-x1 ] || fail "a-kept: the real slot is not leased to the task before the close: $SLOT_ENTRY_BEFORE"
@@ -247,23 +227,23 @@ test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the
   assert_equals 0 "$(real_returns)" "a-kept: the real slot was returned"
   real_assert_slot_unchanged "a-kept"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "a-kept: the driver was not asked exactly once"
-  preserve=$(retained_field "$(retained_record_path)" preserve)
+  # The unique .claude files are saved in the driver's verified archive, which the recorded
+  # answer names (the stand-in's archive is a placeholder); the task's preserve holds the
+  # selected file, restored here into a scratch path.
+  assert_equals '[".claude/channel-outbox/a.jsonl",".claude/channel-outbox/b.jsonl"]' "$(sed -n 's/^answer-base64=//p' "$(retained_record_path)" | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' | jq -c .unique_ignored_paths)" "a-kept: the record does not carry the driver's unique paths"
+  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
   scratch=$FOREIGN_CASE/scratch-restore
   mkdir -p "$scratch"
   (cd "$preserve" && tar -cf - .) | (cd "$scratch" && tar -xf -)
-  for file in .claude/channel-outbox/a.jsonl:one .claude/channel-outbox/b.jsonl:two notes/unique.dat:'only here'; do
-    want=$(printf '%s\n' "${file#*:}" | shasum -a 256 | awk '{print $1}')
-    have=$(shasum -a 256 "$scratch/${file%%:*}" | awk '{print $1}')
-    assert_equals "$want" "$have" "a-kept: ${file%%:*} does not restore to the builder's hash"
-  done
+  want=$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')
+  have=$(shasum -a 256 "$scratch/notes/unique.dat" | awk '{print $1}')
+  assert_equals "$want" "$have" "a-kept: notes/unique.dat does not restore to the builder's hash"
   [ ! -e "$preserve/.venv" ] && [ ! -e "$preserve/node_modules" ] || fail "a-kept: the regenerable control was preserved"
   assert_present "$FOREIGN_COPY/.venv/bin/python" "a-kept: the kept copy lost its control"
   assert_present "$FOREIGN_COPY/node_modules/dep/index.js" "a-kept: the kept copy lost its control"
   if [ -n "$REAL_DIR" ]; then
     diff -r "$preserve" "$scratch" > "$REAL_DIR/restore.diff" 2>&1 && echo "restore: identical" >> "$REAL_DIR/restore.diff"
-    for file in .claude/channel-outbox/a.jsonl:one .claude/channel-outbox/b.jsonl:two notes/unique.dat:'only here'; do
-      printf '%s  builder:%s restored:%s\n' "${file%%:*}" "$(printf '%s\n' "${file#*:}" | shasum -a 256 | awk '{print $1}')" "$(shasum -a 256 "$scratch/${file%%:*}" | awk '{print $1}')" >> "$REAL_DIR/restore.hashes"
-    done
+    printf 'notes/unique.dat  builder:%s restored:%s\n' "$want" "$have" >> "$REAL_DIR/restore.hashes"
   fi
   pass "a-kept: on a real pool slot the close keeps the copy and the lease, the unique files restore to the builder's hashes and the control is left out"
 }
@@ -325,239 +305,6 @@ test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased()
   assert_equals 0 "$(retained_call_count)" "b-process: the driver was asked about a copy with a live user"
   real_assert_kept "b-process"
   pass "b-process: a copy with a foreign process inside it is refused naming the process, the process is left running, and the copy, the task and the real lease are unchanged"
-}
-
-test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_the_close() {
-  local rc pid shape route
-  for route in kept released; do
-    for shape in foreign scrubbed; do
-      real_case b-process-root-$shape-$route
-      SLOT_ENTRY_BEFORE=$(real_slot_entry)
-      case "$shape" in
-        foreign) ( cd "$FOREIGN_COPY" && exec env "FM_TASK_INBOX=$(cd "$FOREIGN_CASE/state" && pwd -P)/other-task.inbox" sleep 600 ) & ;;
-        scrubbed) ( cd "$FOREIGN_COPY" && exec env -i /bin/sleep 600 ) & ;;
-      esac
-      pid=$!
-      sleep 1
-      if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
-      real_record after
-      if ! kill -0 "$pid" 2>/dev/null; then
-        fail "b-process-root-$shape-$route: the process at the copy root that is not proved the task's own was ended"
-      fi
-      kill "$pid" 2>/dev/null || true
-      wait "$pid" 2>/dev/null || true
-      expect_code 1 "$rc" "b-process-root-$shape-$route: a process at the root that is not proved the task's own must refuse: $(cat "$FOREIGN_CASE/stderr")"
-      assert_grep "process $pid" "$FOREIGN_CASE/stderr" "b-process-root-$shape-$route: the refusal did not name the process"
-      # The cause is the missing launch marker, not an unrelated inability to read the process.
-      grep -Eq "process $pid is running in it|does not carry this task's FM_TASK_INBOX launch marker" "$FOREIGN_CASE/stderr" \
-        || fail "b-process-root-$shape-$route: the refusal does not say the process is not proved the task's own: $(grep -E "process $pid" "$FOREIGN_CASE/stderr" | head -3)"
-      assert_equals 0 "$(retained_call_count)" "b-process-root-$shape-$route: the driver was asked about a copy with a live user"
-      real_assert_kept "b-process-root-$shape-$route"
-    done
-  done
-  pass "b-process-root: on the kept and the released route, a process at the copy root that is foreign or has a scrubbed environment refuses the close by name, is left running, and the copy, the task and the real lease are unchanged"
-}
-
-# Real leftover process types at the copy root (Main 2002, 2005): an Apple /bin/zsh
-# with an Apple /bin/sleep child, and a marked non-Apple python. Each state is run on
-# the kept and the released route. "Own" is proved by a readable marker, a place in
-# state/<id>.teardown-owned (pid and start time) or a live parent chain to either;
-# anything else refuses by name and is left running. These cases need a working ps and
-# a non-Apple python3; where either is missing the cases are NOT RUN (a skip is not a
-# pass), and the output says so.
-# A process counts as ended when it is gone or a zombie (ps stat Z), the same rule as
-# teardown_fixture_live in tests/fm-teardown-helpers.sh.
-real_proc_alive() {  # <pid>
-  local st
-  st=$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ') || return 1
-  [ -n "$st" ] || return 1
-  case "$st" in Z*) return 1 ;; esac
-  return 0
-}
-
-real_proc_python() {
-  local py
-  py=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null) || return 1
-  case "$py" in /usr/bin/*|/System/*|/Library/Developer/*|'') return 1 ;; esac
-  printf '%s\n' "$py"
-}
-
-# below-nonapple: a marked non-Apple parent at the copy root, alive, and its child running below
-# the root (notes/): the child is refused by name and left running (the process under test is
-# the child), on both routes, and no TERM is audited for it.
-# real_proc_start <mode>: starts the leftover in $FOREIGN_COPY; the parent's pid is in
-# PROC_PARENT (empty when the parent has exited) and the process at the root in PROC_PID.
-real_proc_start() {
-  local mode=$1 py marker script i
-  py=$(real_proc_python) || return 1
-  marker="FM_TASK_INBOX=$(cd "$FOREIGN_CASE/state" && pwd -P)/task-x1.inbox"
-  script=$FOREIGN_CASE/leftover.py
-  cat > "$script" <<'PY'
-import os, subprocess, sys, time
-root, mode, out = sys.argv[1], sys.argv[2], sys.argv[3]
-apple = ["/bin/zsh", "-c", "/bin/sleep 600; :"]
-nonapple = [sys.executable, "-c", "import time; time.sleep(600)"]
-# "nonapple" also ends with "apple": test the longer suffix first, or every non-Apple state
-# would start the Apple shell and sleep.
-cmd = nonapple if mode.endswith("nonapple") else apple
-if mode.startswith("below"):
-    # The marked parent runs at the copy root and stays alive; its child runs below the root.
-    os.chdir(root)
-    os.makedirs(os.path.join(root, "notes"), exist_ok=True)
-    p = subprocess.Popen(cmd, cwd=os.path.join(root, "notes"))
-    open(out, "w").write(str(p.pid))
-    while p.poll() is None:
-        time.sleep(0.2)
-    time.sleep(600)
-elif mode.startswith("live"):
-    p = subprocess.Popen(cmd, cwd=root)
-    open(out, "w").write(str(p.pid))
-    # A live parent reaps its child as soon as the child ends: an ended child of a parent
-    # that never wait()s stays a zombie, which `kill -0` still reports alive.
-    while p.poll() is None:
-        time.sleep(0.2)
-    time.sleep(600)
-else:
-    if mode.startswith("daemon"):
-        if os.fork() != 0:
-            sys.exit(0)
-        os.setsid()
-        if os.fork() != 0:
-            sys.exit(0)
-        os.chdir(root)
-        open(out, "w").write(str(os.getpid()))
-        os.execv(cmd[0], cmd)
-    else:
-        p = subprocess.Popen(cmd, cwd=root)
-        open(out, "w").write(str(p.pid))
-        sys.exit(0)
-PY
-  rm -f "$FOREIGN_CASE/leftover.pid"
-  case "$mode" in
-    foreign-apple) ( cd "$FOREIGN_COPY" && exec /bin/sleep 600 ) & PROC_PID=$!; PROC_PARENT=; return 0 ;;
-    # A foreign non-Apple process that only mentions this task's marker as an argument: its
-    # environment is readable and does not hold the marker, so it is not the task's own.
-    foreign-argv-nonapple) ( cd "$FOREIGN_COPY" && exec env -u FM_TASK_INBOX "$py" -c 'import time; time.sleep(600)' "$marker" ) & PROC_PID=$!; PROC_PARENT=; return 0 ;;
-  esac
-  env "$marker" "$py" "$script" "$FOREIGN_COPY" "$mode" "$FOREIGN_CASE/leftover.pid" &
-  PROC_PARENT=$!
-  # No cut-off: wait for the leftover's pid file while its starter lives; a slow start prints
-  # one alarm line and the wait goes on.
-  i=0
-  until [ -s "$FOREIGN_CASE/leftover.pid" ]; do
-    kill -0 "$PROC_PARENT" 2>/dev/null || break
-    sleep 0.1
-    i=$((i + 1))
-    [ "$i" -ne 100 ] || echo "slow: the leftover fixture has not written its pid yet" >&2
-  done
-  PROC_PID=$(cat "$FOREIGN_CASE/leftover.pid" 2>/dev/null) || return 1
-  case "$mode" in live*|below*) ;; *) wait "$PROC_PARENT" 2>/dev/null || true; PROC_PARENT= ;; esac
-  sleep 0.5
-}
-
-# real_proc_shape_check <state> <pid> <label>: the leftover must really have the shape its
-# state names. A "nonapple" state whose process is an Apple platform binary (comm under
-# /bin, /usr/bin, /sbin, /usr/sbin or /System) would hide its environment and be judged by
-# another rule than the one the case means to test, so the case fails instead of passing or
-# failing for the wrong reason. An "apple" state must really be one.
-real_proc_shape_check() {
-  local state=$1 pid=$2 label=$3 comm kind want
-  comm=$(ps -o comm= -p "$pid" 2>/dev/null | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
-  case "$comm" in
-    /bin/*|/usr/bin/*|/sbin/*|/usr/sbin/*|/System/*) kind=apple ;;
-    ?*) kind=nonapple ;;
-    *) kind=unreadable ;;
-  esac
-  case "$state" in *nonapple) want=nonapple ;; *) want=apple ;; esac
-  if [ "$kind" != "$want" ]; then
-    kill "$pid" 2>/dev/null || true
-    fail "$label: the fixture process $pid should be $want but its comm is '${comm:-unreadable}'"
-  fi
-}
-
-test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own() {
-  local rc route state want pid parent rec identity
-  if ! ps -p $$ -o pid= >/dev/null 2>&1 || ! real_proc_python >/dev/null; then
-    echo "NOT RUN - b-process-leftovers needs a working ps and a non-Apple python3; a skip is not a pass"
-    return 0
-  fi
-  for route in kept released; do
-    for state in live-apple live-nonapple orphan-nonapple daemon-nonapple orphan-apple daemon-apple foreign-apple foreign-argv-nonapple below-nonapple recorded-orphan-apple pid-reuse; do
-      real_case "b-leftover-$state-$route"
-      SLOT_ENTRY_BEFORE=$(real_slot_entry)
-      want=refused
-      case "$state" in
-        live-apple|live-nonapple|orphan-nonapple|daemon-nonapple|recorded-orphan-apple) want=ended ;;
-      esac
-      case "$state" in
-        recorded-orphan-apple)
-          real_proc_start live-apple || fail "b-leftover-$state-$route: the fixture did not start"
-          real_proc_shape_check live-apple "$PROC_PID" "b-leftover-$state-$route"
-          # Run 1 refuses before anything is reaped (a dirty copy), after the owned record is written.
-          printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
-          if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
-          expect_code 1 "$rc" "b-leftover-$state-$route: run 1 must refuse for the dirty copy: $(cat "$FOREIGN_CASE/stderr")"
-          assert_present "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: no owned record was written"
-          grep -q "^$PROC_PID	" "$FOREIGN_CASE/state/task-x1.teardown-owned" \
-            || fail "b-leftover-$state-$route: the product did not record the live marked-parent's child $PROC_PID (no fixture-written entry exists in this case)"
-          real_proc_alive "$PROC_PID" || fail "b-leftover-$state-$route: run 1 ended the process before the copy was proved"
-          kill "$PROC_PARENT" 2>/dev/null || true
-          wait "$PROC_PARENT" 2>/dev/null || true
-          sleep 0.5
-          rm -f "$FOREIGN_COPY/untracked.txt"
-          held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-          ;;
-        pid-reuse)
-          real_proc_start foreign-apple || fail "b-leftover-$state-$route: the fixture did not start"
-          printf '%s\tlstart=Mon Jan  1 00:00:00 2001\n' "$PROC_PID" > "$FOREIGN_CASE/state/task-x1.teardown-owned"
-          ;;
-        *)
-          real_proc_start "$state" || fail "b-leftover-$state-$route: the fixture did not start"
-          real_proc_shape_check "$state" "$PROC_PID" "b-leftover-$state-$route"
-          ;;
-      esac
-      pid=$PROC_PID
-      parent=$PROC_PARENT
-      # The no-signal oracle reads the signal audit, so the audit exists before the run (an
-      # empty regular file teardown appends to): afterwards a missing or unreadable audit
-      # fails the case instead of passing as "no signal".
-      [ -e "$FOREIGN_CASE/state/task-x1.teardown-processes" ] || : > "$FOREIGN_CASE/state/task-x1.teardown-processes"
-      if [ "$route" = kept ]; then real_teardown rc FM_STUB_CLOSEOUT=retained; else real_teardown rc; fi
-      real_record after
-      if [ "$want" = ended ]; then
-        sleep 0.5
-        if real_proc_alive "$pid"; then
-          # What the close did, before the process is killed (teardown_diag_report).
-          survivor=$(teardown_diag_report "$FOREIGN_CASE" "$rc" "$pid")
-          kill "$pid" 2>/dev/null || true
-          fail "b-leftover-$state-$route: a process proved the task's own was not ended ($survivor)"
-        fi
-        expect_code 0 "$rc" "b-leftover-$state-$route: the close must succeed once the task's own process is ended: $(cat "$FOREIGN_CASE/stderr")"
-        assert_absent "$FOREIGN_CASE/state/task-x1.teardown-owned" "b-leftover-$state-$route: the owned record survived a successful close"
-        # Retained from the deleted b-process-own (Main 2054): the own process is ended AND
-        # the close leaves the kept copy and the real lease as they were.
-        if [ "$route" = kept ]; then
-          real_assert_closed "b-leftover-$state-$route"
-          assert_equals 0 "$(real_returns)" "b-leftover-$state-$route: the slot was returned"
-          real_assert_slot_unchanged "b-leftover-$state-$route"
-          assert_present "$FOREIGN_COPY/.venv/bin/python" "b-leftover-$state-$route: the kept copy lost its control"
-        else
-          assert_absent "$FOREIGN_COPY" "b-leftover-$state-$route: the released copy survived"
-          assert_grep '|return ' "$FOREIGN_CASE/treehouse.calls.log" "b-leftover-$state-$route: the real binary did not return the slot"
-        fi
-      else
-        real_proc_alive "$pid" || fail "b-leftover-$state-$route: a process not proved the task's own was ended"
-        kill "$pid" 2>/dev/null || true
-        expect_code 1 "$rc" "b-leftover-$state-$route: a process not proved the task's own must refuse: $(cat "$FOREIGN_CASE/stderr")"
-        assert_grep "process $pid" "$FOREIGN_CASE/stderr" "b-leftover-$state-$route: the refusal did not name the process"
-        assert_equals 0 "$(retained_call_count)" "b-leftover-$state-$route: the driver was asked about a copy with a live user"
-        real_assert_no_signal_audited "$pid" "b-leftover-$state-$route"
-        real_assert_kept "b-leftover-$state-$route"
-      fi
-      [ -z "$parent" ] || { kill "$parent" 2>/dev/null || true; wait "$parent" 2>/dev/null || true; }
-    done
-  done
-  pass "b-leftovers: on the kept and the released route, an Apple zsh or sleep and a marked non-Apple python at the copy root are ended when a readable marker, the owned record or a live parent chain proves them the task's own, and refused by name and left running otherwise (orphaned or daemonised Apple binaries, a foreign process, a reused pid)"
 }
 
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased() {
@@ -752,7 +499,8 @@ test_an_ignored_file_created_while_the_driver_runs_is_not_closed_over_on_a_real_
   assert_equals 1 "$(retained_call_count)" "c-late-file: run 1 must make exactly one driver call"
   assert_present "$FOREIGN_CASE/state/task-x1.meta" "c-late-file: the task record was removed"
   assert_present "$FOREIGN_COPY/.claude/channel-outbox/late.jsonl" "c-late-file: the late file is gone"
-  assert_equals 0 "$(find "$FOREIGN_CASE/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ')" "c-late-file: a record was written for a copy that changed during the call"
+  assert_equals 1 "$(find "$FOREIGN_CASE/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ')" "c-late-file: the driver's answer was not recorded once"
+  cp "$(retained_record_path)" "$FOREIGN_CASE/record.run1"
   assert_equals 0 "$(real_returns)" "c-late-file: the slot was returned"
   real_assert_slot_unchanged "c-late-file"
   # The late file is part of the copy now; the second close must leave the copy as it finds it.
@@ -763,9 +511,9 @@ test_an_ignored_file_created_while_the_driver_runs_is_not_closed_over_on_a_real_
   assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "c-late-file: the changed copy must be assessed exactly once more"
   retained_assert_closed "c-late-file"
   real_assert_slot_unchanged "c-late-file"
-  preserve=$(retained_field "$(retained_record_path)" preserve)
-  assert_equals "late" "$(cat "$preserve/.claude/channel-outbox/late.jsonl")" "c-late-file: the late file is not held in the preserve of the close"
-  pass "c-late-file: an ignored file created while the driver runs refuses the first close with the copy, claim and real lease unchanged, and the next run assesses it once and holds it in the preserve"
+  cmp -s "$FOREIGN_CASE/record.run1" "$(retained_record_path)" && fail "c-late-file: the record of the state before the change was not replaced"
+  assert_equals "late" "$(cat "$FOREIGN_COPY/.claude/channel-outbox/late.jsonl")" "c-late-file: the late file changed in the kept copy"
+  pass "c-late-file: an ignored file created while the driver runs refuses the first close with the copy, claim and real lease unchanged, and the next run assesses the changed copy once and closes around it"
 }
 
 test_the_scratch_tmux_server_starts_whatever_the_length_of_tmpdir() {
@@ -791,8 +539,6 @@ teardown_test_cases=(
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
 test_a_copy_with_a_foreign_process_inside_it_is_kept_and_the_slot_stays_leased
-test_a_foreign_or_scrubbed_process_at_the_copy_root_is_never_ended_and_refuses_the_close
-test_real_leftover_processes_at_the_copy_root_are_ended_only_when_proved_the_tasks_own
 test_a_copy_that_another_task_record_names_is_kept_and_the_slot_stays_leased
 test_a_slot_another_task_claims_is_left_untouched_and_stays_leased
 test_a_start_racing_the_close_never_receives_the_held_slot

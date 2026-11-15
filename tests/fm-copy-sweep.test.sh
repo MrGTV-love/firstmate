@@ -1636,19 +1636,13 @@ test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries() {
 # and the identity of its creation-lock file. A complete record is valid only while these
 # still describe the copy, so a fixture of a matching record carries the real values.
 complete_retained_fields() {  # <copy>
-  local copy=$1 admin
-  admin=$(git -C "$copy" rev-parse --absolute-git-dir)
+  local copy=$1
   (
     # shellcheck source=/dev/null
     . "$ROOT/bin/fm-teardown-nested-lib.sh"
     teardown_retained_snapshot "$copy" || exit 1
     printf 'head=%s\nstatus-sha256=%s\npayload-sha256=%s\n' "$TEARDOWN_RET_HEAD" "$TEARDOWN_RET_STATUS" "$TEARDOWN_RET_PAYLOAD"
   ) || return 1
-  if [ "$(uname)" = Darwin ]; then
-    printf 'lock-identity=%s\n' "$(/usr/bin/stat -f %i:%B "$admin/locked")"
-  else
-    printf 'lock-identity=%s\n' "$(stat -c %i:%W "$admin/locked")"
-  fi
 }
 
 # The record bin/fm-teardown.sh writes when it closes a task around an own copy
@@ -1669,10 +1663,9 @@ test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it() {
   mkdir -p "${record%/*}"
   {
     printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$lock" "$copy" "$identity"
-    printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task t verified its ignored payload byte for byte\n'
-    printf 'task=t\nslot=%s\npreserve=/p\nreason=cleanup_ignored_payload_archived_tree_retained\nclosed-at=2026-11-03T00:00:00Z\n' "$SLOT"
+    printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained) for task t\n'
+    printf 'task=t\nslot=%s\nreason=cleanup_ignored_payload_archived_tree_retained\nrecorded-at=2026-11-03T00:00:00Z\n' "$SLOT"
     complete_retained_fields "$copy" || fail "the fixture record's fields could not be read"
-    printf 'unique=.claude/channel-outbox/a.jsonl\n'
   } > "$record"
   before=$(shasum -a 256 "$record")
   snap "$copy" > "$W/copy.before"
@@ -1707,9 +1700,9 @@ test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it() {
 # payload and lock cases reach the driver). Controls: the unchanged copy is held by
 # both forms with no driver call; a record that cannot be read, and a payload that cannot
 # be read, still hold the copy and the driver is not asked.
-test_a_teardown_retained_record_no_longer_holds_a_copy_that_changed() {
+test_a_teardown_retained_record_keeps_holding_a_changed_copy_until_its_lock_or_copy_changes() {
   local copy hash record calls kind line before admin
-  for kind in payload head lock-file unreadable-record unreadable-payload; do
+  for kind in payload head lock-file unreadable-record unreadable-payload lock-bytes; do
     make_locked_copy_case "teardown-record-changed-$kind" dead
     install_driver "$SLOT" "$W"
     copy=$(copy_path locked)
@@ -1721,19 +1714,15 @@ test_a_teardown_retained_record_no_longer_holds_a_copy_that_changed() {
     {
       printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$(shasum -a 256 "$(git -C "$copy" rev-parse --absolute-git-dir)/locked" | awk '{print $1}')" "$copy" \
         "$(if [ "$(uname)" = Darwin ]; then /usr/bin/stat -f %i:%B "$copy/.git"; else stat -c %i:%W "$copy/.git"; fi)"
-      printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task t verified its ignored payload byte for byte\n'
-      printf 'task=t\nslot=%s\npreserve=/p\nreason=cleanup_ignored_payload_archived_tree_retained\nclosed-at=2026-11-03T00:00:00Z\n' "$SLOT"
+      printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained) for task t\n'
+      printf 'task=t\nslot=%s\nreason=cleanup_ignored_payload_archived_tree_retained\nrecorded-at=2026-11-03T00:00:00Z\n' "$SLOT"
       complete_retained_fields "$copy" || fail "$kind: the fixture record's fields could not be read"
-      printf 'unique=unique.dat\n'
     } > "$record"
     for mode in report apply; do
       if [ "$mode" = report ]; then run_sweep; else FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply; fi
       assert_class locked HELD-LOCKED
       assert_contains "$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)" "driver retained this copy" "$kind unchanged $mode: the matching record did not hold the copy"
     done
-    calls=0
-    [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
-    assert_equals 0 "$calls" "$kind unchanged: the sweep asked the driver about a copy its matching record holds"
     case "$kind" in
       payload) printf 'second payload\n' > "$copy/unique.dat" ;;
       head)
@@ -1741,42 +1730,43 @@ test_a_teardown_retained_record_no_longer_holds_a_copy_that_changed() {
         git -C "$copy" push -q origin "fm/locked"
         ;;
       lock-file)
-        # The creation lock replaced by a new file with the same bytes is another lock.
+        # The creation lock replaced by a new file with the same bytes: the same lock bytes.
         admin=$(git -C "$copy" rev-parse --absolute-git-dir)
         cp -p "$admin/locked" "$admin/locked.new"
         mv -f "$admin/locked.new" "$admin/locked"
         ;;
       unreadable-record) chmod 000 "$record" ;;
       unreadable-payload) chmod 000 "$copy/unique.dat" ;;
+      lock-bytes)
+        # The control: a different creation lock makes the record stale.
+        admin=$(git -C "$copy" rev-parse --absolute-git-dir)
+        printf '%s 1\n' "$(cat "$admin/locked")" > "$admin/locked"
+        ;;
     esac
     before=$(perl -e 'printf "%o", (lstat $ARGV[0])[2]' "$record")$(cat "$record" 2>/dev/null | shasum -a 256)
     run_sweep
     line=$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)
     assert_equals "$before" "$(perl -e 'printf "%o", (lstat $ARGV[0])[2]' "$record")$(cat "$record" 2>/dev/null | shasum -a 256)" "$kind changed report: the report form wrote or cleared the record"
     case "$kind" in
-      payload|head|lock-file)
-        assert_not_contains "$line" "driver retained this copy" "$kind changed report: a record that no longer describes the copy still held it: $line"
+      lock-bytes)
+        assert_not_contains "$line" "driver retained this copy" "$kind changed report: a record of another lock still held the copy: $line"
         FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
-        line=$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)
-        assert_not_contains "$line" "driver retained this copy" "$kind changed apply: a record that no longer describes the copy still held it: $line"
-        if [ "$kind" != head ]; then
-          calls=0
-          [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
-          [ "$calls" -gt 0 ] || fail "$kind changed apply: the changed copy was not assessed by the driver"
-        fi
+        assert_contains "$OUT" "RECEIPT-CLEARED" "$kind changed apply: the stale record was not cleared"
         ;;
       *)
         assert_class locked HELD-LOCKED
+        assert_contains "$line" "driver retained this copy" "$kind changed report: the record stopped holding a copy whose lock and identity it still describes: $line"
         FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
         assert_class locked HELD-LOCKED
+        [ -e "$record" ] || fail "$kind changed apply: --apply cleared the record of a copy that is still kept"
         calls=0
         [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
-        assert_equals 0 "$calls" "$kind: the sweep asked the driver while the record or the payload could not be read"
+        assert_equals 0 "$calls" "$kind changed: the sweep asked the driver about a copy its record still holds"
         chmod 644 "$record" "$copy/unique.dat" 2>/dev/null || true
         ;;
     esac
   done
-  pass "a teardown-written retained record stops holding the copy once its ignored payload, its HEAD or its creation-lock file changes: report shows no hold and writes nothing, apply assesses the copy afresh; the unchanged copy, an unreadable record and an unreadable payload stay held with no driver call"
+  pass "a teardown-written retained record keeps holding its copy after its payload, HEAD or lock file changes and while it or the payload cannot be read (no driver call, never cleared by --apply), and goes stale only once the copy's creation lock bytes differ"
 }
 
 # A lane home wrote the retained record (it closed its task around the kept copy in
@@ -1791,8 +1781,8 @@ xhome_record() {  # <copy> <record-path>
   mkdir -p "${record%/*}"
   {
     printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$lock" "$copy" "$identity"
-    printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task t verified its ignored payload byte for byte\n'
-    printf 'task=t\nslot=%s\npreserve=/p\nreason=cleanup_ignored_payload_archived_tree_retained\nclosed-at=2026-11-03T00:00:00Z\n' "$SLOT"
+    printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained) for task t\n'
+    printf 'task=t\nslot=%s\nreason=cleanup_ignored_payload_archived_tree_retained\nrecorded-at=2026-11-03T00:00:00Z\n' "$SLOT"
     complete_retained_fields "$copy" || fail "the fixture record's fields could not be read"
   } > "$record"
 }
@@ -1825,17 +1815,21 @@ test_a_sweep_from_another_home_does_not_ask_the_driver_for_a_copy_a_lane_record_
     [ ! -e "$HOMED/data/copy-sweep/retained/$hash" ] || fail "$mode: the sweep wrote a competing record of its own"
     snap "$copy" | cmp -s - "$W/copy.before" || fail "$mode: the sweep changed the kept copy"
   done
-  # The lane's record holds only while it describes the copy. After a new pushed commit it no
-  # longer holds it, and the sweep still never writes, clears or claims the lane's record.
+  # The lane's record holds by the receipt rules: a new pushed commit does not end the hold
+  # (the copy and its lock are the same), and the sweep still never writes, clears or claims
+  # the lane's record.
   git -C "$copy" -c user.email=t@t -c user.name=t commit -q --allow-empty -m next
   git -C "$copy" push -q origin "fm/locked"
   for mode in report apply; do
     if [ "$mode" = report ]; then FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep; else FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply; fi
     line=$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)
-    assert_not_contains "$line" "recorded by another local home" "changed $mode: the lane's record still held a copy it no longer describes: $line"
+    assert_contains "$line" "recorded by another local home" "changed $mode: the lane's record stopped holding a copy it still describes: $line"
+    calls=0
+    [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
+    assert_equals 0 "$calls" "changed $mode: the sweep asked the driver about a copy another home's record keeps"
     assert_equals "$before" "$(shasum -a 256 "$record")" "changed $mode: the sweep wrote or cleared the lane's record"
   done
-  pass "a sweep run from another home holds a copy a lane's retained record keeps: no driver call, no write to the lane's record, no competing record; once the copy changed the record no longer holds it and is still never written or cleared"
+  pass "a sweep run from another home holds a copy a lane's retained record keeps, also after the copy's HEAD moved: no driver call, no write to the lane's record, no competing record"
 }
 
 test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read() {
@@ -3392,7 +3386,7 @@ test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves
 test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it
-test_a_teardown_retained_record_no_longer_holds_a_copy_that_changed
+test_a_teardown_retained_record_keeps_holding_a_changed_copy_until_its_lock_or_copy_changes
 test_a_sweep_from_another_home_does_not_ask_the_driver_for_a_copy_a_lane_record_holds
 test_a_sweep_holds_a_copy_when_another_homes_records_cannot_be_read
 test_a_receipt_survives_while_its_copy_cannot_be_looked_up_and_is_cleared_only_when_it_is_gone
