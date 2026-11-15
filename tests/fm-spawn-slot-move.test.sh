@@ -1359,18 +1359,26 @@ test_an_origin_ref_advanced_before_a_refused_move_does_not_say_untouched() {
 }
 
 # The one ref change a move admits is the exact anchor its own preparation wrote (absent -> the commit it found).
+# The suite stubs fm_task_copy_preserve to a no-op everywhere else. The anchor cases need the real one, so they source the
+# task-copy library for their own run and put the stub back afterwards (anchor_world_done).
 anchor_world() { # <name>: a governed detached copy, proven and prepared; sets W_TARGET
   make_world "$1" 1
   advance_origin advanced.txt
   fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
   fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+  [ -n "$FM_SLOT_EXPECT_REFS" ] || fail "the preparation wrote no anchor, so the anchor cases would prove nothing"
+  git -C "$W_PROJ" rev-parse --verify --quiet "${FM_SLOT_EXPECT_REFS%%=*}" >/dev/null || fail "the anchor ref does not exist"
 }
+anchor_world_done() { fm_task_copy_preserve() { return 0; }; }
 
 test_the_anchor_the_preparation_wrote_is_admitted() {
   anchor_world b3-anchor-ok
   local out rc=0
   out=$(FM_SLOT_REF_ALLOW='refs/fm/anchor/tid-*' fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
   [ "$rc" = 0 ] || fail "the move failed on the anchor its own preparation wrote (rc $rc): $out"
+  anchor_world_done
   pass "a move admits the anchor its own preparation wrote"
 }
 
@@ -1383,7 +1391,23 @@ test_an_anchor_the_preparation_did_not_write_fails_the_move() {
   chmod +x "$bin/git"
   out=$(FM_SLOT_REF_ALLOW='refs/fm/anchor/tid-*' PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
   [ "$rc" != 0 ] || fail "an anchor ref other than the one the preparation wrote was admitted: $out"
+  anchor_world_done
   pass "an anchor ref the preparation did not write fails the move"
+}
+
+# The anchor the preparation wrote must END at the commit it anchors. One that a writer moved to another commit before the
+# merge is a ref change the move did not make.
+test_the_anchor_the_preparation_wrote_fails_the_move_when_it_ends_at_another_commit() {
+  anchor_world b3-anchor-moved
+  local bin="$W_DIR/anchor-moved" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref "$(%s -C %s for-each-ref --format="%%(refname)" "refs/fm/anchor/tid-*" | head -n 1)" %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "'$real_git'" "'$W_SLOT'" "$W_TARGET" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(FM_SLOT_REF_ALLOW='refs/fm/anchor/tid-*' PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "an anchor that ended at another commit was admitted: $out"
+  anchor_world_done
+  pass "an anchor that ends at a commit other than the one it anchors fails the move"
 }
 
 # D-E: any initialized submodule with an index flag (assume-unchanged, skip-worktree) is doubt, whatever its files hold.
@@ -1492,6 +1516,7 @@ CASES=(
   test_an_origin_ref_advanced_before_a_refused_move_does_not_say_untouched
   test_the_anchor_the_preparation_wrote_is_admitted
   test_an_anchor_the_preparation_did_not_write_fails_the_move
+  test_the_anchor_the_preparation_wrote_fails_the_move_when_it_ends_at_another_commit
   test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy
   test_a_skip_worktree_flag_inside_a_submodule_skips_the_copy
   test_an_index_flag_on_the_submodule_entry_of_the_parent_skips_the_copy
