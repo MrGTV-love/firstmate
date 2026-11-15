@@ -4058,10 +4058,14 @@ xl_t1_rows() {
 # its record, its ledger rows, and what a plain teardown says. Used where the
 # scenario failed, so the base record shows every observable point.
 xl_observe_stranded() {
+  local rows rc=0 said
   xl_print_state "$1"
-  printf '%s: O ledger rows for t1: %s\n' "$1" "$(xl_t1_rows | paste -sd ';' - | sed 's/^$/none/')"
-  xl_plain_teardown "$W/observe-teardown.txt" || true
-  printf '%s: plain teardown of t1: %s\n' "$1" "$(grep -m1 -E 'REFUSED|refused|error|not landed' "$W/observe-teardown.txt" | sed 's/^$/no refusal line/')"
+  rows=$(xl_t1_rows | paste -sd ';' -)
+  printf '%s: O ledger rows for t1: %s\n' "$1" "${rows:-none}"
+  xl_plain_teardown "$W/observe-teardown.txt" || rc=$?
+  said=$(cat "$W/teardown.out" "$W/observe-teardown.txt" 2>/dev/null | grep . | paste -sd '|' - || true)
+  printf '%s: plain teardown of t1: rc=%s said: %s\n' "$1" "$rc" "${said:-no output}"
+  xl_print_state "$1 after the plain teardown"
 }
 
 # The validators themselves can fail (Main 1686 F6): each is fed a state that
