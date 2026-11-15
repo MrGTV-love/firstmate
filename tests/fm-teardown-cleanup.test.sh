@@ -6532,6 +6532,9 @@ kept_helper_dispose() {
   for run in $(seq 1 "$runs"); do
     KC=$kc ROOT=$ROOT COPY=$copy bash -c "$(kept_helper_env)"'
 TEARDOWN_NESTED_COPIES=("$COPY")
+# A product whose dispose needs the proof'"'"'s lock note (round 4) gets it here, so the round-4
+# product is judged on the same path; the current product has no such note.
+! declare -F teardown_lock_proved_note >/dev/null || { teardown_copy_lock_file "$COPY"; teardown_lock_proved_note "$COPY"; }
 teardown_own_copy_dispose "$KC" "$COPY" 2>>"$KC/stderr"
 rc=$?
 kept=no
