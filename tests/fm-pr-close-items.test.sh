@@ -2019,7 +2019,7 @@ test_r4_the_top_level_reader() {
 # a child exits; the reader once printed every line from bash loops and hit that on large bodies
 # (logs/main044/eintr). Each reader call here runs ten times on a 300 KB body and a 60 KB body.
 test_r4_a_large_body_is_read_with_no_write_error() {
-  local body n=0 size fn out want i
+  local body n=0 size fn out want run
   for size in 300000 60000; do
     body=$TMP_ROOT/r4-large-$size.md
     { block 'Closes-backlog-item: large-a'
@@ -2031,7 +2031,7 @@ test_r4_a_large_body_is_read_with_no_write_error() {
         fm_pr_closes_outside) want=$(grep -c '^Closes-backlog-item: out-' "$body") ;;
         fm_pr_closes_ids) want=1 ;;
       esac
-      for i in 1 2 3 4 5 6 7 8 9 10; do
+      for run in 1 2 3 4 5 6 7 8 9 10; do
         out=$(lib_call "$fn" "$body" 2>"$TMP_ROOT/r4-large.err" | wc -l | tr -d ' ')
         [ "$out" = "$want" ] || fail "r4-large: $fn on a $size-byte body printed $out lines, not $want"
         if grep -q 'write error' "$TMP_ROOT/r4-large.err"; then
@@ -2039,6 +2039,7 @@ test_r4_a_large_body_is_read_with_no_write_error() {
         fi
         n=$((n + 1))
       done
+      [ "$run" = 10 ] || fail "r4-large: $fn ran $run times, not 10"
     done
   done
   pass "the reader reads a 300 KB and a 60 KB body whole, $n calls, with no write error"
