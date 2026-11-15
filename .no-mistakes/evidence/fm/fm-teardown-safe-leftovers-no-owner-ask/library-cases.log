@@ -1,0 +1,108 @@
+== test_r5_ignored_newline_name_is_preserved
+ok - an ignored file whose name holds a newline is preserved byte for byte, a changed payload of it refuses, and the one-per-line list refuses that name
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.xOoNrN
+exit=0
+== test_r5_history_copy_keeps_a_newline_named_ignored_file
+ok - a history-admitted copy keeps a unique ignored file whose name is a newline, as it keeps an ordinary one; clean, it passes
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.pFN1C0
+exit=0
+== test_r5_preserve_leaf_moved_into_the_copy_refuses
+ok - a preserve whose leaf resolves inside the copy refuses and the original stays; an external preserve passes and survives the removal
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.a6vt5W
+exit=0
+== test_r5_stored_bundle_moved_into_the_copy_refuses
+ok - a stored bundle whose directory resolves inside the copy refuses at the final proof; an external one passes and restores
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.C1q2ac
+exit=0
+== test_r5_failed_preserve_scan_refuses
+ok - a failed scan of the staged preserve or of the copy refuses, alone or hiding a changed payload; working scans pass an intact preserve
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.SItx2i
+exit=0
+== test_r5_interrupted_preserve_keeps_the_earlier_one
+ok - a failed or interrupted preserve publication keeps every earlier preserve; a successful one is published and verified
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.VGnOCs
+exit=0
+== test_r5_landing_admission_rechecks_the_default_ref
+ok - a landing admission refuses at the removal when the default ref it read moved or cannot be read, as a retry; unchanged, it passes
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.kA7aEN
+exit=0
+== test_r5_stale_bundle_credit_stops_before_the_driver
+ok - bundle credit for the driver is rechecked at the final proof: a credited bundle truncated after the credit keeps the copy and the driver never runs; intact, it runs
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.eBy67X
+exit=0
+== test_r5_lock_changed_after_its_first_line_refuses
+ok - a lock changed after its first line, or holding more than Vernant's one line, refuses before the driver; unchanged, the driver runs
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.PuN85j
+exit=0
+== test_r5_holder_after_retirement_refuses_before_the_driver
+ok - a process found in or holding a file of a locked copy after the retire phase refuses before the driver, named and unsignalled; with none, the driver runs
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.FVumNV
+exit=0
+== test_r5_unreadable_task_record_is_owner_unknown
+ok - an unreadable active task record means its owner is unknown and the copy is refused; readable it owns the copy, absent it does not
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.Iq57NG
+exit=0
+== test_r5_untracked_managed_hook_file_refuses_like_git
+ok - the final proof refuses what a plain git worktree remove refuses: an untracked managed hook file or turn-end marker keeps the copy, an excluded one is removed
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.6VIKHg
+exit=0
+== test_r5_landing_cache_reuse_keeps_the_proofs_default_ref
+ok - a reused landing proof keeps the default ref it read: moved before the reuse, the final proof refuses as a retry; unchanged, it passes
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.NgW2So
+exit=0
+== test_r5_own_nested_removal_refuses_an_untracked_hook_before_git
+ok - the own nested removal refuses an untracked managed hook file at the final proof before Git is asked; clean or excluded, the copy is removed without force
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.50xUNv
+exit=0
+== test_r5_cleanup_clearance_refuses_an_unreadable_task_record
+ok - teardown's cleanup-target custody scan refuses when another task's record cannot be read; readable and elsewhere, or absent, it clears
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.g7WkY7
+exit=0
+== test_r5_local_only_landing_watches_the_local_branch
+ok - a local-only landing with an origin remote present watches the local branch its proof read: unchanged it passes, rewound it refuses
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.dpIHcO
+exit=0
+== test_pr400_root_claude_untracked_file_is_the_copys_work
+ok - an untracked file under .claude is the copy's own work on the root check and the anchor proof; only Firstmate's managed files are exempt
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.SP0FEp
+exit=0
+== test_pr400_preserve_replacement_keeps_an_earlier_only_payload
+ok - a successful preserve replacement keeps an earlier preserve with a file the new one lacks, and drops one the new preserve fully covers
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.SPm0oH
+exit=0
+== test_pr400_landing_admission_carries_the_proofs_commit
+ok - the landing admission carries the commit its proof read: a ref moved after the proof refuses, unchanged it passes, and a merged-PR landing needs no default-branch ref
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.FNuS9K
+exit=0
+== test_pr400_last_holder_check_sees_cwd_and_own_indexer
+ok - the last holder check before the unlock refuses any cwd holder, an indexer name included; an open-file-only indexer not recorded as own is exempt; with none the release proceeds
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.WA9ftf
+exit=0
+== test_pr400_vanished_lock_never_takes_the_unlocked_route
+ok - a lock proved earlier that now reads absent or unreadable refuses on the foreign, own-release and own-removal routes; never-locked and still-locked controls take their routes
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.5jJbDB
+exit=0
+== test_pr400_nested_repository_under_a_newline_path_is_found
+ok - the nested-repository guard finds an independent repository under a path that holds a newline, as it finds an ordinary one
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.Z0TbVK
+exit=0
+== test_pr400_newline_copy_path_reaches_disposal_whole
+ok - a copy path that holds a newline reaches foreign and own disposal as one path
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.sWqHdH
+exit=0
+== test_pr400_root_return_retry_rechecks_safety
+ok - the root return takes its safety check again before each retry: a changed result stops the retry, an unchanged one retries
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.Ad31rb
+exit=0
+== test_pr400_forgejo_only_landing_is_held
+ok - a copy that only a merged Forgejo pull request admits is held with a named reason unless the content proof holds it; GitHub, content, bundle-held and Forgejo-plus-content controls are released
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.CGjrYE
+exit=0
+== test_pr400_registered_nested_worktree_is_not_root_dirt
+ok - the root dirt rule skips only a registered worktree of the same repository under .claude/worktrees; one elsewhere, an unregistered directory or repository, or an unreadable worktree list, is dirt
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.3iNmbf
+exit=0
+== test_pr400_orca_keeps_base_behaviour
+ok - an Orca-backed task, an Orca cleanup-recovery record included, keeps base behaviour: the no-hold bundle route, the history landing and the direct release refuse it with a named reason; another backend keeps them
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.6ktrX6
+exit=0
