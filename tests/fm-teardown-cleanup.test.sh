@@ -5422,15 +5422,6 @@ held_marker_case() {  # <label> <enclosing|plain>
   cp "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$FOREIGN_CASE/return-pending.before"
 }
 
-# held_task_files <case-dir>: the inbox, status and tasktmp files with a SHA-256
-# for each.
-held_task_files() {
-  find "$1/state/task-x1.inbox" "$1/state/task-x1.status" "$1/tasktmp" -type f -print 2>/dev/null \
-    | LC_ALL=C sort | while IFS= read -r file; do
-      printf '%s %s\n' "$file" "$(shasum -a 256 < "$file" | awk '{print $1}')"
-    done
-}
-
 # The entry checks of a held close, one named test per control and record shape.
 # held_entry_case <label> <plain|enclosing> <scenario> runs one teardown of a
 # held close whose record, lease or inventory is in the state the scenario
@@ -5489,7 +5480,6 @@ held_entry_case() {  # <label> <plain|enclosing> <scenario>
       rm -f "$FOREIGN_CASE/endpoint-stuck"
       ;;
   esac
-  cp "$data/held-foreign-copies.log" "$FOREIGN_CASE/record.start" 2>/dev/null || true
   held_snapshot "$FOREIGN_CASE" "$HELD_COPY"
   run_foreign_teardown HELD_RC
 }
