@@ -33,7 +33,7 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-# shellcheck source=bin/fm-pending-reply-lib.sh
+# shellcheck source=bin/fm-pending-reply-lib.sh disable=SC2153 # tests/lib.sh sets ROOT
 . "$ROOT/bin/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-marker-lib.sh
 . "$ROOT/bin/fm-marker-lib.sh"

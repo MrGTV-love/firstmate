@@ -37,6 +37,7 @@ stop_probe() {
 # No real PID or endpoint is read: each ps query must match the synthetic PID.
 test_launch_proof_omp_executable_identity() (
   local synthetic_comm synthetic_args
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   ps() {
     case "$*" in
       '-p 2000000000 -o comm=') printf '%s\n' "$synthetic_comm" ;;
@@ -171,6 +172,7 @@ test_launch_proof_recorded_native_identity() {
     fi
   }
   INFO=
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane process-info --pane w1:p1') printf '%s' "$INFO" ;;
@@ -185,6 +187,7 @@ test_launch_proof_recorded_native_identity() {
   # the synthetic helpers it names have synthetic readable environments, so no
   # real process other than the probe is read (Main 1807 (3)).
   GROUP_TABLE=
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   ps() {
     if [ "$*" = '-axo pid=,ppid=' ] && [ -n "$PARENTS" ]; then
       printf '%s\n' "$PARENTS"
@@ -204,6 +207,7 @@ test_launch_proof_recorded_native_identity() {
     esac
   }
   # The probe's kernel working directory, as the claude refusal check reads it.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$PID" "$WORKTREE"; }
   process() { # <argv-json> [pid]
     INFO=$(jq -nc --argjson argv "$1" --argjson pid "${2:-$PID}" --arg cwd "$WORKTREE" '
@@ -385,6 +389,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   mkdir -p "$T" "$LANE/state" "$STATE" "$OPERATOR"
   META="$STATE/vernant-t1.meta"
   PIN_GEN=s1793120312.10459.5003
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   ps() {
     case "$*" in
       '-axo pid=,ppid=,pgid=') [ -f "$T/table-empty" ] && return 0; printf '%s\n' '53733 1 53733'; [ ! -f "$T/env-56557" ] || printf '%s\n' '56557 53733 53733' ;;
@@ -395,6 +400,7 @@ test_launch_proof_claude_verdict_and_refusal() (
     esac
   }
   # Every environment read is counted per process.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() {
     printf x >> "$T/reads-$1"
     [ "$1" != 56557 ] || { [ -f "$T/env-56557" ] && [ -s "$T/env-56557" ] || return 1; cat "$T/env-56557"; return; }
@@ -405,6 +411,7 @@ test_launch_proof_claude_verdict_and_refusal() (
   # a refusal check (Main 1709 ruling 1), never as proof.
   # shellcheck disable=SC2329 # the library's working-directory reader calls it
   lsof() { : > "$T/lsof-called"; printf 'p53733\0\nfcwd\0n%s\0\n' "$LANE"; }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane get w1:p2') [ ! -f "$T/pane-missing" ] || return 1; printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
@@ -572,6 +579,7 @@ test_launch_proof_claude_refusal_checks() (
     rm -rf "$T/A|$T" "$T/B" "$T/C" "$H/data" "$LANE/state"
     mkdir -p "$LANE/state"
   }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   ps() {
     case "$*" in
       '-axo pid=,ppid=')
@@ -588,6 +596,7 @@ test_launch_proof_claude_refusal_checks() (
       *) return 1 ;;
     esac
   }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() {
     printf x >> "$T/w/reads-$1"
     [ -f "$T/w/env-$1" ] || return 1
@@ -599,6 +608,7 @@ test_launch_proof_claude_refusal_checks() (
     printf 'p53539\0\nfcwd\0n%s\0\n' "$(cat "$T/w/cwd")"
     [ ! -f "$T/w/cwd-partial" ] || return 1
   }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane process-info --pane w1:p2')
@@ -806,6 +816,7 @@ test_launch_proof_token_checks_every_harness() (
     printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=%s\n' "$G" > "$T/w/env-7101"
     printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-7102"
   }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   ps() {
     case "$*" in
       '-axo pid=,ppid=') printf '7101 1\n7102 7101\n' ;;
@@ -816,9 +827,11 @@ test_launch_proof_token_checks_every_harness() (
       *) return 1 ;;
     esac
   }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() { [ -f "$T/w/env-$1" ] || return 1; cat "$T/w/env-$1"; }
   # shellcheck disable=SC2329 # the library's working-directory reader calls it
   lsof() { printf 'p7101\0\nfcwd\0n%s\0\n' "$LANE"; }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane process-info --pane w1:p2')
@@ -872,7 +885,8 @@ test_launch_proof_round8_reads() (
   mkdir -p "$T/home/state" "$T/lane/state"
   META="$T/home/state/lane.meta"
   # The claim inventory reads only this state directory and the named home.
-  export FM_LAUNCH_PROOF_VERB_PATH=1
+  # shellcheck disable=SC2030 # each case scopes this to its own subshell
+  local -x FM_LAUNCH_PROOF_VERB_PATH=1
   record() { # <harness> [no-proof]
     printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=%s\nkind=ship\nspawn_gen=%s\nworktree=%s\nhome=%s\n' \
       "$1" "$G" "$T/lane" "$T/lane" > "$META"
