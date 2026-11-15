@@ -436,7 +436,7 @@ fi
 # 0 archives it at once, so they run without exec and a finished row stops blocking its
 # dependents in the same run, exactly like done/close.
 pf_form=0
-fm_typed_completion_resolve "${ARGS[@]}" || pf_form=$?
+fm_typed_completion_resolve ${ARGS[@]+"${ARGS[@]}"} || pf_form=$?
 if [ "$pf_form" != 1 ]; then
   pf_id=$FM_TYPED_COMPLETION_ID
   pf_name=$FM_TYPED_COMPLETION
@@ -447,7 +447,7 @@ if [ "$pf_form" != 1 ]; then
       "$pf_name" "${pf_id:-its item}" "${pf_id:-it}" "${TMPDIR:-/tmp}" >&2
     exit 1
   fi
-  tasks-axi "${ARGS[@]}" > "$pf_out"
+  tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$pf_out"
   pf_status=$?
   cat -- "$pf_out"
   if [ "$pf_status" -eq 0 ] && [ "$pf_form" = 2 ]; then
