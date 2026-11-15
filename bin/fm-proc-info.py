@@ -373,6 +373,11 @@ def memory_processes():
     the declared home, never a name such as node or python. Descendants inherit
     ownership in the consumer even when they clear their own environment.
     Missing RSS is explicit.
+    Each row also carries start_us, the exact kernel start time in microseconds,
+    and rss_source: "task" when the figure came from this pid's own task read
+    with the same start time before and after it (one generation of the pid),
+    "ps" or "unstable" otherwise, so a consumer can join a figure to a process
+    generation by pid and start_us and treat any other figure as unproven.
     """
     # ps can read other users' RSS where libproc is denied. Sandboxed workers
     # cannot execute its setuid binary; retain explicit nulls there, never zeros.
@@ -397,6 +402,12 @@ def memory_processes():
         info = ctypes.create_string_buffer(TASKINFO_SIZE)
         readable = libc.proc_pidinfo(pid, PROC_PIDTASKINFO, ctypes.c_uint64(0), info, TASKINFO_SIZE) == TASKINFO_SIZE
         rss = struct.unpack_from("Q", info.raw, 8)[0] if readable else resident.get(pid)
+        before = process_identity(record)
+        try:
+            after = process_identity(kinfo(pid))
+        except (OSError, LookupError):
+            after = None
+        source = ("task" if after == before else "unstable") if readable else ("ps" if rss is not None else None)
         fleet, run = False, None
         try:
             data = sysctl(CTL_KERN, KERN_PROCARGS2, pid)
@@ -423,7 +434,8 @@ def memory_processes():
                     fleet = os.path.commonpath((fleet_root, cwd)) == fleet_root
         rows.append({"pid": pid, "ppid": struct.unpack_from("i", record, E_PPID)[0],
                      "comm": os.fsdecode(record[P_COMM:P_COMM + 17].split(b"\0", 1)[0]),
-                     "started": lstart(record), "rss_bytes": rss, "fleet": fleet, "run": run})
+                     "started": lstart(record), "start_us": before[0] * 1000000 + before[1],
+                     "rss_bytes": rss, "rss_source": source, "fleet": fleet, "run": run})
     return rows
 
 
