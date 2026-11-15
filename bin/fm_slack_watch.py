@@ -75,7 +75,8 @@ OUTAGE_ERRORS = ('unreachable', 'rate_limited', 'ratelimited', 'network_closed',
 
 def definite_refusal(error):
     name = str(error)
-    return name not in OUTAGE_ERRORS and not name.startswith('http_')
+    # An error after which Slack says the operation may have partly happened is never a definite failure (round 9, F6).
+    return name not in OUTAGE_ERRORS and not name.startswith('http_') and name != 'slack_outcome_unknown'
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 FIELD_LINE = re.compile(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$')
 WAKE_LIMIT = 480
@@ -302,6 +303,15 @@ SECOND_SCHEMA = 'fm-slack-second.v1'
 # Every member id the setting has named, as a one-way hash (so that a protected value equal to an id never stops it being recorded), one per line, append only:
 # a second record beside second.json, so that one failed write never forgets an id (finding 1 of the review of fca2a73d).
 SECOND_ID_FILE = 'second-ids'
+# The start time of the latest owner check, in its own file (F5 of the review of c5868b6f).
+OWNER_CHECK_FILE = 'owner-check-at'
+# Refusals of theirs whose log row could not be written yet, kept apart from second.json with only hashed values (F2 of the review of c5868b6f).
+REFUSAL_QUEUE_FILE = 'refusal-queue.jsonl'
+# The fallback record of the same hashes, tried when SECOND_ID_FILE cannot be written (F1 of the review of c5868b6f).
+SECOND_ID_ALT = 'second-ids.alt'
+# The longest the early id record is waited for (F8 of the review of c5868b6f): its append and fsync run in a thread; a record still unfinished then ends
+# their check with nothing done, and lets the owner's run go on to its other record (second.json).
+ID_RECORD_WAIT = 2.0
 SECOND_ID_HASH = re.compile(r'[0-9a-f]{64}')
 
 
@@ -848,7 +858,11 @@ class SecondBudgetSpent(Exception):
 # are slack_outcome_unknown (internal_error, fatal_error, service_unavailable, which Slack says can follow a partly successful operation), an HTTP 5xx, a
 # connection that broke (unreachable) and a cut-off after the connection was made. Premise: a Slack answer that names an error other than those three means
 # the post was not made; nothing is assumed about Slack's de-duplication of client_msg_id.
-SURELY_ABSENT = frozenset({'rate_limited', 'ratelimited', 'network_closed', 'missing_token', 'api_error'}) | frozenset(SAFE_ERRORS)
+SURELY_ABSENT = frozenset({'network_closed', 'missing_token'})
+# Round 9 (F6, Main 1706): only a local failure before anything left the host is surely absent. Every Slack answer other than ok with a ts is unknown: an answer
+# that names an error (ANSWERED) is looked up in full before any retry and retried only when that lookup finds nothing; any other failure (an HTTP 5xx,
+# slack_outcome_unknown, a broken connection, a cut-off after the connection was made) stays unknown after an empty lookup and is never posted again.
+ANSWERED = frozenset({'rate_limited', 'ratelimited', 'api_error'}) | frozenset(SAFE_ERRORS)
 
 
 def second_user():
@@ -985,31 +999,75 @@ def option_from_board(card):
 
 
 def record_setting_id():
-    """Record the id a valid second-person setting names (its one-way hash, in the append-only `second-ids` record) before anything else a command does: a run
-    that its own fixed-text check refuses still read the setting, and the id it read must never answer later (finding 1 of the review of d9861b24). Only the
-    hash is written, never the id. A run that cannot write it refuses (second_id_unrecorded), as a Watch does when both of its records fail."""
+    """Record the id a valid second-person setting names (its one-way hash) before anything else a command does: a run that its own fixed-text check refuses
+    still read the setting, and the id it read must never answer later (finding 1 of the review of d9861b24). Two independent append-only records are tried in
+    turn, `second-ids` and its fallback `second-ids.alt`, both before any refusal can happen (F1 of the review of c5868b6f); only the hash is written. A run
+    that can write neither refuses (second_id_unrecorded)."""
     second, _ = second_user()
     if not second:
         return
     digest = id_hash(second)
     root = path_setting('FM_STATE_OVERRIDE', home_dir().resolve() / 'state') / STATE_KEY
-    path = root / SECOND_ID_FILE
+    for name in (SECOND_ID_FILE, SECOND_ID_ALT):
+        if append_id(root, root / name, digest):
+            return
+    raise SlackError('second_id_unrecorded')
+
+
+def write_atomically(path, text):
+    if path.is_symlink():
+        raise OSError('unsafe')
+    if value_hits(text):
+        raise OSError('collides')
+    fd, name = tempfile.mkstemp(prefix='.slack-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as out:
+            out.write(text)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def bounded_record(wait):
+    """record_setting_id in a thread, waited for at most `wait` seconds: True when it finished (raising its own refusal if both records failed), False when it
+    is still running. A record that finishes later still records the id; nothing waits for it."""
+    done, failure = [], []
+    def record():
+        try:
+            record_setting_id()
+            done.append(True)
+        except SlackError as error:
+            failure.append(error)
+    worker = threading.Thread(target=record, name='fm-slack-id-record', daemon=True)
+    worker.start()
+    worker.join(wait)
+    if failure:
+        raise failure[0]
+    return bool(done)
+
+
+def append_id(root, path, digest):
+    """Append one id hash to one record, once; whether the record now holds it."""
     try:
         if root.is_symlink() or path.is_symlink():
-            raise OSError('unsafe')
+            return False
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
         existing = path.read_text() if path.exists() else ''
         if digest in existing.split('\n'):
-            return
+            return True
         lead = '' if not existing or existing.endswith('\n') else '\n'
         if value_hits(existing + lead + digest + '\n'):
-            raise OSError('collides')
+            return False
         with open(path, 'a') as out:
             out.write(lead + digest + '\n')
             out.flush()
             os.fsync(out.fileno())
+        return True
     except OSError:
-        raise SlackError('second_id_unrecorded') from None
+        return False
 
 
 def early_recorded(record):
@@ -1061,12 +1119,19 @@ class EarlyProof:
 class Watch:
     # The longest wait for the journal lock, counted from the start of the run, or None to wait as long as it takes (main sets it for their check only).
     lock_wait = None
+    # The monotonic start of a run of main, set before its first step, so that their check's budget counts everything from there (F8 of the review of c5868b6f).
+    run_origin = None
 
     def __init__(self, replay=None, token=None):
-        # The monotonic time this run began, before its journal lock: the second person's check counts the wait for the lock inside its own time budget; and its
-        # wall time, which dates a cap hand-over against the watcher's end-of-sweep mark (R5 of the review of 64ac348b).
-        self.run_started = monotonic()
+        # The monotonic time this run began, before its journal lock (and, for a run of main, before its early id record): the second person's check counts
+        # every wait inside its own time budget; and its wall time, which dates a cap hand-over (R5 of the review of 64ac348b).
+        self.run_started = Watch.run_origin if Watch.run_origin is not None else monotonic()
+        # Whether this run is the second person's check (its waits are bounded by its budget), kept after main resets the class setting.
+        self.their_check = self.lock_wait is not None
         self.run_wall = time.time()
+        # This run's own identity: an owner check binds its cap hand-over to it, and their check accepts a hand-over only with the identity of the latest owner
+        # check (F5 of the review of c5868b6f; Main 1710 (c): a wall-clock time is no proof of the sweep).
+        self.sweep_id = uuid.uuid4().hex
         self.home = home_dir().resolve()
         self.root = path_setting('FM_STATE_OVERRIDE', self.home / 'state') / STATE_KEY
         if self.root.is_symlink():
@@ -1086,7 +1151,8 @@ class Watch:
         # Their check proves their DM while it waits for the journal lock (round 8, Class B): the proof call is this run's own conversations.open, made in a
         # bounded reader from the start of the run; it is used after the lock only for the id it was made for (second_channel, start_second).
         self.early_proof = None
-        early = EarlyProof(self.api, second_user()[0], self.run_started) if self.lock_wait is not None and second_user()[0] else None
+        # Only for a bound source: an unbound run makes no Slack call (round 9, F7).
+        early = EarlyProof(self.api, second_user()[0], self.run_started) if self.lock_wait is not None and second_user()[0] and self.bound() else None
         try:
             self.take_lock(self.lock_wait)
         finally:
@@ -1289,6 +1355,8 @@ class Watch:
         """The binding fence, shared. Inside the second person's budget (round 8, R8) it is waited for only until their deadline: a fence still held by an unbind
         then ends their pass with nothing posted (no attempt mark is written before the fence is held), and a later sweep goes on. The owner waits as before."""
         deadline = getattr(self, 'budget_deadline', None)
+        if deadline is None and getattr(self, 'their_check', False) and isinstance(getattr(self, 'run_started', None), (int, float)):
+            deadline = self.run_started + SECOND_BUDGET                # their final print: inside their run's budget too (F8 of the review of c5868b6f)
         if deadline is None:
             fcntl.flock(held, fcntl.LOCK_SH)
             return
@@ -1652,14 +1720,18 @@ class Watch:
                 # find, so no lookup is made, and a run whose calls of theirs are slow spends its budget on the post itself (finding 3 of the review of d0b0c216).
                 # A previously attempted one is looked up once after that attempt: a lookup that found nothing is kept (clear), so the next run posts without
                 # repeating it, and a new attempt clears it again (finding 3 of the review of 4e0b1bd4); the marker lookup still guards every attempt.
+                if row is not None and row.get('person') == 'second' and row.get('ack_unknown'):
+                    raise AckUnknown('ack_state_unknown')              # written before any later step: never posted again (F6)
                 if row is not None and row.get('person') == 'second' and row.get('attempted') and not row.get('clear'):
                     found = self.look_up_ack(row, thread, channel, marker)
                     if found:
                         return found
-                    # An attempt whose outcome is unknown and a complete lookup that finds nothing: that is no proof the post did not happen (a post Slack
-                    # accepted may not be visible yet), so nothing is posted again with its client_msg_id; the request is woken with its state named unknown
-                    # (R9 of the review of 64ac348b; Main 1673 (3)).
-                    raise AckUnknown('ack_state_unknown')
+                    # A complete lookup that finds nothing: for an attempt Slack answered with an error, that proves it absent and it is posted again below; for
+                    # any other attempt it is no proof (a post Slack accepted may not be visible yet), so nothing is posted again with its client_msg_id and
+                    # the request is woken with its state named unknown (R9 of the review of 64ac348b; Main 1673 (3); F6 of the review of c5868b6f).
+                    if not row.get('clear'):
+                        raise AckUnknown('ack_state_unknown')
+                    earlier = []
                 else:
                     earlier = [] if row is not None and row.get('person') == 'second' else self.recent(thread, channel)
             except SlackError as error:
@@ -1690,17 +1762,32 @@ class Watch:
                 row.pop('looked_after', None)
                 self.commit()
             try:
-                ts = self.api.call('chat.postMessage', **args)['ts']
+                answer = self.api.call('chat.postMessage', **args)
+                if not isinstance(answer, dict) or not isinstance(answer.get('ts'), str):
+                    raise SlackError('slack_outcome_unknown')        # an answer that is not ok with a ts proves nothing
+                ts = answer['ts']
             except SecondBudgetSpent as cut:
-                if row is not None and row.get('person') == 'second' and not cut.sent:
-                    self.surely_absent(row)
+                if row is not None and row.get('person') == 'second':
+                    if not cut.sent:
+                        self.surely_absent(row)
+                    else:
+                        self.attempt_class(row, 'ambiguous')
                 raise
             except SlackError as error:
-                if row is not None and row.get('person') == 'second' and str(error) in SURELY_ABSENT:
-                    self.surely_absent(row)
+                if row is not None and row.get('person') == 'second':
+                    if str(error) in SURELY_ABSENT:
+                        self.surely_absent(row)
+                    else:
+                        self.attempt_class(row, 'answered' if str(error) in ANSWERED else 'ambiguous')
                 raise
             self.posted_fresh = True
             return ts
+
+    def attempt_class(self, row, kind):
+        """How an attempt of theirs failed: 'answered' (Slack named an error) or 'ambiguous' (anything else). An attempt with no class, a run that died during
+        its post, counts as ambiguous."""
+        row['attempt_class'] = kind
+        self.commit()
 
     def surely_absent(self, row):
         """A post of theirs that surely did not reach Slack: its attempt mark goes, so a later run posts it without a lookup."""
@@ -1736,7 +1823,12 @@ class Watch:
                 self.commit()
             if not cursor:
                 break
-        row['clear'] = True
+        # The empty lookup and its consequence are one write (round 9, F6): an attempt Slack answered with an error is then proved absent and may be posted
+        # again; any other attempt stays unknown for good, so a run that dies after this commit can never post it twice.
+        if row.get('person') == 'second' and row.get('attempt_class') != 'answered':
+            row['ack_unknown'] = True
+        else:
+            row['clear'] = True
         self.commit()
         return None
 
@@ -1772,10 +1864,13 @@ class Watch:
             self.staging_only = False
         # The reactions on the old cards of every id without answer authority are refused and logged before the cards are dropped (finding 2 of the review of
         # fca2a73d); a failure here never stops the owner's retarget.
+        # A refusal it can neither log nor queue keeps the old cards: the retarget is refused, and a later one goes on (F2 of the review of c5868b6f).
         try:
-            self.second_view().observe_second_cards()
+            recorded = self.second_view().observe_second_cards()
         except (SecretCollision, SlackError, OSError, ValueError):
-            pass
+            recorded = False
+        if recorded is False:
+            raise SlackError('refusal_not_recorded')
         if self.owner_rows():
             raise SlackError('dm_user_changed_with_pending_work')
         # An empty journal does not prove the old DM was drained either: a poll takes in at most
@@ -1901,6 +1996,13 @@ class Watch:
             self.state.setdefault('windows', {})[id_hash(win['user'])] = dict(win)
             self.state['second'] = {}
             win = self.second_window()
+        saved = self.state.get('windows', {}).get(id_hash(self.second)) if self.second else None
+        if not win and isinstance(saved, dict) and saved.get('user') == self.second and saved.get('intake_cursor') is not None:
+            # The id named now had a window set aside: its own cursor comes back, so an arm never resets unread work of a person (F3 of the review of
+            # c5868b6f, Main 1627 (1)); its DM is proved again by the next run.
+            self.state['second'] = self.state['windows'].pop(id_hash(self.second))
+            self.commit()
+            return
         carried = self.unplaced_after(win)
         win.pop('intake_bounds', None)
         win.pop('intake_cursor', None)
@@ -2836,8 +2938,9 @@ class Watch:
         run is not read again (the reaction cache), so a reaction that came with the owner's closing answer is seen even if it is removed before the next poll; a
         closed card is marked looked-at only once every attempt on it is on record. It needs only reactions:read. A card that cannot be read is skipped."""
         if not self.owner.has_second_history() or 'reactions:read' not in set(self.state.get('scopes') or []):
-            return
+            return True
         cards = self.state.setdefault('cards', {})
+        everything = True
         for occurrence, record in list(self.owner.state.get('threads', {}).items()):
             if not isinstance(record, dict) or not isinstance(record.get('ts'), str):
                 continue
@@ -2861,9 +2964,11 @@ class Watch:
             members = sorted({u for r in reactions if isinstance(r, dict) for u in r.get('users', []) if self.owner.without_authority(u)}
                              | set(entry.get('taps', {})) | self.logged_reaction_members(record['ts']))
             recorded = [self.observe_second_taps(record, reactions, member) for member in members]
+            everything = everything and all(recorded)
             if record.get('retired') and all(recorded) and not cached_only:
                 cards.setdefault(self.card_key(record), {})['final'] = True
                 self.commit()
+        return everything
 
     def observe_second_taps(self, record, reactions, member=None):
         """One member's reactions on a card, whatever the emoji: each one that is new since the last poll is one attempt to answer a decision held for the captain,
@@ -2899,7 +3004,10 @@ class Watch:
         if sorted(kept) != sorted(before) or counts != (attempts.get(member) or {}):
             taps[member] = sorted(kept)
             attempts[member] = counts
-            self.commit()
+            try:
+                self.commit()
+            except SecretCollision:
+                pass                                                   # the log or the refusal queue is the durable record of each attempt (F2)
         return complete
 
     def reaction_choices(self, record):
@@ -3006,13 +3114,13 @@ class Watch:
         read (fail closed: an id the plane may have recorded is never given answer authority by a read error)."""
         found = set()
         try:
-            for name in (SECOND_ID_FILE, SECOND_FILE):
+            for name in (SECOND_ID_FILE, SECOND_ID_ALT, SECOND_FILE):
                 path = self.root / name
                 if path.is_symlink():
                     return None
                 if not path.exists():
                     continue
-                if name == SECOND_ID_FILE:
+                if name in (SECOND_ID_FILE, SECOND_ID_ALT):
                     found |= {line for line in path.read_text().split('\n') if SECOND_ID_HASH.fullmatch(line)}
                 else:
                     data = json.loads(path.read_text())
@@ -3180,16 +3288,22 @@ class Watch:
         try:
             view = self.second_view()
             view.state['cap_left'] = {'left': max(0, left), 'fresh': True, 'clock_first': self.clock_first, 'clock_last': self.clock_last, 'complete': True,
-                                      'at': getattr(self, 'run_wall', None)}
+                                      'at': getattr(self, 'run_wall', None), 'sweep': getattr(self, 'sweep_id', None)}
             view.commit()
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
 
     def start_cap_hand_over(self):
-        """Before any owner work of the owner's check: their check of this sweep is left 0 until the owner's work ends and leave_cap records what it left."""
+        """Before any owner work of the owner's check: their check of this sweep is left 0 until the owner's work ends and leave_cap records what it left. The
+        start of this owner check is also written to its own small file (OWNER_CHECK_FILE), so a hand-over of an earlier, interrupted sweep is known as such
+        even when both writes of second.json fail (F5 of the review of c5868b6f)."""
+        try:
+            write_atomically(self.root / OWNER_CHECK_FILE, json.dumps({'sweep': getattr(self, 'sweep_id', None), 'at': getattr(self, 'run_wall', None)}))
+        except OSError:
+            pass
         try:
             view = self.second_view()
-            view.state['cap_left'] = {'left': 0, 'fresh': True, 'at': getattr(self, 'run_wall', None)}
+            view.state['cap_left'] = {'left': 0, 'fresh': True, 'at': getattr(self, 'run_wall', None), 'sweep': getattr(self, 'sweep_id', None)}
             view.commit()
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
@@ -3210,38 +3324,52 @@ class Watch:
         view.state['second_started'] = getattr(self, 'run_wall', None)
         # A hand-over the owner's check did not complete carries no Slack clock: this run then records no completed-run time, so the host's clock never
         # replaces Slack's (R4 of the review of 64ac348b).
-        self.hand_over_incomplete = bool(ledger.get('fresh')) and not ledger.get('complete')
+        # Also when an owner check of this sweep began (its file names a sweep) but no hand-over of it is proved (F4 of the review of c5868b6f: both its
+        # saves failed): the last completed watermark stays.
+        self.hand_over_incomplete = (bool(ledger.get('fresh')) and not ledger.get('complete')) or self.owner_check_unproved(ledger)
+        stale = bool(ledger.get('fresh')) and self.stale_hand_over(ledger, previous)
         if ledger.get('fresh'):
             view.state['cap_left'] = dict(ledger, fresh=False)
             try:
                 view.commit()
             except (SecretCollision, SlackError, OSError, ValueError):
                 left = 0
-            # The Slack clock of the owner's check of this sweep is this run's clock too (finding 4): their activation and a held window use it.
-            for value in (ledger.get('clock_first'), ledger.get('clock_last')):
-                self.note_date(value)
+            if not stale:
+                # The Slack clock of the owner's check of this sweep is this run's clock too (finding 4): their activation and a held window use it; a
+                # hand-over not proved to be this sweep's gives no clock (F4).
+                for value in (ledger.get('clock_first'), ledger.get('clock_last')):
+                    self.note_date(value)
         try:
             view.second_poll(max(0, left), start=self.started)
         except (SlackError, OSError, ValueError, KeyError, TypeError):
             pass
         self.record_run_safely()
 
-    def stale_hand_over(self, ledger, previous=None):
-        """Whether a hand-over belongs to an earlier sweep (R5 of the review of 64ac348b), so it is never used: it has no date; or its owner's check began
-        before their own previous check began (previous, from their journal); or before the watcher's last end-of-sweep mark (state/.last-check)."""
-        at = ledger.get('at')
-        if not isinstance(at, (int, float)) or isinstance(at, bool):
-            return True
-        if isinstance(previous, (int, float)) and not isinstance(previous, bool) and at <= previous:
-            return True
+    def owner_check_unproved(self, ledger):
         root = getattr(self, 'root', None)
         if root is None:
             return False
         try:
-            ended = (root.parent / '.last-check').stat().st_mtime
-        except OSError:
+            latest = json.loads((root / OWNER_CHECK_FILE).read_text()).get('sweep')
+        except FileNotFoundError:
             return False
-        return at <= ended
+        except (OSError, ValueError, AttributeError):
+            return True
+        return isinstance(latest, str) and latest != ledger.get('sweep')
+
+    def stale_hand_over(self, ledger, previous=None):
+        """Whether a hand-over is not proved to be this sweep's, so it is not used (R5 of the review of 64ac348b; F5 of the review of c5868b6f): it is used only
+        when it carries the identity of the latest owner check, which that check wrote to its own file before its work; a hand-over without one, a file that is
+        missing or unreadable, or another identity all defer their work to a later sweep. previous is kept for the record and no longer decides."""
+        root = getattr(self, 'root', None)
+        sweep = ledger.get('sweep')
+        if root is None or not isinstance(sweep, str):
+            return True
+        try:
+            latest = json.loads((root / OWNER_CHECK_FILE).read_text()).get('sweep')
+        except (OSError, ValueError, AttributeError):
+            return True
+        return latest != sweep
 
     def remember_safely(self):
         """Record the id the setting names (record_second_id); kept as the one call every entry point makes. It raises when the id cannot be recorded at all."""
@@ -3540,6 +3668,10 @@ class Watch:
         except SecretCollision:
             self.restore()
             return
+        try:
+            self.retry_unlogged()                                       # local writes only: a queued refusal is logged even in a paused pass (F2)
+        except (SecretCollision, OSError):
+            pass
         if self.second_blocked:
             # A plane value is part of their label: nothing of theirs is read, taken in or printed in this run (finding 6 of the review of d0b0c216).
             self.second_episode('secret_collides_with_their_label')
@@ -3630,7 +3762,11 @@ class Watch:
                 span['walk'] = min((m['ts'] for m in page), key=ts_key)
                 span['counted'] = count
                 self.commit()
-        if count and not self.second_log('second_intake_unplaced', count=count, after=after, before=before, taken_in=True):
+        # The row is written once (F10 of the review of c5868b6f): its event names the span, a row already in the log is not written again, and the span
+        # leaves the journal only after its row and notice.
+        event = 'unplaced:%s:%s' % (after, before)
+        if count and not self.refusal_logged(event) and not self.second_log('second_intake_unplaced', count=count, after=after, before=before, taken_in=True,
+                                                                           event=event):
             return
         if count:
             self.say('slack: second person unplaced: %d message(s) typed between %s and %s were taken in; the plane cannot tell whether they came before or after the arm'
@@ -3652,8 +3788,30 @@ class Watch:
             self.restore()
 
     def retry_unlogged(self):
-        """Write the refusal rows that a plane value kept out of the log when the attempt was refused (state['second_unlogged']); each stays until its row is
-        written. The attempt itself was never an answer."""
+        """Write the refusal rows that a plane value kept out of the log when the attempt was refused (the queue file, and state['second_unlogged'] of older
+        runs); each stays until its row is written. The attempt itself was never an answer."""
+        path = self.root / REFUSAL_QUEUE_FILE
+        try:
+            queued = [row for row in self.read_rows(path.read_text()) if isinstance(row, dict) and row.get('event')] if path.exists() else []
+        except OSError:
+            queued = []
+        kept = []
+        for entry in queued:
+            reason = {'reply': 'decision_held_for_captain_reply', 'reaction': 'decision_held_for_captain_reaction'}.get(entry.get('kind'))
+            fields = {k: entry[k] for k in ('attempt',) if entry.get(k) is not None}
+            try:
+                logged = reason is not None and (self.refusal_logged(entry['event']) or self.second_log(
+                    reason, detail=HELD_FOR_CAPTAIN, author=entry.get('author'), channel=entry.get('channel'), thread=entry.get('thread'), item=entry.get('item'),
+                    event=entry['event'], **fields))
+            except SecretCollision:
+                logged = False
+            if not logged:
+                kept.append(entry)
+        if queued and len(kept) != len(queued):
+            try:
+                write_atomically(path, ''.join(json.dumps(e, ensure_ascii=True) + '\n' for e in kept))
+            except OSError:
+                pass
         for entry in list(self.state.get('second_unlogged') or []):
             reason = {'reply': 'decision_held_for_captain_reply', 'reaction': 'decision_held_for_captain_reaction'}.get(entry.get('kind'))
             if reason is None:
@@ -3740,17 +3898,54 @@ class Watch:
             if not logged:
                 raise SecretCollision('refusal_row_not_written')     # kept for a later run below, as a refused row is
         except SecretCollision:
-            # A plane value would be in the row (its reason, for example): the row is held back, never the owner's work in the same thread. The attempt is still
-            # refused (it is never an answer) and is kept, without its reason text, until a later run of theirs writes the row (finding 6 of the review of d0b0c216).
+            # The row could not be written (a plane value, or the log failed): the attempt is still refused (it is never an answer) and is queued, with only
+            # hashed values, in a file of its own (REFUSAL_QUEUE_FILE), which a later run of theirs writes into the log (finding 6 of the review of d0b0c216;
+            # F2 of the review of c5868b6f: their journal may hold a value the queue entry must not depend on).
             kind = 'reaction' if attempt is not None else 'reply'
-            self.state.setdefault('second_unlogged', []).append({'event': event, 'kind': kind, 'author': author, 'channel': self.state.get('channel'),
-                                                                 'thread': record['ts'], 'item': item, 'attempt': attempt})
-            logged = True
+            entry = {'event': event, 'kind': kind, 'author': author, 'channel': self.state.get('channel'), 'thread': record['ts'], 'item': item,
+                     'attempt': attempt}
+            logged = self.queue_refusal(entry)
+            if not logged:
+                return False
         if logged:
             self.mark_seen(event, record['key'])
-            self.commit()
+            try:
+                self.commit()
+            except SecretCollision:
+                pass                                                   # the log or the queue holds it; the next run does not count it twice
             return True
         return False
+
+    def queue_refusal(self, entry):
+        """Append one refusal to the queue file, once; whether it is now queued (or already logged)."""
+        path = self.root / REFUSAL_QUEUE_FILE
+        try:
+            if path.is_symlink():
+                return False
+            existing = path.read_text() if path.exists() else ''
+            if any(isinstance(row, dict) and row.get('event') == entry['event'] for row in self.read_rows(existing)):
+                return True
+            line = json.dumps(entry, ensure_ascii=True) + '\n'
+            lead = '' if not existing or existing.endswith('\n') else '\n'
+            if value_hits(existing + lead + line):
+                return False
+            with open(path, 'a') as out:
+                out.write(lead + line)
+                out.flush()
+                os.fsync(out.fileno())
+            return True
+        except OSError:
+            return False
+
+    @staticmethod
+    def read_rows(text):
+        rows = []
+        for line in text.split('\n'):
+            try:
+                rows.append(json.loads(line))
+            except ValueError:
+                continue
+        return rows
 
     def logged_reaction_attempts(self, thread, member, channel=None):
         """{emoji: the highest attempt number} of the reaction refusals the plane's log holds for one card and one member: the durable record that a poll whose
@@ -3793,6 +3988,8 @@ class Watch:
         """Whether the plane's log already holds a row for this event (a whole line that names it)."""
         try:
             lines = (self.root / REFUSAL_FILE).read_text().split('\n')
+        except FileNotFoundError:
+            lines = []
         except OSError:
             return False
         for line in lines:
@@ -4294,7 +4491,7 @@ def parse_flags(argv, names, usage, out, switches=None):
 def plane_watch(name, options, out):
     """The plane of a command that runs outside the poll: an unconfigured or refused plane stops it with the reason, a plane value inside the command's own
     fixed text stops it, and the owner must be the stored one. The id the setting names is recorded before any of these checks (record_setting_id)."""
-    early_recorded(record_setting_id)
+    record_setting_id()
     refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT[name])
     state, reason = mode()
     if state != 'on':
@@ -4442,10 +4639,13 @@ def main(argv, out=None):
     watch = None
     code = 0
     try:
-        # Before any check that can refuse the run: the id the setting names is recorded first (finding 1 of the review of d9861b24). If that one record cannot
-        # be written, the run goes on and the Watch records the id in its other record, second.json (R1 of the review of 64ac348b); only a run that can write
-        # neither refuses (record_second_id).
-        early_recorded(record_setting_id)
+        # Before any check that can refuse the run: the id the setting names is recorded first, in one of two records (finding 1 of the review of d9861b24,
+        # R1 of the review of 64ac348b, F1 of the review of c5868b6f); a run that can write neither refuses. Their check counts this inside its budget (F8).
+        Watch.run_origin = monotonic()
+        if not bounded_record(ID_RECORD_WAIT):
+            if action == 'check-second':
+                Watch.run_origin = None
+                return 0
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
         # Their check waits for the journal lock only inside its budget (take_lock); the token read below is the base's, unchanged (SC6).
@@ -4458,6 +4658,7 @@ def main(argv, out=None):
             return 0
         finally:
             Watch.lock_wait = None
+            Watch.run_origin = None
         watch.out = out
         if action in ('check', 'check-second'):
             watch.api.on_reply = lambda: note_progress(out)
@@ -4492,7 +4693,10 @@ def main(argv, out=None):
         else:
             code = check(watch, action)
         if action not in ('arm', 'retarget'):
-            emit(watch, command)
+            try:
+                emit(watch, command)
+            except SecondBudgetSpent:
+                return 0                                               # their lines stay journaled; a later run prints them (F8)
         return code
     except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
         # Report once per failure episode. Pending rows and state remain durable;
@@ -4516,6 +4720,7 @@ def main(argv, out=None):
         out.diagnostic(refusals, 'slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error')
         return 1
     finally:
+        Watch.run_origin = None
         if watch is not None:
             try:
                 watch.lock.close()

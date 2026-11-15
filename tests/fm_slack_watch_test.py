@@ -8304,12 +8304,15 @@ class Round9Findings(InvariantScenario):
     # ---- F8: every blocking step of their check has a bounded wait ----
 
     def test_r9_f8_a_stalled_first_id_record_never_keeps_their_check_past_its_bound(self):
-        with self.home() as home:
+        with self.home(scott=None) as home, patch.dict(os.environ):
             home.trust_check()
             home.cli('poll')
-            stall, real_fsync = threading.Event(), os.fsync
+            os.environ['FM_SLACK_SECOND_USER'] = INV_SECOND                     # a new id: the check's first fsync is its early id record
+            stall, real_fsync, calls = threading.Event(), os.fsync, [0]
             def blocking(fd):
-                stall.wait(40)
+                calls[0] += 1
+                if calls[0] == 1:                                               # the reviewer's case: only the first fsync, the early id record's, stalls
+                    stall.wait(40)
                 return real_fsync(fd)
             self.addCleanup(stall.set)
             started = time.monotonic()

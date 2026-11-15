@@ -52,8 +52,15 @@ class _Fence:
         host, port = address
         self.check()
         found = []
-        lookup = threading.Thread(target=lambda: found.append(self.resolve(host, port)), name='fm-slack-lookup', daemon=True)
-        lookup.start()
+        with _LOOKUPS:
+            # At most one live name lookup per process (F9 of the review of c5868b6f): a lookup still running from an earlier, cut-off call refuses this one,
+            # which then sends nothing; it cannot be cancelled, so it is never multiplied.
+            if any(t.is_alive() for t in _LOOKUP_THREADS):
+                self.lookup_pending = True
+                raise DeadlineSpent(sent=False)
+            lookup = threading.Thread(target=lambda: found.append(self.resolve(host, port)), name='fm-slack-lookup', daemon=True)
+            _LOOKUP_THREADS[:] = [lookup]
+            lookup.start()
         lookup.join(self.left())
         if not found:
             self.lookup_pending = True
@@ -112,6 +119,10 @@ class _Fence:
                 dup.close()
             except OSError:
                 pass
+
+
+_LOOKUPS = threading.Lock()
+_LOOKUP_THREADS = []
 
 
 def _fenced(base, fence):
@@ -294,6 +305,9 @@ class Slack:
         reader.join(max(0.0, self.time_left()))
         if outcome:
             fence.release()
+            if isinstance(outcome[0][3], DeadlineSpent):
+                # Cut off inside the reader (its lookup ran out of time, or another lookup was still alive): recorded as every cut-off is (F9).
+                self.last_cutoff = {'ended': True, 'closed_at': time.monotonic(), 'lookup_pending': fence.lookup_pending, 'sent': fence.connected}
             return outcome[0]
         fence.close()
         closed_at = time.monotonic()
