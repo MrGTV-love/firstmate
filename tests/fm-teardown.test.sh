@@ -3846,6 +3846,67 @@ test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files() {
   pass 'bundle admission refuses before sweeping anchored or landed prior copies with unique ignored bytes'
 }
 
+# R2 (Main 1681): the bundle that admitted the cleanup is rechecked before every
+# copy it removes, even one an anchor also holds. The task copy (held by the
+# bundle) and an anchored clean prior copy are removed in that order; while the
+# task copy is removed, the fixture truncates the bundle source and stored copy,
+# or rewrites the record so it no longer names the task copy's tip. The anchored
+# prior copy then stays. Unchanged, both close and the bundle restores.
+test_r4_anchored_copy_rechecks_the_admitting_bundle() {
+  local case_dir prior change rc head task_head hash stored line
+  for change in unchanged truncate record; do
+    make_nested_slot_case "r4-anchored-bundle-$change" enclosing nested/current
+    case_dir=$NESTED_CASE
+    printf 'task work\n' > "$NESTED_COPY/work.txt"
+    git -C "$NESTED_COPY" add work.txt
+    git -C "$NESTED_COPY" commit -qm 'unpublished task work'
+    task_head=$(git -C "$NESTED_COPY" rev-parse HEAD)
+    record_preservation_bundle "$case_dir" "$NESTED_COPY" "$case_dir/bundles/work.bundle" --all \
+      || fail 'cannot create bundle fixture'
+    prior="$NESTED_SLOT/nested/prior"
+    git -C "$case_dir/project" worktree add -q -b fm/task-x1-prior "$prior" main
+    printf 'prior work\n' > "$prior/prior.txt"
+    git -C "$prior" add prior.txt
+    git -C "$prior" commit -qm 'anchored prior work outside the bundle'
+    head=$(git -C "$prior" rev-parse HEAD)
+    git -C "$case_dir/project" update-ref "refs/fm/anchor/task-x1-$head" "$head"
+    printf 'prior_worktree=%s\n' "$prior" >> "$case_dir/state/task-x1.meta"
+    hash=$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv")
+    stored="$case_dir/data/task-x1/preserved-bundles/$hash.bundle"
+    line=$(printf '%s\t%s\t%s' "$case_dir/bundles/work.bundle" "$hash" "$head")
+    case "$change" in
+      unchanged) printf ':\n' ;;
+      truncate) printf ': > %q; : > %q\n' "$case_dir/bundles/work.bundle" "$stored" ;;
+      record) printf 'printf %%s\\\\n %q > %q\n' "$line" "$case_dir/data/task-x1/preservation-bundles.tsv" ;;
+    esac > "$case_dir/mutate.sh"
+    cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+"\${REAL_GIT_FOR_TEST:?}" "\$@"
+rc=\$?
+case " \$* " in
+  *" worktree remove "*"$NESTED_COPY "*|*" worktree remove "*"$NESTED_COPY")
+    [ -e '$case_dir/mutated' ] || { : > '$case_dir/mutated'; bash '$case_dir/mutate.sh'; } ;;
+esac
+exit \$rc
+SH
+    chmod +x "$case_dir/fakebin/git"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    assert_present "$case_dir/mutated" "$change: the task copy's removal did not run, so the mutation point was never reached: $(grep -v '^●' "$case_dir/stderr" | tail -4)"
+    if [ "$change" = unchanged ]; then
+      expect_code 0 "$rc" "$change: an unchanged bundle must close both copies: $(cat "$case_dir/stderr")"
+      assert_absent "$prior" "$change: the anchored prior copy survived"
+      git init -q --bare "$case_dir/restored.git"
+      git -C "$case_dir/restored.git" fetch -q "$stored" "$task_head:refs/heads/recovered" || fail "$change: the stored bundle does not restore the task commit"
+      continue
+    fi
+    expect_code 1 "$rc" "$change: a bundle changed before the anchored copy's removal must keep it: $(grep -v '^●' "$case_dir/stderr" | tail -6)"
+    assert_present "$prior/.git" "$change: the anchored prior copy was removed after the admitting bundle changed"
+    assert_present "$case_dir/state/task-x1.meta" "$change: the task record was removed"
+  done
+  pass 'an anchored copy is removed only while the bundle that admitted the cleanup still holds; unchanged, both close and the bundle restores'
+}
+
 # The task's current copy is already gone, so the bundle admits its branch ref.
 # A swept anchored prior's unique ignored bytes refuse before retire reaps.
 test_bundle_removed_copy_sweep_refuses_before_retire() {
@@ -4153,6 +4214,7 @@ test_bundle_is_reverified_before_copy_removal
 test_bundle_does_not_excuse_dirty_copy
 test_bundle_does_not_excuse_nested_copy_ignored_files
 test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files
+test_r4_anchored_copy_rechecks_the_admitting_bundle
 test_bundle_removed_copy_sweep_refuses_before_retire
 test_foreign_bundle_sweep_keeps_anchored_prior_ignored_files
 test_foreign_bundle_preservation_keeps_other_proofs

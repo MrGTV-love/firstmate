@@ -6592,6 +6592,7 @@ SH
 # launcher; a gone launcher's copy still closes.
 test_confined_launcher_state_is_never_taken_for_absence() {
   local rc route state label live args
+  teardown_signal_case_allowed 'test_confined_launcher_state_is_never_taken_for_absence' || return 0
   for route in unavailable uncovered; do
     for state in live unknown gone; do
       label="confined-$route-$state"
@@ -6885,6 +6886,7 @@ test_late_record_that_stops_covering_head_stops_the_removal() {
 # recycled and its copy closes; an unreadable table keeps the copy.
 test_launcher_start_time_not_observation_delay_decides_recycling() {
   local rc route shape label live lockf locked_at start args
+  teardown_signal_case_allowed 'test_launcher_start_time_not_observation_delay_decides_recycling' || return 0
   for route in unavailable uncovered; do
     for shape in prompt-live delayed-live recycled unknown; do
       label="start-$route-$shape"
@@ -6998,6 +7000,7 @@ test_pr_and_tip_landed_copies_keep_a_unique_ignored_file() {
 # is never signalled (still alive after teardown, no TERM in the process record).
 test_real_holder_process_indexer_exempt_and_never_signalled() {
   local rc name label pid held argv0
+  teardown_signal_case_allowed 'test_real_holder_process_indexer_exempt_and_never_signalled' || return 0
   command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { pass 'real lsof absent on this host; skipped'; return 0; }
   for name in indexer other; do
     label="real-holder-$name"
@@ -7041,6 +7044,217 @@ SH
     wait "$pid" 2>/dev/null || true
   done
   pass 'a real process holding a file in the copy open keeps it unless ps names it the Spotlight worker, and is never signalled'
+}
+
+# Round 4 (Main 1681) falsifiers. No case here starts, signals or waits on a
+# process of its own: a creation lock names pid 4194305, above every kernel's
+# pid limit, as its dead launcher (Main 1684).
+R4_DEAD_PID=4194305
+
+# An own nested copy, recorded as the task's worktree in the slot, landed by
+# <route> (merged-pr, tip-equal or bundle) and not locked.
+make_r4_own_copy() {  # <name> <merged-pr|tip-equal|bundle>
+  local head
+  if [ "$2" = bundle ]; then
+    make_locked_bundle_case "$1" own single
+    git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+    return 0
+  fi
+  make_own_locked_copy_case "$1" enclosing
+  printf 'hello\n' > "$FOREIGN_COPY/feature.txt"
+  git -C "$FOREIGN_COPY" add -- feature.txt
+  git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q -m 'add feature'
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  if [ "$2" = merged-pr ]; then
+    git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/pull/7/head"
+    append_pr_meta_url "$FOREIGN_CASE"
+    add_gh_pr_merged_for_head "$FOREIGN_CASE" "$head"
+  else
+    git -C "$FOREIGN_COPY" push -q origin HEAD:main
+  fi
+}
+
+# R1: a unique non-ignored file under .claude in an otherwise admissible own
+# nested copy is never removed: teardown refuses and the bytes stay. The clean
+# copy closes. Merged-PR, tip-equal and bundle-admitted routes.
+test_r4_own_nested_untracked_claude_file_refuses() {
+  local rc route shape label
+  for route in merged-pr tip-equal bundle; do
+    for shape in notes clean; do
+      label="r4-claude-$route-$shape"
+      make_r4_own_copy "$label" "$route"
+      if [ "$shape" = notes ]; then
+        mkdir -p "$FOREIGN_COPY/.claude"
+        printf 'unique notes\n' > "$FOREIGN_COPY/.claude/notes.txt"
+        git -C "$FOREIGN_COPY" status --porcelain --untracked-files=all | grep -qxF '?? .claude/notes.txt' \
+          || fail "$label: the fixture's .claude/notes.txt is not untracked"
+      fi
+      run_foreign_teardown rc
+      if [ "$shape" = clean ]; then
+        expect_code 0 "$rc" "$label: a clean admissible copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        continue
+      fi
+      expect_code 1 "$rc" "$label: an untracked .claude file must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_equals 'unique notes' "$(cat "$FOREIGN_COPY/.claude/notes.txt" 2>/dev/null)" "$label: the untracked bytes were lost"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+      assert_grep '.claude/notes.txt' "$FOREIGN_CASE/stderr" "$label: the refusal did not name the file"
+    done
+  done
+  pass 'an untracked file under .claude keeps an own nested copy on the merged-PR, tip-equal and bundle routes; clean, each closes'
+}
+
+# R3: at the lock reread just before the driver, an absent, unreadable,
+# unparsable or changed lock refuses and the driver is never called; an
+# unchanged lock reaches the driver. The mutation runs inside the credit step
+# (the copy's symbolic-ref read in teardown_credit_pr), after the last reprove.
+test_r4_late_lock_change_refuses_before_the_driver() {
+  local rc state label marker admin
+  for state in unchanged absent unreadable unparsable changed; do
+    label="r4-lock-$state"
+    make_own_locked_copy_case "$label" enclosing "$R4_DEAD_PID"
+    admin=$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)
+    marker="$FOREIGN_CASE/credit-read"
+    case "$state" in
+      unchanged) printf ':\n' ;;
+      absent) printf 'rm -f %q\n' "$admin/locked" ;;
+      unreadable) printf 'rm -f %q; ln -s %q %q\n' "$admin/locked" "$FOREIGN_CASE/nowhere" "$admin/locked" ;;
+      unparsable) printf 'printf %%s\\\\n %q > %q\n' 'someone else holds this' "$admin/locked" ;;
+      changed) printf 'printf %%s\\\\n %q > %q\n' 'vernant-session-active owner=launcher:4194306 launcher=4194306' "$admin/locked" ;;
+    esac > "$FOREIGN_CASE/mutate.sh"
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = -C ] && [ "\$2" = '$FOREIGN_COPY' ] && [ "\$3 \$4 \$5 \$6" = 'symbolic-ref --quiet --short HEAD' ] && [ ! -e '$marker' ]; then
+  : > '$marker'
+  bash '$FOREIGN_CASE/mutate.sh'
+fi
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git"
+    run_foreign_teardown rc
+    assert_present "$marker" "$label: the credit step did not run, so the mutation point was never reached"
+    if [ "$state" = unchanged ]; then
+      expect_code 0 "$rc" "$label: an unchanged lock must reach the driver and close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_present "$FOREIGN_CASE/closeout.log" "$label: the driver was not called"
+      continue
+    fi
+    expect_code 1 "$rc" "$label: a changed lock must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver was called after the lock changed"
+    assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+  done
+  pass 'an absent, unreadable, unparsable or changed lock at the reread before the driver refuses without calling it; unchanged, the driver runs'
+}
+
+# R4: ignored files are preserved outside every removal root, and the preserved
+# payload itself is checked. The copy is an own nested copy landed by a merged
+# pull request with a unique ignored file. Shapes: external storage (control,
+# closes with the payload kept), storage that resolves into the copy through a
+# symlink, a payload changed or removed just after its publication, and a
+# failed rename at publication over an earlier preserve (which must survive).
+test_r4_ignored_preserve_storage_and_payload_are_proved() {
+  local rc shape label exclude root seeded hash path realmv found
+  realmv=$(command -v mv)
+  for shape in external in-copy changed missing failed-publish; do
+    label="r4-preserve-$shape"
+    make_r4_own_copy "$label" merged-pr
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf '%s\n' unique.dat >> "$exclude"
+    printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+    root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+    mkdir -p "$FOREIGN_CASE/data/task-x1"
+    case "$shape" in
+      in-copy)
+        mkdir -p "$FOREIGN_COPY/.claude/kept"
+        ln -s "$FOREIGN_COPY/.claude/kept" "$root"
+        ;;
+      changed|missing|failed-publish)
+        mkdir -p "$root"
+        seeded=
+        for path in "$FOREIGN_COPY" "$(cd "$FOREIGN_COPY" && pwd -P)"; do
+          hash=$(printf '%s' "$path" | shasum -a 256 | awk '{print $1}')
+          if [ "$shape" = failed-publish ]; then
+            mkdir -p "$root/$hash"
+            printf 'earlier\n' > "$root/$hash/earlier.dat"
+            seeded+="$root/$hash "
+          fi
+        done
+        cat > "$FOREIGN_CASE/fakebin/mv" <<SH
+#!/usr/bin/env bash
+src=\${@: -2:1} dst=\${@: -1}
+case "\$src" in
+  '$root'/.staging-*)
+    [ "$shape" != failed-publish ] || { echo 'mv: simulated publication failure' >&2; exit 1; }
+    '$realmv' "\$@" || exit \$?
+    case "$shape" in
+      changed) printf 'tampered\n' > "\$dst/unique.dat" ;;
+      missing) rm -f "\$dst/unique.dat" ;;
+    esac
+    exit 0 ;;
+esac
+exec '$realmv' "\$@"
+SH
+        chmod +x "$FOREIGN_CASE/fakebin/mv"
+        ;;
+    esac
+    run_foreign_teardown rc
+    if [ "$shape" = external ]; then
+      expect_code 0 "$rc" "$label: a copy whose ignored file is preserved outside must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      grep -rlqF 'only here' "$root" 2>/dev/null || fail "$label: the preserved payload does not hold the file"
+      continue
+    fi
+    expect_code 1 "$rc" "$label: the copy must stay: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_equals 'only here' "$(cat "$FOREIGN_COPY/unique.dat" 2>/dev/null)" "$label: the unique ignored file was lost"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    if [ "$shape" = failed-publish ]; then
+      found=0
+      for path in $seeded; do
+        [ "$(cat "$path/earlier.dat" 2>/dev/null)" != earlier ] || found=1
+      done
+      [ "$found" = 1 ] || fail "$label: the earlier preserve was lost when the publication failed"
+    fi
+  done
+  pass 'ignored files are preserved outside every removal root and their preserved payload is checked; a failed publication keeps the earlier preserve'
+}
+
+# R5: when teardown keeps project custody because the pool slot's state cannot
+# be proved, a locked copy is not released in that pass and the driver is never
+# called under the project lock; with a leased slot the driver runs with the
+# lock free and the copy closes.
+test_r4_locked_copy_is_deferred_under_project_custody() {
+  local rc shape label lock pass_no
+  for shape in leased unprovable; do
+    label="r4-custody-$shape"
+    make_own_locked_copy_case "$label" enclosing "$R4_DEAD_PID"
+    if [ "$shape" = unprovable ]; then
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}]}\n' \
+        "$FOREIGN_CASE/pool/1/project" > "$FOREIGN_CASE/pool/treehouse-state.json"
+    fi
+    lock=$(FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+      bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$FOREIGN_CASE/project") \
+      || fail "$label: cannot resolve the shared Treehouse project lock"
+    for pass_no in 1 2; do
+      run_foreign_teardown rc FM_STUB_LOCK="$lock"
+      [ "$shape" = unprovable ] || break
+      cp "$FOREIGN_CASE/stderr" "$FOREIGN_CASE/stderr.pass$pass_no"
+    done
+    if [ "$shape" = leased ]; then
+      expect_code 0 "$rc" "$label: a leased slot's locked copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_equals free "$(cat "$FOREIGN_CASE/closeout.lock-state" 2>/dev/null)" "$label: the driver did not run with the project lock free"
+      continue
+    fi
+    if grep -qx held "$FOREIGN_CASE/closeout.lock-state" 2>/dev/null; then
+      fail "$label: the driver ran under the project lock"
+    fi
+    expect_code 1 "$rc" "$label: the locked copy must be deferred: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_grep 'deferred' "$FOREIGN_CASE/stderr.pass1" "$label: the deferral was not named"
+    assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+      || fail "$label: the copy is no longer locked"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+  done
+  pass 'under project custody for an unprovable slot a locked copy is deferred, twice in a row, and the driver never runs under the lock; a leased slot closes'
 }
 
 # The open-file listing is filtered in one pass, and a listing line of a shape
@@ -7630,6 +7844,10 @@ test_late_record_that_stops_covering_head_stops_the_removal
 test_launcher_start_time_not_observation_delay_decides_recycling
 test_pr_and_tip_landed_copies_keep_a_unique_ignored_file
 test_real_holder_process_indexer_exempt_and_never_signalled
+test_r4_own_nested_untracked_claude_file_refuses
+test_r4_late_lock_change_refuses_before_the_driver
+test_r4_ignored_preserve_storage_and_payload_are_proved
+test_r4_locked_copy_is_deferred_under_project_custody
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table

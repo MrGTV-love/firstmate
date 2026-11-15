@@ -2681,6 +2681,19 @@ SH
   chmod +x "$case_dir/fakebin/git"
 }
 
+# A case that sends a signal to a process it starts runs only where that is
+# allowed: CI (CI=true) or an explicit FM_TEST_SIGNALS=1. Elsewhere it reports
+# itself skipped, so a firstmate host never signals a process a test started.
+teardown_signal_case_allowed() {  # <label>
+  case "${FM_TEST_SIGNALS:-}" in
+    1) return 0 ;;
+    0) ;;
+    *) [ "${CI:-}" != true ] || return 0 ;;
+  esac
+  pass "$1: SKIPPED on this host, CI-only (it signals a process it starts); set FM_TEST_SIGNALS=1 to run"
+  return 1
+}
+
 # A pid that exited, so a creation lock naming it has no live launcher.
 dead_launcher_pid() {
   sleep 0.1 &
