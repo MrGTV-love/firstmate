@@ -94,6 +94,8 @@ test_f4_every_typed_form_resolves_its_id() {
 2 waive |public-followup waive pf-a --reason --json --approved-by captain
 2 record-delivery |public-followup record-delivery --receipt-file f.json
 3 waive |public-followup waive --help
+0 waive pf-dash|public-followup waive pf-dash --reason -h --approved-by captain
+3 waive |public-followup waive pf-a --reason r --approved-by captain -h
 1  |done pf-a --note x
 1  |public-followup begin-delivery pf-a --payload-hash x
 CASES
