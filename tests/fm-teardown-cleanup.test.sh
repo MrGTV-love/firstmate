@@ -6912,6 +6912,22 @@ test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_wh
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside-existing: the close failed: $(cat "$kc/stderr")"
   assert_equals "$first" "$(kept_tree "$base")" "kept-helper-beside-existing: the pre-existing preserve changed"
+  # A pre-existing preserve that agrees with the copy is kept and only gains what it lacks: its
+  # files and every SHA256SUMS line it had stay as they were, and the copied-in file's line is added.
+  kc=$tmp/agreeing
+  kept_helper_case "$kc"
+  base=$(kept_preserve_base "$kc")
+  mkdir -p "$base/notes"
+  printf 'only here\n' > "$base/notes/unique.dat"
+  printf '%s\n' "$(cd "$kc/copy" && pwd -P)" > "$base/copy-path"
+  printf 'an earlier line an older run wrote\n%s  notes/unique.dat\n' "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')" > "$base/SHA256SUMS"
+  cp "$base/SHA256SUMS" "$kc/sums.before"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside-agreeing: the close failed: $(cat "$kc/stderr")"
+  assert_equals 1 "$(find "$kc/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | wc -l | tr -d ' ')" "kept-helper-beside-agreeing: an agreeing preserve was not reused"
+  assert_equals "$(cat "$kc/sums.before")" "$(head -n 2 "$base/SHA256SUMS")" "kept-helper-beside-agreeing: an earlier SHA256SUMS line changed"
+  assert_grep "$(printf 'one\n' | shasum -a 256 | awk '{print $1}')  .claude/channel-outbox/a.jsonl" "$base/SHA256SUMS" "kept-helper-beside-agreeing: the copied-in file has no SHA256SUMS line"
+  assert_equals 'only here' "$(cat "$base/notes/unique.dat")" "kept-helper-beside-agreeing: an earlier preserved file changed"
   # A preserve that did not hold (a selected file lost from it during the driver call): the run
   # refuses, the unchanged retry asks nothing and preserves beside it, and the damaged
   # preserve keeps every byte it still had.
@@ -6943,6 +6959,32 @@ test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_wh
   assert_equals "$first" "$(kept_tree "$base")" "kept-helper-beside-refused: the earlier preserve changed"
   rm -rf "$tmp"
   pass "a changed kept copy is preserved beside its earlier preserve, with new .claude and .opencode entries, tab names and a newline-ended link target, and no earlier preserved byte is ever overwritten or removed"
+}
+
+# Item 2, a copy with nothing selected (only .claude files): its preserve is made when its payload
+# is copied in, and every later run reuses that one preserve, its record unchanged.
+test_kept_copy_helper_a_copy_with_nothing_selected_keeps_one_preserve_across_retries() {
+  local tmp kc out rec
+  tmp=$(fm_test_tmproot kept-helper-unselected)
+  kc=$tmp/case
+  kept_helper_case "$kc"
+  rm -f "$kc/copy/notes/unique.dat"
+  rmdir "$kc/copy/notes"
+  : > "$kc/unlanded"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-unselected: an unlanded kept copy must refuse: $(cat "$kc/stderr")"
+  rm -f "$kc/unlanded"
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-unselected: the landed copy must close from its record: $(cat "$kc/stderr")"
+  rec=$(find "$kc/data/copy-sweep/retained" -type f | head -n 1)
+  cp "$rec" "$kc/record.closed"
+  out=$(kept_helper_dispose "$kc" 2)
+  assert_equals $'rc=0 kept=yes calls=1\nrc=0 kept=yes calls=1' "$out" "kept-helper-unselected: later runs must close without the driver: $(cat "$kc/stderr")"
+  assert_equals 1 "$(find "$kc/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | wc -l | tr -d ' ')" "kept-helper-unselected: a later run made a second preserve"
+  cmp -s "$kc/record.closed" "$rec" || fail "kept-helper-unselected: a later run rewrote the record: $(diff "$kc/record.closed" "$rec")"
+  assert_equals 'one' "$(cat "$(kept_preserve_base "$kc")/.claude/channel-outbox/a.jsonl" 2>/dev/null)" "kept-helper-unselected: the .claude file is not in the preserve"
+  rm -rf "$tmp"
+  pass "a kept copy with nothing selected gets one preserve when its payload is copied in, and later runs reuse it with the record unchanged"
 }
 
 # Item 3 (C2 post-driver, Main 006): when the copy's record cannot be written, the close refuses
@@ -8127,6 +8169,7 @@ test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed
 test_an_unwritable_retained_record_never_makes_an_unchanged_retry_ask_the_driver
 test_kept_copy_helper_a_retry_of_a_closed_task_says_it_is_already_closed
 test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_which_is_never_replaced
+test_kept_copy_helper_a_copy_with_nothing_selected_keeps_one_preserve_across_retries
 test_kept_copy_helper_a_record_that_cannot_be_written_leaves_a_refusal_record
 test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_against_the_copy
 test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_unpreserved
