@@ -638,30 +638,38 @@ fm_pr_poll_check_place() {
   FM_PR_POLL_CHECK_TMP=
 }
 
-# The check name, during a rollback: it is moved aside first, then removed only
-# when it is the file this publication placed (same file object, no trust record)
-# or a merge poll Firstmate wrote for this task by its bytes; anything else is put
-# back exactly as it was, so a rollback never removes what now holds the name
-# (Main 1820 F5). 1 when it could not be judged or put back.
+# The check name, during a rollback: removed only when this publication placed its
+# check there and the name's current bytes still hash-equal the bytes this run
+# wrote (FM_PR_POLL_EXPECT_TEMPLATE_HASH), with no trust record; it is moved aside
+# and hashed there first, so bytes written into the same file meanwhile are seen
+# (Main 1871 P-E). Anything else, a prior poll this run did not write included, is
+# left in place (put back exactly as it was) and named on stderr. The caller holds
+# the task's poll publication lock; bin/fm-check-register.sh takes no lock of its
+# own, so the byte comparison is what protects a check written concurrently.
+# 1 when the name could not be judged or put back.
 fm_pr_poll_check_revoke() {
-  local dest=$FM_PR_POLL_CHECK_DEST state=${FM_PR_POLL_CHECK_DEST%/*} aside identity
+  local dest=$FM_PR_POLL_CHECK_DEST state=${FM_PR_POLL_CHECK_DEST%/*} aside hash=
   [ -e "$dest" ] || [ -L "$dest" ] || return 0
+  if [ "$FM_PR_POLL_CHECK_RENAMED" != 1 ]; then
+    echo "notice: $dest was not written by this publication, so the rollback leaves it" >&2
+    return 0
+  fi
   aside=$(mktemp "$state/.fm-pr-poll-revoke.XXXXXX") || return 1
   if ! mv -f -- "$dest" "$aside"; then
     rm -f -- "$aside"
     return 1
   fi
-  identity=
-  [ -L "$aside" ] || identity=$(fm_pr_file_identity "$aside" 2>/dev/null) || identity=
-  if { [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] && [ -n "$identity" ] \
-       && [ "$identity" = "$FM_PR_POLL_EXPECT_CHECK_IDENTITY" ] \
-       && [ ! -e "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ] && [ ! -L "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ]; } \
-     || fm_pr_poll_check_bytes_ours "$state" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE" "$aside"; then
+  if [ -f "$aside" ] && [ ! -L "$aside" ]; then
+    hash=$(fm_pr_sha256 "$aside" 2>/dev/null) || hash=
+  fi
+  if [ -n "$hash" ] && [ "$hash" = "$FM_PR_POLL_EXPECT_TEMPLATE_HASH" ] \
+    && [ ! -e "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ] && [ ! -L "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ]; then
     rm -f -- "$aside"
     return
   fi
   if ln -P -- "$aside" "$dest" 2>/dev/null; then
     rm -f -- "$aside"
+    echo "notice: $dest no longer holds the bytes this publication wrote, so the rollback leaves it" >&2
     return 0
   fi
   echo "error: $dest is not this publication's check and could not be put back after the rollback moved it; it is kept at $aside" >&2
@@ -679,8 +687,9 @@ fm_pr_poll_revoke_final() {
   if [ -e "$FM_PR_POLL_DATA_DEST" ] || [ -L "$FM_PR_POLL_DATA_DEST" ]; then
     rm -f -- "$FM_PR_POLL_DATA_DEST" || failed=1
   fi
-  if [ -e "$FM_PR_POLL_CHECK_DEST" ] && [ ! -L "$FM_PR_POLL_CHECK_DEST" ] && [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] \
-    && [ "$(fm_pr_file_identity "$FM_PR_POLL_CHECK_DEST" 2>/dev/null)" = "$FM_PR_POLL_EXPECT_CHECK_IDENTITY" ]; then
+  if [ -f "$FM_PR_POLL_CHECK_DEST" ] && [ ! -L "$FM_PR_POLL_CHECK_DEST" ] && [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] \
+    && [ "$(fm_pr_sha256 "$FM_PR_POLL_CHECK_DEST" 2>/dev/null)" = "$FM_PR_POLL_EXPECT_TEMPLATE_HASH" ] \
+    && [ ! -e "${FM_PR_POLL_CHECK_DEST%/*}/$FM_PR_POLL_EXPECT_ID.check-trust" ]; then
     failed=1
   fi
   [ ! -e "$FM_PR_POLL_REG_DEST" ] && [ ! -L "$FM_PR_POLL_REG_DEST" ] || failed=1

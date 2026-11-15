@@ -1590,25 +1590,39 @@ test_postrename_poll_validation_revokes_and_retries() {
       fi
       fm_pr_poll_cleanup
       [ -e "$link_target.fired" ] || fail "post-rename $artifact $action: the fault never fired"
-      if [ "$artifact" = check ] && [ "$action" = type ]; then
-        # A link swapped into the check name after it was placed is not this
-        # publication's file, so the rollback puts it back and never removes it
-        # (Main 1820 F5, Main 1827 Q1). It is inert: no registration, no sidecar
-        # and no trust record, so neither watcher gate runs it.
-        [ -L "$state/task-a.check.sh" ] || fail "post-rename check type: the swapped link was removed or replaced"
-        [ ! -e "$state/task-a.pr-poll" ] && [ ! -L "$state/task-a.pr-poll" ] || fail "post-rename check type: a sidecar name was left"
-        [ ! -e "$state/task-a.pr-poll-registration" ] && [ ! -L "$state/task-a.pr-poll-registration" ] || fail "post-rename check type: a registration name was left"
-        [ ! -e "$state/task-a.check-trust" ] || fail "post-rename check type: a trust record exists"
-        ! fm_pr_poll_snapshot_capture "$state" task-a "$POLL" || fail "post-rename check type: the leftover passed the merge poll gate"
+      if [ "$artifact" != check ]; then
+        # The fault came before this publication placed its check, so the check
+        # name still holds the earlier poll, which this run did not write: the
+        # rollback leaves it (Main 1871 P-E). It is inert without its sidecar and
+        # registration, and the retry below replaces it by its bytes.
+        [ "$(shasum -a 256 < "$state/task-a.check.sh")" = "$(shasum -a 256 < "$POLL")" ] \
+          || fail "post-rename $artifact $action: the earlier poll's check was removed or changed"
+        [ ! -e "$state/task-a.pr-poll" ] && [ ! -L "$state/task-a.pr-poll" ] || fail "post-rename $artifact $action: a sidecar name was left"
+        [ ! -e "$state/task-a.pr-poll-registration" ] && [ ! -L "$state/task-a.pr-poll-registration" ] || fail "post-rename $artifact $action: a registration name was left"
+        ! fm_pr_poll_snapshot_capture "$state" task-a "$POLL" || fail "post-rename $artifact $action: the leftover passed the merge poll gate"
+      elif [ "$action" = type ] || [ "$action" = content ]; then
+        # A link swapped in, or other bytes written, after the check was placed is
+        # not what this publication wrote, so the rollback puts it back and never
+        # removes it (Main 1820 F5, Main 1827 Q1, Main 1871 P-E). It is inert: no
+        # registration, no sidecar and no trust record, so neither watcher gate runs it.
+        if [ "$action" = type ]; then
+          [ -L "$state/task-a.check.sh" ] || fail "post-rename check type: the swapped link was removed or replaced"
+        else
+          [ "$(cat "$state/task-a.check.sh")" = 'faulted final bytes' ] || fail "post-rename check content: the changed bytes were removed or replaced"
+        fi
+        [ ! -e "$state/task-a.pr-poll" ] && [ ! -L "$state/task-a.pr-poll" ] || fail "post-rename check $action: a sidecar name was left"
+        [ ! -e "$state/task-a.pr-poll-registration" ] && [ ! -L "$state/task-a.pr-poll-registration" ] || fail "post-rename check $action: a registration name was left"
+        [ ! -e "$state/task-a.check-trust" ] || fail "post-rename check $action: a trust record exists"
+        ! fm_pr_poll_snapshot_capture "$state" task-a "$POLL" || fail "post-rename check $action: the leftover passed the merge poll gate"
         fm_custom_check_snapshot_cleanup
-        ! fm_custom_check_snapshot_prepare "$state" task-a || fail "post-rename check type: the leftover passed the custom check gate"
+        ! fm_custom_check_snapshot_prepare "$state" task-a || fail "post-rename check $action: the leftover passed the custom check gate"
         fm_custom_check_snapshot_cleanup
         # A retry never replaces it either; once it is removed, the retry publishes.
         fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/2 github.com o/r 2 "$POLL" \
           || fail "could not prepare poll retry"
-        ! PATH="$BASE_PATH" fm_pr_poll_publish_prepared || fail "post-rename check type: a retry replaced a link that is not ours"
+        ! PATH="$BASE_PATH" fm_pr_poll_publish_prepared || fail "post-rename check $action: a retry replaced a check that is not ours"
         fm_pr_poll_cleanup
-        [ -L "$state/task-a.check.sh" ] || fail "post-rename check type: the retry removed the link"
+        [ -e "$state/task-a.check.sh" ] || [ -L "$state/task-a.check.sh" ] || fail "post-rename check $action: the retry removed the leftover"
         rm -f -- "$state/task-a.check.sh"
       else
         assert_no_final_poll "$state"
