@@ -2684,13 +2684,19 @@ SH
 # A case that sends a signal to a process it starts runs only where that is
 # allowed: CI (CI=true) or an explicit FM_TEST_SIGNALS=1. Elsewhere it reports
 # itself skipped, so a firstmate host never signals a process a test started.
+# A case this host or platform cannot run prints one named SKIP line, never an
+# "ok" line, so a log never counts a skipped case as passed.
+skip_case() {  # <case-name> <reason>
+  printf 'SKIP - %s: %s\n' "$1" "$2"
+}
+
 teardown_signal_case_allowed() {  # <label>
   case "${FM_TEST_SIGNALS:-}" in
     1) return 0 ;;
     0) ;;
     *) [ "${CI:-}" != true ] || return 0 ;;
   esac
-  pass "$1: SKIPPED on this host, CI-only (it signals a process it starts); set FM_TEST_SIGNALS=1 to run"
+  skip_case "$1" "CI-only on this host (it signals a process it starts); set FM_TEST_SIGNALS=1 to run"
   return 1
 }
 

@@ -6477,7 +6477,7 @@ SH
   chmod +x "$FOREIGN_CASE/fakebin/lsof"
   run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
   expect_code 1 "$rc" "direct-appears: a process running in the copy must keep it: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
-  assert_grep "The copy was not released directly: process $pid runs in it or holds $FOREIGN_COPY open since the retire phase" "$FOREIGN_CASE/stderr" \
+  assert_grep "The copy was not released directly: process $pid runs in it after the retire phase" "$FOREIGN_CASE/stderr" \
     "direct-appears: the refusal did not name the process"
   assert_present "$FOREIGN_COPY/.git" "direct-appears: the copy was removed"
   git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
@@ -6654,7 +6654,11 @@ SH
       [ "$expected" != unknown ] || assert_grep 'cannot be read' "$FOREIGN_CASE/stderr" "$label: the refusal did not name the unreadable process table"
     done
   done
-  pass 'with ps confined, a live or unreadable launcher keeps its locked copy on both direct-release routes, and a gone one closes'
+  if [ "$(uname -s)" = Darwin ]; then
+    pass 'with ps confined, a live or unreadable launcher keeps its locked copy on both direct-release routes, and a gone one closes'
+  else
+    pass "with ps confined on $(uname -s), where bin/fm-proc-info.py cannot read the process table, every launcher state is unknown and keeps its locked copy on both direct-release routes; the gone-launcher close is Darwin-only and not shown here"
+  fi
 }
 
 # lsof spells a name byte by byte in the C locale: a non-ASCII byte as \\xNN and
@@ -7025,10 +7029,10 @@ test_real_holder_process_indexer_exempt_and_never_signalled() {
   local rc name label pid held argv0
   teardown_signal_case_allowed 'test_real_holder_process_indexer_exempt_and_never_signalled' || return 0
   if [ "$(uname -s)" != Darwin ]; then
-    pass "SKIPPED on $(uname -s): test_real_holder_process_indexer_exempt_and_never_signalled needs bin/fm-proc-info.py, which reads Darwin sysctl"
+    skip_case test_real_holder_process_indexer_exempt_and_never_signalled "not run on $(uname -s): it needs bin/fm-proc-info.py, which reads Darwin sysctl; Unverified there"
     return 0
   fi
-  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { pass 'real lsof absent on this host; skipped'; return 0; }
+  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { skip_case test_real_holder_process_indexer_exempt_and_never_signalled 'real lsof absent on this host; Unverified here'; return 0; }
   for name in indexer other; do
     label="real-holder-$name"
     dead_launcher_pid
@@ -7353,7 +7357,7 @@ SH
   run_foreign_teardown rc
   assert_present "$marker" "direct-late-holder: the Git-protection proof did not run"
   expect_code 1 "$rc" "direct-late-holder: a process that opened a file during the proofs must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
-  assert_grep "process $pid runs in it or holds $FOREIGN_COPY/late.log open since the retire phase" "$FOREIGN_CASE/stderr" \
+  assert_grep "process $pid holds $FOREIGN_COPY/late.log open after the retire phase" "$FOREIGN_CASE/stderr" \
     "direct-late-holder: the refusal did not name the process"
   assert_present "$FOREIGN_COPY/.git" "direct-late-holder: the copy was removed"
   git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
@@ -7372,7 +7376,7 @@ SH
 # indexer, which only reads, the same routes release the copy.
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open() {
   local rc route shape label pid held args
-  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { pass 'real lsof absent on this host; skipped'; return 0; }
+  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { skip_case test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open 'real lsof absent on this host; Unverified here'; return 0; }
   for route in unavailable uncovered; do
     for shape in none indexer holder appears failed; do
       [ "$route:$shape" != unavailable:appears ] || continue
@@ -8078,6 +8082,7 @@ test_r5_stale_bundle_credit_stops_before_the_driver() {
   cat > "$body" <<'BODY'
 pids_with_cwd_under() { :; }
 pids_with_open_file_under() { :; }
+pids_with_open_file_under_all() { :; }
 teardown_launcher_live_since() { return 1; }
 fm_lock_path_mtime() {
   if [ "$shape" = changed ]; then : > "$source_bundle"; : > "$stored"; fi
@@ -8132,6 +8137,7 @@ test_r5_lock_changed_after_its_first_line_refuses() {
   cat > "$body" <<'BODY'
 pids_with_cwd_under() { :; }
 pids_with_open_file_under() { :; }
+pids_with_open_file_under_all() { :; }
 teardown_closeout_credit() { TEARDOWN_CLOSEOUT_CREDIT=(); TEARDOWN_CLOSEOUT_CREDIT_FILE=; }
 fm_lock_path_mtime() { printf '1\n'; }
 teardown_launcher_live_since() { return 1; }
@@ -8177,6 +8183,7 @@ test_r5_holder_after_retirement_refuses_before_the_driver() {
 fm_task_copy_other_record() { return 1; }
 pids_with_cwd_under() { [ "$shape" != holder ] || printf '4194304\t%s\n' "$1"; }
 pids_with_open_file_under() { [ "$shape" != holder ] || printf '4194304\t%s/tracked.txt\n' "$1"; }
+pids_with_open_file_under_all() { pids_with_open_file_under "$1"; }
 teardown_pid_is_task_own() { TEARDOWN_OWN_CWD=$copy; return 0; }
 task_process_identity() { printf 'synthetic-identity\n'; }
 task_record_process_signal() { echo "$shape signalled=$1"; return 0; }
@@ -8299,7 +8306,8 @@ test_r5_landing_cache_reuse_keeps_the_proofs_default_ref() {
   local body=$TMP_ROOT/r5-body-landing-cache.sh
   cat > "$body" <<'BODY'
 eval "$(awk '/^work_is_landed\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
-work_is_landed_proof() { return 0; }
+# The proof records the default-branch commit it read, as the real one does.
+work_is_landed_proof() { TEARDOWN_LANDED_PROOF_SNAP="refs/heads/main $(git -C "$repo" rev-parse refs/heads/main)"; return 0; }
 work_is_landed_bundle() { return 1; }
 TREEHOUSE_PROJECT_LOCK_HELD=0 TEARDOWN_SLOT_CUSTODY='' TEARDOWN_NM_RECORD_SILENT=0 FM_PROJECT_LOCK_BUSY_EXIT=75
 for shape in control moved; do
@@ -8454,6 +8462,431 @@ BODY
   r5_expect 'rewound proof=refused stable=none' 'r5-local-only: a local-only landing passed after the local branch it read was rewound'
   if grep -q 'landed=no' "$R5_OUT"; then fail "r5-local-only: the local-only landing rule did not answer: $(paste -sd '|' - < "$R5_OUT")"; fi
   pass "a local-only landing with an origin remote present watches the local branch its proof read: unchanged it passes, rewound it refuses"
+}
+
+# PR 400 round 2 (Main 1839 items 1-10, Main 1843 a and c): each case below
+# ports one finding of the outside review of 49ded5b4 (r-49ded5b4-review) with
+# its control. Like the round 5 cases they source the libraries, and take single
+# functions out of bin/fm-teardown.sh, on scratch repositories with recording
+# stubs: no case starts, signals or groups a process, and none runs
+# bin/fm-teardown.sh, fm_run_timed or a provider.
+
+
+# Main 1839 item 1: an untracked file under .claude is the copy's own work on the
+# root route too; only the files Firstmate itself writes are exempt.
+test_pr400_root_claude_untracked_file_is_the_copys_work() {
+  local body=$TMP_ROOT/pr400-body-root-claude.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^validate_worktree_teardown_safety\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+work_is_landed() { return 0; }
+teardown_history_swept_ignored_kept() { return 0; }
+report_worktree_dirt() { :; }
+FORCE='' KIND=ship MODE=normal TEARDOWN_SLOT_REASSIGNED=0 TEARDOWN_SLOT_SHARED=0 TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=task
+TEARDOWN_BUNDLE_PROOF='' SCRIPT_DIR=/nonexistent
+for shape in clean managed claude-notes other-notes; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  case "$shape" in
+    managed) mkdir -p "$copy/.claude" && printf '{}\n' > "$copy/.claude/settings.local.json" && : > "$copy/.fm-busy-stop" ;;
+    claude-notes) mkdir -p "$copy/.claude" && printf 'only here\n' > "$copy/.claude/notes.txt" ;;
+    other-notes) mkdir -p "$copy/src" && printf 'only here\n' > "$copy/src/notes.txt" ;;
+  esac
+  WT=$copy TEARDOWN_NESTED_COPIES=()
+  rc=0; validate_worktree_teardown_safety >/dev/null 2>&1 || rc=$?
+  prc=0; fm_task_copy_preserve "$repo" "$ID" "$copy" 0 >/dev/null 2>&1 || prc=$?
+  echo "$shape root=$rc anchor=$prc"
+done
+BODY
+  r5_harness root-claude "$body"
+  r5_expect 'clean root=0 anchor=2' 'pr400-root-claude: a clean copy did not pass the root check (anchor: no anchor yet, 2)'
+  r5_expect 'managed root=0 anchor=2' "pr400-root-claude: Firstmate's own managed files were counted as the copy's work"
+  r5_expect 'claude-notes root=1 anchor=1' 'pr400-root-claude: an untracked .claude/notes.txt passed the root check or the anchor proof'
+  r5_expect 'other-notes root=1 anchor=1' 'pr400-root-claude: an untracked src/notes.txt passed'
+  pass "an untracked file under .claude is the copy's own work on the root check and the anchor proof; only Firstmate's managed files are exempt"
+}
+
+# Main 1839 item 2: a successful replacement keeps an earlier preserve that holds
+# a file the new one lacks; an earlier preserve the new one fully covers goes.
+test_pr400_preserve_replacement_keeps_an_earlier_only_payload() {
+  local body=$TMP_ROOT/pr400-body-earlier-only.sh
+  cat > "$body" <<'BODY'
+for shape in earlier-only covered; do
+  r5_repo "$shape"
+  printf '/current.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'current bytes\n' > "$copy/current.dat"
+  r5_reset "$copy"
+  root="$DATA/$ID/nested-copy-preserved"
+  hash=$(printf '%s' "$copy" | teardown_ignored_sha256)
+  aside="$root/.aside-$hash"
+  mkdir -p "$aside"
+  printf '%s\n' "$copy" > "$aside/copy-path"
+  if [ "$shape" = earlier-only ]; then
+    printf 'earlier only bytes\n' > "$aside/earlier.dat"
+    printf '%s  earlier.dat\n' "$(teardown_ignored_sha256 "$aside/earlier.dat")" > "$aside/SHA256SUMS"
+  else
+    printf 'current bytes\n' > "$aside/current.dat"
+    printf '%s  current.dat\n' "$(teardown_ignored_sha256 "$aside/current.dat")" > "$aside/SHA256SUMS"
+  fi
+  rc=0; teardown_preserve_ignored "$copy" 2>/dev/null || rc=$?
+  kept=no
+  grep -rqxF 'earlier only bytes' "$root" 2>/dev/null && kept=yes
+  asides=$(find "$root" -maxdepth 1 -name ".aside-$hash*" | wc -l | tr -d ' ')
+  v=0; teardown_ignored_preserved_current "$copy" || v=$?
+  echo "$shape publish=$rc earlier-kept=$kept asides=$asides verify=$v"
+done
+BODY
+  r5_harness earlier-only "$body"
+  r5_expect 'earlier-only publish=0 earlier-kept=yes asides=1 verify=0' 'pr400-earlier-only: a successful replacement deleted an earlier preserve holding a file the new one lacks'
+  r5_expect 'covered publish=0 earlier-kept=no asides=0 verify=0' 'pr400-earlier-only: an earlier preserve the new one fully covers was not dropped'
+  pass 'a successful preserve replacement keeps an earlier preserve with a file the new one lacks, and drops one the new preserve fully covers'
+}
+
+# Main 1839 item 3: the landing admission carries the commit the proof itself
+# read, so a ref that moves after the proof, even before the snapshot, refuses;
+# a merged-PR proof needs no default-branch ref.
+test_pr400_landing_admission_carries_the_proofs_commit() {
+  local body=$TMP_ROOT/pr400-body-landing-commit.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^work_is_landed_proof\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+work_is_landed_bundle() { return 1; }
+teardown_history_admit() { :; }
+MODE=normal BASE_BRANCH=main TREEHOUSE_PROJECT_LOCK_HELD=0 TEARDOWN_SLOT_CUSTODY='' TEARDOWN_NM_RECORD_SILENT=0 FM_PROJECT_LOCK_BUSY_EXIT=75
+for shape in stable moved-during-proof merged-pr-no-default-ref; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  bad=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  good=$(git -C "$copy" rev-parse HEAD)
+  git init -q --bare "$R5_BASE/$shape-origin.git"
+  git -C "$repo" remote add origin "$R5_BASE/$shape-origin.git"
+  git -C "$repo" update-ref refs/remotes/origin/main "$good"
+  PR_URL=''
+  pr_is_merged() { return 1; }
+  fm_task_copy_content_in_default() {
+    FM_TASK_COPY_UNASKED=
+    FM_TASK_COPY_COMPARED="remotes/origin/main $good"
+    # The ref moves after the proof read it but before the admission is taken.
+    [ "$shape" != moved-during-proof ] || git -C "$repo" update-ref refs/remotes/origin/main "$bad"
+    return 0
+  }
+  if [ "$shape" = merged-pr-no-default-ref ]; then
+    PR_URL=https://github.com/owner/repo/pull/7
+    pr_is_merged() { return 0; }
+    git -C "$repo" update-ref -d refs/remotes/origin/main
+  fi
+  r5_reset "$copy"
+  TEARDOWN_LANDED_DIRS=() TEARDOWN_LANDED_HEADS=() TEARDOWN_LANDED_SNAPS=()
+  WT=$copy
+  work_is_landed "f-$shape" 2>/dev/null || echo "$shape landed=no"
+  snap=${TEARDOWN_ADMIT_STORED[${#TEARDOWN_ADMIT_STORED[@]}-1]-}
+  case "$snap" in "refs/remotes/origin/main $good") snap=proof-commit ;; "refs/remotes/origin/main $bad") snap=moved-commit ;; 'pr '*) snap=pr ;; esac
+  rc=0; teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape snapshot=$snap proof=$rc"
+done
+BODY
+  r5_harness landing-commit "$body"
+  r5_expect 'stable snapshot=proof-commit proof=0' 'pr400-landing-commit: an unchanged proof commit did not pass'
+  r5_expect 'moved-during-proof snapshot=proof-commit proof=refused' 'pr400-landing-commit: the admission did not carry the commit the proof read, or a moved ref passed'
+  r5_expect 'merged-pr-no-default-ref snapshot=pr proof=0' 'pr400-landing-commit: a merged-PR landing needed the absent origin default ref'
+  if grep -q 'landed=no' "$R5_OUT"; then fail "pr400-landing-commit: the landing rule did not answer: $(paste -sd '|' - < "$R5_OUT")"; fi
+  pass "the landing admission carries the commit its proof read: a ref moved after the proof refuses, unchanged it passes, and a merged-PR landing needs no default-branch ref"
+}
+
+# Main 1839 item 4: the last check before the unlock scans working directories
+# as well as open files, and the search-indexer exemption never covers a process
+# this teardown recorded as its own.
+test_pr400_last_holder_check_sees_cwd_and_own_indexer() {
+  local body=$TMP_ROOT/pr400-body-last-holder.sh
+  cat > "$body" <<'BODY'
+teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:4194305 launcher=4194305'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s; return 0; }
+teardown_launcher_gone() { return 0; }
+teardown_lock_is_first_seen() { return 0; }
+teardown_landed() { teardown_admit "$1" landed "$(git -C "$1" rev-parse HEAD)" "refs/heads/main x"; return 0; }
+teardown_copy_git_protects() { return 1; }
+teardown_admitted_bundles_current() { return 0; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_removal_final_proof() { return 0; }
+fm_task_copy_other_record() { return 1; }
+teardown_pid_is_task_own() { TEARDOWN_OWN_CWD=$copy; return 0; }
+task_process_identity() { printf 'id\n'; }
+fm_task_copy_indexer_pid() { [ "$1" = 4194304 ]; }
+teardown_lock_launcher_may_be_live() { return 1; }
+TEARDOWN_CLOSEOUT_PROOF=fixture META="$R5_BASE/task.meta"
+# The ownership proof's filtered open-file scan, as bin/fm-teardown.sh builds it
+# from the unfiltered one.
+pids_with_open_file_under() {
+  local p l
+  pids_with_open_file_under_all "$1" | while IFS=$'\t' read -r p l; do
+    [ -n "$p" ] || continue
+    fm_task_copy_indexer_pid "$p" || printf '%s\t%s\n' "$p" "$l"
+  done
+}
+pids_with_cwd_under() { case "$shape" in own-indexer-cwd|other-cwd) printf '4194304\t%s\n' "$1" ;; esac; }
+pids_with_open_file_under_all() { case "$shape" in indexer-open) printf '4194304\t%s/f\n' "$1" ;; esac; }
+for shape in own-indexer-cwd other-cwd indexer-open none; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  r5_reset "$copy"
+  head=$(git -C "$copy" rev-parse HEAD)
+  git() { case " $* " in *' worktree unlock '*|*' worktree remove '*) echo "$shape git=$2 $3 $4"; return 0 ;; esac; command git "$@"; }
+  rc=0; teardown_dead_launcher_release "$repo" "$copy" "$head" foreign 2>/dev/null || rc=$?
+  unset -f git
+  echo "$shape release=$rc why=${TEARDOWN_RELEASE_WHY:-none}"
+done
+BODY
+  r5_harness last-holder "$body"
+  r5_expect 'own-indexer-cwd release=1 why=process 4194304 runs in it after the retire phase' 'pr400-last-holder: a task-own cwd holder named like the indexer reached the unlock'
+  r5_expect 'other-cwd release=1 why=process 4194304 runs in it after the retire phase' 'pr400-last-holder: a cwd holder reached the unlock'
+  r5_expect 'indexer-open release=0 why=none' 'pr400-last-holder: an open-file-only search indexer this teardown did not record kept the copy'
+  r5_expect 'none release=0 why=none' 'pr400-last-holder: a copy with no holder did not reach the unlock'
+  if grep -q '^own-indexer-cwd git=\|^other-cwd git=' "$R5_OUT"; then fail 'pr400-last-holder: an unlock or remove ran with a holder present'; fi
+  pass 'the last holder check before the unlock refuses any cwd holder, an indexer name included; an open-file-only indexer not recorded as own is exempt; with none the release proceeds'
+}
+
+# Main 1839 item 5: a lock proved earlier that now reads absent or unreadable
+# refuses on the foreign, own-release and own-removal routes; never the unlocked
+# route.
+test_pr400_vanished_lock_never_takes_the_unlocked_route() {
+  local body=$TMP_ROOT/pr400-body-vanished-lock.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^teardown_remove_own_nested_copies\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^teardown_history_admitted\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+teardown_preserve_ignored() { return 0; }
+teardown_removal_final_proof() { return 0; }
+teardown_closeout_release() { echo "$shape/$route driver"; return 0; }
+teardown_foreign_copy_present() { return 1; }
+teardown_friction_outcome() { :; }
+teardown_refuse_copy() { echo "$shape/$route refused"; }
+teardown_own_locked_copies_prove() { return 0; }
+teardown_own_copy_dispose() { echo "$shape/$route dispose"; return 0; }
+teardown_copy_lock_file() {
+  TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:1 launcher=1'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s
+  case "$shape" in seen-then-absent|never-locked) return 1 ;; unreadable) return 2 ;; *) return 0 ;; esac
+}
+git() { case " $* " in *' worktree remove '*) echo "$shape/$route remove"; return 0 ;; esac; command git "$@"; }
+FORCE='' KIND=ship TEARDOWN_OWN_RELEASED=() TEARDOWN_HISTORY_ADMITTED=() TEARDOWN_BUNDLE_SWEEP_PROOF=''
+copy="$R5_BASE/copy"; mkdir -p "$copy" "$R5_BASE/slot"; PROJ="$R5_BASE/proj"; DATA="$R5_BASE/data" STATE="$R5_BASE/state" ID=r5-fixture
+for shape in seen-then-absent unreadable never-locked locked; do
+  TEARDOWN_LOCK_SEEN_DIRS=() TEARDOWN_LOCK_SEEN_TEXT=()
+  [ "$shape" = never-locked ] || teardown_lock_seen "$copy" 'vernant-session-active owner=launcher:1 launcher=1'
+  TEARDOWN_NESTED_COPIES=("$copy") TEARDOWN_RETURN_SLOT="$R5_BASE/slot"
+  route=foreign; rc=0; teardown_foreign_copy_dispose "$R5_BASE/slot" "$copy" >/dev/null 2>&1 || rc=$?; echo "$shape/foreign rc=$rc"
+  route=own-release; rc=0; teardown_own_locked_copies_release >/dev/null 2>&1 || rc=$?; echo "$shape/own-release rc=$rc"
+  route=own-remove; rc=0; ( teardown_remove_own_nested_copies 'from the slot' ) >/dev/null 2>&1 || rc=$?; echo "$shape/own-remove rc=$rc"
+done 2>&1 | grep -v '^$'
+BODY
+  r5_harness vanished-lock "$body"
+  # The stubs echo inside command substitutions the cases discard, so the
+  # removal attempts are read from the exit codes and the route markers.
+  for route in foreign own-release own-remove; do
+    r5_expect "seen-then-absent/$route rc=1" "pr400-vanished-lock: a lock seen earlier that now reads absent did not refuse on the $route route"
+    r5_expect "unreadable/$route rc=1" "pr400-vanished-lock: an unreadable lock did not refuse on the $route route"
+  done
+  r5_expect 'never-locked/foreign rc=0' 'pr400-vanished-lock: a copy never seen locked did not take the unlocked foreign removal'
+  r5_expect 'never-locked/own-remove rc=0' 'pr400-vanished-lock: a copy never seen locked did not take the plain own removal'
+  r5_expect 'locked/foreign rc=0' 'pr400-vanished-lock: an unchanged lock did not reach the driver route'
+  pass 'a lock proved earlier that now reads absent or unreadable refuses on the foreign, own-release and own-removal routes; never-locked and still-locked controls take their routes'
+}
+
+# Main 1839 item 6: the nested-repository guard reads paths NUL-framed, so an
+# independent repository under a path that holds a newline is found.
+test_pr400_nested_repository_under_a_newline_path_is_found() {
+  local body=$TMP_ROOT/pr400-body-nested-repo.sh
+  cat > "$body" <<'BODY'
+teardown_refuse_copy() { echo "refused: $2" >&2; }
+for shape in none ordinary newline; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  case "$shape" in
+    ordinary) inner="$copy/.claude/inner" ;;
+    newline) inner="$copy/.claude/one"$'\n'"docs" ;;
+    *) inner= ;;
+  esac
+  if [ -n "$inner" ]; then
+    mkdir -p "$inner"
+    git init -q "$inner"
+    printf 'independent\n' > "$inner/work.txt"
+    git -C "$inner" add work.txt && git -C "$inner" commit -qm independent
+  fi
+  # The copy holds a docs directory and the guard runs from inside it, so a path
+  # split at its newline would resolve its second half, docs, to the copy's own
+  # repository (the shape the review's falsifier modeled).
+  mkdir -p "$copy/docs"
+  TEARDOWN_NESTED_COPIES=("$copy") TEARDOWN_RETURN_SLOT=$repo
+  rc=0; ( cd "$copy" && teardown_own_nested_other_repos ) 2>/dev/null || rc=$?
+  echo "$shape guard=$rc"
+done
+BODY
+  r5_harness nested-repo "$body"
+  r5_expect 'none guard=0' 'pr400-nested-repo: a copy with no other repository was refused'
+  r5_expect 'ordinary guard=1' 'pr400-nested-repo: an independent repository was not found'
+  r5_expect 'newline guard=1' 'pr400-nested-repo: an independent repository under a path holding a newline was not found'
+  pass 'the nested-repository guard finds an independent repository under a path that holds a newline, as it finds an ordinary one'
+}
+
+# Main 1839 item 7: copy paths are ordered NUL-framed, so a path that holds a
+# newline reaches disposal as one path, on the foreign and own routes.
+test_pr400_newline_copy_path_reaches_disposal_whole() {
+  local body=$TMP_ROOT/pr400-body-copy-order.sh
+  cat > "$body" <<'BODY'
+teardown_foreign_copy_prove() { return 0; }
+teardown_foreign_copy_dispose() { printf 'foreign-dispose %q\n' "$2"; }
+teardown_own_locked_copies_prove() { return 0; }
+teardown_copy_lock_file() { return 0; }
+teardown_own_copy_dispose() { printf 'own-dispose %q\n' "$2"; }
+for shape in ordinary newline; do
+  case "$shape" in ordinary) p="$R5_BASE/slot/copy" ;; newline) p="$R5_BASE/slot/one"$'\n'"two" ;; esac
+  mkdir -p "$p" "$R5_BASE/slot"
+  TEARDOWN_RETURN_SLOT="$R5_BASE/slot" TEARDOWN_FOREIGN_COPIES=("$p") TEARDOWN_NESTED_COPIES=("$p") TEARDOWN_OWN_RELEASED=()
+  out=$(teardown_foreign_copies_release; teardown_own_locked_copies_release)
+  want_f=$(printf 'foreign-dispose %q' "$p"); want_o=$(printf 'own-dispose %q' "$p")
+  lines=$(printf '%s\n' "$out" | grep -c 'dispose')
+  ok=no
+  [ "$lines" = 2 ] && printf '%s\n' "$out" | grep -qxF -- "$want_f" && printf '%s\n' "$out" | grep -qxF -- "$want_o" && ok=yes
+  echo "$shape whole=$ok calls=$lines"
+done
+BODY
+  r5_harness copy-order "$body"
+  r5_expect 'ordinary whole=yes calls=2' 'pr400-copy-order: an ordinary path did not reach disposal once on each route'
+  r5_expect 'newline whole=yes calls=2' 'pr400-copy-order: a path holding a newline was split before disposal'
+  pass 'a copy path that holds a newline reaches foreign and own disposal as one path'
+}
+
+# Main 1839 item 8: the root return takes its safety check again before each
+# retry; a changed result stops the retry.
+test_pr400_root_return_retry_rechecks_safety() {
+  local body=$TMP_ROOT/pr400-body-root-retry.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^teardown_treehouse_return\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+TREEHOUSE_RETURN_LOCK_RETRIES=1 TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0
+TEARDOWN_TREEHOUSE_CUSTODY_REFUSED=61 TEARDOWN_TREEHOUSE_LOCK_REFUSED=62
+require_registered_slot_copies() { return 0; }
+treehouse_return_is_index_lock_error() { return 0; }
+worktree_git_lock_path() { printf '%s\n' "$R5_BASE/no-such-lock"; }
+sleep() { :; }
+check_changed() { return 1; }
+check_stable() { return 0; }
+treehouse() {
+  n=$(( $(cat "$R5_BASE/calls-$shape" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$R5_BASE/calls-$shape"
+  [ "$n" -gt 1 ] || { echo 'simulated index.lock error'; return 1; }
+  return 0
+}
+mkdir -p "$R5_BASE/dir"
+for shape in changed stable; do
+  callback=check_$shape
+  rc=0; teardown_treehouse_return "$R5_BASE/dir" "$R5_BASE" copy task "$callback" >/dev/null 2>&1 || rc=$?
+  echo "$shape rc=$rc provider-calls=$(cat "$R5_BASE/calls-$shape")"
+done
+BODY
+  r5_harness root-retry "$body"
+  r5_expect 'changed rc=1 provider-calls=1' 'pr400-root-retry: a retry ran the provider again although the safety check now failed'
+  r5_expect 'stable rc=0 provider-calls=2' 'pr400-root-retry: an unchanged safety check did not let the retry succeed'
+  pass 'the root return takes its safety check again before each retry: a changed result stops the retry, an unchanged one retries'
+}
+
+# Main 1843 (a): a copy that only a merged Forgejo pull request admits, with no
+# content proof and no bundle, is held: the driver cannot credit it, so the
+# direct release does not take over.
+test_pr400_forgejo_only_landing_is_held() {
+  local body=$TMP_ROOT/pr400-body-forgejo.sh
+  cat > "$body" <<'BODY'
+teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:4194305 launcher=4194305'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s; return 0; }
+teardown_launcher_gone() { return 0; }
+teardown_lock_is_first_seen() { return 0; }
+teardown_foreign_copy_unowned() { return 0; }
+teardown_copy_git_protects() { return 1; }
+teardown_copy_holder_free() { return 0; }
+pids_with_open_file_under() { :; }
+teardown_admitted_bundles_current() { return 0; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_removal_final_proof() { return 0; }
+TEARDOWN_CLOSEOUT_PROOF=fixture
+teardown_landed() {
+  case "$shape" in
+    forgejo|forgejo-and-bundle) snap='pr https://git.example.org/team/repo/pulls/7' ;;
+    github) snap='pr https://github.com/team/repo/pull/7' ;;
+    content) snap='refs/remotes/origin/main abc' ;;
+  esac
+  teardown_admit "$1" landed "$(git -C "$1" rev-parse HEAD)" "$snap"
+  [ "$shape" != forgejo-and-bundle ] || teardown_admit "$1" bundle "$(git -C "$1" rev-parse HEAD)" "$R5_BASE/stored.bundle"
+  return 0
+}
+for shape in forgejo github content forgejo-and-bundle; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  r5_reset "$copy"
+  git() { case " $* " in *' worktree unlock '*) echo "$shape unlocked"; return 0 ;; *' worktree remove '*) return 0 ;; esac; command git "$@"; }
+  rc=0; teardown_dead_launcher_release "$repo" "$copy" "$(git -C "$copy" rev-parse HEAD)" foreign 2>/dev/null || rc=$?
+  unset -f git
+  case "$TEARDOWN_RELEASE_WHY" in *'Main 1843'*) why=forgejo-held ;; '') why=none ;; *) why=other ;; esac
+  echo "$shape release=$rc why=$why"
+done
+BODY
+  r5_harness forgejo "$body"
+  r5_expect 'forgejo release=1 why=forgejo-held' 'pr400-forgejo: a copy only a merged Forgejo PR admits was released directly'
+  r5_expect 'github release=0 why=none' 'pr400-forgejo: a GitHub-PR landing was held'
+  r5_expect 'content release=0 why=none' 'pr400-forgejo: a content landing was held'
+  r5_expect 'forgejo-and-bundle release=0 why=none' 'pr400-forgejo: a Forgejo landing that a bundle also holds was held'
+  if grep -q '^forgejo unlocked' "$R5_OUT"; then fail 'pr400-forgejo: the Forgejo-only copy was unlocked'; fi
+  pass 'a copy that only a merged Forgejo pull request admits is held with a named reason; GitHub, content and bundle-held controls are released'
+}
+
+# Main 1843 (c): an Orca-backed task keeps base behaviour: the direct release, the
+# history landing and the no-hold bundle route this change adds each refuse for
+# it with a named reason; the same copies on another backend are admitted.
+test_pr400_orca_keeps_base_behaviour() {
+  local body=$TMP_ROOT/pr400-body-orca.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed_proof\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+pr_is_merged() { return 1; }
+TEARDOWN_CLOSEOUT_PROOF=fixture META="$R5_BASE/task.meta"
+fm_task_copy_content_in_default() { FM_TASK_COPY_UNASKED=; FM_TASK_COPY_COMPARED='remotes/origin/main abc'; return 1; }
+fm_task_copy_content_in_default_history() { return 0; }
+teardown_history_admit() { :; }
+MODE=normal
+for backend in orca tmux; do
+  BACKEND=$backend
+  r5_repo "$backend"
+  source_bundle="$R5_BASE/$backend-source.bundle"
+  printf '/.claude/\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$backend" "$copy" main
+  printf 'unique\n' > "$copy/work.txt"
+  git -C "$copy" add work.txt && git -C "$copy" commit -qm unique
+  tip=$(git -C "$copy" rev-parse HEAD)
+  git -C "$copy" bundle create -q "$source_bundle" --all 2>/dev/null
+  printf '%s\t%s\t%s\n' "$source_bundle" "$(teardown_ignored_sha256 "$source_bundle")" "$tip" > "$DATA/$ID/preservation-bundles.tsv"
+  r5_reset "$copy"
+  brc=0; teardown_bundle_preserved "$copy" "$tip" 2> "$R5_BASE/$backend.bundle.err" || brc=$?
+  bw=none; grep -q 'Orca-backed task (Main 1843)' "$R5_BASE/$backend.bundle.err" && bw=orca
+  TEARDOWN_LANDED_DIR=$copy TEARDOWN_LANDED_REF=HEAD
+  hrc=0; work_is_landed_proof task 2> "$R5_BASE/$backend.history.err" || hrc=$?
+  hw=none; grep -q 'Orca-backed task (Main 1843)' "$R5_BASE/$backend.history.err" && hw=orca
+  unset TEARDOWN_LANDED_DIR TEARDOWN_LANDED_REF
+  drc=0; teardown_dead_launcher_release "$repo" "$copy" "$tip" foreign 2>/dev/null || drc=$?
+  dw=other; case "${TEARDOWN_RELEASE_WHY:-}" in *'Orca-backed task (Main 1843)'*) dw=orca ;; esac
+  echo "$backend bundle=$brc/$bw history=$hrc/$hw direct=$drc/$dw"
+done
+BODY
+  r5_harness orca "$body"
+  r5_expect 'orca bundle=1/orca history=1/orca direct=1/orca' 'pr400-orca: an Orca-backed task was admitted by a route this change adds, or the refusal did not name Orca'
+  r5_expect 'tmux bundle=0/none history=0/none direct=1/other' 'pr400-orca: another backend lost the bundle or history route, or was refused as Orca'
+  pass 'an Orca-backed task keeps base behaviour: the no-hold bundle route, the history landing and the direct release refuse it with a named reason; another backend keeps them'
 }
 
 teardown_test_cases=(
@@ -8662,6 +9095,16 @@ test_r5_landing_cache_reuse_keeps_the_proofs_default_ref
 test_r5_own_nested_removal_refuses_an_untracked_hook_before_git
 test_r5_cleanup_clearance_refuses_an_unreadable_task_record
 test_r5_local_only_landing_watches_the_local_branch
+test_pr400_root_claude_untracked_file_is_the_copys_work
+test_pr400_preserve_replacement_keeps_an_earlier_only_payload
+test_pr400_landing_admission_carries_the_proofs_commit
+test_pr400_last_holder_check_sees_cwd_and_own_indexer
+test_pr400_vanished_lock_never_takes_the_unlocked_route
+test_pr400_nested_repository_under_a_newline_path_is_found
+test_pr400_newline_copy_path_reaches_disposal_whole
+test_pr400_root_return_retry_rechecks_safety
+test_pr400_forgejo_only_landing_is_held
+test_pr400_orca_keeps_base_behaviour
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
 test_direct_release_refuses_an_unreadable_process_table
