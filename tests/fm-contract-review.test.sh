@@ -478,6 +478,40 @@ test_criterion_title_with_an_author_term_refused() {
   pass "a criterion title that names author history is refused; a neutral criterion title builds"
 }
 
+test_work_folder_follows_the_entrypoint_rule() {
+  local src="$TMP_ROOT/wf.md" pack d w log="$TMP_ROOT/wf/s.jsonl"
+  make_leak_world
+  # Main 1942 M1: the recorded work folder is the one run-review.sh line 63 names from the
+  # pack folder it is given: <work root>/<basename of the pack's parent>-<basename of the pack>.
+  pack=''
+  build_pack pack --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" --out-root "$TMP_ROOT/x/review-lane/case1" ||
+    fail "build failed: $(cat "$TMP_ROOT/build.err")"
+  d=$(cd "$pack" && pwd -P)
+  w=${REVIEW_WORK_ROOT:-/private/tmp/fm-review-work}/$(basename "$(dirname "$d")")-$(basename "$d")
+  mkdir -p "$w"
+  write_transcript "$log" "$w" "$(tool_call read path "$pack/target.md")"
+  run_check "$log" "$pack"
+  assert_equals 0 "$CHECK_RC" "a session in the folder the entrypoint names was not judged clean: $CHECK_OUT"
+  # Control: a session in a folder the entrypoint would not name still voids the round.
+  write_transcript "$log" "$REVIEW_WORK_ROOT/review-lane-case1" "$(tool_call read path "$pack/target.md")"
+  run_check "$log" "$pack"
+  assert_equals 3 "$CHECK_RC" "a session outside the entrypoint's folder was accepted: $CHECK_OUT"
+  pass "the recorded work folder is the one the entrypoint names, and a session elsewhere voids the round"
+}
+
+test_home_contract_title_form_is_the_title() {
+  local src="$TMP_ROOT/hc.md" pack
+  # Main 1942 M2: every contract in this home opens with "# Definition of done: <key>".
+  printf '# Definition of done: fm-sample-key\n\nAuthor: a preamble line.\n\n## REQUEST (verbatim)\n\nZZ-HC-REQUEST-ZZ the owner asks for the thing.\n\n## Definition Of Done\n\n### Mandatory\n\n- **A1** (mandatory): ZZ-HC-A1-ZZ it exists.\n\n## How You'"'"'re Graded\n\nZZ-HC-GRADED-ZZ a grader checks A1.\n' >"$src"
+  build_pack pack --contract "$src" || fail "a home-shaped contract was refused: $(cat "$TMP_ROOT/build.err")"
+  for m in ZZ-HC-REQUEST-ZZ ZZ-HC-A1-ZZ ZZ-HC-GRADED-ZZ; do
+    assert_grep "$m" "$pack/target.md" "a section of the home-shaped contract was dropped: $m"
+  done
+  assert_no_grep "fm-sample-key" "$pack/target.md" "the title reached the pack"
+  grep -qxF "$(printf 'dropped\ttitle: Definition of done: fm-sample-key')" "$(dirname "$pack").excluded-paths" || fail "the title is not listed as dropped"
+  pass "the home's '# Definition of done: <key>' first line is the title, and the contract builds"
+}
+
 test_first_level_one_known_heading_is_a_section() {
   local src="$TMP_ROOT/f1.md" pack
   # Main 1904 F2: a first level 1 heading that is a known section with a qualifier is that section.
@@ -490,7 +524,8 @@ test_first_level_one_known_heading_is_a_section() {
   build_pack pack --contract "$src" || fail "a qualified Definition Of Done title was refused: $(cat "$TMP_ROOT/build.err")"
   assert_grep "ZZ-DOD-STEER-ZZ" "$pack/target.md" "the qualified Definition Of Done body was dropped"
   # Ambiguous: a first heading that starts with a known name but carries a free qualifier.
-  printf '# Definition of done: some-task\n\nZZ-AMBIG-ZZ\n\n## Definition Of Done\n\n- **A1** (mandatory): x.\n' >"$src"
+  # ("# Definition of done: <key>" is the home's title form since Main 1942 M2.)
+  printf '# Definition of done for the picker\n\nZZ-AMBIG-ZZ\n\n## Definition Of Done\n\n- **A1** (mandatory): x.\n' >"$src"
   build_rc "$TMP_ROOT/f1-ambig" --contract "$src"
   assert_equals 3 "$BUILD_RC" "an ambiguous first heading was not refused: $BUILD_ERR"
   # Control: a title that names no known section is dropped as the title.
@@ -604,4 +639,6 @@ fm_test_run_cases \
   test_internal_record_schemes_are_leaks \
   test_session_outside_the_recorded_work_folder_refused \
   test_gitignore_true_search_is_clean \
+  test_home_contract_title_form_is_the_title \
+  test_work_folder_follows_the_entrypoint_rule \
   -- "$@"

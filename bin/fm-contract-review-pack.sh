@@ -33,7 +33,9 @@
 #   (**Name** or __Name__), which count as the deepest sub-heading; text in a code fence is
 #   never a heading.
 #   The file's first level 1 heading is its known section when it is one, and otherwise the
-#   title, which is dropped and listed.
+#   title, which is dropped and listed; the one owned title form "# Definition of done: <key>"
+#   (a key of letters, digits, dots, dashes and underscores), which every contract in this
+#   home opens with, is the title.
 #   Dropped and listed by heading in the excluded record (dropped lines): the title; every
 #   section whose heading is not known, with everything below it; and text outside any
 #   known section.
@@ -51,9 +53,11 @@
 #   The excluded record is <out-root>.excluded-paths, outside the pack. It always holds the
 #   real path of every input file (the contract, the request, each context file), the
 #   register and history paths when given, and every --exclude path. It also records the
-#   reviewer's work folder, <work-root>/<out-root basename>-pack, which is how the entrypoint
-#   names it; --work-root defaults to $REVIEW_WORK_ROOT, else /private/tmp/fm-review-work,
-#   the entrypoint's own default, so pass the same work root to both. The policy is
+#   reviewer's work folder by the entrypoint's one rule (data/review-lane/run-review.sh line
+#   63, its owner): <work-root>/<basename of the pack's parent>-<basename of the pack>, which
+#   for <out-root>/pack is <work-root>/<out-root basename>-pack; --work-root defaults to
+#   $REVIEW_WORK_ROOT, else /private/tmp/fm-review-work, the entrypoint's own default, so pass
+#   the same work root to both, and give the entrypoint the pack folder itself. The policy is
 #   --policy, else the skill next to this script.
 # check: reads the run's session transcript (--log: the entrypoint's omp-session folder,
 #   or one of its .jsonl files) and judges every read it records. The report's own
@@ -231,7 +235,8 @@ END {
       titled = 1
       if (known(t, SECTIONS) == "") {
         outside_flush("before the title")
-        if (starts_known(t)) print "a first heading that starts with a known section name but is not one: " t2 > REFUSE_OUT
+        # The one owned title form, "Definition of done: <key>", is the title (Main 1942 M2).
+        if (starts_known(t) && norm(t) !~ /^definition of done:[ \t]+[a-z0-9][a-z0-9._-]*$/) print "a first heading that starts with a known section name but is not one: " t2 > REFUSE_OUT
         else print "dropped\ttitle: " t2 > DROP_OUT
         if (two) i++
         continue
@@ -404,7 +409,7 @@ cmd_build() {
     printf 'pack\t%s\n' "$(real "$pack")"
     printf 'root\t%s\n' "$(real "$root")"
     # The reviewer's work folder, named the way the entrypoint names it from REVIEW_WORK_ROOT.
-    printf 'work\t%s\n' "$(real "$work_root/$(basename "$out_root")-pack")"
+    printf 'work\t%s\n' "$(real "$work_root/$(basename "$(dirname "$pack")")-$(basename "$pack")")"
     printf 'exclude\t%s\n' "$(real "$contract")"
     [ -z "$request" ] || printf 'exclude\t%s\n' "$(real "$request")"
     for f in ${contexts[@]+"${contexts[@]}"} ${excludes[@]+"${excludes[@]}"}; do
