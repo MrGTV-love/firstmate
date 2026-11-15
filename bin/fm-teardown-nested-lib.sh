@@ -419,7 +419,7 @@ teardown_regenerable_ignored() {  # <copy>
 # Prints ignored <entry> of <copy> without the class: whole when it holds none of
 # those directories, otherwise split only as far as needed to leave them out.
 teardown_entry_without_regenerable() {  # <copy> <entry>
-  local copy=$1 entry=$2 found first= rc=0 child
+  local copy=$1 entry=$2 found first='' rc=0 child
   found=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
   teardown_regenerable_dirs "$copy/$entry" >"$found" || rc=1
   [ "$rc" != 0 ] || [ ! -s "$found" ] || IFS= read -r -d '' first <"$found" || rc=1
@@ -1252,11 +1252,11 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
   fi
   rm -f "$list"
   if [ -e "$dest" ] || [ -L "$dest" ]; then
-    aside=$(teardown_preserve_aside_name "$root" "$hash") && mv "$dest" "$aside" || {
+    if ! aside=$(teardown_preserve_aside_name "$root" "$hash") || ! mv "$dest" "$aside"; then
       rm -rf "$stage"
       TEARDOWN_PRESERVE_WHY='the earlier preserve cannot be set aside'
       return 1
-    }
+    fi
   fi
   if ! mv "$stage" "$dest"; then
     [ -z "$aside" ] || mv "$aside" "$dest" || true
@@ -1268,7 +1268,9 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
     why=$TEARDOWN_PRESERVE_WHY
     if [ -n "$aside" ]; then
       # The failed preserve is moved beside the earlier one, which goes back.
-      failed=$(teardown_preserve_aside_name "$root" "$hash" failed) && mv "$dest" "$failed" && mv "$aside" "$dest" || true
+      if failed=$(teardown_preserve_aside_name "$root" "$hash" failed) && mv "$dest" "$failed"; then
+        mv "$aside" "$dest" || true
+      fi
     fi
     TEARDOWN_PRESERVE_WHY="the published preserve does not verify ($why)"
     return 1
