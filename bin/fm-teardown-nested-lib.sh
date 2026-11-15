@@ -1607,7 +1607,8 @@ teardown_own_preserve_current() {  # <copy> <dir> <out>
 }
 
 # Writes <dir>/SHA256SUMS anew in sha256sum's form for every regular file under the payload
-# folder of preserve <dir>, each path relative to <dir>.
+# folder of preserve <dir>, each path relative to <dir>. Only a preserve being built, before it
+# is renamed into place, is written this way.
 teardown_own_preserve_sums() {  # <copy> <dir>
   local copy=$1 dir=$2 root rc=0
   root=$(teardown_own_preserve_root "$dir" "$copy") || return 1
@@ -1655,7 +1656,8 @@ teardown_own_preserve_build() {  # <copy> <dir>
 }
 
 # Copies into preserve <dir> every file, symlink and FIFO of <list> that it does not have,
-# never over anything it has, and writes its SHA256SUMS anew. Fails when one cannot be copied.
+# never over anything it has, and appends a SHA256SUMS line for each regular file it copied in;
+# no earlier line of SHA256SUMS changes. Fails when one cannot be copied.
 teardown_own_preserve_adopt() {  # <copy> <dir> <list>
   local copy=$1 dir=$2 list=$3 root rc=0
   root=$(teardown_own_preserve_root "$dir" "$copy") || return 1
@@ -1663,9 +1665,12 @@ teardown_own_preserve_adopt() {  # <copy> <dir> <list>
   perl -e 'my $r = shift; local $/ = "\0"; while (<STDIN>) { chomp; my $rel = $_; $rel =~ s{^\./}{}; print "$_\0" unless lstat("$r/$rel") }' "$root" < "$list" > "$list.missing" || rc=1
   if [ "$rc" = 0 ] && [ -s "$list.missing" ]; then
     (set -o pipefail; cd "$copy" && COPYFILE_DISABLE=1 tar -cf - --null -T "$list.missing" | tar -xpkf - -C "$root") || rc=1
-    [ "$rc" != 0 ] || teardown_own_preserve_sums "$copy" "$dir" || rc=1
+    if [ "$rc" = 0 ]; then
+      perl -e 'my $r = shift; local $/ = "\0"; while (<STDIN>) { chomp; my $rel = $_; $rel =~ s{^\./}{}; my $f = "$r/$rel"; print "$f\0" if -f $f && !-l $f }' "$root" < "$list.missing" > "$list.abs" \
+        && teardown_sums_write "$dir" "$list.abs" "$dir/SHA256SUMS" || rc=1
+    fi
   fi
-  rm -f "$list.missing"
+  rm -f "$list.missing" "$list.abs"
   return "$rc"
 }
 
@@ -1676,17 +1681,14 @@ teardown_own_preserve_adopt() {  # <copy> <dir> <list>
 # data/<task>/nested-copy-preserved/<sha256 of the copy path>/ when that does not exist yet,
 # else beside it in <sha256 of the copy path>.<first 16 characters of the payload fingerprint>/
 # (where such a directory already exists, what it lacks is copied in, never over a byte it
-# holds). Leaves TEARDOWN_PRESERVE_DIR empty when the copy has no selected file. Returns 1 when
-# the copy cannot be listed, copied or checked, or a preserve cannot be made to hold it.
+# holds). Leaves TEARDOWN_PRESERVE_DIR empty when the copy has no selected file and no earlier
+# preserve agrees with it. Returns 1 when the copy cannot be listed, copied or checked, or a
+# preserve cannot be made to hold it.
 teardown_own_preserve() {  # <copy>
   local copy=$1 hash base cand dir payload work rc=0
   TEARDOWN_PRESERVE_DIR=
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-own-preserve.XXXXXX") || return 1
   teardown_own_preserve_list "$copy" "$work/list" selected || { rm -rf "$work"; return 1; }
-  if [ ! -s "$work/list" ]; then
-    rm -rf "$work"
-    return 0
-  fi
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || { rm -rf "$work"; return 1; }
   base="$DATA/$ID/nested-copy-preserved/$hash"
   for cand in "$base" "$base".*; do
@@ -1699,6 +1701,12 @@ teardown_own_preserve() {  # <copy>
       return 0
     fi
   done
+  # Nothing selected and no earlier preserve that agrees with the copy: none is made yet (a kept
+  # copy gets one when its payload is copied in, teardown_own_preserve_widen).
+  if [ ! -s "$work/list" ]; then
+    rm -rf "$work"
+    return 0
+  fi
   teardown_own_preserve_dir_new "$copy" || { rm -rf "$work"; return 1; }
   dir=$TEARDOWN_PRESERVE_DIR
   TEARDOWN_PRESERVE_DIR=
