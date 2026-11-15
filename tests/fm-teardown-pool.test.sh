@@ -4184,6 +4184,8 @@ test_unclaimed_ordinary_lease_of_another_holder_stays_outside_the_route() {
 #     gate refuses before any helper;
 #   - a successor after the planning: refuses; another holder from the start: the
 #     route is never planned, so the gate does not apply (outside the route);
+#   - a route only the planning under project custody selected (the early proof did
+#     not): its own tuple is the record, so a successor after it refuses too;
 #   - an entry on the old recovered holder: adopted before any helper, and bound only
 #     when it then shows the protected holder; a failed status or a status that
 #     rewrites nothing refuses before any helper, and an adopted one proceeds.
@@ -4258,6 +4260,8 @@ test_unclaimed_successor_runs_no_retirement_helper() {
       'successor-holder-after-planning|task-x1|id-1|task-x1|id-1|successor|id-2|none|refused' \
       'successor-id-after-planning|task-x1|id-1|task-x1|id-1|task-x1|id-2|none|refused' \
       'other-holder-from-start|other|id-9|other|id-9|other|id-9|none|outside' \
+      'planning-only-control|other|id-9|task-x1|id-1|task-x1|id-1|none|helpers' \
+      'planning-only-successor|other|id-9|task-x1|id-1|successor|id-2|none|refused' \
       'old-holder-adopted|recovered: old||recovered: old||recovered: old||adopt|helpers' \
       'old-holder-status-failed|recovered: old||recovered: old||recovered: old||failed|refused' \
       'old-holder-status-no-rewrite|recovered: old||recovered: old||recovered: old||noop|refused'; do

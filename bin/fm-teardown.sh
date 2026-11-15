@@ -4510,6 +4510,11 @@ teardown_unclaimed_adopt_old_holder() {
 # helper, and must then show the protected holder.
 teardown_unclaimed_retire_gate() {
   local now why=''
+  # A route only the planning under project custody selected (the early proof did not)
+  # has no earlier tuple: the planning's own tuple is then the binding record.
+  if [ -z "$TEARDOWN_UNCLAIMED_EARLY" ] && [ -n "$TEARDOWN_UNCLAIMED_SLOT" ]; then
+    TEARDOWN_UNCLAIMED_EARLY=$TEARDOWN_UNCLAIMED_SEEN
+  fi
   if [ -z "$TEARDOWN_UNCLAIMED_SLOT" ]; then
     why="the route the early proof planned was not planned again under project custody, so the lease it saw is gone"
   elif [ "$TEARDOWN_UNCLAIMED_SEEN" != "$TEARDOWN_UNCLAIMED_EARLY" ]; then
@@ -5334,7 +5339,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       ;;
     retire)
-      [ -z "$TEARDOWN_UNCLAIMED_EARLY" ] || teardown_unclaimed_retire_gate || exit 1
+      [ -z "$TEARDOWN_UNCLAIMED_EARLY$TEARDOWN_UNCLAIMED_SLOT" ] || teardown_unclaimed_retire_gate || exit 1
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
       swept=("$WT")
       for root in ${TEARDOWN_RETURN_SLOT:+"$TEARDOWN_RETURN_SLOT"} \
