@@ -5020,13 +5020,15 @@ test_the_version_probe_waits_only_for_its_own_lane() {
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off FM_TEST_ANALYSIS_RC=0 \
       FM_LINT_TELEMETRY="$tmp/t.tsv" bash bin/fm-lint.sh bin/consumer.sh > "$tmp/out" 2>&1 ) &
   run=$!
-  sleep 2.5
+  # The run needs about a second to reach the lane (its census first); the lane is
+  # held 4 s from the run's start, so the run waits for it at least a second.
+  sleep 4
   [ ! -s "$tmp/starts.log" ] || { : > "$tmp/lane.release"; wait "$run"; fm_lint_fail_settled "ShellCheck started while the probe lane was held: $(cat "$tmp/starts.log")"; }
   : > "$tmp/lane.release"
   wait "$run" || rc=$?
   [ "$rc" -eq 0 ] || fm_lint_fail_settled "the run failed after the lane was released ($rc): $(cat "$tmp/out")"
   probe_wait=$(awk -F '\t' '$1 == "meta" && $2 == "probe_wait_ms" { print $3 }' "$tmp/t.roots.tsv")
-  [ -n "$probe_wait" ] && [ "$probe_wait" -ge 1000 ] || fm_lint_fail_settled "the probe's recorded lane wait is ${probe_wait:-missing} ms, though the lane was held for 2.5 s after the run began"
+  [ -n "$probe_wait" ] && [ "$probe_wait" -ge 1000 ] || fm_lint_fail_settled "the probe's recorded lane wait is ${probe_wait:-missing} ms, though the lane was held for 4 s after the run began"
   wait 2>/dev/null || true
   pass "the version probe waited for its held lane ($probe_wait ms recorded) and started nothing meanwhile"
 }
