@@ -536,10 +536,6 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: the ignored files of own nested copy $(fm_refuse_text \"$copy\") could not be listed, so the preserve cannot be checked; the task was not closed.\" >&2"
-        },
-        {
-          "file": "bin/fm-teardown-nested-lib.sh",
           "match": "printf 'teardown of task %s refused to close around this own nested copy because %s; the copy is not changed, and Vernant'\"'\"'s closeout driver is not asked again while the cause holds\\n' \"$ID\" \"$4\""
         },
         {

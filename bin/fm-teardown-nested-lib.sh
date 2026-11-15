@@ -1415,9 +1415,11 @@ path_positively_gone() {  # <path>
 # unique ignored file saved (teardown_retained_saved), (c) writes one record naming the kept
 # copy, the driver's answer and why (teardown_retained_write), and (d) closes the task when
 # (a) and (b) hold, refusing with the named reason otherwise (teardown_retained_judge).
-# Before the driver is asked, every own locked copy is preserved in the task's data folder
-# (teardown_own_preserve, never over an earlier preserve), and the preserve must still hold
-# the copy's bytes right before the call and, on a release, right after it. A refusal because
+# Before the driver is asked, every own locked copy's selected ignored files are preserved in
+# the task's data folder (teardown_own_preserve, never over an earlier preserve), and the
+# preserve must still hold the copy's bytes right before the call and, on a release, right
+# after it; once the driver keeps the copy, the rest of its payload and every path the driver
+# names are copied in (teardown_own_preserve_widen). A refusal because
 # the copy's record cannot be written leaves a refusal record (teardown_retained_refused_write),
 # and a completed close marks the record (teardown_retained_mark_closed), so a retry of the
 # closed task is told so (teardown_retained_closed_note).
@@ -1511,22 +1513,25 @@ teardown_retained_snapshot() {  # <copy>
   TEARDOWN_RET_PAYLOAD=$(teardown_retained_payload "$copy") || return 1
 }
 
-# The preserve of an own copy Vernant's creation lock holds (teardown_own_preserve). Its
-# population is everything an earlier byte of the copy could be lost from: every ignored
-# entry teardown_preserve_ignored's own selection holds, every ignored entry of the payload
-# fingerprint (teardown_retained_payload's population: all but the regenerable class, the
-# .claude and .opencode trees whole, symlinks included) and, after the driver answered, every
-# path it names unique. teardown_own_preserve_list writes that population to <out> as the
-# sorted, unique, NUL-separated "./<path>" of every file, symlink and FIFO in it (a socket and
-# an empty directory hold no bytes). Fails when any cannot be listed.
-teardown_own_preserve_list() {  # <copy> <out> [named entry...]
-  local copy=$1 out=$2 rc=0
+# The preserve of an own copy Vernant's creation lock holds (teardown_own_preserve), in
+# data/<task>/nested-copy-preserved/. Before the driver is asked, on every route, it holds what
+# teardown_preserve_ignored's own selection holds, copied the same way. Once the driver keeps
+# the copy, every other ignored entry of the payload fingerprint's population (all but the
+# regenerable class, the .claude and .opencode trees whole, symlinks included) and every path
+# the driver names are copied in too (teardown_own_preserve_widen), never over a byte the
+# preserve holds. teardown_own_preserve_list writes the selected or the wide population to
+# <out> as the sorted, unique, NUL-separated "./<path>" of every file, symlink and FIFO in it
+# (a socket and an empty directory hold no bytes). Fails when any cannot be listed.
+teardown_own_preserve_list() {  # <copy> <out> <selected|wide> [named entry...]
+  local copy=$1 out=$2 mode=$3 rc=0
   local -a entries=()
-  shift 2
+  shift 3
   teardown_ignored_list "$copy" || return 1
   entries=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"})
-  teardown_ignored_list "$copy" retained || return 1
-  entries+=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"} "$@")
+  if [ "$mode" = wide ]; then
+    teardown_ignored_list "$copy" retained || return 1
+    entries+=(${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"} "$@")
+  fi
   if [ "${#entries[@]}" = 0 ]; then
     : > "$out"
     return
@@ -1537,12 +1542,12 @@ teardown_own_preserve_list() {  # <copy> <out> [named entry...]
   return "$rc"
 }
 
-# The folder of preserve <dir> that holds the payload of <list>: <dir> itself, laid out as
-# teardown_preserve_ignored lays it out, unless the payload has a root entry named copy-path
-# or SHA256SUMS, the names of the preserve's own two files; then the payload goes in
-# <dir>/files, so a payload byte and a preserve file never stand for each other.
-teardown_own_preserve_root() {  # <dir> <list>
-  if perl -e 'local $/ = "\0"; while (<STDIN>) { chomp; exit 0 if $_ eq "./copy-path" || $_ eq "./SHA256SUMS" } exit 1' < "$2"; then
+# The folder of preserve <dir> that holds the files of <copy>: <dir> itself, laid out as
+# teardown_preserve_ignored lays it out, unless the copy has a root entry named copy-path or
+# SHA256SUMS, the names of the preserve's own two files; then the files go in <dir>/files, so a
+# preserved byte and a preserve file never stand for each other.
+teardown_own_preserve_root() {  # <dir> <copy>
+  if [ -e "$2/copy-path" ] || [ -L "$2/copy-path" ] || [ -e "$2/SHA256SUMS" ] || [ -L "$2/SHA256SUMS" ]; then
     printf '%s/files\n' "$1"
   else
     printf '%s\n' "$1"
@@ -1556,7 +1561,7 @@ teardown_own_preserve_root() {  # <dir> <list>
 # (a path the copy no longer has included), 2 when the copy could not be read.
 teardown_own_preserve_holds() {  # <copy> <dir> <list>
   local root
-  root=$(teardown_own_preserve_root "$2" "$3") || return 2
+  root=$(teardown_own_preserve_root "$2" "$1") || return 2
   { [ -d "$root" ] && [ ! -L "$root" ]; } || return 1
   perl -e '
     use strict; use warnings; use Digest::SHA;
@@ -1578,72 +1583,106 @@ teardown_own_preserve_holds() {  # <copy> <dir> <list>
   ' "$1" "$root" < "$3"
 }
 
-# Writes the SHA256SUMS lines of the regular files of <list> under preserve <dir>'s payload
-# folder, appended to <dir>/SHA256SUMS in sha256sum's form, each path relative to <dir>.
-teardown_own_preserve_sums() {  # <dir> <list>
-  local root rc=0
-  root=$(teardown_own_preserve_root "$1" "$2") || return 1
-  perl -e 'my $r = shift; local $/ = "\0"; while (<STDIN>) { chomp; my $rel = $_; $rel =~ s{^\./}{}; my $f = "$r/$rel"; print "$f\0" if -f $f && !-l $f }' "$root" < "$2" > "$2.abs" || rc=1
-  [ "$rc" != 0 ] || teardown_sums_write "$1" "$2.abs" "$1/SHA256SUMS" || rc=1
-  rm -f "$2.abs"
+# Writes to <out> the sorted, unique, NUL-separated "./<path>" list that preserve <dir> must hold
+# for <copy> now: the selected population, and every file, symlink and FIFO <dir> already holds
+# that the copy still has (what an earlier run copied in), so an earlier preserve is kept only
+# when it still agrees with the copy byte for byte. Fails when any cannot be listed.
+teardown_own_preserve_current() {  # <copy> <dir> <out>
+  local copy=$1 dir=$2 out=$3 root rc=0
+  teardown_own_preserve_list "$copy" "$out.sel" selected || return 1
+  root=$(teardown_own_preserve_root "$dir" "$copy") || { rm -f "$out.sel"; return 1; }
+  if [ -d "$root" ] && [ ! -L "$root" ]; then
+    (cd "$root" && find -P . ! -type d -print0) 2>/dev/null > "$out.held" || rc=1
+  else
+    : > "$out.held"
+  fi
+  if [ "$rc" = 0 ]; then
+    perl -e '
+      my ($copy, $flat) = @ARGV; local $/ = "\0";
+      while (<STDIN>) { chomp; next if $flat && ($_ eq "./copy-path" || $_ eq "./SHA256SUMS"); my $rel = $_; $rel =~ s{^\./}{}; print "$_\0" if lstat("$copy/$rel") }
+    ' "$copy" "$([ "$root" = "$dir" ] && echo 1)" < "$out.held" | cat "$out.sel" - | LC_ALL=C sort -z -u > "$out" || rc=1
+  fi
+  rm -f "$out.sel" "$out.held"
   return "$rc"
 }
 
-# Builds the preserve <dir> (which must not exist) from <copy> for <list>: copy-path,
-# SHA256SUMS and the payload, written in a staging directory beside it, checked byte for byte
-# against the copy and only then renamed into place. Returns 1, leaving nothing at <dir>,
-# when anything cannot be copied, hashed or checked (a copy that changed meanwhile included).
-teardown_own_preserve_build() {  # <copy> <dir> <list>
-  local copy=$1 dir=$2 list=$3 stage root rc=0
+# Writes <dir>/SHA256SUMS anew in sha256sum's form for every regular file under the payload
+# folder of preserve <dir>, each path relative to <dir>.
+teardown_own_preserve_sums() {  # <copy> <dir>
+  local copy=$1 dir=$2 root rc=0
+  root=$(teardown_own_preserve_root "$dir" "$copy") || return 1
+  if [ "$root" = "$dir" ]; then
+    find "$dir" -type f ! -path "$dir/copy-path" ! -path "$dir/SHA256SUMS" -print0 > "$dir.files" || rc=1
+  else
+    find "$root" -type f -print0 > "$dir.files" || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    : > "$dir/SHA256SUMS" && teardown_sums_write "$dir" "$dir.files" "$dir/SHA256SUMS" || rc=1
+  fi
+  rm -f "$dir.files"
+  return "$rc"
+}
+
+# Builds the preserve <dir> (which must not exist) of <copy>'s selected entries, copied as
+# teardown_preserve_ignored copies them, with copy-path and SHA256SUMS, in a staging directory
+# beside it; checks it byte for byte against the copy and only then renames it into place.
+# Returns 1, leaving nothing at <dir>, when anything cannot be copied, hashed or checked (a copy
+# that changed meanwhile included).
+teardown_own_preserve_build() {  # <copy> <dir>
+  local copy=$1 dir=$2 stage root entry rc=0
   stage="${dir%/*}/.staging-own-${dir##*/}"
   rm -rf "$stage" || return 1
-  root=$(teardown_own_preserve_root "$stage" "$list") || return 1
+  teardown_ignored_list "$copy" || return 1
+  root=$(teardown_own_preserve_root "$stage" "$copy") || return 1
   (
-    set -o pipefail
     mkdir -p "$root" || exit 1
     printf '%s\n' "$copy" > "$stage/copy-path" || exit 1
-    : > "$stage/SHA256SUMS" || exit 1
-    (cd "$copy" && COPYFILE_DISABLE=1 tar -cf - --null -T "$list") | tar -xpf - -C "$root" || exit 1
-    teardown_own_preserve_sums "$stage" "$list" || exit 1
+    for entry in ${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"}; do
+      case "$entry" in /*|..|../*|*/..|*/../*) exit 1 ;; esac
+      case "$entry" in */*) mkdir -p "$root/${entry%/*}" || exit 1 ;; esac
+      cp -RPp "$copy/$entry" "$root/$entry" || exit 1
+    done
+    teardown_own_preserve_sums "$copy" "$stage" || exit 1
+    teardown_own_preserve_list "$copy" "$stage.list" selected || exit 1
   ) || rc=1
-  if [ "$rc" = 0 ] && teardown_own_preserve_holds "$copy" "$stage" "$list" \
+  if [ "$rc" = 0 ] && teardown_own_preserve_holds "$copy" "$stage" "$stage.list" \
       && perl -e 'rename($ARGV[0], $ARGV[1]) or exit 1' -- "$stage" "$dir"; then
+    rm -f "$stage.list"
     return 0
   fi
-  rm -rf "$stage"
+  rm -rf "$stage" "$stage.list"
   return 1
 }
 
 # Copies into preserve <dir> every file, symlink and FIFO of <list> that it does not have,
-# never over anything it has, and adds their SHA256SUMS lines. Fails when one cannot be copied.
+# never over anything it has, and writes its SHA256SUMS anew. Fails when one cannot be copied.
 teardown_own_preserve_adopt() {  # <copy> <dir> <list>
   local copy=$1 dir=$2 list=$3 root rc=0
-  root=$(teardown_own_preserve_root "$dir" "$list") || return 1
+  root=$(teardown_own_preserve_root "$dir" "$copy") || return 1
   { [ -d "$root" ] && [ ! -L "$root" ]; } || mkdir "$root" || return 1
   perl -e 'my $r = shift; local $/ = "\0"; while (<STDIN>) { chomp; my $rel = $_; $rel =~ s{^\./}{}; print "$_\0" unless lstat("$r/$rel") }' "$root" < "$list" > "$list.missing" || rc=1
   if [ "$rc" = 0 ] && [ -s "$list.missing" ]; then
     (set -o pipefail; cd "$copy" && COPYFILE_DISABLE=1 tar -cf - --null -T "$list.missing" | tar -xpkf - -C "$root") || rc=1
-    [ "$rc" != 0 ] || teardown_own_preserve_sums "$dir" "$list.missing" || rc=1
+    [ "$rc" != 0 ] || teardown_own_preserve_sums "$copy" "$dir" || rc=1
   fi
   rm -f "$list.missing"
   return "$rc"
 }
 
-# Preserves the ignored files of own nested <copy> (the population of teardown_own_preserve_list,
-# with any <named> entries) and sets TEARDOWN_PRESERVE_DIR to the directory that holds them. An
-# earlier preserve is never rebuilt, overwritten or removed: the first directory, or one beside
-# it, that already holds the copy's current bytes is kept as it is; otherwise the copy is
-# preserved in data/<task>/nested-copy-preserved/<sha256 of the copy path>/ when that does not
-# exist yet, else beside it in <sha256 of the copy path>.<first 16 characters of the payload
-# fingerprint>/ (where such a directory already exists, what it lacks is copied in, never over
-# a byte it holds). Leaves TEARDOWN_PRESERVE_DIR empty when the copy has no such file. Returns
-# 1 when the copy cannot be listed, copied or checked, or a preserve cannot be made to hold it.
-teardown_own_preserve() {  # <copy> [named entry...]
+# Preserves the selected ignored files of own nested <copy> before the driver is asked and sets
+# TEARDOWN_PRESERVE_DIR to the directory that holds them. An earlier preserve is never rebuilt,
+# overwritten or removed: the first directory, or one beside it, that still agrees with the copy
+# (teardown_own_preserve_current) is kept as it is; otherwise the copy is preserved in
+# data/<task>/nested-copy-preserved/<sha256 of the copy path>/ when that does not exist yet,
+# else beside it in <sha256 of the copy path>.<first 16 characters of the payload fingerprint>/
+# (where such a directory already exists, what it lacks is copied in, never over a byte it
+# holds). Leaves TEARDOWN_PRESERVE_DIR empty when the copy has no selected file. Returns 1 when
+# the copy cannot be listed, copied or checked, or a preserve cannot be made to hold it.
+teardown_own_preserve() {  # <copy>
   local copy=$1 hash base cand dir payload work rc=0
-  shift
   TEARDOWN_PRESERVE_DIR=
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-own-preserve.XXXXXX") || return 1
-  teardown_own_preserve_list "$copy" "$work/list" "$@" || { rm -rf "$work"; return 1; }
+  teardown_own_preserve_list "$copy" "$work/list" selected || { rm -rf "$work"; return 1; }
   if [ ! -s "$work/list" ]; then
     rm -rf "$work"
     return 0
@@ -1652,28 +1691,72 @@ teardown_own_preserve() {  # <copy> [named entry...]
   base="$DATA/$ID/nested-copy-preserved/$hash"
   for cand in "$base" "$base".*; do
     { [ -d "$cand" ] && [ ! -L "$cand" ]; } || continue
-    if teardown_own_preserve_holds "$copy" "$cand" "$work/list"; then
+    if teardown_own_preserve_current "$copy" "$cand" "$work/current" \
+        && teardown_own_preserve_holds "$copy" "$cand" "$work/current"; then
       rm -rf "$work"
       TEARDOWN_PRESERVE_DIR=$cand
       echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $cand (an earlier preserve that already holds them; nothing in it was rebuilt)" >&2
       return 0
     fi
   done
-  dir=$base
-  if [ -e "$base" ] || [ -L "$base" ]; then
-    payload=$(teardown_retained_payload "$copy") || { rm -rf "$work"; return 1; }
-    dir=$base.${payload:0:16}
-  fi
+  teardown_own_preserve_dir_new "$copy" || { rm -rf "$work"; return 1; }
+  dir=$TEARDOWN_PRESERVE_DIR
+  TEARDOWN_PRESERVE_DIR=
   if [ -e "$dir" ] || [ -L "$dir" ]; then
     { [ -d "$dir" ] && [ ! -L "$dir" ] && teardown_own_preserve_adopt "$copy" "$dir" "$work/list" \
-        && teardown_own_preserve_holds "$copy" "$dir" "$work/list"; } || rc=1
+        && teardown_own_preserve_current "$copy" "$dir" "$work/current" \
+        && teardown_own_preserve_holds "$copy" "$dir" "$work/current"; } || rc=1
   else
-    { mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir" "$work/list"; } || rc=1
+    { mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir"; } || rc=1
   fi
   rm -rf "$work"
   [ "$rc" = 0 ] || return 1
   TEARDOWN_PRESERVE_DIR=$dir
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dir" >&2
+}
+
+# Sets TEARDOWN_PRESERVE_DIR to the directory a new preserve of <copy> goes in: the first,
+# <sha256 of the copy path>, when it does not exist, else the one beside it named by the first
+# 16 characters of the copy's payload fingerprint.
+teardown_own_preserve_dir_new() {  # <copy>
+  local base payload
+  base="$DATA/$ID/nested-copy-preserved/$(printf '%s' "$1" | teardown_ignored_sha256)" || return 1
+  if [ ! -e "$base" ] && [ ! -L "$base" ]; then
+    TEARDOWN_PRESERVE_DIR=$base
+    return 0
+  fi
+  payload=$(teardown_retained_payload "$1") || return 1
+  TEARDOWN_PRESERVE_DIR=$base.${payload:0:16}
+}
+
+# The kept route's part of (b): the preserve chosen before the driver was asked must still agree
+# with the copy byte for byte (teardown_own_preserve_current); then every ignored file of the
+# wide population and every <named> path is copied in where the preserve lacks it, never over a
+# byte it holds, and the preserve must then hold the whole of it. A copy with no selected file
+# gets its preserve here. Returns 1 when any of it fails.
+teardown_own_preserve_widen() {  # <copy> [named entry...]
+  local copy=$1 dir work rc=0
+  shift
+  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-own-widen.XXXXXX") || return 1
+  dir=${TEARDOWN_PRESERVE_DIR:-}
+  if [ -n "$dir" ]; then
+    { teardown_own_preserve_current "$copy" "$dir" "$work/current" \
+        && teardown_own_preserve_holds "$copy" "$dir" "$work/current"; } || rc=1
+  fi
+  [ "$rc" != 0 ] || teardown_own_preserve_list "$copy" "$work/wide" wide "$@" || rc=1
+  if [ "$rc" = 0 ] && [ -s "$work/wide" ] && [ -z "$dir" ]; then
+    if teardown_own_preserve_dir_new "$copy" && dir=$TEARDOWN_PRESERVE_DIR && [ ! -e "$dir" ] && [ ! -L "$dir" ]; then
+      { mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir"; } || rc=1
+    else
+      { [ -n "$dir" ] && [ -d "$dir" ] && [ ! -L "$dir" ]; } || rc=1
+    fi
+    [ "$rc" = 0 ] && TEARDOWN_PRESERVE_DIR=$dir || TEARDOWN_PRESERVE_DIR=
+  fi
+  if [ "$rc" = 0 ] && [ -s "$work/wide" ]; then
+    { teardown_own_preserve_adopt "$copy" "$dir" "$work/wide" && teardown_own_preserve_holds "$copy" "$dir" "$work/wide"; } || rc=1
+  fi
+  rm -rf "$work"
+  return "$rc"
 }
 
 # Can the record of <copy> be written? Asked before the driver, so an answer that could not
@@ -2017,27 +2100,11 @@ teardown_retained_saved() {  # <copy> <answer>
     fi
     named+=("${raw%/}")
   done < "$work/named"
-  # Then the task's own preserve, written before the driver was asked, must still hold every
-  # ignored file it preserved (what preservation selects and the payload fingerprint's
-  # population), byte for byte; a driver-named path it lacks is copied in (never over a byte it
-  # holds) and must then be held too.
-  if ! teardown_own_preserve_list "$copy" "$work/list" || ! teardown_own_preserve_list "$copy" "$work/named-list" ${named[@]+"${named[@]}"}; then
-    rm -rf "$work"
-    echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") could not be listed, so the preserve cannot be checked; the task was not closed." >&2
-    return 1
-  fi
+  # Then the task's own preserve, written before the driver was asked, must still agree with
+  # the copy byte for byte, and every ignored file of the copy's payload and every driver-named
+  # path is copied in where it lacks it (never over a byte it holds) and must then be held too.
+  teardown_own_preserve_widen "$copy" ${named[@]+"${named[@]}"} || rc=1
   preserve=${TEARDOWN_PRESERVE_DIR:-}
-  if [ -s "$work/list" ] && { [ -z "$preserve" ] || ! teardown_own_preserve_holds "$copy" "$preserve" "$work/list"; }; then
-    rc=1
-  elif [ -s "$work/named-list" ]; then
-    if [ -z "$preserve" ]; then
-      teardown_own_preserve "$copy" ${named[@]+"${named[@]}"} || rc=1
-      preserve=$TEARDOWN_PRESERVE_DIR
-    else
-      teardown_own_preserve_adopt "$copy" "$preserve" "$work/named-list" || rc=1
-    fi
-    [ "$rc" != 0 ] || teardown_own_preserve_holds "$copy" "$preserve" "$work/named-list" || rc=1
-  fi
   rm -rf "$work"
   if [ "$rc" != 0 ]; then
     echo "REFUSED: the preserve $(fm_refuse_text "${preserve:-$DATA/$ID/nested-copy-preserved}") does not hold every ignored file of own nested copy $(fm_refuse_text "$copy") that preservation selects, that its payload holds or that the driver names, byte for byte (or one could not be read or copied in); the task was not closed, and a retry asks the driver nothing and preserves the unchanged copy again beside it." >&2
@@ -2316,10 +2383,15 @@ teardown_own_copy_dispose_in() {  # <slot> <copy> <work-dir>
   # The preserve must hold the copy's bytes at the last moment before the driver is asked: a
   # file changed after it was preserved would be lost if the driver released the copy.
   rc=0
-  teardown_own_preserve_list "$copy" "$work/list" || rc=1
-  if [ "$rc" = 0 ] && [ -s "$work/list" ]; then
-    { [ -n "$TEARDOWN_PRESERVE_DIR" ] && teardown_own_preserve_holds "$copy" "$TEARDOWN_PRESERVE_DIR" "$work/list" \
-        && at_driver=$(teardown_retained_digest "$copy" < "$work/list"); } || rc=1
+  if [ -n "$TEARDOWN_PRESERVE_DIR" ]; then
+    { teardown_own_preserve_current "$copy" "$TEARDOWN_PRESERVE_DIR" "$work/list" \
+        && teardown_own_preserve_holds "$copy" "$TEARDOWN_PRESERVE_DIR" "$work/list" \
+        && at_driver=$(teardown_retained_digest "$copy" < "$work/list") \
+        && proot=$(teardown_own_preserve_root "$TEARDOWN_PRESERVE_DIR" "$copy"); } || rc=1
+  else
+    # Nothing was selected when the copy was preserved: anything selected now appeared since.
+    teardown_own_preserve_list "$copy" "$work/list" selected || rc=1
+    [ "$rc" != 0 ] || [ ! -s "$work/list" ] || rc=1
   fi
   if [ "$rc" != 0 ]; then
     echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") changed after they were preserved in $(fm_refuse_text "${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved}") (or could not be read again); the driver was not asked, the copy was not removed, and a retry preserves it again beside the earlier preserve." >&2
@@ -2358,7 +2430,6 @@ teardown_own_copy_dispose_in() {  # <slot> <copy> <work-dir>
   fi
   # After the release, the preserve must still hold what the copy held when the driver was asked.
   if [ -s "$work/list" ]; then
-    proot=$(teardown_own_preserve_root "$TEARDOWN_PRESERVE_DIR" "$work/list") || proot=
     after=$(teardown_retained_digest "$proot" < "$work/list" 2>/dev/null) || after=
   fi
   if [ -s "$work/list" ] && { [ -z "$proot" ] || [ "$after" != "$at_driver" ]; }; then
