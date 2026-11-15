@@ -21,18 +21,24 @@
 #   bin/fm-pr-lib.sh's fm_pr_task_id_valid and bin/fm-tasks-axi.sh accept). A repeated id counts
 #   once. A train member is one value; the caller validates and canonicalizes it with
 #   fm_pr_url_parse and matches by the full URL. A repeated value counts once.
-# - The reader reads no Markdown and no HTML anywhere: no heading, fence, quote, list, table,
-#   code span, comment or element is interpreted. It only finds the two marker lines.
+# - The reader interprets no Markdown and no HTML: no heading, fence, quote, list, table, code
+#   span, comment or element is parsed. It finds the two marker lines, and (Main 044) it checks
+#   that the block sits at the top level of the body: no line above the begin line may hold text
+#   that can open a container around it (three backticks, `~~~`, `<!--`, or a `<pre`, `<code`,
+#   `<blockquote` or `<details` tag in any case). Only the presence of such text counts; no closing
+#   text is trusted, so this check can only refuse. A whole block inside a fence, one of those
+#   elements, a comment or a Markdown quote therefore closes nothing.
 # - The body is refused - nothing in it closes, and fm_pr_closes_refusal names why - when it
 #   holds a line that carries the marker text (`firstmate-backlog-closes:`) but is not exactly a
 #   marker line, more than one begin or end line, a begin line with no end line after it, an
-#   end line with no begin line before it, or a line between them of any other kind. The
+#   end line with no begin line before it, a line between them of any other kind, or opener text
+#   above the begin line. bin/fm-pr-close-items.sh also refuses a block whose `Train-member:`
+#   value is no pull request URL, before anything closes. The
 #   refusal is per body: a refused train member's body closes nothing, and the train's own
 #   block and the other members are read as usual.
 # - A body with no marker line has no block and closes nothing.
-# - What it cannot tell apart: because nothing outside the marker lines is read, a whole, valid
-#   block that a body quotes as an example (inside a fence, a quote or a `<details>` element)
-#   is still the body's block, and it closes. Quote a block without its marker lines.
+# - The price of trusting no closer: a real block below a closed fence, element or comment is
+#   refused too, so a body puts its block at the top, above any such text.
 #
 # Outside the block. Every line that is not inside a valid block (every line of a refused body)
 # is plain text, read with no Markdown: fm_pr_closes_outside lists its well-formed directive
@@ -75,6 +81,21 @@ fm_pr_closes_scan() {
           if (t ~ /^Closes-backlog-item:[ \t]+[A-Za-z0-9_-][A-Za-z0-9._-]*[ \t]*$/) continue
           if (t ~ /^Train-member:[ \t]+[^ \t]+[ \t]*$/) continue
           reason = sprintf("line %d inside its closes block is neither a Closes-backlog-item: line, a Train-member: line nor blank: %s", i, t)
+          break
+        }
+      }
+      # Top level (Main 044): nothing above the begin line may hold text that can open a
+      # container around the block. Only the presence of opener text counts; no closer is
+      # trusted, so the one error this check can make is a refusal.
+      if (reason == "" && nb == 1) {
+        for (i = 1; i < begin; i++) {
+          t = line[i]; what = ""
+          if (index(t, "```") > 0) what = "```"
+          else if (index(t, "~~~") > 0) what = "~~~"
+          else if (index(t, "<!--") > 0) what = "<!--"
+          else if (match(tolower(t), /<(pre|code|blockquote|details)([ \t\/>]|$)/)) what = substr(t, RSTART, RLENGTH)
+          if (what == "") continue
+          reason = sprintf("line %d, above its closes block, holds %s, which can open a code fence, a pre, code, blockquote or details element or an HTML comment around the block; put the closes block above any such text: %s", i, what, t)
           break
         }
       }
@@ -171,12 +192,21 @@ fm_pr_closes_malformed() {  # <body-file|->
   done < <(fm_pr_closes_lines O "${1:--}") | LC_ALL=C awk '!seen[$0]++'
 }
 
-# The text outside the block that is not a column-0 directive-word line, as plain text.
+# The text outside the block as plain text: every outside line except a well-formed directive
+# line (fm_pr_closes_outside prints it) and a well-formed old `Closes:` line (the caller reports
+# its id). A malformed directive line stays in, so each id and pull request link on it is
+# reported like any other mention (Main 044 F3); fm_pr_closes_malformed reports the line too.
 fm_pr_closes_prose() {  # <body-file|->
   local line
-  local directive_re='^(Closes-backlog-item|Train-member|Closes):'
+  local id_re="^Closes-backlog-item:[[:space:]]+(${FM_PR_CLOSES_ID_RE})[[:space:]]*\$"
+  local one_re='^(Train-member|Closes):[[:space:]]+[^[:space:]]+[[:space:]]*$'
   while IFS= read -r line; do
-    [[ "$line" =~ $directive_re ]] || printf '%s\n' "$line"
+    if [[ "$line" =~ $id_re ]]; then
+      case "${BASH_REMATCH[1]}" in .*) ;; *) continue ;; esac
+    elif [[ "$line" =~ $one_re ]]; then
+      continue
+    fi
+    printf '%s\n' "$line"
   done < <(fm_pr_closes_lines O "${1:--}")
 }
 

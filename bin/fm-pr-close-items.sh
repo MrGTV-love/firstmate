@@ -12,12 +12,16 @@
 # owns the closes block: the one block between the exact lines
 # `<!-- firstmate-backlog-closes:begin -->` and `<!-- firstmate-backlog-closes:end -->`, whose
 # lines are `Closes-backlog-item: <item-id>`, `Train-member: <pull request URL>` or blank.
-# Nothing outside that block closes an item, and no Markdown or HTML is read anywhere. A body
+# Nothing outside that block closes an item, and no Markdown or HTML is interpreted. A body
 # whose block is refused (a second block, a missing end line, marker text inside other text,
-# or any other line inside the block, as the library header lists) closes nothing. Each
+# any other line inside the block or opener text above it, as the library header lists, or a
+# `Train-member:` value that is no pull request URL or, in the merged body, the merged pull
+# request itself) closes nothing; the whole block is checked before anything closes, so a
+# refused body changes no item and no edge, and a refused merged body reads no member. Each
 # `Train-member:` pull request is read the same way (only its own block's
 # `Closes-backlog-item:` lines), and every task whose state/<task>.meta records pr= equal to
-# that member's full URL is considered too. Bodies are read from GitHub, GitLab and Forgejo, each member by its own
+# that member's full URL is considered too, even when that member's body is refused. Commit
+# messages are never read. Bodies are read from GitHub, GitLab and Forgejo, each member by its own
 # URL. The proof is always the merged pull request this script was given (the train's own
 # URL for a train), because a train's members close unmerged. A body with no directive
 # line closes nothing, a train body written before this block existed included; its items
@@ -35,9 +39,8 @@
 #     closes it;
 #   - a column-0 line outside the block that starts with a directive word but does not fit
 #     its form, a well-formed directive line outside the block (one per line, then one line
-#     per body with the fix), and a `Train-member:` value that is no pull request URL. A
-#     `Train-member:` line that names the
-#     merged pull request itself is ignored with its own `actionable:` line and is not counted;
+#     per body with the fix). Each active id and pull request link on a malformed line is
+#     also reported as a mention, below;
 #   - in the merged pull request's body and in each train member's body that was read: an
 #     active, not-done backlog id that appears as a word in the prose (every line outside the
 #     block, read as plain text, with no Markdown) is a `mentioned ...`
@@ -261,20 +264,46 @@ if ! read_body "$URL" "$WORK/body"; then
 fi
 MERGED=$(cat "$WORK/body.merged" 2>/dev/null) || MERGED=false
 
-# report_refusal <body-file> <where>: a refused block closes nothing from that body; say why.
-report_refusal() {
-  local reason
+# body_refusal <body-file> [<merged-url>]: why the body's block closes nothing, or nothing. The
+# library's reason comes first; then (Main 044 F2) the first Train-member value in the block that
+# is no GitHub, GitLab or Forgejo pull request URL, or, for the merged body, that names the merged
+# pull request itself. The whole block is checked before anything closes, so a refused block
+# changes no item and no edge.
+body_refusal() {
+  local reason member
   reason=$(fm_pr_closes_refusal "$1")
+  if [ -z "$reason" ]; then
+    while IFS= read -r member; do
+      [ -n "$member" ] || continue
+      if ! fm_pr_url_parse "$member"; then
+        reason="its closes block names Train-member $member, which is not a GitHub, GitLab or Forgejo pull request URL"
+        break
+      fi
+      if [ -n "${2:-}" ] && [ "$FM_PR_URL" = "$2" ]; then
+        reason="its closes block names Train-member $member, which is the merged pull request itself"
+        break
+      fi
+    done < <(fm_pr_closes_members "$1")
+  fi
+  printf '%s\n' "$reason"
+}
+
+# report_refusal <reason> <where>: a refused block closes nothing from that body; say why.
+report_refusal() {
+  local reason=$1
   [ -n "$reason" ] || return 0
   LEFT=$((LEFT + 1))
   printf 'actionable: close-at-merge: refused to close anything named by %s: %s; a body holds exactly one closes block, its lines between a %s line and a %s line, each a Closes-backlog-item: <item-id> line, a Train-member: <pull request URL> line or blank; fix it, then retry: %s %s %s\n' \
     "$2" "$reason" "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$0" "$TASK_ID" "$URL" >&2
 }
-report_refusal "$WORK/body" "the body of $URL"
+BODY_REFUSAL=$(body_refusal "$WORK/body" "$URL")
+report_refusal "$BODY_REFUSAL" "the body of $URL"
 
-while IFS= read -r id; do
-  [ -z "$id" ] || consider "$id" "$URL" "the body of $URL"
-done < <(fm_pr_closes_ids "$WORK/body")
+if [ -z "$BODY_REFUSAL" ]; then
+  while IFS= read -r id; do
+    [ -z "$id" ] || consider "$id" "$URL" "the body of $URL"
+  done < <(fm_pr_closes_ids "$WORK/body")
+fi
 
 : > "$WORK/old-form"
 report_old_form() {  # <body-file> <where>: queue the old `Closes:` lines, report malformed and outside-block directive lines
@@ -304,25 +333,22 @@ MEMBER_URLS=()
 MEMBER_SEEN=$'\n'
 while IFS= read -r candidate; do
   [ -n "$candidate" ] || continue
-  if ! fm_pr_url_parse "$candidate"; then
-    LEFT=$((LEFT + 1))
-    printf 'actionable: close-at-merge: could not use Train-member %s: it is not a GitHub, GitLab or Forgejo pull request URL, so nothing was closed for it\n' "$candidate" >&2
-    continue
-  fi
+  # body_refusal checked every value first, so each one here is another pull request's URL.
+  fm_pr_url_parse "$candidate" || continue
   member=$FM_PR_URL
-  if [ "$member" = "$URL" ]; then
-    printf 'actionable: close-at-merge: ignored Train-member %s: it is the merged pull request itself\n' "$member" >&2
-    continue
-  fi
+  [ "$member" != "$URL" ] || continue
   case "$MEMBER_SEEN" in *$'\n'"$member"$'\n'*) continue ;; esac
   MEMBER_SEEN="$MEMBER_SEEN$member"$'\n'
   n=$((n + 1))
   MEMBER_URLS[n]=$member
   if read_body "$member" "$WORK/member-$n"; then
-    report_refusal "$WORK/member-$n" "the body of train member $member"
-    while IFS= read -r id; do
-      [ -z "$id" ] || consider "$id" "$URL" "the body of train member $member"
-    done < <(fm_pr_closes_ids "$WORK/member-$n")
+    member_refusal=$(body_refusal "$WORK/member-$n")
+    report_refusal "$member_refusal" "the body of train member $member"
+    if [ -z "$member_refusal" ]; then
+      while IFS= read -r id; do
+        [ -z "$id" ] || consider "$id" "$URL" "the body of train member $member"
+      done < <(fm_pr_closes_ids "$WORK/member-$n")
+    fi
     report_old_form "$WORK/member-$n" "the body of train member $member"
   else
     LEFT=$((LEFT + 1))
@@ -333,7 +359,7 @@ while IFS= read -r candidate; do
     [ -n "$task" ] || continue
     consider "$task" "$URL" "the task record that holds train member $member"
   done < <(tasks_recording_pr "$member")
-done < <(fm_pr_closes_members "$WORK/body")
+done < <([ -n "$BODY_REFUSAL" ] || fm_pr_closes_members "$WORK/body")
 
 while IFS=$'\t' read -r old where; do
   [ -n "$old" ] || continue
