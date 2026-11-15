@@ -560,11 +560,30 @@ fm_pr_poll_cleanup() {
   FM_PR_POLL_REG_TMP=
 }
 
+# 0 when state/<id>.check.sh may receive the merge poll: it is absent, or it is the
+# poll template's own bytes in a regular file and no custom-check trust record
+# exists. Anything else is another check (bin/fm-check-register.sh), and a merge
+# poll is never published over it or removed in its place (Main 1686 F3).
+fm_pr_poll_check_dest_replaceable() {  # <state> <id> <template>
+  local dest="$1/$2.check.sh"
+  [ ! -e "$1/$2.check-trust" ] && [ ! -L "$1/$2.check-trust" ] || return 1
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+    return 0
+  fi
+  [ -f "$dest" ] && [ ! -L "$dest" ] || return 1
+  cmp -s -- "$3" "$dest"
+}
+
+# Set to 1 when a publication stopped because state/<id>.check.sh is another check.
+FM_PR_POLL_CHECK_CONFLICT=0
+
 fm_pr_poll_revoke_final() {
   local failed=0
   # Neutralize the runnable name first so a failed rearm cannot consume state
-  # whose transactional registration did not commit successfully.
-  if [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; then
+  # whose transactional registration did not commit successfully. Another check
+  # in that name is never this publication's, so it is left in place.
+  if { [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; } \
+    && fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
     rm -f -- "$FM_PR_POLL_CHECK_DEST" || failed=1
   fi
   if [ -e "$FM_PR_POLL_REG_DEST" ] || [ -L "$FM_PR_POLL_REG_DEST" ]; then
@@ -573,7 +592,9 @@ fm_pr_poll_revoke_final() {
   if [ -e "$FM_PR_POLL_DATA_DEST" ] || [ -L "$FM_PR_POLL_DATA_DEST" ]; then
     rm -f -- "$FM_PR_POLL_DATA_DEST" || failed=1
   fi
-  [ ! -e "$FM_PR_POLL_CHECK_DEST" ] && [ ! -L "$FM_PR_POLL_CHECK_DEST" ] || failed=1
+  if [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; then
+    ! fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE" || failed=1
+  fi
   [ ! -e "$FM_PR_POLL_REG_DEST" ] && [ ! -L "$FM_PR_POLL_REG_DEST" ] || failed=1
   [ ! -e "$FM_PR_POLL_DATA_DEST" ] && [ ! -L "$FM_PR_POLL_DATA_DEST" ] || failed=1
   return "$failed"
@@ -654,8 +675,14 @@ fm_pr_poll_prepare() {
 # The caller holds the task's poll publication lock while publishing this
 # prepared generation, so no registration can name another generation's files.
 fm_pr_poll_publish_prepared() {
+  FM_PR_POLL_CHECK_CONFLICT=0
   [ -n "$FM_PR_POLL_DATA_TMP" ] && [ -n "$FM_PR_POLL_CHECK_TMP" ] \
     && [ -n "$FM_PR_POLL_REG_TMP" ] || return 1
+  # Nothing is published over another check: refuse before the first rename.
+  if ! fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
+    FM_PR_POLL_CHECK_CONFLICT=1
+    return 1
+  fi
   fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_DATA_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
   fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_REG_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
   fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
@@ -699,6 +726,13 @@ fm_pr_poll_publish_prepared() {
     return 1
   fi
 
+  # And again just before the runnable name is replaced.
+  if ! fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
+    # shellcheck disable=SC2034 # Read by bin/fm-pr-check.sh to word the refusal.
+    FM_PR_POLL_CHECK_CONFLICT=1
+    fm_pr_poll_revoke_final || true
+    return 1
+  fi
   if ! fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" \
     || ! mv -f -- "$FM_PR_POLL_CHECK_TMP" "$FM_PR_POLL_CHECK_DEST"; then
     fm_pr_poll_revoke_final || true

@@ -231,13 +231,13 @@ reconcile_one() {  # <meta> <id>
   [ ! -f "$refusal" ] || [ -L "$refusal" ] || previous=$(cat -- "$refusal" 2>/dev/null) || previous=
   rc=0
   output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" \
-    FM_PR_CHECK_EXPECT_PR="$pr" "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1) || rc=$?
+    FM_PR_CHECK_EXPECT_PR="${pr:-none}" "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     rm -f -- "$refusal"
     printf 'pr-ready: %s: %s %s\n' "$id" "$registered" "$url"
-  elif [ "$rc" -eq 3 ] && [ -n "$pr" ]; then
+  elif [ "$rc" -eq 3 ]; then
     # Another registration recorded a different PR during this pass: that one owns the record now.
-    printf 'pr-ready: %s: the recorded PR changed during this pass, so the re-arm of %s did nothing; read again next pass\n' "$id" "$url"
+    printf 'pr-ready: %s: the recorded PR changed during this pass, so the registration of %s did nothing; read again next pass\n' "$id" "$url"
   elif [ "$rc" -eq 75 ]; then
     # The run did not answer, so nothing was refused: no new wake, and the last
     # refusal memo stays as it is, so a repeat of that refusal is not woken twice;
