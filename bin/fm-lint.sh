@@ -286,16 +286,18 @@
 # positive decimal integer or lint exits 2 on every host; a value above the default
 # is clamped to it). A root that crosses
 # it is ended and takes the memory retry described below, and the roots log's
-# last end-record column counts the samples each source gave (libproc, or ps
-# for a tick libproc did not answer in time) and names any attempt that gave
-# up its libproc reader, with the reason. Nothing is signalled by its pid: the
-# watch signals only its root's process group, before it reaps the root (to end it,
-# or to stop and resume it while the growth guard holds it). A counted process
-# outside that group that still runs when an over-cap or signalled root has ended
-# fails the root (status 96), stops new admissions, and is named in the roots log's
-# samples column as escaped. Each reader reply is bound to the processes it
-# measured: every member it names is read again after it, and an identity that
-# differs, cannot be read or has ended makes the sample unknown. A member outside the root's
+# last end-record column counts the libproc reader's samples and names any
+# attempt that gave up its reader, with the reason; the reader is the only source
+# of a sample, and a tick it cannot answer is a miss. Nothing is signalled by its
+# pid or by a group taken from input: the watch records its root's exact start
+# time before the root executes and signals only that root's group, after proving
+# the group's leader unchanged (to end it, or to stop and resume it while the
+# growth guard holds it), and acts on every signal result. A counted process that
+# still runs after its root has ended, a normal success included, fails the root
+# (status 96), stops new admissions, and is named in the roots log's samples column
+# as escaped. Each reader reply is bound to the processes it measured: every member
+# it names is read again after it, and an identity that differs, cannot be read or
+# has ended, or a zombie or exiting root, makes the sample unknown. A member outside the root's
 # group and its descendants (one that left and was orphaned) is counted only when
 # two libproc reads give exactly its recorded start time, and a child of it only with
 # the identity the same census listed it under that member; a replacement, a
@@ -306,9 +308,13 @@
 # cap: 96 comes before 98, so no memory retry follows, no success is recorded, and
 # the run fails, naming each root it did not start. Each watched root's measurement
 # record holds the time of its last successful sample; it has none until the first
-# sample, and the first missed sample or failed publication invalidates it at once.
-# Every gate on the host admits a new root only while each watched running root's
-# record names a sample at most 5 s old: positive proof, not a missing stop mark.
+# sample, each sample is read back after it is written, and the first missed sample
+# or failed publication invalidates it at once, under the host admission lock; a
+# record that cannot be invalidated keeps that lock (no root is admitted anywhere)
+# until its root, which the watch ends, is reaped. Every gate on the host admits a
+# new root only while each watched running root's record names a sample at most
+# 5 s old and no live ledger entry is unreadable: positive proof, not a missing
+# stop mark.
 # Linux runs are never watched (the accepted no-cap limit; the run's warning says
 # admission counts them by charge only), and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
