@@ -403,7 +403,7 @@ run_printed_resend() {  # <fakebin> <ssh-log> <command> <out-prefix>
 # no-choice send, and the refusal lists every open key, the request's own
 # reserved blocker included (review N2).
 test_remote_printed_resend_survives_real_escalation() {
-  local dir fb ssh_log home rhome rc corr key count rec faf_text
+  local dir fb ssh_log home rhome rc corr key count rec faf_text blocker_row
   dir="$TMP_ROOT/remote-escalated-resend"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
   rhome=$(setup_remote_secondmate_home remote-escalated-resend)
@@ -411,6 +411,14 @@ test_remote_printed_resend_survives_real_escalation() {
   printf 'working: watching the remote domain\n' > "$home/state/rsm.status"
   lost_remote_request "$fb" "$home" "$ssh_log" "$dir" rsm "please rename the metric"
   corr=$LOST_CORR; key=$LOST_KEY
+  # The request's own blocker is the one open decision now; its whole row (written by
+  # the real escalation) is kept for the check after the resend.
+  fm_test_fold "$home/state/rsm.status"
+  case "$FM_TEST_FOLD" in
+    *$'\n'*) fail "setup: more than one open decision after the escalation: $FM_TEST_FOLD" ;;
+    "$key"$'\t'"blocked"$'\t'?*) blocker_row=$FM_TEST_FOLD ;;
+    *) fail "setup: the escalation did not leave $key open as blocked: $FM_TEST_FOLD" ;;
+  esac
   case "$LOST_RESEND" in
     *" rsm --answers-none please\ rename\ the\ metric") : ;;
     *) fail "a send that stated no choice must be printed with --answers-none after the target: $LOST_RESEND" ;;
@@ -465,10 +473,9 @@ test_remote_printed_resend_survives_real_escalation() {
   if grep -F "resolved [key=$key]" "$home/state/rsm.status" >/dev/null; then
     fail "fm-send closed the library-owned blocker: $(cat "$home/state/rsm.status")"
   fi
-  case $'\n'"$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/rsm.status")" in
-    *$'\n'"$key"$'\t'*) : ;;
-    *) fail "the blocker is not open in the fold after the resend: $(cat "$home/state/rsm.status")" ;;
-  esac
+  fm_test_fold "$home/state/rsm.status"
+  [ "$FM_TEST_FOLD" = "$blocker_row" ] \
+    || fail "after the resend the fold must hold exactly the blocker row, unchanged: $FM_TEST_FOLD"
   pass "fm-send remote: the printed resend carries --answers-none and lands once; no-choice sends with the correlation refuse and list every open key"
 }
 
