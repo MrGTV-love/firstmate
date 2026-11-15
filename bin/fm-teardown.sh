@@ -378,9 +378,14 @@
 # with the named reason. A retry whose record still matches the copy asks the driver
 # nothing and judges the recorded answer again; the retire step then leaves that copy
 # out of its swept roots. A first run reaps as before, since the driver has not yet
-# answered. --force waives none of it, and nothing here removes a kept copy: its
-# release depends on Vernant's driver. bin/fm-teardown-nested-lib.sh ("Kept own
-# copies") owns the mechanics and docs/agent-control.md the rule.
+# answered. An own locked copy's preserve is never rebuilt, overwritten or removed:
+# a later payload goes in a directory beside the earlier one. A close that refuses
+# because the copy's record cannot be written leaves a refusal record in
+# data/<task>/closeout-refused/. A retry of a task that closed this way says it is
+# already closed and names the record. --force waives none of it, and nothing here
+# removes a kept copy: its release depends on Vernant's driver.
+# bin/fm-teardown-nested-lib.sh ("Kept own copies") owns the mechanics and
+# docs/agent-control.md the rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -1307,6 +1312,15 @@ fm_refuse_if_gate_agent
 FM_LOCK_LOG_PREFIX=teardown
 
 fm_backlog_record_present "$META" "task record" "$STATE" || {
+  # A task that closed around a kept own copy has no record any more, and the kept copy's
+  # record carries the mark of that completed close, so a retry is told so, before any copy is
+  # looked up (bin/fm-teardown-nested-lib.sh, teardown_retained_closed_note). A task record
+  # that is damaged rather than gone, a pending backlog close, or a kept copy's record without
+  # the mark is not a completed close and refuses as before.
+  if fm_backlog_record_parent_authorized "$META" "task record" "$STATE" parent-only \
+      && teardown_retained_closed_note "$META" "$STATE"; then
+    exit 0
+  fi
   echo "error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
@@ -4677,7 +4691,7 @@ teardown_held_copies_report() {
   return_cmd="(cd $proj_q && treehouse return $slot_q --if-lease-holder $holder_q </dev/null)"
   if [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ]; then
     for copy in "${TEARDOWN_RETAINED[@]}"; do
-      echo "notice: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and stays untouched in pool slot $(fm_refuse_text "$slot") under a durable lease; its unique ignored files are in the driver's verified archive and in $(fm_refuse_text "$DATA/$ID/nested-copy-preserved"), and it is recorded in $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$copy")")."
+      echo "notice: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and stays untouched in pool slot $(fm_refuse_text "$slot") under a durable lease; its unique ignored files are in the driver's verified archive and in the preserve $(fm_refuse_text "$(teardown_retained_fields "$(teardown_retained_receipt "$DATA" "$copy")" preserve 2>/dev/null)"), and it is recorded in $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$copy")")."
     done
     echo "notice: no command removes a creation-locked retained copy today: its release depends on Vernant's closeout driver (owner: the Vernant lane, through Main), and the driver's --execute-cleanup only writes another archive and keeps the tree, so do not run it for this copy; nothing returns the slot automatically."
     [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
@@ -6913,6 +6927,9 @@ else
     exit 1
   fi
 fi
+# The close is complete: the record of each kept own copy is marked with it, so a retry of
+# this task is told it is already closed.
+teardown_retained_mark_closed
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 case "$KIND:$FORCE" in
