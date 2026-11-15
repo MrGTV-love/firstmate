@@ -483,8 +483,14 @@ test_remote_printed_resend_survives_real_escalation() {
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/resend" || rc=$?
   expect_code 0 "$rc" "the printed correlation resend must be accepted: $(cat "$dir/resend.err")"
   assert_one_remote_record_body "$rhome" "$corr" "please rename the metric" "the printed escalated resend"
-  # Deduplicated: running the printed command again lands no second record.
+  # Deduplicated: running the printed command again reaches the transport (the fake ssh
+  # logs one line per call) and lands no second record; a refusal before the transport
+  # would leave the log as it was and fail here.
+  local calls_before
+  calls_before=$(grep -c 'fm-remote-entrypoint.sh' "$ssh_log" || true)
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/again" || rc=$?
+  [ "$(grep -c 'fm-remote-entrypoint.sh' "$ssh_log" || true)" -gt "$calls_before" ] \
+    || fail "the second printed resend never reached the remote transport (exit $rc): $(cat "$dir/again.err")"
   count=$(remote_inbox_records "$rhome" | grep -c . || true)
   [ "$count" = 1 ] || fail "a second run of the printed resend must deduplicate, found $count records (exit $rc): $(cat "$dir/again.err")"
   # fm-send closes nothing for the library-owned blocker.
@@ -540,9 +546,12 @@ test_remote_printed_resend_carries_the_original_choice() {
   esac
   # The whole open-decision set before the none resend (metric-name and the request's own
   # reserved blocker); a none-send closes nothing, so the set after must be identical.
-  local open_before
+  # A none-send also appends no status line, so the status log itself must be unchanged
+  # byte for byte: a close followed by a reopen of the blocker would leave the same fold.
+  local open_before status_before="$dir/status.before"
   fm_test_fold "$home/state/rsm.status"
   open_before=$FM_TEST_FOLD
+  cp "$home/state/rsm.status" "$status_before" || fail "setup: could not copy the status log"
   case "$open_before" in
     "metric-name"$'\t'"needs-decision"$'\t'"which name for the metric"$'\n'"$LOST_KEY"$'\t'"blocked"$'\t'?*) : ;;
     *) fail "setup: before the none resend, metric-name and $LOST_KEY must both be open: $open_before" ;;
@@ -550,6 +559,8 @@ test_remote_printed_resend_carries_the_original_choice() {
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/none" || rc=$?
   expect_code 0 "$rc" "the printed none resend is accepted: $(cat "$dir/none.err")"
   assert_one_remote_record_body "$rhome" "$LOST_CORR" "status of the weekly run" "the printed none resend"
+  cmp -s "$status_before" "$home/state/rsm.status" \
+    || fail "the none resend appended to the status log: $(diff "$status_before" "$home/state/rsm.status")"
   fm_test_fold "$home/state/rsm.status"
   [ "$FM_TEST_FOLD" = "$open_before" ] \
     || fail "the none resend must leave the whole open set unchanged (metric-name and the reserved blocker): before: $open_before; after: $FM_TEST_FOLD"
