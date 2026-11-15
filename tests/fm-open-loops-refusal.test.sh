@@ -99,5 +99,30 @@ reason, producer = c3.teardown_refusal_record("t1")
 case_ok &= check(reason == "REFUSED: reaper reason A", "control: the reaper's later record was not chosen: " + reason)
 if case_ok:
     print("ok - each recorded refusal's text and time come from one opened file, so a replacement mid-read never pairs old text with a newer time")
+# 3. Kind (d) of Main 1813's V4 amendment: a scout whose report is delivered and whose
+#    last report is done, while its pane still reads working, has no completed_task
+#    row (that row needs the done state), so its completion row is pending_cleanup,
+#    owned by the home, with the scout action. report_status and the copy probe are
+#    stubbed, so no process runs.
+case_ok = True
+c = collector("scout-working")
+(c.data / "t-scout").mkdir(parents=True)
+(c.data / "t-scout" / "report.md").write_text("Delivered investigation report.\n")
+task = dict(id="t-scout", kind="scout", pr={}, mode="direct-PR",
+            current_state=dict(state="working", detail=""), endpoint=dict(exists=True, agent_alive="alive"))
+c.tasks = [task]
+c.backlog = []
+with mock.patch.object(module.Collector, "report_status", lambda self, ident: (None, "done", False, False, None, None)), \
+     mock.patch.object(module.Collector, "teardown_refusal_record", lambda self, ident: ("", "")):
+    c.completion_row(task, "home:" + c.home_label())
+rows = [r for r in c.rows.values() if r["subject"] == "t-scout"]
+case_ok &= check([r["category"] for r in rows] == ["pending_cleanup"], "kind (d): rows were " + repr([r["category"] for r in rows]))
+if rows:
+    case_ok &= check(rows[0]["owner"] == "home:" + c.home_label(), "kind (d): owner was " + rows[0]["owner"])
+    case_ok &= check(rows[0]["next_action"].startswith("accept the delivered report, then run plain bin/fm-teardown.sh t-scout"),
+                     "kind (d): next action was " + rows[0]["next_action"])
+    case_ok &= check("scout report is delivered" in rows[0]["evidence"], "kind (d): evidence was " + rows[0]["evidence"])
+if case_ok:
+    print("ok - kind (d): a scout with a delivered report and a done report whose pane reads working gets an owned pending_cleanup row with the scout action")
 sys.exit(1 if failed else 0)
 PY

@@ -2095,6 +2095,11 @@ v4_task('fin-content', copy=fin_content, note='landed on main by squash')
 (v4 / 'data/fin-scout').mkdir()
 (v4 / 'data/fin-scout/report.md').write_text('Delivered investigation report.\n')
 v4_task('fin-scout', kind='scout', copy=None, note='report delivered')
+# Kind (d) of Main 1813's V4 amendment: a delivered scout report whose last report is
+# done while its pane still reads working has no completed_task row.
+(v4 / 'data/fin-scout-working').mkdir()
+(v4 / 'data/fin-scout-working/report.md').write_text('Delivered investigation report.\n')
+v4_task('fin-scout-working', kind='scout', copy=None, note='report delivered', state='working', live=True)
 (v4 / 'data/fin-scout-refused').mkdir()
 (v4 / 'data/fin-scout-refused/report.md').write_text('Delivered investigation report.\n')
 v4_task('fin-scout-refused', kind='scout', copy=None, note='report delivered')
@@ -2317,6 +2322,11 @@ assert scout_row and scout_row['owner'] == 'firstmate' and scout_row['overdue'] 
 assert 'run plain bin/fm-teardown.sh fin-scout' in scout_row['next_action'] and '--force' not in scout_row['next_action'], \
     ('the accepted report leads to plain teardown', scout_row)
 assert [r['category'] for r in obligations('fin-scout')] == ['completed_task'], ('one obligation, one row', mine('fin-scout'))
+# Kind (d): with no completed_task row, the delivered scout report is a home-owned pending_cleanup row.
+assert [r['category'] for r in obligations('fin-scout-working')] == ['pending_cleanup'], ('kind (d) needs its row', mine('fin-scout-working'))
+scout_working = cleanup['fin-scout-working']
+assert scout_working['owner'] == 'home:firstmate', scout_working
+assert scout_working['next_action'].startswith('accept the delivered report, then run plain bin/fm-teardown.sh fin-scout-working'), scout_working
 # A refused teardown keeps its exact refusal text on that one row.
 scout_refused = handoff.get('fin-scout-refused')
 assert [r['category'] for r in obligations('fin-scout-refused')] == ['completed_task'], mine('fin-scout-refused')
