@@ -6595,13 +6595,17 @@ SH
 # answer: a live launcher is never taken for gone, and an unreadable table is
 # never taken for absence. Both direct-release routes (the driver unavailable,
 # and its uncovered-content verdict) keep the copy locked for a live or unknown
-# launcher; a gone launcher's copy still closes.
+# launcher; a gone launcher's copy still closes. Off Darwin the confined table
+# (bin/fm-proc-info.py, which reads Darwin sysctl) cannot be read at all, so
+# every state there must refuse as unknown, never as gone.
 test_confined_launcher_state_is_never_taken_for_absence() {
-  local rc route state label live args
+  local rc route state label live args expected
   teardown_signal_case_allowed 'test_confined_launcher_state_is_never_taken_for_absence' || return 0
   for route in unavailable uncovered; do
     for state in live unknown gone; do
       label="confined-$route-$state"
+      expected=$state
+      [ "$(uname -s)" = Darwin ] || expected=unknown
       args=()
       if [ "$route" = unavailable ]; then
         dead_launcher_pid
@@ -6629,7 +6633,7 @@ exec "$(command -v python3)" "\$@"
 SH
       chmod +x "$FOREIGN_CASE/fakebin/ps" "$FOREIGN_CASE/fakebin/python3"
       run_foreign_teardown rc ${args[@]+"${args[@]}"}
-      if [ "$state" = gone ]; then
+      if [ "$expected" = gone ]; then
         expect_code 0 "$rc" "$label: a gone launcher's copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
         assert_absent "$FOREIGN_COPY" "$label: the copy survived"
       else
@@ -6643,11 +6647,11 @@ SH
       fi
       if [ "$state" = live ]; then
         kill -0 "$live" 2>/dev/null || fail "$label: the live launcher was ended"
-        assert_grep "launcher process $live may still be running" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the live launcher"
+        [ "$expected" != live ] || assert_grep "launcher process $live may still be running" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the live launcher"
         kill "$live" 2>/dev/null || true
         wait "$live" 2>/dev/null || true
       fi
-      [ "$state" != unknown ] || assert_grep 'cannot be read' "$FOREIGN_CASE/stderr" "$label: the refusal did not name the unreadable process table"
+      [ "$expected" != unknown ] || assert_grep 'cannot be read' "$FOREIGN_CASE/stderr" "$label: the refusal did not name the unreadable process table"
     done
   done
   pass 'with ps confined, a live or unreadable launcher keeps its locked copy on both direct-release routes, and a gone one closes'
@@ -6751,8 +6755,9 @@ SH
 
 # Round 3 falsifiers. A fixture mutation runs once, after the Git-protection
 # proof, at one chosen call before the removal: the last holder scan (lsof), the
-# launcher read (the confined table, ps exits 126 here) or the git worktree
-# unlock. FM_LATE_POINT names the call; "none" runs nothing.
+# launcher read (on Darwin the confined table, ps exits 126 there; elsewhere,
+# where bin/fm-proc-info.py cannot read that table, the real ps launcher query)
+# or the git worktree unlock. FM_LATE_POINT names the call; "none" runs nothing.
 add_late_mutation_hooks() {  # <point>  (mutation script: $FOREIGN_CASE/mutate.sh)
   local point=$1 marker="$FOREIGN_CASE/git-protects-ran"
   rm -f "$FOREIGN_CASE/vernant-python"
@@ -6779,7 +6784,18 @@ case " \$* " in
 esac
 exit 1
 SH
-  printf '#!/usr/bin/env bash\necho "ps: Operation not permitted" >&2\nexit 126\n' > "$FOREIGN_CASE/fakebin/ps"
+  if [ "$(uname -s)" = Darwin ]; then
+    printf '#!/usr/bin/env bash\necho "ps: Operation not permitted" >&2\nexit 126\n' > "$FOREIGN_CASE/fakebin/ps"
+  else
+    cat > "$FOREIGN_CASE/fakebin/ps" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -p "*" -o pid= "*)
+    if [ "$point" = launcher ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi ;;
+esac
+exec "$(command -v ps)" "\$@"
+SH
+  fi
   cat > "$FOREIGN_CASE/fakebin/python3" <<SH
 #!/usr/bin/env bash
 case "\$*" in
@@ -6912,7 +6928,7 @@ test_launcher_start_time_not_observation_delay_decides_recycling() {
       git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$live launcher=$live" "$FOREIGN_COPY"
       lockf="$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)/locked"
       locked_at=$(( $(date +%s) - 120 ))
-      touch -t "$(date -r "$locked_at" +%Y%m%d%H%M.%S)" "$lockf"
+      python3 -c 'import os, sys; t = int(sys.argv[2]); os.utime(sys.argv[1], (t, t))' "$lockf" "$locked_at"
       start=$(( locked_at - 1 ))
       [ "$shape" != recycled ] || start=$(( locked_at + 10 ))
       cat > "$FOREIGN_CASE/fakebin/ps" <<SH
@@ -6927,8 +6943,9 @@ case "\$*" in
     printf '%02d:%02d:%02d\n' \$(( age / 3600 )) \$(( age % 3600 / 60 )) \$(( age % 60 )); exit 0 ;;
   *"-p $live -o lstart="*|*"-o lstart= -p $live"*)
     [ "$shape" != delayed-live ] || sleep 4
-    LC_ALL=C date -r $start '+%a %b %e %H:%M:%S %Y'; exit 0 ;;
+    LC_ALL=C "$(command -v python3)" -c 'import sys, time; print(time.strftime("%a %b %e %H:%M:%S %Y", time.localtime(int(sys.argv[1]))))' $start; exit 0 ;;
 esac
+[ "$(uname -s)" = Darwin ] || exec "$(command -v ps)" "\$@"
 echo "ps: Operation not permitted" >&2
 exit 126
 SH
@@ -7007,6 +7024,10 @@ test_pr_and_tip_landed_copies_keep_a_unique_ignored_file() {
 test_real_holder_process_indexer_exempt_and_never_signalled() {
   local rc name label pid held argv0
   teardown_signal_case_allowed 'test_real_holder_process_indexer_exempt_and_never_signalled' || return 0
+  if [ "$(uname -s)" != Darwin ]; then
+    pass "SKIPPED on $(uname -s): test_real_holder_process_indexer_exempt_and_never_signalled needs bin/fm-proc-info.py, which reads Darwin sysctl"
+    return 0
+  fi
   command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { pass 'real lsof absent on this host; skipped'; return 0; }
   for name in indexer other; do
     label="real-holder-$name"
