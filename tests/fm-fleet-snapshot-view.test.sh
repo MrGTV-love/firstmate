@@ -844,8 +844,8 @@ test_send_hints_run_as_exact_commands() {
   (cd "$ROOT" && env PATH="$fakebin:$PATH" FM_HOME="$home" FM_SEND_SETTLE=0 \
     bash -c "${cmd/fm-secondmate-task /fm-secondmate-task --resolve-key scope-call }") >/dev/null 2>"$err" || rc=$?
   assert_equals 0 "$rc" "the hint with --resolve-key delivers: $(cat "$err")"
-  fm_test_drain_presented "$home/state" "$ROOT/bin/fm-wake-drain.sh"; drain=$FM_TEST_DRAIN_OUT
-  assert_not_contains "$drain" "[key=scope-call]" "the keyed answer closes the key"
+  fm_test_fold_proven "$home/state" secondmate-task
+  ! fm_test_fold_key_open scope-call || fail "the keyed answer closes the key (still open: $FM_TEST_FOLD_OPEN)"
 
   assert_equals "bin/fm-send.sh fm-secondmate-task '<request>'" "$send" "the secondmate send hint is one exact command"
   assert_equals "bin/fm-send.sh fm-ship-task '<instruction>'" "$steer" "the steer hint is one exact command"

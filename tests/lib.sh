@@ -1587,86 +1587,71 @@ assert_not_contains() {
   esac
 }
 
-# fm_test_drain_presented <state-dir> [<drain>]: run the real wake drain over a
-# fixture state dir for an ABSENCE check ("this key is no longer open"), and
-# fail the test unless the drain's own complete open-decision view is proven.
-# The wake drain prints no end-of-output line on stdout for the whole run (its
-# WAKE_ACK_REQUIRED line goes to stderr, before the status presentation), so the
-# proof is the open-decision view's own terminal line: the "OPEN DECISIONS: close
-# one by answering it" hint that bin/fm-wake-drain.sh prints after every row of
-# that view. Required: exit 0; no WAKE DRAIN SKIPPED, STATUS PRESENTATION SKIPPED
-# or INCOMPLETE, or byte-cap "more omitted" line; no status log skipped past its
-# read limits (stderr is read); exactly one view header and one terminal hint,
-# with only rows between them; and among those rows a canary decision on a
-# separate fixture task, written just before the drain, so a view exists at all.
-# Nothing is filtered: FM_TEST_DRAIN_OUT is the drain's whole stdout (the canary's
-# row included) and FM_TEST_DRAIN_ROWS its view rows (the canary's included);
-# FM_TEST_DRAIN_ONLY_CANARY is 1 when the canary's row is the view's only row.
-# Before return the canary's status file, its cursor files, its row in the
-# presentation cursor and the helper's stderr file are removed. Call it directly,
-# not in $(...), so fail stops the test.
-fm_test_drain_presented() {
-  local state=$1 drain=${2:-$ROOT/bin/fm-wake-drain.sh} task=fm-test-drain-canary canary err out rc=0 bad=''
-  local row_prefix='fm-test-drain-canary [key=fm-test-drain-canary] needs-decision: ' pc had_pc=0 rows only
-  canary="$state/$task.status"
-  err="$state/../.fm-test-drain-presented.err.$$"
-  pc="$state/.status-presentation-cursor"
-  [ ! -e "$canary" ] || fail "fm_test_drain_presented: $canary already exists"
-  [ ! -e "$pc" ] || had_pc=1
-  if ! printf 'needs-decision [key=%s]: canary for a complete drain presentation\n' "$task" > "$canary"; then
-    rm -f -- "$canary"
-    fail "fm_test_drain_presented: could not write $canary"
+# fm_test_inbox_records <inbox-dir>: the inbox's record names, one per line, sorted:
+# only numeric NNN.msg names count (bin/fm-task-inbox-lib.sh "Layout").
+fm_test_inbox_records() {
+  local f n
+  for f in "$1"/*.msg; do
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    n=${f##*/}
+    case "${n%.msg}" in ''|*[!0-9]*) continue ;; esac
+    printf '%s\n' "$n"
+  done | LC_ALL=C sort
+}
+
+# fm_test_fold_proven <state-dir> <task>: read the durable open-decision fold
+# (status_open_decisions, bin/fm-status-decision-lib.sh - the source of the
+# drain's OPEN DECISIONS section) for one task, for an ABSENCE check ("this key is
+# no longer open"), and fail the test on any doubt. The fold answers an empty set
+# with status 0 for an absent, unreadable or symlinked log, and for a whole-log
+# read that fails for a reason other than the read limits, so an empty answer
+# alone proves nothing. Required: the task's status log is a readable, non-empty
+# regular file; the direct fold of that log exits 0 with nothing on stderr; and a
+# fold of a byte copy of the log (with the task's meta beside it, so the task kind
+# is the same) plus one canary decision appended after the last line also exits 0
+# with nothing on stderr, lists the canary - so that fold read every line of the
+# log - and otherwise lists exactly the direct fold's records. On success
+# FM_TEST_FOLD_OPEN holds the direct fold's records, one "<key> TAB <verb> TAB
+# <note>" line each (empty when nothing is open). The copy is removed. Call it
+# directly, not in $(...), so fail stops the test.
+fm_test_fold_proven() {
+  local state=$1 task=$2 f lib dir err e direct copied rc=0 canary=fm-test-fold-canary
+  f="$state/$task.status"
+  lib="$ROOT/bin/fm-status-decision-lib.sh"
+  { [ -f "$f" ] && [ ! -L "$f" ] && [ -r "$f" ]; } || fail "fold check: $f is not a readable regular status log"
+  [ -s "$f" ] || fail "fold check: $f is empty, so an empty fold proves nothing"
+  dir=$(fm_test_tmproot fold-check) || fail "fold check: no scratch directory"
+  err="$dir/fold.err"
+  # shellcheck disable=SC2016 # Expanded by the child shell.
+  direct=$(bash -c '. "$1" && status_open_decisions "$2"' _ "$lib" "$f" 2>"$err") || rc=$?
+  [ "$rc" -eq 0 ] && [ ! -s "$err" ] \
+    || { e=$(cat "$err"); rm -rf -- "$dir"; fail "fold check: the fold of $f exited $rc: $e"; }
+  if ! { mkdir "$dir/state" && cp -p -- "$f" "$dir/state/$task.status"; }; then
+    rm -rf -- "$dir"; fail "fold check: could not copy $f"
   fi
-  out=$(FM_STATE_OVERRIDE="$state" "$drain" 2>"$err") || rc=$?
-  if [ "$rc" -ne 0 ]; then bad="the drain exited $rc"
-  else
-    case "$out" in
-      *'WAKE DRAIN SKIPPED'*) bad='the drain skipped (queue lock held elsewhere)' ;;
-      *'STATUS PRESENTATION SKIPPED'*) bad='the status presentation was skipped' ;;
-      *'STATUS PRESENTATION INCOMPLETE'*) bad='the status presentation was incomplete' ;;
-      *'more omitted (byte cap)'*) bad='the open-decision view was cut at its byte cap' ;;
-    esac
+  if [ -e "$state/$task.meta" ]; then
+    cp -p -- "$state/$task.meta" "$dir/state/$task.meta" || { rm -rf -- "$dir"; fail "fold check: could not copy the meta"; }
   fi
-  if [ -z "$bad" ] && grep -E 'past the read limits|could not be acquired safely' "$err" >/dev/null 2>&1; then
-    bad="the drain skipped part of its scan: $(grep -E 'past the read limits|could not be acquired safely' "$err" | head -3)"
-  fi
-  if [ -z "$bad" ]; then
-    # The view: one header, then rows only, then the drain's terminal hint for the view.
-    bad=$(printf '%s\n' "$out" | awk -v canary="$row_prefix" '
-      /^OPEN DECISIONS \(still open/ { headers++; if (state == 0) state = 1; else bad = "a second view header"; next }
-      /^OPEN DECISIONS: close one by answering it: / { hints++; if (state == 1) state = 2; else if (!bad) bad = "the terminal hint outside the view"; next }
-      state == 1 {
-        if ($0 ~ /^OPEN DECISIONS/ || $0 == "") { if (!bad) bad = "a non-row line inside the view: " $0 }
-        else if (index($0, canary) == 1) canaries++
-        next
-      }
-      END {
-        if (!bad && headers != 1) bad = "no open-decision view header"
-        if (!bad && hints != 1) bad = "no terminal hint after the view rows: the view was not shown to its end"
-        if (!bad && canaries != 1) bad = "the canary row is not in the view"
-        print bad
-      }')
-  fi
-  # Restore the fixture before any return or fail.
-  rm -f -- "$canary" "$state/.$task".* "$err"
-  if [ -f "$pc" ]; then
-    awk -F '\t' -v t="$task" '$1 != t' "$pc" > "$pc.fm-test.$$" && mv -f "$pc.fm-test.$$" "$pc"
-    if [ "$had_pc" = 0 ] && [ ! -s "$pc" ]; then rm -f -- "$pc"; fi
-  fi
-  [ ! -e "$canary" ] || fail "fm_test_drain_presented: could not remove $canary"
-  [ -z "$bad" ] || fail "no proof of a complete drain view before an absence check: $bad"$'\n'"--- drain stdout ---"$'\n'"$out"
-  rows=$(printf '%s\n' "$out" | awk '
-    /^OPEN DECISIONS \(still open/ { on = 1; next }
-    on && /^OPEN DECISIONS: close one by answering it: / { on = 0 }
-    on { print }')
-  # shellcheck disable=SC2034 # The results are read by the calling suite.
-  FM_TEST_DRAIN_OUT=$out
-  # shellcheck disable=SC2034 # The results are read by the calling suite.
-  FM_TEST_DRAIN_ROWS=$rows
-  only=0
-  case "$rows" in "$row_prefix"*) [ "$(printf '%s\n' "$rows" | grep -c .)" != 1 ] || only=1 ;; esac
-  # shellcheck disable=SC2034 # The results are read by the calling suite.
-  FM_TEST_DRAIN_ONLY_CANARY=$only
+  [ -z "$(tail -c 1 "$dir/state/$task.status")" ] || printf '\n' >> "$dir/state/$task.status"
+  printf 'needs-decision [key=%s]: canary that proves the fold read every line\n' "$canary" >> "$dir/state/$task.status"
+  rc=0
+  # shellcheck disable=SC2016 # Expanded by the child shell.
+  copied=$(bash -c '. "$1" && status_open_decisions "$2"' _ "$lib" "$dir/state/$task.status" 2>"$err") || rc=$?
+  [ "$rc" -eq 0 ] && [ ! -s "$err" ] \
+    || { e=$(cat "$err"); rm -rf -- "$dir"; fail "fold check: the fold of the copied log exited $rc: $e"; }
+  rm -rf -- "$dir"
+  printf '%s\n' "$copied" | awk -F '\t' -v c="$canary" '$1 == c { n++ } END { exit n != 1 }' \
+    || fail "fold check: the fold of $task's log did not reach its last line (no canary): $copied"
+  [ "$(printf '%s\n' "$copied" | awk -F '\t' -v c="$canary" '$1 != c && $0 != ""')" = "$(printf '%s\n' "$direct" | awk '$0 != ""')" ] \
+    || fail "fold check: the direct fold and the full-read fold of $task's log differ"$'\n'"direct: $direct"$'\n'"full: $copied"
+  # shellcheck disable=SC2034 # Read by the calling suite.
+  FM_TEST_FOLD_OPEN=$direct
+}
+
+# fm_test_fold_key_open <key>: 0 when the last fm_test_fold_proven read lists <key>
+# as open (exact key match), 1 when it does not.
+fm_test_fold_key_open() {
+  printf '%s\n' "$FM_TEST_FOLD_OPEN" | awk -F '\t' -v k="$1" '$1 == k { f = 1 } END { exit !f }'
 }
 
 # fm_launch_holds <launch-text> <token>: the launch holds <token> as written or
