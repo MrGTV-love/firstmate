@@ -1187,26 +1187,47 @@ def m1876_registration_under_lock():
     harm('m1876-registration-outside-lock', probe.get('held') is True, probe)
 
 
+def noted_unknowns():
+    # The engine's unknown collector, cleared, or None at an engine without one.
+    found = getattr(engine, '_unknown', None)
+    if isinstance(found, list):
+        found.clear()
+        return found
+    return None
+
+
 def m1876_claim_stat():
-    # Finding 6: this start's own enclosing entry has a claim whose stat fails: unknown, never "unclaimed": the decision
-    # waits. Read as unclaimed, the entry is skipped as this start's own and 8 admits against 10. Control: the claim is
-    # readable: counted, 11 against 10 waits.
+    # Finding 6: this start's own enclosing entry has a claim whose stat fails: unknown, never "unclaimed". Read as
+    # unclaimed, the entry is skipped as this start's own (no pending start counted, so the decision fits 8 against 10:
+    # the review's review_claim_stat_falsifier.py). At the census (the real kernel, so the holder is this process's
+    # parent): the entry is counted and the stat failure noted; the decision then waits naming the claim. Control: the
+    # claim is readable: counted, 11 against 10 waits.
     for label, denied in (('denied', True), ('readable', False)):
-        w = World('m1876-stat-' + label, available=10)
+        real_lstat, real_lexists = os.lstat, os.path.lexists
+        w = pending_world('m1876-stat-' + label)
         path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None),
                          claim=dict(pid=os.getpid(), nonce=None, seen=[], direct=True, client=os.getpid(), provisional=False))
-        real_lstat = os.lstat
 
         def lstat(target, *a, **k):
             if denied and str(target) == path + '.claimed':
                 raise PermissionError(13, 'Permission denied', str(target))
             return real_lstat(target, *a, **k)
         os.lstat = lstat
-        real_lexists = os.path.lexists
         os.path.lexists = lambda target: (False if denied and str(target) == path + '.claimed' else real_lexists(target))
         try:
+            noted = noted_unknowns()
+            count = engine.counted_pending(str(w.pool), set())
             if denied:
-                waits('m1876-claim-stat-unclaimed', w, unknown='.claimed')
+                harm('m1876-claim-stat-unclaimed', count == 1, count)
+                control(noted is not None and any('.claimed' in line for line in noted), 'the stat failure is noted', noted)
+            else:
+                control(count == 1, 'the readable claim is counted', count)
+            w.close()
+            w = World('m1876-stat-decision-' + label, available=10)
+            path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None),
+                             claim=dict(pid=os.getpid(), nonce=None, seen=[], direct=True, client=os.getpid(), provisional=False))
+            if denied:
+                waits('m1876-claim-stat-decision', w, unknown='.claimed')
             else:
                 waits('m1876-claim-stat-control', w, 11)
         finally:
@@ -1214,37 +1235,78 @@ def m1876_claim_stat():
 
 
 def m1876_short_pending_read():
-    # Finding 6: a pending entry read shorter than its file is unknown, never the prefix's entry: the decision waits.
+    # Finding 6: a pending entry read shorter than its file is unknown, never the prefix's entry (the review's
+    # review_claim_transitions_falsifier.py: a prefix ending at valid JSON was accepted). At the census the entry is
+    # unknown; the decision then waits naming it.
     entry = json.dumps(dict(holder=1, args=None, before=[], created_ns=1, client_nonce=None))
-    w = World('m1876-short-read')
-    path = w.pending(raw=(entry + ' trailing').encode())
     real_pread = os.pread
-    os.pread = lambda fd, size, offset: real_pread(fd, size, offset)[:len(entry)]
+    for build in (pending_world, World):
+        w = build('m1876-short-read-' + build.__name__.lower())
+        w.pending(raw=(entry + ' trailing').encode())
+        os.pread = lambda fd, size, offset: real_pread(fd, size, offset)[:len(entry)]
+        try:
+            if build is pending_world:
+                item = engine.pending_census(str(w.pool), set())[0]
+                w.close()
+                harm('m1876-short-pending-read-accepted', item['entry'] is None and not item['known'],
+                     {k: item.get(k) for k in ('entry', 'known')})
+            else:
+                waits('m1876-short-pending-read', w, unknown='pending start')
+        finally:
+            os.pread = real_pread
+
+
+def below_holder(holder, check):
+    # Runs CHECK with this process's ancestry read as HOLDER's line, so the enclosing entry of HOLDER is this start's
+    # own and reaches the own-entry skip (the admitted-client check); restored after.
+    real = engine.ancestors
+    engine.ancestors = lambda _: [holder, 1]
     try:
-        waits('m1876-short-pending-read', w, unknown='pending start')
+        return check()
     finally:
-        os.pread = real_pread
+        engine.ancestors = real
 
 
 def m1876_partial_process_table():
-    # Finding 6: the process table read for the admitted-client check ends in a partial record (the admitted client):
-    # unknown, so the enclosing entry is counted: 3 + 8 = 11 against 10 waits. Reading the table without that record
-    # skips the entry and admits 8.
-    w = World('m1876-partial-table', available=10)
-    w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None))
-    w.tail = kinfo(777, os.getppid(), 101000000)[:16]
-    waits('m1876-partial-process-table', w, 11)
+    # Finding 6: the process table read for the admitted-client check ends in a partial record (pid 777 below the
+    # holder 4242, running the admitted client): unknown, so the enclosing entry is counted: 3 + 8 = 11 against 10
+    # waits. Reading the table without that record skips the entry and admits 8 (the review's
+    # review_process_read_falsifier.py). Controls: the record whole, the client found: 11 waits; no child: skipped, 8.
+    args = ['axi', 'run', '--intent', 'x']
+    for label in ('partial', 'whole', 'none'):
+        w = World('m1876-table-' + label, available=10)
+        w.pending(dict(holder=4242, args=args, before=[], created_ns=1, client_nonce=None))
+        if label != 'none':
+            w.real_argv = True
+            w.argv[777] = (5, ['no-mistakes'] + args)
+        if label == 'partial':
+            w.tail = kinfo(777, 4242, 101000000)[:16]
+            below_holder(4242, lambda: waits('m1876-partial-process-table', w, 11))
+        elif label == 'whole':
+            w.process(777, parent=4242, start=101000000)
+            below_holder(4242, lambda: waits('m1876-partial-table-control', w, 11))
+        else:
+            below_holder(4242, lambda: admits(w, 8))
 
 
 def m1876_short_argv():
-    # Finding 6: a process below the holder whose argument record declares 3 words and carries 2 is unknown (it could be
-    # the admitted client): the enclosing entry is counted, 11 against 10 waits. Read as a shorter, nonmatching list,
-    # the entry is skipped and 8 admits.
-    w = World('m1876-short-argv', available=10).process(777, parent=os.getppid(), start=101000000)
-    w.real_argv = True
-    w.argv[777] = (3, ['no-mistakes', 'axi'])
-    w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None))
-    waits('m1876-short-argv', w, 11)
+    # Finding 6: a process below the holder 4242 whose argument record declares 5 words and carries 2 is unknown (it
+    # could be the admitted client): the enclosing entry is counted, 11 against 10 waits. Read as a shorter, nonmatching
+    # list, the entry is skipped and 8 admits. Controls: its whole record, not the client: skipped, 8 admits; the whole
+    # record of the client: counted, 11 waits.
+    args = ['axi', 'run', '--intent', 'x']
+    for label, record in (('short', (5, ['no-mistakes', 'axi'])), ('other', (1, ['bash'])),
+                          ('client', (5, ['no-mistakes'] + args))):
+        w = World('m1876-argv-' + label, available=10).process(777, parent=4242, start=101000000)
+        w.real_argv = True
+        w.argv[777] = record
+        w.pending(dict(holder=4242, args=args, before=[], created_ns=1, client_nonce=None))
+        if label == 'short':
+            below_holder(4242, lambda: waits('m1876-short-argv', w, 11))
+        elif label == 'other':
+            below_holder(4242, lambda: admits(w, 8))
+        else:
+            below_holder(4242, lambda: waits('m1876-short-argv-control', w, 11))
 
 
 def m1876_oversized_confirmation():
