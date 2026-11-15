@@ -6076,7 +6076,8 @@
       "owner": "bin/fm-teardown.sh",
       "sites": [
         {"file":"bin/fm-teardown.sh","match":"teardown-unlanded bypass"},
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 7},
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 8},
+        {"file": "bin/fm-teardown.sh", "match": "REFUSED: git would not remove task $ID's nested copy"},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
         {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2},

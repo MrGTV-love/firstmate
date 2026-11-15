@@ -4444,7 +4444,10 @@ teardown_release_enclosing_slot() {
 #      peer, other record, foreign or unregistered copy, live process, or dirt,
 #      and requires the root's HEAD landed (an anchor alone is not enough to
 #      reset a root nobody claims);
-#   3. the ordinary own-copy cleanup (teardown_nested_slot return) runs;
+#   3. the task's own proven copies are removed by a plain git worktree remove,
+#      never --force (the route is non-forcing in git too): a copy Git refuses
+#      to remove stays, and the refusal keeps the record and return-pending
+#      marker;
 #   4. teardown_unclaimed_slot_release repeats every check, returns the slot by
 #      an exact, conditional, non-forced treehouse return with EOF stdin
 #      (never teardown_treehouse_return, which adds --force), and reads the
