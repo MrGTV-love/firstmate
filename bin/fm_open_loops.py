@@ -14,6 +14,7 @@ import re
 import runpy
 import signal
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -38,6 +39,9 @@ GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
 RECEIPT_SECONDS = int(dt.timedelta(hours=4).total_seconds())  # policy: current-turn receipt answer bound
 RECORD_NAME = re.compile(r"[0-9]+[.]msg")
+# A return-pending record holds three short lines (spawn_gen=, slot=, child=); a linked one is
+# read only up to this many bytes, and a longer target gives no evidence.
+LINKED_RECORD_MAX_BYTES = 4096
 REPLY_ID = re.compile(r"[0-9a-fA-F]{16}")  # bin/fm-pending-reply-lib.sh correlation id
 # A prerequisite carrying one of these overdue rows is stalled, missing or failed: it no longer carries a wait.
 PREREQUISITE_TROUBLE = ("stalled_worker", "missing_worker", "failed_task")
@@ -1104,6 +1108,42 @@ class Collector:
                 value = line[len("spawn_gen="):]
         return value
 
+    def linked_record_text(self, marker, task_id):
+        """The evidence text of a linked return-pending record, which counts as pending whatever it holds.
+
+        The target is read only when it is a regular file of at most LINKED_RECORD_MAX_BYTES and is not
+        another task's record; a FIFO, device, directory, oversized, missing or unreadable target, or another
+        task's record, gives empty text, the same outcome as an unreadable record.
+        """
+        try:
+            target = marker.resolve(strict=True)
+            if not stat.S_ISREG(os.lstat(target).st_mode):
+                return ""
+        except (OSError, RuntimeError, ValueError):
+            return ""
+        own = task_id + ".teardown-return-pending"
+        prefix = target.name.split(".", 1)[0]
+        if target.name.endswith(".teardown-return-pending") and target.name != own:
+            return ""
+        if prefix != task_id and (self.state / (prefix + ".meta")).exists():
+            return ""
+        try:
+            fd = os.open(target, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+        except OSError:
+            return ""
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_size > LINKED_RECORD_MAX_BYTES:
+                return ""
+            data = os.read(fd, LINKED_RECORD_MAX_BYTES + 1)
+        except OSError:
+            return ""
+        finally:
+            os.close(fd)
+        if len(data) > LINKED_RECORD_MAX_BYTES:
+            return ""
+        return data.decode("utf-8", "replace")
+
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
         for marker in self.state_files:
@@ -1118,12 +1158,7 @@ class Collector:
                 continue
             if not linked and self.spawn_gen(marker) != self.spawn_gen(meta):
                 continue
-            try:
-                text = marker.read_text()
-            except (OSError, ValueError):
-                if not linked:
-                    raise
-                text = ""
+            text = self.linked_record_text(marker, task_id) if linked else marker.read_text()
             fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
             child = f" for child {fields['child']}" if fields.get("child") else ""
             self.add("interrupted_teardown", task_id,
