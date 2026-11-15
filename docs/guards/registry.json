@@ -884,6 +884,10 @@
         },
         {
           "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: origin/HEAD of pooled worktree '$worktree' cannot be read (git exit $head_rc) after the move"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
           "match": "echo \"error: skipped copy '$skipped' cannot be resolved to a real path"
         },
         {

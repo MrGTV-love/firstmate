@@ -791,9 +791,9 @@ fm_slot_proof_drop() {
 # (an origin-less copy): only the clean tree and the holder rule apply.
 fm_slot_prove_idle() {
   local slot=$1 target=$2 project=${3:-} no_ancestry=${4:-} snap out head status settings tracked colliding reason=unknown_git_read
-  # A new proof starts a new copy: nothing has been written to it by this spawn yet.
-  FM_SLOT_PREPARED=0
-  FM_SLOT_PREPARE_DETACHED=0
+  # The proof never clears what the preparation recorded (FM_SLOT_PREPARED, FM_SLOT_PREPARE_DETACHED): a copy is re-proved
+  # after it was prepared on the relaunch and freshen routes, and a refusal after that is still a failure. The state is
+  # cleared where a new copy is acquired (spawn_skip_copy) and starts at zero for the process (Main 1925 F1).
   fm_slot_proof_drop
   [ -d "$slot" ] || { fm_slot_skip "$slot" unknown_git_read "the slot directory cannot be read"; return; }
   if [ -n "$target" ] && ! git -C "$slot" rev-parse --verify --quiet "$target^{commit}" >/dev/null 2>&1; then
@@ -896,6 +896,7 @@ fm_slot_apply_move() {
   fi
   if [ "$mode" = refused ]; then
     if [ "$prepared" = 1 ]; then
+      FM_SLOT_SKIP_REASON=refused_after_preparation
       note=
       [ -z "$expect" ] || note="the anchor ${expect%%=*} was created; "
       [ "$detached_flag" != 1 ] || note="${note}this spawn's preparation detached the copy from its branch; "

@@ -26,11 +26,15 @@ __fm_clock_jump() {
       __fm_accept_seen=$((__fm_accept_seen + 1))
       if [ -n "${FM_TEST_JUMP_AT_ACCEPT:-}" ] && [ "$__fm_accept_seen" = 2 ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
         SECONDS=$((SPAWN_ACQUIRE_T0 + FM_TEST_JUMP_AT_ACCEPT))
+        : > "${FM_TEST_JUMP_MARK:-/dev/null}"
       fi ;;
     # The custody scan that runs before every get: a jump here is time spent in the scan, between the two bound reads.
-    'fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1')
+    # BASH_COMMAND holds the simple command being run, never the "cmd || exit 1" list around it, so the pattern is the
+    # command alone. The DEBUG trap runs before the command: this is the custody scan between the two bound reads.
+    'fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE"')
       if [ -n "${FM_TEST_JUMP_AT_SCAN:-}" ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
         SECONDS=$((SPAWN_ACQUIRE_T0 + FM_TEST_JUMP_AT_SCAN))
+        : > "${FM_TEST_JUMP_MARK:-/dev/null}"
       fi ;;
   esac
   return 0

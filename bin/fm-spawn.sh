@@ -5128,7 +5128,13 @@ spawn_record_origin_refs() { # <worktree>
   [ "$SPAWN_MOVE_REF_TODO" = 1 ] || return 0
   spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$SPAWN_MOVE_DEFAULT" "$SPAWN_MOVE_ORIGIN_SHA"
   if [ "$SPAWN_MOVE_DISCOVERED" = 1 ]; then
-    current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)
+    # git exits 1 when origin/HEAD is not a symbolic ref (absent); any other failure is an unknown, never "absent" (Main 1925 O2).
+    local head_rc=0
+    current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null) || head_rc=$?
+    if [ "$head_rc" -gt 1 ]; then
+      echo "error: origin/HEAD of pooled worktree '$worktree' cannot be read (git exit $head_rc) after the move, so its state is unknown; refusing to launch" >&2
+      return 1
+    fi
     if [ "$current" != "refs/remotes/origin/$SPAWN_MOVE_DEFAULT" ] &&
       { [ -z "$current" ] ||
         ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1 ||
@@ -5137,6 +5143,7 @@ spawn_record_origin_refs() { # <worktree>
       git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$SPAWN_MOVE_DEFAULT" 2>/dev/null || true
     fi
   fi
+  return 0
 }
 
 # The whole freshness step for one copy: resolve, prove (unless the fresh-spawn loop already did), record the
@@ -5170,7 +5177,7 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$SPAWN_MOVE_TARGET' ('$SPAWN_MOVE_EXPECTED'); refusing to launch" >&2
     return 1
   fi
-  spawn_record_origin_refs "$worktree"
+  spawn_record_origin_refs "$worktree" || { SPAWN_APPLY_FAILED=1; return 1; }
 }
 
 herdr_projection_meta_field_exact() { # <meta> <key>
@@ -6515,6 +6522,8 @@ spawn_slot_refused() {
       echo "harness=$HARNESS"
       echo "kind=$KIND"
       echo 'recovery=slot-provision-refused'
+      # Why the copy is held (Main 1925 O1): the reason the slot step gave, or the provisioner's own refusal.
+      echo "slot_refusal_reason=${FM_SLOT_SKIP_REASON:-provisioner_refused}"
       echo "branch=${BRANCH:-fm/$ID}"
       [ -z "$MODE" ] || echo "mode=$MODE"
       [ -z "$YOLO" ] || echo "yolo=$YOLO"
