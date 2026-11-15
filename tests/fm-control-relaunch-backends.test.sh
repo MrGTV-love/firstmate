@@ -797,22 +797,36 @@ test_live_herdr_lifecycle_accepts_managed_launches() {
 }
 
 test_managed_herdr_relaunch_refuses_unproven_replacement_env() {
-  local dir id pin out rc CONTROL="$ROOT/bin/fm-control.sh"
-  for pin in missing mismatched unreadable; do
-    recovery_case_or_skip "replacement-env-$pin" "replacement-env-$pin" || return 0
+  local dir id pin harness out rc CONTROL="$ROOT/bin/fm-control.sh"
+  # wait_agent_state's alive branch, for omp and for claude: a replacement whose
+  # environment carries no matching pin is never confirmed; the claude control
+  # with a matching pin is (Main 1709 ruling 4).
+  for harness in omp claude; do
+  for pin in missing mismatched unreadable matching; do
+    [ "$harness:$pin" != omp:matching ] || continue
+    recovery_case_or_skip "repl-$harness-$pin" "repl-$harness-$pin" || return 0
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
     prepare_herdr_recovery "$dir" "$id" ship
+    if [ "$harness" = claude ]; then
+      printf 'harness=claude\nmodel=opus\neffort=high\n' >> "$dir/home/state/$id.meta"
+      printf claude > "$dir/fake/recovery-harness"
+    fi
     printf old > "$dir/fake/recovery-spawn-gen"
-    printf '%s' "$pin" > "$dir/fake/replacement-env"
+    [ "$pin" = matching ] || printf '%s' "$pin" > "$dir/fake/replacement-env"
     rc=0
     out=$(run_control "$dir" "$id" relaunch --note "continue managed work") || rc=$?
-    expect_code 1 "$rc" "$pin replacement env must refuse alive confirmation"$'\n'"$out"
-    assert_present "$dir/fake/launched-command" "$pin refusal must exercise a launched replacement"
-    assert_present "$dir/fake/herdr-agent-live" "$pin refusal must observe the replacement running"
-    [ "$(journal_field "$dir" "$id" phase)" = failed:launching ] || fail "$pin unproven replacement was confirmed"
-    assert_absent "$dir/home/state/.control-$id.lock" "$pin failed confirmation retained the control lock"
+    assert_present "$dir/fake/launched-command" "$harness/$pin must exercise a launched replacement"
+    assert_present "$dir/fake/herdr-agent-live" "$harness/$pin must observe the replacement running"
+    if [ "$pin" = matching ]; then
+      expect_code 0 "$rc" "$harness/$pin replacement must be confirmed alive"$'\n'"$out"
+      continue
+    fi
+    expect_code 1 "$rc" "$harness/$pin replacement env must refuse alive confirmation"$'\n'"$out"
+    [ "$(journal_field "$dir" "$id" phase)" = failed:launching ] || fail "$harness/$pin unproven replacement was confirmed"
+    assert_absent "$dir/home/state/.control-$id.lock" "$harness/$pin failed confirmation retained the control lock"
   done
-  pass "ordinary managed relaunch requires matching readable replacement pin for alive confirmation"
+  done
+  pass "ordinary managed relaunch requires matching readable replacement pin for alive confirmation, for omp and claude"
 }
 
 test_reboot_recovery_inspects_without_native_attribution() {
