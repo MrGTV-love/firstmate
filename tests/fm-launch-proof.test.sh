@@ -172,10 +172,15 @@ test_launch_proof_recorded_native_identity() {
   ps() {
     if [ "$*" = '-axo pid=,ppid=' ] && [ -n "$PARENTS" ]; then
       printf '%s\n' "$PARENTS"
+    elif [ "$*" = '-axo pid=,ppid=,pgid=' ]; then
+      # A claude refusal check reads the agent's process group: the probe alone.
+      printf '%s 1 %s\n' "$PID" "$PID"
     else
       command ps "$@"
     fi
   }
+  # The probe's kernel working directory, as the claude refusal check reads it.
+  lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "$PID" "$WORKTREE"; }
   process() { # <argv-json> [pid]
     INFO=$(jq -nc --argjson argv "$1" --argjson pid "${2:-$PID}" --arg cwd "$WORKTREE" '
       {result:{type:"pane_process_info",process_info:{pane_id:"w1:p1",
@@ -252,14 +257,16 @@ test_launch_proof_recorded_native_identity() {
   foreground "$PID" "$CAT"
   PARENTS=$(printf '%s 1\n3 %s\n' "$PID" "$PID")
   attributed 'a normal pane with a present non-agent child must still attribute the agent'
+  # Main 1709 ruling 1: a listed process the later table lacks is unaccounted
+  # for, so the selector refuses rather than drop it.
   PARENTS=$(printf '%s 1\n' "$PID")
-  attributed 'a non-agent child gone from the process table must not fail attribution'
-  assert_proof managed 'a vanished non-agent child must leave the pinned agent managed'
+  unattributed 'a non-agent child gone from the process table refuses attribution'
+  assert_proof unknown 'a vanished non-agent child leaves the pinned agent unattributed'
   foreground "$PID" "$CAT" '{"pid":4,"name":"cat","argv0":"cat","argv":["cat"]}'
-  attributed 'several vanished non-agent children must not fail attribution'
+  unattributed 'several vanished non-agent children refuse attribution'
   foreground 999 "$SHELL_LEADER" "$CAT"
   PARENTS=$(printf '999 1\n%s 999\n' "$PID")
-  attributed 'a vanished child beside a launcher shell must not hide the pinned agent'
+  unattributed 'a vanished child beside a launcher shell refuses attribution'
   foreground "$PID" "$CAT"
   PARENTS=$(printf '4242 1\n3 %s\n' "$PID")
   unattributed 'an agent gone from the process table must not hand attribution to its child'
@@ -280,7 +287,7 @@ test_launch_proof_recorded_native_identity() {
   unattributed 'a vanished child must not make two agent candidates unique'
   PARENTS=
   stop_probe
-  pass 'a non-agent child that vanished between the two process reads no longer fails agent attribution'
+  pass 'a listed process that vanished between the two process reads refuses attribution'
 
   start_probe ''
   BRIEF="$(fm_brief_worker_role "$FM_HOME/state" t "$ROOT")"$'\n\nTask assigned by Firstmate.'
@@ -364,9 +371,10 @@ test_launch_proof_claude_verdict_and_refusal() (
     [ -f "$T/env-unreadable" ] && return 1
     [ ! -f "$T/env-bare" ] || { printf 'ONLY=1\n'; return; }
     printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
-  # The working directory is never proof: any cwd read is recorded.
-  # shellcheck disable=SC2329 # a stub the verdict must never call
-  lsof() { : > "$T/lsof-called"; return 1; }
+  # Any working-directory read is recorded: only the managed path reads it, as
+  # a refusal check (Main 1709 ruling 1), never as proof.
+  # shellcheck disable=SC2329 # the library's working-directory reader calls it
+  lsof() { : > "$T/lsof-called"; printf 'p53733\0\nfcwd\0n%s\0\n' "$LANE"; }
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane get w1:p2') [ ! -f "$T/pane-missing" ] || return 1; printf '{"result":{"pane":{"pane_id":"w1:p2"}}}' ;;
@@ -492,10 +500,11 @@ test_launch_proof_claude_verdict_and_refusal() (
   : > "$T/env-56557"
   refused_row unmanaged 'Main 022: an unreadable live group member of an unpinned agent still refuses'
   printf 'FM_SPAWN_GEN=%s\n' "$PIN_GEN" > "$T/env-extra"
-  verdict_once managed '(k) with a matching token the managed path keeps its base outcome, members unread'
-  [ ! -e "$T/reads-56557" ] || fail '(k) the managed path read a group member'
-  row '(k) a matching token, with an unreadable member present' "verdict $verdict"
-  rm -f "$T/env-56557" "$T/env-extra"
+  refused_row unknown 'Main 1709 ruling 1: a matching token never authorizes while a group member is unreadable'
+  rm -f "$T/env-56557"
+  verdict_once managed '(k) a matching token keeps its base outcome once every refusal check passes'
+  row '(k) a matching token, every refusal check passed' "verdict $verdict"
+  rm -f "$T/env-extra"
 
   # (j) legacy and other harnesses keep their pre-proof rules.
   meta_for claude ''
@@ -506,8 +515,226 @@ test_launch_proof_claude_verdict_and_refusal() (
   pass 'claude verdicts: only the launch record and its token prove an agent, each read once; no adoption record licenses anything'
 )
 
+# Main 1709 ruling 1 and Main 1716 (A, C): a matching token is managed only after
+# the refusal checks pass, in this order: the process table, each other group
+# member (one environment read each), the descendant rule, the agent's kernel
+# working directory, and the claim inventory. E3 (k) applies only after them.
+# Every reader is synthetic; no real process, pane or home is read.
+test_launch_proof_claude_refusal_checks() (
+  local T="$TMP/refusal-checks"
+  local H="$T/home" LANE="$T/lane" META verdict out
+  mkdir -p "$H/state" "$LANE" "$T/elsewhere"
+  META="$H/state/lane.meta"
+  local G=s1793120312.10459.5003
+  # The recorded d1 shape (evidence real-lanes.txt): the TeamClaude node wrapper
+  # is attributed, claude is its child, a tool process is claude's child.
+  world() {
+    rm -rf "$T/w"; mkdir -p "$T/w"
+    printf '%s\n' '500 1 500' '53539 500 53539' '53733 53539 53539' '56557 53733 53539' > "$T/w/table"
+    printf '%s\n' '[{"pid":56557,"name":"railway","argv0":"railway"},{"pid":53733,"name":"2.1.316","argv0":"claude"},{"pid":53539,"name":"node","argv0":"node"}]' > "$T/w/fg"
+    printf '53539' > "$T/w/group"
+    local p
+    for p in 53539 53733 56557; do printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=%s\n' "$G" > "$T/w/env-$p"; done
+    printf '%s' "$LANE" > "$T/w/cwd"
+    printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=claude\nkind=secondmate\nspawn_gen=%s\nworktree=%s\nhome=%s\nlaunch_proof=env-v1\n' \
+      "$G" "$LANE" "$LANE" > "$META"
+    find "$H/state" -name '*.meta' ! -name lane.meta -exec rm -f {} +
+    rm -rf "$T/A|$T" "$T/B" "$T/C" "$H/data"
+  }
+  ps() {
+    case "$*" in
+      '-axo pid=,ppid=')
+        awk '{print $1, $2}' "$T/w/table"
+        [ ! -f "$T/w/ps-fail" ] || return 1 ;;
+      '-axo pid=,ppid=,pgid=')
+        [ ! -f "$T/w/pgid-fail" ] || { head -1 "$T/w/table"; return 1; }
+        if [ -f "$T/w/no-agent" ]; then grep -v '^53539 ' "$T/w/table"; else cat "$T/w/table"; fi ;;
+      '-p '*' -o ppid=')
+        local p=${*#-p }; p=${p%% *}
+        if [ -f "$T/w/live-ppid-$p" ]; then cat "$T/w/live-ppid-$p"; else awk -v p="$p" '$1 == p {print $2}' "$T/w/table"; fi ;;
+      *) return 1 ;;
+    esac
+  }
+  fm_remote_herdr_process_env() {
+    printf x >> "$T/w/reads-$1"
+    [ -f "$T/w/env-$1" ] || return 1
+    cat "$T/w/env-$1"
+  }
+  # shellcheck disable=SC2329 # the library's working-directory reader calls it
+  lsof() {
+    [ ! -f "$T/w/cwd-fail" ] || return 1
+    printf 'p53539\0\nfcwd\0n%s\0\n' "$(cat "$T/w/cwd")"
+    [ ! -f "$T/w/cwd-partial" ] || return 1
+  }
+  fm_backend_herdr_cli() {
+    case "$*" in
+      'lab pane process-info --pane w1:p2')
+        jq -nc --argjson fg "$(cat "$T/w/fg")" --argjson group "$(cat "$T/w/group")" \
+          '{result:{type:"pane_process_info",process_info:{pane_id:"w1:p2",foreground_process_group_id:$group,foreground_processes:$fg}}}' ;;
+      *) return 1 ;;
+    esac
+  }
+  row() { [ -z "${FM_TEST_ROWS:-}" ] || printf 'ROW %-90s | %s\n' "$1" "$2"; }
+  # judged <expected-verdict> <row> [<cause substring>]
+  judged() {
+    verdict=$(fm_launch_proof_herdr "$META")
+    assert_equals "$1" "$verdict" "$2"
+    if [ "$1" = managed ]; then
+      fm_launch_proof_herdr_authorizes "$META" || fail "$2: a managed agent was refused"
+      row "$2" "verdict managed; authorized"
+      return 0
+    fi
+    out=$(fm_launch_proof_herdr_refusal "$META") && fail "$2: authorized"
+    [ -z "${3:-}" ] || assert_contains "$out" "$3" "$2: names its cause"
+    assert_not_contains "$out" 'adopt' "$2: never names adopt"
+    row "$2" "verdict $verdict; refused: ${out%%;*}"
+  }
+
+  world
+  rm -f "$T"/w/reads-*
+  judged managed '(k) the recorded d1 shape with a matching token passes every refusal check'
+  for p in 53539 53733 56557; do
+    [ "$(cat "$T/w/reads-$p" 2>/dev/null)" = x ] || fail "(k) the environment of $p was not read exactly once"
+  done
+
+  # Members, one environment read each (falsify-matching-pin.py).
+  world; printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=s9.9.9\n' > "$T/w/env-56557"
+  judged pinned-elsewhere '(e) a matching token with a group member pinned to another generation' 'pinned to another launch generation'
+  world; rm "$T/w/env-56557"
+  judged unknown 'Main 1716 (A): a matching token with an unreadable group member' 'environment of live group process 56557 cannot be read'
+  world; printf 'ONLY=1\n' > "$T/w/env-56557"
+  judged unknown '(g) a matching token with a member whose environment shows neither PATH nor HOME' 'environment of live group process 56557 cannot be read'
+  world; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-56557"
+  judged managed 'control: a readable descendant without the token is the agent'"'"'s own'
+
+  # The descendant rule, as a refusal only.
+  world; printf '%s\n' '60000 500 53539' >> "$T/w/table"; printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=%s\n' "$G" > "$T/w/env-60000"
+  judged contested 'a readable group member that is neither the agent, its launcher nor its descendant' 'live group process 60000 is not the agent'
+  world; printf '1' > "$T/w/live-ppid-56557"
+  judged unknown 'a parent link that changed between the table and the live read' 'parent chain of live group process 56557 changed'
+  world
+  printf '%s\n' '400 1 400' '53539 400 400' '53733 53539 400' '56557 53733 400' > "$T/w/table"
+  printf '400' > "$T/w/group"
+  printf '%s\n' '[{"pid":400,"name":"zsh","argv0":"-zsh"},{"pid":56557,"name":"railway","argv0":"railway"},{"pid":53733,"name":"2.1.316","argv0":"claude"},{"pid":53539,"name":"node","argv0":"node"}]' > "$T/w/fg"
+  printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-400"
+  judged managed 'control: a launcher shell that leads the group is the agent'"'"'s ancestor'
+
+  # The process table.
+  world; : > "$T/w/pgid-fail"
+  judged unknown 'a process-group table that is partial or fails' 'process table could not be read'
+  world; : > "$T/w/no-agent"
+  judged unknown 'a process-group table that does not list the attributed agent' 'does not list the attributed agent'
+
+  # The agent's kernel working directory.
+  world; printf '%s' "$T/elsewhere" > "$T/w/cwd"
+  judged contested '(d) a matching token whose working directory is not the recorded home or worktree' 'working directory is not this task'
+  world; : > "$T/w/cwd-fail"
+  judged unknown 'a working directory that cannot be read' 'working directory cannot be read'
+  world; : > "$T/w/cwd-partial"
+  judged unknown 'a working-directory read that prints and then fails' 'working directory cannot be read'
+
+  # The claim inventory, in this home and in the homes its records name.
+  world; printf 'window=lab:w1:p2\nharness=claude\n' > "$H/state/other.meta"
+  judged contested '(f) a matching token while another record claims the same pane' 'another task record (other.meta)'
+  world; printf 'window=lab:w7:p7\nherdr_session=lab\nherdr_pane_id=w1:p2\n' > "$H/state/other.meta"
+  judged contested '(f) another record names the same Herdr session and pane' 'another task record (other.meta)'
+  world; printf 'window=lab:w7:p7\nhome=%s\n' "$LANE" > "$H/state/other.meta"
+  judged contested 'another record names the same home' 'another task record (other.meta)'
+  world; printf 'window=lab:w7:p7\nworktree=%s\n' "$LANE" > "$H/state/other.meta"
+  judged contested 'another record names the same worktree' 'another task record (other.meta)'
+  world; printf 'window=lab:w1:p2\nremote_host=mini\n' > "$H/state/other.meta"
+  judged managed 'control: a remote record naming the same window is another host'"'"'s pane'
+  world; printf 'window=lab:w7:p7\n' > "$H/state/other.meta"; chmod 000 "$H/state/other.meta"
+  if [ -r "$H/state/other.meta" ]; then
+    pass 'skip: this user can read a mode-000 file, so the unreadable-record row cannot be staged'
+  else
+    judged unknown 'a task record that cannot be read' 'cannot all be read'
+  fi
+  chmod 600 "$H/state/other.meta"
+  # D2: a home path that contains the separator of a joined seen-list.
+  world
+  mkdir -p "$T/A|$T/B/state" "$T/B/state"
+  printf 'window=lab:w8:p8\nkind=secondmate\nhome=%s\n' "$T/A|$T/B" > "$H/state/a-first.meta"
+  printf 'window=lab:w9:p9\nkind=secondmate\nhome=%s\n' "$T/B" > "$H/state/b-second.meta"
+  printf 'window=lab:w1:p2\n' > "$T/B/state/claimer.meta"
+  judged contested 'D2: a claim in a home whose path is a suffix of an earlier home'"'"'s path' 'another task record (claimer.meta)'
+  world; mkdir -p "$T/C/state"
+  printf 'window=lab:w8:p8\nkind=secondmate\nhome=%s\n' "$T/C" > "$H/state/c.meta"
+  printf 'window=lab:w9:p9\nkind=secondmate\nhome=%s\n' "$H" > "$T/C/state/back.meta"
+  judged managed 'control: a cycle of secondmate homes with no competing claim ends'
+  world; printf 'window=lab:w8:p8\nkind=secondmate\nhome=%s\n' "$T/gone" > "$H/state/gone.meta"
+  judged unknown 'a secondmate home named by a record whose task records cannot be read' 'cannot all be read'
+  world; mkdir -p "$H/data"; printf -- '- local-gone - test home (home: %s; scope: test; projects: none; added 2026-11-15)\n' "$T/missing-home" > "$H/data/secondmates.md"
+  judged unknown 'a registered local home that cannot be reached' 'cannot all be read'
+  rm -rf "$H/data"
+
+  # Main 1716 (C): on the host verb path only the record's own state directory
+  # and the home it names are read, without bin/fm-wake-lib.sh.
+  world; mkdir -p "$H/data"; printf -- '- local-gone - test home (home: %s; scope: test; projects: none; added 2026-11-15)\n' "$T/missing-home" > "$H/data/secondmates.md"
+  verdict=$(FM_LAUNCH_PROOF_VERB_PATH=1 fm_launch_proof_herdr "$META")
+  assert_equals managed "$verdict" 'C2 control: the verb path does not walk the root inventory'
+  mkdir -p "$LANE/state"; printf 'window=lab:w1:p2\n' > "$LANE/state/crew.meta"
+  verdict=$(FM_LAUNCH_PROOF_VERB_PATH=1 fm_launch_proof_herdr "$META")
+  assert_equals contested "$verdict" 'C2: the verb path reads the home the record names'
+  rm -rf "$LANE/state" "$H/data"
+  world; sed "s|^home=.*|home=$T/gone|" "$META" > "$META.next"; mv "$META.next" "$META"
+  verdict=$(FM_LAUNCH_PROOF_VERB_PATH=1 fm_launch_proof_herdr "$META")
+  assert_not_equals managed "$verdict" 'C2: the verb path refuses when the named home cannot be read'
+
+  # Ruling 2 (Main 1716 B): only a positively read record decides legacy or versioned.
+  world; rm -f "$T"/w/env-*; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-53539"
+  printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-53733"; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-56557"
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'an unpinned versioned record was authorized'
+  grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"
+  fm_launch_proof_herdr_authorizes "$META" || fail '(j) control: a record with no launch_proof line keeps its legacy authorization'
+  fm_launch_proof_record_legacy "$META" || fail '(j) control: a record with no launch_proof line is legacy'
+  for shape in 'env-v1,' ',' 'env-v1,env-v1' 'env-v9'; do
+    grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"
+    printf '%s\n' "$shape" | tr ',' '\n' | sed '/^$/d;s/^/launch_proof=/' >> "$META"
+    case "$shape" in ','|'env-v1,') printf 'launch_proof=\n' >> "$META" ;; esac
+    out=$(fm_launch_proof_herdr_refusal "$META") && fail "a record with launch_proof lines '$shape' was authorized"
+    fm_launch_proof_record_legacy "$META" && fail "a record with launch_proof lines '$shape' was read as legacy"
+    assert_not_equals managed "$(fm_launch_proof_herdr "$META")" "launch_proof lines '$shape' are not managed"
+  done
+  grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"; printf 'launch_proof=env-v1\nlaunch_proof=\n' >> "$META"
+  out=$(fm_launch_proof_herdr_refusal "$META") && fail 'a duplicated launch_proof was authorized'
+  assert_contains "$out" 'launch record' 'the record cause names the launch record'
+  rm -f "$META"
+  fm_launch_proof_herdr_authorizes "$META" && fail 'a missing record was authorized'
+  fm_launch_proof_record_legacy "$META" && fail 'a missing record was read as legacy'
+  pass 'a matching token is managed only after the table, member, descendant, cwd and claim checks pass; only one well-formed record decides'
+)
+
+# Main 1709 ruling 1: the foreground selector refuses when a listed process is
+# missing from the later table, or when that table read fails or is partial
+# (falsify-missing-foreground.py), for any harness.
+test_launch_proof_selector_refuses_missing_or_failed_reads() (
+  local T="$TMP/selector" META scenario harness
+  mkdir -p "$T"
+  META="$T/sel.meta"
+  printf 'window=lab:w1:p2\nharness=claude\nspawn_gen=s1\nlaunch_proof=env-v1\n' > "$META"
+  ps() {
+    [ "$*" = '-axo pid=,ppid=' ] || return 1
+    printf '3101 1\n'
+    case "$scenario" in stable) printf '3102 3101\n' ;; missing-member) ;; partial-failure) return 1 ;; esac
+  }
+  for harness in claude omp; do
+    fm_backend_herdr_cli() {
+      printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":3101,"foreground_processes":[{"pid":3101,"name":"%s","argv0":"%s"},{"pid":3102,"name":"helper","argv0":"helper"}]}}}' "$harness" "$harness"
+    }
+    scenario=stable
+    assert_equals 3101 "$(fm_launch_proof_herdr_pid "$META")" "$harness control: a stable table attributes the agent"
+    for scenario in missing-member partial-failure; do
+      fm_launch_proof_herdr_pid "$META" >/dev/null && fail "$harness $scenario: the selector attributed a foreground"
+    done
+  done
+  pass 'the foreground selector refuses a listed process missing from the table and a failed or partial table read'
+)
+
 fm_test_only
 test_launch_proof_omp_executable_identity
 test_launch_proof_recorded_native_identity
 test_launch_proof_pinned_personal_switch
 test_launch_proof_claude_verdict_and_refusal
+test_launch_proof_claude_refusal_checks
+test_launch_proof_selector_refuses_missing_or_failed_reads
