@@ -1168,8 +1168,8 @@ class Watch:
     def proof_of_this_run(self):
         """Slack's own answer to conversations.open for the id the setting names, made in this run: the one made while waiting for the lock, if it was made for
         this id, else a new call. Used once; H2 stays: every run proves their DM with Slack."""
-        early, self.early_proof = self.early_proof, None
-        if self.is_second and self.owner is not self:
+        early, self.early_proof = getattr(self, 'early_proof', None), None
+        if getattr(self, 'is_second', False) and getattr(self, 'owner', self) is not self:
             self.owner.early_proof = None
         if early and early[0] == self.second:
             return early[1]
@@ -1288,7 +1288,7 @@ class Watch:
     def take_binding(self, held):
         """The binding fence, shared. Inside the second person's budget (round 8, R8) it is waited for only until their deadline: a fence still held by an unbind
         then ends their pass with nothing posted (no attempt mark is written before the fence is held), and a later sweep goes on. The owner waits as before."""
-        deadline = self.budget_deadline
+        deadline = getattr(self, 'budget_deadline', None)
         if deadline is None:
             fcntl.flock(held, fcntl.LOCK_SH)
             return
@@ -3180,7 +3180,7 @@ class Watch:
         try:
             view = self.second_view()
             view.state['cap_left'] = {'left': max(0, left), 'fresh': True, 'clock_first': self.clock_first, 'clock_last': self.clock_last, 'complete': True,
-                                      'at': self.run_wall}
+                                      'at': getattr(self, 'run_wall', None)}
             view.commit()
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
@@ -3189,7 +3189,7 @@ class Watch:
         """Before any owner work of the owner's check: their check of this sweep is left 0 until the owner's work ends and leave_cap records what it left."""
         try:
             view = self.second_view()
-            view.state['cap_left'] = {'left': 0, 'fresh': True, 'at': self.run_wall}
+            view.state['cap_left'] = {'left': 0, 'fresh': True, 'at': getattr(self, 'run_wall', None)}
             view.commit()
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
@@ -3204,8 +3204,10 @@ class Watch:
         # record, or one this check cannot mark as used, they take nothing this sweep, and what waits is taken by a later one.
         left = ledger.get('left') if ledger.get('fresh') and isinstance(ledger.get('left'), int) and not isinstance(ledger.get('left'), bool) else 0
         # A hand-over written before the watcher's last end-of-sweep mark belongs to an earlier sweep: never used (R5 of the review of 64ac348b).
-        if ledger.get('fresh') and self.stale_hand_over(ledger):
+        previous = view.state.get('second_started')
+        if ledger.get('fresh') and self.stale_hand_over(ledger, previous):
             left = 0
+        view.state['second_started'] = getattr(self, 'run_wall', None)
         # A hand-over the owner's check did not complete carries no Slack clock: this run then records no completed-run time, so the host's clock never
         # replaces Slack's (R4 of the review of 64ac348b).
         self.hand_over_incomplete = bool(ledger.get('fresh')) and not ledger.get('complete')
@@ -3224,14 +3226,22 @@ class Watch:
             pass
         self.record_run_safely()
 
-    def stale_hand_over(self, ledger):
-        mark = self.root.parent / '.last-check'
+    def stale_hand_over(self, ledger, previous=None):
+        """Whether a hand-over belongs to an earlier sweep (R5 of the review of 64ac348b), so it is never used: it has no date; or its owner's check began
+        before their own previous check began (previous, from their journal); or before the watcher's last end-of-sweep mark (state/.last-check)."""
+        at = ledger.get('at')
+        if not isinstance(at, (int, float)) or isinstance(at, bool):
+            return True
+        if isinstance(previous, (int, float)) and not isinstance(previous, bool) and at <= previous:
+            return True
+        root = getattr(self, 'root', None)
+        if root is None:
+            return False
         try:
-            ended = mark.stat().st_mtime
+            ended = (root.parent / '.last-check').stat().st_mtime
         except OSError:
             return False
-        at = ledger.get('at')
-        return not isinstance(at, (int, float)) or isinstance(at, bool) or at <= ended
+        return at <= ended
 
     def remember_safely(self):
         """Record the id the setting names (record_second_id); kept as the one call every entry point makes. It raises when the id cannot be recorded at all."""
@@ -3356,7 +3366,7 @@ class Watch:
             plan = self.read_requests(max(remaining, 1), second)
             if self.second_reads > reads:
                 self.state['backlog'] = plan is None or self.ready_requests(plan) > max(remaining, 0)
-                if remaining <= 0 and self.state['backlog'] and not self.slots_given:
+                if remaining <= 0 and self.state['backlog'] and not getattr(self, 'slots_given', False):
                     self.state['turn'] = 'second'               # the owner's work had this sweep's slot: the next contested one is theirs
                 self.commit()
             if remaining <= 0:
