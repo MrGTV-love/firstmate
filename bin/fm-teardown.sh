@@ -351,8 +351,10 @@
 # untracked files under .claude only; the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
-# the final project-lock wait, so the driver never runs while the lock is held,
-# except when teardown keeps project custody through the return. A lock in any
+# the final project-lock wait, so the driver never runs while the lock is held;
+# when teardown keeps project custody through the return (the slot's state
+# cannot be proved), a locked copy is deferred and named instead, and is not
+# released in that pass. A lock in any
 # other format, a driver refusal (except the dead-launcher takeover in the
 # creation-lock paragraph above, which releases the copy itself), or a copy still
 # registered afterwards refuses.
@@ -365,15 +367,22 @@
 # driver route instead of a forced removal, before the final project-lock wait
 # like a foreign copy, after the clean and landed proof and the same ignored-file,
 # record, process and launcher proofs; an own copy that is not locked is removed
-# with git worktree remove --force after the same final removal proof
-# (teardown_removal_final_proof): its HEAD held by a proof of this run, its
-# status clean under the first proof's dirt rule, and its ignored files preserved
-# again (or, for a copy only a bundle or default-branch history admitted, none
-# outside the allow-list). A scout's or secondmate's copy, declared scratch,
-# skips that proof as it skips the landed-work rule. The removal still needs
-# --force for an untracked file the dirt rule exempts (under .claude) and for
-# a checked-out submodule of the copy's own repository, not only for ignored
-# files.
+# with a plain git worktree remove, so Git itself refuses any untracked byte or
+# checked-out submodule, after the final removal proof.
+# The final removal proof (teardown_removal_final_proof) runs immediately before
+# every removal: after the direct release's last unlock, just before the
+# driver's execute call (after the lock is read again and found unchanged), and
+# just before each foreign and own nested git worktree remove. It refuses on any
+# input it cannot prove: the HEAD; the status, under a dirt rule that exempts
+# only .claude/settings.local.json and the turn-end markers; every proof that
+# admitted the copy in this run (anchor, landing or bundle, recorded where it was
+# taken) and the bundle that admitted the cleanup, rechecked, never replaced by
+# another; the ignored files, preserved again outside every removal root with
+# the preserved payload hashed against its manifest and the copy (or, for a copy
+# only a bundle or default-branch history admitted, none outside the
+# allow-list); and a locked copy's launcher by pid and start time. A scout's or
+# secondmate's copy, declared scratch, and an operator --force keep the forced
+# removal and skip that proof, as they skip the landed-work rule.
 # Apart from the held-copy rule below, every other case, including a half-removed
 # copy, refuses as before; --force never waives these proofs. The by-hand route
 # for the facts that remain is in docs/agent-control.md.

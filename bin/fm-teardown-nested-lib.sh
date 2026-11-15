@@ -69,8 +69,8 @@
 # untracked files under .claude only; the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
-# the final project-lock wait, so the driver never runs while the lock is held,
-# except when teardown keeps project custody through the return.
+# the final project-lock wait, so the driver never runs while the lock is held;
+# under project custody kept through the return a locked copy is deferred.
 #
 # Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh and bin/fm-refuse-lib.sh first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, DATA, META,
