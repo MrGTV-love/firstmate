@@ -1644,6 +1644,10 @@ test_ship_scaffolds_teach_the_closes_line() {
       assert_grep '<!-- firstmate-backlog-closes:end -->' "$brief" "$mode/$forge ship brief did not teach the closes block's end line"
       assert_grep 'exactly one closes block' "$brief" "$mode/$forge ship brief did not say the body holds exactly one closes block"
       assert_no_grep 'in a paragraph of directive lines alone' "$brief" "$mode/$forge ship brief still teaches the old paragraph rule"
+      # Main 044: the block sits at the top level, above any text that can open an example.
+      assert_grep 'at the top of the PR body, above any code fence' "$brief" "$mode/$forge ship brief did not say the block goes above every code fence and element"
+      assert_grep 'a quoted example closes nothing' "$brief" "$mode/$forge ship brief did not say a quoted example closes nothing"
+      assert_grep 'if any of that text sits above the block' "$brief" "$mode/$forge ship brief's body check does not cover text above the block"
       if [ "$mode" = no-mistakes ]; then
         # The pipeline writes the PR body after the handoff, so the check belongs after the
         # CI-ready return point and before the CI-ready done, never before the handoff done.

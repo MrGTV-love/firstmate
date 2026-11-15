@@ -646,6 +646,7 @@ STUB
       assert_grep "Closes-backlog-item: $id" "$payload" "$mode: the delivered ship instructions did not teach the Closes-backlog-item: line"
       assert_grep "Closes-backlog-item: $id" "$home/data/$id/brief.md" "$mode: the relaunch brief did not teach the Closes-backlog-item: line"
       assert_grep '<!-- firstmate-backlog-closes:begin -->' "$payload" "$mode: the delivered ship instructions did not teach the closes block"
+      assert_grep 'at the top of the PR body, above any code fence' "$payload" "$mode: the delivered ship instructions did not say where the block goes"
     fi
   done
   pass "promotion teaches the Closes-backlog-item: line in the delivered text and the relaunch brief for PR modes only"

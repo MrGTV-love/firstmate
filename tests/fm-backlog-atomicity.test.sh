@@ -1622,6 +1622,21 @@ test_completion_refuses_a_legacy_record_without_an_incarnation() {
   pass "completion leaves legacy records open when no incarnation can be recorded"
 }
 
+# stored_deps <case-dir> <id>: the item's stored blocked-by list, read back from the backlog.
+stored_deps() {
+  tasks-axi show "$2" --file "$(backlog_of "$1")" 2>/dev/null | sed -n 's/^  deps: *//p' | tr -d '"' | sed 's/blocked-by://g; s/ //g'
+}
+
+# assert_teardown_edges <case-dir> <finished-id> <dep> <label>: the dependent lost its stored edge
+# on the finished item, kept its other blocker and kept its hold (Main 044 F6).
+assert_teardown_edges() {
+  local deps
+  deps=$(stored_deps "$1" "$3")
+  case ",$deps," in *",$2,"*) fail "$4: the dependent still stores the finished edge ($deps)" ;; esac
+  case ",$deps," in *",$3-other,"*) ;; *) fail "$4: the dependent lost its other blocker ($deps)" ;; esac
+  tasks-axi show "$3" --file "$(backlog_of "$1")" 2>/dev/null | grep -q 'hold_kind: future' || fail "$4: the dependent lost its hold"
+}
+
 test_a_legacy_record_teardown_clears_the_finished_blocker_with_no_timeout_wrapper() {
   local case_dir id meta out dep
   id=atomic-legacy-unblock-b7
@@ -1629,7 +1644,10 @@ test_a_legacy_record_teardown_clears_the_finished_blocker_with_no_timeout_wrappe
   case_dir=$(make_home legacy-unblock)
   add_item "$case_dir" "$id"
   add_item "$case_dir" "$dep"
+  add_item "$case_dir" "$dep-other"
   tasks-axi block "$dep" --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block "$dep" --by "$dep-other" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi hold "$dep" --reason "wait for a date" --kind future --file "$(backlog_of "$case_dir")" >/dev/null
   start_item "$case_dir" "$id"
   write_task_meta "$case_dir" "$id" ship local-only
   meta="$(home_of "$case_dir")/state/$id.meta"
@@ -1639,7 +1657,8 @@ test_a_legacy_record_teardown_clears_the_finished_blocker_with_no_timeout_wrappe
   assert_absent "$meta" "legacy-record teardown left the task record"
   [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "legacy-record teardown left the item $(row_state "$case_dir" "$id"): $out"
   assert_contains "$out" "unblocked: $dep no longer waits on $id" "legacy-record teardown did not report the cleared edge"
-  pass "a --legacy-record teardown closes the item and clears its dependents, run with no timeout wrapper"
+  assert_teardown_edges "$case_dir" "$id" "$dep" "legacy-record teardown"
+  pass "a --legacy-record teardown closes the item and clears its dependents' stored edge, keeps their other blocker and hold, run with no timeout wrapper"
 }
 
 # The missing-copy scenario of the earlier lab: the task's copy is gone, so teardown may
@@ -1655,7 +1674,10 @@ test_a_missing_copy_teardown_with_a_merged_pr_proof_closes_the_item_and_clears_t
   case_dir=$(make_home missing-copy)
   add_item "$case_dir" "$id"
   add_item "$case_dir" "$dep"
+  add_item "$case_dir" "$dep-other"
   tasks-axi block "$dep" --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block "$dep" --by "$dep-other" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi hold "$dep" --reason "wait for a date" --kind future --file "$(backlog_of "$case_dir")" >/dev/null
   start_item "$case_dir" "$id"
   if [ -n "${FM_LAB_MERGED_PR:-}" ]; then
     pr=$FM_LAB_MERGED_PR
@@ -1683,8 +1705,9 @@ SH
   [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "missing-copy teardown left the item $(row_state "$case_dir" "$id"): $out"
   assert_grep "$pr" "$(backlog_of "$case_dir")" "the closed item does not carry the merged PR as its proof"
   assert_contains "$out" "unblocked: $dep no longer waits on $id" "missing-copy teardown did not report the cleared edge"
+  assert_teardown_edges "$case_dir" "$id" "$dep" "missing-copy teardown"
   printf 'missing-copy proof source: %s\n' "$source" >&2
-  pass "a missing-copy teardown closes the item on a merged PR proof read from the forge and clears its dependents ($source)"
+  pass "a missing-copy teardown closes the item on a merged PR proof read from the forge and clears its dependents' stored edge, keeping their other blocker and hold ($source)"
 }
 
 test_completion_refuses_ambiguous_incarnation_metadata() {
