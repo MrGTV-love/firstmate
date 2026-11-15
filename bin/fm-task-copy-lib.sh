@@ -218,9 +218,10 @@ FM_TASK_COPY_MANAGED_FILES=(
 # exactly one of FM_TASK_COPY_MANAGED_FILES does not count, and neither does the
 # untracked entry of each of the task's own <nested-copy> paths inside <copy>,
 # since each of those is preserved or proved on its own, nor the exact "?? <rel>/"
-# entry of a worktree that `git worktree list --porcelain -z`, read once, names
-# for <copy>'s repository strictly inside <copy> (canonical paths compared); an
-# unreadable list leaves every such entry counted. Any other untracked file,
+# entry, with <rel> under <copy>'s .claude/worktrees/, of a worktree that
+# `git worktree list --porcelain -z`, read once, names for <copy>'s repository
+# (canonical paths compared); a registered worktree anywhere else, and every such
+# entry when the list cannot be read, counts. Any other untracked file,
 # under .claude or anywhere else, is the copy's own work.
 fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
   local status=$1 copy=${2:-} line nested managed rel inner token listed=
@@ -238,7 +239,7 @@ fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
       esac
     done
     case "$line" in
-      '?? '?*/)
+      '?? .claude/worktrees/'?*/)
         if [ -n "$copy" ] && [ -z "$listed" ]; then
           listed=bad
           entries=()
@@ -261,7 +262,7 @@ fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
           rel=${rel%/}
           if inner=$(fm_task_copy_canonical_dir "$copy/$rel"); then
             case "$inner" in
-              "$copy"/?*)
+              "$copy"/.claude/worktrees/?*)
                 for token in ${registered[@]+"${registered[@]}"}; do
                   [ "$token" != "$inner" ] || continue 2
                 done

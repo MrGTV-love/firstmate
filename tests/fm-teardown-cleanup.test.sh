@@ -8852,20 +8852,21 @@ BODY
 }
 
 # Main 1881 (C2-1): the root dirt rule skips the untracked entry of a worktree
-# registered to the copy's own repository strictly inside the copy (the nested
-# copy Vernant makes at <slot>/.claude/worktrees/<x>); an unregistered directory
+# registered to the copy's own repository under the copy's .claude/worktrees/
+# (the nested copy Vernant makes there); one elsewhere, an unregistered directory
 # or repository of that name, or an unreadable worktree list, is still dirt.
 test_pr400_registered_nested_worktree_is_not_root_dirt() {
   local body=$TMP_ROOT/pr400-body-nested-worktree.sh
   cat > "$body" <<'BODY'
-for shape in registered unregistered-file unregistered-repo unreadable; do
+for shape in registered registered-elsewhere unregistered-file unregistered-repo unreadable; do
   r5_repo "$shape"
   printf 'tracked\n' > "$repo/tracked.txt"
   git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
   git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
   inner="$copy/.claude/worktrees/x"
+  [ "$shape" != registered-elsewhere ] || inner="$copy/sub"
   case "$shape" in
-    registered|unreadable) git -C "$repo" worktree add -q -b "n-$shape" "$inner" main ;;
+    registered|registered-elsewhere|unreadable) git -C "$repo" worktree add -q -b "n-$shape" "$inner" main ;;
     unregistered-file) mkdir -p "$inner" && printf 'work\n' > "$inner/work.txt" ;;
     unregistered-repo) git init -q "$inner" && printf 'work\n' > "$inner/work.txt" ;;
   esac
@@ -8880,10 +8881,11 @@ done
 BODY
   r5_harness nested-worktree "$body"
   r5_expect 'registered dirt=0' 'pr400-nested-worktree: a registered nested worktree of the same repository was counted as dirt'
+  r5_expect 'registered-elsewhere dirt=1' 'pr400-nested-worktree: a registered worktree outside .claude/worktrees was not counted as dirt'
   r5_expect 'unregistered-file dirt=1' 'pr400-nested-worktree: an untracked file in an unregistered directory was not counted as dirt'
   r5_expect 'unregistered-repo dirt=1' 'pr400-nested-worktree: an unregistered repository in the copy was not counted as dirt'
   r5_expect 'unreadable dirt=1' 'pr400-nested-worktree: an unreadable worktree list let a nested entry pass'
-  pass 'the root dirt rule skips only a registered nested worktree of the same repository; an unregistered directory or repository, or an unreadable worktree list, is dirt'
+  pass 'the root dirt rule skips only a registered worktree of the same repository under .claude/worktrees; one elsewhere, an unregistered directory or repository, or an unreadable worktree list, is dirt'
 }
 
 # Main 1843 (c): an Orca-backed task keeps base behaviour: the direct release, the

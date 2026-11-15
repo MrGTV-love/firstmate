@@ -350,7 +350,9 @@
 # no commit, because the work is landed or held by a recorded bundle, and no
 # tracked change, because the clean proof refuses one. The clean proof counts
 # every untracked file except the files Firstmate itself writes
-# (FM_TASK_COPY_MANAGED_FILES, bin/fm-task-copy-lib.sh); the ignored-file proof skips ignored files
+# (FM_TASK_COPY_MANAGED_FILES, bin/fm-task-copy-lib.sh) and the exact untracked
+# entry of a worktree registered to the same repository under the copy's
+# .claude/worktrees/ (an unreadable worktree list counts it); the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
 # the final project-lock wait, so the driver never runs while the lock is held;
