@@ -10,7 +10,7 @@ any engine that has these functions: the head and the earlier engines a failing-
 guards a case's harm raises "harm:<id>: ..."; a compliant twin's raises "control: ...", so a red can be told from an
 error. The perturbation group takes every base world that waits and changes one fact toward less evidence; each such
 world must still wait, and its projected demand must not fall. Usage: fm-cpu-pass-attribution.py REPO SCRATCH;
-prints JSON; exits 1 on any failure. Starts no process and sends no signal.
+prints JSON; exits 1 on any failure. Starts one short process (to hold a dead pid) and sends no signal.
 """
 import ctypes
 import importlib.util
@@ -191,6 +191,8 @@ class World:
                       processes=[dict(pid=pid, start_us=self.processes[pid]['start'], rss_bytes=int(size * GIB), rss_source='task')
                                  for pid, size in self.own.items()],
                       runs={'no-mistakes:repo/%s' % run: dict(rss_bytes=int(size * GIB), processes=1) for run, size in self.rss.items()})
+        if getattr(self, 'decide_hook', None):
+            self.decide_hook(report)
         engine.host_observation = lambda fresh=False: dict(reasons=[], memory=None if fallback else report)
         engine.measured_reservations = lambda report, running: (R, S, 2)
         engine.active_term = lambda report: (A, 2)
@@ -296,9 +298,12 @@ def f8_every_owner_kept():
 
 
 def item1_every_ci_state():
-    for step in (('ci', 'running', None), ('ci', 'fixing', 4242)):
+    ended = __import__('subprocess').Popen(['true']); ended.wait()  # a recorded agent pid proven dead
+    for step in (('ci', 'running', None), ('ci', 'fixing', ended.pid)):
         for queued in ((), ('x',)):
-            waits('i1-ci-state', World('i1').run('x', step=step).row('x', None), 11, waiting=queued)
+            # R for the unproven launch beside S; a fixing step not queued also keeps R for its current state.
+            expected = 14 if step[1] == 'fixing' and not queued else 11
+            waits('i1-ci-state', World('i1').run('x', step=step).row('x', None), expected, waiting=queued)
     w = World('i1-visible', available=8.25).run('x').row('x', None); w.rss['x'] = 0.5
     waits('i1-visible', w, 11.5, waiting=('x',))  # R for the unproven launch beside what the queued run holds, S
     w = World('i1-visible-control', available=8.25).run('x').proved('x'); w.rss['x'] = 0.5
@@ -415,6 +420,53 @@ def m1761_history_completeness():
     w = World('m1761-ungated').run('x').proved('x').row('x', 'key-o', agent='codex').record('o', 'x', quiet_us=1, ended_us=1)
     waits('m1761-ungated-agent', w, 11, self_run='x')
     admits(World('m1761-control').run('x').proved('x'), 8, self_run='x')
+
+
+# Main 1656/1683 real-process cases as fact-level twins (Main 1761: their red engine is cff47cc2e, the last engine
+# before attribution, whose gate cannot run the real-process fixtures' launches, so their reds are shown here).
+
+def m1656_escaped_descendant():
+    # X's root is gone and its escaped descendant (pid 42: own session, lineage lost, X's coalition) lives: X holds.
+    waits('m1656-escape-fact', orphan_world('m1656-escape'), 11)
+    admits(quiet_world('m1656-escape-control'), 8)
+
+
+def m1683_copied_identity():
+    # X's orphan carries Y's identity (no marker is read: lineage and coalition decide); Y's own attempt has ended.
+    w = orphan_world('m1683-copied').run('y').proved('y').row('y', 'key-y').record('y', 'y', root=[11, 100100000], quiet_us=1, ended_us=1)
+    waits('m1683-copied-identity-fact', w, 11)
+
+
+def m1683_foreign_in_coalition():
+    # Y's orphan (pid 43) inside the launch coalition outlives X and Y: both held, 3 + 3 + 8 = 14 against 12.
+    w = World('m1683-foreign-in', available=12).run('x').run('y').proved('x').proved('y').row('x', 'key-x').row('y', 'key-y')
+    w.record('x', 'x').record('y', 'y', t0_us=100500000, root=[11, 100600000]).process(43, start=101000000)
+    waits('m1683-foreign-in-fact', w, 14)
+
+
+def m1683_pid_reuse_join():
+    # X's root lives (pid 10); the reading shows X's run at 10 GiB and a 10 GiB figure under pid 10 with another
+    # generation's start (the same second, 0.5 s later): the join is refused, the attempt is unseen: 3 + 10 + 8 = 21
+    # against 8.5 + 10 = 18.5 waits; crediting the figure to the attempt would give 10 + 8 = 18, admitted.
+    w = quiet_world('m1683-reuse').process(10, start=100100000)
+    w.rss['x'], w.own[10] = 10, 10
+    w.decide_hook = lambda report: [row.update(start_us=row['start_us'] + 500000) for row in report['processes']]
+    waits('m1683-pid-reuse-fact', w, 21)
+
+
+def m1683_p1f_own_live():
+    # P1(f): X's launch, bound by its own key, left a live orphan: X holds at R (11 against 8.5); foreign control admits.
+    waits('m1683-p1f-own-live-fact', orphan_world('m1683-p1f'), 11)
+    w = orphan_world('m1683-p1f-foreign'); w.processes[42]['coalition'] = 9
+    admits(w, 8)
+
+
+def m1656_key_binding():
+    # Two rows with no keys and two ended records: not shown ended, held; own keys with their records bind.
+    w = World('m1656-keys').run('x').row('x', None).row('x', None)
+    w.record('r0', 'x', session_key=None, quiet_us=1, ended_us=1).record('r1', 'x', session_key=None, quiet_us=1, ended_us=1)
+    waits('m1656-key-binding-fact', w)
+    admits(World('m1656-keys-control').run('x').proved('x', 'r0').proved('x', 'r1'), 8)
 
 
 def pending_released(world, running):
@@ -624,7 +676,13 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1759 an undecodable pending entry is never released', m1759_undecodable_pending),
          ('Main 1759 an unknown claimant blocks a nonce release', m1759_unknown_claimant),
          ('Main 1759 a completed first run never lends its admission', m1759_completed_first_run),
-         ('Main 1759 a row inside the claim window withdraws the claim', m1759_row_between_census_and_claim))
+         ('Main 1759 a row inside the claim window withdraws the claim', m1759_row_between_census_and_claim),
+         ('Main 1656 an escaped descendant holds its attempt (facts)', m1656_escaped_descendant),
+         ("Main 1683 a copied identity never moves X's orphan to Y (facts)", m1683_copied_identity),
+         ('Main 1683 a foreign in-coalition orphan delays admission (facts)', m1683_foreign_in_coalition),
+         ('Main 1683 a reused pid never credits another generation (facts)', m1683_pid_reuse_join),
+         ('Main 1683 P1(f) own-live waits, foreign admits (facts)', m1683_p1f_own_live),
+         ("Main 1656 only a row's own session key binds it (facts)", m1656_key_binding))
 for name, body in CASES:
     case(name, body)
 case('perturbation group', perturbation_group)
