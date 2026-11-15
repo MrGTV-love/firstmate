@@ -5117,6 +5117,13 @@ INV_POPULATION = ['auth.test', 'chat.postMessage', 'chat.update', 'conversations
 
 
 
+def their_post_attempts(home, thread):
+    """Every chat.postMessage attempt into their DM thread, from the replay's own record of attempts (made or failed)."""
+    path = home.state_dir / 'attempts.jsonl'
+    rows = [json.loads(line) for line in path.read_text().splitlines()] if path.is_file() else []
+    return [r for r in rows if r.get('method') == 'chat.postMessage' and r.get('channel') == INV_SECOND_DM and r.get('thread_ts') == thread]
+
+
 class InvariantResult:
     def __init__(self, rc, out, err):
         self.rc, self.out, self.err = rc, out, err
@@ -6066,10 +6073,14 @@ sys.exit(code)
             home.edit_replay(lambda data: data['failures'].update({'chat.postMessage:200.000200': {'status': 503, 'times': 1}}))
             self.run_check(home, 'normal', 'attempt')                       # the first post is ambiguous: the attempt mark stays
             self.assertTrue(any(r.get('attempted') for r in self.second_rows(home)), self.second_rows(home))
-            # 7 s calls: each run proves the DM and makes one more call; the lookup's result and the attempt are kept between runs (Main 1650).
+            # 7 s calls: each run proves the DM and makes one more call; the lookup is kept between runs (Main 1650). A 5xx leaves the post's outcome unknown,
+            # and a complete lookup that finds nothing does not prove it absent, so the request is woken once with its state named unknown and nothing is
+            # posted again (R9 of the review of 64ac348b; Main 1673 (3)).
             captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='7.0')[1] for n in range(3)]
-            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            woken = [w for c in captured for w in self.wakes_of(c, INV_SECOND)]
+            self.assertEqual(len(woken), 1, captured)
+            self.assertIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
+            self.assertEqual(len(their_post_attempts(home, '200.000200')), 1)
 
     def second_rows(self, home):
         """Their journaled request rows, wherever the plane keeps them (the owner's journal or their own file in the state folder)."""
@@ -6146,10 +6157,13 @@ sys.exit(code)
             self.run_check(home, 'normal', 'attempt')
             for n in range(101):
                 home.say('200.%06d' % (300 + n), 'a reply in their thread', user=INV_SECOND, dm=INV_SECOND_DM, thread_ts='200.000200')
-            # Two pages of lookup, the DM proof and the post need more than one run at 7 s a call: the kept page progress lets a later run post (Main 1650).
+            # Two pages of lookup and the DM proof need more than one run at 7 s a call: the kept page progress completes the lookup, which finds nothing, so
+            # the request is woken once with its state named unknown and nothing is posted again (R9 of the review of 64ac348b).
             captured = [self.run_check(home, 'slow', 'slow%d' % n, delay='7.0')[1] for n in range(4)]
-            self.assertEqual(sum(len(self.wakes_of(c, INV_SECOND)) for c in captured), 1, captured)
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            woken = [w for c in captured for w in self.wakes_of(c, INV_SECOND)]
+            self.assertEqual(len(woken), 1, captured)
+            self.assertIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
+            self.assertEqual(len(their_post_attempts(home, '200.000200')), 1)
 
     def test_r6_f3_a_resumed_owner_row_that_uses_the_cap_never_moves_the_first_activation_past_their_request(self):
         with self.home(scott=None, cap='1', history=False) as home:
@@ -8180,7 +8194,12 @@ class ScottOrderedModelTest(InvariantScenario):
                 self.sweep(home)                                                  # the post is ambiguous: the attempt stays marked
                 self.sweep(home, mode='die')                                      # restart: stopped inside a call of theirs
                 self.sweep(home, mode='slow', delay='3.9', fail_save=fail)
-                self.finish(home, [('200.000200', INV_SECOND)])
+                for _ in range(3):
+                    self.sweep(home)
+                woken = [out for _, _, out in self.outputs if 'slack request 200.000200 from ' + INV_SECOND in out]
+                self.assertEqual(len(woken), 1, self.outputs)                     # woken once, with its acknowledgement state named unknown
+                self.assertIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
+                self.assertEqual(len(their_post_attempts(home, '200.000200')), 1)  # never posted again after the unknown attempt
 
     def test_f4_owner_load_at_the_cap_and_a_change_to_b_and_back_lose_nothing(self):
         for fail in self.each():
