@@ -1457,10 +1457,24 @@ if [ "$VERB" = adopt ]; then
   CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
   fm_lock_acquire_wait "$CONTROL_META_LOCK"
   CONTROL_META_LOCK_HELD=1
-  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
-  adoption_prior=$(cat "$STATE/$ID.omp-session.json" 2>/dev/null) \
+  # One read of each record decides the repair (Main 1874 rule S): the task
+  # record's bytes are validated on a private copy and are the bytes both
+  # adoption proofs must find, and the session record's bytes, read once, are
+  # the bytes both proofs and the final publication check must find.
+  fm_launch_proof_record_read "$META"
+  [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] && [ ! -L "$META" ] \
+    || die "adopt needs one readable regular task record without NUL bytes; no session record was changed"
+  adoption_copy=$(fm_launch_proof_record_copy "$META") || die "adopt could not hold the task record for one decision; no session record was changed"
+  adoption_valid=0
+  fm_backend_validate_task_endpoint "$adoption_copy" "$ID" || adoption_valid=1
+  rm -f -- "$adoption_copy"
+  [ "$adoption_valid" = 0 ] || exit 1
+  adoption_prior=$(fm_launch_proof_bytes "$STATE/$ID.omp-session.json") \
     || die "adopt needs an existing readable session record with the metadata spawn_gen"
-  adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  adoption_prior=${adoption_prior%x}
+  adoption_prior_sha=$(set -o pipefail; printf '%s' "$adoption_prior" | shasum -a 256 | cut -d' ' -f1) && [ -n "$adoption_prior_sha" ] \
+    || die "adopt needs the digest of the session record it read; no session record was changed"
+  adoption_record=$(FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256=$adoption_prior_sha fm_launch_proof_omp_adoption "$META") || exit 1
   # The omp extension rewrites the record of the process it runs in, by rename
   # and without these locks, so a record naming a live omp process is the
   # extension's evidence to keep. A PID reused by any other process after a
@@ -1484,9 +1498,9 @@ if [ "$VERB" = adopt ]; then
     || die "adopt could not stage the session record; original record preserved"
   # Refuse a changing foreground, session registration, generation, or task
   # record rather than publishing a proof gathered for a different activation.
-  adoption_recheck=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  adoption_recheck=$(FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256=$adoption_prior_sha fm_launch_proof_omp_adoption "$META") || exit 1
   [ "$adoption_record" = "$adoption_recheck" ] \
-    && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
+    && [ "$(fm_launch_proof_bytes "$STATE/$ID.omp-session.json" || true)" = "${adoption_prior}x" ] \
     || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
   mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
     || die "adopt could not publish the session record; original record preserved"
