@@ -5033,7 +5033,8 @@ spawn_origin_head_older_than() { # <worktree> <epoch>
 # refusal that is not about the copy's work.
 spawn_resolve_move_target() { # <worktree> [<base-branch>]
   local worktree=$1 base=${2:-} default status advertised tip target
-  SPAWN_MOVE_EXPECTED= SPAWN_MOVE_TARGET= SPAWN_MOVE_ORIGIN_SHA= SPAWN_MOVE_DEFAULT= SPAWN_MOVE_REF_TODO=0 SPAWN_MOVE_DISCOVERED=0
+  SPAWN_MOVE_EXPECTED='' SPAWN_MOVE_TARGET='' SPAWN_MOVE_ORIGIN_SHA='' SPAWN_MOVE_DEFAULT=''
+  SPAWN_MOVE_REF_TODO=0 SPAWN_MOVE_DISCOVERED=0
   status=$(GIT_OPTIONAL_LOCKS=0 git -C "$worktree" -c core.quotePath=false status --porcelain) || {
     fm_slot_skip "$worktree" unknown_git_read "git status failed before refreshing its base"
     return

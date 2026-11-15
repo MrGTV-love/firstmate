@@ -603,6 +603,7 @@ test_a_treehouse_launcher_started_after_the_spawn_owns_its_shell() {
   make_launcher "$dir" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
   start_marker
   sleep 0.5
+  # shellcheck disable=SC2016 # The launcher's own shell expands $1.
   "$dir/treehouse" -c 'cd "$1" && sleep 300 & wait' get "$W_SLOT" &
   HELD_PIDS+=("$!")
   sleep 0.5
@@ -615,6 +616,7 @@ test_a_treehouse_launcher_older_than_the_spawn_does_not_own_its_shell() {
   advance_origin advanced.txt
   local dir="$W_DIR/launcher"
   make_launcher "$dir" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  # shellcheck disable=SC2016 # The launcher's own shell expands $1.
   "$dir/treehouse" -c 'cd "$1" && sleep 300 & wait' get "$W_SLOT" &
   HELD_PIDS+=("$!")
   sleep 0.5

@@ -906,6 +906,23 @@ test_scout_base_branch_refused_on_gerrit_forge() {
 
 # Exercise the final assigned-copy revision, not just its classification before
 # the ordinary freshness reset. Each public-path attempt owns a fresh task ID.
+# install_late_dirt_shim <fakebin> <copy> <file> <content>: a git wrapper that writes <content> to <file> the
+# first time the proof lists the target's tracked paths in <copy>, which is AFTER the proof has read the copy's
+# status and BEFORE the governed preparation looks at it. It models work that appears between the two, the only
+# way left to make a governed preparation refuse for dirt, since a copy that is dirty at the proof is skipped.
+install_late_dirt_shim() {
+  local real_git
+  real_git=$(command -v git)
+  cat > "$1/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'-C $2 '*'ls-tree -r --name-only -z'*)
+  if [ ! -e '$1/late-dirt.done' ]; then : > '$1/late-dirt.done'; printf '%s\\n' '$4' > '$3'; fi ;;
+esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$1/git"
+}
+
 write_refusing_slot_owner() { # <repository>
   mkdir -p "$1/scripts/git-stability"
   cat > "$1/scripts/git-stability/provision_existing_slot.py" <<'PY'
@@ -1228,7 +1245,7 @@ run_local_only_binding_case() { # <prepared|unprepared>
   [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail 'binding task temp already exists'
   [ ! -e "/tmp/fm-$id+$token" ] && [ ! -L "/tmp/fm-$id+$token" ] || fail 'binding staging already exists'
   if [ "$shape" = unprepared ]; then
-    printf 'preserve pre-existing assigned work\n' > "$POOL_DIR/README.md"
+    install_late_dirt_shim "$FAKEBIN_DIR" "$POOL_DIR" "$POOL_DIR/README.md" 'preserve pre-existing assigned work'
   fi
   out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
     --mode local-only --yolo off --owned-path README.md 2>&1) || rc=$?
@@ -1355,7 +1372,7 @@ run_local_only_equal_retry_case() { # <advanced|adopted-scope|diverged|invalid-r
     assert_no_grep 'slot_owned_path=' "$HOME_DIR/state/$id.meta" 'scope-less attempt recorded inferred scope'
     scope_args=(--owned-path README.md)
   else
-    printf 'operator scratch\n' > "$POOL_DIR/scratch.txt"
+    install_late_dirt_shim "$FAKEBIN_DIR" "$POOL_DIR" "$POOL_DIR/scratch.txt" 'operator scratch'
     out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
       --mode local-only --yolo off --owned-path README.md 2>&1) || rc=$?
     [ "$rc" -ne 0 ] || fail 'dirty origin-equal attempt admitted a worker'
@@ -1876,6 +1893,7 @@ test_slot_digest_sees_a_changed_local_branch() {
   id='pool-digest-refs'
   make_skip_case digest-refs "$id" 1
   git -C "$POOL_DIR" branch -q keep-me
+  git -C "$POOL_DIR" fetch --quiet origin
   before=$(slot_digest "$POOL_DIR") || fail "the slot could not be read before the spawn"
   git -C "$POOL_DIR" branch -q -f keep-me "$(git -C "$POOL_DIR" rev-parse origin/main)"
   after=$(slot_digest "$POOL_DIR") || fail "the slot could not be read after the branch moved"

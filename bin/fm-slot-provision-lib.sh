@@ -314,8 +314,11 @@ def enc(path):
     return path.decode("utf-8", "surrogateescape") if isinstance(path, bytes) else path
 
 # ---- snapshot: HEAD, branch, the branch and tag refs, the status, and every ignored file with its
-# size and sha256. Anything that cannot be read fails the whole snapshot.
-def snapshot(slot, out):
+# size and sha256. Anything that cannot be read fails the whole snapshot. The proof reads the status with
+# every submodule counted (a changed submodule is work); the read after a move ignores submodule pins, because a
+# fast-forward that changes a pin leaves the submodule checkout where it was, which bin/fm-spawn.sh
+# describe_stale_submodule_pins reports on the next spawn.
+def snapshot(slot, out, submodules="none"):
     head = git(slot, "rev-parse", "--verify", "HEAD").stdout.decode().strip()
     sym = git(slot, "symbolic-ref", "-q", "HEAD", allow=(0, 1))
     symref = sym.stdout.decode().strip() if sym.returncode == 0 else "detached"
@@ -323,7 +326,7 @@ def snapshot(slot, out):
     for line in git(slot, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/tags").stdout.decode("utf-8", "replace").splitlines():
         name, _, sha = line.rpartition(" ")
         refs[name] = sha
-    status = [enc(e) for e in git(slot, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none").stdout.split(b"\0") if e]
+    status = [enc(e) for e in git(slot, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=" + submodules).stdout.split(b"\0") if e]
     ignored = {}
     for raw in git(slot, "ls-files", "-o", "-i", "--exclude-standard", "-z").stdout.split(b"\0"):
         if not raw:
@@ -593,7 +596,7 @@ FMPROBEPY
 fm_slot_probe() { python3 -I -c "$FM_SLOT_PROBE_PY" "$@"; }
 
 # fm_slot_snapshot <slot> <out-file>: fails (nonzero) when any read fails.
-fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" 2>&1; }
+fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" "${3:-none}" 2>&1; }
 
 # The one holder rule. A process with its working directory in the slot, or an lsof row that names a
 # process and no working directory, is a holder unless it runs under this spawn's own pane
@@ -627,7 +630,8 @@ fm_slot_holders_or_skip() { # <slot> [<project>]
 # Release the proof's scratch directory (the snapshot lives there, outside the slot).
 fm_slot_proof_drop() {
   [ -z "$FM_SLOT_PROOF_DIR" ] || rm -rf -- "$FM_SLOT_PROOF_DIR"
-  FM_SLOT_PROOF_DIR= FM_SLOT_PROOF_SNAPSHOT=
+  FM_SLOT_PROOF_DIR=''
+  FM_SLOT_PROOF_SNAPSHOT=''
 }
 
 # fm_slot_prove_idle <slot> <target-sha-or-empty> [<project>]: 0 proven (FM_SLOT_PROOF_SNAPSHOT is set),
@@ -715,7 +719,7 @@ fm_slot_apply_move() {
       mode=moved
     fi
   fi
-  if ! out=$(fm_slot_snapshot "$slot" "$after"); then
+  if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo all || echo none)"); then
     fm_slot_proof_drop
     echo "error: pooled copy '$slot' could not be read after the move ($(printf '%s' "$out" | sed -n '1p')); its state is unknown, so it is kept as it is and no worker is admitted" >&2
     return 1
