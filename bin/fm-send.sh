@@ -467,25 +467,32 @@ T=$RESOLVED_TARGET
 # expected one (FM_SEND_EXPECTED_PLACEMENT local or remote); a remote record
 # must name the expected host, root, home and remote target, and a local one
 # must resolve to the expected endpoint (FM_SEND_EXPECTED_ENDPOINT). Checked
-# before anything is recorded; the locked validations below repeat it.
-fm_send_remote_route_expected() { # <meta>
-  local placement=local
-  [ -n "${FM_SEND_EXPECTED_PLACEMENT:-}${FM_SEND_EXPECTED_ENDPOINT:-}${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] || return 0
+# before anything is recorded; the locked validations below repeat it. It
+# takes the record as one snapshot (Main 1928): FM_SEND_RECORD_BYTES and its
+# private copy FM_SEND_RECORD_COPY from fm_send_record_snapshot, never the
+# record's path, so every field it compares comes from the caller's one read.
+fm_send_route_expected_set() {
+  [ -n "${FM_SEND_EXPECTED_PLACEMENT:-}${FM_SEND_EXPECTED_ENDPOINT:-}${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ]
+}
+fm_send_remote_route_expected() { # <snapshot-bytes> <snapshot-copy>
+  local placement=local bytes=$1 copy=$2
+  fm_send_route_expected_set || return 0
   [ "$TARGET_BACKEND" != remote ] || placement=remote
   [ -z "${FM_SEND_EXPECTED_PLACEMENT:-}" ] || [ "$FM_SEND_EXPECTED_PLACEMENT" = "$placement" ] || return 1
-  [ -n "$1" ] && [ -f "$1" ] || return 1
+  [ -n "$bytes" ] && [ -n "$copy" ] || return 1
   if [ "$placement" = remote ]; then
     [ -z "${FM_SEND_EXPECTED_ENDPOINT:-}" ] || return 1
-    [ "$(fm_meta_get "$1" remote_host)" = "${FM_ON_EXPECTED_HOST:-}" ] \
-      && [ "$(fm_meta_get "$1" remote_root)" = "${FM_ON_EXPECTED_ROOT:-}" ] \
-      && [ "$(fm_meta_get "$1" home)" = "${FM_ON_EXPECTED_HOME:-}" ] || return 1
+    [ "$(fm_launch_proof_bytes_field "$bytes" remote_host)" = "${FM_ON_EXPECTED_HOST:-}" ] \
+      && [ "$(fm_launch_proof_bytes_field "$bytes" remote_root)" = "${FM_ON_EXPECTED_ROOT:-}" ] \
+      && [ "$(fm_launch_proof_bytes_field "$bytes" home)" = "${FM_ON_EXPECTED_HOME:-}" ] || return 1
     [ -z "${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] \
-      || [ "$(fm_meta_get "$1" remote_target)" = "$FM_SEND_EXPECTED_REMOTE_TARGET" ]
+      || [ "$(fm_launch_proof_bytes_field "$bytes" remote_target)" = "$FM_SEND_EXPECTED_REMOTE_TARGET" ]
     return
   fi
   [ -z "${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] || return 1
+  # The endpoint rule (bin/fm-backend.sh owns it) reads the private copy.
   [ -n "${FM_SEND_EXPECTED_ENDPOINT:-}" ] && [ "$T" = "$FM_SEND_EXPECTED_ENDPOINT" ] \
-    && [ "$(fm_backend_target_of_meta "$1")" = "$FM_SEND_EXPECTED_ENDPOINT" ]
+    && [ "$(fm_backend_target_of_meta "$copy")" = "$FM_SEND_EXPECTED_ENDPOINT" ]
 }
 # A local compared route also re-checks the agent now at that endpoint, right
 # before delivery (Main 1856 F4): the restart's own attribution decision,
@@ -533,7 +540,13 @@ fm_send_ring_snapshot_holds() { # <meta>
   fm_send_expected_attribution "$1" || return 1
   [ "${FM_SECONDMATE_RESTART_RECORD_BYTES:-}" = "$FM_SEND_DECISION_BYTES" ]
 }
-if ! fm_send_remote_route_expected "${TARGET_META:-}"; then
+route_expected_ok=1
+if fm_send_route_expected_set; then
+  fm_send_record_snapshot "${TARGET_META:-}" || true
+  fm_send_remote_route_expected "$FM_SEND_RECORD_BYTES" "$FM_SEND_RECORD_COPY" || route_expected_ok=0
+  [ -z "$FM_SEND_RECORD_COPY" ] || rm -f -- "$FM_SEND_RECORD_COPY"
+fi
+if [ "$route_expected_ok" = 0 ]; then
   echo "error: steer not sent to ${TARGET_REMOTE_ID:-$RAW_TARGET}: its resolved route is not the expected route (placement '${FM_SEND_EXPECTED_PLACEMENT:-}', endpoint '${FM_SEND_EXPECTED_ENDPOINT:-${FM_SEND_EXPECTED_REMOTE_TARGET:-}}', host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent" >&2
   exit 1
 fi
@@ -1021,11 +1034,15 @@ else
     CURRENT_REMOTE_ID=
     CURRENT_REMOTE_HOST=
     CURRENT_REMOTE_SPAWN_GEN=
-    if [ -f "$TARGET_META" ]; then
+    # One read of the parent record decides (Main 1874 rule S, Main 1928): the
+    # id is the record's name, and the host, generation and route fields all
+    # come from the same snapshot.
+    if fm_send_record_snapshot "$TARGET_META"; then
       CURRENT_REMOTE_ID=$(fm_send_id_from_meta "$TARGET_META")
-      CURRENT_REMOTE_HOST=$(fm_meta_get "$TARGET_META" remote_host)
-      CURRENT_REMOTE_SPAWN_GEN=$(fm_meta_get "$TARGET_META" spawn_gen)
+      CURRENT_REMOTE_HOST=$(fm_launch_proof_bytes_field "$FM_SEND_RECORD_BYTES" remote_host)
+      CURRENT_REMOTE_SPAWN_GEN=$(fm_launch_proof_bytes_field "$FM_SEND_RECORD_BYTES" spawn_gen)
     fi
+    remote_valid=1
     if [ "$CURRENT_REMOTE_ID" != "$TARGET_REMOTE_ID" ] ||
       { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
         [ "$CURRENT_REMOTE_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
@@ -1033,7 +1050,11 @@ else
         [ "$CURRENT_REMOTE_HOST" != "$FM_SEND_EXPECTED_REMOTE_HOST" ]; } ||
       [ -z "$CURRENT_REMOTE_HOST" ] ||
       [ "$CURRENT_REMOTE_HOST" != "$TARGET_REMOTE_HOST" ] ||
-      ! fm_send_remote_route_expected "$TARGET_META"; then
+      ! fm_send_remote_route_expected "$FM_SEND_RECORD_BYTES" "$FM_SEND_RECORD_COPY"; then
+      remote_valid=0
+    fi
+    [ -z "$FM_SEND_RECORD_COPY" ] || rm -f -- "$FM_SEND_RECORD_COPY"
+    if [ "$remote_valid" = 0 ]; then
       fm_lock_release "$REMOTE_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
@@ -1148,7 +1169,7 @@ else
       { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
         [ "$CURRENT_INBOX_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
       [ -n "$CURRENT_INBOX_REMOTE_HOST" ] ||
-      ! fm_send_remote_route_expected "$FM_SEND_RECORD_COPY" ||
+      ! fm_send_remote_route_expected "$FM_SEND_RECORD_BYTES" "$FM_SEND_RECORD_COPY" ||
       ! fm_send_expected_attribution "$TARGET_META" ||
       { [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] &&
         [ "${FM_SECONDMATE_RESTART_RECORD_BYTES:-}" != "$FM_SEND_RECORD_BYTES" ]; }; then

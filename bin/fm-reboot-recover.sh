@@ -179,8 +179,10 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
           "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta")" && result=1
         continue
       fi
+      # An unpinned omp names its cause and next action as claude does (Main
+      # 1901 (b), Main 1928 F3); it keeps the zero status omp always had.
       notice "$id" "unmanaged $identity" \
-        "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" || true
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta")" || true
       ;;
     pinned-elsewhere|contested)
       notice "$id" "$proof $identity" \

@@ -121,11 +121,39 @@ validate_home() { # <id>
 
 meta_path() { printf '%s/%s.meta\n' "$CONTROL_STATE" "$1"; }
 
+# One read of the endpoint record per load (Main 1874 rule S, Main 1928): the
+# record's bytes are read once (bin/fm-launch-proof-lib.sh owns the reader: a
+# failed, empty or NUL-bearing read fails) into REMOTE_ENDPOINT_RECORD, with
+# their sha256 in REMOTE_ENDPOINT_DIGEST; the endpoint is validated on a
+# private copy of those bytes, removed at once, and every later field of the
+# verb comes from REMOTE_ENDPOINT_RECORD (remote_endpoint_field).
+remote_endpoint_field() { # <key>
+  fm_launch_proof_bytes_field "$REMOTE_ENDPOINT_RECORD" "$1"
+}
+
 remote_endpoint_load() {
-  local id=$1 herdr_session
+  local id=$1 herdr_session bytes copy valid=0
   REMOTE_ENDPOINT_ERROR=
+  REMOTE_ENDPOINT_RECORD='' REMOTE_ENDPOINT_DIGEST=''
   REMOTE_ENDPOINT_META=$(meta_path "$id")
-  if ! fm_backend_validate_task_endpoint "$REMOTE_ENDPOINT_META" "$id" 2>/dev/null; then
+  if ! declare -F fm_launch_proof_bytes >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-launch-proof-lib.sh
+    . "$SCRIPT_DIR/fm-launch-proof-lib.sh" || { REMOTE_ENDPOINT_ERROR="the record reader could not be loaded"; return 1; }
+  fi
+  copy=''
+  if [ -L "$REMOTE_ENDPOINT_META" ] || ! bytes=$(fm_launch_proof_bytes "$REMOTE_ENDPOINT_META"); then
+    valid=1
+  else
+    REMOTE_ENDPOINT_RECORD=${bytes%x}
+    REMOTE_ENDPOINT_DIGEST=$(set -o pipefail; printf '%s' "$REMOTE_ENDPOINT_RECORD" | shasum -a 256 | cut -d' ' -f1) || REMOTE_ENDPOINT_DIGEST=''
+    copy=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-remote-record.XXXXXX") || copy=''
+    if [ -z "$REMOTE_ENDPOINT_DIGEST" ] || [ -z "$copy" ] || ! printf '%s' "$REMOTE_ENDPOINT_RECORD" > "$copy" \
+      || ! fm_backend_validate_task_endpoint "$copy" "$id" 2>/dev/null; then
+      valid=1
+    fi
+  fi
+  [ -z "$copy" ] || rm -f -- "$copy"
+  if [ "$valid" != 0 ]; then
     REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint metadata is invalid; refusing access until it is explicitly migrated"
     return 1
   fi
@@ -135,7 +163,7 @@ remote_endpoint_load() {
     REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded on backend '$REMOTE_ENDPOINT_BACKEND', expected 'herdr'; refusing access until it is explicitly migrated"
     return 1
   fi
-  herdr_session=$(fm_backend_meta_exact_value "$REMOTE_ENDPOINT_META" herdr_session 2>/dev/null || true)
+  herdr_session=$(fm_launch_proof_bytes_exact_value "$REMOTE_ENDPOINT_RECORD" herdr_session || true)
   if [ "$herdr_session" != "$REMOTE_HERDR_SESSION" ]; then
     REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded in Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'; refusing access until it is explicitly migrated"
     return 1
@@ -165,9 +193,12 @@ state_value() { # <id>; prints recovery-grade state
   fm_backend_agent_state "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" 2>/dev/null || printf 'unreadable\n'
 }
 
-# <record-sha256> is internal to the send verb (the verb line takes two
-# arguments): the proof must then rest on record bytes with that digest, so the
-# send's check and its doorbell re-check judge the bytes the send read.
+# The decision rests on one read of the record (Main 1874 rule S, Main 1928):
+# the endpoint load's bytes, whose digest the proof's own read must match, so
+# the endpoint comparison and the proof judge the same bytes. <record-sha256>
+# is internal to the send verb (the verb line takes two arguments): the load
+# must then also have read bytes with that digest, so the send's check and its
+# doorbell re-check judge the bytes the send read.
 cmd_attribution() { # <id> <recorded-target> [<record-sha256>]
   local id=$1 target=$2 digest=${3:-} meta state cause
   validate_id "$id"
@@ -182,18 +213,17 @@ cmd_attribution() { # <id> <recorded-target> [<record-sha256>]
     printf 'attribution=refuse: %s\n' "$REMOTE_ENDPOINT_ERROR"
     return 0
   fi
+  if [ -n "$digest" ] && [ "$REMOTE_ENDPOINT_DIGEST" != "$digest" ]; then
+    printf 'attribution=refuse: its record changed after this send read it\n'
+    return 0
+  fi
   if [ "$REMOTE_ENDPOINT_TARGET" != "$target" ]; then
     printf "attribution=refuse: this host's endpoint for %s is '%s', not the recorded route's '%s'\n" "$id" "$REMOTE_ENDPOINT_TARGET" "$target"
     return 0
   fi
   state=$(fm_backend_agent_state "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" 2>/dev/null) || state=unreadable
   case "$state" in
-    dead|missing)
-      if [ -n "$digest" ] && [ "$(record_snapshot "$meta" || true)" != "$digest" ]; then
-        printf 'attribution=refuse: its record changed after this send read it\n'
-        return 0
-      fi
-      printf 'attribution=proceed\n'; return 0 ;;
+    dead|missing) printf 'attribution=proceed\n'; return 0 ;;
     alive) ;;
     *) printf "attribution=refuse: its Herdr agent state reads '%s' rather than a positively classified state\n" "$state"; return 0 ;;
   esac
@@ -201,14 +231,12 @@ cmd_attribution() { # <id> <recorded-target> [<record-sha256>]
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" \
     FM_LAUNCH_PROOF_VERB_PATH=1 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" || exit 1
-      if [ -n "$4" ]; then
-        fm_launch_proof_record_read "$2"
-        [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] \
-          && [ "$(set -o pipefail; printf "%s" "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d" " -f1)" = "$4" ] \
-          || { printf "its record changed after this send read it"; exit 1; }
-      fi
+      fm_launch_proof_record_read "$2"
+      [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] \
+        && [ "$(set -o pipefail; printf "%s" "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d" " -f1)" = "$4" ] \
+        || { printf "its record changed after its endpoint was read"; exit 1; }
       fm_launch_proof_herdr_refusal "$2" "$3"' \
-    _ "$SCRIPT_DIR" "$meta" "$target" "$digest" 2>/dev/null); then
+    _ "$SCRIPT_DIR" "$meta" "$target" "$REMOTE_ENDPOINT_DIGEST" 2>/dev/null); then
     printf 'attribution=proceed\n'
   else
     cause=$(printf '%s\n' "$cause" | sed -n '/./{s/[[:space:]]\{1,\}/ /g;p;q;}')
@@ -217,12 +245,17 @@ cmd_attribution() { # <id> <recorded-target> [<record-sha256>]
 }
 
 print_route() { # <id>
-  local id=$1 harness model effort traceparent
-  remote_endpoint_require "$id"
-  harness=$(fm_meta_get "$REMOTE_ENDPOINT_META" harness)
-  model=$(fm_meta_get "$REMOTE_ENDPOINT_META" model)
-  effort=$(fm_meta_get "$REMOTE_ENDPOINT_META" effort)
-  traceparent=$(fm_meta_get "$REMOTE_ENDPOINT_META" traceparent)
+  remote_endpoint_require "$1"
+  print_loaded_route
+}
+
+# The route of the endpoint record the last load read, from its bytes alone.
+print_loaded_route() {
+  local harness model effort traceparent
+  harness=$(remote_endpoint_field harness)
+  model=$(remote_endpoint_field model)
+  effort=$(remote_endpoint_field effort)
+  traceparent=$(remote_endpoint_field traceparent)
   printf 'schema=fm-remote-secondmate-control.v1\n'
   printf 'backend=%s\n' "$REMOTE_ENDPOINT_BACKEND"
   printf 'target=%s\n' "$REMOTE_ENDPOINT_TARGET"
@@ -246,7 +279,7 @@ cmd_route() {
 
 cmd_launch() {
   local id=$1 harness=$2 model=$3 effort=$4 selected_backend=$5 traceparent=
-  local current meta out herdr_session compact_disable=0 arg captain_model_pin=
+  local current meta out compact_disable=0 arg captain_model_pin=
   shift 5
   for arg in "$@"; do
     case "$arg" in
@@ -286,7 +319,7 @@ cmd_launch() {
     current=$(fm_backend_agent_state "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" 2>/dev/null || printf 'unreadable\n')
     case "$current" in
       alive)
-        print_route "$id"
+        print_loaded_route
         printf 'launch=already-running\n'
         return 0
         ;;
@@ -316,10 +349,10 @@ cmd_launch() {
     die "remote host-local secondmate launch failed"
   fi
   [ -f "$meta" ] || die "remote launch returned without endpoint metadata"
-  herdr_session=$(fm_meta_get "$meta" herdr_session)
-  [ "$herdr_session" = "$REMOTE_HERDR_SESSION" ] \
-    || die "remote launch recorded Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'"
-  print_route "$id"
+  # One read of the new record decides and prints (Main 1928): the load checks
+  # its Herdr session, and the route printed comes from the same bytes.
+  remote_endpoint_load "$id" || die "remote launch left endpoint metadata this host cannot accept: $REMOTE_ENDPOINT_ERROR"
+  print_loaded_route
   printf 'launch=spawned\n'
 }
 
@@ -412,15 +445,6 @@ cmd_stay() {
     "$SCRIPT_DIR/fm-control.sh" "$id" stay
 }
 
-# The sha256 of a task record's exact bytes (bin/fm-launch-proof-lib.sh owns the
-# reader: a failed, empty or NUL-bearing read fails), read in a separate process.
-record_snapshot() { # <meta>
-  # shellcheck disable=SC2016 # the script expands in the child shell
-  bash -c '. "$1/fm-launch-proof-lib.sh" >/dev/null 2>&1 && bytes=$(fm_launch_proof_bytes "$2") || exit 1
-    digest=$(set -o pipefail; printf "%s" "${bytes%x}" | shasum -a 256 | cut -d" " -f1) && [ -n "$digest" ] || exit 1
-    printf "%s" "$digest"' _ "$SCRIPT_DIR" "$1"
-}
-
 cmd_send() {
   local id=$1 message=$2 delivery_mode='' expected='' arg rec ring_rc=0 meta meta_lock decision snapshot=''
   shift 2
@@ -453,10 +477,10 @@ cmd_send() {
   # F4): the same host decision the parent asked for, read again right before
   # the record is written, refuses a replaced agent at an unchanged address.
   # One endpoint snapshot binds the check, the write and the doorbell (Main
-  # 1874 rule S and (i)): the send reads the record's digest once, and each
-  # attribution decision must rest on record bytes with that digest.
+  # 1874 rule S and (i)): the endpoint load above read the record once, and
+  # each attribution decision must rest on record bytes with that digest.
   if [ -n "$expected" ]; then
-    snapshot=$(record_snapshot "$meta") || snapshot=''
+    snapshot=$REMOTE_ENDPOINT_DIGEST
     decision='attribution=refuse: its record could not be read'
     [ -z "$snapshot" ] || decision=$(cmd_attribution "$id" "$expected" "$snapshot")
     if [ "$decision" != attribution=proceed ]; then
@@ -529,7 +553,7 @@ cmd_observe() {
   validate_id "$id"
   validate_home "$id"
   remote_endpoint_require "$id"
-  harness=$(fm_meta_get "$REMOTE_ENDPOINT_META" harness)
+  harness=$(remote_endpoint_field harness)
   fm_pending_reply_backend_observation "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" "fm-$id" "$harness"
   printf '\n'
 }
