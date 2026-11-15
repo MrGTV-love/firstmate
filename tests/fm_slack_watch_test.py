@@ -5861,7 +5861,7 @@ import fm_slack_watch as plane
 from fm_slack_replay import Replay
 mode = os.environ['INV4_MODE']
 clock = [0.0]
-if mode != 'trickle':
+if mode not in ('trickle', 'trickle-accepted'):
     plane.monotonic = lambda: clock[0]
 else:
     # The real transport (urllib, a real socket) carries every call of theirs to the local server of the test, on the real clock, with the time left that the
@@ -5877,6 +5877,12 @@ def call(self, method, **fields):
         if mode == 'trickle':
             wire.time_left = self.__dict__.get('time_left')
             wire.call(method, **fields)
+        if mode == 'trickle-accepted':
+            # Slack accepts the call (the replay applies it) and only its answer is slow: the real transport is cut off after the effect.
+            result = real(self, method, **fields)
+            wire.time_left = self.__dict__.get('time_left')
+            wire.call(method, **fields)
+            return result
         if mode == 'die':
             os._exit(137)                                    # the check is stopped while its call of theirs is blocked: no flush, no cleanup
         if mode == 'fail':
@@ -5905,7 +5911,12 @@ if order:
 plane.Watch.bound = lambda self: True
 plane.Watch.backlog = lambda self: []
 plane.run = lambda script, *args, text=None: subprocess.CompletedProcess([], 0, stdout='x\n', stderr='')
-sys.exit(plane.main(sys.argv[1:]))
+code = plane.main(sys.argv[1:])
+import threading
+with open(os.environ['INV4_LOG'] + '.threads', 'a') as log:
+    # Every thread still running when the check ends, whatever its name: a reader left behind past the deadline is one of them.
+    log.write('bounded-alive %d\n' % len([t for t in threading.enumerate() if t is not threading.main_thread() and t.is_alive()]))
+sys.exit(code)
 """
 
     def run_check(self, home, mode, name, command='poll', delay='0', order=None, server=''):
@@ -7254,6 +7265,357 @@ class Round6CapOne(InvariantScenario):
             _, second_run, _ = self.run_check(home, 'normal', 'second-1', command='check-second')
             self.assertEqual([who for _, who in self.REQ.findall(owner_run + second_run)], [INV_SECOND])
             self.assertEqual(home.posts().count((INV_SECOND_DM, '5002.000200')), 1)
+
+
+class PostServer(TrickleServer):
+    """A TrickleServer that also records, per request, the method and the client_msg_id of each post, and when it saw the client close the connection."""
+
+    def __init__(self, **kw):
+        self.received, self.closed_at, self.sent_after = [], [], {}
+        super().__init__(**kw)
+
+    def answer(self, conn):
+        with conn:
+            conn.settimeout(5)
+            data = b''
+            try:
+                while b'\r\n\r\n' not in data:
+                    chunk = conn.recv(65536)
+                    if not chunk:
+                        return
+                    data += chunk
+                head, _, body = data.partition(b'\r\n\r\n')
+                length = re.search(rb'(?i)content-length:\s*(\d+)', head)
+                while length and len(body) < int(length.group(1)):
+                    chunk = conn.recv(65536)
+                    if not chunk:
+                        break
+                    body += chunk
+                method = head.split(b' ')[1].decode().rsplit('/', 1)[-1]
+                fields = urllib.parse.parse_qs(body.decode())
+                self.received.append((method, (fields.get('client_msg_id') or [''])[0]))
+                self.requests += 1
+                payload = b'{"ok": true, "ts": "1.000001"}'.ljust(self.size)
+                conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' % len(payload))
+                if self.mode == 'fast' or method != 'chat.postMessage':        # only a post's answer is slow
+                    conn.sendall(payload)
+                    return
+                key = len(self.received)
+                self.sent_after[key] = []
+                for i in range(len(payload)):
+                    if self.stop.is_set():
+                        return
+                    conn.sendall(payload[i:i + 1])
+                    self.sent_after[key].append(time.monotonic())
+                    time.sleep(self.step)
+            except OSError:
+                self.closed_at.append(time.monotonic())
+                return
+
+
+class Round7Findings(InvariantScenario):
+    """Round 7 (the outside review of d9861b24, Main 1621 and 1623): findings 1, 2, 3, 4, 5, 7, 8, 9 and 10 through the real entry points."""
+
+    CARD = Round6Findings.CARD
+    OTHER_AUTHOR = Round6Findings.OTHER_AUTHOR
+    held_card = Round6Findings.held_card
+    decisions = Round6Findings.decisions
+    card_ts = staticmethod(Round6Findings.card_ts)
+    reply_after_unset = Round6Findings.reply_after_unset
+    failed_arm = Round6Findings.failed_arm
+    DRIVER = Invariant4OwnerFirst.DRIVER
+    run_check = Invariant4OwnerFirst.run_check
+    REQ = re.compile(r'slack request (\S+) from (U[A-Z0-9]+)')
+    MARKER_TEXT = 'request finished'       # a synthetic protected value inside the fixed wake text (WAKE_FIXED_TEXT)
+
+    def woken(self, results, user=INV_SECOND):
+        return [ts for r in results for ts, who in self.REQ.findall(r.out) if who == user]
+
+    # ---- finding 1: a run refused by its fixed-text check still records the id it read ----
+
+    def test_r7_f1_a_mirror_refused_by_its_fixed_text_check_records_the_id_and_the_id_never_answers(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
+            home.cli('poll')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                refused = home.cli('mirror', extra={'SLACK_SIGNING_SECRET': self.MARKER_TEXT})
+            self.assertEqual(refused.rc, 1, (refused.out, refused.err))
+            self.assertEqual(self.reply_after_unset(home, answers), [])
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reply', INV_SECOND)])
+
+    def test_r7_f1_a_reply_refused_by_its_fixed_text_check_records_the_id_and_the_id_never_answers(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
+            home.cli('poll')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                refused = home.cli('reply', '--thread', '200.000200@' + INV_SECOND, '--to', '200.000200', stdin='text',
+                                   extra={'SLACK_SIGNING_SECRET': plane.REPLY_REFUSAL.strip(': ')})
+            self.assertNotEqual(refused.rc, 0, (refused.out, refused.err))
+            self.assertEqual(self.reply_after_unset(home, answers), [])
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reply', INV_SECOND)])
+
+    def test_r7_f1_control_a_never_known_allowlisted_id_still_answers_after_a_refused_mirror(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, self.OTHER_AUTHOR])) as home, self.held_card() as answers:
+            home.cli('poll')
+            home.cli('mirror', extra={'SLACK_SIGNING_SECRET': self.MARKER_TEXT})
+            self.assertEqual(len(self.reply_after_unset(home, answers, user=self.OTHER_AUTHOR)), 1)
+
+    # ---- finding 2: a reaction the owner's check read is refused durably, though the second check no longer sees it ----
+
+    def reacted_card(self, home):
+        home.trust_check()
+        home.cli('poll')
+        ts = self.card_ts(home)
+        home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).extend([{'name': 'one', 'users': [INV_OWNER]}, {'name': 'two', 'users': [INV_SECOND]}]))
+        return ts
+
+    def test_r7_f2_a_reaction_the_owner_check_read_is_refused_once_after_it_is_removed_before_their_check(self):
+        with self.home(authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
+            ts = self.reacted_card(home)
+            home.cli('check', action='check')                                  # the owner's check reads the card's reactions and takes the owner's answer
+            home.edit_replay(lambda data: data['reactions'].__setitem__(ts, [r for r in data['reactions'][ts] if INV_SECOND not in r['users']]))
+            home.cli('check', action='check-second')
+            home.check_pass()
+            self.assertEqual(len(answers()), 1)
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reaction', INV_SECOND)])
+
+    def test_r7_f2_control_a_reaction_that_stays_is_refused_once_over_several_check_pairs(self):
+        with self.home(authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
+            self.reacted_card(home)
+            for _ in range(3):
+                home.check_pass()
+            self.assertEqual(len(answers()), 1)
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reaction', INV_SECOND)])
+
+    # ---- finding 3: a protected value equal to the reaction item never loses the refusal, and is never written ----
+
+    def test_r7_f3_retarget_with_a_protected_value_equal_to_their_reaction_keeps_one_refusal_without_the_value(self):
+        value, new_owner, new_dm = 'zebrafish42', 'U0NEWOWNER01', 'D0NEWOWNER01'
+        with self.home(authors=','.join([INV_OWNER, new_owner]), extra_env={'SLACK_SIGNING_SECRET': value}) as home, self.held_card() as answers:
+            home.add_member(new_owner, new_dm)
+            home.cli('poll')
+            ts = self.card_ts(home)
+            home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).append({'name': value, 'users': [INV_SECOND]}))
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': new_owner}):
+                result = home.cli('check', action='retarget')
+                polls = [home.cli('poll'), home.cli('poll')]
+            self.assertEqual(result.rc, 0, (result.out, result.err))
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reaction', INV_SECOND)])
+            self.assertEqual(answers(), [])
+            for name in ('state.json', 'second.json', 'refusals.jsonl', 'requests.jsonl', 'second-requests.jsonl', 'second-ids'):
+                path = home.state_dir / name
+                if path.is_file():
+                    self.assertNotIn(value, path.read_text(), name)
+            self.assertNotIn(value, result.out + result.err + ''.join(p.out + p.err for p in polls))
+
+    def test_r7_f3_control_with_no_collision_the_retarget_logs_the_reaction_by_its_name(self):
+        new_owner, new_dm = 'U0NEWOWNER01', 'D0NEWOWNER01'
+        with self.home(authors=','.join([INV_OWNER, new_owner])) as home, self.held_card() as answers:
+            home.add_member(new_owner, new_dm)
+            home.cli('poll')
+            ts = self.card_ts(home)
+            home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).append({'name': 'three', 'users': [INV_SECOND]}))
+            with patch.dict(os.environ, {'FM_SLACK_DM_USER': new_owner}):
+                home.cli('check', action='retarget')
+            self.assertEqual([r.get('item') for r in home.refusals() if r['reason'] == 'decision_held_for_captain_reaction'], ['three'])
+
+    # ---- finding 4: the second check keeps Slack's clock, and a held window recovers in the separate checks ----
+
+    def test_r7_f4_with_the_host_clock_ahead_of_slack_the_separate_checks_record_slacks_time_and_take_the_request_in(self):
+        with self.home(scott=None) as home, patch.object(plane, 'host_now', lambda: 300.0):
+            home.trust_check()
+            home.set_clock(100.0)
+            home.check_pass()
+            self.assertEqual(home.theirs().get('last_run'), '100.000000')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                home.set_clock(120.0)
+                home.say('110.000000', 'typed after the enable')
+                passes = [home.check_pass() for _ in range(3)]
+            self.assertEqual(self.woken(passes), ['110.000000'])
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '110.000000')), 1)
+
+    def test_r7_f4_a_held_window_of_a_no_date_failed_arm_recovers_in_the_separate_checks_once_a_date_returns(self):
+        with self.home(history=False, arm=False) as home:
+            home.trust_check()
+            home.set_clock(None)
+            self.failed_arm(home)
+            self.assertTrue(home.theirs().get('second', {}).get('hold'), home.theirs().get('second'))
+            home.set_clock(150.0)
+            home.say('150.900000', 'typed after the arm')
+            passes = [home.check_pass() for _ in range(3)]
+            self.assertEqual(self.woken(passes), ['150.900000'])
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '150.900000')), 1)
+
+    # ---- finding 5: a long span makes progress across passes whose calls are cut off at the total deadline ----
+
+    @contextlib.contextmanager
+    def slow_theirs(self, delay):
+        """Every call of theirs takes `delay` fake seconds, and one that would end after the total deadline is cut off as the real transport cuts it."""
+        clock = [0.0]
+        real = Replay.call
+        def slow(replay, method, **fields):
+            if fields.get('channel') == INV_SECOND_DM or fields.get('users') == INV_SECOND:
+                left = replay.__dict__.get('time_left')
+                clock[0] += delay
+                if left is not None and left() < 0:
+                    raise fm_slack_module().DeadlineSpent()
+            return real(replay, method, **fields)
+        with patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(Replay, 'call', slow):
+            yield clock
+
+    def test_r7_f5_a_span_longer_than_a_page_completes_under_repeated_deadline_cutoffs_and_its_requests_arrive_once(self):
+        with self.home(history=False, arm=False) as home:
+            home.trust_check()
+            home.set_clock(150.0)
+            home.say('150.000500', 'their request inside the span')
+            for n in range(205):
+                home.say('150.%06d' % (1000 + n), 'a bot message in their DM', bot_id='B0SYNTHBOT1')   # top level, so the span is longer than a page; never a request
+            self.failed_arm(home)
+            home.say('150.900000', 'typed after the arm')
+            with self.slow_theirs(4.2):
+                passes = [home.check_pass() for _ in range(12)]
+            woken = self.woken(passes)
+            self.assertEqual(sorted(woken), ['150.000500', '150.900000'], [r.out for r in passes])
+            self.assertEqual([home.posts().count((INV_SECOND_DM, ts)) for ts in ('150.000500', '150.900000')], [1, 1])
+            self.assertEqual(len([r for r in home.refusals() if r['reason'] == 'second_intake_unplaced' and r.get('taken_in')]), 1)
+            self.assertEqual(sum(r.out.count('second person unplaced') for r in passes), 1)
+
+    # ---- finding 7: the paged lookup finds an acknowledgement already posted ----
+
+    def test_r7_f7_an_acknowledgement_posted_before_a_crash_is_found_on_a_later_page_and_not_posted_again(self):
+        with self.home() as home:
+            home.cli('poll')
+            home.say('200.000200', 'second person request')
+            for n in range(101):
+                home.say('200.%06d' % (300 + n), 'a reply in their thread', thread_ts='200.000200')
+            crashed = home.cli('poll', extra={'FM_SLACK_FAULT': 'after-post'})
+            self.assertEqual(crashed.rc, 75, (crashed.out, crashed.err))
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            later = [home.cli('poll') for _ in range(2)]
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            self.assertEqual(self.woken([crashed] + later).count('200.000200'), 1)
+
+    def test_r7_f7_control_with_a_short_thread_the_acknowledgement_is_found(self):
+        with self.home() as home:
+            home.cli('poll')
+            home.say('200.000200', 'second person request')
+            for n in range(10):
+                home.say('200.%06d' % (300 + n), 'a reply in their thread', thread_ts='200.000200')
+            home.cli('poll', extra={'FM_SLACK_FAULT': 'after-post'})
+            home.cli('poll')
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+
+    # ---- finding 8: a failed hand-over of the cap never widens it ----
+
+    def cap_sweep(self, home, fail):
+        real_leave, real_save = Watch.leave_cap, plane.save
+        def leave(watch, left):
+            def failing(path, value):
+                if Path(path).name == 'second.json':
+                    raise OSError('synthetic transient write failure')
+                return real_save(path, value)
+            with patch.object(plane, 'save', failing):
+                return real_leave(watch, left)
+        with patch.object(Watch, 'leave_cap', leave if fail else real_leave):
+            first = home.cli('check', action='check')
+        second = home.cli('check', action='check-second')
+        return self.REQ.findall(first.out + second.out)
+
+    def test_r7_f8_a_failed_cap_hand_over_never_lets_one_sweep_exceed_the_cap_and_nothing_is_lost(self):
+        with self.home(cap='2') as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            home.say('200.000200', 'second request one')
+            home.say('200.000300', 'second request two')
+            sweeps = [self.cap_sweep(home, fail=True)] + [self.cap_sweep(home, fail=False) for _ in range(3)]
+            self.assertEqual([n for n, found in enumerate(sweeps) if len(found) > 2], [], sweeps)
+            got = [ts for found in sweeps for ts, _ in found]
+            self.assertEqual(sorted(got), ['200.000100', '200.000200', '200.000300'], sweeps)
+
+    def test_r7_f8_control_with_no_fault_one_sweep_takes_two(self):
+        with self.home(cap='2') as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            home.say('200.000200', 'second request one')
+            home.say('200.000300', 'second request two')
+            self.assertEqual(len(self.cap_sweep(home, fail=False)), 2)
+
+    # ---- finding 9 (Main 1623): at the deadline the caller closes the exchange's socket and the reader thread ends ----
+
+    def bounded_threads(self):
+        return [t for t in threading.enumerate() if t.name == 'fm-slack-bounded' and t.is_alive()]
+
+    def test_r7_f9_at_the_deadline_the_socket_is_closed_no_byte_is_taken_after_it_and_the_reader_thread_ends(self):
+        server = PostServer(step=0.1, size=200)               # about 20 s in all, 0.1 s between bytes
+        self.addCleanup(server.close)
+        slack = plane.Slack('fixture-token-not-a-secret-r7-wire')
+        slack.base = server.url
+        deadline = time.monotonic() + 1.0
+        slack.time_left = lambda: deadline - time.monotonic()
+        outcome = 'completed'
+        try:
+            slack.call('chat.postMessage', channel=INV_SECOND_DM, text='ack', client_msg_id='r7-f9-id')
+        except Exception as error:
+            outcome = type(error).__name__
+        returned = time.monotonic()
+        alive = self.bounded_threads()
+        time.sleep(1.0)
+        self.assertEqual(outcome, 'DeadlineSpent')
+        self.assertLessEqual(returned - deadline, 1.0)
+        self.assertTrue(server.closed_at, 'the server never saw the connection end')
+        self.assertLessEqual(server.closed_at[0] - deadline, 0.8, 'the connection ended %.2f s after the deadline' % (server.closed_at[0] - deadline))
+        self.assertEqual([t for t in server.sent_after.get(1, []) if t > deadline + 0.8], [], 'bytes were still taken after the deadline')
+        self.assertEqual(alive, [], 'the reader thread was still running when the call returned')
+        self.assertIs(getattr(slack, 'last_cutoff', {}).get('ended'), True, getattr(slack, 'last_cutoff', None))
+        self.assertEqual(server.received, [('chat.postMessage', 'r7-f9-id')])
+
+    def test_r7_f9_a_cut_off_acknowledgement_that_slack_accepted_is_not_posted_again(self):
+        server = PostServer(step=0.3, size=80)
+        self.addCleanup(server.close)
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'second person request')
+            self.run_check(home, 'normal', 'owner', command='check')
+            rc, out, calls = self.run_check(home, 'trickle-accepted', 'cut', command='check-second', server=server.url)
+            self.assertEqual(rc, 0, out)
+            log = (home.dir / 'cut.calls.threads').read_text()
+            self.assertIn('bounded-alive 0', log)
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)          # Slack accepted the post whose answer was cut off
+            server.mode = 'fast'
+            later = [self.run_check(home, 'trickle', 'later-%d' % n, command='check-second', server=server.url)[1] for n in range(2)]
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            posts = [cid for method, cid in server.received if method == 'chat.postMessage']
+            self.assertEqual(len(posts), len(set(posts)), server.received)
+            self.assertEqual(sum(len(re.findall(r'slack request 200\.000200 from', c)) for c in [out] + later), 1, [out] + later)
+
+    # ---- finding 10: the journal lock is taken inside their 12 s budget ----
+
+    def test_r7_f10_a_held_journal_lock_never_keeps_their_check_past_its_budget_and_their_request_is_kept(self):
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'second person request')
+            holder = open(home.state_dir / 'lock', 'a')
+            fcntl.flock(holder, fcntl.LOCK_EX)
+            release = threading.Timer(15.0, holder.close)
+            release.start()
+            self.addCleanup(release.cancel)
+            self.addCleanup(holder.close)
+            started = time.monotonic()
+            first = home.cli('check', action='check-second')
+            elapsed = time.monotonic() - started
+            release.cancel()
+            holder.close()
+            self.assertLessEqual(elapsed, plane.SECOND_BUDGET + 2.0, 'their check waited %.1f s for the lock' % elapsed)
+            self.assertEqual(first.rc, 0, (first.out, first.err))
+            later = home.cli('check', action='check-second')
+            self.assertEqual(self.woken([first, later]), ['200.000200'])
+
+
+def fm_slack_module():
+    import fm_slack
+    return fm_slack
 
 
 class ScottPassModelTest(InvariantScenario):
