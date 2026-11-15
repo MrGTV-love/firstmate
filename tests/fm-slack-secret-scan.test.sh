@@ -78,7 +78,8 @@ for ts in 3000.000100 3000.000200 3000.000300; do
   grep -q "^check: slack request $ts from U0SYNTHSEC1: .*secret removed" "${HOMES[3]}/data/captured/request-secrets.out" || fail "the second person request $ts did not carry the marker and its flag"
 done
 [ "$(grep -c '"method": "chat.postMessage"' "${HOMES[3]}/state/slack-watch/outbound.jsonl")" = 3 ] || fail "the second person requests were not all acknowledged"
-[ -s "${HOMES[3]}/state/slack-watch/requests.jsonl" ] || fail "the second person requests left no record to scan"
+# Their records are kept in their own store, second-requests.jsonl (the owner's requests.jsonl holds nothing of theirs); the full scan below reads it.
+[ -s "${HOMES[3]}/state/slack-watch/second-requests.jsonl" ] || fail "the second person requests left no record to scan"
 
 # The scan is only meaningful if the plane really ran with the token.
 [ -s "${HOMES[0]}/state/slack-watch/state.json" ] || fail "the plane left no state to scan"
