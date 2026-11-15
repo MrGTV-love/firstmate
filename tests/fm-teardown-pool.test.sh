@@ -3905,7 +3905,7 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
       # a successor under the same protected holder with a new id must not be cleared.
       akind=ordinary mode_name=$mode
       if [ "${mode#recovered-}" != "$mode" ]; then
-        akind=recovered-id
+        akind="recovered-id"
         mode_name=${mode#recovered-}
       fi
       unc_pool_case "unclaimed-interrupt-$mode" "$akind" "$provider" || fail "$provider $mode: cannot build the pool"
