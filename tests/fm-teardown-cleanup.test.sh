@@ -4818,6 +4818,7 @@ test_creation_lock_owner_asks_the_same_question_at_proof_and_release_time() {
   git -C "$FOREIGN_CASE/project" worktree add -q -b fm/task-x1-v3 "$second" main
   git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID" "$second"
   cat > "$FOREIGN_SLOT/scripts/git-stability/closeout_pr.py" <<SH
+if [ "\${3:-}" != --execute-cleanup ]; then echo '{"allowed": true}'; exit 0; fi
 printf '%s|%s\n' "\$PWD" "\$*" >> "$FOREIGN_CASE/closeout.log"
 case "\$2" in
   "$second") git worktree unlock "$FOREIGN_COPY" && git worktree lock --reason 'held by a human' "$FOREIGN_COPY" ;;
@@ -4946,6 +4947,45 @@ test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry() {
     assert_absent "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record survived the release"
   done
   pass "an own Vernant-locked copy whose closeout interpreter cannot run refuses at entry for both record shapes, and closes once it can"
+}
+
+# Vernant's closeout driver is asked in plan mode at entry for every locked copy
+# the release will hand it: a plan that declines, or answers with no verdict,
+# refuses before any protected step, for an own copy of either record shape and
+# for a foreign copy; the release itself never runs. An allowing plan lets the
+# same case close, and the release asks the driver again.
+test_closeout_plan_refusal_refuses_at_entry() {
+  local form shape rc label
+  for form in refuse garbled; do
+    for shape in plain enclosing; do
+      label="own-plan-$form-$shape"
+      dead_launcher_pid
+      make_own_locked_copy_case "$label" "$shape" "$FOREIGN_DEAD_PID"
+      nested_seed_task_files "$FOREIGN_CASE"
+      nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+      run_foreign_teardown rc FM_STUB_PLAN="$form"
+      assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "Vernant's closeout driver would not release it"
+      assert_present "$FOREIGN_CASE/closeout-plan.log" "$label: the driver was not asked in plan mode"
+      assert_absent "$FOREIGN_CASE/closeout.log" "$label: the release ran after a plan refusal"
+    done
+  done
+  label=foreign-plan-refuse
+  dead_launcher_pid
+  make_foreign_copy_case "$label" "$FOREIGN_DEAD_PID"
+  run_foreign_teardown rc FM_STUB_PLAN=refuse
+  expect_code 1 "$rc" "$label: a declining plan must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "Vernant's closeout driver would not release it" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the plan"
+  assert_foreign_copy_untouched "$label"
+  assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$label: a return-pending record was written before the refusal"
+  label=own-plan-allows
+  dead_launcher_pid
+  make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "$label: an allowing plan must let the copy go: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/closeout-plan.log" "$label: the driver was not asked in plan mode"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    "$label: the release did not run once after the plan"
+  pass "a closeout plan that declines or gives no verdict refuses at entry for own and foreign copies, and an allowing plan lets the release run"
 }
 
 # On Linux the removability check reads each entry's and directory's immutable
@@ -7051,6 +7091,7 @@ test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
 test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
 test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry
+test_closeout_plan_refusal_refuses_at_entry
 test_linux_removability_refuses_an_entry_it_cannot_open
 test_preserve_parent_and_metadata_boundaries
 test_preserve_parent_on_another_filesystem_refuses_at_entry

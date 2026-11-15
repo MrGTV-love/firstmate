@@ -2443,6 +2443,7 @@ test_teardown_after_a_joint_reassociation_releases_a_vernant_locked_copy_through
       | { IFS= read -r exclude; printf '%s\n' scripts/ >> "$exclude"; }
     mkdir -p "$slot/scripts/git-stability"
     cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
+if [ "\${3:-}" != --execute-cleanup ]; then echo '{"allowed": true}'; exit 0; fi
 printf '%s|%s\n' "\$PWD" "\$*" >> "$dir/closeout.log"
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
   echo '{"allowed": false, "reason": "stub_refusal"}'

@@ -1234,7 +1234,8 @@ teardown_foreign_copy_prove() {  # <copy>
 # Can the release teardown_foreign_copy_dispose runs for each proved foreign copy
 # start? teardown_foreign_copy_prove already refuses a lock that is not
 # Vernant's and an unreadable lock state; this adds that a Vernant-locked copy's
-# closeout driver and interpreter are there. Called at entry only once the route
+# closeout driver and interpreter are there and that the driver, asked in plan
+# mode, would release it (teardown_closeout_plan_allows). Called at entry only once the route
 # will release the foreign copies (not for a held close, which releases none),
 # so a release that would refuse on that is refused before any protected step.
 # Prints the refusal and returns 1.
@@ -1246,8 +1247,12 @@ teardown_foreign_copies_release_ready() {
     rc=0
     teardown_copy_lock_file "$copy" || rc=$?
     [ "$rc" = 0 ] || continue
-    teardown_closeout_ready_in "$slot" && continue
-    TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
+    if teardown_closeout_ready_in "$slot"; then
+      teardown_closeout_plan_allows "$slot" "$copy" && continue
+      TEARDOWN_FOREIGN_WHY=$TEARDOWN_CLOSEOUT_PLAN_WHY
+    else
+      TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
+    fi
     teardown_refuse_copy inspection-unavailable "foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." "$copy"
     echo "REFUSED: foreign copy $(fm_refuse_text "$copy") in pool slot $(fm_refuse_text "$slot") cannot be released; nothing was removed." >&2
     return 1
@@ -1503,6 +1508,47 @@ teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
   return "$rc"
 }
 
+# True only when <driver output> carries a real positive verdict: it is exactly
+# one JSON document whose top-level "allowed" key is the boolean true. Text that
+# merely mentions allowed=true, a bare allowed=true, a false or non-boolean
+# value, no verdict, an empty or malformed answer, and more than one document
+# are not permission.
+teardown_closeout_plan_verdict_allows() {  # <driver output>
+  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
+}
+
+# True when the plan's one JSON document reports the driver's retain rule for a
+# tree that holds unique ignored files: the driver archives them and then keeps
+# the tree, so a release of it can never succeed.
+teardown_closeout_plan_verdict_retains_tree() {  # <driver output>
+  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .ignored_payload_disposition == "archive_then_retain_tree")' >/dev/null 2>&1
+}
+
+# Asks Vernant's closeout driver, in plan mode and at entry, whether it would
+# release <copy> from <slot>, so a release it would decline is refused before any
+# protected step. A non-zero exit, no answer, an answer that is not one JSON
+# document with "allowed": true (teardown_closeout_plan_verdict_allows), and the
+# driver's archive-then-retain rule all refuse, with TEARDOWN_CLOSEOUT_PLAN_WHY
+# saying why. The release asks the driver again and keeps its own refusal as the
+# recheck, since its answer can change during the run. Like the release call it
+# has no time bound of its own.
+TEARDOWN_CLOSEOUT_PLAN_WHY=
+teardown_closeout_plan_allows() {  # <slot> <copy>
+  local rc=0 said
+  TEARDOWN_CLOSEOUT_PLAN_WHY=
+  teardown_run_closeout "$1" "$2" plan || rc=$?
+  said=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
+  said=${said:0:600}
+  if [ "$rc" != 0 ] || ! teardown_closeout_plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; then
+    TEARDOWN_CLOSEOUT_PLAN_WHY="Vernant's closeout driver would not release it (plan exit $rc): ${said:-no answer}"
+    return 1
+  fi
+  if teardown_closeout_plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_STDOUT"; then
+    TEARDOWN_CLOSEOUT_PLAN_WHY="Vernant's closeout driver would archive its ignored files and keep the tree (ignored_payload_disposition=archive_then_retain_tree): $said"
+    return 1
+  fi
+}
+
 # Saves a refused driver's full output privately, then shows its last 20 lines.
 # Prefix and sanitize each line so driver text cannot forge refusal directives.
 # Successful closeouts never call this helper and create no durable output file.
@@ -1654,10 +1700,17 @@ teardown_own_locked_copies_prove() {
       FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
     fi
     # The release hands this copy to Vernant's closeout driver, run from the
-    # slot; one that cannot start refuses here, before any protected step.
+    # slot; one that cannot start, or that the driver in plan mode would not
+    # release, refuses here, before any protected step.
     if [ -z "$TEARDOWN_FOREIGN_WHY" ] && ! teardown_closeout_ready_in "$slot"; then
       TEARDOWN_FOREIGN_RULE=inspection-unavailable
       TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
+    fi
+    # The driver's own answer, asked in plan mode now; the release asks again.
+    if [ -z "$TEARDOWN_FOREIGN_WHY" ] \
+        && ! teardown_closeout_plan_allows "$(fm_task_copy_canonical_dir "$slot")" "$copy"; then
+      TEARDOWN_FOREIGN_RULE=inspection-unavailable
+      TEARDOWN_FOREIGN_WHY=$TEARDOWN_CLOSEOUT_PLAN_WHY
     fi
     if [ -n "$TEARDOWN_FOREIGN_WHY" ]; then
       teardown_refuse_copy "${TEARDOWN_FOREIGN_RULE:-creation-lock-owner}" "own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." "$copy"

@@ -2799,6 +2799,18 @@ make_foreign_copy_case() {
   printf '%s\n' scripts/ .venv/ >> "$exclude"
   mkdir -p "$NESTED_SLOT/scripts/git-stability"
   cat > "$NESTED_SLOT/scripts/git-stability/closeout_pr.py" <<SH
+# A plan call (no --execute-cleanup) only answers; it is logged apart and never
+# counts as a release. FM_STUB_PLAN=refuse or =garbled makes it decline or
+# answer with no verdict.
+if [ "\${3:-}" != --execute-cleanup ]; then
+  printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout-plan.log"
+  case "\${FM_STUB_PLAN:-ok}" in
+    refuse) echo '{"allowed": false, "reason": "stub_plan_refusal"}'; exit 3 ;;
+    garbled) echo 'no verdict here'; exit 0 ;;
+  esac
+  echo '{"allowed": true}'
+  exit 0
+fi
 printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout.log"
 if [ -n "\${FM_STUB_LOCK:-}" ]; then
   if [ -d "\$FM_STUB_LOCK" ]; then echo held; else echo free; fi >> "$case_dir/closeout.lock-state"

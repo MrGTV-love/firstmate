@@ -1350,15 +1350,6 @@ gib_or_dash() {  # <KiB or ->
   case "$1" in ''|*[!0-9]*) printf -- '-' ;; *) kib_to_gib "$1" ;; esac
 }
 
-# True only when <driver output> carries a real positive verdict: it is exactly
-# one JSON document whose top-level "allowed" key is the boolean true. Text that
-# merely mentions allowed=true, a bare allowed=true, a false or non-boolean
-# value, no verdict, an empty or malformed answer, and more than one document
-# are not permission.
-plan_verdict_allows() {  # <driver output>
-  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
-}
-
 # The driver's own reason as "<reason>: " when its whole answer is one JSON
 # document with a non-empty string "reason", otherwise nothing. The driver prints
 # its keys sorted, so a long answer can cut off before its reason; this puts the
@@ -1367,13 +1358,6 @@ driver_reason_prefix() {  # <driver output>
   local reason
   reason=$(printf '%s' "$1" | jq -s -r 'if length == 1 and (.[0] | type == "object" and (.reason | type == "string") and .reason != "") then .[0].reason else empty end' 2>/dev/null) || return 0
   [ -z "$reason" ] || printf '%s: ' "$(fm_refuse_text "${reason:0:600}")"
-}
-
-# True when the plan's one JSON document reports the driver's retain rule for a
-# tree that holds unique ignored files: the driver archives them and then keeps
-# the tree, so a release of it can never succeed.
-plan_verdict_retains_tree() {  # <driver output>
-  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .ignored_payload_disposition == "archive_then_retain_tree")' >/dev/null 2>&1
 }
 
 # The plan's process group, while one runs. Killing the whole group is the only
@@ -1433,11 +1417,11 @@ driver_plan_allows() {  # <clone> <copy>
   fi
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
   PLAN_WHY="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")${PLAN_WHY:0:600}"
-  if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; then
+  if [ "$rc" != 0 ] || ! teardown_closeout_plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; then
     PLAN_WHY="its closeout driver would not release it (exit ${rc:-1}): ${PLAN_WHY:-no output}"
     return 1
   fi
-  if plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_STDOUT"; then
+  if teardown_closeout_plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_STDOUT"; then
     PLAN_WHY="its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: $PLAN_WHY"
     return 1
   fi
