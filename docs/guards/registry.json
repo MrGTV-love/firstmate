@@ -3395,7 +3395,7 @@
       "owner": "bin/fm-control.sh",
       "invariant": "Lifecycle input targets a live agent positively attributed to this task.",
       "layer": "runtime-block",
-      "source": "the task metadata and launch proof (for a versioned claude record, a matching launch token only after the process-group, descendant, working-directory and claim refusal checks in bin/fm-launch-proof-lib.sh pass; a record that is not one readable record with at most one launch_proof refuses), selected verified harness/backend capabilities, current screen/composer state and recovery journal; existing decision points: site:bin/fm-control.sh:c46aa9a752",
+      "source": "the task metadata and launch proof (for a versioned record of any harness, a matching launch token only after the process-group, descendant, working-directory and claim refusal checks in bin/fm-launch-proof-lib.sh pass; a record that is not one readable record with at most one launch_proof refuses), selected verified harness/backend capabilities, current screen/composer state and recovery journal; existing decision points: site:bin/fm-control.sh:c46aa9a752",
       "trigger": "lifecycle input (interrupt/exit/stay/relaunch) into an endpoint whose state is not positively classified or whose live Herdr agent is not attributed to this task's launch proof",
       "decision": "deny",
       "fail_direction": "closed",
@@ -7203,7 +7203,7 @@
       "owner": "bin/fm-secondmate-restart.sh",
       "invariant": "The secondmate restart sends no request, record or nudge to a live Herdr agent that is not positively attributed to the task.",
       "layer": "runtime-block",
-      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read from the mate's own record (even after an early capability refusal) before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a mate whose record names a remote_host, the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb whatever its capability verdict, only when the registry route's host, root and home equal the recorded remote_host, remote_root and home, the record names a remote_target, and the host's own endpoint target equals it, whose exact bytes attribution=proceed plus one newline with a zero transport status are the only accepted answer, and a remote_backend other than herdr refuses; every later delivery to a remote mate carries that compared route, so bin/fm-on.sh refuses before ssh when the route it resolves differs (FM_ON_EXPECTED_HOST, FM_ON_EXPECTED_ROOT, FM_ON_EXPECTED_HOME), bin/fm-send.sh refuses before any pending-reply record when the record's route differs, and the host send verb refuses an endpoint other than the expected target; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
+      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read from the mate's own record (even after an early capability refusal) before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a mate whose record names a remote_host, the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb whatever its capability verdict, only when the registry route's host, root and home equal the recorded remote_host, remote_root and home, the record names a remote_target, and the host's own endpoint target equals it, whose exact bytes attribution=proceed plus one newline with a zero transport status are the only accepted answer, and a remote_backend other than herdr refuses; the restart keeps that one compared route per mate and rechecks the registry row and record before it creates any pending-reply expectation; its persistence request, fallback nudge and relaunch carry that route, so bin/fm-on.sh refuses before ssh when the route it resolves differs (FM_ON_EXPECTED_HOST, FM_ON_EXPECTED_ROOT, FM_ON_EXPECTED_HOME), bin/fm-send.sh refuses before any pending-reply record when the record's route differs, and the host send verb refuses an endpoint other than the expected target; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
       "trigger": "restart of a local Herdr secondmate whose live agent is not managed by the launch-proof owner (unmanaged, pinned elsewhere, contested or unreadable), or whose Herdr backend does not load, endpoint does not validate, or agent state is neither alive nor positively dead or missing, at the first effect or at a later fallback nudge; restart of a remote Herdr secondmate whose registry route or target differs from its record, or whose host answers anything but attribution=proceed (a refusal, no answer, an unreachable host, or a code root without the verb); and a delivery to it whose registry route, record or host endpoint changed after that decision",
       "decision": "deny",
       "fail_direction": "closed",
@@ -7224,7 +7224,7 @@
         {
           "file": "bin/fm-secondmate-restart.sh",
           "match": "PLAN[i]=\"refused\"",
-          "count": 2
+          "count": 3
         },
         {
           "file": "bin/fm-remote-secondmate-control.sh",
