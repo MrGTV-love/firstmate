@@ -3617,8 +3617,8 @@ test_skipped_copies_with_an_anchor_or_ignored_work_are_kept() {
   sha=$(git -C "$anchored" rev-parse HEAD)
   short=$(git -C "$anchored" rev-parse --short "$sha")
   git -C "$case_dir/project" update-ref "refs/fm/anchor/task-x1-$short" "$sha"
-  printf '*.local\n' >> "$case_dir/project/.git/info/exclude"
-  printf 'private ignored bytes\n' > "$ignored/notes.local"
+  # The reset target (origin's default branch) tracks notes.local, so the ignored file there is in a return's way (R4-4).
+  put_ignored_at_reset_path "$ignored"
   log="$case_dir/treehouse.log"
   rec="$case_dir/data/task-x1/skipped-copies.tsv"
   : > "$rec"; : > "$log"
@@ -3759,6 +3759,41 @@ test_a_skipped_copy_whose_path_cannot_be_resolved_keeps_its_record() {
   pass "a path that cannot be resolved keeps the record"
 }
 
+# R4-4: ignored files keep a skipped copy only when the tree a return resets to (origin's default branch) tracks a path they
+# sit at, inside or above. A .venv-style ignored directory the reset never writes does not keep the copy.
+add_venv_only() {
+  printf '.venv/\n' >> "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  mkdir -p "$1/.venv/bin"
+  printf 'interpreter\n' > "$1/.venv/bin/python"
+}
+
+test_a_skipped_copy_with_only_an_ignored_venv_is_released() {
+  SKIPPED_CASE_PREP=add_venv_only skipped_unknown_custody_case venv-only '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "venv-only: a clean, landed copy whose only ignored files sit where the reset writes nothing was kept"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "a skipped copy whose only ignored files are a .venv directory the reset never writes is released"
+}
+
+# R4-4 control: an ignored file at a path origin's default branch tracks keeps the copy leased and its bytes unchanged.
+put_ignored_at_reset_path() {
+  local copy=$1 pub
+  pub="$(dirname "$copy")/publisher"
+  git clone -q "$(dirname "$copy")/origin.git" "$pub"
+  printf 'tracked by the reset target\n' > "$pub/notes.local"
+  git -C "$pub" add -f notes.local
+  git -C "$pub" -c user.email=t@t -c user.name=t commit -q -m 'track notes.local'
+  git -C "$pub" push -q origin HEAD
+  git -C "$copy" fetch -q origin
+  printf '*.local\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  printf 'private ignored bytes\n' > "$copy/notes.local"
+}
+
+test_a_skipped_copy_with_an_ignored_file_at_a_reset_path_stays_leased() {
+  SKIPPED_CASE_PREP=put_ignored_at_reset_path skipped_unknown_custody_case reset-collide '[]'
+  assert_skipped_copy_kept reset-collide
+  grep -Fq 'private ignored bytes' "$CANON_X/notes.local" || fail "reset-collide: the ignored bytes changed"
+  pass "an ignored file at a path the reset target tracks keeps the skipped copy leased and recorded"
+}
+
 teardown_test_cases=(
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
@@ -3837,6 +3872,8 @@ test_a_skipped_copy_with_a_skip_worktree_edit_stays_leased
 test_a_skipped_copy_with_a_hidden_mode_change_stays_leased
 test_a_skipped_copy_stays_leased_when_another_pool_row_path_holds_a_nul
 test_a_skipped_copy_whose_path_cannot_be_resolved_keeps_its_record
+test_a_skipped_copy_with_only_an_ignored_venv_is_released
+test_a_skipped_copy_with_an_ignored_file_at_a_reset_path_stays_leased
 )
 
 # In the combined tests/fm-teardown.test.sh run,

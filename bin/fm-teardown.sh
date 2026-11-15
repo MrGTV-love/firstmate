@@ -2912,12 +2912,13 @@ teardown_landed() {  # <dir> <ref> <branch>
 # $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch).
 # This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
 # sweep, and only when that copy passes the same landed-work test as any other copy: a clean worktree
-# root whose HEAD is anchored or landed (teardown_landed), with no process running in it and its lease still
-# held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
+# root whose HEAD is anchored or landed (teardown_landed), with no process running in it, no ignored file where the
+# default branch a return resets it to tracks a path (fm_slot_ignored_collisions, the proof's own comparison), and its
+# lease still held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
 # whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
 teardown_skipped_copies() {
-  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok
+  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok reset_tree
   local keep="$record.keep.${BASHPID:-$$}" changed=0
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
   : > "$keep" || return 0
@@ -2976,8 +2977,10 @@ teardown_skipped_copies() {
       echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2
     elif ! hidden_work=$(fm_slot_hidden_work "$canonical") || [ -n "$hidden_work" ]; then
       echo "warning: leaving $copy leased to $holder: a tracked edit is hidden by an index flag, or the flags cannot be read (skipped for: $reason)" >&2
-    elif ! ignored_files=$(git -C "$canonical" ls-files -o -i --exclude-standard 2>/dev/null) || [ -n "$ignored_files" ]; then
-      echo "warning: leaving $copy leased to $holder: it holds ignored files, or they cannot be listed, and a return could replace one that sits where the reset target tracks a file (skipped for: $reason)" >&2
+    elif ! reset_tree=$(git -C "$canonical" rev-parse --verify --quiet 'refs/remotes/origin/HEAD^{commit}' 2>/dev/null) || [ -z "$reset_tree" ]; then
+      echo "warning: leaving $copy leased to $holder: the default branch a return resets it to (origin/HEAD) cannot be read, so its ignored files cannot be compared with it (skipped for: $reason)" >&2
+    elif ! ignored_files=$(fm_slot_ignored_collisions "$canonical" "$reset_tree") || [ -n "$ignored_files" ]; then
+      echo "warning: leaving $copy leased to $holder: ignored files sit where the default branch a return resets it to tracks a path${ignored_files:+ ($ignored_files)}, or they cannot be compared with it (skipped for: $reason)" >&2
     else
       # Only the landed-work test releases a copy. An anchor makes a commit recoverable; it does not make it landed.
       TEARDOWN_BUNDLE_ACCEPTED=

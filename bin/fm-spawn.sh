@@ -557,9 +557,16 @@
 #   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
 #   One absolute thirty-minute bound covers every get and is read before each get, after the custody scan.
-#   After the move a second snapshot is compared with the first, ref for ref: any difference
-#   beyond the expected HEAD/branch move and the one anchor ref this task's own preparation
-#   creates fails the spawn, never reports success. Origin's tracking refs are recorded only
+#   After the move a second snapshot is compared with the first. The copy's own refs (HEAD, the
+#   branch it had at the first snapshot, the branch the move advances, and the one anchor ref
+#   this task's own preparation creates) must show only the expected move: any other difference
+#   fails the spawn, never reports success. A change to any other ref in the namespace the pool
+#   shares is printed as context, never a refusal. Ignored entries are compared by identity
+#   (type, size, mtime, inode) and read for content only at or under a path the target tracks.
+#   A fresh Orca worktree, which this spawn created and which is no pool slot, gets no idle
+#   proof: it is moved by the same fast-forward, and any failure stops the spawn. A lease
+#   released by teardown also requires that no ignored file sits where the default branch a
+#   return resets to tracks a path. Origin's tracking refs are recorded only
 #   after a move that succeeded. A refusal does nothing: no checkout, no switch of HEAD, no deletion
 #   and no undo. Once a move has begun, any failed check stops the spawn, leaves HEAD, refs and files
 #   as they are, holds the copy and refuses (a git refusal after the preparation is such a failure). No claim is
@@ -5149,28 +5156,40 @@ spawn_record_origin_refs() { # <worktree>
 # The whole freshness step for one copy: resolve, prove (unless the fresh-spawn loop already did), record the
 # origin tip, then move. A copy in doubt returns FM_SLOT_SKIP_RC with nothing written to it. After the proof, a
 # failure sets SPAWN_APPLY_FAILED (the copy may have changed) and returns 1.
+# An Orca worktree is not a pool slot: this spawn created it, so the pool slot's idle proof does not run on it. It is
+# moved by the same fast-forward with hooks off, which git refuses over lost work, and any failure returns 1.
 freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
   local worktree=$1 base=${2:-} rc=0 actual
   SPAWN_APPLY_FAILED=0
-  if [ "$SPAWN_PROVEN_COPY" != "$worktree" ]; then
-    spawn_resolve_move_target "$worktree" "$base" || return $?
-    fm_slot_prove_idle "$worktree" "$SPAWN_MOVE_EXPECTED" "${PROJ_ABS:-}" || return $?
+  if [ "$BACKEND" = orca ]; then
+    spawn_resolve_move_target "$worktree" "$base" || return 1
+    [ -n "$SPAWN_MOVE_EXPECTED" ] || return 0
+    if [ "$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null)" != "$SPAWN_MOVE_EXPECTED" ] &&
+      ! git -C "$worktree" -c core.hooksPath=/dev/null merge --ff-only --quiet "$SPAWN_MOVE_EXPECTED" >/dev/null 2>&1; then
+      echo "error: could not fast-forward Orca worktree '$worktree' to '$SPAWN_MOVE_TARGET'; no worker is launched" >&2
+      return 1
+    fi
+  else
+    if [ "$SPAWN_PROVEN_COPY" != "$worktree" ]; then
+      spawn_resolve_move_target "$worktree" "$base" || return $?
+      fm_slot_prove_idle "$worktree" "$SPAWN_MOVE_EXPECTED" "${PROJ_ABS:-}" || return $?
+    fi
+    SPAWN_PROVEN_COPY=
+    # No ref is written between the proof and the move. The move compares this copy's own refs exactly (HEAD, its
+    # branch, and the anchor this task's own preparation created, fm_slot_prepare_base); other refs in the shared
+    # namespace are context only. Origin's tracking refs are recorded below, only after a move that succeeded.
+    if [ -z "$SPAWN_MOVE_EXPECTED" ]; then
+      fm_slot_proof_drop
+      return 0
+    fi
+    fm_slot_apply_move "$worktree" "$SPAWN_MOVE_EXPECTED" || {
+      rc=$?
+      [ "$rc" = "$FM_SLOT_SKIP_RC" ] || [ "$rc" = "$FM_SLOT_REFUSE_RC" ] && return "$rc"
+      SPAWN_APPLY_FAILED=1
+      echo "error: could not move pooled worktree '$worktree' to '$SPAWN_MOVE_TARGET'; refusing to launch" >&2
+      return 1
+    }
   fi
-  SPAWN_PROVEN_COPY=
-  # No ref is written between the proof and the move: every ref is compared exactly, and the only change admitted is
-  # the anchor this task's own preparation created (fm_slot_prepare_base). Origin's tracking refs are recorded below,
-  # only after a move that succeeded (Main 1823 D-B).
-  if [ -z "$SPAWN_MOVE_EXPECTED" ]; then
-    fm_slot_proof_drop
-    return 0
-  fi
-  fm_slot_apply_move "$worktree" "$SPAWN_MOVE_EXPECTED" || {
-    rc=$?
-    [ "$rc" = "$FM_SLOT_SKIP_RC" ] || [ "$rc" = "$FM_SLOT_REFUSE_RC" ] && return "$rc"
-    SPAWN_APPLY_FAILED=1
-    echo "error: could not move pooled worktree '$worktree' to '$SPAWN_MOVE_TARGET'; refusing to launch" >&2
-    return 1
-  }
   actual=$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null || true)
   if [ "$actual" != "$SPAWN_MOVE_EXPECTED" ]; then
     SPAWN_APPLY_FAILED=1
@@ -6628,22 +6647,26 @@ if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
       spawn_slot_refused
     }
   fi
-  FM_SLOT_PANE_PID=$(spawn_pane_pid)
   SPAWN_PROVEN_COPY=
-  spawn_proof_rc=0
-  spawn_resolve_move_target "$WT" "$BASE_BRANCH" &&
-    fm_slot_prove_idle "$WT" "$SPAWN_MOVE_EXPECTED" "$PROJ_ABS" || spawn_proof_rc=$?
-  if [ "$spawn_proof_rc" != 0 ]; then
-    spawn_try_skip "$spawn_proof_rc" && continue
-    if fm_slot_required "$PROJ_ABS" "$WT"; then
-      SLOT_GOVERNED=1
-      BRANCH=${BRANCH:-fm/$ID}
-      spawn_slot_refused
+  # The idle proof vets reuse of a Treehouse pool slot. A fresh Orca worktree was created by this spawn and is no pool
+  # slot, so the proof does not run on it (freshen_spawn_worktree_base moves it).
+  if [ "$BACKEND" != orca ]; then
+    FM_SLOT_PANE_PID=$(spawn_pane_pid)
+    spawn_proof_rc=0
+    spawn_resolve_move_target "$WT" "$BASE_BRANCH" &&
+      fm_slot_prove_idle "$WT" "$SPAWN_MOVE_EXPECTED" "$PROJ_ABS" || spawn_proof_rc=$?
+    if [ "$spawn_proof_rc" != 0 ]; then
+      spawn_try_skip "$spawn_proof_rc" && continue
+      if fm_slot_required "$PROJ_ABS" "$WT"; then
+        SLOT_GOVERNED=1
+        BRANCH=${BRANCH:-fm/$ID}
+        spawn_slot_refused
+      fi
+      # An unknown (could not tell) is never skipped past: the copy is leased where it stands and the spawn is refused.
+      spawn_hold_and_refuse "${FM_SLOT_SKIP_REASON:-unknown}"
     fi
-    # An unknown (could not tell) is never skipped past: the copy is leased where it stands and the spawn is refused.
-    spawn_hold_and_refuse "${FM_SLOT_SKIP_REASON:-unknown}"
+    SPAWN_PROVEN_COPY=$WT
   fi
-  SPAWN_PROVEN_COPY=$WT
 fi
 if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
   SLOT_GOVERNED=1
@@ -6685,7 +6708,7 @@ if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" 
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || {
     rc=$?
     spawn_try_skip "$rc" && continue
-    if [ "$RELAUNCH" -eq 0 ] && [ "$SLOT_GOVERNED" = 0 ]; then
+    if [ "$RELAUNCH" -eq 0 ] && [ "$SLOT_GOVERNED" = 0 ] && [ "$BACKEND" != orca ]; then
       # The move began and a check failed, or the doubt is an unknown: the copy is leased where it stands, recorded, and
       # the spawn is refused. It is never left for the pane close to return and reset (Main 1886 CUT).
       if [ "$SPAWN_APPLY_FAILED" = 1 ]; then spawn_hold_and_refuse changed_during_move; fi

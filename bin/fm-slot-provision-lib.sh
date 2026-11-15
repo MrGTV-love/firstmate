@@ -20,7 +20,7 @@ FM_SLOT_PREPARED_HEAD=
 # There is no undo. A refusal, or any failed check after a move has begun, leaves HEAD, every ref and every file exactly as
 # they are and says so (Main 1886 CUT).
 # The one ref change this spawn's own preparation makes before the move: "<anchor ref>=<commit it anchors>" (absent before,
-# exactly that commit after). The move admits that one creation and no other ref change.
+# exactly that commit after). The move admits that one creation and no other change to this copy's own refs.
 FM_SLOT_EXPECT_REFS=
 # 1 once fm_slot_prepare_base has written anything to the copy (a detach or an anchor ref). From then on the copy is no
 # longer "untouched by this spawn", so a failed move is never a skip (rule Q).
@@ -243,8 +243,10 @@ EOF
 #                       holds the shared project lock (the fresh-spawn path takes it before it
 #                       acquires a copy), so the snapshot and the move see one copy.
 #   fm_slot_apply_move  moves a copy the proof passed, with hooks off, re-reads it, and compares.
-#                       It compares every ref exactly: the only change admitted besides the HEAD/branch
-#                       move is the anchor this spawn's own preparation created. A refusal writes no
+#                       It compares this copy's own refs exactly: HEAD, the branch it had at the first
+#                       snapshot, the branch the move advances, and the anchor this spawn's own
+#                       preparation created. Other refs in the namespace the pool shares are recorded
+#                       as context in a refusal or skip, never a refusal. A refusal writes no
 #                       file, runs no checkout and undoes nothing. A git refusal after the preparation
 #                       wrote anything is a failure (return 1), never a skip, and so is any other
 #                       difference.
@@ -287,7 +289,7 @@ fm_slot_skip_is_known() { # <reason-code>
   return 1
 }
 
-# One embedded program with five read-only modes. It runs git and lsof through PATH, so a failing
+# One embedded program with seven read-only modes. It runs git and lsof through PATH, so a failing
 # tool fails closed (exit 3, the reason on stderr).
 FM_SLOT_PROBE_PY=$(cat <<'FMPROBEPY'
 import datetime, hashlib, json, os, stat as stat_mod, subprocess, sys, time, unicodedata
@@ -309,8 +311,10 @@ def git(slot, *args, allow=(0,)):
 def enc(path):
     return path.decode("utf-8", "surrogateescape") if isinstance(path, bytes) else path
 
-# ---- snapshot: HEAD, branch, EVERY ref, the status (submodules counted, hidden index flags checked), and every
-# ignored file with its size and sha256 (a symlink by its target). Anything that cannot be read fails the whole snapshot.
+# ---- snapshot: HEAD, branch, every ref, the status (submodules counted, hidden index flags checked), and every
+# ignored entry git lists (a wholly ignored directory is one entry) by its identity: type, size, mtime and inode, a
+# symlink also by its target. Content is read only for an entry at or under a path the target tracks. Anything that
+# cannot be read fails the whole snapshot.
 def head_and_refs(slot):
     head = git(slot, "rev-parse", "--verify", "HEAD").stdout.decode().strip()
     sym = git(slot, "symbolic-ref", "-q", "HEAD", allow=(0, 1))
@@ -433,7 +437,34 @@ def submodule_pin_only(slot, entry, before_heads):
         fail("submodule %r status exit %d" % (path, inner.returncode))
     return not inner.stdout.strip(b"\0 \n")
 
-def snapshot(slot, out, after_move="0", before=""):
+# The path-comparison settings and the tracked paths of the target, written by fm_slot_target_paths into one directory.
+def path_key(paths):
+    settings = ""
+    if paths and os.path.exists(os.path.join(paths, "settings")):
+        settings = open(os.path.join(paths, "settings"), encoding="utf-8", errors="replace").read()
+    cfg = dict(line.split(" ", 1) for line in settings.splitlines() if " " in line)
+    ignorecase = cfg.get("core.ignorecase") == "true"
+    precompose = cfg.get("core.precomposeunicode") == "true"
+    def key(text):
+        if precompose:
+            text = unicodedata.normalize("NFC", text)
+        return text.casefold() if ignorecase else text
+    return key
+
+def tracked_paths(paths, key):
+    """The tracked paths of the target as compared keys, or None when no target was listed."""
+    if not paths or not os.path.exists(os.path.join(paths, "tracked")):
+        return None
+    return set(key(enc(p)) for p in open(os.path.join(paths, "tracked"), "rb").read().split(b"\0") if p)
+
+def at_or_under(folded, written):
+    parts = folded.split("/")
+    return folded in written or any("/".join(parts[:i]) in written for i in range(1, len(parts)))
+
+def ignored_entries(slot):
+    return [raw for raw in git(slot, "ls-files", "-o", "-i", "--exclude-standard", "--directory", "-z").stdout.split(b"\0") if raw]
+
+def snapshot(slot, out, after_move="0", before="", paths=""):
     head, symref, refs = head_and_refs(slot)
     status = [enc(e) for e in git(slot, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none").stdout.split(b"\0") if e]
     heads = submodule_heads(slot)
@@ -443,27 +474,29 @@ def snapshot(slot, out, after_move="0", before=""):
     status += hidden_changes(slot)
     status += nested_flags(slot)
     ignored = {}
-    for raw in git(slot, "ls-files", "-o", "-i", "--exclude-standard", "-z").stdout.split(b"\0"):
-        if not raw:
-            continue
+    key = path_key(paths)
+    written = tracked_paths(paths, key)
+    for raw in ignored_entries(slot):
         path = os.path.join(os.fsencode(slot), raw.rstrip(b"/"))
         try:
             st = os.lstat(path)
-            if os.path.islink(path):
-                entry = ["link", 0, os.readlink(path).__repr__()]
-            elif os.path.isdir(path):
-                entry = ["dir", 0, ""]
-            elif os.path.isfile(path):
-                digest = hashlib.sha256()
-                with open(path, "rb") as handle:
-                    for chunk in iter(lambda: handle.read(1 << 20), b""):
-                        digest.update(chunk)
-                entry = ["file", st.st_size, digest.hexdigest()]
+            if stat_mod.S_ISLNK(st.st_mode):
+                kind, extra = "link", os.readlink(path).__repr__()
+            elif stat_mod.S_ISDIR(st.st_mode):
+                kind, extra = "dir", ""
+            elif stat_mod.S_ISREG(st.st_mode):
+                kind, extra = "file", ""
+                if written is not None and at_or_under(key(enc(raw).rstrip("/")), written):
+                    digest = hashlib.sha256()
+                    with open(path, "rb") as handle:
+                        for chunk in iter(lambda: handle.read(1 << 20), b""):
+                            digest.update(chunk)
+                    extra = digest.hexdigest()
             else:
-                entry = ["special", 0, ""]
+                kind, extra = "special", ""
         except OSError as exc:
             fail("ignored entry %r cannot be read: %s" % (enc(raw), exc))
-        ignored[enc(raw)] = entry
+        ignored[enc(raw)] = [kind, st.st_size, st.st_mtime_ns, st.st_ino, extra]
     # The refs are read LAST here, and FIRST in the read after a move, so the window in which another writer's
     # ref change can look like ours is the move itself.
     head, symref, refs = head_and_refs(slot)
@@ -474,71 +507,76 @@ def load(path):
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
 
-# ---- compare two snapshots. same: nothing differs. moved <target> <attached-ref>: HEAD is the target, the attached
-# branch (if any) is the target, every other ref is as it was (but for the named exceptions), the status is clean,
-# and every ignored entry is exactly as it was.
+# ---- compare two snapshots. same: nothing of this copy differs. moved <target> <attached-ref>: HEAD is the target, the
+# attached branch (if any) is the target, the other own refs of this copy are as they were, the status is clean, and every
+# ignored entry is exactly as it was. The own refs of this copy are the branch it had at the first snapshot, the branch the
+# move advances, and the anchors its preparation creates. Every other ref lives in the namespace the pool shares, where
+# other spawns and workers write: a change there is printed as context, never a refusal.
 def compare(before, after, mode, target, attached, detached="", expect=""):
     a, b, diffs = load(before), load(after), []
     # expect: "<ref>=<sha>" entries, the exact refs the preparation of this operation creates: absent before, exactly <sha> after.
     made = dict(e.split("=", 1) for e in expect.split() if "=" in e)
+    own = a["symref"] if a["symref"].startswith("refs/") else ""
     if detached == "1":
         a["symref"] = "detached"
-    def named(want, have):
-        return ", ".join(sorted(k for k in set(want) | set(have) if want.get(k) != have.get(k))[:3])
-    want = dict(a["refs"])
+    watched = set(made) | set(r for r in (own, attached) if r)
+    want = dict((r, a["refs"][r]) for r in watched if r in a["refs"])
     if mode != "same" and attached:
         want[attached] = target
     for ref, sha in made.items():
         if ref in a["refs"]:
-            # Already there before the proof: it must be exactly as it was (the general comparison covers it).
+            # Already there before the proof: it must be exactly as it was.
             continue
         if b["refs"].get(ref) != sha:
             diffs.append("the expected anchor %s was not created at %s (it is %s)" % (ref, sha, b["refs"].get(ref, "missing")))
+            watched.discard(ref)
         else:
             want[ref] = sha
+    mine = sorted(r for r in watched if want.get(r) != b["refs"].get(r))
+    others = sorted(k for k in set(a["refs"]) | set(b["refs"]) if k not in watched and a["refs"].get(k) != b["refs"].get(k))
     if mode == "same":
         for key in ("head", "symref", "status", "ignored"):
             if a[key] != b[key]:
                 diffs.append("%s changed" % key)
-        if want != b["refs"]:
-            diffs.append("refs changed: %s" % named(want, b["refs"]))
+        if mine:
+            diffs.append("refs changed: %s" % ", ".join(mine[:3]))
     else:
         if b["head"] != target:
             diffs.append("HEAD is %s, not %s" % (b["head"], target))
         if b["symref"] != a["symref"]:
             diffs.append("the checked-out branch changed from %s to %s" % (a["symref"], b["symref"]))
-        if want != b["refs"]:
-            diffs.append("refs changed beyond the move: %s" % named(want, b["refs"]))
+        if mine:
+            diffs.append("refs changed beyond the move: %s" % ", ".join(mine[:3]))
         if b["status"]:
             diffs.append("the tree is not clean after the move: %s" % "; ".join(b["status"][:3]))
         if a["ignored"] != b["ignored"]:
             changed = sorted(k for k in set(a["ignored"]) | set(b["ignored"]) if a["ignored"].get(k) != b["ignored"].get(k))
             diffs.append("ignored files changed: %s" % ", ".join(changed[:3]))
+    context = ""
+    if others:
+        context = "other refs in the shared namespace changed (context, not a refusal): %s" % ", ".join(others[:5])
     if diffs:
-        print("; ".join(diffs))
+        print("; ".join(diffs + ([context] if context else [])))
         sys.exit(1)
+    if context:
+        print(context)
 
-# ---- collide: ignored entries at a path the target tracks (the same path, below it, or above it).
-def collide(snap, tracked, settings):
-    cfg = dict(line.split(" ", 1) for line in settings.splitlines() if " " in line)
-    ignorecase = cfg.get("core.ignorecase") == "true"
-    precompose = cfg.get("core.precomposeunicode") == "true"
-    def key(text):
-        if precompose:
-            text = unicodedata.normalize("NFC", text)
-        return text.casefold() if ignorecase else text
-    written = set(key(enc(p)) for p in open(tracked, "rb").read().split(b"\0") if p)
+# ---- collide: ignored entries at a path the target tracks (the same path, below it, or above it). The entries come from a
+# snapshot (the proof) or from a fresh listing of the slot (teardown, before a skipped copy is returned).
+def collide(entries, paths):
+    key = path_key(paths)
+    written = tracked_paths(paths, key)
+    if written is None:
+        fail("the tracked paths of the target were not listed")
     below = set()
     for path in written:
         parts = path.split("/")
         for i in range(1, len(parts)):
             below.add("/".join(parts[:i]))
     found = []
-    for entry in load(snap)["ignored"]:
+    for entry in entries:
         folded = key(entry.rstrip("/"))
-        parts = folded.split("/")
-        inside = any("/".join(parts[:i]) in written for i in range(1, len(parts)))
-        if folded in written or folded in below or inside:
+        if at_or_under(folded, written) or folded in below:
             found.append(entry)
     if found:
         print(", ".join(sorted(found)[:3]).replace("\n", "\\n"))
@@ -728,7 +766,9 @@ if mode == "snapshot":
 elif mode == "compare":
     compare(*args)
 elif mode == "collide":
-    collide(*args)
+    collide(list(load(args[0])["ignored"]), args[1])
+elif mode == "collide-live":
+    collide([enc(raw) for raw in ignored_entries(args[0])], args[1])
 elif mode == "holders":
     holders(*args)
 elif mode == "hidden":
@@ -743,8 +783,33 @@ FMPROBEPY
 
 fm_slot_probe() { python3 -I -c "$FM_SLOT_PROBE_PY" "$@"; }
 
-# fm_slot_snapshot <slot> <out-file>: fails (nonzero) when any read fails.
-fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" "${3:-0}" "${4:-}" 2>&1; }
+# fm_slot_snapshot <slot> <out-file> [<after-move 0|1> <before-file> <paths-dir>]: fails (nonzero) when any read fails.
+# <paths-dir> holds what fm_slot_target_paths wrote; an ignored file at or under a path listed there is read for its content.
+fm_slot_snapshot() { fm_slot_probe snapshot "$1" "$2" "${3:-0}" "${4:-}" "${5:-}" 2>&1; }
+
+# fm_slot_target_paths <slot> <commit> <dir>: writes <dir>/tracked (the paths <commit> tracks) and <dir>/settings (the
+# path-comparison settings of the slot: core.ignorecase, core.precomposeunicode). Nonzero when either cannot be read.
+fm_slot_target_paths() {
+  local rc=0
+  git -C "$1" config --bool --get-regexp '^core\.(ignorecase|precomposeunicode)$' >"$3/settings" 2>/dev/null || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 1 ] || return 1
+  git -C "$1" ls-tree -r --name-only -z "$2" -- >"$3/tracked" 2>/dev/null
+}
+
+# fm_slot_ignored_collisions <slot> <commit>: prints the ignored entries of the slot that sit at a path <commit> tracks,
+# inside one or above one (the same comparison the proof makes). Nonzero when the listing or the comparison cannot run.
+fm_slot_ignored_collisions() {
+  local dir out rc=0
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-collide.XXXXXX" 2>/dev/null) || return 1
+  if fm_slot_target_paths "$1" "$2" "$dir"; then
+    out=$(fm_slot_probe collide-live "$1" "$dir" 2>&1) || rc=$?
+  else
+    rc=1
+  fi
+  rm -rf -- "$dir"
+  [ "$rc" = 0 ] || return 1
+  printf '%s' "$out"
+}
 
 # fm_slot_hidden_work <slot>: prints tracked work hidden by an index flag (assume-unchanged, skip-worktree), by blob or by
 # mode, at the top level and inside every initialized submodule. Returns nonzero when it cannot tell. The same function
@@ -799,7 +864,7 @@ fm_slot_proof_drop() {
 # FM_SLOT_SKIP_RC doubt. Writes nothing to the slot. An empty target means the spawn moves nothing
 # (an origin-less copy): only the clean tree and the holder rule apply.
 fm_slot_prove_idle() {
-  local slot=$1 target=$2 project=${3:-} no_ancestry=${4:-} snap out head status settings tracked colliding reason=unknown_git_read
+  local slot=$1 target=$2 project=${3:-} snap out head status colliding reason=unknown_git_read
   # A proof is of one copy. The reason of an earlier copy's skip must not survive into a record written for this one
   # (Main 1939 N-1); a skip in this proof sets it again.
   FM_SLOT_SKIP_REASON=
@@ -815,7 +880,12 @@ fm_slot_prove_idle() {
   FM_SLOT_PROOF_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-proof.XXXXXX" 2>/dev/null) ||
     { FM_SLOT_PROOF_DIR=; fm_slot_skip "$slot" unknown_git_read "a scratch directory for the snapshot cannot be created"; return; }
   snap="$FM_SLOT_PROOF_DIR/before.json"
-  out=$(fm_slot_snapshot "$slot" "$snap") || {
+  if [ -n "$target" ] && ! fm_slot_target_paths "$slot" "$target" "$FM_SLOT_PROOF_DIR"; then
+    fm_slot_proof_drop
+    fm_slot_skip "$slot" unknown_ignored_inventory "the path-comparison settings of the slot or the tracked paths of the target cannot be read"
+    return
+  fi
+  out=$(fm_slot_snapshot "$slot" "$snap" 0 '' "$FM_SLOT_PROOF_DIR") || {
     case "$out" in *ls-files*|*'ignored entry'*) reason=unknown_ignored_inventory ;; esac
     fm_slot_proof_drop
     fm_slot_skip "$slot" "$reason" "the copy cannot be read in one snapshot (${out:-no detail})"
@@ -833,14 +903,7 @@ fm_slot_prove_idle() {
   fi
   fm_slot_holders_or_skip "$slot" "$project" || { out=$?; fm_slot_proof_drop; return "$out"; }
   if [ -n "$target" ]; then
-    settings=$(git -C "$slot" config --bool --get-regexp '^core\.(ignorecase|precomposeunicode)$' 2>/dev/null) || {
-      [ "$?" = 1 ] || { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_ignored_inventory "the slot's path-comparison settings cannot be read"; return; }
-      settings=
-    }
-    tracked="$FM_SLOT_PROOF_DIR/tracked"
-    git -C "$slot" ls-tree -r --name-only -z "$target" -- >"$tracked" 2>/dev/null ||
-      { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_ignored_inventory "the target's tracked paths cannot be listed"; return; }
-    colliding=$(fm_slot_probe collide "$snap" "$tracked" "$settings" 2>&1) ||
+    colliding=$(fm_slot_probe collide "$snap" "$FM_SLOT_PROOF_DIR" 2>&1) ||
       { out=$colliding; fm_slot_proof_drop; fm_slot_skip "$slot" unknown_ignored_inventory "the ignored entries could not be compared with the target's tracked paths (${out:-no detail})"; return; }
     if [ -n "$colliding" ]; then
       fm_slot_proof_drop
@@ -848,7 +911,7 @@ fm_slot_prove_idle() {
       return
     fi
     head=$(fm_slot_probe field "$snap" head 2>/dev/null) || { fm_slot_proof_drop; fm_slot_skip "$slot" unknown_git_read "HEAD cannot be read"; return; }
-    if [ "$head" != "$target" ] && [ "$no_ancestry" != noancestry ]; then
+    if [ "$head" != "$target" ]; then
       if git -C "$slot" merge-base --is-ancestor "$head" "$target" 2>/dev/null; then
         :
       else
@@ -892,7 +955,7 @@ fm_slot_apply_move() {
       mode=moved
     fi
   fi
-  if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo 1 || echo 0)" "$snap"); then
+  if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo 1 || echo 0)" "$snap" "$FM_SLOT_PROOF_DIR"); then
     fm_slot_proof_drop
     echo "error: pooled copy '$slot' could not be read after the move ($(printf '%s' "$out" | sed -n '1p')); its state is unknown, so it is left exactly as it is and no worker is admitted" >&2
     return 1
@@ -912,10 +975,10 @@ fm_slot_apply_move() {
       note=
       [ -z "$expect" ] || note="the anchor ${expect%%=*} was created; "
       [ "$detached_flag" != 1 ] || note="${note}this spawn's preparation detached the copy from its branch; "
-      echo "error: git refused the move of pooled copy '$slot' to $target after this spawn had prepared it (${note}it is $(fm_slot_where "$slot")); nothing is switched back, the copy is left exactly as it is, and no worker is admitted" >&2
+      echo "error: git refused the move of pooled copy '$slot' to $target after this spawn had prepared it (${note}it is $(fm_slot_where "$slot")${out:+; $out}); nothing is switched back, the copy is left exactly as it is, and no worker is admitted" >&2
       return 1
     fi
-    fm_slot_skip "$slot" not_fast_forward "git refused the move to $target and a second read shows no change ($(printf '%s' "$merge_out" | sed -n '1p'))"
+    fm_slot_skip "$slot" not_fast_forward "git refused the move to $target and a second read shows no change to this copy ($(printf '%s' "$merge_out" | sed -n '1p'))${out:+; $out}"
     return
   fi
   return 0

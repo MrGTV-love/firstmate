@@ -1020,8 +1020,8 @@ test_a_move_that_changes_a_submodule_pin_is_not_called_dirty() {
   pass "a move that changes a submodule pin succeeds; the stale checkout is for the next spawn to report"
 }
 
-# 6. A ref that changes after the proof and before the merge is a difference outside the expected move.
-test_a_ref_that_changes_after_the_proof_fails_the_move() {
+# 6. A ref outside this copy that appears after the proof and before the merge is context, not a refusal (R4-1).
+test_a_ref_outside_the_copy_that_appears_after_the_proof_does_not_fail_the_move() {
   make_world m6-late-ref
   advance_origin advanced.txt
   local bin="$W_DIR/lateref" real_git out rc=0
@@ -1030,8 +1030,8 @@ test_a_ref_that_changes_after_the_proof_fails_the_move() {
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/review/custody %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
-  [ "$rc" != 0 ] || fail "a ref created after the proof was admitted: $out"
-  pass "a ref that appears after the proof fails the move"
+  [ "$rc" = 0 ] || fail "a ref outside the copy created after the proof refused the move (rc $rc): $out"
+  pass "a ref outside the copy that appears after the proof does not fail the move"
 }
 
 # The HEAD-equals-target rule on its own: a target whose tree equals the slot's, so nothing else differs.
@@ -1172,9 +1172,9 @@ test_a_promotion_refusal_returns_the_provisioners_code() {
   pass "a refusal returns the provisioner's code"
 }
 
-# D-B: every ref is compared exactly. The old allow list is set the way the spawn used to set it; it must not matter.
+# R4-1: the refs of this copy are compared exactly; origin's tracking refs are shared by every slot and are context only.
 
-test_a_rewound_origin_tracking_ref_fails_the_move() {
+test_a_rewound_origin_tracking_ref_does_not_fail_the_move() {
   make_world b1-rewind
   advance_origin advanced.txt
   local bin="$W_DIR/rewind" real_git out rc=0
@@ -1183,8 +1183,9 @@ test_a_rewound_origin_tracking_ref_fails_the_move() {
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/remotes/origin/main %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
-  [ "$rc" != 0 ] || fail "a rewind of origin's tracking ref was admitted: $out"
-  pass "a rewind of an origin tracking ref fails the move"
+  [ "$rc" = 0 ] || fail "a rewind of origin's shared tracking ref refused the move (rc $rc): $out"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$W_TARGET" ] || fail "HEAD is not the target after the move"
+  pass "a rewind of an origin tracking ref does not fail the move of a detached copy"
 }
 
 test_the_failure_for_a_changed_ref_names_the_ref() {
@@ -1193,14 +1194,17 @@ test_the_failure_for_a_changed_ref_names_the_ref() {
   local bin="$W_DIR/names" real_git out rc=0
   real_git=$(command -v git)
   mkdir -p "$bin"
-  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/remotes/origin/main %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
+  # shellcheck disable=SC2016 # The shim's own shell expands $*, $rc and "$@".
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s "$@"; rc=$?; %s -C %s update-ref refs/remotes/origin/main %s; %s -C %s update-ref --no-deref HEAD %s; exit $rc ;; esac\nexec %s "$@"\n' \
+    "'$real_git'" "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
-  assert_contains "$out" "refs/remotes/origin/main" "the failure did not say which ref changed"
-  pass "the failure names the ref that changed"
+  [ "$rc" = 1 ] || fail "a move that left HEAD off the target was not a failure (rc $rc): $out"
+  assert_contains "$out" "refs/remotes/origin/main" "the failure did not say which other ref changed"
+  pass "a failure names the other refs that changed"
 }
 
-test_an_origin_ref_advanced_before_a_refused_move_is_not_called_untouched() {
+test_an_origin_ref_advanced_before_a_refused_move_is_a_skip_that_names_it() {
   make_world b2-skipref
   advance_origin advanced.txt
   git -C "$W_PROJ" update-ref refs/remotes/origin/main "$W_BASE"
@@ -1212,8 +1216,9 @@ test_an_origin_ref_advanced_before_a_refused_move_is_not_called_untouched() {
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
-  [ "$rc" = 1 ] || fail "a refused move after a ref changed was not reported as a failure (rc $rc): $out"
-  pass "a refused move after an origin ref changed is a failure, not a skip"
+  [ "$rc" = 20 ] || fail "a refused move after only a shared origin ref changed was not a skip (rc $rc): $out"
+  assert_contains "$out" "refs/remotes/origin/main" "the skip did not record the shared ref change as context"
+  pass "a refused move after a shared origin ref changed is a skip that names the ref as context"
 }
 
 test_an_origin_ref_advanced_before_a_refused_move_does_not_say_untouched() {
@@ -1257,7 +1262,7 @@ test_the_anchor_the_preparation_wrote_is_admitted() {
   pass "a move admits the anchor its own preparation wrote"
 }
 
-test_an_anchor_the_preparation_did_not_write_fails_the_move() {
+test_an_anchor_the_preparation_did_not_write_does_not_fail_the_move() {
   anchor_world b3-anchor-extra
   local bin="$W_DIR/anchor-extra" real_git out rc=0
   real_git=$(command -v git)
@@ -1265,9 +1270,9 @@ test_an_anchor_the_preparation_did_not_write_fails_the_move() {
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/fm/anchor/tid-0000000 %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
-  [ "$rc" != 0 ] || fail "an anchor ref other than the one the preparation wrote was admitted: $out"
   anchor_world_done
-  pass "an anchor ref the preparation did not write fails the move"
+  [ "$rc" = 0 ] || fail "an anchor ref another writer created refused the move (rc $rc): $out"
+  pass "an anchor ref the preparation did not write is another writer's ref, not a refusal"
 }
 
 # The anchor the preparation wrote must END at the commit it anchors. One that a writer moved to another commit before the
@@ -1341,8 +1346,8 @@ test_a_submodule_commit_made_after_the_proof_fails_the_move() {
   pass "a submodule commit made after the proof fails the move"
 }
 
-# N5: the comparison starts at the FIRST snapshot. A ref that changes while the proof is still running refuses the move.
-test_a_ref_that_changes_during_the_proof_fails_the_move() {
+# N5: the comparison starts at the FIRST snapshot. A ref outside this copy that changes while the proof runs is context (R4-1).
+test_a_ref_outside_the_copy_that_changes_during_the_proof_does_not_fail_the_move() {
   make_world n5-during-proof
   advance_origin advanced.txt
   local bin="$W_DIR/duringproof" real_git out rc=0
@@ -1351,8 +1356,8 @@ test_a_ref_that_changes_during_the_proof_fails_the_move() {
   printf '#!/bin/sh\ncase " $* " in *" merge-base --is-ancestor "*) %s -C %s update-ref refs/review/during-proof %s ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
-  [ "$rc" != 0 ] || fail "a ref that changed after the first snapshot was adopted: $out"
-  pass "a ref that changes after the first snapshot fails the move"
+  [ "$rc" = 0 ] || fail "a ref outside the copy that changed during the proof refused the move (rc $rc): $out"
+  pass "a ref outside the copy that changes during the proof does not fail the move"
 }
 
 # N5: an expected anchor that is missing after the preparation made it refuses (nonzero), it is not accepted.
@@ -1370,8 +1375,8 @@ test_an_expected_anchor_that_goes_missing_fails_the_move() {
   pass "an expected anchor that is missing after the preparation fails the move"
 }
 
-# N5: a symbolic ref is recorded with its target, so a retarget between two branches at one commit is a difference.
-test_a_symbolic_ref_retargeted_between_same_commit_branches_fails_the_move() {
+# N5: a symbolic ref is recorded with its target. origin/HEAD is shared by every slot, so its retarget is context (R4-1).
+test_a_shared_symbolic_ref_retargeted_between_same_commit_branches_does_not_fail_the_move() {
   make_world n5-symref
   advance_origin advanced.txt
   git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
@@ -1383,8 +1388,8 @@ test_a_symbolic_ref_retargeted_between_same_commit_branches_fails_the_move() {
   printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/alt ;; esac\nexec %s "$@"\n' "'$real_git'" "'$W_SLOT'" "'$real_git'" >"$bin/git"
   chmod +x "$bin/git"
   out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
-  [ "$rc" != 0 ] || fail "a symbolic ref retargeted between same-commit branches was admitted: $out"
-  pass "a retargeted symbolic ref fails the move"
+  [ "$rc" = 0 ] || fail "a retarget of the shared origin/HEAD refused the move (rc $rc): $out"
+  pass "a retargeted shared symbolic ref does not fail the move"
 }
 
 # --- Main 1925 (review of 9af0ff6df): F1 a refusal after a preparation, F2 the clock seam -----------------------------------
@@ -1558,6 +1563,96 @@ test_an_index_flag_inside_a_nested_submodule_skips_the_copy() {
   expect_skip "an index flag inside a nested submodule refuses the spawn" index_flag
 }
 
+# --- Main review round 4: R4-1 the move compares only this copy's refs, R4-3 ignored entries by identity -----------------
+
+# R4-1: pool slots share one ref namespace. A sibling spawn's private base ref and a sibling worker's branch, written between
+# the proof and the read after the move, are not this copy's refs: the move passes, and they are context only.
+test_a_sibling_ref_written_during_the_move_does_not_fail_it() {
+  make_world r41-sibling
+  advance_origin advanced.txt
+  local bin="$W_DIR/sibling" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/fm/spawn-base/sibling-1 %s; %s -C %s update-ref refs/heads/fm/other %s ;; esac\nexec %s "$@"\n' \
+    "'$real_git'" "'$W_PROJ'" "$W_BASE" "'$real_git'" "'$W_PROJ'" "$W_BASE" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 0 ] || fail "a sibling's ref write during the move refused it (rc $rc): $out"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$W_TARGET" ] || fail "HEAD is not the target after the move"
+  pass "a sibling spawn's base ref and a sibling branch written during the move do not refuse it"
+}
+
+# R4-1 control: the branch the copy had at the first snapshot is this copy's ref. A preparation detached the copy, so the move
+# runs detached; a change to that branch before the read after the move still refuses.
+test_a_change_to_the_copys_own_branch_during_the_move_fails_it() {
+  make_branch_slot r41-own
+  advance_origin advanced.txt
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+  [ "$FM_SLOT_PREPARE_DETACHED" = 1 ] || fail "the preparation did not detach the copy, so this case proves nothing"
+  local bin="$W_DIR/ownbranch" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s -C %s update-ref refs/heads/old-owner %s ;; esac\nexec %s "$@"\n' \
+    "'$real_git'" "'$W_SLOT'" "$W_TARGET" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_apply_move "$W_SLOT" "$W_TARGET" 2>&1) || rc=$?
+  [ "$rc" = 1 ] || fail "a change to the copy's own branch during the move was admitted (rc $rc): $out"
+  assert_contains "$out" "refs/heads/old-owner" "the failure did not name the copy's own branch"
+  pass "a change to the copy's own branch during the move still refuses"
+}
+
+# R4-1: a refusal for this copy's own ref also records the other refs that changed, as context.
+test_a_refusal_records_other_ref_changes_as_context() {
+  make_world r41-context
+  advance_origin advanced.txt
+  local bin="$W_DIR/context" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  # shellcheck disable=SC2016 # The shim's own shell expands $*, $rc and "$@".
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s "$@"; rc=$?; %s -C %s update-ref refs/fm/spawn-base/sibling-2 %s; %s -C %s update-ref --no-deref HEAD %s; exit $rc ;; esac\nexec %s "$@"\n' \
+    "'$real_git'" "'$real_git'" "'$W_PROJ'" "$W_BASE" "'$real_git'" "'$W_SLOT'" "$W_BASE" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 1 ] || fail "a move that left HEAD off the target was not a failure (rc $rc): $out"
+  assert_contains "$out" "refs/fm/spawn-base/sibling-2" "the refusal did not record the other ref change as context"
+  pass "a refusal names the other refs that changed, as context"
+}
+
+# R4-3: ignored entries are recorded by identity (type, size, mtime, inode). Content is read only for an entry at or under a
+# path the target tracks. Files that cannot be opened under one ignored directory prove that no content is read.
+test_ignored_files_under_an_ignored_directory_are_not_read() {
+  make_world r43-identity
+  advance_origin advanced.txt
+  local i out rc=0
+  mkdir -p "$W_SLOT/cache/deep"
+  for i in $(seq 1 40); do printf 'cache bytes %s\n' "$i" >"$W_SLOT/cache/deep/f$i"; done
+  chmod 000 "$W_SLOT"/cache/deep/f*
+  out=$(fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  chmod 644 "$W_SLOT"/cache/deep/f*
+  [ "$rc" = 0 ] || fail "the move read the content of ignored files no target path touches (rc $rc): $out"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$W_TARGET" ] || fail "HEAD is not the target after the move"
+  grep -q 'cache bytes 7' "$W_SLOT/cache/deep/f7" || fail "an ignored file changed across the move"
+  pass "ignored files under an ignored directory are compared by identity, and none of their content is read"
+}
+
+# R4-3 control: an ignored file whose identity changes between the proof and the read after the move fails the move.
+test_an_ignored_file_whose_identity_changes_during_the_move_fails_it() {
+  make_world r43-changed
+  advance_origin advanced.txt
+  printf 'before\n' >"$W_SLOT/scratch.local"
+  local bin="$W_DIR/ignchange" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) printf "changed during the move\\n" >%s ;; esac\nexec %s "$@"\n' \
+    "'$W_SLOT/scratch.local'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 1 ] || fail "an ignored file that changed during the move was admitted (rc $rc): $out"
+  assert_contains "$out" "scratch.local" "the failure did not name the changed ignored file"
+  pass "an ignored file whose identity changes during the move fails it"
+}
+
 CASES=(
   test_control_clean_slot_behind_the_target_moves
   test_detached_extra_commit_is_skipped
@@ -1617,12 +1712,12 @@ CASES=(
   test_attach_reports_failure_instead_of_switching
   test_a_promotion_refusal_leaves_a_moved_symbolic_head_as_found
   test_a_promotion_refusal_returns_the_provisioners_code
-  test_a_rewound_origin_tracking_ref_fails_the_move
+  test_a_rewound_origin_tracking_ref_does_not_fail_the_move
   test_the_failure_for_a_changed_ref_names_the_ref
-  test_an_origin_ref_advanced_before_a_refused_move_is_not_called_untouched
+  test_an_origin_ref_advanced_before_a_refused_move_is_a_skip_that_names_it
   test_an_origin_ref_advanced_before_a_refused_move_does_not_say_untouched
   test_the_anchor_the_preparation_wrote_is_admitted
-  test_an_anchor_the_preparation_did_not_write_fails_the_move
+  test_an_anchor_the_preparation_did_not_write_does_not_fail_the_move
   test_the_anchor_the_preparation_wrote_fails_the_move_when_it_ends_at_another_commit
   test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy
   test_a_skip_worktree_flag_inside_a_submodule_skips_the_copy
@@ -1633,9 +1728,9 @@ CASES=(
   test_an_executable_bit_hidden_by_an_index_flag_is_work
   test_a_flagged_file_that_is_unchanged_is_not_work
   test_a_submodule_commit_made_after_the_proof_fails_the_move
-  test_a_ref_that_changes_during_the_proof_fails_the_move
+  test_a_ref_outside_the_copy_that_changes_during_the_proof_does_not_fail_the_move
   test_an_expected_anchor_that_goes_missing_fails_the_move
-  test_a_symbolic_ref_retargeted_between_same_commit_branches_fails_the_move
+  test_a_shared_symbolic_ref_retargeted_between_same_commit_branches_does_not_fail_the_move
   test_a_refused_move_after_preparation_is_a_failure_not_a_skip
   test_a_refused_move_after_preparation_leaves_the_copy_detached_as_it_is
   test_a_refused_move_after_preparation_says_the_copy_is_left_as_it_is
@@ -1654,11 +1749,16 @@ CASES=(
   test_a_proof_skip_after_a_detach_is_a_failure_that_names_the_detach
   test_a_proof_skip_after_an_anchor_is_a_failure_that_names_the_anchor
   test_a_dirty_copy_nothing_was_written_to_is_still_a_skip_after_the_n2_change
-  test_a_ref_that_changes_after_the_proof_fails_the_move
+  test_a_ref_outside_the_copy_that_appears_after_the_proof_does_not_fail_the_move
   test_a_move_that_ends_elsewhere_than_the_target_fails
   test_the_changed_bytes_witness_fails_when_a_snapshot_cannot_be_taken
   test_the_snapshot_sees_a_symlink_retarget
   test_the_git_call_oracle_flags_every_forced_form
+  test_a_sibling_ref_written_during_the_move_does_not_fail_it
+  test_a_change_to_the_copys_own_branch_during_the_move_fails_it
+  test_a_refusal_records_other_ref_changes_as_context
+  test_ignored_files_under_an_ignored_directory_are_not_read
+  test_an_ignored_file_whose_identity_changes_during_the_move_fails_it
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

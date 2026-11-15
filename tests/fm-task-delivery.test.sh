@@ -2205,7 +2205,8 @@ EOF
   status=$?
   [ "$status" -ne 0 ] || fail 'promotion admitted a refused slot'
   assert_contains "$out" 'manifest_live_owner' 'promotion lost the actual governed refusal'
-  cmp -s "$meta" "$meta.before" || fail 'refused promotion changed scout metadata'
+  # R4-5: the record names the branch the copy is left on; nothing else in it changes.
+  diff <(grep -v '^branch=' "$meta") "$meta.before" >/dev/null || fail 'refused promotion changed scout metadata beyond the branch it names'
   cmp -s "$brief" "$brief.before" || fail 'refused promotion changed the scout contract'
   # Main 1886 CUT: a refusal does nothing. The copy stays on the task branch the provisioning step set, at the same commit;
   # the scout's own branch is where it was; nothing is switched back and nothing is deleted.
@@ -2358,8 +2359,32 @@ PY
   pass 'promotion refuses to override recorded slot scope before provisioning or rewriting the record'
 }
 
+# R4-5: a refused governed promotion leaves the copy on the task branch the provisioning step set. The task record names that
+# branch, the refusal says where the copy is and what to do next, and a scout commit made after it lands on the recorded branch.
+test_refused_promotion_records_the_branch_the_copy_is_on() {
+  local rec home proj id=promote-slot-recorded slot out recorded tip
+  rec=$(promotion_refusal_fixture promote-slot-recorded "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
+  assert_contains "$out" 'manifest_live_owner' 'the case lost the governed refusal'
+  recorded=$(sed -n 's/^branch=//p' "$home/state/$id.meta")
+  [ "$recorded" = "fm/$id" ] || fail "the task record names branch '$recorded', not fm/$id, the branch the copy is on"
+  [ "$(git -C "$slot" branch --show-current)" = "$recorded" ] || fail 'the copy is not on the branch the task record names'
+  assert_contains "$out" "$slot is on branch fm/$id" 'the refusal did not name the branch the copy is on'
+  assert_contains "$out" "next:" 'the refusal did not name the next action'
+  printf 'scout work after the refusal\n' > "$slot/after-refusal.txt"
+  git -C "$slot" add after-refusal.txt
+  git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'scout work after the refusal'
+  tip=$(git -C "$slot" rev-parse HEAD)
+  [ "$(git -C "$slot" rev-parse "refs/heads/$recorded")" = "$tip" ] || fail 'the scout commit did not land on the branch the task record names'
+  pass 'a refused governed promotion records the branch the copy is on, says what to do next, and later scout commits land there'
+}
+
 test_governed_promotion_preserves_scout_on_refusal
 test_refused_promotion_preserves_other_task_branches
+test_refused_promotion_records_the_branch_the_copy_is_on
 test_refused_detached_promotion_retries_after_scout_advances
 test_refused_promotion_preserves_project_declared_branch
 test_promotion_refuses_recorded_scope_override
