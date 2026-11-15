@@ -2942,7 +2942,6 @@ teardown_skipped_copies() {
       printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
       continue
     fi
-    row=
     row=$(jq -r --arg p "$canonical" '[.[] | select(.path == $p)] as $m
       | if ($m | length) == 0 then empty
         elif ($m | length) > 1 then ["", "?", "0"]

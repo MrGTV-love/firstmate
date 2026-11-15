@@ -388,7 +388,7 @@ def nested_flags(slot, prefix=""):
     return found
 
 def submodule_heads(slot, prefix=""):
-    """The HEAD of every initialized submodule, however deep, keyed by its path from the copy's root."""
+    """The HEAD of every initialized submodule, however deep, keyed by its path from the root of the copy."""
     heads = {}
     for raw in git(slot, "ls-files", "-s", "-z").stdout.split(b"\0"):
         if not raw:
@@ -412,7 +412,7 @@ def submodule_pin_only(slot, entry, before_heads):
     stage = git(slot, "ls-files", "-s", "--", path).stdout.decode()
     if not stage.startswith("160000"):
         return False
-    # Only the pin changed when the submodule's own HEAD is still the commit it had when the copy was proven. A commit made
+    # Only the pin changed when the own HEAD of the submodule is still the commit it had when the copy was proven. A commit made
     # in it since then is a change, not the expected pin.
     now = git(os.path.join(slot, path), "rev-parse", "--verify", "HEAD").stdout.decode().strip()
     if before_heads.get(path) != now:
@@ -469,7 +469,7 @@ def load(path):
 # and every ignored entry is exactly as it was.
 def compare(before, after, mode, target, attached, detached="", expect=""):
     a, b, diffs = load(before), load(after), []
-    # expect: "<ref>=<sha>" entries, the exact refs this operation's own preparation creates: absent before, exactly <sha> after.
+    # expect: "<ref>=<sha>" entries, the exact refs the preparation of this operation creates: absent before, exactly <sha> after.
     made = dict(e.split("=", 1) for e in expect.split() if "=" in e)
     if detached == "1":
         a["symref"] = "detached"

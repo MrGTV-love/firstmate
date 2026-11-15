@@ -850,7 +850,7 @@
       "id": "pooled-copy-no-discard",
       "version": "1",
       "owner": "bin/fm-spawn.sh",
-      "invariant": "Refreshing a pooled launch base moves a copy only after a read-only proof that it is clean (submodules and index flags counted) and idle, and only by a fast-forward that git itself refuses to complete over lost work; any doubt skips the copy with nothing written to it. Every ref is compared exactly between the proof and the move, and a refusal never writes or deletes a file: it undoes its own step by ref only, and only when HEAD, the branch and the commit are exactly what it left. One window is not excluded and not detected: an ignored file or a holder that appears after the proof and before the merge is in neither inventory, so the second snapshot does not report it and the merge may overwrite it.",
+      "invariant": "Refreshing a pooled launch base moves a copy only after a read-only proof that it is clean (submodules and index flags counted) and idle, and only by a fast-forward that git itself refuses to complete over lost work. A copy proved untouched by a known state (dirty, a holder, an ignored file in the way, HEAD not an ancestor, a stale submodule) is skipped, leased and recorded, and its record is read back before another copy is taken. Any unknown (an unreadable status, a holder row with no directory, a flagged path, a failed record write, a path that cannot be resolved) refuses the whole spawn and leases the copy where it stands. Once a move has begun, any later failed check stops the spawn, leaves HEAD, refs and files exactly as they are, holds the copy and refuses; no undo runs. Every ref is compared exactly from the first snapshot. One window is not excluded and not detected: an ignored file or a holder that appears after the proof and before the merge is in neither inventory, so the second snapshot does not report it and the merge may overwrite it.",
       "layer": "runtime-block",
       "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: site:bin/fm-spawn.sh:6eceab4636",
       "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the target tree tracks, has an index flag on a tracked file or inside a submodule, has a live holder (any process in it that is not the spawn's own pane, a lock, a lease, or a contention row, readable or not), or has a stale submodule checkout; skips or refuses it with nothing written to it, and leases a skipped copy in place",
@@ -871,12 +871,37 @@
       "status": "active",
       "sites": [
         {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not release this spawn's claim on skipped copy $skipped; refusing to take another copy\" >&2"
+        },
+        {
           "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target and a second read shows no other change${note:+; $note}\""
+          "match": "echo \"error: git refused the move of pooled copy '$slot' to $target after this spawn had prepared it"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target and a second read shows no change"
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not release this spawn's claim on skipped copy $skipped; refusing to take another copy\" >&2"
+          "match": "echo \"error: skipped copy '$skipped' cannot be resolved to a real path"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not write and read back the record of skipped copy $real"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: copy held and the spawn refused ($1); nothing more was written to it\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "spawn_hold_and_refuse \"${FM_SLOT_SKIP_REASON:-unknown}\"",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "if [ \"$SPAWN_APPLY_FAILED\" = 1 ]; then spawn_hold_and_refuse changed_during_move; fi"
         }
       ]
     },
@@ -5192,7 +5217,6 @@
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refused slot has an invalid prepared commit identity", "count": 2},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refusing to reset or overwrite it"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner refused task"},
-        {"file": "bin/fm-slot-provision-lib.sh", "match": "created by this refused promotion"},
         {"file": "bin/fm-spawn.sh", "match": "could not record the refused slot checkpoint"},
         {"file": "bin/fm-spawn.sh", "match": "could not be confirmed stopped"},
         {"file": "bin/fm-control.sh", "match": "refused invalid --owned-path"},
