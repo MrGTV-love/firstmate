@@ -2365,9 +2365,12 @@ teardown_busy_retire_ready() {  # <state-dir> <id> <gen>
 # still claims it, printed; fails when there is no such record, it names no
 # slot, or the slot's claim does not name this task. That slot still awaits its
 # return, so the task record and the return-pending record are retired only
-# after it is returned, or while this close holds it on purpose.
+# after it is returned, or while this close holds it on purpose. A scout keeps
+# its own route, which returns only its copy and leaves the slot's claim, so a
+# scout's record never owes a slot here.
 teardown_return_pending_owed_slot() {
   local marker="$STATE/$ID.teardown-return-pending" slot
+  [ "$KIND" != scout ] || return 1
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   slot=$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)
   [ -n "$slot" ] && [ -d "$slot" ] || return 1
