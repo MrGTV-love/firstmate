@@ -99,10 +99,19 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
   index=$(( (start + offset) % count ))
   meta=${records[index]}
   [ -f "$meta" ] && [ ! -L "$meta" ] || continue
-  [ "$(fm_meta_get "$meta" backend)" = herdr ] || continue
-  [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
   id=${meta##*/}; id=${id%.meta}
-  case "$(fm_meta_get "$meta" kind)" in ship|scout|secondmate|'') ;; *) continue ;; esac
+  # One read of each record decides its inspection (Main 1874 rule S, Main
+  # 1901): the selection, the endpoint validation (on a private copy), the
+  # inspection and its wording all use these bytes, which the inspection
+  # inherits (FM_LAUNCH_PROOF_RECORD_*).
+  fm_launch_proof_record_read "$meta"
+  # A record that cannot be read as one record names no backend to skip on, so
+  # it is selected and reported, and the --one cursor moves past it.
+  if [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ]; then
+    [ "$(fm_launch_proof_field "$meta" backend)" = herdr ] || continue
+    [ -z "$(fm_launch_proof_field "$meta" remote_host)" ] || continue
+    case "$(fm_launch_proof_field "$meta" kind)" in ship|scout|secondmate|'') ;; *) continue ;; esac
+  fi
   selected=1
   if [ "$ONE" = 1 ]; then
     tmp=$(umask 077; mktemp "$STATE/.reboot-recovery-cursor.XXXXXX") || exit 1
@@ -112,7 +121,16 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
       exit 1
     fi
   fi
-  if ! fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null; then
+  if [ "$FM_LAUNCH_PROOF_RECORD_OK" != 1 ]; then
+    notice "$id" "record-unreadable" \
+      "REBOOT_RECOVERY: $id: $FM_LAUNCH_PROOF_RECORD_CAUSE; no lifecycle action taken" && result=1
+    continue
+  fi
+  copy=$(fm_launch_proof_record_copy "$meta") || { result=1; continue; }
+  valid=0
+  fm_backend_validate_task_endpoint "$copy" "$id" >/dev/null || valid=1
+  rm -f -- "$copy"
+  if [ "$valid" != 0 ]; then
     result=1
     continue
   fi
@@ -128,7 +146,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
     *) result=1; continue ;;
   esac
   born=''
-  # One record read decides the legacy branch, the attributed PID and the
+  # The same record read decides the legacy branch, the attributed PID and the
   # verdict (Main 1807 (2)).
   judged=$(fm_launch_proof_recovery_judge "$meta" "$target")
   legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}
@@ -154,7 +172,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
           "REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" || true
         continue
       fi
-      if [ "$(fm_meta_get "$meta" harness)" = claude ]; then
+      if [ "$(fm_launch_proof_field "$meta" harness)" = claude ]; then
         # An unpinned native restore keeps the nonzero status an unproven
         # versioned launch always had; only its wording follows the true cause.
         notice "$id" "unmanaged $identity" \

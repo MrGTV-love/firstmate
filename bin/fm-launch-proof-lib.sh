@@ -2,12 +2,9 @@
 # Proof that a recorded Herdr agent came through Firstmate's launch boundary.
 # fm-spawn stamps FM_SPAWN_GEN with the record's spawn_gen and records
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
-# For omp, a matching pin also requires current-session proof. Explicit adopt
-# repairs only a record whose PID is gone or no longer an omp process and
-# whose live process has a readable environment without a usable pin; without
-# a pin, every adoption proof is rechecked before the repaired live PID and
-# session-file identity authorize lifecycle, and a pin for another generation
-# never passes that recheck.
+# For omp, a matching pin also requires current-session proof. There is no omp
+# adoption route (Main 1874, Main 1901), as there is none for claude (Main
+# 1637): an omp agent without its matching pin is unmanaged, with its cause.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|pinned-elsewhere|contested|unknown. Only managed
 # authorizes lifecycle action for a proven record; a legacy record (one
@@ -23,8 +20,6 @@
 # no spawn_gen). For every harness, a matching token on a versioned record is
 # managed only after the refusal checks of fm_launch_proof_token_checks pass;
 # a failed check is contested, unknown or pinned-elsewhere, with its own cause.
-# An adopted omp process carries no token and keeps its own adoption proofs.
-# There is no claude adoption route (Main 1637).
 # No endpoint discovery: callers supply this home's validated exact endpoint.
 
 _FM_LAUNCH_PROOF_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
@@ -88,28 +83,6 @@ fm_launch_proof_group_pinned_elsewhere() { # <spawn-gen> <process-table> <anchor
   while IFS= read -r kid; do
     [ -z "$kid" ] || ! fm_launch_proof_pid_pinned_elsewhere "$kid" "$gen" || return 0
   done < <(awk -v g="$group" -v p="$anchor" '$3 == g && $1 != p {print $1}' <<< "$table")
-  return 1
-}
-
-# Publication eligibility is stricter than a lifecycle verdict: an unknown
-# environment must not let adoption hide the task anchor from a pinned writer.
-# Readers keep their existing managed/unmanaged/unknown contract. Prints nothing.
-fm_launch_proof_pid_unpinned() { # <pid>
-  local environment
-  environment=$(fm_remote_herdr_process_env "$1") || return 1
-  printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' || return 1
-  ! printf '%s\n' "$environment" | grep -Eq '^FM_SPAWN_GEN=.+$'
-}
-
-# Succeeds only for a live process whose readable executable name or argv[0]
-# has basename omp. Installation directory names are not identity. Prints nothing.
-fm_launch_proof_pid_is_omp() { # <pid>
-  local pid=$1 comm args name
-  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
-    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || return 1
-  for name in "$comm" "${args%% *}"; do
-    [ "${name##*/}" != omp ] || return 0
-  done
   return 1
 }
 
@@ -178,221 +151,12 @@ fm_launch_proof_herdr_pid() { # <meta> [with-listed] -> the attributed live fore
   printf '\n%s' "$(printf '%s' "$info" | jq -r '[.result.process_info.foreground_processes[].pid | tostring] | join(" ")')"
 }
 
-# Rebuild candidate proof only from this home's recorded endpoint. The native
-# session reference supplies a file candidate, never authority on its own.
-# All five adoption checks live here so lifecycle readers can recheck them too.
-# One record read (Main 1874 rule S): the window, the generation and the
-# Python proof all rest on this decision's bytes of <meta> (a caller's when it
-# holds them), and the Python proof refuses any other bytes. Every caller reads
-# the session record once and passes the sha256 of those bytes in
-# FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256 (mandatory, as the endpoint is for
-# fm_launch_proof_herdr_refusal), and the proof refuses any other.
-fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
-  local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
-  local meta=$1 target session pane pid reference gen sha
-  fm_launch_proof_record_ensure "$meta"
-  [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] || {
-    echo 'adopt refused: record proof needs one readable task record without NUL bytes' >&2; return 1;
-  }
-  target=$(fm_launch_proof_bytes_exact_value "$FM_LAUNCH_PROOF_RECORD_BYTES" window) || {
-    echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;
-  }
-  gen=$(fm_launch_proof_field "$meta" spawn_gen)
-  sha=$(set -o pipefail; printf '%s' "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d' ' -f1) && [ -n "$sha" ] || {
-    echo 'adopt refused: record proof needs the digest of the task record it read' >&2; return 1;
-  }
-  session=${target%%:*}; pane=${target#*:}
-  if ! fm_backend_herdr_cli "$session" pane get "$pane" 2>/dev/null \
-    | jq -e --arg pane "$pane" '.result.pane.pane_id == $pane' >/dev/null; then
-    echo 'adopt refused: endpoint proof needs the recorded pane to exist and be readable' >&2; return 1
-  fi
-  pid=$(fm_launch_proof_herdr_pid "$meta") || {
-    echo 'adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane' >&2; return 1;
-  }
-  # A lingering registration must not turn whatever now runs in the worktree
-  # into a lifecycle target: the resolved process itself has to be omp.
-  fm_launch_proof_pid_is_omp "$pid" || {
-    echo 'adopt refused: process proof needs the resolved foreground process to be a readable omp process' >&2; return 1;
-  }
-  if fm_launch_proof_pid_pinned_elsewhere "$pid" "$gen"; then
-    echo 'adopt refused: generation proof needs the live process not to be pinned to another launch generation' >&2; return 1
-  fi
-  reference=$(fm_backend_herdr_pane_agent_session_ref "$session" "$pane") || {
-    echo 'adopt refused: session proof needs a readable omp session-file registration on the recorded pane' >&2; return 1;
-  }
-  case "$reference" in
-    omp$'\t'/*) reference=${reference#*$'\t'} ;;
-    *) echo 'adopt refused: session proof needs an absolute omp session-file registration' >&2; return 1 ;;
-  esac
-  FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256=$sha python3 - "$meta" "$pid" "$reference" <<'PY'
-import json
-import os
-from pathlib import Path
-import re
-import subprocess
-import sys
-
-
-def require(condition, message):
-    if not condition:
-        raise ValueError(message)
-
-
-def metadata(path, expected_sha256=None):
-    require(path.is_file() and not path.is_symlink(),
-            f"record proof needs a readable regular metadata file: {path.name}")
-    raw = path.read_bytes()
-    # The proof rests on the bytes the shell decision read, so an A-to-B-to-A
-    # rewrite cannot slip a B proof past an A read (Main 1856 (a), Main 1874).
-    if expected_sha256 is not None:
-        import hashlib
-        require(hashlib.sha256(raw).hexdigest() == expected_sha256,
-                "record proof needs the same record bytes the caller read")
-    # A NUL (or the \001 the shell reader maps it to) makes a record unknown,
-    # never a record without a claim (Main 1856 F6/F7, Main 1874).
-    require(b"\0" not in raw and b"\x01" not in raw,
-            f"record proof needs task records without NUL bytes: {path.name}")
-    fields = {}
-    for line in raw.decode().splitlines():
-        key, sep, value = line.partition("=")
-        if sep:
-            fields.setdefault(key, []).append(value)
-    return fields
-
-
-def single(fields, key):
-    values = fields.get(key, [])
-    require(len(values) == 1 and values[0] and not any(ord(c) < 32 for c in values[0]),
-            f"metadata proof needs one nonempty {key}")
-    return values[0]
-
-
-def remote(fields):
-    values = fields.get("remote_host", [])
-    require(len(values) <= 1, "unique-claim proof needs an unambiguous remote_host field")
-    return any(values)
-
-
-def inside(path, root):
-    return path == root or root in path.parents
-
-
-try:
-    meta = Path(sys.argv[1])
-    pid = int(sys.argv[2])
-    live = Path(sys.argv[3])
-    expected_record = os.environ.get("FM_LAUNCH_PROOF_EXPECTED_RECORD_SHA256", "")
-    require(expected_record != "", "record proof needs the digest of the task record the shell read")
-    fields = metadata(meta, expected_record)
-    require(single(fields, "backend") == "herdr" and single(fields, "harness") == "omp"
-            and not remote(fields), "endpoint proof needs a local Herdr omp task")
-    session = single(fields, "herdr_session")
-    pane = single(fields, "herdr_pane_id")
-    target = single(fields, "window")
-    require(target == f"{session}:{pane}", "endpoint proof needs window and herdr_pane_id to agree")
-    root = Path(single(fields, "worktree"))
-    require(root.is_absolute() and root.is_dir(), "workspace proof needs an existing absolute worktree")
-    root = root.resolve(strict=True)
-    gen = single(fields, "spawn_gen")
-    record_path = meta.with_suffix(".omp-session.json")
-    require(record_path.is_file() and not record_path.is_symlink(),
-            "generation proof needs an existing regular session record")
-    session_raw = record_path.read_bytes()
-    expected_session = os.environ.get("FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256", "")
-    require(expected_session != "", "generation proof needs the digest of the session record the caller read")
-    import hashlib
-    require(hashlib.sha256(session_raw).hexdigest() == expected_session,
-            "generation proof needs the same session record bytes the caller read")
-    old = json.loads(session_raw.decode())
-    require(isinstance(old, dict) and old.get("version") == 1 and old.get("spawn_gen") == gen,
-            "generation proof needs the existing record spawn_gen to equal metadata spawn_gen")
-
-    # Read cwd from the resolved PID, not the pane's creation-time directory.
-    result = subprocess.run(["lsof", "-w", "-a", "-p", str(pid), "-d", "cwd", "-F", "pn0"],
-                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True)
-    parts = [p.lstrip(b"\n") for p in result.stdout.split(b"\0") if p.strip(b"\n")]
-    require([p for p in parts if p.startswith(b"p")] == [f"p{pid}".encode()],
-            "workspace proof needs the resolved foreground PID's kernel cwd")
-    names = [p[1:] for p in parts if p.startswith(b"n")]
-    require(len(names) == 1, "workspace proof needs exactly one readable foreground cwd")
-    # lsof escapes backslashes and nonprinting/non-ASCII bytes even with -F0.
-    def unescape(match):
-        token = match.group(0)[1:]
-        if token == b"\\":
-            return b"\\"
-        if token.startswith(b"x"):
-            return bytes([int(token[1:], 16)])
-        escapes = {b"a": b"\a", b"b": b"\b", b"f": b"\f", b"n": b"\n",
-                   b"r": b"\r", b"t": b"\t", b"v": b"\v"}
-        require(token in escapes, "workspace proof needs an unambiguous kernel cwd pathname")
-        return escapes[token]
-    cwd = Path(os.fsdecode(re.sub(rb"\\(?:x[0-9a-fA-F]{2}|.)", unescape, names[0])))
-    require(cwd.is_absolute() and cwd.is_dir(), "workspace proof needs an existing absolute foreground cwd")
-    cwd = cwd.resolve(strict=True)
-    require(inside(cwd, root), "workspace proof needs the foreground cwd inside this task's recorded worktree")
-
-    # The deepest containing worktree wins; ties are not exclusive ownership.
-    # scandir must succeed: glob can silently turn an unreadable directory
-    # into an empty inventory, which would not prove exclusive ownership.
-    try:
-        with os.scandir(meta.parent) as entries:
-            peers = sorted(Path(entry.path) for entry in entries if entry.name.endswith(".meta"))
-    except OSError:
-        raise ValueError("unique-claim proof needs a readable complete inventory of local task metadata") from None
-    for other in peers:
-        if other == meta:
-            continue
-        peer = metadata(other)
-        if remote(peer):
-            continue
-        require(target not in peer.get("window", []) and not
-                (session in peer.get("herdr_session", []) and pane in peer.get("herdr_pane_id", [])),
-                f"unique-claim proof needs no other local task to claim this pane; claimed by {other.stem}")
-        if "worktree" not in peer:
-            continue
-        peer_root = Path(single(peer, "worktree"))
-        require(peer_root.is_absolute(), f"workspace proof needs an absolute worktree for {other.stem}")
-        peer_root = peer_root.resolve()
-        require(not (inside(cwd, peer_root) and len(peer_root.parts) >= len(root.parts)),
-                f"workspace proof needs this task to be the unique deepest match; cwd belongs to {other.stem}")
-
-    require(live.is_absolute() and live.is_file() and not any(ord(c) < 32 for c in str(live)),
-            "session proof needs an existing absolute live session file")
-    current = old.get("current_session_file")
-    if old.get("pid") == pid:
-        # The extension's record for this exact live process, including its
-        # deliberate empty mark, outranks a registration Herdr may have
-        # retained from an earlier conversation.
-        require(isinstance(current, str) and current != "",
-                "current-session proof for the live PID is empty or invalid, which the omp extension writes as unproven; adoption cannot overwrite it")
-        require(current.startswith("/")
-                and not any(ord(c) < 32 for c in current)
-                and Path(current).is_file() and os.path.samefile(current, live),
-                "current-session proof contradicts the registered task session for the live PID; adoption needs agreeing current-session evidence")
-    task = old.get("task_session_file")
-    if task is None or task == "":
-        task = str(live)
-    require(isinstance(task, str) and task.startswith("/") and not any(ord(c) < 32 for c in task),
-            "session proof needs an absolute task_session_file to preserve")
-    require(Path(task).is_file() and os.path.samefile(task, live),
-            "session proof needs the live session file to identify the preserved task session")
-    print(json.dumps(dict(version=1, spawn_gen=gen, pid=pid,
-                          task_session_file=task, current_session_file=str(live))))
-except (OSError, ValueError, TypeError, subprocess.SubprocessError):
-    error = sys.exc_info()[1]
-    # Never leak subprocess output, process argv/environment, or a traceback.
-    message = str(error) if isinstance(error, ValueError) and not isinstance(error, json.JSONDecodeError) else "readable metadata, session file, and kernel cwd proof are required"
-    print(f"adopt refused: {message}", file=sys.stderr)
-    sys.exit(1)
-PY
-}
-
 # The one read of a task record (Main 1634 D1, Main 1807 (2)). One decision
 # reads the record's bytes once, and every field it uses comes from those same
 # bytes; a nested call in the same decision reuses them. Each entry point
 # below declares the three FM_LAUNCH_PROOF_RECORD_* variables local, so the
 # bytes live only as long as that decision. A read that needs the file again
-# (the omp adoption proof) compares it byte for byte and refuses on a change.
+# compares it byte for byte and refuses on a change.
 FM_LAUNCH_PROOF_RECORD_CAUSE='its launch record is not one readable record with at most one launch_proof line naming a known proof (it is missing, unreadable, empty, duplicated, changed while read, or names an unknown proof), so nothing proves the live agent'
 # The exact bytes of a regular, readable, nonempty file, trailing newlines kept
 # (Main 1856 F6). A shell variable cannot hold a NUL byte, so each NUL is turned
@@ -832,9 +596,14 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|pinned-els
   printf '%s' "${judged%%$'\t'*}"
 }
 
+# The causes an omp refusal names (Main 1901): no matching pin, which no route
+# can repair, or a matching pin whose session record does not prove the live
+# process's current session.
+FM_LAUNCH_PROOF_OMP_UNPINNED_CAUSE='live omp agent carries no launch pin matching this record (a native resume or restore), and there is no omp adoption route, so nothing can authorize it'
+FM_LAUNCH_PROOF_OMP_SESSION_CAUSE='live omp agent carries this record'"'"'s launch pin, but its omp session record does not name this live process and its current session'
 fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
   local FM_LAUNCH_PROOF_RECORD_PATH=${FM_LAUNCH_PROOF_RECORD_PATH-} FM_LAUNCH_PROOF_RECORD_BYTES=${FM_LAUNCH_PROOF_RECORD_BYTES-} FM_LAUNCH_PROOF_RECORD_OK=${FM_LAUNCH_PROOF_RECORD_OK-}
-  local meta=$1 pid=$2 proof gen verdict record session_bytes session_sha task_file current_file adopted refusal=unmanaged harness table token
+  local meta=$1 pid=$2 proof gen verdict record session_bytes task_file current_file harness table token
   fm_launch_proof_record_ensure "$meta"
   proof=$(fm_launch_proof_record_proof "$meta") \
     || { printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return; }
@@ -870,47 +639,34 @@ fm_launch_proof_herdr_verdict_judge() { # <meta> <pid>
     return
   fi
   verdict=$(fm_launch_proof_pid "$pid" "$gen")
-  [ "$verdict" != unknown ] || refusal=unknown
   # A versioned record whose live token matches is managed, for every harness,
   # only after the same refusal checks (Main 1777 (1)); a legacy record keeps
-  # its base outcome. Adoption carries no token and has its own proofs.
+  # its base outcome.
   token=''
   [ "$verdict" != managed ] || [ "$proof" != env-v1 ] || token=1
   if [ "$harness" = omp ]; then
-    # A current activation for this live PID is mandatory, even after adoption.
-    # The session record is read once (Main 1874 rule S): the adoption proof
-    # gets the digest of these bytes and refuses any other.
+    # There is no omp adoption route (Main 1874, Main 1901): an omp agent
+    # without its matching pin is unmanaged, and nothing can authorize it.
+    case "$verdict" in
+      unmanaged) printf 'unmanaged\t%s' "$FM_LAUNCH_PROOF_OMP_UNPINNED_CAUSE"; return ;;
+      unknown) printf 'unknown\t'; return ;;
+    esac
+    # A current activation for this live PID is mandatory: the session record,
+    # read once, must name this PID and its current session (Main 1874 rule S).
     session_bytes=$(fm_launch_proof_bytes "${meta%.meta}.omp-session.json") \
-      || { printf '%s\t' "$refusal"; return; }
+      || { printf 'unmanaged\t%s' "$FM_LAUNCH_PROOF_OMP_SESSION_CAUSE"; return; }
     session_bytes=${session_bytes%x}
     record=$(printf '%s' "$session_bytes" | jq -ec --arg gen "$gen" --argjson pid "$pid" '
       select(.version == 1 and .spawn_gen == $gen and .pid == $pid)
       | select(all(.task_session_file, .current_session_file;
           type == "string" and startswith("/") and (explode | all(. >= 32))))' 2>/dev/null) \
-      || { printf '%s\t' "$refusal"; return; }
+      || { printf 'unmanaged\t%s' "$FM_LAUNCH_PROOF_OMP_SESSION_CAUSE"; return; }
     task_file=$(printf '%s' "$record" | jq -r '.task_session_file')
     current_file=$(printf '%s' "$record" | jq -r '.current_session_file')
     if [ ! -f "$task_file" ] || [ ! -f "$current_file" ] \
       || [ ! "$task_file" -ef "$current_file" ]; then
-      printf '%s\t' "$refusal"
+      printf 'unmanaged\t%s' "$FM_LAUNCH_PROOF_OMP_SESSION_CAUSE"
       return
-    fi
-    if [ "$verdict" = unmanaged ]; then
-      # Adoption is a second authorization route, not a relaxed environment
-      # comparison. A valid record alone still cannot license lifecycle input.
-      # The adoption proof rests on this decision's task record bytes (in scope)
-      # and on the session record bytes read above; it refuses any other.
-      session_sha=$(set -o pipefail; printf '%s' "$session_bytes" | shasum -a 256 | cut -d' ' -f1) && [ -n "$session_sha" ] \
-        || { printf '%s\t' "$refusal"; return; }
-      adopted=$(FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256=$session_sha fm_launch_proof_omp_adoption "$meta" 2>/dev/null) \
-        || { printf '%s\t' "$refusal"; return; }
-      # The record must still hold those bytes after the proof.
-      fm_launch_proof_record_unchanged "$meta" \
-        || { printf 'unknown\t%s' "$FM_LAUNCH_PROOF_RECORD_CAUSE"; return; }
-      [ "$(printf '%s' "$adopted" | jq -r '.pid')" = "$pid" ] \
-        && [ "$current_file" -ef "$(printf '%s' "$adopted" | jq -r '.current_session_file')" ] \
-        || { printf '%s\t' "$refusal"; return; }
-      verdict=managed
     fi
   fi
   if [ -n "$token" ]; then
@@ -958,9 +714,9 @@ fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|contested|unknown
 }
 
 # Lifecycle authorization for a live recorded Herdr agent, with the refusal
-# cause on stdout when it fails for a claude record (omp's unmanaged verdict
-# also covers a matching pin whose session proof failed, so it keeps its
-# existing wording). A legacy record (no launch_proof line at all: published
+# cause and next action on stdout when it fails for a claude or omp record
+# (Main 1901: an omp record that adoption once repaired now refuses with its
+# named reason). A legacy record (no launch_proof line at all: published
 # before launch proofs existed) has no pin to compare; any present value other
 # than a known proof, and a record that cannot be read as one record with at
 # most one launch_proof, refuses. The record and the verdict are each read
@@ -984,17 +740,19 @@ fm_launch_proof_herdr_refusal() { # <meta> <expected-endpoint>
     return 1
   fi
   if ! proof=$(fm_launch_proof_record_proof "$1") || { [ "$proof" != absent ] && [ "$proof" != proof=env-v1 ]; }; then
-    [ "$harness" != claude ] \
-      || printf '%s; %s' "$FM_LAUNCH_PROOF_RECORD_CAUSE" "$(fm_launch_proof_refusal_next unknown "$1")"
+    case "$harness" in claude|omp)
+      printf '%s; %s' "$FM_LAUNCH_PROOF_RECORD_CAUSE" "$(fm_launch_proof_refusal_next unknown "$1")" ;;
+    esac
     return 1
   fi
   [ "$proof" != absent ] || return 0
   judged=$(fm_launch_proof_herdr_judge "$1")
   verdict=${judged%%$'\t'*}
   [ "$verdict" != managed ] || return 0
-  [ "$harness" != claude ] \
-    || printf '%s; %s' "$(fm_launch_proof_refusal_cause "$verdict" "${judged#*$'\t'}")" \
-      "$(fm_launch_proof_refusal_next "$verdict" "$1")"
+  case "$harness" in claude|omp)
+    printf '%s; %s' "$(fm_launch_proof_refusal_cause "$verdict" "${judged#*$'\t'}")" \
+      "$(fm_launch_proof_refusal_next "$verdict" "$1")" ;;
+  esac
   return 1
 }
 

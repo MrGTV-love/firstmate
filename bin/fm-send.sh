@@ -506,6 +506,27 @@ fm_send_expected_attribution() { # <meta>
 # bytes. Otherwise the steer stays in the inbox for the next agent that reads
 # it, and the ring is withheld and reported.
 FM_SEND_DECISION_BYTES=''
+# The locked final validation reads the task record once (Main 1874 rule S,
+# Main 1901): FM_SEND_RECORD_BYTES holds the bytes (bin/fm-launch-proof-lib.sh
+# owns the reader: a failed, empty or NUL-bearing read fails) and
+# FM_SEND_RECORD_COPY a private copy that every field reader is given, so no
+# field comes from a second read of the record. The caller removes the copy.
+FM_SEND_RECORD_BYTES='' FM_SEND_RECORD_COPY=''
+fm_send_record_snapshot() { # <meta>
+  local bytes
+  FM_SEND_RECORD_BYTES='' FM_SEND_RECORD_COPY=''
+  [ -n "$1" ] && [ -f "$1" ] || return 1
+  if ! declare -F fm_launch_proof_bytes >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-launch-proof-lib.sh
+    . "$SCRIPT_DIR/fm-launch-proof-lib.sh" || return 1
+  fi
+  bytes=$(fm_launch_proof_bytes "$1") || return 1
+  FM_SEND_RECORD_BYTES=${bytes%x}
+  FM_SEND_RECORD_COPY=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-send-record.XXXXXX") || return 1
+  printf '%s' "$FM_SEND_RECORD_BYTES" > "$FM_SEND_RECORD_COPY" || {
+    rm -f -- "$FM_SEND_RECORD_COPY"; FM_SEND_RECORD_COPY=''; return 1
+  }
+}
 fm_send_ring_snapshot_holds() { # <meta>
   [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] || return 0
   [ -n "$FM_SEND_DECISION_BYTES" ] || return 1
@@ -1110,18 +1131,31 @@ else
     CURRENT_INBOX_TARGET=
     CURRENT_INBOX_BACKEND=
     CURRENT_INBOX_SPAWN_GEN=
-    if [ -f "$TARGET_META" ]; then
-      CURRENT_INBOX_TARGET=$(fm_backend_target_of_meta "$TARGET_META")
-      CURRENT_INBOX_BACKEND=$(fm_backend_of_meta "$TARGET_META")
-      CURRENT_INBOX_SPAWN_GEN=$(fm_meta_get "$TARGET_META" spawn_gen)
+    CURRENT_INBOX_REMOTE_HOST=
+    # Every field below comes from one read of the record (its private copy);
+    # a local compared route's attribution decision must have read the same
+    # bytes (Main 1874 rule S, Main 1901).
+    if fm_send_record_snapshot "$TARGET_META"; then
+      CURRENT_INBOX_TARGET=$(fm_backend_target_of_meta "$FM_SEND_RECORD_COPY")
+      CURRENT_INBOX_BACKEND=$(fm_backend_of_meta "$FM_SEND_RECORD_COPY")
+      CURRENT_INBOX_SPAWN_GEN=$(fm_meta_get "$FM_SEND_RECORD_COPY" spawn_gen)
+      CURRENT_INBOX_REMOTE_HOST=$(fm_meta_get "$FM_SEND_RECORD_COPY" remote_host)
     fi
-    if [ "$CURRENT_INBOX_TARGET" != "$T" ] ||
+    final_valid=1
+    if [ -z "$FM_SEND_RECORD_COPY" ] ||
+      [ "$CURRENT_INBOX_TARGET" != "$T" ] ||
       [ "$CURRENT_INBOX_BACKEND" != "$TARGET_BACKEND" ] ||
       { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
         [ "$CURRENT_INBOX_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
-      [ -n "$(fm_meta_get "$TARGET_META" remote_host)" ] ||
-      ! fm_send_remote_route_expected "$TARGET_META" ||
-      ! fm_send_expected_attribution "$TARGET_META"; then
+      [ -n "$CURRENT_INBOX_REMOTE_HOST" ] ||
+      ! fm_send_remote_route_expected "$FM_SEND_RECORD_COPY" ||
+      ! fm_send_expected_attribution "$TARGET_META" ||
+      { [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] &&
+        [ "${FM_SECONDMATE_RESTART_RECORD_BYTES:-}" != "$FM_SEND_RECORD_BYTES" ]; }; then
+      final_valid=0
+    fi
+    [ -z "$FM_SEND_RECORD_COPY" ] || rm -f -- "$FM_SEND_RECORD_COPY"
+    if [ "$final_valid" = 0 ]; then
       fm_lock_release "$INBOX_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
@@ -1129,7 +1163,7 @@ else
       echo "error: steer not sent to $INBOX_TASK_ID: the task retired or changed endpoint during target resolution" >&2
       exit 1
     fi
-    [ "${FM_SEND_EXPECTED_PLACEMENT:-}" != local ] || FM_SEND_DECISION_BYTES=${FM_SECONDMATE_RESTART_RECORD_BYTES:-}
+    [ "${FM_SEND_EXPECTED_PLACEMENT:-}" != local ] || FM_SEND_DECISION_BYTES=$FM_SEND_RECORD_BYTES
     if [ "${FM_SEND_IDEMPOTENT:-0}" = 1 ]; then
       INBOX_RECORD=$(fm_task_inbox_write_idempotent "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
         "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
