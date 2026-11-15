@@ -1231,19 +1231,27 @@ teardown_foreign_copy_prove() {  # <copy>
   [ -z "$diag" ] || { [ ! -s "$diag" ] || cat "$diag" >&2; rm -f "$diag"; }
 }
 
-# Can the release teardown_foreign_copy_dispose runs for proved <copy> start?
-# teardown_foreign_copy_prove already refuses a lock that is not Vernant's and an
-# unreadable lock state; this adds, at entry, that a Vernant-locked copy's
-# closeout driver and interpreter are there, so a release that would refuse on
-# that is refused before any protected step.
-teardown_foreign_copy_release_ready() {  # <slot> <copy>
-  local rc=0
-  teardown_copy_lock_file "$2" || rc=$?
-  [ "$rc" = 0 ] || return 0
-  teardown_closeout_ready_in "$1" && return 0
-  TEARDOWN_FOREIGN_RULE=inspection-unavailable
-  TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
-  return 1
+# Can the release teardown_foreign_copy_dispose runs for each proved foreign copy
+# start? teardown_foreign_copy_prove already refuses a lock that is not
+# Vernant's and an unreadable lock state; this adds that a Vernant-locked copy's
+# closeout driver and interpreter are there. Called at entry only once the route
+# will release the foreign copies (not for a held close, which releases none),
+# so a release that would refuse on that is refused before any protected step.
+# Prints the refusal and returns 1.
+teardown_foreign_copies_release_ready() {
+  local slot copy rc
+  [ -n "${TEARDOWN_RETURN_SLOT:-}" ] && [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ] || return 0
+  slot=$(fm_task_copy_canonical_dir "$TEARDOWN_RETURN_SLOT") || return 1
+  for copy in "${TEARDOWN_FOREIGN_COPIES[@]}"; do
+    rc=0
+    teardown_copy_lock_file "$copy" || rc=$?
+    [ "$rc" = 0 ] || continue
+    teardown_closeout_ready_in "$slot" && continue
+    TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
+    teardown_refuse_copy inspection-unavailable "foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." "$copy"
+    echo "REFUSED: foreign copy $(fm_refuse_text "$copy") in pool slot $(fm_refuse_text "$slot") cannot be released; nothing was removed." >&2
+    return 1
+  done
 }
 
 # Prints the refusals teardown_foreign_copies_prove kept back, each with the
@@ -1287,7 +1295,7 @@ teardown_foreign_copies_prove() {  # <slot>
       [ "$copy" != "$allowed" ] || known=1
     done
     [ "$known" = 0 ] || continue
-    if teardown_foreign_copy_prove "$copy" && teardown_foreign_copy_release_ready "$slot" "$copy"; then
+    if teardown_foreign_copy_prove "$copy"; then
       TEARDOWN_FOREIGN_COPIES+=("$copy")
       ! teardown_copy_inside_own_nested "$copy" || swept=1
     else

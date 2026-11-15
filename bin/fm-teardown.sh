@@ -5441,6 +5441,9 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         require_registered_slot_copies "$ID" "$TEARDOWN_RETURN_SLOT" \
           ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
           ${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"} || return 1
+        # This route releases the proved foreign copies, so each one's release
+        # must be able to start (a held close releases none).
+        teardown_foreign_copies_release_ready || return 1
       fi
       for copy in ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
         [ -d "$copy" ] || [ "$copy" = "$TEARDOWN_RETURN_SLOT" ] || continue

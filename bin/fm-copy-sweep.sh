@@ -178,7 +178,8 @@
 # teardown library's own preservation,
 # then released and removed by the driver as bin/fm-teardown.sh does it.
 # Preserved entries land in
-# data/copy-sweep/<run-stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>,
+# data/copy-sweep/<run-stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>/files
+# (the library's manifest beside them in meta/),
 # so a new copy at the same path and HEAD never replaces earlier preserved bytes.
 # Before executing the driver, a durable receipt under
 # data/copy-sweep/retained/<sha256 of the path> protects the copy from later
