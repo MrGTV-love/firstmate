@@ -4060,10 +4060,7 @@ test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver() {
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers() {
   local cases rows counts num tip cls pr state kind own name line label expect_released=0 expect_never=0 merged_kept=0
   cases=${FM_SUPERSEDENCE_CASES:-}
-  if [ ! -f "$cases/d7-supersedence-table.md" ] || [ ! -f "$cases/d7-closeout-driver-report.md" ]; then
-    pass "SKIPPED (not run): the staged d7 cases are not available; set FM_SUPERSEDENCE_CASES to the staged cases directory to decide the 26 rows and the PR 3446 twin"
-    return 0
-  fi
+  route_staged_cases_gate "$cases" || return 0
   rows=$(route_table_rows "$cases")
   counts=$(route_table_counts "$rows")
   assert_equals "5/4/16/1" "$counts" "table: the staged table's class counts are not 5 twins, 4 ancestors, 16 closed-unmerged and 1 open"
@@ -4206,11 +4203,13 @@ route_content_fixture() {
 # route_prove <repo> <tip> <merge>: the content proof; sets PROVE_RC and PROVE_WHY.
 PROVE_RC=
 PROVE_WHY=
+PROVE_OUT=
 # shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
 route_prove() {
   local out
   out=$(ROUTE_PROVE_REPO=$1 ROUTE_PROVE_TIP=$2 ROUTE_PROVE_MERGE=$3 route_lib "${ROUTE_TRIP_SNIPPET:-:}"'
 rc=0; teardown_route_content_proven "$ROUTE_PROVE_REPO" "$ROUTE_PROVE_TIP" "$ROUTE_PROVE_MERGE" || rc=$?; printf "RC=%s\nWHY=%s\n" "$rc" "$TEARDOWN_CLOSEOUT_ROUTE_WHY"' 2>&1)
+  PROVE_OUT=$out
   PROVE_RC=$(printf '%s\n' "$out" | sed -n 's/^RC=//p' | head -n 1)
   PROVE_WHY=$(printf '%s\n' "$out" | sed -n 's/^WHY=//p' | head -n 1)
   [ -n "$PROVE_RC" ] || PROVE_RC="no answer: $out"
@@ -4229,10 +4228,19 @@ test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the
   # A twin: the merge commit holds exactly the copy's change.
   route_content_fixture twin f.txt 'a\n' 'a\nadded\n' 'a\nadded\n'
   route_prove "$CR" "$CT" "$CM"; assert_proved "a twin"
-  # A squash onto a moved main: the files differ from the copy's, the merge into them changes nothing.
+  # A squash onto a moved main: the target moved at another path, and holds the copy's file exactly.
   body='1\n2\n3\n4\n5\n6\n7\n8\n9\n'
-  route_content_fixture squash f.txt "$body" '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n10\n'
-  route_prove "$CR" "$CT" "$CM"; assert_proved "a squash onto a moved main"
+  route_content_fixture squash f.txt "$body" '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n'
+  git -C "$CR" checkout -q merged
+  printf 'moved on\n' > "$CR/other.txt"
+  git -C "$CR" add other.txt
+  git -C "$CR" commit -qm "main moved at another path"
+  CM=$(git -C "$CR" rev-parse HEAD)
+  git -C "$CR" checkout -q main
+  route_prove "$CR" "$CT" "$CM"; assert_proved "a squash onto a main that moved at another path"
+  # The target changed the copy's path further (Main 1869): the blob differs, so the copy is kept.
+  route_content_fixture squashfurther f.txt "$body" '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n10\n'
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "a target that changed the copy's path further" "f.txt"
   # An ancestor: the copy's tip is inside the merge commit's history.
   route_content_fixture ancestor f.txt 'a\n' 'a\nadded\n' 'a\nadded\n'
   git -C "$CR" checkout -q merged
@@ -4248,7 +4256,7 @@ test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the
   # A misattributed row: a genuinely merged result that does not carry the copy's lines.
   route_content_fixture misattributed f.txt 'a\n' 'a\nsecurity fix\n' 'a\nsomething else\n'
   route_prove "$CR" "$CT" "$CM"; assert_unproved "a merged result that does not carry the copy's lines" "f.txt"
-  pass "the content proof proves a twin, a squash onto a moved main and an ancestor, and keeps an added line or a result that the merge commit lacks"
+  pass "the content proof proves a twin, a squash onto a main that moved at another path and an ancestor, and keeps an added line, a result that the merge commit lacks and a path the target changed further"
 }
 
 test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_changes_the_meaning() {
@@ -4266,8 +4274,8 @@ test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_ch
   route_prove "$CR" "$CT" "$CM"; assert_proved "the secure result"
   comments='# 1\n# 2\n# 3\n# 4\n# 5\n# 6\n# 7\n# 8\n# end\n'
   route_content_fixture separated policy.txt "AUTH_DISABLED=true\n$comments" "AUTH_DISABLED=false\n$comments" "AUTH_DISABLED=false\n${comments}AUTH_DISABLED=true\n"
-  route_prove "$CR" "$CT" "$CM"; assert_proved "the separated later override (the copy's change is fully present in landed history)"
-  pass "the content proof compares whole lines: a commented or suffixed line and an adjacent override keep the copy, the exact line and a separated later override route"
+  route_prove "$CR" "$CT" "$CM"; assert_unproved "the separated later override (the target changed the path further, so its blob differs from the copy's)" "policy.txt"
+  pass "the content proof compares whole files by blob: a commented or suffixed line, an adjacent override and a separated later override keep the copy, and the exact file and the secure result route"
 }
 
 test_the_content_proof_judges_mode_and_text_together_and_needs_identical_entries_for_removals_and_binaries() {
@@ -4365,28 +4373,24 @@ test_the_content_proof_keeps_an_empty_change_that_is_not_an_ancestor_and_histori
   pass "the content proof proves an empty change without calling it an ancestor and keeps unrelated histories, two merge bases and a failing git"
 }
 
-test_the_content_proof_writes_nothing_to_the_clone_and_does_not_run_on_an_older_git() {
+test_the_content_proof_writes_nothing_to_the_clone_runs_no_merge_and_needs_no_newer_git() {
   local before after objs_before objs_after
   make_world world-content-readonly
-  route_content_fixture readonly f.txt '1\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n10\n'
+  route_content_fixture readonly f.txt '1\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n' '1\nX\n2\n3\n4\n5\n6\n7\n8\n9\n'
   before=$(git -C "$CR" for-each-ref | shasum -a 256; git -C "$CR" status --porcelain=v1 --ignored | shasum -a 256)
   objs_before=$(find "$CR/.git/objects" -type f | LC_ALL=C sort | shasum -a 256)
   mkdir -p "$W/proof-tmp"
-  TMPDIR="$W/proof-tmp" route_prove "$CR" "$CT" "$CM"; assert_proved "the text proof"
+  : > "$W/git.log"
+  TMPDIR="$W/proof-tmp" route_prove "$CR" "$CT" "$CM"; assert_proved "the text twin"
+  ! grep -q 'merge-tree' "$W/git.log" || fail "the content proof ran git merge-tree"
   after=$(git -C "$CR" for-each-ref | shasum -a 256; git -C "$CR" status --porcelain=v1 --ignored | shasum -a 256)
   objs_after=$(find "$CR/.git/objects" -type f | LC_ALL=C sort | shasum -a 256)
   [ "$before" = "$after" ] || fail "the proof changed the clone's refs or status"
   [ "$objs_before" = "$objs_after" ] || fail "the proof wrote an object into the clone's object store"
   [ -z "$(ls -A "$W/proof-tmp")" ] || fail "the proof left a temporary directory behind: $(ls -A "$W/proof-tmp")"
-  # An older git: the text proof does not run and the text twin is kept; a change with no text line still proves.
-  FAKE_GIT_VERSION=2.39.5 route_prove "$CR" "$CT" "$CM"; assert_unproved "a text twin on a git older than 2.40" "2.40"
-  route_content_fixture empty2 f.txt 'a\n' 'a\n' 'a\nchanged\n'
-  git -C "$CR" checkout -q tip
-  git -C "$CR" commit -q --allow-empty -m "empty"
-  CT=$(git -C "$CR" rev-parse HEAD)
-  git -C "$CR" checkout -q main
-  FAKE_GIT_VERSION=2.39.5 route_prove "$CR" "$CT" "$CM"; assert_proved "a change with no text line on a git older than 2.40"
-  pass "the content proof writes no ref, status or object to the clone and leaves no temporary directory, and on a git older than 2.40 a text twin is kept while a change with no text line still proves"
+  # No merge, no git floor: a git that reports an older version proves the same twin.
+  FAKE_GIT_VERSION=2.39.5 route_prove "$CR" "$CT" "$CM"; assert_proved "a text twin on a git older than 2.40"
+  pass "the content proof writes no ref, status or object to the clone, leaves no temporary directory, never runs git merge-tree and proves a text twin on any git version"
 }
 
 test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed() {
@@ -4408,19 +4412,18 @@ test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed() {
     [ ! -e "$CMARK" ] || fail "the lying driver ran (channel $channel): the proof let a configured merge driver decide"
     # The legitimate text twin under the same configuration: a real merge decides.
     if [ "$channel" = attributes ]; then ROUTE_FIX_ATTR=1; else ROUTE_FIX_ATTR=; fi
-    route_content_fixture "liartwin-$channel" policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    route_content_fixture "liartwin-$channel" policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n'
     ROUTE_FIX_ATTR=
     git -C "$CR" config merge.liar.name liar
     git -C "$CR" config merge.liar.driver "touch '$CMARK'; true"
     [ "$channel" != default ] || git -C "$CR" config merge.default liar
     [ "$channel" != info ] || printf 'policy.txt merge=liar\n' > "$CR/.git/info/attributes"
     route_prove "$CR" "$CT" "$CM"
-    # A configured merge driver of any name keeps the text proof from running (Main 1841 F1):
-    # the twin is refused too, and the same twin with no driver configured is proved (see the F1 case).
-    assert_unproved "the text twin under a configured lying driver ($channel)" "merge driver"
+    # The proof runs no merge, so the legitimate twin routes under the same configuration (Main 1869).
+    assert_proved "the legitimate text twin under a configured lying driver ($channel)"
     [ ! -e "$CMARK" ] || fail "the lying driver ran on the twin (channel $channel)"
   done
-  pass "a lying merge driver selected through .gitattributes, merge.default or info/attributes never runs: the POLICY case is kept, and so is the text twin, because a merge driver configured in the repository keeps the text proof from running"
+  pass "a lying merge driver selected through .gitattributes, merge.default or info/attributes never runs, because the proof runs no merge: the POLICY case is kept and the legitimate text twin routes under the same configuration"
 }
 
 # route_closeout <plan|execute> <name> [<before> [<after>]]: teardown_run_closeout in a
@@ -4497,7 +4500,7 @@ test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_rou
     rm -f "$marker"
     [ "$channel" != attributes ] || printf 'policy.txt merge=liar\ntwin.txt merge=liar\n' > "$SLOT/.gitattributes"
     route_content_copy policy 7 policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
-    route_content_copy twin 8 twin.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    route_content_copy twin 8 twin.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n'
     git -C "$SLOT" config merge.liar.name liar
     git -C "$SLOT" config merge.liar.driver "touch '$marker'; true"
     [ "$channel" != default ] || git -C "$SLOT" config merge.default liar
@@ -4507,12 +4510,14 @@ test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_rou
     [ -z "$(route_calls_for policy)" ] || fail "the closeout driver was asked for the POLICY copy through $channel: $(route_calls_for policy)"
     [ ! -e "$marker" ] || fail "the lying driver ran through $channel: the route let a configured merge driver decide"
     route_closeout plan twin
-    # A merge driver configured in the repository keeps the text proof from running (Main 1841 F1).
-    [ "$CO_ROUTE" = invalid ] && [ -z "$(route_calls_for twin)" ] || fail "the text twin under a configured lying driver ($channel) reached the driver ($CO_ROUTE): $(route_calls_for twin)"
+    # The proof runs no merge, so the legitimate twin routes under the same configuration (Main 1869).
+    [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "the text twin under a configured lying driver ($channel) did not route ($CO_RC $CO_ROUTE): $CO_OUT"
+    [ "$(route_call_count twin)" = 1 ] || fail "the twin was not asked once: $(route_calls_for twin)"
+    assert_contains "$(route_calls_for twin)" "--pr 8" "the twin's plan was not asked by the --pr route"
     [ ! -e "$marker" ] || fail "the lying driver ran on the twin through $channel"
-    printf 'liar %s: POLICY copy and twin kept with no driver call, marker absent\n' "$channel"
+    printf 'liar %s: POLICY copy kept with no driver call, twin routed, marker absent\n' "$channel"
   done
-  pass "through the whole route on real git, a lying merge driver selected by .gitattributes, merge.default or info/attributes never runs: the POLICY copy is kept with an empty closeout argv and so is the text twin, because a merge driver configured in the repository keeps the text proof from running"
+  pass "through the whole route on real git, a lying merge driver selected by .gitattributes, merge.default or info/attributes never runs: the POLICY copy is kept with an empty closeout argv and the text twin under the same configuration routes, because the proof runs no merge"
 }
 
 test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an_unreachable_remote_keeps_the_copy() {
@@ -4962,50 +4967,66 @@ route_stub_before() {
   printf '%s\nteardown_route_pr_landed() { TEARDOWN_ROUTE_HEADREF=fm/pr-7-head; TEARDOWN_ROUTE_MERGE=%s; return 0; }\n' "$ROUTE_TRIP_SNIPPET" "$ROUTE_MERGE"
 }
 
-# F1: a custom merge driver named in the repository's configuration, in any scope git
-# reads there, keeps the text proof from running. The reviewer's case is a driver named
-# text, which shadows the built-in one that merge.default=text selects.
-test_a_repository_configured_merge_driver_of_any_name_keeps_the_text_proof_from_running() {
-  local marker kind
+# F1 (Main 1869): the content proof runs no merge machinery. A copy counts as landed only
+# when, at every path it changed against the merge base, the merge commit holds the copy's
+# exact entry (a deleted path is absent there). So no merge driver, textconv or external
+# diff can run, whatever the repository's configuration: the lying-driver POLICY negative
+# holds and the legitimate text twin routes under the same configuration. A merge driver in
+# the configuration is only reported (a notice line), never a refusal.
+test_a_configured_merge_driver_of_any_name_runs_nothing_and_the_twin_routes_while_the_policy_copy_is_kept() {
+  local marker kind want
   make_world world-driver-config
   route_trip_arm
   marker=$TMP_ROOT/driver-ran
-  for kind in shadow-text other-name included-file command-scope; do
+  for kind in none shadow-text other-name included-file command-scope; do
     rm -f "$marker"
-    route_content_fixture "cfg-$kind" policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
     case "$kind" in
-      shadow-text) git -C "$CR" config merge.text.driver "touch '$marker'; true" ;;
-      other-name) git -C "$CR" config merge.mine.driver "touch '$marker'; true"; git -C "$CR" config merge.default mine ;;
-      included-file)
-        printf '[merge "text"]\n\tdriver = touch %s; true\n' "'$marker'" > "$CR/.git/extra.cfg"
-        git -C "$CR" config include.path "$CR/.git/extra.cfg"
-        ;;
+      none) want= ;;
+      other-name) want=merge.mine.driver ;;
+      *) want=merge.text.driver ;;
     esac
-    if [ "$kind" = command-scope ]; then
-      GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.text.driver GIT_CONFIG_VALUE_0="touch '$marker'; true" route_prove "$CR" "$CT" "$CM"
+    config_driver() {  # applies the configuration of <kind> to $CR
+      case "$kind" in
+        shadow-text) git -C "$CR" config merge.text.driver "touch '$marker'; true" ;;
+        other-name) git -C "$CR" config merge.mine.driver "touch '$marker'; true"; git -C "$CR" config merge.default mine ;;
+        included-file)
+          printf '[merge "text"]\n\tdriver = touch %s; true\n' "'$marker'" > "$CR/.git/extra.cfg"
+          git -C "$CR" config include.path "$CR/.git/extra.cfg"
+          ;;
+      esac
+    }
+    prove_with_kind() {
+      : > "$W/git.log"
+      if [ "$kind" = command-scope ]; then
+        GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.text.driver GIT_CONFIG_VALUE_0="touch '$marker'; true" route_prove "$CR" "$CT" "$CM"
+      else
+        route_prove "$CR" "$CT" "$CM"
+      fi
+    }
+    # The POLICY case: the copy sets required, the merge commit holds other.
+    route_content_fixture "cfg-$kind" policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
+    config_driver
+    prove_with_kind
+    assert_unproved "the POLICY case with a merge driver configured ($kind)" "policy.txt"
+    [ ! -e "$marker" ] || fail "a configured merge driver ran ($kind): the proof ran machinery that a driver could hijack"
+    ! grep -q 'merge-tree' "$W/git.log" || fail "the content proof ran git merge-tree ($kind)"
+    # The legitimate twin: the merge commit holds the copy's file exactly. It routes under the same configuration.
+    route_content_fixture "cfgtwin-$kind" policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n'
+    config_driver
+    prove_with_kind
+    assert_proved "the legitimate text twin with a merge driver configured ($kind)"
+    [ ! -e "$marker" ] || fail "a configured merge driver ran on the twin ($kind)"
+    ! grep -q 'merge-tree' "$W/git.log" || fail "the content proof ran git merge-tree on the twin ($kind)"
+    # The configured driver is a reported fact, not a refusal.
+    if [ -n "$want" ]; then
+      assert_contains "$PROVE_OUT" "$want" "the configured driver is not reported ($kind)"
     else
-      route_prove "$CR" "$CT" "$CM"
+      assert_not_contains "$PROVE_OUT" "merge driver" "a notice about a merge driver appeared with none configured"
     fi
-    assert_unproved "the POLICY case with a configured merge driver ($kind)" "merge driver"
-    [ ! -e "$marker" ] || fail "the configured merge driver ran ($kind): the text proof let it decide"
-    printf 'driver config %s: refused, marker absent; reason: %s\n' "$kind" "${PROVE_WHY:0:150}"
+    printf 'driver config %s: POLICY copy kept, twin proved, marker absent, no merge-tree; notice: %s\n' "$kind" "$(printf '%s' "$PROVE_OUT" | grep -a 'merge driver' | head -n 1 | cut -c1-130)"
   done
-  # Control: the same history with no driver configured. The real merge conflicts.
-  route_content_fixture cfg-none policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
-  route_prove "$CR" "$CT" "$CM"
-  assert_unproved "the POLICY case with no driver configured" "not clean"
-  # Control: a legitimate twin with no driver configured is proved.
-  route_content_fixture cfg-twin policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
-  route_prove "$CR" "$CT" "$CM"
-  assert_proved "the legitimate text twin with no driver configured"
-  # A twin under a configured driver is refused: refusal, not neutralisation.
-  route_content_fixture cfg-twin-shadow policy.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
-  git -C "$CR" config merge.text.driver "touch '$marker'; true"
-  route_prove "$CR" "$CT" "$CM"
-  assert_unproved "the legitimate twin under a configured driver" "merge driver"
-  [ ! -e "$marker" ] || fail "the configured merge driver ran on the twin"
   route_trip_check "driver config"
-  pass "a merge driver configured in the repository (named text or any other name, by include file or by command scope) keeps the text proof from running and the copy kept, the marker stays absent, and the same history with no driver conflicts while a legitimate twin with no driver is proved"
+  pass "with a merge driver configured in the repository (named text or any other name, by include file or by command scope) the content proof runs no merge: the POLICY copy is kept, the legitimate twin is proved under the same configuration, the marker stays absent, git merge-tree is never run, and the driver is only reported"
 }
 
 # F1 and F5, through the route: with a driver scripted to allow, a copy whose lines the
@@ -5016,7 +5037,7 @@ test_an_allowing_driver_is_never_asked_for_a_copy_whose_lines_the_merge_commit_l
     route_world "route-allow-$variant"
     marker=$W/driver-ran
     route_content_copy policy 7 policy.txt 'POLICY=base\n' 'POLICY=required\n' 'POLICY=other\n'
-    route_content_copy twin 8 twin.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=2\n'
+    route_content_copy twin 8 twin.txt 'POLICY=base\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n' 'POLICY=required\na\nb\nc\nd\nx=1\n'
     [ "$variant" != shadow-text ] || git -C "$SLOT" config merge.text.driver "touch '$marker'; true"
     route_trip_arm
     route_closeout plan policy "$(route_stub_before)"
@@ -5024,15 +5045,11 @@ test_an_allowing_driver_is_never_asked_for_a_copy_whose_lines_the_merge_commit_l
     [ -z "$(route_calls_for policy)" ] || fail "the allowing driver was asked for the copy ($variant): $(route_calls_for policy)"
     [ ! -e "$marker" ] || fail "the configured merge driver ran ($variant)"
     route_closeout plan twin "$(route_stub_before)"
-    if [ "$variant" = no-config ]; then
-      [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "the legitimate twin did not route ($CO_RC $CO_ROUTE): $CO_OUT"
-      [ "$(route_call_count twin)" = 1 ] || fail "the twin was not asked once: $(route_calls_for twin)"
-    else
-      [ "$CO_ROUTE" = invalid ] && [ -z "$(route_calls_for twin)" ] || fail "the twin under a configured driver reached the driver ($CO_ROUTE): $(route_calls_for twin)"
-    fi
+    [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "the legitimate twin did not route ($variant: $CO_RC $CO_ROUTE): $CO_OUT"
+    [ "$(route_call_count twin)" = 1 ] || fail "the twin was not asked once: $(route_calls_for twin)"
     route_trip_check "allowing driver $variant"
   done
-  pass "with a driver scripted to allow, a copy whose lines the merge commit lacks is kept with an empty driver argv (with no config, and with a configured text driver that never runs), and the legitimate twin routes only when no driver is configured"
+  pass "with a driver scripted to allow, a copy whose lines the merge commit lacks is kept with an empty driver argv (with no config, and with a configured text driver that never runs), and the legitimate twin routes in both"
 }
 
 # F2: the checkout check, on a real repository with the real functions and a git
@@ -5231,7 +5248,7 @@ test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty(
     assert_contains "$out" "route_rc=0 bound=$value " "the override $value was not honoured: $out"
     printf 'forge timeout override %s: honoured (%s)\n' "$value" "$(printf '%s' "$out" | cut -c1-60)"
   done
-  for value in abc 0 -5 1.5 007 1000000000; do
+  for value in '' abc 0 -5 1.5 007 1000000000; do
     out=$(FM_TEARDOWN_FORGE_TIMEOUT=$value OV_REPO=$repo OV_MERGE=$merge route_lib "$ROUTE_OV_PRE" 2>&1)
     assert_contains "$out" "route_rc=1 bound= " "the bad override $value did not refuse before a forge read: $out"
     assert_contains "$out" "FM_TEARDOWN_FORGE_TIMEOUT" "the refusal for $value does not name the setting: $out"
@@ -5239,9 +5256,79 @@ test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty(
     printf 'forge timeout override %s: refused (%s)\n' "$value" "$(printf '%s' "$out" | sed 's/.*reason=//' | cut -c1-150)"
   done
   route_trip_check "forge timeout override"
-  pass "the forge timeout is 60 by default, an override of 12, 10000 or 999999999 seconds is honoured, and a value that is not a whole number of seconds from 1 to 999999999 refuses the route with the setting and the value named before any forge read"
+  pass "the forge timeout is 60 when the setting is unset, an override of 12, 10000 or 999999999 seconds is honoured, and a value that is empty or not a whole number of seconds from 1 to 999999999 refuses the route with the setting and the value named before any forge read"
 }
 
+
+# Main 1869 inference (ii): the route's lock key comes from the same owner function that
+# the other actors use (fm_treehouse_project_lock_path), called on the project when the
+# caller names one (teardown does, through TEARDOWN_ROUTE_PROJECT) and on the slot clone
+# only when none is named (the sweep's pool slots). A slot whose origin differs from the
+# project's would otherwise take a different lock from the one teardown holds.
+# shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
+test_the_route_takes_its_lock_from_the_callers_project_and_from_the_slot_only_when_none_is_named() {
+  local proj out lock_slot lock_proj
+  route_world route-lock-key
+  proj=$TMP_ROOT/lockkey-project
+  rm -rf "$proj"
+  git init -q -b main "$proj"
+  git -C "$proj" remote add origin https://github.com/example/the-project.git
+  route_trip_arm
+  out=$(ROUTE_PROJ=$proj ROUTE_SLOT=$SLOT route_lib "$ROUTE_TRIP_SNIPPET"'
+set +u
+lock_slot=$(fm_treehouse_project_lock_path "$ROUTE_SLOT") || lock_slot=none
+lock_proj=$(fm_treehouse_project_lock_path "$ROUTE_PROJ") || lock_proj=none
+printf "slot=%s\nproj=%s\n" "$lock_slot" "$lock_proj"
+TEARDOWN_ROUTE_PROJECT=$ROUTE_PROJ
+rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
+printf "named: rc=%s path=%s own=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN"
+teardown_route_lock_release
+TEARDOWN_ROUTE_PROJECT=
+rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
+printf "unnamed: rc=%s path=%s own=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN"
+teardown_route_lock_release
+fm_project_lock_try "$lock_proj" outer || { echo "outer-take-failed"; exit 0; }
+TEARDOWN_ROUTE_PROJECT=$ROUTE_PROJ
+TEARDOWN_ROUTE_LOCK_HELD=$lock_proj
+rc=0; teardown_route_lock_take "$ROUTE_SLOT" copy || rc=$?
+printf "borrowed: rc=%s path=%s own=%s\n" "$rc" "$TEARDOWN_ROUTE_LOCK_PATH" "$TEARDOWN_ROUTE_LOCK_OWN"
+teardown_route_lock_release
+fm_project_lock_release "$lock_proj"
+' 2>&1)
+  lock_slot=$(printf '%s\n' "$out" | sed -n 's/^slot=//p')
+  lock_proj=$(printf '%s\n' "$out" | sed -n 's/^proj=//p')
+  [ -n "$lock_slot" ] && [ -n "$lock_proj" ] && [ "$lock_slot" != "$lock_proj" ] || fail "the fixture does not discriminate: the slot and the project have the same lock key: $out"
+  assert_contains "$out" "named: rc=0 path=$lock_proj own=1" "the route did not take the named project's lock: $out"
+  assert_contains "$out" "unnamed: rc=0 path=$lock_slot own=1" "the route did not fall back to the slot's lock when no project is named: $out"
+  assert_contains "$out" "borrowed: rc=0 path=$lock_proj own=0" "the route did not borrow the hold on the project's lock: $out"
+  route_trip_check "lock key"
+  pass "the route takes its lock from the project the caller names and from the slot only when none is named, through the one owner function, and borrows a proved hold on the project's lock"
+}
+
+# Main 1869 R5 note: a missing staged-cases directory skips the table cases with a success
+# line, unless FM_SUPERSEDENCE_CASES_REQUIRED=1, which makes the skip a failure.
+test_a_missing_staged_cases_skip_with_a_notice_unless_this_prs_cases_are_required() {
+  local none present rc out
+  make_world world-staged-gate
+  none=$TMP_ROOT/staged-none
+  present=$TMP_ROOT/staged-present
+  rm -rf "$none" "$present"
+  mkdir -p "$none" "$present"
+  : > "$present/d7-supersedence-table.md"
+  : > "$present/d7-closeout-driver-report.md"
+  rc=0; ( route_staged_cases_gate "$present" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 0 ] || fail "the gate refused staged cases that are present ($rc)"
+  rc=0; ( FM_SUPERSEDENCE_CASES_REQUIRED=1 route_staged_cases_gate "$present" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 0 ] || fail "the gate refused present staged cases when they are required ($rc)"
+  rc=0; out=$( ( route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
+  [ "$rc" = 1 ] || fail "absent staged cases did not skip (rc $rc): $out"
+  assert_contains "$out" "SKIPPED" "the skip does not say it skipped"
+  assert_contains "$out" "FM_SUPERSEDENCE_CASES_REQUIRED" "the skip does not name the setting that makes it a failure"
+  rc=0; out=$( ( FM_SUPERSEDENCE_CASES_REQUIRED=1 route_staged_cases_gate "$none" ) 2>&1 ) || rc=$?
+  [ "$rc" != 0 ] || fail "absent staged cases passed although they are required: $out"
+  assert_contains "$out" "FM_SUPERSEDENCE_CASES_REQUIRED" "the failure does not name the setting"
+  pass "absent staged cases skip with a notice that names how to require them, and fail when FM_SUPERSEDENCE_CASES_REQUIRED=1, while present staged cases pass the gate either way"
+}
 
 # FM_TEST_ONLY=<function> runs one case, which keeps a mutation proof quick.
 fm_test_only
@@ -5359,7 +5446,7 @@ test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the
 test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_changes_the_meaning
 test_the_content_proof_judges_mode_and_text_together_and_needs_identical_entries_for_removals_and_binaries
 test_the_content_proof_keeps_an_empty_change_that_is_not_an_ancestor_and_histories_without_one_merge_base
-test_the_content_proof_writes_nothing_to_the_clone_and_does_not_run_on_an_older_git
+test_the_content_proof_writes_nothing_to_the_clone_runs_no_merge_and_needs_no_newer_git
 test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed
 test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_route
 test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an_unreachable_remote_keeps_the_copy
@@ -5380,10 +5467,12 @@ test_a_detected_switch_stops_the_run_even_when_the_first_executes_answer_is_a_re
 test_an_ordinary_refusal_without_a_switch_keeps_the_copy_and_the_run_goes_on_to_the_next_copy
 test_a_switch_and_restore_between_the_plan_and_the_execute_is_found_from_the_plans_first_read
 test_a_copy_with_no_record_is_asked_exactly_as_before_at_every_no_record_call
-test_a_repository_configured_merge_driver_of_any_name_keeps_the_text_proof_from_running
+test_a_configured_merge_driver_of_any_name_runs_nothing_and_the_twin_routes_while_the_policy_copy_is_kept
 test_an_allowing_driver_is_never_asked_for_a_copy_whose_lines_the_merge_commit_lacks
 test_the_checkout_check_reads_the_reflog_once_and_stops_on_a_read_error_an_interleaved_entry_or_a_missing_anchor
 test_a_reflog_read_error_a_masked_interleaving_or_a_rewritten_anchor_sets_the_stop_flag
 test_a_refusal_is_temporary_only_when_it_is_the_called_prs_complete_envelope
 test_the_forge_timeout_override_is_honoured_or_refused_and_never_silently_sixty
+test_the_route_takes_its_lock_from_the_callers_project_and_from_the_slot_only_when_none_is_named
+test_a_missing_staged_cases_skip_with_a_notice_unless_this_prs_cases_are_required
 pass "fm-copy-sweep"

@@ -444,3 +444,19 @@ forge_reads_are_gone() {
   FORGE_ALIVE=$alive
   return 1
 }
+
+# route_staged_cases_gate <cases-dir>: 0 when both staged d7 files exist. When they are
+# absent the caller's case is skipped with a success line, unless
+# FM_SUPERSEDENCE_CASES_REQUIRED=1 (set by the test step that owns this change's recorded
+# cases), which turns the skip into a failure so that a generic green run cannot hide them.
+# Returns 1 for a skip, and the caller then returns 0.
+route_staged_cases_gate() {
+  if [ -f "$1/d7-supersedence-table.md" ] && [ -f "$1/d7-closeout-driver-report.md" ]; then
+    return 0
+  fi
+  if [ "${FM_SUPERSEDENCE_CASES_REQUIRED:-}" = 1 ]; then
+    fail "the staged d7 cases are not available, and FM_SUPERSEDENCE_CASES_REQUIRED=1 says this run must decide the 26 rows and the PR 3446 twin; set FM_SUPERSEDENCE_CASES to the staged cases directory"
+  fi
+  pass "SKIPPED (not run): the staged d7 cases are not available; set FM_SUPERSEDENCE_CASES to the staged cases directory to decide the 26 rows and the PR 3446 twin, and FM_SUPERSEDENCE_CASES_REQUIRED=1 to make their absence a failure"
+  return 1
+}

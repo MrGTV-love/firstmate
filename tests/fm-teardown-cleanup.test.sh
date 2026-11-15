@@ -6850,13 +6850,20 @@ route_teardown_merge_carrying() {  # <name>...
   ROUTE_MERGE=$commit
 }
 
+# A reject row's file is landed on origin/main in a commit AFTER the PR's merge commit,
+# which stays as it is and so lacks the file. The foreign copy's own landed-content proof
+# then sees the content in the default branch and the plain call happens (the no-record
+# step of the table), while the route's content proof against the merge commit refuses.
+route_teardown_land_after() {  # <name>
+  local keep=$ROUTE_MERGE
+  route_teardown_merge_carrying "$1"
+  ROUTE_MERGE=$keep
+}
+
 test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
   local cases rows num tip cls pr state kind own label rc counts released=0 refused=0 never=0 stub
   cases=${FM_SUPERSEDENCE_CASES:-}
-  if [ ! -f "$cases/d7-supersedence-table.md" ] || [ ! -f "$cases/d7-closeout-driver-report.md" ]; then
-    pass "SKIPPED (not run): the staged d7 cases are not available; set FM_SUPERSEDENCE_CASES to the staged cases directory to decide the 26 rows and the PR 3446 twin"
-    return 0
-  fi
+  route_staged_cases_gate "$cases" || return 0
   rows=$(route_table_rows "$cases")
   counts=$(route_table_counts "$rows")
   assert_equals "5/4/16/1" "$counts" "table: the staged table's class counts are not 5 twins, 4 ancestors, 16 closed-unmerged and 1 open"
@@ -6872,7 +6879,7 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
       git -C "$FOREIGN_COPY" add -- "row-$num.txt"
       git -C "$FOREIGN_COPY" -c user.name=t -c user.email=t@example.invalid commit -qm "row $num"
       git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/heads/fm/row-$num"
-      [ "$kind" != accept ] || route_teardown_merge_carrying "row-$num"
+      if [ "$kind" = accept ]; then route_teardown_merge_carrying "row-$num"; else route_teardown_land_after "row-$num"; fi
     fi
     route_set_pr "$FOREIGN_CASE/forge" "$pr" "$state" "$([ "$state" = MERGED ] && printf '%s' "$ROUTE_MERGE" || true)"
     if [ "$kind" = accept ]; then
