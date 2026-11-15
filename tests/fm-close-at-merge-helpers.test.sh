@@ -290,6 +290,23 @@ test_locked_clear_the_store_decides_under_its_lock() {
   case "$out" in *'pf-x: closed, edges kept: row unreadable'*) ok "locked clear: the held lock is reported as closed, edges kept: row unreadable" ;; *) not_ok "locked clear: the held lock was not reported: $(tr '\n' '|' <<< "$out")" ;; esac
 }
 
+# A node warning on standard error is not the helper's answer: the clear is read from standard
+# output only, so a warning before `clear` neither hides the clear nor turns it into a false
+# "edges kept" report. A failing helper's standard error is its reason.
+test_locked_clear_reads_the_answer_from_stdout() {
+  local out
+  out=$(bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; set -u
+    fm_backlog_tasks_axi_addressing() { FM_BACKLOG_AXI_ROOT=/ FM_BACKLOG_AXI_FILE=/nonexistent/backlog.md; }
+    fm_tasks_axi_package_dir() { builtin printf "/nonexistent/tasks-axi\n"; }
+    node() { builtin printf "(node:1) ExperimentalWarning: a warning\n" >&2; builtin printf "clear\nunblocked waits-pf-x -\n"; }
+    fm_typed_completion_locked_clear /dev/null pf-x; builtin printf "rc=%s\n" "$?"
+    node() { builtin printf "backlog is locked by another tasks-axi process\n" >&2; return 1; }
+    fm_typed_completion_locked_clear /dev/null pf-x; builtin printf "rc=%s why=%s\n" "$?" "$FM_TYPED_COMPLETION_CLEAR_ERROR"' _ "$ROOT" 2>/dev/null)
+  check "locked clear: a node warning does not hide the clear" "unblocked: waits-pf-x no longer waits on pf-x; no stored blocked-by edge remains
+rc=0
+rc=1 why=backlog is locked by another tasks-axi process" "$out"
+}
+
 # Main 1873: the lock the clear holds is the store's own: a tasks-axi store write attempted
 # while the clear holds it is refused as LOCKED, so no writer can act between the decision and
 # the edge removal.
@@ -391,6 +408,7 @@ test_f6_a_missing_body_field_is_a_failed_read
 test_f7_an_unreadable_task_record_is_reported
 test_locked_clear_the_store_decides_under_its_lock
 test_locked_clear_holds_the_store_lock_writers_take
+test_locked_clear_reads_the_answer_from_stdout
 test_f8_a_failed_replay_is_not_success
 test_f4_a_call_with_no_arguments_runs
 test_f4_every_typed_form_resolves_its_id
