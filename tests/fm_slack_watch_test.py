@@ -7637,6 +7637,53 @@ class Round7Findings(InvariantScenario):
             self.assertEqual(len(posts), len(set(posts)), server.received)
             self.assertEqual(sum(len(re.findall(r'slack request 200\.000200 from', c)) for c in [out] + later), 1, [out] + later)
 
+    def test_r7_f9_main1627_the_cut_off_socket_is_closed_and_its_reader_ended_before_the_binding_fence_is_released(self):
+        server = PostServer(step=0.1, size=200)
+        self.addCleanup(server.close)
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as d, patch.dict(os.environ, {'FM_HOME': d, 'FM_STATE_OVERRIDE': d}):
+            fence_dir = Path(d) / 'decision-bindings'
+            fence_dir.mkdir()
+            watch = Watch(token='fixture-token-not-a-secret-r7-fence')
+            self.addCleanup(watch.lock.close)
+            slack = plane.Slack('fixture-token-not-a-secret-r7-fence')
+            slack.base = server.url
+            deadline = time.monotonic() + 1.0
+            slack.time_left = lambda: deadline - time.monotonic()
+            freed, stop = [], threading.Event()
+            def probe():                                     # the moment an unbind could take the fence exclusive
+                while not stop.is_set():
+                    fd = os.open(fence_dir, os.O_RDONLY)
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        freed.append(time.monotonic())
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    except BlockingIOError:
+                        pass
+                    finally:
+                        os.close(fd)
+                    time.sleep(0.005)
+            with patch.object(Watch, 'bound', lambda self: True):
+                with watch.delivering() as bound:
+                    self.assertTrue(bound)
+                    prober = threading.Thread(target=probe, daemon=True)
+                    prober.start()
+                    outcome = 'completed'
+                    try:
+                        slack.call('chat.postMessage', channel=INV_SECOND_DM, text='ack', client_msg_id='r7-fence-id')
+                    except Exception as error:
+                        outcome = type(error).__name__
+                    held_until = time.monotonic()
+                time.sleep(0.2)
+                stop.set()
+                prober.join(2)
+        self.assertEqual(outcome, 'DeadlineSpent')
+        cutoff = getattr(slack, "last_cutoff", None) or {}
+        self.assertIs(cutoff.get('ended'), True, cutoff)
+        self.assertTrue(freed, 'the fence was never free after the post')
+        self.assertGreaterEqual(min(freed), held_until)                 # nobody could take the fence while the call ran
+        self.assertLess(cutoff.get('closed_at', float('inf')), min(freed))   # the socket was closed before the fence was free
+        self.assertEqual(server.received, [('chat.postMessage', 'r7-fence-id')])
+
     # ---- finding 10: the journal lock is taken inside their 12 s budget ----
 
     def test_r7_f10_a_held_journal_lock_never_keeps_their_check_past_its_budget_and_their_request_is_kept(self):
