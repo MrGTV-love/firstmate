@@ -160,9 +160,9 @@ def kinfo_exact(pid):
     data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_PID, pid)
     if not data:
         raise NoSuchProcess(pid)
-    if len(data) < KINFO_SIZE or struct.unpack_from("i", data, P_PID)[0] != pid:
-        raise OSError("malformed process record for pid %d (%d bytes)" % (pid, len(data)))
-    return data[:KINFO_SIZE]
+    if len(data) != KINFO_SIZE or struct.unpack_from("i", data, P_PID)[0] != pid:
+        raise OSError("malformed process record for pid %d (%d bytes)" % (pid, len(data)))  # short or oversized: unknown
+    return data
 
 
 # macOS ps escapes each argv word with vis(3) and VIS_NOSLASH, VIS_NL and

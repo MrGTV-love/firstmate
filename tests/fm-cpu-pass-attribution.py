@@ -81,6 +81,7 @@ def pid_fact(pid):
 
 
 engine.pid_dead = pid_fact
+REAL_PROCESS_ARGV = engine.process_argv
 COALITION_FLAVOR = getattr(proc, 'PROC_PIDCOALITIONINFO', 20)
 
 
@@ -128,6 +129,8 @@ class World:
         self.processes = {200: dict(parent=1, start=50000000, coalition=9)}  # one unrelated process older than every attempt
         self.rss = {}
         self.own = {}  # pid -> resident GiB of an attempt's process in the reading (its exact start, a task figure)
+        self.unstable = {}  # pid -> resident GiB read with a start time that changed during the read (rss_source unstable)
+        self.argv = {}  # pid -> (declared argc, words) its KERN_PROCARGS2 answer carries
         self.tail = b''
         self.fds = []
         self.rows = 0
@@ -205,7 +208,12 @@ class World:
                 return b''
             if confirm == 'short':
                 return b'X'
+            if confirm == 'oversize':
+                return kinfo(mib[3], p['parent'], p['start']) + b'\0' * 16  # a longer answer than one record
             return kinfo(mib[3], p['parent'], p['start'] + (1 if confirm == 'other' else 0), p.get('traced', False))
+        if mib[:2] == (proc.CTL_KERN, proc.KERN_PROCARGS2) and mib[2] in self.argv:
+            argc, words = self.argv[mib[2]]
+            return struct.pack('i', argc) + b'/bin/fake\0\0' + b''.join(w.encode() + b'\0' for w in words)
         if mib[:2] == (proc.CTL_KERN, proc.KERN_PROCARGS2) and mib[2] in self.processes:
             marker = self.processes[mib[2]].get('marker')
             environment = ('FM_LAUNCH_ATTEMPT=%s\0' % marker).encode() if marker else b''
@@ -230,13 +238,23 @@ class World:
         proc.libc = SimpleNamespace(proc_pidinfo=self.proc_pidinfo, strvis=REAL_LIBC.strvis)
         engine.sibling = lambda module, filename: proc
         engine.HOST_STATE_DB = str(self.db)
-        engine.process_argv = lambda pid: ['fake']
+        engine.process_argv = REAL_PROCESS_ARGV if getattr(self, 'real_argv', False) else (lambda pid: ['fake'])
+
+    def observe(self, fallback=False):
+        # The memory reading and record facts a decision reads, installed for a caller that decides on its own.
+        self.install()
+        report = dict(available_bytes=int(self.available * GIB), errors=[], processes=[], runs={})
+        engine.host_observation = lambda fresh=False: dict(reasons=[], memory=report)
+        engine.measured_reservations = lambda report, running: None if fallback else (R, S, 2)
+        engine.active_term = lambda report: (A, 2)
 
     def decide(self, self_run=None, waiting=(), cores=18, fallback=False):
         self.install()
         report = dict(available_bytes=int(self.available * GIB), errors=[],
                       processes=[dict(pid=pid, start_us=self.processes[pid]['start'], rss_bytes=int(size * GIB), rss_source='task')
-                                 for pid, size in self.own.items()],
+                                 for pid, size in self.own.items()]
+                      + [dict(pid=pid, start_us=self.processes[pid]['start'], rss_bytes=int(size * GIB), rss_source='unstable')
+                         for pid, size in self.unstable.items()],
                       runs={'no-mistakes:repo/%s' % run: dict(rss_bytes=int(size * GIB), processes=1) for run, size in self.rss.items()})
         if getattr(self, 'decide_hook', None):
             self.decide_hook(report)
@@ -337,7 +355,7 @@ def quiet_world(name, **kw):
 
 def f1_unreadable_confirming_read():
     w = orphan_world('f1'); w.processes[42].update(coalition=None, confirm='short')
-    waits('f1-unreadable-confirm', w, 11)
+    waits('f1-unreadable-confirm', w, unknown="could be run x")  # a possible orphan, its memory unjoined (Main 1876 J)
     admits(quiet_world('f1-control'), 8)
 
 
@@ -349,7 +367,7 @@ def f2_unreadable_record():
 
 def f6_unknown_launch_coalition():
     w = orphan_world('f6'); w.record('x', 'x', coalition=None)
-    waits('f6-unknown-coalition', w, 11)
+    waits('f6-unknown-coalition', w, unknown="could be run x")
     w = orphan_world('f6-control'); w.processes[42]['coalition'] = 9
     admits(w, 8)
 
@@ -365,7 +383,11 @@ def f8_every_owner_kept():
     # (X never had it), 11 against 12 admits.
     w = World('f8', available=12).run('x').run('y').proved('x').proved('y').process(42, start=200000000)
     w.record('x', 'x', t0_us=100, members=[[42, 200000000]]).record('y', 'y', t0_us=150, root=[42, 200000000])
-    waits('f8-every-owner', w, 14)
+    out = waits('f8-every-owner', w, 14)
+    # Each owner on its own (Main 1876 E): X's attempt and Y's are each charged R once, unseen, and neither history
+    # adds a charge (S 8 + 3 + 3 = 14). A total of 14 from any other split fails here.
+    control('x:launched:3221225472:unseen' in out['line'] and 'y:launched:3221225472:unseen' in out['line']
+            and 'counted_runs=[x:0,y:0]' in out['line'], 'each owner charged R once', out)
     w = World('f8-control', available=12).run('x').run('y').proved('x').proved('y').process(42, start=200000000, coalition=8)
     w.record('y', 'y', t0_us=150, root=[42, 200000000], coalition=8)
     admits(w, 11)
@@ -396,19 +418,20 @@ def item2_same_run():
 def item4_another_owner():
     w = World('i4', available=11.5).run('x').run('y').proved('x').proved('y').process(42, start=200000000)
     w.record('x', 'x', t0_us=100, root=[10, 110]).record('y', 'y', t0_us=150, root=[42, 200000000])
-    waits('i4-possible-descendant', w, 14)
+    waits('i4-possible-descendant', w, unknown="could be run x")
 
 
 def item5_reads():
     w = orphan_world('i5-short'); w.processes[42].update(coalition=9, confirm='short')
-    waits('i5-short-confirm', w, 11)
+    waits('i5-short-confirm', w, unknown="could be run x")
     w = orphan_world('i5-generation'); w.processes[42].update(coalition=9, confirm='other')
-    waits('i5-coalition-generation', w, 11)
+    waits('i5-coalition-generation', w, unknown="could be run x")
     waits('i5-malformed-field', World('i5-malformed').run('x').proved('x').record('x', 'x', root='garbage'), unknown='attempt-x.json')
 
 
 def item6_run_status():
     w = World('i6', available=13).run('y', step=('review', 'running', None)).proved('y').record('x', 'gone-run')
+    w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('gone-run', 'completed', 'repo', ?)", (NOW - 500,))
     waits('i6-live-attempt-run-stopped', w.process(10, start=100100000), 14)
 
 
@@ -443,14 +466,15 @@ def m1759_visible_attempt_masks_predecessor():
 
 
 def m1759_two_passive_attempts():
-    w = World('m1759-passive', available=13).run('x').proved('x').process(10, start=100100000).process(11, start=100100000)
+    w = World('m1759-passive', available=13).run('x').proved('x').process(10, parent=200, start=100100000).process(11, parent=200, start=100100000)
     w.record('a', 'x', reserves=False).record('b', 'x', reserves=False, root=[11, 100100000])
     waits('m1759-two-passive', w, 14)
 
 
 def m1759_fallback_counts_attempts():
     w = World('m1759-fb').run('x').proved('x').record('a', 'x').record('b', 'x', root=[11, 100100000])
-    waits('m1759-fallback-two-attempts', w.process(10, start=100100000).process(11, start=100100000), self_run='x', cores=6, fallback=True)
+    waits('m1759-fallback-two-attempts', w.process(10, parent=200, start=100100000).process(11, parent=200, start=100100000), self_run='x',
+          cores=6, fallback=True)
     admits(World('m1759-fb-control').run('x').proved('x').record('a', 'x').process(10, start=100100000), self_run='x', cores=6,
            fallback=True)
 
@@ -464,12 +488,12 @@ def m1759_uncounted_self():
 def m1759_partial_bulk():
     w = quiet_world('m1759-partial')  # X's root's record is the read's truncated tail: the read is not whole
     w.tail = kinfo(10, 1, 100100000)[:16]
-    waits('m1759-partial-bulk', w, 11)
+    waits('m1759-partial-bulk', w, unknown='process table unreadable')
 
 
 def m1759_short_coalition():
     w = orphan_world('m1759-coalition'); w.record('x', 'x', coalition=263); w.processes[42].update(coalition=263, coalition_len=1)
-    waits('m1759-short-coalition', w, 11)
+    waits('m1759-short-coalition', w, unknown="could be run x")
     w = orphan_world('m1759-coalition-control'); w.record('x', 'x', coalition=263); w.processes[42]['coalition'] = 7
     admits(w, 8)
 
@@ -511,7 +535,7 @@ def m1761_history_completeness():
 
 def m1656_escaped_descendant():
     # X's root is gone and its escaped descendant (pid 42: own session, lineage lost, X's coalition) lives: X holds.
-    waits('m1656-escape-fact', orphan_world('m1656-escape'), 11)
+    waits('m1656-escape-fact', orphan_world('m1656-escape'), unknown="could be run x")
     admits(quiet_world('m1656-escape-control'), 8)
 
 
@@ -521,14 +545,16 @@ def m1683_copied_identity():
     w = orphan_world('m1683-copied').run('y').proved('y').row('y', 'key-y').record('y', 'y', root=[11, 100100000], ended_us=1)
     w.processes[42]['marker'] = 'y'
     control(b'FM_LAUNCH_ATTEMPT=y' in w.sysctl(proc.CTL_KERN, proc.KERN_PROCARGS2, 42), 'the copied identity is on the orphan')
-    waits('m1683-copied-identity-fact', w, 11)
+    waits('m1683-copied-identity-fact', w, unknown="could be run x")
 
 
 def m1683_foreign_in_coalition():
     # Y's orphan (pid 43) inside the launch coalition outlives X and Y: both held, 3 + 3 + 8 = 14 against 12.
     w = World('m1683-foreign-in', available=12).run('x').run('y').proved('x').proved('y').row('x', 'key-x').row('y', 'key-y')
     w.record('x', 'x').record('y', 'y', t0_us=100500000, root=[11, 100600000]).process(43, start=101000000)
-    waits('m1683-foreign-in-fact', w, 14)
+    out = waits('m1683-foreign-in-fact', w, unknown="could be run x")
+    # Each owner on its own (Main 1876 E): the orphan is a possible process of X's attempt and of Y's, each named.
+    control("could be run x's attempt" in out['line'] and "could be run y's attempt" in out['line'], 'each owner holds', out)
 
 
 def m1683_pid_reuse_join():
@@ -543,7 +569,7 @@ def m1683_pid_reuse_join():
 
 def m1683_p1f_own_live():
     # P1(f): X's launch, bound by its own key, left a live orphan: X holds at R (11 against 8.5); foreign control admits.
-    waits('m1683-p1f-own-live-fact', orphan_world('m1683-p1f'), 11)
+    waits('m1683-p1f-own-live-fact', orphan_world('m1683-p1f'), unknown="could be run x")
     w = orphan_world('m1683-p1f-foreign'); w.processes[42]['coalition'] = 9
     admits(w, 8)
 
@@ -650,7 +676,7 @@ def m1759_row_between_census_and_claim():
             return None
         engine.start_binding = binding
         try:
-            got = engine.claim_round(str(w.pool), args, True)
+            got = engine.claim_pending(str(w.pool), args)
         finally:
             engine.start_binding = real_binding
         claim = Path(path + '.claimed')
@@ -954,6 +980,314 @@ def m1812_nested_shell_two_clients():
     harm('m1812-second-live-client', second is None, second)
 
 
+# Main 1876 (outside review of 899dee770): each a red at 899dee770 and green at the head, with its control.
+
+def failing_writes(match):
+    """update_attempt failing (None) for the changes MATCH picks, as a failed write of the record does."""
+    real = engine.update_attempt
+
+    def update(path, change):
+        probe = {'members': [], 'ended_us': None}
+        change(probe)
+        if match(probe):
+            return None
+        return real(path, change)
+    return real, update
+
+
+def m1876_membership_write():
+    # Finding 1: X's live root (pid 10) has a child (pid 50) the census proves X's; writing it into X's record fails.
+    # A descendant seen and not recorded could be forgotten once its lineage is lost: the decision waits, naming the
+    # record. An engine ignoring the failed write admits at 11 against 12. Control: the write succeeds, 11 admits.
+    for label, fail in (('fails', True), ('written', False)):
+        w = quiet_world('m1876-members-' + label, available=12).process(10, start=100100000).process(50, parent=10, start=100200000, coalition=9)
+        real, update = failing_writes(lambda probe: bool(probe['members']))
+        if fail:
+            engine.update_attempt = update
+        try:
+            out = w.decide()
+        finally:
+            engine.update_attempt = real
+            w.close()
+        if fail:
+            harm('m1876-membership-write-ignored', not out['admit'], out)
+            control(out['line'].startswith('unknown:') and 'members could not be written' in out['line'], out)
+        else:
+            control(out['admit'] and out['projected'] == 11, out)
+
+
+def m1876_end_write():
+    # Finding 1: X is quiet at both censuses and writing its end fails: a host-wide unknown (Main 1819), the decision
+    # waits naming the record. An engine that only keeps X held (and charges it) admits at 11 against 12. Control:
+    # the end is written, X ends, 8 admits.
+    for label, fail in (('fails', True), ('written', False)):
+        w = quiet_world('m1876-end-' + label, available=12)
+        real, update = failing_writes(lambda probe: probe['ended_us'] is not None)
+        if fail:
+            engine.update_attempt = update
+        try:
+            out = w.decide()
+        finally:
+            engine.update_attempt = real
+            w.close()
+        if fail:
+            harm('m1876-end-write-unnoted', not out['admit'], out)
+            control(out['line'].startswith('unknown:') and 'end could not be written' in out['line'], out)
+        else:
+            control(out['admit'] and out['projected'] == 8, out)
+
+
+def m1876_stopped_history():
+    # Finding 2: stopped X keeps a live held attempt (root 10) and an earlier keyless row; Y is a healthy counted run.
+    # X's history is built though X stopped: X's attempt R and its incomplete history R: 3 + 3 + 8 = 14 against 13
+    # waits (fit), and 3 starts against the limit 3 (fallback, 9 cores). Omitting X's history admits at 11 / 2 starts.
+    # Control: the same, X's history complete (its row bound to its own ended record), 11 admits.
+    for label, fallback in (('fit', False), ('fallback', True)):
+        w = World('m1876-stopped-' + label, available=13).run('y').proved('y')  # y waits on CI, shown ended: 0
+        w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('x', 'completed', 'repo', ?)", (NOW - 500,))
+        w.row('x', None).record('x', 'x').process(10, parent=200, start=100100000)
+        waits('m1876-stopped-history-' + label, w, None if fallback else 14, cores=9, fallback=fallback)
+    w = World('m1876-stopped-control', available=13).run('y').proved('y')
+    w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('x', 'completed', 'repo', ?)", (NOW - 500,))
+    w.proved('x').record('x', 'x').process(10, parent=200, start=100100000)
+    admits(w, 11)
+
+
+def m1876_unjoined_possible():
+    # Finding 3: X's root (pid 10) joins at 1 GiB; a lineage-lost process in X's coalition (pid 42) that could be X's has
+    # only an unstable 20 GiB figure. It is unknown memory: the decision waits. Treating the attempt as seen at 1 GiB
+    # admits at 29 against 29.5. Control: pid 42's figure joins too: seen at 21 GiB, 21 + 8 = 29 admits.
+    for label, joined in (('unstable', False), ('joined', True)):
+        w = quiet_world('m1876-join-' + label).process(10, parent=200, start=100100000).process(42)
+        w.rss['x'], w.own[10] = 21, 1
+        (w.own if joined else w.unstable)[42] = 20
+        if joined:
+            admits(w, 29)
+        else:
+            waits('m1876-unjoined-possible', w, unknown='memory is not joined')
+
+
+def as_client(w, pid, chain, args, **kw):
+    import inspect
+    real = os.getpid
+    os.getpid = lambda: pid
+    engine.ancestors = lambda _: list(chain)
+    if 'direct' not in inspect.signature(engine.claim_round).parameters:
+        kw.pop('direct', None)
+    try:
+        with engine.start_lock(str(w.pool)):
+            found = engine.claim_round(str(w.pool), args, True, **kw)
+            return found if found is not None else engine.claim_round(str(w.pool), args, False, **kw)
+    finally:
+        os.getpid = real
+
+
+def m1876_nested_shell_subtree():
+    # Finding 4: shell 202 claims for its one client; a nested shell 250 below it binds the claim; two live clients 301
+    # and 303 below 250 are not that client: each is decided on its own. An engine accepting the bound client's
+    # subtree gives both the holder. Control: 250 itself, through one more route, gets the holder.
+    args = ['axi', 'run', '--intent', 'x']
+    w = pending_world('m1876-subtree')
+    w.pending(dict(holder=4242, args=args, before=[], created_ns=1, client_nonce=None))
+    real = dict(ancestors=engine.ancestors, process_table=engine.process_table, process_argv=engine.process_argv)
+    engine.process_table = lambda: {202: 4242, 250: 202, 301: 250, 303: 250}
+    engine.process_argv = lambda pid: ['bash']
+    try:
+        shell = as_client(w, 202, [4242, 1], args, direct=False)
+        nested = as_client(w, 250, [202, 4242, 1], args)
+        again = as_client(w, 250, [250, 202, 4242, 1], args)
+        first = as_client(w, 301, [250, 202, 4242, 1], args)
+        second = as_client(w, 303, [250, 202, 4242, 1], args)
+    finally:
+        for name, value in real.items():
+            setattr(engine, name, value)
+        w.close()
+    control(shell == 4242 and nested == 4242 and again == 4242, shell, nested, again)
+    harm('m1876-subtree-shares-reservation', first is None and second is None, first, second)
+
+
+def m1876_binding_nonce():
+    # Finding 4: the shell's parsed command carries nonce N; its first actual client carries M and binds the claim. A
+    # delayed row carrying N is not that client's: it releases nothing; the client's own M row releases it.
+    args_n = ['axi', 'run', '--intent', 'x', '--launch-nonce', 'N']
+    args_m = ['axi', 'run', '--intent', 'y', '--launch-nonce', 'M']
+    results = {}
+    for label, row_nonce in (('N row', 'N'), ('M row', 'M')):
+        w = pending_world('m1876-nonce-' + label.split()[0])
+        path = w.pending(dict(holder=4242, args=args_n, before=[], created_ns=1, client_nonce=None))
+        real = dict(ancestors=engine.ancestors, process_table=engine.process_table, process_argv=engine.process_argv)
+        engine.process_table = lambda: {202: 4242, 301: 202}
+        engine.process_argv = lambda pid: ['bash']
+        try:
+            as_client(w, 202, [4242, 1], args_n, direct=False)
+            as_client(w, 301, [202, 4242, 1], args_m)
+        finally:
+            for name, value in real.items():
+                setattr(engine, name, value)
+        w.sql("INSERT INTO runs (id, status, repo_id, created_at, launch_nonce) VALUES ('late', 'running', 'repo', ?, ?)", (NOW, row_nonce))
+        results[label] = pending_released(w, {'late'})
+    harm('m1876-binding-keeps-old-nonce', results['N row'] == [(False, None)], results)
+    control(results['M row'] == [(True, 'late')], results)
+
+
+def m1876_k7_bound_client():
+    # Finding 4: K7 ends a shell claim by its bound client: with the shell gone and its client alive the reservation is
+    # kept; with the client gone it ends.
+    out = {}
+    for label, shell, client in (('shell gone', DEAD_PID, os.getpid()), ('client gone', os.getpid(), DEAD_PID)):
+        w = pending_world('m1876-k7-' + label.split()[0])
+        w.pending(dict(holder=4242, args=['axi', 'run'], before=[], created_ns=1, client_nonce=None),
+                  claim=dict(pid=shell, nonce=None, seen=[], direct=False, client=client, provisional=False))
+        out[label] = pending_released(w, set())
+    harm('m1876-k7-by-shell-pid', out['shell gone'] == [(False, None)], out)
+    control(out['client gone'] == [(True, None)], out)
+
+
+def m1876_registration_under_lock():
+    # Finding 5 (L): a start's registration release is proven and applied while it holds the start lock. Through the
+    # engine's own cmd_pipeline_start, in this process, with COMMAND replaced (no process): the release's pending census
+    # is read while the lock is held. Control: the start is admitted and its own row releases it.
+    import argparse
+    w = World('m1876-registered')
+    w.observe()
+    probe = {}
+    real = dict(run_child=engine.run_child, pending_census=engine.pending_census, start_binding=engine.start_binding,
+                with_intercept=engine.with_intercept)
+
+    def census(directory, running):
+        if probe.get('armed'):
+            fd = engine.open_lock(os.path.join(directory, 'pipeline-start.lock'))
+            try:
+                probe['held'] = not engine.try_lock(fd)
+            finally:
+                os.close(fd)
+        return real['pending_census'](directory, running)
+
+    def child(command, environment, fd, on_poll=None, cancellable=False):
+        w.sql("INSERT INTO runs (id, status, repo_id, created_at, launch_nonce) VALUES ('own', 'running', 'repo', ?, 'N')", (NOW,))
+        probe['armed'] = True
+        probe['released'] = on_poll()
+        return 0
+    engine.pending_census, engine.run_child = census, child
+    engine.start_binding = lambda cwd, words: None
+    engine.with_intercept = lambda env, priority: None
+    saved = dict(os.environ)
+    os.environ['FM_CPU_POOL_DIR'] = str(w.pool)
+    try:
+        code = engine.cmd_pipeline_start(argparse.Namespace(command=['no-mistakes', 'axi', 'run', '--intent', 'x', '--launch-nonce', 'N'],
+                                                            only_fresh=False, priority='other'))
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+        for name, value in real.items():
+            setattr(engine, name, value)
+        proc.sysctl, proc.libc = REAL_SYSCTL, REAL_LIBC
+        w.close()
+    control(code == 0 and probe.get('released') is True, 'admitted and released by its own row', code, probe)
+    harm('m1876-registration-outside-lock', probe.get('held') is True, probe)
+
+
+def m1876_claim_stat():
+    # Finding 6: this start's own enclosing entry has a claim whose stat fails: unknown, never "unclaimed": the decision
+    # waits. Read as unclaimed, the entry is skipped as this start's own and 8 admits against 10. Control: the claim is
+    # readable: counted, 11 against 10 waits.
+    for label, denied in (('denied', True), ('readable', False)):
+        w = World('m1876-stat-' + label, available=10)
+        path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None),
+                         claim=dict(pid=os.getpid(), nonce=None, seen=[], direct=True, client=os.getpid(), provisional=False))
+        real_lstat = os.lstat
+
+        def lstat(target, *a, **k):
+            if denied and str(target) == path + '.claimed':
+                raise PermissionError(13, 'Permission denied', str(target))
+            return real_lstat(target, *a, **k)
+        os.lstat = lstat
+        real_lexists = os.path.lexists
+        os.path.lexists = lambda target: (False if denied and str(target) == path + '.claimed' else real_lexists(target))
+        try:
+            if denied:
+                waits('m1876-claim-stat-unclaimed', w, unknown='.claimed')
+            else:
+                waits('m1876-claim-stat-control', w, 11)
+        finally:
+            os.lstat, os.path.lexists = real_lstat, real_lexists
+
+
+def m1876_short_pending_read():
+    # Finding 6: a pending entry read shorter than its file is unknown, never the prefix's entry: the decision waits.
+    entry = json.dumps(dict(holder=1, args=None, before=[], created_ns=1, client_nonce=None))
+    w = World('m1876-short-read')
+    path = w.pending(raw=(entry + ' trailing').encode())
+    real_pread = os.pread
+    os.pread = lambda fd, size, offset: real_pread(fd, size, offset)[:len(entry)]
+    try:
+        waits('m1876-short-pending-read', w, unknown='pending start')
+    finally:
+        os.pread = real_pread
+
+
+def m1876_partial_process_table():
+    # Finding 6: the process table read for the admitted-client check ends in a partial record (the admitted client):
+    # unknown, so the enclosing entry is counted: 3 + 8 = 11 against 10 waits. Reading the table without that record
+    # skips the entry and admits 8.
+    w = World('m1876-partial-table', available=10)
+    w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None))
+    w.tail = kinfo(777, os.getppid(), 101000000)[:16]
+    waits('m1876-partial-process-table', w, 11)
+
+
+def m1876_short_argv():
+    # Finding 6: a process below the holder whose argument record declares 3 words and carries 2 is unknown (it could be
+    # the admitted client): the enclosing entry is counted, 11 against 10 waits. Read as a shorter, nonmatching list,
+    # the entry is skipped and 8 admits.
+    w = World('m1876-short-argv', available=10).process(777, parent=os.getppid(), start=101000000)
+    w.real_argv = True
+    w.argv[777] = (3, ['no-mistakes', 'axi'])
+    w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None))
+    waits('m1876-short-argv', w, 11)
+
+
+def m1876_oversized_confirmation():
+    # Finding 6: the confirming read of a possible orphan of X (pid 42, its coalition read as foreign) is longer than
+    # one record: unknown, so its coalition is not taken as its own: X holds and the decision waits. Truncated and taken
+    # as exact, the foreign coalition ends X and 8 admits. Control: an exact confirmation: X ends, 8 admits.
+    for label, confirm in (('oversized', 'oversize'), ('exact', None)):
+        w = orphan_world('m1876-oversize-' + label)
+        w.processes[42].update(coalition=9, confirm=confirm)
+        if confirm:
+            waits('m1876-oversized-confirmation', w, unknown='could be run x')
+        else:
+            admits(w, 8)
+
+
+def m1876_row_read_error():
+    # Finding 6: the run-row read for pending releases fails (OperationalError): unknown, the decision waits, never an
+    # escaping error (which the entrypoint turns into 125). Control: the rows read: the entry is counted, 11 against 10.
+    for label, broken in (('broken', True), ('readable', False)):
+        w = World('m1876-row-error-' + label, available=10).run('own', step=('review', 'running', None), nonce='N')
+        w.proved('own')
+        w.pending(dict(holder=1, args=None, before=[], created_ns=1, client_nonce='M'))
+        real = engine.read_host_db
+
+        def read(sql, parameters=(), real=real):
+            if broken and 'launch_nonce FROM runs' in sql:
+                raise sqlite3.OperationalError('database is locked')
+            return real(sql, parameters)
+        engine.read_host_db = read
+        try:
+            try:
+                out = settle(w)
+            except sqlite3.Error as exc:
+                out = dict(admit=None, error=repr(exc))
+        finally:
+            engine.read_host_db = real
+            w.close()
+        if broken:
+            harm('m1876-row-read-error-escapes', out.get('admit') is False and out.get('line', '').startswith('unknown:'), out)
+        else:
+            control(out['admit'] is False and out['projected'] == 14, out)
+
+
 # The perturbation generator (Main 1759): less evidence never admits, and never lowers the projected demand.
 
 BASES = {
@@ -964,7 +1298,7 @@ BASES = {
     .record('a', 'x', session_key='s', ended_us=1).record('b', 'x', session_key='s', ended_us=1),
     'no activation': lambda: World('p-noact', activated=False).run('x').proved('x'),
     'two live attempts': lambda: World('p-two', available=13).run('x').proved('x').record('a', 'x').record('b', 'x', root=[11, 100100000])
-    .process(10, start=100100000).process(11, start=100100000),
+    .process(10, parent=200, start=100100000).process(11, parent=200, start=100100000),
 }
 
 
@@ -990,6 +1324,21 @@ OPERATORS = dict(
        ('queue the run', dict(waiting=('x',))),
        ('request as the run', dict(self_run='x')),
        ('request as the run, now uncounted', 'uncounted')])
+
+
+def activation_before(w, created):
+    """Whether the world's activation record is well formed and older than CREATED (Main 1876 E): an epoch-second
+    activated_at, a 64-hex gate digest and an integer creation time after it. A missing, unreadable or malformed
+    record is no proof."""
+    try:
+        record = json.loads((w.pool / 'gate-activation.json').read_text())
+    except (OSError, ValueError):
+        return False
+    if not isinstance(record, dict):
+        return False
+    at, sha = record.get('activated_at'), record.get('gate_sha256')
+    return (type(at) is int and isinstance(sha, str) and len(sha) == 64 and all(ch in '0123456789abcdef' for ch in sha)
+            and type(created) is int and at < created)
 
 
 def perturbation_group():
@@ -1018,8 +1367,9 @@ def perturbation_group():
                     # record of x left, and the activation record before x.
                     with sqlite3.connect(w.db) as c:
                         rows = c.execute("SELECT count(*) FROM agent_invocations WHERE run_id = 'x'").fetchone()[0]
+                        created = c.execute("SELECT created_at FROM runs WHERE id = 'x'").fetchone()
                     recorded = any(json.loads(p.read_text()).get('run') == 'x' for p in w.pool.glob('attempt-*.json'))
-                    ok = rows == 0 and not recorded and (w.pool / 'gate-activation.json').exists()
+                    ok = rows == 0 and not recorded and activation_before(w, created[0] if created else None)
                 harm_id = ident.replace(':', '/')  # a harm id carries no colon
                 results[ident] = 'pass' if ok else ('FAIL: HarmError: harm:%s: %r' % (harm_id, (reference['projected'], out)))[:900]
             except (Exception, BarredProcessCall) as exc:  # noqa: BLE001 - an error is reported, never counted red
@@ -1070,6 +1420,20 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1812 an incomplete own entry is counted', m1812_incomplete_own_entry),
          ('Main 1812 an undecodable claim is unknown, not a refusal', m1812_undecodable_claim),
          ('Main 1812 a shell admission covers one client', m1812_nested_shell_two_clients),
+         ('Main 1876 a failed membership write waits', m1876_membership_write),
+         ('Main 1876 a failed end write waits', m1876_end_write),
+         ("Main 1876 a stopped run's history is built", m1876_stopped_history),
+         ('Main 1876 an unjoined possible process waits', m1876_unjoined_possible),
+         ("Main 1876 a binding names one client, never its subtree", m1876_nested_shell_subtree),
+         ('Main 1876 a binding takes its client nonce', m1876_binding_nonce),
+         ('Main 1876 K7 ends a shell claim by its bound client', m1876_k7_bound_client),
+         ('Main 1876 a registration release is proven under the lock', m1876_registration_under_lock),
+         ('Main 1876 an unreadable claim stat waits', m1876_claim_stat),
+         ('Main 1876 a short pending read waits', m1876_short_pending_read),
+         ('Main 1876 a partial process table counts the entry', m1876_partial_process_table),
+         ('Main 1876 a short argument record counts the entry', m1876_short_argv),
+         ('Main 1876 an oversized confirmation is unknown', m1876_oversized_confirmation),
+         ('Main 1876 a row read error waits', m1876_row_read_error),
          ('Main 1656 an escaped descendant holds its attempt (facts)', m1656_escaped_descendant),
          ("Main 1683 a copied identity never moves X's orphan to Y (facts)", m1683_copied_identity),
          ('Main 1683 a foreign in-coalition orphan delays admission (facts)', m1683_foreign_in_coalition),
