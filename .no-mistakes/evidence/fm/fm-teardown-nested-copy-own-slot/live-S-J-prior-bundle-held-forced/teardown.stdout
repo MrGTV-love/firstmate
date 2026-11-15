@@ -1,0 +1,5 @@
+/Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj
+🌳 Worktree returned to pool.
+proj: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj returned)
+Backlog: task-x1 stays open in /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.

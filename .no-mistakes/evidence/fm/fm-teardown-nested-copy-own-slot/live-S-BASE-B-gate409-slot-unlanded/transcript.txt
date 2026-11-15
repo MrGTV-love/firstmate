@@ -1,0 +1,86 @@
+== setup ==
+shape=plain claim=mine variant=slot-unlanded force=yes leftovers=no
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.CwTpvB (marked lab home)
+TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-live-world.mlIgsu/th
+slotmode=tmuxget
+slot=/Users/charlesabrooker/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj
+nested copy=/Users/charlesabrooker/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj/.claude/worktrees/task-x1-v2
+--- task-x1.meta
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj/.claude/worktrees/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.CwTpvB/projects/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+branch=fm/task-x1-v2
+tasktmp=/Users/charlesabrooker/tmp/fm-live-world.mlIgsu/tasktmp
+spawn_gen=live-gen-1
+--- claim
+task=task-x1
+home=/Users/charlesabrooker/tmp/fm-lab.CwTpvB
+--- treehouse status (before)
+base  main  (repository default)
+1     in-use       ~/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj  (detached)
+                   bash (23739)
+--- tmux windows (before)
+firstmate:fm-task-x1
+--- state dir (before)
+task-x1.inbox
+task-x1.meta
+task-x1.status
+
+== bin/fm-teardown.sh task-x1 --force --drop-file /Users/charlesabrooker/tmp/fm-live-world.mlIgsu/drop.txt ==
+exit=1
+--- stdout
+/Users/charlesabrooker/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-src.LtdFSE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌳 Leased worktree 1 at ~/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj. Run 'treehouse return ~/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj' to release it.
+worktree /Users/charlesabrooker/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj/.claude/worktrees/task-x1-v2 is not managed by treehouse
+error: treehouse return failed for worktree /Users/charlesabrooker/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj/.claude/worktrees/task-x1-v2; teardown aborted
+
+== after ==
+nested copy: kept
+slot root dir: present
+claim: kept
+task-x1.meta: kept
+task-x1.status: kept
+task-x1.inbox: kept
+task-x1.backlog-close: kept
+task-x1.teardown-return-pending: kept
+tasktmp: kept
+--- treehouse status (after)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-world.mlIgsu/th/.treehouse/proj-90736c/1/proj  (detached)  (held by task-x1)
+                   bash (23739)
+--- tmux windows (after)
+firstmate:fm-task-x1
+--- backlog (after)
+# Backlog
+
+## In flight
+- [ ] task-x1 - live lab task (kind: ship) (since 2026-11-15)
+
+## Queued
+## Done
+--- snapshot diff (before -> after)
+1a2,6
+> file /Users/charlesabrooker/tmp/fm-lab.CwTpvB/state/.treehouse-project-9ff4d5da36410a4cea0a9e8b00d614f3a624f7dd.lock.holds 5c49df82c11bff69
+> dir /Users/charlesabrooker/tmp/fm-lab.CwTpvB/state/.treehouse-project-9ff4d5da36410a4cea0a9e8b00d614f3a624f7dd.lock.queue
+> file /Users/charlesabrooker/tmp/fm-lab.CwTpvB/state/.treehouse-project-9ff4d5da36410a4cea0a9e8b00d614f3a624f7dd.lock.queue/sequence 53c234e5e8472b6a
+> file /Users/charlesabrooker/tmp/fm-lab.CwTpvB/state/guard-events.jsonl 777a142aaf024697
+> file /Users/charlesabrooker/tmp/fm-lab.CwTpvB/state/task-x1.backlog-close dea28c1d815c357b
+5a11
+> file /Users/charlesabrooker/tmp/fm-lab.CwTpvB/state/task-x1.teardown-return-pending 869ad944a1b569db
+7a14,15
+> dir /Users/charlesabrooker/tmp/fm-lab.CwTpvB/data/task-x1
+> file /Users/charlesabrooker/tmp/fm-lab.CwTpvB/data/task-x1/captain-drop.md e223d72ddd8334bd
+19d26
+< ref refs/heads/fm/task-x1-v2 faa7f30dc94e757c88a600428310a7906fc82094

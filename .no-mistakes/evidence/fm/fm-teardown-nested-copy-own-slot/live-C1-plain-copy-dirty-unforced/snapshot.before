@@ -1,0 +1,25 @@
+dir /Users/charlesabrooker/tmp/fm-lab.PfDuZi/state
+file /Users/charlesabrooker/tmp/fm-lab.PfDuZi/state/task-x1.backlog-close 054b0a0801e401c9
+dir /Users/charlesabrooker/tmp/fm-lab.PfDuZi/state/task-x1.inbox
+file /Users/charlesabrooker/tmp/fm-lab.PfDuZi/state/task-x1.inbox/001.msg f17d0901cfc94e01
+file /Users/charlesabrooker/tmp/fm-lab.PfDuZi/state/task-x1.meta d1a11e774a280a90
+file /Users/charlesabrooker/tmp/fm-lab.PfDuZi/state/task-x1.status 9399a0c552b1b4b7
+file /Users/charlesabrooker/tmp/fm-lab.PfDuZi/state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir /Users/charlesabrooker/tmp/fm-lab.PfDuZi/data
+file /Users/charlesabrooker/tmp/fm-lab.PfDuZi/data/backlog.md 2936f303ee158e8f
+dir /Users/charlesabrooker/tmp/fm-live-world.apbIoE/tasktmp
+file /tasktmp/scratch.txt a27110a155b1dd07
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/.claude/worktrees/task-x1-v2/dirty.txt abe9c2071f1d073a
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/.claude/worktrees/task-x1-v2/dirty.txt abe9c2071f1d073a
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.apbIoE/th/.treehouse/proj-6d10b8/1/proj/README.md 5891b5b522d5df08
+nested-head 5449249ff55da314d30c2fa4e8f95f6fe1410b42
+slot-head 5449249ff55da314d30c2fa4e8f95f6fe1410b42
+ref refs/heads/fm/task-x1-v2 5449249ff55da314d30c2fa4e8f95f6fe1410b42
+ref refs/heads/main 5449249ff55da314d30c2fa4e8f95f6fe1410b42
+claim task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.PfDuZi 
+tmux-windows firstmate:fm-task-x1 

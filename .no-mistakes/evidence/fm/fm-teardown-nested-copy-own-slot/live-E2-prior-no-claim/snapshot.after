@@ -1,0 +1,23 @@
+dir /Users/charlesabrooker/tmp/fm-lab.QE1fwi/state
+file /Users/charlesabrooker/tmp/fm-lab.QE1fwi/state/.treehouse-project-f9617bed2bda5fbd9a207a52eab51c07c7e19f84.lock.holds 88a64c1c9f2b3b4a
+dir /Users/charlesabrooker/tmp/fm-lab.QE1fwi/state/.treehouse-project-f9617bed2bda5fbd9a207a52eab51c07c7e19f84.lock.queue
+file /Users/charlesabrooker/tmp/fm-lab.QE1fwi/state/.treehouse-project-f9617bed2bda5fbd9a207a52eab51c07c7e19f84.lock.queue/sequence 53c234e5e8472b6a
+file /Users/charlesabrooker/tmp/fm-lab.QE1fwi/state/guard-events.jsonl 7fe5c31c6052be4b
+dir /Users/charlesabrooker/tmp/fm-lab.QE1fwi/state/terminal-outcomes
+dir /Users/charlesabrooker/tmp/fm-lab.QE1fwi/data
+file /Users/charlesabrooker/tmp/fm-lab.QE1fwi/data/backlog.md 2b12086e5f4cefb2
+dir /Users/charlesabrooker/tmp/fm-lab.QE1fwi/data/task-x1
+file /Users/charlesabrooker/tmp/fm-lab.QE1fwi/data/task-x1/captain-drop.md e223d72ddd8334bd
+absent /Users/charlesabrooker/tmp/fm-live-world.Uj6ar3/tasktmp
+file /Users/charlesabrooker/tmp/fm-live-world.Uj6ar3/th/.treehouse/proj-20ba2d/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.Uj6ar3/th/.treehouse/proj-20ba2d/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.Uj6ar3/th/.treehouse/proj-20ba2d/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.Uj6ar3/th/.treehouse/proj-20ba2d/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.Uj6ar3/th/.treehouse/proj-20ba2d/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.Uj6ar3/th/.treehouse/proj-20ba2d/1/proj/README.md 5891b5b522d5df08
+nested-head a84d685f4e886d6b909b0a01ae1a3d3851eedd78
+slot-head a84d685f4e886d6b909b0a01ae1a3d3851eedd78
+ref refs/heads/fm/task-x1-v2 a84d685f4e886d6b909b0a01ae1a3d3851eedd78
+ref refs/heads/main a84d685f4e886d6b909b0a01ae1a3d3851eedd78
+claim absent
+tmux-windows 

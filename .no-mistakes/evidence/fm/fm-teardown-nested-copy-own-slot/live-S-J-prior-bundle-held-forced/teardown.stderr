@@ -1,0 +1,16 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GB1N8QYSE803GNN90Z2A4G/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle sha256=bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9 tips=0aeba9f374b7c9b69c4df36384f5899d7a4253b7 620d1e402b5631577531ddf29b892679de5a37c4 d4d882fbaa21d155348a24686263c0f21e41a51b (source /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle)
+🌳 Leased worktree 1 at ~/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj. Run 'treehouse return ~/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj' to release it.
+teardown: reaping leaked worktree process(es) for task-x1: 34067
+teardown: force-killing leaked worktree process(es) for task-x1: 34067
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle sha256=bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9 tips=0aeba9f374b7c9b69c4df36384f5899d7a4253b7 620d1e402b5631577531ddf29b892679de5a37c4 d4d882fbaa21d155348a24686263c0f21e41a51b (source /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle sha256=bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9 tips=0aeba9f374b7c9b69c4df36384f5899d7a4253b7 620d1e402b5631577531ddf29b892679de5a37c4 d4d882fbaa21d155348a24686263c0f21e41a51b (source /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle)

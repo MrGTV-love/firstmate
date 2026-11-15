@@ -1,0 +1,94 @@
+== setup ==
+shape=plain claim=other variant=landed force=yes leftovers=no
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.pP8ElV (marked lab home)
+TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-live-world.fXoYMV/th
+slot=/Users/charlesabrooker/tmp/fm-live-world.fXoYMV/th/.treehouse/proj-d4e738/1/proj
+nested copy=/Users/charlesabrooker/tmp/fm-live-world.fXoYMV/th/.treehouse/proj-d4e738/1/proj/.claude/worktrees/task-x1-v2
+--- task-x1.meta
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-live-world.fXoYMV/th/.treehouse/proj-d4e738/1/proj/.claude/worktrees/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.pP8ElV/projects/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+branch=fm/task-x1-v2
+tasktmp=/Users/charlesabrooker/tmp/fm-live-world.fXoYMV/tasktmp
+spawn_gen=live-gen-1
+--- claim
+task=other-task
+home=/Users/charlesabrooker/tmp/fm-lab.pP8ElV
+--- treehouse status (before)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-world.fXoYMV/th/.treehouse/proj-d4e738/1/proj  (detached)  (held by task-x1)
+--- tmux windows (before)
+firstmate:fm-task-x1
+--- state dir (before)
+task-x1.inbox
+task-x1.meta
+task-x1.status
+
+== bin/fm-teardown.sh task-x1 --force --drop-file /Users/charlesabrooker/tmp/fm-live-world.fXoYMV/drop.txt ==
+exit=0
+--- stdout
+proj: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /Users/charlesabrooker/tmp/fm-live-world.fXoYMV/th/.treehouse/proj-d4e738/1/proj/.claude/worktrees/task-x1-v2 left in place, since it is not a pool slot)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.pP8ElV/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GB1N8QYSE803GNN90Z2A4G/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task task-x1's recorded worktree /Users/charlesabrooker/tmp/fm-live-world.fXoYMV/th/.treehouse/proj-d4e738/1/proj was reassigned to task other-task (home /Users/charlesabrooker/tmp/fm-lab.pP8ElV), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+
+== after ==
+nested copy: kept
+slot root dir: present
+claim: kept
+task-x1.meta: removed
+task-x1.status: removed
+task-x1.inbox: removed
+task-x1.backlog-close: removed
+task-x1.teardown-return-pending: removed
+tasktmp: removed
+--- treehouse status (after)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-world.fXoYMV/th/.treehouse/proj-d4e738/1/proj  (detached)  (held by task-x1)
+--- tmux windows (after)
+no server running on /private/tmp/fml.ltmunx/tmux-501/default
+--- backlog (after)
+# Backlog
+
+## In flight
+## Queued
+## Done
+- [x] task-x1 - live lab task (kind: ship) (done 2026-11-15)
+  dropped
+--- snapshot diff (before -> after)
+2,5c2,6
+< dir /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/task-x1.inbox
+< file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/task-x1.inbox/001.msg f17d0901cfc94e01
+< file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/task-x1.meta 5098598874b58b74
+< file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/task-x1.status 9399a0c552b1b4b7
+---
+> file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/.treehouse-project-77c2d30323bf5a08ec99a8db9841077987ecda2b.lock.holds df8ee99ae8ff71b5
+> dir /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/.treehouse-project-77c2d30323bf5a08ec99a8db9841077987ecda2b.lock.queue
+> file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/.treehouse-project-77c2d30323bf5a08ec99a8db9841077987ecda2b.lock.queue/sequence 53c234e5e8472b6a
+> file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/guard-events.jsonl 58d90f03bc6478bb
+> dir /Users/charlesabrooker/tmp/fm-lab.pP8ElV/state/terminal-outcomes
+7,9c8,11
+< file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/data/backlog.md 2936f303ee158e8f
+< dir /Users/charlesabrooker/tmp/fm-live-world.fXoYMV/tasktmp
+< file /tasktmp/scratch.txt a27110a155b1dd07
+---
+> file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/data/backlog.md 2b12086e5f4cefb2
+> dir /Users/charlesabrooker/tmp/fm-lab.pP8ElV/data/task-x1
+> file /Users/charlesabrooker/tmp/fm-lab.pP8ElV/data/task-x1/captain-drop.md e223d72ddd8334bd
+> absent /Users/charlesabrooker/tmp/fm-live-world.fXoYMV/tasktmp
+21c23
+< tmux-windows firstmate:fm-task-x1 
+---
+> tmux-windows 

@@ -1,0 +1,107 @@
+== setup ==
+shape=plain claim=mine variant=slot-unlanded force=yes leftovers=yes
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.NBqVP1 (marked lab home)
+TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-live-world.U1unrS/th
+slotmode=tmuxget
+slot=/Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj
+nested copy=/Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj/.claude/worktrees/task-x1-v2
+--- task-x1.meta
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj/.claude/worktrees/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.NBqVP1/projects/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+branch=fm/task-x1-v2
+tasktmp=/Users/charlesabrooker/tmp/fm-live-world.U1unrS/tasktmp
+spawn_gen=live-gen-1
+--- claim
+task=task-x1
+home=/Users/charlesabrooker/tmp/fm-lab.NBqVP1
+--- treehouse status (before)
+base  main  (repository default)
+1     in-use       ~/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj  (detached)
+                   bash (72319)
+--- tmux windows (before)
+firstmate:fm-task-x1
+--- state dir (before)
+task-x1.backlog-close
+task-x1.inbox
+task-x1.meta
+task-x1.status
+task-x1.teardown-return-pending
+
+== bin/fm-teardown.sh task-x1 --force --drop-file /Users/charlesabrooker/tmp/fm-live-world.U1unrS/drop.txt ==
+exit=1
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GB1N8QYSE803GNN90Z2A4G/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.NBqVP1/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.NBqVP1/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj would sweep away task task-x1's claimed pool slot /Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj, whose HEAD d92aa373c50a71147cf4e4475ed30e4d6c5c0e3b is neither landed nor held by a refs/fm/anchor/task-x1-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+
+== after ==
+nested copy: kept
+slot root dir: present
+claim: kept
+task-x1.meta: kept
+task-x1.status: kept
+task-x1.inbox: kept
+task-x1.backlog-close: kept
+task-x1.teardown-return-pending: kept
+tasktmp: kept
+--- treehouse status (after)
+base  main  (repository default)
+1     in-use       ~/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj  (detached)
+                   bash (72319)
+--- tmux windows (after)
+firstmate:fm-task-x1
+--- backlog (after)
+# Backlog
+
+## In flight
+- [ ] task-x1 - live lab task (kind: ship) (since 2026-11-15)
+
+## Queued
+## Done
+--- snapshot diff (before -> after)
+1a2,5
+> file /Users/charlesabrooker/tmp/fm-lab.NBqVP1/state/.treehouse-project-f85af6e51410ae491e6c57f5d09f4fee5da41107.lock.holds e8790be2d4a7ed1d
+> dir /Users/charlesabrooker/tmp/fm-lab.NBqVP1/state/.treehouse-project-f85af6e51410ae491e6c57f5d09f4fee5da41107.lock.queue
+> file /Users/charlesabrooker/tmp/fm-lab.NBqVP1/state/.treehouse-project-f85af6e51410ae491e6c57f5d09f4fee5da41107.lock.queue/sequence 4355a46b19d348dc
+> file /Users/charlesabrooker/tmp/fm-lab.NBqVP1/state/guard-events.jsonl 0b4a9498c036c9a1
+
+== slot root HEAD pushed to origin main (landed); plain re-run: bin/fm-teardown.sh task-x1 ==
+exit=0
+--- stdout
+/Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj
+🌳 Worktree returned to pool.
+proj: synced fc7a4a3..d92aa37
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj returned)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.NBqVP1/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+🌳 Leased worktree 1 at ~/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj. Run 'treehouse return ~/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj' to release it.
+teardown: reaping leaked worktree process(es) for task-x1: 72319
+teardown: force-killing leaked worktree process(es) for task-x1: 72319
+nested copy: removed
+claim: removed
+task-x1.meta: removed
+task-x1.status: removed
+task-x1.inbox: removed
+task-x1.backlog-close: removed
+task-x1.teardown-return-pending: removed
+tasktmp: removed
+--- treehouse status (after re-run)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj  (detached)
+--- tmux windows (after re-run)
+no server running on /private/tmp/fml.zhljnq/tmux-501/default

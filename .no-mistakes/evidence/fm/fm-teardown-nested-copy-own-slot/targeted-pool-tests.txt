@@ -1,7 +1,13 @@
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands, for a prior and a plain record
 ok - a plain nested copy in the task's own claimed slot is removed and the slot returned
 ok - a plain nested copy in the task's own claimed slot is removed and the slot returned under --force --drop-file
 ok - an entry refusal for the slot root's unlanded commit or the nested copy's dirt changes nothing, for a prior and a plain record
+ok - the entry preflight refuses a plain and a prior-shape nested close before any mutation (busy-state-directory merge-notified-directory turn-ended-directory immutable-meta immutable-return-pending forced), and each repaired retry closes
+ok - with the pool on another filesystem, a teardown routes when the claim names the peer and refuses at entry when it must hand its own claim over
+ok - a data folder on another filesystem does not stop a clean nested close that writes nothing there
 ok - a plain nested record gets the prior shape's result for every claim state and fixture
-ok - a scout with a plain nested copy in its claimed slot is left as before: refused, copy, claim and record kept, no slot returned
+ok - a scout with a plain nested copy in its claimed slot keeps its own route: ordinary copy cleanup, claim kept, no slot returned
 ok - the recorded gate-409 case tears down, returns the slot and clears both leftover files
 ok - the recorded gate-409 case refuses naming the slot root and its HEAD, with every file left as it was
+bash tests/fm-teardown-pool.test.sh     test_gate_409_recorded_case_tears_dow  104.40s user 186.63s system 48% cpu 9:57.40 total
+rc=0

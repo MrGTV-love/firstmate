@@ -1,0 +1,142 @@
+== setup ==
+shape=prior claim=mine variant=bundle force=yes leftovers=yes
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.OLGxOO (marked lab home)
+TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-live-world.AKj617/th
+slotmode=tmuxget
+slot=/Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj
+nested copy=/Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2
+--- task-x1.meta
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.OLGxOO/projects/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+branch=fm/task-x1-v2
+tasktmp=/Users/charlesabrooker/tmp/fm-live-world.AKj617/tasktmp
+spawn_gen=live-gen-1
+prior_worktree=/Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj
+--- claim
+task=task-x1
+home=/Users/charlesabrooker/tmp/fm-lab.OLGxOO
+--- treehouse status (before)
+base  main  (repository default)
+1     in-use       ~/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj  (detached)
+                   bash (34067)
+--- tmux windows (before)
+firstmate:fm-task-x1
+--- state dir (before)
+task-x1.backlog-close
+task-x1.inbox
+task-x1.meta
+task-x1.status
+task-x1.teardown-return-pending
+
+== bin/fm-teardown.sh task-x1 --force --drop-file /Users/charlesabrooker/tmp/fm-live-world.AKj617/drop.txt ==
+exit=0
+--- stdout
+/Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj
+🌳 Worktree returned to pool.
+proj: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj returned)
+Backlog: task-x1 stays open in /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GB1N8QYSE803GNN90Z2A4G/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle sha256=bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9 tips=0aeba9f374b7c9b69c4df36384f5899d7a4253b7 620d1e402b5631577531ddf29b892679de5a37c4 d4d882fbaa21d155348a24686263c0f21e41a51b (source /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle)
+🌳 Leased worktree 1 at ~/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj. Run 'treehouse return ~/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj' to release it.
+teardown: reaping leaked worktree process(es) for task-x1: 34067
+teardown: force-killing leaked worktree process(es) for task-x1: 34067
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle sha256=bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9 tips=0aeba9f374b7c9b69c4df36384f5899d7a4253b7 620d1e402b5631577531ddf29b892679de5a37c4 d4d882fbaa21d155348a24686263c0f21e41a51b (source /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle sha256=bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9 tips=0aeba9f374b7c9b69c4df36384f5899d7a4253b7 620d1e402b5631577531ddf29b892679de5a37c4 d4d882fbaa21d155348a24686263c0f21e41a51b (source /Users/charlesabrooker/tmp/fm-live-world.AKj617/bundles/task-x1.bundle)
+
+== after ==
+nested copy: removed
+slot root dir: present
+claim: removed
+task-x1.meta: removed
+task-x1.status: removed
+task-x1.inbox: removed
+task-x1.backlog-close: removed
+task-x1.teardown-return-pending: removed
+tasktmp: removed
+--- treehouse status (after)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj  (detached)
+--- tmux windows (after)
+no server running on /private/tmp/fml.hEhXfr/tmux-501/default
+--- backlog (after)
+# Backlog
+
+## In flight
+## Queued
+- [ ] task-x1 - live lab task (kind: ship) (since 2026-11-15) (hold: fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JsZC5BS2o2MTcvYnVuZGxlcy90YXNrLXgxLmJ1bmRsZSwgcmVjb3JkZWQgdGlwcyAwYWViYTlmMzc0YjdjOWI2OWM0ZGYzNjM4NGY1ODk5ZDdhNDI1M2I3IDYyMGQxZTQwMmI1NjMxNTc3NTMxZGRmMjliODkyNjc5ZGU1YTM3YzQgZDRkODgyZmJhYTIxZDE1NTM0OGEyNDY4NjI2M2MwZjIxZTQxYTUxYi4=) (hold-kind: captain)
+  Captain hold set: 2026-11-15T20:32:16Z
+  Decision owner: captain
+
+  Deliverable of the finished work: dropped
+## Done
+--- umask during run: 0022
+--- data/task-x1 file modes (after)
+600 task-x1/captain-drop.md
+600 task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle
+644 task-x1/preservation-bundles.tsv
+--- snapshot diff (before -> after)
+2,7c2,7
+< file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/task-x1.backlog-close 5eb6d0989180a59c
+< dir /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/task-x1.inbox
+< file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/task-x1.inbox/001.msg f17d0901cfc94e01
+< file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/task-x1.meta a68459eafffcb4e0
+< file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/task-x1.status 9399a0c552b1b4b7
+< file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+---
+> file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/.treehouse-project-5a3b246fbafc8d9b82977d160f671c8c7bc24254.lock.holds c9cab29f654e87c6
+> dir /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/.treehouse-project-5a3b246fbafc8d9b82977d160f671c8c7bc24254.lock.queue
+> file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/.treehouse-project-5a3b246fbafc8d9b82977d160f671c8c7bc24254.lock.queue/sequence 1121cfccd5913f0a
+> file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/guard-events.jsonl ed629470e84cc20a
+> file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/task-x1.teardown-processes 2090f00f4d944110
+> dir /Users/charlesabrooker/tmp/fm-lab.OLGxOO/state/terminal-outcomes
+9c9
+< file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/backlog.md c26724865ed3987f
+---
+> file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/backlog.md acc31ba6cae00591
+10a11
+> file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/captain-drop.md e223d72ddd8334bd
+12,21c13,16
+< dir /Users/charlesabrooker/tmp/fm-live-world.AKj617/tasktmp
+< file /tasktmp/scratch.txt a27110a155b1dd07
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/copy.txt 3a13555e294d9cbe
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/slot.txt 683b7f716e60454c
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/copy.txt 3a13555e294d9cbe
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2/slot.txt 683b7f716e60454c
+---
+> dir /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles
+> file /Users/charlesabrooker/tmp/fm-lab.OLGxOO/data/task-x1/preserved-bundles/bf108f33db85216fa87d5e2041a74ecc23e437d7a11d82f82568b52cd00ac7d9.bundle bf108f33db85216f
+> absent /Users/charlesabrooker/tmp/fm-live-world.AKj617/tasktmp
+> tree /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/.claude/worktrees/task-x1-v2 absent
+24,26c19,20
+< file /Users/charlesabrooker/tmp/fm-live-world.AKj617/th/.treehouse/proj-0e8ca8/1/proj/slot.txt 683b7f716e60454c
+< nested-head d4d882fbaa21d155348a24686263c0f21e41a51b
+< slot-head 0aeba9f374b7c9b69c4df36384f5899d7a4253b7
+---
+> nested-head absent
+> slot-head 620d1e402b5631577531ddf29b892679de5a37c4
+29,30c23,24
+< claim task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.OLGxOO 
+< tmux-windows firstmate:fm-task-x1 
+---
+> claim absent
+> tmux-windows 

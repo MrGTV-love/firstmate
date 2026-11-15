@@ -1,0 +1,24 @@
+dir /Users/charlesabrooker/tmp/fm-lab.2FsjiH/state
+file /Users/charlesabrooker/tmp/fm-lab.2FsjiH/state/task-x1.backlog-close f466006b4197e788
+dir /Users/charlesabrooker/tmp/fm-lab.2FsjiH/state/task-x1.inbox
+file /Users/charlesabrooker/tmp/fm-lab.2FsjiH/state/task-x1.inbox/001.msg f17d0901cfc94e01
+file /Users/charlesabrooker/tmp/fm-lab.2FsjiH/state/task-x1.meta e7e86c88cbb20d0a
+file /Users/charlesabrooker/tmp/fm-lab.2FsjiH/state/task-x1.status 9399a0c552b1b4b7
+file /Users/charlesabrooker/tmp/fm-lab.2FsjiH/state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+dir /Users/charlesabrooker/tmp/fm-lab.2FsjiH/data
+file /Users/charlesabrooker/tmp/fm-lab.2FsjiH/data/backlog.md 2936f303ee158e8f
+dir /Users/charlesabrooker/tmp/fm-live-world.miQ75B/tasktmp
+file /tasktmp/scratch.txt a27110a155b1dd07
+file /Users/charlesabrooker/tmp/fm-live-world.miQ75B/th/.treehouse/proj-74e70d/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.miQ75B/th/.treehouse/proj-74e70d/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.miQ75B/th/.treehouse/proj-74e70d/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.miQ75B/th/.treehouse/proj-74e70d/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.miQ75B/th/.treehouse/proj-74e70d/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.miQ75B/th/.treehouse/proj-74e70d/1/proj/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.miQ75B/th/.treehouse/proj-74e70d/1/proj/slot.txt 683b7f716e60454c
+nested-head 3f28e2fe5acd0647b1020e86f21bba4570d2ef57
+slot-head 9def3c04e2cbd589ff8337297b530c3f74af817b
+ref refs/heads/fm/task-x1-v2 3f28e2fe5acd0647b1020e86f21bba4570d2ef57
+ref refs/heads/main 3f28e2fe5acd0647b1020e86f21bba4570d2ef57
+claim task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.2FsjiH 
+tmux-windows firstmate:fm-task-x1 

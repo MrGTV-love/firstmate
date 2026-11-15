@@ -1,0 +1,9 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-src.qFQ63C/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+worktree /Users/charlesabrooker/tmp/fm-live-world.FlR5FB/th/.treehouse/proj-3604e4/1/proj/.claude/worktrees/task-x1-v2 is not managed by treehouse
+error: treehouse return failed for worktree /Users/charlesabrooker/tmp/fm-live-world.FlR5FB/th/.treehouse/proj-3604e4/1/proj/.claude/worktrees/task-x1-v2; teardown aborted

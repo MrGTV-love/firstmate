@@ -1,0 +1,23 @@
+dir /Users/charlesabrooker/tmp/fm-lab.NzIy3o/state
+file /Users/charlesabrooker/tmp/fm-lab.NzIy3o/state/.treehouse-project-a769bb9c19e2af295e24576262865b4594891506.lock.holds 877209b6444ab966
+dir /Users/charlesabrooker/tmp/fm-lab.NzIy3o/state/.treehouse-project-a769bb9c19e2af295e24576262865b4594891506.lock.queue
+file /Users/charlesabrooker/tmp/fm-lab.NzIy3o/state/.treehouse-project-a769bb9c19e2af295e24576262865b4594891506.lock.queue/sequence 53c234e5e8472b6a
+file /Users/charlesabrooker/tmp/fm-lab.NzIy3o/state/guard-events.jsonl a82c13f2581b6a6d
+dir /Users/charlesabrooker/tmp/fm-lab.NzIy3o/state/terminal-outcomes
+dir /Users/charlesabrooker/tmp/fm-lab.NzIy3o/data
+file /Users/charlesabrooker/tmp/fm-lab.NzIy3o/data/backlog.md 2b12086e5f4cefb2
+dir /Users/charlesabrooker/tmp/fm-lab.NzIy3o/data/task-x1
+file /Users/charlesabrooker/tmp/fm-lab.NzIy3o/data/task-x1/captain-drop.md e223d72ddd8334bd
+absent /Users/charlesabrooker/tmp/fm-live-world.6Nls9e/tasktmp
+file /Users/charlesabrooker/tmp/fm-live-world.6Nls9e/th/.treehouse/proj-24451a/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.6Nls9e/th/.treehouse/proj-24451a/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.6Nls9e/th/.treehouse/proj-24451a/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.6Nls9e/th/.treehouse/proj-24451a/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.6Nls9e/th/.treehouse/proj-24451a/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.6Nls9e/th/.treehouse/proj-24451a/1/proj/README.md 5891b5b522d5df08
+nested-head ff384755d2172f27ffde5c04338ae2bce270dfc6
+slot-head ff384755d2172f27ffde5c04338ae2bce270dfc6
+ref refs/heads/fm/task-x1-v2 ff384755d2172f27ffde5c04338ae2bce270dfc6
+ref refs/heads/main ff384755d2172f27ffde5c04338ae2bce270dfc6
+claim task=other-task home=/Users/charlesabrooker/tmp/fm-lab.NzIy3o 
+tmux-windows 

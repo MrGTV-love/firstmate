@@ -1,0 +1,19 @@
+dir /Users/charlesabrooker/tmp/fm-lab.OmwynY/state
+file /Users/charlesabrooker/tmp/fm-lab.OmwynY/state/.treehouse-project-c50f9112cc999893050cd3c70e3130e0f3b7d21b.lock.holds bce9c812e64b6791
+dir /Users/charlesabrooker/tmp/fm-lab.OmwynY/state/.treehouse-project-c50f9112cc999893050cd3c70e3130e0f3b7d21b.lock.queue
+file /Users/charlesabrooker/tmp/fm-lab.OmwynY/state/.treehouse-project-c50f9112cc999893050cd3c70e3130e0f3b7d21b.lock.queue/sequence 1121cfccd5913f0a
+file /Users/charlesabrooker/tmp/fm-lab.OmwynY/state/guard-events.jsonl c77a97942b854342
+file /Users/charlesabrooker/tmp/fm-lab.OmwynY/state/task-x1.teardown-processes 8e0ca72dcefed149
+dir /Users/charlesabrooker/tmp/fm-lab.OmwynY/state/terminal-outcomes
+dir /Users/charlesabrooker/tmp/fm-lab.OmwynY/data
+file /Users/charlesabrooker/tmp/fm-lab.OmwynY/data/backlog.md 2f3a810ec5a673dd
+absent /Users/charlesabrooker/tmp/fm-live-world.wIWaVi/tasktmp
+tree /Users/charlesabrooker/tmp/fm-live-world.wIWaVi/th/.treehouse/proj-2aaae7/1/proj/.claude/worktrees/task-x1-v2 absent
+file /Users/charlesabrooker/tmp/fm-live-world.wIWaVi/th/.treehouse/proj-2aaae7/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.wIWaVi/th/.treehouse/proj-2aaae7/1/proj/README.md 5891b5b522d5df08
+nested-head absent
+slot-head e125123f4eab2bd1d5c8817cfa6ab340bb422b70
+ref refs/heads/fm/task-x1-v2 e125123f4eab2bd1d5c8817cfa6ab340bb422b70
+ref refs/heads/main e125123f4eab2bd1d5c8817cfa6ab340bb422b70
+claim absent
+tmux-windows 

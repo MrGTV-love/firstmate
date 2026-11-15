@@ -1,0 +1,24 @@
+dir /Users/charlesabrooker/tmp/fm-lab.tiHHdo/state
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/state/.treehouse-project-af0f1442f7cafa297113e21ce6d2add3386ef5eb.lock.holds ed4fc244843f2ecf
+dir /Users/charlesabrooker/tmp/fm-lab.tiHHdo/state/.treehouse-project-af0f1442f7cafa297113e21ce6d2add3386ef5eb.lock.queue
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/state/.treehouse-project-af0f1442f7cafa297113e21ce6d2add3386ef5eb.lock.queue/sequence 1121cfccd5913f0a
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/state/guard-events.jsonl b9270088e5a98578
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/state/task-x1.teardown-processes ba7fc51753db2699
+dir /Users/charlesabrooker/tmp/fm-lab.tiHHdo/state/terminal-outcomes
+dir /Users/charlesabrooker/tmp/fm-lab.tiHHdo/data
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/data/backlog.md 10a0cd10fb52e3bd
+dir /Users/charlesabrooker/tmp/fm-lab.tiHHdo/data/task-x1
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/data/task-x1/captain-drop.md e223d72ddd8334bd
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/data/task-x1/preservation-bundles.tsv aaaaac701f261bed
+dir /Users/charlesabrooker/tmp/fm-lab.tiHHdo/data/task-x1/preserved-bundles
+file /Users/charlesabrooker/tmp/fm-lab.tiHHdo/data/task-x1/preserved-bundles/edb104d12f68ceb4c38abb4c28d25c5602b8ef577c2ca4cb58a1235b63e69944.bundle edb104d12f68ceb4
+absent /Users/charlesabrooker/tmp/fm-live-world.mHvxvd/tasktmp
+tree /Users/charlesabrooker/tmp/fm-live-world.mHvxvd/th/.treehouse/proj-f45fc1/1/proj/.claude/worktrees/task-x1-v2 absent
+file /Users/charlesabrooker/tmp/fm-live-world.mHvxvd/th/.treehouse/proj-f45fc1/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.mHvxvd/th/.treehouse/proj-f45fc1/1/proj/README.md 5891b5b522d5df08
+nested-head absent
+slot-head a8133cd6b309ab55203a3a0bfab291d6031a5737
+ref refs/heads/fm/task-x1-v2 a3de04d07092bc7ba6b0918f11f472e6434ef12a
+ref refs/heads/main a8133cd6b309ab55203a3a0bfab291d6031a5737
+claim absent
+tmux-windows 

@@ -1,0 +1,21 @@
+dir /Users/charlesabrooker/tmp/fm-lab.Ox2jEq/state
+dir /Users/charlesabrooker/tmp/fm-lab.Ox2jEq/state/task-x1.inbox
+file /Users/charlesabrooker/tmp/fm-lab.Ox2jEq/state/task-x1.inbox/001.msg f17d0901cfc94e01
+file /Users/charlesabrooker/tmp/fm-lab.Ox2jEq/state/task-x1.meta 0487618b14c6d465
+file /Users/charlesabrooker/tmp/fm-lab.Ox2jEq/state/task-x1.status 9399a0c552b1b4b7
+dir /Users/charlesabrooker/tmp/fm-lab.Ox2jEq/data
+file /Users/charlesabrooker/tmp/fm-lab.Ox2jEq/data/backlog.md 2936f303ee158e8f
+dir /Users/charlesabrooker/tmp/fm-live-world.5ncRy2/tasktmp
+file /tasktmp/scratch.txt a27110a155b1dd07
+file /Users/charlesabrooker/tmp/fm-live-world.5ncRy2/th/.treehouse/proj-3307db/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.5ncRy2/th/.treehouse/proj-3307db/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.5ncRy2/th/.treehouse/proj-3307db/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.5ncRy2/th/.treehouse/proj-3307db/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+file /Users/charlesabrooker/tmp/fm-live-world.5ncRy2/th/.treehouse/proj-3307db/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.5ncRy2/th/.treehouse/proj-3307db/1/proj/README.md 5891b5b522d5df08
+nested-head 6629113e39c574fa0791b74c5e47b45bdb0dcdfb
+slot-head 6629113e39c574fa0791b74c5e47b45bdb0dcdfb
+ref refs/heads/fm/task-x1-v2 6629113e39c574fa0791b74c5e47b45bdb0dcdfb
+ref refs/heads/main 6629113e39c574fa0791b74c5e47b45bdb0dcdfb
+claim task=other-task home=/Users/charlesabrooker/tmp/fm-lab.Ox2jEq 
+tmux-windows firstmate:fm-task-x1 

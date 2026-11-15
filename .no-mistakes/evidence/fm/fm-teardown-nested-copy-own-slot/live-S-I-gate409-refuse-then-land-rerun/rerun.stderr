@@ -1,0 +1,4 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+🌳 Leased worktree 1 at ~/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj. Run 'treehouse return ~/tmp/fm-live-world.U1unrS/th/.treehouse/proj-a68aaa/1/proj' to release it.
+teardown: reaping leaked worktree process(es) for task-x1: 72319
+teardown: force-killing leaked worktree process(es) for task-x1: 72319

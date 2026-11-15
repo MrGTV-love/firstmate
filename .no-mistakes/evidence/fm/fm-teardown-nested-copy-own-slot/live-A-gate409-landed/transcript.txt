@@ -1,0 +1,109 @@
+== setup ==
+shape=plain claim=mine variant=landed force=yes leftovers=yes
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.QRWqZS (marked lab home)
+TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th
+slot=/Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj
+nested copy=/Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2
+--- task-x1.meta
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.QRWqZS/projects/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+branch=fm/task-x1-v2
+tasktmp=/Users/charlesabrooker/tmp/fm-live-world.NqSfTl/tasktmp
+spawn_gen=live-gen-1
+--- claim
+task=task-x1
+home=/Users/charlesabrooker/tmp/fm-lab.QRWqZS
+--- treehouse status (before)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj  (detached)  (held by task-x1)
+--- tmux windows (before)
+firstmate:fm-task-x1
+--- state dir (before)
+task-x1.backlog-close
+task-x1.inbox
+task-x1.meta
+task-x1.status
+task-x1.teardown-return-pending
+
+== bin/fm-teardown.sh task-x1 --force --drop-file /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/drop.txt ==
+exit=0
+--- stdout
+🌳 Worktree returned to pool.
+proj: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj returned)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.QRWqZS/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GB1N8QYSE803GNN90Z2A4G/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+== after ==
+nested copy: removed
+slot root dir: present
+claim: removed
+task-x1.meta: removed
+task-x1.status: removed
+task-x1.inbox: removed
+task-x1.backlog-close: removed
+task-x1.teardown-return-pending: removed
+tasktmp: removed
+--- treehouse status (after)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj  (detached)
+--- tmux windows (after)
+no server running on /private/tmp/fml.RsutJM/tmux-501/default
+--- backlog (after)
+# Backlog
+
+## In flight
+## Queued
+## Done
+- [x] task-x1 - live lab task (kind: ship) (done 2026-11-15)
+  dropped
+--- snapshot diff (before -> after)
+2,7c2,6
+< file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/task-x1.backlog-close 4262f14ba889168a
+< dir /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/task-x1.inbox
+< file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/task-x1.inbox/001.msg f17d0901cfc94e01
+< file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/task-x1.meta 26779d66b67ecac0
+< file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/task-x1.status 9399a0c552b1b4b7
+< file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/task-x1.teardown-return-pending 5aa9f3fee6b5d515
+---
+> file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/.treehouse-project-34c936db4f241db7b4168072ee6a997d6266ce56.lock.holds 5db4b613b1d59c47
+> dir /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/.treehouse-project-34c936db4f241db7b4168072ee6a997d6266ce56.lock.queue
+> file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/.treehouse-project-34c936db4f241db7b4168072ee6a997d6266ce56.lock.queue/sequence 1121cfccd5913f0a
+> file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/guard-events.jsonl 2c3928b6b7e8f1c0
+> dir /Users/charlesabrooker/tmp/fm-lab.QRWqZS/state/terminal-outcomes
+9,15c8,12
+< file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/data/backlog.md 2936f303ee158e8f
+< dir /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/tasktmp
+< file /tasktmp/scratch.txt a27110a155b1dd07
+< file /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+< file /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+< file /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2/.gitignore 442787ab3b4dcc0a
+< file /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2/README.md 5891b5b522d5df08
+---
+> file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/data/backlog.md 2b12086e5f4cefb2
+> dir /Users/charlesabrooker/tmp/fm-lab.QRWqZS/data/task-x1
+> file /Users/charlesabrooker/tmp/fm-lab.QRWqZS/data/task-x1/captain-drop.md e223d72ddd8334bd
+> absent /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/tasktmp
+> tree /Users/charlesabrooker/tmp/fm-live-world.NqSfTl/th/.treehouse/proj-048a0f/1/proj/.claude/worktrees/task-x1-v2 absent
+18c15
+< nested-head c840c6b0895203a055940d8afd783d690ed83bca
+---
+> nested-head absent
+22,23c19,20
+< claim task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.QRWqZS 
+< tmux-windows firstmate:fm-task-x1 
+---
+> claim absent
+> tmux-windows 

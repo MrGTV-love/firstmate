@@ -1,0 +1,20 @@
+dir /Users/charlesabrooker/tmp/fm-lab.p763cE/state
+file /Users/charlesabrooker/tmp/fm-lab.p763cE/state/.treehouse-project-9da0e534339bd79201c870034a891630257f4c37.lock.holds 7bd561cf6a5d46ff
+dir /Users/charlesabrooker/tmp/fm-lab.p763cE/state/.treehouse-project-9da0e534339bd79201c870034a891630257f4c37.lock.queue
+file /Users/charlesabrooker/tmp/fm-lab.p763cE/state/.treehouse-project-9da0e534339bd79201c870034a891630257f4c37.lock.queue/sequence 1121cfccd5913f0a
+file /Users/charlesabrooker/tmp/fm-lab.p763cE/state/guard-events.jsonl fef4e5b559772dd7
+dir /Users/charlesabrooker/tmp/fm-lab.p763cE/state/terminal-outcomes
+dir /Users/charlesabrooker/tmp/fm-lab.p763cE/data
+file /Users/charlesabrooker/tmp/fm-lab.p763cE/data/backlog.md 2b12086e5f4cefb2
+dir /Users/charlesabrooker/tmp/fm-lab.p763cE/data/task-x1
+file /Users/charlesabrooker/tmp/fm-lab.p763cE/data/task-x1/captain-drop.md e223d72ddd8334bd
+absent /Users/charlesabrooker/tmp/fm-live-world.wwiirY/tasktmp
+tree /Users/charlesabrooker/tmp/fm-live-world.wwiirY/th/.treehouse/proj-890e3f/1/proj/.claude/worktrees/task-x1-v2 absent
+file /Users/charlesabrooker/tmp/fm-live-world.wwiirY/th/.treehouse/proj-890e3f/1/proj/.gitignore 442787ab3b4dcc0a
+file /Users/charlesabrooker/tmp/fm-live-world.wwiirY/th/.treehouse/proj-890e3f/1/proj/README.md 5891b5b522d5df08
+nested-head absent
+slot-head 884a1fab0e5af1028f95da9d48d955b0ab53630f
+ref refs/heads/fm/task-x1-v2 884a1fab0e5af1028f95da9d48d955b0ab53630f
+ref refs/heads/main 884a1fab0e5af1028f95da9d48d955b0ab53630f
+claim absent
+tmux-windows 

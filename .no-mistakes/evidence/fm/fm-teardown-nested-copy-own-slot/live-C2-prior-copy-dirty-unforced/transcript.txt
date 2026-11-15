@@ -1,0 +1,77 @@
+== setup ==
+shape=prior claim=mine variant=copy-dirty force=no leftovers=yes
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.MlGKMs (marked lab home)
+TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-live-world.U865wH/th
+slot=/Users/charlesabrooker/tmp/fm-live-world.U865wH/th/.treehouse/proj-2a50b7/1/proj
+nested copy=/Users/charlesabrooker/tmp/fm-live-world.U865wH/th/.treehouse/proj-2a50b7/1/proj/.claude/worktrees/task-x1-v2
+--- task-x1.meta
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-live-world.U865wH/th/.treehouse/proj-2a50b7/1/proj/.claude/worktrees/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.MlGKMs/projects/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+branch=fm/task-x1-v2
+tasktmp=/Users/charlesabrooker/tmp/fm-live-world.U865wH/tasktmp
+spawn_gen=live-gen-1
+prior_worktree=/Users/charlesabrooker/tmp/fm-live-world.U865wH/th/.treehouse/proj-2a50b7/1/proj
+--- claim
+task=task-x1
+home=/Users/charlesabrooker/tmp/fm-lab.MlGKMs
+--- treehouse status (before)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-world.U865wH/th/.treehouse/proj-2a50b7/1/proj  (detached)  (held by task-x1)
+--- tmux windows (before)
+firstmate:fm-task-x1
+--- state dir (before)
+task-x1.backlog-close
+task-x1.inbox
+task-x1.meta
+task-x1.status
+task-x1.teardown-return-pending
+
+== bin/fm-teardown.sh task-x1 ==
+exit=1
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GB1N8QYSE803GNN90Z2A4G/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-live-world.U865wH/th/.treehouse/proj-2a50b7/1/proj/.claude/worktrees/task-x1-v2 has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+
+== after ==
+nested copy: kept
+slot root dir: present
+claim: kept
+task-x1.meta: kept
+task-x1.status: kept
+task-x1.inbox: kept
+task-x1.backlog-close: kept
+task-x1.teardown-return-pending: kept
+tasktmp: kept
+--- treehouse status (after)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-world.U865wH/th/.treehouse/proj-2a50b7/1/proj  (detached)  (held by task-x1)
+--- tmux windows (after)
+firstmate:fm-task-x1
+--- backlog (after)
+# Backlog
+
+## In flight
+- [ ] task-x1 - live lab task (kind: ship) (since 2026-11-15)
+
+## Queued
+## Done
+--- snapshot diff (before -> after)
+1a2,5
+> file /Users/charlesabrooker/tmp/fm-lab.MlGKMs/state/.treehouse-project-c036d402c919a37ab224f7bd834f5df3d5a2ecdd.lock.holds bb325a58ec2fdfe2
+> dir /Users/charlesabrooker/tmp/fm-lab.MlGKMs/state/.treehouse-project-c036d402c919a37ab224f7bd834f5df3d5a2ecdd.lock.queue
+> file /Users/charlesabrooker/tmp/fm-lab.MlGKMs/state/.treehouse-project-c036d402c919a37ab224f7bd834f5df3d5a2ecdd.lock.queue/sequence 4355a46b19d348dc
+> file /Users/charlesabrooker/tmp/fm-lab.MlGKMs/state/guard-events.jsonl 56f323a8e7bae064
