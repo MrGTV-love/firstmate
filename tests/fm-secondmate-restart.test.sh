@@ -556,6 +556,9 @@ case "${rargs[1]:-}" in
       [ -z "$corr" ] || printf 'done [%s]: open records written down\n' "$corr" \
         >> "$FM_FAKE_ANSWER_STATUS"
     fi
+    # Main 1874 (i): the host recorded the steer but withheld its doorbell.
+    [ ! -f "$FM_FAKE_DIR/withhold-doorbell" ] \
+      || printf 'notice: doorbell withheld: the record or the agent at %s is no longer the one this steer was checked against, so the pane was not rung; the steer stays durably recorded at /synthetic/inbox for the next agent that reads its inbox\n' "$host_target" >&2
     # A barrier after the persistence request, before the relaunch.
     [ -z "${FM_FAKE_AFTER_SEND:-}" ] || "$FM_FAKE_AFTER_SEND"
     ;;
@@ -855,6 +858,23 @@ test_remote_delivery_uses_the_compared_route() {
       || fail "$case: input reached a local pane: $(cat "$dir/fake/literal")"
   done
   pass "a remote restart delivers only over the route it compared: a registry, record, endpoint or placement change after the decision refuses at a check that runs before any expectation exists"
+}
+
+# --- Main 1874 (i): a withheld doorbell is reported, not dropped ------------
+# The host records the persistence request but withholds its doorbell; the
+# restart says so for that mate, and the pass otherwise goes on as delivered.
+test_remote_withheld_doorbell_is_reported() {
+  local dir out rc
+  dir=$(new_case remote-withheld)
+  setup_remote_case "$dir" sm2 ok
+  : > "$dir/fake/withhold-doorbell"
+  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+  out=$(run_restart "$dir" sm2); rc=$?
+  unset FM_FAKE_ANSWER_STATUS
+  assert_contains "$out" "notice: sm2: the request to write down its open work is recorded, but doorbell withheld:" \
+    "a withheld doorbell must be reported for the mate"$'\n'"$out"
+  expect_code 0 "$rc" "a recorded request whose doorbell was withheld is still delivered"$'\n'"$out"
+  pass "Main 1874 (i) a withheld doorbell on the persistence request is reported"
 }
 
 # --- Main 1807 (6): an early capability refusal keeps its first route --------
@@ -1351,6 +1371,7 @@ test_remote_backend_other_than_herdr_refuses_before_any_effect
 test_remote_omitted_backend_is_herdr_and_obeys_its_host
 test_remote_attribution_is_bound_to_the_recorded_route
 test_remote_delivery_uses_the_compared_route
+test_remote_withheld_doorbell_is_reported
 test_remote_relaunch_uses_the_compared_route
 test_early_capability_fallback_keeps_the_first_route
 test_remote_fleet_restart_obeys_initiating_policy
