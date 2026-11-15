@@ -39,8 +39,11 @@
 # A pushed branch is recoverable work, not a delivered result.
 # A ship has landed only when its content is in the default branch: its PR is
 # merged and the copy's HEAD is exactly the merged head and that head is in the
-# default branch, or the copy's content is already present in the up-to-date
-# default branch (merging the copy into it changes nothing). A task whose meta
+# default branch's history, or the copy's content is already present in the
+# default branch (merging the copy into it changes nothing). Both read the
+# default branch fetched just before (Main 1820 F2): a cached ref is never used,
+# and a fetch that fails refuses. A head in the default branch's history stays
+# landed when a later commit drops its change (Main 1820 F1). A task whose meta
 # records base_branch= (bin/fm-spawn.sh) runs that content check against origin's
 # copy of its base branch instead of the default branch. Matching a commit
 # somewhere in the PR's history proves nothing (Main 1686 F1): a PR can replay a
@@ -48,8 +51,14 @@
 # count, and a later change on the default branch to the same lines makes the merge
 # differ, so teardown refuses (refusing is safe; a wrong landed verdict loses
 # work). A refusal names the copy's commits the default branch does not hold.
-# With no pr=, every PR the branch lookup lists is judged in turn, newest first,
-# and a lookup that cannot show it listed every PR is refused. A copy that was a
+# With no pr=, every PR the branch lookup lists is judged in turn, newest first.
+# The lookup asks for one PR more than its bound of 1000, and a full page, a cut
+# list or a failed call is incomplete: no PR is judged from it, and its reason is
+# named in the refusal, never read as "no PR" (Main 1820 F4(a)). The content
+# check above still decides on its own, since it is independent proof (F4(c)).
+# A PR found this way is recorded as the completion PR only when its merged head
+# is the copy's HEAD; a copy landed by its content alone records none (F4(b)).
+# A copy that was a
 # no-mistakes run's input is judged the same way: the run record alone does not
 # land it, because a merged pushed head can still have lost the change later in the
 # PR (Main 1688 Q2), so only the content check above decides.
@@ -170,10 +179,11 @@
 # removed: teardown_nested_slot judges it first by its branch= ref.
 # After landing and runtime cleanup pass, ship teardown also reaps only local
 # archive/<task>-{submitted,pipeline}-<8 lowercase hex> branches whose exact head
-# is an ancestor of the merged PR head, or whose non-merge commits all have
-# equivalent patches in that head.
-# The PR head must match its forge-reported merge commit on every changed path.
-# Forced discard, unavailable proof, non-ancestor merge commits, checked-out
+# the default branch, refreshed first, holds: in its history, or with merging
+# the head into it changing nothing (Main 1820 F3). A patch matched in the PR's
+# history is not enough, since a later commit can revert it.
+# The merged PR head must also match its forge-reported merge commit on every
+# changed path. Forced discard, unavailable proof, a refresh that fails, checked-out
 # archives, an archive that is a symbolic ref or a filesystem symlink, or a
 # concurrently moved ref keep the archive and name it; another
 # task's refs and records-only shared/reassigned slots remain untouched.
@@ -2335,37 +2345,31 @@ remove_pr_poll_artifacts() {
   fm_check_stop_episode_clear "$state_dir" "$id"
 }
 
-# Every PR number the forge lists for <branch>, newest first, one per line. A
-# branch can have several PRs (an older merged one and a newer open one), so the
-# landed proof judges each in turn, and it must see all of them (Main 1686 F2): the
-# list is asked for with a bound far above any real branch and is accepted only when
-# its count line shows it is complete ("count: N", or "count: N of N total") and N
-# PR rows follow. A list that is cut short, an unrecognized count line, a row count
-# that differs, or a failed call refuses: non-zero with TEARDOWN_LANDED_UNASKED
-# naming why. No PR at all is non-zero with nothing unasked.
-TEARDOWN_PR_LIST_LIMIT=1000
+# Every PR number the forge lists for <branch>, newest first, in
+# TEARDOWN_PR_NUMBERS (one per line). A branch can have several PRs (an older
+# merged one and a newer open one), so the landed proof judges each in turn, and
+# it must see all of them (Main 1686 F2). The list is asked for with one row more
+# than a bound far above any real branch, and fm_task_copy_pr_list_read accepts
+# it only when it is shown complete within that bound; a full page, a cut list or
+# a failed call is incomplete, never "no PR" (Main 1820 F4(a)): non-zero with
+# TEARDOWN_LANDED_UNASKED naming why. No PR at all is non-zero with nothing
+# unasked. It sets globals rather than printing, so the reason reaches the caller.
+TEARDOWN_PR_LIST_BOUND=1000
+TEARDOWN_PR_NUMBERS=
 pr_numbers_from_branch() {
-  local branch=$1 out count total numbers rows
+  local branch=$1 out rc=0
+  TEARDOWN_PR_NUMBERS=
   [ -n "$branch" ] && [ "$branch" != HEAD ] || return 1
-  out=$( cd "${TEARDOWN_LANDED_DIR:-$WT}" && gh-axi pr list --state all --head "$branch" --limit "$TEARDOWN_PR_LIST_LIMIT" 2>/dev/null ) || {
+  out=$( cd "${TEARDOWN_LANDED_DIR:-$WT}" && gh-axi pr list --state all --head "$branch" --limit "$((TEARDOWN_PR_LIST_BOUND + 1))" 2>/dev/null ) || {
     TEARDOWN_LANDED_UNASKED="the PR list for branch $branch could not be read"
     return 1
   }
-  count=$(printf '%s\n' "$out" | sed -n '1s/^count: \([0-9][0-9]*\)$/\1/p')
-  total=$count
-  if [ -z "$count" ]; then
-    count=$(printf '%s\n' "$out" | sed -n '1s/^count: \([0-9][0-9]*\) of [0-9][0-9]* total$/\1/p')
-    total=$(printf '%s\n' "$out" | sed -n '1s/^count: [0-9][0-9]* of \([0-9][0-9]*\) total$/\1/p')
-  fi
-  numbers=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p')
-  rows=$(printf '%s' "$numbers" | grep -c . || true)
-  if [ -z "$count" ] || [ -z "$total" ] || [ "$count" != "$total" ] || [ "$rows" != "$count" ] \
-    || [ "$count" -ge "$TEARDOWN_PR_LIST_LIMIT" ]; then
-    TEARDOWN_LANDED_UNASKED="the PR list for branch $branch is not shown complete (count line: $(printf '%s\n' "$out" | head -1); $rows rows)"
-    return 1
-  fi
-  [ "$count" -gt 0 ] || return 1
-  printf '%s\n' "$numbers"
+  fm_task_copy_pr_list_read "$TEARDOWN_PR_LIST_BOUND" "$out" || rc=$?
+  case "$rc" in
+    0) TEARDOWN_PR_NUMBERS=$FM_TASK_COPY_PR_NUMBERS ;;
+    1) return 1 ;;
+    *) TEARDOWN_LANDED_UNASKED="branch $branch: $FM_TASK_COPY_UNASKED"; return 1 ;;
+  esac
 }
 
 pr_number_from_target() {
@@ -2400,20 +2404,24 @@ ensure_commit_object() {
   git -C "$dir" cat-file -e "$commit^{commit}" 2>/dev/null
 }
 
-# The default-branch ref that already-landed history is read from, resolved the
-# way fm_task_copy_content_in_default resolves it but without fetching: origin's
-# copy when the copy has an origin remote, else the local branch. A stale ref is
-# still sound because every commit reachable from it is in the default branch.
+# The default-branch ref that already-landed history is read from, refreshed
+# first (Main 1820 F2): fm_task_copy_refresh_default fetches origin's copy when the
+# copy has an origin remote, else reads the local branch, and a failed refresh is
+# no answer. TEARDOWN_DEFAULT_REF names it on success; on failure
+# TEARDOWN_LANDED_UNASKED says why, and no proof may use a cached ref.
+TEARDOWN_DEFAULT_REF=
 landed_default_ref() {
-  local name=${BASE_BRANCH:-} ref dir=${TEARDOWN_LANDED_DIR:-$WT}
-  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || return 1
-  if git -C "$dir" remote get-url origin >/dev/null 2>&1; then
-    ref="refs/remotes/origin/$name"
-  else
-    ref="refs/heads/$name"
-  fi
-  git -C "$dir" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || return 1
-  printf '%s\n' "$ref"
+  local name=${BASE_BRANCH:-} dir=${TEARDOWN_LANDED_DIR:-$WT}
+  TEARDOWN_DEFAULT_REF=
+  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || {
+    TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-the default branch of $PROJ could not be named}
+    return 1
+  }
+  fm_task_copy_refresh_default "$dir" "$name" || {
+    TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
+    return 1
+  }
+  TEARDOWN_DEFAULT_REF=$FM_TASK_COPY_DEFAULT_REF
 }
 
 # One "<short sha> <subject>" line per commit whose change the default branch was
@@ -2463,7 +2471,8 @@ pr_is_merged() {
     pr_is_merged_target "$PR_URL"
     return
   fi
-  targets=$(pr_numbers_from_branch "$branch") || return 1
+  pr_numbers_from_branch "$branch" || return 1
+  targets=$TEARDOWN_PR_NUMBERS
   while IFS= read -r target; do
     [ -n "$target" ] || continue
     pr_is_merged_target "$target" && return 0
@@ -2511,23 +2520,32 @@ pr_is_merged_target() {
   current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
   # Landed means present in the default branch's final content (Main 1686 F1),
   # never matched somewhere in the PR's history: a PR can replay a change and then
-  # revert it. The copy is landed when it is exactly the merged head and that head
-  # is in the default branch, or when merging the copy into the default branch
-  # changes nothing (fm_task_copy_content_in_default). A later change on the
-  # default branch to the same lines makes that merge differ, and teardown refuses.
-  default_ref=$(landed_default_ref) || default_ref=
-  if [ "$current" = "$head" ] && [ -n "$default_ref" ] \
-    && git -C "$dir" merge-base --is-ancestor "$head" "$default_ref" 2>/dev/null; then
-    landed=1
-  elif fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"; then
-    landed=1
-  else
-    [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
-    TEARDOWN_UNPROVEN_COMMITS=$(teardown_commits_beyond_default "$dir" "$ref" "$default_ref")
+  # revert it. Both proofs read the default branch refreshed just now, never a
+  # cached ref (Main 1820 F2), and a failed refresh refuses. The copy is landed
+  # when it is exactly the merged head and that head is in the default branch's
+  # history (Main 1688 Q1; a later commit that drops its change does not undo
+  # that, Main 1820 F1), or when merging the copy into the default branch changes
+  # nothing (fm_task_copy_content_in_default). A later change on the default
+  # branch to the same lines makes that merge differ, and teardown refuses.
+  default_ref=
+  if landed_default_ref; then
+    default_ref=$TEARDOWN_DEFAULT_REF
+    if [ "$current" = "$head" ] && git -C "$dir" merge-base --is-ancestor "$head" "$default_ref" 2>/dev/null; then
+      landed=1
+    elif fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" no-fetch; then
+      landed=1
+    else
+      [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
+    fi
   fi
-  [ "$landed" = 1 ] || return 1
-  if [ -z "$PR_URL" ]; then
-    [ -n "$resolved_url" ] || return 1
+  if [ "$landed" != 1 ]; then
+    TEARDOWN_UNPROVEN_COMMITS=$(teardown_commits_beyond_default "$dir" "$ref" "$default_ref")
+    return 1
+  fi
+  # A PR found by the branch is recorded as this copy's completion PR only when
+  # its merged head is the copy's HEAD (Main 1820 F4(b)); a copy that landed by
+  # its content alone records none. A recorded pr= stays as it is.
+  if [ -z "$PR_URL" ] && [ "$current" = "$head" ] && [ -n "$resolved_url" ]; then
     PR_URL=$resolved_url
   fi
   return 0
@@ -2650,7 +2668,9 @@ teardown_retire_slot_manifest() {  # <slot>
 
 # Archive cleanup needs its own stricter proof, not the general landed proof:
 # the forge's merged PR head must match its merge commit on every path either
-# side changed. Keep filenames NUL-delimited and literal, including deletions.
+# side changed, and each archive tip must then be held by the refreshed default
+# branch (fm_task_copy_archive_carried). Keep filenames NUL-delimited and
+# literal, including deletions.
 TEARDOWN_ARCHIVE_PR_HEAD=
 task_archive_pr_matches_merge() {
   local target=$1 view state head merge parent base paths_file path
@@ -2684,7 +2704,7 @@ task_archive_pr_matches_merge() {
 }
 
 reap_task_archive_branches() {
-  local refs ref sha symref branch target targets head cherry merges checked_out common reason
+  local refs ref sha symref branch target targets head checked_out common reason name default_ref
   local hex8='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
   [ "$KIND" = ship ] && teardown_owns_worktree || return 0
   refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname) %(symref)' \
@@ -2702,7 +2722,8 @@ reap_task_archive_branches() {
     if [ -n "$PR_URL" ]; then
       targets=$PR_URL
     else
-      targets=$(pr_numbers_from_branch "$(teardown_record_branch)") || targets=
+      targets=
+      ! pr_numbers_from_branch "$(teardown_record_branch)" || targets=$TEARDOWN_PR_NUMBERS
     fi
     while IFS= read -r target; do
       [ -n "$target" ] || continue
@@ -2714,6 +2735,19 @@ reap_task_archive_branches() {
     done <<EOF
 $targets
 EOF
+  fi
+  # An archive goes only when the default branch, refreshed now, holds its tip
+  # by history or by content (Main 1820 F3); a patch matched in the PR's history
+  # is not enough, because a later commit can revert it.
+  default_ref=
+  if [ -z "$reason" ]; then
+    name=${BASE_BRANCH:-}
+    [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || name=
+    if [ -n "$name" ] && fm_task_copy_refresh_default "$PROJ" "$name"; then
+      default_ref=$FM_TASK_COPY_DEFAULT_REF
+    else
+      reason="the default branch could not be refreshed"
+    fi
   fi
   checked_out=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null) \
     || reason="checked-out branch inventory could not be read"
@@ -2734,25 +2768,14 @@ EOF
       echo "notice: keeping $branch (checked out in a local copy)" >&2
       continue
     fi
-    if ! git -C "$PROJ" merge-base --is-ancestor "$sha" "$head" 2>/dev/null; then
-      # git cherry omits merge commits, so it alone cannot prove a merge's edits.
-      # Non-ancestor merges stay archived rather than being silently discarded.
-      if ! merges=$(git -C "$PROJ" rev-list --merges "$sha" --not "$head" -- 2>/dev/null) \
-         || [ -n "$merges" ] \
-         || ! cherry=$(git -C "$PROJ" cherry "$head" "$sha" 2>/dev/null); then
-        echo "notice: keeping $branch (archive history is not proven carried by the merged PR head)" >&2
-        continue
-      fi
-      case "$cherry" in
-        +*|*$'\n+'*)
-          echo "notice: keeping $branch (archive patches are not all carried by the merged PR head)" >&2
-          continue ;;
-      esac
+    if ! fm_task_copy_archive_carried "$PROJ" "$default_ref" "$sha"; then
+      echo "notice: keeping $branch (the default branch does not hold its change)" >&2
+      continue
     fi
     # The expected old value prevents a concurrently moved archive from being
     # deleted on proof about its previous head. Never detach another copy.
     if git -C "$PROJ" update-ref --no-deref -d "$ref" "$sha" 2>/dev/null; then
-      echo "teardown: reaped $branch (carried by the merged PR lineage)" >&2
+      echo "teardown: reaped $branch (the default branch holds its change)" >&2
     else
       echo "notice: keeping $branch (archive deletion could not be completed at its proven head)" >&2
     fi
@@ -3258,6 +3281,7 @@ validate_worktree_teardown_safety() {
     "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
       [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
       [ -z "$TEARDOWN_UNPROVEN_COMMITS" ] || printf 'commits whose change the default branch does not hold:\n%s\n' "$TEARDOWN_UNPROVEN_COMMITS" >&2
+      [ -z "$TEARDOWN_LANDED_UNASKED" ] || printf 'the landing proof could not be completed: %s\n' "$TEARDOWN_LANDED_UNASKED" >&2
       if [ "$MODE" = local-only ]; then
         echo "Merge the branch into local $(fm_task_copy_default_branch "$PROJ" 2>/dev/null || echo main) first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
       else

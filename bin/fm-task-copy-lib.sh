@@ -149,6 +149,80 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   [ "$merged_tree" = "$default_tree" ]
 }
 
+# The default branch's current tip in <dir>, read fresh: with an origin remote,
+# refs/remotes/origin/<branch> is fetched first and a failed fetch is no answer, so
+# a cached ref is never taken as the default branch (Main 1820 F2); without one,
+# the local branch. FM_TASK_COPY_DEFAULT_REF names the ref on success, and on
+# failure FM_TASK_COPY_UNASKED says why.
+FM_TASK_COPY_DEFAULT_REF=
+fm_task_copy_refresh_default() {  # <dir> <default-branch>
+  local dir=$1 name=$2
+  FM_TASK_COPY_DEFAULT_REF=
+  FM_TASK_COPY_UNASKED="the default branch of $dir could not be refreshed"
+  [ -d "$dir" ] && [ -n "$name" ] || return 1
+  if git -C "$dir" remote get-url origin >/dev/null 2>&1; then
+    git -C "$dir" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
+      FM_TASK_COPY_UNASKED="origin/$name could not be refreshed"
+      return 1
+    }
+    FM_TASK_COPY_DEFAULT_REF="refs/remotes/origin/$name"
+  else
+    FM_TASK_COPY_DEFAULT_REF="refs/heads/$name"
+  fi
+  git -C "$dir" rev-parse --quiet --verify "$FM_TASK_COPY_DEFAULT_REF^{commit}" >/dev/null 2>&1 || {
+    FM_TASK_COPY_DEFAULT_REF=
+    return 1
+  }
+  FM_TASK_COPY_UNASKED=
+}
+
+# Reads `gh-axi pr list` text that was asked for with --limit <bound+1>
+# (Main 1820 F4(a)). The list is complete only when its count line reads
+# "count: N" or "count: N of N total", N PR rows follow, and N is at most
+# <bound>; a full page of <bound+1> rows, a cut list, an unknown count line or a
+# row count that differs is incomplete, never "no PR". Returns 0 with
+# FM_TASK_COPY_PR_NUMBERS holding the listed numbers in order, one per line;
+# 1 for a complete list with no PR; 2 for an incomplete list, with
+# FM_TASK_COPY_UNASKED naming why.
+FM_TASK_COPY_PR_NUMBERS=
+fm_task_copy_pr_list_read() {  # <bound> <list-text>
+  local bound=$1 out=$2 first count total numbers rows
+  FM_TASK_COPY_PR_NUMBERS=
+  FM_TASK_COPY_UNASKED=
+  first=$(printf '%s\n' "$out" | sed -n '1p')
+  count=$(printf '%s\n' "$first" | sed -n 's/^count: \([0-9][0-9]*\)$/\1/p')
+  total=$count
+  if [ -z "$count" ]; then
+    count=$(printf '%s\n' "$first" | sed -n 's/^count: \([0-9][0-9]*\) of [0-9][0-9]* total$/\1/p')
+    total=$(printf '%s\n' "$first" | sed -n 's/^count: [0-9][0-9]* of \([0-9][0-9]*\) total$/\1/p')
+  fi
+  numbers=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p')
+  rows=$(printf '%s' "$numbers" | grep -c . || true)
+  if [ -z "$count" ] || [ -z "$total" ] || [ "$count" != "$total" ] || [ "$rows" != "$count" ] \
+    || [ "$count" -gt "$bound" ]; then
+    FM_TASK_COPY_UNASKED="the PR list is not shown complete (count line: $first; $rows rows; bound $bound)"
+    return 2
+  fi
+  [ "$count" -gt 0 ] || return 1
+  FM_TASK_COPY_PR_NUMBERS=$numbers
+}
+
+# 0 when the archive tip <tip> may be reaped: it is in the history of <default-ref>,
+# or merging it into <default-ref> changes nothing, so its net change is in the
+# default branch's content (Main 1820 F3). Anything else, a conflict or an error
+# included, keeps it. The caller refreshes <default-ref> first
+# (fm_task_copy_refresh_default); a patch matched somewhere in history is never
+# enough, since a later commit can revert it.
+fm_task_copy_archive_carried() {  # <dir> <default-ref> <tip>
+  local dir=$1 ref=$2 tip=$3 default_tree merged_tree
+  [ -n "$ref" ] && [ -n "$tip" ] || return 1
+  git -C "$dir" merge-base --is-ancestor "$tip" "$ref" 2>/dev/null && return 0
+  default_tree=$(git -C "$dir" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
+  merged_tree=$(git -C "$dir" merge-tree --write-tree "$ref" "$tip" 2>/dev/null) || return 1
+  merged_tree=${merged_tree%%$'\n'*}
+  [ -n "$default_tree" ] && [ "$merged_tree" = "$default_tree" ]
+}
+
 # The porcelain status lines of <copy> that are its own uncommitted work:
 # Firstmate's hook files do not count, and neither does the untracked entry of
 # each of the task's own <nested-copy> paths inside <copy>, since each of those
