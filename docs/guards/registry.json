@@ -7114,6 +7114,10 @@
         {
           "file": "bin/fm-cpu-pass.py",
           "match": "pipeline-start refused: %s"
+        },
+        {
+          "file": "bin/fm-cpu-pass.sh",
+          "match": "needs python3 to judge and admit a fresh start"
         }
       ],
       "invariant": "a Firstmate-driven fresh no-mistakes start never launches without a readable run database and CPU count",
@@ -7148,6 +7152,11 @@
         {
           "file": "bin/fm-cpu-pass.py",
           "match": "launch-gate refused: gate error: %s; %s; next action:"
+        },
+        {
+          "file": "bin/fm-cpu-pass.py",
+          "match": "refuse_visibly(text, \"launch-gate-\"",
+          "count": 2
         }
       ],
       "invariant": "a no-mistakes CI fix agent launched through the gate starts only after the pipeline-start rule admits one more active run for its run",
