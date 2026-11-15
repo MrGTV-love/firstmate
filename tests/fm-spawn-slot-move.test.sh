@@ -1387,6 +1387,96 @@ test_a_symbolic_ref_retargeted_between_same_commit_branches_fails_the_move() {
   pass "a retargeted symbolic ref fails the move"
 }
 
+# --- Main 1925 (review of 9af0ff6df): F1 a refusal after a preparation, F2 the clock seam -----------------------------------
+
+# F1: the relaunch-with-recorded-source route (and the freshen route) proves a copy AFTER the preparation wrote a detach or an
+# anchor, then moves it through fm_slot_move_forward. The proof must not clear the preparation's state, so a git refusal is still
+# a failure (1) that names what was written, never a skip (20).
+refuse_through_move_forward() { # <name> <attached|detached>: prepare first, then fm_slot_move_forward with a git that refuses the merge
+  if [ "$2" = detached ]; then
+    anchor_world "$1"
+  else
+    make_branch_slot "$1"
+    advance_origin advanced.txt
+    fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the first proof did not pass"
+    fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid || fail "the preparation failed"
+  fi
+  local bin="$W_DIR/refuse-mf" real_git
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  REFUSE_RC=0
+  REFUSE_OUT=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || REFUSE_RC=$?
+  [ "$2" != detached ] || anchor_world_done
+}
+
+test_a_refusal_after_a_detach_through_move_forward_is_a_failure_that_names_the_detach() {
+  refuse_through_move_forward f1-detach attached
+  [ "$REFUSE_RC" = 1 ] || fail "a refusal after this spawn detached the copy returned $REFUSE_RC, not the failure code 1: $REFUSE_OUT"
+  assert_contains "$REFUSE_OUT" "detached" "the output did not name the detach"
+  assert_not_contains "$REFUSE_OUT" "was not moved (not_fast_forward)" "the refusal was reported as a skip"
+  pass "a refusal after a detach, through fm_slot_move_forward, is a failure that names the detach"
+}
+
+test_a_refusal_after_an_anchor_through_move_forward_is_a_failure_that_names_the_anchor() {
+  refuse_through_move_forward f1-anchor detached
+  [ "$REFUSE_RC" = 1 ] || fail "a refusal after this spawn wrote an anchor returned $REFUSE_RC, not the failure code 1: $REFUSE_OUT"
+  assert_contains "$REFUSE_OUT" "refs/fm/anchor/tid-" "the output did not name the anchor"
+  assert_not_contains "$REFUSE_OUT" "was not moved (not_fast_forward)" "the refusal was reported as a skip"
+  pass "a refusal after an anchor, through fm_slot_move_forward, is a failure that names the anchor"
+}
+
+test_a_refusal_after_a_preparation_leaves_the_copy_unchanged_through_move_forward() {
+  refuse_through_move_forward f1-unchanged detached
+  [ "$REFUSE_RC" = 1 ] || fail "returned $REFUSE_RC: $REFUSE_OUT"
+  [ "$(git -C "$W_SLOT" rev-parse HEAD)" = "$W_BASE" ] || fail "HEAD moved"
+  ! git -C "$W_SLOT" symbolic-ref -q HEAD >/dev/null || fail "the copy was switched onto a branch"
+  pass "a refusal after a preparation, through fm_slot_move_forward, leaves the copy as it is"
+}
+
+# The control for F1: a copy nothing was written to is still skipped (20) when git refuses, through the same function.
+test_a_refusal_with_no_preparation_through_move_forward_is_still_a_skip() {
+  make_world f1-control
+  advance_origin advanced.txt
+  local bin="$W_DIR/refuse-ctl" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) exit 1 ;; esac\nexec %s "$@"\n' "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 20 ] || fail "a refusal on a copy nothing was written to returned $rc, not the skip code 20: $out"
+  pass "a refusal on an untouched copy is still a skip"
+}
+
+# F2: the clock seam must fire on the spawn's real custody-scan command. The case runs the SAME line the spawn runs (read from
+# bin/fm-spawn.sh) in a child shell with the seam loaded, and asserts the jump happened.
+scan_seam_run() { # <jump-seconds> [<clock-file>]: prints "SECONDS=<n>" after the scan line ran
+  local clock=${2:-${FM_TEST_SKIP_CLOCK:-$ROOT/tests/skip-clock.sh}} line
+  # shellcheck disable=SC2016 # The text is searched for literally; it is the spawn's own line, not an expansion.
+  line=$(grep -F 'fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1' "$ROOT/bin/fm-spawn.sh" | head -n 1 | sed 's/^[[:space:]]*//')
+  [ -n "$line" ] || fail "the spawn's custody scan line was not found"
+  FM_TEST_JUMP_AT_SCAN=$1 BASH_ENV="$clock" bash -c '
+    PROJ_ABS=/scratch/project STATE=/scratch/state SPAWN_ACQUIRE_T0=100 SECONDS=100
+    fm_task_copy_pool_slots_hold_no_current_copy() { return 0; }
+    '"$line"'
+    printf "SECONDS=%s\n" "$SECONDS"'
+}
+
+test_the_clock_seam_fires_on_the_spawns_custody_scan_line() {
+  local out
+  out=$(scan_seam_run 1800)
+  assert_contains "$out" "SECONDS=1900" "the seam did not set the clock to start plus 1800 on the spawn's own scan line: $out"
+  pass "the clock seam fires on the spawn's custody scan line"
+}
+
+test_the_clock_seam_stays_quiet_when_no_jump_is_asked_for() {
+  local out
+  out=$(FM_TEST_JUMP_AT_SCAN='' BASH_ENV="${FM_TEST_SKIP_CLOCK:-$ROOT/tests/skip-clock.sh}" bash -c 'SPAWN_ACQUIRE_T0=100 SECONDS=100; echo "SECONDS=$SECONDS"')
+  assert_contains "$out" "SECONDS=100" "the clock moved although no jump was asked for"
+  pass "the clock seam does nothing when no jump is asked for"
+}
+
 # D-E: any initialized submodule with an index flag (assume-unchanged, skip-worktree) is doubt, whatever its files hold.
 test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy() {
   make_submodule_world e1-assume
@@ -1498,6 +1588,12 @@ CASES=(
   test_a_commit_on_the_task_branch_that_changes_a_file_is_left_as_is_and_reported
   test_a_quiet_promotion_refusal_leaves_the_copy_on_the_task_branch
   test_a_promotion_refusal_never_rewrites_a_late_ignored_file
+  test_a_refusal_after_a_detach_through_move_forward_is_a_failure_that_names_the_detach
+  test_a_refusal_after_an_anchor_through_move_forward_is_a_failure_that_names_the_anchor
+  test_a_refusal_after_a_preparation_leaves_the_copy_unchanged_through_move_forward
+  test_a_refusal_with_no_preparation_through_move_forward_is_still_a_skip
+  test_the_clock_seam_fires_on_the_spawns_custody_scan_line
+  test_the_clock_seam_stays_quiet_when_no_jump_is_asked_for
   test_a_ref_that_changes_after_the_proof_fails_the_move
   test_a_move_that_ends_elsewhere_than_the_target_fails
   test_the_changed_bytes_witness_fails_when_a_snapshot_cannot_be_taken

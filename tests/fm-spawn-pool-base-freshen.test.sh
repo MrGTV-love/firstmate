@@ -64,46 +64,7 @@ run_spawn() {
 # A copy the slot rules skip is left as found and another is requested; this fake world has no other
 # copy, so the acquisition wait must reach its no-progress limit. The clock below advances SECONDS
 # by a minute per one-second sleep, so that wait ends at once and the refusal is what the case reads.
-SKIP_CLOCK="$TMP_ROOT/skip-clock.sh"
-cat > "$SKIP_CLOCK" <<'SH'
-sleep() {
-  if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_TICK_SECONDS:-}" ]; then
-    SECONDS=$((SECONDS + FM_TEST_TICK_SECONDS))
-  fi
-  command sleep "$@"
-}
-# The spawn creates its task data folder while it records a skipped copy, between two gets. A jump there spends the
-# bound after one copy was accepted and before the next get is typed.
-mkdir() {
-  if [ -n "${FM_TEST_MKDIR_JUMP_PATH:-}" ] && [ "${2:-}" = "$FM_TEST_MKDIR_JUMP_PATH" ]; then
-    SECONDS=$((SECONDS + ${FM_TEST_MKDIR_JUMP:-0}))
-  fi
-  command mkdir "$@"
-}
-# A clock jump at the moment a copy is about to be accepted: the spawn's own DEBUG hook sets SECONDS to
-# <spawn start> + FM_TEST_JUMP_AT_ACCEPT on the second pass over the line that reads the accepted copy's real path
-# (the pass that would accept it). Nothing in the spawn is changed to make this possible.
-__fm_accept_seen=0
-__fm_clock_jump() {
-  case "$BASH_COMMAND" in
-    'p_real=$(real_path_or_raw "$p")')
-      __fm_accept_seen=$((__fm_accept_seen + 1))
-      if [ -n "${FM_TEST_JUMP_AT_ACCEPT:-}" ] && [ "$__fm_accept_seen" = 2 ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
-        SECONDS=$((SPAWN_ACQUIRE_T0 + FM_TEST_JUMP_AT_ACCEPT))
-      fi ;;
-    # The custody scan that runs before every get: a jump here is time spent in the scan, between the two bound reads.
-    'fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1')
-      if [ -n "${FM_TEST_JUMP_AT_SCAN:-}" ] && [ -n "${SPAWN_ACQUIRE_T0:-}" ]; then
-        SECONDS=$((SPAWN_ACQUIRE_T0 + FM_TEST_JUMP_AT_SCAN))
-      fi ;;
-  esac
-  return 0
-}
-if [ -n "${FM_TEST_JUMP_AT_ACCEPT:-}" ] || [ -n "${FM_TEST_JUMP_AT_SCAN:-}" ]; then
-  set -T
-  trap '__fm_clock_jump' DEBUG
-fi
-SH
+SKIP_CLOCK="$ROOT/tests/skip-clock.sh"
 
 run_spawn_skipping() {
   FM_TEST_TICK_SECONDS=60 BASH_ENV="$SKIP_CLOCK" run_spawn "$@"
@@ -2004,7 +1965,9 @@ test_a_get_is_sent_when_the_scan_ends_at_1799() {
   id='pool-bound-scan-1799'
   make_skip_case skip-bound-scan-1799 "$id" 3
   printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1799 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1799 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  # The jump is what this control exists to show: without it the second get would be sent whatever the bound code did.
+  [ -f "$CASE_DIR/jumped" ] || fail "the clock seam never fired, so the 1799 control proves nothing"$'\n'"$out"
   [ "$(cat "$CASE_DIR/get-count")" -ge 2 ] || fail "no second get was sent although the scan ended inside the bound"$'\n'"$out"
   pass "a get is sent when the custody scan ends at 1799 of 1800"
 }
@@ -2014,7 +1977,8 @@ test_no_get_is_sent_when_the_scan_crosses_the_bound() {
   id='pool-bound-scan-1800'
   make_skip_case skip-bound-scan-1800 "$id" 3
   printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1800 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  [ -f "$CASE_DIR/jumped" ] || fail "the clock seam never fired, so the 1800 crossing was not simulated"$'\n'"$out"
   assert_no_launch "$CASE_DIR/launch.log"
   [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was sent after the custody scan crossed the bound: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
   assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
@@ -2044,6 +2008,24 @@ SH
 }
 
 # Main 1886 N7: a record that cannot be written refuses the spawn; there is no warn-and-go-on.
+# Main 1925 O2: a failed read of origin/HEAD after a successful move is unknown, never "absent". The spawn refuses.
+test_a_failed_origin_head_read_after_a_move_refuses() {
+  local id out real_git
+  id='pool-origin-head-unknown'
+  make_skip_case origin-head-unknown "$id" 1
+  real_git=$(command -v git)
+  cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'symbolic-ref --quiet refs/remotes/origin/HEAD'*) exit 128 ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/git"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn_skipping "$id" --mode no-mistakes --yolo off) || true
+  assert_no_launch "$CASE_DIR/launch.log"
+  assert_contains "$out" "origin/HEAD" "the failed origin/HEAD read was not reported"
+  pass "a failed origin/HEAD read after a successful move refuses the spawn"
+}
+
 test_a_failed_record_write_refuses_the_spawn() {
   local id out
   id='pool-record-fails'
@@ -2311,6 +2293,7 @@ test_a_governed_refusal_after_preparation_holds_the_copy_and_refuses() {
   ! git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD >/dev/null || fail "the copy was switched back onto a branch"$'\n'"$GOV_OUT"
   assert_contains "$GOV_OUT" "left exactly as it is" "the refusal did not say the copy is left as it is"
   assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/pool-governed-refused-after-prep.meta" "the copy was not recorded as held"
+  assert_grep 'slot_refusal_reason=refused_after_preparation' "$HOME_DIR/state/pool-governed-refused-after-prep.meta" "the refusal record does not carry its reason"
   pass "a governed copy refused after preparation is held as it is and the spawn is refused"
 }
 
@@ -2408,6 +2391,7 @@ test_a_get_is_sent_when_the_scan_ends_at_1799
 test_no_get_is_sent_when_the_scan_crosses_the_bound
 test_an_unreadable_copy_refuses_the_whole_spawn_and_is_leased
 test_a_failed_record_write_refuses_the_spawn
+test_a_failed_origin_head_read_after_a_move_refuses
 test_a_governed_refusal_after_preparation_holds_the_copy_and_refuses
 test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was
 
