@@ -49,7 +49,8 @@
 # its live lock launcher,
 # and no other active record may name it; the driver then verifies the landing
 # again and refuses what it cannot prove. An own copy that is not locked is
-# removed as before.
+# removed with a plain non-forced git worktree remove after the final removal
+# proof (scout, secondmate and operator --force keep the forced removal).
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
 # own driver (closeout_pr.py --cleanup-worktree <copy> --execute-cleanup, run
 # from the slot with FM_TEARDOWN_VERNANT_PYTHON or <slot>/.venv/bin/python) with
@@ -246,18 +247,10 @@ teardown_vernant_lock_pid() {  # <reason>
   printf '%s\n' "$pid"
 }
 
-# Seconds since <pid> started, from ps etime ([[dd-]hh:]mm:ss), or, where ps
-# cannot run (a confined worker), from the confined table's start time
-# (bin/fm-proc-info.py lstart, in local time).
+# Seconds since <pid> started, from ps etime ([[dd-]hh:]mm:ss).
 teardown_pid_age_secs() {  # <pid>
-  local etime days=0 a b c hours minutes seconds start started
-  if ! etime=$(LC_ALL=C ps -p "$1" -o etime= 2>/dev/null); then
-    start=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" lstart "$1" 2>/dev/null) || return 1
-    started=$(python3 -c 'import sys, time; print(int(time.mktime(time.strptime(sys.argv[1], "%a %b %d %H:%M:%S %Y"))))' "$start" 2>/dev/null) || return 1
-    case "$started" in ''|*[!0-9]*) return 1 ;; esac
-    printf '%s\n' "$(( $(date +%s) - started ))"
-    return 0
-  fi
+  local etime days=0 a b c hours minutes seconds
+  etime=$(LC_ALL=C ps -p "$1" -o etime= 2>/dev/null) || return 1
   etime=${etime//[[:space:]]/}
   [ -n "$etime" ] || return 1
   case "$etime" in *-*) days=${etime%%-*}; etime=${etime#*-} ;; esac
