@@ -273,6 +273,7 @@ def kill_group(child):
 
 def sampling_valid(case, seen, label):
     """A sampler that saw no worker, or that slept longer than a worker lives, proves nothing about a cap."""
+    case.measure(**{'sampler_gap_p99_max_ms[%s]' % label: '%d/%d' % (seen['gap_p99_ms'], seen['gap_max_ms'])})
     case.check(seen['peak_total'] > 0, '%s: the sampler never saw a worker, so a cap that held proves nothing' % label)
     # The contract asks for a sample at least every 50 ms: the p99 gap enforces that cadence, and a maximum gap of 250 ms is the
     # point where the sampler is declared invalid (a worker lives at least 300 ms), reported as invalid sampling, not a product failure.
