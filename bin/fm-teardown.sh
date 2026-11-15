@@ -347,8 +347,9 @@
 # ignored under its .claude and .opencode trees); any other ignored entry is
 # preserved first in data/<task>/nested-copy-preserved with its SHA-256. It loses
 # no commit, because the work is landed or held by a recorded bundle, and no
-# tracked change, because the clean proof refuses one. The clean proof skips
-# untracked files under .claude only; the ignored-file proof skips ignored files
+# tracked change, because the clean proof refuses one. The clean proof counts
+# every untracked file except the files Firstmate itself writes
+# (FM_TASK_COPY_MANAGED_FILES, bin/fm-task-copy-lib.sh); the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
 # the final project-lock wait, so the driver never runs while the lock is held;
