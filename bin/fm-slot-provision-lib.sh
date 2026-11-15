@@ -638,13 +638,14 @@ def is_own(pid, pane, began):
         cur = info[0]
     return False
 
-def holders(slot, real, spawn, common, governed, pane):
+def holders(slot, real, spawn, common, governed, pane, endpoint=""):
     me = os.getpid()
     try:
         spawn = int(spawn)
         pane = int(pane) if pane else 0
+        endpoint = int(endpoint) if endpoint else 0
     except ValueError:
-        fail("the spawn or pane pid is not a number")
+        fail("the spawn, pane or endpoint pid is not a number")
     began = (proc_info(spawn) or (0, "", None))[2]
     if began is None:
         fail("the spawn's own start time cannot be read")
@@ -679,6 +680,9 @@ def holders(slot, real, spawn, common, governed, pane):
         if pid == me:
             continue
         if cwd is not None and not any(cwd == base or cwd.startswith(base + "/") for base in inside):
+            continue
+        # The recorded endpoint of a relaunched task: that one pid, never a child or any other descendant.
+        if cwd is not None and endpoint and pid == endpoint:
             continue
         # An lsof row with no working directory proves nothing about where the process is: it is never excused.
         if cwd is not None and is_own(pid, pane, began):
@@ -826,7 +830,9 @@ fm_slot_pool_rows_valid() {
 # The one holder rule. A process with its working directory in the slot, or an lsof row that names a
 # process and no working directory, is a holder unless it runs under this spawn's own pane
 # (FM_SLOT_PANE_PID) or, for a backend with no pane pid, under a `treehouse` launcher that started
-# after the spawn began (FM_SLOT_SPAWN_PID). There is no age exemption. A live lease, a contention row
+# after the spawn began (FM_SLOT_SPAWN_PID). On a relaunch, the shell of the task's own recorded endpoint
+# (FM_SLOT_ENDPOINT_PID, read from the recorded window) is excused too: that one pid, never its children.
+# There is no age exemption. A live lease, a contention row
 # (or one that cannot be read) and a git worktree lock count too. A holder list that cannot be read skips.
 fm_slot_holders_or_skip() { # <slot> [<project>]
   local slot=$1 project=${2:-} real common governed=0 out locked path line
@@ -834,7 +840,7 @@ fm_slot_holders_or_skip() { # <slot> [<project>]
   common=$(git -C "$slot" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     { fm_slot_skip "$slot" unknown_holders "the git common directory cannot be read"; return; }
   if [ -n "$project" ] && fm_slot_required "$project" "$slot"; then governed=1; fi
-  out=$(fm_slot_probe holders "$slot" "$real" "${FM_SLOT_SPAWN_PID:-$$}" "$common" "$governed" "${FM_SLOT_PANE_PID:-}" 2>&1) || {
+  out=$(fm_slot_probe holders "$slot" "$real" "${FM_SLOT_SPAWN_PID:-$$}" "$common" "$governed" "${FM_SLOT_PANE_PID:-}" "${FM_SLOT_ENDPOINT_PID:-}" 2>&1) || {
     fm_slot_skip "$slot" unknown_holders "the holder list cannot be read (${out:-no detail})"
     return
   }

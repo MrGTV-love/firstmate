@@ -1282,15 +1282,7 @@ PY
   [ "$(git -C "$PROJECT_DIR" rev-parse origin/main)" = "$remote" ] || fail 'binding relabeled local as origin'
   # Model the existing, agent-free retained shell using the established relaunch fixture.
   stoppedbin="$CASE_DIR/stopped"
-  mkdir "$stoppedbin"
-  {
-    cat <<'SH'
-#!/usr/bin/env bash
-case "$*" in *'#{pane_current_command}'*) printf 'zsh\n'; exit 0 ;; esac
-SH
-    printf 'exec %q "$@"\n' "$FAKEBIN_DIR/tmux"
-  } > "$stoppedbin/tmux"
-  chmod +x "$stoppedbin/tmux"
+  make_stopped_tmux "$stoppedbin"
   rc=0
   out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" fm_test_run_spawn \
     "$HOME_DIR" "$POOL_DIR" "$stoppedbin:$FAKEBIN_DIR" "$id" --relaunch 2>&1) || rc=$?
@@ -1320,13 +1312,30 @@ PY
 test_local_only_source_binding() { run_local_only_binding_case prepared; }
 test_local_only_unprepared_retry() { run_local_only_binding_case unprepared; }
 
-make_stopped_tmux() { # <dir>; an agent-free retained shell for the relaunch fixture
+# make_stopped_tmux <dir>: an agent-free retained shell for the relaunch fixture. A real process stands in for that shell:
+# its working directory is the recorded copy, and the fake tmux answers its pid as the recorded window's pane pid.
+STOPPED_SHELL_PIDS=()
+stop_stopped_shells() {
+  local pid
+  for pid in ${STOPPED_SHELL_PIDS[@]+"${STOPPED_SHELL_PIDS[@]}"}; do
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+  STOPPED_SHELL_PIDS=()
+}
+trap stop_stopped_shells EXIT
+make_stopped_tmux() { # <dir>
+  local pid
   mkdir "$1"
+  (cd "$POOL_DIR" && exec sleep 900) &
+  pid=$!
+  STOPPED_SHELL_PIDS+=("$pid")
   {
     cat <<'SH'
 #!/usr/bin/env bash
 case "$*" in *'#{pane_current_command}'*) printf 'zsh\n'; exit 0 ;; esac
 SH
+    printf 'case "$*" in *"#{pane_pid}"*) printf "%%s\\n" %q; exit 0 ;; esac\n' "$pid"
     printf 'exec %q "$@"\n' "$FAKEBIN_DIR/tmux"
   } > "$1/tmux"
   chmod +x "$1/tmux"

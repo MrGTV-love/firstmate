@@ -545,7 +545,7 @@
 #   It is preceded by a read-only proof (fm_slot_prove_idle) that writes nothing to the
 #   copy, no ref and no file: one snapshot must show the tree clean, no process with its
 #   working directory in the copy (no age exemption; only the spawn's own pane or `treehouse`
-#   launcher is excused), no git worktree lock, no live project lease or recent or unreadable
+#   launcher is excused; on a relaunch, the recorded endpoint's own shell pid alone), no git worktree lock, no live project lease or recent or unreadable
 #   contention row, no ignored file at a path the target tree tracks (git overwrites ignored
 #   files silently), no index flag (assume-unchanged, skip-worktree) on any tracked file or
 #   inside any initialized submodule, and HEAD an ancestor of the target. Any doubt, an
@@ -6500,6 +6500,10 @@ elif [ "$RELAUNCH" -eq 1 ]; then
     fi
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
+  # The recorded endpoint is agent-free and stands in the recorded worktree: its own shell, read live from the recorded
+  # window, is the one process the idle proof of this relaunch excuses (bin/fm-slot-provision-lib.sh holder rule).
+  FM_SLOT_PANE_PID=$(spawn_pane_pid)
+  FM_SLOT_ENDPOINT_PID=$FM_SLOT_PANE_PID
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # A base that could not be fetched or resolved is a fact about the project's origin, not about any copy, so
   # it refuses here, before a copy is acquired: there is nothing in a copy to put at risk, and no copy is leased.

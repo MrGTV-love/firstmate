@@ -1653,6 +1653,61 @@ test_an_ignored_file_whose_identity_changes_during_the_move_fails_it() {
   pass "an ignored file whose identity changes during the move fails it"
 }
 
+# --- R7-1: the relaunch excuses its own recorded endpoint's shell, that one pid only -------------------------------------
+
+# start_endpoint_shell_with_child: a shell whose working directory is the slot, with one child also standing in it. Sets
+# ENDPOINT_PID (the shell) and CHILD_PID (its child).
+start_endpoint_shell_with_child() {
+  local file="$W_DIR/child.pid" _
+  (cd "$W_SLOT" && exec sh -c 'sleep 300 & echo $! > "$1"; wait' _ "$file") &
+  ENDPOINT_PID=$!
+  HELD_PIDS+=("$ENDPOINT_PID")
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$file" ] && break; sleep 0.1; done
+  CHILD_PID=$(cat "$file")
+  HELD_PIDS+=("$CHILD_PID")
+}
+
+test_the_recorded_endpoint_shell_alone_does_not_hold_the_slot() {
+  make_world r71-endpoint
+  advance_origin advanced.txt
+  start_holder "$W_SLOT"
+  sleep 0.3
+  FM_SLOT_PANE_PID=$HOLDER_PID FM_SLOT_ENDPOINT_PID=$HOLDER_PID expect_moved "the recorded endpoint's own shell, alone in the slot, is not a holder"
+  cleanup_held
+}
+
+test_a_child_of_the_recorded_endpoint_shell_holds_the_slot() {
+  make_world r71-child
+  advance_origin advanced.txt
+  start_endpoint_shell_with_child
+  sleep 0.3
+  [ -n "$CHILD_PID" ] || fail "the endpoint shell started no child, so the case proves nothing"
+  FM_SLOT_PANE_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID expect_skip "a child of the recorded endpoint's shell still holds the slot" live_holder
+  cleanup_held
+}
+
+test_a_foreign_shell_holds_the_slot_beside_the_recorded_endpoint() {
+  make_world r71-foreign
+  advance_origin advanced.txt
+  local endpoint
+  start_holder "$W_SLOT"
+  endpoint=$HOLDER_PID
+  start_holder "$W_SLOT"
+  sleep 0.3
+  FM_SLOT_PANE_PID=$endpoint FM_SLOT_ENDPOINT_PID=$endpoint expect_skip "a foreign shell beside the recorded endpoint still holds the slot" live_holder
+  cleanup_held
+}
+
+# The recorded window cannot be read (spawn_pane_pid prints nothing): no pid is excused, and the shell holds the slot.
+test_an_unreadable_recorded_endpoint_excuses_nobody() {
+  make_world r71-unreadable
+  advance_origin advanced.txt
+  start_holder "$W_SLOT"
+  sleep 0.3
+  FM_SLOT_PANE_PID='' FM_SLOT_ENDPOINT_PID='' expect_skip "with no readable recorded endpoint, the shell in the slot holds it" live_holder
+  cleanup_held
+}
+
 CASES=(
   test_control_clean_slot_behind_the_target_moves
   test_detached_extra_commit_is_skipped
@@ -1759,6 +1814,10 @@ CASES=(
   test_a_refusal_records_other_ref_changes_as_context
   test_ignored_files_under_an_ignored_directory_are_not_read
   test_an_ignored_file_whose_identity_changes_during_the_move_fails_it
+  test_the_recorded_endpoint_shell_alone_does_not_hold_the_slot
+  test_a_child_of_the_recorded_endpoint_shell_holds_the_slot
+  test_a_foreign_shell_holds_the_slot_beside_the_recorded_endpoint
+  test_an_unreadable_recorded_endpoint_excuses_nobody
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"
