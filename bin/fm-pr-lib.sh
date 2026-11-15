@@ -560,10 +560,14 @@ fm_pr_poll_cleanup() {
   FM_PR_POLL_REG_TMP=
 }
 
-# 0 when state/<id>.check.sh may receive the merge poll: it is absent, or it is the
-# poll template's own bytes in a regular file and no custom-check trust record
-# exists. Anything else is another check (bin/fm-check-register.sh), and a merge
-# poll is never published over it or removed in its place (Main 1686 F3).
+# 0 when state/<id>.check.sh may receive the merge poll: it is absent, or it is a
+# merge poll in a regular file with no custom-check trust record: the poll
+# template's own bytes, or a check that belongs to this task's poll lifecycle (a
+# poll registration or retirement receipt is on record), such as a poll of an
+# earlier template version. A registered custom check always has its trust
+# record, so it is never replaceable. Anything else is another check
+# (bin/fm-check-register.sh), and a merge poll is never published over it or
+# removed in its place (Main 1686 F3).
 fm_pr_poll_check_dest_replaceable() {  # <state> <id> <template>
   local dest="$1/$2.check.sh"
   [ ! -e "$1/$2.check-trust" ] && [ ! -L "$1/$2.check-trust" ] || return 1
@@ -571,7 +575,9 @@ fm_pr_poll_check_dest_replaceable() {  # <state> <id> <template>
     return 0
   fi
   [ -f "$dest" ] && [ ! -L "$dest" ] || return 1
-  cmp -s -- "$3" "$dest"
+  cmp -s -- "$3" "$dest" && return 0
+  { [ -f "$1/$2.pr-poll-registration" ] && [ ! -L "$1/$2.pr-poll-registration" ]; } \
+    || { [ -f "$1/$2.pr-poll-retirement" ] && [ ! -L "$1/$2.pr-poll-retirement" ]; }
 }
 
 # Set to 1 when a publication stopped because state/<id>.check.sh is another check.
