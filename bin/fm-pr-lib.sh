@@ -561,51 +561,127 @@ fm_pr_poll_cleanup() {
   FM_PR_POLL_REG_TMP=
 }
 
-# 0 when state/<id>.check.sh may receive the merge poll: it is absent, or it is a
-# merge poll in a regular file with no custom-check trust record: the poll
-# template's own bytes, or a check that belongs to this task's poll lifecycle (a
-# poll registration or retirement receipt is on record), such as a poll of an
-# earlier template version. A registered custom check always has its trust
-# record, so it is never replaceable. Anything else is another check
+# 0 when <file> is a merge poll check that Firstmate wrote for task <id>, proven
+# by its bytes (Main 1820 F5): a regular file, not a link, with no custom-check
+# trust record for <id>, whose SHA-256 is the poll template's, or the template
+# hash that this task's poll registration or retirement receipt recorded (a poll
+# of an earlier template version). A receipt on record proves nothing by itself:
+# a check whose bytes match neither is another check.
+fm_pr_poll_check_bytes_ours() {  # <state> <id> <template> <file>
+  local state=$1 id=$2 template=$3 file=$4 hash expected
+  [ ! -e "$state/$id.check-trust" ] && [ ! -L "$state/$id.check-trust" ] || return 1
+  [ -f "$file" ] && [ ! -L "$file" ] || return 1
+  hash=$(fm_pr_sha256 "$file") || return 1
+  [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || return 1
+  expected=$(fm_pr_sha256 "$template") || expected=
+  [ "$hash" != "$expected" ] || return 0
+  expected=$(fm_pr_poll_registration_parse "$state/$id.pr-poll-registration" >/dev/null 2>&1 \
+    && [ "$FM_PR_REG_ID" = "$id" ] && printf '%s' "$FM_PR_REG_TEMPLATE_HASH") || expected=
+  [ -z "$expected" ] || [ "$hash" != "$expected" ] || return 0
+  expected=$(fm_pr_poll_retirement_parse "$state/$id.pr-poll-retirement" >/dev/null 2>&1 \
+    && [ "$FM_PR_RETIRE_ID" = "$id" ] && printf '%s' "$FM_PR_RETIRE_TEMPLATE_HASH") || expected=
+  [ -n "$expected" ] && [ "$hash" = "$expected" ]
+}
+
+# 0 when state/<id>.check.sh may receive the merge poll: the name is free, or it
+# holds a merge poll check that Firstmate wrote for this task, proven by its bytes
+# (fm_pr_poll_check_bytes_ours). Anything else is another check
 # (bin/fm-check-register.sh), and a merge poll is never published over it or
-# removed in its place (Main 1686 F3).
+# removed in its place (Main 1686 F3, Main 1820 F5).
 fm_pr_poll_check_dest_replaceable() {  # <state> <id> <template>
   local dest="$1/$2.check.sh"
   [ ! -e "$1/$2.check-trust" ] && [ ! -L "$1/$2.check-trust" ] || return 1
   if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
     return 0
   fi
-  [ -f "$dest" ] && [ ! -L "$dest" ] || return 1
-  cmp -s -- "$3" "$dest" && return 0
-  { [ -f "$1/$2.pr-poll-registration" ] && [ ! -L "$1/$2.pr-poll-registration" ]; } \
-    || { [ -f "$1/$2.pr-poll-retirement" ] && [ ! -L "$1/$2.pr-poll-retirement" ]; }
+  fm_pr_poll_check_bytes_ours "$1" "$2" "$3" "$dest"
 }
 
 # Set to 1 when a publication stopped because state/<id>.check.sh is another check.
 FM_PR_POLL_CHECK_CONFLICT=0
 
+# Puts the prepared check at its name without ever replacing another check, even
+# one written after the last guard (Main 1820 F5): a check already there is first
+# moved aside and proven by its bytes, and the new one is then linked into the
+# free name, which fails rather than replace anything that took it meanwhile. A
+# moved check that is not ours is put back exactly as it was.
+fm_pr_poll_check_place() {
+  local dest=$FM_PR_POLL_CHECK_DEST state=${FM_PR_POLL_CHECK_DEST%/*} aside=
+  if [ -e "$dest" ] || [ -L "$dest" ]; then
+    aside=$(mktemp "$state/.fm-pr-poll-prior.XXXXXX") || return 1
+    if ! mv -f -- "$dest" "$aside"; then
+      rm -f -- "$aside"
+      return 1
+    fi
+    if ! fm_pr_poll_check_bytes_ours "$state" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE" "$aside"; then
+      # shellcheck disable=SC2034 # Read by bin/fm-pr-check.sh to word the refusal.
+      FM_PR_POLL_CHECK_CONFLICT=1
+      if ln -P -- "$aside" "$dest" 2>/dev/null; then
+        rm -f -- "$aside"
+      else
+        echo "error: $dest is another check; it was moved to $aside to be replaced and could not be put back because the name was taken again; both are kept" >&2
+      fi
+      return 1
+    fi
+  fi
+  if ! ln -P -- "$FM_PR_POLL_CHECK_TMP" "$dest" 2>/dev/null; then
+    [ -z "$aside" ] || rm -f -- "$aside"
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      # shellcheck disable=SC2034 # Read by bin/fm-pr-check.sh to word the refusal.
+      FM_PR_POLL_CHECK_CONFLICT=1
+    fi
+    return 1
+  fi
+  FM_PR_POLL_CHECK_RENAMED=1
+  [ -z "$aside" ] || rm -f -- "$aside"
+  rm -f -- "$FM_PR_POLL_CHECK_TMP" || return 1
+  FM_PR_POLL_CHECK_TMP=
+}
+
+# The check name, during a rollback: it is moved aside first, then removed only
+# when it is the file this publication placed (same file object, no trust record)
+# or a merge poll Firstmate wrote for this task by its bytes; anything else is put
+# back exactly as it was, so a rollback never removes what now holds the name
+# (Main 1820 F5). 1 when it could not be judged or put back.
+fm_pr_poll_check_revoke() {
+  local dest=$FM_PR_POLL_CHECK_DEST state=${FM_PR_POLL_CHECK_DEST%/*} aside identity
+  [ -e "$dest" ] || [ -L "$dest" ] || return 0
+  aside=$(mktemp "$state/.fm-pr-poll-revoke.XXXXXX") || return 1
+  if ! mv -f -- "$dest" "$aside"; then
+    rm -f -- "$aside"
+    return 1
+  fi
+  identity=
+  [ -L "$aside" ] || identity=$(fm_pr_file_identity "$aside" 2>/dev/null) || identity=
+  if { [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] && [ -n "$identity" ] \
+       && [ "$identity" = "$FM_PR_POLL_EXPECT_CHECK_IDENTITY" ] \
+       && [ ! -e "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ] && [ ! -L "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ]; } \
+     || fm_pr_poll_check_bytes_ours "$state" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE" "$aside"; then
+    rm -f -- "$aside"
+    return
+  fi
+  if ln -P -- "$aside" "$dest" 2>/dev/null; then
+    rm -f -- "$aside"
+    return 0
+  fi
+  echo "error: $dest is not this publication's check and could not be put back after the rollback moved it; it is kept at $aside" >&2
+  return 1
+}
+
 fm_pr_poll_revoke_final() {
   local failed=0
   # Neutralize the runnable name first so a failed rearm cannot consume state
-  # whose transactional registration did not commit successfully. Once this
-  # publication has renamed its check into the name, whatever the name holds
-  # is removed (a link or other file swapped in after the rename included).
-  # Before that rename, another check in that name is never this
-  # publication's, so it is left in place.
-  if { [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; } \
-    && { [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] \
-      || fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; }; then
-    rm -f -- "$FM_PR_POLL_CHECK_DEST" || failed=1
-  fi
+  # whose transactional registration did not commit successfully.
+  fm_pr_poll_check_revoke || failed=1
   if [ -e "$FM_PR_POLL_REG_DEST" ] || [ -L "$FM_PR_POLL_REG_DEST" ]; then
     rm -f -- "$FM_PR_POLL_REG_DEST" || failed=1
   fi
   if [ -e "$FM_PR_POLL_DATA_DEST" ] || [ -L "$FM_PR_POLL_DATA_DEST" ]; then
     rm -f -- "$FM_PR_POLL_DATA_DEST" || failed=1
   fi
-  if [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; then
-    [ "$FM_PR_POLL_CHECK_RENAMED" != 1 ] || failed=1
-    ! fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE" || failed=1
+  if [ -e "$FM_PR_POLL_CHECK_DEST" ] && [ ! -L "$FM_PR_POLL_CHECK_DEST" ] && [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] \
+    && [ "$(fm_pr_file_identity "$FM_PR_POLL_CHECK_DEST" 2>/dev/null)" = "$FM_PR_POLL_EXPECT_CHECK_IDENTITY" ]; then
+    failed=1
   fi
   [ ! -e "$FM_PR_POLL_REG_DEST" ] && [ ! -L "$FM_PR_POLL_REG_DEST" ] || failed=1
   [ ! -e "$FM_PR_POLL_DATA_DEST" ] && [ ! -L "$FM_PR_POLL_DATA_DEST" ] || failed=1
@@ -747,12 +823,10 @@ fm_pr_poll_publish_prepared() {
     return 1
   fi
   if ! fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" \
-    || ! mv -f -- "$FM_PR_POLL_CHECK_TMP" "$FM_PR_POLL_CHECK_DEST"; then
+    || ! fm_pr_poll_check_place; then
     fm_pr_poll_revoke_final || true
     return 1
   fi
-  FM_PR_POLL_CHECK_RENAMED=1
-  FM_PR_POLL_CHECK_TMP=
   if ! fm_pr_poll_artifacts_valid "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
     fm_pr_poll_revoke_final || true
     return 1

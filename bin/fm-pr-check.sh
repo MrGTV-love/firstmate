@@ -32,9 +32,14 @@
 #     fm/<id>) only finds the PR; its landed proof was strengthened (Main 038
 #     ruling (a), then Main 1686 F1): the copy's content must already be in the
 #     default branch, so a found PR alone never lands a copy.
-# (e) Another check in state/<id>.check.sh is never replaced: this registrar
-#     refuses before pr= is written, and the publisher (bin/fm-pr-lib.sh
-#     fm_pr_poll_check_dest_replaceable) checks again before each rename.
+# (e) Another check in state/<id>.check.sh is never replaced or removed: a
+#     check counts as the merge poll only by its bytes (the template, or the
+#     template hash this task's registration or retirement recorded), never by
+#     a receipt alone. This registrar refuses before pr= is written; the
+#     publisher (bin/fm-pr-lib.sh fm_pr_poll_check_place) moves an earlier check
+#     aside, proves it, and links the new one into the free name, so a check
+#     written meanwhile is kept; a rollback removes only this publication's own
+#     file or a proven poll and puts anything else back (Main 1820 F5).
 # A merge call (FM_PR_CHECK_MERGE=1) on a GitHub task that owns several pull
 # requests (bin/fm-dod-lib.sh fm_dod_task_owns_several_prs) is judged on the
 # forge's head for the PR it names instead, because the worker copy's HEAD
