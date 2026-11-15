@@ -2482,9 +2482,10 @@ teardown_preflight_removable() {  # <path> <label>
 }
 
 # The entry preflight: every refusal that the state at entry already decides,
-# made in one pass that writes and removes nothing, before the first protected
-# mutation (the captain's drop record, the slot lease, the return-pending
-# record, the endpoint close, and any copy, tasktmp, record or slot removal).
+# made in one pass that leaves no persistent change (it creates and removes its
+# private run directory), before the first protected mutation (the captain's
+# drop record, the slot lease, the return-pending record, the endpoint close,
+# and any copy, tasktmp, record or slot removal).
 # It covers the records those later steps remove or replace (the previous
 # pending-close record, the return-pending record, the task record, the busy,
 # PR-poll, turn-end and status records), the busy generation, the held-copy
@@ -6782,8 +6783,9 @@ if [ "$BACKEND" = herdr ]; then
   TEARDOWN_HERDR_PANE=$FM_BACKEND_HERDR_PANE
 fi
 teardown_release_herdr_locks
-# Every refusal the state at entry decides, in one pass that changes nothing,
-# before the first protected mutation (teardown_entry_preflight).
+# Every refusal the state at entry decides, in one pass that leaves no
+# persistent change (it creates and removes its private run directory), before
+# the first protected mutation (teardown_entry_preflight).
 if ! teardown_entry_preflight; then
   [ -z "$TEARDOWN_PREFLIGHT_ERROR" ] \
     || echo "REFUSED: $TEARDOWN_PREFLIGHT_ERROR; nothing was changed and every task record is retained. Fix what is named and re-run." >&2
