@@ -4251,12 +4251,6 @@ def main(argv, out=None):
     except SlackError as error:
         out.diagnostic(refusals, 'error: slack ' + str(error))
         return 2
-    try:
-        # Before any check that can refuse the run: the id the setting names is recorded first (finding 1 of the review of d9861b24).
-        record_setting_id()
-    except SlackError as error:
-        out.diagnostic(refusals, 'slack: refused: ' + str(error))
-        return 1
     if command not in ('mirror', 'poll', 'check'):
         out.diagnostic('out', 'error: unknown command; use --help')
         return 2
@@ -4280,6 +4274,9 @@ def main(argv, out=None):
     watch = None
     code = 0
     try:
+        # Before any check that can refuse the run: the id the setting names is recorded first (finding 1 of the review of d9861b24); a run that cannot
+        # record it fails like any other local failure below.
+        record_setting_id()
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
         try:
