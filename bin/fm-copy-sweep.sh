@@ -174,10 +174,14 @@
 # executed through the driver's own --pr route instead, and its plan allows only on
 # that route's dry-run answer (exit 3, state BLOCKED, predicates_failed exactly
 # ["cleanup_not_executed"]); bin/fm-teardown-nested-lib.sh's header owns the record
-# format and the merged-PR conditions, and a record that fails one, or any other
-# answer, holds the copy as above with the route and PR named; a plan that times out
-# names the route and PR too. A route execute that claims success uses a release slot
-# of the per-run cap even when the copy and its lock are untouched.
+# format, the merged-PR and content conditions, the project lock the route takes here
+# and the reads of the slot's primary checkout, and a record that fails one, or any
+# other answer, holds the copy as above with the route and PR named; a plan that times
+# out names the route and PR too. A route execute that claims success uses a release
+# slot of the per-run cap even when the copy and its lock are untouched. A switch of
+# the slot's primary checkout that the route sees, at a plan or an execute, stops the
+# run: the copy is reported FAILED (an execute) or held (a plan) with the route's
+# words, and every copy still pending is reported SKIPPED without a driver call.
 # The timeout is deliberate (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by default):
 # the owner's rule holds a copy whose plan does not answer. The plan runs as a
 # process group of its own and the timeout kills that whole group, so neither the
@@ -355,6 +359,8 @@ MAX_LINE=1600
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-lock-lib.sh
 . "$SCRIPT_DIR/fm-lock-lib.sh"
+# shellcheck source=bin/fm-project-lock-lib.sh
+. "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # shellcheck source=bin/fm-refuse-lib.sh
@@ -1395,6 +1401,7 @@ plan_verdict_retains_tree() {  # <driver output>
 # way the driver and what it started stop with the sweep, so every exit path of
 # the plan, and the sweep's own signal traps, go through stop_plan.
 PLAN_PID=
+PLAN_SWITCHED=0
 stop_plan() {
   [ -z "$PLAN_PID" ] || kill -s KILL -- "-$PLAN_PID" 2>/dev/null
   PLAN_PID=
@@ -1410,6 +1417,7 @@ stop_plan() {
 PLAN_WHY=
 driver_plan_allows() {  # <clone> <copy>
   local dir rc=0 limit ticks=0 timed_out=0 pid
+  PLAN_SWITCHED=0
   limit=${FM_COPY_SWEEP_PLAN_TIMEOUT:-120}
   case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
   limit=$((10#$limit))
@@ -1444,7 +1452,13 @@ driver_plan_allows() {  # <clone> <copy>
   TEARDOWN_CLOSEOUT_ROUTE_PR=
   TEARDOWN_CLOSEOUT_ROUTE_WHY=
   if [ -f "$dir/route" ]; then
-    { IFS= read -r TEARDOWN_CLOSEOUT_ROUTE; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_PR; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_WHY; } < "$dir/route" || true
+    # The window of the checkout observation opened at the plan's first step is kept
+    # for the execute of this copy (TEARDOWN_CKO_*); a switch found by the plan stops the run.
+    { IFS= read -r TEARDOWN_CLOSEOUT_ROUTE; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_PR; IFS= read -r TEARDOWN_CLOSEOUT_ROUTE_WHY
+      IFS= read -r TEARDOWN_CKO_COPY; IFS= read -r TEARDOWN_CKO_BRANCH; IFS= read -r TEARDOWN_CKO_HEAD; IFS= read -r TEARDOWN_CKO_POS
+      IFS= read -r TEARDOWN_ROUTE_HEADREF; IFS= read -r PLAN_SWITCHED; } < "$dir/route" || true
+    [ "$PLAN_SWITCHED" = 1 ] || PLAN_SWITCHED=0
+    if [ -n "$TEARDOWN_CKO_COPY" ] && [ "$TEARDOWN_CLOSEOUT_ROUTE" = pr ]; then TEARDOWN_CKO_OPEN=1; else TEARDOWN_CKO_OPEN=0; fi
   fi
   rm -f "$dir/out" "$dir/rc" "$dir/verdict" "$dir/route"
   rmdir "$dir" 2>/dev/null
@@ -1687,6 +1701,13 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   fi
   rc=0
   teardown_run_closeout "$clone" "$copy" || rc=$?
+  if [ "$TEARDOWN_CLOSEOUT_SWITCHED" = 1 ]; then
+    # The primary checkout of the slot was found switched to the PR's head branch (or
+    # moved) during the route. Whatever the driver did is not undone; the run stops.
+    words=$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")
+    echo "REFUSED: the primary checkout of the slot was switched during the supersedence route of $shown (exit $rc): $words; this run releases no further copy." >&2
+    return 4
+  fi
   if [ "$rc" != 0 ]; then
     words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
     if [ "$TEARDOWN_CLOSEOUT_ROUTE" = invalid ] && copy_still_holds "$copy" "$identity" "$7"; then
@@ -1752,6 +1773,7 @@ apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
   local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity route_used route_file
+  local stop_run=0 stop_why=
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1767,6 +1789,12 @@ apply_removals() {
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"
+    if [ "$stop_run" = 1 ]; then
+      # A switch of a slot's primary checkout was found: this run releases no further copy.
+      REMOVAL_REPORT="${REMOVAL_REPORT}SKIPPED"$'\t'"$copy"$'\t'"not released: this run stopped after $stop_why"$'\n'
+      continue
+    fi
+    TEARDOWN_CKO_OPEN=0
     scan_processes
     classify "$copy" "$clone" "$pool" "$container"
     case "$CLASS" in
@@ -1796,6 +1824,10 @@ apply_removals() {
       }
       if ! driver_plan_allows "$clone" "$copy"; then
         held="$held$copy"$'\t'"$PLAN_WHY"$'\n'
+        if [ "$PLAN_SWITCHED" = 1 ]; then
+          stop_run=1
+          stop_why="the primary checkout of the slot was switched during the plan of $copy"
+        fi
         continue
       fi
       release_id="$CHECK_ID/$stamp-$head"
@@ -1823,6 +1855,18 @@ apply_removals() {
           && [ "$enumeration_rc" = 0 ] && grep -qxF "$copy" <<< "$registered"; }; then
           driver_slots=$((driver_slots + 1))
         fi
+      fi
+      if [ "$release_rc" = 4 ]; then
+        stop_run=1
+        stop_why="the primary checkout of the slot was switched during the execute of $copy"
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"$(printf '%s' "${refusal:-$err}" | tr '\n\t' '  ')"$'\n'
+        # The driver may have been called and may have removed the copy: what is on disk decides the rest.
+        if [ -e "$copy" ] || [ -L "$copy" ]; then
+          continue
+        fi
+        release_rc=0
       fi
       if [ "$release_rc" = 3 ]; then
         held="$held$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'

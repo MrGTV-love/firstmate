@@ -337,7 +337,11 @@
 # other format, a driver refusal, or a copy still registered afterwards refuses.
 # A copy that data/supersedence-records.tsv names at its tip is released through
 # the driver's own --pr route instead; bin/fm-teardown-nested-lib.sh's header owns
-# the record format, the merged-PR conditions and the answer it reads.
+# the record format, the merged-PR and content conditions and the answer it reads.
+# A routed copy is the exception to the driver never running under the project lock:
+# the route holds the slot's lock across its checks and the driver call, borrowing
+# this script's hold through TEARDOWN_ROUTE_LOCK_HELD when it has one and taking its
+# own otherwise.
 # A driver refusal saves its complete combined output unchanged in a private
 # data/<task>/vernant-closeout.XXXXXX file, names that file (or the data/<task>
 # directory it could not save into), and prints the last 20 lines with control
@@ -982,12 +986,16 @@ teardown_acquire_project_lock() {  # [wait]
     return "$rc"
   fi
   TREEHOUSE_PROJECT_LOCK_HELD=1
+  # The supersedence route (bin/fm-teardown-nested-lib.sh) borrows this hold after
+  # proving it by the lock's pid file; it never takes it again or releases it.
+  TEARDOWN_ROUTE_LOCK_HELD=$TREEHOUSE_PROJECT_LOCK
 }
 
 teardown_release_project_lock() {
   [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || return 0
   fm_project_lock_release "$TREEHOUSE_PROJECT_LOCK" || return 1
   TREEHOUSE_PROJECT_LOCK_HELD=0
+  TEARDOWN_ROUTE_LOCK_HELD=
 }
 
 # Whether the installed treehouse has the state-only lease command, probed
@@ -1276,6 +1284,7 @@ teardown_release_locks() {
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     fm_project_lock_release "$TREEHOUSE_PROJECT_LOCK" || true
     TREEHOUSE_PROJECT_LOCK_HELD=0
+    TEARDOWN_ROUTE_LOCK_HELD=
   fi
   fm_lease_guard_release || true
   [ -z "${TEARDOWN_SLOT_PROOF:-}" ] || rm -f "$TEARDOWN_SLOT_PROOF"
