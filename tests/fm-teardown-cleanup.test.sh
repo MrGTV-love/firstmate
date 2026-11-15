@@ -4925,7 +4925,7 @@ SH
 }
 
 test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
-  local shape rc exclude hash dest real_cp
+  local shape rc exclude hash dest real_cp beside
   real_cp=$(command -v cp)
   for shape in failed-copy replaced; do
     dead_launcher_pid
@@ -4955,13 +4955,19 @@ SH
       assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was destroyed by a failed replacement"
       assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "own-backup-$shape: the earlier manifest was destroyed by a failed replacement"
     else
-      expect_code 0 "$rc" "own-backup-$shape: a verified replacement must release the copy: $(cat "$FOREIGN_CASE/stderr")"
-      assert_equals "only here" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was not replaced"
-      assert_grep "$(shasum -a 256 "$dest/unique.dat" | awk '{print $1}')  unique.dat" "$dest/SHA256SUMS" \
-        "own-backup-$shape: the manifest does not describe the replacement"
+      # An existing preserve is never replaced (Main 1970, Main 1961): the verified new one is
+      # written beside it and the earlier backup keeps every byte.
+      expect_code 0 "$rc" "own-backup-$shape: a verified new preserve must release the copy: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was replaced"
+      assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "own-backup-$shape: the earlier manifest was replaced"
+      beside=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -maxdepth 1 -type d -name "$hash.*" | head -n 1)
+      [ -n "$beside" ] || fail "own-backup-$shape: no new preserve was written beside the earlier one"
+      assert_equals "only here" "$(cat "$beside/unique.dat")" "own-backup-$shape: the new preserve lacks the copy's bytes"
+      assert_grep "$(shasum -a 256 "$beside/unique.dat" | awk '{print $1}')  unique.dat" "$beside/SHA256SUMS" \
+        "own-backup-$shape: the manifest does not describe the new preserve"
     fi
   done
-  pass "an earlier preserved copy of a locked own copy survives a failed replacement and is replaced only by a verified one"
+  pass "an earlier preserved copy of a locked own copy survives a failed new preserve and a verified one; the new preserve is written beside it, never over it"
 }
 
 test_a_held_copy_keeps_its_unique_ignored_files_and_none_are_preserved() {
@@ -7007,8 +7013,8 @@ test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_a
     base=$(kept_preserve_base "$kc")
     json='[".claude/channel-outbox/a.jsonl", ".claude/channel-outbox/b.jsonl"]' count=2 want=refuse
     case "$shape" in
-      first-differs) printf 'printf "different\\n" > "%s/.claude/channel-outbox/a.jsonl"\n' "$base" > "$kc/after" ;;
-      second-differs) printf 'printf "different\\n" > "%s/.claude/channel-outbox/b.jsonl"\n' "$base" > "$kc/after" ;;
+      first-differs) printf 'mkdir -p "%s/.claude/channel-outbox" && printf "different\\n" > "%s/.claude/channel-outbox/a.jsonl"\n' "$base" "$base" > "$kc/after" ;;
+      second-differs) printf 'mkdir -p "%s/.claude/channel-outbox" && printf "different\\n" > "%s/.claude/channel-outbox/b.jsonl"\n' "$base" "$base" > "$kc/after" ;;
       selected-changed) printf 'printf "changed\\n" > "%s/notes/unique.dat"\n' "$kc/copy" > "$kc/after-preserve" ;;
       selected-removed) printf 'rm -f "%s/notes/unique.dat"\n' "$base" > "$kc/after" ;;
       lacking)
@@ -7313,8 +7319,8 @@ retained_variant() {
     changed-during-driver) driver_env+=("FM_STUB_AFTER=printf 'changed\\n' > '$FOREIGN_COPY/notes/unique.dat'") ;;
     removed-from-preserve) driver_env+=("FM_STUB_AFTER=rm -f '$preserve/notes/unique.dat'") ;;
     driver-path-directory) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/") ;;
-    driver-path-differs) driver_env+=("FM_STUB_AFTER=printf 'different\\n' > '$preserve/.claude/channel-outbox/a.jsonl'") ;;
-    driver-path-differs-second) driver_env+=("FM_STUB_AFTER=printf 'different\\n' > '$preserve/.claude/channel-outbox/b.jsonl'") ;;
+    driver-path-differs) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/.claude/channel-outbox' && printf 'different\\n' > '$preserve/.claude/channel-outbox/a.jsonl'") ;;
+    driver-path-differs-second) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/.claude/channel-outbox' && printf 'different\\n' > '$preserve/.claude/channel-outbox/b.jsonl'") ;;
     driver-path-gone) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl .claude/channel-outbox/missing.jsonl") ;;
     driver-path-escapes) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl ../outside.dat") ;;
     empty-path) driver_env+=('FM_STUB_UNIQUE_JSON=[""]') ;;
@@ -7435,11 +7441,11 @@ test_a_kept_copy_whose_cause_went_closes_from_its_record_without_the_driver() {
   expect_code 1 "$rc" "retained-cause-went: a preserve without a selected file must refuse: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-cause-went: run 1 did not ask the driver once"
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
-  expect_code 0 "$rc" "retained-cause-went: the rebuilt preserve must let the record close the task: $(cat "$FOREIGN_CASE/stderr")"
+  expect_code 0 "$rc" "retained-cause-went: the copy preserved again beside the first must let the record close the task: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-cause-went: the closing run asked the driver"
   retained_assert_closed retained-cause-went
   retained_preserved_is retained-cause-went notes/unique.dat
-  pass "a kept copy whose cause went (its preserve rebuilt) closes from its record without the driver"
+  pass "a kept copy whose cause went (preserved again beside the preserve that lost a file, which is left as it is) closes from its record without the driver"
 }
 
 # C1 (f): the close and every later run leave the task's preserve, the driver's tars and the
