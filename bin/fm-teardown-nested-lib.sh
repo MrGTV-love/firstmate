@@ -1215,9 +1215,10 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
 # file's SHA-256 in its SHA256SUMS (teardown_manifest_line). The new preserve is
 # built in a staging directory, every listing and scan checked; it is published
 # by renaming the earlier preserve aside and the new one into place, and the
-# earlier one is deleted only after the published one verifies
-# (teardown_ignored_preserved_current). A failed publication or verification puts
-# the earlier preserve back, and an earlier preserve an interrupted run left set
+# earlier one is deleted only after the published one verifies against its own
+# manifest (teardown_preserve_self_check). A failed publication or verification
+# puts the earlier preserve back (a failed new preserve is deleted: the copy
+# still holds its bytes), and an earlier preserve an interrupted run left set
 # aside is put back before anything else, so no failure, interruption or retry
 # costs an earlier preserve. Returns 1 with TEARDOWN_PRESERVE_WHY when anything
 # cannot be listed, copied, hashed, published or verified, and the caller then
@@ -1264,13 +1265,16 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
     TEARDOWN_PRESERVE_WHY='the new preserve could not be published'
     return 1
   fi
-  if ! teardown_ignored_preserved_current "$copy" "$mode"; then
+  if ! teardown_preserve_self_check "$copy" "$dest"; then
     why=$TEARDOWN_PRESERVE_WHY
+    # The failed preserve holds nothing the copy does not still hold, so it goes,
+    # and the earlier preserve, when there is one, goes back into place.
     if [ -n "$aside" ]; then
-      # The failed preserve is moved beside the earlier one, which goes back.
       if failed=$(teardown_preserve_aside_name "$root" "$hash" failed) && mv "$dest" "$failed"; then
-        mv "$aside" "$dest" || true
+        mv "$aside" "$dest" && rm -rf "$failed"
       fi
+    else
+      rm -rf "$dest"
     fi
     TEARDOWN_PRESERVE_WHY="the published preserve does not verify ($why)"
     return 1
@@ -1278,6 +1282,42 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
   # The new preserve is proved: every earlier one of this copy may go.
   teardown_preserve_drop_asides "$root" "$hash" || true
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
+}
+
+# Is published preserve <dest> of <copy> whole by its own manifest? It is a real
+# directory outside every removal root naming <copy>, its manifest is a regular
+# file, every regular payload file lies inside it and has its one manifest line,
+# and the manifest holds no line more. A copy that changed meanwhile is the
+# caller's comparison (teardown_ignored_preserved_current), not this check's.
+teardown_preserve_self_check() {  # <copy> <dest>
+  local copy=$1 dest=$2 real files file rel sum dir count=0 lines rc=0
+  teardown_preserve_dest_outside "$copy" "$dest" || return 1
+  [ -d "$dest" ] && [ ! -L "$dest" ] || { TEARDOWN_PRESERVE_WHY='the preserve is not a real directory'; return 1; }
+  real=$(fm_task_copy_canonical_dir "$dest") || { TEARDOWN_PRESERVE_WHY='the preserve cannot be resolved'; return 1; }
+  teardown_path_outside_removal_roots "$copy" "$real" \
+    || { TEARDOWN_PRESERVE_WHY="the preserve resolves inside $TEARDOWN_ROOT_LABEL $TEARDOWN_ROOT_HIT"; return 1; }
+  [ -f "$dest/SHA256SUMS" ] && [ ! -L "$dest/SHA256SUMS" ] || { TEARDOWN_PRESERVE_WHY='the preserve has no manifest'; return 1; }
+  [ "$(cat "$dest/copy-path" 2>/dev/null)" = "$copy" ] || { TEARDOWN_PRESERVE_WHY='the preserve does not name this copy'; return 1; }
+  files=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
+  if ! find "$dest" -type f ! -path "$dest/copy-path" ! -path "$dest/SHA256SUMS" -print0 >"$files" 2>/dev/null; then
+    rm -f "$files"
+    TEARDOWN_PRESERVE_WHY='the preserve cannot be scanned'
+    return 1
+  fi
+  while IFS= read -r -d '' file; do
+    rel=${file#"$dest/"}
+    dir=$(fm_task_copy_canonical_dir "${file%/*}") || { TEARDOWN_PRESERVE_WHY="the preserved ${rel//$'\n'/\\n} cannot be resolved"; rc=1; break; }
+    case "$dir/" in "$real"/*) ;; *) TEARDOWN_PRESERVE_WHY="the preserved ${rel//$'\n'/\\n} resolves outside the preserve"; rc=1; break ;; esac
+    sum=$(teardown_ignored_sha256 "$file") || { TEARDOWN_PRESERVE_WHY="the preserved ${rel//$'\n'/\\n} cannot be hashed"; rc=1; break; }
+    grep -qxF -- "$(teardown_manifest_line "$sum" "$rel")" "$dest/SHA256SUMS" \
+      || { TEARDOWN_PRESERVE_WHY="the preserved ${rel//$'\n'/\\n} does not match its manifest line"; rc=1; break; }
+    count=$((count + 1))
+  done <"$files"
+  rm -f "$files"
+  [ "$rc" = 0 ] || return 1
+  lines=$(wc -l < "$dest/SHA256SUMS") || { TEARDOWN_PRESERVE_WHY='the manifest cannot be read'; return 1; }
+  lines=${lines//[!0-9]/}
+  [ "${lines:-x}" = "$count" ] || { TEARDOWN_PRESERVE_WHY="the manifest holds ${lines:-no} lines for the $count preserved files"; return 1; }
 }
 
 # Builds staging directory <stage> from the NUL-ended entry list <list> of
