@@ -145,8 +145,8 @@ test_answer_send_closes_open_decision() {
     fail "the answerer's close hid a worker line the drain never listed"
   fi
 
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the answered decision still lists as open: $out"
   fi
   pass "fm-send --resolve-key: the answer send itself closes the open decision"
@@ -266,8 +266,8 @@ test_colon_first_key_position_is_answerable() {
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/t8.status" | grep -qF 'resolved [key=seam-max-bound]: answered: cap it at 4' \
     || fail "the closing resolved line is missing:"$'\n'"$(cat "$home/state/t8.status")"
 
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the answered colon-first decision still lists as open: $out"
   fi
   pass "fm-send --resolve-key: a colon-first stated key is open under that key and answerable"
@@ -289,8 +289,8 @@ test_answer_starts_work_never_orphans() {
   printf 'working [key=phased-impl]: building region gates\n' >> "$home/state/t2.status"
   printf 'done [key=phased-impl]: PR up\n' >> "$home/state/t2.status"
 
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the answered decision orphaned after the answer started work: $out"
   fi
   pass "fm-send --resolve-key: an answer that starts a workstream leaves no orphaned decision"
@@ -391,7 +391,7 @@ test_failed_ring_still_closes_at_enqueue() {
     || fail "the answer must be durably recorded despite the failed ring"
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/t5.status" | grep -qF 'resolved [key=creds]: answered: token is in the vault now' \
     || fail "the enqueued answer must close the decision at answer time: $(cat "$home/state/t5.status")"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
   if printf '%s' "$out" | grep -F '[key=creds]' >/dev/null; then
     fail "the answered blocker still lists as open after an enqueue-time close: $out"
   fi
@@ -439,7 +439,7 @@ test_multiple_keys_close_together() {
   run_send "$fb" "$home" "$log" t6 --resolve-key k1 --resolve-key k2 \
     "one answer covering both"; rc=$?
   expect_code 0 "$rc" "an answer resolving two keys should succeed"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
   printf '%s' "$out" | grep -F '[key=k3]' >/dev/null \
     || fail "the unanswered third decision must stay open: $out"
   if printf '%s' "$out" | grep -E '\[key=k1\]|\[key=k2\]' >/dev/null; then
@@ -472,8 +472,8 @@ test_multiple_keys_close_after_fold_is_self_announced() {
     . "$1"; fm_wake_signal_seen_current "$2" "$3"
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state" "$home/state/t7.status" \
     || fail "one answer's two closes after an OPEN DECISIONS drain were left to re-wake this home"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "an answered folded key is still open: $out"
   fi
   pass "fm-send --resolve-key: one answer's closes after a drain fold never wake this home"
@@ -504,8 +504,8 @@ test_local_secondmate_answer_marked_and_closed() {
     *"$FM_FROMFIRST_SEPARATOR"*) fail "the closing line leaked marker bytes" ;;
   esac
   assert_contains "$closing" "shard by team" "the closing line should carry the plain answer"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the answered secondmate decision still lists as open: $out"
   fi
   pass "fm-send --resolve-key: a marked local-secondmate answer closes with the plain answer text"
@@ -553,8 +553,8 @@ test_remote_secondmate_answer_closes_locally() {
     "the answer message should cross the remote transport"
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/rsm.status" | grep -qF 'resolved [key=upgrade-window]: answered: the weekend, freeze Friday' \
     || fail "the remote answer did not close the local ledger: $(cat "$home/state/rsm.status")"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the answered remote-secondmate decision still lists as open: $out"
   fi
   pass "fm-send --resolve-key: a remote-secondmate answer closes the same local ledger, transport-only difference"
@@ -589,8 +589,8 @@ test_remote_reply_corr_tag_does_not_block_resolve_key() {
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/rsm.status" | grep -qF 'resolved [key=loan-installment-cadence-amount]: answered: monthly' \
     || fail "the closing resolved line is missing:"$'\n'"$(cat "$home/state/rsm.status")"
 
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the answered corr-tagged remote decision still lists as open: $out"
   fi
   pass "fm-send --resolve-key: a remote reply's leading [corr=...] tag no longer blocks closing its stated key"
@@ -691,8 +691,8 @@ test_reserved_pending_reply_key_closes_through_resolve_key() {
     fail "the operator close still wrote a bare answered: note that the fold ignores:"$'\n'"$(cat "$home/state/mate.status")"
   fi
 
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the reserved pending-reply decision still lists as open after --resolve-key: $out"
   fi
   pass "fm-send --resolve-key: a reserved pending-reply key actually closes through the operator path"
@@ -714,7 +714,7 @@ test_unrelated_writer_cannot_close_or_hijack_reserved_key() {
     printf 'resolved [key=%s]: all good now\n' "$key"
   } > "$home/state/mate.status"
 
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
   printf '%s' "$out" | grep -F "pending-reply-id=$corr" >/dev/null \
     || fail "an unrelated answered: resolution cleared a reserved decision: $out"
   if printf '%s' "$out" | grep -F 'shipping is blocked on infra' >/dev/null; then
@@ -723,8 +723,8 @@ test_unrelated_writer_cannot_close_or_hijack_reserved_key() {
 
   run_send "$fb" "$home" "$log" mate --resolve-key "$key" "dismiss the missed-reply hold"; rc=$?
   expect_code 0 "$rc" "the operator close should still succeed after foreign no-op lines"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the reserved key stayed open after the operator close: $out"
   fi
   pass "fm-send --resolve-key: an unrelated writer cannot close or hijack a reserved key, and the operator close still can"
@@ -834,8 +834,8 @@ test_failed_close_recovery_command_is_shell_safe() {
   manual=${manual% - do not resend the answer.}
   bash -c "$manual" || fail "the generated manual close command should execute successfully"
   [ ! -e "$marker" ] || fail "the generated manual close command executed answer text as shell code"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the generated manual close command did not close the decision: $out"
   fi
   pass "fm-send --resolve-key: failed-close recovery commands safely quote operator text and paths"
@@ -860,8 +860,8 @@ test_remote_reserved_pending_reply_key_closes_locally() {
   grep -F "pending-reply-resolved: task=rsm pending-reply-id=$corr via=operator-resolve-key" \
     "$home/state/rsm.status" >/dev/null \
     || fail "the remote operator close did not write the owning library's close note: $(cat "$home/state/rsm.status")"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  if [ -n "$FM_TEST_DRAIN_OPEN" ]; then
     fail "the remote reserved pending-reply decision still lists as open: $out"
   fi
   pass "fm-send --resolve-key: a remote secondmate reserved-key close is the same local ledger append"
@@ -914,7 +914,7 @@ test_decision_answer_partition_relocates_under_the_record() {
     || fail "the relocated answer did not close the decision:"$'\n'"$(cat "$home/state/t1.status")"
   grep -qF "go with REST" "$home/state/t1.inbox/002.msg" \
     || fail "the relocated answer did not reach the worker's inbox"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
   if printf '%s' "$out" | grep -F '[key=api-shape]' >/dev/null; then
     fail "the relocated answer left the decision open: $out"
   fi
@@ -1214,7 +1214,7 @@ test_double_dash_ends_options() {
   expect_code 0 "$rc" "a keyed answer whose literal body is --answers-none is delivered"
   body=$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")
   assert_equals "--answers-none" "$body" "the literal keyed answer is delivered unchanged"
-  drained=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
+  fm_test_drain_presented "$home/state" "$DRAIN"; drained=$FM_TEST_DRAIN_OUT
   assert_not_contains "$drained" "[key=k1]" "the keyed answer closed k1"
   assert_contains "$(drain_out "$home")" "[key=k2]" "k2 stays open"
   send_capture "$fb" "$home" "$log" "$err" t1 -- "plain words"; rc=$?
@@ -1289,7 +1289,7 @@ test_answers_none_delivers_a_routine_steer() {
   # --resolve-key for one of two keys is a stated choice and leaves the other open.
   send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "REST"; rc=$?
   expect_code 0 "$rc" "--resolve-key for one of two open keys needs no further flag"
-  drain=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
+  fm_test_drain_presented "$home/state" "$DRAIN"; drain=$FM_TEST_DRAIN_OUT
   case "$drain" in *"[key=k1]"*) fail "k1 should be closed" ;; esac
   assert_contains "$drain" "[key=k2]" "k2 stays open after answering k1"
   pass "fm-send --answers-none: delivers a routine steer, appends nothing, and leaves every key open"
@@ -1361,8 +1361,8 @@ test_reserved_key_counts_as_an_open_decision() {
   grep -F "pending-reply-resolved: task=mate pending-reply-id=$corr via=operator-resolve-key" \
     "$home/state/mate.status" >/dev/null \
     || fail "the keyed answer did not close with the owning library's vocabulary:"$'\n'"$(cat "$home/state/mate.status")"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
-  case "$out" in *"OPEN DECISIONS"*) fail "the reserved key still lists as open: $out" ;; esac
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
+  [ -z "$FM_TEST_DRAIN_OPEN" ] || fail "the reserved key still lists as open: $out"
   pass "fm-send: an open reserved pending-reply key refuses a bare send; the keyed answer closes it; the none-send leaves it open"
 }
 
@@ -1446,6 +1446,7 @@ test_config_reread_pointer_is_delivered_to_a_mate_with_an_open_keyed_decision() 
 # lane's own working:/done: lines cannot close it); now the bare send refuses.
 recorded_case_check() {  # <case-name> <task> <key> <status-log-file> <lane-lines-file> <drain-marker>
   local name=$1 task=$2 key=$3 statusfile=$4 lanefile=$5 marker=$6 dir fb log home err rc out
+  local before after new_records rec status_lines keyed_text="stand-in keyed answer text"
   dir="$TMP_ROOT/recorded-$name"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
   home=$(setup_home "recorded-$name")
@@ -1466,11 +1467,26 @@ recorded_case_check() {  # <case-name> <task> <key> <status-log-file> <lane-line
   cat "$lanefile" >> "$home/state/$task.status"
   assert_contains "$(drain_out "$home")" "$marker" "$name: the lane's working:/done: lines closed the key"
 
-  send_capture "$fb" "$home" "$log" "$err" "$task" --resolve-key "$key" "stand-in answer text"; rc=$?
+  # The keyed answer must land its OWN new inbox record: one record that did not exist before this
+  # send, whose body (after the record's -- line) carries this send's answer text, and the send must
+  # append its own resolved [key=<key>] line naming that answer. The record format has no key field
+  # (bin/fm-task-inbox-lib.sh "Record format"); the key is carried by that status line.
+  before=$(cd "$home/state/$task.inbox" && ls -1 -- *.msg 2>/dev/null)
+  status_lines=$(wc -l < "$home/state/$task.status" | tr -d ' ')
+  send_capture "$fb" "$home" "$log" "$err" "$task" --resolve-key "$key" "$keyed_text"; rc=$?
   expect_code 0 "$rc" "$name: the keyed answer is delivered"
-  [ "$(grep -lF "stand-in answer text" "$home/state/$task.inbox"/*.msg 2>/dev/null | wc -l | tr -d ' ')" = 2 ] \
-    || fail "$name: the keyed answer did not land its own inbox record"
-  out=$(drain_out "$home") || fail "the drain failed (exit $?) before an absence check (${FUNCNAME[0]}:$LINENO)"
+  after=$(cd "$home/state/$task.inbox" && ls -1 -- *.msg 2>/dev/null)
+  new_records=$(comm -13 <(printf '%s\n' "$before" | sort) <(printf '%s\n' "$after" | sort) | grep -c .)
+  [ "$new_records" = 1 ] || fail "$name: the keyed answer must add exactly one new inbox record (added $new_records)"
+  rec=$(comm -13 <(printf '%s\n' "$before" | sort) <(printf '%s\n' "$after" | sort) | grep .)
+  case "$(sed '1,/^--$/d' "$home/state/$task.inbox/$rec")" in
+    *"$keyed_text"*) ;;
+    *) fail "$name: the keyed answer's own record $rec does not carry the answer in its body: $(cat "$home/state/$task.inbox/$rec")" ;;
+  esac
+  sed -n "$((status_lines + 1)),\$p" "$home/state/$task.status" | sed -E 's/ \[at=[0-9]+\]//' \
+    | grep -qF "resolved [key=$key]: answered: $keyed_text" \
+    || fail "$name: the keyed answer did not append its own resolved [key=$key] line: $(cat "$home/state/$task.status")"
+  fm_test_drain_presented "$home/state" "$DRAIN"; out=$FM_TEST_DRAIN_OUT
   case "$out" in
     *"$marker"*) fail "$name: the key is still open after the keyed answer: $out" ;;
   esac

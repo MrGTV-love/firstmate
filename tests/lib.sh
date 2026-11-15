@@ -1587,6 +1587,57 @@ assert_not_contains() {
   esac
 }
 
+# fm_test_drain_presented <state-dir> [<drain>]: run the real wake drain over a
+# fixture state dir for an ABSENCE check ("this key is no longer open"), and
+# fail the test unless the drain gives positive evidence that it ran and
+# presented its open-decision view in full. Absence of a key in the output of a
+# drain that failed, took the zero-exit queue-lock skip (WAKE DRAIN SKIPPED),
+# skipped or cut its status presentation (STATUS PRESENTATION SKIPPED or
+# INCOMPLETE, the byte-cap "more omitted" line), or skipped a status log past
+# its read limits is not a closed key. The positive evidence is a canary: a
+# separate fixture task with one open decision, written just before the drain
+# and removed after it, which a complete presentation must list. On success it
+# sets FM_TEST_DRAIN_OUT to the drain's stdout without the canary's lines, and
+# FM_TEST_DRAIN_OPEN to the OPEN DECISIONS item lines without the canary's (empty
+# when nothing else is open). Call it directly, not in $(...), so fail stops
+# the test.
+fm_test_drain_presented() {
+  local state=$1 drain=${2:-$ROOT/bin/fm-wake-drain.sh} canary err out rc=0 bad
+  canary="$state/fm-test-drain-canary.status"
+  err="$state/../.fm-test-drain-presented.err"
+  [ ! -e "$canary" ] || fail "fm_test_drain_presented: $canary already exists"
+  printf 'needs-decision [key=fm-test-drain-canary]: canary for a complete drain presentation\n' > "$canary" \
+    || fail "fm_test_drain_presented: could not write $canary"
+  out=$(FM_STATE_OVERRIDE="$state" "$drain" 2>"$err") || rc=$?
+  rm -f -- "$canary"
+  [ "$rc" -eq 0 ] || fail "the drain failed (exit $rc) before an absence check: $(cat "$err" 2>/dev/null)"
+  bad=''
+  case "$out" in
+    *'WAKE DRAIN SKIPPED'*) bad='the drain skipped (queue lock held elsewhere)' ;;
+    *'STATUS PRESENTATION SKIPPED'*) bad='the status presentation was skipped' ;;
+    *'STATUS PRESENTATION INCOMPLETE'*) bad='the status presentation was incomplete' ;;
+    *'more omitted (byte cap)'*) bad='the open-decision view was cut at its byte cap' ;;
+  esac
+  if [ -z "$bad" ] && grep -E 'past the read limits|could not be acquired safely' "$err" >/dev/null 2>&1; then
+    bad="the drain skipped part of its scan: $(grep -E 'past the read limits|could not be acquired safely' "$err" | head -3)"
+  fi
+  if [ -z "$bad" ]; then
+    printf '%s\n' "$out" | awk '
+      /^OPEN DECISIONS \(still open/ { on = 1; next }
+      on && /^OPEN DECISIONS:/ { on = 0 }
+      on && /^fm-test-drain-canary \[key=fm-test-drain-canary\] needs-decision: / { found = 1 }
+      END { exit !found }' || bad='the canary decision was not listed, so the open-decision view was not shown in full'
+  fi
+  [ -z "$bad" ] || fail "no positive evidence of a complete drain before an absence check: $bad"$'\n'"--- drain stdout ---"$'\n'"$out"
+  # shellcheck disable=SC2034 # Both results are read by the calling suite.
+  FM_TEST_DRAIN_OUT=$(printf '%s\n' "$out" | grep -v 'fm-test-drain-canary')
+  # shellcheck disable=SC2034 # Both results are read by the calling suite.
+  FM_TEST_DRAIN_OPEN=$(printf '%s\n' "$out" | awk '
+    /^OPEN DECISIONS \(still open/ { on = 1; next }
+    on && /^OPEN DECISIONS:/ { on = 0 }
+    on && !/^fm-test-drain-canary / { print }')
+}
+
 # fm_launch_holds <launch-text> <token>: the launch holds <token> as written or
 # nested in single-quoted levels. The launch boundary runs the launch as one
 # quoted -c argument, a confined launch adds a sandbox-exec level, and a launcher
