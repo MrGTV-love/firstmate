@@ -1181,7 +1181,6 @@ def case_holder_killed():
         codes = wait_all([queued], timeout=240)
         seen = world.sample_stop()
         queued_start = [stamp for group, _, stamp in starts(world) if group == 'queued']
-        first_start = [stamp for group, _, stamp in starts(world) if group == 'first']
         first_end = [stamp for group, _, stamp in ends(world) if group == 'first']
         rows[label] = dict(queued_started_before_the_worker_ended=queued_early, sampled_max_workers_total=seen['peak_total'], queued_exit=codes)
         case.check(codes == [0], '%s: the queued request never ran: %s' % (label, world.text('queued')[-200:]))
