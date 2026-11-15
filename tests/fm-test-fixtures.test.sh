@@ -594,6 +594,14 @@ test_spawn_tree_follows_untracked_content() (
   [ "$first" != "$second" ] || fail "an untracked file whose content changed reused the tree built for the old content: $first"
   grep -q second "$(dirname "$second")/helper.sh" || fail "the new tree does not hold the new content"
   pass "the private spawn tree changes when an untracked file's content changes"
+  # R10-2: a name git would quote (non-ASCII) is hashed by its content too.
+  rm -f "$dir/repo/bin/helper.sh"
+  printf 'first\n' >"$dir/repo/bin/"$'h\303\251lper.sh'
+  first=$(ROOT="$dir/repo" TMPDIR="$dir/tmp" FM_TEST_STUB_SUMMARY_REFRESH=1 fm_test_spawn_script) || fail "the first non-ASCII tree could not be built"
+  printf 'second\n' >"$dir/repo/bin/"$'h\303\251lper.sh'
+  second=$(ROOT="$dir/repo" TMPDIR="$dir/tmp" FM_TEST_STUB_SUMMARY_REFRESH=1 fm_test_spawn_script) || fail "the second non-ASCII tree could not be built"
+  [ "$first" != "$second" ] || fail "an untracked non-ASCII file whose content changed reused the tree built for the old content: $first"
+  pass "the private spawn tree changes when an untracked file with a non-ASCII name changes content"
 )
 
 test_duration_fixture_isolation || fail "Fixture duration isolation"

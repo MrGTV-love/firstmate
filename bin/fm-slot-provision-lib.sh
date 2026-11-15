@@ -604,6 +604,38 @@ def proc_info(pid):
     except Exception:
         return None
 
+def exe_argv0(pid):
+    """The full executable path and argv[0] of <pid> from the kernel, or None when either cannot be read."""
+    try:
+        if sys.platform == "darwin":
+            import ctypes, ctypes.util, struct
+            lib = ctypes.CDLL(ctypes.util.find_library("proc") or "/usr/lib/libproc.dylib")
+            buf = ctypes.create_string_buffer(4096)
+            if lib.proc_pidpath(pid, buf, 4096) <= 0:
+                return None
+            path = buf.value
+            libc = ctypes.CDLL(ctypes.util.find_library("c"))
+            mib = (ctypes.c_int * 3)(1, 49, pid)
+            size = ctypes.c_size_t(0)
+            if libc.sysctl(mib, 3, None, ctypes.byref(size), None, 0) != 0 or size.value < 4:
+                return None
+            raw = ctypes.create_string_buffer(size.value)
+            if libc.sysctl(mib, 3, raw, ctypes.byref(size), None, 0) != 0:
+                return None
+            data = raw.raw[:size.value]
+            argc = struct.unpack_from("<i", data, 0)[0]
+            rest = data[4:]
+            rest = rest[rest.index(b"\0"):].lstrip(b"\0")
+            argv0 = rest.split(b"\0", 1)[0] if argc > 0 else b""
+        else:
+            path = os.fsencode(os.readlink("/proc/%d/exe" % pid))
+            with open("/proc/%d/cmdline" % pid, "rb") as handle:
+                argv0 = handle.read().split(b"\0", 1)[0]
+    except Exception:
+        return None
+    clean = lambda raw: raw.decode("utf-8", "replace").replace("\x1f", " ").replace("\n", " ")
+    return clean(path), clean(argv0)
+
 def chain(pid):
     out, cur = [], pid
     for _ in range(64):
@@ -690,14 +722,21 @@ def holders(slot, real, spawn, common, governed, pane, endpoint="", endpoint_sta
             continue
         if cwd is not None and not any(cwd == base or cwd.startswith(base + "/") for base in inside):
             continue
-        # Inside the tree rooted at the recorded endpoint: the own lineage of this task. Each name on the way up is printed
-        # (T rows) so the caller refuses an agent; a chain that cannot be read is unknown.
+        # Inside the tree rooted at the recorded endpoint: the own lineage of this task. The executable path and argv0 of
+        # each process on the way up are printed (a T row, fields split by 0x1f) so the caller refuses an agent; a chain,
+        # path or argv0 that cannot be read is unknown.
         if cwd is not None and endpoint:
             path, complete = chain(pid)
             pids = [p for p, _ in path]
             if endpoint in pids:
-                names = [info[1] for _, info in path[:pids.index(endpoint) + 1]]
-                print("T\t%d\t%s" % (pid, "\t".join(n.replace("\t", " ") for n in names)))
+                fields = [str(pid)]
+                for member in pids[:pids.index(endpoint) + 1]:
+                    found = exe_argv0(member)
+                    if found is None:
+                        print("U\tthe executable or argv0 of a process (pid %d) in the recorded endpoint tree cannot be read" % member)
+                        return
+                    fields += list(found)
+                print("T\t" + "\x1f".join(fields))
                 continue
             if not complete:
                 print("U\tthe parent chain of a live process (pid %d, %s) in the slot cannot be read" % (pid, row["cmd"]))
@@ -856,7 +895,8 @@ fm_slot_pool_rows_valid() {
 # after the spawn began (FM_SLOT_SPAWN_PID). On a relaunch, the process tree rooted at the task's own recorded
 # endpoint (FM_SLOT_ENDPOINT_PID, the pane shell read from the recorded window, with FM_SLOT_ENDPOINT_START its start
 # time) is this task's lineage too, except a process in it that fm_agent_process_classify_name (bin/fm-agent-process-lib.sh,
-# which the caller sources) names an agent. A start time that does not match, or a chain that cannot be read, is unknown.
+# which the caller sources) names an agent by its executable path and argv0. A start time that does not match, or a chain,
+# path or argv0 that cannot be read, is unknown.
 # There is no age exemption. A live lease, a contention row
 # (or one that cannot be read) and a git worktree lock count too. A holder list that cannot be read skips.
 fm_slot_holders_or_skip() { # <slot> [<project>]
@@ -875,12 +915,12 @@ fm_slot_holders_or_skip() { # <slot> [<project>]
       H$'\t'*) fm_slot_skip "$slot" live_holder "${line#H$'\t'}"; return ;;
       U$'\t'*) fm_slot_skip "$slot" unknown_holders "${line#U$'\t'}"; return ;;
       T$'\t'*)
-        IFS=$'\t' read -r -a tree <<<"${line#T$'\t'}"
+        IFS=$'\x1f' read -r -a tree <<<"${line#T$'\t'}"
         declare -F fm_agent_process_classify_name >/dev/null ||
           { fm_slot_skip "$slot" unknown_holders "the agent classifier is not loaded, so the recorded endpoint's tree cannot be judged"; return; }
-        for name in "${tree[@]:1}"; do
-          [ "$(fm_agent_process_classify_name "$name")" != agent ] ||
-            { fm_slot_skip "$slot" live_holder "an agent ($name) in the recorded endpoint's tree has the slot (pid ${tree[0]})"; return; }
+        for ((name = 1; name < ${#tree[@]}; name += 2)); do
+          [ "$(fm_agent_process_classify_name "${tree[name]}" "${tree[name + 1]:-}")" != agent ] ||
+            { fm_slot_skip "$slot" live_holder "an agent (${tree[name]}, argv0 ${tree[name + 1]:-none}) in the recorded endpoint's tree has the slot (pid ${tree[0]})"; return; }
         done
         ;;
     esac

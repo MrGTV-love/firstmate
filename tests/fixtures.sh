@@ -374,9 +374,14 @@ fm_test_spawn_script() {
     printf '%s\n' "$ROOT/bin/fm-spawn.sh"
     return
   fi
-  key=$( { git -C "$ROOT" rev-parse HEAD; git -C "$ROOT" diff HEAD; git -C "$ROOT" ls-files -o --exclude-standard | sort |
-    while IFS= read -r untracked; do printf '%s %s\n' "$(git -C "$ROOT" hash-object -- "$untracked")" "$untracked"; done; } 2>/dev/null |
-    shasum -a 256 | cut -c1-16)
+  key=$(
+    set -o pipefail
+    { git -C "$ROOT" rev-parse HEAD; git -C "$ROOT" diff HEAD; git -C "$ROOT" ls-files -o --exclude-standard -z | sort -z |
+      while IFS= read -r -d '' untracked; do
+        hash=$(git -C "$ROOT" hash-object -- "$untracked") || exit 1
+        printf '%s %s\n' "$hash" "$untracked"
+      done; } 2>/dev/null | shasum -a 256 | cut -c1-16
+  ) || return 1
   tree="${TMPDIR:-/tmp}/fm-spawn-tree-$(id -u)-$key"
   if [ ! -x "$tree/bin/fm-spawn.sh" ]; then
     rm -rf "$tree.part"

@@ -1662,21 +1662,24 @@ test_an_ignored_file_whose_identity_changes_during_the_move_fails_it() {
 
 # --- R9-1: on a relaunch, the process tree rooted at the task's own recorded endpoint is this task's lineage ----------
 
-# start_recorded_endpoint [<inner-name>]: the real treehouse shape. A pane shell standing in the project folder runs a
-# `treehouse` launcher, which opens a shell in the slot; that shell runs <inner-name> (a copy of sleep; default sleep).
+# start_recorded_endpoint [<inner-path> [<argv0>]]: the real treehouse shape. A pane shell standing in the project folder
+# runs a `treehouse` launcher, which opens a shell in the slot; that shell runs <inner-path> (a copy of sleep at that path
+# under the launcher directory; default sleep itself) with <argv0> (default: its own path).
 # The launcher started before the spawn (start_marker runs after), so only the recorded tree can excuse it.
 # Sets ENDPOINT_PID (the pane shell) and ENDPOINT_START (its start time, read by the probe).
 start_recorded_endpoint() {
-  local inner=${1:-sleep} dir="$W_DIR/launcher" bin
+  local inner=${1:-sleep} dir="$W_DIR/launcher" bin argv0
   make_launcher "$dir" || return 1
   bin=$(command -v sleep)
   if [ "$inner" != sleep ]; then
+    mkdir -p "$(dirname "$dir/$inner")"
     cp "$bin" "$dir/$inner" || return 1
     [ "$(uname)" != Darwin ] || codesign -f -s - "$dir/$inner" >/dev/null 2>&1 || true
     bin="$dir/$inner"
   fi
+  argv0=${2:-$bin}
   # shellcheck disable=SC2016 # The pane and launcher shells expand their own positional arguments.
-  (cd "$W_PROJ" && exec bash -c '"$1" -c "cd \"\$1\" && \"\$2\" 300 & wait" get "$2" "$3"; :' pane "$dir/treehouse" "$W_SLOT" "$bin") &
+  (cd "$W_PROJ" && exec bash -c '"$1" -c "(cd \"\$1\" && exec -a \"\$3\" \"\$2\" 300) & wait" get "$2" "$3" "$4"; :' pane "$dir/treehouse" "$W_SLOT" "$bin" "$argv0") &
   ENDPOINT_PID=$!
   HELD_PIDS+=("$ENDPOINT_PID")
   sleep 0.5
@@ -1724,6 +1727,25 @@ test_an_agent_in_the_recorded_tree_holds_the_slot() {
   start_recorded_endpoint claude || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
     expect_skip "an agent inside the recorded tree still holds the slot" live_holder
+  cleanup_held
+}
+
+# R10-1: the agent check reads each process of the tree by its executable path and argv0, not only its short name.
+test_a_version_named_agent_in_the_recorded_tree_holds_the_slot() {
+  make_world r101-versioned
+  advance_origin advanced.txt
+  start_recorded_endpoint claude/versions/2.1.220 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
+    expect_skip "an agent whose executable is named by its version, under claude/versions/, still holds the slot" live_holder
+  cleanup_held
+}
+
+test_a_node_named_agent_in_the_recorded_tree_holds_the_slot() {
+  make_world r101-node
+  advance_origin advanced.txt
+  start_recorded_endpoint node "$W_DIR/launcher/codex/bin/codex" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
+    expect_skip "a node process whose argv0 names a harness still holds the slot" live_holder
   cleanup_held
 }
 
@@ -1856,6 +1878,8 @@ CASES=(
   test_a_foreign_shell_beside_the_recorded_tree_holds_the_slot
   test_a_reparented_orphan_in_the_slot_holds_it
   test_an_agent_in_the_recorded_tree_holds_the_slot
+  test_a_version_named_agent_in_the_recorded_tree_holds_the_slot
+  test_a_node_named_agent_in_the_recorded_tree_holds_the_slot
   test_an_unreadable_recorded_window_excuses_nobody
   test_a_recorded_endpoint_whose_start_time_does_not_match_refuses
 )
