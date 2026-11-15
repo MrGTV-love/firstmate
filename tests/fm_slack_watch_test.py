@@ -8403,6 +8403,21 @@ class Round9Findings(InvariantScenario):
         self.assertLessEqual(len(alive), 1, alive)
         self.assertTrue(all(isinstance(c, dict) for c in cutoffs), cutoffs)
 
+    def test_r9_f9_a_call_with_no_time_left_is_not_begun_and_its_cut_off_is_still_recorded(self):
+        looked_up = []
+        with patch.object(socket, 'getaddrinfo', lambda *args, **kwargs: looked_up.append(args) or []):
+            for left in (0.0, -1.0):
+                slack = plane.Slack('fixture-token-not-a-secret-r9-f9b')
+                slack.base = 'https://127.0.0.1:9/'
+                slack.time_left = lambda left=left: left
+                with self.assertRaises(plane.DeadlineSpent) as cut:
+                    slack.call('chat.postMessage', channel=INV_SECOND_DM, text='x', client_msg_id='r9-f9b')
+                self.assertFalse(cut.exception.sent)
+                record = dict(slack.last_cutoff or {})
+                record.pop('closed_at', None)
+                self.assertEqual(record, {'ended': True, 'lookup_pending': False, 'sent': False, 'begun': False})
+        self.assertEqual(looked_up, [])                                         # nothing was looked up, so nothing could be sent
+
     # ---- Main 1729 (b), (c): the real boundary of a name lookup that never returns ----
 
     DRIVER = Invariant4OwnerFirst.DRIVER
@@ -8448,16 +8463,20 @@ class Round9Findings(InvariantScenario):
     def test_r9_main1729_while_one_lookup_is_stuck_every_later_call_is_refused_and_recorded_with_no_growth(self):
         import tracemalloc
         port, accepted = self.counting_listener()
-        stuck, real_lookup = threading.Event(), socket.getaddrinfo
+        for left_over in [t for t in threading.enumerate() if t.name == 'fm-slack-lookup']:
+            left_over.join(5)                                                   # a lookup an earlier test released may still be ending
+        self.assertEqual([t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()], [])
+        stuck, real_lookup, started = threading.Event(), socket.getaddrinfo, []
         def blocking(*args, **kwargs):
+            started.append(args[:2])
             stuck.wait()
             return real_lookup(*args, **kwargs)
         self.addCleanup(stuck.set)
         with patch.object(socket, 'getaddrinfo', blocking):
-            def one(n):
+            def one(n, budget=0.1):
                 slack = plane.Slack('fixture-token-not-a-secret-r9-c')
                 slack.base = 'https://127.0.0.1:%d/' % port
-                deadline = time.monotonic() + 0.1
+                deadline = time.monotonic() + budget
                 slack.time_left = lambda: deadline - time.monotonic()
                 outcome = 'completed'
                 try:
@@ -8465,18 +8484,29 @@ class Round9Findings(InvariantScenario):
                 except Exception as error:
                     outcome = type(error).__name__
                 return outcome, slack.last_cutoff
-            one(0)                                                              # the lookup that stays stuck
+            one(0, 2.0)                                                         # the lookup that stays stuck (time enough for its reader to reach it)
+            self.assertEqual(len(started), 1, started)
             tracemalloc.start()
-            before = tracemalloc.get_traced_memory()[0]
-            results = [one(n) for n in range(1, 31)]
-            grown = tracemalloc.get_traced_memory()[0] - before
+            results = [one(n) for n in range(1, 31)]                            # also the warm-up: one-time library caches and garbage not yet collected
+            grown = []
+            for batch in range(2):                                              # then two more batches of 30, each measured after a collection
+                gc.collect()
+                before = tracemalloc.get_traced_memory()[0]
+                [one(100 + 30 * batch + k) for k in range(30)]
+                gc.collect()
+                grown.append(tracemalloc.get_traced_memory()[0] - before)
             tracemalloc.stop()
             lookups = [t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()]
             stuck.set()
         self.assertEqual({o for o, _ in results}, {'DeadlineSpent'})
-        self.assertTrue(all(isinstance(c, dict) and c.get('lookup_pending') and c.get('sent') is False for _, c in results), results[:2])
+        # Each later call is refused and recorded, ended, with nothing sent. Under load a reader may reach the fence only after its caller's deadline closed it;
+        # that call is refused before any lookup (lookup_pending False), which is also no new lookup. The proof that none was started is the count below.
+        odd = [(n, c) for n, (_, c) in enumerate(results, 1) if not (isinstance(c, dict) and c.get('ended') is True and c.get('sent') is False)]
+        self.assertEqual(odd, [])
+        self.assertEqual(len(started), 1, started)                              # one lookup in all: the stuck one; no later call started another
+        self.assertTrue(any(c.get('lookup_pending') for _, c in results), results)  # control: the refusal by the live lookup was exercised
         self.assertLessEqual(len(lookups), 1, lookups)
-        self.assertLess(grown, 256 * 1024, grown)                               # no growth with the number of calls
+        self.assertLess(max(grown), 8 * 1024, grown)                            # no growth with the number of calls (measured 0.7 KB to 2.8 KB a batch)
         self.assertEqual(accepted, [])
 
     # ---- F10: an interrupted span report appends its row once ----
