@@ -10,6 +10,7 @@
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
 #       [--context <file>]... --root <repo-root> [--exclude <path>]...
 #       [--register <path>] [--history <path>] [--policy <file>] [--out-root <dir>]
+#       [--work-root <dir>]
 #   fm-contract-review-pack.sh check --pack <dir> --log <session-transcript>
 #       [--manifest <file>]
 #
@@ -25,15 +26,22 @@
 #   followed by a qualifier made only of QUALIFIER_WORDS, numbers, short ids such as a2 or
 #   r19, corr=<hex> and the punctuation ( ) , ; : and dashes. Inside a known section a
 #   sub-heading must be on CONTRACT_SUBSECTIONS or, inside the Definition Of Done, have the
-#   one owned criterion-title form "<title> - mandatory" or "<title> - supporting" (any dash).
+#   one owned criterion-title form "<title> - mandatory" or "<title> - supporting" (any dash)
+#   with no CRITERION_TITLE_TERMS word in <title>; a known section name nested deeper starts
+#   that section.
 #   Headings are ATX (# to ######), setext (a line over === or ---) and bold-only lines
 #   (**Name** or __Name__), which count as the deepest sub-heading; text in a code fence is
 #   never a heading.
-#   Dropped and listed by heading in the excluded record (dropped lines): the file's first
-#   level 1 heading when it is not exactly a known name (the title); every section whose
-#   heading is not known, with everything below it; and text outside any known section.
+#   The file's first level 1 heading is its known section when it is one, and otherwise the
+#   title, which is dropped and listed.
+#   Dropped and listed by heading in the excluded record (dropped lines): the title; every
+#   section whose heading is not known, with everything below it; and text outside any
+#   known section.
 #   Refused with exit 3, nothing written: an unknown sub-heading inside a known section
-#   (dropping it could drop part of a criterion), and a code fence that never closes.
+#   (dropping it could drop part of a criterion); a first level 1 heading that starts with a
+#   known section name but is not one (it is neither proven a section nor proven a title); a
+#   criterion sub-section name (on CONTRACT_SUBSECTIONS only) outside a known section; a
+#   Definition Of Done that holds no text; and a code fence that never closes.
 #   A contract with no Definition Of Done section exits 2.
 #   The request and each context file are admitted whole by role (Main or the owner supplies
 #   them), with no filter, and the excluded record lists each as admitted-whole-by-role.
@@ -42,7 +50,10 @@
 #   be put there.
 #   The excluded record is <out-root>.excluded-paths, outside the pack. It always holds the
 #   real path of every input file (the contract, the request, each context file), the
-#   register and history paths when given, and every --exclude path. The policy is
+#   register and history paths when given, and every --exclude path. It also records the
+#   reviewer's work folder, <work-root>/<out-root basename>-pack, which is how the entrypoint
+#   names it; --work-root defaults to $REVIEW_WORK_ROOT, else /private/tmp/fm-review-work,
+#   the entrypoint's own default, so pass the same work root to both. The policy is
 #   --policy, else the skill next to this script.
 # check: reads the run's session transcript (--log: the entrypoint's omp-session folder,
 #   or one of its .jsonl files) and judges every read it records. The report's own
@@ -50,15 +61,17 @@
 #   Judged reads: read and edit paths (a trailing :selector such as :raw:1-11 or :-1 is
 #   removed one segment at a time; the read is authorized when the path or one of these
 #   shorter forms is), and grep, glob and find roots.
-#   Authorized: anything inside the pack; the run's work folder (the session's folder),
-#   except the entrypoint's OPERATIONAL-BOUNDARIES.md copy there; the transcript itself;
+#   Every session record must name a folder under the recorded work folder, else the round
+#   is void: the transcript never chooses its own work folder.
+#   Authorized: anything inside the pack; the recorded work folder, except the entrypoint's
+#   OPERATIONAL-BOUNDARIES.md copy there; the transcript itself;
 #   the SKILL.md of assess-done-and-grade or define-done-and-grading, by path or as
 #   skill://<name>; the review rubric, by path or by the pinned raw.githubusercontent.com
 #   or github.com blob URL of this repository's origin; a file the manifest's root tracks;
-#   a search root under the root whose search reaches no untracked file (and, unless the
-#   call sets gitignore true, no ignored file); and the run's own agent://, artifact://,
-#   proc:// and history:// records. A path in the excluded record is refused even when
-#   tracked. Every other read, search or scheme is an INPUT LEAK.
+#   and a search root under the root whose search reaches no untracked file (and, unless the
+#   call sets gitignore true, no ignored file). A path in the excluded record is refused
+#   even when tracked. Every other read, search or scheme is an INPUT LEAK, including every
+#   agent://, artifact://, proc:// and history:// record: none can be proven to be this run's.
 #   Not provable, so never clean: a bash or eval call, any other tool that can read, and a
 #   subagent whose transcript the log does not hold (a single-file log never holds one).
 #   Prints INPUT LEAK lines and ROUND VOID (exit 3) on any leak; otherwise INPUT UNVERIFIED
@@ -103,6 +116,9 @@ BLOCK_END='<!-- reviewer-block:end -->'
 CONTRACT_SECTIONS="request|context|captain's intent|captain intent|rulings|rulings on this contract|terms|amendment|definition of done|how you're graded|how you are graded|assumptions|decisive scenario|out of scope|known limits|hard gates|execution constraints|honesty rule|mandatory items|supporting items"
 CONTRACT_SUBSECTIONS="mandatory|mandatory items|supporting|supporting items|hard gates|honesty rule|out of scope"
 QUALIFIER_WORDS="verbatim from main steer task neutral facts with sources disclosed not criteria execution constraints withdrawn and revision"
+# Words that, anywhere in a criterion title, mark it as author material rather than a criterion
+# (Main 1904 F1); such a title is an unknown sub-heading.
+CRITERION_TITLE_TERMS="responses|response|answered|findings|finding|owner background|contract review|review history|revision log|revision history|author|author's|authors|self-check|all-green|boundary dispositions|prior review|suggested attack|register|notes from"
 
 # Section filter, run under LC_ALL=C so byte escapes match. Reads the contract and writes the
 # admitted text to KEEP_OUT, one excluded-record line per drop to DROP_OUT, one line per
@@ -142,10 +158,24 @@ function known(t, list,   n, i, parts, b, q) {
   }
   return ""
 }
-function criterion(t) {
+function criterion(t,   title, n, i, parts) {
   t = norm(t)
   gsub(/\342\200\224|\342\200\223/, "-", t)
-  return t ~ /[^ \t][ \t]+-[ \t]*(mandatory|supporting)$/
+  if (t !~ /[^ \t][ \t]+-[ \t]*(mandatory|supporting)$/) return 0
+  title = t
+  sub(/[ \t]+-[ \t]*(mandatory|supporting)$/, "", title)
+  n = split(CT, parts, "|")
+  for (i = 1; i <= n; i++)
+    if (parts[i] != "" && (" " title " ") ~ ("[^a-z0-9]" parts[i] "[^a-z0-9]")) return 0
+  return 1
+}
+# True when a heading starts with a known section name, whatever follows it.
+function starts_known(t,   n, i, parts) {
+  t = norm(t)
+  n = split(SECTIONS, parts, "|")
+  for (i = 1; i <= n; i++)
+    if (parts[i] != "" && index(t, parts[i]) == 1 && substr(t, length(parts[i]) + 1) !~ /^[a-z0-9]/) return 1
+  return 0
 }
 function runlen(s, ch,   n) {
   n = 0
@@ -158,7 +188,7 @@ function outside_flush(where) {
 }
 { L[++N] = $0 }
 END {
-  fence = 0; titled = 0; insec = 0; seclv = 0; dropto = 0; outside = 0; secname = ""
+  fence = 0; titled = 0; insec = 0; seclv = 0; dropto = 0; outside = 0; secname = ""; dodseen = 0; dodbody = 0
   for (i = 1; i <= N; i++) {
     line = L[i]
     match(line, /^ ? ? ?/)
@@ -184,18 +214,25 @@ END {
     }
     if (!lv) {
       if (dropto) continue
-      if (insec) { print line > KEEP_OUT; continue }
+      if (insec) {
+        print line > KEEP_OUT
+        if (secname == "definition of done" && line !~ /^[ \t]*$/) dodbody++
+        continue
+      }
       if (line !~ /^[ \t]*$/) outside++
       continue
     }
     head = line
     if (two) head = line "\n" L[i + 1]
     t2 = t; gsub(/^[ \t]+|[ \t]+$/, "", t2)
+    # The first level 1 heading is its known section when it is one; otherwise it is the
+    # title, unless it starts with a known name it is not, which is ambiguous (Main 1904 F2).
     if (!titled && lv == 1) {
       titled = 1
-      if (known(t, SECTIONS) != norm(t)) {
+      if (known(t, SECTIONS) == "") {
         outside_flush("before the title")
-        print "dropped\ttitle: " t2 > DROP_OUT
+        if (starts_known(t)) print "a first heading that starts with a known section name but is not one: " t2 > REFUSE_OUT
+        else print "dropped\ttitle: " t2 > DROP_OUT
         if (two) i++
         continue
       }
@@ -209,15 +246,26 @@ END {
         if (two) i++
         continue
       }
-      print "unknown heading inside a known section: " t2 " (under: " sectitle ")" > REFUSE_OUT
-      dropto = lv
-      if (two) i++
-      continue
+      # A known section name nested deeper starts that section; anything else is refused.
+      if (known(t, SECTIONS) == "") {
+        print "unknown heading inside a known section: " t2 " (under: " sectitle ")" > REFUSE_OUT
+        dropto = lv
+        if (two) i++
+        continue
+      }
     }
     b = known(t, SECTIONS)
     outside_flush("before \"" t2 "\"")
+    if (b == "" && known(t, SUBS) != "") {
+      # A criterion sub-section name outside a known section would drop its criteria (Main 1904 F3).
+      print "a criterion sub-section name outside a known section: " t2 > REFUSE_OUT
+      insec = 0; dropto = lv
+      if (two) i++
+      continue
+    }
     if (b != "") {
       insec = 1; seclv = lv; secname = b; sectitle = t2
+      if (b == "definition of done") dodseen = 1
       print b > NAMES_OUT
       print head > KEEP_OUT
     } else {
@@ -228,13 +276,14 @@ END {
   }
   outside_flush("at the end")
   if (fence) print "the code fence opened at line " fline " never closes" > REFUSE_OUT
+  if (dodseen && !dodbody) print "the Definition Of Done holds no criterion text" > REFUSE_OUT
 }
 '
 
 filter_sections() { # <file> <keep> <drop> <refuse> <names>
   : >"$2"; : >"$3"; : >"$4"; : >"$5"
   LC_ALL=C awk -v KEEP_OUT="$2" -v DROP_OUT="$3" -v REFUSE_OUT="$4" -v NAMES_OUT="$5" \
-    -v SECTIONS="$CONTRACT_SECTIONS" -v SUBS="$CONTRACT_SUBSECTIONS" -v QW="$QUALIFIER_WORDS" \
+    -v SECTIONS="$CONTRACT_SECTIONS" -v SUBS="$CONTRACT_SUBSECTIONS" -v QW="$QUALIFIER_WORDS" -v CT="$CRITERION_TITLE_TERMS" \
     "$SECTION_AWK" <"$1"
 }
 
@@ -247,7 +296,7 @@ policy_block() { # <policy> -> block with marker lines on stdout, nonzero unless
 }
 
 cmd_build() {
-  local contract='' request='' root='' policy='' out_root=''
+  local contract='' request='' root='' policy='' out_root='' work_root=${REVIEW_WORK_ROOT:-/private/tmp/fm-review-work}
   local -a contexts=() excludes=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -259,11 +308,13 @@ cmd_build() {
         [ $# -ge 2 ] || die "$1 needs a path"; excludes+=("$2"); shift 2 ;;
       --policy) [ $# -ge 2 ] || die "--policy needs a file"; policy=$2; shift 2 ;;
       --out-root) [ $# -ge 2 ] || die "--out-root needs a directory"; out_root=$2; shift 2 ;;
+      --work-root) [ $# -ge 2 ] || die "--work-root needs a directory"; work_root=$2; shift 2 ;;
       -h | --help) usage; exit 0 ;;
       *) die "unknown argument: $1" ;;
     esac
   done
   [ -n "$contract" ] || die "--contract is required"
+  [ -n "$work_root" ] || die "--work-root is empty"
   [ -n "$root" ] || die "--root is required: the repository checkout the reviewer reads, so the check can judge every read against it"
   [ -f "$contract" ] && [ -r "$contract" ] || die "contract file not readable: $contract"
   [ -z "$request" ] || { [ -f "$request" ] && [ -r "$request" ] || die "request file not readable: $request"; }
@@ -352,6 +403,8 @@ cmd_build() {
     echo "# fm-contract-review-pack excluded record: paths the reviewer must never read, and contract text it was not given"
     printf 'pack\t%s\n' "$(real "$pack")"
     printf 'root\t%s\n' "$(real "$root")"
+    # The reviewer's work folder, named the way the entrypoint names it from REVIEW_WORK_ROOT.
+    printf 'work\t%s\n' "$(real "$work_root/$(basename "$out_root")-pack")"
     printf 'exclude\t%s\n' "$(real "$contract")"
     [ -z "$request" ] || printf 'exclude\t%s\n' "$(real "$request")"
     for f in ${contexts[@]+"${contexts[@]}"} ${excludes[@]+"${excludes[@]}"}; do
@@ -380,6 +433,7 @@ pack, log, manifest, skills, rubric, rubric_rev, slug = sys.argv[1:8]
 real = os.path.realpath
 pack = real(pack)
 root = None
+work_rec = None
 excludes = []
 for line in open(manifest, encoding="utf-8", errors="replace"):
     f = line.rstrip("\n").split("\t")
@@ -387,8 +441,13 @@ for line in open(manifest, encoding="utf-8", errors="replace"):
         root = real(f[1])
     elif f[0] == "exclude" and len(f) > 1:
         excludes.append(real(f[1]))
+    elif f[0] == "work" and len(f) > 1 and work_rec is None:
+        work_rec = real(f[1])
 if root is None:
     print("fm-contract-review-pack: manifest has no root; rebuild the pack with --root: " + manifest, file=sys.stderr)
+    sys.exit(2)
+if work_rec is None:
+    print("fm-contract-review-pack: excluded record has no work folder; rebuild the pack: " + manifest, file=sys.stderr)
     sys.exit(2)
 named_skills = ("assess-done-and-grade", "define-done-and-grading")
 skill_files = {real(os.path.join(skills, s, "SKILL.md")) for s in named_skills}
@@ -418,13 +477,14 @@ child_names = set()
 if os.path.isdir(log):
     child_names = {os.path.basename(f)[:-6] for f in files if os.path.dirname(real(f)) != log_real}
 
-work = None
+work = work_rec
 calls = 0
 judged = 0
 leaks = []
 unverified = []
 NOT_READS = {"write", "todo", "wait", "ask", "notebook_edit"}
-OWN = ("agent", "artifact", "proc", "history")
+# Internal records no read can prove belong to this run (Main 1904 F4).
+INTERNAL = ("agent", "artifact", "proc", "history")
 
 def excluded(p):
     for x in excludes:
@@ -485,8 +545,8 @@ def judge_read(raw, cwd):
             if slug and rubric_rev and raw in pinned:
                 return None
             return "a URL other than the pinned rubric revision of this repository"
-        if scheme in OWN:
-            return None
+        if scheme in INTERNAL:
+            return "an internal " + scheme + ":// record, which cannot be proven to belong to this run"
         return "a " + scheme + ":// read outside the allowed inputs"
     p = os.path.normpath(os.path.join(cwd, os.path.expanduser(raw)))
     first = None
@@ -512,8 +572,7 @@ def search_roots(raw, cwd):
         yield os.path.normpath(os.path.join(cwd, "/".join(comps) or "."))
 
 for f in files:
-    top = os.path.dirname(real(f)) == log_real if os.path.isdir(log) else True
-    cwd = "/"
+    cwd = None
     try:
         lines = open(f, encoding="utf-8", errors="replace").read().splitlines()
     except OSError as e:
@@ -528,8 +587,9 @@ for f in files:
             continue
         if o.get("type") == "session" and o.get("cwd"):
             cwd = o["cwd"]
-            if top and work is None:
-                work = real(cwd)
+            # The work folder comes from the excluded record, never from the transcript (Main 1904 F5).
+            if not under(real(cwd), work):
+                leaks.append((cwd, "the session ran outside the recorded work folder " + work))
         msg = o.get("message")
         content = msg.get("content") if isinstance(msg, dict) else None
         if not isinstance(content, list):
@@ -540,6 +600,9 @@ for f in files:
             calls += 1
             name = c.get("name") or ""
             a = c.get("arguments") if isinstance(c.get("arguments"), dict) else {}
+            if cwd is None:
+                unverified.append((f, "a tool call before any session record, so its folder is not known"))
+                cwd = work
             here = a.get("cwd") or cwd
             if name in ("read", "edit"):
                 p = str(a.get("path") or "")

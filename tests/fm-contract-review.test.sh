@@ -11,6 +11,9 @@ POLICY="$ROOT/.agents/skills/contract-review/SKILL.md"
 TMP_ROOT=$(fm_test_tmproot fm-contract-review)
 export TMPDIR="$TMP_ROOT"
 mkdir -p "$TMPDIR"
+# The entrypoint and the builder both name the reviewer's work folder from REVIEW_WORK_ROOT:
+# <work root>/<pack parent basename>-pack.
+export REVIEW_WORK_ROOT="$TMP_ROOT/work"
 
 # The known sections of a fixture contract, each with a marker, in the order the pack keeps them.
 write_known_sections() { # <file>
@@ -355,7 +358,7 @@ test_clean_transcript_is_clean() {
     "$(tool_call read path "$LEAK_SKILLS/define-done-and-grading/SKILL.md")" \
     "$(tool_call read path "$LEAK_ROOT/docs/review-rubric.md")" \
     "$(tool_call read path "https://raw.githubusercontent.com/owner/repo/$rev/docs/review-rubric.md")" \
-    "$(tool_call read path "$LEAK_ROOT/bin/fm-spawn.sh")" "$(tool_call read path agent://GuardScout)" \
+    "$(tool_call read path "$LEAK_ROOT/bin/fm-spawn.sh")" \
     "$(tool_call grep pattern A1 path "$LEAK_PACK" gitignore false)" \
     "$(tool_call grep pattern sh path "$LEAK_ROOT/bin" gitignore true)" \
     "$(tool_call write path "$LEAK_WORK/review.md" content x)"
@@ -438,7 +441,7 @@ test_pack_in_a_spaced_or_bracketed_folder_is_clean() {
     pack=''
     build_pack pack --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" --out-root "$TMP_ROOT/$parent" ||
       fail "build into '$parent' failed: $(cat "$TMP_ROOT/build.err")"
-    write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$pack/target.md")"
+    write_transcript "$log" "$REVIEW_WORK_ROOT/$parent-pack" "$(tool_call read path "$pack/target.md")"
     run_check "$log" "$pack"
     assert_equals 0 "$CHECK_RC" "a read of the pack in '$parent' was not clean: $CHECK_OUT"
   done
@@ -454,6 +457,127 @@ test_log_must_be_a_transcript() {
   run_check "$TMP_ROOT/text.log"
   assert_equals 2 "$CHECK_RC" "a text log with no tool call was certified: $CHECK_OUT"
   pass "the check needs the session transcript, and refuses a log that records no tool call"
+}
+
+test_criterion_title_with_an_author_term_refused() {
+  local src="$TMP_ROOT/ct.md" heading n=0 pack
+  # Main 1904 F1: a criterion title that names author history is an unknown sub-heading.
+  for heading in '### Responses - mandatory' '### Responses — supporting' '### Owner background - mandatory' \
+    '### Earlier findings - mandatory' '### Contract Review - mandatory' "### Author's all-green candidate - mandatory" '### Responses'; do
+    n=$((n + 1))
+    printf '## Definition Of Done\n\n### Mandatory\n\n- **A1** (mandatory): return 204 on success.\n\n%s\n\n- **A2** (mandatory): A1 is fixed, passes. The author confirms all green.\n' "$heading" >"$src"
+    build_rc "$TMP_ROOT/ct-out-$n" --contract "$src"
+    assert_equals 3 "$BUILD_RC" "'$heading' was not refused: $BUILD_ERR"
+    assert_absent "$TMP_ROOT/ct-out-$n" "a refused build left an output directory"
+  done
+  # Compliant control: a criterion title that names no author term builds.
+  printf '## Definition Of Done\n\n### Picker cutover — mandatory\n\n- ZZ-PICKER-ZZ the picker routes by the declared set.\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a neutral criterion title was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-PICKER-ZZ" "$pack/target.md" "the neutral criterion title's text was dropped"
+  pass "a criterion title that names author history is refused; a neutral criterion title builds"
+}
+
+test_first_level_one_known_heading_is_a_section() {
+  local src="$TMP_ROOT/f1.md" pack
+  # Main 1904 F2: a first level 1 heading that is a known section with a qualifier is that section.
+  printf '# REQUEST (verbatim)\n\nZZ-REQUEST-BODY-ZZ the owner asks for the thing.\n\n## Definition Of Done\n\n- **A1** (mandatory): ZZ-A1-ZZ it exists.\n' >"$src"
+  build_pack pack --contract "$src" || fail "a qualified REQUEST title was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-REQUEST-BODY-ZZ" "$pack/target.md" "the REQUEST body under a qualified level 1 heading was dropped"
+  assert_grep "ZZ-A1-ZZ" "$pack/target.md" "the Definition Of Done after a level 1 REQUEST was dropped"
+  printf '# Definition Of Done (steer)\n\n- **A1** (mandatory): ZZ-DOD-STEER-ZZ it exists.\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a qualified Definition Of Done title was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-DOD-STEER-ZZ" "$pack/target.md" "the qualified Definition Of Done body was dropped"
+  # Ambiguous: a first heading that starts with a known name but carries a free qualifier.
+  printf '# Definition of done: some-task\n\nZZ-AMBIG-ZZ\n\n## Definition Of Done\n\n- **A1** (mandatory): x.\n' >"$src"
+  build_rc "$TMP_ROOT/f1-ambig" --contract "$src"
+  assert_equals 3 "$BUILD_RC" "an ambiguous first heading was not refused: $BUILD_ERR"
+  # Control: a title that names no known section is dropped as the title.
+  printf '# Fixture contract\n\n## Definition Of Done\n\n- **A1** (mandatory): ZZ-CTRL-ZZ x.\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a plain title was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-CTRL-ZZ" "$pack/target.md" "the control contract lost its Definition Of Done"
+  assert_no_grep "Fixture contract" "$pack/target.md" "the plain title reached the pack"
+  pass "a first level 1 known heading is its section, an ambiguous one is refused, and a plain title is dropped"
+}
+
+test_lost_or_empty_criteria_refused() {
+  local src="$TMP_ROOT/lc.md" heading n=0 pack
+  # Main 1904 F3: a known sub-section name outside the Definition Of Done, and an empty Definition Of Done.
+  for heading in '## Mandatory' '## Supporting'; do
+    n=$((n + 1))
+    printf '## Definition Of Done\n\n%s\n\n- **A1** (mandatory): return 204 on success.\n' "$heading" >"$src"
+    build_rc "$TMP_ROOT/lc-out-$n" --contract "$src"
+    assert_equals 3 "$BUILD_RC" "'$heading' after the Definition Of Done was not refused: $BUILD_ERR"
+    assert_absent "$TMP_ROOT/lc-out-$n" "a refused build left an output directory"
+  done
+  printf '## REQUEST\n\nr\n\n## Definition Of Done\n\n## How You'"'"'re Graded\n\ng\n' >"$src"
+  build_rc "$TMP_ROOT/lc-empty" --contract "$src"
+  assert_equals 3 "$BUILD_RC" "an empty Definition Of Done was not refused: $BUILD_ERR"
+  # Control: the canonical sub-section keeps its criteria.
+  printf '## Definition Of Done\n\n### Mandatory\n\n- **A1** (mandatory): ZZ-A1-KEPT-ZZ return 204.\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a canonical ### Mandatory was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-A1-KEPT-ZZ" "$pack/target.md" "the criterion under ### Mandatory was dropped"
+  pass "criteria under a known sub-section name outside the Definition Of Done, or an empty Definition Of Done, stop the build"
+}
+
+test_internal_record_schemes_are_leaks() {
+  local log="$TMP_ROOT/sch/s.jsonl" uri
+  make_leak_world
+  # Main 1904 F4: no agent, artifact, proc or history record is proven to be this run's.
+  for uri in agent://SomeoneElsesAgent agent://all artifact://another-run-output proc://another-job/output history://an-earlier-review-session; do
+    write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")" "$(tool_call read path "$uri")"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "a read of $uri was not a leak: $CHECK_OUT"
+  done
+  # Control: the run's own log stays readable by path.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$log")"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "a read of the run's own log by path was flagged: $CHECK_OUT"
+  pass "every agent, artifact, proc and history read is a leak; the run's own log stays readable by path"
+}
+
+test_session_outside_the_recorded_work_folder_refused() {
+  local log="$TMP_ROOT/cwd/s.jsonl" cwd
+  make_leak_world
+  printf 'not excluded\n' >"$LEAK_ROOT/data/case/truth/not-excluded.md"
+  # Main 1904 F5: the work folder comes from the excluded record, never from the transcript.
+  grep -qxF "$(printf 'work\t%s' "$(cd "$LEAK_WORK" && pwd -P)")" "$(dirname "$LEAK_PACK").excluded-paths" ||
+    fail "the excluded record does not hold the work folder $LEAK_WORK"
+  for cwd in / "$LEAK_ROOT"; do
+    write_transcript "$log" "$cwd" "$(tool_call read path "$LEAK_PACK/target.md")"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "a session in $cwd was not refused: $CHECK_OUT"
+    write_transcript "$log" "$cwd" "$(tool_call read path "$LEAK_ROOT/data/case/truth/not-excluded.md")"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "a session in $cwd certified an ignored read: $CHECK_OUT"
+  done
+  # Control: a session in the recorded work folder.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "a session in the recorded work folder was flagged: $CHECK_OUT"
+  pass "a session outside the recorded work folder is refused, and one inside it is judged"
+}
+
+test_gitignore_true_search_is_clean() {
+  local log="$TMP_ROOT/gi/s.jsonl"
+  make_leak_world
+  # A tracked folder that also holds an ignored sub-folder.
+  mkdir -p "$LEAK_ROOT/docs/build"
+  printf 'ignored build output\n' >"$LEAK_ROOT/docs/build/out.md"
+  printf 'docs/build/\n' >>"$LEAK_ROOT/.gitignore"
+  git -C "$LEAK_ROOT" -c user.name=t -c user.email=t@example.invalid commit -qam "ignore docs/build"
+  # Main 1904 F6: a search that passes gitignore true over tracked files and ignored ones is clean.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call grep pattern x path "$LEAK_ROOT/docs" gitignore true)"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "a gitignore true search over a tracked folder was flagged: $CHECK_OUT"
+  # The same search without the setting may read ignored files, so it is not proven clean.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call grep pattern x path "$LEAK_ROOT/docs")"
+  run_check "$log"
+  assert_equals 3 "$CHECK_RC" "a search with no gitignore setting was certified: $CHECK_OUT"
+  pass "a gitignore true search over tracked and ignored files is clean; one without the setting is not"
 }
 
 fm_test_run_cases \
@@ -474,4 +598,10 @@ fm_test_run_cases \
   test_unauditable_calls_are_never_clean \
   test_pack_in_a_spaced_or_bracketed_folder_is_clean \
   test_log_must_be_a_transcript \
+  test_criterion_title_with_an_author_term_refused \
+  test_first_level_one_known_heading_is_a_section \
+  test_lost_or_empty_criteria_refused \
+  test_internal_record_schemes_are_leaks \
+  test_session_outside_the_recorded_work_folder_refused \
+  test_gitignore_true_search_is_clean \
   -- "$@"

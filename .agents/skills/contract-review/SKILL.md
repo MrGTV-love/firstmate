@@ -26,7 +26,8 @@ Run `bin/fm-contract-review-pack.sh` for every contract review.
 It is the only code path that builds reviewer input.
 Its header owns the arguments, the section rules and the exit codes.
 It copies the reviewer block below byte for byte into the pack's `contract.md`, so a rule changes in this file and nowhere else.
-It builds the pack in a directory it creates fresh, and writes an excluded record outside the pack.
+It builds the pack in a directory it creates fresh, and writes an excluded record outside the pack, which also names the reviewer's work folder.
+Give the builder `--work-root` with the same work root the entrypoint uses (`REVIEW_WORK_ROOT`, default `/private/tmp/fm-review-work`), so the recorded folder is the one the run uses.
 The reviewer gets only the contract sections whose headings are on the builder's allow-list of known contract sections (`CONTRACT_SECTIONS` and `CONTRACT_SUBSECTIONS` in the script), each copied byte for byte.
 Every other section, the title and any text outside a known section are dropped, and the excluded record lists each by heading.
 An unknown sub-heading inside a known section stops the build, because dropping it could drop part of a criterion: give that text a known heading.
@@ -109,6 +110,8 @@ Allowed inputs, and only these:
 
 Open nothing else.
 Open inputs with the read and search tools, not with shell or code commands, so the run's record shows each file you opened.
+Pass `gitignore: true` on every search.
+Do not open agent, artifact, process or history records: no check can prove they belong to this review.
 Do not search or list a skill folder: no file in it other than its `SKILL.md` is an input.
 Any helper or subagent you start is bound by this list, and what it opens belongs in your `Inputs read`.
 A report, review, register, history, earlier folder, sibling folder, transcript or copy of the contract from elsewhere is not an input.
