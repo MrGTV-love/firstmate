@@ -3366,7 +3366,7 @@ class Watch:
             plan = self.read_requests(max(remaining, 1), second)
             if self.second_reads > reads:
                 self.state['backlog'] = plan is None or self.ready_requests(plan) > max(remaining, 0)
-                if remaining <= 0 and self.state['backlog'] and not getattr(self, 'slots_given', False):
+                if remaining <= 0 and self.state['backlog']:
                     self.state['turn'] = 'second'               # the owner's work had this sweep's slot: the next contested one is theirs
                 self.commit()
             if remaining <= 0:
@@ -3531,8 +3531,6 @@ class Watch:
         their journal, record store and refusal log, so the owner's state is what it is without them. A failure of any Slack call of it is logged once per episode
         with one notice line naming only the error, never raised; a plane value that collides with something of theirs ends only this pass. With the setting off or
         invalid it still refuses, durably, every observable reaction of an id the setting has named; it takes nothing in."""
-        # Whether this sweep gave them any of the cap: only a sweep that gave them none makes the next contested slot theirs (take_requests).
-        self.slots_given = remaining > 0
         if not self.owner.has_second_history() and not self.state['pending'] and not self.state.get('second_failure') \
                 and not self.state.get('second_note') and self.second_reason in ('', 'unset'):
             return                                             # never configured: nothing of theirs exists, and no file is written
