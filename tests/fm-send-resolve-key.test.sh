@@ -1162,6 +1162,19 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 "go"; rc=$?
   expect_code 1 "$rc" "the contradictory pair refuses"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "contradictory-pair refusal"
+  # The pair wins over an option error: with any --resolve-key form beside
+  # --answers-none, nothing but the gate event is recorded, no supervision warning
+  # is printed and the stale lease is untouched.
+  for pair in "--answers-none --resolve-key k1 --resolve-key k1" "--answers-none --resolve-key=bad@" \
+    "--resolve-key=bad@ --answers-none" "--answers-none --resolve-key"; do
+    # shellcheck disable=SC2086 # Word-split on purpose: each case is a flag list.
+    refusal_env_send "$fb" "$home" "$log" "$err" t1 $pair "go"; rc=$?
+    expect_code 1 "$rc" "the pair with an option error ($pair) refuses with exit 1: $(cat "$err")"
+    assert_contains "$(cat "$err")" "contradict each other" "the pair refusal is the one reported ($pair)"
+    assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the pair refusal ($pair)"
+    assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "pair with an option error ($pair)"
+    assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the pair refusal ($pair)"
+  done
 
   { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t1.status"
   before=$(full_state "$home")
@@ -1184,6 +1197,10 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   assert_contains "$(cat "$err")" "[key=k2] blocked" "the choice refusal lists the open keys"
   assert_not_contains "$(cat "$err")" "leased to the branch" "the lease guard did not run before the choice refusal"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "refusal under a live lease"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 --resolve-key k1 "go"; rc=$?
+  expect_code 1 "$rc" "under the live lease the pair with a duplicate key still refuses as the pair (exit 1, not 6): $(cat "$err")"
+  assert_contains "$(cat "$err")" "contradict each other" "the pair refusal comes before the lease guard"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "pair under a live lease"
 
   # A gate agent admitted in a marked disposable lab home: containment admits it
   # first and writes its one allow event; the choice refusal then changes nothing else.
@@ -1212,7 +1229,7 @@ test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
   expect_code 3 "$rc" "a gate agent outside a lab home is refused by containment first"
   assert_contains "$(cat "$err")" "gate agent must not drive the fleet" "the containment refusal is the one shown"
   assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "deny"' "denied gate agent"
-  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory and unknown-open-set refusals; telemetry, banner and lease come after"
+  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error) and unknown-open-set refusals; telemetry, banner and lease come after"
 }
 
 # -- ends the options, so a literal body that starts with -- can be sent, and

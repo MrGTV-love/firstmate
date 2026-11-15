@@ -162,7 +162,10 @@
 # or reminder; accepted on a task with no open decision, so a caller may pass
 # it unconditionally). A send with neither refuses with exit 1 and lists each
 # open key with its verb and both flags; the two flags together are refused as
-# contradictory. Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
+# contradictory. The pair is read from the raw arguments right after the
+# explicit-home check (an unset FM_HOME is refused first, as on base) and before
+# target resolution, so it wins over any option error, such as a malformed or
+# duplicate --resolve-key. Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
 # as a security guard, and may write its one guard event: to
 # state/guard-events.jsonl by default, or, with an explicit FM_GUARD_EVENT_LOG,
 # to that log, creating its directory when needed, as on base
@@ -171,7 +174,9 @@
 # other guard telemetry, the supervision warning (bin/fm-guard.sh), the lease
 # guard, and anything marked, locked, recorded, or typed, so a refused send
 # changes nothing else. Every other path keeps the base order: the explicit-home
-# guard's allow event is recorded and the lease guard runs before an option error
+# guard's allow event is recorded (also for a send with no arguments, an unknown
+# home or state directory, and an unresolvable target) and the lease guard runs
+# before an option error
 # (a malformed, duplicate or missing --resolve-key or --fire-and-forget value) is
 # reported, so a send under the other actor's live lease still exits 6. A --key send and
 # a send to an explicit backend target cannot answer a decision, so the rule
@@ -271,11 +276,40 @@ if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
   exit 1
 fi
 
+# The contradictory pair (header: "Decision closure") is refused from the raw
+# arguments, before any side effect: before the explicit-home allow, the
+# supervision warning, the lease guard and target resolution. The scan walks the
+# same option grammar as the parse loop below but never stops at a bad value, so
+# --answers-none with any --resolve-key form (valid, malformed, duplicate, missing
+# or --resolve-key=) is the pair, even where an option error would come first.
+fm_send_states_both_choices() { # <target> <args...>
+  local none=0 key=0
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --resolve-key | --fire-and-forget)
+      [ "$1" != --resolve-key ] || key=1
+      if [ $# -ge 2 ]; then shift 2; else shift; fi
+      ;;
+    --resolve-key=*) key=1; shift ;;
+    --answers-none) none=1; shift ;;
+    --fire-and-forget=*) shift ;;
+    *) break ;;
+    esac
+  done
+  [ "$none" = 1 ] && [ "$key" = 1 ]
+}
+if [ $# -gt 0 ] && fm_send_states_both_choices "$@"; then
+  echo "error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent." >&2
+  exit 1
+fi
+
 # The explicit-home guard admitted this send: its allow is recorded exactly once, so the
 # guard's deny/allow sequence (bin/fm-guard-metrics.sh) reads as it does on base, where the
 # allow was written right here. It is written at the first point the send leaves this
-# guard's path: on every early exit below (home dir, state dir, target resolution, option
-# errors) and before the lease guard on the normal path. Only the two choice refusals
+# guard's path: on every early exit below (home dir, state dir, no arguments, target
+# resolution, option errors) and before the lease guard on the normal path. The
+# contradictory-pair refusal above and the unknown-open-set and no-choice refusals
 # (header: "Decision closure") record nothing but the gate-agent containment event, as
 # Main's 2026-11-14 D1 ruling requires, so they do not call it.
 FM_SEND_HOME_GUARD_TASK=${1:-}
@@ -496,7 +530,14 @@ fm_send_resolve_target() { # <raw-target>
   return 1
 }
 
-RAW_TARGET=$1
+RAW_TARGET=${1:-}
+if [ $# -eq 0 ]; then
+  # Base recorded the explicit-home allow before reading the target, so a send
+  # with no arguments records it too (base then stopped on the unset $1, exit 1).
+  fm_send_record_home_allow
+  echo "usage: FM_HOME=<home> bin/fm-send.sh <task> <message>" >&2
+  exit 1
+fi
 fm_send_resolve_target "$RAW_TARGET" || {
   fm_send_record_home_allow
   exit 1
@@ -612,15 +653,10 @@ if [ -n "$FM_SEND_OPTION_ERROR" ]; then
   exit 1
 fi
 
-if [ "$ANSWERS_NONE" = 1 ] && [ -n "$RESOLVE_KEYS" ]; then
-  echo "error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent." >&2
-  exit 1
-fi
-
 # A text send to a task selector must state its choice when that task has open
 # keyed decisions (header: "Decision closure"). The open set is the one the
 # --resolve-key check below also reads (status_open_decisions). This check and
-# the contradictory-pair refusal above run after gate-agent containment only,
+# the contradictory-pair refusal near the top run after gate-agent containment only,
 # and before any other guard telemetry, the supervision warning, and the lease
 # guard, so a refused send records, creates, removes, and locks nothing else.
 CHOICE_IS_KEY_SEND=0
