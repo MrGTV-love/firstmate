@@ -305,7 +305,8 @@ if (($ARGV[0] // '') eq 'probe') {
 # its owner may hold the lock, so the waiter scans without the lock. Slot flocks
 # alone enforce the capacity count.
 # The memory budget is checked only by the request whose turn it is, under
-# admission.lock, or without it on the stopped-gate path above. The request is
+# admission.lock (or without it on the stopped-gate path above), and always under
+# the host lock, never without it. The request is
 # charged the recorded peak of its root times 1.10 plus 64 MiB, at most the
 # per-root worst case (FM_LINT_INTERNAL_ROOT_KEY, kept in
 # history/<sha256 of the key> as "<peak KiB> <input bytes>") only when its input
@@ -991,15 +992,21 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # the loss of its parent, ends the group within about one tick (about 1 s, or
 # about 6 s if the command ignores TERM) after the lint that started it ends;
 # the watch itself sits in a group of its own, out of reach of its owner's
-# group sweep. Samples that keep failing warn once and sampling goes on each
-# later tick rather than failing lint.
+# group sweep. When every reader fails three ticks in a row (libproc and the
+# process table), the watch warns once, writes FM_LINT_INTERNAL_ABORT_FILE so the
+# run starts no further root, records rss_unmeasured=1 in <rss-file>, and goes on
+# sampling each later tick. A process the memory reading does not name makes the
+# tick a miss, never a zero.
 # The watch never signals a process by its pid alone. It keeps, for each member
 # of the tree, the pid and the exact time the process started, taken from the
-# reader's reply (or, for the tick that ps or the helper's table answers, from
-# the start seconds they print), and ends a member only through
-# fm_signal_by_identity above, which sends nothing to a process whose start time
-# differs or cannot be read and names it on stderr and in <rss-file> as
-# rss_signal_skipped=<pid>:<mismatch|unreadable>. The root's own process group
+# reader's reply (or, for a member first found by ps or the helper's table, the
+# whole start second they print, which is never exact), and ends a member only
+# through fm_signal_by_identity above, which sends nothing to a process whose start
+# time differs, cannot be read or is known only to the second, and names it on
+# stderr and in <rss-file> as rss_signal_skipped=<pid>:<mismatch|unreadable|inexact>.
+# A restarted reader knows only the root's group and its descendants, so after
+# each reply the watch looks up, in the process table, every member it already
+# knew that the reply does not name, and keeps and counts each that still runs. The root's own process group
 # is signalled as a group only while the watch has not yet reaped the root,
 # because that pid cannot be reused until then. While the reader is down, each tick
 # is sampled from the process table (ps, or the helper's table and memory when ps

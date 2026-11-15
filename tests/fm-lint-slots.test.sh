@@ -754,14 +754,12 @@ test_cached_success_does_not_wait_for_host_slots() {
   # bounded host-wide by the growth guard and the outside count.
   local tmp repo out fakebin
   tmp=$(fm_test_tmproot fm-lint-cache-slots)
-  repo="$tmp/repo"
-  fm_lint_small_repo "$repo"
+  repo=$(fm_lint_isolated_copy "$tmp" cached)
   fakebin=$(fm_fakebin "$tmp/fake")
-  # A native stand-in: a script is a wrapper and is probed every run.
   fm_lint_native_version_stub "$fakebin" "$tmp/starts.log" 0.11.0 || { pass "SKIP (no C compiler for a native ShellCheck stand-in): cached success does not wait for host slots"; return; }
   # The warm-up runs in the pool the hit run uses, as two runs of one user do in
-  # the host pool: the pool then knows this ShellCheck binary's version and the
-  # hit run starts no version probe, which would have to queue.
+  # the host pool. The hit run still probes the version, in the probe's own lane,
+  # which no slot holds.
   out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" FM_LINT_SLOT_DIR="$tmp/slots" \
     "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "cache warm-up failed: $out"
   perl - "$repo/bin/fm-lint.sh" "$tmp" "$fakebin" <<'PL' || fail "warm cache queued behind an occupied host slot"

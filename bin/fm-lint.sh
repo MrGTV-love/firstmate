@@ -81,7 +81,10 @@
 # 3758096384 bytes, the value Main recorded on 2026-11-06. No environment variable
 # or flag sets it (FM_LINT_HOST_RSS_KIB is refused by name), this script is the
 # only place that holds the number, and it is printed as the host_memory_budget_kib
-# line of the roots log. Tests get no seam either: a test uses a private
+# line of the roots log. Inside it the version probe has a lane of its own,
+# PROBE_RESERVE_KIB = 65536 KiB (one probe at a time on the host), and the roots'
+# admission works with the rest, ROOTS_RSS_KIB = 3604480 KiB; the total stays
+# 3670016 KiB. Tests get no seam either: a test uses a private
 # FM_LINT_SLOT_DIR pool, and a test that starts ShellCheck counts against this same
 # host-wide budget and may queue on it.
 # T is at most the budget at the moment a root is admitted, and the bound it keeps
@@ -148,10 +151,16 @@
 # that refusal stops both workers from starting any further root, so the run
 # does not spend 5 s on every root or hold the head of the shared queue. The
 # version probe (`shellcheck --version`, once per lint in every mode except
-# --list-files) is a ShellCheck start too, so it takes a turn in the same
-# admission, charged 64 MiB (it holds about 15 MB for 0.02 s), unless the pool
-# already holds the version of this native binary (kept under the SHA-256 of its
-# bytes), when no probe starts; a script wrapper is probed every run. With nothing held
+# --list-files) is a ShellCheck start too. Every run probes (no version is kept
+# between runs: nothing proves which ShellCheck a script or a compiled launcher
+# runs), in the probe's own lane of the budget above: one probe at a time on the
+# host, held to 64 MiB by the resident watch on native macOS (it holds about
+# 15 MB for 0.02 s) and to the per-root address-space limit under the enforced
+# envelope, and never queued behind roots, so a run whose roots are all cache
+# hits reserves nothing in the roots' budget. Runs whose probes of one ShellCheck
+# file overlap share one probe (a run takes a version printed by a probe that
+# ended after it began waiting for the lane); the roots log's probe_wait_ms meta
+# line records the wait for the lane. With nothing held
 # and nothing running outside, one root is always admitted, so a root larger
 # than the budget runs alone once that outside memory has ended, and queued roots
 # wait rather than fail. When a root's analysis completes, a record whose input
@@ -166,8 +175,10 @@
 # /usr/bin/time and the macOS watch no record forms, so every root stays
 # charged the worst case. Because a record is trusted only for the input it
 # was measured on, the sum of the charges is at most the budget at every admission.
-# THE BOUND THIS GIVES, stated exactly (Main 1566, Design A): at admission,
-# T is at most the budget; afterwards, T is at most the budget plus the sum, over
+# THE BOUND THIS GIVES, stated exactly (Main 1566, Design A; Main 1572): only
+# the charges taken at admission bound T, and only at admission, where T is at
+# most the budget; nothing after admission guarantees R. Afterwards, T is at
+# most the budget plus the sum, over
 # the running roots, of (actual peak minus charge) where that is positive, each
 # root being ended at the 8 GiB per-root cap (plus the watch's sampling overshoot,
 # R above). The 10 percent and 64 MiB margin covers the 8.5 percent run-to-run
@@ -176,7 +187,9 @@
 # budget); it is not a proof for a root that grows past it. The ceiling of that
 # expression is not R: roots that all grow from their charges to the 8 GiB cap
 # together could hold the number of admitted roots times 8 GiB (an algebraic
-# ceiling, never measured here; whether it is acceptable is Main's decision, open).
+# ceiling, never measured here: with this host's 41 roots admissible at once it
+# is 352262914048 bytes, about 328 GiB; whether it is acceptable is Main's
+# decision, open).
 # A strict byte bound at
 # every moment is not available on this host without a kernel limit or killing
 # and re-running a grown root (a design Main withdrew), and SIGSTOP releases
@@ -229,8 +242,23 @@
 # and keeps the entry's flock through its command, and every admission, in any
 # pool, charges every live entry what it names (or what the root holds now, if
 # more), so a root just admitted in another pool counts at its charge and not at
-# the few MiB it holds in the instant of the reading. A pool whose gates predate
-# the ledger is still counted through its slot files and its processes. Host load
+# the few MiB it holds in the instant of the reading. The ledger is read only while
+# the host lock is held, immediately before the decision taken on it; a gate that
+# cannot take the lock waits, and no path decides without it. A live entry that
+# cannot be opened or read is a charge the gate cannot account for: the gate
+# refuses (exit 2) and names it. The pool, the lock and the ledger are per user
+# (the shell's UID): a lint run by another OS user on the same host keeps its own
+# and is not counted here, except as processes named shellcheck in the table read
+# at admission. A pool whose gates predate
+# the ledger is still counted through its slot files and its processes. Each lint
+# run also writes a run entry there (run.<pid>.<time>, held for the run's life)
+# naming the perl and python it resolved, its bound mechanism and its per-root
+# address-space and resident limits; the private modes this script runs for its
+# own roots (--internal-worker, --internal-timed, --internal-root) take those
+# values from a live run entry and an admitted gate entry in this ledger, whose
+# owners are their ancestors, and from no setting or inherited variable, or exit 2
+# and start nothing. FM_LINT_INTERNAL_CENSUS_ONLY in the environment stops a lint
+# (exit 2) before any ShellCheck starts. Host load
 # average never changes admission, so unrelated machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty FM_LINT_HOST_SLOTS must be a positive decimal integer without
@@ -246,7 +274,15 @@
 # it is ended and takes the memory retry described below, and the roots log's
 # last end-record column counts the samples each source gave (libproc, or ps
 # for a tick libproc did not answer in time) and names any attempt that gave
-# up its libproc reader, with the reason. Linux runs are never watched, and CI
+# up its libproc reader, with the reason. The watch and the growth guard signal a
+# process only by its exact start time (seconds and microseconds): a member known
+# only by the whole second a process table prints is counted but never signalled,
+# and is recorded in the roots log's samples column as skipped; the guard stops
+# only processes inside its own gate's tree and resumes only the exact identity it
+# stopped. A restarted libproc reader does not lose a member the watch already
+# knew. A watch that loses every reader (libproc and the process table) for three
+# ticks lets its root finish but marks the run, which starts no further root and
+# fails, naming each root it did not start. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # ShellCheck started outside this script (an agent or a test running it
 # directly) holds no slot and is not bounded by the pool; each admission counts
@@ -446,6 +482,8 @@ fm_lint_root_rss_samples() {  # <rss-file>...
   cat "$@" 2>/dev/null | awk -F '[=:,]' '
     /^rss_samples=/ { for (i = 2; i < NF; i += 2) count[$i] += $(i + 1); found = 1 }
     /^rss_reader_unavailable=/ { reasons = reasons ",reader-unavailable:" $2 }
+    /^rss_signal_skipped=/ { line = $0; sub(/^rss_signal_skipped=/, "", line); gsub(/,/, ";", line); reasons = reasons ",signal-skipped:" line }
+    /^rss_unmeasured=1$/ { reasons = reasons ",unmeasured" }
     END { if (found) printf "libproc:%d,ps:%d%s\n", count["libproc"], count["ps"], reasons; else print "none" }
   '
 }
