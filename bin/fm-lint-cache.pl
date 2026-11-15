@@ -21,113 +21,267 @@ use File::Basename qw(dirname basename);
 # Signalling by process identity. A process is named by its pid and the exact
 # time it started (the kernel's start seconds and microseconds), never by its pid
 # alone: a pid is reused once its process ends, and a signal to a reused pid ends
-# an unrelated process. fm_signal_by_identity (the private `signal` mode below
-# and the resident watch's end of a tree) sends <signal> to each "<pid>:<sec>:<usec>"
-# whose live process still has that start time, in one python process that reads
-# the identity and sends in the same step, and sends nothing to a process whose
-# start time differs or cannot be read. It returns { gone, mismatch, unreadable,
-# sent } as lists of pids. A usec of "-" compares the start second alone (an
-# identity taken from ps, which prints whole seconds). The residual is the few
-# microseconds between that read and that send, which no portable call closes.
-my $IDENTITY_SIGNAL_PY = <<'PY';
-import importlib.util, os, signal, sys
+# an unrelated process. Every signal the watch and the gate send to a process other
+# than their own unreaped child goes through fm_signal_items, in one python process
+# that reads the identity and sends in the same step, through the one send() below.
+# An item is one of:
+#   <pid>:<sec>:<usec>  sent only when the live process has exactly that start time
+#                       (seconds and microseconds); a usec of "-" (an identity taken
+#                       from ps or a table, which prints whole seconds) is never
+#                       exact, so nothing is sent and the pid is reported inexact;
+#   under:<ancestor>:<pid>  sent only when <pid> is now a descendant of <ancestor>
+#                       (the gate's own tree); the exact start time read in that
+#                       step is reported, so a later signal can name it exactly;
+#   group:<pgid>        the process group of the caller's own unreaped child, whose
+#                       pid cannot be reused before the caller reaps it.
+# Each result line is "<sent|gone|mismatch|unreadable|inexact> <pid> [<sec> <usec>]".
+# The residual is the few microseconds between that read and that send, which no
+# portable call closes.
+my $IDENTITY_SIGNAL_PY = <<'PYTHON';
+import importlib.util, os, signal, struct, sys
 spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
 fp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fp)
 number = getattr(signal, "SIG" + sys.argv[2])
+def send(pid, group):
+    if group:
+        os.killpg(pid, number)
+    else:
+        os.kill(pid, number)
+def descends(pid, ancestor):
+    for _ in range(80):
+        if pid == ancestor:
+            return True
+        if pid <= 1:
+            return False
+        pid = struct.unpack_from("i", fp.kinfo(pid), fp.E_PPID)[0]
+    return False
 for item in sys.argv[3:]:
-    pid, sec, usec = item.split(":")
-    pid = int(pid)
+    parts = item.split(":")
+    pid = int(parts[1] if parts[0] == "group" else parts[2] if parts[0] == "under" else parts[0])
     try:
+        if parts[0] == "group":
+            send(pid, True)
+            print("sent", pid)
+            continue
+        if parts[0] == "under":
+            identity = fp.process_identity(fp.kinfo(pid))
+            if not descends(pid, int(parts[1])):
+                print("mismatch", pid)
+                continue
+            send(pid, False)
+            print("sent", pid, identity[0], identity[1])
+            continue
+        if parts[2] == "-":
+            print("inexact", pid)
+            continue
         identity = fp.process_identity(fp.kinfo(pid))
-    except LookupError:
+        if identity[0] != int(parts[1]) or identity[1] != int(parts[2]):
+            print("mismatch", pid)
+            continue
+        send(pid, False)
+        print("sent", pid)
+    except (LookupError, ProcessLookupError):
         print("gone", pid)
-        continue
     except Exception:
         print("unreadable", pid)
-        continue
-    if identity[0] != int(sec) or (usec != "-" and identity[1] != int(usec)):
-        print("mismatch", pid)
-        continue
-    try:
-        os.kill(pid, number)
-        print("sent", pid)
-    except ProcessLookupError:
-        print("gone", pid)
-    except OSError:
-        print("unreadable", pid)
-PY
-sub fm_signal_by_identity {
-    my ($name, @members) = @_;
-    my %result = (gone => [], mismatch => [], unreadable => [], sent => []);
-    return \%result unless @members;
+PYTHON
+sub fm_signal_items {
+    my ($name, @items) = @_;
+    my %result = (gone => [], mismatch => [], unreadable => [], inexact => [], sent => [], identity => {});
+    return \%result unless @items;
     my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
     my %seen;
-    if (-r $helper && open(my $py, '-|', $python, '-I', '-c', $IDENTITY_SIGNAL_PY, $helper, $name,
-            map { sprintf '%d:%d:%s', $_->[0], $_->[1], defined $_->[2] ? $_->[2] : '-' } @members)) {
+    if (-r $helper && open(my $py, '-|', $python, '-I', '-c', $IDENTITY_SIGNAL_PY, $helper, $name, @items)) {
         while (my $line = <$py>) {
-            next unless $line =~ /\A(gone|mismatch|unreadable|sent) ([0-9]+)\n\z/;
+            next unless $line =~ /\A(gone|mismatch|unreadable|inexact|sent) ([0-9]+)(?: ([0-9]+) ([0-9]+))?\n\z/;
             push @{$result{$1}}, $2 + 0;
+            $result{identity}{$2 + 0} = [$3 + 0, $4 + 0] if defined $3;
             $seen{$2 + 0} = 1;
         }
         close $py;
     }
     # A process the helper did not answer for is unreadable: nothing is sent to it.
-    push @{$result{unreadable}}, grep { !$seen{$_} } map { $_->[0] } @members;
+    push @{$result{unreadable}}, grep { !$seen{$_} } map { /(?:\A|:)([0-9]+)(?::[0-9]+:(?:[0-9]+|-))?\z/ ? $1 + 0 : () } @items;
     return \%result;
 }
-# Private mode: perl fm-lint-cache.pl signal <HUP|INT|TERM|KILL|CONT|STOP> <pid:sec:usec>...
-# prints "<gone|mismatch|unreadable|sent> <pid>" for each and exits 0 (the watch's
-# identity check, reachable by a test).
+sub fm_signal_by_identity {
+    my ($name, @members) = @_;
+    return fm_signal_items($name, map { sprintf '%d:%d:%s', $_->[0], $_->[1], defined $_->[2] ? $_->[2] : '-' } @members);
+}
+# Private mode: perl fm-lint-cache.pl signal <HUP|INT|TERM|KILL|CONT|STOP> <item>...
+# prints "<sent|gone|mismatch|unreadable|inexact> <pid>" for each and exits 0 (the
+# watch's and the gate's identity check, reachable by a test).
 if (($ARGV[0] // '') eq 'signal') {
     my (undef, $name, @items) = @ARGV;
     die "fm-lint-signal: invalid private invocation\n"
-        unless ($name // '') =~ /\A(?:HUP|INT|TERM|KILL|CONT|STOP)\z/ && @items && !grep { !/\A[0-9]+:[0-9]+:(?:[0-9]+|-)\z/ } @items;
-    my $result = fm_signal_by_identity($name, map { [split /:/] } @items);
-    for my $kind (qw(sent gone mismatch unreadable)) { print "$kind $_\n" for @{$result->{$kind}}; }
+        unless ($name // '') =~ /\A(?:HUP|INT|TERM|KILL|CONT|STOP)\z/ && @items
+            && !grep { !/\A(?:[0-9]+:[0-9]+:(?:[0-9]+|-)|under:[0-9]+:[0-9]+)\z/ } @items;
+    my $result = fm_signal_items($name, @items);
+    for my $kind (qw(sent gone mismatch unreadable inexact)) {
+        for my $pid (@{$result->{$kind}}) {
+            my $exact = $result->{identity}{$pid};
+            print "$kind $pid", ($kind eq 'sent' && $exact ? " @$exact" : ''), "\n";
+        }
+    }
     exit 0;
 }
 
-# Private mode: perl fm-lint-cache.pl admitted <ledger entry path>. Exit 0 only
-# when the entry is one a gate wrote under a host ledger, its flock is held (its
-# root is running) and the gate it names is an ancestor of the caller, so a command
-# that bin/fm-lint.sh's private modes (--internal-timed, --internal-root) are about
-# to run is inside an admitted root. Anything else exits 1 and starts nothing.
-if (($ARGV[0] // '') eq 'admitted') {
-    my (undef, $entry) = @ARGV;
-    exit 1 unless defined $entry && $entry =~ m{\A/\S*\.ledger/entry\.([0-9]+)\.[0-9]+\z} && -f $entry;
-    my $gate_pid = $1 + 0;
-    open(my $fh, '>>', $entry) or exit 1;
-    exit 1 if flock($fh, LOCK_EX | LOCK_NB);   # free: its root has ended
-    open(my $record, '<', $entry) or exit 1;
-    my $line = <$record> // '';
-    close $record;
-    exit 1 unless $line =~ /\A([0-9]+)\t[0-9]+\t/ && $1 + 0 == $gate_pid;
+# Process facts for the admission checks below: the parent of a pid, and its
+# command line, from ps or, where ps is refused, from fm-proc-info.py.
+sub fm_process_fact {
+    my ($field, $pid) = @_;
     my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
-    my $parent_of = sub {
-        my ($pid) = @_;
-        no warnings 'exec';
-        if (open(my $ps, '-|', 'ps', '-o', 'ppid=', '-p', $pid)) {
-            my $text = <$ps> // '';
-            close $ps;
-            return $1 + 0 if $text =~ /\A\s*([0-9]+)\s*\z/;
-        }
-        if (-r $helper && open(my $py, '-|', $python, $helper, 'ppid', $pid)) {
-            my $text = <$py> // '';
-            close $py;
-            return $1 + 0 if $text =~ /\A\s*([0-9]+)\s*\z/;
-        }
-        return undef;
-    };
+    no warnings 'exec';
+    if (open(my $ps, '-|', 'ps', '-o', ($field eq 'ppid' ? 'ppid=' : 'command='), '-p', $pid)) {
+        my $text = do { local $/; <$ps> } // '';
+        close $ps;
+        $text =~ s/\s+\z//;
+        $text =~ s/\A\s+//;
+        return $text if length $text && ($field ne 'ppid' || $text =~ /\A[0-9]+\z/);
+    }
+    if (-r $helper && open(my $py, '-|', $python, $helper, ($field eq 'ppid' ? 'ppid' : 'args'), $pid)) {
+        my $text = do { local $/; <$py> } // '';
+        close $py;
+        $text =~ s/\s+\z//;
+        return $text if length $text && ($field ne 'ppid' || $text =~ /\A[0-9]+\z/);
+    }
+    return undef;
+}
+# Whether <pid> is an ancestor of this process (its parent, its parent's parent...).
+sub fm_is_ancestor {
+    my ($target) = @_;
     my $pid = getppid();
     for (1 .. 80) {
-        exit 0 if $pid == $gate_pid;
+        return 1 if $pid == $target;
         last unless $pid > 1;
-        $pid = $parent_of->($pid) // last;
+        $pid = fm_process_fact('ppid', $pid) // last;
     }
-    exit 1;
+    return 0;
+}
+# Whether <entry> is a file directly in <ledger dir> named <prefix>.<pid>.<n>, its
+# flock is held (its owner is alive), its first field is that pid, the pid is an
+# ancestor of this process and its command matches <pattern>. Returns the pid, or
+# undef.
+sub fm_live_ledger_owner {
+    my ($ledger_dir, $entry, $prefix, $pattern) = @_;
+    return undef unless defined $ledger_dir && length $ledger_dir && defined $entry;
+    my $dir = abs_path($ledger_dir) // return undef;
+    return undef unless $entry =~ m{\A(.*)/\Q$prefix\E\.([0-9]+)\.[0-9]+\z} && !-l $entry && -f $entry;
+    my ($parent, $pid) = ($1, $2 + 0);
+    return undef unless (abs_path($parent) // '') eq $dir;
+    open(my $fh, '>>', $entry) or return undef;
+    return undef if flock($fh, LOCK_EX | LOCK_NB);   # free: its owner has ended
+    open(my $record, '<', $entry) or return undef;
+    my $line = <$record> // '';
+    close $record;
+    return undef unless $line =~ /\A([0-9]+)\t/ && $1 + 0 == $pid;
+    return undef unless fm_is_ancestor($pid);
+    my $command = fm_process_fact('command', $pid) // return undef;
+    return $command =~ $pattern ? $pid : undef;
+}
+# Private mode: perl fm-lint-cache.pl admitted <host ledger dir> <gate entry>. Exit 0
+# only when the entry is one a gate wrote directly in that host ledger (the
+# directory bin/fm-lint.sh names from its own constant, never any other *.ledger
+# directory), its flock is held (its root is running), and the pid it names is an
+# ancestor of the caller that runs this script's gate mode, so a command that
+# bin/fm-lint.sh's private modes (--internal-timed, --internal-root) are about to run
+# is inside an admitted root. Anything else exits 1 and starts nothing.
+if (($ARGV[0] // '') eq 'admitted') {
+    my (undef, $ledger_dir, $entry) = @ARGV;
+    exit(defined fm_live_ledger_owner($ledger_dir, $entry, 'entry', qr{\A\S*perl\S*\s+(?:-\S+\s+)*\S*fm-lint-cache\.pl\s+gate\s}) ? 0 : 1);
+}
+# Private mode: perl fm-lint-cache.pl admitted-run <host ledger dir> <run entry>.
+# Exit 0 only when the entry is a lint run's entry directly in that host ledger,
+# its flock is held (the run is alive), and the pid it names is an ancestor of the
+# caller that runs bin/fm-lint.sh.
+if (($ARGV[0] // '') eq 'admitted-run') {
+    my (undef, $ledger_dir, $entry) = @ARGV;
+    exit(defined fm_live_ledger_owner($ledger_dir, $entry, 'run', qr{\A\S*(?:bash|sh)\S*\s+(?:-\S+\s+)*\S*fm-lint\.sh(?:\s|\z)}) ? 0 : 1);
+}
+
+# Private mode: perl fm-lint-cache.pl probe <host lock> <key> <wait-file> -- <command...>
+# The version probe's lane in the host-wide budget. bin/fm-lint.sh keeps a fixed
+# share of the budget for it (its PROBE_RESERVE_KIB) and gives the roots' admission
+# the rest, so a probe never waits behind roots holding the budget and a run whose
+# roots are all cache hits reserves nothing in the roots' budget. One probe runs at
+# a time on the host: the lane is the flock of <host lock>.probe, and the command
+# (a ShellCheck --version that bin/fm-lint.sh has wrapped in its memory bound) runs
+# only while it is held. A probe that waited for the lane first looks in
+# <host lock>.probe.d/<key> (<key> names the ShellCheck file and its bytes): a
+# version written there by a probe that ended after this one began waiting is
+# printed as its own result and nothing is started, so runs whose probes overlap
+# share one. Otherwise the command runs, its output is passed through, and a
+# version it prints with exit 0 is written there with its end time. A version is
+# never taken from a probe that ended before this one began waiting. The time spent
+# waiting for the lane is written in milliseconds to <wait-file>. A lane that cannot
+# be used names its path and exits 2 without starting the command.
+if (($ARGV[0] // '') eq 'probe') {
+    require POSIX;
+    require Time::HiRes;
+    my (undef, $host_lock, $key, $wait_file, $dashes, @command) = @ARGV;
+    die "fm-lint-probe: invalid private invocation\n"
+        unless defined $dashes && $dashes eq '--' && @command && length($host_lock // '') && ($key // '') =~ /\A[0-9a-z]{1,64}\z/;
+    my $refuse = sub {
+        my ($path, $why) = @_;
+        print STDERR "fm-lint: version probe lane unusable at $path ($why); the host-wide ShellCheck memory bound cannot be enforced, "
+            . "so the probe was not started. Make that path writable, or remove it if it is damaged.\n";
+        exit 2;
+    };
+    my %signal_number = (HUP => 1, INT => 2, TERM => 15);
+    my ($caught, $child);
+    for my $name (keys %signal_number) { $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; }; }
+    my $arrived = Time::HiRes::time();
+    my $lane_path = "$host_lock.probe";
+    open(my $lane, '>>', $lane_path) or $refuse->($lane_path, $!);
+    until (flock($lane, LOCK_EX | LOCK_NB)) {
+        $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($lane_path, $!);
+        exit 128 + $signal_number{$caught} if $caught;
+        Time::HiRes::sleep(0.02);
+    }
+    if (open(my $fh, '>', $wait_file)) { printf {$fh} "%d\n", (Time::HiRes::time() - $arrived) * 1000; close $fh; }
+    my $results = "$host_lock.probe.d";
+    eval { make_path($results, {mode => 0700}); 1 } or $refuse->($results, $@);
+    -d $results && -w _ or $refuse->($results, 'not a writable directory');
+    my $result = "$results/$key";
+    if (open(my $fh, '<', $result)) {
+        my $line = <$fh> // '';
+        close $fh;
+        if ($line =~ /\A([0-9]+(?:\.[0-9]+)?)\t([0-9A-Za-z.+-]+)\n\z/ && $1 >= $arrived) {
+            print "version: $2\n";
+            exit 0;
+        }
+    }
+    pipe(my $from_probe, my $to_caller) or die "fm-lint-probe: pipe: $!\n";
+    $child = fork();
+    die "fm-lint-probe: fork: $!\n" unless defined $child;
+    if (!$child) {
+        close $from_probe;
+        open(STDOUT, '>&', $to_caller) or POSIX::_exit(127);
+        exec {$command[0]} @command;
+        warn "fm-lint-probe: exec $command[0]: $!\n";
+        POSIX::_exit(127);
+    }
+    close $to_caller;
+    kill 'TERM', $child if $caught;
+    my $output = do { local $/; <$from_probe> } // '';
+    close $from_probe;
+    my $reaped;
+    while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
+    my $status = $reaped == $child ? $? : 127 << 8;
+    print $output;
+    my $rc = ($status & 127) ? 128 + ($status & 127) : $status >> 8;
+    if ($rc == 0 && $output =~ /^version:\s*([0-9A-Za-z.+-]+)\s*$/m) {
+        my ($staged, $version, $fh) = ("$result.tmp.$$", $1);
+        if (open($fh, '>', $staged) && printf({$fh} "%.6f\t%s\n", Time::HiRes::time(), $version) && close($fh)) {
+            rename($staged, $result) or unlink $staged;
+        } else {
+            unlink $staged;
+        }
+    }
+    exit $rc;
 }
 
 # Private gate protocol; bin/fm-lint.sh's header owns the public pool controls.
@@ -195,17 +349,35 @@ if (($ARGV[0] // '') eq 'admitted') {
 # an entry whose flock is free belongs to an ended root and is removed.
 # The high-resolution wait is written in milliseconds to <wait-file> before
 # launch so the caller can account for queue time separately.
-if (($ARGV[0] // '') eq 'gate') {
+# The census (perl fm-lint-cache.pl census <same arguments>) is a mode of its own,
+# chosen by its argument and never by the environment: it reads the host process
+# table, as an admission would, and exits 0 when the table can be read, else waits
+# about 5 s and refuses as a root would. It never runs its command, so it never
+# produces a success that an analysis would have produced. The gate refuses to run
+# when FM_LINT_INTERNAL_CENSUS_ONLY, the census's former environment switch, is set:
+# an inherited switch must never turn an analysis into a no-op that exits 0.
+if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     require POSIX;
     require Time::HiRes;
-    my (undef, $slot_dir, $ncpu, $run, $wait_file, $dashes, @command) = @ARGV;
+    my ($gate_mode, $slot_dir, $ncpu, $run, $wait_file, $dashes, @command) = @ARGV;
     die "fm-lint-gate: invalid private invocation\n"
         unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/
             && ($run // '') =~ /\A[A-Za-z0-9_-]{1,64}\z/;
+    if ($gate_mode eq 'gate' && length($ENV{FM_LINT_INTERNAL_CENSUS_ONLY} // '')) {
+        print STDERR "fm-lint: FM_LINT_INTERNAL_CENSUS_ONLY is set in this analysis's environment; it is not an input "
+            . "to an analysis (the census is its own mode), so this analysis was not started. Unset it and run the lint again.\n";
+        exit 2;
+    }
+    # %paused: each process the growth guard stopped, by pid, with the exact start
+    # time read when it was stopped; it is resumed only by that exact identity.
     my ($child, $caught, %paused);
+    my $resume = sub {
+        fm_signal_by_identity('CONT', map { [$_, @{$paused{$_}}] } sort { $a <=> $b } keys %paused);
+        %paused = ();
+    };
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     for my $name (keys %signal_number) {
-        $SIG{$name} = sub { $caught = $name; kill 'CONT', keys %paused; kill 'TERM', $child if $child; };
+        $SIG{$name} = sub { $caught = $name; $resume->() if %paused; kill 'TERM', $child if $child; };
     }
     my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
         : ($ncpu >> 1) > 2 ? ($ncpu >> 1) : 2;
@@ -314,9 +486,9 @@ if (($ARGV[0] // '') eq 'gate') {
             . "beside bin/fm-lint-cache.pl with a python3 that can run it.\n";
         exit 2;
     };
-    # Probe mode, run once by bin/fm-lint.sh before any root starts: succeeds when
+    # Census mode, run once by bin/fm-lint.sh before any root starts: succeeds when
     # the table can be read, else waits about 5 s and refuses as a root would.
-    if ($ENV{FM_LINT_INTERNAL_CENSUS_ONLY}) {
+    if ($gate_mode eq 'census') {
         my $began = Time::HiRes::time();
         while (!$process_table->()) {
             $refuse_census->() if Time::HiRes::time() - $began >= 5;
@@ -425,7 +597,7 @@ if (($ARGV[0] // '') eq 'gate') {
         return $found;
     };
     my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $host_blocked_at, $host_checked_at, $host_bypass, $queued);
+    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
@@ -443,7 +615,10 @@ if (($ARGV[0] // '') eq 'gate') {
     # Every live ledger entry as [gate pid, charge KiB, peak file], and the ended
     # ones removed. An empty entry is one being written by an admitting gate that
     # has not yet filled it: it counts at the worst case for 5 s and is then
-    # removed.
+    # removed. It is called only while this gate holds the host lock, so no other
+    # gate admits, writes or removes an entry between this reading and the
+    # decision taken on it. An entry that cannot be opened or read is a ledger
+    # this gate cannot account for: it refuses and names the entry, never skips it.
     my $ledger_entries = sub {
         my @live;
         opendir(my $listing, $ledger_dir) or $refuse->($ledger_dir, $!);
@@ -451,7 +626,8 @@ if (($ARGV[0] // '') eq 'gate') {
         closedir $listing;
         for my $name (sort @names) {
             my $path = "$ledger_dir/$name";
-            open(my $fh, '>>', $path) or next;
+            my $fh;
+            unless (open($fh, '>>', $path)) { next if $!{ENOENT}; $refuse->($path, $!); }
             my $free = flock($fh, LOCK_EX | LOCK_NB);
             if ($free) {
                 my $age = Time::HiRes::time() - ((stat $path)[9] // 0);
@@ -463,7 +639,8 @@ if (($ARGV[0] // '') eq 'gate') {
             }
             $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($path, $!);
             close $fh;
-            open(my $record, '<', $path) or next;
+            my $record;
+            unless (open($record, '<', $path)) { next if $!{ENOENT}; $refuse->($path, $!); }
             my $line = <$record> // '';
             close $record;
             if ($line =~ /\A([0-9]+)\t([0-9]+)\t(.*)\n\z/) { push @live, [$1 + 0, $2 + 0, $3]; }
@@ -561,12 +738,12 @@ if (($ARGV[0] // '') eq 'gate') {
                     || $oldest{$a} cmp $oldest{$b}
             } keys %oldest;
             if (defined $next && $oldest{$next} eq $ticket_path) {
-                # My turn. The memory budget decides, from a table read now under
-                # the host-wide admission lock (FM_LINT_INTERNAL_HOST_LOCK), which
-                # an admitted gate keeps until its command has started, so no two
-                # pools admit on one reading. A gate blocked from that lock for a
-                # second while a stopped gate exists decides without it. The
-                # budget counts the held roots, the memory outside them and the
+                # My turn. The memory budget decides, from the ledger and a table
+                # read now under the host-wide admission lock
+                # (FM_LINT_INTERNAL_HOST_LOCK), which an admitted gate keeps until
+                # its command has started, so no two pools admit on one reading. A
+                # gate that cannot take that lock waits; nothing decides without
+                # it. The budget counts the held roots, the memory outside them and the
                 # new root; a root takes its turn alone only when no held root
                 # runs and nothing runs outside. Without a table nothing is
                 # admitted, and after about 5 s without one the request is
@@ -576,44 +753,41 @@ if (($ARGV[0] // '') eq 'gate') {
                 # A trusted record's peak understates the next run by up to 8.5 percent
                 # in this repository's measured runs, so the charge is the record
                 # times 1.10 plus 64 MiB, never more than the per-root worst case.
-                # Every root admitted on this host, whatever its pool: this pool's held
-                # slots (older gates name no ledger entry) and the ledger's entries,
-                # one per gate pid.
-                my (%by_gate, @unnamed);
-                for my $held (@charges, $ledger_entries->()) {
-                    if (defined $held->[0]) { $by_gate{$held->[0]} = $held; } else { push @unnamed, $held; }
-                }
-                my @host_charges = (values %by_gate, @unnamed);
                 my $recorded = $in_band->($line);
                 $charge_kib = $recorded ? $min->($worst_kib, int($recorded * 1.10 + 0.999) + 65536) : $worst_kib;
                 my $now = Time::HiRes::time();
                 my $fits;
-                my $held = !$host || flock($host, LOCK_EX | LOCK_NB);
+                # The decision is taken only under the host lock: no path decides
+                # without it, a stopped holder included (its lock is released when it
+                # continues or dies). The ledger and the table are read after the lock
+                # is taken, immediately before the decision, so a root another pool
+                # admitted while this gate waited is read at its charge.
+                my $held = flock($host, LOCK_EX | LOCK_NB);
+                $held || $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($host_lock, $!);
                 if ($held) {
-                    undef $host_blocked_at;
-                    undef $host_bypass;
-                } else {
-                    $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($host_lock, $!);
-                    $host_blocked_at //= $now;
-                    if ($now - $host_blocked_at >= 1 && $now - ($host_checked_at // 0) >= 1) {
-                        $host_checked_at = $now;
-                        $host_bypass = $stopped_gate->('fm-lint-cache.pl gate ');
+                    # Every root admitted on this host, whatever its pool: this pool's
+                    # held slots (older gates name no ledger entry) and the ledger's
+                    # entries, one per gate pid.
+                    my (%by_gate, @unnamed);
+                    for my $held_root (@charges, $ledger_entries->()) {
+                        if (defined $held_root->[0]) { $by_gate{$held_root->[0]} = $held_root; } else { push @unnamed, $held_root; }
+                    }
+                    my @host_charges = (values %by_gate, @unnamed);
+                    $table = $process_table->();
+                    if (!$table) {
+                        $census_from //= $now;
+                        if ($now - $census_from >= 5) {
+                            unlink($ticket_path);
+                            $refuse_census->();
+                        }
+                    } else {
+                        undef $census_from;
+                        my $outside = $foreign->($table, @host_charges);
+                        $fits = !@host_charges && !$outside
+                            || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib;
                     }
                 }
-                $table = $process_table->() if $held || $host_bypass;
-                if (($held || $host_bypass) && !$table) {
-                    $census_from //= $now;
-                    if ($now - $census_from >= 5) {
-                        unlink($ticket_path);
-                        $refuse_census->();
-                    }
-                } elsif ($held || $host_bypass) {
-                    undef $census_from;
-                    my $outside = $foreign->($table, @host_charges);
-                    $fits = !@host_charges && !$outside
-                        || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib;
-                }
-                flock($host, LOCK_UN) if $host && $held && !$fits;
+                flock($host, LOCK_UN) if $held && !$fits;
                 if ($fits) {
                     ($slot, $slot_path) = @{shift @free};
                     $peak_file = "$slot_path.peak";
@@ -702,8 +876,12 @@ if (($ARGV[0] // '') eq 'gate') {
     # outside every gate alone hold the budget), so every root finishes. No
     # polling guard can remove what roots grow inside one reading interval (up
     # to 2 s at or below 60 percent of the budget, 0.5 s above it).
+    # The guard stops a process only through fm_signal_items' under:<gate>:<pid>,
+    # which sends nothing unless that pid is a descendant of this gate when the
+    # signal is sent, and records the exact start time it read; it resumes only that
+    # exact identity, so a pid reused by another process is neither stopped nor
+    # continued.
     my ($guard_busy, $poll) = (0, 0.5);
-    my $resume = sub { for my $pid (keys %paused) { kill 'CONT', $pid; delete $paused{$pid}; } };
     my $guard = sub {
         return if $caught || $guard_busy;
         $guard_busy = 1;
@@ -719,13 +897,16 @@ if (($ARGV[0] // '') eq 'gate') {
             grep { $view->{gates}{$_}[2] } keys %{$view->{gates}};
         my $over = $view->{total} > $budget_kib;
         if ($over && (!defined $oldest || $oldest != $$ || $view->{named} >= $budget_kib)) {
-            for my $pid (keys %{$mine->[0]}) {
+            my @stop;
+            for my $pid (sort { $a <=> $b } keys %{$mine->[0]}) {
                 next if $pid == $$ || $paused{$pid};
                 my $row = $table->{$pid} or next;
                 next if $row->[1] < 8192
                     || $row->[3] =~ m{\A\S*(?i:perl|bash|python)\S*\s+(?:-\S+\s+)*\S*(?:fm-lint-cache\.pl|fm-lint\.sh|fm-proc-info\.py)\b|\A\(?\S*(?i:python)\S*\)?\z};
-                $paused{$pid} = 1 if kill 'STOP', $pid;
+                push @stop, "under:$$:$pid";
             }
+            my $stopped = fm_signal_items('STOP', @stop);
+            $paused{$_} = $stopped->{identity}{$_} for grep { $stopped->{identity}{$_} } @{$stopped->{sent}};
         } elsif (%paused) {
             $resume->();
         }
@@ -844,12 +1025,22 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     my ($reader_failures, %samples) = (0, libproc => 0, ps => 0);
     my %known;    # pid => [start seconds, start microseconds or undef], every member seen
     my ($child_reaped, %skipped);
+    # A reader exits when its input closes; only a reader still running 2 s later,
+    # the watch's own unreaped child, is ended by a signal.
     my $stop_reader = sub {
         return unless $reader_pid;
-        kill 'KILL', $reader_pid;
-        waitpid($reader_pid, 0);
         close $to_reader;
         close $from_reader;
+        my $until = Time::HiRes::time() + 2;
+        my $reaped = waitpid($reader_pid, POSIX::WNOHANG());
+        while ($reaped == 0 && Time::HiRes::time() < $until) {
+            Time::HiRes::sleep(0.02);
+            $reaped = waitpid($reader_pid, POSIX::WNOHANG());
+        }
+        if ($reaped == 0) {
+            kill 'KILL', $reader_pid;
+            waitpid($reader_pid, 0);
+        }
         undef $reader_pid;
     };
     # The reader stays in the watch's own group, so the bound never counts or
@@ -907,7 +1098,9 @@ if (($ARGV[0] // '') eq 'rsswatch') {
             while (my $line = <$py>) {
                 next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+(\S+\s+\S+\s+[0-9]+\s+[0-9:]+\s+[0-9]+)\s*\z/;
                 my $started = $start_seconds->($4) // next;
-                $table{$1} = [$2 + 0, $3 + 0, $rss{$1} // 0, $started];
+                # A process the memory reading did not name has no size: a sample
+                # that needs it is a miss, never a zero.
+                $table{$1} = [$2 + 0, $3 + 0, $rss{$1}, $started];
             }
             close $py;
         }
@@ -937,8 +1130,34 @@ if (($ARGV[0] // '') eq 'rsswatch') {
                 # processes this watch ends along with the group.
                 my $named = eval { require JSON::PP; JSON::PP::decode_json($answer)->{members} };
                 if (ref $named eq 'ARRAY') {
-                    %known = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) }
+                    my %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) }
                         grep { ref $_ eq 'ARRAY' && @$_ >= 3 && !grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
+                    # A reader that was restarted knows only the root's group and its
+                    # descendants; a member the watch already knew that left the group
+                    # and was orphaned is not among them. Every known member the reply
+                    # does not name is looked up in the process table: one that still
+                    # runs with its start second is kept, with the exact start time
+                    # the watch knew, and counted with its descendants (whose start
+                    # times are whole seconds, so they are counted and recorded but
+                    # never signalled). Without a table the tick is a miss.
+                    my @missing = grep { !$reply{$_} } keys %known;
+                    if (@missing) {
+                        my $table = $read_table->() or return undef;
+                        my %children;
+                        push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
+                        my @queue = grep { $table->{$_} && $table->{$_}[3] == $known{$_}[0] } @missing;
+                        my %extra;
+                        while (defined(my $member = shift @queue)) {
+                            next if $reply{$member} || $extra{$member}++ || !$table->{$member} || $member == $$;
+                            push @queue, @{$children{$member} // []};
+                        }
+                        for my $pid (keys %extra) {
+                            return undef unless defined $table->{$pid}[2];
+                            $kib += $table->{$pid}[2];
+                            $reply{$pid} = $known{$pid} && $known{$pid}[0] == $table->{$pid}[3] ? $known{$pid} : [$table->{$pid}[3], undef];
+                        }
+                    }
+                    %known = %reply;
                 }
                 return $kib;
             }
@@ -974,7 +1193,10 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         }
         %known = %next;
         my $total = 0;
-        $total += $table->{$_}[2] for keys %selected;
+        for my $pid (keys %selected) {
+            return undef unless defined $table->{$pid}[2];
+            $total += $table->{$pid}[2];
+        }
         return $total;
     };
     my ($child, $caught, $term_at, $over, $warned);
@@ -986,10 +1208,10 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # started at another time, or whose start time cannot be read, and the watch
     # records it. The watch's own pid and the root's are never members to signal.
     my $end_tree = sub {
-        kill 'KILL', -$child if $child && !$child_reaped;
+        fm_signal_items('KILL', "group:$child") if $child && !$child_reaped;
         my @members = map { [$_, @{$known{$_}}] } grep { $_ != $$ && $_ != ($child // 0) } sort { $a <=> $b } keys %known;
         my $result = fm_signal_by_identity('KILL', @members);
-        for my $kind (qw(mismatch unreadable)) {
+        for my $kind (qw(mismatch unreadable inexact)) {
             for my $pid (@{$result->{$kind}}) {
                 next if $skipped{$pid};
                 $skipped{$pid} = $kind;
@@ -1003,7 +1225,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         $SIG{$name} = sub {
             $caught = $name;
             $term_at //= Time::HiRes::time();
-            kill 'TERM', -$child if $child && !$child_reaped;
+            fm_signal_items('TERM', "group:$child") if $child && !$child_reaped;
         };
     }
     # Perl restarts waitpid after a handled signal, so the sampling runs in the
@@ -1013,7 +1235,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         if (!$caught && getppid() != $owner) {
             $caught = 'TERM';
             $term_at = Time::HiRes::time();
-            kill 'TERM', -$child unless $child_reaped;
+            fm_signal_items('TERM', "group:$child") unless $child_reaped;
         }
         $end_tree->() if $caught && Time::HiRes::time() - $term_at >= 5;
         return if $caught || $over;
@@ -1021,9 +1243,17 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         # A root that exits mid-sample is a zombie no sampler can read, so only
         # three misses in a row mean the sampler is failing.
         if (!defined $rss) {
-            return unless kill 0, $child;
+            return if $child_reaped || !kill(0, $child);
             return if ++$misses < 3 || $warned;
-            warn "fm-lint: resident-memory watch cannot sample this root; the per-root resident bound applies only once a sample succeeds\n";
+            # Every reader failed three ticks in a row: this root runs unmeasured.
+            # The run admits no new root (the abort mark its workers check), and the
+            # loss is recorded on stderr and in <rss-file>.
+            my $abort = $ENV{FM_LINT_INTERNAL_ABORT_FILE} // '';
+            if (length $abort && open(my $mark, '>>', $abort)) {
+                print {$mark} "the resident-memory watch lost every reader of a running root's memory (libproc and the process table)\n";
+                close $mark;
+            }
+            warn "fm-lint: resident-memory watch cannot sample this root (no reader answers); the run starts no further root\n";
             $warned = 1;
             return;
         }
@@ -1058,7 +1288,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         POSIX::_exit(127);
     }
     POSIX::setpgid($child, $child);
-    kill 'TERM', -$child if $caught;
+    fm_signal_items('TERM', "group:$child") if $caught;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 1, 1);
     my $reaped = waitpid($child, 0);
     $child_reaped = 1 if $reaped == $child;
@@ -1071,6 +1301,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         print {$fh} "rss_reader_unavailable=$reader_down\n" if $reader_down;
         printf {$fh} "watch_peak_kib=%d\n", $peak if $peak;
         print {$fh} 'rss_signal_skipped=' . join(',', map { "$_:$skipped{$_}" } sort { $a <=> $b } keys %skipped) . "\n" if %skipped;
+        print {$fh} "rss_unmeasured=1\n" if $warned;
         close $fh;
     }
     exit 98 if $over;

@@ -357,6 +357,14 @@ ROOT="$(cd "$SELF_DIR/.." && pwd -P)"
 # own UID, not the id command: no PATH entry can name another user.
 HOST_POOL_ROOT=/var/tmp/firstmate-lint-${UID:-0}
 HOST_RSS_KIB=3670016
+# The version probe's own lane inside that budget (one probe at a time on the host,
+# held to this many KiB); the roots' admission works with the rest.
+PROBE_RESERVE_KIB=65536
+ROOTS_RSS_KIB=$((HOST_RSS_KIB - PROBE_RESERVE_KIB))
+# The host ledger: gate entries (entry.*) and each lint run's entry (run.*), which
+# carries the values that bound every root the run starts. The private modes read
+# those values from the run's entry and from no setting or inherited variable.
+HOST_LEDGER_DIR=$HOST_POOL_ROOT/admission.lock.ledger
 cd "$ROOT" || exit 1
 
 # The sibling timeout library supplies the shared group-kill watchdog that
@@ -543,7 +551,7 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   fi
   gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${FM_LINT_INTERNAL_MODE:-full}:${path#"$ROOT"/}" \
     "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
-    "FM_LINT_INTERNAL_HOST_RSS_KIB=$HOST_RSS_KIB" "FM_LINT_INTERNAL_HOST_LOCK=$HOST_POOL_ROOT/admission.lock" \
+    "FM_LINT_INTERNAL_HOST_RSS_KIB=$ROOTS_RSS_KIB" "FM_LINT_INTERNAL_HOST_LOCK=$HOST_POOL_ROOT/admission.lock" \
     ${gate_cap[@]+"${gate_cap[@]}"} \
     "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
     "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
@@ -716,9 +724,16 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
     fi
     : > "$output.out"
     for entry in "${root_entries[@]}"; do
-      # A gate that refused for an unreadable host process table marked the
-      # run: start no further root in either worker.
-      [ ! -e "${FM_LINT_INTERNAL_ABORT_FILE:-}" ] || break
+      # A gate that refused for an unreadable host process table, or a watch that
+      # lost every reader of its root's memory, marked the run: start no further
+      # root in either worker, and fail the shard, because a root not started is
+      # not analyzed.
+      if [ -e "${FM_LINT_INTERNAL_ABORT_FILE:-}" ]; then
+        printf 'fm-lint: %s not started: %s\n' "${entry#*"$tab"}" \
+          "$(head -n 1 "$FM_LINT_INTERNAL_ABORT_FILE" 2>/dev/null || true)" >> "$output.out"
+        [ "$rc" -ne 0 ] || rc=2
+        continue
+      fi
       index=${entry%%"$tab"*}
       path=${entry#*"$tab"}
       invocation_rc=0
@@ -735,12 +750,57 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
   return "$rc"
 }
 
+# The private modes (--internal-worker, --internal-root, --internal-timed) take
+# every value that bounds what they start from the entry of the lint run that
+# started them, never from a setting or inherited variable: the perl that checks
+# admission, the python that reads memory, the bound mechanism, the per-root
+# address-space limit and the per-root resident limit. The entry is
+# FM_LINT_INTERNAL_RUN_ENTRY, which must name a run.<pid>.<n> file directly in
+# this script's host ledger (HOST_LEDGER_DIR, a constant here), whose flock is held
+# (its run is alive), whose pid is an ancestor of this process and runs this lint.
+# Anything else exits 2 and starts nothing.
+fm_lint_load_run_entry() {  # <mode>
+  local mode=$1 entry=${FM_LINT_INTERNAL_RUN_ENTRY:-} name owner perl python bounded memory rss rest
+  name=${entry##*/}
+  case "$entry" in
+    "$HOST_LEDGER_DIR/$name") ;;
+    *) entry= ;;
+  esac
+  case "$name" in
+    run.*.*) case "${name#run.}" in *[!0-9.]*|.*|*.|*.*.*) entry= ;; esac ;;
+    *) entry= ;;
+  esac
+  if [ -z "$entry" ] || [ -L "$entry" ] || [ ! -f "$entry" ] \
+    || ! IFS=$'\t' read -r owner perl python bounded memory rss rest < "$entry"; then
+    printf 'fm-lint.sh: %s starts a command only for a lint run whose entry is in the host ledger %s.\n' "$mode" "$HOST_LEDGER_DIR" >&2
+    exit 2
+  fi
+  case "$owner" in ''|0*|*[!0-9]*) owner= ;; esac
+  case "$perl" in /*) [ -x "$perl" ] || owner= ;; *) owner= ;; esac
+  case "$python" in /*|python3) ;; *) owner= ;; esac
+  case "$bounded" in none|perl) ;; *) owner= ;; esac
+  case "$memory" in ''|0*|*[!0-9]*) owner= ;; esac
+  case "$rss" in ''|0*|*[!0-9]*) owner= ;; esac
+  if [ -z "$owner" ] || [ -n "$rest" ] || [ "${#rss}" -gt 7 ] || [ "$rss" -gt 8388608 ] \
+    || ! "$perl" "$SELF_DIR/fm-lint-cache.pl" admitted-run "$HOST_LEDGER_DIR" "$entry"; then
+    printf 'fm-lint.sh: %s starts a command only for a live lint run whose entry in %s is valid; %s is not.\n' "$mode" "$HOST_LEDGER_DIR" "$entry" >&2
+    exit 2
+  fi
+  FM_LINT_PERL_BIN=$perl
+  FM_LINT_INTERNAL_PYTHON=$python
+  FM_LINT_INTERNAL_BOUNDED=$bounded
+  FM_LINT_INTERNAL_MEMORY_KIB=$memory
+  FM_LINT_INTERNAL_RSS_KIB=$rss
+  export FM_LINT_PERL_BIN FM_LINT_INTERNAL_PYTHON FM_LINT_INTERNAL_BOUNDED FM_LINT_INTERNAL_MEMORY_KIB FM_LINT_INTERNAL_RSS_KIB
+}
+
 # Private subprocess mode used only by the bounded parent above.
 if [ "${1:-}" = "--internal-worker" ]; then
   [ "${FM_LINT_INTERNAL:-}" = 1 ] || {
     printf 'fm-lint.sh: --internal-worker is private to the lint owner.\n' >&2
     exit 2
   }
+  fm_lint_load_run_entry --internal-worker
   [ "$#" -eq 4 ] && [ -n "${FM_LINT_SHELLCHECK:-}" ] || exit 2
   fm_lint_worker "$2" "$3" "$4"
   exit $?
@@ -749,10 +809,13 @@ fi
 # The private modes that run a command they are handed (--internal-root and
 # --internal-timed) run it only inside an admitted root: the gate that admitted
 # the root names its ledger entry in FM_LINT_INTERNAL_ADMISSION, and that entry must
-# be live and belong to a gate that is an ancestor of this process. A caller that
-# sets FM_LINT_INTERNAL=1 itself gets exit 2 and no command.
+# be in this script's host ledger, live, and belong to a gate (a perl running
+# fm-lint-cache.pl gate) that is an ancestor of this process. The perl that checks
+# it is the run entry's. A caller that sets FM_LINT_INTERNAL=1 itself gets exit 2
+# and no command.
 fm_lint_require_admission() {  # <mode>
-  "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" admitted "${FM_LINT_INTERNAL_ADMISSION:-}" || {
+  fm_lint_load_run_entry "$1"
+  "$FM_LINT_PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" admitted "$HOST_LEDGER_DIR" "${FM_LINT_INTERNAL_ADMISSION:-}" || {
     printf 'fm-lint.sh: %s starts a command only inside a root the host-wide admission has admitted.\n' "$1" >&2
     exit 2
   }
@@ -780,6 +843,12 @@ if [ "${1:-}" = "--internal-root" ]; then
       exit 2
       ;;
   esac
+  # The limit is the run entry's, not what the caller passes.
+  [ "$internal_memory_kib" = "$FM_LINT_INTERNAL_MEMORY_KIB" ] || {
+    printf 'fm-lint.sh: --internal-root memory limit %s KiB is not the lint run'"'"'s %s KiB\n' \
+      "$internal_memory_kib" "$FM_LINT_INTERNAL_MEMORY_KIB" >&2
+    exit 2
+  }
   ulimit -v "$internal_memory_kib" 2>/dev/null || {
     printf 'fm-lint.sh: per-root memory limit %s KiB is not enforceable on this host\n' \
       "$internal_memory_kib" >&2
@@ -2136,6 +2205,7 @@ fm_lint_stop_workers() {
 fm_lint_cleanup() {
   fm_lint_stop_workers
   rm -rf "$TMP_ROOT"
+  [ -z "${RUN_ENTRY:-}" ] || rm -f "$RUN_ENTRY"
 }
 FM_LINT_DURATION_LOAD=
 if declare -F fm_duration_load >/dev/null 2>&1; then
@@ -2200,74 +2270,82 @@ if [ -n "$pool_problem" ]; then
   exit 2
 fi
 
+# FM_LINT_INTERNAL_CENSUS_ONLY was the census's environment switch; an analysis
+# never takes it as an input, so an inherited value stops the run before any
+# ShellCheck starts rather than turn analyses into no-ops that exit 0.
+if [ -n "${FM_LINT_INTERNAL_CENSUS_ONLY:-}" ]; then
+  printf 'fm-lint.sh: FM_LINT_INTERNAL_CENSUS_ONLY is set in the environment; it is not an input to a lint, so no root was started. Unset it and run the lint again.\n' >&2
+  exit 2
+fi
+
+# This run's entry in the host ledger: the values that bound every root it starts
+# (the perl and python it resolved, the bound mechanism, the per-root address-space
+# and resident limits). The run holds the entry's flock on descriptor 9 for its
+# whole life (its workers inherit it), so the entry is live exactly while the run
+# is. The private modes read their bounds from this entry and from nothing else.
+# The same step removes the entries of runs that have ended.
+( umask 077; mkdir -p "$HOST_LEDGER_DIR" ) 2>/dev/null
+RUN_ENTRY=$HOST_LEDGER_DIR/run.$$.$(date +%s)
+# shellcheck disable=SC2016  # $fh, $old and $other are Perl variables in the -e program.
+# The entry is locked before it is filled, and only an entry whose lock is free and
+# that is more than a minute old is removed, so no run removes another run's entry
+# in the instant between its creation and its lock.
+if ! { [ -d "$HOST_LEDGER_DIR" ] && [ ! -L "$HOST_LEDGER_DIR" ] \
+  && ( umask 077; : >> "$RUN_ENTRY" ) 2>/dev/null \
+  && exec 9>>"$RUN_ENTRY" \
+  && "$PERL_BIN" -MFcntl=:flock -e 'open(my $fh, ">>&=", 9) or exit 1; flock($fh, LOCK_EX | LOCK_NB) or exit 1; for my $old (glob "$ARGV[0]/run.*") { next if $old eq $ARGV[1] || time() - ((stat $old)[9] // time()) < 60; open(my $other, ">>", $old) or next; unlink $old if flock($other, LOCK_EX | LOCK_NB); }' "$HOST_LEDGER_DIR" "$RUN_ENTRY" \
+  && printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$$" "$PERL_BIN" "$WATCH_PYTHON" "$BOUND_MECH" "$ROOT_MEMORY_KIB" "$ROOT_RSS_KIB" > "$RUN_ENTRY"; }; then
+  printf 'fm-lint.sh: host ledger unusable (%s cannot hold this run'"'"'s entry); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.\n' \
+    "$HOST_LEDGER_DIR" >&2
+  exit 2
+fi
+
 # The gate admits no root without a readable host process table, so read it once
 # here, before any root starts: a host that cannot give it fails this run in
 # about 5 s, not 5 s for every root, and holds no place in the shared queue.
-if ! census_problem=$(FM_LINT_INTERNAL_CENSUS_ONLY=1 FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
-    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate \
+if ! census_problem=$(FM_LINT_INTERNAL_HOST_RSS_KIB="$ROOTS_RSS_KIB" \
+    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" census \
     "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/census.wait" -- true 2>&1); then
   printf '%s\n' "$census_problem" >&2
   exit 2
 fi
 
-# The version probe is a ShellCheck start like any other, so it takes a turn in
-# the host-wide admission, charged a small fixed amount (64 MiB, above the 15 MB
-# measured for `shellcheck --version`) and never a recorded peak. It runs after
-# the pool and census checks above and before any root, in every mode except
-# --list-files (which starts no ShellCheck). What `--version` prints of a native
-# executable is a function of its bytes, so the pool keeps it under the SHA-256 of
-# those bytes (version/<digest>, written only after a probe the admission ran, in the
-# local pool, in the host-wide directory beside the default pool and in the lint
-# cache directory): a run whose binary is already known to any of them starts no
-# probe, as a cache hit starts no root, and so never waits behind a pool that is
-# full. A ShellCheck that is a script (a wrapper) is never remembered: what it runs
-# can change, through its delegate or its environment, without its own bytes
-# changing, so every run probes it in the admission and applies the version policy
-# to what that probe printed.
+# The version probe is a ShellCheck start like any other: every run probes, in
+# every mode except --list-files (which starts no ShellCheck), and the version
+# policy applies to what that probe printed. No version is remembered across runs:
+# nothing proves which ShellCheck a launcher (a script, or a compiled program)
+# runs, so a version kept under the launcher's bytes could pass a changed
+# delegate. The probe has its own lane in the host-wide budget (PROBE_RESERVE_KIB,
+# one probe at a time on the host, held to that many KiB by the resident watch on
+# native macOS and to the per-root address-space limit under the enforced
+# envelope), and the roots' admission works with the rest (ROOTS_RSS_KIB), so a
+# run whose roots are all cache hits waits only for another probe, never behind
+# roots holding the budget, and reserves nothing in the roots' budget. Runs whose
+# probes of the same ShellCheck overlap share one probe: a run that waited for the
+# lane takes the version printed by a probe of the same file that ended after the
+# run began waiting.
 probe_rc=0
 resolved=
-# shellcheck disable=SC2016  # the single quotes are deliberate: $fh is a Perl variable in the -e program, not a shell expansion.
-version_digest=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; read($fh, my $magic, 2); exit 1 if ($magic // "") eq "#!"; seek($fh, 0, 0); print Digest::SHA->new(256)->addfile($fh)->hexdigest' \
-  "$SHELLCHECK_BIN" 2>/dev/null) || version_digest=
-version_file=
-host_version_file=
-cache_version_file=
-if [ -n "$version_digest" ]; then
-  version_file=$SLOT_DIR/version/$version_digest
-  host_version_file=$HOST_POOL_ROOT/version/$version_digest
-  case "$CACHE_DIR" in ''|off) ;; *) cache_version_file=$CACHE_DIR/version/$version_digest ;; esac
-  # The local pool's record first, then the host-wide one: a binary some run of
-  # this user already probed is known to every pool, so a fresh local pool does
-  # not start a probe that would queue ahead of a cache hit.
-  for known_file in "$version_file" "$host_version_file" ${cache_version_file:+"$cache_version_file"}; do
-    if [ -f "$known_file" ] && [ ! -L "$known_file" ]; then
-      read -r resolved < "$known_file" || resolved=
-      case "$resolved" in ''|*[!0-9A-Za-z.+-]*) resolved= ;; esac
-      [ -z "$resolved" ] || break
-    fi
-  done
+probe_command=("$SHELLCHECK_BIN" --version)
+if [ "$BOUND_MECH" != none ]; then
+  # shellcheck disable=SC2016  # $1 is the inner shell's argument.
+  probe_command=("${BASH:-bash}" -c 'ulimit -v "$1" 2>/dev/null || exit 97; shift; exec "$@"' fm-lint-probe "$ROOT_MEMORY_KIB" "${probe_command[@]}")
+elif [ "$(uname)" = Darwin ]; then
+  probe_command=("$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" rsswatch "$PROBE_RESERVE_KIB" "$TMP_ROOT/probe.rss" -- "${probe_command[@]}")
 fi
-if [ -z "$resolved" ]; then
-  resolved=$(env FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB" \
-      FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" FM_LINT_INTERNAL_ROOT_CAP_KIB=65536 FM_LINT_INTERNAL_RUN_ID="$$" \
-      FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" \
-      "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" gate "$SLOT_DIR" "$NCPU" "$$" "$TMP_ROOT/probe.wait" -- \
-      "$SHELLCHECK_BIN" --version 2>"$TMP_ROOT/probe.err" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
-  if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
-    cat "$TMP_ROOT/probe.err" >&2
-    exit 2
-  fi
-  if [ -n "$version_file" ] && [ -n "$resolved" ]; then
-    ( umask 077; mkdir -p "$SLOT_DIR/version" && printf '%s\n' "$resolved" > "$version_file.$$" && mv -f "$version_file.$$" "$version_file" ) 2>/dev/null || true
-    ( umask 077; mkdir -p "$HOST_POOL_ROOT/version" && printf '%s\n' "$resolved" > "$host_version_file.$$" && mv -f "$host_version_file.$$" "$host_version_file" ) 2>/dev/null || true
-    # The cache directory keeps one too: a warm cache hit then finds the version
-    # beside the results it reuses even when the pool and the host-wide directory
-    # could not keep it, so it starts no probe and waits for nothing.
-    if [ -n "$cache_version_file" ]; then
-      ( umask 077; mkdir -p "$CACHE_DIR/version" && printf '%s\n' "$resolved" > "$cache_version_file.$$" && mv -f "$cache_version_file.$$" "$cache_version_file" ) 2>/dev/null || true
-    fi
-  fi
+# shellcheck disable=SC2016  # $fh is a Perl variable in the -e program.
+probe_key=$("$PERL_BIN" -MDigest::SHA -e 'open(my $fh, "<", $ARGV[0]) or exit 1; binmode $fh; print Digest::SHA->new(256)->add("$ARGV[0]\0")->addfile($fh)->hexdigest' \
+  "$SHELLCHECK_BIN" 2>/dev/null) || probe_key=unreadable
+resolved=$(FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON" FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" \
+    "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" probe "$HOST_POOL_ROOT/admission.lock" "$probe_key" "$TMP_ROOT/probe.wait" -- \
+    "${probe_command[@]}" 2>"$TMP_ROOT/probe.err" | awk '/^version:/ {print $2; exit}'; exit "${PIPESTATUS[0]}") || probe_rc=$?
+if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
+  cat "$TMP_ROOT/probe.err" >&2
+  exit 2
 fi
+# The probe's wait for its lane, in milliseconds, for the roots log.
+probe_wait_ms=$(tr -d '[:space:]' < "$TMP_ROOT/probe.wait" 2>/dev/null) || probe_wait_ms=
+case "$probe_wait_ms" in ''|*[!0-9]*) probe_wait_ms=unavailable ;; esac
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
 if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
   export FM_LINT_STRICT_VERSION=1
@@ -2317,6 +2395,7 @@ fi
 {
   printf 'format\t%s\n' 'fm-lint-roots-v1'
   printf 'meta\t%s\t%s\n' 'shellcheck_version' "$resolved"
+  printf 'meta\t%s\t%s\n' 'probe_wait_ms' "$probe_wait_ms"
   printf 'meta\t%s\t%s\n' 'platform' "$(uname -s) $(uname -m)"
   printf 'meta\t%s\t%s\n' 'image_os' "${ImageOS:-unknown}"
   printf 'meta\t%s\t%s\n' 'image_version' "${ImageVersion:-unknown}"
@@ -2420,8 +2499,8 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
-  worker_env+=(FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$HOST_RSS_KIB"
-    FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort")
+  worker_env+=(FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$ROOTS_RSS_KIB"
+    FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" FM_LINT_INTERNAL_RUN_ENTRY="$RUN_ENTRY")
   worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
   # The most one root can hold: its address-space limit under the enforced
   # envelope, else the resident watch bound. The gate charges it for a root
