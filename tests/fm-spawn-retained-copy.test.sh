@@ -691,6 +691,8 @@ test_unproved_fresh_read_and_blank_version_are_refused() (
   local meta_dir="$TMP_ROOT/in-memory-guard/home/state"
   mkdir -p "$meta_dir"
   : > "$meta_dir/holder.meta"
+  # The stub sets the guard's own variables inside this test's subshell on purpose.
+  # shellcheck disable=SC2030
   fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$meta_dir"); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
   fm_meta_get() { printf '%s\n' /virtual/pool/1/project/nested; }
   fm_task_copy_canonical_dir() { printf '%s\n' "$1"; }
@@ -761,6 +763,8 @@ test_forged_capability_holder_cannot_collapse_to_the_old_literal() (
   fslot="$dir/pool/1/project"
   mkdir -p "$fslot/state" "$dir/project"
   : > "$fslot/state/holder.meta"
+  # The stub sets the guard's own variables inside this test's subshell on purpose.
+  # shellcheck disable=SC2030
   fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$fslot/state"); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
   fm_meta_get() { printf '%s\n' "$fslot/nested"; }
   fm_task_copy_canonical_dir() { printf '%s\n' "$1"; }
@@ -1505,6 +1509,8 @@ test_lease_entry_oracle_checks_every_field() (
 # none; the test runs it over both suites that drive a real provider and over a mutant
 # file with one root-less get, which it must catch.
 provider_gets_without_root() {  # <file>
+  # The pattern is literal text to find, never an expansion.
+  # shellcheck disable=SC2016
   grep -n -E '("\$bin"|"\$UNC_PROVIDER"|"\$FM_TEST_TREEHOUSE_PROVIDER") get ' "$1" | grep -v -e '--root' || true
 }
 
