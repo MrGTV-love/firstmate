@@ -7216,6 +7216,12 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ] || [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = peers ]; then
     TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
     teardown_reprove_same_route || exit 1
+    if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = peers ] && [ -n "$TEARDOWN_PEER_SLOT" ]; then
+      # As in teardown_nested_slot return, the claim moves before any copy
+      # goes, so a handoff that refuses leaves every copy in place.
+      [ ! -d "$WT" ] || require_worktree_teardown_safety
+      teardown_peer_claim_handoff
+    fi
     teardown_foreign_copies_release || exit 1
     [ ! -d "$WT" ] || require_worktree_teardown_safety
     teardown_own_locked_copies_release || exit 1
