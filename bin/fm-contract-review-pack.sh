@@ -12,6 +12,14 @@
 # passes a read only with positive proof from the run's session transcript. The guard
 # admits a known name with any qualifier, and the skill template's Definition Of Done names,
 # because real contracts use them (their text was already admitted under a known section).
+# Harm-model reassessment (Main 1974): the check admits the work folder's
+# OPERATIONAL-BOUNDARIES.md when its bytes equal the installed define-done-and-grading copy,
+# and a skill:// read that resolves to that installed file. Main pins that file:
+# data/review-lane/run-review.sh copies it into the work folder, and the installed
+# assess-done-and-grade skill links it. It is not author text, so reading it cannot leak the
+# author's candidate or history. A search of the work folder is admitted only while the
+# folder holds nothing but that copy, the report and files the reviewer wrote; a copy with
+# other bytes, and a search of a parent of the work folder, still void the round.
 # Known limits: author text inside a request, a context file or a known section reaches the
 # reviewer; shell, eval, other tools and unrecorded subagents leave a round unverified; a
 # read that leaves no record cannot be seen.
@@ -43,7 +51,9 @@
 #   DOD_ONLY_SUBSECTIONS, the installed define-done-and-grading skill's template names
 #   (~/.agents/skills/define-done-and-grading/SKILL.md lines 630-642), are known only inside
 #   the Definition Of Done. A criterion title must hold no CRITERION_TITLE_TERMS word in
-#   <title>. A known section name nested deeper starts that section.
+#   <title>. A known section name nested deeper starts that section; inside the Definition
+#   Of Done it stays inside it, so every later heading deeper than the Definition Of Done
+#   heading is judged by these sub-heading rules.
 #   Headings are ATX (# to ######), setext (a line over === or ---) and bold-only lines
 #   (**Name** or __Name__), which count as the deepest sub-heading; text in a code fence is
 #   never a heading.
@@ -78,16 +88,20 @@
 #   --policy, else the skill next to this script.
 # check: reads the run's session transcript (--log: the entrypoint's omp-session folder,
 #   or one of its .jsonl files) and judges every read it records. The report's own
-#   Inputs read list is the reviewer's declaration and is not evidence.
+#   Inputs read list is the reviewer's declaration and is not evidence; a report
+#   (<work folder>/review.md) with no Inputs read list voids the round.
 #   Judged reads: read and edit paths (a trailing :selector such as :raw:1-11 or :-1 is
 #   removed one segment at a time; the read is authorized when the path or one of these
-#   shorter forms is), and grep, glob and find roots.
+#   shorter forms is), every [<path>#...] target line of an edit with no path (an edit with
+#   neither is unverified), and grep, glob and find roots.
 #   Every session record must name a folder under the recorded work folder, else the round
 #   is void: the transcript never chooses its own work folder.
-#   Authorized: anything inside the pack; the recorded work folder, except the entrypoint's
-#   OPERATIONAL-BOUNDARIES.md copy there; the transcript itself;
-#   the SKILL.md of assess-done-and-grade or define-done-and-grading, by path or as
-#   skill://<name>; the review rubric, by path or by the pinned raw.githubusercontent.com
+#   Authorized: anything inside the pack; a read in the recorded work folder, except an
+#   OPERATIONAL-BOUNDARIES.md there whose bytes differ from the installed one; a search of
+#   the work folder that holds only that copy, the report and files the run wrote; the
+#   transcript itself; the SKILL.md of assess-done-and-grade or define-done-and-grading, by
+#   path or as skill://<name>; a skill:// read that resolves to the installed
+#   define-done-and-grading OPERATIONAL-BOUNDARIES.md; the review rubric, by path or by the pinned raw.githubusercontent.com
 #   or github.com blob URL of this repository's origin; a file the manifest's root tracks;
 #   and a search root under the root whose search reaches no untracked file (and, unless the
 #   call sets gitignore true, no ignored file). A path in the excluded record is refused
@@ -231,7 +245,7 @@ function outside_flush(where) {
 }
 { L[++N] = $0 }
 END {
-  fence = 0; titled = 0; insec = 0; seclv = 0; dropto = 0; outside = 0; secname = ""; dodseen = 0; dodbody = 0
+  fence = 0; titled = 0; insec = 0; seclv = 0; dropto = 0; outside = 0; secname = ""; dodseen = 0; dodbody = 0; dodlv = 0
   for (i = 1; i <= N; i++) {
     line = L[i]
     match(line, /^ ? ? ?/)
@@ -284,10 +298,11 @@ END {
     titled = 1
     if (dropto && lv <= dropto) dropto = 0
     if (dropto) { if (two) i++; continue }
-    if (insec && lv > seclv) {
+    if (dodlv && lv <= dodlv) dodlv = 0
+    if ((insec && lv > seclv) || dodlv) {
       sb = known_q(t, SUBS)
-      if (sb != "" && secname != "definition of done" && index("|" DODONLY "|", "|" sb "|")) sb = ""
-      if (sb != "" || (secname == "definition of done" && criterion(t))) {
+      if (sb != "" && !dodlv && index("|" DODONLY "|", "|" sb "|")) sb = ""
+      if (sb != "" || (dodlv && criterion(t))) {
         if (sb != "") note_qualified(t, sb)
         print head > KEEP_OUT
         if (two) i++
@@ -313,7 +328,7 @@ END {
     if (b != "") {
       note_qualified(t, b)
       insec = 1; seclv = lv; secname = b; sectitle = t2
-      if (b == "definition of done") dodseen = 1
+      if (b == "definition of done") { dodseen = 1; if (!dodlv) dodlv = lv }
       print b > NAMES_OUT
       print head > KEEP_OUT
     } else {
@@ -501,6 +516,16 @@ named_skills = ("assess-done-and-grade", "define-done-and-grading")
 skill_files = {real(os.path.join(skills, s, "SKILL.md")) for s in named_skills}
 rubric_real = real(rubric) if rubric else ""
 log_real = real(log)
+opb_installed = real(os.path.join(skills, "define-done-and-grading", "OPERATIONAL-BOUNDARIES.md"))
+opb_copy = os.path.join(work_rec, "OPERATIONAL-BOUNDARIES.md")
+report = os.path.join(work_rec, "review.md")
+
+def same_bytes(a, b):
+    try:
+        with open(a, "rb") as x, open(b, "rb") as y:
+            return x.read() == y.read()
+    except OSError:
+        return False
 
 def under(p, d):
     return p == d or p.startswith(d.rstrip("/") + "/")
@@ -530,7 +555,9 @@ calls = 0
 judged = 0
 leaks = []
 unverified = []
-NOT_READS = {"write", "todo", "wait", "ask", "notebook_edit"}
+searches = []
+written = set()
+NOT_READS = {"todo", "wait", "ask", "notebook_edit"}
 # Internal records no read can prove belong to this run (Main 1904 F4).
 INTERNAL = ("agent", "artifact", "proc", "history")
 
@@ -546,9 +573,9 @@ def why_file(p):
         return "excluded path " + x
     if under(p, pack) or under(p, log_real):
         return None
-    if work and under(p, work):
-        if p == os.path.join(work, "OPERATIONAL-BOUNDARIES.md"):
-            return "the entrypoint copy of OPERATIONAL-BOUNDARIES.md, which is not an authorized input"
+    if under(p, work):
+        if p == opb_copy and not same_bytes(p, opb_installed):
+            return "a work-folder OPERATIONAL-BOUNDARIES.md whose bytes differ from the installed file"
         return None
     if p in skill_files or (rubric_real and p == rubric_real):
         return None
@@ -564,13 +591,19 @@ def why_search(p, ignored_too):
         return "a search that reaches excluded path " + x
     if under(p, pack) or under(p, log_real):
         return None
-    if work and under(p, work):
-        opb = os.path.join(work, "OPERATIONAL-BOUNDARIES.md")
-        if under(opb, p) and os.path.exists(opb):
-            return "a search of the work folder, which holds the entrypoint copy of OPERATIONAL-BOUNDARIES.md"
-        return None
     if os.path.isfile(p):
         return why_file(p)
+    if under(p, work):
+        allowed = {report} | written
+        if same_bytes(opb_copy, opb_installed):
+            allowed.add(opb_copy)
+        for d, dirs, names in os.walk(p):
+            for n in names + [x for x in dirs if os.path.islink(os.path.join(d, x))]:
+                if real(os.path.join(d, n)) not in allowed:
+                    return "a search of the work folder, which holds " + os.path.join(d, n) + ", a file the reviewer did not write"
+        return None
+    if under(work, p):
+        return "a search of a parent of the work folder"
     if under(p, root):
         rel = "" if p == root else os.path.relpath(p, root)
         if untracked_below(rel, ignored_too):
@@ -585,6 +618,8 @@ def judge_read(raw, cwd):
         if scheme == "skill":
             name = rest.rstrip("/")
             if name in named_skills or (name.endswith("/SKILL.md") and name[:-9] in named_skills):
+                return None
+            if real(os.path.join(skills, name)) == opb_installed and os.path.isfile(opb_installed):
                 return None
             return "a skill path other than the SKILL.md of the two named skills"
         if scheme in ("http", "https"):
@@ -654,21 +689,26 @@ for f in files:
             here = a.get("cwd") or cwd
             if name in ("read", "edit"):
                 p = str(a.get("path") or "")
-                if not p:
-                    continue
-                judged += 1
-                w = judge_read(p, here)
-                if w:
-                    leaks.append((p, w))
+                targets = [p] if p else []
+                if not p and name == "edit":
+                    targets = re.findall(r"(?m)^\[(.+)#[^#\]]*\][ \t]*$", str(a.get("input") or ""))
+                    if not targets:
+                        unverified.append(("edit call", "it names no path and no [<path>#...] target, so its reads cannot be audited"))
+                for p in targets:
+                    judged += 1
+                    w = judge_read(p, here)
+                    if w:
+                        leaks.append((p, w))
+            elif name == "write":
+                if a.get("path"):
+                    written.add(real(os.path.normpath(os.path.join(here, os.path.expanduser(str(a["path"]))))))
             elif name in ("grep", "glob", "find"):
                 # Only an explicit gitignore setting proves a search skips ignored files.
                 g = a.get("gitignore")
                 ignored_too = not (g is True or str(g).lower() == "true")
                 for d in search_roots(a.get("path") or ".", here):
                     judged += 1
-                    w = why_search(real(d), ignored_too)
-                    if w:
-                        leaks.append((d, w))
+                    searches.append((d, ignored_too))
             elif name == "task":
                 for t in a.get("tasks") or []:
                     n = (t or {}).get("name") or "?"
@@ -682,6 +722,18 @@ for f in files:
 if calls == 0:
     print("fm-contract-review-pack: log records no tool call, so it is not a session transcript and the run reads cannot be audited: " + log, file=sys.stderr)
     sys.exit(2)
+
+for d, ignored_too in searches:
+    w = why_search(real(d), ignored_too)
+    if w:
+        leaks.append((d, w))
+
+try:
+    rep_text = open(report, encoding="utf-8", errors="replace").read()
+except OSError:
+    rep_text = ""
+if not re.search(r"(?im)^[ \t>#*_`-]*inputs read\b", rep_text):
+    leaks.append((report, "the report has no Inputs read list, so the round is void"))
 
 def uniq(xs):
     seen = []

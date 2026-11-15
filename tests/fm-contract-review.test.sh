@@ -315,8 +315,15 @@ make_leak_world() { # builds LEAK_* variables
   build_pack LEAK_PACK --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" \
     --exclude "$LEAK_ROOT/sources/notes.md" || fail "leak world build failed: $(cat "$TMP_ROOT/build.err")"
   LEAK_WORK="$TMP_ROOT/work/$(basename "$(dirname "$LEAK_PACK")")-pack"
-  mkdir -p "$LEAK_WORK" "$TMP_ROOT/sibling/pack"
+  mkdir -p "$TMP_ROOT/sibling/pack"
+  write_report "$LEAK_WORK"
   printf 'VERDICT: PASS\n' >"$TMP_ROOT/sibling/pack/review.md"
+}
+
+# write_report <work folder>: the reviewer's report, with its Inputs read list.
+write_report() {
+  mkdir -p "$1"
+  printf '## Inputs read\n\n- %s/target.md\n\nVERDICT: FAIL\n' "$LEAK_PACK" >"$1/review.md"
 }
 
 # One tool call of a session transcript: tool_call <name> <key> <value> [<key> <value>]...
@@ -374,7 +381,6 @@ test_every_round_finding_read_is_a_leak() {
   local log="$TMP_ROOT/leak/s.jsonl" call n=0
   make_leak_world
   printf 'untracked\n' >"$LEAK_ROOT/notes/draft.md"
-  printf 'boundaries\n' >"$LEAK_WORK/OPERATIONAL-BOUNDARIES.md"
   # Each read the two outside rounds showed certified clean, or that the boundary forbids.
   local -a calls=(
     "$(tool_call read path "$LEAK_ROOT/data/case/truth/r23-review.md")"
@@ -386,10 +392,8 @@ test_every_round_finding_read_is_a_leak() {
     "$(tool_call grep pattern F1 path "$LEAK_ROOT/notes" gitignore true)"
     "$(tool_call grep pattern F1 path "$LEAK_ROOT" gitignore false)"
     "$(tool_call glob path "$LEAK_ROOT/data/**/*.md")"
-    "$(tool_call read path skill://define-done-and-grading/OPERATIONAL-BOUNDARIES.md)"
     "$(tool_call read path skill://diagnostic-reasoning)"
     "$(tool_call read path "$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md")"
-    "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md")"
     "$(tool_call read path https://example.com/anything)"
     "$(tool_call read path pr://owner/repo/380)"
   )
@@ -443,6 +447,7 @@ test_pack_in_a_spaced_or_bracketed_folder_is_clean() {
     pack=''
     build_pack pack --contract "$LEAK_ROOT/sources/raw-contract.md" --root "$LEAK_ROOT" --out-root "$TMP_ROOT/$parent" ||
       fail "build into '$parent' failed: $(cat "$TMP_ROOT/build.err")"
+    write_report "$REVIEW_WORK_ROOT/$parent-pack"
     write_transcript "$log" "$REVIEW_WORK_ROOT/$parent-pack" "$(tool_call read path "$pack/target.md")"
     run_check "$log" "$pack"
     assert_equals 0 "$CHECK_RC" "a read of the pack in '$parent' was not clean: $CHECK_OUT"
@@ -490,7 +495,7 @@ test_work_folder_follows_the_entrypoint_rule() {
     fail "build failed: $(cat "$TMP_ROOT/build.err")"
   d=$(cd "$pack" && pwd -P)
   w=${REVIEW_WORK_ROOT:-/private/tmp/fm-review-work}/$(basename "$(dirname "$d")")-$(basename "$d")
-  mkdir -p "$w"
+  write_report "$w"
   write_transcript "$log" "$w" "$(tool_call read path "$pack/target.md")"
   run_check "$log" "$pack"
   assert_equals 0 "$CHECK_RC" "a session in the folder the entrypoint names was not judged clean: $CHECK_OUT"
@@ -669,6 +674,105 @@ test_gitignore_true_search_is_clean() {
   pass "a gitignore true search over tracked and ignored files is clean; one without the setting is not"
 }
 
+test_criterion_after_a_nested_known_section_is_kept() {
+  local src="$TMP_ROOT/nk.md" pack
+  # R16-1: a known section nested in the Definition Of Done does not end it, so a criterion
+  # title after it reaches target.md.
+  printf '## Definition Of Done\n\n### Mandatory items\n\n- **A1** (mandatory): ZZ-NK-A1-ZZ.\n\n### Execution constraints\n\n- run in a temp dir.\n\n### Picker cutover — mandatory\n\nZZ-NK-PICKER-ZZ the picker routes by the declared set.\n\n## Assumptions\n\nZZ-NK-ASSUME-ZZ\n' >"$src"
+  build_pack pack --contract "$src" || fail "a criterion after a nested known section was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-NK-PICKER-ZZ" "$pack/target.md" "a criterion after a nested known section was dropped"
+  assert_grep "ZZ-NK-ASSUME-ZZ" "$pack/target.md" "the section after the Definition Of Done was dropped"
+  # Control: an unknown sub-heading after a nested known section still refuses.
+  printf '## Definition Of Done\n\n- **A1** (mandatory): x.\n\n### Execution constraints\n\n- run in a temp dir.\n\n### Responses\n\nZZ-NK-AUTHOR-ZZ fixed.\n' >"$src"
+  build_rc "$TMP_ROOT/nk-unknown" --contract "$src"
+  assert_equals 3 "$BUILD_RC" "an unknown heading after a nested known section was accepted: $BUILD_ERR"
+  assert_absent "$TMP_ROOT/nk-unknown" "a refused build left an output directory"
+  # Control: a template sub-section after a nested known section stays inside the Definition Of Done.
+  printf '## Definition Of Done\n\n- **A1** (mandatory): x.\n\n### Assumptions\n\n- a.\n\n### Verification Complete\n\nZZ-NK-VC-ZZ\n' >"$src"
+  pack=''
+  build_pack pack --contract "$src" || fail "a template sub-section after a nested known section was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-NK-VC-ZZ" "$pack/target.md" "a template sub-section after a nested known section was dropped"
+  pass "a criterion after a known section nested in the Definition Of Done is kept, and an unknown heading there still refuses"
+}
+
+test_patch_form_edit_is_judged() {
+  local log="$TMP_ROOT/pe/s.jsonl"
+  make_leak_world
+  printf 'scratch\n' >"$LEAK_WORK/probe.txt"
+  # R16-2: an edit with no path names its targets in [<path>#<n>] lines of its input.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call edit input $'*** Begin Patch\n['"$LEAK_ROOT"$'/data/case/truth/r23-review.md#1]\nPUT 1.=1:\n+x\n*** End Patch')"
+  run_check "$log"
+  assert_equals 3 "$CHECK_RC" "a patch to an ignored file was not a leak: $CHECK_OUT"
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call edit input $'*** Begin Patch\n['"$LEAK_WORK"$'/probe.txt#1]\nPUT 1.=1:\n+x\n*** End Patch')"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "a patch to a work-folder file was flagged: $CHECK_OUT"
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")" "$(tool_call edit input 'no target here')"
+  run_check "$log"
+  assert_equals 4 "$CHECK_RC" "an edit with no readable target was certified: $CHECK_OUT"
+  pass "a patch-form edit is judged by its target lines, and one with no target is unverified"
+}
+
+test_pinned_operational_boundaries_reads_are_clean() {
+  local log="$TMP_ROOT/opb/s.jsonl" call n=0
+  make_leak_world
+  cp "$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md" "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md"
+  # R16-3 (Main 1974): the reads the entrypoint tells the reviewer to make, and work-folder
+  # searches while the folder holds only the pinned copy, the report and the run's own files.
+  local -a calls=(
+    "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md")"
+    "$(tool_call read path OPERATIONAL-BOUNDARIES.md)"
+    "$(tool_call read path skill://define-done-and-grading/OPERATIONAL-BOUNDARIES.md)"
+    "$(tool_call read path skill://assess-done-and-grade/../define-done-and-grading/OPERATIONAL-BOUNDARIES.md)"
+    "$(tool_call grep pattern MUST gitignore true)"
+    "$(tool_call find pattern '*.md' path "$LEAK_WORK")"
+  )
+  for call in "${calls[@]}"; do
+    n=$((n + 1))
+    write_transcript "$log" "$LEAK_WORK" "$(tool_call write path falsifier.sh content x)" "$call"
+    printf 'x\n' >"$LEAK_WORK/falsifier.sh"
+    run_check "$log"
+    assert_equals 0 "$CHECK_RC" "pinned read $n was not clean: $call -> $CHECK_OUT"
+  done
+  # Controls: a parent-rooted search, an author file, a skill:// path that is not the
+  # installed file, a work folder that holds a file the run did not write, and a changed copy.
+  for call in "$(tool_call grep pattern MUST path "$TMP_ROOT/work" gitignore true)" \
+    "$(tool_call read path "$LEAK_ROOT/sources/raw-contract.md")" \
+    "$(tool_call read path skill://assess-done-and-grade/OPERATIONAL-BOUNDARIES.md)"; do
+    write_transcript "$log" "$LEAK_WORK" "$call"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "a control read was not a leak: $call -> $CHECK_OUT"
+  done
+  printf 'planted\n' >"$LEAK_WORK/earlier-review.md"
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call grep pattern MUST gitignore true)"
+  run_check "$log"
+  assert_equals 3 "$CHECK_RC" "a search of a work folder holding a planted file was clean: $CHECK_OUT"
+  rm -f "$LEAK_WORK/earlier-review.md"
+  printf 'changed\n' >"$LEAK_WORK/OPERATIONAL-BOUNDARIES.md"
+  for call in "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md")" "$(tool_call grep pattern MUST gitignore true)"; do
+    write_transcript "$log" "$LEAK_WORK" "$call"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "a changed work-folder copy was not a leak: $call -> $CHECK_OUT"
+  done
+  pass "the pinned OPERATIONAL-BOUNDARIES.md reads and clean work-folder searches pass; a changed copy, a planted file and a parent search void"
+}
+
+test_report_with_no_inputs_read_voids() {
+  local log="$TMP_ROOT/nir/s.jsonl"
+  make_leak_world
+  # R16-4, G2(iv)(6): a report with no Inputs read list voids the round.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "a report with an Inputs read list and a clean transcript was flagged: $CHECK_OUT"
+  printf '## Findings\n\nnone\n\nVERDICT: PASS\n' >"$LEAK_WORK/review.md"
+  run_check "$log"
+  assert_equals 3 "$CHECK_RC" "a report with no Inputs read list was not void: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "no Inputs read list" "the void does not name the missing list"
+  rm -f "$LEAK_WORK/review.md"
+  run_check "$log"
+  assert_equals 3 "$CHECK_RC" "a missing report was not void: $CHECK_OUT"
+  pass "a report with no Inputs read list voids the round, and one with the list and a clean transcript is clean"
+}
+
 fm_test_run_cases \
   test_known_sections_pass_byte_identical \
   test_every_round_finding_section_is_dropped \
@@ -698,4 +802,8 @@ fm_test_run_cases \
   test_known_section_with_any_qualifier_is_that_section \
   test_skill_template_dod_subsections_build \
   test_plural_known_name_is_known \
+  test_criterion_after_a_nested_known_section_is_kept \
+  test_patch_form_edit_is_judged \
+  test_pinned_operational_boundaries_reads_are_clean \
+  test_report_with_no_inputs_read_voids \
   -- "$@"
