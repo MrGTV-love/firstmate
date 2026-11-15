@@ -2365,7 +2365,7 @@ merge_marker_restore() {  # <state> <id> <record>
     return 0
   fi
   [ -z "${tmp:-}" ] || rm -f -- "$tmp"
-  echo "REFUSED: the task record $3 could not be removed, and its merge-notified marker $marker could not be restored; a later pass may report that merge again until both are repaired" >&2
+  echo "error: the task record $3 could not be removed, and its merge-notified marker $marker could not be restored; teardown stops, and a later pass may report that merge again until both are repaired" >&2
   return 1
 }
 

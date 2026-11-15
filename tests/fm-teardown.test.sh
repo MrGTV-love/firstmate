@@ -814,7 +814,7 @@ SH
 # shows it was cut short is never trusted: the closeout names the incomplete list
 # and records no PR from it. Control: a branch with PR 10 alone records it.
 many_prs_case() {  # <name> <complete|cut|single|1000|1001> [landed yes|no]
-  local name=$1 mode=$2 landed=${3:-yes} case_dir head n
+  local name=$1 mode=$2 landed=${3:-yes} case_dir head
   case_dir=$(make_case "$name")
   write_meta "$case_dir" direct-PR ship
   seed_backlog_in_flight "$case_dir" ship

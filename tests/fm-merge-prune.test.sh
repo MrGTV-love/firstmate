@@ -4038,7 +4038,7 @@ xl_print_state() {  # <label>
   printf '%s: record=%s pr=%s poll=%s prune-record=%s copy=%s ledger=[%s]\n' "$1" \
     "$([ -e "$STATE/t1.meta" ] && echo open || echo gone)" \
     "$(sed -n 's/^pr=//p' "$STATE/t1.meta" 2>/dev/null | tail -1 | grep . || echo none)" \
-    "$({ [ -e "$STATE/t1.check.sh" ] || [ -e "$STATE/t1.pr-poll" ]; } && echo "armed($(cd "$STATE" && ls t1.check.sh t1.pr-poll 2>/dev/null | tr '\n' ' '))" || echo none)" \
+    "$({ [ -e "$STATE/t1.check.sh" ] || [ -e "$STATE/t1.pr-poll" ]; } && echo "armed($(for f in t1.check.sh t1.pr-poll; do [ ! -e "$STATE/$f" ] || printf '%s ' "$f"; done))" || echo none)" \
     "$([ -e "$STATE/t1.merge-prune" ] && echo armed || echo none)" \
     "$([ -e "$COPY" ] && echo present || echo gone)" "$(xl_ledger_events)"
 }

@@ -1631,7 +1631,7 @@ test_postrename_poll_validation_revokes_and_retries() {
 # registration it renamed, and the custom check and its trust stay byte for
 # byte (fm-check-register.sh takes no lock, so this order is reachable).
 test_custom_check_registered_mid_publication_is_left_in_place() {
-  local dir state before
+  local dir state before outer_path=$PATH
   dir=$(make_case poll-custom-mid-publication)
   state="$dir/home/state"
   write_poll_meta "$state" task-a https://github.com/o/r/pull/1
@@ -1653,7 +1653,7 @@ PATH="${FM_TEST_OUTER_PATH:?}" FM_STATE_OVERRIDE="${FM_TEST_STATE:?}" \
 SH
   chmod +x "$dir/fakebin/mv"
   if FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REGISTER_AFTER="$state/task-a.pr-poll-registration" \
-    FM_TEST_CHECK_NAME="$state/task-a.check.sh" FM_TEST_OUTER_PATH="$PATH" FM_TEST_STATE="$state" \
+    FM_TEST_CHECK_NAME="$state/task-a.check.sh" FM_TEST_OUTER_PATH="$outer_path" FM_TEST_STATE="$state" \
     FM_TEST_REGISTER="$REGISTER" PATH="$dir/fakebin:$BASE_PATH" fm_pr_poll_publish_prepared; then
     fail "a publication over a custom check registered mid-way was reported as success"
   fi
