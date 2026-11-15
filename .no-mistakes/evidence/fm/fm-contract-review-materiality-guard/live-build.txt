@@ -1,0 +1,55 @@
+## S1: build with no --root
+fm-contract-review-pack: --root is required: the repository checkout the reviewer reads, so the check can judge every read against it
+rc=2
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/noroot: No such file or directory
+
+## S2: build real d3 rev19 with --root
+fm-contract-review-pack: pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r19/pack head=eda638c35da0d47b3f69e7a6fb335949f5959f7d diff=diff.patch manifest=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r19.excluded-paths
+rc=0 pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r19/pack
+pack
+ci-evidence.md
+contract.md
+diff.patch
+head.txt
+target.md
+author text in pack:
+none
+dropped lines in manifest:
+6
+dropped	title: G2 steer: owner ruling on F-CAT-048 and cleaning re-check (Main 2643, Main 2644)
+dropped	text outside a known section (2 line(s) before "REQUEST (verbatim, from Main)")
+dropped	Boundary dispositions
+dropped	Author's all-green candidate
+dropped	Contract Review history
+dropped	Contract Review
+source excluded:
+exclude	/Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md
+policy block byte-equal:
+cmp equal
+
+## S2: build real d3 rev23 with --root
+fm-contract-review-pack: pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r23/pack head=7114fab7b88d8be631d24972332284027156ec8e diff=diff.patch manifest=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r23.excluded-paths
+rc=0 pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r23/pack
+pack
+ci-evidence.md
+contract.md
+diff.patch
+head.txt
+target.md
+author text in pack:
+none
+dropped lines in manifest:
+5
+dropped	title: G2 steer: owner ruling on F-CAT-048 and cleaning re-check (Main 2643, Main 2644)
+dropped	text outside a known section (2 line(s) before "REQUEST (verbatim, from Main)")
+dropped	Boundary dispositions
+dropped	Author's all-green candidate
+dropped	Contract Review
+source excluded:
+exclude	/Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev23.md
+policy block byte-equal:
+cmp equal
+
+## S3: refuse non-empty out-root
+fm-contract-review-pack: out-root is not empty (it may hold a review or another pack): /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r19
+rc=2

@@ -1,0 +1,21 @@
+# work-folder and report rules at HEAD 9dbb4fc7c (real pinned OPB copied as run-review.sh does)
+PASS want=0 rc=0 :: read of byte-equal work-folder OPB copy, then grep with no path (work folder)
+      INPUT CLEAN: 2 recorded read(s), all authorized
+PASS want=3 rc=3 :: grep of work folder holding a planted earlier report
+      INPUT LEAK: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/work/r19-pack: a search of the work folder, which holds /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/work/r19-pack/earlier-review.md, a file the reviewer did not write
+      ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+PASS want=3 rc=3 :: grep of the parent of the work folder
+      INPUT LEAK: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/work: a search of a parent of the work folder
+      ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+PASS want=3 rc=3 :: read of a work-folder OPB copy whose bytes differ
+      INPUT LEAK: OPERATIONAL-BOUNDARIES.md: a work-folder OPERATIONAL-BOUNDARIES.md whose bytes differ from the installed file
+      ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+PASS want=4 rc=4 :: a bash call is never proven clean
+      INPUT UNVERIFIED: bash call: its reads are not recorded as paths, so they cannot be audited
+      ROUND UNVERIFIED: the transcript holds reads that cannot be proven; the round is not clean
+PASS want=3 rc=3 :: report with no Inputs read list
+      INPUT LEAK: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/work/r19-pack/review.md: the report has no Inputs read list, so the round is void
+      ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+PASS want=3 rc=3 :: no report at all
+      INPUT LEAK: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/work/r19-pack/review.md: the report has no Inputs read list, so the round is void
+      ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round

@@ -1,0 +1,59 @@
+# check at HEAD 9dbb4fc7c, real installed skills dir ~/.agents/skills, pack built from real d3 rev19
+## expect clean (exit 0)
+PASS want=0 rc=0  ~/.agents/skills/define-done-and-grading/OPERATIONAL-BOUNDARIES.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  ~/.agents/skills/assess-done-and-grade/../define-done-and-grading/OPERATIONAL-BOUNDARIES.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  ~/.agents/skills/define-done-and-grading/OPERATIONAL-BOUNDARIES.md:1-200
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  ~/.agents/skills/define-done-and-grading/CLI-EXAMPLE.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  ~/.agents/skills/define-done-and-grading/SKILL.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  ~/.agents/skills/assess-done-and-grade/SKILL.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  skill://assess-done-and-grade
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  skill://assess-done-and-grade:1-200
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  skill://define-done-and-grading/OPERATIONAL-BOUNDARIES.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  skill://define-done-and-grading/OPERATIONAL-BOUNDARIES.md:raw
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  skill://define-done-and-grading/CLI-EXAMPLE.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  skill://define-done-and-grading/CLI-EXAMPLE.md:1-200
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  skill://assess-done-and-grade/../define-done-and-grading/OPERATIONAL-BOUNDARIES.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  ~/.no-mistakes/worktrees/32d18ed9638d/01M7GNBN9272XSFJPXH2TE7Z5N/bin/fm-spawn.sh
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  ~/.no-mistakes/worktrees/32d18ed9638d/01M7GNBN9272XSFJPXH2TE7Z5N/docs/review-rubric.md
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+PASS want=0 rc=0  /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r19/pack/contract.md:raw:1-11
+      -> INPUT CLEAN: 2 recorded read(s), all authorized 
+## expect void (exit 3)
+PASS want=3 rc=3  ~/.agents/skills/define-done-and-grading/MAINTAINERS.md
+      -> INPUT LEAK: /Users/charlesabrooker/.agents/skills/define-done-and-grading/MAINTAINERS.md: outside the allowed inputs ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  ~/.agents/skills/define-done-and-grading/REGRESSION-EVALS.md
+      -> INPUT LEAK: /Users/charlesabrooker/.agents/skills/define-done-and-grading/REGRESSION-EVALS.md: outside the allowed inputs ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  ~/.agents/skills/define-done-and-grading/SKILL.md.backup-20261101-agent-invocable
+      -> INPUT LEAK: /Users/charlesabrooker/.agents/skills/define-done-and-grading/SKILL.md.backup-20261101-agent-invocable: outside the allowed inputs ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  skill://define-done-and-grading/MAINTAINERS.md
+      -> INPUT LEAK: skill://define-done-and-grading/MAINTAINERS.md: a skill path other than the named installed skill files ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  skill://define-done-and-grading/MAINTAINERS.md:1-200
+      -> INPUT LEAK: skill://define-done-and-grading/MAINTAINERS.md:1-200: a skill path other than the named installed skill files ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  skill://define-done-and-grading/REGRESSION-EVALS.md:raw
+      -> INPUT LEAK: skill://define-done-and-grading/REGRESSION-EVALS.md:raw: a skill path other than the named installed skill files ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  ~/.agents/skills/assess-done-and-grade/SKILL.md.backup-20261029-verdict-handling
+      -> INPUT LEAK: /Users/charlesabrooker/.agents/skills/assess-done-and-grade/SKILL.md.backup-20261029-verdict-handling: outside the allowed inputs ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  ~/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md
+      -> INPUT LEAK: /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md: excluded path /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  ~/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md:1-50
+      -> INPUT LEAK: /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md:1-50: outside the allowed inputs ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  ~/firstmate/data/fm-contract-review-materiality-guard/cases/d3/truth/r23-review.md
+      -> INPUT LEAK: /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/truth/r23-review.md: outside the allowed inputs ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r23/pack/target.md
+      -> INPUT LEAK: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/r23/pack/target.md: outside the allowed inputs ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 
+PASS want=3 rc=3  skill://diagnostic-reasoning
+      -> INPUT LEAK: skill://diagnostic-reasoning: a skill path other than the named installed skill files ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round 

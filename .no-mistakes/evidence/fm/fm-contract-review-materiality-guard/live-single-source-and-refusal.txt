@@ -1,0 +1,16 @@
+# single source: edit one reviewer-block line in a policy copy
+build rc=0
+1
+# FIRST ATTEMPT (tester error): the awk pattern matched no heading, so the file was not mutated; rc=0 below is the unmutated contract building, not a refusal failure
+fm-contract-review-pack: pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/mut/pack head=7114fab7b88d8be631d24972332284027156ec8e diff=diff.patch manifest=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/mut.excluded-paths
+/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/mut/pack
+rc=0
+pack
+# unknown sub-heading inside the Definition Of Done of real rev23 refuses (corrected mutation)
+56:### Author notes
+fm-contract-review-pack: refused: unknown heading inside a known section: Author notes (under: Definition Of Done (steer), revision 23)
+fm-contract-review-pack: refused: the Definition Of Done holds no criterion text
+fm-contract-review-pack: no pack written; give the text a known heading (CONTRACT_SECTIONS or CONTRACT_SUBSECTIONS in this script) or move it out of the contract
+rc=3
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/mut: No such file or directory
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.kxiJBe06Sx/mut.excluded-paths: No such file or directory
