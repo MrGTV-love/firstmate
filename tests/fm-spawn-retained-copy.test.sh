@@ -103,13 +103,17 @@ run_retained_spawn() {
 }
 
 assert_retained_refusal() {
-  local name=$1 reason=$2 remedy=${3:-} forbidden=${4:-} out rc=0
+  local name=$1 reason=$2 remedy=${3:-} forbidden=${4:-} out rc=0 f
   retained_fingerprint > "$CASE_DIR/before-copy"
   out=$(run_retained_spawn "$name") || rc=$?
   [ "$rc" -ne 0 ] || fail "spawn accepted an unsafe pool slot: $out"
   assert_contains "$out" "$reason" "allocation refusal lost its reason"
   [ -z "$remedy" ] || assert_contains "$out" "$remedy" "allocation refusal did not name the command that clears it"
-  [ -z "$forbidden" ] || assert_not_contains "$out" "$forbidden" "allocation refusal named a command that cannot clear it"
+  if [ -n "$forbidden" ]; then
+    while IFS= read -r f; do
+      [ -z "$f" ] || assert_not_contains "$out" "$f" "allocation refusal named a command that cannot clear it"
+    done <<<"$forbidden"
+  fi
   assert_contains "$out" "before treehouse get" "allocation did not refuse at the pre-acquisition boundary"
   ! grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refused allocation sent treehouse get"
   ! grep -Eq 'reset|treehouse return' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refused allocation sent a destructive command"
@@ -405,8 +409,8 @@ test_conflicting_unleased_alias_refuses_before_allocation() {
       out=$(run_retained_spawn "$name") || rc=$?
       if [ "$rc" = 0 ] || [[ "$out" != *"has conflicting lease records"* ]] || \
         [[ "$out" != *"report the conflicting entries for repair"* ]] || [[ "$out" == *"treehouse lease"* ]] || \
-        [[ "$out" != *"(cd '$PROJECT_DIR' && treehouse status)"* ]]; then
-        printf 'not ok - %s/%s: mixed-entry refusal must name status/repair, not a lease or an unleased-only verdict: %s\n' "$order" "$spelling" "$out" >&2
+        [[ "$out" != *"Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"* ]] || [[ "$out" == *"treehouse status)"* ]]; then
+        printf 'not ok - %s/%s: mixed-entry refusal on an unproven provider must name the upgrade and repair, not a lease, an unleased-only verdict or a status read: %s\n' "$order" "$spelling" "$out" >&2
         failed=1
       fi
       assert_contains "$out" "before treehouse get" "mixed-entry refusal did not precede acquisition"
@@ -416,7 +420,7 @@ test_conflicting_unleased_alias_refuses_before_allocation() {
     done
   done
   [ "$failed" = 0 ] || fail "mixed-entry refusal recommends an order-dependent lease remedy"
-  pass "mixed leased/unleased aliases refuse with status/repair guidance in both entry orders"
+  pass "mixed leased/unleased aliases refuse with upgrade and repair guidance, and no status read, in both entry orders on an unproven provider"
 }
 
 test_conflicting_recovered_alias_refuses_before_allocation() {
@@ -435,7 +439,7 @@ test_conflicting_recovered_alias_refuses_before_allocation() {
       "$SLOT_DIR" "$alias" "$recovered" > "$CASE_DIR/pool/treehouse-state.json"
     cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
     assert_retained_refusal "$name" "carries Treehouse's recovered-state lease" \
-      "(cd '$PROJECT_DIR' && treehouse status)"
+      "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true" "treehouse status)"
     cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
   done
   pass "conflicting recovered-lease aliases refuse a spawn before allocation without changing pool state"
@@ -483,14 +487,14 @@ test_unprovable_slot_hold_still_refuses() {
         printf '{"worktrees":[{"name":"9","path":"%s/pool/9/project","leased":true,"lease_holder":"other"}]}\n' \
           "$CASE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
         reason="has no entry in Treehouse state"
-        remedy="(cd '$PROJECT_DIR' && treehouse status)"
-        forbidden="treehouse lease"
+        remedy="Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
+        forbidden=$'treehouse lease\ntreehouse status)'
         ;;
       unreadable)
         printf '{"worktrees":[{"name":"1","path":"%s","leased":true\n' "$SLOT_DIR" > "$CASE_DIR/pool/treehouse-state.json"
         reason="cannot be read"
-        remedy="(cd '$PROJECT_DIR' && treehouse status)"
-        forbidden="treehouse lease"
+        remedy="Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
+        forbidden=$'treehouse lease\ntreehouse status)'
         ;;
       recovered-not-home)
         entry=$(printf ',"leased":true,"lease_holder":"%s"' "$recovered")
@@ -941,16 +945,19 @@ test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn() {
 # The `.treehouse` half of the missing-state boundary, with real directories: a slot
 # of the project's repository under a `.treehouse` path whose pool folder has no state
 # file, `treehouse pool-dir` failing, an unproven provider. The recorded copy inside it
-# refuses (the hold cannot be read). Controls: the same copy under a path with no
-# `.treehouse` component is not evidenced as a pool slot and is not refused; a pool
-# whose state file exists is judged by it as before.
+# refuses (the hold cannot be read), and so does the same copy under a plain path when
+# `treehouse pool-dir` cannot say (a linked worktree whose slot status cannot be proved
+# is a slot, Main 1864 R-C: a changed case, a custom pool root looks exactly like it).
+# Controls: the same copy under a plain path when pool-dir names another folder is
+# proved not a slot and is not refused; a pool whose state file exists is judged by it
+# as before.
 test_missing_state_slot_under_a_dot_treehouse_path_refuses() (
   # shellcheck source=bin/fm-task-copy-lib.sh
   . "$ROOT/bin/fm-task-copy-lib.sh"
   local variant root project slot nested_path rc expect
   # variant: where the pool is, what `treehouse pool-dir` answers, and the verdict
   for variant in 'dot-treehouse|dot|fails|refuse' 'pool-dir-evidence|plain|answers-pool|refuse' \
-      'plain-path|plain|fails|admit' 'pool-dir-elsewhere|plain|answers-other|admit'; do
+      'plain-path-unproven|plain|fails|refuse' 'pool-dir-elsewhere|plain|answers-other|admit'; do
     IFS='|' read -r variant where pooldir expect <<<"$variant"
     root="$TMP_ROOT/missing-state-$variant"
     [ "$where" != dot ] || root="$root/.treehouse"
@@ -977,11 +984,11 @@ test_missing_state_slot_under_a_dot_treehouse_path_refuses() (
       fm_task_copy_pool_slots_hold_no_current_copy "$project" "$TMP_ROOT/missing-state-$variant-home/state" >/dev/null 2>&1 || rc=$?
       case "$expect" in
         refuse) [ "$rc" != 0 ] || fail "$variant: a copy in a pool slot with no state file was skipped" ;;
-        admit) [ "$rc" = 0 ] || fail "$variant: a copy in a worktree with no pool evidence was refused" ;;
+        admit) [ "$rc" = 0 ] || fail "$variant: a copy in a worktree that pool-dir proves is outside the pool was refused" ;;
       esac
     ) || exit 1
   done
-  pass "a recorded copy in a Treehouse slot with no state file refuses when the pool is evidenced by a .treehouse path or by treehouse pool-dir, and the same copy with no pool evidence (a plain path, or a pool-dir that names another folder) is not taken for a pool slot"
+  pass "a recorded copy in a linked worktree with no state file refuses when the pool is evidenced by a .treehouse path or by treehouse pool-dir, and when pool-dir cannot say; it is not taken for a pool slot only when pool-dir names another folder"
 )
 
 # The capability-positive half: with the proof, a recovered slot on the
