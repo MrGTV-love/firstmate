@@ -29,9 +29,13 @@
 #     metadata lock or the poll publication lock, and the pass tries both before
 #     it re-arms, so a registration in progress is never re-armed.
 # (d) bin/fm-teardown.sh's lookup for a detached copy (the record's branch=, else
-#     fm/<id>) only finds the PR; its landed proof was strengthened (Main 038
-#     ruling (a), then Main 1686 F1): the copy's content must already be in the
-#     default branch, so a found PR alone never lands a copy.
+#     fm/<id>) only identifies the work; the existing landed proofs decide
+#     (bin/fm-task-copy-lib.sh fm_task_copy_landed and
+#     fm_task_copy_pipeline_input): the copy's content is in the default
+#     branch, or its HEAD is an ancestor of the merged PR head and the forge's
+#     merge commit for that PR is in the default branch's history, or its HEAD
+#     is the recorded input of the no-mistakes run that pushed the merged head
+#     (Main 1907). A found PR alone never lands a copy.
 # (e) Another check in state/<id>.check.sh is never replaced or removed: a
 #     check counts as the merge poll only by its bytes (the template, the
 #     template hash this task's registration or retirement recorded, or the
