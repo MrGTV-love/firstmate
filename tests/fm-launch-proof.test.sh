@@ -983,13 +983,16 @@ test_launch_proof_omp_adoption_reads_the_callers_bytes() (
   }
   # shellcheck disable=SC2030 # each case scopes PATH to its own subshell
   local PATH="$T/bin:$PATH"
-  verdict() { rm -f "$T/py.ran" "$T/py.err"; fm_launch_proof_herdr_verdict "$META" 4242; }
+  # The public verdict: the record read, the selector (a stand-in naming 4242)
+  # and fm_launch_proof_herdr_verdict_judge, which hands its bytes to the proof.
+  verdict() { rm -f "$T/py.ran" "$T/py.err"; fm_launch_proof_herdr "$META"; }
 
   # Stable control: the record holds A throughout and the adoption succeeds.
   write_a
   got=$(verdict)
   assert_equals managed "$got" 'control: a stable record and a provable unpinned omp process are adopted'$'\n'"$(cat "$T/py.err" 2>/dev/null)"
   [ ! -s "$T/py.err" ] || fail "control: the adoption proof reported a refusal: $(cat "$T/py.err")"
+  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 || fail 'control: a stable adopted omp agent was not authorized'
 
   # A-to-B-to-A at the caller: the verdict reads A; B is in the file when the
   # Python proof reads it; A is back before the caller's final comparison.
@@ -1000,6 +1003,9 @@ test_launch_proof_omp_adoption_reads_the_callers_bytes() (
   assert_contains "$(cat "$T/py.err" 2>/dev/null)" 'record proof needs the same record bytes the caller read' \
     'A-B-A: the refusal is the record-bytes check, not another proof'
   [ "$(cat "$META")" = "$A" ] || fail 'A-B-A: the record was not restored to A before the final comparison'
+  ON_REF=write_b; AFTER_PY=write_a
+  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 && fail 'A-B-A: the authorization owner accepted a record that was B for the proof'
+  ON_REF=''; AFTER_PY=''
 
   # Main 1874 finding 3: the live process carries foreign pin B; the record is
   # B only while the shell's identity checks run and A again before Python.
@@ -1027,13 +1033,16 @@ test_launch_proof_omp_adoption_reads_the_callers_bytes() (
 # a peer holding a NUL byte is unknown, never a peer without a claim. The
 # control peers keep their outcome.
 test_launch_proof_omp_adoption_refuses_a_nul_peer() (
-  local T="$TMP/omp-nul-peer" META out
+  local T="$TMP/omp-nul-peer" META out FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256
   mkdir -p "$T/home/state" "$T/wt" "$T/bin"
   META="$T/home/state/om.meta"
   printf 'window=lab:w1:p2\nherdr_session=lab\nherdr_pane_id=w1:p2\nbackend=herdr\nharness=omp\nkind=ship\nspawn_gen=sA\nworktree=%s\nlaunch_proof=env-v1\n' "$T/wt" > "$META"
   : > "$T/session.jsonl"
   printf '{"version":1,"spawn_gen":"sA","pid":4242,"task_session_file":"%s","current_session_file":"%s"}\n' \
     "$T/session.jsonl" "$T/session.jsonl" > "$T/home/state/om.omp-session.json"
+  # The caller's one read of the session record (the proof requires its digest).
+  FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256=$(shasum -a 256 < "$T/home/state/om.omp-session.json" | cut -d' ' -f1)
+  export FM_LAUNCH_PROOF_EXPECTED_SESSION_SHA256
   printf '#!/usr/bin/env bash\nprintf "p4242\\0n%%s\\0" %q\n' "$T/wt" > "$T/bin/lsof"
   chmod +x "$T/bin/lsof"
   # shellcheck disable=SC2329 # the adoption proof calls these stand-ins
@@ -1126,7 +1135,7 @@ test_launch_proof_selector_refuses_a_short_parent_row() (
 # its record once: a record that names p1 when the decision reads it and p2
 # while the agent state is read never proves p2 for a kept p1 route.
 test_launch_proof_binds_the_acting_endpoint() (
-  local T="$TMP/bind-endpoint" META P1_PIN=s1 REWRITE='' rc
+  local T="$TMP/bind-endpoint" META P1_PIN=s1 REWRITE='' SHORT='' rc
   mkdir -p "$T/home/state" "$T/lane/state"
   META="$T/home/state/sm.meta"
   rec() { # <pane> -> a coherent local Herdr secondmate record naming lab:w1:<pane>
@@ -1150,7 +1159,7 @@ test_launch_proof_binds_the_acting_endpoint() (
   # shellcheck disable=SC2329
   fm_agent_process_classify_name() { printf agent; }
   # shellcheck disable=SC2329
-  ps() { case "$*" in '-axo pid=,ppid=,pgid=') printf '7201 1 7201\n7202 1 7202\n' ;; *) return 1 ;; esac; }
+  ps() { case "$*" in '-axo pid=,ppid=,pgid=') printf '7201 1 7201\n7202 1 7202\n'; [ -z "$SHORT" ] || printf '7203 1\n' ;; *) return 1 ;; esac; }
   # shellcheck disable=SC2329
   lsof() { printf 'p%s\0\nfcwd\0n%s\0\n' "${4:-}" "$T/lane"; }
   # shellcheck disable=SC2329
@@ -1174,11 +1183,22 @@ test_launch_proof_binds_the_acting_endpoint() (
   fm_launch_proof_herdr_authorizes "$META" && fail 'a proof with no endpoint named authorized an action'
   assert_contains "$(fm_launch_proof_recovery_judge "$META" lab:w1:p1)" 'does not name the endpoint' \
     'a recovery inspection of p1 on a p2 record is unknown'
+  # Main 1874: the claude unmanaged verdict reads one complete group table; a
+  # short row is unknown (it could hide a member pinned elsewhere).
+  P1_PIN=''
+  assert_equals unmanaged "$(fm_launch_proof_herdr_verdict "$META" 7201)" 'control: an unpinned claude with a complete table is unmanaged'
+  SHORT=1
+  assert_equals unknown "$(fm_launch_proof_herdr_verdict "$META" 7201)" 'an unpinned claude with a short group-table row is unknown'
+  SHORT=''
   # (ii): an unpinned claude* alias is unknown and refuses, with no token path.
   sed -i.bak 's/^harness=claude$/harness=claude-custom/' "$META"
-  P1_PIN=''
   assert_equals unknown "$(fm_launch_proof_herdr_verdict "$META" 7201)" '(ii): an unpinned claude alias is unknown'
   fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 || fail '(ii) control: a claude alias with the matching token keeps its checks and passes'
+  # shellcheck disable=SC2329 # the selector calls this stand-in
+  fm_backend_herdr_cli() {
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_process_group_id":7201,"foreground_processes":[{"pid":7201,"name":"claude","argv0":"claude"}]}}}'
+  }
+  fm_launch_proof_herdr_authorizes "$META" lab:w1:p2 && fail '(ii): an unpinned claude alias was authorized'
   pass 'the proof is of the endpoint the caller acts on: no endpoint, another endpoint and a decision that kept p1 while p2 was proved all refuse; an unpinned claude alias is unknown'
 )
 
