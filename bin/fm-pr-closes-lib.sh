@@ -50,7 +50,6 @@
 # Every reader takes a body file path (or `-` for standard input) and prints one value per line,
 # once each. They never fail on a body without matches; they print nothing.
 
-FM_PR_CLOSES_ID_RE='[A-Za-z0-9._-]+'
 FM_PR_CLOSES_BEGIN='<!-- firstmate-backlog-closes:begin -->'
 FM_PR_CLOSES_END='<!-- firstmate-backlog-closes:end -->'
 FM_PR_CLOSES_MARKER='firstmate-backlog-closes:'
@@ -113,101 +112,88 @@ fm_pr_closes_refusal() {  # <body-file|->
   fm_pr_closes_lines R "${1:--}"
 }
 
+# Every reader below prints from awk, never from a bash loop: under bash 3.2 a builtin printf
+# that is blocked on a full pipe fails with "Interrupted system call" when a child exits, which a
+# large body hit (tests/fm-pr-close-items.test.sh test_r4_a_large_body_is_read_with_no_write_error).
+#
+# FM_PR_CLOSES_KIND_AWK: awk functions shared by the readers. kind(line) names a body line:
+#   id        a well-formed `Closes-backlog-item: <item-id>` line (no leading `.` in the id)
+#   member    a well-formed `Train-member: <value>` line
+#   legacy    a well-formed old `Closes: <value>` line
+#   malformed a column-0 line that starts with one of those words and colon but fits no form
+#   prose     any other line
+# value(line) is the line's one value, without the word, the colon and the spaces around it.
+FM_PR_CLOSES_KIND_AWK='
+function kind(l,   v) {
+  if (l ~ /^Closes-backlog-item:[[:space:]]+[A-Za-z0-9._-]+[[:space:]]*$/) {
+    v = value(l)
+    return (substr(v, 1, 1) == ".") ? "malformed" : "id"
+  }
+  if (l ~ /^Train-member:[[:space:]]+[^[:space:]]+[[:space:]]*$/) return "member"
+  if (l ~ /^Closes:[[:space:]]+[^[:space:]]+[[:space:]]*$/) return "legacy"
+  if (l ~ /^(Closes-backlog-item|Train-member|Closes):/) return "malformed"
+  return "prose"
+}
+function value(l) {
+  sub(/^[^:]*:[[:space:]]+/, "", l)
+  sub(/[[:space:]]+$/, "", l)
+  return l
+}
+'
+
 # fm_pr_closes_lines <I|O|R> <body-file|->: the body lines inside (I) or outside (O) the block,
 # or the refusal reason (R), each as written (leading whitespace kept).
 fm_pr_closes_lines() {
-  local want=$1 raw
-  while IFS= read -r raw; do
-    [ "${raw%%$'\t'*}" = "$want" ] && printf '%s\n' "${raw#*$'\t'}"
-  done < <(fm_pr_closes_scan "${2:--}")
+  fm_pr_closes_scan "${2:--}" | LC_ALL=C awk -v w="$1" '{ i = index($0, "\t"); if (substr($0, 1, i - 1) == w) print substr($0, i + 1) }'
   return 0
 }
 
-# fm_pr_closes_directive <word> <I|O> <body-file|->: the value of each well-formed
-# `<word>: value` line inside (I) or outside (O) the block, once each, in body order.
-fm_pr_closes_directive() {
-  local word=$1 where=$2 line value seen=$'\n'
-  local re="^${word}:[[:space:]]+([^[:space:]]+)[[:space:]]*\$"
-  while IFS= read -r line; do
-    [[ "$line" =~ $re ]] || continue
-    value=${BASH_REMATCH[1]}
-    case "$seen" in *$'\n'"$value"$'\n'*) continue ;; esac
-    seen="$seen$value"$'\n'
-    printf '%s\n' "$value"
-  done < <(fm_pr_closes_lines "$where" "${3:--}")
+# fm_pr_closes_pick <I|O> <kinds> <value|line> <body-file|->: from the lines inside (I) or outside
+# (O) the block, each line whose kind is one of the space-separated <kinds>, printed as its value
+# or as the whole line, once each, in body order.
+fm_pr_closes_pick() {
+  fm_pr_closes_lines "$1" "${4:--}" | LC_ALL=C awk -v kinds=" $2 " -v as="$3" "$FM_PR_CLOSES_KIND_AWK"'
+    index(kinds, " " kind($0) " ") {
+      out = (as == "value") ? value($0) : $0
+      if (!seen[out]++) print out
+    }'
 }
 
 fm_pr_closes_ids() {  # <body-file|->
-  local id id_re="^${FM_PR_CLOSES_ID_RE}\$"
-  while IFS= read -r id; do
-    [[ "$id" =~ $id_re ]] || continue
-    case "$id" in .*) continue ;; esac
-    printf '%s\n' "$id"
-  done < <(fm_pr_closes_directive 'Closes-backlog-item' I "${1:--}")
+  fm_pr_closes_pick I id value "${1:--}"
 }
 
 fm_pr_closes_members() {  # <body-file|->
-  fm_pr_closes_directive 'Train-member' I "${1:--}"
+  fm_pr_closes_pick I member value "${1:--}"
 }
 
 # The old line form outside the block: reported by the caller, never a directive.
 fm_pr_closes_legacy_ids() {  # <body-file|->
-  fm_pr_closes_directive 'Closes' O "${1:--}"
+  fm_pr_closes_pick O legacy value "${1:--}"
 }
 
 # A well-formed directive line outside the block (every one, when the body is refused). It
 # closes nothing; the whole line is printed, once each.
 fm_pr_closes_outside() {  # <body-file|->
-  local line
-  local id_re="^Closes-backlog-item:[[:space:]]+(${FM_PR_CLOSES_ID_RE})[[:space:]]*\$"
-  local member_re='^Train-member:[[:space:]]+[^[:space:]]+[[:space:]]*$'
-  while IFS= read -r line; do
-    if [[ "$line" =~ $id_re ]]; then
-      case "${BASH_REMATCH[1]}" in .*) continue ;; esac
-    elif ! [[ "$line" =~ $member_re ]]; then
-      continue
-    fi
-    printf '%s\n' "$line"
-  done < <(fm_pr_closes_lines O "${1:--}") | LC_ALL=C awk '!seen[$0]++'
+  fm_pr_closes_pick O 'id member' line "${1:--}"
 }
 
 # A column-0 line outside the block that starts with a directive word (the two forms and the old
 # `Closes:`) but does not fit its form: an id with a bad character or a leading `.`, a missing
 # or doubled value, trailing text. The whole line is printed, once each.
 fm_pr_closes_malformed() {  # <body-file|->
-  local line id
-  local id_re="^Closes-backlog-item:[[:space:]]+(${FM_PR_CLOSES_ID_RE})[[:space:]]*\$"
-  local one_re='^(Train-member|Closes):[[:space:]]+[^[:space:]]+[[:space:]]*$'
-  while IFS= read -r line; do
-    case "$line" in
-      'Closes-backlog-item:'*)
-        if [[ "$line" =~ $id_re ]]; then
-          id=${BASH_REMATCH[1]}
-          case "$id" in .*) ;; *) continue ;; esac
-        fi ;;
-      'Train-member:'*|'Closes:'*) [[ "$line" =~ $one_re ]] && continue ;;
-      *) continue ;;
-    esac
-    printf '%s\n' "$line"
-  done < <(fm_pr_closes_lines O "${1:--}") | LC_ALL=C awk '!seen[$0]++'
+  fm_pr_closes_pick O malformed line "${1:--}"
 }
 
 # The text outside the block as plain text: every outside line except a well-formed directive
 # line (fm_pr_closes_outside prints it) and a well-formed old `Closes:` line (the caller reports
 # its id). A malformed directive line stays in, so each id and pull request link on it is
 # reported like any other mention (Main 044 F3); fm_pr_closes_malformed reports the line too.
+# Unlike the pickers above, every line is kept, repeated lines included.
 fm_pr_closes_prose() {  # <body-file|->
-  local line
-  local id_re="^Closes-backlog-item:[[:space:]]+(${FM_PR_CLOSES_ID_RE})[[:space:]]*\$"
-  local one_re='^(Train-member|Closes):[[:space:]]+[^[:space:]]+[[:space:]]*$'
-  while IFS= read -r line; do
-    if [[ "$line" =~ $id_re ]]; then
-      case "${BASH_REMATCH[1]}" in .*) ;; *) continue ;; esac
-    elif [[ "$line" =~ $one_re ]]; then
-      continue
-    fi
-    printf '%s\n' "$line"
-  done < <(fm_pr_closes_lines O "${1:--}")
+  fm_pr_closes_lines O "${1:--}" | LC_ALL=C awk "$FM_PR_CLOSES_KIND_AWK"'
+    { k = kind($0) }
+    k == "prose" || k == "malformed"'
 }
 
 # The distinct words of the prose, as item-id candidates. A word keeps every character a

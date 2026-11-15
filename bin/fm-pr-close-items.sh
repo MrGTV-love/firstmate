@@ -264,7 +264,9 @@ if ! read_body "$URL" "$WORK/body"; then
 fi
 MERGED=$(cat "$WORK/body.merged" 2>/dev/null) || MERGED=false
 
-# body_refusal <body-file> [<merged-url>]: why the body's block closes nothing, or nothing. The
+# body_refusal <body-file> <members-file> [<merged-url>]: why the body's block closes nothing, or
+# nothing. <members-file> holds the block's Train-member values, read once, and the caller uses
+# that same file for the members it reads, so the check and the closes see one list. The
 # library's reason comes first; then (Main 044 F2) the first Train-member value in the block that
 # is no GitHub, GitLab or Forgejo pull request URL, or, for the merged body, that names the merged
 # pull request itself. The whole block is checked before anything closes, so a refused block
@@ -279,11 +281,11 @@ body_refusal() {
         reason="its closes block names Train-member $member, which is not a GitHub, GitLab or Forgejo pull request URL"
         break
       fi
-      if [ -n "${2:-}" ] && [ "$FM_PR_URL" = "$2" ]; then
+      if [ -n "${3:-}" ] && [ "$FM_PR_URL" = "$3" ]; then
         reason="its closes block names Train-member $member, which is the merged pull request itself"
         break
       fi
-    done < <(fm_pr_closes_members "$1")
+    done < "$2"
   fi
   printf '%s\n' "$reason"
 }
@@ -296,7 +298,8 @@ report_refusal() {
   printf 'actionable: close-at-merge: refused to close anything named by %s: %s; a body holds exactly one closes block, its lines between a %s line and a %s line, each a Closes-backlog-item: <item-id> line, a Train-member: <pull request URL> line or blank; fix it, then retry: %s %s %s\n' \
     "$2" "$reason" "$FM_PR_CLOSES_BEGIN" "$FM_PR_CLOSES_END" "$0" "$TASK_ID" "$URL" >&2
 }
-BODY_REFUSAL=$(body_refusal "$WORK/body" "$URL")
+fm_pr_closes_members "$WORK/body" > "$WORK/members"
+BODY_REFUSAL=$(body_refusal "$WORK/body" "$WORK/members" "$URL")
 report_refusal "$BODY_REFUSAL" "the body of $URL"
 
 if [ -z "$BODY_REFUSAL" ]; then
@@ -333,16 +336,21 @@ MEMBER_URLS=()
 MEMBER_SEEN=$'\n'
 while IFS= read -r candidate; do
   [ -n "$candidate" ] || continue
-  # body_refusal checked every value first, so each one here is another pull request's URL.
-  fm_pr_url_parse "$candidate" || continue
+  # body_refusal checked every value of this same list first, so each one here is another pull
+  # request's URL; a value that is not is still reported, never skipped in silence.
+  if ! fm_pr_url_parse "$candidate" || [ "$FM_PR_URL" = "$URL" ]; then
+    LEFT=$((LEFT + 1))
+    printf 'actionable: close-at-merge: could not use Train-member %s, so nothing was closed for it; retry: %s %s %s\n' "$candidate" "$0" "$TASK_ID" "$URL" >&2
+    continue
+  fi
   member=$FM_PR_URL
-  [ "$member" != "$URL" ] || continue
   case "$MEMBER_SEEN" in *$'\n'"$member"$'\n'*) continue ;; esac
   MEMBER_SEEN="$MEMBER_SEEN$member"$'\n'
   n=$((n + 1))
   MEMBER_URLS[n]=$member
   if read_body "$member" "$WORK/member-$n"; then
-    member_refusal=$(body_refusal "$WORK/member-$n")
+    fm_pr_closes_members "$WORK/member-$n" > "$WORK/member-$n.members"
+    member_refusal=$(body_refusal "$WORK/member-$n" "$WORK/member-$n.members")
     report_refusal "$member_refusal" "the body of train member $member"
     if [ -z "$member_refusal" ]; then
       while IFS= read -r id; do
@@ -359,7 +367,7 @@ while IFS= read -r candidate; do
     [ -n "$task" ] || continue
     consider "$task" "$URL" "the task record that holds train member $member"
   done < <(tasks_recording_pr "$member")
-done < <([ -n "$BODY_REFUSAL" ] || fm_pr_closes_members "$WORK/body")
+done < <([ -n "$BODY_REFUSAL" ] || cat "$WORK/members")
 
 while IFS=$'\t' read -r old where; do
   [ -n "$old" ] || continue
