@@ -2911,7 +2911,8 @@ teardown_landed() {  # <dir> <ref> <branch>
 # The branch `treehouse return` resets a copy to, by the rule treehouse owns: its configured base_branch (treehouse.toml
 # in the main checkout, else the user config), else refs/remotes/origin/HEAD, else the main checkout's current branch,
 # else init.defaultBranch (projects/treehouse internal/vcs/gitvcs/gitvcs.go:47-110 GetDefaultBranch,
-# internal/pool/pool.go:910-932 and :1078-1104, internal/config/config.go:157-229, cmd/init.go:45). Prints the branch;
+# internal/pool/pool.go:910-932 and :1078-1104, internal/config/config.go:157-187 Load and :207-229 the user config path,
+# cmd/init.go:45). Prints the branch;
 # nonzero when it cannot be read.
 teardown_return_base_branch() { # <copy>
   local common main conf branch

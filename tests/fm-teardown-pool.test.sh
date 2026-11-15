@@ -3679,7 +3679,9 @@ case "\${1:-}" in status) cat '$CASE_DIR_X/pool.json' ;; esac
 exit 0
 SH
   chmod +x "$CASE_DIR_X/fakebin/treehouse"
-  run_teardown "$CASE_DIR_X" > "$CASE_DIR_X/stdout" 2> "$CASE_DIR_X/stderr" || rc=$?
+  # A private HOME: the user config treehouse reads ($HOME/.config/treehouse/config.toml) never leaks in from the real home.
+  mkdir -p "$CASE_DIR_X/user-home"
+  HOME="$CASE_DIR_X/user-home" run_teardown "$CASE_DIR_X" > "$CASE_DIR_X/stdout" 2> "$CASE_DIR_X/stderr" || rc=$?
   expect_code 0 "$rc" "$label: teardown should complete"$'\n'"$(cat "$CASE_DIR_X/stderr")"
 }
 
@@ -3843,6 +3845,31 @@ test_a_skipped_copy_stays_leased_when_the_reset_target_is_unreadable() {
   pass "a reset target that cannot be read keeps the skipped copy leased"
 }
 
+# R6-1: a repo treehouse.toml is read alone; treehouse takes no base_branch from the user config then
+# (internal/config/config.go:157-187). The user config names a branch that tracks the copy's ignored file; the repo file names
+# none, so the reset branch is origin/HEAD's, which does not track it, and the copy is released.
+user_base_ignored_under_repo_config() {
+  local copy=$1 case_dir proj
+  case_dir=$(dirname "$copy")
+  proj="$case_dir/project"
+  git -C "$proj" checkout -q -b decoy
+  printf 'decoy\n' > "$proj/notes.local"
+  git -C "$proj" add -f notes.local
+  git -C "$proj" -c user.email=t@t -c user.name=t commit -q -m 'decoy tracks notes.local'
+  git -C "$proj" checkout -q main
+  printf 'max_trees = 4\n' > "$proj/treehouse.toml"
+  mkdir -p "$case_dir/user-home/.config/treehouse"
+  printf 'base_branch = "decoy"\n' > "$case_dir/user-home/.config/treehouse/config.toml"
+  printf '*.local\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  printf 'private ignored bytes\n' > "$copy/notes.local"
+}
+
+test_a_user_config_base_branch_is_ignored_when_the_repo_has_a_treehouse_toml() {
+  SKIPPED_CASE_PREP=user_base_ignored_under_repo_config skipped_unknown_custody_case user-base-ignored '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "user-base-ignored: the user config's base_branch was used although the repo has a treehouse.toml"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "a user config base_branch is ignored when the repo has a treehouse.toml, as treehouse does"
+}
+
 teardown_test_cases=(
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
@@ -3926,6 +3953,7 @@ test_a_skipped_copy_with_an_ignored_file_at_a_reset_path_stays_leased
 test_a_skipped_copy_with_only_a_venv_is_released_without_origin_head
 test_a_skipped_copy_with_a_collision_stays_leased_without_origin_head
 test_a_skipped_copy_stays_leased_when_the_reset_target_is_unreadable
+test_a_user_config_base_branch_is_ignored_when_the_repo_has_a_treehouse_toml
 )
 
 # In the combined tests/fm-teardown.test.sh run,
