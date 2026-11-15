@@ -197,7 +197,32 @@ case "${1:-}" in
           rm -f "$pane_file"
           : > "$pane_file.alive"
           (
-            chosen=$(cd "$FM_FAKE_TMUX_GET_DIR" && treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null) || exit 1
+            if [ "${FM_FAKE_TMUX_GET_LIVE:-}" = beat ]; then
+              # Like a real pane, the get itself stays alive: its interactive subshell owns the
+              # allocation. It runs in the background, prints its path, then keeps beating
+              # (FM_FAKE_GET_BEAT) until the .alive marker goes. A get that prints its path and
+              # exits never beats, so no pane path is published and the case fails.
+              out=$pane_file.get-out
+              : > "$out"
+              rm -f "$pane_file.getbeat"
+              ( cd "$FM_FAKE_TMUX_GET_DIR" && FM_FAKE_GET_BEAT="$pane_file.getbeat" FM_FAKE_GET_ALIVE="$pane_file.alive" \
+                  exec treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null >"$out" 2>/dev/null ) &
+              n=0
+              while [ ! -s "$out" ] && [ "$n" -lt 50 ]; do
+                n=$((n + 1))
+                /bin/sleep 0.1
+              done
+              [ -s "$out" ] || exit 1
+              n=0
+              while [ ! -e "$pane_file.getbeat" ] && [ "$n" -lt 20 ]; do
+                n=$((n + 1))
+                /bin/sleep 0.1
+              done
+              [ -e "$pane_file.getbeat" ] || exit 1
+              chosen=$(tail -n 1 "$out")
+            else
+              chosen=$(cd "$FM_FAKE_TMUX_GET_DIR" && treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null) || exit 1
+            fi
             cd "${chosen##*$'\n'}" || exit 1
             pwd -P > "$pane_file"
             n=0

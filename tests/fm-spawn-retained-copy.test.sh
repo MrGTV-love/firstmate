@@ -1303,7 +1303,7 @@ test_proven_capability_does_not_relax_other_refusals() {
 # recovered slot (mode chooses-recovered, the defect the case must be able to see),
 # and a get without an explicit --root is refused. Every call is recorded; status,
 # lease, return, list, prune and destroy mark treehouse-forbidden and fail.
-install_getting_treehouse() {  # <normal|chooses-recovered|fails>
+install_getting_treehouse() {  # <normal|chooses-recovered|prints-and-exits|fails>
   local mode=$1
   : > "$CASE_DIR/treehouse-calls"
   rm -f "$CASE_DIR/treehouse-forbidden"
@@ -1323,11 +1323,25 @@ case "\${1:-}" in
       case "\$1" in --root) root=\${2:-}; shift 2 || exit 2 ;; *) shift ;; esac
     done
     [ -n "\$root" ] || { echo "fake treehouse: get needs an explicit --root" >&2; exit 2; }
+    # The interactive get stays alive for the whole session (its subshell owns the
+    # allocation): after it prints the slot it beats until the .alive marker goes. Mode
+    # prints-and-exits is the defect the case must see: it prints and returns at once.
+    hold() {
+      [ -n "\${FM_FAKE_GET_BEAT:-}" ] || return 0
+      n=0
+      while [ -e "\${FM_FAKE_GET_ALIVE:-/nonexistent}" ] && [ "\$n" -lt 600 ]; do
+        : > "\$FM_FAKE_GET_BEAT"
+        n=\$((n + 1))
+        /bin/sleep 0.2
+      done
+    }
     case "$mode" in
-      chooses-recovered) printf '%s\n' "$SLOT_DIR"; exit 0 ;;
+      chooses-recovered) printf '%s\n' "$SLOT_DIR"; hold; exit 0 ;;
+      prints-and-exits) jq -r '[.worktrees[] | select((.leased // false) | not)][0].path' "\$state"; exit 0 ;;
       fails) echo "fake treehouse: get failed" >&2; exit 1 ;;
     esac
     jq -r '[.worktrees[] | select((.leased // false) | not)][0].path' "\$state"
+    hold
     exit 0
     ;;
   status|lease|return|list|prune|destroy)
@@ -1353,6 +1367,8 @@ assert_spawn_took_the_slot_its_own_get_chose() {  # <name> <free-slot> <label>
   # spawn finished (it is released by removing the .alive marker, never by a signal)
   [ -e "$CASE_DIR/pane-path.alive" ] || fail "$3: the fixture's live subshell was released before the spawn finished"
   [ -e "$CASE_DIR/pane-path.beat" ] || fail "$3: the fixture's live subshell never beat"
+  # the get itself stayed alive after printing its slot, as the interactive get does
+  [ -e "$CASE_DIR/pane-path.getbeat" ] || fail "$3: the get returned as soon as it printed its slot, so it never held the allocation"
   [ "$(grep -c '^get ' "$CASE_DIR/treehouse-calls")" = 1 ] || fail "$3: the spawn's get did not run exactly once: $(cat "$CASE_DIR/treehouse-calls")"
   grep -Fxq "get --root $CASE_DIR/real-root" "$CASE_DIR/treehouse-calls" || fail "$3: the get did not carry the explicit fixture root: $(cat "$CASE_DIR/treehouse-calls")"
   [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$3: a pool diagnostic command ran: $(cat "$CASE_DIR/treehouse-calls")"
@@ -1381,7 +1397,7 @@ run_spawn_with_own_get() {  # <name>
 # interactive allocation can no longer coexist with a passing test.
 test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose() (
   local mode name out rc second mutant
-  for mode in normal chooses-recovered fails; do
+  for mode in normal chooses-recovered prints-and-exits fails; do
     name="own-get-$mode"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
@@ -1394,7 +1410,7 @@ test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose() (
     cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
     rm -f "$CASE_DIR/pane-path"
     rc=0
-    out=$(run_spawn_with_own_get "$name") || rc=$?
+    out=$(FM_FAKE_TMUX_GET_LIVE=beat run_spawn_with_own_get "$name") || rc=$?
     case "$mode" in
       normal)
         expect_code 0 "$rc" "$mode: the spawn beside a recovered quarantine failed"$'\n'"$out"
@@ -1411,6 +1427,13 @@ test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose() (
           *"the get chose the recovered slot $SLOT_DIR"*) ;;
           *) fail "$mode: the validator failed for the wrong reason: $mutant" ;;
         esac
+        ;;
+      prints-and-exits)
+        # a get that prints a slot and returns holds no allocation: the pane never reports
+        # a path, the spawn fails, and no path is fabricated for it
+        [ "$rc" -ne 0 ] || fail "$mode: the spawn succeeded although its get printed a slot and returned at once"$'\n'"$out"
+        [ ! -s "$CASE_DIR/pane-path" ] || fail "$mode: a path was published for a get that did not stay alive"
+        [ ! -e "$CASE_DIR/pane-path.getbeat" ] || fail "$mode: the returning get beat"
         ;;
       fails)
         # a get that fails fails the spawn and leaves no path: nothing is faked
@@ -1634,10 +1657,16 @@ real_provider_recovered_slot_cases() {
     old_session_exit "$state"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$start/$order: an old session's exit changed the recovered slot"
     ! compgen -G "$pool/../treehouse-recovered-backup-*" >/dev/null || fail "$order: a recovered backup appeared"
-    # A further get, run for real as an extra allocatability check (not a substitute
-    # for the spawn's own get above): it hands out B, never A.
-    entry=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || fail "$order: the real get failed"
-    [ "$(cd "$entry" && pwd -P)" = "$b" ] || fail "$order: the real get handed out $entry, not the free slot $b"
+    # A further get, run for real as an extra check (not a substitute for the spawn's own get
+    # above). The spawn's own get still holds B, so no later get is assumed to return B or any
+    # particular slot: it may hand out another slot or fail at capacity, but it never hands out
+    # the recovered slot A and never the slot B the live get holds.
+    entry=$(cd "$PROJECT_DIR" && "$FM_TEST_TREEHOUSE_PROVIDER" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || entry=
+    if [ -n "$entry" ]; then
+      entry=$(cd "$entry" && pwd -P)
+      [ "$entry" != "$a" ] || fail "$order: a further get handed out the recovered slot $a"
+      [ "$entry" != "$b" ] || fail "$order: a further get handed out the slot $b that the spawn's own get holds"
+    fi
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$order: the real get changed the recovered slot"
     jq -e --arg a "$a" --arg r "$recovered" '.worktrees[] | select(.path == $a) | .lease_holder == $r and (.lease_id // "") == ""' "$state" >/dev/null \
       || fail "$order: the recovered entry changed after the real get"
