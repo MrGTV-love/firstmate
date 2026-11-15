@@ -26,36 +26,99 @@ CUTOFF_JOIN = 1.0
 
 
 class _Fence:
-    """The sockets of one bounded exchange: closing it shuts down and closes each of them, and refuses any connection made after that."""
+    """Everything one bounded exchange opens (Main 1621 (9), 1623, 1671 (2)): the reader owns the whole exchange, name lookup and connection set-up included.
+    The name lookup runs in a lookup thread the reader waits on only for the time left; each socket is registered (a duplicate of its descriptor, which reaches
+    the same connection after a TLS wrap) BEFORE it connects; connect and the TLS handshake use the time left as their timeout. Closing the fence shuts down and
+    closes every registered descriptor and refuses every later connection, so nothing is sent after it closes: a lookup that ends late finds it closed before any
+    socket exists. `connected` says whether any connection was made (so whether anything could have been sent)."""
 
-    def __init__(self):
+    def __init__(self, time_left):
+        self.time_left = time_left
         self.lock = threading.Lock()
-        self.sockets = []
+        self.duplicates = []
         self.closed = False
+        self.connected = False
+        self.lookup_pending = False
 
-    def opened(self, sock):
-        with self.lock:
-            if self.closed:
-                raise OSError('deadline_spent')
-            self.sockets.append(sock)
+    def left(self):
+        return max(0.0, self.time_left())
+
+    def check(self):
+        if self.closed or self.left() <= 0:
+            raise DeadlineSpent(sent=self.connected)
+
+    def create(self, address, timeout=None, source_address=None, *args, **kwargs):
+        """socket.create_connection, fenced (http.client calls it for the plain and the TLS connection, and for a proxy)."""
+        host, port = address
+        self.check()
+        found = []
+        lookup = threading.Thread(target=lambda: found.append(self.resolve(host, port)), name='fm-slack-lookup', daemon=True)
+        lookup.start()
+        lookup.join(self.left())
+        if not found:
+            self.lookup_pending = True
+            raise DeadlineSpent(sent=False)
+        if isinstance(found[0], BaseException):
+            raise found[0]
+        error = None
+        for family, kind, proto, _, where in found[0]:
+            sock = socket.socket(family, kind, proto)
+            with self.lock:
+                if self.closed:
+                    sock.close()
+                    raise DeadlineSpent(sent=self.connected)
+                self.duplicates.append(sock.dup())
+            try:
+                self.check()
+                sock.settimeout(min(self.left(), timeout) if isinstance(timeout, (int, float)) else self.left())
+                if source_address:
+                    sock.bind(source_address)
+                sock.connect(where)
+                with self.lock:
+                    if self.closed:
+                        raise DeadlineSpent(sent=True)
+                    self.connected = True
+                return sock
+            except OSError as failure:
+                error = failure
+                sock.close()
+        raise error or OSError('no_address')
+
+    @staticmethod
+    def resolve(host, port):
+        try:
+            return socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        except OSError as error:
+            return error
 
     def close(self):
+        """At the deadline: shut down and close every registered descriptor; refuse every later connection."""
         with self.lock:
             self.closed = True
-            sockets = list(self.sockets)
-        for sock in sockets:
-            for end in (lambda: sock.shutdown(socket.SHUT_RDWR), sock.close):
+            duplicates, self.duplicates = list(self.duplicates), []
+        for dup in duplicates:
+            for end in (lambda: dup.shutdown(socket.SHUT_RDWR), dup.close):
                 try:
                     end()
                 except OSError:
                     pass
 
+    def release(self):
+        """After a completed exchange: close the registered duplicates only (the exchange closed its own sockets)."""
+        with self.lock:
+            duplicates, self.duplicates = list(self.duplicates), []
+        for dup in duplicates:
+            try:
+                dup.close()
+            except OSError:
+                pass
+
 
 def _fenced(base, fence):
     class Fenced(base):
-        def connect(self):
-            super().connect()
-            fence.opened(self.sock)
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._create_connection = fence.create
 
     return Fenced
 
@@ -79,8 +142,12 @@ class _FencedHTTPS(urllib.request.HTTPSHandler):
 
 
 class DeadlineSpent(Exception):
-    """A call of a caller with a total deadline (Slack.time_left) that could not be begun, or could not end, before that deadline. It is not a Slack failure:
-    whether a call that was cut off reached Slack is unknown, and the caller keeps its work for a later run."""
+    """A call of a caller with a total deadline (Slack.time_left) that could not be begun, or could not end, before that deadline. It is not a Slack failure.
+    sent is False when no connection was ever made, so nothing of the call reached Slack (surely absent); otherwise whether it reached Slack is unknown."""
+
+    def __init__(self, sent=True):
+        super().__init__()
+        self.sent = sent
 
 
 def plane_secrets():
@@ -144,6 +211,8 @@ def refuse_outbound(fields, wire=False):
         raise SecretCollision('secret_collides_with_marker')
 
 
+# Slack's chat.postMessage documents that internal_error and fatal_error can follow a partly successful operation; service_unavailable says no more.
+OUTCOME_UNKNOWN_ERRORS = frozenset({'internal_error', 'fatal_error', 'service_unavailable'})
 SAFE_ERRORS = {
     'invalid_auth', 'token_revoked', 'not_authed', 'account_inactive',
     'missing_scope', 'not_in_channel', 'channel_not_found', 'user_not_found',
@@ -202,8 +271,9 @@ class Slack:
             self.on_reply()
         if not isinstance(data, dict) or not data.get('ok'):
             code = data.get('error', '') if isinstance(data, dict) else ''
-            # Never relay arbitrary API text, including an echoed Authorization header.
-            raise SlackError(code if code in SAFE_ERRORS else 'api_error')
+            # Never relay arbitrary API text, including an echoed Authorization header. The errors after which Slack says an operation may have partly
+            # succeeded get one fixed name of their own (round 8, R9); every other unnamed error stays api_error.
+            raise SlackError(code if code in SAFE_ERRORS else 'slack_outcome_unknown' if code in OUTCOME_UNKNOWN_ERRORS else 'api_error')
         return data
 
     def _bounded(self, request):
@@ -215,20 +285,21 @@ class Slack:
         Returns the exchange's outcome, or raises DeadlineSpent."""
         left = self.time_left()
         if left <= 0:
-            raise DeadlineSpent()
-        fence = _Fence()
+            raise DeadlineSpent(sent=False)
+        fence = _Fence(self.time_left)
         opener = urllib.request.build_opener(_FencedHTTP(fence), _FencedHTTPS(fence))
         outcome = []
         reader = threading.Thread(target=lambda: outcome.append(self._exchange(request, min(10, left), opener)), name='fm-slack-bounded', daemon=True)
         reader.start()
         reader.join(max(0.0, self.time_left()))
         if outcome:
+            fence.release()
             return outcome[0]
         fence.close()
         closed_at = time.monotonic()
         reader.join(CUTOFF_JOIN)
-        self.last_cutoff = {'ended': not reader.is_alive(), 'closed_at': closed_at}
-        raise DeadlineSpent()
+        self.last_cutoff = {'ended': not reader.is_alive(), 'closed_at': closed_at, 'lookup_pending': fence.lookup_pending, 'sent': fence.connected}
+        raise DeadlineSpent(sent=fence.connected)
 
     def _exchange(self, request, timeout, opener=None):
         """One HTTP exchange: (the reply's Date header or None, its x-oauth-scopes header, the parsed body or None, the error to raise or None). It reads and writes
