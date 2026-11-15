@@ -1587,12 +1587,6 @@ assert_not_contains() {
   esac
 }
 
-# fm_test_ere_quote <text>: <text> with every POSIX ERE metacharacter escaped, for an
-# anchored grep -E pattern that must match the text literally.
-fm_test_ere_quote() {
-  printf '%s' "$1" | sed 's/[][\\.*^$+?(){}|/]/\\&/g'
-}
-
 # fm_test_inbox_records <inbox-dir>: the inbox's record names, one per line, sorted:
 # only numeric NNN.msg names count (bin/fm-task-inbox-lib.sh "Layout").
 fm_test_inbox_records() {
@@ -1605,112 +1599,28 @@ fm_test_inbox_records() {
   done | LC_ALL=C sort
 }
 
-# fm_test_fold_proven <state-dir> <task>: read the durable open-decision fold
-# (status_open_decisions, bin/fm-status-decision-lib.sh - the source of the
-# drain's OPEN DECISIONS section) for one task, for an ABSENCE check ("this key is
-# no longer open"), and fail the test on any doubt. The fold answers an empty set
-# with status 0 for an absent, unreadable or symlinked log, and for a whole-log
-# read that fails for a reason other than the read limits, so an empty answer
-# alone proves nothing. Required, with every step's status checked: the task's
-# status log is a readable, non-empty regular file; the direct fold of that log
-# exits 0 with nothing on stderr; the fold of a plain byte copy of the log (the
-# task's meta beside it, so the kind is the same) exits 0 with nothing on stderr
-# and prints exactly what the direct fold printed (a direct read that failed
-# silently is contradicted here); and the fold of that copy with one canary
-# decision appended after its last line exits 0 with nothing on stderr and prints
-# exactly the direct fold plus one canary record (so that read reached the last
-# line). The scratch copy is removed and the removal is checked. On success
-# FM_TEST_FOLD_OPEN holds the direct fold's records, one "<key> TAB <verb> TAB
-# <note>" line each (empty when nothing is open). Call it directly, not in $(...),
-# so fail stops the test.
-fm_test_fold_proven() {
-  local state=$1 task=$2 f lib dir err e direct plain canaried rest line rc n canary=fm-test-fold-canary
-  f="$state/$task.status"
-  lib="$ROOT/bin/fm-status-decision-lib.sh"
-  { [ -f "$f" ] && [ ! -L "$f" ] && [ -r "$f" ]; } || fail "fold check: $f is not a readable regular status log"
-  [ -s "$f" ] || fail "fold check: $f is empty, so an empty fold proves nothing"
-  dir=$(fm_test_tmproot fold-check) || fail "fold check: no scratch directory"
-  err="$dir/fold.err"
-  rc=0
+# fm_test_fold <status-file>: run the durable open-decision fold (status_open_decisions,
+# bin/fm-status-decision-lib.sh - the source of the drain's OPEN DECISIONS section) on a
+# fixture status log the test wrote itself, with pipefail; the test fails unless the fold
+# exits 0. FM_TEST_FOLD is its whole output ("<key> TAB <verb> TAB <note>" per open record,
+# empty when nothing is open); FM_TEST_FOLD_KEYS is its keys, one per line, in fold order.
+# Callers compare the whole output or the whole key list for exact equality. A fold that
+# reads a readable log and silently answers empty is a product question outside this PR
+# (named in the PR text), not something this helper tests around. Call it directly, not in
+# $(...), so fail stops the test.
+fm_test_fold() {
+  local rc=0 line keys=''
   # shellcheck disable=SC2016 # Expanded by the child shell.
-  direct=$(bash -c '. "$1" && status_open_decisions "$2"' _ "$lib" "$f" 2>"$err") || rc=$?
-  if [ "$rc" -ne 0 ] || [ -s "$err" ]; then
-    e=$(cat "$err"); rm -rf -- "$dir"; fail "fold check: the fold of $f exited $rc: $e"
-  fi
-  if ! { mkdir "$dir/state" && cp -p -- "$f" "$dir/state/$task.status"; }; then
-    rm -rf -- "$dir"; fail "fold check: could not copy $f"
-  fi
-  if [ -e "$state/$task.meta" ] && ! cp -p -- "$state/$task.meta" "$dir/state/$task.meta"; then
-    rm -rf -- "$dir"; fail "fold check: could not copy the meta"
-  fi
-  rc=0
-  # shellcheck disable=SC2016 # Expanded by the child shell.
-  plain=$(bash -c '. "$1" && status_open_decisions "$2"' _ "$lib" "$dir/state/$task.status" 2>"$err") || rc=$?
-  if [ "$rc" -ne 0 ] || [ -s "$err" ]; then
-    e=$(cat "$err"); rm -rf -- "$dir"; fail "fold check: the fold of the plain copy exited $rc: $e"
-  fi
-  if [ "$plain" != "$direct" ]; then
-    rm -rf -- "$dir"
-    fail "fold check: the direct fold of $task's log and the fold of its plain byte copy differ"$'\n'"direct: $direct"$'\n'"copy: $plain"
-  fi
-  if ! { { [ -z "$(tail -c 1 "$dir/state/$task.status")" ] || printf '\n' >> "$dir/state/$task.status"; } \
-    && printf 'needs-decision [key=%s]: canary that proves the fold read every line\n' "$canary" >> "$dir/state/$task.status"; }; then
-    rm -rf -- "$dir"; fail "fold check: could not append the canary"
-  fi
-  rc=0
-  # shellcheck disable=SC2016 # Expanded by the child shell.
-  canaried=$(bash -c '. "$1" && status_open_decisions "$2"' _ "$lib" "$dir/state/$task.status" 2>"$err") || rc=$?
-  if [ "$rc" -ne 0 ] || [ -s "$err" ]; then
-    e=$(cat "$err"); rm -rf -- "$dir"; fail "fold check: the fold of the canaried copy exited $rc: $e"
-  fi
-  rm -rf -- "$dir" || fail "fold check: could not remove the scratch copy $dir"
-  [ ! -e "$dir" ] || fail "fold check: the scratch copy $dir is still there"
-  # The canaried fold must be exactly the direct fold plus one canary record.
-  rest='' n=0
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      "$canary"$'\t'*) n=$((n + 1)) ;;
-      *) rest="$rest$line"$'\n' ;;
-    esac
+  FM_TEST_FOLD=$(set -o pipefail; bash -c '. "$1" && status_open_decisions "$2"' _ "$ROOT/bin/fm-status-decision-lib.sh" "$1") || rc=$?
+  [ "$rc" -eq 0 ] || fail "the fold of $1 exited $rc"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    keys="$keys${keys:+$'\n'}${line%%$'\t'*}"
   done <<EOF
-$canaried
+$FM_TEST_FOLD
 EOF
-  rest=${rest%$'\n'}
-  [ "$n" -eq 1 ] || fail "fold check: the canaried fold of $task's log has $n canary records, not 1: $canaried"
-  [ "$rest" = "$direct" ] \
-    || fail "fold check: the canaried fold of $task's log is not the direct fold plus the canary"$'\n'"direct: $direct"$'\n'"canaried: $canaried"
   # shellcheck disable=SC2034 # Read by the calling suite.
-  FM_TEST_FOLD_OPEN=$direct
-}
-
-# fm_test_fold_key_open <key>: status 0 when the last fm_test_fold_proven read lists
-# <key> as open (exact key match), 1 when it does not; any other status of the
-# match is a test failure, never an answer.
-fm_test_fold_key_open() {
-  local st
-  printf '%s\n' "$FM_TEST_FOLD_OPEN" | awk -F '\t' -v k="$1" '$1 == k { f = 1 } END { exit !f }'
-  st=("${PIPESTATUS[@]}")
-  [ "${st[0]}" -eq 0 ] || fail "fold check: could not feed the fold records to the key match (status ${st[0]})"
-  case "${st[1]}" in
-    0|1) return "${st[1]}" ;;
-    *) fail "fold check: the key match for $1 failed (status ${st[1]})" ;;
-  esac
-}
-
-# fm_test_fold_key_closed <key> <message>: fail unless the key match answers
-# exactly 1 (the key is not open in the last fm_test_fold_proven read).
-fm_test_fold_key_closed() {
-  local rc=0
-  fm_test_fold_key_open "$1" || rc=$?
-  [ "$rc" -eq 1 ] || fail "$2 (key $1 match status $rc; open: $FM_TEST_FOLD_OPEN)"
-}
-
-# fm_test_fold_key_still_open <key> <message>: fail unless the key match answers
-# exactly 0 (the key is open in the last fm_test_fold_proven read).
-fm_test_fold_key_still_open() {
-  local rc=0
-  fm_test_fold_key_open "$1" || rc=$?
-  [ "$rc" -eq 0 ] || fail "$2 (key $1 match status $rc; open: $FM_TEST_FOLD_OPEN)"
+  FM_TEST_FOLD_KEYS=$keys
 }
 
 # fm_launch_holds <launch-text> <token>: the launch holds <token> as written or

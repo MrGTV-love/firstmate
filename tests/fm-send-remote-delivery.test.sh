@@ -491,8 +491,9 @@ test_remote_printed_resend_carries_the_original_choice() {
   rc=0; run_printed_resend "$fb" "$ssh_log" "$LOST_RESEND" "$dir/keyed" || rc=$?
   expect_code 0 "$rc" "the printed keyed resend is accepted: $(cat "$dir/keyed.err")"
   [ "$(remote_inbox_records "$rhome" | grep -c .)" = 1 ] || fail "the keyed resend must land one record"
-  fm_test_fold_proven "$home/state" rsm
-  fm_test_fold_key_closed metric-name "the keyed resend closed metric-name once delivered"
+  fm_test_fold "$home/state/rsm.status"
+  [ "$FM_TEST_FOLD_KEYS" = "$LOST_KEY" ] \
+    || fail "the keyed resend closed metric-name once delivered, and only the request's own blocker stays open: $FM_TEST_FOLD"
   assert_contains "$(drain_out "$home")" "[key=$LOST_KEY]" "the request's own blocker stays the library's to close"
 
   dir="$TMP_ROOT/remote-resend-none"; mkdir -p "$dir"
@@ -680,9 +681,9 @@ test_remote_resolve_key_closes_at_enqueue() {
   expect_code 0 "$rc" "a durably recorded remote answer must exit 0"
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/rsm.status" | grep -qF 'resolved [key=upgrade-window]: answered: the weekend, freeze Friday' \
     || fail "a recorded remote answer must close the decision at enqueue: $(cat "$home/state/rsm.status")"
-  fm_test_fold_proven "$home/state" rsm
-  if [ -n "$FM_TEST_FOLD_OPEN" ]; then
-    fail "the answered decision still lists as open after a recorded remote answer: $FM_TEST_FOLD_OPEN"
+  fm_test_fold "$home/state/rsm.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the answered decision still lists as open after a recorded remote answer: $FM_TEST_FOLD"
   fi
   grep -rqF 'the weekend, freeze Friday' "$rhome/state/parent-route/rsm.inbox" \
     || fail "the remote answer must land in the remote steering inbox"
