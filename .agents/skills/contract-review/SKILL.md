@@ -46,8 +46,8 @@ Never run a review in a pack folder that already holds a report.
 After the run, run `bin/fm-contract-review-pack.sh check --pack <pack> --log <pack>.omp-session`, the session transcript folder the entrypoint writes beside the pack.
 The transcript is the only evidence of what the run read; the report's `Inputs read` list is the reviewer's declaration, not evidence.
 A report with no `Inputs read` list voids the round.
-The check judges every recorded read and search against the authorized inputs: the pack's own files, the three named references, a file tracked by the passed repository root, and the run's own work folder.
-The named references are the installed `assess-done-and-grade/SKILL.md`, and the installed define-done-and-grading `SKILL.md`, `OPERATIONAL-BOUNDARIES.md` and `CLI-EXAMPLE.md`, read by path, by a `../` form or as `skill://`; any other file in those folders is a leak.
+The check judges every recorded read and search against the authorized inputs: the pack's own files, the pinned rubric, the named skill files, a file tracked by the passed repository root, and the run's own work folder.
+The named skill files are the installed `assess-done-and-grade/SKILL.md`, and the installed define-done-and-grading `SKILL.md`, `OPERATIONAL-BOUNDARIES.md` and `CLI-EXAMPLE.md`, read by path, by a `../` form or as `skill://`; any other file in those folders is a leak.
 The entrypoint's copy of `OPERATIONAL-BOUNDARIES.md` in the work folder is authorized only while its bytes equal the installed define-done-and-grading file.
 A search of the work folder is authorized only while it holds nothing but that copy, the report and files the reviewer wrote; a search of a parent of the work folder is a leak.
 An excluded path is refused even when it is tracked or sits under the root, and a gitignored file is not tracked context.
