@@ -682,6 +682,27 @@ class Collector:
         return self.git(worktree, "rev-list", "--reverse", "--cherry-pick", "--right-only",
                         "--no-merges", base + "...HEAD").splitlines()
 
+    def unproven_merges(self, worktree, base):
+        """Merge commits on HEAD beyond base that are not exactly git's merge of their two parents."""
+        unproven = []
+        for line in self.git(worktree, "rev-list", "--merges", "--parents", base + "..HEAD").splitlines():
+            commit, *parents = line.split()
+            if len(parents) != 2:
+                unproven.append(commit)
+                continue
+            try:
+                objects = self.git(worktree, "rev-parse", "--path-format=absolute", "--git-path", "objects")
+                with tempfile.TemporaryDirectory(prefix="fm-open-loops-objects-") as temporary:
+                    env = dict(self.env, GIT_OBJECT_DIRECTORY=temporary, GIT_ALTERNATE_OBJECT_DIRECTORIES=objects)
+                    merged = self.run(["git", "-C", worktree, "merge-tree", "--write-tree", parents[0], parents[1]],
+                                      env=env).splitlines()[0]
+            except RuntimeError:
+                unproven.append(commit)
+                continue
+            if merged != self.git(worktree, "rev-parse", commit + "^{tree}"):
+                unproven.append(commit)
+        return unproven
+
     def pr_pending(self, worktree, pending, pr):
         head = pr["head"]["sha"]
         # rev-parse --verify --quiet exits 1 without output only for an absent object; any other failure still raises.
@@ -761,13 +782,12 @@ class Collector:
             return bool(pr and pr.get("merged_at"))
         if self.git(worktree, "status", "--porcelain"):
             return False
-        if pr and pr.get("merged_at"):
-            uncovered = self.pr_head_pending(task, worktree, None, pr)
-            if uncovered == []:
-                return True
+        # Landed means present in the default branch's content, the rule bin/fm-teardown.sh applies: merging the
+        # copy into the default branch changes nothing. A PR's history is not consulted (a PR can replay a change
+        # and revert it), and a local merge commit that carries a change of its own is not landed. A merge that
+        # conflicts or cannot be computed is not landed.
         base = self.default_ref(worktree, task.get("mode"))
-        pending = self.pending_commits(worktree, base)
-        return not pending or self.content_in_default(worktree, base)
+        return self.content_in_default(worktree, base)
 
     def unlanded(self, task):
         if task["kind"] != "ship" or self.captain_dropped(task):
@@ -776,14 +796,17 @@ class Collector:
         if not worktree:
             return
         base = self.default_ref(worktree, task.get("mode"))
-        pending = self.pending_commits(worktree, base)
-        if not pending or self.content_in_default(worktree, base):
+        if self.content_in_default(worktree, base):
             return
+        pending = self.pending_commits(worktree, base)
         pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
-        if pr and (pr.get("merged_at") or pr.get("state") == "open"):
+        if pending and pr and (pr.get("merged_at") or pr.get("state") == "open"):
             covered = self.pr_head_pending(task, worktree, pending, pr)
             if covered is not None:
                 pending = covered
+        # A merge commit is never covered by its parents: one that carries a change of its own, conflicts, or
+        # joins more than two parents stays pending.
+        pending = pending + [c for c in self.unproven_merges(worktree, base) if c not in pending]
         if not pending:
             return
         oldest = min(int(self.git(worktree, "show", "-s", "--format=%ct", c)) for c in pending)
@@ -1156,31 +1179,37 @@ class Collector:
     def teardown_refusal_record(self, task_id):
         """(reason, producer) of the newest recorded refusal, or ("", "").
 
-        Newest means written last: both records are ordered by their file's write time in nanoseconds,
-        because the idle reaper's memo stamps the reaper's start time, not the time it wrote the refusal.
-        The prune record's reason may come from the prune's own landed proof before any teardown ran, so it
-        is labeled as the prune's.
+        Newest means published last. Both producers write a temporary file and rename it into place, so the
+        file's write time is when the temporary was written, and the idle reaper's memo stamps the reaper's start
+        time; neither orders publication. A rename sets the file's status-change time, so records are ordered
+        by that, in nanoseconds. When two records were published at the same instant, both reasons are named,
+        in a fixed order, rather than one chosen. The prune record's reason may come from the prune's own landed
+        proof before any teardown ran, so it is labeled as the prune's.
         """
         found = []
         prune = self.state / (task_id + ".merge-prune")
         try:
             fields = dict(line.split("=", 1) for line in prune.read_text().splitlines() if "=" in line)
             if fields.get("state") in ("retained", "pending") and fields.get("reason"):
-                found.append((prune.stat().st_mtime_ns, 0, fields["reason"], "recorded by bin/fm-merge-prune.sh"))
+                found.append((prune.stat().st_ctime_ns, 0, fields["reason"], "recorded by bin/fm-merge-prune.sh"))
         except OSError:
             pass
         memo_path = self.state / ".idle-reap" / (task_id + ".refused")
         try:
             memo = memo_path.read_text().splitlines()
             if len(memo) >= 4 and memo[0] == "fm-idle-reap-refused-v1" and memo[3] and memo[1].isdigit():
-                found.append((memo_path.stat().st_mtime_ns, 1, memo[3],
+                found.append((memo_path.stat().st_ctime_ns, 1, memo[3],
                               "a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh"))
         except OSError:
             pass
         if not found:
             return "", ""
-        _, _, reason, producer = max(found)
-        return reason, producer
+        newest = max(published for published, _, _, _ in found)
+        tied = sorted(record for record in found if record[0] == newest)
+        if len(tied) == 1:
+            return tied[0][2], tied[0][3]
+        return ("; ".join(f"{producer}: {reason}" for _, _, reason, producer in tied),
+                "published at the same instant by " + " and ".join(producer for _, _, _, producer in tied))
 
     def covering_rows(self, ident, pr_url):
         """The rows another source already raised for this task: its own subject, a keyed subject, or its PR."""
@@ -1233,13 +1262,20 @@ class Collector:
         # A merged PR is a finished deliverable whether or not the worker ever reported done.
         pr = self.source("completion PR " + ident, self.pr_state, pr_url) if pr_url else None
         merged = bool(pr and pr.get("merged_at"))
-        if not (closed or verb == "done" or state == "done" or merged):
+        # Landed content with positive evidence of delivery is finished too, done report or not: a working ship
+        # with no PR whose own commits are already on the default branch owes its cleanup.
+        content = False
+        if not (closed or verb == "done" or state == "done" or merged) and task["kind"] == "ship" and state == "working":
+            content = bool(self.source("finished deliverable " + ident, self.delivered, task))
+        if not (closed or verb == "done" or state == "done" or merged or content):
             self.attach_refusal(ident, pr_url, refusal, refused)
             return
         if state in ("working", "paused", "blocked", "parked") and not closed and not done_refused:
             # A worker still reading working after its done report may be running its pipeline: that is
             # progress, not a stranded task. Once its deliverable is delivered, the cleanup is owed anyway.
-            if state == "working" and (verb == "done" or merged):
+            if content:
+                landed = True
+            elif state == "working" and (verb == "done" or merged):
                 landed = self.source("finished deliverable " + ident, self.delivered, task)
             if not landed:
                 self.attach_refusal(ident, pr_url, refusal, refused)
