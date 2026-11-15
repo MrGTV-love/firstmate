@@ -72,6 +72,10 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
       exit 125
     fi
     [ -z "$wait_file" ] || printf '0\n' >"$wait_file" 2>/dev/null || true
+    # Rule 7 for a nested request too: it cannot lease without Python, so it runs under the inherited marker and says so once.
+    if { : >&"$log_fd"; } 2>/dev/null; then
+      printf '%s\n' "fm-cpu-pass: running $1 without leasing from its reservation: python3 not found" >&"$log_fd" || true
+    fi
     exec "$@"
   fi
   [ -z "$wait_file" ] || printf '0\n' >"$wait_file" 2>/dev/null || true

@@ -17,8 +17,9 @@ The pool uses Python's standard-library `fcntl.flock` over one lock file per pas
 A kernel file lock is released when its last owning descriptor closes, including on `SIGKILL`.
 Only the pool owner and a guard process it starts before the command retain slot descriptors; commands and their exec children never inherit them, so surviving worker descendants cannot hold a master's reservation after its command ends.
 Ordinary termination signals keep that owner until its command exits, and the guard keeps the passes until the command process itself is gone even if the owner is killed with `SIGKILL`, so killing only the owner never frees a pass for a second worker; descendants that outlive the command hold nothing.
-The guard exists before the command does, so no moment exists in which a command runs and nothing but its starter holds the passes: an owner killed after it started the command but before it named it leaves the guard waiting on a pipe the command inherited, which holds the passes at least as long as the command lives.
-A guard that cannot be started returns the passes and the command runs without one, said once (rule 7).
+The guard exists, and has said it is ready, before the command does, so no moment exists in which a command runs and nothing but its starter holds the passes.
+The command writes its own pid into the pipe the guard reads, between fork and exec, so the guard knows the command whatever happens to the owner or to the command's descriptors afterwards.
+A guard that cannot be started, or dies before it is ready, returns the passes and the command runs without one, said once (rule 7).
 The pool has no stale slot state to repair; `sem` keeps its own bookkeeping that must notice dead holders.
 A token directory (rule 6) is a private temporary directory that its holder, or the holder's guard, removes when the command ends; a holder killed together with its guard leaves only that empty directory in the temporary directory.
 `python3` is already a runtime dependency of Firstmate's runner and of the Python projects that will join the pool, so the pool adds no new install, while `sem` would add Perl-based GNU parallel and its citation prompt to every host and CI image.
@@ -41,6 +42,7 @@ Every participant on a host follows these rules, so one pool is shared by every 
 5. **Count:** a request asks for exactly as many passes as the CPU-bound workers it will run (one for one test script, `W` for `pytest -n W`).
    Callers read `size` and use that same positive count for their workers and reservation; a count below one or above the pool size is a usage error and never starts work.
    This validation also applies to nested and degraded execution; without Python, oversized counts are refused when the host CPU count can be read using `sysctl` or `getconf`.
+   `bin/fm-duration.py gate --passes N` follows the same rule (below one, above the pool size, or above a positive inherited count exits 125 and runs nothing), and a fresh gate takes the N passes it asks for.
 6. **Nested work:** a holder exports `FM_CPU_PASS_HELD=<k>` to the work it runs.
    A participant that finds `FM_CPU_PASS_HELD` set runs without taking another pass, because taking another could deadlock a full pool.
    With a positive inherited count, nested work never runs more concurrent CPU-bound workers than that count; a caller needing parallel nested work reserves enough passes before starting the outer work.
@@ -52,6 +54,7 @@ Every participant on a host follows these rules, so one pool is shared by every 
    The marker must be a nonnegative decimal integer in both Python and no-Python execution; a malformed marker is a usage error, while `0` denotes degraded work with no reservation or concurrency limit.
 7. **Degrade, never block:** a participant that cannot use the pool (no `flock`, no pool directory, a foreign-owned directory) runs its work without a pass and says so once.
    Degradation notices use `--log-fd` (default stderr), separate from the work's stdout, including when Python is unavailable.
+   A nested participant that cannot lease from its holder's tokens (no file locks, no Python) degrades the same way: it runs under the inherited marker and says so once, never with a traceback and never silently.
    The pool governs throughput; it is not a safety boundary, and a broken pool must not stop every test on the host.
 8. **Waiting stays outside work bounds:** take passes before starting any per-test or per-worker timeout, so time spent queued never counts toward that timeout.
    A caller's own overall budget, such as a harness command limit, still includes the wait.

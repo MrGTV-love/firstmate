@@ -26,8 +26,9 @@
 #   --jobs N     max concurrent workers (default: 4; min 1)
 #   --json path  write a pool-scoped machine-readable proof artifact after the
 #                run; fm_test_run_jobs_enabled is true only for a successful
-#                concurrent run at the requested --jobs within that pool's
-#                recorded admission cap
+#                run whose observed peak concurrency (more than one candidate
+#                actually running together) equals the requested --jobs, within
+#                that pool's recorded admission cap
 #   --list       print the proven candidate paths (one per line) and exit 0
 #   --list-exclusions
 #                print basename + reason for scripts deliberately kept serial
@@ -37,8 +38,11 @@
 # Before it starts, the proof takes min(--jobs, candidates, pool size) passes of the host-wide CPU
 # pool (docs/cpu-pass-pool.md) for its whole run and runs that many workers; a proof
 # already inside a pass takes none and runs at most that many. The concurrency it
-# prints and records is the number of workers it ran, which is never more than the number of
-# candidates, so a one-candidate proof records one, for a --jobs value of any length. When
+# prints and records as concurrency is the peak it OBSERVED: the most candidates that were running
+# together, measured from the start and end each candidate stamps inside its lease (the plan, which
+# is never more than the candidates, passes and --jobs, is printed as planned=). A one-candidate
+# proof records one, a contended reservation records what really overlapped, and --jobs of any
+# length is clamped to the plan. When
 # the reservation it runs inside exports its tokens (FM_CPU_PASS_TOKENS), each worker leases
 # its share of them (the marker divided among the workers), so the workers of sibling proofs
 # under one reservation never exceed the passes held and a candidate's nested runner does
@@ -54,10 +58,10 @@
 #   - no production sharding and no retry-until-green
 #
 # Markers (stdout):
-#   FM_ISOLATION_BEGIN <iso8601> concurrency=<n> candidates=<n>
+#   FM_ISOLATION_BEGIN <iso8601> planned=<n> candidates=<n>
 #   FM_ISOLATION_CANDIDATE_BEGIN <iso8601> <script> worker=<i>
 #   FM_ISOLATION_CANDIDATE_END <iso8601> <script> exit=<code> duration_ms=<n> worker=<i>
-#   FM_ISOLATION_SUMMARY total=<n> failed=<n> concurrency=<n> duration_ms=<n>
+#   FM_ISOLATION_SUMMARY total=<n> failed=<n> concurrency=<n> planned=<n> duration_ms=<n>
 #
 # Exit status is the aggregate of candidate exits: non-zero if any candidate
 # fails, gate-skips (first meaningful line matching ^skip:), if isolation checks
@@ -268,10 +272,10 @@ detect_gate_skip() {
 }
 
 write_json_artifact() {
-  local out=$1 started=$2 finished=$3 run_id=$4 total=$5 failed=$6 concurrency=$7 duration=$8 records=$9 pool=${10} jobs_enabled=${11}
-  python3 - "$out" "$started" "$finished" "$run_id" "$total" "$failed" "$concurrency" "$duration" "$records" "$pool" "$jobs_enabled" <<'PY'
+  local out=$1 started=$2 finished=$3 run_id=$4 total=$5 failed=$6 concurrency=$7 duration=$8 records=$9 pool=${10} jobs_enabled=${11} planned=${12} requested=${13}
+  python3 - "$out" "$started" "$finished" "$run_id" "$total" "$failed" "$concurrency" "$duration" "$records" "$pool" "$jobs_enabled" "$planned" "$requested" <<'PY'
 import json, sys
-out, started, finished, run_id, total, failed, concurrency, duration, records_path, pool, jobs_enabled = sys.argv[1:12]
+out, started, finished, run_id, total, failed, concurrency, duration, records_path, pool, jobs_enabled, planned, requested = sys.argv[1:14]
 scripts = []
 with open(records_path, encoding="utf-8") as fh:
     for line in fh:
@@ -293,6 +297,8 @@ doc = {
     "kind": "isolation-proof",
     "pool": pool,
     "concurrency": int(concurrency),
+    "planned_concurrency": int(planned),
+    "requested_jobs": requested,
     "summary": {
         "total": int(total),
         "failed": int(failed),
@@ -498,7 +504,7 @@ TOTAL=${#CANDIDATES[@]}
 FAILED=0
 AGG_RC=0
 
-printf 'FM_ISOLATION_BEGIN %s concurrency=%s candidates=%s\n' \
+printf 'FM_ISOLATION_BEGIN %s planned=%s candidates=%s\n' \
   "$RUN_STARTED_ISO" "$JOBS" "$TOTAL"
 
 # Worker state arrays parallel to CANDIDATES indices (1-based worker labels).
@@ -578,6 +584,15 @@ wait_one_completed_slot() {
   done
 }
 
+STAMP_SHELL="$(declare -f now_ms)"'
+start_ms=$(now_ms)
+bash "$1"
+rc=$?
+end_ms=$(now_ms)
+printf "%s\n" "$start_ms" >"$2/start_ms"
+printf "%s\n" "$end_ms" >"$2/end_ms"
+exit "$rc"'
+
 idx=0
 for script in "${CANDIDATES[@]}"; do
   idx=$((idx + 1))
@@ -618,11 +633,13 @@ for script in "${CANDIDATES[@]}"; do
     fi
     cd "$ROOT" || exit 1
     begin_ms=$(now_ms)
+    # The candidate runs inside a small shell that stamps its own start and end, so the stamps lie inside the
+    # lease: two candidates that share one token can never overlap, and a real overlap is a real concurrency.
     if [ "$LEASE_CANDIDATES" -eq 1 ]; then
       "$ROOT/bin/fm-cpu-pass.sh" run --passes "$CANDIDATE_MARKER" --label "fm-test-isolation-proof $POOL candidate $idx" -- \
-        bash "$script" >"$work/out/output" 2>&1
+        bash -c "$STAMP_SHELL" _ "$script" "$work/out" >"$work/out/output" 2>&1
     else
-      bash "$script" >"$work/out/output" 2>&1
+      bash -c "$STAMP_SHELL" _ "$script" "$work/out" >"$work/out/output" 2>&1
     fi
     rc=$?
     end_ms=$(now_ms)
@@ -675,8 +692,20 @@ if [ "$RUN_DURATION" -lt 0 ]; then
   RUN_DURATION=0
 fi
 
-printf 'FM_ISOLATION_SUMMARY total=%s failed=%s concurrency=%s duration_ms=%s\n' \
-  "$TOTAL" "$FAILED" "$JOBS" "$RUN_DURATION"
+# The peak the candidates actually reached: the most intervals [start, end) that contain one candidate's start.
+PEAK=$(
+  for idx in $(seq 1 "$TOTAL"); do
+    if [ -s "$PROOF_ROOT/w$idx/out/start_ms" ] && [ -s "$PROOF_ROOT/w$idx/out/end_ms" ]; then
+      printf '%s %s\n' "$(cat "$PROOF_ROOT/w$idx/out/start_ms")" "$(cat "$PROOF_ROOT/w$idx/out/end_ms")"
+    fi
+  done | awk '{ s[NR] = $1; e[NR] = $2 }
+    END { peak = 0
+      for (i = 1; i <= NR; i++) { c = 0; for (j = 1; j <= NR; j++) if (s[j] <= s[i] && s[i] < e[j]) c++; if (c > peak) peak = c }
+      print peak }'
+)
+case "$PEAK" in ''|*[!0-9]*) PEAK=0 ;; esac
+printf 'FM_ISOLATION_SUMMARY total=%s failed=%s concurrency=%s planned=%s duration_ms=%s\n' \
+  "$TOTAL" "$FAILED" "$PEAK" "$JOBS" "$RUN_DURATION"
 
 if [ -n "$JSON_PATH" ]; then
   mkdir -p "$(dirname "$JSON_PATH")"
@@ -687,13 +716,13 @@ if [ -n "$JSON_PATH" ]; then
   if "$ROOT/bin/fm-test-run.sh" --list-concurrent-safe-families | grep -Fxq "$POOL"; then
     jobs_max=$("$ROOT/bin/fm-test-run.sh" --concurrent-safe-family-jobs-max "$POOL")
   fi
-  if [ "$AGG_RC" -eq 0 ] && [ "$JOBS" -gt 1 ] && [ "$JOBS" = "$REQUESTED_JOBS" ] \
-    && [ "$JOBS" -le "$jobs_max" ]; then
+  if [ "$AGG_RC" -eq 0 ] && [ "$PEAK" -gt 1 ] && [ "$PEAK" = "$REQUESTED_JOBS" ] \
+    && [ "$PEAK" -le "$jobs_max" ]; then
     jobs_enabled=1
   fi
   write_json_artifact "$JSON_PATH" \
     "$RUN_STARTED_ISO" "$RUN_FINISHED_ISO" "$RUN_ID" \
-    "$TOTAL" "$FAILED" "$JOBS" "$RUN_DURATION" "$RECORDS" "$POOL" "$jobs_enabled"
+    "$TOTAL" "$FAILED" "$PEAK" "$RUN_DURATION" "$RECORDS" "$POOL" "$jobs_enabled" "$JOBS" "$REQUESTED_JOBS"
   log "wrote isolation proof artifact: $JSON_PATH"
 fi
 

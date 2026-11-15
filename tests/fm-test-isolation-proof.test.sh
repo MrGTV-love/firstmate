@@ -147,7 +147,8 @@ assert artifact["summary"]["failed"] == 0
 import json, sys
 artifact = json.load(open(sys.argv[1], encoding="utf-8"))
 assert artifact["pool"] == "admitted-family"
-assert artifact["concurrency"] == 3
+assert artifact["planned_concurrency"] == 3
+assert 1 <= artifact["concurrency"] <= 3  # the peak the candidates reached, not the plan
 assert artifact["fm_test_run_jobs_enabled"] is False
 assert artifact["summary"]["failed"] == 0
 ' "$capped_json" || fail "over-cap family pool artifact metadata is incorrect"

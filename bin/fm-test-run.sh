@@ -3332,13 +3332,14 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       --wait-file "$out.slotwait" --pass-wait-file "$out.passwait" --cpu-file "$out.cpu" ${pass_option[@]+"${pass_option[@]}"} \
       "test.$script" -- "${cmd[@]}")
   elif [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
+    # The wait file keeps the pass wait out of the script's sample on this route too (FM_TEST_KEY_SLOTS=0 has no gate).
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
-      --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
+      --log-fd "$CPU_PASS_LOG_FD" --wait-file "$out.passwait" -- "${cmd[@]}")
   fi
   if [ -n "$lease" ]; then
     # No per-key gate to lease through (slots off or no helper): lease the share around the script itself.
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --passes "$lease" --label "fm-test-run $script" \
-      --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
+      --log-fd "$CPU_PASS_LOG_FD" --wait-file "$out.passwait" -- "${cmd[@]}")
   fi
   set +e
   if [ "$stream" -eq 1 ]; then

@@ -92,6 +92,14 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
     if os.environ.get('CASE_FOREIGN_OWNER'):
         _uid = os.getuid()
         os.getuid = lambda: _uid + 1
+    if os.environ.get('CASE_TOKEN_FAIL'):
+        import tempfile as _tf
+        _mkdtemp = _tf.mkdtemp
+        def _fail_tokens(*a, **k):
+            if str(k.get('prefix', '')).startswith('fm-cpu-tokens-'):
+                raise PermissionError(13, 'injected: token storage is not writable')
+            return _mkdtemp(*a, **k)
+        _tf.mkdtemp = _fail_tokens
     if os.environ.get('CASE_GUARD_EXIT'):
         import subprocess as _sp2
         _popen2 = _sp2.Popen
@@ -827,28 +835,41 @@ def case_waiting():
     return case
 
 
-@ci_only
-def case_drain():
-    """H5: a burst three or more times the pool drains by itself; a killed holder or waiter leaves nothing stuck."""
-    case = Case('H5', 'burst of 3 x pool size + 2 one-pass requests drains; SIGKILLed holder and waiters free the queue')
-    world = World('drain')
+def case_burst_drain():
+    """H5: a burst three or more times the pool, submitted together, drains by itself and leaves the burst's own pool empty."""
+    case = Case('H5 burst', 'burst of 3 x pool size + 2 one-pass requests submitted at one barrier drains; the pool that ran it ends with nothing held or queued')
+    world = World('burst')
     burst = 3 * N + 2
     world.sample_start()
+    go = world.folder / 'go'
     order = []
     jobs = []
     for i in range(burst):
-        jobs.append(world.launch('q%02d' % i, ['bash', tool('fm-cpu-pass.sh'), 'run', '--label', 'q%02d' % i, '--'] + world.work('q%02d' % i, 0.3)))
-        order.append('q%02d' % i)
-        time.sleep(0.01)
+        name = 'q%02d' % i
+        jobs.append(world.launch(name, ['bash', '-c', 'while [ ! -e "$1" ]; do :; done; shift; exec "$@"', '_', str(go), 'bash', tool('fm-cpu-pass.sh'), 'run', '--label', name, '--'] + world.work(name, 0.3)))
+        order.append(name)
+    time.sleep(1.0)  # every submitter is spinning at the barrier
+    go.touch()
     codes = wait_all(jobs)
     seen = world.sample_stop()
     started = [group for group, _, _ in sorted(starts(world), key=lambda row: row[2])]
-    sampling_valid(case, seen, 'drain')
+    status = subprocess.run(['bash', tool('fm-cpu-pass.sh'), 'status', '--json'], env=world.env, capture_output=True, text=True, timeout=30)
+    leftovers = sorted(path.name for path in world.pool.glob('pipeline-waiter-*'))
+    state = json.loads(status.stdout or '{}')
+    sampling_valid(case, seen, 'burst')
     case.measure(requests=burst, pool_size=N, sampled_max_workers_total=seen['peak_total'], sampled_max_passes_held=seen['peak_held'],
-                 arrival_order=' '.join(order), start_order=' '.join(started), completed=sum(1 for code in codes if code == 0))
+                 start_order=' '.join(started), completed=sum(1 for code in codes if code == 0), final_status=status.stdout.strip()[-120:])
     case.check(codes == [0] * burst, 'a burst request did not complete: %s' % codes)
     case.check(seen['peak_total'] <= N, 'burst ran %d workers together on a pool of %d' % (seen['peak_total'], N))
     case.check(sorted(started) == sorted(order), 'some burst request never started: %s' % started)
+    case.check(state.get('held') == 0 and state.get('free') == N and not leftovers, 'the burst pool did not end empty: %s %s' % (status.stdout.strip()[-200:], leftovers))
+    return case
+
+
+@ci_only
+def case_drain():
+    """H5: a killed holder or waiter leaves nothing stuck (kill signals, so CI-only)."""
+    case = Case('H5 kill', 'SIGKILLed holder and waiters free the queue')
     # A holder killed with SIGKILL frees its pass at once and the next waiter starts.
     kill_world = World('drain-kill', cores=2)
     held = [kill_world.launch('hold%d' % i, ['bash', tool('fm-cpu-pass.sh'), 'run', '--label', 'hold%d' % i, '--'] + kill_world.work('hold%d' % i, 30)) for i in range(2)]
@@ -1395,10 +1416,11 @@ def case_duration_sample():
 def case_guard_unavailable():
     """R6a/b: a guard that cannot be started, or token storage that cannot be created, degrades and says so once; the work still runs."""
     case = Case('R6 guard and token faults', 'injected: the guard cannot start / the token directory cannot be created: the command runs without a pass, once-said, and the pass is free')
-    blocker = root / 'r6-not-a-directory'
-    blocker.write_text('x')
     notice = 'without a CPU pass: cannot'
-    for label, extra in (('guard-fork', dict(CASE_GUARD_FAIL='1')), ('guard-exits', dict(CASE_GUARD_EXIT='1')), ('token-storage', dict(TMPDIR=str(blocker)))):
+    # The faults are injected at the process boundary (a TMPDIR that is not a directory would be skipped by Python's temporary directory search),
+    # and every row names its cause, so a fault that was never injected cannot pass as a degrade.
+    for label, extra, cause in (('guard-fork', dict(CASE_GUARD_FAIL='1'), 'injected'), ('guard-exits', dict(CASE_GUARD_EXIT='1'), 'exited before it was ready'),
+                                ('token-storage', dict(CASE_TOKEN_FAIL='1'), 'injected')):
         for route, make in (('gate', lambda w, m: [pyshim, tool('fm-duration.py'), 'gate', 'test.r6.' + label, '--', 'bash', '-c', 'printf "%s\\n" "${FM_CPU_PASS_HELD-unset}" > "$1"', '_', str(m)]),
                             ('run', lambda w, m: ['bash', tool('fm-cpu-pass.sh'), 'run', '--', 'bash', '-c', 'printf "%s\\n" "${FM_CPU_PASS_HELD-unset}" > "$1"', '_', str(m)])):
             world = World('r6-%s-%s' % (label, route), cores=1)
@@ -1410,6 +1432,7 @@ def case_guard_unavailable():
             case.measure(**{'%s_%s_exit' % (label, route): codes, '%s_%s_marker' % (label, route): held})
             case.check(codes == [0], '%s %s: the command did not run to the end: %s' % (label, route, text[-300:]))
             case.check(held == '0', '%s %s: the command saw FM_CPU_PASS_HELD=%s, but it holds no pass' % (label, route, held))
+            case.check(cause in text, '%s %s: the injected cause %r is not named, so the fault may never have happened: %s' % (label, route, cause, text[-300:]))
             case.check(text.count(notice) == 1, '%s %s: the degrade notice (%r) was said %d times: %s' % (label, route, notice, text.count(notice), text[-300:]))
             case.check(json.loads(status.stdout or '{}').get('held') == 0, '%s %s: a pass is still held after the command ended: %s' % (label, route, status.stdout[-200:]))
     return case
@@ -1594,7 +1617,7 @@ def case_proof_contention():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_proof_contention, case_async_cycle, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_proof_contention, case_async_cycle, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():
