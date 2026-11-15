@@ -7152,10 +7152,10 @@
       "invariant": "a no-mistakes CI fix agent launched through the gate starts only after the pipeline-start rule admits one more active run for its run",
       "layer": "runtime-block",
       "source": "the launch's working directory mapped to runs.worktree_dir and its open step in ~/.no-mistakes/state.sqlite opened read-only, the pipeline-start rule's memory and process reading, agent_timeout in ~/.no-mistakes/config.yaml and completed step ci agent_invocations durations, read by cmd_launch_gate in bin/fm-cpu-pass.py",
-      "trigger": "bin/fm-cpu-pass.sh launch-gate, the agent launcher's final exec, cannot map its directory to exactly one run, cannot read the run database, or finds no fit for a ci launch within its hold bound",
+      "trigger": "bin/fm-cpu-pass.sh launch-gate, the agent launcher's final exec, cannot map its directory to exactly one run, cannot read the run database, cannot establish the run's open step (step not established), cannot record the attempt before its agent runs (process facts unreadable), cannot write a first hold's wake (hold line not recorded), or finds no fit within its hold bound for a ci launch or any launch of a run that is not counted",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "repair the cause the refusal line names (for a hold bound, wait until capacity returns), then answer the run's parked CI decision with no-mistakes axi respond --action fix; its next fix round enters bin/fm-cpu-pass.sh launch-gate again",
+      "remedy": "repair the cause the refusal line names (for a hold bound, wait until capacity returns), then answer the run's parked CI decision with no-mistakes axi respond --action fix, or, for a run that is not counted and failed with its launch, start that run again; its next launch enters bin/fm-cpu-pass.sh launch-gate again",
       "budget": 3,
       "telemetry": "state/.wake-queue; a wake written while the queue lock is busy waits in state/.wake-spill.<seq> until the next append to that queue, or the watcher's next start, replays it",
       "test": "tests/fm-cpu-pass.test.sh",
@@ -7167,7 +7167,37 @@
       "exemptions": [],
       "instrumented": false,
       "status": "active",
-      "layer_note": "deny without a guard event: the refusal exits 75 with one line naming the cause and the next action and never starts the agent; the daemon logs it as warning: CI fix failed, spends one auto_fix.ci attempt and parks the CI findings as an ask-user decision after the last one; each refusal, first hold and admission after a hold appends a launch-gate check wake to the root home's queue; a ci launch that waits for capacity inside its bound is a hold, not this refusal; tests/fm-cpu-pass-admission.py proves the three mapping refusals, the bound refusal and the absence of the daemon's retry phrases; the gate protects nothing until the captain approves the one launcher line"
+      "layer_note": "deny without a guard event: the refusal exits 75 with one line naming the cause and the next action and never starts the agent; for a counted run at its ci step the daemon logs it as warning: CI fix failed, spends one auto_fix.ci attempt and parks the CI findings as an ask-user decision after the last one, while a run that is not counted fails with its launch; each refusal, first hold and admission after a hold appends a launch-gate check wake to the root home's queue; a launch that waits for capacity inside its bound is a hold, not this refusal; the rule it asks charges one R for each run whose launch history is not shown complete, which needs the pool's gate-activation.json (written once by bin/fm-cpu-pass.sh activate) dated before the run's creation, so runs created before activation keep that R while they are counted, queued or hold an attempt; tests/fm-cpu-pass-gate.py proves the three mapping refusals, the bound refusal and the absence of the daemon's retry phrases; the gate protects nothing until the captain approves the one launcher line and the activation step follows it"
+    },
+    {
+      "id": "gate-activation-once",
+      "version": "1",
+      "owner": "bin/fm-cpu-pass.py",
+      "sites": [
+        {
+          "file": "bin/fm-cpu-pass.py",
+          "match": "activate refused: %s; no record written"
+        }
+      ],
+      "invariant": "the pool's gate activation record is written once, never replaced or moved later, from a readable gate file, and never while a waiter of the earlier engine is queued",
+      "layer": "runtime-block",
+      "source": "the pool directory's gate-activation.json and pipeline-waiter entries and the gate file named by --gate, read by cmd_activate in bin/fm-cpu-pass.py",
+      "trigger": "bin/fm-cpu-pass.sh activate finds the activation record already present, cannot read the gate file, cannot read the pool's waiters, or finds a live waiter with no pid (one the earlier engine wrote)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "for an existing record do nothing (activation is already done); otherwise repair the cause the line names, or have the waiter's owner re-issue that start, then run bin/fm-cpu-pass.sh activate --gate <the gate file the launcher line names> again",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-cpu-pass.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "layer_note": "deny without a guard event: the refusal exits 1 with one line naming the reason and writes nothing; the record is published by a hard link that never replaces an existing record; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-attribution.py, which proves the written record, the second activation that leaves the first byte-identical, and the unreadable-gate and earlier-engine-waiter refusals with no record"
     },
     {
       "id": "github-accounting-foreign-database",

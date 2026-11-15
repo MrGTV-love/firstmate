@@ -6,6 +6,7 @@ Usage:
   fm-cpu-pass.sh run [--passes K] [--label TEXT] [--log-fd N] -- COMMAND [ARGS...]
   fm-cpu-pass.sh pipeline-start [--priority CLASS] [--only-fresh] -- COMMAND [ARGS...]
   fm-cpu-pass.sh launch-gate -- AGENT [ARGS...]
+  fm-cpu-pass.sh activate --gate GATE_FILE
   fm-cpu-pass.sh status [--json]
   fm-cpu-pass.sh size
 
@@ -62,12 +63,19 @@ Pipeline starts:
     resident memory the counted runs hold (never capped), or when no other run
     is counted (a one-start minimum). The projection is S for the new run plus,
     per counted run: only what it holds when it waits on remote CI (open step ci
-    in running, no live launch reservation, and positive proof that no agent
+    in running, no held attempt record, and positive proof that no agent
     lives: no process of it is visible, and its recorded agent pid is absent
     or dead; a visible tree keeps A whatever its processes are named and
     whatever its recorded pid) or while its launch gate waits in
-    this queue with no live launch reservation; its resident memory or A,
-    whichever is larger, when the reading sees it; R while the reading cannot see it. S is the largest per-run peak of every recorded
+    this queue with no held attempt record; its resident memory or A,
+    whichever is larger, when the reading sees it; R while the reading cannot see it.
+    Beside that, each run whose launch history is not shown complete is charged
+    one more R (history_units). A history is complete only when the pool's
+    gate-activation.json (activated_at and gate_sha256, written once by
+    `activate`) is dated before the run's creation, every invocation row of the
+    run names a gated agent, and its rows and attempt records bind one to one by
+    session key. A run created before activation therefore keeps that R while it
+    is counted, queued or holds an attempt. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
     rank) of those peaks leaving out runs that are status-running with
     ci_ready_at IS NULL, read from the root home's .memory-calibration.json
@@ -79,10 +87,11 @@ Pipeline starts:
     kept once resolved, and a failed walk falls back. available and each run's
     resident memory come from one fm-mem-guard.py admission_sample reading,
     re-taken at most every 2 s while waiting and always taken anew at the moment
-    of a grant (both backstop signals included). With fewer than 2 recorded runs
-    left to rank for R, no qualifying reading for A, or no native memory facts on
-    this platform, the start falls back to counted < max(1, floor(logical CPUs /
-    3)); a missing record never refuses a start and never reads as an empty host.
+    of a grant (both backstop signals included). With no qualifying reading for A,
+    A is R, so every visible active run counts at least R. With fewer than 2
+    recorded runs left to rank for R, or no native memory facts on this platform,
+    the start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
+    record never refuses a start and never reads as an empty host.
   - Pause-only backstop: while that reading is unreadable or reports a reason to
     defer (the same list that makes fm-mem-guard.sh admit exit 75, such as native
     pressure level 2 or higher) or fm-proc-guard.py reports a pile-up (user
@@ -147,17 +156,26 @@ Pipeline starts:
 Launch gate:
   - `launch-gate -- AGENT [ARGS...]` is the no-mistakes agent launcher's final
     exec. It first maps its working directory to exactly one runs.worktree_dir
-    (the directory or its real path); none, more than one, or an unreadable
-    database refuses. A launch whose run's open step is not ci execs AGENT at
-    once, unchanged. Any other launch (ci, or a step it cannot read) queues as
-    a pipeline-start waiter in class other and asks the same rule for one more
-    active run, its own run counted as a waiter. On a grant, still under the start lock, it publishes the run's
-    reservation (a locked launch-*.lock entry it holds while AGENT lives),
-    starts AGENT at once as its child in its own process group, then releases
-    the lock; it never waits for AGENT to appear in memory. A launch entry
-    whose holder is gone reserves nothing and is removed by the next scan;
-    each live attempt of a run is its own agent and reserves its own R (A once
-    visible), so two attempts that both start an agent never share one.
+    (the directory or its real path). A directory that is no run's worktree but
+    a registered repository's checkout (repos.working_path, the attach wizard)
+    execs AGENT unchanged; none, more than one, or an unreadable database
+    refuses. A step it cannot establish (step facts unreadable, no open step,
+    an unrecognized step name) refuses. A counted run's launch at a step other
+    than ci starts AGENT at once with no hold, as a watched child whose passive
+    attempt record is published under the start lock. Every other launch (ci,
+    or any step of a run that is not counted) queues as a pipeline-start waiter
+    in class other and asks the same rule for one more active run, its own run
+    counted as a waiter. On a grant, still under the start lock, it publishes
+    the attempt's record (attempt-*.json in the pool, rewritten whole through a
+    temporary file), starts AGENT at once as its child in its own process group,
+    then releases the lock; it never waits for AGENT to appear in memory. An
+    attempt is held while a process of it is proven or possibly alive, and ends
+    only when two successive censuses in one decision show none. Held records of
+    one run that share one session key (a resumed session) are one attempt and
+    are charged once; each other held attempt reserves its own R (A once
+    visible). A refusal also comes from an attempt that cannot be recorded
+    (process facts unreadable) and a first hold whose wake cannot be written
+    (hold line not recorded).
   - Hold bound: the daemon's per-invocation budget (agent_timeout in
     ~/.no-mistakes/config.yaml, else the daemon's 30-minute default) minus the
     nearest-rank 99th percentile of completed (exit_status ok) agent_invocations
@@ -166,7 +184,7 @@ Launch gate:
     records refused and held launches and timed-out runs as step ci, and
     counting them would let holds shrink their own bound and pull it to zero
     (on this host 2026-11-03: ok rows p99 152.45 min, bound about 87.5 min of
-    240; all rows 156.83 min, about 83.2 min). At the bound, or on a mapping refusal, it does not start AGENT,
+    240; all rows 156.83 min, about 83.2 min). At the bound, or on any refusal, it does not start AGENT,
     prints one "launch-gate refused: <cause>: run <id>; <detail>; next action:
     <action>" line and exits 75; every number in it carries a unit suffix and
     it uses none of the daemon's retry or fallback phrases. A fit reached only
@@ -188,6 +206,17 @@ Launch gate:
     process execs only after the watcher holds its pid, so a gate that dies at
     the handoff leaves no agent; an internal error after the start kills AGENT
     before the gate exits.
+
+Activation:
+  - `activate --gate GATE_FILE` is the deployment step that follows the
+    launcher line. It writes the pool's gate-activation.json once, with
+    activated_at (now, epoch seconds) and gate_sha256 (the sha256 of
+    GATE_FILE), through a temporary file hard-linked into place, so it never
+    replaces a record. It writes nothing and exits 1 with one "activate
+    refused: <reason>" line when the record exists, GATE_FILE cannot be read,
+    the waiters cannot be read, a live waiter of the earlier engine (an entry
+    with no pid) is queued, or the pool cannot be used or written; on success
+    it prints the record.
 
 Exit status of `run`, `pipeline-start` and `launch-gate`: COMMAND's own status; 126 when
 COMMAND cannot be executed, 127 when it is not found, 125 for a usage error; launch-gate
@@ -1582,6 +1611,57 @@ def read_activation(directory: str) -> Optional[int]:
         note_unknown("activation record malformed")  # Main 1876 U
         return None
     return activated
+
+
+def write_activation(directory: str, gate: str) -> Tuple[bool, str]:
+    """Write DIRECTORY's activation record once: (True, its JSON) or (False, the reason nothing was written).
+
+    Nothing is written when a record already exists (activation never moves later),
+    when GATE cannot be read, or when the pool holds a live waiter of the earlier
+    engine, which writes no run and no pid (it predates this rule and must be
+    re-issued by its owner first), or a waiter that cannot be read.
+    """
+    import hashlib
+    final = os.path.join(directory, ACTIVATION_RECORD)
+    if os.path.lexists(final):
+        return False, "record exists: %s" % final
+    try:
+        digest = hashlib.sha256(Path(gate).read_bytes()).hexdigest()
+    except OSError as exc:
+        return False, "gate file unreadable: %s" % exc
+    try:
+        old = [entry["path"] for entry in waiter_census(directory) if "pid" not in entry]
+    except (OSError, ValueError) as exc:
+        return False, "waiters unreadable: %s" % exc
+    if old:
+        return False, "a waiter of the earlier engine is queued: %s; its owner re-issues that start first" % old[0]
+    text = json.dumps(dict(activated_at=int(time.time()), gate_sha256=digest))
+    fd, temporary = tempfile.mkstemp(prefix="." + ACTIVATION_RECORD + ".", dir=directory)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(text)
+        os.link(temporary, final)
+    except FileExistsError:
+        return False, "record exists: %s" % final
+    finally:
+        os.unlink(temporary)
+    return True, text
+
+
+def cmd_activate(args: argparse.Namespace) -> int:
+    try:
+        directory = pool_dir()
+        ensure_pool_dir(directory)
+        written, text = write_activation(directory, args.gate)
+    except PoolUnavailable as exc:
+        written, text = False, "pool unavailable: %s" % exc
+    except OSError as exc:
+        written, text = False, "record write failed: %s" % exc
+    if not written:
+        log(2, "activate refused: %s; no record written" % text)
+        return 1
+    print("fm-cpu-pass: activate wrote %s: %s" % (os.path.join(directory, ACTIVATION_RECORD), text))
+    return 0
 
 
 def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) -> Dict[str, int]:
@@ -3221,6 +3301,8 @@ def build_parser() -> argparse.ArgumentParser:
     intercept.add_argument("command", nargs=argparse.REMAINDER, help="-- ARGS of the no-mistakes client")
     gate = sub.add_parser("launch-gate", help="secure capacity for a CI fix agent before it starts (the agent launcher's final exec)")
     gate.add_argument("command", nargs=argparse.REMAINDER, help="-- AGENT [ARGS...]")
+    activate = sub.add_parser("activate", help="write the pool's gate activation record once (the deployment step)")
+    activate.add_argument("--gate", required=True, help="the gate file the agent launcher's final line names")
     status = sub.add_parser("status", help="report held and free passes")
     status.add_argument("--json", action="store_true", help="print one JSON object")
     sub.add_parser("size", help="print the pool size")
@@ -3241,6 +3323,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_exec_intercept(args)
     if args.action == "launch-gate":
         return cmd_launch_gate(args)
+    if args.action == "activate":
+        return cmd_activate(args)
     if args.action == "status":
         return cmd_status(args)
     if args.action == "size":

@@ -14,8 +14,10 @@ prints JSON; exits 1 on any failure. Starts no process, sends no signal and make
 kernel, the run database and the pool are the case's own facts, and one case runs the engine's launch gate in this
 process with its agent start replaced by a probe.
 """
+import contextlib
 import ctypes
 import importlib.util
+import io
 import json
 import os
 import sqlite3
@@ -1576,6 +1578,63 @@ def perturbation_group():
                 proc.sysctl, proc.libc = REAL_SYSCTL, REAL_LIBC
 
 
+def activation_writer():
+    """The deployment step's writer: one well-formed record, never replaced, and nothing written on a refusal."""
+    gate_file = scratch / 'activation-gate.sh'
+    gate_file.write_bytes(b'#!/bin/sh\nexec true\n')
+    w = World('activation-write', activated=False)
+    try:
+        written, text = engine.write_activation(str(w.pool), str(gate_file))
+        harm('activation-written', written and activation_before(w, int(time.time()) + 10), text)
+        first = (w.pool / 'gate-activation.json').read_bytes()
+        harm('activation-digest', json.loads(first)['gate_sha256'] == __import__('hashlib').sha256(gate_file.read_bytes()).hexdigest(), first)
+        again, reason = engine.write_activation(str(w.pool), str(gate_file))
+        harm('activation-never-replaced', not again and 'record exists' in reason
+             and (w.pool / 'gate-activation.json').read_bytes() == first, reason)
+    finally:
+        w.close()
+    w = World('activation-unreadable-gate', activated=False)
+    written, reason = engine.write_activation(str(w.pool), str(scratch / 'no-such-gate'))
+    harm('activation-unreadable-gate', not written and 'gate file unreadable' in reason
+         and sorted(os.listdir(w.pool)) == [], reason)
+    w = World('activation-old-waiter', activated=False)
+    try:
+        fd, _ = engine.publish_locked(str(w.pool), 'pipeline-waiter-', dict(priority='other', queued_ns=1))
+        w.fds.append(fd)
+        written, reason = engine.write_activation(str(w.pool), str(gate_file))
+        harm('activation-old-waiter', not written and 'earlier engine' in reason
+             and not (w.pool / 'gate-activation.json').exists(), reason)
+    finally:
+        w.close()
+    w = World('activation-new-waiter', activated=False).waiter('x', DEAD_PID)
+    try:
+        written, text = engine.write_activation(str(w.pool), str(gate_file))
+        control(written and activation_before(w, int(time.time()) + 10), text)
+    finally:
+        w.close()
+    # The subcommand itself, against this world's pool only: 0 and a record, then 1 with the record unchanged, and 125
+    # without its gate file. Its success line goes to stdout, which carries this file's JSON result, so it is caught.
+    w = World('activation-command', activated=False)
+    saved = os.environ.get('FM_CPU_POOL_DIR')
+    os.environ['FM_CPU_POOL_DIR'] = str(w.pool)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            first_code = engine.main(['activate', '--gate', str(gate_file)])
+        record = (w.pool / 'gate-activation.json').read_bytes() if first_code == 0 else b''
+        harm('activation-command-writes', first_code == 0 and activation_before(w, int(time.time()) + 10)
+             and record.decode() in out.getvalue(), first_code, out.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()):
+            second_code = engine.main(['activate', '--gate', str(gate_file)])
+            usage_code = engine.main(['activate'])
+        harm('activation-command-refuses', second_code == 1 and (w.pool / 'gate-activation.json').read_bytes() == record
+             and usage_code == 125, second_code, usage_code)
+    finally:
+        if saved is None:
+            os.environ.pop('FM_CPU_POOL_DIR', None)
+        else:
+            os.environ['FM_CPU_POOL_DIR'] = saved
+
+
 CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_read),
          ('F2 an unreadable attempt record reserves', f2_unreadable_record),
          ('F6 an unknown launch coalition excludes nothing', f6_unknown_launch_coalition),
@@ -1601,6 +1660,7 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1759 a root that exits during the census holds', m1759_root_exits_during_census),
          ('Main 1759 two records on one shared-key row hold', m1759_shared_key_one_row),
          ('Main 1761 history completeness needs the activation record and gated agents', m1761_history_completeness),
+         ('the activation record is written once, and never on a refusal', activation_writer),
          ('Main 1759 a claim is read once', m1759_claim_read_once),
          ('Main 1759 an undecodable pending entry is never released', m1759_undecodable_pending),
          ('Main 1759 an unknown claimant blocks a nonce release', m1759_unknown_claimant),

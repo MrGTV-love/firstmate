@@ -79,15 +79,16 @@ Subject to the one-start minimum and pause-only backstop below, the first waiter
 
 ```text
 projected  <=  budget        where  budget = available_bytes + held
-projected  =   the reservations of the counted runs  +  S for the new run
+projected  =   the reservations of the counted runs  +  R per incomplete history  +  S for the new run
 ```
 
 | A counted run that is | reserves | why |
 |---|---|---|
-| waiting on remote CI: its open step is `ci` with status `running`, no launch-gate reservation is live, and no agent can be alive: no process of it is visible, and its recorded agent pid is absent or dead | only the resident memory it holds, which is 0 because no process of it is visible | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
-| waiting in its [launch gate](#launch-gate): a live launch-gate entry of it is queued in the pool and no launch-gate reservation of it is live, whatever its step or visibility | only the resident memory it holds | its agent has not started, and it reserves capacity only when its gate is admitted |
-| visible in the reading at any other step, or with a live launch-gate reservation | its resident memory or `A`, whichever is larger | startup memory alone is not its demand; memory above `A` is counted as it is, never capped at `R`, `S` or a recorded peak |
+| waiting on remote CI: its open step is `ci` with status `running`, no launch-gate attempt of it is held, and no agent can be alive: no process of it is visible, and its recorded agent pid is absent or dead | only the resident memory it holds, which is 0 because no process of it is visible, plus the history charge below while its history is not shown complete | it uses memory again only when a fix round starts, and that agent starts only through the [launch gate](#launch-gate), which secures capacity first |
+| waiting in its [launch gate](#launch-gate): a live launch-gate entry of it is queued in the pool and no launch-gate attempt of it is held, whatever its step or visibility | only the resident memory it holds, plus the history charge below while its history is not shown complete | its agent has not started, and it reserves capacity only when its gate is admitted |
+| visible in the reading at any other step, or with a held launch-gate attempt | its resident memory or `A`, whichever is larger | startup memory alone is not its demand; memory above `A` is counted as it is, never capped at `R`, `S` or a recorded peak |
 | not visible yet: just registered, between steps, with an unreadable step, or a launch-gate start the reading cannot see | `R` | the reading cannot show what it will use, so it is never read as idle |
+| any of the above whose launch history is not shown complete | one more `R` beside its row's reservation, once per run | an agent launch the gate did not record may still linger, and `R` is a whole run's measured peak |
 
 | Symbol | Meaning | Source |
 |---|---|---|
@@ -99,6 +100,8 @@ projected  =   the reservations of the counted runs  +  S for the new run
 
 A counted run's resident memory appears in both `projected` and `budget`, so memory a run holds is never treated as free for new starts, and only the part of its reservation it does not hold yet must fit in `available_bytes`.
 The open step is the highest-ordered `step_results` row in `running` or `fixing`, read with the run rows.
+A run's launch history is shown complete only when the pool's activation record, `gate-activation.json` (`activated_at` in epoch seconds and `gate_sha256`, written once by [activation](#activation)), is dated before the run's `created_at`, every `agent_invocations` row of the run names a gated agent, and its rows and the gate's attempt records bind one to one by session key.
+Every other run, a run created before activation included, is charged one `R` for its history while it is counted, queued or holds an attempt, so runs created before activation keep that `R` until they leave the census.
 With no other counted run, one start is admitted even when the rule does not fit, a one-start minimum, so a large `S` or a low `available_bytes` never holds an idle host closed; the pause-only backstop below still pauses that start.
 The admission and waiting lines print every input: the counted runs, each run's reservation and why (`reserved=[run:kind:bytes]`, `holding_only=[...]`, `:unseen` for a run the reading cannot see), the projection, the budget, `R`, `A`, `S` and the class.
 The records belong to the host: they must name this host and its RAM size.
@@ -107,7 +110,7 @@ The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh`
 `R` and `S` are measurements, and taking the 75th percentile as `R` is a policy choice (Main 2473 ruling).
 `A` is a measurement with no chosen margin: because `S` covers one run at the largest recorded peak, `k x A + S` is at least the summed run memory of every recorded reading with `k` runs, so the projection never falls below what the record measured in use together.
 Measured on the root home's records of 2026-11-03 (373 readings, 347 of them with at least 2 runs): `A` is 1.82 GiB and `S` 13.39 GiB; the most run memory recorded at once was 20.1 GiB, with 10 and with 12 runs.
-At 12 visible runs the projection is at least 12 x 1.82 + 13.39 = 35.2 GiB, against 88 GiB under the previous rule, which reserved `R` for every counted run at once.
+At 12 visible runs whose histories are all shown complete the projection is at least 12 x 1.82 + 13.39 = 35.2 GiB, against 88 GiB under the previous rule, which reserved `R` for every counted run at once; each of them whose history is not shown complete adds one `R`.
 The replay of every recorded reading against both rules, including the only pressure-2 episode (2026-11-02 21:11Z to 22:44Z), is in the task's private evidence; the pressure hold refuses every reading of that episode, and the rule alone never projects below the run memory a reading measured.
 The protection still has residuals: a run admitted just before pressure rises is not visible in the reading until it registers and grows, and an agent that raises its own memory after it starts is bounded by the next decision and the pressure hold, not by its reservation.
 A CI run is released only on positive proof that no agent of it lives, never by what its processes are named or who their parent is: the daemon records an agent's pid at the agent's start and clears it at its exit, so a visible tree, whatever its recorded pid (a reparented agent can outlive its launcher's dead pid), or a live pid keeps the active term `A`.
@@ -118,7 +121,8 @@ Processes appear only in the backstop below.
 
 ### Fallback
 
-With fewer than 2 recorded runs left to rank for `R`, a calibration or readings record for another host or RAM size, an unreadable record, no recorded reading of this host with at least 2 runs for `A`, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
+With fewer than 2 recorded runs left to rank for `R`, a calibration record for another host or RAM size, an unreadable calibration record, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
+No recorded reading of this host and RAM size with at least 2 runs for `A` is not a fallback: `A` is then `R`, so every visible active run counts at least `R`.
 That is the previous count limit, kept only until the host has measured runs; a missing record never refuses a start and never reads as an empty host.
 
 ### Pause-only backstop
@@ -134,24 +138,42 @@ It only delays a start; the unreadable run database or CPU count still refuses w
 
 ### Launch gate
 
-A run waiting on remote CI reserves nothing beyond what it holds, so its capacity is secured when its fix round resumes, before the fix agent starts.
+A run waiting on remote CI reserves only what it holds, beside its history charge, so its capacity is secured when its fix round resumes, before the fix agent starts.
 `bin/fm-cpu-pass.sh launch-gate -- AGENT [ARGS...]` is the agent launcher's final exec: the daemon starts the launcher named by `agent_path_override` in `~/.no-mistakes/config.yaml` in the run worktree, and the launcher's last line `exec <firstmate>/bin/fm-cpu-pass.sh launch-gate -- <agent> "$@"` keeps the gate as the agent's parent.
 The [engine header](../bin/fm-cpu-pass.py) owns its exact sequence, refusal text, hold bound and process hygiene; in short:
 
-1. It maps its working directory to exactly one `runs.worktree_dir`; an unmapped or ambiguous directory or an unreadable database refuses, visibly, and never passes through.
-2. A launch for any step other than `ci` runs the agent at once, unchanged, because that run is already counted.
-3. A `ci` launch waits in this same class-ordered queue in class `other` and asks this same rule for one more active run, with its own run and every other run whose gate waits in the queue counted as waiters.
-4. On admission it publishes the run's reservation, a lock file it holds for the agent's life, under the start lock, then starts the agent at once without waiting for it to appear in memory, then releases the lock.
-   Each live attempt of a run is its own agent and carries its own reservation, so two attempts of one run that both start an agent are counted twice, never once.
-   Every later decision counts that run at `R` while it is invisible and at its resident memory or `A` afterwards, until the agent's process tree has exited.
+1. It maps its working directory to exactly one `runs.worktree_dir`; an unmapped or ambiguous directory or an unreadable database refuses, visibly.
+   A directory that is no run's worktree but a registered repository's checkout (`repos.working_path`, the attach wizard) is no run's work, and its agent runs unchanged.
+2. A step it cannot establish (step facts unreadable, no open step, an unrecognized step name) refuses.
+   A counted run's launch at any step other than `ci` starts the agent at once, with no hold, because that run is already counted; its attempt record is still published under the start lock.
+3. Every other launch, a `ci` launch or any launch of a run that is not counted, waits in this same class-ordered queue in class `other` and asks this same rule for one more active run, with its own run and every other run whose gate waits in the queue counted as waiters.
+4. On admission it publishes the attempt's record, `attempt-<id>.json` in the pool, under the start lock, then starts the agent at once without waiting for it to appear in memory, then releases the lock.
+   An attempt is held while a process of it is proven or possibly alive, and ends only when two successive censuses in one decision show none of them.
+   Held records of one run that share one session key (a resumed session) are one attempt and are charged once; every other held attempt carries its own reservation.
+   Every later decision counts a held attempt at `R` while it is invisible and at its resident memory or `A` afterwards.
 5. It holds at most the daemon's per-invocation agent budget minus the 99th percentile of completed CI-fix invocation durations, and refuses at that bound, including a fit that comes only after a wait past it; a fit at the very first decision is admitted, so a bound of 0 holds not at all.
 
-A refusal exits 75 with one line naming the cause and the next action; the daemon logs it as `warning: CI fix failed` and does not fail the run.
-Each refusal spends one of the run's `auto_fix.ci` attempts; after the last one the CI findings park as the ordinary ask-user decision, whose owner answers it once capacity has returned.
+The gate also refuses when it cannot record the attempt before its agent runs (process facts unreadable) and when a first hold cannot write its wake (hold line not recorded).
+A refusal exits 75 with one line naming the cause and the next action.
+For a counted run at its `ci` step the daemon logs it as `warning: CI fix failed` and does not fail the run.
+Each such refusal spends one of the run's `auto_fix.ci` attempts; after the last one the CI findings park as the ordinary ask-user decision, whose owner answers it once capacity has returned.
+A run that is not counted reaches the hold bound only as a failed launch, and its run fails with it; its owner restarts the run once capacity has returned.
 Every hold (the first time the gate is not admitted, whatever the cause: a decision that does not fit, a start ahead of it, or start-lock contention however short), admission after a hold and refusal also appends one check wake naming the run, the reason and the time waited to the root home's wake queue, the durable record supervision drains.
 The gate never waits for the wake queue's lock: when another process holds it, the wake is spilled to the root home's `state/.wake-spill.<seq>`, and the next append to that queue, or the watcher's next start, replays it.
 A spill is published by a hard link that never replaces an existing spill, so a gate's spill and the watcher's, or two gates', each keep their own file.
 The live launcher is captain-private host configuration outside this repository: the gate protects nothing until that one line is applied, and a fix-round agent launched through any other path is not gated.
+
+### Activation
+
+`bin/fm-cpu-pass.sh activate --gate GATE_FILE` writes the pool's `gate-activation.json` once: `activated_at` (now, in epoch seconds) and `gate_sha256` (the sha256 of `GATE_FILE`, the gate file the launcher line names).
+It writes through a temporary file in the pool directory, hard-linked into place, so it never replaces a record and activation never moves later.
+It writes nothing and exits 1 with one `activate refused: <reason>` line when the record already exists, when `GATE_FILE` cannot be read, when the pool's waiters cannot be read, when a live waiter of the earlier engine (an entry with no `pid`) is queued (that waiter's owner re-issues its start first), or when the pool cannot be used or written.
+
+Deployment is one operator step.
+First apply the launcher line.
+Then, immediately after it, run `bin/fm-cpu-pass.sh activate --gate <the gate file the launcher line names>`.
+Then read the record with `cat ~/.cache/fm-cpu-pool/gate-activation.json` (or the pool directory `FM_CPU_POOL_DIR` names): it must be one JSON object with an integer `activated_at` at the time of the step and a 64-digit lowercase hexadecimal `gate_sha256` equal to `shasum -a 256` of that gate file.
+Residual: each run created before activation still carries one `R` for its history until it leaves the census, so the admission the corrected reservation allows is reached only after those runs drain.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
 Admission never preempts an already granted start or stops running work.

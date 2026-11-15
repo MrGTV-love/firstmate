@@ -247,9 +247,9 @@ try:
             change(db, 'INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES (?, ?, ?, ?, ?, ?)',
                    (run + '-' + name, run, name, 1, status, pid))
 
-    def counted_case(name, available, active, waiting_ci=(), invisible=()):
+    def counted_case(name, available, active, waiting_ci=(), invisible=(), activated=True):
         """Counted runs: active is (id, rss) at an agent step; waiting_ci and invisible list runs the reading cannot see."""
-        folder, db, env = case(name, measured=True, available=available)
+        folder, db, env = case(name, measured=True, available=available, activated=activated)
         calibrate(folder, peaks=diag_peaks, active=diag_active)
         for run, _ in active:
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES (?, 'running', 'repo')", (run,))
@@ -270,6 +270,16 @@ try:
     text = (folder / 'p1a.stderr').read_text()
     assert 'admitted: counted=11 ' in text and 'start waiting' not in text and 'ci-361:ci-waiting:0:unseen' in text \
         and 'lint:active:%d' % int(2.22 * GIB) in text and 'review-b:active:%d' % diag_active in text, text
+    # The same world with no activation record: no history is shown complete, so each counted run carries one more R
+    # and the start waits: the deployment's activation step is what lets (a) admit.
+    folder, db, env = counted_case('p1-live-unactivated', 32.82 * GIB // 16384 * 16384, live,
+                                   waiting_ci=['ci-361', 'ci-367', 'ci-369', 'ci-3609'], activated=False)
+    child = launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'sh', '-c', 'exit 3'], env, folder / 'p1a-unactivated')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=11 ' in (folder / 'p1a-unactivated.stderr').read_text(), 'no activation record waits')
+    assert child.poll() is None and 'ci-361:ci-unproven' in (folder / 'p1a-unactivated.stderr').read_text()
+    os.killpg(child.pid, signal.SIGTERM)
+    finish(child, -signal.SIGTERM)
     # (b) the 2026-11-03 14:14Z record: 12 runs holding 20.1 GiB together, 25.27 GiB available.
     recorded = [21299200, 118226944, 491290624, 545144832, 574226432, 652591104, 673792000, 1083260928,
                 1926561792, 3074097152, 5121441792, 7301611520]
