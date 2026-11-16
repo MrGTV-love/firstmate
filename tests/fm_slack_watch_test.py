@@ -5923,7 +5923,12 @@ if os.environ.get('INV4_BLOCK_RESOLVER'):
     # A system resolver that never returns (Main 1729 (b)): every name lookup of this process blocks for good; no network, no signal, no child process.
     import socket, threading as _threading
     _never = _threading.Event()
-    socket.getaddrinfo = lambda *args, **kwargs: _never.wait() or []
+    def _blocked(*args, **kwargs):
+        # Each entry into the blocked resolver is logged first, so a test can show the lookup was really reached (F9 of the review of 5048f815).
+        with open(os.environ['INV4_LOG'] + '.resolver', 'a') as log:
+            log.write('entered\n')
+        return _never.wait() or []
+    socket.getaddrinfo = _blocked
 if os.environ.get('INV4_CARD'):
     # One held decision card (the ordered event model): the board's open row, live; each answer handed to the intake is logged, and the stand-in closes it.
     import json as _json
@@ -5951,6 +5956,7 @@ import threading
 with open(os.environ['INV4_LOG'] + '.threads', 'a') as log:
     # Every thread still running when the check ends, whatever its name: a reader left behind past the deadline is one of them.
     log.write('bounded-alive %d\n' % len([t for t in threading.enumerate() if t is not threading.main_thread() and t.is_alive()]))
+    log.write('lookup-alive %d\n' % len([t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()]))
 sys.exit(code)
 """
 
@@ -8101,15 +8107,17 @@ class Round8Findings(InvariantScenario):
             self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1, [r.out for r in passes])
             self.assertEqual(self.woken(passes).count('200.000200'), 1, [r.out for r in passes])
 
-    def test_r8_r9_control_a_post_that_surely_did_not_happen_is_posted_again_once(self):
-        # A rate limit (HTTP 429): Slack refused the call before processing it, so the post surely did not happen and a later run posts it once.
+    def test_r8_r9_a_rate_limited_post_is_a_slack_answer_so_it_is_unknown_never_posted_again_and_woken_once(self):
+        # Round 10 (Main 1753, 2082): a rate limit (HTTP 429) is a Slack answer other than ok with a ts, and an empty lookup proves no absence, so the post is
+        # never made again; the request is woken once with its acknowledgement state named unknown.
         with self.home(failures={'chat.postMessage:200.000200': {'status': 429, 'times': 1}}) as home:
             home.trust_check()
             home.cli('poll')
             home.say('200.000200', 'their request')
             passes = [home.check_pass() for _ in range(3)]
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            self.assertEqual(len(their_post_attempts(home, '200.000200')), 1)
             self.assertEqual(self.woken(passes).count('200.000200'), 1)
+            self.assertIn(plane.REQUEST_UNKNOWN.strip(), [l for r in passes for l in r.out.split('; ') if '200.000200' in l][0])
 
     def test_r8_r9_an_http_5xx_leaves_the_post_unknown_it_is_never_posted_again_and_the_request_is_woken_once_named_unknown(self):
         # A 5xx does not say whether Slack applied the post: its outcome is unknown. A complete lookup that finds nothing is no proof either, so the request is
@@ -8217,7 +8225,8 @@ class Round9Findings(InvariantScenario):
     # ---- F4: both owner-side hand-over saves failing never put host time in place of Slack time ----
 
     def test_r9_f4_both_failed_hand_over_saves_keep_the_slack_watermark(self):
-        with self.home(scott=None, history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
+        # Round 10 (F8 of the review of 5048f815): an owner check with the setting unset writes nothing of theirs, so the Slack watermark is made while they are set.
+        with self.home(history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
             home.trust_check()
             home.set_clock(90.0)
             home.check_pass()
@@ -8263,19 +8272,6 @@ class Round9Findings(InvariantScenario):
             self.assertIn(('200.000100', INV_OWNER), found)
 
     # ---- F6: an acknowledgement is retried only after a lookup proves it absent; unknown stays unknown ----
-
-    def test_r9_f6_an_unrecognized_slack_error_is_looked_up_before_the_post_is_tried_again(self):
-        with self.home(failures={'chat.postMessage:200.000200': {'status': 400, 'times': 1}}) as home:
-            home.trust_check()
-            home.cli('poll')
-            home.say('200.000200', 'their request')
-            passes = [home.check_pass() for _ in range(3)]
-            methods = [r['method'] for r in self.their_attempts(home) if r.get('method') in ('chat.postMessage', 'conversations.replies')]
-            posts = [i for i, m in enumerate(methods) if m == 'chat.postMessage']
-            self.assertGreaterEqual(len(posts), 2, methods)
-            self.assertIn('conversations.replies', methods[posts[0]:posts[1]], methods)   # a lookup between the failed post and its retry
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
-            self.assertEqual(self.woken(passes).count('200.000200'), 1)
 
     def test_r9_f6_a_crash_after_an_empty_lookup_of_an_unknown_post_never_posts_it_again(self):
         with self.home(failures={'chat.postMessage:200.000200': {'status': 503, 'times': 1}}) as home:
@@ -8460,55 +8456,6 @@ class Round9Findings(InvariantScenario):
             self.assertLessEqual(exited, plane.OWNER_WAKE_WAIT_BOUND, exited)
             self.assertEqual(accepted, [], 'a connection reached the server')   # nothing sent, before or after the process ended
 
-    def test_r9_main1729_while_one_lookup_is_stuck_every_later_call_is_refused_and_recorded_with_no_growth(self):
-        import tracemalloc
-        port, accepted = self.counting_listener()
-        for left_over in [t for t in threading.enumerate() if t.name == 'fm-slack-lookup']:
-            left_over.join(5)                                                   # a lookup an earlier test released may still be ending
-        self.assertEqual([t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()], [])
-        stuck, real_lookup, started = threading.Event(), socket.getaddrinfo, []
-        def blocking(*args, **kwargs):
-            started.append(args[:2])
-            stuck.wait()
-            return real_lookup(*args, **kwargs)
-        self.addCleanup(stuck.set)
-        with patch.object(socket, 'getaddrinfo', blocking):
-            def one(n, budget=0.1):
-                slack = plane.Slack('fixture-token-not-a-secret-r9-c')
-                slack.base = 'https://127.0.0.1:%d/' % port
-                deadline = time.monotonic() + budget
-                slack.time_left = lambda: deadline - time.monotonic()
-                outcome = 'completed'
-                try:
-                    slack.call('chat.postMessage', channel=INV_SECOND_DM, text='x', client_msg_id='r9-c-%d' % n)
-                except Exception as error:
-                    outcome = type(error).__name__
-                return outcome, slack.last_cutoff
-            one(0, 2.0)                                                         # the lookup that stays stuck (time enough for its reader to reach it)
-            self.assertEqual(len(started), 1, started)
-            tracemalloc.start()
-            results = [one(n) for n in range(1, 31)]                            # also the warm-up: one-time library caches and garbage not yet collected
-            grown = []
-            for batch in range(2):                                              # then two more batches of 30, each measured after a collection
-                gc.collect()
-                before = tracemalloc.get_traced_memory()[0]
-                [one(100 + 30 * batch + k) for k in range(30)]
-                gc.collect()
-                grown.append(tracemalloc.get_traced_memory()[0] - before)
-            tracemalloc.stop()
-            lookups = [t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()]
-            stuck.set()
-        self.assertEqual({o for o, _ in results}, {'DeadlineSpent'})
-        # Each later call is refused and recorded, ended, with nothing sent. Under load a reader may reach the fence only after its caller's deadline closed it;
-        # that call is refused before any lookup (lookup_pending False), which is also no new lookup. The proof that none was started is the count below.
-        odd = [(n, c) for n, (_, c) in enumerate(results, 1) if not (isinstance(c, dict) and c.get('ended') is True and c.get('sent') is False)]
-        self.assertEqual(odd, [])
-        self.assertEqual(len(started), 1, started)                              # one lookup in all: the stuck one; no later call started another
-        self.assertTrue(any(c.get('lookup_pending') for _, c in results), results)  # control: the refusal by the live lookup was exercised
-        self.assertLessEqual(len(lookups), 1, lookups)
-        self.assertLess(max(grown), 8 * 1024, grown)                            # no growth with the number of calls (measured 0.7 KB to 2.8 KB a batch)
-        self.assertEqual(accepted, [])
-
     # ---- F10: an interrupted span report appends its row once ----
 
     def test_r9_f10_a_span_report_interrupted_after_its_row_appends_the_row_once(self):
@@ -8531,6 +8478,639 @@ class Round9Findings(InvariantScenario):
             rows = [r for r in home.refusals() if r['reason'] == 'second_intake_unplaced' and r.get('taken_in')]
             self.assertEqual(len(rows), 1, home.refusals())
             self.assertEqual(self.woken(passes).count('150.900000'), 1)
+
+
+class Round10Findings(InvariantScenario):
+    """Round 10 (the outside review of 5048f815, Main 1753 and 2082: refuse when in doubt, act only on positive proof; the journal commits before any effect; an
+    unknown outcome survives a restart as unknown; an empty lookup is no proof of absence; the owner's path never waits on second-person bookkeeping). F1 to F11
+    through the production entry points where the property is end to end; each records every attempted post of the seam it names."""
+
+    CARD = Round6Findings.CARD
+    held_card = Round6Findings.held_card
+    decisions = Round6Findings.decisions
+    card_ts = staticmethod(Round6Findings.card_ts)
+    reply_after_unset = Round6Findings.reply_after_unset
+    failed_arm = Round6Findings.failed_arm
+    failing_open = Round8Findings.failing_open
+    woken = Round8Findings.woken
+    REQ = Round8Findings.REQ
+    B_USER, B_DM = Round8Findings.B_USER, Round8Findings.B_DM
+    MARKER_TEXT = Round7Findings.MARKER_TEXT
+    DRIVER = Invariant4OwnerFirst.DRIVER
+    run_check = Invariant4OwnerFirst.run_check
+    counting_listener = Round9Findings.counting_listener
+    SECOND_FILES = ('second.json', 'owner-check-at', 'second-ids', 'second-ids.alt', 'refusals.jsonl', 'refusal-queue.jsonl', 'second-requests.jsonl')
+
+    def attempts(self, home, method=None, channel=None, thread=None):
+        """Every call the replay received (made or failed), in order: its own record of attempts."""
+        path = home.state_dir / 'attempts.jsonl'
+        rows = [json.loads(line) for line in path.read_text().splitlines()] if path.is_file() else []
+        return [r for r in rows if (method is None or r.get('method') == method) and (channel is None or r.get('channel') == channel)
+                and (thread is None or r.get('thread_ts') == thread)]
+
+    def hashes(self, home, name):
+        path = home.state_dir / name
+        return path.read_text().split() if path.is_file() else []
+
+    @contextlib.contextmanager
+    def stalling_open(self, name, release, failing=()):
+        """Every open of the plane's file `name` blocks until release is set (a single-file stall), then opens it; every open of a file named in `failing`
+        fails."""
+        real = open
+        def opening(path, *args, **kwargs):
+            if Path(path).name in failing:
+                raise OSError('synthetic single-file failure')
+            if Path(path).name == name:
+                release.wait(60)
+            return real(path, *args, **kwargs)
+        with patch.object(plane, 'open', opening, create=True):
+            yield
+
+    # ---- F1: an id record completes before the run goes on; a stalled first record is replaced by the fallback, or the run refuses ----
+
+    def test_r10_f1_a_stalled_first_id_record_is_replaced_by_the_fallback_before_a_refusal_and_the_id_never_answers(self):
+        with self.home(scott=None, authors=','.join([INV_OWNER, INV_SECOND])) as home, self.held_card() as answers:
+            home.cli('poll')
+            release = threading.Event()
+            self.addCleanup(release.set)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}), self.stalling_open('second-ids', release):
+                refused = home.cli('mirror', extra={'SLACK_SIGNING_SECRET': self.MARKER_TEXT})
+                at_return = self.hashes(home, 'second-ids.alt')              # read when the run returned, the first record still stalled
+            self.assertEqual(refused.rc, 1, (refused.out, refused.err))
+            self.assertIn(plane.id_hash(INV_SECOND), at_return)
+            self.assertEqual(self.reply_after_unset(home, answers), [])        # the stalled record never finished: the fallback alone keeps the id out
+            self.assertEqual(self.decisions(home), [('decision_held_for_captain_reply', INV_SECOND)])
+
+    def test_r10_f1_a_stalled_first_record_and_a_failed_fallback_refuse_the_owner_check_with_nothing_published(self):
+        with self.home(scott=None) as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('9100.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            before = len(self.attempts(home))
+            release = threading.Event()
+            self.addCleanup(release.set)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}), self.stalling_open('second-ids', release, failing=('second-ids.alt',)):
+                owner = home.cli('check', action='check')
+                second = home.cli('check', action='check-second')
+            self.assertEqual((owner.rc, second.rc), (1, 1), (owner.out, second.out))
+            for result in (owner, second):
+                self.assertIn('second_id_unrecorded', result.out + result.err)
+                self.assertEqual(self.REQ.findall(result.out), [])
+            self.assertEqual(self.attempts(home)[before:], [])                 # no call at all: nothing read, posted or woken
+
+    def test_r10_f1_control_a_first_record_that_finishes_lets_the_run_go_on_with_no_fallback(self):
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            result = home.check_pass()
+            self.assertEqual(result.rc, 0, (result.out, result.err))
+            self.assertIn(plane.id_hash(INV_SECOND), self.hashes(home, 'second-ids'))
+            self.assertEqual(self.hashes(home, 'second-ids.alt'), [])
+            self.assertEqual(self.woken([result]), ['200.000200'])
+
+    # ---- F2: a queued collision refusal keeps Main 1719's reason, the hash form and the one notice ----
+
+    def queued_reaction_refusal(self, signing):
+        new_owner, new_dm = 'U0NEWOWNER01', 'D0NEWOWNER01'
+        def unchecked(replay, path, line):
+            with open(path, 'a') as out:
+                out.write(line)
+        outs = []
+        with self.home(authors=','.join([INV_OWNER, new_owner])) as home, self.held_card() as answers:
+            home.add_member(new_owner, new_dm)
+            home.cli('poll')
+            ts = self.card_ts(home)
+            home.edit_replay(lambda data: data['reactions'].setdefault(ts, []).append({'name': 'two', 'users': [INV_SECOND]}))
+            env = {'FM_SLACK_DM_USER': new_owner, **({'SLACK_SIGNING_SECRET': signing} if signing else {})}
+            with patch.dict(os.environ, env), patch.object(Replay, 'append_line', unchecked):
+                os.environ.pop('FM_SLACK_SECOND_USER', None)
+                with self.failing_open('refusals.jsonl'):
+                    outs.append(home.cli('check', action='retarget'))
+                for _ in range(2):
+                    outs.append(home.cli('poll'))
+            rows = [(r.get('author'), r.get('withheld')) for r in home.refusals() if r['reason'] == 'decision_held_for_captain_reaction']
+            text = ''.join(r.out + r.err for r in outs)
+            return rows, text.count(plane.AUTHOR_COLLISION_NOTICE), (home.state_dir / 'refusals.jsonl').read_text(), answers()
+
+    def test_r10_f2_a_queued_collision_refusal_is_logged_later_with_the_main_1719_reason_the_hash_and_one_notice(self):
+        rows, notices, log, answered = self.queued_reaction_refusal(INV_SECOND)          # the protected value equals their id
+        self.assertEqual(rows, [('sha256-id:' + plane.id_hash(INV_SECOND), plane.AUTHOR_WITHHELD)])
+        self.assertEqual(notices, 1)
+        self.assertNotIn(INV_SECOND, log)
+        self.assertEqual(answered, [])
+
+    def test_r10_f2_control_a_queued_normal_refusal_names_the_literal_id_with_no_reason_and_no_notice(self):
+        rows, notices, _, answered = self.queued_reaction_refusal(None)
+        self.assertEqual(rows, [(INV_SECOND, None)])
+        self.assertEqual(notices, 0)
+        self.assertEqual(answered, [])
+
+    # ---- F3: a held window with no cursor comes back when A is armed again ----
+
+    def held_a_then_b(self, home):
+        home.trust_check()
+        home.add_member(self.B_USER, self.B_DM)
+        home.set_clock(None)
+        self.failed_arm(home)                                                   # no Slack Date at all: A's intake is held, with a boundary and no cursor
+        window = home.theirs()['second']
+        self.assertTrue(window.get('hold') and 'intake_cursor' not in window, window)
+        home.say('110.000000', 'request typed while A is held')
+
+    def test_r10_f3_a_held_window_returns_on_an_arm_of_a_and_its_request_reaches_a_once(self):
+        with self.home(history=False, arm=False) as home:
+            self.held_a_then_b(home)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': self.B_USER}):
+                self.assertEqual(home.cli('check', action='arm').rc, 0)
+            self.assertEqual(home.cli('check', action='arm').rc, 0)            # back to A, by an arm
+            home.set_clock(150.0)
+            back = [home.check_pass() for _ in range(3)]
+            self.assertEqual(self.woken(back), ['110.000000'], [r.out for r in back])
+            self.assertEqual(len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM, '110.000000')), 1)
+            self.assertEqual(self.attempts(home, 'chat.postMessage', self.B_DM), [])
+
+    def test_r10_f3_control_a_held_window_returns_on_a_check_of_a(self):
+        with self.home(history=False, arm=False) as home:
+            self.held_a_then_b(home)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': self.B_USER}):
+                home.check_pass()
+            home.set_clock(150.0)
+            back = [home.check_pass() for _ in range(3)]
+            self.assertEqual(self.woken(back), ['110.000000'], [r.out for r in back])
+            self.assertEqual(len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM, '110.000000')), 1)
+
+    # ---- F4, F5: when the marker write and both journal writes of an owner check fail, keep the last Slack watermark and grant no slot ----
+
+    @contextlib.contextmanager
+    def owner_writes_fail(self, unlink_fails=False):
+        real_save, real_write, real_unlink = plane.save, plane.write_atomically, Path.unlink
+        def save(path, value):
+            if Path(path).name == 'second.json':
+                raise OSError('synthetic: both owner-side journal saves fail')
+            return real_save(path, value)
+        def write(path, text):
+            if Path(path).name == plane.OWNER_CHECK_FILE:
+                raise OSError('synthetic: the marker write fails')
+            return real_write(path, text)
+        def unlink(path, *args, **kwargs):
+            if unlink_fails and path.name == plane.OWNER_CHECK_FILE:
+                raise OSError('synthetic: the marker cannot be removed either')
+            return real_unlink(path, *args, **kwargs)
+        with patch.object(plane, 'save', save), patch.object(plane, 'write_atomically', write), patch.object(Path, 'unlink', unlink):
+            yield
+
+    def test_r10_f4_a_failed_marker_and_both_hand_over_saves_keep_the_last_slack_watermark_and_a_new_id_starts_there(self):
+        with self.home(history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
+            home.trust_check()
+            home.set_clock(90.0)
+            home.check_pass()
+            self.assertEqual(home.theirs().get('last_run'), '90.000000')
+            home.set_clock(None)                                                 # this sweep's replies carry no Slack clock
+            with self.owner_writes_fail():
+                home.cli('check', action='check')
+            home.cli('check', action='check-second')
+            self.assertEqual(home.theirs().get('last_run'), '90.000000')        # never this host's 300
+            home.add_member(self.B_USER, self.B_DM)
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': self.B_USER}):
+                home.set_clock(120.0)
+                home.say('110.000000', 'typed by B after the enable', user=self.B_USER, dm=self.B_DM)
+                passes = [home.check_pass() for _ in range(3)]
+            self.assertEqual(self.woken(passes, self.B_USER), ['110.000000'])
+
+    def interrupted_sweep(self, home, ended):
+        home.trust_check()
+        home.cli('poll')
+        time.sleep(0.05)
+        home.cli('check', action='check')                                       # the old sweep's owner check: a fresh hand-over; their check never ran
+        if ended:
+            (home.dir / '.last-check').touch()                                  # the watcher ended that sweep
+        time.sleep(0.05)
+        home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+        for n in range(3):
+            home.say('200.%06d' % (200 + n), 'second request %d' % n)
+
+    def test_r10_f5_an_interrupted_sweeps_hand_over_grants_nothing_when_the_next_owner_check_writes_nothing(self):
+        with self.home(cap='2') as home:
+            self.interrupted_sweep(home, ended=False)
+            before = len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM))
+            with self.owner_writes_fail():
+                first = home.cli('check', action='check')
+            second = home.cli('check', action='check-second')
+            self.assertEqual(self.woken([first], INV_OWNER), ['200.000100'])
+            self.assertEqual(self.woken([second]), [])                           # no slot: nothing of theirs woken
+            self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM)[before:], [])   # and nothing of theirs posted
+            later = [home.check_pass() for _ in range(3)]                        # recovery: later sweeps take each of theirs once
+            self.assertEqual(sorted(self.woken(later)), ['200.000200', '200.000201', '200.000202'])
+
+    def test_r10_f5_a_hand_over_of_a_sweep_the_watcher_ended_grants_nothing_even_when_the_marker_cannot_be_removed(self):
+        with self.home(cap='2') as home:
+            self.interrupted_sweep(home, ended=True)
+            with self.owner_writes_fail(unlink_fails=True):
+                home.cli('check', action='check')
+            second = home.cli('check', action='check-second')
+            self.assertEqual(self.woken([second]), [])
+
+    def test_r10_f5_control_a_current_hand_over_grants_their_slot_in_the_same_sweep(self):
+        with self.home(cap='2') as home:
+            self.interrupted_sweep(home, ended=True)
+            result = home.check_pass()
+            self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
+            self.assertGreaterEqual(len(self.woken([result])), 1, result.out)
+
+    # ---- F6: no repost after any Slack answer; unknown survives a restart; the terminal message names the real class ----
+
+    def failing_their_posts(self, first_error, then=None):
+        """Their chat.postMessage calls: the first raises first_error after the replay recorded the attempt; a later one is applied and then the process dies
+        before its outcome is read (then='crash'); their DM thread's lookups never show anything (a post Slack accepted that is not visible yet)."""
+        real = Replay.call
+        posts = [0]
+        def call(replay, method, **fields):
+            if method == 'chat.postMessage' and fields.get('channel') == INV_SECOND_DM:
+                posts[0] += 1
+                if posts[0] == 1:
+                    replay.attempt(method, fields)
+                    raise SlackError(first_error)
+                if then == 'crash':
+                    real(replay, method, **fields)
+                    raise RuntimeError('FM_SLACK_FAULT=after-their-post')
+            if method == 'conversations.replies' and fields.get('channel') == INV_SECOND_DM:
+                replay.attempt(method, fields)
+                return {'ok': True, 'messages': [], 'has_more': False}
+            return real(replay, method, **fields)
+        return patch.object(Replay, 'call', call)
+
+    def their_wakes(self, results, ts):
+        return [l for r in results for l in r.out.split('; ') if 'slack request %s from %s' % (ts, INV_SECOND) in l]
+
+    def test_r10_f6_an_unrecognized_error_or_ok_false_with_no_error_is_unknown_and_never_posted_again(self):
+        # The replay's HTTP 400 is the transport's api_error: an error it does not recognize, or ok:false with no error at all (fm_slack.Slack.call).
+        with self.home(failures={'chat.postMessage:200.000200': {'status': 400, 'times': 1}}) as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            passes = [home.check_pass() for _ in range(4)]
+            self.assertEqual(len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM, '200.000200')), 1)
+            woken = self.their_wakes(passes, '200.000200')
+            self.assertEqual(len(woken), 1, [r.out for r in passes])
+            self.assertIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
+
+    def test_r10_f6_the_transport_names_an_unrecognized_error_and_ok_false_with_no_error_api_error(self):
+        import fm_slack
+        class Fixed(fm_slack.Slack):
+            def __init__(self, data):
+                super().__init__('fixture-token-not-a-secret-r10-f6')
+                self.data = data
+            def _exchange(self, request, timeout, opener=None):
+                return None, '', self.data, None
+        for data in ({'ok': False, 'error': 'an_error_slack_never_documented'}, {'ok': False}, ['not', 'a', 'dict']):
+            with self.assertRaises(SlackError) as raised:
+                Fixed(data).call('chat.postMessage', channel=INV_SECOND_DM, text='x', client_msg_id='r10-f6')
+            self.assertEqual(str(raised.exception), 'api_error')
+            self.assertNotIn(str(raised.exception), plane.SURELY_ABSENT)
+
+    def test_r10_f6_a_named_slack_refusal_then_a_crash_after_an_accepted_retry_can_never_post_a_third_time(self):
+        # The seam of the reviewer's restart falsifier: the first post is refused by name (a rate limit), the lookup finds nothing. A retry would be accepted
+        # and the process would die before reading its outcome; after a restart the lookup still finds nothing. No retry is ever made, so one post in all.
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            with self.failing_their_posts('rate_limited', then='crash'):
+                passes = []
+                for _ in range(4):
+                    try:
+                        passes.append(home.check_pass())
+                    except RuntimeError:
+                        pass                                                    # the process died; the next pass is a restart
+            self.assertEqual(len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM, '200.000200')), 1)
+            woken = self.their_wakes(passes, '200.000200')
+            self.assertEqual(len(woken), 1, [r.out for r in passes])
+            self.assertIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
+
+    def test_r10_f6_a_new_attempt_mark_carries_no_class_of_an_earlier_attempt(self):
+        # The journal row of a new attempt is read back after a restart: it holds no attempt_class of an earlier attempt, so a run that dies during this post is
+        # unknown on reload (F6 of the review of 5048f815).
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            home.cli('check', action='check')
+            real_post = Watch.post
+            seen = []
+            def post(watch, event, text, thread=None, row=None, person=None):
+                if row is not None and row.get('person') == 'second':
+                    row['attempt_class'] = 'answered'                             # a class left by an earlier attempt that surely did not happen
+                    real_commit = watch.commit
+                    def commit():
+                        real_commit()
+                        if row.get('attempted'):
+                            seen.append(json.loads(watch.path.read_text()))
+                    watch.commit = commit
+                return real_post(watch, event, text, thread, row, person)
+            with patch.object(Watch, 'post', post):
+                home.cli('check', action='check-second')
+            marked = [p for state in seen for p in state.get('pending', []) if p.get('person') == 'second' and p.get('attempted')]
+            self.assertTrue(marked, seen)
+            self.assertNotIn('attempt_class', marked[0])
+
+    def test_r10_f6_a_post_that_fails_every_try_with_a_slack_answer_is_never_named_not_acknowledged(self):
+        for error in ('api_error', 'not_in_channel'):
+            with self.subTest(error=error), self.home() as home:
+                home.trust_check()
+                home.cli('poll')
+                home.say('200.000200', 'their request')
+                real = Replay.call
+                def failing(replay, method, **fields):
+                    if method == 'chat.postMessage' and fields.get('channel') == INV_SECOND_DM:
+                        replay.attempt(method, fields)
+                        raise SlackError(error)
+                    return real(replay, method, **fields)
+                with patch.object(Replay, 'call', failing):
+                    passes = [home.check_pass() for _ in range(5)]
+                text = ''.join(r.out for r in passes)
+                self.assertNotIn(plane.REQUEST_UNACKNOWLEDGED.strip(), text)
+                woken = self.their_wakes(passes, '200.000200')
+                self.assertEqual(len(woken), 1, text)
+                self.assertIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
+                self.assertEqual(len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM, '200.000200')), 1)
+
+    def test_r10_f6_control_a_refusal_before_any_attempt_counts_its_tries_and_is_named_not_acknowledged_after_the_last(self):
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            real = Watch.post
+            def refused(watch, event, text, thread=None, row=None, person=None):
+                if row is not None and row.get('person') == 'second':
+                    raise SlackError('channel_not_found')                       # refused before any attempt mark: nothing can have reached Slack
+                return real(watch, event, text, thread, row, person)
+            with patch.object(Watch, 'post', refused):
+                passes = [home.check_pass() for _ in range(5)]
+            woken = self.their_wakes(passes, '200.000200')
+            self.assertEqual(len(woken), 1, [r.out for r in passes])
+            self.assertIn(plane.REQUEST_UNACKNOWLEDGED.strip(), woken[0])
+            self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM, '200.000200'), [])
+
+    def test_r10_f6_control_the_owner_path_keeps_its_base_rule_for_a_refused_acknowledgement(self):
+        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            passes = [home.check_pass() for _ in range(4)]
+            owner = [l for r in passes for l in r.out.split('; ') if 'slack request 200.000100 from ' + INV_OWNER in l]
+            self.assertEqual(len(owner), 1, [r.out for r in passes])
+            self.assertIn(plane.REQUEST_UNACKNOWLEDGED.strip(), owner[0])
+            self.assertEqual(len(self.attempts(home, 'chat.postMessage', INV_OWNER_DM, '200.000100')), plane.REQUEST_TRIES)
+
+    # ---- F7: the binding is checked again immediately before the DM proof; unbound means no call ----
+
+    def test_r10_f7_an_unbind_between_the_first_check_and_the_dm_proof_makes_no_slack_call(self):
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            before = len(self.attempts(home))
+            answers = iter([True])                                              # bound at the run's first check, unbound from then on
+            with patch.object(Watch, 'bound', lambda self: next(answers, False)):
+                result = home.cli('check', action='check-second')
+            self.assertEqual(result.rc, 0, (result.out, result.err))
+            self.assertEqual(self.attempts(home)[before:], [])                 # no conversations.open, no call of any method
+
+    def test_r10_f7_control_a_bound_source_makes_its_one_dm_proof(self):
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            before = len(self.attempts(home))
+            home.cli('check', action='check-second')
+            self.assertEqual([r['method'] for r in self.attempts(home)[before:]].count('conversations.open'), 1)
+
+    # ---- F8: the owner's check writes nothing of theirs when the setting is unset, and never waits on their bookkeeping when it is set ----
+
+    def test_r10_f8_with_the_setting_unset_the_owners_check_writes_no_file_of_the_second_person(self):
+        with self.home(scott=None) as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            written, real_save, real_write, real_open, real_fsync = [], plane.save, plane.write_atomically, open, os.fsync
+            def save(path, value):
+                written.append(Path(path).name)
+                return real_save(path, value)
+            def write(path, text):
+                written.append(Path(path).name)
+                return real_write(path, text)
+            def opening(path, mode='r', *args, **kwargs):
+                if any(c in mode for c in 'wa+'):
+                    written.append(Path(path).name)
+                return real_open(path, mode, *args, **kwargs)
+            snapshot = lambda: {name: (home.state_dir / name).read_bytes() for name in self.SECOND_FILES if (home.state_dir / name).exists()}
+            before = snapshot()
+            with patch.object(plane, 'save', save), patch.object(plane, 'write_atomically', write), patch.object(plane, 'open', opening, create=True):
+                result = home.cli('check', action='check')
+            self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
+            self.assertEqual([name for name in written if name in self.SECOND_FILES], [])
+            self.assertEqual(snapshot(), before)
+
+    def owner_check_with_a_stall(self, name, how):
+        release = threading.Event()
+        self.addCleanup(release.set)
+        timer = threading.Timer(30.0, release.set)                              # a stall that ends on its own, so a failing run ends too
+        timer.start()
+        self.addCleanup(timer.cancel)
+        real = getattr(plane, how)
+        def stalling(path, *args, **kwargs):
+            if Path(path).name == name:
+                release.wait(60)
+            return real(path, *args, **kwargs)
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+            started = time.monotonic()
+            with patch.object(plane, how, stalling):
+                result = home.cli('check', action='check')
+            return time.monotonic() - started, result
+
+    def test_r10_f8_a_stalled_owner_check_marker_write_never_keeps_the_owner_waiting_past_its_bound(self):
+        elapsed, result = self.owner_check_with_a_stall(plane.OWNER_CHECK_FILE, 'write_atomically')
+        self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
+        self.assertLess(elapsed, plane.OWNER_MARK_WAIT + 10.0, elapsed)
+
+    def test_r10_f8_a_stalled_save_of_their_journal_never_keeps_the_owner_waiting_past_its_bound(self):
+        elapsed, result = self.owner_check_with_a_stall(plane.SECOND_FILE, 'save')
+        self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
+        self.assertLess(elapsed, plane.OWNER_MARK_WAIT + plane.SECOND_IO_WAIT + 10.0, elapsed)
+
+    # ---- F9: the blocked resolver is really entered; every later call is checked; a fresh check process each time has its own bound ----
+
+    def test_r10_f9_fresh_check_processes_whose_lookups_never_return_each_enter_the_resolver_end_in_bound_and_send_nothing(self):
+        port, accepted = self.counting_listener()
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            self.run_check(home, 'normal', 'owner', command='check')
+            for n in range(3):                                                  # the watcher's shape: one fresh check process per sweep
+                name = 'blocked%d' % n
+                started = time.monotonic()
+                with patch.dict(os.environ, {'INV4_BLOCK_RESOLVER': '1'}):
+                    rc, out, _ = self.run_check(home, 'trickle', name, command='check-second', server='https://127.0.0.1:%d/' % port)
+                exited = time.monotonic() - started
+                entered = (home.dir / (name + '.calls.resolver')).read_text().split() if (home.dir / (name + '.calls.resolver')).exists() else []
+                threads = (home.dir / (name + '.calls.threads')).read_text()
+                self.assertEqual(rc, 0, out)
+                self.assertGreaterEqual(len(entered), 1, 'the blocked resolver was never reached')
+                self.assertLessEqual(exited, plane.OWNER_WAKE_WAIT_BOUND, exited)   # this process's own bound
+                self.assertIn('lookup-alive 1', threads)                         # at most one lookup thread in this process, the stuck one
+            time.sleep(1.0)
+            self.assertEqual(accepted, [], 'a connection reached the server')
+
+    def test_r10_f9_while_one_lookup_is_stuck_each_of_ninety_later_calls_is_refused_and_recorded_and_the_refusal_is_exercised(self):
+        port, accepted = self.counting_listener()
+        for left_over in [t for t in threading.enumerate() if t.name == 'fm-slack-lookup']:
+            left_over.join(5)
+        stuck, real_lookup, started = threading.Event(), socket.getaddrinfo, []
+        def blocking(*args, **kwargs):
+            started.append(args[:2])
+            stuck.wait()
+            return real_lookup(*args, **kwargs)
+        self.addCleanup(stuck.set)
+        with patch.object(socket, 'getaddrinfo', blocking):
+            def one(n, budget):
+                slack = plane.Slack('fixture-token-not-a-secret-r10-f9')
+                slack.base = 'https://127.0.0.1:%d/' % port
+                deadline = time.monotonic() + budget
+                slack.time_left = lambda: deadline - time.monotonic()
+                outcome = 'completed'
+                try:
+                    slack.call('chat.postMessage', channel=INV_SECOND_DM, text='x', client_msg_id='r10-f9-%d' % n)
+                except Exception as error:
+                    outcome = type(error).__name__
+                return outcome, slack.last_cutoff
+            one(0, 3.0)                                                         # the lookup that stays stuck
+            self.assertEqual(len(started), 1, started)
+            control = one(1, 3.0)                                               # time enough to reach the fence under any load: refused by the live lookup
+            results = [one(2 + n, 0.1) for n in range(90)]                      # three batches of 30, every call checked
+            lookups = [t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()]
+            stuck.set()
+        self.assertEqual(control[0], 'DeadlineSpent')
+        self.assertTrue(control[1].get('lookup_pending') and control[1].get('sent') is False, control)
+        odd = [(n, r) for n, r in enumerate(results) if not (r[0] == 'DeadlineSpent' and isinstance(r[1], dict) and r[1].get('ended') is True and r[1].get('sent') is False)]
+        self.assertEqual(odd, [])
+        self.assertEqual(len(started), 1, started)                              # one lookup in all
+        self.assertLessEqual(len(lookups), 1, lookups)
+        self.assertEqual(accepted, [])
+
+    # ---- F10: a span's row names the person and is appended after the journal commit ----
+
+    def span_window(self, home, user, dm, after, before):
+        state = home.theirs()
+        state['second'] = {'user': user, 'channel': dm, 'intake_cursor': plane.just_before(after), 'unplaced': {'after': after, 'before': before}}
+        (home.state_dir / plane.SECOND_FILE).write_text(json.dumps(state))
+
+    def test_r10_f10_equal_spans_of_two_configured_people_are_two_rows_and_two_notices(self):
+        with self.home(history=False) as home:
+            home.trust_check()
+            home.add_member(self.B_USER, self.B_DM)
+            home.check_pass()
+            outs = []
+            for user, dm in ((INV_SECOND, INV_SECOND_DM), (self.B_USER, self.B_DM)):
+                with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': user}):
+                    home.check_pass()
+                    home.say('150.500000', 'typed in the span', user=user, dm=dm)
+                    self.span_window(home, user, dm, '150.000000', '151.000000')
+                    outs += [home.check_pass() for _ in range(2)]
+            rows = [r for r in home.refusals() if r['reason'] == 'second_intake_unplaced' and r.get('taken_in')]
+            self.assertEqual(len(rows), 2, home.refusals())
+            self.assertEqual(sum(r.out.count('second person unplaced') for r in outs), 2)
+
+    def test_r10_f10_the_span_row_is_appended_only_after_the_journal_commit_that_removes_the_span(self):
+        with self.home(history=False) as home:
+            home.trust_check()
+            home.check_pass()
+            home.say('150.500000', 'typed in the span')
+            self.span_window(home, INV_SECOND, INV_SECOND_DM, '150.000000', '151.000000')
+            real, journal_at_row = Watch.second_log, []
+            def second_log(watch, reason, **fields):
+                if reason == 'second_intake_unplaced' and fields.get('taken_in'):
+                    journal_at_row.append(home.theirs().get('second', {}))
+                return real(watch, reason, **fields)
+            with patch.object(Watch, 'second_log', second_log):
+                passes = [home.check_pass() for _ in range(2)]
+            self.assertEqual(len(journal_at_row), 1, journal_at_row)
+            self.assertNotIn('unplaced', journal_at_row[0])                      # the span was already gone from the committed journal
+            self.assertEqual(sum(r.out.count('second person unplaced') for r in passes), 1)
+
+    def test_r10_f10_a_run_that_dies_after_the_journal_commit_appends_the_row_once_later_with_one_notice(self):
+        with self.home(history=False) as home:
+            home.trust_check()
+            home.check_pass()
+            home.say('150.500000', 'typed in the span')
+            self.span_window(home, INV_SECOND, INV_SECOND_DM, '150.000000', '151.000000')
+            real, died = Watch.second_log, [False]
+            def dying(watch, reason, **fields):
+                if reason == 'second_intake_unplaced' and fields.get('taken_in') and not died[0]:
+                    died[0] = True
+                    raise RuntimeError('FM_SLACK_FAULT=before-unplaced-row')        # the run dies before its row
+                return real(watch, reason, **fields)
+            outs = []
+            with patch.object(Watch, 'second_log', dying):
+                outs.append(home.check_pass())
+            outs += [home.check_pass() for _ in range(2)]
+            rows = [r for r in home.refusals() if r['reason'] == 'second_intake_unplaced' and r.get('taken_in')]
+            self.assertEqual(len(rows), 1, home.refusals())
+            self.assertEqual(sum(r.out.count('second person unplaced') for r in outs), 1)
+            self.assertEqual(self.woken(outs).count('150.500000'), 1)
+
+    # ---- F11: the secret scan sets aside only the exact stand-ins it created ----
+
+    def scan_predicate(self):
+        text = (Path(plane.__file__).resolve().parent.parent / 'tests' / 'fm-slack-secret-scan.test.sh').read_text()
+        start = text.index('scan() {')
+        body = text[text.index("<<'PY'\n", start) + len("<<'PY'\n"):text.index('\nPY\n', start)]
+        return body
+
+    def run_scan(self, files, homes, standins, tracked):
+        out = io.StringIO()
+        class Kept(io.StringIO):
+            def close(self):
+                pass
+        capture = Kept()
+        def fake_open(path, mode='r', *args, **kwargs):
+            if path == '/synthetic-output':
+                return capture
+            return io.BytesIO(files[path])
+        def walk(path):
+            return [(os.path.dirname(name), [], [os.path.basename(name)]) for name in files if name.startswith(path + '/')]
+        predicate = self.scan_predicate()
+        env = {'FM_SLACK_SCAN_SECRET': 'synthetic-secret-r10', 'FM_SLACK_SCAN_SIGNING': 'synthetic-signing-r10',
+               'FM_SLACK_SCAN_STANDINS': ''.join('%s\t%s\n' % pair for pair in standins)}
+        with patch.dict(os.environ, env, clear=True), patch.object(sys, 'argv', ['scan', '/synthetic-output', *homes]), \
+                patch.object(subprocess, 'check_output', return_value=b'\0'.join(t.encode() for t in tracked)), patch.object(os, 'walk', walk), \
+                patch.object(os.path, 'isfile', lambda path: path in files), patch.object(os.path, 'realpath', lambda path: path), \
+                patch('builtins.open', fake_open), contextlib.redirect_stdout(out):
+            exec(compile(predicate, '<scan-predicate>', 'exec'), {})
+        return sorted(line[len('match: '):] for line in capture.getvalue().splitlines())
+
+    def test_r10_f11_the_scan_finds_a_leak_that_carries_the_replay_schema_or_name_and_sets_aside_only_the_exact_stand_in(self):
+        home, transcript = '/h', '/fix/second/transcript.json'
+        digest = hashlib.sha256(transcript.encode()).hexdigest()[:16]
+        state = home + '/state/slack-watch'
+        schema = b'{"schema": "fm-slack-replay-state.v1", "value": "synthetic-secret-r10"}'
+        files = {state + '/replay-state-' + digest + '.json': schema,              # the genuine stand-in, named by its provenance
+                 state + '/second-requests.jsonl': schema,                         # a second-person store that carries the schema bytes
+                 state + '/replay-state-0000000000000000.json': schema,            # a replay-named file no run of the test created
+                 state + '/ordinary.json': b'synthetic-signing-r10',
+                 'tests/schema-leak.txt': schema}
+        found = self.run_scan(files, [home], [(home, transcript)], ['tests/schema-leak.txt'])
+        self.assertEqual(found, sorted([state + '/second-requests.jsonl', state + '/replay-state-0000000000000000.json', state + '/ordinary.json',
+                                        'tests/schema-leak.txt']))
+
+    def test_r10_f11_control_a_clean_home_with_its_stand_in_has_no_match(self):
+        home, transcript = '/h', '/fix/second/transcript.json'
+        digest = hashlib.sha256(transcript.encode()).hexdigest()[:16]
+        files = {home + '/state/slack-watch/replay-state-' + digest + '.json': b'{"schema": "fm-slack-replay-state.v1", "typed": "synthetic-secret-r10"}',
+                 home + '/state/slack-watch/second-requests.jsonl': b'{"text": "[secret removed]"}'}
+        self.assertEqual(self.run_scan(files, [home], [(home, transcript)], []), [])
 
 
 class ScottOrderedModelTest(InvariantScenario):
