@@ -270,6 +270,7 @@ This metadata-only operation holds the lifecycle lock before the metadata lock, 
 Missing, foreign, or dead session ownership, a worker, and the supervision branch in any posture cannot authorize clearance.
 It does not start a worker or send conversational text.
 After clearance, send a new continuation instruction with `fm-send` to a live owner, or use ordinary `fm-control <task-id> relaunch --note ...` for an exited owner.
+When the task has open keyed decisions, that send states its choice, `--resolve-key <key>` or `--answers-none` (rule: the [`bin/fm-send.sh`](../bin/fm-send.sh) header, "Decision closure").
 An `fm-send` message never clears recovery by its text.
 
 ### Reassociating a task with a replacement copy

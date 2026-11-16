@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Steer a task by durable record: write the message into the task's steering
 # inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
-# Usage: fm-send.sh <target> [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# Usage: fm-send.sh <target> [--resolve-key <key> [--resolve-key <key>]... | --answers-none] [--fire-and-forget <delivery-id>] [--] <text...>
+#   One key per --resolve-key flag: repeat the flag for each key the send
+#   answers. A lone -- ends the options, so a message that starts with -- (even
+#   --answers-none or --key) is sent as text.
 #   <target> may be an exact task id, a legacy fm-<id> task label resolved
 #   through this home's state/<id>.meta, or an explicit well-formed backend
 #   target. fm-send refuses unresolved guesses rather than falling back to a
@@ -156,9 +159,50 @@
 # when its record's remote_host, remote_root or home differ, and passes the
 # target to the host send verb, which refuses another endpoint.
 #
-# Decision closure (answerer-closes): pass --resolve-key <key> (repeatable,
-# before the message) when this send answers an open keyed needs-decision: or
-# blocked: record in the target task's state/<id>.status. fm-send itself
+# Decision closure (answerer-closes): a text send to a task selector whose
+# state/<id>.status holds open keyed decisions (every key status_open_decisions
+# returns, reserved keys included) must state its choice, because a send that
+# states none is delivered yet leaves its decision open and the drain keeps
+# listing answered work as waiting. State it with --resolve-key <key>
+# (before the message, one key per flag, the flag repeated for each key) when
+# this send answers an open keyed needs-decision: or blocked: record, or with
+# --answers-none when this send answers none of them (a routine steer, nudge,
+# or reminder; accepted on a task with no open decision, so a caller may pass
+# it unconditionally). A send with neither refuses with exit 1 and lists each
+# open key with its verb and both flags; the two flags together are refused as
+# contradictory. The options are read once, by one grammar (fm_send_tokenize),
+# right after the explicit-home check (an unset FM_HOME is refused first, as on
+# base) and before target resolution: --resolve-key takes the next word as its
+# key, a lone -- ends the options where an option may stand, and the first word
+# that is not an option starts the message. --answers-none and any --resolve-key
+# form, both as options, are the pair, so it wins over any option error, such as a
+# malformed or duplicate --resolve-key; a split-form value that is exactly
+# --answers-none (--resolve-key --answers-none) counts as that flag too; any other
+# split-form value is the key, as on base. Gate-agent containment (bin/fm-gate-refuse-lib.sh) runs first,
+# as a security guard, and may write its one guard event: to
+# state/guard-events.jsonl by default, or, with an explicit FM_GUARD_EVENT_LOG,
+# to that log, creating its directory when needed, as on base
+# (bin/fm-guard-event.sh). After it, these refusals, and the refusal when the
+# open set cannot be read (a log past the status read limits), come before any
+# other guard telemetry, the supervision warning (bin/fm-guard.sh), the lease
+# guard, and anything marked, locked, recorded, or typed, so a refused send
+# changes nothing else. Every other path keeps the base order: the explicit-home
+# guard's allow event is recorded (also for a send with no arguments, an unknown
+# home or state directory, and an unresolvable target) and the lease guard runs
+# before an option error
+# (a malformed, duplicate or missing --resolve-key or --fire-and-forget value) is
+# reported, so a send under the other actor's live lease still exits 6. A --key send and
+# a send to an explicit backend target cannot answer a decision, so the rule
+# does not apply to them. The printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
+# resend of an unconfirmed secondmate request re-delivers that same request and
+# carries the same choice the original send made (its --resolve-key keys or
+# --answers-none, or --answers-none for a send that stated neither), then a lone
+# -- and the original message words, so it meets this rule like any other send
+# and its message is never read as options; the rule has no exception for it. A lone
+# -- ends the options, so a literal message that starts with -- is sent as
+# text; before this rule a leading --answers-none or -- was itself text.
+# This is the one statement of the rule; every other file points here.
+# With --resolve-key, fm-send itself
 # appends the closing resolved line to that status file, so the captain-facing
 # OPEN DECISIONS record closes at answer time and never depends on the busy
 # worker writing a matching resolved line. For ordinary keys the payload is
@@ -246,14 +290,139 @@ if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
   exit 1
 fi
 
-"$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed allow --rule explicit-home --task "${1:-}" 2>/dev/null || true
+# One option grammar (header: "Decision closure"). fm_send_tokenize walks the words after
+# the target exactly as the option parser reads them and only sets variables, so it runs
+# before any side effect: --resolve-key takes the next word as its key, a lone -- ends the
+# options only where an option may stand, and the first word that is not an option ends
+# them (that word and every word after it are the message). Its results are used twice: by
+# the refusals right below, and, after target resolution, as the parsed options.
+#   FM_TOK_KEYS        the --resolve-key keys, space-separated, in order
+#   FM_TOK_NONE        1 when --answers-none stood as an option
+#   FM_TOK_KEY_SEEN    1 when any --resolve-key form stood as an option (also a bad or
+#                      missing value)
+#   FM_TOK_FAF         the --fire-and-forget delivery id
+#   FM_TOK_END         1 when a lone -- ended the options
+#   FM_TOK_WORDS       how many words the options took (the message starts after them)
+#   FM_TOK_ERROR       the first option error, held for the base order below
+# The split form --resolve-key <value> always takes the next word as the value, whatever it
+# starts with, as on base; a value that is exactly --answers-none counts as that flag
+# instead, so the pair is still seen. After an option error
+# the walk goes on with the same grammar, so a pair after the error is still seen; its keys
+# and words are then unused, because the send stops.
+fm_send_tok_error() { [ -n "$FM_TOK_ERROR" ] || FM_TOK_ERROR=$1; }
+fm_send_tok_key() { # <key>
+  local k=$1
+  case "$k" in
+  '' | *[!A-Za-z0-9._-]*)
+    fm_send_tok_error "error: --resolve-key '$k' is not a valid decision key (allowed: A-Z a-z 0-9 . _ -)"
+    return 0
+    ;;
+  esac
+  case " $FM_TOK_KEYS " in
+  *" $k "*)
+    fm_send_tok_error "error: duplicate --resolve-key '$k'"
+    return 0
+    ;;
+  esac
+  FM_TOK_KEYS="${FM_TOK_KEYS}${FM_TOK_KEYS:+ }$k"
+}
+fm_send_tokenize() { # <words after the target...>
+  local n=0
+  FM_TOK_KEYS='' FM_TOK_NONE=0 FM_TOK_KEY_SEEN=0 FM_TOK_FAF='' FM_TOK_END=0 FM_TOK_ERROR=''
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --resolve-key)
+      FM_TOK_KEY_SEEN=1
+      if [ $# -lt 2 ]; then
+        fm_send_tok_error "error: --resolve-key requires a key"
+        shift
+        n=$((n + 1))
+      elif [ "$2" = --answers-none ]; then
+        FM_TOK_NONE=1
+        shift 2
+        n=$((n + 2))
+      else
+        fm_send_tok_key "$2"
+        shift 2
+        n=$((n + 2))
+      fi
+      ;;
+    --resolve-key=*)
+      FM_TOK_KEY_SEEN=1
+      fm_send_tok_key "${1#--resolve-key=}"
+      shift
+      n=$((n + 1))
+      ;;
+    --answers-none)
+      FM_TOK_NONE=1
+      shift
+      n=$((n + 1))
+      ;;
+    --)
+      # End of options: everything after it is the message, even a word that
+      # looks like a flag (--answers-none, --key, --resolve-key).
+      FM_TOK_END=1
+      n=$((n + 1))
+      break
+      ;;
+    --fire-and-forget)
+      if [ $# -lt 2 ]; then
+        fm_send_tok_error "error: --fire-and-forget requires a delivery id"
+        shift
+        n=$((n + 1))
+      else
+        [ -z "$FM_TOK_FAF" ] || fm_send_tok_error "error: duplicate --fire-and-forget"
+        [ -n "$FM_TOK_FAF" ] || FM_TOK_FAF=$2
+        shift 2
+        n=$((n + 2))
+      fi
+      ;;
+    --fire-and-forget=*)
+      [ -z "$FM_TOK_FAF" ] || fm_send_tok_error "error: duplicate --fire-and-forget"
+      [ -n "$FM_TOK_FAF" ] || FM_TOK_FAF=${1#--fire-and-forget=}
+      shift
+      n=$((n + 1))
+      ;;
+    *) break ;;
+    esac
+  done
+  FM_TOK_WORDS=$n
+}
+# The contradictory pair (--answers-none and any --resolve-key form, both as options in
+# that grammar) is refused here, before any side effect: before the explicit-home allow,
+# the supervision warning, the lease guard and target resolution. Every other option
+# error is held for the base order below.
+FM_TOK_WORDS=0 FM_TOK_KEYS='' FM_TOK_NONE=0 FM_TOK_KEY_SEEN=0 FM_TOK_FAF='' FM_TOK_END=0 FM_TOK_ERROR=''
+[ $# -eq 0 ] || fm_send_tokenize "${@:2}"
+if [ "$FM_TOK_NONE" = 1 ] && [ "$FM_TOK_KEY_SEEN" = 1 ]; then
+  echo "error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent." >&2
+  exit 1
+fi
+
+# The explicit-home guard admitted this send: its allow is recorded exactly once, so the
+# guard's deny/allow sequence (bin/fm-guard-metrics.sh) reads as it does on base, where the
+# allow was written right here. It is written at the first point the send leaves this
+# guard's path: on every early exit below (home dir, state dir, no arguments, target
+# resolution, option errors) and before the lease guard on the normal path. The
+# contradictory-pair refusal above and the unknown-open-set and no-choice refusals
+# (header: "Decision closure") record nothing but the gate-agent containment event, as
+# Main's 2026-11-14 D1 ruling requires, so they do not call it.
+FM_SEND_HOME_GUARD_TASK=${1:-}
+FM_SEND_HOME_ALLOW_RECORDED=0
+fm_send_record_home_allow() {
+  [ "$FM_SEND_HOME_ALLOW_RECORDED" = 0 ] || return 0
+  FM_SEND_HOME_ALLOW_RECORDED=1
+  "$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed allow --rule explicit-home --task "$FM_SEND_HOME_GUARD_TASK" 2>/dev/null || true
+}
 
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 if [ ! -d "$FM_HOME" ]; then
+  fm_send_record_home_allow
   echo "error: FM_HOME '$FM_HOME' is not a directory; fm-send cannot resolve this home's state" >&2
   exit 1
 fi
 if [ ! -d "$STATE" ]; then
+  fm_send_record_home_allow
   echo "error: state dir '$STATE' is missing; fm-send cannot resolve targets for FM_HOME '$FM_HOME'" >&2
   exit 1
 fi
@@ -276,8 +445,6 @@ fi
 . "$SCRIPT_DIR/fm-task-inbox-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
-
-FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/fm-guard.sh" || true
 
 fm_send_id_from_meta() { # <meta-file>
   local base
@@ -458,8 +625,18 @@ fm_send_resolve_target() { # <raw-target>
   return 1
 }
 
-RAW_TARGET=$1
-fm_send_resolve_target "$RAW_TARGET" || exit 1
+RAW_TARGET=${1:-}
+if [ $# -eq 0 ]; then
+  # Base recorded the explicit-home allow before reading the target, so a send
+  # with no arguments records it too (base then stopped on the unset $1, exit 1).
+  fm_send_record_home_allow
+  echo "usage: FM_HOME=<home> bin/fm-send.sh <task> <message>" >&2
+  exit 1
+fi
+fm_send_resolve_target "$RAW_TARGET" || {
+  fm_send_record_home_allow
+  exit 1
+}
 T=$RESOLVED_TARGET
 
 # A compared route (Main 1714 (b), Main 1807 (4)) binds the send for every
@@ -553,77 +730,87 @@ fi
 shift
 
 # Supervision lease guard: a steer is overlap territory between the two Pi
-# supervision actors, so refuse while the OTHER actor holds this task's live
-# lease. A home with no supervision branch has no lease files and passes
-# untouched (contract: bin/fm-lease-lib.sh).
+# supervision actors, so refuse (exit 6) while the OTHER actor holds this task's
+# live lease. A home with no supervision branch has no lease files and passes
+# untouched (contract: bin/fm-lease-lib.sh). It runs once, at one of two points:
+# before an option error is reported (as on base, where it ran before option
+# parsing, so a held lease answers 6 for any key, valid or malformed), or after the
+# choice checks on the normal path (Main 015 ordering: a no-choice refusal comes
+# first and takes no lease lock).
 # shellcheck source=bin/fm-lease-lib.sh
 . "$SCRIPT_DIR/fm-lease-lib.sh"
-if [ -n "$TARGET_META" ]; then
-  LEASE_GUARD_TASK=$(fm_send_id_from_meta "$TARGET_META")
-  if [ -n "$LEASE_GUARD_TASK" ]; then
-    fm_lease_guard "$LEASE_GUARD_TASK" "steer (fm-send)"
-    trap 'fm_lease_guard_release' EXIT
+FM_SEND_LEASE_GUARDED=0
+fm_send_lease_guard() {
+  [ "$FM_SEND_LEASE_GUARDED" = 0 ] || return 0
+  FM_SEND_LEASE_GUARDED=1
+  if [ -n "$TARGET_META" ]; then
+    LEASE_GUARD_TASK=$(fm_send_id_from_meta "$TARGET_META")
+    if [ -n "$LEASE_GUARD_TASK" ]; then
+      fm_lease_guard "$LEASE_GUARD_TASK" "steer (fm-send)"
+      trap 'fm_lease_guard_release' EXIT
+    fi
+  fi
+}
+
+# The --resolve-key flags (answerer-closes; see the header contract) and the other
+# options, as fm_send_tokenize read them before any side effect. They must precede --key
+# or the message text; everything after them is the message exactly as before, so
+# ordinary sends are byte-identical. An option error is held, not printed, until the
+# explicit-home allow, the supervision warning and the lease guard have run in base order
+# (see the lease guard above).
+RESOLVE_KEYS=$FM_TOK_KEYS
+FIRE_AND_FORGET_ID=$FM_TOK_FAF
+ANSWERS_NONE=$FM_TOK_NONE
+END_OF_OPTIONS=$FM_TOK_END
+FM_SEND_OPTION_ERROR=$FM_TOK_ERROR
+[ -n "$FM_SEND_OPTION_ERROR" ] || shift "$FM_TOK_WORDS"
+
+if [ -n "$FM_SEND_OPTION_ERROR" ]; then
+  # Base order for an option error: the explicit-home allow, the supervision warning,
+  # the lease guard (exit 6 while the other actor holds the lease), then the error.
+  fm_send_record_home_allow
+  FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/fm-guard.sh" || true
+  fm_send_lease_guard
+  printf '%s\n' "$FM_SEND_OPTION_ERROR" >&2
+  exit 1
+fi
+
+# A text send to a task selector must state its choice when that task has open
+# keyed decisions (header: "Decision closure"). The open set is the one the
+# --resolve-key check below also reads (status_open_decisions). This check and
+# the contradictory-pair refusal near the top run after gate-agent containment only,
+# and before any other guard telemetry, the supervision warning, and the lease
+# guard, so a refused send records, creates, removes, and locks nothing else.
+CHOICE_IS_KEY_SEND=0
+[ "${1:-}" != "--key" ] || [ "$END_OF_OPTIONS" = 1 ] || CHOICE_IS_KEY_SEND=1
+if [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ] && [ -n "$TARGET_SELECTOR" ] && [ -n "$TARGET_META" ] && [ "$CHOICE_IS_KEY_SEND" = 0 ]; then
+  CHOICE_TASK_ID=$(fm_send_id_from_meta "$TARGET_META")
+  CHOICE_STATUS_FILE="$STATE/$CHOICE_TASK_ID.status"
+  choice_open_set=$(status_open_decisions "$CHOICE_STATUS_FILE") || {
+    echo "error: cannot tell whether $CHOICE_TASK_ID has open decisions: $CHOICE_STATUS_FILE is past the status read limits (bin/fm-status-cap-lib.sh), so a send that states no choice would be a guess. Refusing it; resend with --resolve-key <key> or --answers-none; nothing was sent." >&2
+    exit 1
+  }
+  if [ -n "$choice_open_set" ]; then
+    {
+      echo "error: $CHOICE_TASK_ID has open keyed decisions in $CHOICE_STATUS_FILE, and this send states no choice. Refusing it; nothing was sent. Open keys:"
+      while IFS= read -r choice_line; do
+        [ -n "$choice_line" ] || continue
+        choice_key=${choice_line%%$'\t'*}
+        echo "  [key=$choice_key] $(_fm_open_set_verb "$choice_open_set" "$choice_key")"
+      done <<CHOICE_OPEN_SET
+$choice_open_set
+CHOICE_OPEN_SET
+      echo "Resend with --resolve-key <key> before the message (one key per flag; repeat the flag for each key this send answers and closes), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, \"Decision closure\"."
+    } >&2
+    exit 1
   fi
 fi
 
-# Collect --resolve-key flags (answerer-closes; see the header contract). They
-# must precede --key or the message text; everything after the last flag is the
-# message exactly as before, so ordinary sends are byte-identical.
-RESOLVE_KEYS=
-FIRE_AND_FORGET_ID=
-fm_send_add_resolve_key() { # <key>
-  local k=$1
-  case "$k" in
-  '' | *[!A-Za-z0-9._-]*)
-    echo "error: --resolve-key '$k' is not a valid decision key (allowed: A-Z a-z 0-9 . _ -)" >&2
-    return 1
-    ;;
-  esac
-  case " $RESOLVE_KEYS " in
-  *" $k "*)
-    echo "error: duplicate --resolve-key '$k'" >&2
-    return 1
-    ;;
-  esac
-  RESOLVE_KEYS="${RESOLVE_KEYS}${RESOLVE_KEYS:+ }$k"
-}
-while :; do
-  case "${1:-}" in
-  --resolve-key)
-    [ $# -ge 2 ] || {
-      echo "error: --resolve-key requires a key" >&2
-      exit 1
-    }
-    fm_send_add_resolve_key "$2" || exit 1
-    shift 2
-    ;;
-  --resolve-key=*)
-    fm_send_add_resolve_key "${1#--resolve-key=}" || exit 1
-    shift
-    ;;
-  --fire-and-forget)
-    [ $# -ge 2 ] || {
-      echo "error: --fire-and-forget requires a delivery id" >&2
-      exit 1
-    }
-    [ -z "$FIRE_AND_FORGET_ID" ] || {
-      echo "error: duplicate --fire-and-forget" >&2
-      exit 1
-    }
-    FIRE_AND_FORGET_ID=$2
-    shift 2
-    ;;
-  --fire-and-forget=*)
-    [ -z "$FIRE_AND_FORGET_ID" ] || {
-      echo "error: duplicate --fire-and-forget" >&2
-      exit 1
-    }
-    FIRE_AND_FORGET_ID=${1#--fire-and-forget=}
-    shift
-    ;;
-  *) break ;;
-  esac
-done
+fm_send_record_home_allow
+
+FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/fm-guard.sh" || true
+
+fm_send_lease_guard
 
 if [ "$TARGET_BACKEND" != remote ]; then
   fm_backend_validate "$TARGET_BACKEND" || exit 1
@@ -724,7 +911,7 @@ if [ -n "$RESOLVE_KEYS" ]; then
     echo "error: --resolve-key needs a task selector resolved through this home's metadata; an explicit backend target has no decision ledger here" >&2
     exit 1
   fi
-  if [ "${1:-}" = "--key" ]; then
+  if [ "${1:-}" = "--key" ] && [ "$END_OF_OPTIONS" = 0 ]; then
     echo "error: --resolve-key cannot accompany --key; answering a decision requires a text answer" >&2
     exit 1
   fi
@@ -881,7 +1068,7 @@ fm_send_feed_resolved_holds() { # <answer-text>
 # send implementation. A failed backend send is still surfaced below as a hard
 # error with the attempted resolution attached.
 
-if [ "${1:-}" = "--key" ]; then
+if [ "${1:-}" = "--key" ] && [ "$END_OF_OPTIONS" = 0 ]; then
   [ -z "$FIRE_AND_FORGET_ID" ] ||
     {
       echo "error: --fire-and-forget cannot accompany --key" >&2
@@ -1108,8 +1295,29 @@ else
         printf 'FM_STATE_OVERRIDE=%q ' "$resend_state" >&2
       fi
       printf 'FM_PENDING_REPLY_EXISTING_CORR=%q %q' "$PENDING_REPLY_CORR" "$SCRIPT_DIR/fm-send.sh" >&2
-      for resend_arg in "${FM_SEND_ORIGINAL_ARGS[@]}"; do
-        printf ' %q' "$resend_arg" >&2
+      # The resend carries the same decision choice this send made, so it
+      # meets the ordinary choice rule like any send (header: "Decision
+      # closure"): its --resolve-key keys or --answers-none as given, and a
+      # send that stated neither (it met no open keyed decision) gets
+      # --answers-none, because it answered none. By then this request's own
+      # reserved blocker pending-reply-<corr> may be open.
+      # Every option first, then a lone --, then the original message words, so the
+      # message can never be read as options (it may hold --resolve-key or start with -).
+      printf ' %q' "${FM_SEND_ORIGINAL_ARGS[0]}" >&2
+      resend_index=1
+      while [ "$resend_index" -le "$FM_TOK_WORDS" ]; do
+        if [ "$resend_index" -lt "$FM_TOK_WORDS" ] || [ "$END_OF_OPTIONS" = 0 ]; then
+          printf ' %q' "${FM_SEND_ORIGINAL_ARGS[$resend_index]}" >&2
+        fi
+        resend_index=$((resend_index + 1))
+      done
+      if [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ]; then
+        printf ' %q' --answers-none >&2
+      fi
+      printf ' --' >&2
+      while [ "$resend_index" -lt "${#FM_SEND_ORIGINAL_ARGS[@]}" ]; do
+        printf ' %q' "${FM_SEND_ORIGINAL_ARGS[$resend_index]}" >&2
+        resend_index=$((resend_index + 1))
       done
       printf '\n' >&2
       exit 1

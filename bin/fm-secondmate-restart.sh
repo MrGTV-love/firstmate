@@ -170,7 +170,7 @@ fall_back_to_nudge() {  # <id> <reason> [<array-index>]
   # A remote nudge travels only over the route this decision compared.
   while IFS= read -r line; do route_env+=("$line"); done < <(fm_secondmate_restart_route_env)
   if out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
+    "$SCRIPT_DIR/fm-send.sh" "$id" --answers-none "$FM_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
     nudged_count=$((nudged_count + 1))
     withheld=$(withheld_doorbell "$out")
     printf 'nudged: %s: %s%s\n' "$id" "$reason" "${withheld:+; the re-read message is recorded, but $withheld}"
@@ -394,7 +394,7 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}")
   if ! send_out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_PENDING_REPLY_EXISTING_CORR="$corr" \
-    "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
+    "$SCRIPT_DIR/fm-send.sh" "$id" --answers-none "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
     # A refused or failed send is this mate's final outcome for the pass (Main
     # 1860, Main 1874 finding 6): it is refused, phase B sends it nothing, and a
     # pending-reply record that cannot be discarded is reported, never hidden.
