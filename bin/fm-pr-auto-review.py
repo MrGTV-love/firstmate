@@ -15,8 +15,9 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
      merges nothing and only records the step state `waiting: the forge did not answer the PR read`
      (it replaces any state shown; a queued, held, failed or merged state is put back once the forge
-     answers), and a new head starts a new sequence, so a PASS recorded for an older head is
-     never counted (bin/fm-review-record.py binds every record to its exact head);
+     answers, and with no prior state the waiting state is cleared), and a new head starts a new
+     sequence, so a PASS recorded for an older head is never counted (bin/fm-review-record.py binds
+     every record to its exact head);
   2. collects the reads it requested earlier for the live head: a finished report is recorded through
      `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
      ends the head at fail, and a crashed, unusable or nonzero-exit read burns that model for the head

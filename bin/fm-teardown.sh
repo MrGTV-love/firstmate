@@ -60,7 +60,8 @@
 # change and then revert it, so equal patch ids never count, ancestry of the PR
 # head counts only with the forge's merge commit on the default branch, and a
 # later change on the default branch to the same lines otherwise refuses
-# (refusing is safe; a wrong landed verdict loses work). A refusal names the copy's commits the default branch does not hold.
+# (refusing is safe; a wrong landed verdict loses work). A refusal names the copy's commits the default branch does not hold;
+# when that branch cannot be resolved it lists none and names only why the landing proof could not be completed.
 # With no pr=, every PR the branch lookup lists is judged in turn, newest first.
 # The lookup asks for one PR more than its bound of 1000, and a full page, a cut
 # list or a failed call is incomplete: no PR is judged from it, and its reason is
