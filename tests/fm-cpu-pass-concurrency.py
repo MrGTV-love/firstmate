@@ -495,7 +495,8 @@ def case_key_guard():
     only_one = dict(FM_TEST_KEY_SLOTS='1')
     for mode, claim in (('gate', '3'), ('run', '3'), ('gate-padded', '003')):
         ready = world.folder / (mode + '.ready')
-        holder = world.launch(mode + '-holder', [pyshim, tool('fm-duration.py'), 'gate', 'test.claim.' + mode, '--', 'bash', '-c', 'touch "$1"; sleep 4', '_', str(ready)], extra=only_one)
+        done = world.folder / (mode + '.done')
+        holder = world.launch(mode + '-holder', [pyshim, tool('fm-duration.py'), 'gate', 'test.claim.' + mode, '--', 'bash', '-c', 'touch "$1"; sleep 4; touch "$2"', '_', str(ready), str(done)], extra=only_one)
         for _ in range(300):
             if ready.exists():
                 break
@@ -505,7 +506,8 @@ def case_key_guard():
         waiter = world.launch(mode + '-waiter', [pyshim, tool('fm-duration.py'), action, 'test.claim.' + mode, '--', 'touch', str(marker)],
                               extra=dict(only_one, FM_CPU_PASS_HELD=claim))
         holder.wait(timeout=60)
-        ended = time.time()
+        # The holder's command stamps its own end; a reap delay after it must not make a correct waiter look early.
+        ended = done.stat().st_mtime if done.exists() else time.time()
         wait_all([waiter])
         ran = marker.stat().st_mtime if marker.exists() else None
         case.measure(**{mode + '_waiter_ran_after_holder_end_s': None if ran is None else round(ran - ended, 2)})
@@ -520,7 +522,8 @@ def case_key_guard():
                 '"$FM_CONC_SHIM" "$FM_CONC_DURATION" gate test.proofkey.' + mode + ' -- touch "$FM_CONC_PROBE/ran"\n')
         family = proof_family_repo(world, ['fm-fam-%d.test.sh' % index for index in range(2)], body=body, folder=mode + '-repo')
         ready = world.folder / (mode + '.ready')
-        holder = world.launch(mode + '-holder', [pyshim, tool('fm-duration.py'), 'gate', 'test.proofkey.' + mode, '--', 'bash', '-c', 'touch "$1"; sleep 4', '_', str(ready)], extra=only_one)
+        done = world.folder / (mode + '.done')
+        holder = world.launch(mode + '-holder', [pyshim, tool('fm-duration.py'), 'gate', 'test.proofkey.' + mode, '--', 'bash', '-c', 'touch "$1"; sleep 4; touch "$2"', '_', str(ready), str(done)], extra=only_one)
         for _ in range(300):
             if ready.exists():
                 break
@@ -528,7 +531,8 @@ def case_key_guard():
         proof = world.launch(mode, ['bash', str(family / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--jobs', '2'],
                              extra=dict(only_one, **extra, FM_CONC_PROBE=str(probe), FM_CONC_SHIM=pyshim, FM_CONC_DURATION=tool('fm-duration.py')))
         holder.wait(timeout=60)
-        ended = time.time()
+        # The holder's command stamps its own end; a reap delay after it must not make a correct waiter look early.
+        ended = done.stat().st_mtime if done.exists() else time.time()
         code = wait_all([proof], timeout=120)
         ran = (probe / 'ran').stat().st_mtime if (probe / 'ran').exists() else None
         seen_marker = (probe / 'marker').read_text().strip() if (probe / 'marker').exists() else None
