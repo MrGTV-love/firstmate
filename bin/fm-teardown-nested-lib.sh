@@ -1092,7 +1092,6 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
     suffix=$(date -u +%Y%m%dT%H%M%SZ).$$
   fi
   rm -rf "$stage" || return 1
-  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-preserve.XXXXXX") || return 1
   (
     mkdir -p "$stage/files" "$stage/meta" || exit 1
     printf '%s\n' "$copy" > "$stage/meta/copy-path" || exit 1
@@ -1121,7 +1120,7 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
     mv "$stage" "$dest" || exit 1
     echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
   ) || {
-    rm -rf "$stage" "$work"
+    rm -rf "$stage"
     return 1
   }
 }
@@ -1909,15 +1908,18 @@ teardown_own_preserve_sums() {  # <copy> <dir>
 
 # Builds the preserve <dir> (which must not exist) of <copy>'s selected entries, copied as
 # teardown_preserve_ignored copies them, with meta/copy-path and meta/SHA256SUMS, in a staging
-# directory (the teardown's private run directory when there is one, otherwise beside it); checks
+# directory (the teardown's private run directory when it is on the same filesystem, otherwise
+# beside it); checks
 # it byte for byte against the copy and only then renames it into place.
 # Returns 1, leaving nothing at <dir>, when anything cannot be copied, hashed or checked (a copy
 # that changed meanwhile included).
 teardown_own_preserve_build() {  # <copy> <dir>
-  local copy=$1 dir=$2 stage root entry rc=0
+  local copy=$1 dir=$2 stage root entry device rc=0
   # A teardown stages in its private run directory (bin/fm-teardown.sh's
-  # teardown_run_dir_prepare, whose filesystem the entry check proved); otherwise beside.
-  if [ -n "${TEARDOWN_RUN_DIR:-}" ]; then
+  # teardown_run_dir_prepare) when that is on the preserve parent's filesystem, so the
+  # rename stays on one filesystem; otherwise it stages beside the preserve.
+  if [ -n "${TEARDOWN_RUN_DIR:-}" ] && [ -n "${TEARDOWN_RUN_DEVICE:-}" ] \
+      && device=$(teardown_device_of "${dir%/*}") && [ "$device" = "$TEARDOWN_RUN_DEVICE" ]; then
     stage="$TEARDOWN_RUN_DIR/ignored-own-${dir##*/}"
   else
     stage="${dir%/*}/.staging-own-${dir##*/}"

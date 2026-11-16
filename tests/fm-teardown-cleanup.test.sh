@@ -8105,6 +8105,39 @@ test_a_kept_copy_whose_cause_went_closes_from_its_record_without_the_driver() {
   pass "a kept copy whose cause went (preserved again beside the preserve that lost a file, which is left as it is) closes from its record without the driver"
 }
 
+# A kept copy whose only ignored files are under .claude has nothing the entry plan preserves,
+# so the entry check never compares the preserve parent with the run directory. When the
+# preserve parent is on another filesystem (a `stat` stand-in, with a `perl` stand-in whose
+# rename fails across devices as rename(2) does), the widened preserve must still be built and
+# the task must close.
+test_a_kept_copy_with_only_claude_files_closes_when_its_preserve_is_on_another_filesystem() {
+  local rc root real_perl
+  make_retained_case retained-xdev-preserve enclosing
+  rm -f "$FOREIGN_COPY/notes/unique.dat"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+  mkdir -p "$root"
+  teardown_test_fake_other_device "$FOREIGN_CASE/fakebin" "$root"
+  real_perl=$(command -v perl)
+  cat > "$FOREIGN_CASE/fakebin/perl" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 5 ] && [ "\$1" = -e ] && [ "\$2" = 'rename(\$ARGV[0], \$ARGV[1]) or exit 1' ] && [ "\$3" = -- ]; then
+  case "\$(uname -s)" in Darwin|*BSD) flag=-f ;; *) flag=-c ;; esac
+  [ "\$(stat \$flag %d "\${4%/*}")" = "\$(stat \$flag %d "\${5%/*}")" ] || exit 1
+fi
+exec "$real_perl" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/perl"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "retained-xdev-preserve: a kept copy whose preserve is on another filesystem must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-xdev-preserve: the driver was not asked exactly once for one tar"
+  retained_assert_closed retained-xdev-preserve
+  retained_preserved_is retained-xdev-preserve .claude/channel-outbox/a.jsonl
+  retained_preserved_is retained-xdev-preserve .claude/channel-outbox/b.jsonl
+  assert_equals '' "$(find "$root" "$FOREIGN_CASE/state" -name '.staging-own-*' -o -name 'ignored-own-*' 2>/dev/null)" "retained-xdev-preserve: a staging directory was left behind"
+  pass "a kept copy with only .claude ignored files closes, its widened preserve built, when the preserve parent is on another filesystem from the run directory"
+}
+
 # C1 (f): the close and every later run leave the task's preserve, the driver's tars and the
 # saved outputs as they were before (each tar's SHA-256 read before the close).
 test_the_preserve_and_the_archives_survive_the_close_and_every_later_run() {
@@ -8828,6 +8861,7 @@ test_a_kept_copy_in_a_slot_a_peer_works_in_refuses_and_its_retry_asks_the_driver
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses
 test_a_stable_refusal_after_the_driver_asks_the_driver_nothing_on_retry
 test_a_kept_copy_whose_cause_went_closes_from_its_record_without_the_driver
+test_a_kept_copy_with_only_claude_files_closes_when_its_preserve_is_on_another_filesystem
 test_the_preserve_and_the_archives_survive_the_close_and_every_later_run
 test_the_default_driver_interpreter_and_the_override_close_the_same_way
 test_the_first_teardown_of_a_copy_that_already_holds_tars_asks_the_driver_once
