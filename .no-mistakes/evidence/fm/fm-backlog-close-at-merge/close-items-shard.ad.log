@@ -1,0 +1,24 @@
+ok - a closes block in a commit message closes nothing and changes no edge; only the PR body is read
+ok - the block the real ship brief teaches, built for a merge train, closes the train's and its member's items
+ok - the reader reads a 300 KB and a 60 KB body whole, 60 calls, with no write error
+ok - a block in a code span, a div, a table or a comment, or a quoted second copy, refuses the whole body and keeps every edge; a block that opens the body closes
+ok - a quoted train block selects no member and reads none; a quoted member block closes none of its items while the member's pr= task closes
+ok - a vertical tab, a Gerrit or non-canonical member, the train itself, two spaces, a trailing space, a tab or a non-ASCII byte refuses the whole block and keeps its edge; the retry after the repair closes
+ok - a refusal names every direct item id and pull request link; a one-token malformed outside line reports its id and its link
+ok - a real block below closed example text is refused by name (the intended cost); the same block first closes
+ok - one parse: the library offers only fm_pr_closes_parse, its pass and fm_pr_closes_get, the close step calls no other reader, each body is read once, and the close and the report read ids alike
+ok - the parse gives status, ids, members, outside, malformed and legacy lines, words and links in one result, ending with its end record; no marker is status none; a CRLF block refuses and a leading empty line is fine
+ok - a waive whose show fails clears its finished edge in the same run from its own printed result; the other blocker and the hold stay; the readable control clears too
+ok - a body that a read step writes only in part refuses the whole body with the PR and the reason; the complete two-block body refuses and a valid block closes
+ok - a NUL byte in a member value refuses the whole body and reads no member; a vertical tab refuses; a compliant block closes
+ok - a failed parse of the merged body or of a member body closes nothing from it and is reported with the PR, the body, the reason and its ids; the normal parse closes
+ok - a refused block names each accepted id exactly, trailing dot included, with its reason and no edge change; a valid block closes that id
+ok - a waive whose capture file cannot be made does not run, changes nothing and says so; with the file it runs and clears the finished edge
+ok - a waive whose output is lost and whose show fails clears its finished edge in the same run on its exit 0, TOON and JSON, keeping the other blocker and hold, and says so; a refused waive keeps every edge; a readable waive clears
+ok - a result that shows the row not done keeps every edge and the hold, and a held store lock makes the unblock refuse with every edge kept; both are reported (Main 2086)
+ok - a typed completion with its flags first, with the task noun or with --flag=value clears its finished edge and keeps the rest, and the capture guard stops every form
+ok - a failed member read refuses the block; a parse result read cut or failed closes nothing and keeps every edge, with one line naming the body; the control closes
+ok - a typed completion with --backend before the subcommand or after the id clears its finished edge and keeps the rest, its JSON stays valid, and the capture guard stops it
+ok - a member record without a body field and an unreadable task record are reported, a failed byte count is a reported parse failure, and the train's own item still closes
+ok - a tasks-axi that says it is another version clears the finished edge, keeping the other blocker and the hold; a failed replay exits 1 and is reported while the finished edge clears
+exit=0

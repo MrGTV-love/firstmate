@@ -1,0 +1,24 @@
+ok - a real typed record-delivery completion through the wrapper clears the finished edge, keeps another blocker and a hold
+ok - done --json through the wrapper has the same fields and values as tasks-axi alone
+ok - F1: a setext heading's directive line closes nothing, keeps the dependent's edge and is reported, while the real block closes
+ok - F1: a directive inside a <pre> example closes nothing and keeps the dependent's edge, with or without blank lines, while the real block closes
+ok - F1: a directive inside a code span over lines closes nothing, keeps the dependent's edge and is reported, while the real block closes
+ok - F1: a directive inside an open <blockquote>, <details> or mid-line <pre> closes nothing and keeps the dependent's edge, while the real block closes
+ok - F1: a Train-member line inside a code span lists no member and keeps the pr= item and its dependent's edge, while the real member closes
+ok - F2: a pull request link in a train member's body is reported once and never closed; the listed member, the train and an unrelated item are not reported
+ok - F1: a quoting element opened after a comment's end, a <pre> block's end or a mid-line comment's close holds its directive, which closes nothing and keeps the edge
+ok - F2: a Train-member line in a member's body lists nothing, closes nothing and is reported
+ok - review F1: example lines close nothing whatever the HTML around them and keep both edges; opener text above the block refuses the body, and a block above the example closes
+ok - a block below opener text in a code span is refused by name and closes nothing; the block above the same text closes
+ok - review F2: a member line that ends a <pre> example still reports its link and id; nothing outside the block closes
+ok - a body with two closes blocks refuses the whole close, names why and closes nothing
+ok - a block with no end line, or an end line before its begin line, refuses the whole close and closes nothing
+ok - marker text inside other text, an indented marker included, refuses the whole close
+ok - a prose line, an old Closes: line, a malformed, indented or lower-case directive or a fence line inside the block refuses the whole close
+ok - a member body is read only inside its own block; a member body with two blocks closes none of its own items and is refused by name, while the train's block and the member's pr= task close
+ok - a block with CRLF line ends is refused by name; the same block with LF line ends and a blank line inside closes each named item
+ok - a whole block inside a fence, a pre, code, blockquote or details element, an HTML comment or a quote closes nothing and keeps its edge
+ok - opener text above the block refuses the whole body whatever seems to close it: an HTML block, a list fence, a code span, an inline tag, a longer fence or an open comment
+ok - a block above every example closes; the example lines below it close nothing and are reported
+ok - a malformed directive-shaped line outside the block reports each id and each link on it, in the merged body and a member body; nothing closes
+exit=0

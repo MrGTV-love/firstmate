@@ -1,0 +1,5 @@
+$ adversarial: a ship row with a dependent, done with no proof
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+exit=2
+  state: queued
+  deps: "blocked-by:shipx"

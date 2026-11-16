@@ -1,0 +1,24 @@
+ok - a merge closes each named eligible item with the merged PR URL and reports the one it left open
+ok - a merge that names its own task reports the live-record refusal and still succeeds
+ok - a prose mention of the merging task prints no mention line, and another prose id still prints one
+ok - an old Closes: line naming the merging task is left to its teardown, uncounted, while another old line is still actionable
+ok - an old Closes: line never stops a directive or a task record from closing the same id
+ok - a body with no directive line closes nothing and reports each id and pull request it mentions in prose
+ok - a merge whose outcome cannot be recorded runs no close and lists the named items
+ok - a merge the watcher already recorded still closes its items and sends no second notice
+ok - an unreadable merged body leaves the merge unchanged and names the URL and the error
+ok - each failure kind is reported with its reason, none stops the next item, and holds win
+ok - a hold placed after the close step's last look is caught inside the completion lock
+ok - a repeat of the close step changes nothing, with the task record present and after it is gone
+ok - a rerun after a partial close only reports the closed item and closes the rest
+ok - a hand run with a pull request that is not merged closes nothing and reports each named item
+ok - a train closes its Train-member lines' items from bodies and from pr=, never an excluded PR's, whatever decorative layout the body also holds
+ok - a train body without its own Closes-backlog-item line still closes the members' items
+ok - an unreadable member is reported by URL while the item behind its pr= still closes
+ok - a Train-member value that is no pull request URL or is the train itself refuses the whole block: nothing closes and no edge changes; a retry after the repair closes
+ok - a member block with an invalid Train-member value is refused and closes none of its items; the train's block and the member's pr= task still close
+ok - members match by the full URL, never by number
+ok - F1: an excluded descendant Component table closes nothing, keeps its item and edge, and is reported; a Train-member line closes the member
+ok - F2: Closes-backlog-item and Train-member lines in a fence, outside the block, close nothing and are reported, and the block still closes
+ok - F3: a negated exclusion heading no longer decides anything; the unlisted member is reported and a Train-member line closes it
+exit=0

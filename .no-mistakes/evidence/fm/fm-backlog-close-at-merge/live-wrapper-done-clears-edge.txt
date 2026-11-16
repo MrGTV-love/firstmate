@@ -1,0 +1,129 @@
+$ fm-tasks-axi.sh add blocker / dep (blocked-by blocker + other) / hold on dep
+ok: added blocker (docs) -> Queued
+task:
+  id: blocker
+  title: the blocker
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start blocker` to move it to in flight
+  - Run `tasks-axi block blocker --by <other>` to record a dependency
+ok: added other (docs) -> Queued
+task:
+  id: other
+  title: other blocker
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start other` to move it to in flight
+  - Run `tasks-axi block other --by <other>` to record a dependency
+ok: added dep (docs) -> Queued
+task:
+  id: dep
+  title: the dependent
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start dep` to move it to in flight
+  - Run `tasks-axi block dep --by <other>` to record a dependency
+ok: block dep -> blocked-by blocker
+help[2]:
+  - Run `tasks-axi unblock dep --by <other>` to clear it
+  - Run `tasks-axi ready` to see what is still dispatchable
+ok: block dep -> blocked-by other
+help[2]:
+  - Run `tasks-axi unblock dep --by <other>` to clear it
+  - Run `tasks-axi ready` to see what is still dispatchable
+$ fm-tasks-axi.sh show dep  (before)
+task:
+  id: dep
+  title: the dependent
+  state: queued
+  blocked: yes
+  blocked_by: "blocker,other"
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: "blocked-by:blocker,blocked-by:other"
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unblock dep --by <other>` to clear a blocker
+  - Run `tasks-axi start dep` to move it to in flight
+$ fm-tasks-axi.sh done blocker
+ok: done blocker -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: dep no longer waits on blocker; it still waits on other
+exit=0
+$ fm-tasks-axi.sh show dep  (after)
+task:
+  id: dep
+  title: the dependent
+  state: queued
+  blocked: yes
+  blocked_by: other
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: "blocked-by:other"
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unblock dep --by <other>` to clear a blocker
+  - Run `tasks-axi start dep` to move it to in flight
+$ adversarial: fm-tasks-axi.sh done --backend markdown other  (unsupported global flag?)
+fm-tasks-axi: unsupported done option '--bogus'; run tasks-axi directly for that invocation
+exit=2
+  deps: "blocked-by:other"
