@@ -223,11 +223,15 @@ def unanswered(side):
 
 
 def answered(side):
-    """The forge answered: a phase kept aside by unanswered() is shown again."""
+    """The forge answered: a phase kept aside by unanswered() is shown again, and with none the unanswered state
+    is cleared, so a pass that sets no phase of its own (a closed PR, a head with an outcome) does not keep it."""
     standing = side.data.pop("standing", None)
     current = side.data.get("phase") or {}
-    if standing and current.get("state") == "waiting" and current.get("detail") == UNANSWERED:
-        side.data["phase"] = standing
+    if current.get("state") == "waiting" and current.get("detail") == UNANSWERED:
+        if standing:
+            side.data["phase"] = standing
+        else:
+            side.data.pop("phase", None)
 
 
 def emit(home, task, side, sha, key, text, wake=None):

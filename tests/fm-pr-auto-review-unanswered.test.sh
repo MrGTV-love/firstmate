@@ -61,6 +61,24 @@ for state, detail in (("queued", url), ("held", "left the merge queue and is sti
     ok &= check(side.data.get("standing") == prior, f"the {state} state was not kept aside: {side.data.get('standing')}")
     module.answered(side)
     ok &= check(side.data.get("phase") == prior and "standing" not in side.data, f"the {state} state was not shown again once the forge answered")
+for closed_state, outcome in (("CLOSED", None), ("OPEN", {"kind": "fail", "detail": "review FAIL"})):
+    task = "t-answered-" + closed_state.lower()
+    sha = "c" * 40
+    line = case(task, {"head": sha, "state": "reading", "detail": "review of " + sha[:12]})
+    ok &= check(line == "waiting: the forge did not answer the PR read", f"{task}: the unanswered read was not shown: {line}")
+    if outcome:
+        side = module.Sidecar(home, task, url)
+        side.head(sha)["outcome"] = outcome
+        side.save()
+    module.gh_view = lambda url, state=closed_state, sha=sha: {"headRefOid": sha, "baseRefOid": "d" * 40, "state": state}
+    side = module.Sidecar(home, task, url)
+    module.advance(home, task, url, {}, side)
+    line = module.state_line(home, task)
+    ok &= check(line != "waiting: the forge did not answer the PR read",
+                f"{task}: the forge answered ({closed_state}) but the unanswered read was still shown")
+    module.gh_view = lambda url: None
+if ok:
+    print("ok - once the forge answers again, a closed PR or a head with an outcome no longer shows the unanswered read")
 if ok:
     print("ok - an unanswered PR read shows 'waiting: the forge did not answer the PR read' over any state, with no merge, no wake and no process; a queued, held, failed or merged state is kept aside and shown again once the forge answers")
 sys.exit(1 if failed else 0)

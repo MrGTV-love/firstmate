@@ -1307,8 +1307,15 @@ class Collector:
         pr = self.source("completion PR " + ident, self.pr_state, pr_url) if pr_url else None
         merged = bool(pr and pr.get("merged_at"))
         # A worker still reading working owns its task: landed content alone cannot tell its own landed commit from
-        # a sync to main, so it owes cleanup only after a done report or a merged PR (Main 1968).
+        # a sync to main, so it owes cleanup only after a done report or a merged PR (Main 1968). Its check-in row
+        # asks it to report done if its work is finished.
         if not (closed or verb == "done" or state == "done" or merged):
+            if task["kind"] == "ship" and state == "working" \
+                    and self.source("finished deliverable " + ident, self.delivered, task):
+                for row in self.rows.values():
+                    if row["category"] == "silent_report" and row["subject"] == ident:
+                        row["next_action"] = (f"{row['next_action']}; its copy's content is on the default branch: "
+                                              "if its work is finished, report done so its cleanup can follow")
             self.attach_refusal(ident, pr_url, refusal, refused)
             return
         if merged and not self.captain_dropped(task) and self.merged_cleanup_blocked(task, ident, pr, refusal, refused):

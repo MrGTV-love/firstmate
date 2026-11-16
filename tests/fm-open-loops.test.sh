@@ -2447,6 +2447,9 @@ assert not any(r['category'] in ('missing_worker', 'unlanded_commit') for r in m
 clean_rows = [r for r in mine('pend-clean') if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')]
 ret = by_cat('interrupted_teardown').get('fin-return')
 covered = by_cat('unlanded_commit').get('gate-covered')
+PLAIN_CHECK_IN = 'check in: progress, blockers, cross-workstream dependencies'
+LANDED_CHECK_IN = (PLAIN_CHECK_IN + "; its copy's content is on the default branch: "
+                   'if its work is finished, report done so its cleanup can follow')
 f4 = [
     # A merged PR whose worker still reads working is still owed cleanup.
     ('merged-while-working', 'fin-working' in cleanup and 'bin/fm-teardown.sh fin-working' in cleanup['fin-working']['next_action'],
@@ -2482,9 +2485,12 @@ f4 = [
     # Main 1968: landed content alone owes no cleanup while the worker reads working with no done report or PR;
     # its check-in row stays.
     ('content-landed-working-no-pr-keeps-check-in', 'work-landed' not in cleanup and 'work-landed' not in by_cat('pending_acceptance')
-     and 'work-landed' in by_cat('silent_report'), mine('work-landed')),
+     and by_cat('silent_report').get('work-landed', {}).get('next_action') == LANDED_CHECK_IN, mine('work-landed')),
     ('synced-working-no-cleanup', 'work-synced' not in cleanup and 'work-synced' not in by_cat('pending_acceptance')
-     and 'work-synced' in by_cat('silent_report'), mine('work-synced')),
+     and by_cat('silent_report').get('work-synced', {}).get('next_action') == LANDED_CHECK_IN, mine('work-synced')),
+    # Every other check-in row keeps its exact text, the content-landed ask included only where it applies.
+    ('plain-check-in-unchanged', by_cat('silent_report').get('work-empty', {}).get('next_action') == PLAIN_CHECK_IN,
+     mine('work-empty')),
     ('synced-after-done-report-cleanup', 'work-synced-done' in cleanup
      and cleanup['work-synced-done']['next_action'].startswith('run plain bin/fm-teardown.sh work-synced-done;'), mine('work-synced-done')),
     ('working-with-no-commits-no-cleanup', 'work-empty' not in cleanup and 'work-empty' not in by_cat('pending_acceptance'),
