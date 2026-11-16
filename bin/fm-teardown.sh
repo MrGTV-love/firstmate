@@ -3160,6 +3160,9 @@ work_is_landed() {
   fi
   if [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ]; then
     echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2
+    # The release pass for skipped copies must never end the teardown: it asks for a return, and reads
+    # TEARDOWN_NM_RECORD_SILENT=1 afterwards to tell this unknown from a proof that came back unlanded.
+    [ "${TEARDOWN_LANDED_RETURN_BUSY:-0}" != 1 ] || return 1
     exit "$FM_PROJECT_LOCK_BUSY_EXIT"
   fi
   work_is_landed_bundle "$branch" "$dir" "$head" hint
@@ -3391,14 +3394,6 @@ teardown_return_collisions() { # <copy> <branch>
   printf '%s' "$found"
 }
 
-# The landed-work proof for one skipped copy, always run inside a command substitution so work_is_landed's exit for a retry
-# (and its bookkeeping) stays out of the release pass. It prints FM_SKIPPED_COPY_LANDED only for a proved-landed HEAD that no
-# recorded bundle accepted; any other outcome prints nothing.
-teardown_skipped_copy_landed() {  # <canonical copy path>
-  TEARDOWN_BUNDLE_ACCEPTED=
-  if teardown_landed "$1" HEAD "" && [ -z "$TEARDOWN_BUNDLE_ACCEPTED" ]; then echo FM_SKIPPED_COPY_LANDED; fi
-}
-
 # Copies this task's spawn skipped and left leased in place (bin/fm-spawn.sh spawn_skip_copy writes one
 # $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch).
 # This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
@@ -3410,7 +3405,7 @@ teardown_skipped_copy_landed() {  # <canonical copy path>
 # whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
 teardown_skipped_copies() {
   local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok reset_branch
-  local keep="$record.keep.${BASHPID:-$$}" changed=0 landed_proof landed_rc
+  local keep="$record.keep.${BASHPID:-$$}" changed=0
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
   : > "$keep" || return 0
   if ! fm_task_copy_current_pool_listing "$PROJ"; then
@@ -3474,17 +3469,20 @@ teardown_skipped_copies() {
       echo "warning: leaving $copy leased to $holder: ignored files sit where the branch a return resets it to tracks a path${ignored_files:+ ($ignored_files)}, or they cannot be compared with it (skipped for: $reason)" >&2
     else
       # Only the landed-work test releases a copy. An anchor makes a commit recoverable; it does not make it landed.
-      # The proof runs in a subshell because work_is_landed ends the whole process (exit FM_PROJECT_LOCK_BUSY_EXIT) when the
-      # no-mistakes record does not answer; this pass must never change the exit status, so that exit stays inside the
-      # subshell and the copy keeps its lease. Unknown is never landed.
-      landed_proof=$(teardown_skipped_copy_landed "$canonical") && landed_rc=0 || landed_rc=$?
-      if [ "$landed_rc" = 0 ] && [ "${landed_proof##*$'\n'}" = FM_SKIPPED_COPY_LANDED ]; then
+      # The proof runs in this shell, so its proof cache and its pending backlog restage are kept. work_is_landed returns
+      # instead of ending the teardown when the no-mistakes run record does not answer (TEARDOWN_LANDED_RETURN_BUSY), so this
+      # pass never changes the exit status; that unknown keeps the lease and is never read as landed.
+      TEARDOWN_BUNDLE_ACCEPTED=
+      TEARDOWN_NM_RECORD_SILENT=0
+      TEARDOWN_LANDED_RETURN_BUSY=1
+      if teardown_landed "$canonical" HEAD "" && [ -z "$TEARDOWN_BUNDLE_ACCEPTED" ]; then
         ok=1
-      elif [ "$landed_rc" != 0 ]; then
-        echo "warning: leaving $copy leased to $holder: its landing proof could not be read (exit $landed_rc), so it is not proved landed; retry teardown to release it (skipped for: $reason)" >&2
+      elif [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ]; then
+        echo "warning: leaving $copy leased to $holder: the no-mistakes run record did not answer, so its HEAD is not proved landed; retry teardown to release it (skipped for: $reason)" >&2
       else
         echo "warning: leaving $copy leased to $holder: its HEAD is not proved landed (skipped for: $reason)" >&2
       fi
+      TEARDOWN_LANDED_RETURN_BUSY=0
     fi
     if [ "$ok" = 1 ] && (cd "$PROJ" && treehouse return "$canonical" --if-lease-holder "$holder" </dev/null) >/dev/null 2>&1; then
       echo "teardown: released the lease on skipped copy $canonical (clean and landed)" >&2
