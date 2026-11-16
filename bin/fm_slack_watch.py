@@ -889,6 +889,22 @@ def second_user():
     return raw, ''
 
 
+# The watcher's token of one sweep of the standing checks: the same for every check of that sweep, new for the next (bin/fm-watch.sh).
+SWEEP_TOKEN = re.compile(r'[A-Za-z0-9.-]{1,64}')
+
+
+def watcher_sweep():
+    """The token of the watcher sweep this check runs in, or '' when it runs outside one (a manual check) or the value is not a token."""
+    value = env_value('FM_CHECK_SWEEP').strip()
+    return value if SWEEP_TOKEN.fullmatch(value) else ''
+
+
+def poll_interval():
+    """The watcher's interval between sweeps of the standing checks, which the checks inherit as FM_CHECK_INTERVAL (bin/fm-watch.sh, 300 s when unset)."""
+    value = env_value('FM_CHECK_INTERVAL').strip()
+    return float(value) if value.isdigit() and int(value) > 0 else 300.0
+
+
 def host_now():
     """This host's clock: only the marked seed of a completed-run time when no Slack instant exists at all (record_run); never in place of Slack's."""
     return time.time()
@@ -1137,8 +1153,9 @@ class Watch:
         self.their_check = self.lock_wait is not None
         self.run_wall = time.time()
         # This run's own identity: an owner check binds its cap hand-over to it, and their check accepts a hand-over only with the identity of the latest owner
-        # check (F5 of the review of c5868b6f; Main 1710 (c): a wall-clock time is no proof of the sweep).
-        self.sweep_id = uuid.uuid4().hex
+        # check (F5 of the review of c5868b6f; Main 1710 (c): a wall-clock time is no proof of the sweep). Run by the watcher, it is the watcher's own token
+        # of this sweep (FM_CHECK_SWEEP), which both checks of the sweep share (F5 of the review of 5048f815, Main 2190).
+        self.sweep_id = watcher_sweep() or uuid.uuid4().hex
         self.home = home_dir().resolve()
         self.root = path_setting('FM_STATE_OVERRIDE', self.home / 'state') / STATE_KEY
         if self.root.is_symlink():
@@ -3446,6 +3463,9 @@ class Watch:
         self.record_run_safely()
 
     def owner_check_unproved(self, ledger):
+        token = watcher_sweep()
+        if token:
+            return ledger.get('sweep') != token                           # the watcher names this sweep: only its own hand-over proves it
         root = getattr(self, 'root', None)
         if root is None:
             return False
@@ -3460,7 +3480,13 @@ class Watch:
     def stale_hand_over(self, ledger, previous=None):
         """Whether a hand-over is not proved to be this sweep's, so it is not used (R5 of the review of 64ac348b; F5 of the review of c5868b6f): it is used only
         when it carries the identity of the latest owner check, which that check wrote to its own file before its work; a hand-over without one, a file that is
-        missing or unreadable, or another identity all defer their work to a later sweep. previous is kept for the record and no longer decides."""
+        missing or unreadable, or another identity all defer their work to a later sweep. previous is kept for the record and no longer decides.
+        Run by the watcher, the proof is exact: the hand-over must carry the watcher's token of this very sweep (FM_CHECK_SWEEP, the same for both checks of
+        one sweep), so a hand-over of any earlier sweep is never used, also when the owner check of this sweep could write nothing at all (F5 of the review of
+        5048f815, Main 2190). The rules below apply to a run with no token (a manual check)."""
+        token = watcher_sweep()
+        if token:
+            return ledger.get('sweep') != token
         root = getattr(self, 'root', None)
         sweep = ledger.get('sweep')
         if root is None or not isinstance(sweep, str):
@@ -3731,12 +3757,12 @@ class Watch:
         same = win.get('user') == self.second
         if same and win.get('channel') and win.get('intake_cursor') is not None:
             return
-        mark = self.state.get('last_run')
-        if not same and not self.arming and isinstance(mark, str) and SLACK_TS.fullmatch(mark):
-            # The plane reads this id for the first time: the setting changed after its previous completed run, so that run's time (the last Slack instant on
-            # record, never this host's clock: record_run) is the start, inclusive, compared as Slack orders timestamps. Nothing
-            # typed after the enable is lost; earlier messages of theirs since that watermark are also taken in, as data under their label (Main's ruling
-            # e59cdb79 on the enable anchor). A watermark not advanced by runs with no Slack clock (record_run) only moves the start earlier, never later.
+        mark = self.enable_start() if not same and not self.arming else None
+        if mark is not None:
+            # The plane reads this id for the first time (Main's ruling e59cdb79 on the enable anchor, Main 2189 (2)): the start, inclusive, compared as Slack
+            # orders timestamps, is the later of the previous completed run (last_run: Slack time of runs that read the setting before it named this id, so
+            # never after the enable) and this run's first Slack instant minus one poll interval (the enable is at most one interval before this run). Nothing
+            # typed after the enable is lost, and earlier messages of theirs taken in, as data under their label, are at most one poll interval old.
             self.state['second'] = {'user': self.second, 'intake_cursor': just_before(mark)}
             self.commit()
             win, same = self.second_window(), True
@@ -3757,6 +3783,18 @@ class Watch:
             self.state['second']['unplaced'] = win['unplaced']
         self.commit()
         self.second_proven = True
+
+    def enable_start(self):
+        """The start of a first read of an id (see start_second), as a Slack ts, or None when no completed run is on record (then the owner path's first-run rule
+        applies, Main 1310 addendum d02e84e1). Without a Slack instant in this run, the previous completed run alone (its marked host seed included) is the start,
+        as before; a marked host seed never stands beside a Slack instant."""
+        mark = self.state.get('last_run')
+        if not (isinstance(mark, str) and SLACK_TS.fullmatch(mark)):
+            return None
+        found = [] if self.clock_first is not None and self.state.get('last_run_host') else [float(mark)]
+        if self.clock_first is not None:
+            found.append(max(0.0, float(self.clock_first) - poll_interval()))
+        return slack_ts(max(found)) if found else None
 
     def resume_second(self, remaining):
         """Deliver the second person's journaled requests (an acknowledgement that failed, or a source that was unbound), inside what the cap leaves."""
