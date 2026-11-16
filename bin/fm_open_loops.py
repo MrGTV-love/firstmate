@@ -39,6 +39,9 @@ CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream depe
                  "Reply through your supervised status/report channel before acknowledging this inbox message; "
                  "secondmates must preserve the request correlation in their parent-channel reply. "
                  "Handle this at your next safe checkpoint; do not interrupt a running step.")
+# Added to the check-in of a working ship whose copy's content is on the default branch with no done report and no
+# merged PR (Main 1968, Main 2009); every other check-in sends CHECK_IN_TEXT alone.
+REPORT_DONE_ASK = "If your work is finished, report done so its cleanup can follow."
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
@@ -165,6 +168,7 @@ class Collector:
         self.backlog = []
         self.prs = {}
         self.missing_heads = {}
+        self.report_done_asked = set()
         self.state_files = []
         self.owned_urls = set()
         self.owned_branches = set()
@@ -488,7 +492,8 @@ class Collector:
         env = dict(self.env)
         if task.get("spawn_gen"):
             env["FM_SEND_EXPECTED_SPAWN_GEN"] = task["spawn_gen"]
-        self.run([BIN / "fm-send.sh", task_id, CHECK_IN_TEXT], env=env)
+        text = CHECK_IN_TEXT + (" " + REPORT_DONE_ASK if task_id in self.report_done_asked else "")
+        self.run([BIN / "fm-send.sh", task_id, text], env=env)
         return dict(check_in="sent", subject=task_id)
 
     def recorded_stop(self, task):
@@ -1312,6 +1317,7 @@ class Collector:
         if not (closed or verb == "done" or state == "done" or merged):
             if task["kind"] == "ship" and state == "working" \
                     and self.source("finished deliverable " + ident, self.delivered, task):
+                self.report_done_asked.add(ident)
                 for row in self.rows.values():
                     if row["category"] == "silent_report" and row["subject"] == ident:
                         row["next_action"] = (f"{row['next_action']}; its copy's content is on the default branch: "

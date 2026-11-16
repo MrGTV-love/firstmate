@@ -2509,6 +2509,24 @@ f4 = [
 for name, ok, got in f4:
     print('F4', name, 'ok' if ok else 'FAILED', '' if ok else [(r['category'], r['next_action'][:160]) for r in got], flush=True)
 assert all(ok for _, ok, _ in f4), 'an F4 witness failed'
+# Main 2009: the check-in a content-landed working ship receives also asks it to report done if its work is finished;
+# every other check-in is the plain text, byte for byte. Read from the message each worker's inbox received.
+V4_CHECK_IN = ('Check in: report progress, blockers, and cross-workstream dependencies that need resolution. '
+               'Reply through your supervised status/report channel before acknowledging this inbox message; '
+               'secondmates must preserve the request correlation in their parent-channel reply. '
+               'Handle this at your next safe checkpoint; do not interrupt a running step.')
+V4_REPORT_DONE = 'If your work is finished, report done so its cleanup can follow.'
+for name, expected in (('work-synced', V4_CHECK_IN + ' ' + V4_REPORT_DONE),
+                       ('work-landed', V4_CHECK_IN + ' ' + V4_REPORT_DONE),
+                       ('work-empty', V4_CHECK_IN)):
+    sent = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--check-in', name, '--json'], env=env4, text=True,
+                          capture_output=True, timeout=180)
+    assert sent.returncode == 0 and json.loads(sent.stdout)['check_in'] == 'sent', (name, sent.stdout, sent.stderr)
+    received = sorted((v4 / f'state/{name}.inbox').glob('*.msg'))
+    assert len(received) == 1, (name, received)
+    body = received[0].read_text().split('\n--\n', 1)[1].rstrip('\n')
+    assert body == expected, ('the check-in text sent to the worker is wrong', name, body)
+print('PASS: a content-landed working ship is asked to report done; other check-ins are unchanged', flush=True)
 # A record whose last report was done with no accepted deliverable and no live worker is never left with no row.
 # A done task, or a stopped one whose last report is done, with no PR and nothing landed is the completed_task
 # handoff's, so it gets that one row.
