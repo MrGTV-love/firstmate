@@ -112,7 +112,7 @@ printf '%s\n' "201 100 Sun Nov  1 13:00:$born 2026 /fixture/gh pr checks --body 
         self.assertEqual(missing["ancestors"], [])
         self.assertEqual(missing["ancestor_end"], "unobserved")
         self.assertNotIn("fixture-secret", json.dumps(rows))
-        self.assertEqual(self.records("quota")[0]["graphql"]["used"], 23)
+        self.assertEqual(self.completed_quota("used=23 reset=1794000000 limit=5000 remaining=4977")["graphql"]["used"], 23)
 
     def test_injected_tables_filter_script_identity_and_ancestor_cycles(self):
         # Labeled table fixtures exercise the actual owner/filter/storage path,
@@ -607,10 +607,14 @@ exec sleep 600
 
     def test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working(self):
         self.hung_ps_fixture()
+        self.tool("gh-axi", ''': > "$FIXTURE_ROOT/quota-asked"
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
         reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "3"], env=self.env,
                                capture_output=True, text=True, timeout=60)
         self.assertEqual(reply.returncode, 0, reply.stderr)
-        self.assertIn("observed", [row["status"] for row in self.records("quota")])
+        self.assertTrue((self.root / "quota-asked").exists(), "the hung ps blocked the quota stream")
+        self.assertEqual(self.completed_quota("used=23 reset=1794000000 limit=5000 remaining=4977")["status"], "observed")
         self.assertHungPsEnded()
 
     def test_hung_ps_does_not_grow_verdicts_across_repeated_requests(self):
@@ -634,7 +638,7 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
         # completed child's metadata/body; persist and read the actual records.
         owner = runpy.run_path(str(OWNER))
         root = self.state / "github-accounting"
-        root.mkdir(mode=0o700)
+        root.mkdir(mode=0o700, exist_ok=True)
         db = owner["database"](root)
         try:
             owner["quota_result"](db, SimpleNamespace(pid=123, returncode=0),
@@ -643,7 +647,7 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
             db.commit()
         finally:
             db.close()
-        return self.records("quota")[0]
+        return self.records("quota")[-1]
 
     def test_malformed_quota_is_unavailable_not_zero(self):
         row = self.completed_quota("used=null reset=null limit=5000 remaining=0")
