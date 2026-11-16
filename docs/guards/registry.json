@@ -494,6 +494,10 @@
         },
         {
           "file": "bin/fm-copy-sweep.sh",
+          "match": "refusal=$(printf '%s\\n' \"$err\" | sed -n '/^REFUSED:/,$p')"
+        },
+        {
+          "file": "bin/fm-copy-sweep.sh",
           "match": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $RETRY_PRESERVE; the next sweep run plans it again.\" >&2"
         },
         {
