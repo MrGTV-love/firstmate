@@ -303,14 +303,8 @@ SECOND_SCHEMA = 'fm-slack-second.v1'
 # Every member id the setting has named, as a one-way hash (so that a protected value equal to an id never stops it being recorded), one per line, append only:
 # a second record beside second.json, so that one failed write never forgets an id (finding 1 of the review of fca2a73d).
 SECOND_ID_FILE = 'second-ids'
-# The start time of the latest owner check, in its own file (F5 of the review of c5868b6f), and the longest the owner's check waits for its write (F8 of the
-# review of 5048f815).
-OWNER_CHECK_FILE = 'owner-check-at'
-OWNER_MARK_WAIT = 1.0
 # The longest any run but their own check waits for one write of the second person's bookkeeping (Watch.second_io, Main 2082).
 SECOND_IO_WAIT = 2.0
-# The watcher's mark of the end of each sweep of the standing checks (bin/fm-watch.sh touches it after the last check of a sweep), in its state folder.
-WATCHER_SWEEP_MARK = '.last-check'
 # Refusals of theirs whose log row could not be written yet, kept apart from second.json with only hashed values (F2 of the review of c5868b6f).
 REFUSAL_QUEUE_FILE = 'refusal-queue.jsonl'
 # The fallback record of the same hashes, tried when SECOND_ID_FILE cannot be written (F1 of the review of c5868b6f).
@@ -3395,12 +3389,9 @@ class Watch:
             pass
 
     def start_cap_hand_over(self):
-        """Before any owner work of the owner's check: their check of this sweep is left 0 until the owner's work ends and leave_cap records what it left. The
-        start of this owner check is also written to its own small file (OWNER_CHECK_FILE), so a hand-over of an earlier, interrupted sweep is known as such
-        even when both writes of second.json fail (F5 of the review of c5868b6f). That file's write is waited for at most OWNER_MARK_WAIT; an unfinished one
-        goes on in its own thread and owner work starts (F8 of the review of 5048f815). A write that fails removes the file, so no earlier sweep's identity can
-        stay in it and prove an old hand-over (F5 of the review of 5048f815). With the setting unset nothing is written: the owner's check then makes no write
-        the base did not make (F8)."""
+        """Before any owner work of the owner's check: their check of this sweep is left 0 until the owner's work ends and leave_cap records what it left (with
+        complete set: the completion proof their check needs). With the setting unset nothing is written: the owner's check then makes no write the base did not
+        make (F8 of the review of 5048f815)."""
         if not self.second:
             return
         try:
@@ -3409,105 +3400,40 @@ class Watch:
             view.commit()
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
-        root = getattr(self, 'root', None)
-        if root is None:
-            return
-        mark = json.dumps({'sweep': getattr(self, 'sweep_id', None), 'at': getattr(self, 'run_wall', None)})
-        def write_mark():
-            try:
-                write_atomically(root / OWNER_CHECK_FILE, mark)
-            except OSError:
-                try:
-                    (root / OWNER_CHECK_FILE).unlink()
-                except OSError:
-                    pass
-        worker = threading.Thread(target=write_mark, name='fm-slack-owner-mark', daemon=True)
-        worker.start()
-        worker.join(OWNER_MARK_WAIT)
 
     def second_check(self):
         """The second person's standing check: no owner work at all; their pass takes what the owner's check of this watcher pass left of the shared cap, which
-        holds the one request reserved for them (reserve_for_second), or the whole cap when no owner check ran since their last check; a completed pass records
-        the run's time (record_run)."""
+        holds the one request reserved for them (reserve_for_second); a completed pass with a proven hand-over records the run's time (record_run).
+
+        Proof (Main 1706, 1710 (c), 2190, 2214; F5 of the review of 5048f815): a hand-over gives them part of the cap only when it is the owner check's final
+        write of THIS sweep: it carries the watcher's token of the sweep this check runs in (FM_CHECK_SWEEP, the same for both checks of one sweep) and
+        `complete` (leave_cap writes it after all owner work). The watcher's end-of-sweep mark (.last-check) comes after this check in the same sweep, so it
+        cannot be that proof; a hand-over of an interrupted or earlier sweep never matches again, because every later sweep, and a restarted watcher, has
+        another token. With no token (a check run by hand), another token, or no complete write (the owner check stopped before it), nothing of the cap is
+        given and the last completed watermark stays; the owner's work and their work that takes no slot (refusals, card observation) go on."""
         view = self.second_view()
         ledger = view.state.get('cap_left') if isinstance(view.state.get('cap_left'), dict) else {}
-        # Fail closed (finding 8 of the review of d9861b24): only a hand-over the owner's check of this sweep recorded gives them part of the cap; with none on
-        # record, or one this check cannot mark as used, they take nothing this sweep, and what waits is taken by a later one.
-        left = ledger.get('left') if ledger.get('fresh') and isinstance(ledger.get('left'), int) and not isinstance(ledger.get('left'), bool) else 0
-        # A hand-over written before the watcher's last end-of-sweep mark belongs to an earlier sweep: never used (R5 of the review of 64ac348b).
-        previous = view.state.get('second_started')
-        if ledger.get('fresh') and self.stale_hand_over(ledger, previous):
-            left = 0
+        token = watcher_sweep()
+        proven = bool(token) and bool(ledger.get('fresh')) and ledger.get('sweep') == token and ledger.get('complete') is True
+        left = ledger.get('left') if proven and isinstance(ledger.get('left'), int) and not isinstance(ledger.get('left'), bool) else 0
         view.state['second_started'] = getattr(self, 'run_wall', None)
-        # A hand-over the owner's check did not complete carries no Slack clock: this run then records no completed-run time, so the host's clock never
-        # replaces Slack's (R4 of the review of 64ac348b).
-        # Also when an owner check of this sweep began (its file names a sweep) but no hand-over of it is proved (F4 of the review of c5868b6f: both its
-        # saves failed): the last completed watermark stays.
-        self.hand_over_incomplete = (bool(ledger.get('fresh')) and not ledger.get('complete')) or self.owner_check_unproved(ledger)
-        stale = bool(ledger.get('fresh')) and self.stale_hand_over(ledger, previous)
+        self.hand_over_incomplete = not proven
         if ledger.get('fresh'):
             view.state['cap_left'] = dict(ledger, fresh=False)
             try:
                 view.commit()
             except (SecretCollision, SlackError, OSError, ValueError):
-                left = 0
-            if not stale:
-                # The Slack clock of the owner's check of this sweep is this run's clock too (finding 4): their activation and a held window use it; a
-                # hand-over not proved to be this sweep's gives no clock (F4).
+                left, proven = 0, False
+            if proven:
+                # The Slack clock of the owner's check of this sweep is this run's clock too (finding 4): their activation and a held window use it.
                 for value in (ledger.get('clock_first'), ledger.get('clock_last')):
                     self.note_date(value)
         try:
             view.second_poll(max(0, left), start=self.started)
         except (SlackError, OSError, ValueError, KeyError, TypeError):
             pass
-        self.record_run_safely()
-
-    def owner_check_unproved(self, ledger):
-        token = watcher_sweep()
-        if token:
-            return ledger.get('sweep') != token                           # the watcher names this sweep: only its own hand-over proves it
-        root = getattr(self, 'root', None)
-        if root is None:
-            return False
-        try:
-            latest = json.loads((root / OWNER_CHECK_FILE).read_text()).get('sweep')
-        except FileNotFoundError:
-            return False
-        except (OSError, ValueError, AttributeError):
-            return True
-        return isinstance(latest, str) and latest != ledger.get('sweep')
-
-    def stale_hand_over(self, ledger, previous=None):
-        """Whether a hand-over is not proved to be this sweep's, so it is not used (R5 of the review of 64ac348b; F5 of the review of c5868b6f): it is used only
-        when it carries the identity of the latest owner check, which that check wrote to its own file before its work; a hand-over without one, a file that is
-        missing or unreadable, or another identity all defer their work to a later sweep. previous is kept for the record and no longer decides.
-        Run by the watcher, the proof is exact: the hand-over must carry the watcher's token of this very sweep (FM_CHECK_SWEEP, the same for both checks of
-        one sweep), so a hand-over of any earlier sweep is never used, also when the owner check of this sweep could write nothing at all (F5 of the review of
-        5048f815, Main 2190). The rules below apply to a run with no token (a manual check)."""
-        token = watcher_sweep()
-        if token:
-            return ledger.get('sweep') != token
-        root = getattr(self, 'root', None)
-        sweep = ledger.get('sweep')
-        if root is None or not isinstance(sweep, str):
-            return True
-        try:
-            latest = json.loads((root / OWNER_CHECK_FILE).read_text()).get('sweep')
-        except (OSError, ValueError, AttributeError):
-            return True
-        if latest != sweep:
-            return True
-        # A watcher sweep that ended after the hand-over was written is a later sweep than the hand-over's: its second check did not take it, and this one
-        # never does (Main 1706: not accepted after that sweep's .last-check commit; F5 of the review of 5048f815, where the next owner check could write
-        # nothing at all). The mark is the watcher's own file beside the plane's state folder; with none yet, no sweep has ended.
-        try:
-            ended = (root.parent / WATCHER_SWEEP_MARK).stat().st_mtime
-        except FileNotFoundError:
-            return False
-        except OSError:
-            return True
-        at = ledger.get('at')
-        return not isinstance(at, (int, float)) or isinstance(at, bool) or at <= ended
+        if proven:
+            self.record_run_safely()
 
     def remember_safely(self):
         """Record the id the setting names (record_second_id); kept as the one call every entry point makes. It raises when the id cannot be recorded at all."""
