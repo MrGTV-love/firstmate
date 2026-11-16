@@ -738,6 +738,24 @@ def case_isolation_proof():
                    'family proof --jobs %s did not record concurrency=2: %s' % (jobs, world.text(label, 'out')[-300:]))
         case.check(recorded.get('concurrency') == 2 and recorded.get('fm_test_run_jobs_enabled') is enabled,
                    'family proof --jobs %s on a pool of 2 recorded %s' % (jobs, recorded))
+    # Fewer candidates than the default --jobs 4: all three seen running together enable runner jobs.
+    together = World('proof-three', cores=4)
+    barrier = together.folder / 'barrier'
+    barrier.mkdir()
+    three = proof_family_repo(together, ['fm-fam-%d.test.sh' % index for index in range(3)], body=
+                              ': > "$FM_CONC_BARRIER/$$"\n'
+                              'waited=0\n'
+                              'while [ "$(ls "$FM_CONC_BARRIER" | wc -l)" -lt 3 ] && [ "$waited" -lt 600 ]; do sleep 0.05; waited=$((waited + 1)); done\n'
+                              'sleep 0.3\n')
+    artifact = together.folder / 'three.json'
+    code = wait_all([together.launch('three', ['bash', str(three / 'bin' / 'fm-test-isolation-proof.sh'), '--pool', 'fam', '--json', str(artifact)],
+                                     extra=dict(FM_CONC_BARRIER=str(barrier)))])
+    recorded = json.loads(artifact.read_text()) if artifact.exists() else {}
+    case.measure(three_candidates_default_jobs_markers=proof_markers(together.text('three', 'out')),
+                 three_candidates_default_jobs_enabled=recorded.get('fm_test_run_jobs_enabled'))
+    case.check(code == [0], 'three-candidate family proof failed: %s %s' % (code, together.text('three')[-300:]))
+    case.check(recorded.get('concurrency') == 3 and recorded.get('fm_test_run_jobs_enabled') is True,
+               'three candidates seen together under the default --jobs 4 recorded %s' % recorded)
     return case
 
 

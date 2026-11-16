@@ -1528,7 +1528,7 @@ The one other way out of a wait is a proven wait cycle, and the proof is constru
 The cycle is closed when every holder of every waiting key is such a gate, whatever `FM_TEST_KEY_SLOTS` is, and a waiter that only waits on the cycle, holding nothing a member waits for, is not part of it; the earliest queued waiter in it, seen on two polls in a row, runs beside the limit and says so (the [`fm-duration.py` header](../bin/fm-duration.py) owns the rule).
 Any other shape gets no exception, because nothing available shows what a user shell, a pass wrapper or a runner between two gates is waiting on: that waiter starts only when a holder ends.
 So a real cycle with a user shell between the gates waits until a holder ends, which in a true cycle nobody does; no timeout, reaper or other mechanism is added for it.
-Which of these limits to accept is the owner's open choice for amendment A-4; removing the exception altogether is the alternative.
+Amendment A-4 decided this rule: the one constructive exception for a proven wait cycle of gates, and no other exception, timeout or reaper.
 A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
 The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the wait until a holder ends, the nested-run and wait-cycle rules and the exit codes.
 

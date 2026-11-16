@@ -211,8 +211,8 @@ two gates, a pass wrapper, a runner, a shell that waits on a builtin timer besid
 background gate. Such a waiter starts only when a holder ends. The residual is stated
 plainly: a real cycle with a user shell between the gates waits until a holder ends,
 which in a true cycle nobody does; there is no timeout, reaper or other mechanism for it
-(the owner's choice for amendment A-4 stays open: no exception at all is the alternative
-that removes the constructive case too). Only gates that export FM_TEST_SLOT_PIDS and
+(amendment A-4 decided this rule: the one constructive exception above, and no other
+exception, timeout or reaper). Only gates that export FM_TEST_SLOT_PIDS and
 FM_TEST_SLOT_HELD can be seen. FM_CPU_PASS_HELD, which a caller can claim without holding
 any pass, never lets a command skip a slot.
 

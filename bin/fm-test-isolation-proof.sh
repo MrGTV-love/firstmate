@@ -27,8 +27,9 @@
 #   --json path  write a pool-scoped machine-readable proof artifact after the
 #                run; fm_test_run_jobs_enabled is true only for a successful
 #                run whose observed peak concurrency (more than one candidate
-#                actually running together) equals the requested --jobs, within
-#                that pool's recorded admission cap
+#                actually running together) equals --jobs, or the candidate
+#                count when that is smaller, within that pool's recorded
+#                admission cap
 #   --list       print the proven candidate paths (one per line) and exit 0
 #   --list-exclusions
 #                print basename + reason for scripts deliberately kept serial
@@ -463,6 +464,7 @@ smaller_number() {  # <a> <b>
 # The proof never claims more concurrency than it can run: with fewer candidates than --jobs it runs, takes passes for,
 # prints and records one worker per candidate, for a --jobs value of any length.
 JOBS=$(smaller_number "$JOBS" "${#CANDIDATES[@]}")
+CANDIDATE_JOBS=$JOBS
 CANDIDATE_MARKER=
 LEASE_CANDIDATES=0
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
@@ -886,7 +888,7 @@ if [ -n "$JSON_PATH" ]; then
   if "$ROOT/bin/fm-test-run.sh" --list-concurrent-safe-families | grep -Fxq "$POOL"; then
     jobs_max=$("$ROOT/bin/fm-test-run.sh" --concurrent-safe-family-jobs-max "$POOL")
   fi
-  if [ "$AGG_RC" -eq 0 ] && [ "$PEAK" -gt 1 ] && [ "$PEAK" = "$REQUESTED_JOBS" ] \
+  if [ "$AGG_RC" -eq 0 ] && [ "$PEAK" -gt 1 ] && [ "$PEAK" = "$CANDIDATE_JOBS" ] \
     && [ "$PEAK" -le "$jobs_max" ]; then
     jobs_enabled=1
   fi
