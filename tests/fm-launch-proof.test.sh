@@ -719,6 +719,8 @@ test_launch_proof_claude_refusal_checks() (
   world; rm -f "$T"/w/env-*; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-53539"
   printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-53733"; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-56557"
   out=$(fm_launch_proof_herdr_refusal "$META" "$(fm_meta_get "$META" window)") && fail 'an unpinned versioned record was authorized'
+  assert_contains "$out" 'unpinned native restore' 'the unpinned d1 wrapper shape names an unpinned native restore'
+  assert_not_contains "$out" 'unreadable' 'the unpinned d1 wrapper shape is not called unreadable'
   grep -v '^launch_proof=' "$META" > "$META.next"; mv "$META.next" "$META"
   fm_launch_proof_herdr_authorizes "$META" "$(fm_meta_get "$META" window)" || fail '(j) control: a record with no launch_proof line keeps its legacy authorization'
   fm_launch_proof_record_legacy "$META" || fail '(j) control: a record with no launch_proof line is legacy'

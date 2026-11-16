@@ -1816,11 +1816,12 @@ test_claude_restore_has_no_adoption_route() {
   assert_absent "$dir/home/state/$id.claude-adoption.json" "adopt writes no claude record"
   for verb in interrupt exit stay; do
     claude_lifecycle_refusal "$dir" "$id" "$verb"
-    [ "$shape" != harness ] || assert_contains "$CLAUDE_REFUSAL_OUT" "$CLAUDE_UNPINNED_CAUSE" "$verb names the unpinned native restore"
+    assert_contains "$CLAUDE_REFUSAL_OUT" "$CLAUDE_UNPINNED_CAUSE" "$verb names the unpinned native restore ($shape)"
+    assert_not_contains "$CLAUDE_REFUSAL_OUT" "unreadable" "$verb does not call the unpinned restore unreadable ($shape)"
     assert_not_contains "$CLAUDE_REFUSAL_OUT" "adopt" "$verb never names adopt ($shape)"
   done
   claude_restart_unreached "$dir" "$id" "$ROOT/bin/fm-secondmate-restart.sh" \
-    "its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it" \
+    "its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: $CLAUDE_UNPINNED_CAUSE" \
     "a restored claude ($shape)"
   assert_not_contains "$CLAUDE_REFUSAL_OUT" "adopt" "the restart never names adopt ($shape)"
   done
