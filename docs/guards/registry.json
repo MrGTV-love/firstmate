@@ -490,6 +490,10 @@
         },
         {
           "file": "bin/fm-copy-sweep.sh",
+          "match": "echo \"REFUSED: the primary checkout of the slot was switched during the supersedence route of $shown (exit $rc): $words; this run releases no further copy.\" >&2"
+        },
+        {
+          "file": "bin/fm-copy-sweep.sh",
           "match": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $RETRY_PRESERVE; the next sweep run plans it again.\" >&2"
         },
         {

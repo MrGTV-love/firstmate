@@ -1859,6 +1859,7 @@ apply_removals() {
         IFS= read -r route_used < "$route_file" || route_used=
         rm -f -- "$route_file"
       fi
+      refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
       if [ "$release_rc" != 2 ]; then
         enumeration_rc=0
         registered=$(list_nested "$clone") || enumeration_rc=$?
@@ -1875,7 +1876,6 @@ apply_removals() {
         stop_run=1
         stop_why="the primary checkout of the slot was switched during the execute of $copy"
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"$(printf '%s' "${refusal:-$err}" | tr '\n\t' '  ')"$'\n'
         # The driver may have been called and may have removed the copy: what is on disk decides the rest.
         if [ -e "$copy" ] || [ -L "$copy" ]; then
@@ -1890,7 +1890,6 @@ apply_removals() {
       fi
       if [ "$release_rc" != 0 ]; then
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"the copy was left: $(printf '%s' "${refusal:-$err}" | tr '\n\t' '  ')"$'\n'
         continue
       fi
