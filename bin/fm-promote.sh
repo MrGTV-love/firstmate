@@ -472,6 +472,7 @@ INSTRUCTIONS_Q=$(printf '%q' "$INSTRUCTIONS")
 echo "promoted $ID to ship mode=$MODE yolo=$YOLO$PROMOTE_FORGE_WORDS (teardown protection restored)"
 echo "wrote ship instructions for mode=$MODE$PROMOTE_FORGE_WORDS: $INSTRUCTIONS"
 echo "next: FM_HOME=$HOME_Q bin/fm-send.sh fm-$ID \"\$(cat $INSTRUCTIONS_Q)\""
+echo "choice: when fm-$ID has open keyed decisions, fm-send stops that send and lists them; add --resolve-key <key> after the target (one key per flag) when it answers one, or --answers-none when it answers none (rule: bin/fm-send.sh header, \"Decision closure\")"
 
 promote_print_rechain_hint() {
   local consent_home=$1 work_home=$2 task_id=$3 id prefix

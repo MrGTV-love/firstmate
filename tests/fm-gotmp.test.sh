@@ -114,6 +114,8 @@ SH
   ln -s "$ROOT/bin/fm-slot-provision-lib.sh" "$fake/bin/fm-slot-provision-lib.sh"
   # fm-hold-reason-lib.sh: teardown sources it to read captain-hold reasons for the bundle route.
   ln -s "$ROOT/bin/fm-hold-reason-lib.sh" "$fake/bin/fm-hold-reason-lib.sh"
+  # fm-busy-lib.sh: teardown's entry preflight reads the busy-state gen through it.
+  ln -s "$ROOT/bin/fm-busy-lib.sh" "$fake/bin/fm-busy-lib.sh"
   # fm-refuse-lib.sh and the friction writer it runs: teardown requires the typed refusal envelope.
   ln -s "$ROOT/bin/fm-refuse-lib.sh" "$fake/bin/fm-refuse-lib.sh"
   ln -s "$ROOT/bin/fm-friction-ledger.py" "$fake/bin/fm-friction-ledger.py"

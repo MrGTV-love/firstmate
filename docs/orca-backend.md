@@ -24,6 +24,7 @@ No manual repository registration is required.
 
 Open the Orca app to watch a task's terminal.
 Routine supervision uses the recorded endpoint through `bin/fm-peek.sh <id>` and `FM_HOME=<home> bin/fm-send.sh <id> '<text>'`.
+A text steer to a task that has open keyed decisions must also pass `--resolve-key <key>` or `--answers-none` (rule: `bin/fm-send.sh` header).
 Enter and Ctrl-C are supported; Escape is not.
 
 ## Task shape and metadata
