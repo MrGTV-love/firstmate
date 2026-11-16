@@ -556,7 +556,7 @@ test_the_panes_own_launcher_tree_is_not_a_holder() {
   advance_origin advanced.txt
   start_marker
   sleep 0.4
-  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_pane "$W_SLOT" 1 || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_moved "the shell a treehouse launcher under the spawn's own pane opened is not a holder"
   cleanup_held
 }
@@ -574,7 +574,7 @@ test_a_process_under_the_pane_but_not_under_the_launcher_is_a_holder() {
 test_a_process_under_the_pane_that_predates_the_spawn_is_a_holder() {
   make_world f4-pane-old
   advance_origin advanced.txt
-  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_pane "$W_SLOT" 1 || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   start_marker
   FM_SLOT_PANE_PID=$PANE_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a launcher tree that started before the spawn is not its acquisition, even under the pane" live_holder
   cleanup_held
@@ -602,7 +602,7 @@ test_an_lsof_row_with_no_directory_for_a_launcher_child_is_a_holder() {
   advance_origin advanced.txt
   start_marker
   sleep 0.4
-  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_pane "$W_SLOT" 1 || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   local launcher child bin="$W_DIR/childrow"
   launcher=$(pgrep -P "$PANE_PID" | head -n 1)
   child=$(pgrep -P "${launcher:-0}" | head -n 1)
@@ -624,7 +624,7 @@ test_a_launcher_that_does_not_run_under_the_named_pane_is_a_holder() {
   advance_origin advanced.txt
   start_marker
   sleep 0.4
-  start_pane "$W_SLOT" 1 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_pane "$W_SLOT" 1 || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_PANE_PID=$MARKER_PID FM_SLOT_SPAWN_PID=$MARKER_PID expect_skip "a launcher that is not under the pane the backend named is not the spawn's own" live_holder
   cleanup_held
 }
@@ -669,7 +669,7 @@ test_a_treehouse_launcher_started_after_the_spawn_owns_its_shell() {
   make_world f4-launcher-own
   advance_origin advanced.txt
   local dir="$W_DIR/launcher"
-  make_launcher "$dir" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  make_launcher "$dir" || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   start_marker
   sleep 0.5
   # shellcheck disable=SC2016 # The launcher's own shell expands $1.
@@ -684,7 +684,7 @@ test_a_treehouse_launcher_older_than_the_spawn_does_not_own_its_shell() {
   make_world f4-launcher-old
   advance_origin advanced.txt
   local dir="$W_DIR/launcher"
-  make_launcher "$dir" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  make_launcher "$dir" || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   # shellcheck disable=SC2016 # The launcher's own shell expands $1.
   "$dir/treehouse" -c 'cd "$1" && sleep 300 & wait' get "$W_SLOT" &
   HELD_PIDS+=("$!")
@@ -1667,6 +1667,196 @@ SH
   pass "a commit after the proof that makes git refuse is a failure, not a skip"
 }
 
+# --- Main 2132 F-7: the holder rule as the pipeline commits changed it, driven with no process at all ----------------------
+# The probe's own proc_info, exe_argv0 and lsof are replaced by a fake process table, so is_own, the parent chain, the
+# recorded endpoint's tree root and the start-time check are judged on fixed facts. The agent classification (the bash side)
+# is driven by canned T rows. Every case here starts no process.
+
+# probe_holders <json-scenario-file>: runs the real holders() of the embedded probe against the scenario's fake kernel.
+# The scenario holds procs {pid: [ppid, comm, start]}, exes {pid: [path, argv0, args]}, lsof (the -F pcn text) and args
+# (the eight holders() arguments). It prints what holders() printed, then EXIT <code> when it ended the process.
+probe_holders() {
+  python3 -I - "$1" "$FM_SLOT_PROBE_PY" <<'PY'
+import json, sys, types
+scenario = json.load(open(sys.argv[1]))
+source = sys.argv[2]
+head = source[:source.index("mode, args = sys.argv[1], sys.argv[2:]")]
+ns = {"__name__": "probe"}
+exec(compile(head, "probe", "exec"), ns)
+procs = {int(k): tuple(v) for k, v in scenario["procs"].items()}
+exes = {int(k): tuple(v) for k, v in scenario.get("exes", {}).items()}
+ns["proc_info"] = lambda pid: procs.get(pid)
+ns["exe_argv0"] = lambda pid: exes.get(pid)
+def run(cmd, **kwargs):
+    return types.SimpleNamespace(returncode=0, stdout=scenario["lsof"], stderr="")
+ns["subprocess"] = types.SimpleNamespace(run=run, DEVNULL=-3)
+try:
+    ns["holders"](*scenario["args"])
+except SystemExit as stop:
+    print("EXIT %s" % stop.code)
+PY
+}
+
+# holders_scenario <name> <procs-json> <exes-json> <lsof-text> <pane> <endpoint> <endpoint-start>: writes the scenario file and
+# runs it. The slot is /slot, the spawn is pid 100 (started at 1000).
+holders_scenario() {
+  local file="$TMP_ROOT/holders-$1.json"
+  python3 -I - "$file" "$2" "$3" "$4" "$5" "$6" "$7" <<'PY'
+import json, sys
+file, procs, exes, lsof, pane, endpoint, start = sys.argv[1:]
+json.dump({"procs": json.loads(procs), "exes": json.loads(exes), "lsof": lsof,
+           "args": ["/slot", "/slot", "100", "/common", "0", pane, endpoint, start]}, open(file, "w"))
+PY
+  probe_holders "$file" 2>&1
+}
+
+# A shell inside the slot, started by a launcher named treehouse that started after the spawn, under the pane (pid 200).
+HOLD_BASE='{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "300": [200, "treehouse", 1001.0], "400": [300, "bash", 1002.0]}'
+HOLD_ROW=$'p400\ncbash\nn/slot\n'
+
+test_a_shell_under_a_later_launcher_under_the_pane_is_the_spawns_own() {
+  local out
+  out=$(holders_scenario own "$HOLD_BASE" '{}' "$HOLD_ROW" 200 '' '')
+  [ -z "$out" ] || fail "the spawn's own shell was reported as a holder: $out"
+  pass "a shell under a treehouse launcher that started after the spawn, under the pane, is the spawn's own"
+}
+
+test_a_launcher_that_started_before_the_spawn_does_not_own_its_shell() {
+  local out
+  out=$(holders_scenario older '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "300": [200, "treehouse", 950.0], "400": [300, "bash", 1002.0]}' '{}' "$HOLD_ROW" 200 '' '')
+  assert_contains "$out" "H"$'\t'"a live process (pid 400" "a launcher older than the spawn owned its shell: $out"
+  pass "a launcher that started before the spawn is not the spawn's own"
+}
+
+test_an_ancestor_not_named_treehouse_does_not_own_the_shell() {
+  local out
+  out=$(holders_scenario name '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "300": [200, "launcher", 1001.0], "400": [300, "bash", 1002.0]}' '{}' "$HOLD_ROW" 200 '' '')
+  assert_contains "$out" "H"$'\t'"a live process (pid 400" "an ancestor with another name owned the shell: $out"
+  pass "an ancestor that is not named treehouse does not make a shell the spawn's own"
+}
+
+test_a_launcher_that_does_not_run_under_the_named_pane_does_not_own_the_shell() {
+  local out
+  out=$(holders_scenario pane '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "300": [1, "treehouse", 1001.0], "400": [300, "bash", 1002.0]}' '{}' "$HOLD_ROW" 200 '' '')
+  assert_contains "$out" "H"$'\t'"a live process (pid 400" "a launcher outside the pane owned the shell: $out"
+  pass "a launcher that does not run under the named pane does not own the shell"
+}
+
+test_a_shell_whose_parent_chain_cannot_be_read_is_a_holder() {
+  local out
+  out=$(holders_scenario chain '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "400": [300, "bash", 1002.0]}' '{}' "$HOLD_ROW" 200 '' '')
+  assert_contains "$out" "H"$'\t'"a live process (pid 400" "a shell with an unreadable parent was excused: $out"
+  pass "a shell whose parent chain cannot be read is a holder"
+}
+
+test_a_backend_with_no_pane_pid_excuses_a_shell_under_a_later_launcher() {
+  local out
+  out=$(holders_scenario nopane "$HOLD_BASE" '{}' "$HOLD_ROW" '' '' '')
+  [ -z "$out" ] || fail "a shell under a later launcher was a holder on a backend with no pane pid: $out"
+  pass "with no pane pid, a shell under a later treehouse launcher is the spawn's own"
+}
+
+# The recorded endpoint (pid 200, started at 900.0) is the root of this task's own lineage on a relaunch.
+TREE_EXES='{"200": ["/bin/bash", "bash", "bash"], "450": ["/bin/bash", "bash", "bash"], "500": ["/bin/bash", "bash", "bash"]}'
+
+test_a_process_in_the_recorded_tree_is_reported_with_every_member_up_to_the_root() {
+  local out
+  out=$(holders_scenario tree '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "450": [200, "bash", 950.0], "500": [450, "bash", 1100.0]}' "$TREE_EXES" $'p500\ncbash\nn/slot\n' '' 200 900.0)
+  assert_contains "$out" "T"$'\t'"500"$'\x1f'"500"$'\x1f'"/bin/bash"$'\x1f'"bash"$'\x1f'"bash"$'\x1f'"450" "the tree row did not start with the holder and its own member: $out"
+  assert_contains "$out" $'\x1f'"200"$'\x1f'"/bin/bash" "the tree row stopped before the recorded root: $out"
+  pass "a process in the recorded tree is reported with every member up to the root"
+}
+
+test_a_process_beside_the_recorded_tree_is_a_holder() {
+  local out
+  out=$(holders_scenario beside '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "600": [1, "bash", 1100.0]}' '{"200": ["/bin/bash", "bash", "bash"], "600": ["/bin/bash", "bash", "bash"]}' $'p600\ncbash\nn/slot\n' '' 200 900.0)
+  assert_contains "$out" "H"$'\t'"a live process (pid 600" "a process outside the recorded tree was excused: $out"
+  pass "a process whose chain does not reach the recorded root is a holder"
+}
+
+test_a_process_beside_the_tree_with_an_unreadable_chain_is_unknown() {
+  local out
+  out=$(holders_scenario unreadable '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "700": [9999, "bash", 1100.0]}' '{"200": ["/bin/bash", "bash", "bash"]}' $'p700\ncbash\nn/slot\n' '' 200 900.0)
+  assert_contains "$out" "U"$'\t'"the parent chain of a live process (pid 700" "an unreadable chain was not unknown: $out"
+  pass "a live process whose chain cannot be read is unknown, never excused"
+}
+
+test_a_recorded_root_with_another_start_time_ends_the_probe() {
+  local out
+  out=$(holders_scenario start '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0]}' '{}' '' '' 200 123.0)
+  assert_contains "$out" "start time does not match" "a recorded root with another start time was accepted: $out"
+  assert_contains "$out" "EXIT 3" "the probe did not end with its failure code: $out"
+  pass "a recorded root whose start time does not match ends the probe"
+}
+
+test_a_tree_member_whose_executable_cannot_be_read_is_unknown() {
+  local out
+  out=$(holders_scenario noexe '{"100": [1, "bash", 1000.0], "200": [1, "bash", 900.0], "500": [200, "bash", 1100.0]}' '{"200": ["/bin/bash", "bash", "bash"]}' $'p500\ncbash\nn/slot\n' '' 200 900.0)
+  assert_contains "$out" "U"$'\t'"the executable or argv of a process (pid 500" "an unreadable tree member was not unknown: $out"
+  pass "a tree member whose executable or argv cannot be read is unknown"
+}
+
+# tree_row_case <label> <want-rc> <want-text-or-empty> <row-fields...>: fm_slot_holders_or_skip with a canned T row. The fields are
+# the holder pid, then one group of pid, path, argv0, args per tree member.
+tree_row_case() {
+  local label=$1 want=$2 text=$3 row="" field out rc=0
+  shift 3
+  for field in "$@"; do row="${row:+$row$'\x1f'}$field"; done
+  make_world "tree-row-$RANDOM" 1
+  out=$(
+    # shellcheck disable=SC2329 # Called by fm_slot_holders_or_skip.
+    fm_slot_probe() {
+      if [ "$1" = holders ]; then printf 'T\t%s\n' "$row"; return 0; fi
+      python3 -I -c "$FM_SLOT_PROBE_PY" "$@"
+    }
+    fm_slot_holders_or_skip "$W_SLOT" "$W_PROJ" 2>&1
+  ) || rc=$?
+  [ "$rc" = "$want" ] || fail "$label: expected the code $want, got $rc: $out"
+  [ -z "$text" ] || assert_contains "$out" "$text" "$label: the message did not say what was expected"
+  pass "$label"
+}
+
+test_a_tree_of_ordinary_programs_does_not_hold_the_slot() {
+  tree_row_case "a recorded tree of a shell and sleep is not a holder" 0 "" 500 500 /bin/bash bash bash 450 /bin/sleep sleep "sleep 300"
+}
+
+test_an_agent_by_path_in_the_recorded_tree_holds_the_slot() {
+  tree_row_case "an agent named by its executable path holds the slot" 20 "(live_holder)" 500 500 /opt/claude/bin/claude claude claude
+}
+
+test_an_agent_named_only_by_its_versions_directory_holds_the_slot() {
+  tree_row_case "an agent whose path is under claude/versions holds the slot" 20 "(live_holder)" 500 500 /opt/claude/versions/2.1.220 "" ""
+}
+
+test_a_node_process_whose_argv0_names_a_harness_holds_the_slot() {
+  tree_row_case "a node process with a harness argv0 holds the slot" 20 "(live_holder)" 500 500 /usr/bin/node /opt/codex/bin/codex "node /srv/app.js"
+}
+
+test_a_node_process_running_a_gemini_script_by_its_arguments_holds_the_slot() {
+  tree_row_case "a node process whose arguments name the Gemini CLI holds the slot" 20 "(live_holder)" 500 500 /usr/bin/node node "node /x/lib/node_modules/@google/gemini-cli/dist/index.js"
+}
+
+test_an_agent_that_is_not_the_first_tree_member_holds_the_slot() {
+  tree_row_case "an agent behind an ordinary first member holds the slot" 20 "(live_holder)" 500 500 /bin/bash bash bash 450 /opt/claude/bin/claude claude claude 400 /bin/bash bash bash
+}
+
+test_a_tree_row_is_unknown_when_the_agent_classifier_is_not_loaded() {
+  local out rc=0
+  make_world tree-row-noclassifier 1
+  out=$(
+    unset -f fm_agent_process_classify_name fm_agent_process_classify
+    # shellcheck disable=SC2329 # Called by fm_slot_holders_or_skip.
+    fm_slot_probe() {
+      if [ "$1" = holders ]; then printf 'T\t500\037500\037/bin/bash\037bash\037bash\n'; return 0; fi
+      python3 -I -c "$FM_SLOT_PROBE_PY" "$@"
+    }
+    fm_slot_holders_or_skip "$W_SLOT" "$W_PROJ" 2>&1
+  ) || rc=$?
+  [ "$rc" = 21 ] || fail "a tree row with no classifier was not refused as unknown (rc $rc): $out"
+  assert_contains "$out" "(unknown_holders)" "the refusal did not name unknown_holders"
+  pass "with no agent classifier loaded, a recorded tree is unknown and refuses"
+}
+
 # D-E: any initialized submodule with an index flag (assume-unchanged, skip-worktree) is doubt, whatever its files hold.
 test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy() {
   make_submodule_world e1-assume
@@ -1819,7 +2009,7 @@ start_recorded_endpoint() {
 test_the_recorded_endpoint_tree_does_not_hold_the_slot() {
   make_world r91-tree
   advance_origin advanced.txt
-  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
     expect_moved "the shell treehouse opened under the recorded endpoint, in the slot, is this task's own lineage"
   cleanup_held
@@ -1828,7 +2018,7 @@ test_the_recorded_endpoint_tree_does_not_hold_the_slot() {
 test_a_foreign_shell_beside_the_recorded_tree_holds_the_slot() {
   make_world r91-foreign
   advance_origin advanced.txt
-  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   start_holder "$W_SLOT"
   sleep 0.3
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
@@ -1840,7 +2030,7 @@ test_a_reparented_orphan_in_the_slot_holds_it() {
   make_world r91-orphan
   advance_origin advanced.txt
   local file="$W_DIR/orphan.pid"
-  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   # shellcheck disable=SC2016 # The subshell expands its own $!.
   (cd "$W_SLOT" && sleep 300 & echo $! >"$file")
   sleep 0.3
@@ -1853,7 +2043,7 @@ test_a_reparented_orphan_in_the_slot_holds_it() {
 test_an_agent_in_the_recorded_tree_holds_the_slot() {
   make_world r91-agent
   advance_origin advanced.txt
-  start_recorded_endpoint claude || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint claude || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
     expect_skip "an agent inside the recorded tree still holds the slot" live_holder
   cleanup_held
@@ -1863,7 +2053,7 @@ test_an_agent_in_the_recorded_tree_holds_the_slot() {
 test_a_version_named_agent_in_the_recorded_tree_holds_the_slot() {
   make_world r101-versioned
   advance_origin advanced.txt
-  start_recorded_endpoint claude/versions/2.1.220 || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint claude/versions/2.1.220 || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
     expect_skip "an agent whose executable is named by its version, under claude/versions/, still holds the slot" live_holder
   cleanup_held
@@ -1872,7 +2062,7 @@ test_a_version_named_agent_in_the_recorded_tree_holds_the_slot() {
 test_a_node_named_agent_in_the_recorded_tree_holds_the_slot() {
   make_world r101-node
   advance_origin advanced.txt
-  start_recorded_endpoint node "$W_DIR/launcher/codex/bin/codex" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint node "$W_DIR/launcher/codex/bin/codex" || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
     expect_skip "a node process whose argv0 names a harness still holds the slot" live_holder
   cleanup_held
@@ -1885,7 +2075,7 @@ test_a_node_running_a_gemini_script_in_the_recorded_tree_holds_the_slot() {
   local script="$W_DIR/launcher/lib/node_modules/@google/gemini-cli/dist/index.js"
   mkdir -p "$(dirname "$script")"
   printf 'while :; do sleep 1; done\n' >"$script"
-  start_recorded_endpoint node "" "$script" "$(command -v bash)" || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint node "" "$script" "$(command -v bash)" || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=$ENDPOINT_START \
     expect_skip "a node process whose first argument is a Gemini CLI script still holds the slot" live_holder
   cleanup_held
@@ -1914,7 +2104,7 @@ test_a_tree_member_with_an_empty_argv_is_still_judged_by_its_path() {
 test_an_unreadable_recorded_window_excuses_nobody() {
   make_world r91-unreadable
   advance_origin advanced.txt
-  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID='' FM_SLOT_ENDPOINT_START='' \
     expect_skip "with no readable recorded window, the recorded tree's shell holds the slot" live_holder
   cleanup_held
@@ -1923,7 +2113,7 @@ test_an_unreadable_recorded_window_excuses_nobody() {
 test_a_recorded_endpoint_whose_start_time_does_not_match_refuses() {
   make_world r91-start
   advance_origin advanced.txt
-  start_recorded_endpoint || { pass "SKIPPED: this host cannot run a renamed copy of bash"; return 0; }
+  start_recorded_endpoint || fail "the fixture needs a renamed copy of bash and could not be built; the case proves nothing without it"
   [ -n "$ENDPOINT_START" ] || fail "the probe could not read the endpoint's start time"
   FM_SLOT_SPAWN_PID=$MARKER_PID FM_SLOT_ENDPOINT_PID=$ENDPOINT_PID FM_SLOT_ENDPOINT_START=1 \
     expect_skip "a recorded endpoint whose start time does not match refuses" unknown_holders
@@ -2052,6 +2242,24 @@ CASES=(
   test_the_checked_out_branch_changing_during_the_move_fails_it
   test_an_ignored_file_below_a_directory_the_target_replaces_with_a_file_is_skipped
   test_a_commit_after_the_proof_that_makes_git_refuse_is_a_failure_not_a_skip
+  test_a_shell_under_a_later_launcher_under_the_pane_is_the_spawns_own
+  test_a_launcher_that_started_before_the_spawn_does_not_own_its_shell
+  test_an_ancestor_not_named_treehouse_does_not_own_the_shell
+  test_a_launcher_that_does_not_run_under_the_named_pane_does_not_own_the_shell
+  test_a_shell_whose_parent_chain_cannot_be_read_is_a_holder
+  test_a_backend_with_no_pane_pid_excuses_a_shell_under_a_later_launcher
+  test_a_process_in_the_recorded_tree_is_reported_with_every_member_up_to_the_root
+  test_a_process_beside_the_recorded_tree_is_a_holder
+  test_a_process_beside_the_tree_with_an_unreadable_chain_is_unknown
+  test_a_recorded_root_with_another_start_time_ends_the_probe
+  test_a_tree_member_whose_executable_cannot_be_read_is_unknown
+  test_a_tree_of_ordinary_programs_does_not_hold_the_slot
+  test_an_agent_by_path_in_the_recorded_tree_holds_the_slot
+  test_an_agent_named_only_by_its_versions_directory_holds_the_slot
+  test_a_node_process_whose_argv0_names_a_harness_holds_the_slot
+  test_a_node_process_running_a_gemini_script_by_its_arguments_holds_the_slot
+  test_an_agent_that_is_not_the_first_tree_member_holds_the_slot
+  test_a_tree_row_is_unknown_when_the_agent_classifier_is_not_loaded
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"
