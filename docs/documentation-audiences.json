@@ -725,6 +725,10 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/contract-review/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/ship-landing/SKILL.md",
       "audience": "agent-runtime"
     },

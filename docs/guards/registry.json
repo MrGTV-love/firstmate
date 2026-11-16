@@ -158,7 +158,8 @@
     "send-states-its-choice",
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
-    "slack-command-refusal-line"
+    "slack-command-refusal-line",
+    "contract-review-pack-unclassified-text"
   ],
   "guards": [
     {
@@ -7235,6 +7236,37 @@
         }
       ],
       "layer_note": "Registers the existing per-line protection, not a new refusal or permission. test_malformed_check_events_keep_delivery_and_cadence drives the real watcher with missing delimiters, invalid identities, valid events and ordinary state; it checks malformed payload exclusion and reported counts while valid delivery, coalescing and cadence continue. The site mapping preserves S1/S2 visibility rather than removing refusal vocabulary from the scan."
+    },
+    {
+      "id": "contract-review-pack-unclassified-text",
+      "version": "1",
+      "owner": "bin/fm-contract-review-pack.sh",
+      "invariant": "a contract-review pack is never written from a contract whose text the section filter cannot classify",
+      "layer": "runtime-block",
+      "source": "the contract file named by --contract, read by the filter_sections awk program in bin/fm-contract-review-pack.sh against CONTRACT_SECTIONS and CONTRACT_SUBSECTIONS",
+      "trigger": "bin/fm-contract-review-pack.sh build meets an unknown sub-heading inside a known section, a first level 1 heading that starts with a known section name but is not one, a criterion sub-section name outside a known section, a Definition Of Done that holds no text, or a code fence that never closes",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "give the text a known heading or move it out of the contract, then build again: bin/fm-contract-review-pack.sh build --root <repo root> --contract <contract>",
+      "budget": 1,
+      "budget_reason": "One refused build per invocation; no cross-invocation counter is implemented, and the caller fixes the contract before it builds again.",
+      "telemetry": "Not instrumented under this id; the refusal reaches the caller as exit 3 with one fm-contract-review-pack: refused: line per cause on stderr. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-contract-review.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-contract-review-pack.sh",
+          "match": "echo \"fm-contract-review-pack: refused: $why\" >&2"
+        }
+      ],
+      "layer_note": "Registers the existing builder refusal, not a new refusal or permission: the build exits 3 before it writes any pack, so a reviewer never judges a contract with an unclassified part dropped. test_unknown_heading_inside_a_known_section_refused, test_unclosed_fence_refused and test_criterion_title_with_an_author_term_refused prove the refusal, and test_known_sections_pass_byte_identical proves a contract of known sections builds."
     }
   ],
   "excluded": [
