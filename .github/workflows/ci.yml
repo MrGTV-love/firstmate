@@ -133,6 +133,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Full history: the lint cases run bin/fm-lint.sh, whose limit-literal check compares against origin/main.
+          fetch-depth: 0
       - name: Run the concurrency proofs under their own passes
         run: |
           set -eu

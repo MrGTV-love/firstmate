@@ -1502,7 +1502,7 @@ def case_unusable_modes():
     nopython.mkdir()
     for directory in ('/usr/bin', '/bin', '/usr/sbin', '/sbin'):
         for name in os.listdir(directory):
-            if not name.startswith(('python', 'pip')) and not (nopython / name).exists():
+            if not name.startswith(('python', 'pip')) and not os.path.lexists(nopython / name):
                 os.symlink(os.path.join(directory, name), nopython / name)
     marker = world.folder / 'marker'
     codes = wait_all([world.launch('pool', ['bash', tool('fm-cpu-pass.sh'), 'run', '--', 'bash', '-c', show, '_', str(marker)], extra=dict(PATH=str(nopython)))], timeout=120)
