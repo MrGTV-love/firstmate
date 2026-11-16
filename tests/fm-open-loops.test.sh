@@ -686,9 +686,37 @@ domain = teardown_rows['closed-domain']
 assert not domain['overdue'] and 'child child-1' in domain['next_action'], domain
 pending[0].unlink()
 assert 'closed-pool' not in rows(ledger(), 'interrupted_teardown'), 'a completed teardown is no longer open work'
+linked_target = home / 'linked-pool.target'
+linked_target.write_text('spawn_gen=g0\nslot=/pool/linked-pool/project\n')
+(home / 'state' / 'linked-pool.meta').write_text('kind=ship\nspawn_gen=g5\n')
+linked_marker = home / 'state' / 'linked-pool.teardown-return-pending'
+linked_marker.symlink_to(linked_target)
+linked_rows = rows(ledger(), 'interrupted_teardown')
+assert 'linked-pool' in linked_rows, linked_rows
+assert 'fm-teardown.sh linked-pool' in linked_rows['linked-pool']['next_action'], linked_rows
+assert linked_rows['linked-pool']['evidence'] == '/pool/linked-pool/project', linked_rows
+linked_marker.unlink()
+linked_fifo = home / 'linked-pool.fifo'
+os.mkfifo(linked_fifo)
+linked_marker.symlink_to(linked_fifo)
+linked_rows = rows(ledger(), 'interrupted_teardown')
+assert linked_rows['linked-pool']['evidence'] == '', 'a link to a FIFO is pending with no evidence, never a blocked read'
+linked_marker.unlink()
+(home / 'state' / 'other-pool.meta').write_text('kind=ship\nspawn_gen=g1\n')
+other_record = home / 'state' / 'other-pool.teardown-return-pending'
+other_record.write_text('spawn_gen=g0\nslot=/pool/other-pool/project\nchild=other-child\n')
+linked_marker.symlink_to(other_record)
+linked_rows = rows(ledger(), 'interrupted_teardown')
+assert linked_rows['linked-pool']['evidence'] == '', 'a link to another task\'s record never borrows its slot'
+assert 'other-child' not in linked_rows['linked-pool']['next_action'], linked_rows
+linked_marker.unlink()
+other_record.unlink()
+(home / 'state' / 'other-pool.meta').unlink()
+linked_fifo.unlink()
+linked_target.unlink()
 for marker in pending[1:]:
     marker.unlink(missing_ok=True)
-for task_id in ('closed-pool', 'closed-domain', 'respawned-pool'):
+for task_id in ('closed-pool', 'closed-domain', 'respawned-pool', 'linked-pool'):
     (home / 'state' / (task_id + '.meta')).unlink()
 print('PASS: interrupted teardown records bound to the current task record', flush=True)
 
@@ -2013,6 +2041,17 @@ assert rows()['scout']['overdue']
 refused = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--check-in', 'worker'],
                          env=dict(env, FM_HOME=''), text=True, capture_output=True, timeout=120)
 assert refused.returncode == 1 and 'FM_HOME is required' in refused.stdout
+# A reserved key a supervisor raised (a pending-reply expectation) is not the report's own wait, so the silent
+# report stays eligible and its check-in reaches a task that fm-send sees as holding an open keyed decision.
+# The check-in answers none of them and states --answers-none (fm-send header, "Decision closure"), so fm-send
+# delivers it and the key stays open.
+status('scout', f'blocked [at={now - 901}] [key=pending-reply-abcdef0123456789]: pending-reply-missed: task=scout pending-reply-id=abcdef0123456789 request=ship it\n', now - 901)
+assert rows()['scout']['overdue']
+scout_status_before = (home / 'state/scout.status').read_text()
+call('--check-in', 'scout')
+scout_messages = list((home / 'state/scout.inbox').glob('*.msg')); assert len(scout_messages) == 1, scout_messages
+assert 'report progress' in scout_messages[0].read_text()
+assert (home / 'state/scout.status').read_text() == scout_status_before
 print('PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run', flush=True)
 PY
 

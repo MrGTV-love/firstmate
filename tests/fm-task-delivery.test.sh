@@ -520,6 +520,8 @@ test_promotion_delivers_the_real_definition_of_done() {
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
 # Capture the message a promoted worker would receive, instead of steering one.
+# The printed command carries no answers flag: the target and the text only.
+[ "$#" -eq 2 ] || exit 64
 printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
@@ -626,6 +628,7 @@ test_promotion_teaches_the_closes_line_only_where_a_pr_body_exists() {
   mkdir -p "$home/state" "$sendroot/bin"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
+[ "$#" -eq 2 ] || exit 64
 printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
@@ -648,6 +651,35 @@ STUB
     fi
   done
   pass "promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only"
+}
+
+# A promotion often answers the scout's own keyed question, so the delivery command
+# promotion prints states no answers choice: run as printed against the real
+# fm-send.sh, it refuses while the key is open and names it, and the sender chooses.
+test_promotion_delivery_command_makes_the_sender_choose() {
+  local home id out cmd err rc fakebin
+  home="$TMP_ROOT/promote-choice/home"
+  fakebin="$TMP_ROOT/promote-choice/fakebin"
+  id=promote-choice-c1
+  mkdir -p "$home/state" "$fakebin"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/tmux"
+  chmod +x "$fakebin/tmux"
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+  FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
+    || fail "scout brief generation should succeed"
+  fill_brief_subsections "$home/data/$id/brief.md" "Build what the scout found." "Keep the scope."
+  printf 'needs-decision [key=ship-it]: should I build it?\n' > "$home/state/$id.status"
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1) \
+    || fail "promotion should succeed: $out"
+  cmd=$(printf '%s\n' "$out" | sed -n 's/^next: //p' | grep 'fm-send\.sh')
+  [ -n "$cmd" ] || fail "promotion printed no delivery command: $out"
+  err="$TMP_ROOT/promote-choice/send.err"
+  ( cd "$ROOT" && PATH="$fakebin:$PATH" FM_SEND_SETTLE=0 eval "$cmd" ) >/dev/null 2>"$err"
+  rc=$?
+  [ "$rc" -eq 1 ] || fail "the printed delivery command should refuse while ship-it is open (rc=$rc): $(cat "$err")"
+  assert_grep "[key=ship-it] needs-decision" "$err" "the refusal did not name the open key"
+  assert_absent "$home/state/$id.inbox" "the refused delivery command wrote a steering record"
+  pass "fm-promote: the printed delivery command states no choice, so fm-send refuses while a key is open and names it"
 }
 
 test_promotion_persists_the_selected_ship_branch() {
@@ -1923,6 +1955,7 @@ test_promotion_carries_the_forge_binding() {
   printf '%s\n' '- proj [no-mistakes forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
+[ "$#" -eq 2 ] || exit 64
 printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
@@ -1997,6 +2030,7 @@ EOF
   mkdir -p "$sendroot/bin"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
+[ "$#" -eq 2 ] || exit 64
 printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
@@ -2133,6 +2167,7 @@ test_promote_requires_and_records_the_delivery_contract
 test_promote_refuses_a_symlinked_task_record
 test_promotion_delivers_the_real_definition_of_done
 test_promotion_teaches_the_closes_line_only_where_a_pr_body_exists
+test_promotion_delivery_command_makes_the_sender_choose
 test_promotion_persists_the_selected_ship_branch
 test_promotion_branch_command_is_shell_safe
 test_local_merge_uses_the_recorded_ship_branch
@@ -2205,11 +2240,15 @@ EOF
   status=$?
   [ "$status" -ne 0 ] || fail 'promotion admitted a refused slot'
   assert_contains "$out" 'manifest_live_owner' 'promotion lost the actual governed refusal'
-  cmp -s "$meta" "$meta.before" || fail 'refused promotion changed scout metadata'
+  # R4-5: the record names the branch the copy is left on; nothing else in it changes.
+  diff <(grep -v '^branch=' "$meta") "$meta.before" >/dev/null || fail 'refused promotion changed scout metadata beyond the branch it names'
   cmp -s "$brief" "$brief.before" || fail 'refused promotion changed the scout contract'
-  [ "$(git -C "$slot" branch --show-current)" = "$original_branch" ] || fail 'refused promotion changed the scout checkout'
+  # Main 1886 CUT: a refusal does nothing. The copy stays on the task branch the provisioning step set, at the same commit;
+  # the scout's own branch is where it was; nothing is switched back and nothing is deleted.
+  [ "$(git -C "$slot" branch --show-current)" = "fm/$id" ] || fail 'refused promotion switched the copy off the task branch'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$original_head" ] || fail 'refused promotion moved HEAD'
   [ "$(git -C "$slot" rev-parse "refs/heads/$original_branch")" = "$original_head" ] || fail 'refused promotion moved the scout branch'
-  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion left its own task branch behind'
+  assert_contains "$out" 'left exactly where it is' 'the refusal did not say where the copy is'
   assert_absent "$home/data/$id/ship-instructions.md" 'refused promotion published ship instructions'
   assert_absent "$slot/.claude/worktrees" 'refused promotion created nested isolation'
   printf 'scout work\n' > "$slot/scout-work.txt"
@@ -2221,15 +2260,14 @@ EOF
   [ "$status" -ne 0 ] || fail 'retried promotion admitted a refused slot'
   assert_not_contains "$out" "is not at the assigned copy's HEAD" 'retry was blocked by the earlier refused promotion'
   assert_contains "$out" 'manifest_live_owner' 'retry did not reach the project owner'
-  [ "$(git -C "$slot" branch --show-current)" = "$original_branch" ] || fail 'retry changed the scout checkout'
-  [ "$(git -C "$slot" rev-parse "refs/heads/$original_branch")" = "$advanced" ] || fail 'retry lost the advanced scout work'
+  [ "$(git -C "$slot" branch --show-current)" = "fm/$id" ] || fail 'retry changed the checkout'
+  [ "$(git -C "$slot" rev-parse "refs/heads/fm/$id")" = "$advanced" ] || fail 'retry lost the advanced scout work'
   [ "$(cat "$slot/scout-work.txt")" = 'scout work' ] || fail 'retry lost the scout content'
-  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused retry left its own task branch behind'
-  pass 'governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner'
+  pass 'governed promotion preserves scout metadata, instructions, branch and work on refusal, switches nothing back, and a retry after the scout advances reaches the project owner'
 }
 
-# Only the alias this refused call created is removed: a task branch that
-# already existed, or that gained work while the project owner ran, survives.
+# A refusal deletes nothing: a task branch that already existed, or that gained work while the project owner ran, survives,
+# and the copy stays where the refusal found it.
 test_refused_promotion_preserves_other_task_branches() {
   local rec home proj id=promote-slot-existing slot out head moved
   rec=$(promotion_refusal_fixture promote-slot-existing "$id")
@@ -2241,6 +2279,7 @@ EOF
   if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
   assert_contains "$out" 'manifest_live_owner' 'pre-existing task branch case lost the refusal'
   [ "$(git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id")" = "$head" ] || fail 'refused promotion deleted a pre-existing task branch'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$head" ] || fail 'refused promotion moved HEAD'
 
   id=promote-slot-moved
   rec=$(promotion_refusal_fixture promote-slot-moved "$id" \
@@ -2250,15 +2289,17 @@ $rec
 EOF
   head=$(git -C "$slot" rev-parse HEAD)
   if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
-  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: fm/$id moved from" 'moved task branch was not reported as preserved'
   moved=$(git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id") || fail 'refused promotion deleted a task branch that gained work'
   [ "$moved" != "$head" ] && [ "$(git -C "$slot" rev-parse "$moved^")" = "$head" ] || fail 'moved task branch lost its work'
-  [ "$(git -C "$slot" rev-parse HEAD)" = "$head" ] || fail 'refused promotion did not restore the scout checkout'
-  pass 'refused promotion preserves a pre-existing task branch and one that gained work'
+  # Main 1886 CUT: HEAD is the commit the provisioner made, on the task branch; nothing is switched back, even when the
+  # tree of that commit equals the tree of the scout head.
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$moved" ] || fail 'refused promotion switched HEAD off the commit the provisioner made'
+  assert_contains "$out" "left exactly where it is (refs/heads/fm/$id at $moved)" 'the refusal did not say where the copy is'
+  pass 'refused promotion keeps a pre-existing task branch and one that gained work, and leaves the copy as it found it'
 }
 
-# A legacy scout works at a detached HEAD. Its refused promotion removes only
-# the alias it created, so the scout's later detached work never blocks a retry.
+# A legacy scout works at a detached HEAD. Its refused promotion deletes nothing and switches nothing back: the copy stays on
+# the task branch the provisioning step created from that commit, and the scout's later work on it never blocks a retry.
 test_refused_detached_promotion_retries_after_scout_advances() {
   local rec home proj id=promote-slot-detached slot out original advanced
   rec=$(promotion_refusal_fixture promote-slot-detached "$id")
@@ -2270,10 +2311,8 @@ EOF
   original=$(git -C "$slot" rev-parse HEAD)
   if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused detached slot'; fi
   assert_contains "$out" 'manifest_live_owner' 'detached promotion lost the actual governed refusal'
-  assert_not_contains "$out" 'preserving task branch' 'detached rollback did not prove its own alias unused'
-  ! git -C "$slot" symbolic-ref -q HEAD >/dev/null || fail 'refused promotion left the detached scout on a branch'
+  [ "$(git -C "$slot" branch --show-current)" = "fm/$id" ] || fail 'a refusal switched the copy off the task branch the provisioning step set'
   [ "$(git -C "$slot" rev-parse HEAD)" = "$original" ] || fail 'refused promotion moved the detached scout'
-  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused detached promotion left its own task branch behind'
   printf 'detached scout work\n' > "$slot/scout-work.txt"
   git -C "$slot" add scout-work.txt
   git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'detached scout advances after refusal'
@@ -2284,7 +2323,7 @@ EOF
   [ "$(git -C "$slot" rev-parse HEAD)" = "$advanced" ] || fail 'detached retry lost the advanced scout work'
   [ "$(git -C "$slot" rev-parse "$advanced^")" = "$original" ] || fail 'detached retry lost the original scout commit'
   [ "$(cat "$slot/scout-work.txt")" = 'detached scout work' ] || fail 'detached retry lost the scout content'
-  pass 'refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner'
+  pass 'refused detached promotion deletes nothing, and a retry after the scout advances reaches the project owner'
 }
 
 # A project that declared the alias in a PASS manifest has used it, even when
@@ -2309,12 +2348,10 @@ EOF
   printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts/\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
   if out=$(FM_TEST_SLOT_RECORD="$manifest" run_promotion "$home" "$id"); then fail 'promotion admitted a mismatched declaration'; fi
   assert_contains "$out" 'provisioner identity mismatch: owned_paths' 'declared mismatch lost its attestation refusal'
-  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: the project report may declare it" \
-    'project-declared alias was not reported as preserved'
   git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion deleted a project-declared task branch'
   assert_grep "\"branch\": \"fm/$id\"" "$manifest" 'refused promotion changed the project manifest'
-  [ "$(git -C "$slot" branch --show-current)" = scout-retained ] || fail 'refused promotion did not restore the scout checkout'
-  pass 'refused promotion preserves a task branch the project declared before attestation refused it'
+  [ "$(git -C "$slot" branch --show-current)" = "fm/$id" ] || fail 'refused promotion switched the copy off the task branch'
+  pass 'refused promotion keeps a task branch the project declared before attestation refused it'
 }
 
 # Recorded scope is Firstmate's own frozen contract: a caller's --owned-path is
@@ -2357,8 +2394,32 @@ PY
   pass 'promotion refuses to override recorded slot scope before provisioning or rewriting the record'
 }
 
+# R4-5: a refused governed promotion leaves the copy on the task branch the provisioning step set. The task record names that
+# branch, the refusal says where the copy is and what to do next, and a scout commit made after it lands on the recorded branch.
+test_refused_promotion_records_the_branch_the_copy_is_on() {
+  local rec home proj id=promote-slot-recorded slot out recorded tip
+  rec=$(promotion_refusal_fixture promote-slot-recorded "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
+  assert_contains "$out" 'manifest_live_owner' 'the case lost the governed refusal'
+  recorded=$(sed -n 's/^branch=//p' "$home/state/$id.meta")
+  [ "$recorded" = "fm/$id" ] || fail "the task record names branch '$recorded', not fm/$id, the branch the copy is on"
+  [ "$(git -C "$slot" branch --show-current)" = "$recorded" ] || fail 'the copy is not on the branch the task record names'
+  assert_contains "$out" "$slot is on branch fm/$id" 'the refusal did not name the branch the copy is on'
+  assert_contains "$out" "next:" 'the refusal did not name the next action'
+  printf 'scout work after the refusal\n' > "$slot/after-refusal.txt"
+  git -C "$slot" add after-refusal.txt
+  git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'scout work after the refusal'
+  tip=$(git -C "$slot" rev-parse HEAD)
+  [ "$(git -C "$slot" rev-parse "refs/heads/$recorded")" = "$tip" ] || fail 'the scout commit did not land on the branch the task record names'
+  pass 'a refused governed promotion records the branch the copy is on, says what to do next, and later scout commits land there'
+}
+
 test_governed_promotion_preserves_scout_on_refusal
 test_refused_promotion_preserves_other_task_branches
+test_refused_promotion_records_the_branch_the_copy_is_on
 test_refused_detached_promotion_retries_after_scout_advances
 test_refused_promotion_preserves_project_declared_branch
 test_promotion_refuses_recorded_scope_override
