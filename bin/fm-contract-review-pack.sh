@@ -25,6 +25,11 @@
 # as skill://, whose real path is exactly one of define-done-and-grading/SKILL.md,
 # OPERATIONAL-BOUNDARIES.md and CLI-EXAMPLE.md, or assess-done-and-grade/SKILL.md, inside the
 # installed skills folder. Any other file there, and a link that resolves outside it, still voids.
+# Harm-model reassessment (Main 2042): a ?q= query suffix names the same file, so the set of
+# authorized files does not change (the exclusion, copy-byte and tracked tests still judge that
+# file); a numbered Inputs read heading is still the list, and a report with no such heading
+# still voids; a read or search path under the root's .git folder is refused, which only adds a
+# refusal.
 # Known limits: author text inside a request, a context file or a known section reaches the
 # reviewer; shell, eval, other tools and unrecorded subagents leave a round unverified; a
 # read that leaves no record cannot be seen; a falsifier saved through bash, or a file a
@@ -101,7 +106,7 @@
 #   Judged reads: read and edit paths and skill:// reads (a trailing :selector such as :raw:1-11 or :-1,
 #   and for a path a ?q=... query suffix in its last component, is removed one segment at a
 #   time; the read is authorized when the path or one of these shorter forms is; a path
-#   under .git is not a tracked file), every [<path>#...] target line of an edit with no path (an edit with
+#   under .git is not a tracked file, and a search under .git is refused), every [<path>#...] target line of an edit with no path (an edit with
 #   neither is unverified), and grep, glob and find roots.
 #   Every session record must name a folder under the recorded work folder, else the round
 #   is void: the transcript never chooses its own work folder.
@@ -548,6 +553,8 @@ def under(p, d):
 genv = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")}
 def git(*args):
     return subprocess.run(["git", "-C", root] + list(args), env=genv, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+def git_dir_path(p):
+    return p != root and os.path.relpath(p, root).split(os.sep)[0] == ".git"
 def tracked(rel):
     return git("ls-files", "--error-unmatch", "--", rel).returncode == 0
 def untracked_below(rel, ignored_too):
@@ -601,6 +608,8 @@ def why_file(p):
     if p in skill_files or (rubric_real and p == rubric_real):
         return None
     if under(p, root):
+        if git_dir_path(p):
+            return "a path under the .git folder of the root"
         if p != root and tracked(os.path.relpath(p, root)):
             return None
         return "untracked or gitignored file under the root"
@@ -626,6 +635,8 @@ def why_search(p, ignored_too):
     if under(work, p):
         return "a search of a parent of the work folder"
     if under(p, root):
+        if git_dir_path(p):
+            return "a search of the .git folder of the root"
         rel = "" if p == root else os.path.relpath(p, root)
         if untracked_below(rel, ignored_too):
             return "a search that reaches untracked " + ("or ignored " if ignored_too else "") + "files under the root"

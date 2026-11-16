@@ -874,6 +874,29 @@ test_query_suffix_read_is_judged_by_its_file() {
   pass "a ?q= read is judged by its file: clean for a tracked file, a leak for an untracked, ignored, excluded or .git file"
 }
 
+test_search_under_git_folder_is_a_leak() {
+  local log="$TMP_ROOT/gitdir/s.jsonl" call n=0
+  make_leak_world
+  # Main 2042 L-3: a path under .git is not tracked context, so a search there is not clean.
+  for call in "$(tool_call grep pattern x path "$LEAK_ROOT/.git" gitignore true)" \
+    "$(tool_call find pattern '*' path "$LEAK_ROOT/.git/refs")" \
+    "$(tool_call glob path "$LEAK_ROOT/.git/refs/**")" \
+    "$(tool_call grep pattern x path "$LEAK_ROOT/.git/logs" gitignore true)" \
+    "$(tool_call read path "$LEAK_ROOT/.git/HEAD")"; do
+    n=$((n + 1))
+    write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")" "$call"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" ".git case $n was not a leak: $call -> $CHECK_OUT"
+    assert_contains "$CHECK_OUT" "INPUT LEAK" ".git case $n did not report a leak"
+  done
+  # Controls: a gitignore true search over a tracked folder and a read of a tracked file stay clean.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call grep pattern sh path "$LEAK_ROOT/bin" gitignore true)" \
+    "$(tool_call read path "$LEAK_ROOT/notes/plan.md")"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "a tracked search or read was flagged: $CHECK_OUT"
+  pass "a read or search under the root's .git folder is a leak; tracked reads and searches stay clean"
+}
+
 test_numbered_inputs_read_heading_is_the_list() {
   local log="$TMP_ROOT/nih/s.jsonl" h n=0
   make_leak_world
@@ -931,5 +954,6 @@ fm_test_run_cases \
   test_named_installed_skill_files_are_clean \
   test_work_folder_read_needs_the_allowed_set \
   test_query_suffix_read_is_judged_by_its_file \
+  test_search_under_git_folder_is_a_leak \
   test_numbered_inputs_read_heading_is_the_list \
   -- "$@"
