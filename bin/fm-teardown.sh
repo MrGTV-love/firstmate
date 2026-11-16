@@ -3403,7 +3403,7 @@ teardown_skipped_copy_landed() {  # <canonical copy path>
 # $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch).
 # This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
 # sweep, and only when that copy passes the same landed-work test as any other copy: a clean worktree
-# root whose HEAD is anchored or landed (teardown_landed), with no process running in it, no ignored file where the
+# root whose HEAD is landed (teardown_landed, with no recorded bundle accepting it; an anchor alone never releases), with no process running in it, no ignored file where the
 # branch a return resets it to tracks a path (teardown_return_collisions, the proof's own comparison), and its
 # lease still held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
