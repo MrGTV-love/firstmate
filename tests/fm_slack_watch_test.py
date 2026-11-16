@@ -5920,6 +5920,19 @@ def call(self, method, **fields):
             clock[0] += float(os.environ['INV4_DELAY'])      # a call of theirs that is slow and still succeeds
     return real(self, method, **fields)
 Replay.call = call
+if os.environ.get('INV4_LOCK_WAIT'):
+    # Another run holds the journal lock for INV4_LOCK_WAIT seconds from the start of this run, on this process's own clock (the fake one of the fixed-time
+    # modes): their DM proof, made while the check waits for the lock, ends first; the lock is then taken at the later of the two (Main 2187).
+    import threading as _lock_threads
+    _real_take = plane.Watch.take_lock
+    def _take_after_wait(self, wait):
+        if wait is not None:
+            for _t in _lock_threads.enumerate():
+                if _t.name == 'fm-slack-early-proof':
+                    _t.join()
+            clock[0] = max(clock[0], self.run_started + float(os.environ['INV4_LOCK_WAIT']))
+        return _real_take(self, wait)
+    plane.Watch.take_lock = _take_after_wait
 order = os.environ.get('INV4_ORDER')
 if order:
     real_call, real_line = Replay.call, plane.Out.line
@@ -5976,15 +5989,16 @@ with open(os.environ['INV4_LOG'] + '.threads', 'a') as log:
     # Every thread still running when the check ends, whatever its name: a reader left behind past the deadline is one of them.
     log.write('bounded-alive %d\n' % len([t for t in threading.enumerate() if t is not threading.main_thread() and t.is_alive()]))
     log.write('lookup-alive %d\n' % len([t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()]))
+    log.write('clock %.6f\n' % clock[0])
 sys.exit(code)
 """
 
-    def run_check(self, home, mode, name, command='poll', delay='0', order=None, server=''):
+    def run_check(self, home, mode, name, command='poll', delay='0', order=None, server='', lock_wait=''):
         """One run of the poll (or of the standing check, command='check') as the watcher runs a check: output to a private file, read after the process has
         ended. Returns (rc, captured output, Scott calls)."""
         log, captured = home.dir / (name + '.calls'), home.dir / (name + '.out')
         env = {**os.environ, 'INV4_MODE': mode, 'INV4_LOG': str(log), 'INV4_SECOND_DM': INV_SECOND_DM, 'INV4_SECOND': INV_SECOND, 'INV4_DELAY': delay,
-               'INV4_ORDER': str(order) if order else '', 'INV4_SERVER': server,
+               'INV4_ORDER': str(order) if order else '', 'INV4_SERVER': server, 'INV4_LOCK_WAIT': lock_wait,
                'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': command if command.startswith('check') else ''}
         with open(captured, 'w') as out:
             done = subprocess.run([sys.executable, '-c', self.DRIVER, 'check' if command.startswith('check') else command, '--replay', str(home.transcript)],
@@ -7996,34 +8010,43 @@ class Round8Findings(InvariantScenario):
     DRIVER = Invariant4OwnerFirst.DRIVER
     run_check = Invariant4OwnerFirst.run_check
 
+    def lock_wait_sweeps(self, home, delay, lock_wait):
+        """Three sweeps, each the owner's check then theirs as fresh processes, on the driver's fixed clock: every call of theirs takes `delay` seconds and another
+        run holds the journal lock for `lock_wait` seconds from the start of their check. Returns their posts after each sweep, the wakes, and each run's clock."""
+        posts, outs, clocks = [], [], []
+        for n in range(3):
+            self.run_check(home, 'normal', 'owner-%d' % n, command='check')
+            rc, out, _ = self.run_check(home, 'slow', 'second-%d' % n, command='check-second', delay=delay, lock_wait=lock_wait)
+            self.assertEqual(rc, 0, out)
+            outs.append(out)
+            posts.append(home.posts().count((INV_SECOND_DM, '200.000200')))
+            clocks.append(float([l for l in (home.dir / ('second-%d.calls.threads' % n)).read_text().split('\n') if l.startswith('clock ')][-1].split()[1]))
+        woken = sum(len(re.findall(r'slack request 200\.000200 from ' + INV_SECOND, o)) for o in outs)
+        return posts, woken, clocks
+
     def test_r8_r6_seven_second_calls_after_a_seven_second_lock_wait_still_deliver_once(self):
-        # Real time: in every sweep another run holds the journal lock for 7.1 s when their check starts, and every call of theirs takes about 7 s on the real
-        # transport (a loopback server sending its answer slowly). Their check proves their DM while it waits for the lock, so one more call still fits.
-        server = TrickleServer(size=70, duration=7.0)                           # every call of theirs takes 7 s of the wall clock
-        self.addCleanup(server.close)
+        # Main 2187: the boundary case, on a fixed clock (the earlier version paced calls and the lock by the wall clock and its 24 s and three-sweep oracles
+        # depended on host load). Another run holds the journal lock for 7.1 s when their check starts and every call of theirs takes 7 s. Their check proves
+        # their DM while it waits, so one more call still fits: in the first sweep the read ends at 14.1 s and the post would end at 21.1 s, 0.1 s past their
+        # 21 s budget, so it is not begun; the second sweep posts it at once. Delivered exactly once, and no run of theirs passes its budget.
         with self.home() as home:
             home.trust_check()
             home.cli('poll')
             home.say('200.000200', 'their request')
-            outs = []
-            for n in range(3):
-                self.run_check(home, 'normal', 'owner-%d' % n, command='check')
-                holder = open(home.state_dir / 'lock', 'a')
-                fcntl.flock(holder, fcntl.LOCK_EX)
-                release = threading.Timer(7.1, holder.close)
-                release.start()
-                started = time.monotonic()
-                rc, out, _ = self.run_check(home, 'trickle', 'second-%d' % n, command='check-second', server=server.url)
-                elapsed = time.monotonic() - started
-                release.cancel()
-                holder.close()
-                self.assertEqual(rc, 0, out)
-                self.assertLessEqual(elapsed, plane.OWNER_WAKE_WAIT_BOUND, elapsed)
-                outs.append(out)
-            self.assertEqual(sum(len(re.findall(r'slack request 200\.000200 from ' + INV_SECOND, o)) for o in outs), 1, outs)
-            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+            posts, woken, clocks = self.lock_wait_sweeps(home, '7.0', '7.1')
+            self.assertEqual(posts, [0, 1, 1])
+            self.assertEqual(woken, 1)
+            self.assertTrue(all(c <= plane.SECOND_BUDGET for c in clocks), clocks)
 
-    # ---- R7: a call cut off while it connects sends nothing afterwards ----
+    def test_r8_r6_control_with_quick_calls_and_a_free_lock_their_request_is_delivered_once_in_the_first_sweep(self):
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            posts, woken, clocks = self.lock_wait_sweeps(home, '3.0', '0')
+            self.assertEqual(posts, [1, 1, 1])
+            self.assertEqual(woken, 1)
+            self.assertTrue(all(c <= plane.SECOND_BUDGET for c in clocks), clocks)
 
     def test_r8_r7_a_call_cut_off_in_name_lookup_sends_no_byte_after_it_returns(self):
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
