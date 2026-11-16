@@ -5947,6 +5947,166 @@ test_each_ancestor_copy_of_the_recorded_table_gets_its_own_generated_tip_that_is
 }
 
 
+# --- Main 2194 item 10 and Main 2197: the two R4(b) tests the outside review found absent
+# (review F7), and the two real-default waits (R2(d), R3(d)) that run only on GitHub CI ---------
+
+# The CI-only gate itself: off GitHub CI it prints one named skip and never a pass; on a runner it is silent.
+test_the_ci_only_gate_prints_one_named_skip_off_github_ci_and_lets_the_case_run_on_it() {
+  local out rc=0 lines
+  out=$(unset GITHUB_ACTIONS; route_ci_only_gate "the probe case") || rc=$?
+  [ "$rc" = 1 ] || fail "the CI-only gate let a case run off GitHub CI ($rc): $out"
+  lines=$(printf '%s\n' "$out" | grep -c .)
+  [ "$lines" = 1 ] || fail "the CI-only gate printed $lines lines off GitHub CI, not one named skip: $out"
+  case "$out" in "skip: the probe case: "*) ;; *) fail "the skip line does not start with 'skip: <case>: ': $out" ;; esac
+  assert_not_contains "$out" "ok -" "the skip line reads as a pass: $out"
+  rc=0
+  out=$(GITHUB_ACTIONS=false route_ci_only_gate "the probe case") || rc=$?
+  [ "$rc" = 1 ] || fail "GITHUB_ACTIONS=false let the case run ($rc): $out"
+  rc=0
+  out=$(GITHUB_ACTIONS=true route_ci_only_gate "the probe case") || rc=$?
+  [ "$rc" = 0 ] && [ -z "$out" ] || fail "the CI-only gate did not let a case run quietly on GitHub CI ($rc): $out"
+  pass "off GitHub CI the gate prints one named skip line and returns 1 (never a pass); with GITHUB_ACTIONS=true it is silent and returns 0"
+}
+
+# R4(b), the snapshot of the ignored area (review F7): a plan changes no ignored path of the slot
+# clone except the driver's named verification report under .claude/bug-evidence/tree-presence/.
+# A sandbox check with a scripted driver that writes that report as the real driver does (the real
+# driver's plan-side writes are R6(c)'s trace). The digest has controls that make it fail, and a
+# second copy whose scripted driver also writes a file at another ignored path must change it.
+test_a_plan_leaves_every_ignored_path_of_the_slot_clone_unchanged_except_the_trees_presence_report() {
+  local before before_all tp
+  route_world route-ignored
+  printf '.claude/bug-evidence/\nignored-area/\n' >> "$SLOT/.git/info/exclude"
+  mkdir -p "$SLOT/ignored-area" "$SLOT/.claude/bug-evidence/earlier"
+  printf 'kept\n' > "$SLOT/ignored-area/kept.txt"
+  printf 'an earlier report\n' > "$SLOT/.claude/bug-evidence/earlier/report.json"
+  route_copy twin 7
+  route_copy planted 7
+  tp=$SLOT/.claude/bug-evidence/tree-presence
+  cat > "$W/ans/twin/plan.hook" <<SH
+mkdir -p "$tp"
+printf 'report for %s\n' "\$1" > "$tp/report.json"
+SH
+  cat > "$W/ans/planted/plan.hook" <<SH
+mkdir -p "$tp"
+printf 'report for %s\n' "\$1" > "$tp/report.json"
+printf 'a write outside the report directory\n' > "$SLOT/ignored-area/driver-wrote-this.txt"
+SH
+  route_assert_ignored_digest_sees "$SLOT" route-ignored
+  before=$(route_ignored_digest "$SLOT")
+  before_all=$(route_ignored_digest "$SLOT" all)
+  route_trip_arm
+  route_closeout plan twin "$(route_stub_before)"
+  [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "route-ignored: the twin's plan did not route ($CO_RC $CO_ROUTE): $CO_OUT"
+  [ "$(route_call_count twin)" = 1 ] || fail "route-ignored: the twin was not asked once: $(route_calls_for twin)"
+  [ -f "$tp/report.json" ] || fail "route-ignored: the scripted driver did not write its verification report"
+  assert_equals "$before" "$(route_ignored_digest "$SLOT")" "route-ignored: the plan changed an ignored path of the slot clone other than the tree-presence report"
+  [ "$(route_ignored_digest "$SLOT" all)" != "$before_all" ] || fail "route-ignored: with nothing left out the digest did not see the driver's report, so the leave-out proves nothing"
+  before=$(route_ignored_digest "$SLOT")
+  route_closeout plan planted "$(route_stub_before)"
+  [ "$CO_RC" = 0 ] || fail "route-ignored: the second plan failed ($CO_RC): $CO_OUT"
+  [ -f "$SLOT/ignored-area/driver-wrote-this.txt" ] || fail "route-ignored: the planted write did not happen"
+  [ "$before" != "$(route_ignored_digest "$SLOT")" ] || fail "route-ignored: the ignored-area check missed a planted write to another ignored path"
+  route_trip_check "ignored-area snapshot"
+  pass "a plan leaves every ignored path of the slot clone as it was except the driver's tree-presence report (a sandbox check), and the same check fails on a planted write to another ignored path, a new, edited or deleted ignored file"
+}
+
+# R4(b), the unlocked path (review F7): a sandbox stand-in for a Firstmate code path that switches a
+# slot's primary checkout without the project lock (the K8 inventory's path: remove_firstmate_home's
+# teardown_treehouse_return in bin/fm-teardown.sh, Main 1786) acts while the route holds the lock;
+# the lock does not stop it, and the route refuses before the driver with an empty argv. The
+# refusal is the pre-entry read (second promise).
+test_a_firstmate_path_that_takes_no_project_lock_and_switches_the_slot_checkout_is_refused_before_the_driver() {
+  local lock
+  route_late_world unlocked-path
+  route_copy zz-a 7
+  # shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variable
+  lock=$(ROUTE_SLOT=$SLOT route_lib 'fm_treehouse_project_lock_path "$ROUTE_SLOT"')
+  [ -n "$lock" ] || fail "no project lock path for the slot"
+  cat > "$W/late/mb.hook" <<SH
+if [ -e "$lock" ] || [ -L "$lock" ]; then printf 'held\n' > "$W/late/unlocked-actor.state"; else printf 'free\n' > "$W/late/unlocked-actor.state"; fi
+git -C "$SLOT" checkout -q fm/pr-7-head
+SH
+  route_trip_arm
+  FAKE_GIT_MERGEBASE_HOOK="$W/late/mb.hook" route_closeout plan zz-a "$(route_stub_before)"
+  [ "$CO_RC" != 0 ] || fail "a switch by a path that takes no project lock still reached the driver"
+  assert_equals 1 "$CO_SWITCHED" "the switch by the unlocked path was not reported as a switch"
+  assert_contains "$CO_OUT" "just before the driver was entered" "the refusal does not name the pre-entry read"
+  [ "$(route_call_count zz-a)" = 0 ] || fail "the driver was called after the unlocked path switched the checkout: $(route_calls_for zz-a)"
+  assert_equals held "$(cat "$W/late/unlocked-actor.state" 2>/dev/null)" "the route did not hold the project lock when the actor switched, so the actor was not the unlocked path this case stands for"
+  git -C "$SLOT" checkout -q main
+  FAKE_GIT_MERGEBASE_HOOK='' route_closeout plan zz-a "$(route_stub_before)"
+  [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] && [ "$CO_SWITCHED" != 1 ] || fail "the control with no actor did not route ($CO_RC $CO_ROUTE $CO_SWITCHED): $CO_OUT"
+  [ "$(route_call_count zz-a)" = 1 ] || fail "the control was not asked once: $(route_calls_for zz-a)"
+  route_trip_check "unlocked path"
+  pass "a path that takes no project lock cannot be stopped by the lock, but its switch of the slot checkout to the PR's head is refused before the driver with an empty argv log, and the same copy routes with no actor"
+}
+
+# R2(d): the real 60 s forge-read default, through the real forge-read path and the real
+# bounder, on GitHub CI only (Main 2197). A hung read with FM_TEARDOWN_FORGE_TIMEOUT unset ends at
+# the 60 s default, the copy is kept with no driver call, and a timely control routes.
+test_the_real_60_second_forge_default_keeps_a_copy_whose_read_hangs_and_a_timely_control_routes_on_github_ci() {
+  local t0 t1
+  route_ci_only_gate "R2(d) the real 60 s forge-read default" || return 0
+  route_world route-forge-default
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_set_pr "$W/forge" 8 HANG
+  route_copy ok 7
+  route_copy hang 8
+  unset FM_TEARDOWN_FORGE_TIMEOUT
+  t0=$(date +%s)
+  route_closeout plan hang
+  t1=$(date +%s)
+  [ "$CO_RC" != 0 ] || fail "a forge read that hangs was treated as merged: $CO_OUT"
+  assert_contains "$CO_OUT" "timed out after 60s" "the hung read did not end at the 60 s default: $CO_OUT"
+  [ "$(route_call_count hang)" = 0 ] || fail "the copy with a hung forge read reached the driver: $(route_calls_for hang)"
+  [ $((t1 - t0)) -ge 58 ] && [ $((t1 - t0)) -le 100 ] || fail "the hung read ended after $((t1 - t0)) s, not at the 60 s default"
+  t0=$(date +%s)
+  route_closeout plan ok
+  t1=$(date +%s)
+  [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "the timely control did not route ($CO_RC $CO_ROUTE): $CO_OUT"
+  [ "$(route_call_count ok)" = 1 ] || fail "the timely control was not asked once: $(route_calls_for ok)"
+  [ $((t1 - t0)) -le 30 ] || fail "the timely control took $((t1 - t0)) s"
+  pass "with FM_TEARDOWN_FORGE_TIMEOUT unset a hung forge read ends at 60 s through the real bounder, the copy is kept with no driver call, and a timely read routes"
+}
+
+# R3(d): the real 120 s plan default, through the real sweep plan and its process-group kill,
+# on GitHub CI only (Main 2197). With FM_COPY_SWEEP_PLAN_TIMEOUT unset, a plan that hangs is
+# still alive at 100 s, ends at the 120 s default, the copy is kept and no driver process is left.
+test_the_real_120_second_plan_default_holds_a_hung_plan_at_its_boundary_on_github_ci() {
+  local sweep waited=0 t0 t1
+  route_ci_only_gate "R3(d) the real 120 s plan default" || return 0
+  make_locked_copy_case plan120 dead
+  install_driver "$SLOT" "$W"
+  : > "$W/plan-hang"
+  (
+    unset FM_COPY_SWEEP_PLAN_TIMEOUT
+    rc=0
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" sweep_cmd --apply > "$W/real120.out" 2>&1 || rc=$?
+    printf '%s' "$rc" > "$W/real120.rc"
+  ) &
+  sweep=$!
+  while [ "$(driver_pid_count)" != 2 ] && [ "$waited" -lt 200 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ "$(driver_pid_count)" = 2 ] || { kill "$sweep" 2>/dev/null; fail "the hung plan never started"; }
+  t0=$(date +%s)
+  sleep 100
+  [ "$(driver_pid_count)" = 2 ] || fail "the hung plan was stopped before 100 s, before the 120 s default"
+  wait "$sweep" || true
+  t1=$(date +%s)
+  OUT=$(cat "$W/real120.out")
+  RC=$(cat "$W/real120.rc")
+  [ "$RC" = 0 ] || fail "the run failed ($RC): $OUT"
+  [ $((t1 - t0)) -ge 112 ] && [ $((t1 - t0)) -le 150 ] || fail "the hung plan ended $((t1 - t0)) s after it started, not at the 120 s default"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "did not answer within 120s" "the hung plan did not end at the 120 s default: $OUT"
+  assert_driver_pids_gone "a hung plan under the 120 s default"
+  [ -e "$(copy_path locked)" ] || fail "the copy was removed although its plan hung"
+  pass "with FM_COPY_SWEEP_PLAN_TIMEOUT unset a hung plan is alive at 100 s, ends at the 120 s default, keeps the copy and leaves no driver process"
+}
+
 # FM_TEST_ONLY=<function> runs one case, which keeps a mutation proof quick.
 fm_test_only
 
@@ -6104,4 +6264,9 @@ test_a_claimed_outer_hold_at_another_path_refuses_and_never_falls_through_to_the
 test_the_parent_releases_a_killed_plans_lock_only_when_its_owner_is_gone_and_the_record_names_it
 test_the_route_keys_its_lock_by_the_slots_registered_project_and_refuses_a_slot_whose_origin_differs
 test_each_ancestor_copy_of_the_recorded_table_gets_its_own_generated_tip_that_is_an_ancestor_of_the_landed_tip
+test_the_ci_only_gate_prints_one_named_skip_off_github_ci_and_lets_the_case_run_on_it
+test_a_plan_leaves_every_ignored_path_of_the_slot_clone_unchanged_except_the_trees_presence_report
+test_a_firstmate_path_that_takes_no_project_lock_and_switches_the_slot_checkout_is_refused_before_the_driver
+test_the_real_60_second_forge_default_keeps_a_copy_whose_read_hangs_and_a_timely_control_routes_on_github_ci
+test_the_real_120_second_plan_default_holds_a_hung_plan_at_its_boundary_on_github_ci
 pass "fm-copy-sweep"

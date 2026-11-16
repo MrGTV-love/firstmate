@@ -471,3 +471,73 @@ route_staged_cases_gate() {
   done
   return 0
 }
+
+# route_ci_only_gate <what>: the real 60 s forge-read default (R2(d)) and the real 120 s plan
+# default (R3(d)) are proved by waiting the production default with the real bounder and a
+# real process-group kill, which Firstmate's own hosts bar (Main 1837, Main 1850, Main 2197).
+# They run only on GitHub's CI runners, where GITHUB_ACTIONS is "true":
+#   on a runner: returns 0 and prints nothing; the case then waits the real default.
+#   anywhere else: prints one "skip:" line that names the case and the reason and returns 1;
+#     the caller then returns 0. The line starts with "skip:", never "ok -", so it is not a pass.
+route_ci_only_gate() {  # <what>
+  [ "${GITHUB_ACTIONS:-}" != true ] || return 0
+  printf 'skip: %s: runs only on GitHub CI (GITHUB_ACTIONS is not "true"); the real wait and process-group kill are barred on Firstmate hosts (Main 1837, 1850, 2197)\n' "$1"
+  return 1
+}
+
+# route_ignored_digest <clone> [all]: the sha256 of every IGNORED path of a clone: the
+# `git status --ignored` listing (one line per path) and, for each ignored file, its content
+# hash (a symlink's target). `.claude/bug-evidence/tree-presence/` is the driver's named
+# verification-report directory (R4(b), R6(c)) and is left out, and so is `.claude/worktrees/`,
+# where the copies themselves live; with a second argument `all` nothing is left out (a control
+# that the leave-out matters). Tracked and non-ignored files are route_checkout_digest's.
+route_ignored_digest() {
+  (
+    cd "$1" || exit 1
+    leave_out='^(\.claude/bug-evidence/tree-presence/|\.claude/worktrees/)'
+    [ "${2:-}" != all ] || leave_out='^$'
+    git status --porcelain=v1 --ignored --untracked-files=all | LC_ALL=C sort \
+      | while IFS= read -r line; do
+        case "$line" in '!!'*) ;; *) continue ;; esac
+        printf '%s\n' "${line#!! }" | grep -q -E "$leave_out" || printf '%s\n' "$line"
+      done
+    printf -- '--- ignored files\n'
+    git ls-files -z --others --ignored --exclude-standard | tr '\0' '\n' | LC_ALL=C sort | grep -v -E "$leave_out" \
+      | while IFS= read -r f; do
+        if [ -L "$f" ]; then
+          printf 'L %s %s\n' "$f" "$(readlink "$f")"
+        elif [ -f "$f" ]; then
+          printf 'F %s %s\n' "$f" "$(shasum -a 256 < "$f" | awk '{print $1}')"
+        else
+          printf 'D %s\n' "$f"
+        fi
+      done
+  ) | shasum -a 256 | awk '{print $1}'
+}
+
+# route_assert_ignored_digest_sees <clone> <label>: the control that the ignored-area digest
+# can fail. A new ignored file, an edit of one and the deletion of one each change it, a
+# write under the leave-out directory does not, and the clone is put back after each.
+route_assert_ignored_digest_sees() {
+  local clone=$1 label=$2 before before_all f
+  before=$(route_ignored_digest "$clone")
+  before_all=$(route_ignored_digest "$clone" all)
+  f=$(cd "$clone" && git ls-files -z --others --ignored --exclude-standard | tr '\0' '\n' | grep -v -E '^(\.claude/bug-evidence/tree-presence/|\.claude/worktrees/)' | head -n 1)
+  [ -n "$f" ] || fail "$label: the clone has no ignored file to edit"
+  printf 'planted\n' > "$clone/ignored-area/route-digest-planted.txt"
+  [ "$(route_ignored_digest "$clone")" != "$before" ] || fail "$label: the ignored-area digest missed a new ignored file"
+  rm -f "$clone/ignored-area/route-digest-planted.txt"
+  printf 'planted\n' >> "$clone/$f"
+  [ "$(route_ignored_digest "$clone")" != "$before" ] || fail "$label: the ignored-area digest missed an edit of the ignored file $f"
+  cp -p "$clone/$f" "$clone/$f.keep" && sed '$d' "$clone/$f.keep" > "$clone/$f" && rm -f "$clone/$f.keep"
+  [ "$(route_ignored_digest "$clone")" = "$before" ] || fail "$label: the ignored file $f was not put back after the digest control"
+  mv "$clone/$f" "$clone/$f.away"
+  [ "$(route_ignored_digest "$clone")" != "$before" ] || fail "$label: the ignored-area digest missed the deletion of the ignored file $f"
+  mv "$clone/$f.away" "$clone/$f"
+  mkdir -p "$clone/.claude/bug-evidence/tree-presence"
+  printf 'a report\n' > "$clone/.claude/bug-evidence/tree-presence/route-digest-control.json"
+  [ "$(route_ignored_digest "$clone")" = "$before" ] || fail "$label: the ignored-area digest counted the tree-presence report directory"
+  [ "$(route_ignored_digest "$clone" all)" != "$before_all" ] || fail "$label: the leave-out control (digest of every ignored path) missed the tree-presence report, so the leave-out proves nothing"
+  rm -f "$clone/.claude/bug-evidence/tree-presence/route-digest-control.json"
+  assert_equals "$before" "$(route_ignored_digest "$clone")" "$label: the clone was not put back after the ignored-area digest control"
+}
