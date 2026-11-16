@@ -1468,9 +1468,10 @@ test_the_typed_record_delivery_completion_clears_the_finished_edge() {
   # The real typed route: tasks-axi's own add, bind-work, work-event and begin-delivery, then
   # record-delivery through the wrapper. Nothing is posted; the receipt is what a post leaves.
   now=$(date -u +%s)
-  later=$(date -u -r $((now + 7 * 86400)) +%Y-%m-%dT%H:%M:%SZ)
-  expires=$(date -u -r $((now + 30 * 86400)) +%Y-%m-%dT%H:%M:%SZ)
-  jq -n --arg r "$(date -u -r "$now" +%Y-%m-%dT%H:%M:%SZ)" --arg l "$later" '{request_id:"req-rd", platform:"discord",
+  iso_at() { jq -rn --argjson t "$1" '$t | todate'; }
+  later=$(iso_at $((now + 7 * 86400)))
+  expires=$(iso_at $((now + 30 * 86400)))
+  jq -n --arg r "$(iso_at "$now")" --arg l "$later" '{request_id:"req-rd", platform:"discord",
     context_binding:{version:"ctx1", value:"ctx1_req-rd"}, public_safe_summary:"s", received_at:$r,
     followup_expires_at:$l, reservation_expires_at:$l}' > "$case_dir/request.json"
   jq -n '{type:"pr-merged", project:"alpha", required_deliverables:["pr_url"], completion_policy:"all-required"}' > "$case_dir/expected.json"
@@ -1478,7 +1479,7 @@ test_the_typed_record_delivery_completion_clears_the_finished_edge() {
   wrapper public-followup add pf-delivered --request-context-file "$case_dir/request.json" --purpose promised-final \
     --expected-final-file "$case_dir/expected.json" --expires-at "$expires" >/dev/null 2>&1 || fail "c4-record-delivery: add failed"
   wrapper public-followup bind-work pf-delivered --relation-file "$case_dir/relation.json" >/dev/null 2>&1 || fail "c4-record-delivery: bind-work failed"
-  jq -n --arg at "$(date -u -r "$now" +%Y-%m-%dT%H:%M:%SZ)" '{schema_version:1,
+  jq -n --arg at "$(iso_at "$now")" '{schema_version:1,
     event_id:"0000000000000000000000000000000000000000000000000000000000000001", obligation_id:"pf-delivered",
     relation_id:"rel-code", work_id:"work-rd", generation:1, source_home_id:"main", outcome_type:"pr-merged",
     deliverables:{pr_url:"https://github.com/example/repo/pull/7"}, public_safe_outcome:"landed", occurred_at:$at, successor:null}' \
