@@ -12,8 +12,9 @@
 # them. Every other command is staged after the worker is ready. On Darwin, a
 # missing Aqua session fails before staging with the doctor-actionable
 # console-login diagnostic. Linux uses the same queue and worker shape without
-# an Aqua requirement. An unavailable system ps fails ownership inspection
-# before worker startup or staging with exit 69 and the ps status/diagnostic;
+# an Aqua requirement. Unavailable ownership inspection (an unresolvable owner
+# PID, or a missing or failing system ps) fails before worker startup or
+# staging with exit 69 and its diagnostic, including any ps status and stderr;
 # it is not reported as protocol-usage exit 64.
 #
 # stdin is captured as bounded job input. The completed worker result is relayed
