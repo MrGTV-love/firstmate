@@ -1,0 +1,7 @@
+ok - teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease
+ok - teardown keeps a skipped copy that is only anchored, and one holding ignored work
+ok - an edit hidden by assume-unchanged keeps the skipped copy leased and recorded
+ok - an ignored file at a path the reset target tracks keeps the skipped copy leased and recorded
+ok - a reset target that cannot be read keeps the skipped copy leased
+ok - a skipped copy whose run record is locked stays leased and teardown still completes
+bash tests/fm-teardown-pool.test.sh        10.83s user 20.72s system 50% cpu 1:02.14 total

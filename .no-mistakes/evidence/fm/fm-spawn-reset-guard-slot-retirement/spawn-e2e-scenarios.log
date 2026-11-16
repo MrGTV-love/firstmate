@@ -1,0 +1,13 @@
+ok - a stale pooled worktree refreshes to current origin/main before a crew branch is created
+ok - a dirty pooled worktree is refused without discarding its local work
+ok - a dirty copy is leased in place, left byte-identical, and a second copy is taken and launched from
+ok - a copy holding an unlanded commit is skipped with the commit kept, and the task runs on another copy
+ok - with no other copy the spawn refuses, names the skipped copy and its reason, and launches nothing
+ok - an origin-less copy with a live process in it is skipped, not launched from
+ok - a skipped governed copy keeps its branch and every byte
+ok - an unknown refuses the whole spawn and the copy is leased and recorded
+ok - a refused move leaves every ref as it found it
+ok - a stale-submodule copy with an unlanded commit is leased where it stands and another copy is requested
+not ok - unknown selected acquisition test: live_ignored_collision_is_skipped_and_kept
+bash /tmp/fm-test-runner-59982/runner.sh                 21.86s user 41.52s system 27% cpu 3:48.76 total
+NOTE: the final "not ok - unknown selected acquisition test" line is the test-file case dispatcher rejecting a gate-added case name passed to it by mistake; those gate cases were re-run separately in spawn-live-harm-cases.log. All 10 named repository cases above it passed.

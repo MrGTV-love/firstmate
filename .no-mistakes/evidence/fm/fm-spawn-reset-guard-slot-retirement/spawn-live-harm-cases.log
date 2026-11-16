@@ -1,0 +1,27 @@
+== live_ignored_collision_is_skipped_and_kept
+    | skip: pooled copy '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-ignored/pool' was not moved (ignored_collision): ignored work at a path the target tracks would be overwritten: advanced-main.txt
+    | skipped: copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-ignored/pool (ignored_collision) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+    | leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-ignored/home/data/live-ignored-collision/skipped-copies.tsv):
+    |   /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-ignored/pool (ignored_collision) held by firstmate-skipped:live-ignored-collision
+ok - LIVE: an ignored file at a path origin's tip tracks makes the copy skipped; its bytes survive; another copy is used
+== live_ignored_untracked_path_does_not_block
+ok - LIVE control: an ignored file at a path the target does not track does not block; the copy moves to origin's tip and the file survives
+== live_attached_owner_branch_ahead_is_kept
+    | skip: pooled copy '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-owner/pool' was not moved (not_fast_forward): HEAD c8af40671fb3296e5598f39309dfa8f113875b04 is not an ancestor of the target dbbfcc4ca63662bc32b12e5fe4e4aca466d1d3b7 (the copy holds commits the target lacks)
+    | skipped: copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-owner/pool (not_fast_forward) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+    | leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-owner/home/data/live-owner-branch-ahead/skipped-copies.tsv):
+    |   /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-owner/pool (not_fast_forward) held by firstmate-skipped:live-owner-branch-ahead
+ok - LIVE: an attached owner branch with a commit not in origin is skipped; branch ref, HEAD and files unchanged
+== live_holder_in_pooled_copy_is_skipped
+    | skip: pooled copy '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-holder/pool' was not moved (live_holder): a live process (pid 61533, sleep) has its working directory in the slot
+    | skipped: copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-holder/pool (live_holder) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+    | leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-holder/home/data/live-holder-pooled/skipped-copies.tsv):
+    |   /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-holder/pool (live_holder) held by firstmate-skipped:live-holder-pooled
+ok - LIVE: a copy with a live process in it is skipped untouched; another copy is used
+== live_tracked_edit_is_skipped
+    | skip: pooled copy '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-tracked/pool' was not moved (dirty_tree): it is not clean, it holds uncommitted work ( M README.md)
+    | skipped: copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-tracked/pool (dirty_tree) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+    | leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-tracked/home/data/live-tracked-edit/skipped-copies.tsv):
+    |   /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.ojbTR2/live-tracked/pool (dirty_tree) held by firstmate-skipped:live-tracked-edit
+ok - LIVE: a tracked edit makes the copy skipped; the edit survives byte-for-byte
+# selected cases passed
