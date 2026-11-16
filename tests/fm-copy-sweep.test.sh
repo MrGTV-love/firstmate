@@ -720,7 +720,7 @@ assert_driver_release() {  # <name> <lock-mode>
   [ -n "$preserved" ] || fail "the copy's ignored state was not preserved before release"
   assert_contains "$preserved" "$head" "the preserve directory is not keyed by the copy's HEAD"
   assert_equals 'durable state' "$(cat "$preserved")" 'the preserved ignored file changed'
-  sums="$(dirname "$preserved")/SHA256SUMS"
+  sums="$(dirname "$(dirname "$preserved")")/meta/SHA256SUMS"
   assert_present "$sums" "no SHA-256 manifest was written for the preserved state"
   hash=$(shasum -a 256 "$preserved" | awk '{print $1}')
   assert_contains "$(cat "$sums")" "$hash  unique.dat" "the manifest does not record the preserved content"

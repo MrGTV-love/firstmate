@@ -4818,6 +4818,7 @@ test_creation_lock_owner_asks_the_same_question_at_proof_and_release_time() {
   git -C "$FOREIGN_CASE/project" worktree add -q -b fm/task-x1-v3 "$second" main
   git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID" "$second"
   cat > "$FOREIGN_SLOT/scripts/git-stability/closeout_pr.py" <<SH
+if [ "\${3:-}" != --execute-cleanup ]; then echo '{"allowed": true}'; exit 0; fi
 printf '%s|%s\n' "\$PWD" "\$*" >> "$FOREIGN_CASE/closeout.log"
 case "\$2" in
   "$second") git worktree unlock "$FOREIGN_COPY" && git worktree lock --reason 'held by a human' "$FOREIGN_COPY" ;;
@@ -4924,50 +4925,254 @@ SH
   pass 'teardown usage and transient Git inspection errors retain exits without policy events'
 }
 
-test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
-  local shape rc exclude hash dest real_cp beside
-  real_cp=$(command -v cp)
-  for shape in failed-copy replaced; do
+# An own nested copy Vernant's creation lock holds is released through the
+# closeout driver; when its interpreter cannot run, that is known at entry, so
+# the teardown refuses before any protected step (the return-pending record,
+# the endpoint close, the inbox, status or tasktmp removal), for the plain and
+# the prior record shapes. With the interpreter there, the same case closes.
+test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry() {
+  local shape rc label
+  for shape in plain enclosing; do
+    label="own-closeout-$shape"
     dead_launcher_pid
-    make_own_locked_copy_case "own-backup-$shape" enclosing "$FOREIGN_DEAD_PID"
+    make_own_locked_copy_case "$label" "$shape" "$FOREIGN_DEAD_PID"
+    nested_seed_task_files "$FOREIGN_CASE"
+    nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+    run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
+    assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "is not available, so it cannot be released"
+    assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "$label: with the interpreter there the same copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+    assert_absent "$FOREIGN_COPY" "$label: the copy survived the release"
+    assert_absent "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record survived the release"
+  done
+  pass "an own Vernant-locked copy whose closeout interpreter cannot run refuses at entry for both record shapes, and closes once it can"
+}
+
+# Vernant's closeout driver is asked in plan mode at entry for every locked copy
+# the release will hand it: a plan that declines, or answers with no verdict,
+# refuses before any protected step, for an own copy of either record shape and
+# for a foreign copy; the release itself never runs. An allowing plan lets the
+# same case close, and the release asks the driver again.
+test_closeout_plan_refusal_refuses_at_entry() {
+  local form shape rc label
+  for form in refuse garbled; do
+    for shape in plain enclosing; do
+      label="own-plan-$form-$shape"
+      dead_launcher_pid
+      make_own_locked_copy_case "$label" "$shape" "$FOREIGN_DEAD_PID"
+      nested_seed_task_files "$FOREIGN_CASE"
+      nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+      run_foreign_teardown rc FM_STUB_PLAN="$form"
+      assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "Vernant's closeout driver would not release it"
+      assert_present "$FOREIGN_CASE/closeout-plan.log" "$label: the driver was not asked in plan mode"
+      assert_absent "$FOREIGN_CASE/closeout.log" "$label: the release ran after a plan refusal"
+    done
+  done
+  label='foreign-plan-refuse'
+  dead_launcher_pid
+  make_foreign_copy_case "$label" "$FOREIGN_DEAD_PID"
+  run_foreign_teardown rc FM_STUB_PLAN=refuse
+  expect_code 1 "$rc" "$label: a declining plan must refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "Vernant's closeout driver would not release it" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the plan"
+  assert_foreign_copy_untouched "$label"
+  assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$label: a return-pending record was written before the refusal"
+  label='own-plan-allows'
+  dead_launcher_pid
+  make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "$label: an allowing plan must let the copy go: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/closeout-plan.log" "$label: the driver was not asked in plan mode"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    "$label: the release did not run once after the plan"
+  pass "a closeout plan that declines or gives no verdict refuses at entry for own and foreign copies, and an allowing plan lets the release run"
+}
+
+# On Linux the removability check reads each entry's and directory's immutable
+# and append-only attributes; an entry it cannot open is doubt and refuses,
+# while a readable regular file, a symbolic link (judged by its directory) and an
+# absent path pass. macOS asks faccessat instead, and root reads everything.
+test_linux_removability_refuses_an_entry_it_cannot_open() {
+  local dir rc item
+  if [ "$(uname -s)" != Linux ] || [ "$(id -u)" = 0 ]; then
+    pass "the Linux removability check refuses an unopenable entry (skipped: needs Linux and a non-root user)"
+    return 0
+  fi
+  dir=$(mktemp -d "$TMP_ROOT/linux-removable.XXXXXX")
+  printf 'x\n' > "$dir/unreadable"
+  chmod 000 "$dir/unreadable"
+  printf 'x\n' > "$dir/readable"
+  ln -s "$dir/readable" "$dir/link"
+  for item in unreadable:1 readable:0 link:0 absent:0; do
+    rc=0
+    bash -c '. "$1/bin/fm-backlog-transition-lib.sh"; fm_backlog_path_deletable "$2"' _ "$ROOT" "$dir/${item%%:*}" || rc=$?
+    case "${item#*:}" in
+      1) [ "$rc" != 0 ] || fail "linux-removable: an entry whose attributes cannot be read passed (${item%%:*})" ;;
+      *) expect_code 0 "$rc" "linux-removable: a removable entry was refused (${item%%:*})" ;;
+    esac
+  done
+  chmod 600 "$dir/unreadable"
+  pass "the Linux removability check refuses an entry it cannot open and passes readable files, links and absent paths"
+}
+
+# The archive of a copy's ignored files is never removed or overwritten: a
+# failed copy keeps the earlier one, an identical one is kept as is, a
+# different one is kept beside a new archive, and a preserve parent that cannot
+# be written refuses at entry with nothing changed.
+test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
+  local shape rc exclude hash dest real_cp root label new
+  real_cp=$(command -v cp)
+  for shape in failed-copy kept-beside same-content read-only-parent; do
+    label="own-backup-$shape"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
     exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
     printf 'unique.dat\n' >> "$exclude"
     printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
     hash=$(printf '%s' "$(cd "$FOREIGN_COPY" && pwd -P)" | shasum -a 256 | awk '{print $1}')
-    dest="$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$hash"
-    mkdir -p "$dest"
-    printf 'earlier backup\n' > "$dest/unique.dat"
-    printf 'earlier manifest\n' > "$dest/SHA256SUMS"
-    if [ "$shape" = failed-copy ]; then
-      cat > "$FOREIGN_CASE/fakebin/cp" <<SH
+    root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+    dest="$root/$hash"
+    mkdir -p "$dest/files" "$dest/meta"
+    if [ "$shape" = same-content ]; then
+      printf 'only here\n' > "$dest/files/unique.dat"
+      printf '%s\n' "$(cd "$FOREIGN_COPY" && pwd -P)" > "$dest/meta/copy-path"
+      printf '%s  unique.dat\n' "$(shasum -a 256 "$dest/files/unique.dat" | awk '{print $1}')" > "$dest/meta/SHA256SUMS"
+    else
+      printf 'earlier backup\n' > "$dest/files/unique.dat"
+      printf 'earlier manifest\n' > "$dest/meta/SHA256SUMS"
+    fi
+    case "$shape" in
+      failed-copy)
+        cat > "$FOREIGN_CASE/fakebin/cp" <<SH
 #!/usr/bin/env bash
 case " \$* " in
-  *nested-copy-preserved*) echo "cp: simulated copy failure" >&2; exit 1 ;;
+  *nested-copy-preserved*|*/.teardown-run.*/ignored-*) : > "$FOREIGN_CASE/cp-failure-injected"; echo "cp: simulated copy failure" >&2; exit 1 ;;
 esac
 exec "$real_cp" "\$@"
 SH
-      chmod +x "$FOREIGN_CASE/fakebin/cp"
-    fi
+        chmod +x "$FOREIGN_CASE/fakebin/cp"
+        ;;
+      read-only-parent)
+        nested_seed_task_files "$FOREIGN_CASE"
+        chmod 555 "$root"
+        nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+        ;;
+    esac
     run_foreign_teardown rc
-    if [ "$shape" = failed-copy ]; then
-      expect_code 1 "$rc" "own-backup-$shape: a failed preserve must refuse: $(cat "$FOREIGN_CASE/stderr")"
-      assert_present "$FOREIGN_COPY/unique.dat" "own-backup-$shape: the own copy's ignored file was lost"
-      assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was destroyed by a failed replacement"
-      assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "own-backup-$shape: the earlier manifest was destroyed by a failed replacement"
-    else
-      # An existing preserve is never replaced (Main 1970, Main 1961): the verified new one is
-      # written beside it and the earlier backup keeps every byte.
-      expect_code 0 "$rc" "own-backup-$shape: a verified new preserve must release the copy: $(cat "$FOREIGN_CASE/stderr")"
-      assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "own-backup-$shape: the earlier preserved copy was replaced"
-      assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "own-backup-$shape: the earlier manifest was replaced"
-      beside=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -maxdepth 1 -type d -name "$hash.*" | head -n 1)
-      [ -n "$beside" ] || fail "own-backup-$shape: no new preserve was written beside the earlier one"
-      assert_equals "only here" "$(cat "$beside/unique.dat")" "own-backup-$shape: the new preserve lacks the copy's bytes"
-      assert_grep "$(shasum -a 256 "$beside/unique.dat" | awk '{print $1}')  unique.dat" "$beside/SHA256SUMS" \
-        "own-backup-$shape: the manifest does not describe the new preserve"
-    fi
+    case "$shape" in
+      failed-copy)
+        expect_code 1 "$rc" "$label: a failed preserve must refuse: $(cat "$FOREIGN_CASE/stderr")"
+        assert_present "$FOREIGN_CASE/cp-failure-injected" "$label: the refusal came before the injected copy failure"
+        assert_present "$FOREIGN_COPY/unique.dat" "$label: the own copy's ignored file was lost"
+        assert_equals "earlier backup" "$(cat "$dest/files/unique.dat")" "$label: the earlier preserved copy was destroyed by a failed replacement"
+        assert_equals "earlier manifest" "$(cat "$dest/meta/SHA256SUMS")" "$label: the earlier manifest was destroyed by a failed replacement"
+        ;;
+      kept-beside)
+        expect_code 0 "$rc" "$label: a verified preserve must release the copy: $(cat "$FOREIGN_CASE/stderr")"
+        assert_equals "earlier backup" "$(cat "$dest/files/unique.dat")" "$label: the earlier preserved copy was replaced"
+        assert_equals "earlier manifest" "$(cat "$dest/meta/SHA256SUMS")" "$label: the earlier manifest was replaced"
+        new=$(find "$root" -mindepth 1 -maxdepth 1 -name "$hash.*" -type d)
+        [ "$(printf '%s\n' "$new" | grep -c .)" = 1 ] || fail "$label: no single new preserve was kept beside the earlier one: $new"
+        assert_equals "only here" "$(cat "$new/files/unique.dat")" "$label: the new preserve does not hold the copy's bytes"
+        assert_grep "$(shasum -a 256 "$new/files/unique.dat" | awk '{print $1}')  unique.dat" "$new/meta/SHA256SUMS" \
+          "$label: the new manifest does not describe the preserved bytes"
+        ;;
+      same-content)
+        expect_code 0 "$rc" "$label: an identical earlier preserve must let the copy go: $(cat "$FOREIGN_CASE/stderr")"
+        assert_equals "only here" "$(cat "$dest/files/unique.dat")" "$label: the identical preserve changed"
+        [ -z "$(find "$root" -mindepth 1 -maxdepth 1 -name "$hash.*")" ] || fail "$label: a duplicate preserve was written beside an identical one"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        ;;
+      read-only-parent)
+        chmod 755 "$root"
+        if [ "$(id -u)" = 0 ]; then
+          expect_code 0 "$rc" "$label: root writes any parent, so the copy is released: $(cat "$FOREIGN_CASE/stderr")"
+        else
+          assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "cannot be written through"
+          assert_equals "earlier backup" "$(cat "$dest/files/unique.dat")" "$label: the earlier preserved copy was lost"
+          assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+        fi
+        ;;
+    esac
   done
-  pass "an earlier preserved copy of a locked own copy survives a failed new preserve and a verified one; the new preserve is written beside it, never over it"
+  pass "an earlier preserve of a locked own copy is never removed: a failed copy, an identical one, a different one and an unwritable parent all keep it"
+}
+
+# The preserve parent must be a real directory whose physical location is
+# outside the copies this teardown removes: a parent that is a link, or a data
+# folder that resolves into the copy, refuses at entry with nothing changed. A
+# user file named like the metadata never meets it: the bytes sit under files/
+# and the manifest under meta/.
+test_preserve_parent_and_metadata_boundaries() {
+  local shape rc exclude label root preserved name
+  for shape in parent-link data-in-copy metadata-names; do
+    label="preserve-boundary-$shape"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf 'unique.dat\nSHA256SUMS\ncopy-path\nkept/\n' >> "$exclude"
+    printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+    root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+    case "$shape" in
+      parent-link)
+        mkdir -p "$FOREIGN_COPY/kept" "$FOREIGN_CASE/data/task-x1"
+        ln -s "$FOREIGN_COPY/kept" "$root"
+        ;;
+      data-in-copy)
+        mkdir -p "$FOREIGN_COPY/kept"
+        rm -rf "$FOREIGN_CASE/data/task-x1"
+        ln -s "$FOREIGN_COPY/kept" "$FOREIGN_CASE/data/task-x1"
+        ;;
+      metadata-names)
+        printf 'user manifest\n' > "$FOREIGN_COPY/SHA256SUMS"
+        printf 'user path\n' > "$FOREIGN_COPY/copy-path"
+        ;;
+    esac
+    nested_seed_task_files "$FOREIGN_CASE"
+    nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+    run_foreign_teardown rc
+    case "$shape" in
+      parent-link)
+        assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "is not a real directory"
+        ;;
+      data-in-copy)
+        assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "which this teardown removes"
+        ;;
+      metadata-names)
+        expect_code 0 "$rc" "$label: the copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+        preserved=$(find "$root" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+        assert_equals 'user manifest' "$(cat "$preserved/files/SHA256SUMS")" "$label: a user file named SHA256SUMS was not kept as is"
+        assert_equals 'user path' "$(cat "$preserved/files/copy-path")" "$label: a user file named copy-path was not kept as is"
+        assert_equals 'only here' "$(cat "$preserved/files/unique.dat")" "$label: the other ignored file was not kept"
+        for name in SHA256SUMS copy-path unique.dat; do
+          assert_grep "$(shasum -a 256 "$preserved/files/$name" | awk '{print $1}')  $name" "$preserved/meta/SHA256SUMS" \
+            "$label: the manifest does not hash the user file $name"
+        done
+        ;;
+    esac
+  done
+  pass "a preserve parent that is a link or resolves into the copy refuses at entry, and user files named like the metadata are kept apart from it"
+}
+
+# The same-device check reads the parent each rename really targets: a preserve
+# parent on another filesystem refuses at entry when the release will preserve
+# into it, though the task's data folder itself shares the run directory's.
+test_preserve_parent_on_another_filesystem_refuses_at_entry() {
+  local rc exclude label=preserve-parent-xdev root
+  dead_launcher_pid
+  make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+  root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+  mkdir -p "$root"
+  teardown_test_fake_other_device "$FOREIGN_CASE/fakebin" "$root"
+  nested_seed_task_files "$FOREIGN_CASE"
+  nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
+  run_foreign_teardown rc
+  assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "$root are not on one filesystem"
+  assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+  pass "a preserve parent on another filesystem refuses at entry when a release will preserve into it"
 }
 
 test_a_held_copy_keeps_its_unique_ignored_files_and_none_are_preserved() {
@@ -5283,6 +5488,10 @@ SH
   pass "an ordinary close whose slot gains a copy holding unique ignored files during the project-lock wait refuses with nothing removed"
 }
 
+# A foreign copy that appears in the slot while its stale lock blocks the return
+# (here on the first failed return, since a retry waits while the lock is there)
+# must stop the return at the reproof after the stale-lock cleanup: the route
+# changed, so neither an ordinary return nor a held close may follow.
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close() {
   local case_dir rc lock late
   make_nested_slot_case route-flip-stale-lock enclosing .claude/worktrees/x
@@ -5296,7 +5505,7 @@ lock=\$(git -C "\$wt" rev-parse --path-format=absolute --git-path index.lock 2>/
 if [ -n "\$lock" ] && [ -e "\$lock" ]; then
   calls=\$(( \$(cat "$case_dir/return-calls" 2>/dev/null || echo 0) + 1 ))
   printf '%s' "\$calls" > "$case_dir/return-calls"
-  if [ "\$calls" = 2 ]; then
+  if [ "\$calls" = 1 ]; then
     git -C "$case_dir/project" worktree add -q -b fm/late-lane "$late" main
     exclude=\$(git -C "$late" rev-parse --path-format=absolute --git-path info/exclude)
     printf 'unique.dat\n' >> "\$exclude"
@@ -5406,15 +5615,261 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
   pass "a held close refuses before it removes anything when the slot cannot be durably leased, and says why"
 }
 
+# A held close that cannot durably lease its slot is an entry-decidable refusal,
+# so it leaves a pending-close record from an earlier failed run, and the return
+# record beside it, byte for byte, for a prior and a plain record; the same
+# fixture with a slot that leases closes normally and retires both.
+held_marker_case() {  # <label> <enclosing|plain>
+  make_own_locked_copy_case "$1" "$2"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_CASE/project" rev-parse main)"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  HELD_COPY=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$HELD_COPY" main
+  held_foreign_unlanded "$HELD_COPY"
+  held_plain_get_slot "$FOREIGN_CASE"
+  nested_place_leftovers "$FOREIGN_CASE"
+  cp "$FOREIGN_CASE/state/task-x1.backlog-close" "$FOREIGN_CASE/backlog-close.before"
+  cp "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$FOREIGN_CASE/return-pending.before"
+}
+
+# The entry checks of a held close, one named test per control and record shape.
+# held_entry_case <label> <plain|enclosing> <scenario> runs one teardown of a
+# held close whose record, lease or inventory is in the state the scenario
+# names. The refusal scenarios must leave a pending-close record and a
+# return-pending record placed beforehand byte for byte, take no lease and
+# write no held-copy record, before the slot is reserved; the others close.
+held_entry_refused() {  # <label> <fragment>
+  local label=$1 fragment=$2
+  expect_code 1 "$HELD_RC" "$label: the held close must refuse at entry: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "$fragment" "$FOREIGN_CASE/stderr" "$label: the refusal did not name its cause"
+  cmp -s "$FOREIGN_CASE/backlog-close.before" "$FOREIGN_CASE/state/task-x1.backlog-close" || fail "$label: the refusal changed the pending-close record"
+  cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" || fail "$label: the refusal changed the return-pending record"
+  jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null || fail "$label: the refusal took a lease"
+  assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+  held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
+}
+
+held_entry_case() {  # <label> <plain|enclosing> <scenario>
+  local label=$1 shape=$2 scenario=$3 data
+  held_marker_case "$label" "$shape"
+  data=$FOREIGN_CASE/data
+  mkdir -p "$data"
+  HELD_RC=0
+  case "$scenario" in
+    lease-no-command) : > "$FOREIGN_CASE/no-lease-command" ;;
+    lease-fails) : > "$FOREIGN_CASE/lease-fails" ;;
+    record-directory) mkdir "$data/held-foreign-copies.log" ;;
+    unrecorded-readonly | symlink-unrecorded-readonly)
+      printf '2000-01-01T00:00:00Z\ttask-x1\t/elsewhere\t/elsewhere/copy\tother reason\n' > "$data/real-held-log"
+      chmod a-w "$data/real-held-log"
+      if [ "$scenario" = unrecorded-readonly ]; then mv "$data/real-held-log" "$data/held-foreign-copies.log"; else ln -s real-held-log "$data/held-foreign-copies.log"; fi
+      # A user who can write a read-only file (root) cannot show this refusal.
+      if [ -w "$data/held-foreign-copies.log" ]; then HELD_RC=skip; return 0; fi
+      ;;
+    no-backlog-pending-close-directory)
+      # No backlog data applies, so only the clear of the previous pending-close
+      # record would refuse this path: it must be refused at entry.
+      rm -f "$FOREIGN_CASE/data/backlog.md" "$FOREIGN_CASE/state/task-x1.backlog-close"
+      mkdir "$FOREIGN_CASE/state/task-x1.backlog-close"
+      ;;
+    symlink-dangling) ln -s no-such-target "$data/held-foreign-copies.log" ;;
+    symlink-directory) mkdir "$data/real-held-dir"; ln -s real-held-dir "$data/held-foreign-copies.log" ;;
+    symlink-writable)
+      printf '2000-01-01T00:00:00Z\ttask-x1\t/elsewhere\t/elsewhere/copy\tother reason\n' > "$data/real-held-log"
+      ln -s real-held-log "$data/held-foreign-copies.log"
+      ;;
+    recorded-readonly | recorded-writable)
+      stuck_endpoint_tmux "$FOREIGN_CASE"
+      : > "$FOREIGN_CASE/endpoint-stuck"
+      run_foreign_teardown HELD_RC
+      expect_code 1 "$HELD_RC" "$label: a stuck endpoint must refuse the first close: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals 1 "$(wc -l < "$data/held-foreign-copies.log" | tr -d ' ')" "$label: the first close did not record its one held copy"
+      cp "$data/held-foreign-copies.log" "$FOREIGN_CASE/record.before"
+      [ "$scenario" = recorded-writable ] || chmod a-w "$data/held-foreign-copies.log"
+      rm -f "$FOREIGN_CASE/endpoint-stuck"
+      ;;
+  esac
+  held_snapshot "$FOREIGN_CASE" "$HELD_COPY"
+  run_foreign_teardown HELD_RC
+}
+
+held_entry_scenario() {  # <plain|enclosing> <scenario>
+  local shape=$1 scenario=$2 label="held-entry-$2-$1" data
+  held_entry_case "$label" "$shape" "$scenario"
+  data=$FOREIGN_CASE/data
+  [ "$HELD_RC" != skip ] || return 0
+  case "$scenario" in
+    lease-no-command | lease-fails)
+      held_entry_refused "$label" "REFUSED: pool slot $FOREIGN_SLOT could not be durably leased"
+      assert_absent "$data/held-foreign-copies.log" "$label: a refused close wrote a held-copy record"
+      ;;
+    record-directory | unrecorded-readonly | symlink-dangling | symlink-directory | symlink-unrecorded-readonly)
+      held_entry_refused "$label" "REFUSED: the held-copy record $data/held-foreign-copies.log could not be written"
+      ;;
+    no-backlog-pending-close-directory)
+      expect_code 1 "$HELD_RC" "$label: the held close must refuse at entry: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "is not a regular file" "$FOREIGN_CASE/stderr" "$label: the refusal did not name its cause"
+      [ -d "$FOREIGN_CASE/state/task-x1.backlog-close" ] || fail "$label: the refusal removed the bad pending-close path"
+      cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" || fail "$label: the refusal changed the return-pending record"
+      jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null || fail "$label: the refusal took a lease"
+      assert_absent "$data/held-foreign-copies.log" "$label: a refused close wrote a held-copy record"
+      assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+      held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
+      ;;
+    symlink-writable)
+      expect_code 0 "$HELD_RC" "$label: a symlink to a writable record must let the close finish: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "$label"
+      assert_equals 2 "$(wc -l < "$data/real-held-log" | tr -d ' ')" "$label: the close did not append through the symlink"
+      ;;
+    recorded-readonly | recorded-writable)
+      expect_code 0 "$HELD_RC" "$label: the rerun must close, since every held copy is already recorded: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "$label"
+      cmp -s "$FOREIGN_CASE/record.before" "$data/held-foreign-copies.log" || fail "$label: the rerun changed the record"
+      ;;
+    close)
+      expect_code 0 "$HELD_RC" "$label: a held close whose slot leases must finish: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "$label"
+      assert_absent "$FOREIGN_CASE/state/task-x1.backlog-close" "$label: the earlier pending-close record survived"
+      assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$label: the return-pending record survived"
+      assert_no_grep "dropped" "$FOREIGN_CASE/data/backlog.md" "$label: the earlier record's drop note was replayed"
+      ;;
+  esac
+  chmod -R u+w "$data" 2>/dev/null || true
+}
+
+test_held_entry_lease_no_command_plain() {
+  held_entry_scenario plain lease-no-command
+  pass "held close entry check, lease-no-command, plain record"
+}
+
+test_held_entry_lease_no_command_enclosing() {
+  held_entry_scenario enclosing lease-no-command
+  pass "held close entry check, lease-no-command, enclosing record"
+}
+
+test_held_entry_lease_fails_plain() {
+  held_entry_scenario plain lease-fails
+  pass "held close entry check, lease-fails, plain record"
+}
+
+test_held_entry_lease_fails_enclosing() {
+  held_entry_scenario enclosing lease-fails
+  pass "held close entry check, lease-fails, enclosing record"
+}
+
+test_held_entry_record_directory_plain() {
+  held_entry_scenario plain record-directory
+  pass "held close entry check, record-directory, plain record"
+}
+
+test_held_entry_record_directory_enclosing() {
+  held_entry_scenario enclosing record-directory
+  pass "held close entry check, record-directory, enclosing record"
+}
+
+test_held_entry_unrecorded_readonly_plain() {
+  held_entry_scenario plain unrecorded-readonly
+  pass "held close entry check, unrecorded-readonly, plain record"
+}
+
+test_held_entry_unrecorded_readonly_enclosing() {
+  held_entry_scenario enclosing unrecorded-readonly
+  pass "held close entry check, unrecorded-readonly, enclosing record"
+}
+
+test_held_entry_symlink_dangling_plain() {
+  held_entry_scenario plain symlink-dangling
+  pass "held close entry check, symlink-dangling, plain record"
+}
+
+test_held_entry_symlink_dangling_enclosing() {
+  held_entry_scenario enclosing symlink-dangling
+  pass "held close entry check, symlink-dangling, enclosing record"
+}
+
+test_held_entry_symlink_directory_plain() {
+  held_entry_scenario plain symlink-directory
+  pass "held close entry check, symlink-directory, plain record"
+}
+
+test_held_entry_symlink_directory_enclosing() {
+  held_entry_scenario enclosing symlink-directory
+  pass "held close entry check, symlink-directory, enclosing record"
+}
+
+test_held_entry_symlink_unrecorded_readonly_plain() {
+  held_entry_scenario plain symlink-unrecorded-readonly
+  pass "held close entry check, symlink-unrecorded-readonly, plain record"
+}
+
+test_held_entry_symlink_unrecorded_readonly_enclosing() {
+  held_entry_scenario enclosing symlink-unrecorded-readonly
+  pass "held close entry check, symlink-unrecorded-readonly, enclosing record"
+}
+
+test_held_entry_symlink_writable_plain() {
+  held_entry_scenario plain symlink-writable
+  pass "held close entry check, symlink-writable, plain record"
+}
+
+test_held_entry_symlink_writable_enclosing() {
+  held_entry_scenario enclosing symlink-writable
+  pass "held close entry check, symlink-writable, enclosing record"
+}
+
+test_held_entry_no_backlog_pending_close_directory_plain() {
+  held_entry_scenario plain no-backlog-pending-close-directory
+  pass "held close entry check, no-backlog-pending-close-directory, plain record"
+}
+
+test_held_entry_no_backlog_pending_close_directory_enclosing() {
+  held_entry_scenario enclosing no-backlog-pending-close-directory
+  pass "held close entry check, no-backlog-pending-close-directory, enclosing record"
+}
+
+test_held_entry_recorded_readonly_plain() {
+  held_entry_scenario plain recorded-readonly
+  pass "held close entry check, recorded-readonly, plain record"
+}
+
+test_held_entry_recorded_readonly_enclosing() {
+  held_entry_scenario enclosing recorded-readonly
+  pass "held close entry check, recorded-readonly, enclosing record"
+}
+
+test_held_entry_recorded_writable_plain() {
+  held_entry_scenario plain recorded-writable
+  pass "held close entry check, recorded-writable, plain record"
+}
+
+test_held_entry_recorded_writable_enclosing() {
+  held_entry_scenario enclosing recorded-writable
+  pass "held close entry check, recorded-writable, enclosing record"
+}
+
+test_held_entry_close_plain() {
+  held_entry_scenario plain close
+  pass "held close entry check, close, plain record"
+}
+
+test_held_entry_close_enclosing() {
+  held_entry_scenario enclosing close
+  pass "held close entry check, close, enclosing record"
+}
+
 # A held close of a copy in a superseded pool folder: the project's current pool
 # is another folder that reuses its slot names, so the close leases the slot by
 # its exact path in the folder that holds it, never by name, and Treehouse then
 # never hands it out over the held copies, even once that folder is current
 # again. A lease an earlier teardown took by name on a same-named slot of the
 # current pool is released after the reservation and the held-copy record
-# checks, so a close those checks refuse releases no such lease, and its rerun,
-# whose own slot is by then leased by path, releases it, whether the rerun is
-# still a held close or, once the held copy is gone, an ordinary one. Without lease --path
+# checks, so a close those checks refuse takes no lease and releases no such
+# lease, and its rerun releases it, whether the rerun is still a held close,
+# which first leases its own slot by path, or, once the held copy is gone, an
+# ordinary one. Without lease --path
 # the close refuses and the copies stay held.
 held_superseded_case() {  # <name> <misdirected|plain> [no-lease-path]
   local cur
@@ -5496,17 +5951,16 @@ test_a_refused_held_close_releases_no_misdirected_lease() {
   expect_code 1 "$rc" "held-superseded-refused: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
   assert_grep "could not be written" "$FOREIGN_CASE/stderr" "held-superseded-refused: the refusal did not say why"
   assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-refused: the task record was removed"
-  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-refused: the refusal leased anything but the exact slot it keeps held"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-refused: the refusal took a lease"
   assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-refused: the refusal returned or released a slot"
-  held_assert_copies_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  held_assert_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
   rmdir "$FOREIGN_CASE/data/held-foreign-copies.log"
   run_foreign_teardown rc
   expect_code 0 "$rc" "held-superseded-refused: the rerun must close: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "return $HELD_CURRENT_SLOT --if-lease-holder task-x1" "$(cat "$FOREIGN_CASE/treehouse.log")" \
     "held-superseded-refused: the rerun did not release the misdirected lease by the conditional return alone"
   assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-refused: the rerun leased the slot again"
+    "held-superseded-refused: the rerun did not lease the slot once, by its exact path"
   pass "a held close that refuses releases no misdirected lease, and its rerun, with its own slot leased by path, releases it"
 }
 
@@ -5516,8 +5970,9 @@ test_an_ordinary_rerun_after_a_refused_held_close_releases_the_misdirected_lease
   mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
   run_foreign_teardown rc
   expect_code 1 "$rc" "held-superseded-then-ordinary: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
-  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-then-ordinary: the refused close did not lease its own slot by path"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-then-ordinary: the refused close took a lease"
+  assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-then-ordinary: the refused close returned or released a slot"
+  held_assert_untouched "held-superseded-then-ordinary" "$FOREIGN_CASE" "$FOREIGN_COPY"
   rmdir "$FOREIGN_CASE/data/held-foreign-copies.log"
   git -C "$FOREIGN_CASE/project" worktree remove --force "$FOREIGN_COPY"
   run_foreign_teardown rc
@@ -5527,8 +5982,7 @@ test_an_ordinary_rerun_after_a_refused_held_close_releases_the_misdirected_lease
     "held-superseded-then-ordinary: the rerun was still a held close"
   assert_equals 1 "$(grep -c "^return $HELD_CURRENT_SLOT --if-lease-holder task-x1\$" "$FOREIGN_CASE/treehouse.log" || true)" \
     "held-superseded-then-ordinary: the ordinary rerun did not release the misdirected lease by the conditional return: $(cat "$FOREIGN_CASE/treehouse.log" 2>/dev/null)"
-  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-then-ordinary: the rerun leased a slot again"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-then-ordinary: the rerun leased a slot"
   pass "an ordinary rerun after a refused held close releases the misdirected lease its task still holds"
 }
 
@@ -6154,12 +6608,13 @@ test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place() {
       run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
     fi
     expect_code 1 "$rc" "missing-$shape: a locked copy with no driver to release it must refuse: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "did not release foreign copy $FOREIGN_COPY (exit 127)" "$FOREIGN_CASE/stderr" \
-      "missing-$shape: the refusal did not report the unavailable driver"
-    assert_grep "is not available" "$FOREIGN_CASE/stderr" "missing-$shape: the refusal did not say what was missing"
+    assert_grep "foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: Vernant's closeout driver" "$FOREIGN_CASE/stderr" \
+      "missing-$shape: the proof did not refuse the copy whose driver cannot start"
+    assert_grep "is not available, so it cannot be released" "$FOREIGN_CASE/stderr" "missing-$shape: the refusal did not say what was missing"
     assert_foreign_copy_untouched "missing-$shape"
+    assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "missing-$shape: a return-pending record was written before the refusal"
   done
-  pass "a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing"
+  pass "a Vernant-locked copy whose closeout driver or interpreter is missing is refused at entry and stays"
 }
 
 test_foreign_copy_nested_in_another_is_removed_first() {
@@ -6312,7 +6767,7 @@ test_locked_own_nested_copy_with_unique_ignored_file_is_preserved_and_released()
   preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f 2>/dev/null | head -n 1)
   [ -n "$preserved" ] || fail "own-locked-ignored: the ignored file was not preserved in the task data directory"
   assert_equals "only here" "$(cat "$preserved")" "own-locked-ignored: the preserved file changed"
-  sums="$(dirname "$preserved")/SHA256SUMS"
+  sums="$(dirname "$(dirname "$preserved")")/meta/SHA256SUMS"
   assert_present "$sums" "own-locked-ignored: no SHA-256 manifest was written"
   hash=$(shasum -a 256 "$preserved" | awk '{print $1}')
   assert_grep "$hash  unique.dat" "$sums" "own-locked-ignored: the manifest does not record the preserved content"
@@ -8152,6 +8607,30 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
+test_held_entry_lease_no_command_plain
+test_held_entry_lease_no_command_enclosing
+test_held_entry_lease_fails_plain
+test_held_entry_lease_fails_enclosing
+test_held_entry_record_directory_plain
+test_held_entry_record_directory_enclosing
+test_held_entry_unrecorded_readonly_plain
+test_held_entry_unrecorded_readonly_enclosing
+test_held_entry_symlink_dangling_plain
+test_held_entry_symlink_dangling_enclosing
+test_held_entry_symlink_directory_plain
+test_held_entry_symlink_directory_enclosing
+test_held_entry_symlink_unrecorded_readonly_plain
+test_held_entry_symlink_unrecorded_readonly_enclosing
+test_held_entry_symlink_writable_plain
+test_held_entry_symlink_writable_enclosing
+test_held_entry_no_backlog_pending_close_directory_plain
+test_held_entry_no_backlog_pending_close_directory_enclosing
+test_held_entry_recorded_readonly_plain
+test_held_entry_recorded_readonly_enclosing
+test_held_entry_recorded_writable_plain
+test_held_entry_recorded_writable_enclosing
+test_held_entry_close_plain
+test_held_entry_close_enclosing
 test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path
 test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path
 test_a_refused_held_close_releases_no_misdirected_lease
@@ -8213,6 +8692,11 @@ test_foreign_copy_nested_in_another_is_removed_first
 test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
 test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
+test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry
+test_closeout_plan_refusal_refuses_at_entry
+test_linux_removability_refuses_an_entry_it_cannot_open
+test_preserve_parent_and_metadata_boundaries
+test_preserve_parent_on_another_filesystem_refuses_at_entry
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
 test_locked_own_nested_copy_is_released_by_the_closeout_driver
 test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released
