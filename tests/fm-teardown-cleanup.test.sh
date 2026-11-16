@@ -6987,6 +6987,90 @@ test_kept_copy_helper_a_copy_with_nothing_selected_keeps_one_preserve_across_ret
   pass "a kept copy with nothing selected gets one preserve when its payload is copied in, and later runs reuse it with the record unchanged"
 }
 
+# kept_preserve_dirs <dir>: the case's preserve directories, one per line, sorted.
+kept_preserve_dirs() {
+  find "$1/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' 2>/dev/null | LC_ALL=C sort
+}
+
+# kept_preserve_trees <dirs>: kept_tree of each directory named in <dirs> (one per line).
+kept_preserve_trees() {
+  local d
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    printf '== %s\n' "$d"
+    kept_tree "$d"
+  done <<< "$1"
+}
+
+# kept_selected_states_case <dir> <exit>: kept_helper_case with a top-level .cache/ that the
+# default selection keeps and the payload fingerprint leaves out, and the driver's exit code.
+kept_selected_states_case() {
+  kept_helper_case "$1"
+  printf '%s\n' '.cache/' >> "$1/copy/.git/info/exclude"
+  mkdir -p "$1/copy/.cache"
+  printf 'A\n' > "$1/copy/.cache/x"
+  printf '%s\n' "$2" > "$1/exit"
+}
+
+# kept_selected_states_run <dir> <want> <dirs-after> <label>: one run; the run's line must be
+# <want>, there must then be <dirs-after> preserve directories, and every directory that existed
+# before the run must be byte for byte as it was.
+kept_selected_states_run() {
+  local kc=$1 want=$2 count=$3 label=$4 before trees out
+  before=$(kept_preserve_dirs "$kc")
+  trees=$(kept_preserve_trees "$before")
+  out=$(kept_helper_dispose "$kc" 1)
+  assert_equals "$want" "$out" "$label: the run did not progress as expected: $(cat "$kc/stderr")"
+  assert_equals "$count" "$(kept_preserve_dirs "$kc" | wc -l | tr -d ' ')" "$label: wrong number of preserve directories: $(kept_preserve_dirs "$kc")"
+  assert_equals "$trees" "$(kept_preserve_trees "$before")" "$label: an earlier preserve directory changed"
+}
+
+# Main 2007 (R7-1), released route: three selected states of .cache/x with one payload
+# fingerprint each keep one preserve directory, in <sha256>, <sha256>.<P16> and <sha256>.<P16>.2;
+# a run whose selected state equals an earlier one reuses its directory and builds nothing, and
+# the third state is preserved and asks the driver instead of refusing on every retry.
+test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_released_route() {
+  local tmp kc base third
+  tmp=$(fm_test_tmproot kept-helper-states-released)
+  kc=$tmp/case
+  kept_selected_states_case "$kc" 4
+  kept_selected_states_run "$kc" 'rc=1 kept=no calls=1' 1 "kept-helper-states-released-A"
+  base=$(kept_preserve_base "$kc")
+  assert_equals 'A' "$(cat "$base/.cache/x" 2>/dev/null)" "kept-helper-states-released: the first state is not in the first preserve"
+  printf 'B\n' > "$kc/copy/.cache/x"
+  kept_selected_states_run "$kc" 'rc=1 kept=no calls=2' 2 "kept-helper-states-released-B"
+  kept_selected_states_run "$kc" 'rc=1 kept=no calls=3' 2 "kept-helper-states-released-B-again"
+  printf 'C\n' > "$kc/copy/.cache/x"
+  printf '0\n' > "$kc/exit"
+  kept_selected_states_run "$kc" 'rc=0 kept=no calls=4' 3 "kept-helper-states-released-C"
+  third=$(kept_preserve_dirs "$kc" | grep -x -F -v "$base" | grep '\.2$')
+  case "$third" in "$base".????????????????.2) ;; *) fail "kept-helper-states-released: the third preserve is not <sha256>.<P16>.2: $(kept_preserve_dirs "$kc")" ;; esac
+  assert_equals 'C' "$(cat "$third/.cache/x" 2>/dev/null)" "kept-helper-states-released: the third state is not in the third preserve"
+  rm -rf "$tmp"
+  pass "on the released route each distinct selected state keeps one preserve directory in the next free name, an equal state reuses its directory, and no earlier directory changes"
+}
+
+# Main 2007 (R7-1), kept route: the record matches while the selected-only .cache/x changes
+# twice; each run closes from the record without the driver, the last in <sha256>.<P16>.2, and
+# no earlier preserve directory changes.
+test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_kept_route() {
+  local tmp kc base
+  tmp=$(fm_test_tmproot kept-helper-states-kept)
+  kc=$tmp/case
+  kept_selected_states_case "$kc" 3
+  kept_selected_states_run "$kc" 'rc=0 kept=yes calls=1' 1 "kept-helper-states-kept-A"
+  base=$(kept_preserve_base "$kc")
+  printf 'B\n' > "$kc/copy/.cache/x"
+  kept_selected_states_run "$kc" 'rc=0 kept=yes calls=1' 2 "kept-helper-states-kept-B"
+  printf 'C\n' > "$kc/copy/.cache/x"
+  kept_selected_states_run "$kc" 'rc=0 kept=yes calls=1' 3 "kept-helper-states-kept-C"
+  case "$(kept_preserve_dirs "$kc" | grep '\.2$')" in "$base".????????????????.2) ;; *) fail "kept-helper-states-kept: the third preserve is not <sha256>.<P16>.2: $(kept_preserve_dirs "$kc")" ;; esac
+  assert_equals 'C' "$(cat "$(kept_preserve_dirs "$kc" | grep '\.2$')/.cache/x" 2>/dev/null)" "kept-helper-states-kept: the third state is not in the third preserve"
+  assert_equals "$(kept_preserve_dirs "$kc" | grep '\.2$')" "$(sed -n 's/^preserve=//p' "$(find "$kc/data/copy-sweep/retained" -type f | head -n 1)")" "kept-helper-states-kept: the record does not name the preserve that holds the copy"
+  rm -rf "$tmp"
+  pass "on the kept route each distinct selected state keeps one preserve directory in the next free name and the task closes from its record without the driver"
+}
+
 # Item 3 (C2 post-driver, Main 006): when the copy's record cannot be written, the close refuses
 # and a refusal record names the copy, its state and the cause in data/<task>/closeout-refused/;
 # every unchanged retry adds no driver call; once the record can be written the next run asks
@@ -8170,6 +8254,8 @@ test_an_unwritable_retained_record_never_makes_an_unchanged_retry_ask_the_driver
 test_kept_copy_helper_a_retry_of_a_closed_task_says_it_is_already_closed
 test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_which_is_never_replaced
 test_kept_copy_helper_a_copy_with_nothing_selected_keeps_one_preserve_across_retries
+test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_released_route
+test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_kept_route
 test_kept_copy_helper_a_record_that_cannot_be_written_leaves_a_refusal_record
 test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_against_the_copy
 test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_unpreserved

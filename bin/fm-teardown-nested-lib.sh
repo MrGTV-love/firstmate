@@ -1677,12 +1677,9 @@ teardown_own_preserve_adopt() {  # <copy> <dir> <list>
 # Preserves the selected ignored files of own nested <copy> before the driver is asked and sets
 # TEARDOWN_PRESERVE_DIR to the directory that holds them. An earlier preserve is never rebuilt,
 # overwritten or removed: the first directory, or one beside it, that still agrees with the copy
-# (teardown_own_preserve_current) is kept as it is; otherwise the copy is preserved in
-# data/<task>/nested-copy-preserved/<sha256 of the copy path>/ when that does not exist yet,
-# else beside it in <sha256 of the copy path>.<first 16 characters of the payload fingerprint>/
-# (where such a directory already exists, what it lacks is copied in, never over a byte it
-# holds). Leaves TEARDOWN_PRESERVE_DIR empty when the copy has no selected file and no earlier
-# preserve agrees with it. Returns 1 when the copy cannot be listed, copied or checked, or a
+# (teardown_own_preserve_current) is kept as it is; otherwise the copy is preserved in the next
+# free name (teardown_own_preserve_dir_new). Leaves TEARDOWN_PRESERVE_DIR empty when the copy
+# has no selected file and no earlier preserve agrees with it. Returns 1 when the copy cannot be listed, copied or checked, or a
 # preserve cannot be made to hold it.
 teardown_own_preserve() {  # <copy>
   local copy=$1 hash base cand dir payload work rc=0
@@ -1710,24 +1707,18 @@ teardown_own_preserve() {  # <copy>
   teardown_own_preserve_dir_new "$copy" || { rm -rf "$work"; return 1; }
   dir=$TEARDOWN_PRESERVE_DIR
   TEARDOWN_PRESERVE_DIR=
-  if [ -e "$dir" ] || [ -L "$dir" ]; then
-    { [ -d "$dir" ] && [ ! -L "$dir" ] && teardown_own_preserve_adopt "$copy" "$dir" "$work/list" \
-        && teardown_own_preserve_current "$copy" "$dir" "$work/current" \
-        && teardown_own_preserve_holds "$copy" "$dir" "$work/current"; } || rc=1
-  else
-    { mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir"; } || rc=1
-  fi
+  { mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir"; } || rc=1
   rm -rf "$work"
   [ "$rc" = 0 ] || return 1
   TEARDOWN_PRESERVE_DIR=$dir
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dir" >&2
 }
 
-# Sets TEARDOWN_PRESERVE_DIR to the directory a new preserve of <copy> goes in: the first,
-# <sha256 of the copy path>, when it does not exist, else the one beside it named by the first
-# 16 characters of the copy's payload fingerprint.
+# Sets TEARDOWN_PRESERVE_DIR to the first free name of a new preserve of <copy>, in the order
+# <sha256 of the copy path>, <sha256>.<first 16 characters of the copy's payload fingerprint>,
+# then <sha256>.<those 16 characters>.<n> for n = 2, 3, ...; an existing name is never reused.
 teardown_own_preserve_dir_new() {  # <copy>
-  local base payload
+  local base payload n=2
   base="$DATA/$ID/nested-copy-preserved/$(printf '%s' "$1" | teardown_ignored_sha256)" || return 1
   if [ ! -e "$base" ] && [ ! -L "$base" ]; then
     TEARDOWN_PRESERVE_DIR=$base
@@ -1735,6 +1726,10 @@ teardown_own_preserve_dir_new() {  # <copy>
   fi
   payload=$(teardown_retained_payload "$1") || return 1
   TEARDOWN_PRESERVE_DIR=$base.${payload:0:16}
+  while [ -e "$TEARDOWN_PRESERVE_DIR" ] || [ -L "$TEARDOWN_PRESERVE_DIR" ]; do
+    TEARDOWN_PRESERVE_DIR=$base.${payload:0:16}.$n
+    n=$((n + 1))
+  done
 }
 
 # The kept route's part of (b): the preserve chosen before the driver was asked must still agree
@@ -1753,11 +1748,8 @@ teardown_own_preserve_widen() {  # <copy> [named entry...]
   fi
   [ "$rc" != 0 ] || teardown_own_preserve_list "$copy" "$work/wide" wide "$@" || rc=1
   if [ "$rc" = 0 ] && [ -s "$work/wide" ] && [ -z "$dir" ]; then
-    if teardown_own_preserve_dir_new "$copy" && dir=$TEARDOWN_PRESERVE_DIR && [ ! -e "$dir" ] && [ ! -L "$dir" ]; then
-      { mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir"; } || rc=1
-    else
-      { [ -n "$dir" ] && [ -d "$dir" ] && [ ! -L "$dir" ]; } || rc=1
-    fi
+    { teardown_own_preserve_dir_new "$copy" && dir=$TEARDOWN_PRESERVE_DIR \
+        && mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir"; } || rc=1
     [ "$rc" = 0 ] && TEARDOWN_PRESERVE_DIR=$dir || TEARDOWN_PRESERVE_DIR=
   fi
   if [ "$rc" = 0 ] && [ -s "$work/wide" ]; then
@@ -2115,7 +2107,7 @@ teardown_retained_saved() {  # <copy> <answer>
   preserve=${TEARDOWN_PRESERVE_DIR:-}
   rm -rf "$work"
   if [ "$rc" != 0 ]; then
-    echo "REFUSED: the preserve $(fm_refuse_text "${preserve:-$DATA/$ID/nested-copy-preserved}") does not hold every ignored file of own nested copy $(fm_refuse_text "$copy") that preservation selects, that its payload holds or that the driver names, byte for byte (or one could not be read or copied in); the task was not closed, and a retry asks the driver nothing and preserves the unchanged copy again beside it." >&2
+    echo "REFUSED: the preserve $(fm_refuse_text "${preserve:-$DATA/$ID/nested-copy-preserved}") does not hold every ignored file of own nested copy $(fm_refuse_text "$copy") that preservation selects, that its payload holds or that the driver names, byte for byte (or one could not be read or copied in); the task was not closed, and a retry asks the driver nothing, keeps an earlier preserve that agrees with the unchanged copy and otherwise preserves it in the next free name beside it, never over an earlier preserve." >&2
     return 1
   fi
 }
@@ -2402,7 +2394,7 @@ teardown_own_copy_dispose_in() {  # <slot> <copy> <work-dir>
     [ "$rc" != 0 ] || [ ! -s "$work/list" ] || rc=1
   fi
   if [ "$rc" != 0 ]; then
-    echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") changed after they were preserved in $(fm_refuse_text "${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved}") (or could not be read again); the driver was not asked, the copy was not removed, and a retry preserves it again beside the earlier preserve." >&2
+    echo "REFUSED: the ignored files of own nested copy $(fm_refuse_text "$copy") changed after they were preserved in $(fm_refuse_text "${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved}") (or could not be read again); the driver was not asked, the copy was not removed, and a retry keeps an earlier preserve that agrees with the copy and otherwise preserves it in the next free name beside it, never over an earlier preserve." >&2
     return 1
   fi
   before="$TEARDOWN_RET_HEAD $TEARDOWN_RET_STATUS $TEARDOWN_RET_PAYLOAD"

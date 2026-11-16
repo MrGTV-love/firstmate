@@ -569,7 +569,7 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: the preserve $(fm_refuse_text \"${preserve:-$DATA/$ID/nested-copy-preserved}\") does not hold every ignored file of own nested copy $(fm_refuse_text \"$copy\") that preservation selects, that its payload holds or that the driver names, byte for byte (or one could not be read or copied in); the task was not closed, and a retry asks the driver nothing and preserves the unchanged copy again beside it.\" >&2"
+          "match": "echo \"REFUSED: the preserve $(fm_refuse_text \"${preserve:-$DATA/$ID/nested-copy-preserved}\") does not hold every ignored file of own nested copy $(fm_refuse_text \"$copy\") that preservation selects, that its payload holds or that the driver names, byte for byte (or one could not be read or copied in); the task was not closed, and a retry asks the driver nothing, keeps an earlier preserve that agrees with the unchanged copy and otherwise preserves it in the next free name beside it, never over an earlier preserve.\" >&2"
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
@@ -589,7 +589,7 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: the ignored files of own nested copy $(fm_refuse_text \"$copy\") changed after they were preserved in $(fm_refuse_text \"${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved}\") (or could not be read again); the driver was not asked, the copy was not removed, and a retry preserves it again beside the earlier preserve.\" >&2"
+          "match": "echo \"REFUSED: the ignored files of own nested copy $(fm_refuse_text \"$copy\") changed after they were preserved in $(fm_refuse_text \"${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved}\") (or could not be read again); the driver was not asked, the copy was not removed, and a retry keeps an earlier preserve that agrees with the copy and otherwise preserves it in the next free name beside it, never over an earlier preserve.\" >&2"
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
