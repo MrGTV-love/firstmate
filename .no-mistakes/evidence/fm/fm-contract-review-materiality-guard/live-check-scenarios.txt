@@ -1,0 +1,58 @@
+=== 01-clean-pack-skills-rubric-tracked
+INPUT CLEAN: 10 recorded read(s), all authorized
+rc=0
+=== 02-leak-raw-contract-source
+INPUT LEAK: /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md: excluded path /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 03-leak-raw-source-with-selector
+INPUT LEAK: /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md:1-200: excluded path /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 04-leak-earlier-truth-report
+INPUT LEAK: /Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/truth/r23-review.md: outside the allowed inputs
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 05-leak-sibling-pack-review
+INPUT LEAK: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev23/pack/target.md: outside the allowed inputs
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 06-leak-gitignored-under-root
+INPUT LEAK: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7H2PKAVHB05D9H6S7WB8057/data/whatever.md: untracked or gitignored file under the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 07-leak-planted-workfolder-file
+INPUT LEAK: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/rev19-pack/earlier-report.md: a work-folder file the run did not write
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 08-leak-planted-workfolder-file-selector
+INPUT LEAK: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/rev19-pack/earlier-report.md:1-50: a work-folder file the run did not write
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 09-clean-runwritten-workfolder-file
+INPUT CLEAN: 2 recorded read(s), all authorized
+rc=0
+=== 10-leak-read-before-write
+INPUT LEAK: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/rev19-pack/falsifier.py: a work-folder file the run did not write
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+rm: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/rev19-pack/falsifier.py: No such file or directory
+=== 11-leak-altered-opb-copy-raw
+INPUT LEAK: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/rev19-pack/OPERATIONAL-BOUNDARIES.md:raw: a work-folder OPERATIONAL-BOUNDARIES.md whose bytes differ from the installed file
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 12-leak-other-installed-skill-file
+INPUT LEAK: skill://define-done-and-grading/MAINTAINERS.md:1-200: a skill path other than the named installed skill files
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 13-unverified-bash
+INPUT UNVERIFIED: bash call: its reads are not recorded as paths, so they cannot be audited
+ROUND UNVERIFIED: the transcript holds reads that cannot be proven; the round is not clean
+rc=4
+=== 14-leak-parent-search
+INPUT LEAK: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work: a search of a parent of the work folder
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== 15-clean-workfolder-search
+INPUT CLEAN: 2 recorded read(s), all authorized
+rc=0

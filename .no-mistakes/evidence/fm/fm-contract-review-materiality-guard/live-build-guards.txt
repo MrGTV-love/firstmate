@@ -1,0 +1,30 @@
+=== single source: policy block vs pack block (cmp) ===
+cmp: identical (      86 lines)
+=== changed policy copy -> pack block follows ===
+rc=0
+1
+cmp with changed copy: identical
+=== distinctive sentence lives only in the policy file ===
+.agents/skills/contract-review/SKILL.md
+=== unknown sub-heading inside DoD -> exit 3, nothing written ===
+fm-contract-review-pack: refused: unknown heading inside a known section: Reviewer notes from the author (under: Definition Of Done (steer), revision 19)
+fm-contract-review-pack: refused: the Definition Of Done holds no criterion text
+fm-contract-review-pack: no pack written; give the text a known heading (CONTRACT_SECTIONS or CONTRACT_SUBSECTIONS in this script) or move it out of the contract
+rc=3
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/unk: No such file or directory
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/unk.excluded-paths: No such file or directory
+=== non-empty out-root refused ===
+fm-contract-review-pack: out-root is not empty (it may hold a review or another pack): /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev19
+rc=2
+=== missing contract ===
+fm-contract-review-pack: contract file not readable: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/nope.md
+rc=2
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/m1: No such file or directory
+=== no Definition Of Done ===
+fm-contract-review-pack: contract has no Definition Of Done section: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/nodod.md
+rc=2
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/m2: No such file or directory
+=== unreadable policy ===
+fm-contract-review-pack: policy file not readable: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/none.md
+rc=2
+ls: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/m3: No such file or directory

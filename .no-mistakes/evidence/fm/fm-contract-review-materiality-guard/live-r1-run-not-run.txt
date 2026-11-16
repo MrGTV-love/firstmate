@@ -1,0 +1,19 @@
+=== live R1 run: entrypoint output ===
+Terra quota exhausted (marker /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.TOXobBgIiX/quota-mark); using openai-codex/gpt-6.1-sol
+=== review-run.log ===
+Working...
+Retrying (1/10): Codex error event: The usage limit has been reached (code=usage_limit_reached)
+Retrying (2/10): Codex error event: The usage limit has been reached (code=usage_limit_reached)
+Retrying (3/10): Codex error event: The usage limit has been reached (code=usage_limit_reached)
+
+[Stopped by SIGTERM]
+[Recovery]
+  Main: omp --resume 01a1e233-8751-762c-933e-6df88c5cd3ea
+=== models in session record ===
+   3 "model":"gpt-6.1-sol"
+   1 "model":"openai-codex/gpt-6.1-sol"
+=== work folder ===
+OPERATIONAL-BOUNDARIES.md
+=== check on the real omp session folder ===
+fm-contract-review-pack: log records no tool call, so it is not a session transcript and the run reads cannot be audited: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.TOXobBgIiX/r1/pack.omp-session
+rc=2

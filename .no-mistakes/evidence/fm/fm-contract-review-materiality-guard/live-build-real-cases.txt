@@ -1,0 +1,88 @@
+=== build real d3 rev19 ===
+fm-contract-review-pack: pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev19/pack head=eda638c35da0d47b3f69e7a6fb335949f5959f7d diff=diff.patch manifest=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev19.excluded-paths
+rc=0 pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev19/pack
+ci-evidence.md
+contract.md
+diff.patch
+head.txt
+target.md
+-- parent holds:
+pack
+-- excluded record:
+# fm-contract-review-pack excluded record: paths the reviewer must never read, and contract text it was not given
+pack	/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev19/pack
+root	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7H2PKAVHB05D9H6S7WB8057
+work	/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/rev19-pack
+exclude	/Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev19.md
+dropped	title: G2 steer: owner ruling on F-CAT-048 and cleaning re-check (Main 2643, Main 2644)
+dropped	text outside a known section (2 line(s) before "REQUEST (verbatim, from Main)")
+qualified	REQUEST (verbatim, from Main) (as: request)
+qualified	Rulings on this contract (Main 2686, corr=bf60b25497a0ace2, and Main 2697, verbatim) (as: rulings on this contract)
+qualified	Amendment A1 (as: amendment)
+qualified	Amendment A2 (as: amendment)
+qualified	Definition Of Done (steer), revision 19 (as: definition of done)
+dropped	Boundary dispositions
+dropped	Author's all-green candidate
+dropped	Contract Review history
+dropped	Contract Review
+-- grep forbidden text in pack (expect none):
+NONE
+-- kept headings in target.md:
+1:## REQUEST (verbatim, from Main)
+9:## Rulings on this contract (Main 2686, corr=bf60b25497a0ace2, and Main 2697, verbatim)
+15:## Terms
+37:## Amendment A1
+41:## Amendment A2
+45:## Definition Of Done (steer), revision 19
+128:## How You're Graded
+135:## Assumptions
+143:## Execution constraints
+=== build real d3 rev23 ===
+fm-contract-review-pack: pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev23/pack head=7114fab7b88d8be631d24972332284027156ec8e diff=diff.patch manifest=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev23.excluded-paths
+rc=0 pack=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev23/pack
+ci-evidence.md
+contract.md
+diff.patch
+head.txt
+target.md
+-- parent holds:
+pack
+-- excluded record:
+# fm-contract-review-pack excluded record: paths the reviewer must never read, and contract text it was not given
+pack	/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/rev23/pack
+root	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7H2PKAVHB05D9H6S7WB8057
+work	/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/rev23-pack
+exclude	/Users/charlesabrooker/firstmate/data/fm-contract-review-materiality-guard/cases/d3/rounds/steer-main2643-dod.rev23.md
+dropped	title: G2 steer: owner ruling on F-CAT-048 and cleaning re-check (Main 2643, Main 2644)
+dropped	text outside a known section (2 line(s) before "REQUEST (verbatim, from Main)")
+qualified	REQUEST (verbatim, from Main) (as: request)
+qualified	Rulings on this contract (Main 2686, 2697, 2708 (withdrawn) and 2715) (as: rulings on this contract)
+qualified	Amendment A1 (as: amendment)
+qualified	Amendment A2 (as: amendment)
+qualified	Definition Of Done (steer), revision 23 (as: definition of done)
+dropped	Boundary dispositions
+dropped	Author's all-green candidate
+dropped	Contract Review
+-- grep forbidden text in pack (expect none):
+NONE
+-- kept headings in target.md:
+1:## REQUEST (verbatim, from Main)
+9:## Rulings on this contract (Main 2686, 2697, 2708 (withdrawn) and 2715)
+19:## Terms
+41:## Amendment A1
+45:## Amendment A2
+49:## Definition Of Done (steer), revision 23
+148:## How You're Graded
+155:## Assumptions
+163:## Execution constraints
+=== build real mini contract ===
+contract-review-main2648.md
+contract-review-main2654.md
+contract-review-main2721.md
+contract-review-main2736.md
+contract-review-round1-input.md
+r2-owner-context.md
+r3-owner-context.md
+r4-owner-context.md
+r5-owner-context.md
+request.md

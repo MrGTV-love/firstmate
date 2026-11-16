@@ -1,0 +1,12 @@
+=== caller --exclude of a tracked file, then read it ===
+build rc=0
+INPUT LEAK: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7H2PKAVHB05D9H6S7WB8057/bin/fm-spawn.sh: excluded path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7H2PKAVHB05D9H6S7WB8057/bin/fm-spawn.sh
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== same transcript, report has no Inputs read list ===
+INPUT LEAK: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3grx9nPtR6/work/ex-pack/review.md: the report has no Inputs read list, so the round is void
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+=== control: report with the list, same clean transcript ===
+INPUT CLEAN: 1 recorded read(s), all authorized
+rc=0
