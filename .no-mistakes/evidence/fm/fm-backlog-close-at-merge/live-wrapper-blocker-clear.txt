@@ -1,0 +1,27 @@
+$ fm-tasks-axi.sh add blocker-a / blocker-b / dep-x / dep-y; block dep-x --by blocker-a,blocker-b; block dep-y --by blocker-a
+dep-x deps: "blocked-by:blocker-a,blocked-by:blocker-b"
+dep-y deps: "blocked-by:blocker-a"
+
+$ fm-tasks-axi.sh done blocker-a --note finished
+ok: done blocker-a -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: dep-x no longer waits on blocker-a; it still waits on blocker-b
+unblocked: dep-y no longer waits on blocker-a; no stored blocked-by edge remains
+exit=0
+dep-x deps: "blocked-by:blocker-b"
+dep-y deps: none
+
+$ fm-tasks-axi.sh close blocker-b --note finished
+ok: done blocker-b -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: dep-x no longer waits on blocker-b; no stored blocked-by edge remains
+exit=0
+dep-x deps: none
+
+# adversarial: a refused completion (scout without report) clears nothing
+$ fm-tasks-axi.sh done scout-b --note nope
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+exit=2
+dep-z deps: "blocked-by:scout-b"

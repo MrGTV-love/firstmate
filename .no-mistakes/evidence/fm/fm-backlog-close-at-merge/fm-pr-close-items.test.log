@@ -15,27 +15,32 @@ ok - a hand run with a pull request that is not merged closes nothing and report
 ok - a train closes its Train-member lines' items from bodies and from pr=, never an excluded PR's, whatever decorative layout the body also holds
 ok - a train body without its own Closes-backlog-item line still closes the members' items
 ok - an unreadable member is reported by URL while the item behind its pr= still closes
-ok - a Train-member line that is no pull request URL, or is the train itself, is reported and the valid member still closes
+ok - a Train-member value that is no pull request URL or is the train itself refuses the whole block: nothing closes and no edge changes; a retry after the repair closes
+ok - a member block with an invalid Train-member value is refused and closes none of its items; the train's block and the member's pr= task still close
 ok - members match by the full URL, never by number
 ok - F1: an excluded descendant Component table closes nothing, keeps its item and edge, and is reported; a Train-member line closes the member
-ok - F2: a fence indented three spaces keeps its Closes-backlog-item and Train-member lines examples, and the real directive still closes
+ok - F2: Closes-backlog-item and Train-member lines in a fence, outside the block, close nothing and are reported, and the block still closes
 ok - F3: a negated exclusion heading no longer decides anything; the unlisted member is reported and a Train-member line closes it
 ok - F4: an unlisted Forgejo or GitLab member is reported by its URL and closes nothing; a Train-member line closes it; a plain body is silent
 ok - a GitLab or Forgejo merge that names its own In-flight task reports the live-record refusal and still succeeds
 ok - a Forgejo train closes the items of its listed members from bodies and pr=, never a prose-only PR or another repository's number, and reports the prose link
 ok - a GitLab train reads each listed member, never a prose-only merge request, and reports the prose link
-ok - a failed backlog listing reports the skipped id check once and still closes the named item
-ok - the parser takes the two directive forms, and reads no example, indented line, table cell, quote or malformed line as one
+ok - a failed backlog listing reports the skipped id check once for each body that has prose and names that body, with or without a directive line, and still closes the named item
+ok - F1: a directive inside an HTML comment closes nothing and keeps the dependent's edge, while the real directive closes
+ok - F2: a train member's prose-only mention is reported once and never closed; its directive id and an unrelated id stay silent
+ok - F3: a mention keeps the id's own spelling, trailing underscore and hyphen included, and is reported once
+ok - a mention inside an HTML comment is reported like the text after it, and closes nothing
+ok - a member's own directive and a distinct pr= task both close, and two listed members that share a number in different repositories both close by full URL
 ok - a GitLab merge reports the completion path's actual result per item and still succeeds
 ok - a Forgejo merge reports the completion path's actual result per item and still succeeds
 ok - a dependent whose id the list prints in quotes still loses the finished edge
 ok - completing a blocker clears its edge on every wrapper route, keeps other blockers and holds, and reports the dependents
-ok - the task noun forms and a typed public-followup completion clear the finished edge
-ok - a typed completion clears the edge when the row is archived at once and reports a failed read back
+ok - the task noun forms and a typed public-followup completion clear the finished edge and keep the dependent's other blocker and hold
+ok - a typed completion clears the edge in the same run when the row is archived at once and when its show fails, from its own printed result, and when it prints no result, on its exit 0 (Main 1795, 2086)
 ok - a help call on a typed completion asks nobody to act
 ok - a merge reports a cleared edge on stdout and a failed clear behind actionable: on stderr
-ok - answering a captain call clears the call's edge from its dependents
-ok - withdrawing a captain call clears the call's edge from its dependents
+ok - answering a captain call clears the call's edge from its dependents and keeps their other blocker and hold
+ok - withdrawing a captain call clears the call's edge from its dependents and keeps their other blocker and hold
 ok - an explicit data root gets the same blocker clear
 ok - a merge closes each named eligible item with the merged PR URL and reports the one it left open
 ok - a merge that names its own task reports the live-record refusal and still succeeds
@@ -46,6 +51,29 @@ ok - a Forgejo train closes the items of its listed members from bodies and pr=,
 ok - a GitLab train reads each listed member, never a prose-only merge request, and reports the prose link
 ok - with production merge prune on and a busy teardown, GitHub, GitLab and Forgejo merges close, report and defer as with prune off
 ok - a second bin/fm-pr-merge.sh run on the merged PR changes nothing, with the task record present and after prune removed it
-ok - a typed record-delivery completion through the wrapper clears the finished edge and keeps another blocker
+ok - a real typed record-delivery completion through the wrapper clears the finished edge, keeps another blocker and a hold
 ok - done --json through the wrapper has the same fields and values as tasks-axi alone
-exit=0
+ok - F1: a setext heading's directive line closes nothing, keeps the dependent's edge and is reported, while the real block closes
+ok - F1: a directive inside a <pre> example closes nothing and keeps the dependent's edge, with or without blank lines, while the real block closes
+ok - F1: a directive inside a code span over lines closes nothing, keeps the dependent's edge and is reported, while the real block closes
+ok - F1: a directive inside an open <blockquote>, <details> or mid-line <pre> closes nothing and keeps the dependent's edge, while the real block closes
+ok - F1: a Train-member line inside a code span lists no member and keeps the pr= item and its dependent's edge, while the real member closes
+ok - F2: a pull request link in a train member's body is reported once and never closed; the listed member, the train and an unrelated item are not reported
+ok - F1: a quoting element opened after a comment's end, a <pre> block's end or a mid-line comment's close holds its directive, which closes nothing and keeps the edge
+ok - F2: a Train-member line in a member's body lists nothing, closes nothing and is reported
+ok - review F1: example lines close nothing whatever the HTML around them and keep both edges; opener text above the block refuses the body, and a block above the example closes
+ok - a block below opener text in a code span is refused by name and closes nothing; the block above the same text closes
+ok - review F2: a member line that ends a <pre> example still reports its link and id; nothing outside the block closes
+ok - a body with two closes blocks refuses the whole close, names why and closes nothing
+ok - a block with no end line, or an end line before its begin line, refuses the whole close and closes nothing
+ok - marker text inside other text, an indented marker included, refuses the whole close
+ok - a prose line, an old Closes: line, a malformed, indented or lower-case directive or a fence line inside the block refuses the whole close
+ok - a member body is read only inside its own block; a member body with two blocks closes none of its own items and is refused by name, while the train's block and the member's pr= task close
+ok - a block with CRLF line ends is refused by name; the same block with LF line ends and a blank line inside closes each named item
+ok - a whole block inside a fence, a pre, code, blockquote or details element, an HTML comment or a quote closes nothing and keeps its edge
+ok - opener text above the block refuses the whole body whatever seems to close it: an HTML block, a list fence, a code span, an inline tag, a longer fence or an open comment
+ok - a block above every example closes; the example lines below it close nothing and are reported
+ok - a malformed directive-shaped line outside the block reports each id and each link on it, in the merged body and a member body; nothing closes
+ok - a closes block in a commit message closes nothing and changes no edge; only the PR body is read
+ok - the block the real ship brief teaches, built for a merge train, closes the train's and its member's items
+ok - the reader reads a 300 KB and a 60 KB body whole, 60 calls, with no write error

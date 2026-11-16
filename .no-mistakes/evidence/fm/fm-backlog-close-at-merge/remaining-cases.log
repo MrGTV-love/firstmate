@@ -1,0 +1,2 @@
+ok - a typed completion with --backend before the subcommand or after the id clears its finished edge and keeps the rest, its JSON stays valid, and the capture guard stops it
+not ok - r9-reads: a member record without a body field was not a failed read

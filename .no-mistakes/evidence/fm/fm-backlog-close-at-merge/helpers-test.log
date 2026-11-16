@@ -1,0 +1,64 @@
+ok - f1: the injection reached the member-value reader
+ok - f1: a cut, failed member-value reader still refuses the invalid member
+ok - f1 control: the invalid member refuses without the injection
+ok - f1 control: a valid block is honored
+ok - f1: a failed byte count closes nothing (failed)
+ok - f1 control: with a real count the NUL refuses the body
+ok - crlf: a block with CRLF line ends is refused
+ok - crlf control: the same block with LF line ends is honored
+ok - p: a cut parse result does not load
+ok - p: a complete result loads with its ids and its report records
+ok - p: a failed read of the result loads nothing
+ok - f5: an unreadable result is reported and counted (left=1 lines=1)
+ok - f5: the line names the body and says no item closed, every edge kept
+ok - f6: forgejo {"merged":true}
+ok - f6: gitlab {"state":"merged"}
+ok - f6: github {"state":"MERGED"}
+ok - f6: forgejo {"merged":true,"body":""}
+ok - f6: gitlab {"state":"merged","description":null}
+ok - f6: github {"state":"MERGED","body":"text"}
+ok - f7: an unreadable task record is reported and counted
+ok - f7 control: a record whose last pr= is the member matches
+ok - f7 control: a record whose last pr= is another URL does not match
+ok - c4 result: tasks-axi prints the waived row as done, plain and --json
+ok - c4 result: a plain result that shows the row done clears its dependents
+ok - c4 result: a --json result that shows the row done clears its dependents
+ok - c4 result: a repeated completion's result clears its dependents
+ok - c4 result: a result that shows the row not done keeps every edge and says so
+ok - c4 result: a result for another row keeps every edge and says so
+ok - c4 result: with no readable result, exit 0 clears and the report says so
+ok - c4 modules: the typed branch runs no node
+ok - f8: a cut replay does not exit 0 (status 1)
+ok - f8 control: an intact replay exits 0 with the output
+ok - n1: a recorded merge's close step is called with the id and the URL
+ok - n1: a recorded merge's retry line separates the id and the URL
+ok - n1 control: an unrecorded merge's retry line keeps --not-recorded
+ok - f4: a bare call passes the typed branch under set -u
+ok - f4: public-followup waive pf-a --reason r --approved-by captain
+ok - f4: public-followup waive --json pf-flags --reason r --approved-by captain
+ok - f4: task public-followup waive pf-noun --reason r --approved-by captain --json
+ok - f4: public-followup waive --reason=r --approved-by=captain pf-eq
+ok - f4: public-followup waive --reason r --approved-by captain --json pf-last
+ok - f4: public-followup record-delivery --receipt-file f.json pf-rd
+ok - f4: task public-followup record-delivery --json --receipt-file=f.json pf-rd2
+ok - f4: public-followup --backend=markdown waive pf-be --reason r --approved-by captain
+ok - f4: public-followup waive pf-bt --reason r --approved-by captain --backend=markdown
+ok - f4: public-followup --backend markdown waive pf-bs --reason r --approved-by captain
+ok - f4: task public-followup record-delivery pf-bm --backend markdown --receipt-file f.json
+ok - f4: public-followup waive pf-dash --reason -h --approved-by captain
+ok - f4: public-followup waive pf-one pf-two --reason r --approved-by captain
+ok - f4: public-followup waive pf-a --reason --json --approved-by captain
+ok - f4: public-followup waive pf-a --reason r --approved-by captain --backend
+ok - f4: public-followup --backend= waive pf-a --reason r --approved-by captain
+ok - f4: public-followup record-delivery --receipt-file f.json
+ok - f4: public-followup waive pf-a --reason r --approved-by captain -h
+ok - f4: public-followup waive --help
+ok - f4: public-followup waive pf-a --reason --help --approved-by captain
+ok - f4: task public-followup record-delivery pf-a --receipt-file f.json --help
+ok - f4: done pf-a --note x
+ok - f4: public-followup begin-delivery pf-a --payload-hash x
+ok - f4: public-followup --backend=markdown ready
+ok - f5: a NUL in a body with no marker is refused with that reason
+ok - f5 control: a plain body with no marker is no block
+ok - f5 control: a NUL inside a block refuses it, with no id
+bash tests/fm-close-at-merge-helpers.test.sh  0.95s user 1.06s system 86% cpu 2.336 total

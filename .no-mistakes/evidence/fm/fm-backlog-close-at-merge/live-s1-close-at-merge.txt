@@ -1,0 +1,125 @@
+$ seed backlog
+ok: block lab-dependent -> blocked-by lab-close-a
+help[2]:
+  - Run `tasks-axi unblock lab-dependent --by <other>` to clear it
+  - Run `tasks-axi ready` to see what is still dispatchable
+ok: block lab-dependent -> blocked-by lab-other
+help[2]:
+  - Run `tasks-axi unblock lab-dependent --by <other>` to clear it
+  - Run `tasks-axi ready` to see what is still dispatchable
+ok: hold lab-dependent -> held (future)
+task:
+  id: lab-dependent
+  title: item lab-dependent
+  state: queued
+  blocked: yes
+  blocked_by: "lab-close-a,lab-other"
+  held: yes
+  hold_reason: wait for a date
+  hold_kind: future
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: "blocked-by:lab-close-a,blocked-by:lab-other"
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold lab-dependent` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+task:
+  id: lab-dependent
+  title: item lab-dependent
+  state: queued
+  blocked: yes
+  blocked_by: "lab-close-a,lab-other"
+  held: yes
+  hold_reason: wait for a date
+  hold_kind: future
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: "blocked-by:lab-close-a,blocked-by:lab-other"
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unblock lab-dependent --by <other>` to clear a blocker
+  - Run `tasks-axi start lab-dependent` to move it to in flight
+$ PR body (forge stand-in for #399):
+<!-- firstmate-backlog-closes:begin -->
+Closes-backlog-item: lab-close-a
+Closes-backlog-item: lab-close-b
+Closes-backlog-item: lab-unknown-z
+<!-- firstmate-backlog-closes:end -->
+
+Summary of the work.
+$ bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/399
+close-at-merge: closed lab-close-a with https://github.com/MrGTV-love/firstmate/pull/399 (named by the body of https://github.com/MrGTV-love/firstmate/pull/399)
+close-at-merge: unblocked: lab-dependent no longer waits on lab-close-a; it still waits on lab-other
+close-at-merge: closed lab-close-b with https://github.com/MrGTV-love/firstmate/pull/399 (named by the body of https://github.com/MrGTV-love/firstmate/pull/399)
+actionable: close-at-merge: not closed lab-unknown-z: unknown id named by the body of https://github.com/MrGTV-love/firstmate/pull/399; no item with that id is in the active backlog (an archived item is not read), and none was created
+close-at-merge: 2 closed, 1 left open
+exit=3
+$ show after
+task:
+  id: lab-close-a
+  title: "item lab-close-a https://github.com/MrGTV-love/firstmate/pull/399"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-11-16
+  deps: none
+  links: "pr:https://github.com/MrGTV-love/firstmate/pull/399"
+  body: ""
+task:
+  id: lab-close-b
+  title: "item lab-close-b https://github.com/MrGTV-love/firstmate/pull/399"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-11-16
+  deps: none
+  links: "pr:https://github.com/MrGTV-love/firstmate/pull/399"
+  body: ""
+task:
+  id: lab-dependent
+  title: item lab-dependent
+  state: queued
+  blocked: yes
+  blocked_by: lab-other
+  held: yes
+  hold_reason: wait for a date
+  hold_kind: future
+  hold_until: "-"
+  kind: docs
+  repo: "-"
+  priority: "-"
+  created: 2026-11-16
+  closed: "-"
+  deps: "blocked-by:lab-other"
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unblock lab-dependent --by <other>` to clear a blocker
+  - Run `tasks-axi start lab-dependent` to move it to in flight

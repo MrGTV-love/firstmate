@@ -1,0 +1,253 @@
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/61 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed fm-fixture-alpha-1 with https://github.com/example/repo/pull/61 (named by the body of https://github.com/example/repo/pull/61)
+close-at-merge: closed fm-fixture-beta-2 with https://github.com/example/repo/pull/61 (named by the body of https://github.com/example/repo/pull/61)
+close-at-merge: closed ship-a with https://github.com/example/repo/pull/61 (named by the body of https://github.com/example/repo/pull/61)
+close-at-merge: closed docs-live-4 with https://github.com/example/repo/pull/61 (named by the body of https://github.com/example/repo/pull/61)
+close-at-merge: 4 closed, 3 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  4 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/61 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000061, which contains the current main tip b4f5e5b396c443659889f04fe0865fce0df23792
+review: PASS
+actionable: close-at-merge: ignored a malformed directive line in the body of https://github.com/example/repo/pull/61: Closes-backlog-item: fm-fixture-prose-5 # comment; the forms are one Closes-backlog-item: <item-id> or Train-member: <GitHub, GitLab or Forgejo pull request URL> per line, one space after the colon and nothing after the value
+actionable: close-at-merge: not closed fm-fixture-live-3: bin/fm-tasks-axi.sh done did not close it: fm-fixture-live-3 has a live task record; complete it with bin/fm-teardown.sh fm-fixture-live-3, which owns the landing proof
+actionable: close-at-merge: not closed fm-fixture-legacy-6: the body of https://github.com/example/repo/pull/61 names it with a Closes: line, which closes nothing; write 'Closes-backlog-item: fm-fixture-legacy-6' in the body's closes block, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/61
+actionable: close-at-merge: mentioned fm-fixture-prose-5 in the prose of https://github.com/example/repo/pull/61: nothing was closed for it; add a Closes-backlog-item: fm-fixture-prose-5 line to the body's closes block if this merge finished it
+ok - a merge closes each named eligible item with the merged PR URL and reports the one it left open
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/80 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed train-own-item with https://github.com/example/repo/pull/80 (named by the body of https://github.com/example/repo/pull/80)
+close-at-merge: closed m1-item with https://github.com/example/repo/pull/80 (named by the body of train member https://github.com/example/repo/pull/71)
+close-at-merge: closed m3-live-docs with https://github.com/example/repo/pull/80 (named by the task record that holds train member https://github.com/example/repo/pull/73)
+close-at-merge: 3 closed, 1 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  5 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/80 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000080, which contains the current main tip 22dde8a297753a3e90387a303ad4931bf3a42f77
+review: PASS
+actionable: close-at-merge: not closed m2-live-ship: bin/fm-tasks-axi.sh done did not close it: m2-live-ship has a live task record; complete it with bin/fm-teardown.sh m2-live-ship, which owns the landing proof
+actionable: close-at-merge: mentioned https://github.com/example/repo/pull/90 in the prose of https://github.com/example/repo/pull/80: no item was closed for it; list it as a Train-member: line if it landed with this merge
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/80 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed train-own-item with https://github.com/example/repo/pull/80 (named by the body of https://github.com/example/repo/pull/80)
+close-at-merge: closed m1-item with https://github.com/example/repo/pull/80 (named by the body of train member https://github.com/example/repo/pull/71)
+close-at-merge: closed m3-live-docs with https://github.com/example/repo/pull/80 (named by the task record that holds train member https://github.com/example/repo/pull/73)
+close-at-merge: 3 closed, 1 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  5 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/80 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000080, which contains the current main tip 4543a5597a6eae7f9ee5a60b5e5e713f2c8f277a
+review: PASS
+actionable: close-at-merge: not closed m2-live-ship: bin/fm-tasks-axi.sh done did not close it: m2-live-ship has a live task record; complete it with bin/fm-teardown.sh m2-live-ship, which owns the landing proof
+actionable: close-at-merge: mentioned https://github.com/example/repo/pull/90 in the prose of https://github.com/example/repo/pull/80: no item was closed for it; list it as a Train-member: line if it landed with this merge
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/80 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed train-own-item with https://github.com/example/repo/pull/80 (named by the body of https://github.com/example/repo/pull/80)
+close-at-merge: closed m1-item with https://github.com/example/repo/pull/80 (named by the body of train member https://github.com/example/repo/pull/71)
+close-at-merge: closed m3-live-docs with https://github.com/example/repo/pull/80 (named by the task record that holds train member https://github.com/example/repo/pull/73)
+close-at-merge: 3 closed, 1 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  5 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/80 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000080, which contains the current main tip f4458540c89e77be065c39ec5d3dc761d900419f
+review: PASS
+actionable: close-at-merge: not closed m2-live-ship: bin/fm-tasks-axi.sh done did not close it: m2-live-ship has a live task record; complete it with bin/fm-teardown.sh m2-live-ship, which owns the landing proof
+actionable: close-at-merge: mentioned https://github.com/example/repo/pull/90 in the prose of https://github.com/example/repo/pull/80: no item was closed for it; list it as a Train-member: line if it landed with this merge
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/80 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed train-own-item with https://github.com/example/repo/pull/80 (named by the body of https://github.com/example/repo/pull/80)
+close-at-merge: closed m1-item with https://github.com/example/repo/pull/80 (named by the body of train member https://github.com/example/repo/pull/71)
+close-at-merge: closed m3-live-docs with https://github.com/example/repo/pull/80 (named by the task record that holds train member https://github.com/example/repo/pull/73)
+close-at-merge: 3 closed, 1 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  5 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/80 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000080, which contains the current main tip 9f6ea208bc9dd791d470b67a49bc960048bb27c9
+review: PASS
+actionable: close-at-merge: not closed m2-live-ship: bin/fm-tasks-axi.sh done did not close it: m2-live-ship has a live task record; complete it with bin/fm-teardown.sh m2-live-ship, which owns the landing proof
+actionable: close-at-merge: mentioned https://github.com/example/repo/pull/90 in the prose of https://github.com/example/repo/pull/80: no item was closed for it; list it as a Train-member: line if it landed with this merge
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/80 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed train-own-item with https://github.com/example/repo/pull/80 (named by the body of https://github.com/example/repo/pull/80)
+close-at-merge: closed m1-item with https://github.com/example/repo/pull/80 (named by the body of train member https://github.com/example/repo/pull/71)
+close-at-merge: closed m3-live-docs with https://github.com/example/repo/pull/80 (named by the task record that holds train member https://github.com/example/repo/pull/73)
+close-at-merge: 3 closed, 1 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  5 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/80 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000080, which contains the current main tip b7fbb4828db5e37d7ef9e13178c9075a1e7a8942
+review: PASS
+actionable: close-at-merge: not closed m2-live-ship: bin/fm-tasks-axi.sh done did not close it: m2-live-ship has a live task record; complete it with bin/fm-teardown.sh m2-live-ship, which owns the landing proof
+actionable: close-at-merge: mentioned https://github.com/example/repo/pull/90 in the prose of https://github.com/example/repo/pull/80: no item was closed for it; list it as a Train-member: line if it landed with this merge
+ok - a train closes its Train-member lines' items from bodies and from pr=, never an excluded PR's, whatever decorative layout the body also holds
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/91 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed edge-blocker with https://github.com/example/repo/pull/91 (named by the body of https://github.com/example/repo/pull/91)
+close-at-merge: unblocked: dep-clears no longer waits on edge-blocker; no stored blocked-by edge remains
+close-at-merge: 1 closed, 0 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/91 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000091, which contains the current main tip cac69121ceb1c456c679dc649d7afc070786fc74
+review: PASS
+actionable: close-at-merge: edge-blocker is done, but dep-fails could not be unblocked (error: simulated unblock failure); run tasks-axi unblock dep-fails --by edge-blocker
+ok - a merge reports a cleared edge on stdout and a failed clear behind actionable: on stderr
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/160 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: 0 closed, 2 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/160 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000160, which contains the current main tip 39cac14c56637c29b739c70f483411be7dc92a62
+review: PASS
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/example/repo/pull/160: its first non-empty line, line 1, is not the closes block begin line, so any block it holds is not at the top of the body: This is an illustrative code span, not a closing instruction: `example; it names item ids: r5-span; pull request links: none; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/160
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/example/repo/pull/160: Closes-backlog-item: r5-span
+actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a <!-- firstmate-backlog-closes:begin --> line and end with a <!-- firstmate-backlog-closes:end --> line; fix the body of https://github.com/example/repo/pull/160, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/160
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/161 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: 0 closed, 2 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/161 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000161, which contains the current main tip da1dd9df595723f1952864756503cf30c1aebd5e
+review: PASS
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/example/repo/pull/161: its first non-empty line, line 1, is not the closes block begin line, so any block it holds is not at the top of the body: This is an illustrative example inside a div, not a closing instruction:; it names item ids: r5-div; pull request links: none; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/161
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/example/repo/pull/161: Closes-backlog-item: r5-div
+actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a <!-- firstmate-backlog-closes:begin --> line and end with a <!-- firstmate-backlog-closes:end --> line; fix the body of https://github.com/example/repo/pull/161, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/161
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/162 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: 0 closed, 2 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/162 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000162, which contains the current main tip e651d36b4eaca7eb13e5fbbe83ab610ecf50135f
+review: PASS
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/example/repo/pull/162: its first non-empty line, line 1, is not the closes block begin line, so any block it holds is not at the top of the body: | example | block |; it names item ids: r5-table; pull request links: none; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/162
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/example/repo/pull/162: Closes-backlog-item: r5-table
+actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a <!-- firstmate-backlog-closes:begin --> line and end with a <!-- firstmate-backlog-closes:end --> line; fix the body of https://github.com/example/repo/pull/162, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/162
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/163 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: 0 closed, 2 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/163 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000163, which contains the current main tip a40037e68e8906294740f0f40514358ca4ad9f25
+review: PASS
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/example/repo/pull/163: its first non-empty line, line 1, is not the closes block begin line, so any block it holds is not at the top of the body: <!-- an example; it names item ids: r5-comment; pull request links: none; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/163
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/example/repo/pull/163: Closes-backlog-item: r5-comment
+actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a <!-- firstmate-backlog-closes:begin --> line and end with a <!-- firstmate-backlog-closes:end --> line; fix the body of https://github.com/example/repo/pull/163, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/163
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/164 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: 0 closed, 3 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/164 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000164, which contains the current main tip 9a9b4af5c73ebc08f38c684ae50a0488407ca3dd
+review: PASS
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/example/repo/pull/164: line 7 holds the closes block marker text outside its one block: <!-- firstmate-backlog-closes:begin -->; it names item ids: r5-first-real, r5-quoted-copy; pull request links: none; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/164
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/example/repo/pull/164: Closes-backlog-item: r5-first-real
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/example/repo/pull/164: Closes-backlog-item: r5-quoted-copy
+actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a <!-- firstmate-backlog-closes:begin --> line and end with a <!-- firstmate-backlog-closes:end --> line; fix the body of https://github.com/example/repo/pull/164, then retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-pr-close-items.sh task-x1 https://github.com/example/repo/pull/164
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/165 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+close-at-merge: closed r5-control with https://github.com/example/repo/pull/165 (named by the body of https://github.com/example/repo/pull/165)
+close-at-merge: unblocked: r5-control-waiter no longer waits on r5-control; no stored blocked-by edge remains
+close-at-merge: 1 closed, 0 left open
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HP4C3BERMZ1380M3T5CFP7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+verified: https://github.com/example/repo/pull/165 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 0000000000000000000000000000000000000165, which contains the current main tip 0d84476393d1353f16e1111d261b3185efa32c55
+review: PASS
+ok - a block in a code span, a div, a table or a comment, or a quoted second copy, refuses the whole body and keeps every edge; a block that opens the body closes

@@ -1,0 +1,60 @@
+=== S2 train: merged #394 is a train naming member #393 ===
+--- body 394
+<!-- firstmate-backlog-closes:begin -->
+Closes-backlog-item: lab-train-own
+Train-member: https://github.com/MrGTV-love/firstmate/pull/393
+<!-- firstmate-backlog-closes:end -->
+--- body 393
+<!-- firstmate-backlog-closes:begin -->
+Closes-backlog-item: lab-member-item
+<!-- firstmate-backlog-closes:end -->
+
+Member work.
+close-at-merge: closed lab-train-own with https://github.com/MrGTV-love/firstmate/pull/394 (named by the body of https://github.com/MrGTV-love/firstmate/pull/394)
+close-at-merge: closed lab-member-item with https://github.com/MrGTV-love/firstmate/pull/394 (named by the body of train member https://github.com/MrGTV-love/firstmate/pull/393)
+close-at-merge: 2 closed, 0 left open
+exit=0
+  state: done  held: no  deps: none <- lab-train-own
+  state: done  held: no  deps: none <- lab-member-item
+
+=== S3 adversarial: block is below other text -> whole body refused ===
+--- body 399
+Intro line first.
+
+<!-- firstmate-backlog-closes:begin -->
+Closes-backlog-item: lab-refuse-a
+Train-member: https://github.com/MrGTV-love/firstmate/pull/393
+<!-- firstmate-backlog-closes:end -->
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/MrGTV-love/firstmate/pull/399: its first non-empty line, line 1, is not the closes block begin line, so any block it holds is not at the top of the body: Intro line first.; it names item ids: lab-refuse-a; pull request links: https://github.com/MrGTV-love/firstmate/pull/393; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/399
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/MrGTV-love/firstmate/pull/399: Closes-backlog-item: lab-refuse-a
+actionable: close-at-merge: ignored a directive line outside a directive block in the body of https://github.com/MrGTV-love/firstmate/pull/399: Train-member: https://github.com/MrGTV-love/firstmate/pull/393
+actionable: close-at-merge: a directive closes only inside the one closes block, which must open the body with a <!-- firstmate-backlog-closes:begin --> line and end with a <!-- firstmate-backlog-closes:end --> line; fix the body of https://github.com/MrGTV-love/firstmate/pull/399, then retry: bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/399
+actionable: close-at-merge: mentioned https://github.com/MrGTV-love/firstmate/pull/393 in the prose of https://github.com/MrGTV-love/firstmate/pull/399: no item was closed for it; list it as a Train-member: line if it landed with this merge
+close-at-merge: 0 closed, 3 left open
+exit=3
+--- forge reads:
+gh pr view https://github.com/MrGTV-love/firstmate/pull/399
+  state: queued  held: no  deps: none <- lab-refuse-a
+  state: queued  held: no  deps: "blocked-by:lab-refuse-a" <- lab-refuse-dep
+
+=== S4 adversarial: CRLF body -> refused ===
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/MrGTV-love/firstmate/pull/399: its first non-empty line, line 1, holds the closes block marker text but is not exactly the begin line: <!-- firstmate-backlog-closes:begin -->; it names item ids: lab-refuse-a; pull request links: none; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/399
+actionable: close-at-merge: ignored a malformed directive line in the body of https://github.com/MrGTV-love/firstmate/pull/399: Closes-backlog-item: lab-refuse-a; the forms are one Closes-backlog-item: <item-id> or Train-member: <GitHub, GitLab or Forgejo pull request URL> per line, one space after the colon and nothing after the value
+actionable: close-at-merge: mentioned lab-refuse-a in the prose of https://github.com/MrGTV-love/firstmate/pull/399: nothing was closed for it; add a Closes-backlog-item: lab-refuse-a line to the body's closes block if this merge finished it
+close-at-merge: 0 closed, 2 left open
+exit=3
+  state: queued  held: no  deps: none <- lab-refuse-a
+  state: queued  held: no  deps: "blocked-by:lab-refuse-a" <- lab-refuse-dep
+
+=== S5 adversarial: malformed directive inside the block -> refused ===
+actionable: close-at-merge: refused to close anything named by the body of https://github.com/MrGTV-love/firstmate/pull/399: line 2 inside its closes block is not exactly a Closes-backlog-item: <item-id> line, a Train-member: <url> line or an empty line: Closes-backlog-item: lab-refuse-a # note; it names item ids: lab-refuse-a, note; pull request links: none; none was closed, no member was read from it and no blocked-by edge changed; a body names what it closes only when its first non-empty line is <!-- firstmate-backlog-closes:begin -->, then only exact Closes-backlog-item: <item-id> and Train-member: <GitHub, GitLab or Forgejo pull request URL> lines or empty lines, then <!-- firstmate-backlog-closes:end -->, with the marker text nowhere else; fix it, then retry: bin/fm-pr-close-items.sh lab-merging https://github.com/MrGTV-love/firstmate/pull/399
+actionable: close-at-merge: ignored a malformed directive line in the body of https://github.com/MrGTV-love/firstmate/pull/399: Closes-backlog-item: lab-refuse-a # note; the forms are one Closes-backlog-item: <item-id> or Train-member: <GitHub, GitLab or Forgejo pull request URL> per line, one space after the colon and nothing after the value
+actionable: close-at-merge: mentioned lab-refuse-a in the prose of https://github.com/MrGTV-love/firstmate/pull/399: nothing was closed for it; add a Closes-backlog-item: lab-refuse-a line to the body's closes block if this merge finished it
+close-at-merge: 0 closed, 2 left open
+exit=3
+  state: queued  held: no  deps: none <- lab-refuse-a
+
+=== S6 rerun of S1 is idempotent (already done reported, no second link) ===
+close-at-merge: lab-close-a is already done
+exit=0
+backlog unchanged by rerun

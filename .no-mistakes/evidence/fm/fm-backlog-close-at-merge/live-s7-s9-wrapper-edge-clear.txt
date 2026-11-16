@@ -1,0 +1,25 @@
+=== S7 bin/fm-tasks-axi.sh done with a real merged PR (#399, proved by the real gh-axi) clears the edge ===
+  state: queued  held: yes  hold_kind: future  deps: "blocked-by:lab-ship-done,blocked-by:lab-ship-other" <- lab-ship-dep
+$ bin/fm-tasks-axi.sh done lab-ship-done --pr https://github.com/MrGTV-love/firstmate/pull/399
+ok: done lab-ship-done -> Done (pr https://github.com/MrGTV-love/firstmate/pull/399)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: lab-ship-dep no longer waits on lab-ship-done; it still waits on lab-ship-other
+exit=0
+  state: done  held: no  hold_kind: "-"  deps: none <- lab-ship-done
+  state: queued  held: yes  hold_kind: future  deps: "blocked-by:lab-ship-other" <- lab-ship-dep
+
+=== S8 adversarial: done proof unchanged - an OPEN PR (#402) is refused, edge kept ===
+fm-tasks-axi: the pull request has not merged: https://github.com/MrGTV-love/firstmate/pull/402
+exit=2
+  state: queued  held: no  hold_kind: "-"  deps: none <- lab-open-a
+  state: queued  held: no  hold_kind: "-"  deps: "blocked-by:lab-open-a" <- lab-open-dep
+
+=== S9 typed completion: public-followup waive clears the edge ===
+add exit=0
+  state: queued  held: yes  hold_kind: future  deps: "blocked-by:lab-pf-1,blocked-by:lab-pf-other" <- lab-pf-dep
+$ bin/fm-tasks-axi.sh public-followup waive lab-pf-1 --reason "not needed" --approved-by captain
+unblocked: lab-pf-dep no longer waits on lab-pf-1; it still waits on lab-pf-other
+exit=0
+  state: done  held: no  hold_kind: "-"  deps: none <- lab-pf-1
+  state: queued  held: yes  hold_kind: future  deps: "blocked-by:lab-pf-other" <- lab-pf-dep

@@ -1,0 +1,2 @@
+ok - a member record without a body field and an unreadable task record are reported, a failed byte count is a reported parse failure, and the train's own item still closes
+ok - a tasks-axi that says it is another version clears the finished edge, keeping the other blocker and the hold; a failed replay exits 1 and is reported while the finished edge clears
