@@ -7913,7 +7913,7 @@ test_a_changed_kept_copy_is_assessed_afresh() {
           opencode-entry) retained_preserved_is "retained-changed-$change" .opencode/new.json ;;
           tab-name) retained_preserved_is "retained-changed-$change" ".claude/channel-outbox/a	b.jsonl" ;;
           link-newline)
-            assert_equals "$(printf 'a.jsonl\n' | od -An -tx1 | tr -d ' \n')" "$(perl -e 'print unpack("H*", readlink($ARGV[0]) // "")' "$(sed -n 's/^preserve=//p' "$record")/.claude/channel-outbox/link")" "retained-changed-$change: the link target's trailing newline was not preserved"
+            assert_equals "$(printf 'a.jsonl\n' | od -An -tx1 | tr -d ' \n')" "$(perl -e 'print unpack("H*", readlink($ARGV[0]) // "")' "$(sed -n 's/^preserve=//p' "$record")/files/.claude/channel-outbox/link")" "retained-changed-$change: the link target's trailing newline was not preserved"
             ;;
         esac
         ;;
