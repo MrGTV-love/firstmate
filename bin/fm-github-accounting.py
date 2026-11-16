@@ -31,6 +31,8 @@ Quota source: gh-axi api rate_limit --full, unchanged inherited authentication,
 every 15 seconds. Records identify REST resources.graphql, not GraphQL response
 headers. This observer intentionally uses the REST counter rather than spending
 points on a GraphQL accounting query. REST shard agreement is not established.
+A completed request with a malformed quota projection records status=unavailable
+with graphql={}, never inferred zero counters.
 A slow request is not overlapped or retried in a burst; pending ticks are recorded.
 A request is stopped only on bin/fm-duration.py's no-progress verdict (no process-tree
 CPU growth and no runnable member for FM_DURATION_NO_PROGRESS_SECS, default 15 minutes),

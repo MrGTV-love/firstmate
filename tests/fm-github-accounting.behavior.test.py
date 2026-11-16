@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Behavioral observer regressions with labeled local process/quota inputs only."""
 import fcntl
+import io
 import json
 import os
 from pathlib import Path
+import runpy
 import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 
 OWNER = Path(__file__).resolve().parents[1] / "bin/fm-github-accounting.py"
@@ -625,12 +628,33 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
         self.assertGreaterEqual([row["status"] for row in rows].count("observed"), 3, rows)
         self.assertEqual(len(self.assertHungPsEnded()), 1, f"{requests} requests")
 
+    def completed_quota(self, projection):
+        # Parsing requires a completed response, not a short observation window
+        # that can end before the owner collects any request. Inject only the
+        # completed child's metadata/body; persist and read the actual records.
+        owner = runpy.run_path(str(OWNER))
+        root = self.state / "github-accounting"
+        root.mkdir(mode=0o700)
+        db = owner["database"](root)
+        try:
+            owner["quota_result"](db, SimpleNamespace(pid=123, returncode=0),
+                                  io.BytesIO(f"api_response:\n  body: {projection}\n".encode()),
+                                  1794000000, "fixture-completed-request", False)
+            db.commit()
+        finally:
+            db.close()
+        return self.records("quota")[0]
+
     def test_malformed_quota_is_unavailable_not_zero(self):
-        self.tool("gh-axi", "printf 'api_response:\\n  body: used=null reset=null limit=5000 remaining=0\\n'\n")
-        self.cli("run", "--duration", "0.8")
-        row = self.records("quota")[0]
+        row = self.completed_quota("used=null reset=null limit=5000 remaining=0")
         self.assertEqual(row["status"], "unavailable")
         self.assertEqual(row["graphql"], {})
+        self.assertEqual(row["source"], "REST rate_limit resources.graphql")
+
+    def test_zero_quota_is_observed_not_unavailable(self):
+        row = self.completed_quota("used=0 reset=1794000000 limit=5000 remaining=0")
+        self.assertEqual(row["status"], "observed")
+        self.assertEqual(row["graphql"], {"used": 0, "reset": 1794000000, "limit": 5000, "remaining": 0})
         self.assertEqual(row["source"], "REST rate_limit resources.graphql")
 
     def test_retention_exact_boundary_and_unrelated_state(self):
