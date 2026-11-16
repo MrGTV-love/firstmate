@@ -3992,6 +3992,10 @@ prelude_phase() {
   if prelude_step_begin 10 && [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
     rejected_checks=
     contribution_check_output=
+    # One token for this sweep, the same for every check in it and new for the next sweep: a check that leaves work to a later check of the same sweep
+    # (the Slack plane's owner check to the second person's) binds it to this token, so work left by an earlier, interrupted sweep is never taken for this one.
+    FM_CHECK_SWEEP="${WATCHER_PID:-$$}.$(date +%s).$RANDOM"
+    export FM_CHECK_SWEEP
     for stopped in "$STATE"/*.check-stopped; do
       [ -e "$stopped" ] || continue
       [ -e "${stopped%-stopped}.sh" ] || rm -f -- "$stopped"
