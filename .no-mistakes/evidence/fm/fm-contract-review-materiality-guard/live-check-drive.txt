@@ -1,0 +1,84 @@
+### live drive of bin/fm-contract-review-pack.sh at 8a9b27375a3ba5cabacdd8cf5ccadc860054f048 (S = throwaway mktemp dir)
+$ fm-contract-review-pack.sh build --contract $S/repo/contract.md --root $S/repo --out-root $S/out --work-root $S/work
+build rc=0 pack=$S/out/pack
+pack files: ci-evidence.md contract.md diff.patch head.txt target.md 
+markers in pack (only KEEP markers expected):
+ZZ-KEEP-DOD
+ZZ-KEEP-REQUEST
+excluded record:
+# fm-contract-review-pack excluded record: paths the reviewer must never read, and contract text it was not given
+pack	$S/out/pack
+root	$S/repo
+work	$S/work/out-pack
+exclude	$S/repo/contract.md
+dropped	title: Definition of done: demo-key
+dropped	Author's all-green candidate
+dropped	Contract Review history
+--- case: grep over repo/.git (gitignore true) (expect rc=3)
+INPUT LEAK: $S/repo/.git: a search of the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: find under repo/.git/refs (expect rc=3)
+INPUT LEAK: $S/repo/.git/refs: a search of the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: glob repo/.git/refs/** (expect rc=3)
+INPUT LEAK: $S/repo/.git/refs: a search of the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: grep repo/.git/logs (gitignore true) (expect rc=3)
+INPUT LEAK: $S/repo/.git/logs: a search of the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: read repo/.git/HEAD (expect rc=3)
+INPUT LEAK: $S/repo/.git/HEAD: a path under the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: read repo/.git/config with ?q= suffix (expect rc=3)
+INPUT LEAK: $S/repo/.git/config?q=url: a path under the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: read repo/.git/HEAD:1-20 selector (expect rc=3)
+INPUT LEAK: $S/repo/.git/HEAD:1-20: a path under the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: control: read repo/.git/../bin/tool.sh (resolves to a tracked file) (expect rc=0)
+INPUT CLEAN: 2 recorded read(s), all authorized
+rc=0
+--- case: control: grep over tracked folder bin (gitignore true) (expect rc=0)
+INPUT CLEAN: 2 recorded read(s), all authorized
+rc=0
+--- case: control: read tracked bin/tool.sh (expect rc=0)
+INPUT CLEAN: 2 recorded read(s), all authorized
+rc=0
+--- case: control: read installed define-done-and-grading SKILL.md (expect rc=0)
+INPUT CLEAN: 2 recorded read(s), all authorized
+rc=0
+--- case: control: read gitignored data/r23-review.md (expect rc=3)
+INPUT LEAK: $S/repo/data/r23-review.md: untracked or gitignored file under the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: control: read the raw contract source (tracked, auto-excluded) (expect rc=3)
+INPUT LEAK: $S/repo/contract.md: excluded path $S/repo/contract.md
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: control: bash call is never clean (expect rc=4)
+INPUT UNVERIFIED: bash call: its reads are not recorded as paths, so they cannot be audited
+ROUND UNVERIFIED: the transcript holds reads that cannot be proven; the round is not clean
+rc=4
+
+### worktree root, where .git is a pointer file
+build rc=0
+--- case: read wt/.git pointer file (expect rc=3)
+INPUT LEAK: $S/wt/.git: a path under the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: grep wt/.git pointer file (expect rc=3)
+INPUT LEAK: $S/wt/.git: a path under the .git folder of the root
+ROUND VOID: 1 input leak(s); rerun on a fresh pack, and do not count this round
+rc=3
+--- case: control: read tracked wt/bin/tool.sh (expect rc=0)
+INPUT CLEAN: 2 recorded read(s), all authorized
+rc=0
+
+throwaway dir removed: yes

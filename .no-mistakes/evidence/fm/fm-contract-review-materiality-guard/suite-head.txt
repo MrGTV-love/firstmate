@@ -32,4 +32,7 @@ ok - the pinned OPERATIONAL-BOUNDARIES.md reads and clean work-folder searches p
 ok - a report with no Inputs read list voids the round, and one with the list and a clean transcript is clean
 ok - reads that resolve to the named installed skill files are clean; another file, an outside link and an author file void
 ok - a work-folder read is clean only for the report, the byte-equal pinned copy and run-written files
-bash tests/fm-contract-review.test.sh  17.41s user 22.02s system 30% cpu 2:10.74 total
+ok - a ?q= read is judged by its file: clean for a tracked file, a leak for an untracked, ignored, excluded or .git file
+ok - a read or search under the root's .git folder is a leak; tracked reads and searches stay clean
+ok - a numbered Inputs read heading is the list, and a report without the heading still voids
+bash tests/fm-contract-review.test.sh  18.57s user 19.50s system 34% cpu 1:50.73 total

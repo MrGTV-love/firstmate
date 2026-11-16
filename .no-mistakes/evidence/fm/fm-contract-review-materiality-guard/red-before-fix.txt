@@ -1,0 +1,1 @@
+not ok - .git case 1 was not a leak: {"type": "toolCall", "name": "grep", "arguments": {"pattern": "x", "path": "/Users/charlesabrooker/tmp/fm-contract-review.9I0ROi/leak-root/.git", "gitignore": true}} -> INPUT CLEAN: 2 recorded read(s), all authorized (expected '3', got '0')
