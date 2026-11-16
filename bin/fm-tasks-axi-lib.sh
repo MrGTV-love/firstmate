@@ -301,13 +301,14 @@ fm_typed_completion_resolve() {
 # the output the completion printed, kept in <result-file>: with --json, one object with a `task`
 # object; otherwise its `public_followup:` block of `id:` and `state:` lines. It is read with the
 # shell's own file read, so a failed replay of the same file does not decide it, and it loads no
-# tasks-axi module. Prints the state and returns 0 when the result names <id> with one state;
-# returns 2 when a readable result names another row (FM_TYPED_COMPLETION_RESULT_ROW holds it);
-# returns 1 when there is no readable result for a row at all (the file cannot be read, is empty,
-# or holds neither form, or the row has no state).
+# tasks-axi module. Call it directly, not in a command substitution, since it answers in
+# variables: returns 0 when the result names <id> with one state (FM_TYPED_COMPLETION_RESULT_STATE
+# holds it); returns 2 when a readable result names another row (FM_TYPED_COMPLETION_RESULT_ROW
+# holds it); returns 1 when there is no readable result for a row at all (the file cannot be read,
+# is empty, or holds neither form, or the row has no state).
 fm_typed_completion_result_state() {  # <result-file> <id>
   local text answer
-  FM_TYPED_COMPLETION_RESULT_ROW=''
+  FM_TYPED_COMPLETION_RESULT_STATE='' FM_TYPED_COMPLETION_RESULT_ROW=''
   text=$(< "$1") || return 1
   case "$text" in
     '{'*)
@@ -328,9 +329,9 @@ fm_typed_completion_result_state() {  # <result-file> <id>
         }' <<< "$text") || return 1
       ;;
   esac
-  # shellcheck disable=SC2034  # FM_TYPED_COMPLETION_RESULT_ROW is read by bin/fm-tasks-axi.sh.
+  # shellcheck disable=SC2034  # FM_TYPED_COMPLETION_RESULT_STATE and _ROW are read by bin/fm-tasks-axi.sh.
   case "$answer" in
-    state$'\t'?*) printf '%s\n' "${answer#*$'\t'}"; return 0 ;;
+    state$'\t'?*) FM_TYPED_COMPLETION_RESULT_STATE=${answer#*$'\t'}; return 0 ;;
     other$'\t'*) FM_TYPED_COMPLETION_RESULT_ROW=${answer#*$'\t'}; return 2 ;;
     *) return 1 ;;
   esac

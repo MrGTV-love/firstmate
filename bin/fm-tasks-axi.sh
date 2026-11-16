@@ -474,7 +474,8 @@ if [ "$pf_form" != 1 ]; then
     # command that clears an id's dependents only while that id is done, in one locked write
     # (docs/configuration.md names the window this leaves).
     pf_result=0
-    pf_state=$(fm_typed_completion_result_state "$pf_out" "$pf_id") || pf_result=$?
+    fm_typed_completion_result_state "$pf_out" "$pf_id" || pf_result=$?
+    pf_state=$FM_TYPED_COMPLETION_RESULT_STATE
     case "$pf_result:$pf_state" in
       0:done)
         fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
