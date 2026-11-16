@@ -262,12 +262,14 @@ teardown_pid_age_secs() {  # <pid>
 
 # When <pid> started, in seconds since the epoch: ps lstart, or, where ps cannot
 # run (a confined worker), the confined table's (bin/fm-proc-info.py lstart). An
-# absolute start time, so a slow reading never moves it.
+# absolute start time, so a slow reading never moves it; both are read in UTC, so
+# a local time that names two instants (the hour repeated when clocks go back)
+# never makes the result ambiguous.
 teardown_pid_start_epoch() {  # <pid>
   local start
-  start=$(LC_ALL=C ps -p "$1" -o lstart= 2>/dev/null) \
-    || start=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" lstart "$1" 2>/dev/null) || return 1
-  LC_ALL=C python3 -c 'import sys, time; print(int(time.mktime(time.strptime(" ".join(sys.argv[1].split()), "%a %b %d %H:%M:%S %Y"))))' "$start" 2>/dev/null
+  start=$(TZ=UTC0 LC_ALL=C ps -p "$1" -o lstart= 2>/dev/null) \
+    || start=$(TZ=UTC0 python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" lstart "$1" 2>/dev/null) || return 1
+  LC_ALL=C python3 -c 'import calendar, sys, time; print(calendar.timegm(time.strptime(" ".join(sys.argv[1].split()), "%a %b %d %H:%M:%S %Y")))' "$start" 2>/dev/null
 }
 
 # Is the pid in a creation lock a launcher that may still be alive? The lock

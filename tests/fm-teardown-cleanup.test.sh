@@ -8891,6 +8891,34 @@ BODY
   pass 'the root dirt rule skips only a registered worktree of the same repository under .claude/worktrees; one elsewhere, an unregistered directory or repository, or an unreadable worktree list, is dirt'
 }
 
+# R5-1: a launcher's start time is read and converted in UTC, so the hour that
+# repeats when clocks go back cannot move it. Two launchers start at 01:30 EDT
+# and at 01:30 EST on 2026-11-01 in America/New_York; ps prints the same local
+# time for both, so only a UTC reading tells them apart.
+test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour() {
+  local body=$TMP_ROOT/pr400-body-start-epoch.sh
+  cat > "$body" <<'BODY'
+cat > "$R5_BASE/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *'-p 101 -o lstart='*) utc='Sun Nov  1 05:30:00 2026' ;;
+  *'-p 102 -o lstart='*) utc='Sun Nov  1 06:30:00 2026' ;;
+  *) exit 1 ;;
+esac
+if [ "${TZ:-}" = UTC0 ]; then echo "$utc"; else echo 'Sun Nov  1 01:30:00 2026'; fi
+SH
+chmod +x "$R5_BASE/fakebin/ps"
+export TZ=America/New_York
+for pid in 101 102; do
+  echo "pid $pid start=$(teardown_pid_start_epoch "$pid" || echo failed)"
+done
+BODY
+  r5_harness start-epoch "$body"
+  r5_expect 'pid 101 start=1793511000' 'pr400-start-epoch: the launcher started at 01:30 EDT got the wrong epoch'
+  r5_expect 'pid 102 start=1793514600' 'pr400-start-epoch: the launcher started at 01:30 EST got the wrong epoch'
+  pass 'a launcher start time in the hour repeated when clocks go back converts to its exact epoch'
+}
+
 # Main 1843 (c): an Orca-backed task keeps base behaviour: the direct release, the
 # history landing and the no-hold bundle route this change adds each refuse for
 # it with a named reason; the same copies on another backend are admitted.
@@ -9156,6 +9184,7 @@ test_pr400_newline_copy_path_reaches_disposal_whole
 test_pr400_root_return_retry_rechecks_safety
 test_pr400_forgejo_only_landing_is_held
 test_pr400_registered_nested_worktree_is_not_root_dirt
+test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour
 test_pr400_orca_keeps_base_behaviour
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
 test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
