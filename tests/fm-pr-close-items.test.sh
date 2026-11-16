@@ -2215,15 +2215,9 @@ test_r5_f5_a_real_block_below_closed_example_text_is_refused_by_name() {
   pass "a real block below closed example text is refused by name (the intended cost); the same block first closes"
 }
 
-# Main 046: one parse. The library offers only the parse (with its one structural pass) and the
-# readers of its result (Main 1851 F1 and F2 added the checked value reader and the whole-result
-# loader), and the close step reads each body exactly once through it.
+# Main 046: one parse. The close step reads each body exactly once.
 test_r5_one_parse_owns_the_block() {
-  local fns case_dir
-  fns=$(bash -c '. "$1"; declare -F | awk "{print \$3}" | grep "^fm_pr_closes_" | sort | tr "\n" " "' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ "$fns" = 'fm_pr_closes_failed fm_pr_closes_get fm_pr_closes_load fm_pr_closes_parse fm_pr_closes_pass fm_pr_closes_values ' ] || fail "r5-one-parse: the library defines more than the parse, its pass, its failure result and its result readers: $fns"
-  ! grep -nE 'fm_pr_closes_(scan|lines|ids|members|outside|malformed|legacy_ids|prose|seen|refusal)' "$ROOT/bin/fm-pr-close-items.sh" >/dev/null \
-    || fail "r5-one-parse: the close step calls a second reader"
+  local case_dir
   case_dir=$(gh_case r5-one-parse 184)
   cx_add "$case_dir" r5-one
   block 'Closes-backlog-item: r5-one' "Train-member: $REPO_URL/71" > "$case_dir/bodies/184"

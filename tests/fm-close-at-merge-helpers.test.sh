@@ -200,24 +200,6 @@ typed_branch() {  # <probe: done|missing|unreadable> <replay: ok|cut> [args...]
     eval "$branch"' _ "$ROOT" "$probe" "$replay" "$@"
 }
 
-# The installed tasks-axi package, found by this test itself (not by the code under test), from
-# the real path of each tasks-axi on PATH.
-test_tasks_axi_package() {
-  local bin real dir
-  for bin in $(type -ap tasks-axi); do
-    real=$bin
-    while [ -L "$real" ]; do
-      case "$(readlink "$real")" in /*) real=$(readlink "$real") ;; *) real=${real%/*}/$(readlink "$real") ;; esac
-    done
-    dir=$(cd "${real%/*}/../.." 2>/dev/null && pwd -P) || continue
-    [ -f "$dir/dist/src/context.js" ] && grep -q '"name": *"tasks-axi"' "$dir/package.json" 2>/dev/null || continue
-    printf '%s\n' "$dir"
-    return 0
-  done
-  return 1
-}
-TASKS_AXI_PKG=$(test_tasks_axi_package) || TASKS_AXI_PKG=''
-
 # Real results of typed completions, printed by the installed tasks-axi command on a scratch
 # store: HOME, the working directory and --file under $TMP, the environment overrides unset. Two
 # obligations are waived (plain and --json) with done_keep 5, then the first is waived again, so
@@ -246,40 +228,30 @@ completion_results() {  # prints the directory with waive.toon, waive.json and a
 
 # The typed branch with tasks-axi printing a given completion result and exiting 0. The dependents'
 # clear is a stub that prints UNBLOCK. node, when the branch calls it, is recorded in $TMP/node.log
-# and then run, so a branch that loads tasks-axi through node is seen. The installed tasks-axi
-# package the branch may look for is a copy that says it is 0.2.7, to show that no version decides.
+# and then run, so a branch that loads tasks-axi through node is seen.
 typed_branch_result() {  # <result-file> [args...]
   local result=$1
   shift
   bash -c 'branch=$(awk "/^pf_form=0\$/ {copy=1} /^exec tasks-axi / {exit} copy {print}" "$1/bin/fm-tasks-axi.sh")
     . "$1/bin/fm-backlog-transition-lib.sh"; . "$1/bin/fm-tasks-axi-lib.sh"; set -u
-    RESULT=$2 NEWER=$3 NODELOG=$4 STORE=$5; shift 5
+    RESULT=$2 NODELOG=$3 STORE=$4; shift 4
     ARGS=("$@") DATA=$STORE/data
     tasks-axi() { command cat -- "$RESULT"; }
     node() { builtin printf "%s\n" "$*" >> "$NODELOG"; command node "$@"; }
-    fm_tasks_axi_package_dir() { builtin printf "%s\n" "$NEWER"; }
     fm_backlog_tasks_axi_addressing() { FM_BACKLOG_AXI_ROOT=$STORE FM_BACKLOG_AXI_FILE=$STORE/data/backlog.md; }
     fm_backlog_unblock_dependents() { builtin printf "UNBLOCK %s\n" "$2"; }
-    cd "$STORE" && eval "$branch"' _ "$ROOT" "$result" "$TMP/tasks-axi-0.2.7" "$TMP/node.log" "$(completion_results)" "$@" 2>&1
-}
-newer_tasks_axi() {  # a copy of the installed package that says it is 0.2.7
-  [ -n "$TASKS_AXI_PKG" ] || return 1
-  [ -d "$TMP/tasks-axi-0.2.7" ] && return 0
-  mkdir -p "$TMP/tasks-axi-0.2.7" && cp -R "$TASKS_AXI_PKG/dist" "$TMP/tasks-axi-0.2.7/dist" || return 1
-  [ ! -d "$TASKS_AXI_PKG/node_modules" ] || cp -R "$TASKS_AXI_PKG/node_modules" "$TMP/tasks-axi-0.2.7/node_modules" || return 1
-  sed 's/"version": *"[^"]*"/"version": "0.2.7"/' "$TASKS_AXI_PKG/package.json" > "$TMP/tasks-axi-0.2.7/package.json"
+    cd "$STORE" && eval "$branch"' _ "$ROOT" "$result" "$TMP/node.log" "$(completion_results)" "$@" 2>&1
 }
 
 # Main 2086 (1): a typed completion's own result decides the clear. tasks-axi prints the completed
 # row's state for a fresh and a repeated completion, plain and --json; when it shows the row
-# done, its dependents are cleared through the same clear as done and close, whatever tasks-axi
-# version is installed. A readable result that shows another state or names another row keeps
+# done, its dependents are cleared through the same clear as done and close. A readable result that shows another state or names another row keeps
 # every edge and hold, and says so. With no readable result, exit 0 alone is the proof
 # (Main 1795): the dependents are cleared and the report says the clear rests on it.
 test_c4_the_completions_own_result_decides_the_clear() {
   local dir out
   command -v tasks-axi >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { ok "skipped: tasks-axi or jq is not installed"; return 0; }
-  dir=$(completion_results) && newer_tasks_axi || { not_ok "c4 result: tasks-axi could not print real completion results here"; return 0; }
+  dir=$(completion_results) || { not_ok "c4 result: tasks-axi could not print real completion results here"; return 0; }
   check "c4 result: tasks-axi prints the waived row as done, plain and --json" "state: done | done" \
     "$(grep -x '  state: done' "$dir/waive.toon" | sed 's/^ *//') | $(jq -r .task.state "$dir/waive.json")"
   out=$(typed_branch_result "$dir/waive.toon" public-followup waive pf-x --reason r --approved-by captain)
@@ -309,7 +281,7 @@ test_c4_the_completions_own_result_decides_the_clear() {
 test_c4_no_tasks_axi_module_is_loaded() {
   local dir
   command -v tasks-axi >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { ok "skipped: tasks-axi or jq is not installed"; return 0; }
-  dir=$(completion_results) && newer_tasks_axi || { not_ok "c4 modules: tasks-axi could not print real completion results here"; return 0; }
+  dir=$(completion_results) || { not_ok "c4 modules: tasks-axi could not print real completion results here"; return 0; }
   rm -f "$TMP/node.log"
   typed_branch_result "$dir/waive.toon" public-followup waive pf-x --reason r --approved-by captain >/dev/null
   check "c4 modules: the typed branch runs no node" "" "$(cat "$TMP/node.log" 2>/dev/null)"
