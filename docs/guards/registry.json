@@ -7,6 +7,7 @@
     "live-lab-processes-stopped-before-remove",
     "merge-local-ff-only",
     "merge-unproved-outcome",
+    "close-at-merge-body-refused",
     "nested-copy-ignored-bytes-preserved",
     "nested-copy-reproof",
     "nested-copy-vernant-closeout",
@@ -373,6 +374,45 @@
         {
           "file": "bin/fm-pr-merge.sh",
           "match": "printf 'error: this run refuses even though the request for %s was accepted with the exact flags base branch %s requires (--auto --%s): the pull request has still not entered the merge queue, so no landed or queued outcome is proven; re-check the pull request'\"'\"'s merge queue state before retrying\\n' \\"
+        }
+      ]
+    },
+    {
+      "id": "close-at-merge-body-refused",
+      "version": "1",
+      "owner": "bin/fm-pr-close-items.sh",
+      "invariant": "A merged pull request body closes backlog items, reads train members or changes blocked-by edges only when its closes block is proven exact; any doubt refuses the whole body.",
+      "layer": "runtime-block",
+      "source": "the merged pull request body (and each listed train member body) parsed once by fm_pr_closes_parse in bin/fm-pr-closes-lib.sh",
+      "trigger": "the body's closes block is not the first non-empty line at column 0, holds a line other than an exact Closes-backlog-item: <id> or Train-member: <PR URL> line or an empty line, has no end marker, repeats the marker text, or holds a NUL or CR byte",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Edit the pull request body so it opens with exactly one closes block in the form bin/fm-dod-lib.sh describes, then run the retry command the actionable: close-at-merge line prints.",
+      "budget": 1,
+      "budget_reason": "One refused close per merge run; the merge itself still succeeds, and the printed retry command is the owner's next step. No cross-invocation counter is implemented.",
+      "telemetry": "Not instrumented under this family id; the refusal prints one actionable: close-at-merge line on stderr naming the reason, every item id and every pull request link. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-pr-close-items.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-pr-close-items.sh",
+          "match": "printf 'actionable: close-at-merge: refused to close anything named by %s: %s;"
+        },
+        {
+          "file": "bin/fm-pr-closes-lib.sh",
+          "match": "status = (reason != \"\") ? \"refused\" : (nm == 0) ? \"none\" : \"block\""
+        },
+        {
+          "file": "bin/fm-dod-lib.sh",
+          "match": "makes the merge refuse the whole body",
+          "count": 3
         }
       ]
     },
