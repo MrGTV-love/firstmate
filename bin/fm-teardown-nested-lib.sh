@@ -80,7 +80,7 @@
 # named or not, with the reason naming the file, until it reads again.
 # For a copy a line names, teardown_closeout_route uses the route only when all of
 # these hold, read afresh at every call (the sweep's plan and execute, teardown's
-# execute): every line that names the copy speaks for the owner and is judged on its
+# entry plan and execute): every line that names the copy speaks for the owner and is judged on its
 # own, so a line for another tip of the path (history is not ignored: take the line
 # out once it no longer applies), a line with other than four fields, a line that
 # leaves the PR or the profile empty or gives a PR that is no decimal integer
