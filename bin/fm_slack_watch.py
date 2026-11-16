@@ -308,7 +308,7 @@ SECOND_ID_FILE = 'second-ids'
 OWNER_CHECK_FILE = 'owner-check-at'
 OWNER_MARK_WAIT = 1.0
 # The longest any run but their own check waits for one write of the second person's bookkeeping (Watch.second_io, Main 2082).
-SECOND_IO_WAIT = 1.0
+SECOND_IO_WAIT = 2.0
 # The watcher's mark of the end of each sweep of the standing checks (bin/fm-watch.sh touches it after the last check of a sweep), in its state folder.
 WATCHER_SWEEP_MARK = '.last-check'
 # Refusals of theirs whose log row could not be written yet, kept apart from second.json with only hashed values (F2 of the review of c5868b6f).
@@ -889,12 +889,6 @@ def second_user():
     return raw, ''
 
 
-def host_now():
-    """This host's clock, used only to seed the first completed-run time of a journal that has none, when no Slack reply dated the run (Main's ruling e59cdb79
-    on the enable anchor); it never replaces a recorded one (F4 of the review of 5048f815)."""
-    return time.time()
-
-
 def just_before(ts):
     """The Slack timestamp one microsecond before ts: a cursor that takes in ts itself and everything after it (Slack orders timestamps to the microsecond)."""
     whole, _, part = ts.partition('.')
@@ -1326,9 +1320,10 @@ class Watch:
         any other run it runs in a thread that is waited for at most SECOND_IO_WAIT (Main 2082: the owner's path never waits on second-person bookkeeping):
         one that has not finished then fails this write (OSError), and no later write of theirs starts in this run, so an unfinished one never races another.
         Every caller treats the failure as an unwritten step: nothing that the write was to come before is done (the journal commits before any effect)."""
-        if getattr(self, 'their_check', False):
-            return step()
         owner = getattr(self, 'owner', self)
+        if getattr(self, 'their_check', False) or getattr(owner, 'in_their_pass', False):
+            # Their own check, or their pass of a manual poll after the owner's lines were printed: the owner waits on nothing of it.
+            return step()
         if getattr(owner, 'second_io_stalled', False):
             raise OSError('second_bookkeeping_stalled')
         outcome = []
@@ -3293,12 +3288,20 @@ class Watch:
                 self.second_journal.note_date(value)
 
     def record_run(self):
-        """The time of this completed run, in the second person's own journal (last_run): the latest Slack clock its replies reported. A later run that first
-        reads a new id starts that person's intake there (start_second). A run whose replies carried no Slack clock keeps the last watermark as it is: this
-        host's clock never replaces one (F4 of the review of 5048f815); it only seeds a journal that has none yet, so that the first enable has a start."""
-        if self.clock_last is None and isinstance(self.state.get('last_run'), str):
+        """The time of this completed run, in the second person's own journal (last_run), from Slack's clock only (F4 of the review of 5048f815, Main 1753:
+        this host's clock is never used): the latest Slack clock this run's replies reported, else the newest Slack instant the owner's journal holds (its intake
+        cursor, a message ts Slack gave). A later run that first reads a new id starts that person's intake there (start_second). The watermark only moves
+        forward; with no Slack instant at all, nothing is written and the first enable follows the owner path's first-run rule."""
+        found = [self.clock_last] if self.clock_last is not None else []
+        cursor = (getattr(getattr(self, 'owner', self), 'state', None) or {}).get('intake_cursor')
+        if isinstance(cursor, str) and SLACK_TS.fullmatch(cursor) and cursor != '0':
+            found.append(float(cursor))
+        if not found:
             return
-        value = slack_ts(self.clock_last if self.clock_last is not None else host_now())
+        value = slack_ts(max(found))
+        last = self.state.get('last_run')
+        if isinstance(last, str) and SLACK_TS.fullmatch(last) and ts_key(last) >= ts_key(value):
+            return
         if self.state.get('last_run') != value:
             self.state['last_run'] = value
             self.commit()
@@ -3519,10 +3522,13 @@ class Watch:
         # prints them twice. Their pass then takes only what the one shared cap leaves.
         if self.before_second is not None:
             self.before_second()
+        self.in_their_pass = True
         try:
             self.second_view().second_poll(max(0, left))
         except (SlackError, OSError, ValueError, KeyError, TypeError):
             pass
+        finally:
+            self.in_their_pass = False
         # A completed run (their pass included) is the start of a later first activation; a run that crashed before here records nothing.
         self.record_run_safely()
         if self.owner_deferred:
@@ -3715,8 +3721,8 @@ class Watch:
             return
         mark = self.state.get('last_run')
         if not same and not self.arming and isinstance(mark, str) and SLACK_TS.fullmatch(mark):
-            # The plane reads this id for the first time: the setting changed after its previous completed run, so that run's time (the last Slack clock on
-            # record, or this host's clock only when the journal had no completed run yet) is the start, inclusive, compared as Slack orders timestamps. Nothing
+            # The plane reads this id for the first time: the setting changed after its previous completed run, so that run's time (the last Slack instant on
+            # record, never this host's clock: record_run) is the start, inclusive, compared as Slack orders timestamps. Nothing
             # typed after the enable is lost; earlier messages of theirs since that watermark are also taken in, as data under their label (Main's ruling
             # e59cdb79 on the enable anchor). A watermark not advanced by runs with no Slack clock (record_run) only moves the start earlier, never later.
             self.state['second'] = {'user': self.second, 'intake_cursor': just_before(mark)}
