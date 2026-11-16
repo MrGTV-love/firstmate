@@ -7346,7 +7346,7 @@ test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing() {
 
 test_a_changed_kept_copy_is_assessed_afresh() {
   local rc record change
-  local base first
+  local base first added
   for change in more-ignored opencode-entry tab-name link-newline dirty-tracked unlanded; do
     make_retained_case "retained-changed-$change" enclosing
     held_plain_get_slot "$FOREIGN_CASE"
@@ -7357,6 +7357,7 @@ test_a_changed_kept_copy_is_assessed_afresh() {
     cp "$record" "$FOREIGN_CASE/record.run1"
     base=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
     first=$(kept_tree "$base")
+    cp "$base/SHA256SUMS" "$FOREIGN_CASE/sums.run1"
     case "$change" in
       more-ignored) printf 'more\n' > "$FOREIGN_COPY/notes/unique.dat" ;;
       opencode-entry)
@@ -7375,8 +7376,22 @@ test_a_changed_kept_copy_is_assessed_afresh() {
         assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-changed-$change: a changed copy that passes every proof was not evaluated again"
         assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-changed-$change: run 2 did not reach the lease check"
         cmp -s "$FOREIGN_CASE/record.run1" "$record" && fail "retained-changed-$change: the stale record was not replaced"
-        # No earlier preserved byte is overwritten or removed; the new payload is beside it.
-        assert_equals "$first" "$(kept_tree "$base")" "retained-changed-$change: the earlier preserve changed"
+        # No earlier preserved byte is overwritten or removed. A changed selected file goes
+        # beside the earlier preserve; a new payload-only entry is copied into the earlier
+        # preserve, which still agrees with the copy, and only that entry and its line are added.
+        case "$change" in
+          more-ignored) assert_equals "$first" "$(kept_tree "$base")" "retained-changed-$change: the earlier preserve changed" ;;
+          *)
+            case "$change" in
+              opencode-entry) added=.opencode/new.json ;;
+              tab-name) added=".claude/channel-outbox/a	b.jsonl" ;;
+              link-newline) added=.claude/channel-outbox/link ;;
+            esac
+            assert_equals "$(printf '%s\n' "$first" | grep -v '^F \./SHA256SUMS ')" "$(kept_tree "$base" | grep -v '^F \./SHA256SUMS ' | grep -vF " ./$added ")" "retained-changed-$change: the earlier preserve lost or changed an entry, or gained one other than $added"
+            { [ -e "$base/$added" ] || [ -L "$base/$added" ]; } || fail "retained-changed-$change: $added was not copied into the agreeing earlier preserve"
+            assert_equals "$(cat "$FOREIGN_CASE/sums.run1")" "$(head -n "$(wc -l < "$FOREIGN_CASE/sums.run1")" "$base/SHA256SUMS")" "retained-changed-$change: an earlier SHA256SUMS line changed"
+            ;;
+        esac
         case "$change" in
           more-ignored) retained_preserved_is "retained-changed-$change" notes/unique.dat ;;
           opencode-entry) retained_preserved_is "retained-changed-$change" .opencode/new.json ;;

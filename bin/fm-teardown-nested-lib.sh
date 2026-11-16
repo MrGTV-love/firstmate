@@ -2128,6 +2128,8 @@ teardown_retained_judge() {  # <copy> <answer>
     echo "REFUSED: the record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD") of own nested copy $(fm_refuse_text "$copy") could not be updated to name its preserve $(fm_refuse_text "$TEARDOWN_PRESERVE_DIR"); the task was not closed, and a retry asks the driver nothing." >&2
     return 1
   fi
+  # A pool-slot close releases own copies twice (main, then the slot return): report once.
+  ! teardown_copy_retained "$copy" || return 0
   TEARDOWN_RETAINED+=("$copy")
   echo "teardown: Vernant's closeout driver kept own nested copy $(fm_refuse_text "$copy"); it is landed and clean, its unique ignored files are in the driver's verified archive and in the task's preserve $(fm_refuse_text "${TEARDOWN_PRESERVE_DIR:-(no ignored file to preserve)}"), and the copy is untouched (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD"))" >&2
 }
