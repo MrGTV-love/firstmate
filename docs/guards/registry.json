@@ -158,7 +158,8 @@
     "send-states-its-choice",
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
-    "slack-command-refusal-line"
+    "slack-command-refusal-line",
+    "secondmate-restart-attribution"
   ],
   "guards": [
     {
