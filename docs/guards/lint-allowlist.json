@@ -1331,11 +1331,6 @@
       "text": "[ -z \"$TEARDOWN_HELD_SLOT\" ] || echo \"REFUSED: pool slot $TEARDOWN_RESERVED_SLOT could not be durabl"
     },
     {
-      "id": "site:bin/fm-teardown.sh:88fbf36b30",
-      "rule": "S1",
-      "text": "echo \"REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task r"
-    },
-    {
       "id": "site:bin/fm-test-isolation-proof.sh:bcbb439d55",
       "rule": "S1",
       "text": "[ \"${#CANDIDATES[@]}\" -gt 0 ] || die \"candidate set is empty; refusing isolation proof\""

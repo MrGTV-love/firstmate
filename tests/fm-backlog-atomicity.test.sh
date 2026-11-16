@@ -1945,7 +1945,8 @@ test_completion_refuses_a_close_target_symlinked_to_a_directory() {
 
   out=$(run_teardown "$case_dir" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "teardown published through a directory symlink"
-  assert_contains "$out" "pending-close record target resolves outside its authorized directory" \
+  # The entry preflight finds the unsafe record before any mutation.
+  assert_contains "$out" "pending-close record resolves outside its authorized directory" \
     "teardown did not report the unsafe publication target"
   [ -L "$marker" ] || fail "teardown replaced the unsafe close target"
   [ -z "$(find "$external" -mindepth 1 -maxdepth 1 -print -quit)" ] \
