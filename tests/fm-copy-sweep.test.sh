@@ -508,6 +508,7 @@ install_driver() {  # <slot> <log-dir>
   mkdir -p "$slot/scripts/git-stability"
   cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
 export FAKE_DRIVER=1
+[ ! -e "$log/record-env" ] || env > "$log/driver-env.txt"
 printf '%s|%s\n' "\$PWD" "\$*" >> "$log/closeout.log"
 printf '%s\n' "\$\$" >> "$log/driver.pids"
 if [ "\${3:-}" != --execute-cleanup ]; then
@@ -3044,6 +3045,69 @@ test_arm_and_disarm_bind_the_check() {
   pass "arm binds the check to the existing watcher cadence and disarm removes it"
 }
 
+# A driver released through the sweep runs in the clone's own environment: the
+# clone's .venv/bin/python by absolute path with VIRTUAL_ENV set to the clone's
+# .venv, a decoy venv bin dropped from PATH, and the ambient interpreter
+# variables unset. bin/fm-copy-env-lib.sh owns the rule; the stub interpreter
+# stands where the real one lives and records the environment it was given.
+test_driver_release_runs_in_the_clone_environment() {
+  local env_file saved_path=$ORIGINAL_PATH name base_home
+  # A polluted yet valid PYTHONHOME: the sweep's own python3 helpers must still start.
+  base_home=$(python3 -c 'import sys; print(sys.base_prefix)') || fail 'no python3 for the fixture'
+  make_locked_copy_case clone-env dead
+  install_driver "$SLOT" "$W"
+  : > "$W/record-env"
+  printf '%s\t%s\n' "$(copy_path locked)" $((2 * GIB)) >> "$W/du-table"
+  mkdir -p "$SLOT/.venv/bin" "$W/decoy/bin"
+  cp "$DRIVER_PY" "$SLOT/.venv/bin/python"
+  printf 'home = /decoy\n' > "$W/decoy/pyvenv.cfg"
+  run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_class locked PENDING-DRIVER
+  ORIGINAL_PATH="$W/decoy/bin:$SLOT/.venv/bin:$saved_path"
+  FM_SENTINEL=sentinel-value VIRTUAL_ENV="$W/decoy" PYTHONPATH=/polluted/pythonpath PYTHONHOME="$base_home" \
+    PYTHONUSERBASE=/polluted/userbase PYTHONSTARTUP=/polluted/startup.py __PYVENV_LAUNCHER__=/polluted/launcher \
+    UV_PROJECT_ENVIRONMENT=/polluted/uv CONDA_PREFIX=/polluted/conda run_sweep --apply
+  ORIGINAL_PATH=$saved_path
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the driver did not release the copy: $OUT"
+  env_file="$W/driver-env.txt"
+  assert_present "$env_file" "the closeout driver recorded no environment"
+  assert_contains "$(cat "$env_file")" "VIRTUAL_ENV=$SLOT/.venv" "the driver did not run in the clone venv"
+  for name in PYTHONPATH PYTHONHOME PYTHONUSERBASE PYTHONSTARTUP __PYVENV_LAUNCHER__ UV_PROJECT_ENVIRONMENT CONDA_PREFIX; do
+    assert_no_grep "$name=" "$env_file" "$name reached the closeout driver"
+  done
+  assert_contains "$(grep '^PATH=' "$env_file")" "PATH=$SLOT/.venv/bin:" "the clone venv bin does not lead the driver's PATH"
+  assert_not_contains "$(grep '^PATH=' "$env_file")" "$W/decoy/bin" "a foreign venv bin stayed on the driver's PATH"
+  assert_contains "$(cat "$env_file")" "FM_SENTINEL=sentinel-value" "the scrub dropped an unrelated variable"
+  pass "the sweep's driver release runs in the clone environment with the ambient environment scrubbed"
+}
+
+# The sweep's existence test and the closeout it guards use one interpreter
+# expression: the operator's explicit interpreter when named, else the clone's.
+test_driver_unavailable_reason_follows_the_closeout_interpreter() {
+  make_locked_copy_case clone-env-reason dead
+  install_driver "$SLOT" "$W"
+  mkdir -p "$SLOT/.venv/bin"
+  cp "$DRIVER_PY" "$SLOT/.venv/bin/python"
+  run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_class locked PENDING-DRIVER
+  assert_not_contains "$OUT" "closeout driver or interpreter unavailable" "a usable clone interpreter was called unavailable"
+  FM_TEARDOWN_VERNANT_PYTHON="$W/no-such-python" run_sweep
+  [ "$RC" = 0 ] || fail "report with an unusable override failed ($RC): $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "closeout driver or interpreter unavailable" "an unusable explicit interpreter fell back to the clone's"
+  rm -f "$SLOT/.venv/bin/python"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
+  assert_class locked PENDING-DRIVER
+  run_sweep
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "closeout driver or interpreter unavailable" "a clone with no interpreter was not refused by name"
+  assert_absent "$W/closeout.log" "the driver ran with no interpreter"
+  pass "the sweep names a missing closeout interpreter the way teardown_run_closeout refuses it"
+}
+
 test_help_and_bad_calls() {
   local out
   out=$("$SWEEP" --help 2>&1) || fail "--help failed"
@@ -3145,4 +3209,6 @@ test_bad_config_is_refused
 test_real_lsof_sees_a_process_inside_a_copy
 test_arm_and_disarm_bind_the_check
 test_help_and_bad_calls
+test_driver_release_runs_in_the_clone_environment
+test_driver_unavailable_reason_follows_the_closeout_interpreter
 pass "fm-copy-sweep"

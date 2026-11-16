@@ -14,8 +14,20 @@ done_keep pruned into the archive has no readable Done entry, so its record is
 listed UNPROVEN and kept; the fail direction is always keep.
 --project may be any up-to-date worktree of the Vernant clone: the record
 stores come from its shared git common directory.
-The entry point is the project checkout's scripts/git-stability/
-retire_slot_manifest.py, else the slot copy's own when the checkout lacks it.
+The entry point and its interpreter come from the same tree, because an
+environment follows the tree that owns the script: the project checkout's
+scripts/git-stability/retire_slot_manifest.py runs in the checkout's own
+.venv/bin/python when the checkout holds both, else the slot copy's script runs
+in the slot copy's own .venv/bin/python when the copy holds both. The run goes
+through bin/fm-copy-env.sh, so an inherited VIRTUAL_ENV and the ambient
+interpreter variables never reach it. When a script exists but no tree holds it
+beside an executable .venv/bin/python, nothing falls back to this process's
+interpreter: --apply refuses by name (exit 1, so teardown refuses before it
+detaches or deletes the slot branch) and says to give the tree that holds the
+script its own .venv, then rerun teardown; the slot record and branch are kept.
+Report-only runs, --keep and --prove-to never refuse for this: --prove-to still
+builds the landing proof because the script exists. With no script in either
+tree the old behavior stays (the record is left unchanged and teardown goes on).
 For teardown: --slot PATH --owner-id ID --owner-branch BRANCH --prove-to FILE
 builds the forge proof before project custody; then --apply --proof-file FILE
 after its landed-work proof runs only the local entry point with that file.
@@ -131,20 +143,44 @@ def stores(project, state_dir):
     return common, durable, state_dir / "worktree-lifecycle"
 
 
+ENTRY = "scripts/git-stability/retire_slot_manifest.py"
+COPY_ENV = Path(__file__).resolve().parent / "fm-copy-env.sh"
+
+
+def usable_python(tree):
+    python = tree / ".venv/bin/python"
+    return python.is_file() and os.access(python, os.X_OK)
+
+
 def entry_point(project, slot):
-    script = project / "scripts/git-stability/retire_slot_manifest.py"
-    copy = slot / "scripts/git-stability/retire_slot_manifest.py"
-    return copy if not script.is_file() and copy.is_file() else script
+    """Return (script, tree): the script to run and the tree whose environment runs it.
+
+    The script and the interpreter always come from one tree. tree is None when a
+    script exists but no tree holds it beside an executable .venv/bin/python;
+    script is the project's expected path (a file that does not exist) when no
+    tree holds a script at all. prove_slot, retire_slot and retire all call this
+    one function, so the three phases agree.
+    """
+    for tree in (project, slot):
+        if (tree / ENTRY).is_file() and usable_python(tree):
+            return tree / ENTRY, tree
+    for tree in (project, slot):
+        if (tree / ENTRY).is_file():
+            return tree / ENTRY, None
+    return project / ENTRY, None
 
 
 def retire(args, slot, owner, branch, paths, proof_file):
-    script = entry_point(args.project, slot)
+    script, tree = entry_point(args.project, slot)
     if not script.is_file():
         print(f"missing entry point: {script}; lifecycle records unchanged")
         return
-    python = args.project / ".venv/bin/python"
-    interpreter = str(python) if python.is_file() else sys.executable
-    result = subprocess.run([interpreter, str(script), "retire", "--slot-path", str(slot),
+    if tree is None:
+        raise Refusal(f"no usable interpreter for {script}: neither {args.project}/.venv/bin/python nor "
+                      f"{slot}/.venv/bin/python is an executable file, and no other interpreter is borrowed; "
+                      f"next step: give the tree that holds the script its own .venv (nothing is installed "
+                      f"here), then rerun teardown")
+    result = subprocess.run([str(COPY_ENV), "run", str(tree), "--", str(script), "retire", "--slot-path", str(slot),
                              "--repo-root", str(args.project), "--owner-id", owner,
                              "--owner-branch", branch, "--proof-file", str(proof_file),
                              "--state-dir", str(args.state_dir)], cwd=script.parents[2], text=True,
@@ -182,7 +218,7 @@ def slot_keep_reason(args, paths):
 def prove_slot(args):
     try:
         slot, paths, existing = slot_records(args)
-        if not existing or not entry_point(args.project, slot).is_file() or slot_keep_reason(args, paths):
+        if not existing or not entry_point(args.project, slot)[0].is_file() or slot_keep_reason(args, paths):
             return 0
         outcome, _ = landing_proof(args.project, recorded_pr(args.firstmate_state, args.owner_id), fetch=True)
     except (Refusal, OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
@@ -197,8 +233,9 @@ def retire_slot(args):
         slot, paths, existing = slot_records(args)
         if not existing:
             return 0
-        if not entry_point(args.project, slot).is_file():
-            print(f"missing entry point: {entry_point(args.project, slot)}; lifecycle records unchanged")
+        script = entry_point(args.project, slot)[0]
+        if not script.is_file():
+            print(f"missing entry point: {script}; lifecycle records unchanged")
             return 0
         reason = slot_keep_reason(args, paths)
         if reason:

@@ -554,8 +554,13 @@
 #   delivery. The latter requires the project's explicit --base-source local-default
 #   capability; an older project owner refuses rather than widening scope. Task id
 #   remains the owner. Spawn executes it through the acquired shell, retaining
-#   the primary-project Python cwd, so get/bash holders are actual ancestors;
+#   the primary-project working directory, so get/bash holders are actual ancestors;
 #   unrelated live holders remain the provisioner's refusal, not a PID allow-list.
+#   The provisioner lives in the assigned copy, so it runs in that copy's own
+#   environment (<copy>/.venv/bin/python, chosen by bin/fm-copy-env-lib.sh and
+#   reached from the pane by bin/fm-copy-env.sh), never the nested project clone's
+#   and never an inherited VIRTUAL_ENV. A copy with no usable environment is
+#   refused by name before the freshness reset moves it or any checkout changes.
 #   The shell must start that helper within the same ten-minute no-progress
 #   budget as treehouse get, and the attempt ends at the thirty-minute absolute
 #   extreme. Either stop, or a vanished endpoint, ends only that attempt's own
@@ -5086,6 +5091,9 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     printf 'local-only source: local=%s@%s origin=%s@%s selected=%s@%s\n' \
       "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$expected"
   fi
+  # A revision that brings the project's provisioner needs the copy's own
+  # environment before the copy moves, so a refusal changes no HEAD or file.
+  fm_slot_check_env_for_revision "$worktree" "$expected" || return 1
   if ! git -C "$worktree" reset --hard "$expected" >/dev/null; then
     echo "error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base" >&2
     return 1
@@ -6473,17 +6481,21 @@ spawn_slot_cancel_helper() { # <attempt-dir>
   done
   return 1
 }
-spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
-  local project=$1 report=$2 attempt script claim job cancel result rc started stop=
-  shift 2
+# The staged script runs inside the acquired pane, whose inherited environment is
+# unknown, so it hands the run to bin/fm-copy-env.sh (the owner of the rule in
+# bin/fm-copy-env-lib.sh) by absolute path: the provisioner runs from <project> as
+# its working directory in the environment of <copy>, never of the nested clone.
+spawn_slot_run_in_pane() { # <project> <copy> <report> <provisioner> <arg>...
+  local project=$1 copy=$2 report=$3 attempt script claim job cancel result rc started stop=
+  shift 3
   attempt=$(umask 077; mktemp -d "$DATA/$ID/.slot-provision.XXXXXX") || return 1
   script="$attempt/run" claim="$attempt/claim" job="$attempt/job" cancel="$attempt/cancel" result="$attempt/result"
   {
     # shellcheck disable=SC2016 # The acquired Bash records its own identity and status.
     printf 'set +e\numask 077\nset -C\n{ printf '\''%%s\\n'\'' "$$" >%q; } 2>/dev/null || exit 0\nset +C -m\n' "$claim"
-    # shellcheck disable=SC2016 # The job's shell records its own process group and PATH.
-    printf '/bin/sh -c '\''printf "%%s\\n" "$$" >"$1.part" && mv -- "$1.part" "$1" && [ ! -e "$2" ] && cd -- "$3" && PATH="$4:$PATH" && shift 4 && PYTHONDONTWRITEBYTECODE=1 exec python3 "$@"'\'' sh %q %q %q %q' \
-      "$job" "$cancel" "$project" "$project/.venv/bin"
+    # shellcheck disable=SC2016 # The job's shell records its own process group.
+    printf '/bin/sh -c '\''printf "%%s\\n" "$$" >"$1.part" && mv -- "$1.part" "$1" && [ ! -e "$2" ] && cd -- "$3" && owner=$4 && copy=$5 && shift 5 && PYTHONDONTWRITEBYTECODE=1 exec "$owner" run "$copy" -- "$@"'\'' sh %q %q %q %q %q' \
+      "$job" "$cancel" "$project" "$SCRIPT_DIR/fm-copy-env.sh" "$copy"
     printf ' %q' "$@"
     # shellcheck disable=SC2016 # The acquired Bash records its own exit status.
     printf ' </dev/null >%q 2>&1 &\nslot_job=$!\nwait "$slot_job"\nslot_rc=$?\nprintf '\''%%s\\n'\'' "$slot_rc" >%q\nmv -- %q %q\n' \
