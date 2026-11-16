@@ -44,6 +44,7 @@ A spawn stops with an actionable setup message when the app, minimum version, `j
 The adapter may launch the app with `open -a cmux` only when the socket is down; it does not relaunch the app for access-denied or authentication errors.
 
 Routine supervision uses `bin/fm-peek.sh <id>` and `FM_HOME=<home> bin/fm-send.sh <id> '<text>'` without bringing the cmux window forward.
+A text steer to a task that has open keyed decisions must also pass `--resolve-key <key>` or `--answers-none` (rule: `bin/fm-send.sh` header).
 Task workspace and surface creation use `focus=false`.
 
 Verify setup by spawning a small task and confirming metadata contains `backend=cmux`, `cmux_workspace_id=`, and `cmux_surface_id=`.

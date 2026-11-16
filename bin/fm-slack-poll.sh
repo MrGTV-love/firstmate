@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Poll tracked Slack threads into the existing bound keyed-answer intake.
+# Poll tracked Slack threads into the existing bound keyed-answer intake, and take in new owner DM requests.
 # Usage: fm-slack-poll.sh [--replay <transcript.json>] [--help]
 # Journal, precedence, and authority behavior are owned by fm_slack_watch.py.
 set -euo pipefail

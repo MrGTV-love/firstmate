@@ -14,6 +14,7 @@ import re
 import runpy
 import signal
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -26,7 +27,7 @@ GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota f
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
     "unhandled_board_answer": 300, "interrupted_teardown": 1800,
-    "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
+    "failed_task": 1800, "completed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
@@ -38,6 +39,9 @@ GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
 RECEIPT_SECONDS = int(dt.timedelta(hours=4).total_seconds())  # policy: current-turn receipt answer bound
 RECORD_NAME = re.compile(r"[0-9]+[.]msg")
+# A return-pending record holds three short lines (spawn_gen=, slot=, child=); a linked one is
+# read only up to this many bytes, and a longer target gives no evidence.
+LINKED_RECORD_MAX_BYTES = 4096
 REPLY_ID = re.compile(r"[0-9a-fA-F]{16}")  # bin/fm-pending-reply-lib.sh correlation id
 # A prerequisite carrying one of these overdue rows is stalled, missing or failed: it no longer carries a wait.
 PREREQUISITE_TROUBLE = ("stalled_worker", "missing_worker", "failed_task")
@@ -416,7 +420,7 @@ class Collector:
         excluded = None
         long_wait = False
         if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") == "done"):
-            excluded = "excluded: done/ready task is covered by PR or landing evidence"
+            excluded = "excluded: done/ready task is covered by PR or completion handoff"
         elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
             excluded = "excluded: idle secondmate has no routed work in flight"
         elif open_decision or self.gate_awaits_human(task):
@@ -457,7 +461,7 @@ class Collector:
         env = dict(self.env)
         if task.get("spawn_gen"):
             env["FM_SEND_EXPECTED_SPAWN_GEN"] = task["spawn_gen"]
-        self.run([BIN / "fm-send.sh", task_id, CHECK_IN_TEXT], env=env)
+        self.run([BIN / "fm-send.sh", task_id, "--answers-none", CHECK_IN_TEXT], env=env)
         return dict(check_in="sent", subject=task_id)
 
     def recorded_stop(self, task):
@@ -474,6 +478,11 @@ class Collector:
                          'if [ "$(status_line_verb "$last")" = done ] || '
                          'status_is_paused "$(status_declared_wait_line "$2")"; then printf stopped; fi',
                          BIN / "fm-status-event-lib.sh", self.state / (task["id"] + ".status")).strip() == "stopped"
+
+    def declared_done(self, task_id):
+        """True when the task's latest durable status event is `done`; read without folding the log."""
+        return self.bash('. "$1"; status_line_verb "$(last_status_line "$2")"', BIN / "fm-status-event-lib.sh",
+                         self.state / (task_id + ".status")).strip() == "done"
 
     def backlog_rows(self):
         by_id = {t["id"]: t for t in self.tasks}
@@ -530,11 +539,33 @@ class Collector:
             if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
-            if task["current_state"].get("state") == "failed":
-                if not self.source("failed deliverable " + task["id"], self.deliverable_landed, task):
+            state = task["current_state"].get("state")
+            if state == "failed":
+                # A scout's report is output to consume, not proof its failed
+                # investigation has been resolved by the supervising owner.
+                if not self.captain_dropped(task) and (task["kind"] == "scout" or not self.source(
+                        "failed deliverable " + task["id"], self.deliverable_landed, task)):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")))
-            elif task["current_state"].get("state") == "working" and alive == "alive":
+            elif ((state == "done" or (state == "unknown" and stopped)) and not task["pr"].get("url")
+                  and not self.captain_dropped(task)
+                  # The durable status log, not the live pane, owns the completion declaration: a closed
+                  # or unreadable pane must not retire the owner handoff its last `done` line created.
+                  and (state == "done" or self.source("completion declaration " + task["id"],
+                                                      self.declared_done, task["id"]))
+                  and (task["kind"] == "scout" or not self.source(
+                      "completed deliverable " + task["id"], self.deliverable_landed, task))):
+                # A report still needs owner consumption, but an already landed
+                # ship has no remaining review or validation handoff to advance.
+                status = self.source("completion status " + task["id"], self.report_status, task["id"])
+                status_at = status[0] if status else mtime(self.state / (task["id"] + ".status"))
+                self.add("completed_task", task["id"],
+                         "consume the report, complete the owner handoff and tear the task down"
+                         if task["kind"] == "scout"
+                         else "advance the committed candidate through its selected delivery path",
+                         status_at, evidence="worker completion is a handoff, not final acceptance",
+                         source=self.source("completion provenance " + task["id"], self.task_source, task["id"]))
+            elif state == "working" and alive == "alive":
                 self.source("progress " + task["id"], self.stalled, task)
             self.source("unlanded work " + task["id"], self.unlanded, task)
 
@@ -688,7 +719,7 @@ class Collector:
         return merged_tree == default_tree
 
     def captain_dropped(self, task):
-        return any(record["id"] == task["id"] and record.get("captain_drop") for record in self.backlog)
+        return any(record.get("id") == task["id"] and record.get("captain_drop") for record in self.backlog)
 
     def deliverable_landed(self, task):
         if self.captain_dropped(task):
@@ -1077,18 +1108,58 @@ class Collector:
                 value = line[len("spawn_gen="):]
         return value
 
+    def linked_record_text(self, marker, task_id):
+        """The evidence text of a linked return-pending record, which counts as pending whatever it holds.
+
+        The target is read only when it is a regular file of at most LINKED_RECORD_MAX_BYTES and is not
+        another task's record; a FIFO, device, directory, oversized, missing or unreadable target, or another
+        task's record, gives empty text, the same outcome as an unreadable record.
+        """
+        try:
+            target = marker.resolve(strict=True)
+            if not stat.S_ISREG(os.lstat(target).st_mode):
+                return ""
+        except (OSError, RuntimeError, ValueError):
+            return ""
+        own = task_id + ".teardown-return-pending"
+        prefix = target.name.split(".", 1)[0]
+        if target.name.endswith(".teardown-return-pending") and target.name != own:
+            return ""
+        if prefix != task_id and (self.state / (prefix + ".meta")).exists():
+            return ""
+        try:
+            fd = os.open(target, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+        except OSError:
+            return ""
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_size > LINKED_RECORD_MAX_BYTES:
+                return ""
+            data = os.read(fd, LINKED_RECORD_MAX_BYTES + 1)
+        except OSError:
+            return ""
+        finally:
+            os.close(fd)
+        if len(data) > LINKED_RECORD_MAX_BYTES:
+            return ""
+        return data.decode("utf-8", "replace")
+
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
         for marker in self.state_files:
-            if not marker.name.endswith(".teardown-return-pending") or marker.is_symlink() or not marker.is_file():
+            if not marker.name.endswith(".teardown-return-pending"):
+                continue
+            linked = marker.is_symlink()
+            if not linked and not marker.is_file():
                 continue
             task_id = marker.name[:-len(".teardown-return-pending")]
             meta = self.state / (task_id + ".meta")
             if meta.is_symlink() or not meta.is_file():
                 continue
-            if self.spawn_gen(marker) != self.spawn_gen(meta):
+            if not linked and self.spawn_gen(marker) != self.spawn_gen(meta):
                 continue
-            fields = dict(line.split("=", 1) for line in marker.read_text().splitlines() if "=" in line)
+            text = self.linked_record_text(marker, task_id) if linked else marker.read_text()
+            fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
             child = f" for child {fields['child']}" if fields.get("child") else ""
             self.add("interrupted_teardown", task_id,
                      f"re-run bin/fm-teardown.sh {task_id} to finish returning its pool slot{child}; "

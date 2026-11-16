@@ -810,6 +810,74 @@ test_view_renders_snapshot() {
   pass "fleet view renders the snapshot without secondmate peek guidance"
 }
 
+# The send hints are exact, runnable commands: run as printed against a mate
+# with an open keyed decision they refuse and name the key (the sender must
+# choose); with --answers-none added they deliver and leave the key open; with
+# --resolve-key <key> added they deliver and close it. The choice itself is a
+# separate sentence that points at the rule's owner, never part of the command.
+test_send_hints_run_as_exact_commands() {
+  local home fakebin out send steer choice cmd rc err drain
+  home=$(make_home hints-exact)
+  write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  printf 'needs-decision [key=scope-call]: split by team or by repo\n' >> "$home/state/secondmate-task.status"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
+  send=$(printf '%s' "$out" | jq -r '.tasks[] | select(.id == "secondmate-task") | .actions.send')
+  steer=$(printf '%s' "$out" | jq -r '.tasks[] | select(.id == "ship-task") | .actions.steer')
+  choice=$(printf '%s' "$out" | jq -r '.tasks[] | select(.id == "secondmate-task") | .actions.choice')
+  err="$home/hint.err"
+
+  cmd=${send//<request>/please report the split}
+  rc=0
+  (cd "$ROOT" && env PATH="$fakebin:$PATH" FM_HOME="$home" FM_SEND_SETTLE=0 bash -c "$cmd") >/dev/null 2>"$err" || rc=$?
+  assert_equals 1 "$rc" "the send hint run as printed must reach fm-send and refuse for the open key: $(cat "$err")"
+  assert_contains "$(cat "$err")" "[key=scope-call] needs-decision" "the refusal names the open key"
+
+  rc=0
+  (cd "$ROOT" && env PATH="$fakebin:$PATH" FM_HOME="$home" FM_SEND_SETTLE=0 \
+    bash -c "${cmd/fm-secondmate-task /fm-secondmate-task --answers-none }") >/dev/null 2>"$err" || rc=$?
+  assert_equals 0 "$rc" "the hint with --answers-none delivers: $(cat "$err")"
+  drain=$(FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-wake-drain.sh" 2>/dev/null)
+  assert_contains "$drain" "[key=scope-call]" "the none-send leaves the key open"
+
+  rc=0
+  (cd "$ROOT" && env PATH="$fakebin:$PATH" FM_HOME="$home" FM_SEND_SETTLE=0 \
+    bash -c "${cmd/fm-secondmate-task /fm-secondmate-task --resolve-key scope-call }") >/dev/null 2>"$err" || rc=$?
+  assert_equals 0 "$rc" "the hint with --resolve-key delivers: $(cat "$err")"
+  fm_test_fold "$home/state/secondmate-task.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the keyed answer closes the key: $FM_TEST_FOLD"
+
+  assert_equals "bin/fm-send.sh fm-secondmate-task '<request>'" "$send" "the secondmate send hint is one exact command"
+  assert_equals "bin/fm-send.sh fm-ship-task '<instruction>'" "$steer" "the steer hint is one exact command"
+  assert_contains "$choice" "--resolve-key <key>" "the choice sentence names the keyed answer"
+  assert_contains "$choice" "--answers-none" "the choice sentence names the none-send"
+  assert_contains "$choice" "bin/fm-send.sh header" "the choice sentence points at the rule's owner"
+  assert_contains "$(PATH="$fakebin:$PATH" FM_HOME="$home" "$VIEW")" "\`bin/fm-send.sh fm-secondmate-task '<request>'\`" \
+    "the fleet view shows the send hint as a code-quoted command"
+  pass "fleet send hints are exact commands; the choice is a separate sentence pointing at the fm-send header"
+}
+
+# The send hint names a choice of two flags; a literal "|" inside it splits the
+# markdown table cell, so the secondmate row gets more cells than the header and
+# a renderer drops the tail of the guidance.
+test_view_secondmate_row_keeps_header_cell_count() {
+  local home fakebin view header row
+  home=$(make_home view-cells)
+  write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  view=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$VIEW")
+  header=$(printf '%s\n' "$view" | awk '/^## Under Way/{f=1;next} f && /^\| /{print; exit}')
+  row=$(printf '%s\n' "$view" | grep '^| secondmate-task |')
+  [ -n "$header" ] || fail "fleet view has no Under Way table header"
+  [ -n "$row" ] || fail "fleet view has no secondmate-task row"
+  assert_equals "$(printf '%s' "$header" | tr -cd '|' | wc -c | tr -d ' ')" \
+    "$(printf '%s' "$row" | tr -cd '|' | wc -c | tr -d ' ')" \
+    "secondmate row must have the header's cell count: $row"
+  assert_contains "$row" "--resolve-key <key>" "secondmate row must keep the full send choice"
+  assert_contains "$row" "do not routinely fm-peek a secondmate" "secondmate row must keep the watch guidance"
+  pass "fleet view secondmate row keeps the header's cell count and the full send guidance"
+}
+
 test_view_renders_dead_secondmate_agent_status() {
   local home fakebin view
   home=$(make_home dead-secondmate)
@@ -1312,4 +1380,6 @@ test_parked_scout_decision_stays_pending
 test_scout_reports_include_teardown_reports
 test_backlog_tasks_axi_forms_and_overrides
 test_view_renders_snapshot
+test_view_secondmate_row_keeps_header_cell_count
+test_send_hints_run_as_exact_commands
 test_view_renders_dead_secondmate_agent_status

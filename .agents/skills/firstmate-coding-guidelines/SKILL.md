@@ -84,6 +84,8 @@ Mark an axis not applicable only after inspecting its integration surface, and u
 For critical safety, routing, startup, and supervision infrastructure, prefer deterministic and idempotent enforcement over relying on agent memory alone.
 Keep instructions as the authority and discovery layer, but make repeated execution converge safely and make invalid or unsafe states fail closed wherever the runtime can enforce them.
 
+For work that adds or changes tests, hooks or validators, apply the [existing intent-to-test criteria](../../../docs/review-rubric.md#intent-to-test-alignment) at the relevant behavior or scenario.
+
 ### Harness-dependent checks
 
 This section is the single owner of the rule and of how to satisfy it.
