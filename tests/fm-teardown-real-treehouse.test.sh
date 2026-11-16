@@ -161,7 +161,7 @@ real_record() {
   hash=$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
   preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$hash
   [ -d "$preserve" ] && find "$preserve" -type f | sort | sed "s#^$preserve/##" > "$dir/$phase.preserve.list" || : > "$dir/$phase.preserve.list"
-  [ ! -f "$preserve/SHA256SUMS" ] || cp "$preserve/SHA256SUMS" "$dir/$phase.preserve.SHA256SUMS"
+  [ ! -f "$preserve/meta/SHA256SUMS" ] || cp "$preserve/meta/SHA256SUMS" "$dir/$phase.preserve.SHA256SUMS"
   [ ! -f "$FOREIGN_CASE/treehouse.calls.log" ] || cp "$FOREIGN_CASE/treehouse.calls.log" "$dir/$phase.treehouse-calls.log"
 }
 
@@ -234,7 +234,7 @@ test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the
   preserve=$(sed -n 's/^preserve=//p' "$(retained_record_path)")
   scratch=$FOREIGN_CASE/scratch-restore
   mkdir -p "$scratch/preserve" "$scratch/archive"
-  (cd "$preserve" && tar -cf - .) | (cd "$scratch/preserve" && tar -xf -)
+  (cd "$preserve/files" && tar -cf - .) | (cd "$scratch/preserve" && tar -xf -)
   tar -xf "$(sed -n 's/^answer-base64=//p' "$(retained_record_path)" | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' | jq -r '.ignored_payload_preservation[-1].archive_path')" -C "$scratch/archive"
   want=$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')
   have=$(shasum -a 256 "$scratch/preserve/notes/unique.dat" | awk '{print $1}')
@@ -245,11 +245,11 @@ test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the
   assert_equals "$(printf 'one\n' | shasum -a 256 | awk '{print $1}') $(printf 'two\n' | shasum -a 256 | awk '{print $1}')" \
     "$(shasum -a 256 "$scratch/archive/.claude/channel-outbox/a.jsonl" | awk '{print $1}') $(shasum -a 256 "$scratch/archive/.claude/channel-outbox/b.jsonl" | awk '{print $1}')" \
     "a-kept: the unique .claude files do not restore from the driver's archive to the builder's hashes"
-  [ ! -e "$preserve/.venv" ] && [ ! -e "$preserve/node_modules" ] || fail "a-kept: the regenerable control was preserved"
+  [ ! -e "$preserve/files/.venv" ] && [ ! -e "$preserve/files/node_modules" ] || fail "a-kept: the regenerable control was preserved"
   assert_present "$FOREIGN_COPY/.venv/bin/python" "a-kept: the kept copy lost its control"
   assert_present "$FOREIGN_COPY/node_modules/dep/index.js" "a-kept: the kept copy lost its control"
   if [ -n "$REAL_DIR" ]; then
-    diff -r "$preserve" "$scratch/preserve" > "$REAL_DIR/restore.diff" 2>&1 && echo "restore: identical" >> "$REAL_DIR/restore.diff"
+    diff -r "$preserve/files" "$scratch/preserve" > "$REAL_DIR/restore.diff" 2>&1 && echo "restore: identical" >> "$REAL_DIR/restore.diff"
     printf 'notes/unique.dat  builder:%s restored:%s\n' "$want" "$have" >> "$REAL_DIR/restore.hashes"
     (cd "$scratch" && shasum -a 256 preserve/.claude/channel-outbox/*.jsonl archive/.claude/channel-outbox/*.jsonl) >> "$REAL_DIR/restore.hashes"
   fi
@@ -270,9 +270,9 @@ test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_con
   assert_absent "$FOREIGN_CASE/state/task-x1.meta" "a-released: the task record survived"
   hash=$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
   preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$hash
-  assert_equals "only here" "$(cat "$preserve/notes/unique.dat")" "a-released: the unique file was not preserved before the removal"
-  assert_grep "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')  notes/unique.dat" "$preserve/SHA256SUMS" "a-released: SHA256SUMS does not record the unique file"
-  [ ! -e "$preserve/.venv" ] && [ ! -e "$preserve/node_modules" ] || fail "a-released: the regenerable control was preserved"
+  assert_equals "only here" "$(cat "$preserve/files/notes/unique.dat")" "a-released: the unique file was not preserved before the removal"
+  assert_grep "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')  notes/unique.dat" "$preserve/meta/SHA256SUMS" "a-released: SHA256SUMS does not record the unique file"
+  [ ! -e "$preserve/files/.venv" ] && [ ! -e "$preserve/files/node_modules" ] || fail "a-released: the regenerable control was preserved"
   # The preserve was verified before anything was removed, read from the product's own output
   # order and not from the end state: its "preserved" line comes before its removal line.
   pl=$(grep -n 'teardown: preserved ignored files from' "$FOREIGN_CASE/stderr" | head -n 1 | cut -d: -f1)

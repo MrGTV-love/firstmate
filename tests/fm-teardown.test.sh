@@ -2799,7 +2799,7 @@ test_the_kept_copy_route_accepts_a_recorded_verified_bundle_for_unlanded_commits
   expect_code 0 "$rc" "retained-bundle: a recorded verified bundle must let the kept route close: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-bundle: the driver was not asked exactly once"
   assert_present "$(retained_record_path)" "retained-bundle: no retained record was written"
-  assert_equals "only here" "$(cat "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')/notes/unique.dat")" "retained-bundle: the selected ignored file is not in the preserve"
+  assert_equals "only here" "$(cat "$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')/files/notes/unique.dat")" "retained-bundle: the selected ignored file is not in the preserve"
   assert_present "$FOREIGN_COPY/.git" "retained-bundle: the copy was removed"
   assert_grep "$bundle" "$FOREIGN_CASE/stderr" "retained-bundle: the bundle was not reported"
   pass "the kept-copy route closes around a copy whose unlanded commits a recorded verified bundle holds, as the header's mechanics allow"

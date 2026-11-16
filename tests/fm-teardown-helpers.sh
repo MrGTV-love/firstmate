@@ -2839,13 +2839,19 @@ make_foreign_copy_case() {
   cat > "$NESTED_SLOT/scripts/git-stability/closeout_pr.py" <<SH
 # A plan call (no --execute-cleanup) only answers; it is logged apart and never
 # counts as a release. FM_STUB_PLAN=refuse or =garbled makes it decline or
-# answer with no verdict.
+# answer with no verdict. Under FM_STUB_CLOSEOUT=retained it answers as the real
+# driver does for a tree with unique ignored files: allowed, with
+# ignored_payload_disposition=archive_then_retain_tree.
 if [ "\${3:-}" != --execute-cleanup ]; then
   printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout-plan.log"
   case "\${FM_STUB_PLAN:-ok}" in
     refuse) echo '{"allowed": false, "reason": "stub_plan_refusal"}'; exit 3 ;;
     garbled) echo 'no verdict here'; exit 0 ;;
   esac
+  if [ "\${FM_STUB_CLOSEOUT:-ok}" = retained ]; then
+    echo '{"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree"}'
+    exit 0
+  fi
   echo '{"allowed": true}'
   exit 0
 fi

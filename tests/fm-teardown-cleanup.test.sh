@@ -6952,8 +6952,17 @@ teardown_friction_outcome() { :; }
 report_worktree_dirt() { :; }
 teardown_refuse_copy() { printf 'REFUSED: %s\n' "$2" >&2; return 1; }
 teardown_foreign_copy_present() { return 1; }
+teardown_closeout_ready_in() { return 0; }
 teardown_run_closeout() {
   local n tar sha
+  # A plan call (Main 2056) answers like the real driver for a tree with unique ignored files,
+  # unless $KC/plan-answer and $KC/plan-exit say otherwise; it is counted in $KC/plan-calls.
+  if [ "${3:-}" = plan ]; then
+    printf '%s\n' "$2" >> "$KC/plan-calls"
+    TEARDOWN_CLOSEOUT_STDOUT=$(cat "$KC/plan-answer" 2>/dev/null || printf '%s' '{"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree"}')
+    TEARDOWN_CLOSEOUT_OUT=$TEARDOWN_CLOSEOUT_STDOUT
+    return "$(cat "$KC/plan-exit" 2>/dev/null || echo 0)"
+  fi
   n=$(( $(cat "$KC/calls" 2>/dev/null || echo 0) + 1 ))
   printf '%s\n' "$n" > "$KC/calls"
   mkdir -p "$KC/tars"
@@ -7138,7 +7147,7 @@ test_kept_copy_helper_a_refused_kept_copy_is_judged_again_from_its_record() {
   kc=$tmp/preserve
   kept_helper_case "$kc"
   # shellcheck disable=SC2016 # expanded by the stand-in driver's shell.
-  printf 'rm -f "$DATA/$ID/nested-copy-preserved/"*/notes/unique.dat\n' > "$kc/after"
+  printf 'rm -f "$DATA/$ID/nested-copy-preserved/"*/files/notes/unique.dat\n' > "$kc/after"
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-rejudge-preserve: a preserve without a selected file must refuse: $(cat "$kc/stderr")"
   assert_grep 'does not hold every ignored file' "$kc/stderr" "kept-helper-rejudge-preserve: the refusal did not name the preserve"
@@ -7201,6 +7210,8 @@ teardown_foreign_copy_unowned() { TEARDOWN_FOREIGN_PROCS+=("4242	identity	$1"); 
 teardown_retained_copy_held() { [ "$1" = "$KC/kept" ]; }
 teardown_retained_matches() { [ "$1" = "$KC/kept" ]; }
 teardown_refuse_copy() { printf "REFUSED: %s\n" "$2" >&2; return 1; }
+teardown_closeout_ready_in() { return 0; }
+teardown_run_closeout() { TEARDOWN_CLOSEOUT_STDOUT="{\"allowed\": true}"; TEARDOWN_CLOSEOUT_OUT=$TEARDOWN_CLOSEOUT_STDOUT; return 0; }
 teardown_own_locked_copies_prove; rc=$?
 printf "rc=%s\n" "$rc"
 printf "%s\n" "${TEARDOWN_FOREIGN_PROCS[@]}"
@@ -7324,8 +7335,8 @@ test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_wh
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside: the first run did not close: $(cat "$kc/stderr")"
   base=$(kept_preserve_base "$kc")
-  assert_equals 'only here' "$(cat "$base/notes/unique.dat" 2>/dev/null)" "kept-helper-beside: the first preserve is not at the base path in the base layout"
-  assert_equals 'one' "$(cat "$base/.claude/channel-outbox/a.jsonl" 2>/dev/null)" "kept-helper-beside: the .claude entry is not in teardown's own preserve"
+  assert_equals 'only here' "$(cat "$base/files/notes/unique.dat" 2>/dev/null)" "kept-helper-beside: the first preserve is not at the base path in the files/ and meta/ layout"
+  assert_equals 'one' "$(cat "$base/files/.claude/channel-outbox/a.jsonl" 2>/dev/null)" "kept-helper-beside: the .claude entry is not in teardown's own preserve"
   first=$(kept_tree "$base")
   # The new population: a new .opencode entry, a new .claude entry, two names that differ only
   # after a tab, a symlink whose target ends in a newline, and changed bytes of a selected file.
@@ -7343,11 +7354,11 @@ test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_wh
   assert_equals 2 "$(printf '%s\n' "$dirs" | wc -l | tr -d ' ')" "kept-helper-beside: the changed payload was not preserved in one directory beside the first: $dirs"
   second=$(printf '%s\n' "$dirs" | grep -v -x -F "$base")
   case "$second" in "$base".????????????????) ;; *) fail "kept-helper-beside: the beside directory is not named by 16 characters of the payload fingerprint: $second" ;; esac
-  assert_equals 'oc' "$(cat "$second/.opencode/new.json" 2>/dev/null)" "kept-helper-beside: the new .opencode entry is not preserved"
-  assert_equals 'two' "$(cat "$second/.claude/channel-outbox/b.jsonl" 2>/dev/null)" "kept-helper-beside: the new .claude entry is not preserved"
-  assert_equals 'tab-a tab-b' "$(cat "$second/notes/x	a" 2>/dev/null) $(cat "$second/notes/x	b" 2>/dev/null)" "kept-helper-beside: the tab names are not preserved apart"
-  assert_equals "$(printf 'target\n' | od -An -tx1 | tr -d ' \n')" "$(perl -e 'print unpack("H*", readlink($ARGV[0]) // "")' "$second/notes/link")" "kept-helper-beside: the symlink's trailing newline was not preserved"
-  assert_equals 'changed' "$(cat "$second/notes/unique.dat")" "kept-helper-beside: the changed bytes are not preserved"
+  assert_equals 'oc' "$(cat "$second/files/.opencode/new.json" 2>/dev/null)" "kept-helper-beside: the new .opencode entry is not preserved"
+  assert_equals 'two' "$(cat "$second/files/.claude/channel-outbox/b.jsonl" 2>/dev/null)" "kept-helper-beside: the new .claude entry is not preserved"
+  assert_equals 'tab-a tab-b' "$(cat "$second/files/notes/x	a" 2>/dev/null) $(cat "$second/files/notes/x	b" 2>/dev/null)" "kept-helper-beside: the tab names are not preserved apart"
+  assert_equals "$(printf 'target\n' | od -An -tx1 | tr -d ' \n')" "$(perl -e 'print unpack("H*", readlink($ARGV[0]) // "")' "$second/files/notes/link")" "kept-helper-beside: the symlink's trailing newline was not preserved"
+  assert_equals 'changed' "$(cat "$second/files/notes/unique.dat")" "kept-helper-beside: the changed bytes are not preserved"
   assert_equals "$(sed -n 's/^preserve=//p' "$(find "$kc/data/copy-sweep/retained" -type f | head -n 1)")" "$second" "kept-helper-beside: the record does not name the preserve that holds the copy"
   # A return to the earlier payload is a change (P3): it asks once and reuses the first preserve.
   rm -rf "$kc/copy/.opencode" "$kc/copy/.claude/channel-outbox/b.jsonl" "$kc/copy/notes/x	a" "$kc/copy/notes/x	b" "$kc/copy/notes/link"
@@ -7360,9 +7371,9 @@ test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_wh
   kc=$tmp/existing
   kept_helper_case "$kc"
   base=$(kept_preserve_base "$kc")
-  mkdir -p "$base/notes"
-  printf 'earlier bytes\n' > "$base/notes/unique.dat"
-  printf 'earlier only\n' > "$base/notes/gone.dat"
+  mkdir -p "$base/files/notes"
+  printf 'earlier bytes\n' > "$base/files/notes/unique.dat"
+  printf 'earlier only\n' > "$base/files/notes/gone.dat"
   first=$(kept_tree "$base")
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside-existing: the close failed: $(cat "$kc/stderr")"
@@ -7372,24 +7383,24 @@ test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_wh
   kc=$tmp/agreeing
   kept_helper_case "$kc"
   base=$(kept_preserve_base "$kc")
-  mkdir -p "$base/notes"
-  printf 'only here\n' > "$base/notes/unique.dat"
-  printf '%s\n' "$(cd "$kc/copy" && pwd -P)" > "$base/copy-path"
-  printf 'an earlier line an older run wrote\n%s  notes/unique.dat\n' "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')" > "$base/SHA256SUMS"
-  cp "$base/SHA256SUMS" "$kc/sums.before"
+  mkdir -p "$base/files/notes" "$base/meta"
+  printf 'only here\n' > "$base/files/notes/unique.dat"
+  printf '%s\n' "$(cd "$kc/copy" && pwd -P)" > "$base/meta/copy-path"
+  printf 'an earlier line an older run wrote\n%s  notes/unique.dat\n' "$(printf 'only here\n' | shasum -a 256 | awk '{print $1}')" > "$base/meta/SHA256SUMS"
+  cp "$base/meta/SHA256SUMS" "$kc/sums.before"
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-beside-agreeing: the close failed: $(cat "$kc/stderr")"
   assert_equals 1 "$(find "$kc/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | wc -l | tr -d ' ')" "kept-helper-beside-agreeing: an agreeing preserve was not reused"
-  assert_equals "$(cat "$kc/sums.before")" "$(head -n 2 "$base/SHA256SUMS")" "kept-helper-beside-agreeing: an earlier SHA256SUMS line changed"
-  assert_grep "$(printf 'one\n' | shasum -a 256 | awk '{print $1}')  .claude/channel-outbox/a.jsonl" "$base/SHA256SUMS" "kept-helper-beside-agreeing: the copied-in file has no SHA256SUMS line"
-  assert_equals 'only here' "$(cat "$base/notes/unique.dat")" "kept-helper-beside-agreeing: an earlier preserved file changed"
+  assert_equals "$(cat "$kc/sums.before")" "$(head -n 2 "$base/meta/SHA256SUMS")" "kept-helper-beside-agreeing: an earlier SHA256SUMS line changed"
+  assert_grep "$(printf 'one\n' | shasum -a 256 | awk '{print $1}')  .claude/channel-outbox/a.jsonl" "$base/meta/SHA256SUMS" "kept-helper-beside-agreeing: the copied-in file has no SHA256SUMS line"
+  assert_equals 'only here' "$(cat "$base/files/notes/unique.dat")" "kept-helper-beside-agreeing: an earlier preserved file changed"
   # A preserve that did not hold (a selected file lost from it during the driver call): the run
   # refuses, the unchanged retry asks nothing and preserves beside it, and the damaged
   # preserve keeps every byte it still had.
   kc=$tmp/unheld
   kept_helper_case "$kc"
   # shellcheck disable=SC2016 # expanded by the stand-in driver's shell.
-  printf 'rm -f "$DATA/$ID/nested-copy-preserved/"*/notes/unique.dat\n' > "$kc/after"
+  printf 'rm -f "$DATA/$ID/nested-copy-preserved/"*/files/notes/unique.dat\n' > "$kc/after"
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-beside-unheld: a preserve that does not hold must refuse: $(cat "$kc/stderr")"
   rm -f "$kc/after"
@@ -7437,7 +7448,7 @@ test_kept_copy_helper_a_copy_with_nothing_selected_keeps_one_preserve_across_ret
   assert_equals $'rc=0 kept=yes calls=1\nrc=0 kept=yes calls=1' "$out" "kept-helper-unselected: later runs must close without the driver: $(cat "$kc/stderr")"
   assert_equals 1 "$(find "$kc/data/task-x1/nested-copy-preserved" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | wc -l | tr -d ' ')" "kept-helper-unselected: a later run made a second preserve"
   cmp -s "$kc/record.closed" "$rec" || fail "kept-helper-unselected: a later run rewrote the record: $(diff "$kc/record.closed" "$rec")"
-  assert_equals 'one' "$(cat "$(kept_preserve_base "$kc")/.claude/channel-outbox/a.jsonl" 2>/dev/null)" "kept-helper-unselected: the .claude file is not in the preserve"
+  assert_equals 'one' "$(cat "$(kept_preserve_base "$kc")/files/.claude/channel-outbox/a.jsonl" 2>/dev/null)" "kept-helper-unselected: the .claude file is not in the preserve"
   rm -rf "$tmp"
   pass "a kept copy with nothing selected gets one preserve when its payload is copied in, and later runs reuse it with the record unchanged"
 }
@@ -7491,7 +7502,7 @@ test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_rel
   kept_selected_states_case "$kc" 4
   kept_selected_states_run "$kc" 'rc=1 kept=no calls=1' 1 "kept-helper-states-released-A"
   base=$(kept_preserve_base "$kc")
-  assert_equals 'A' "$(cat "$base/.cache/x" 2>/dev/null)" "kept-helper-states-released: the first state is not in the first preserve"
+  assert_equals 'A' "$(cat "$base/files/.cache/x" 2>/dev/null)" "kept-helper-states-released: the first state is not in the first preserve"
   printf 'B\n' > "$kc/copy/.cache/x"
   kept_selected_states_run "$kc" 'rc=1 kept=no calls=2' 2 "kept-helper-states-released-B"
   kept_selected_states_run "$kc" 'rc=1 kept=no calls=3' 2 "kept-helper-states-released-B-again"
@@ -7500,7 +7511,7 @@ test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_rel
   kept_selected_states_run "$kc" 'rc=0 kept=no calls=4' 3 "kept-helper-states-released-C"
   third=$(kept_preserve_dirs "$kc" | grep -x -F -v "$base" | grep '\.2$')
   case "$third" in "$base".????????????????.2) ;; *) fail "kept-helper-states-released: the third preserve is not <sha256>.<P16>.2: $(kept_preserve_dirs "$kc")" ;; esac
-  assert_equals 'C' "$(cat "$third/.cache/x" 2>/dev/null)" "kept-helper-states-released: the third state is not in the third preserve"
+  assert_equals 'C' "$(cat "$third/files/.cache/x" 2>/dev/null)" "kept-helper-states-released: the third state is not in the third preserve"
   rm -rf "$tmp"
   pass "on the released route each distinct selected state keeps one preserve directory in the next free name, an equal state reuses its directory, and no earlier directory changes"
 }
@@ -7520,10 +7531,60 @@ test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_kep
   printf 'C\n' > "$kc/copy/.cache/x"
   kept_selected_states_run "$kc" 'rc=0 kept=yes calls=1' 3 "kept-helper-states-kept-C"
   case "$(kept_preserve_dirs "$kc" | grep '\.2$')" in "$base".????????????????.2) ;; *) fail "kept-helper-states-kept: the third preserve is not <sha256>.<P16>.2: $(kept_preserve_dirs "$kc")" ;; esac
-  assert_equals 'C' "$(cat "$(kept_preserve_dirs "$kc" | grep '\.2$')/.cache/x" 2>/dev/null)" "kept-helper-states-kept: the third state is not in the third preserve"
+  assert_equals 'C' "$(cat "$(kept_preserve_dirs "$kc" | grep '\.2$')/files/.cache/x" 2>/dev/null)" "kept-helper-states-kept: the third state is not in the third preserve"
   assert_equals "$(kept_preserve_dirs "$kc" | grep '\.2$')" "$(sed -n 's/^preserve=//p' "$(find "$kc/data/copy-sweep/retained" -type f | head -n 1)")" "kept-helper-states-kept: the record does not name the preserve that holds the copy"
   rm -rf "$tmp"
   pass "on the kept route each distinct selected state keeps one preserve directory in the next free name and the task closes from its record without the driver"
+}
+
+# Main 2056: the entry proof's plan call (PR 366) and the kept route. For an own locked copy, an
+# allowed plan whose disposition is archive_then_retain_tree (the real driver's answer for a tree
+# with unique ignored files) is not an entry refusal: the copy goes on to the kept route and
+# closes. Every other plan refusal still refuses at entry: not allowed, a non-zero exit with the
+# keep-tree answer, no verdict. A copy whose record still matches asks the driver nothing, not
+# even a plan.
+test_kept_copy_helper_the_entry_plan_lets_a_kept_own_copy_through_and_a_matching_record_skips_it() {
+  local tmp kc out shape copy
+  tmp=$(fm_test_tmproot kept-helper-plan)
+  for shape in keep-tree not-allowed keep-tree-nonzero no-verdict allowed matching; do
+    kc=$tmp/$shape
+    kept_helper_case "$kc"
+    case "$shape" in
+      not-allowed) printf '%s' '{"allowed": false, "reason": "cleanup_policy_not_allowed"}' > "$kc/plan-answer"; echo 3 > "$kc/plan-exit" ;;
+      keep-tree-nonzero) echo 3 > "$kc/plan-exit" ;;
+      no-verdict) printf '%s' 'no verdict here' > "$kc/plan-answer" ;;
+      allowed) printf '%s' '{"allowed": true}' > "$kc/plan-answer" ;;
+      matching)
+        out=$(kept_helper_dispose "$kc" 1)
+        assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-plan-matching: the first close failed: $(cat "$kc/stderr")"
+        ;;
+    esac
+    copy=$(cd "$kc/copy" && pwd -P)
+    out=$(KC=$kc ROOT=$ROOT COPY=$copy bash -c "$(kept_helper_env)"'
+TEARDOWN_NESTED_COPIES=("$COPY")
+mkdir -p "$KC/slot"
+TEARDOWN_RETURN_SLOT=$KC/slot
+TEARDOWN_FOREIGN_PROCS=()
+teardown_foreign_copy_unowned() { return 0; }
+prove=0; teardown_own_locked_copies_prove 2>>"$KC/stderr" || prove=$?
+dispose=-
+if [ "$prove" = 0 ]; then dispose=0; teardown_own_copy_dispose "$KC/slot" "$COPY" 2>>"$KC/stderr" || dispose=$?; fi
+kept=no; ! teardown_copy_retained "$COPY" || kept=yes
+printf "prove=%s dispose=%s kept=%s calls=%s plans=%s\n" "$prove" "$dispose" "$kept" "$(cat "$KC/calls" 2>/dev/null || echo 0)" "$(if [ -f "$KC/plan-calls" ]; then wc -l < "$KC/plan-calls" | tr -d " "; else echo 0; fi)"
+')
+    [ -n "${FM_RETAINED_EVIDENCE:-}" ] && printf '%s | case=%s | %s\n' "${FUNCNAME[0]}" "$shape" "$out" >> "$FM_RETAINED_EVIDENCE"
+    case "$shape" in
+      keep-tree) assert_equals 'prove=0 dispose=0 kept=yes calls=1 plans=1' "$out" "kept-helper-plan-keep-tree: an own copy the plan says the driver keeps must reach the kept route and close: $(cat "$kc/stderr")" ;;
+      allowed) assert_equals 'prove=0 dispose=0 kept=yes calls=1 plans=1' "$out" "kept-helper-plan-allowed: the allowed plan must go on: $(cat "$kc/stderr")" ;;
+      matching) assert_equals 'prove=0 dispose=0 kept=yes calls=1 plans=0' "$out" "kept-helper-plan-matching: a copy whose record matches asked the driver for a plan: $(cat "$kc/stderr")" ;;
+      *)
+        assert_equals 'prove=1 dispose=- kept=no calls=0 plans=1' "$out" "kept-helper-plan-$shape: the plan refusal must refuse at entry: $(cat "$kc/stderr")"
+        assert_grep "would not release it" "$kc/stderr" "kept-helper-plan-$shape: the entry refusal does not name the plan"
+        ;;
+    esac
+  done
+  rm -rf "$tmp"
+  pass "an own locked copy whose plan keeps the tree reaches the kept route and closes, every other plan refusal refuses at entry, and a matching record asks for no plan"
 }
 
 # Item 3 (C2 post-driver, Main 006): when the copy's record cannot be written, the close refuses
@@ -7594,10 +7655,10 @@ test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_a
     base=$(kept_preserve_base "$kc")
     json='[".claude/channel-outbox/a.jsonl", ".claude/channel-outbox/b.jsonl"]' count=2 want=refuse
     case "$shape" in
-      first-differs) printf 'mkdir -p "%s/.claude/channel-outbox" && printf "different\\n" > "%s/.claude/channel-outbox/a.jsonl"\n' "$base" "$base" > "$kc/after" ;;
-      second-differs) printf 'mkdir -p "%s/.claude/channel-outbox" && printf "different\\n" > "%s/.claude/channel-outbox/b.jsonl"\n' "$base" "$base" > "$kc/after" ;;
+      first-differs) printf 'mkdir -p "%s/.claude/channel-outbox" && printf "different\\n" > "%s/.claude/channel-outbox/a.jsonl"\n' "$base/files" "$base/files" > "$kc/after" ;;
+      second-differs) printf 'mkdir -p "%s/.claude/channel-outbox" && printf "different\\n" > "%s/.claude/channel-outbox/b.jsonl"\n' "$base/files" "$base/files" > "$kc/after" ;;
       selected-changed) printf 'printf "changed\\n" > "%s/notes/unique.dat"\n' "$kc/copy" > "$kc/after-preserve" ;;
-      selected-removed) printf 'rm -f "%s/notes/unique.dat"\n' "$base" > "$kc/after" ;;
+      selected-removed) printf 'rm -f "%s/notes/unique.dat"\n' "$base/files" > "$kc/after" ;;
       lacking)
         # .cache is in the regenerable class, so the preserve does not select it before the
         # driver names it; the named file is copied in and checked.
@@ -7624,7 +7685,7 @@ test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_a
     case "$want" in
       close)
         assert_equals $'rc=0 kept=yes calls=1\nrc=0 kept=yes calls=1' "$out" "kept-helper-named-$shape: the case must close: $(cat "$kc/stderr")"
-        [ "$shape" != lacking ] || assert_equals 'blob' "$(cat "$base/.cache/blob" 2>/dev/null)" "kept-helper-named-lacking: the named file the preserve lacked was not copied in"
+        [ "$shape" != lacking ] || assert_equals 'blob' "$(cat "$base/files/.cache/blob" 2>/dev/null)" "kept-helper-named-lacking: the named file the preserve lacked was not copied in"
         ;;
       refuse)
         case "$shape" in
@@ -7655,7 +7716,7 @@ test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_un
     base=$(kept_preserve_base "$kc")
     case "$shape" in
       changed) printf 'printf "new source\\n" > "%s/notes/unique.dat"\n' "$kc/copy" > "$kc/after-preserve" ;;
-      preserve-lost) printf 'printf "lost\\n" > "%s/notes/unique.dat"\n' "$base" > "$kc/after" ;;
+      preserve-lost) printf 'printf "lost\\n" > "%s/notes/unique.dat"\n' "$base/files" > "$kc/after" ;;
     esac
     out=$(kept_helper_dispose "$kc" 1)
     case "$shape" in
@@ -7669,7 +7730,7 @@ test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_un
         ;;
       unchanged)
         assert_equals 'rc=0 kept=no calls=1' "$out" "kept-helper-release-unchanged: the control was not released: $(cat "$kc/stderr")"
-        assert_equals 'only here' "$(cat "$base/notes/unique.dat")" "kept-helper-release-unchanged: the preserve does not hold the released bytes"
+        assert_equals 'only here' "$(cat "$base/files/notes/unique.dat")" "kept-helper-release-unchanged: the preserve does not hold the released bytes"
         ;;
       preserve-lost)
         assert_equals 'rc=1 kept=no calls=1' "$out" "kept-helper-release-preserve-lost: a release whose preserve lost bytes closed: $(cat "$kc/stderr")"
@@ -7683,7 +7744,7 @@ test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_un
 
 # F10: a root ignored file named like one of the preserve's own files (copy-path, SHA256SUMS) is
 # preserved byte for byte and the kept copy closes; its preserve holds the payload in files/ and
-# its SHA256SUMS lists every payload file there. The ordinary copy keeps the base layout.
+# its meta/SHA256SUMS lists every preserved file there. Every copy uses that layout (PR 366).
 test_kept_copy_helper_root_files_named_like_the_preserves_own_files_are_preserved() {
   local tmp kc out base
   tmp=$(fm_test_tmproot kept-helper-reserved)
@@ -7697,18 +7758,18 @@ test_kept_copy_helper_root_files_named_like_the_preserves_own_files_are_preserve
   base=$(kept_preserve_base "$kc")
   assert_equals "the project's own sums" "$(cat "$base/files/SHA256SUMS" 2>/dev/null)" "kept-helper-reserved: SHA256SUMS of the copy is not preserved byte for byte"
   assert_equals "the project's own copy-path" "$(cat "$base/files/copy-path" 2>/dev/null)" "kept-helper-reserved: copy-path of the copy is not preserved byte for byte"
-  assert_equals "$(cd "$kc/copy" && pwd -P)" "$(cat "$base/copy-path")" "kept-helper-reserved: the preserve's own copy-path does not name the copy"
-  (cd "$base" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1) || fail "kept-helper-reserved: the preserve's SHA256SUMS does not check: $(cat "$base/SHA256SUMS")"
-  assert_grep '  files/SHA256SUMS' "$base/SHA256SUMS" "kept-helper-reserved: SHA256SUMS does not list the payload's SHA256SUMS"
+  assert_equals "$(cd "$kc/copy" && pwd -P)" "$(cat "$base/meta/copy-path")" "kept-helper-reserved: the preserve's own copy-path does not name the copy"
+  (cd "$base/files" && shasum -a 256 -c ../meta/SHA256SUMS >/dev/null 2>&1) || fail "kept-helper-reserved: the preserve's SHA256SUMS does not check: $(cat "$base/meta/SHA256SUMS")"
+  assert_grep '  SHA256SUMS' "$base/meta/SHA256SUMS" "kept-helper-reserved: SHA256SUMS does not list the payload's SHA256SUMS"
   kc=$tmp/ordinary
   kept_helper_case "$kc"
   out=$(kept_helper_dispose "$kc" 1)
   assert_equals 'rc=0 kept=yes calls=1' "$out" "kept-helper-reserved-ordinary: the control did not close: $(cat "$kc/stderr")"
   base=$(kept_preserve_base "$kc")
-  assert_absent "$base/files" "kept-helper-reserved-ordinary: an ordinary copy's preserve left the base layout"
-  assert_grep '  notes/unique.dat' "$base/SHA256SUMS" "kept-helper-reserved-ordinary: the base layout's SHA256SUMS line is missing"
+  assert_equals 'only here' "$(cat "$base/files/notes/unique.dat" 2>/dev/null)" "kept-helper-reserved-ordinary: an ordinary copy's preserve does not hold its file in files/"
+  assert_grep '  notes/unique.dat' "$base/meta/SHA256SUMS" "kept-helper-reserved-ordinary: meta/SHA256SUMS does not list the preserved file"
   rm -rf "$tmp"
-  pass "root files named copy-path and SHA256SUMS are preserved byte for byte in files/ and the kept copy closes, while an ordinary copy keeps the base layout"
+  pass "root files named copy-path and SHA256SUMS are preserved byte for byte in files/ and the kept copy closes, and an ordinary copy uses the same files/ and meta/ layout"
 }
 
 retained_field() {  # <record> <key>
@@ -7723,9 +7784,9 @@ retained_preserved_is() {
   preserve=$(sed -n 's/^preserve=//p' "$(retained_record_path)" 2>/dev/null | head -n 1)
   [ -n "$preserve" ] || preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
   want=$(shasum -a 256 "$FOREIGN_COPY/$2" | awk '{print $1}')
-  have=$(shasum -a 256 "$preserve/$2" 2>/dev/null | awk '{print $1}')
+  have=$(shasum -a 256 "$preserve/files/$2" 2>/dev/null | awk '{print $1}')
   assert_equals "$want" "$have" "$1: the preserved $2 is not the copy's bytes"
-  assert_grep "$want  $2" "$preserve/SHA256SUMS" "$1: SHA256SUMS does not record $2"
+  assert_grep "$want  $2" "$preserve/meta/SHA256SUMS" "$1: SHA256SUMS does not record $2"
 }
 
 # retained_recorded_answer: the driver's answer the record carries.
@@ -7812,7 +7873,7 @@ test_a_changed_kept_copy_is_assessed_afresh() {
     cp "$record" "$FOREIGN_CASE/record.run1"
     base=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
     first=$(kept_tree "$base")
-    cp "$base/SHA256SUMS" "$FOREIGN_CASE/sums.run1"
+    cp "$base/meta/SHA256SUMS" "$FOREIGN_CASE/sums.run1"
     case "$change" in
       more-ignored) printf 'more\n' > "$FOREIGN_COPY/notes/unique.dat" ;;
       opencode-entry)
@@ -7842,9 +7903,9 @@ test_a_changed_kept_copy_is_assessed_afresh() {
               tab-name) added=".claude/channel-outbox/a	b.jsonl" ;;
               link-newline) added=.claude/channel-outbox/link ;;
             esac
-            assert_equals "$(printf '%s\n' "$first" | grep -v '^F \./SHA256SUMS ')" "$(kept_tree "$base" | grep -v '^F \./SHA256SUMS ' | grep -vF " ./$added ")" "retained-changed-$change: the earlier preserve lost or changed an entry, or gained one other than $added"
-            { [ -e "$base/$added" ] || [ -L "$base/$added" ]; } || fail "retained-changed-$change: $added was not copied into the agreeing earlier preserve"
-            assert_equals "$(cat "$FOREIGN_CASE/sums.run1")" "$(head -n "$(wc -l < "$FOREIGN_CASE/sums.run1")" "$base/SHA256SUMS")" "retained-changed-$change: an earlier SHA256SUMS line changed"
+            assert_equals "$(printf '%s\n' "$first" | grep -v '^F \./meta/SHA256SUMS ')" "$(kept_tree "$base" | grep -v '^F \./meta/SHA256SUMS ' | grep -vF " ./files/$added ")" "retained-changed-$change: the earlier preserve lost or changed an entry, or gained one other than $added"
+            { [ -e "$base/files/$added" ] || [ -L "$base/files/$added" ]; } || fail "retained-changed-$change: $added was not copied into the agreeing earlier preserve"
+            assert_equals "$(cat "$FOREIGN_CASE/sums.run1")" "$(head -n "$(wc -l < "$FOREIGN_CASE/sums.run1")" "$base/meta/SHA256SUMS")" "retained-changed-$change: an earlier SHA256SUMS line changed"
             ;;
         esac
         case "$change" in
@@ -7913,10 +7974,10 @@ retained_variant() {
     unlanded) held_foreign_unlanded "$FOREIGN_COPY" ;;
     dirty) printf 'edit\n' > "$FOREIGN_COPY/untracked.txt" ;;
     changed-during-driver) driver_env+=("FM_STUB_AFTER=printf 'changed\\n' > '$FOREIGN_COPY/notes/unique.dat'") ;;
-    removed-from-preserve) driver_env+=("FM_STUB_AFTER=rm -f '$preserve/notes/unique.dat'") ;;
+    removed-from-preserve) driver_env+=("FM_STUB_AFTER=rm -f '$preserve/files/notes/unique.dat'") ;;
     driver-path-directory) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/") ;;
-    driver-path-differs) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/.claude/channel-outbox' && printf 'different\\n' > '$preserve/.claude/channel-outbox/a.jsonl'") ;;
-    driver-path-differs-second) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/.claude/channel-outbox' && printf 'different\\n' > '$preserve/.claude/channel-outbox/b.jsonl'") ;;
+    driver-path-differs) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/files/.claude/channel-outbox' && printf 'different\\n' > '$preserve/files/.claude/channel-outbox/a.jsonl'") ;;
+    driver-path-differs-second) driver_env+=("FM_STUB_AFTER=mkdir -p '$preserve/files/.claude/channel-outbox' && printf 'different\\n' > '$preserve/files/.claude/channel-outbox/b.jsonl'") ;;
     driver-path-gone) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl .claude/channel-outbox/missing.jsonl") ;;
     driver-path-escapes) driver_env+=("FM_STUB_UNIQUE=.claude/channel-outbox/a.jsonl ../outside.dat") ;;
     empty-path) driver_env+=('FM_STUB_UNIQUE_JSON=[""]') ;;
@@ -8033,7 +8094,7 @@ test_a_kept_copy_whose_cause_went_closes_from_its_record_without_the_driver() {
   local rc preserve
   make_retained_case retained-cause-went enclosing
   preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
-  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=rm -f '$preserve/notes/unique.dat'"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_AFTER=rm -f '$preserve/files/notes/unique.dat'"
   expect_code 1 "$rc" "retained-cause-went: a preserve without a selected file must refuse: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-cause-went: run 1 did not ask the driver once"
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
@@ -8755,6 +8816,7 @@ test_kept_copy_helper_a_changed_copy_is_preserved_beside_its_earlier_preserve_wh
 test_kept_copy_helper_a_copy_with_nothing_selected_keeps_one_preserve_across_retries
 test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_released_route
 test_kept_copy_helper_each_distinct_selected_state_keeps_one_preserve_on_the_kept_route
+test_kept_copy_helper_the_entry_plan_lets_a_kept_own_copy_through_and_a_matching_record_skips_it
 test_kept_copy_helper_a_record_that_cannot_be_written_leaves_a_refusal_record
 test_kept_copy_helper_every_driver_named_path_is_judged_as_written_and_checked_against_the_copy
 test_kept_copy_helper_a_file_changed_after_it_was_preserved_is_never_released_unpreserved
