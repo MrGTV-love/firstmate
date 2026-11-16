@@ -352,9 +352,9 @@
 # like a foreign copy, after the clean and landed proof and the same ignored-file,
 # record, process and launcher proofs; an own copy that is not locked is removed
 # as before.
-# Apart from the held-copy rule below, every other case, including a half-removed
-# copy, refuses as before; --force never waives these proofs. The by-hand route
-# is in docs/agent-control.md.
+# Apart from the held-copy rule below and the kept-own-copy rule after it, every
+# other case, including a half-removed copy, refuses as before; --force never
+# waives these proofs. The by-hand route is in docs/agent-control.md.
 # Held copies. A foreign copy that is clean, owned by no record, process or live
 # launcher, and held back only by ignored files that exist nowhere else or by a
 # HEAD that is not proved landed does not stop the close of a task whose own copy
@@ -374,6 +374,25 @@
 # it (this teardown's own included) still refuses. A copy the hold does not apply
 # to that holds unique ignored files has them preserved and is released like any
 # other proved copy. docs/agent-control.md owns the rule.
+# Kept own copies. When the driver keeps an own nested copy (exit 3 with
+# cleanup_ignored_payload_archived_tree_retained: it writes one more archive and
+# keeps the tree on every call), teardown runs no destructive step on that copy (no
+# removal, reset, checkout, signal or lock release). It records the driver's answer
+# in one record, the copy sweep's receipt data/copy-sweep/retained/<sha256 of the
+# copy path>, and closes the task as a held copy does, the slot under a durable
+# lease, only when the copy is landed and clean and its unique ignored files are in
+# the driver's verified archive and in the task's preserve; otherwise it refuses
+# with the named reason. A retry whose record still matches the copy asks the driver
+# nothing and judges the recorded answer again; the retire step then leaves that copy
+# out of its swept roots. A first run reaps as before, since the driver has not yet
+# answered. An own locked copy's preserve is never rebuilt, overwritten or removed:
+# a copy no preserve agrees with goes in the next free name beside it. A close that refuses
+# because the copy's record cannot be written leaves a refusal record in
+# data/<task>/closeout-refused/. A retry of a task that closed this way says it is
+# already closed and names the record. --force waives none of it, and nothing here
+# removes a kept copy: its release depends on Vernant's driver.
+# bin/fm-teardown-nested-lib.sh ("Kept own copies") owns the mechanics and
+# docs/agent-control.md the rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -1391,6 +1410,15 @@ fm_refuse_if_gate_agent
 FM_LOCK_LOG_PREFIX=teardown
 
 fm_backlog_record_present "$META" "task record" "$STATE" || {
+  # A task that closed around a kept own copy has no record any more, and the kept copy's
+  # record carries the mark of that completed close, so a retry is told so, before any copy is
+  # looked up (bin/fm-teardown-nested-lib.sh, teardown_retained_closed_note). A task record
+  # that is damaged rather than gone, a pending backlog close, or a kept copy's record without
+  # the mark is not a completed close and refuses as before.
+  if fm_backlog_record_parent_authorized "$META" "task record" "$STATE" parent-only \
+      && teardown_retained_closed_note "$META" "$STATE"; then
+    exit 0
+  fi
   echo "error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
@@ -5146,6 +5174,13 @@ teardown_held_copies_report() {
     holder_q="'<the lease holder that treehouse status shows for the slot>'"
   fi
   return_cmd="(cd $proj_q && treehouse return $slot_q --if-lease-holder $holder_q </dev/null)"
+  if [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ]; then
+    for copy in "${TEARDOWN_RETAINED[@]}"; do
+      echo "notice: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and stays untouched in pool slot $(fm_refuse_text "$slot") under a durable lease; its unique ignored files are in the driver's verified archive and in the preserve $(fm_refuse_text "$(teardown_retained_fields "$(teardown_retained_receipt "$DATA" "$copy")" preserve 2>/dev/null)"), and it is recorded in $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$copy")")."
+    done
+    echo "notice: no command removes a creation-locked retained copy today: its release depends on Vernant's closeout driver (owner: the Vernant lane, through Main), and the driver's --execute-cleanup only writes another archive and keeps the tree, so do not run it for this copy; nothing returns the slot automatically."
+    [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
+  fi
   echo "notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy."
   for i in "${!TEARDOWN_FOREIGN_HELD[@]}"; do
     entry=${TEARDOWN_FOREIGN_HELD[$i]}
@@ -5272,6 +5307,8 @@ teardown_remove_own_nested_copies() {  # <slot-label>
     for root in ${TEARDOWN_OWN_RELEASED[@]+"${TEARDOWN_OWN_RELEASED[@]}"}; do
       [ "$root" != "$copy" ] || known=1
     done
+    # A copy the closeout driver kept is never removed: the task closes around it.
+    ! teardown_copy_retained "$copy" || known=1
     [ "$known" = 0 ] || continue
     git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
       echo "error: could not remove $ID's nested copy $copy $1; teardown aborted" >&2
@@ -5283,7 +5320,14 @@ teardown_remove_own_nested_copies() {  # <slot-label>
 # still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
-  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}
+  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED} lock_rc=0
+  # A copy Vernant's creation lock holds is released or kept only through
+  # teardown_own_copy_dispose, which preserves its ignored files before the driver
+  # is asked and, when the driver keeps the copy, checks that preserve against the
+  # copy; the bundle's ignored-file refusal is for a copy that would be removed
+  # with them unpreserved.
+  teardown_copy_lock_file "$1" || lock_rc=$?
+  [ "$lock_rc" != 0 ] || return 0
   if unique=$(teardown_preservable_ignored "$1"); then
     [ -n "$unique" ] || return 0
     echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
@@ -5452,6 +5496,13 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         # and the registered-copy check that would see a separate repository there
         # is not asked, so it is asked here.
         teardown_own_nested_other_repos || return 1
+      elif [ -n "$TEARDOWN_RETURN_SLOT" ] && [ "$TEARDOWN_FOREIGN_REFUSED" = 0 ] && teardown_retained_own_present; then
+        # An own nested copy the closeout driver kept, unchanged since its record
+        # was written, closes the task as a held copy does: the slot stays under
+        # its lease, no copy is touched, and the driver is not asked again.
+        TEARDOWN_HELD_SLOT=$TEARDOWN_RETURN_SLOT
+        TEARDOWN_FOREIGN_COPIES=()
+        teardown_own_nested_other_repos || return 1
       elif [ -n "$TEARDOWN_RETURN_SLOT" ]; then
         require_registered_slot_copies "$ID" "$TEARDOWN_RETURN_SLOT" \
           ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
@@ -5480,14 +5531,29 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
           ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
         [ "$root" -ef "$WT" ] || swept+=("$root")
       done
+      # An own nested copy whose record says the closeout driver kept it, unchanged since,
+      # is not a swept root: nothing here ends a run, retires an agent or signals a process
+      # in it. A process found in it through the slot's scan refuses by name instead.
+      still=()
       for root in "${swept[@]}"; do
+        for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+          if [ "$root" -ef "$copy" ] && teardown_retained_copy_held "$copy"; then
+            echo "teardown: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and is unchanged since; nothing in it is ended or signalled" >&2
+            continue 2
+          fi
+        done
+        still+=("$root")
+      done
+      swept=(${still[@]+"${still[@]}"})
+      still=()
+      for root in ${swept[@]+"${swept[@]}"}; do
         conclude_task_no_mistakes_run "$root" || exit 1
       done
-      for root in "${swept[@]}"; do
+      for root in ${swept[@]+"${swept[@]}"}; do
         retire_task_private_nm_launch_agents "$root" || exit 1
       done
       teardown_foreign_procs_retire || exit 1
-      reap_task_worktree_processes worktree "${swept[@]}" "$TASK_TMP" || exit 1
+      reap_task_worktree_processes worktree ${swept[@]+"${swept[@]}"} "$TASK_TMP" || exit 1
       ;;
     return)
       if [ -n "$TEARDOWN_PEER_SLOT" ] || [ -n "$TEARDOWN_HELD_SLOT" ]; then
@@ -5518,6 +5584,8 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         [ ! -d "$WT" ] || require_worktree_teardown_safety
         teardown_own_locked_copies_release || exit 1
         teardown_remove_own_nested_copies "before returning pool slot $TEARDOWN_RETURN_SLOT"
+        # The driver kept an own copy: the slot is held under its lease, not returned.
+        [ -z "$TEARDOWN_HELD_SLOT" ] || return 0
       fi
       teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
       branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
@@ -7403,6 +7471,9 @@ else
     exit 1
   fi
 fi
+# The close is complete: the record of each kept own copy is marked with it, so a retry of
+# this task is told it is already closed.
+teardown_retained_mark_closed
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 case "$KIND:$FORCE" in
@@ -7433,6 +7504,8 @@ elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}; shared pool slot $TEARDOWN_SHARED_SLOT and every copy inside it left untouched; only this task's own slot claim, if present, released)"
+elif [ -n "$TEARDOWN_HELD_SLOT" ] && [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ] && teardown_owns_worktree; then
+  echo "teardown $ID complete (window ${T:-none}; the task's own work is landed and its record is closed, but own nested copy ${TEARDOWN_RETAINED[0]} was kept by Vernant's closeout driver and stays untouched in pool slot $TEARDOWN_HELD_SLOT, reserved under a durable lease and unreturned; retained record: $(teardown_retained_receipt "$DATA" "${TEARDOWN_RETAINED[0]}"))"
 elif [ -n "$TEARDOWN_HELD_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; the task's own work is landed and its record is closed, but pool slot $TEARDOWN_HELD_SLOT is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)"
 elif [ -n "$TEARDOWN_PEER_SLOT" ] && teardown_owns_worktree; then

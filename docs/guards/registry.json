@@ -503,6 +503,106 @@
         {
           "file": "bin/fm-teardown-nested-lib.sh",
           "match": "printf \"REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output: %s\\n\" \\"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the state of own nested copy $(fm_refuse_text \"$copy\") could not be read, so it is not proved clean; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") has uncommitted or untracked changes, so it is not clean and its work is not landed; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the HEAD of own nested copy $(fm_refuse_text \"$copy\") cannot be resolved, so it is not proved landed; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") has HEAD $head, which is not landed (a refs/fm/anchor ref alone does not land it) and is held by no recorded verified bundle; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver kept own nested copy $(fm_refuse_text \"$copy\"), but its recorded answer does not name a restore-verified archive of every unique ignored file it lists (or lists an empty, uncovered or non-string path); its unique ignored files are not proved saved, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver's recorded answer keeps a tree other than own nested copy $(fm_refuse_text \"$copy\"); its unique ignored files are not proved saved, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the archive $(fm_refuse_text \"$archive\") that Vernant's closeout driver recorded for own nested copy $(fm_refuse_text \"$copy\") is not a regular file; its unique ignored files are not proved saved, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the archive $(fm_refuse_text \"$archive\") that Vernant's closeout driver recorded for own nested copy $(fm_refuse_text \"$copy\") is inside the copy; its unique ignored files are not proved saved apart from it, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the archive $(fm_refuse_text \"$archive\") that Vernant's closeout driver recorded for own nested copy $(fm_refuse_text \"$copy\") does not have the SHA-256 it recorded ($sha); its unique ignored files are not proved saved, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "printf 'teardown of task %s refused to close around this own nested copy because %s; the copy is not changed, and Vernant'\"'\"'s closeout driver is not asked again while the cause holds\\n' \"$ID\" \"$4\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") was kept by Vernant's closeout driver (record $(fm_refuse_text \"$TEARDOWN_RETAINED_RECORD\")), but the task's nested copies hold another Git repository or could not be scanned for one; the task was not closed, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"${TEARDOWN_RETAINED[0]}\") was kept by Vernant's closeout driver (record $(fm_refuse_text \"$(teardown_retained_receipt \"$DATA\" \"${TEARDOWN_RETAINED[0]}\")\")) in pool slot $(fm_refuse_text \"${TEARDOWN_PEER_SLOT:-}\"), which another live task still works in, so this task cannot hold the slot under its lease; the copy, the slot and the record stay as they are, the task was not closed, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: pool slot $(fm_refuse_text \"$TEARDOWN_RETURN_SLOT\") could not be durably leased, and a close that keeps own nested copy $(fm_refuse_text \"${TEARDOWN_RETAINED[0]}\") never leaves its slot without a durable lease, since a later treehouse get could reset it over the copy; the copy, the slot and the record stay as they are, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the record $(fm_refuse_text \"${record:-of own nested copy}\") of own nested copy $(fm_refuse_text \"$copy\") cannot be read, so what Vernant's closeout driver already answered is unknown; the driver was not asked, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the unique ignored paths in the recorded answer of Vernant's closeout driver for own nested copy $(fm_refuse_text \"$copy\") could not be read; the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver names ignored path $(fm_refuse_text \"$raw\") of own nested copy $(fm_refuse_text \"$copy\"), which is not a plain path inside the copy, resolves outside it or nowhere, or no longer exists, so its bytes cannot be checked against the copy; the task was not closed, and a retry asks the driver nothing while the copy is unchanged.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") changed while Vernant's closeout driver ran (or its state could not be read again); the task was not closed, and a retry assesses the changed copy afresh.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the preserve $(fm_refuse_text \"${preserve:-$DATA/$ID/nested-copy-preserved}\") does not hold every ignored file of own nested copy $(fm_refuse_text \"$copy\") that preservation selects, that its payload holds or that the driver names, byte for byte (or one could not be read or copied in); the task was not closed, and a retry asks the driver nothing, keeps an earlier preserve that agrees with the unchanged copy and otherwise preserves it in the next free name beside it, never over an earlier preserve.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the record $(fm_refuse_text \"$TEARDOWN_RETAINED_RECORD\") of own nested copy $(fm_refuse_text \"$copy\") could not be updated to name its preserve $(fm_refuse_text \"$TEARDOWN_PRESERVE_DIR\"); the task was not closed, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the identity, creation lock or state of own nested copy $(fm_refuse_text \"$copy\") cannot be read, so an answer of Vernant's closeout driver could not be recorded against it; the driver was not asked, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: neither the record $(fm_refuse_text \"$record\") nor the refusal record $(fm_refuse_text \"${refused:-of own nested copy}\") of own nested copy $(fm_refuse_text \"$copy\") is proved writable, so an answer of Vernant's closeout driver could not be recorded; the driver was not asked, and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the record $(fm_refuse_text \"$record\") of own nested copy $(fm_refuse_text \"$copy\") cannot be written, so an answer of Vernant's closeout driver could not be recorded; the driver was not asked, the refusal is recorded in $(fm_refuse_text \"$refused\"), and the task was not closed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the ignored files of own nested copy $(fm_refuse_text \"$copy\") changed after they were preserved in $(fm_refuse_text \"${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved}\") (or could not be read again); the driver was not asked, the copy was not removed, and a retry keeps an earlier preserve that agrees with the copy and otherwise preserves it in the next free name beside it, never over an earlier preserve.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver kept own nested copy $(fm_refuse_text \"$copy\"), but its record $(fm_refuse_text \"$record\") could not be written; the refusal and the driver's answer are recorded in $(fm_refuse_text \"$refused\"), the task was not closed, and a retry asks the driver nothing while the record cannot be written.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver released own nested copy $(fm_refuse_text \"$copy\"), but its preserve $(fm_refuse_text \"$TEARDOWN_PRESERVE_DIR\") no longer holds the bytes the copy held when the driver was asked; the task was not closed.\" >&2"
         }
       ]
     },
