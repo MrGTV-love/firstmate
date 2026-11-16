@@ -379,7 +379,7 @@
 # nothing and judges the recorded answer again; the retire step then leaves that copy
 # out of its swept roots. A first run reaps as before, since the driver has not yet
 # answered. An own locked copy's preserve is never rebuilt, overwritten or removed:
-# a later payload goes in a directory beside the earlier one. A close that refuses
+# a copy no preserve agrees with goes in the next free name beside it. A close that refuses
 # because the copy's record cannot be written leaves a refusal record in
 # data/<task>/closeout-refused/. A retry of a task that closed this way says it is
 # already closed and names the record. --force waives none of it, and nothing here
