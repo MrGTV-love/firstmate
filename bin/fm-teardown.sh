@@ -475,7 +475,9 @@
 # unknown, never "no run is parked", "still parked" or "not landed". A run-record
 # read the landing proof needed prints "unknown: the no-mistakes run record did not
 # answer; retry teardown", fires no unlanded-work guard event and exits
-# FM_PROJECT_LOCK_BUSY_EXIT. A silent parked-run lookup or abort confirmation
+# FM_PROJECT_LOCK_BUSY_EXIT, except in the skipped-copy release pass
+# (teardown_skipped_copies), which keeps that copy's lease and leaves the exit
+# status alone. A silent parked-run lookup or abort confirmation
 # prints an UNKNOWN line and exits FM_PROJECT_LOCK_BUSY_EXIT with nothing more closed,
 # except under --force, where the captain's authorized discard goes on and prints
 # and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown;
