@@ -9266,6 +9266,27 @@ class Round11Findings(InvariantScenario):
                 self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM)[before:], [])
                 self.assertEqual(home.theirs().get('last_run'), watermark)
 
+    def test_r11_f5_a_complete_hand_over_of_a_sweep_that_stopped_before_their_check_is_denied_on_the_next_sweep(self):
+        # Main 2218: sweep w.2.2 stops after the owner check's final write and before their check runs; their check does not run in that sweep. On the next
+        # sweep (token w.3.3) the complete record of w.2.2 is denied and the watermark is kept: whether the next owner check writes nothing at all, or does not
+        # run before their check.
+        for next_owner in ('writes nothing', 'does not run'):
+            with self.subTest(next_owner=next_owner), self.home(cap='2') as home:
+                home.set_clock(150.0)
+                self.sweep_with_owner_request(home)
+                self.assertEqual(home.cli('check', action='check', extra={'FM_CHECK_SWEEP': 'w.2.2'}).rc, 0)   # the final write; then the sweep stops
+                ledger = home.theirs().get('cap_left', {})
+                self.assertEqual((ledger.get('sweep'), ledger.get('complete'), ledger.get('fresh')), ('w.2.2', True, True))
+                watermark = home.theirs().get('last_run')
+                before = len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM))
+                if next_owner == 'writes nothing':
+                    with self.owner_writes_fail(unlink_fails=True):
+                        home.cli('check', action='check', extra={'FM_CHECK_SWEEP': 'w.3.3'})
+                second = home.cli('check', action='check-second', extra={'FM_CHECK_SWEEP': 'w.3.3'})
+                self.assertEqual(self.woken([second]), [])
+                self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM)[before:], [])
+                self.assertEqual(home.theirs().get('last_run'), watermark)
+
     def test_r11_f5_control_a_hand_over_of_the_same_sweep_token_grants_their_slot(self):
         with self.home(cap='2') as home:
             self.sweep_with_owner_request(home)
