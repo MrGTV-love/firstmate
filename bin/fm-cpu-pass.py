@@ -875,6 +875,13 @@ def sibling(module: str, filename: str):
 _root_home: List[Path] = []
 
 
+# One bound for the engine's local reads: the root-home walk and start_binding's git reads.
+# Ten real fm_firstmate_root_home calls from a worker checkout: maximum 0.035 s (private task evidence); fifteen
+# start_binding git reads (rev-parse --show-toplevel, rev-parse --git-common-dir, symbolic-ref) on 2026-11-15: maximum 0.01 s.
+# measured: value=10 date=2026-11-01 host=Mac-Studio.local margin=285
+LOCAL_READ_TIMEOUT_SECS = 10
+
+
 def root_home() -> Path:
     """The top-most local firstmate home, which owns the host's calibration record."""
     if _root_home:
@@ -885,9 +892,7 @@ def root_home() -> Path:
     walk = subprocess.run(
         ["bash", "-c", '. "$1" && fm_firstmate_root_home "$2"', "bash",
          str(Path(__file__).with_name("fm-secondmate-parent-lib.sh")), start],
-        # Ten real fm_firstmate_root_home calls from a worker checkout: maximum 0.035 s (private task evidence).
-        # measured: value=10 date=2026-11-01 host=Mac-Studio.local margin=285
-        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10, check=True)
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=LOCAL_READ_TIMEOUT_SECS, check=True)
     home = walk.stdout.strip()
     if not home.startswith("/"):
         raise ValueError("no root home resolved from %s" % start)
@@ -1254,7 +1259,7 @@ def pipeline_observation() -> Tuple[dict, int]:
 ATTEMPT_PREFIX = "attempt-"
 # How long the gate keeps relaying the agent's output after the agent exits, for a descendant that holds it open:
 # the daemon's own pipe backstop (no-mistakes fork internal/shellenv/shell_command_unix.go:20, defaultWaitDelay).
-# measured: value=5 date=2026-11-15 host=Mac-Studio.local margin=1
+# measured: value=5.0 date=2026-11-15 host=Mac-Studio.local margin=1 (copies the daemon's documented constant; not timed here)
 RELAY_AFTER_EXIT_SECS = 5.0
 # Reads of one process's coalition before it counts as unreadable (and so holds every attempt it could belong to);
 # a process caught mid-creation answers on a later read. Not a measured limit: three reads, 0, 10 and 20 ms apart.
@@ -1757,7 +1762,7 @@ def start_binding(cwd: str, args) -> Optional[dict]:
     def git(*words) -> Optional[str]:
         try:
             done = subprocess.run(["git", "-C", cwd] + list(words), stdin=subprocess.DEVNULL,
-                                  capture_output=True, text=True, timeout=10)
+                                  capture_output=True, text=True, timeout=LOCAL_READ_TIMEOUT_SECS)
         except (OSError, subprocess.SubprocessError):
             return None
         return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
@@ -2905,6 +2910,8 @@ def status_log_line(branch, key: str, text: str) -> bool:
     line = "launch-gate [at=%d] [key=%s]: %s" % (int(time.time()), key, text)
     try:
         done = subprocess.run(["bash", str(Path(__file__).with_name("fm-status-append.sh")), str(state / (task + ".status")), line],
+                              # fm-status-append.sh waits at most 10 s for the log's lock; five uncontended appends took at most 0.01 s.
+                              # measured: value=30 date=2026-11-15 host=Mac-Studio.local margin=3
                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=30)
     except (OSError, subprocess.SubprocessError) as exc:
         log(2, "launch-gate: status-log line not recorded (%s): %s" % (exc, text))
