@@ -5151,6 +5151,13 @@ class InvariantHome:
     def __init__(self, directory, transcript):
         self.dir, self.transcript = Path(directory), Path(transcript)
         self.state_dir = self.dir / 'slack-watch'
+        self.sweep = 0
+
+    def sweep_token(self, action):
+        """The watcher's token of a sweep (FM_CHECK_SWEEP, round 11): each owner check starts a new sweep, and their check that follows shares its token."""
+        if action == 'check' or self.sweep == 0:
+            self.sweep += 1
+        return 'test.%d' % self.sweep
 
     def replay_state_file(self):
         found = sorted(self.state_dir.glob('replay-state-*.json'))
@@ -5226,6 +5233,8 @@ class InvariantHome:
             argv += ['--replay', str(self.transcript)]
         out, err = io.StringIO(), io.StringIO()
         env = {'FM_SLACK_CHECK_ACTION': action, **(extra or {})}
+        if action in ('check', 'check-second') and 'FM_CHECK_SWEEP' not in env:
+            env['FM_CHECK_SWEEP'] = self.sweep_token(action)
         with patch.dict(os.environ, env), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), patch.object(sys, 'stdin', io.StringIO(stdin)):
             rc = plane.main(argv)
         return InvariantResult(rc, out.getvalue(), err.getvalue())
@@ -6000,6 +6009,8 @@ sys.exit(code)
         env = {**os.environ, 'INV4_MODE': mode, 'INV4_LOG': str(log), 'INV4_SECOND_DM': INV_SECOND_DM, 'INV4_SECOND': INV_SECOND, 'INV4_DELAY': delay,
                'INV4_ORDER': str(order) if order else '', 'INV4_SERVER': server, 'INV4_LOCK_WAIT': lock_wait,
                'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': command if command.startswith('check') else ''}
+        if command in ('check', 'check-second') and 'FM_CHECK_SWEEP' not in os.environ:
+            env['FM_CHECK_SWEEP'] = home.sweep_token(command)
         with open(captured, 'w') as out:
             done = subprocess.run([sys.executable, '-c', self.DRIVER, 'check' if command.startswith('check') else command, '--replay', str(home.transcript)],
                                   stdout=out, stderr=subprocess.PIPE,
@@ -8694,11 +8705,11 @@ class Round10Findings(InvariantScenario):
                 raise OSError('synthetic: both owner-side journal saves fail')
             return real_save(path, value)
         def write(path, text):
-            if Path(path).name == plane.OWNER_CHECK_FILE:
+            if Path(path).name == 'owner-check-at':                            # the round-10 marker; round 11 writes none
                 raise OSError('synthetic: the marker write fails')
             return real_write(path, text)
         def unlink(path, *args, **kwargs):
-            if unlink_fails and path.name == plane.OWNER_CHECK_FILE:
+            if unlink_fails and path.name == 'owner-check-at':
                 raise OSError('synthetic: the marker cannot be removed either')
             return real_unlink(path, *args, **kwargs)
         with patch.object(plane, 'save', save), patch.object(plane, 'write_atomically', write), patch.object(Path, 'unlink', unlink):
@@ -8976,15 +8987,10 @@ class Round10Findings(InvariantScenario):
                 result = home.cli('check', action='check')
             return time.monotonic() - started, result
 
-    def test_r10_f8_a_stalled_owner_check_marker_write_never_keeps_the_owner_waiting_past_its_bound(self):
-        elapsed, result = self.owner_check_with_a_stall(plane.OWNER_CHECK_FILE, 'write_atomically')
-        self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
-        self.assertLess(elapsed, getattr(plane, 'OWNER_MARK_WAIT', 1.0) + 10.0, elapsed)   # the bound, read so that code without it fails on time
-
     def test_r10_f8_a_stalled_save_of_their_journal_never_keeps_the_owner_waiting_past_its_bound(self):
         elapsed, result = self.owner_check_with_a_stall(plane.SECOND_FILE, 'save')
         self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
-        self.assertLess(elapsed, getattr(plane, 'OWNER_MARK_WAIT', 1.0) + getattr(plane, 'SECOND_IO_WAIT', 1.0) + 10.0, elapsed)
+        self.assertLess(elapsed, getattr(plane, 'SECOND_IO_WAIT', 1.0) + 10.0, elapsed)
 
     # ---- F9: the blocked resolver is really entered; every later call is checked; a fresh check process each time has its own bound ----
 
@@ -9210,6 +9216,56 @@ class Round11Findings(InvariantScenario):
             later = [home.check_pass(extra={'FM_CHECK_SWEEP': 'w.%d.%d' % (n, n)}) for n in (3, 4, 5)]
             self.assertEqual(sorted(self.woken(later)), ['200.000200', '200.000201', '200.000202'])
 
+    def test_r11_f5_a_missing_or_another_watchers_token_grants_nothing_and_keeps_the_watermark(self):
+        # Main 2214 (1): with no token (a check run by hand) or the token of another watcher (one restarted between the two checks), no hand-over is proved to be
+        # this sweep's: their check takes no slot (no fallback to the earlier marker rules), the time of the last completed run stays, and the owner leg goes on.
+        for label, token in (('missing', ''), ('restarted', 'other-watcher.9.9')):
+            with self.subTest(identity=label), self.home(cap='2') as home:
+                home.set_clock(150.0)
+                self.sweep_with_owner_request(home)
+                watermark = home.theirs().get('last_run')
+                before = len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM))
+                first = home.cli('check', action='check', extra={'FM_CHECK_SWEEP': 'w.2.2'})
+                second = home.cli('check', action='check-second', extra={'FM_CHECK_SWEEP': token})
+                self.assertEqual(self.woken([first], INV_OWNER), ['200.000100'])
+                self.assertEqual(self.woken([second]), [])
+                self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM)[before:], [])
+                self.assertEqual(home.theirs().get('last_run'), watermark)
+
+    def owner_check_dies(self, home, where):
+        """The owner check of sweep w.2.2 dies before its final hand-over is in place: 'work' stops it during its owner work (only the start record exists);
+        'rename' stops it after the final record's temporary file is written and before the rename that makes it the journal (Main 2217 (1): a partial write
+        never reads as complete)."""
+        if where == 'work':
+            def dying(watch):
+                raise RuntimeError('FM_SLACK_FAULT=owner-work')
+            context = patch.object(Watch, 'poll_work', dying)
+        else:
+            real_replace = plane.os.replace
+            def replacing(source, target):
+                if Path(target).name == plane.SECOND_FILE and '"complete": true' in Path(source).read_text():
+                    raise RuntimeError('FM_SLACK_FAULT=before-final-rename')
+                return real_replace(source, target)
+            context = patch.object(plane.os, 'replace', replacing)
+        with context:
+            return home.cli('check', action='check', extra={'FM_CHECK_SWEEP': 'w.2.2'})
+
+    def test_r11_f5_a_start_only_or_partly_written_hand_over_of_the_same_sweep_grants_nothing_and_keeps_the_watermark(self):
+        for where in ('work', 'rename'):
+            with self.subTest(dies=where), self.home(cap='2') as home:
+                home.set_clock(150.0)
+                self.sweep_with_owner_request(home)
+                watermark = home.theirs().get('last_run')
+                before = len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM))
+                died = self.owner_check_dies(home, where)
+                self.assertEqual(died.rc, 75, (died.out, died.err))
+                ledger = home.theirs().get('cap_left', {})
+                self.assertEqual((ledger.get('sweep'), ledger.get('complete')), ('w.2.2', None))   # the start record of this sweep, never marked complete
+                second = home.cli('check', action='check-second', extra={'FM_CHECK_SWEEP': 'w.2.2'})
+                self.assertEqual(self.woken([second]), [])
+                self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM)[before:], [])
+                self.assertEqual(home.theirs().get('last_run'), watermark)
+
     def test_r11_f5_control_a_hand_over_of_the_same_sweep_token_grants_their_slot(self):
         with self.home(cap='2') as home:
             self.sweep_with_owner_request(home)
@@ -9242,6 +9298,8 @@ class ScottOrderedModelTest(InvariantScenario):
                  'INV4_ORDER': '', 'INV4_SERVER': '', 'INV4_BIN': str(Path(plane.__file__).resolve().parent), 'FM_SLACK_CHECK_ACTION': action, **(env or {})}
         if card:
             child.update(INV4_CARD=json.dumps(self.CARD), INV4_ANSWERS=str(home.dir / 'answers.log'))
+        if action in ('check', 'check-second') and 'FM_CHECK_SWEEP' not in (env or {}):
+            child['FM_CHECK_SWEEP'] = home.sweep_token(action)                 # the watcher's token of this sweep (round 11)
         argv = ['check' if action else command, '--replay', str(home.transcript)]
         with open(captured, 'w') as out:
             done = subprocess.run([sys.executable, '-c', self.DRIVER, *argv], stdout=out, stderr=subprocess.PIPE, env=child, text=True, timeout=120)
