@@ -9159,6 +9159,65 @@ class Round10Findings(InvariantScenario):
         self.assertEqual(self.run_scan(files, [home], [(home, transcript)], []), [])
 
 
+class Round11Findings(InvariantScenario):
+    """Round 11 (Main 2189, 2190): the first-enable start is at most one poll interval before the enable (ruling e59cdb79), and the watcher's sweep token binds a
+    cap hand-over to the very sweep of the owner check that wrote it (F5 of the review of 5048f815)."""
+
+    woken = Round8Findings.woken
+    REQ = Round8Findings.REQ
+    owner_writes_fail = Round10Findings.owner_writes_fail
+    attempts = Round10Findings.attempts
+
+    def test_r11_point2_a_first_enable_takes_in_earlier_messages_at_most_one_poll_interval_old_and_loses_nothing_typed_after_it(self):
+        # The watcher's interval is 300 s (FM_CHECK_INTERVAL unset). The enable sweep's first Slack instant is 1000, so the start is 700: a message of theirs at
+        # 690 is older than one interval before the enable and is not taken in; one at 710 is inside it and is taken in; one typed after the enable is taken in.
+        with self.home(scott=None, history=False) as home:
+            home.trust_check()
+            home.set_clock(None)
+            home.check_pass()                                                  # a sweep with the setting unset: no Slack clock in their check
+            self.assertLess(float(home.theirs().get('last_run')), 690.0)      # the previous completed run is older than the bound
+            home.say('690.000000', 'older than one poll interval before the enable')
+            home.say('710.000000', 'inside one poll interval before the enable')
+            with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
+                home.set_clock(1000.0)
+                home.say('1000.500000', 'typed after the enable')
+                passes = [home.check_pass() for _ in range(3)]
+            self.assertEqual(self.woken(passes), ['710.000000', '1000.500000'])
+            self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM, '690.000000'), [])
+
+    def sweep_with_owner_request(self, home):
+        home.trust_check()
+        home.cli('poll')
+        time.sleep(0.05)
+        home.cli('check', action='check', extra={'FM_CHECK_SWEEP': 'w.1.1'})    # sweep 1: the owner check leaves a fresh hand-over; the watcher stops before theirs
+        time.sleep(0.05)
+        home.say('200.000100', 'owner request', user=INV_OWNER, dm=INV_OWNER_DM)
+        for n in range(3):
+            home.say('200.%06d' % (200 + n), 'second request %d' % n)
+
+    def test_r11_f5_with_the_watchers_sweep_token_a_stopped_sweeps_hand_over_grants_nothing_even_when_the_next_owner_check_writes_nothing(self):
+        # The case the round-10 marker rules could not tell apart: no end-of-sweep mark, and the next owner check can neither write nor remove its marker nor
+        # write their journal. Their check of sweep 2 sees only sweep 1's hand-over, whose token is not theirs: no slot, nothing of theirs posted or woken.
+        with self.home(cap='2') as home:
+            self.sweep_with_owner_request(home)
+            before = len(self.attempts(home, 'chat.postMessage', INV_SECOND_DM))
+            with self.owner_writes_fail(unlink_fails=True):
+                first = home.cli('check', action='check', extra={'FM_CHECK_SWEEP': 'w.2.2'})
+            second = home.cli('check', action='check-second', extra={'FM_CHECK_SWEEP': 'w.2.2'})
+            self.assertEqual(self.woken([first], INV_OWNER), ['200.000100'])
+            self.assertEqual(self.woken([second]), [])
+            self.assertEqual(self.attempts(home, 'chat.postMessage', INV_SECOND_DM)[before:], [])
+            later = [home.check_pass(extra={'FM_CHECK_SWEEP': 'w.%d.%d' % (n, n)}) for n in (3, 4, 5)]
+            self.assertEqual(sorted(self.woken(later)), ['200.000200', '200.000201', '200.000202'])
+
+    def test_r11_f5_control_a_hand_over_of_the_same_sweep_token_grants_their_slot(self):
+        with self.home(cap='2') as home:
+            self.sweep_with_owner_request(home)
+            result = home.check_pass(extra={'FM_CHECK_SWEEP': 'w.2.2'})
+            self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
+            self.assertGreaterEqual(len(self.woken([result])), 1, result.out)
+
+
 class ScottOrderedModelTest(InvariantScenario):
     """The ordered event model of Main 1308/1553, as Main 1627 (3) and finding 12 of the review of d9861b24 require: each falsifier of the review of 4e0b1bd4 is
     driven as ORDERED transitions, each step a FRESH PROCESS of the production entry point (`plane.main` behind fm-slack-check.sh: arm, the owner's check, the

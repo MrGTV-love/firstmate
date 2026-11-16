@@ -480,6 +480,33 @@ SH
   pass "checkpoint preserves watcher environment for registered custom checks"
 }
 
+test_checks_of_one_sweep_share_one_sweep_token_and_the_next_sweep_gets_a_new_one() {
+  local home out err status id tokens token
+  home=$(make_home check-sweep)
+  out="$home/out.txt"
+  err="$home/err.txt"
+  for id in a-sweep b-sweep; do
+    cat > "$home/state/$id.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s %s\n' "$(basename "$0" .check.sh)" "${FM_CHECK_SWEEP:-missing}" >> "$FM_HOME/sweeps.log"
+SH
+    chmod 0700 "$home/state/$id.check.sh"
+    FM_HOME="$home" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "could not register $id"
+  done
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=1 "$CHECKPOINT" --seconds 8 >"$out" 2>"$err" || status=$?
+  expect_code 124 "$status" "a quiet sweep checkpoint: $(cat "$out" "$err")"
+  [ -s "$home/sweeps.log" ] || fail "no check ran"
+  if grep -q ' missing$' "$home/sweeps.log"; then fail "a check ran with no sweep token"; fi
+  tokens=$(awk '{print $2}' "$home/sweeps.log" | sort -u)
+  [ "$(printf '%s\n' "$tokens" | wc -l | tr -d ' ')" -ge 2 ] || fail "two sweeps did not get two tokens: $(cat "$home/sweeps.log")"
+  for token in $tokens; do
+    [ "$(awk -v t="$token" '$2 == t {print $1}' "$home/sweeps.log" | sort | tr '\n' ' ')" = "a-sweep b-sweep " ] \
+      || fail "the checks of sweep $token did not share its token: $(cat "$home/sweeps.log")"
+  done
+  pass "the checks of one sweep share one sweep token and the next sweep gets a new one"
+}
+
 test_due_checks_precede_repeated_unmanaged_recovery() {
   local home bin file status cycle drained notice expected_checks='' expected_recoveries=''
   local sequence generation
@@ -738,6 +765,7 @@ test_never_announced_recovery_is_announced_once
 test_queue_append_during_checkpoint_still_resurfaces
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
+test_checks_of_one_sweep_share_one_sweep_token_and_the_next_sweep_gets_a_new_one
 test_due_checks_precede_repeated_unmanaged_recovery
 test_existing_singleton_watcher_is_not_success
 test_host_checkpoint_bounds_the_park_by_posture
