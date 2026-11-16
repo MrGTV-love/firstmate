@@ -14,6 +14,18 @@ from fm_cpu_pass_fixture import *  # noqa: E402,F401,F403
 from fm_cpu_pass_fixture import cleanup  # noqa: E402
 
 try:
+    if not KERNEL_FACTS:
+        # Off macOS the gate has no kernel facts to record an attempt with: a mapped ci launch that fits refuses with
+        # exit 75 and a durable line, and its agent never runs. Every other case here needs an admission, so none runs.
+        folder, db, env = gate_case('gate-no-kernel-facts')
+        child, log = gate(folder, env, 'x', mode='exit-0')
+        finish(child, 75)
+        text = log.with_suffix('.stderr').read_text()
+        assert 'launch-gate refused: process facts unreadable: run x' in text and not (folder / 'x.agent').exists(), text
+        assert 'process facts unreadable' in wakes(folder), wakes(folder)
+        skipped_without_kernel_facts('every other launch-gate case')
+        print(json.dumps(dict(result='pass', artifacts=str(root), invocations=records)), flush=True)
+        sys.exit(0)
     # CASE_NAMED_ONLY (a failing-first run against an earlier engine, harness/r29_prior_heads.py): only the named
     # groups below run, so an engine that predates the main fixtures still records each named case's outcome.
     if not os.environ.get('CASE_NAMED_ONLY'):

@@ -273,6 +273,20 @@ def group_done(results):
         assert all(value == 'pass' for value in results.values()), results
 
 
+# The launch gate records a ci agent's attempt from kernel process facts only macOS gives (bin/fm-cpu-pass.py
+# kernel_snapshot); on any other host it refuses every admitted ci launch with exit 75, as documented. A case that needs
+# such an admission runs only on macOS. Elsewhere it is named as skipped and left out of its group's results.
+KERNEL_FACTS = sys.platform == 'darwin'
+
+
+def skipped_without_kernel_facts(name):
+    """True, after naming the skip on stdout, when this host has no kernel process facts for NAME's admitted launch."""
+    if KERNEL_FACTS:
+        return False
+    print('SKIP (needs macOS kernel process facts for an admitted ci launch): ' + name, flush=True)
+    return True
+
+
 def wait_for(predicate, description):
     until = time.monotonic() + 30
     while not predicate():

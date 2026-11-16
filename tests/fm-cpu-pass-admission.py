@@ -936,6 +936,8 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                        ('F3 start words as data', data_words), ('F4 visible process at ci:running with no recorded pid', visible_agent),
                        ('F5 gate killed at the pid handoff', handoff_kill), ('F6 grant after the hold bound', late_grant),
                        ('F7 start-lock contention record', lock_contention_record)):
+        if name in ('F6 grant after the hold bound', 'F7 start-lock contention record') and skipped_without_kernel_facts(name):
+            continue
         fix_case(name, body)
     (root / 'fixround.json').write_text(json.dumps(fixround, indent=2))
     print(json.dumps(dict(fixround=fixround)), flush=True)
@@ -1061,7 +1063,10 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         line = 'no-mistakes axi run --intent goal'
 
         def accepted(command):
-            return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+            try:
+                return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+            except FileNotFoundError:  # a host without the binary (Linux has no /usr/bin/time by default) refuses the form
+                return False
 
         fresh = {
             'env-S': ['env', '-S', line], 'env-S-attached': ['env', '-S' + line], 'env-u-S': ['env', '-u', 'UNSET_X', '-S', line],
@@ -1501,6 +1506,9 @@ exec /bin/ln "$@"
                        ('R3 gate and watcher spills collide', watcher_collision),
                        ('D3 a collision replayed before the failed link returns', collision_then_replay), ('R3 controls: free lock, lone spill, replay', spill_controls),
                        ('R4 a short start-lock hold is recorded', short_hold_record)):
+        if name in ('F1 a live agent with no recorded pid holds the launch gate', 'R4 a short start-lock hold is recorded') \
+                and skipped_without_kernel_facts(name):
+            continue
         review_case(name, body)
     (root / 'review-5e36d93a.json').write_text(json.dumps(review, indent=2))
     print(json.dumps(dict(review=review)), flush=True)
