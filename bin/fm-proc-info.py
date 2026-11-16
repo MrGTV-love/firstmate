@@ -75,6 +75,8 @@ KINFO_SIZE, P_START, P_PID, P_COMM, P_FLAG, P_STAT, E_PPID, E_PGID = 648, 0, 40,
 E_UID = 420
 # sys/proc.h P_WEXIT and the p_stat values SSTOP and SZOMB.
 P_WEXIT, SSTOP, SZOMB = 0x2000, 4, 5
+# sys/proc.h P_TRACED: a debugger is attached, which can change the parent the kernel reports.
+P_TRACED = 0x800
 # proc_pidinfo PROC_PIDTASKINFO: struct proc_taskinfo and its pti_numrunning.
 PROC_PIDTASKINFO, TASKINFO_SIZE, PTI_NUMRUNNING = 4, 96, 88
 DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -144,6 +146,25 @@ def kinfo(pid):
     return data[:KINFO_SIZE]
 
 
+class NoSuchProcess(Exception):
+    """The kernel holds no process with this pid: it answered a pid query with no record at all."""
+
+
+def kinfo_exact(pid):
+    """PID's kinfo_proc record, telling a proven absence from a read that failed.
+
+    NoSuchProcess only when the kernel answers with no record (no process has the pid);
+    a short, malformed or other-pid answer raises OSError, because it is not proof the
+    process is gone (bin/fm-cpu-pass.py holds an attempt on it).
+    """
+    data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_PID, pid)
+    if not data:
+        raise NoSuchProcess(pid)
+    if len(data) != KINFO_SIZE or struct.unpack_from("i", data, P_PID)[0] != pid:
+        raise OSError("malformed process record for pid %d (%d bytes)" % (pid, len(data)))  # short or oversized: unknown
+    return data
+
+
 # macOS ps escapes each argv word with vis(3) and VIS_NOSLASH, VIS_NL and
 # VIS_TAB; in the C locale every byte above 0x7f gets its own M- escape.
 VIS_FLAGS = 0x08 | 0x10 | 0x40
@@ -171,6 +192,18 @@ def kinfos(*selector):
     data = sysctl(CTL_KERN, KERN_PROC, *(selector or (KERN_PROC_ALL,)))
     for offset in range(0, len(data) - KINFO_SIZE + 1, KINFO_SIZE):
         yield data[offset:offset + KINFO_SIZE]
+
+
+def kinfo_table():
+    """Every process's kinfo_proc record from one read of the process table, or OSError when the read is not whole.
+
+    A trailing partial record is not a smaller table: the read is refused (bin/fm-cpu-pass.py then holds
+    every attempt), where kinfos() drops it.
+    """
+    data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_ALL)
+    if not data or len(data) % KINFO_SIZE:
+        raise OSError("process table read is not a whole number of records (%d bytes)" % len(data))
+    return [data[offset:offset + KINFO_SIZE] for offset in range(0, len(data), KINFO_SIZE)]
 
 
 def processes(*selector):
@@ -255,6 +288,24 @@ def mem_tree(root):
             continue
         resident, footprint = resident + more_resident, footprint + more_footprint
     return f"{resident // 1024} {footprint // 1024}"
+
+
+PROC_PIDCOALITIONINFO = 20
+# sizeof(struct proc_pidcoalitioninfo): coalition_id[COALITION_NUM_TYPES = 2] and three reserved, uint64 each.
+COALITION_INFO_SIZE = 40
+
+
+def coalition(pid):
+    """The process's resource coalition id (proc_pidinfo PROC_PIDCOALITIONINFO), or None when it cannot be read.
+
+    A process inherits its coalition from its parent and cannot leave it without
+    privilege, so it bounds every fork descendant of a launch (bin/fm-cpu-pass.py
+    attempt attribution).
+    """
+    buffer = ctypes.create_string_buffer(64)
+    if libc.proc_pidinfo(pid, PROC_PIDCOALITIONINFO, ctypes.c_uint64(0), buffer, 64) != COALITION_INFO_SIZE:
+        return None  # a short or failed answer is unknown, never a coalition
+    return struct.unpack_from("Q", buffer.raw, 0)[0]
 
 
 def process_identity(record):
@@ -373,6 +424,11 @@ def memory_processes():
     the declared home, never a name such as node or python. Descendants inherit
     ownership in the consumer even when they clear their own environment.
     Missing RSS is explicit.
+    Each row also carries start_us, the exact kernel start time in microseconds,
+    and rss_source: "task" when the figure came from this pid's own task read
+    with the same start time before and after it (one generation of the pid),
+    "ps" or "unstable" otherwise, so a consumer can join a figure to a process
+    generation by pid and start_us and treat any other figure as unproven.
     """
     # ps can read other users' RSS where libproc is denied. Sandboxed workers
     # cannot execute its setuid binary; retain explicit nulls there, never zeros.
@@ -397,6 +453,12 @@ def memory_processes():
         info = ctypes.create_string_buffer(TASKINFO_SIZE)
         readable = libc.proc_pidinfo(pid, PROC_PIDTASKINFO, ctypes.c_uint64(0), info, TASKINFO_SIZE) == TASKINFO_SIZE
         rss = struct.unpack_from("Q", info.raw, 8)[0] if readable else resident.get(pid)
+        before = process_identity(record)
+        try:
+            after = process_identity(kinfo(pid))
+        except (OSError, LookupError):
+            after = None
+        source = ("task" if after == before else "unstable") if readable else ("ps" if rss is not None else None)
         fleet, run = False, None
         try:
             data = sysctl(CTL_KERN, KERN_PROCARGS2, pid)
@@ -423,7 +485,8 @@ def memory_processes():
                     fleet = os.path.commonpath((fleet_root, cwd)) == fleet_root
         rows.append({"pid": pid, "ppid": struct.unpack_from("i", record, E_PPID)[0],
                      "comm": os.fsdecode(record[P_COMM:P_COMM + 17].split(b"\0", 1)[0]),
-                     "started": lstart(record), "rss_bytes": rss, "fleet": fleet, "run": run})
+                     "started": lstart(record), "start_us": before[0] * 1000000 + before[1],
+                     "rss_bytes": rss, "rss_source": source, "fleet": fleet, "run": run})
     return rows
 
 

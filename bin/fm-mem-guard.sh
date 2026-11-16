@@ -12,7 +12,11 @@
 # probe readings; the engine header owns every record's contents and derivation.
 # run checks once and execs a NEW run only; reattach/respond directly so pressure
 # cannot prevent supervising existing work. admit, run and sample only record a
-# reading in the invoking home's state.
+# reading in the invoking home's state. After that check, run hands COMMAND to
+# fm-cpu-pass.py pipeline-start --only-fresh: a command that begins a new
+# no-mistakes run (its engine's fresh_pipeline_start) queues there in class
+# other; any other command runs with only the engine's exec interception added
+# first on PATH, which admits a fresh no-mistakes the command itself reaches.
 # probe is the root local home's periodic host observation; elsewhere it does
 # nothing. It records the host's run and pressure calibration and queues
 # identifying check wakes through fm-wake-lib.sh in the root home's own queue.
@@ -24,7 +28,8 @@
 # .memory-baseline.json, which only the baseline command writes.
 # FM_MEMORY_FIXTURE_DIR supplies sysctl, vm_stat and processes.json native facts
 # for isolated tests; every fixture reading is explicitly marked in the log.
-# Non-macOS admission is unchanged; its legacy diagnostic remains available.
+# Off macOS, run takes no memory reading and hands COMMAND straight to
+# pipeline-start --only-fresh; its legacy diagnostic remains available.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "${1:-}" = --help ] || [ "${2:-}" = --help ]; then
@@ -42,7 +47,11 @@ else
   [ "$#" -eq 0 ] || { echo 'unexpected memory guard arguments' >&2; exit 2; }
 fi
 if [ "$(uname -s)" != Darwin ] && [ -z "${FM_MEMORY_FIXTURE_DIR:-}" ]; then
-  if [ "$mode" = run ]; then exec "$@"; fi
+  if [ "$mode" = run ]; then
+    # Without python3 the base's direct exec stands (Main 4938): no reading and no pipeline-start admission here.
+    command -v python3 >/dev/null 2>&1 || exec "$@"
+    exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" pipeline-start --only-fresh -- "$@"
+  fi
   exit 0
 fi
 # shellcheck source=bin/fm-wake-lib.sh
@@ -110,7 +119,7 @@ if [ "$mode" = probe ]; then
 fi
 if [ "$mode" = run ]; then
   if [ "$rc" -ne 0 ]; then printf '%s\n' "$reading" >&2; exit "$rc"; fi
-  exec "$@"
+  exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" pipeline-start --only-fresh -- "$@"
 fi
 printf '%s\n' "$reading"
 exit "$rc"
