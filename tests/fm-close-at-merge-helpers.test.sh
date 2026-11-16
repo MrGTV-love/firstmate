@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2015,SC2016,SC2329  # ok only prints, so not_ok never runs after a passing check; each child bash expands its own code; cases run by name from CASES.
-# Helper-level tests for close at merge and typed completions (Main 1851, 1875; Main 1850
+# Helper-level tests for close at merge and typed completions (Main 1851, 1875, 2086; Main 1850
 # limits). Each case sources bin/ libraries, or takes one named function or the typed branch out
 # of a bin/ script, and runs it on fixture text with one read failure injected by a shell
-# function. No case runs tasks-axi, a forge, a merge, a timed or progress runner, a kill, a
-# process group, a spawn or a teardown, and this file does not source tests/lib.sh. Each
-# witness calls code that exists at the reviewed head 1719e38d7 too, so its red there is a wrong
-# result, not a missing function. The end-to-end cases for the same rulings are in
-# tests/fm-pr-close-items.test.sh and are owed to CI.
+# function. The only tasks-axi run is the installed tasks-axi command on a scratch store under
+# $TMP, to print real completion results (completion_results); no case runs the wrapper, a
+# forge, a merge, a timed or progress runner, a kill, a process group, a spawn or a teardown, and
+# this file does not source tests/lib.sh. Each witness calls code that exists at the head it was
+# written against too, so its red there is a wrong result, not a missing function. The
+# end-to-end cases for the same rulings are in tests/fm-pr-close-items.test.sh and are owed to CI.
 #
 # Usage: bash tests/fm-close-at-merge-helpers.test.sh [case...]
 set -u
@@ -191,7 +192,6 @@ typed_branch() {  # <probe: done|missing|unreadable> <replay: ok|cut> [args...]
     }
     fm_backlog_row_states() { builtin printf "pf-x:done\n"; }
     fm_backlog_unblock_dependents() { builtin printf "UNBLOCK %s\n" "$2"; }
-    fm_typed_completion_locked_clear() { builtin printf "UNBLOCK %s\n" "$2"; }
     eval "$branch"' _ "$ROOT" "$probe" "$replay" "$@"
 }
 
@@ -213,156 +213,104 @@ test_tasks_axi_package() {
 }
 TASKS_AXI_PKG=$(test_tasks_axi_package) || TASKS_AXI_PKG=''
 
-# A real markdown store under $TMP, built and read with the installed tasks-axi library (no
-# tasks-axi command, no live backlog). HOME and the working directory are under $TMP, the
-# environment overrides are unset, and every store path is checked to be under its root.
-store_node() {  # <root> <mode> [args...]: setup | state <id> | edges <id> | complete <id> | recreate <id>
-  local root=$1
-  shift
-  (cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node --input-type=module -e '
-    import { pathToFileURL } from "node:url";
-    const [pkg, root, mode, id] = process.argv.slice(1);
-    const { resolveTasksContext } = await import(pathToFileURL(pkg + "/dist/src/context.js").href);
-    const { store } = resolveTasksContext({ cwd: root, file: root + "/data/backlog.md" });
-    if (!store.path.startsWith(root + "/")) { console.error("store outside its root: " + store.path); process.exit(9); }
-    const edges = async (x) => { const t = await store.get(x); return t ? (t.deps.map((d) => d.id).join(",") || "-") + " " + (t.hold?.kind ?? "-") : "absent"; };
-    if (mode === "setup") {
-      for (const x of ["pf-x", "waits-pf-x", "held-pf-x", "other"]) await store.create({ id: x, title: x, kind: "docs" });
-      await store.addDep("waits-pf-x", { type: "blocked-by", id: "pf-x" });
-      await store.addDep("held-pf-x", { type: "blocked-by", id: "pf-x" });
-      await store.addDep("held-pf-x", { type: "blocked-by", id: "other" });
-      await store.update("held-pf-x", { hold: { kind: "future", reason: "fixture hold" } });
-    } else if (mode === "state") { const t = await store.get(id); console.log(t ? t.state : "absent"); }
-    else if (mode === "edges") { console.log(await edges(id)); }
-    else if (mode === "complete") { await store.transition(id, "done"); await store.prune({ state: "done", keep: 0 }); }
-    else if (mode === "recreate") { await store.create({ id, title: "new unfinished work under the same id", kind: "docs" }); }
-  ' "$TASKS_AXI_PKG" "$root" "$@")
-}
-new_store() {  # <name>: a fresh store root with the fixture items
-  local root=$TMP/$1
-  mkdir -p "$root/data" "$TMP/home"
-  printf 'backend = "markdown"\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 0\n' > "$root/.tasks.toml"
-  printf '%s\n' '## In flight' '' '## Queued' '' '## Done' > "$root/data/backlog.md"
-  store_node "$root" setup || return 1
+# Real results of typed completions, printed by the installed tasks-axi command on a scratch
+# store: HOME, the working directory and --file under $TMP, the environment overrides unset. Two
+# obligations are waived (plain and --json) with done_keep 5, then the first is waived again, so
+# the three files hold what tasks-axi prints for a fresh and a repeated completion.
+completion_results() {  # prints the directory with waive.toon, waive.json and again.toon
+  local root=$TMP/pf-results id
+  if [ ! -f "$root/ready" ]; then
+    command -v tasks-axi >/dev/null 2>&1 || return 1
+    mkdir -p "$root/data" "$TMP/home" || return 1
+    printf 'backend = "markdown"\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 5\n' > "$root/.tasks.toml"
+    printf '%s\n' '## In flight' '' '## Queued' '' '## Done' > "$root/data/backlog.md"
+    printf '%s' '{"request_id":"req-h","platform":"x","context_binding":{"version":"ctx1","value":"ctx1_req-h"},"public_safe_summary":"s","received_at":"2026-07-30T10:00:00Z","followup_expires_at":"2099-08-06T10:00:00Z","reservation_expires_at":"2099-08-06T10:00:00Z"}' > "$root/request.json"
+    printf '%s' '{"type":"pr-merged","project":"alpha","required_deliverables":["pr_url"],"completion_policy":"all-required"}' > "$root/expected.json"
+    axi() { (cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" tasks-axi "$@" --file "$root/data/backlog.md"); }
+    for id in pf-x pf-y; do
+      axi public-followup add "$id" --request-context-file "$root/request.json" --purpose promised-final \
+        --expected-final-file "$root/expected.json" --expires-at 2099-10-01T00:00:00Z >/dev/null || return 1
+    done
+    axi public-followup waive pf-x --reason r --approved-by captain > "$root/waive.toon" || return 1
+    axi public-followup waive pf-y --reason r --approved-by captain --json > "$root/waive.json" || return 1
+    axi public-followup waive pf-x --reason r --approved-by captain > "$root/again.toon" || return 1
+    : > "$root/ready"
+  fi
   printf '%s\n' "$root"
 }
 
-# The typed branch against a real store: the completion is simulated by archiving the row
-# through the store library; a controlled writer may then create a new unfinished item under the
-# same id (Main 1873). The row read after the completion fails, and at the reviewed head the
-# fallback list is stale (it saw the store before the writer). The branch's own clear runs for
-# real: tasks-axi's CLI at the reviewed head, the locked clear here.
-typed_branch_store() {  # <root> <writer: none|recreate> <lock: free|held>
+# The typed branch with tasks-axi printing a given completion result and exiting 0. The dependents'
+# clear is a stub that prints UNBLOCK. node, when the branch calls it, is recorded in $TMP/node.log
+# and then run, so a branch that loads tasks-axi through node is seen. The installed tasks-axi
+# package the branch may look for is a copy that says it is 0.2.7, to show that no version decides.
+typed_branch_result() {  # <result-file> [args...]
+  local result=$1
+  shift
   bash -c 'branch=$(awk "/^pf_form=0\$/ {copy=1} /^exec tasks-axi / {exit} copy {print}" "$1/bin/fm-tasks-axi.sh")
     . "$1/bin/fm-backlog-transition-lib.sh"; . "$1/bin/fm-tasks-axi-lib.sh"; set -u
-    ROOT=$1 STORE=$2 WRITER=$3 LOCK=$4 HELPERS=$5 TMP=$6/.. TASKS_AXI_PKG=$7
-    export HOME=$6; unset TASKS_AXI_FILE TASKS_AXI_BACKEND FM_TASKS_AXI_TIMEOUT
-    eval "$HELPERS"
-    ARGS=(public-followup waive pf-x --reason r --approved-by captain) DATA=$STORE/data
+    RESULT=$2 NEWER=$3 NODELOG=$4 STORE=$5; shift 5
+    ARGS=("$@") DATA=$STORE/data
+    tasks-axi() { command cat -- "$RESULT"; }
+    node() { builtin printf "%s\n" "$*" >> "$NODELOG"; command node "$@"; }
+    fm_tasks_axi_package_dir() { builtin printf "%s\n" "$NEWER"; }
     fm_backlog_tasks_axi_addressing() { FM_BACKLOG_AXI_ROOT=$STORE FM_BACKLOG_AXI_FILE=$STORE/data/backlog.md; }
-    tasks-axi() {
-      store_node "$STORE" complete pf-x
-      [ "$WRITER" != recreate ] || { store_node "$STORE" recreate pf-x; }
-      [ "$LOCK" != held ] || builtin printf "held by a fixture writer\n" > "$STORE/data/backlog.md.lock"
-      builtin printf "waived pf-x\n"
-    }
-    fm_backlog_row_probe() { FM_BACKLOG_ROW_RESULT=error FM_BACKLOG_ROW_ERROR="simulated read failure"; return 1; }
-    fm_backlog_row_states() { builtin printf "other:queued\nwaits-pf-x:queued\nheld-pf-x:queued\n"; }
-    cd "$STORE" && eval "$branch"' _ "$ROOT" "$1" "$2" "$3" "$(declare -f store_node)" "$TMP/home" "$TASKS_AXI_PKG" 2>&1
+    fm_backlog_unblock_dependents() { builtin printf "UNBLOCK %s\n" "$2"; }
+    cd "$STORE" && eval "$branch"' _ "$ROOT" "$result" "$TMP/tasks-axi-0.2.7" "$TMP/node.log" "$(completion_results)" "$@" 2>&1
+}
+newer_tasks_axi() {  # a copy of the installed package that says it is 0.2.7
+  [ -n "$TASKS_AXI_PKG" ] || return 1
+  [ -d "$TMP/tasks-axi-0.2.7" ] && return 0
+  mkdir -p "$TMP/tasks-axi-0.2.7" && cp -R "$TASKS_AXI_PKG/dist" "$TMP/tasks-axi-0.2.7/dist" || return 1
+  [ ! -d "$TASKS_AXI_PKG/node_modules" ] || cp -R "$TASKS_AXI_PKG/node_modules" "$TMP/tasks-axi-0.2.7/node_modules" || return 1
+  sed 's/"version": *"[^"]*"/"version": "0.2.7"/' "$TASKS_AXI_PKG/package.json" > "$TMP/tasks-axi-0.2.7/package.json"
 }
 
-# Main 1882 and 1873: the clear is decided and written under tasks-axi's own store lock. An
-# archived completion clears its finished edges in the same run and keeps the other blocker and
-# the hold; a new unfinished item created under the id before the clear keeps every edge and
-# hold; a lock held by another writer changes nothing and is reported.
-test_locked_clear_the_store_decides_under_its_lock() {
-  local root out
-  command -v node >/dev/null 2>&1 && [ -n "$TASKS_AXI_PKG" ] || { ok "skipped: node or the tasks-axi package is not installed"; return 0; }
-  root=$(new_store lc-control) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
-  out=$(typed_branch_store "$root" none free)
-  check "locked clear control: an archived completion clears the finished edge in the same run" "- - | other future" \
-    "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
-  case "$out" in *'unblocked: held-pf-x no longer waits on pf-x; it still waits on other'*) ok "locked clear control: the clear is reported with the edge that stays" ;; *) not_ok "locked clear control: the clear was not reported: $(tr '\n' '|' <<< "$out")" ;; esac
-  root=$(new_store lc-writer) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
-  out=$(typed_branch_store "$root" recreate free)
-  check "locked clear: a new unfinished item under the id keeps every edge and hold" "queued | pf-x - | pf-x,other future" \
-    "$(store_node "$root" state pf-x) | $(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
-  root=$(new_store lc-locked) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
-  out=$(typed_branch_store "$root" none held)
-  rm -f "$root/data/backlog.md.lock"
-  check "locked clear: a lock held by another writer changes no edge" "pf-x - | pf-x,other future" \
-    "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
-  case "$out" in *'pf-x: closed, edges kept: row unreadable'*) ok "locked clear: the held lock is reported as closed, edges kept: row unreadable" ;; *) not_ok "locked clear: the held lock was not reported: $(tr '\n' '|' <<< "$out")" ;; esac
+# Main 2086 (1): a typed completion's own printed result decides the clear. tasks-axi prints the
+# completed row's state for a fresh and a repeated completion, plain and --json; when it shows
+# the row done, its dependents are cleared through the same clear as done and close, whatever
+# tasks-axi version is installed. A result that shows another state, names another row, or
+# cannot be read keeps every edge and hold, and says so.
+test_c4_the_completions_own_result_decides_the_clear() {
+  local dir out
+  dir=$(completion_results) && newer_tasks_axi || { not_ok "c4 result: tasks-axi could not print real completion results here"; return 0; }
+  check "c4 result: tasks-axi prints the waived row as done, plain and --json" "state: done | done" \
+    "$(grep -x '  state: done' "$dir/waive.toon" | sed 's/^ *//') | $(jq -r .task.state "$dir/waive.json")"
+  out=$(typed_branch_result "$dir/waive.toon" public-followup waive pf-x --reason r --approved-by captain)
+  check "c4 result: a plain result that shows the row done clears its dependents" "UNBLOCK pf-x" "$(grep '^UNBLOCK\|^actionable' <<< "$out")"
+  out=$(typed_branch_result "$dir/waive.json" public-followup waive pf-y --reason r --approved-by captain --json)
+  check "c4 result: a --json result that shows the row done clears its dependents" "UNBLOCK pf-y" "$(grep '^UNBLOCK\|^actionable' <<< "$out")"
+  out=$(typed_branch_result "$dir/again.toon" public-followup waive pf-x --reason r --approved-by captain)
+  check "c4 result: a repeated completion's result clears its dependents" "UNBLOCK pf-x" "$(grep '^UNBLOCK\|^actionable' <<< "$out")"
+  sed 's/^  state: done$/  state: queued/' "$dir/waive.toon" > "$TMP/queued.toon"
+  out=$(typed_branch_result "$TMP/queued.toon" public-followup waive pf-x --reason r --approved-by captain)
+  check "c4 result: a result that shows the row not done keeps every edge and says so" \
+    "actionable: tasks-axi accepted the waive of pf-x, but its own result shows pf-x as queued, not done, so every blocked-by edge and hold on it is kept" \
+    "$(grep '^UNBLOCK\|^actionable' <<< "$out")"
+  out=$(typed_branch_result "$dir/waive.json" public-followup waive pf-x --reason r --approved-by captain --json)
+  case "$out" in
+    *UNBLOCK*) not_ok "c4 result: a result for another row cleared pf-x" ;;
+    *'actionable: pf-x: closed, edges kept: completion result unreadable;'*) ok "c4 result: a result for another row keeps every edge and says so" ;;
+    *) not_ok "c4 result: a result for another row was not reported: $(tr '\n' '|' <<< "$out")" ;;
+  esac
+  : > "$TMP/empty.out"
+  out=$(typed_branch_result "$TMP/empty.out" public-followup waive pf-x --reason r --approved-by captain)
+  case "$out" in
+    *UNBLOCK*) not_ok "c4 result: an empty result cleared pf-x" ;;
+    *'actionable: pf-x: closed, edges kept: completion result unreadable;'*) ok "c4 result: an empty result keeps every edge and says so" ;;
+    *) not_ok "c4 result: an empty result was not reported: $(tr '\n' '|' <<< "$out")" ;;
+  esac
 }
 
-# Main 1890 (a): the locked clear is pinned to the tasks-axi it was checked against (0.2.6). A
-# package of another version, or one whose internal modules cannot be loaded, is refused: exit
-# nonzero, every edge and hold kept. Control: the installed 0.2.6 package clears.
-test_locked_clear_refuses_another_tasks_axi() {
-  local root fake broken out rc
-  command -v node >/dev/null 2>&1 && [ -n "$TASKS_AXI_PKG" ] || { ok "skipped: node or the tasks-axi package is not installed"; return 0; }
-  [ -f "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" ] || { not_ok "locked clear: bin/fm-tasks-axi-locked-unblock.mjs is missing"; return 0; }
-  fake=$TMP/fake-tasks-axi broken=$TMP/broken-tasks-axi
-  mkdir -p "$fake" "$broken"
-  cp -R "$TASKS_AXI_PKG/dist" "$fake/dist"
-  [ ! -d "$TASKS_AXI_PKG/node_modules" ] || cp -R "$TASKS_AXI_PKG/node_modules" "$fake/node_modules"
-  sed 's/"version": *"[^"]*"/"version": "0.2.7"/' "$TASKS_AXI_PKG/package.json" > "$fake/package.json"
-  sed 's/"version": *"[^"]*"/"version": "0.2.6"/' "$TASKS_AXI_PKG/package.json" > "$broken/package.json"
-  for pkg in "$fake" "$broken"; do
-    root=$(new_store "lc-pin-${pkg##*/}") || { not_ok "locked clear: the fixture store could not be made"; return 0; }
-    store_node "$root" complete pf-x
-    rc=0
-    out=$(cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" "$pkg" "$root" "$root/data/backlog.md" pf-x 2>&1) || rc=$?
-    [ "$rc" -ne 0 ] && ok "locked clear: the ${pkg##*/} package is refused (status $rc)" || not_ok "locked clear: the ${pkg##*/} package was used: $out"
-    check "locked clear: the ${pkg##*/} package changes no edge" "pf-x - | pf-x,other future" \
-      "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
-  done
-  root=$(new_store lc-pin-real) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
-  store_node "$root" complete pf-x
-  out=$(cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" "$TASKS_AXI_PKG" "$root" "$root/data/backlog.md" pf-x 2>&1)
-  check "locked clear control: the installed tasks-axi clears" "- - | other future" \
-    "$(store_node "$root" edges waits-pf-x) | $(store_node "$root" edges held-pf-x)"
+# Main 2086 (2): the clear loads no tasks-axi module: the typed branch never runs node, so no
+# private tasks-axi file is imported and no version of it is checked.
+test_c4_no_tasks_axi_module_is_loaded() {
+  local dir
+  dir=$(completion_results) && newer_tasks_axi || { not_ok "c4 modules: tasks-axi could not print real completion results here"; return 0; }
+  rm -f "$TMP/node.log"
+  typed_branch_result "$dir/waive.toon" public-followup waive pf-x --reason r --approved-by captain >/dev/null
+  check "c4 modules: the typed branch runs no node" "" "$(cat "$TMP/node.log" 2>/dev/null)"
 }
 
-# A node warning on standard error is not the helper's answer: the clear is read from standard
-# output only, so a warning before `clear` neither hides the clear nor turns it into a false
-# "edges kept" report. A failing helper's standard error is its reason.
-test_locked_clear_reads_the_answer_from_stdout() {
-  local out
-  out=$(bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; set -u
-    fm_backlog_tasks_axi_addressing() { FM_BACKLOG_AXI_ROOT=/ FM_BACKLOG_AXI_FILE=/nonexistent/backlog.md; }
-    fm_tasks_axi_package_dir() { builtin printf "/nonexistent/tasks-axi\n"; }
-    node() { builtin printf "(node:1) ExperimentalWarning: a warning\n" >&2; builtin printf "clear\nunblocked waits-pf-x -\n"; }
-    fm_typed_completion_locked_clear /dev/null pf-x; builtin printf "rc=%s\n" "$?"
-    node() { builtin printf "backlog is locked by another tasks-axi process\n" >&2; return 1; }
-    fm_typed_completion_locked_clear /dev/null pf-x; builtin printf "rc=%s why=%s\n" "$?" "$FM_TYPED_COMPLETION_CLEAR_ERROR"' _ "$ROOT" 2>/dev/null)
-  check "locked clear: a node warning does not hide the clear" "unblocked: waits-pf-x no longer waits on pf-x; no stored blocked-by edge remains
-rc=0
-rc=1 why=backlog is locked by another tasks-axi process" "$out"
-}
-
-# Main 1873: the lock the clear holds is the store's own: a tasks-axi store write attempted
-# while the clear holds it is refused as LOCKED, so no writer can act between the decision and
-# the edge removal.
-test_locked_clear_holds_the_store_lock_writers_take() {
-  local root pkg out
-  command -v node >/dev/null 2>&1 && [ -n "$TASKS_AXI_PKG" ] || { ok "skipped: node or the tasks-axi package is not installed"; return 0; }
-  [ -f "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" ] || { not_ok "locked clear: bin/fm-tasks-axi-locked-unblock.mjs is missing"; return 0; }
-  root=$(new_store lc-inside) || { not_ok "locked clear: the fixture store could not be made"; return 0; }
-  pkg=$TASKS_AXI_PKG
-  out=$(cd "$root" && env -u TASKS_AXI_FILE -u TASKS_AXI_BACKEND HOME="$TMP/home" node --input-type=module -e '
-    import { pathToFileURL } from "node:url";
-    const [helper, pkg, root] = process.argv.slice(1);
-    const { lockedUnblock } = await import(pathToFileURL(helper).href);
-    const { resolveTasksContext } = await import(pathToFileURL(pkg + "/dist/src/context.js").href);
-    const other = resolveTasksContext({ cwd: root, file: root + "/data/backlog.md" }).store;
-    let writer = "not tried";
-    const result = await lockedUnblock({ pkg, root, file: root + "/data/backlog.md", id: "pf-x",
-      inside: async () => { try { await other.create({ id: "late-writer", title: "late", kind: "docs" }); writer = "written"; } catch (e) { writer = e.code || String(e); } } });
-    console.log(writer + " " + result.verdict);
-  ' "$ROOT/bin/fm-tasks-axi-locked-unblock.mjs" "$pkg" "$root" 2>&1)
-  check "locked clear: a store write during the clear is refused by the same lock" "LOCKED keep" "$out"
-}
 # Main 1875 F8: a replay of the kept output that fails is reported and the wrapper exits 1, so a
 # JSON caller is not handed cut output as success. Control: an intact replay exits 0 with it.
 test_f8_a_failed_replay_is_not_success() {
@@ -464,10 +412,8 @@ test_p_a_cut_parse_result_does_not_load
 test_f5_an_unreadable_result_is_reported_never_silent
 test_f6_a_missing_body_field_is_a_failed_read
 test_f7_an_unreadable_task_record_is_reported
-test_locked_clear_the_store_decides_under_its_lock
-test_locked_clear_holds_the_store_lock_writers_take
-test_locked_clear_reads_the_answer_from_stdout
-test_locked_clear_refuses_another_tasks_axi
+test_c4_the_completions_own_result_decides_the_clear
+test_c4_no_tasks_axi_module_is_loaded
 test_f8_a_failed_replay_is_not_success
 test_n1_the_retry_line_is_the_call_the_merge_made
 test_f4_a_call_with_no_arguments_runs
