@@ -6909,7 +6909,12 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
 # --- supersedence route (bin/fm-teardown-nested-lib.sh owns the route) ---------
 # The forge is a fake `gh` and the driver a scripted stand-in per copy
 # (tests/fm-supersedence-route-helpers.sh): reduced evidence, the real driver is
-# never called. A teardown asks the driver only to execute, never to plan.
+# never called. A teardown asks the driver to plan each copy before any removal,
+# once at each proof of the slot (two for a foreign copy; three for an own nested
+# copy, whose release proves it again), and then to execute it once; the scripted
+# driver allows a plain plan, as this suite's other fakes do, and refuses a plain
+# execute. ROUTE_TEARDOWN_PLANS is the number of plans the current copy gets.
+ROUTE_TEARDOWN_PLANS=2
 
 # Gives the current foreign case a GitHub-named origin (rewritten to the local
 # bare one), the fake forge and the scripted driver. ROUTE_MERGE is the tip of
@@ -6919,7 +6924,7 @@ route_teardown_prepare() {
   git -C "$FOREIGN_CASE/project" config "url.$origin.insteadOf" "$ROUTE_REMOTE_URL"
   git -C "$FOREIGN_CASE/project" remote set-url origin "$ROUTE_REMOTE_URL"
   route_install_gh "$FOREIGN_CASE/fakebin" "$FOREIGN_CASE/forge"
-  route_install_row_driver "$FOREIGN_SLOT" "$FOREIGN_CASE"
+  route_install_row_driver "$FOREIGN_SLOT" "$FOREIGN_CASE" plain-plan-allows
   mkdir -p "$FOREIGN_CASE/profiles" "$FOREIGN_CASE/data"
   ROUTE_MERGE=$(git -C "$FOREIGN_CASE/project" rev-parse refs/remotes/origin/main)
   route_set_pr "$FOREIGN_CASE/forge" 7 MERGED "$ROUTE_MERGE"
@@ -6955,15 +6960,41 @@ route_teardown_calls() {  # <copy>
       if (rest == "" || substr(rest, 1, 1) == " ") { sub(/^[^|]*\|/, ""); print } }' "$FOREIGN_CASE/closeout.log"
 }
 
-# Exactly one call for <copy>, an execute with exactly the route's bindings, run from the slot.
+# The calls for <copy> are exactly the given stages, in order, each with exactly the
+# route's bindings for its stage and each run from the slot.
+route_teardown_assert_route_calls() {  # <copy> <pr> <label> <plan|execute>...
+  local copy=$1 pr=$2 label=$3 calls call stage i=0
+  shift 3
+  calls=$(route_teardown_calls "$copy")
+  [ "$(printf '%s\n' "$calls" | grep -c .)" = "$#" ] || fail "$label: wanted $# driver call(s) ($*) for $copy, got: $calls"
+  for stage in "$@"; do
+    i=$((i + 1))
+    call=$(printf '%s\n' "$calls" | sed -n "${i}p")
+    # shellcheck disable=SC2086 # the argv words hold no spaces
+    route_argv_check "$stage" "$pr" "$FOREIGN_CASE/profiles/${copy##*/}.json" "$copy" $call || fail "$label: $stage argv: $ROUTE_ARGV_WHY ($call)"
+    [ "$(grep -cF -x "$FOREIGN_SLOT|$call" "$FOREIGN_CASE/closeout.log")" = "$(printf '%s\n' "$calls" | grep -cF -x -- "$call")" ] \
+      || fail "$label: the $stage did not run from the slot clone"
+    printf 'argv: %s: %s: %s\n' "$label" "$stage" "${call//$FOREIGN_CASE/<case>}"
+  done
+}
+
+# The plans before any removal (ROUTE_TEARDOWN_PLANS of them) and then one execute
+# for <copy>, by the route.
 route_teardown_assert_execute() {  # <copy> <pr> <label>
-  local copy=$1 pr=$2 label=$3 call
-  call=$(route_teardown_calls "$copy")
-  [ "$(printf '%s\n' "$call" | grep -c .)" = 1 ] || fail "$label: wanted one driver call for $copy, got: $call"
-  # shellcheck disable=SC2086 # the argv words hold no spaces
-  route_argv_check execute "$pr" "$FOREIGN_CASE/profiles/${copy##*/}.json" "$copy" $call || fail "$label: argv: $ROUTE_ARGV_WHY ($call)"
-  [ "$(grep -cF "$FOREIGN_SLOT|$call" "$FOREIGN_CASE/closeout.log")" = 1 ] || fail "$label: the driver did not run from the slot clone"
-  printf 'argv: %s: execute: %s\n' "$label" "${call//$FOREIGN_CASE/<case>}"
+  local -a stages=()
+  while [ "${#stages[@]}" -lt "$ROUTE_TEARDOWN_PLANS" ]; do stages+=(plan); done
+  route_teardown_assert_route_calls "$1" "$2" "$3" "${stages[@]}" execute
+}
+
+# The driver log a copy with no record leaves: its plain plans (ROUTE_TEARDOWN_PLANS
+# of them) and then its plain execute, each from the slot.
+route_teardown_plain_calls() {  # <copy>
+  local i=0
+  while [ "$i" -lt "$ROUTE_TEARDOWN_PLANS" ]; do
+    printf '%s|--cleanup-worktree %s\n' "$FOREIGN_SLOT" "$1"
+    i=$((i + 1))
+  done
+  printf '%s|--cleanup-worktree %s --execute-cleanup\n' "$FOREIGN_SLOT" "$1"
 }
 
 test_a_record_makes_teardown_ask_the_driver_by_its_pr_route_for_foreign_and_own_copies() {
@@ -6971,13 +7002,15 @@ test_a_record_makes_teardown_ask_the_driver_by_its_pr_route_for_foreign_and_own_
   route_argv_selftest
   for shape in foreign enclosing reverse; do
     kind="own nested"
-    [ "$shape" != foreign ] || kind=foreign
+    ROUTE_TEARDOWN_PLANS=3
+    [ "$shape" != foreign ] || { kind=foreign; ROUTE_TEARDOWN_PLANS=2; }
     route_teardown_world "route-argv-$shape" "$shape"
     route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success 7
-    # no record: asked exactly as before (the scripted driver refuses the plain call)
+    # no record: asked exactly as before, the entry plan and then the execute (the
+    # scripted driver allows the plain plan and refuses the plain execute)
     run_foreign_teardown rc
     expect_code 1 "$rc" "route-argv-$shape: the plain call is refused by the scripted driver: $(cat "$FOREIGN_CASE/stderr")"
-    assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    assert_equals "$(route_teardown_plain_calls "$FOREIGN_COPY")" "$(cat "$FOREIGN_CASE/closeout.log")" \
       "route-argv-$shape: a copy with no record was not asked exactly as before"
     assert_grep "Vernant's closeout driver did not release $kind copy $FOREIGN_COPY (exit 3)" "$FOREIGN_CASE/stderr" "route-argv-$shape: the plain refusal changed"
     assert_no_grep "supersedence route" "$FOREIGN_CASE/stderr" "route-argv-$shape: a copy with no record reads as a route refusal"
@@ -6992,6 +7025,7 @@ test_a_record_makes_teardown_ask_the_driver_by_its_pr_route_for_foreign_and_own_
     assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "route-argv-$shape: the slot was not returned"
     assert_absent "$FOREIGN_CASE/state/task-x1.meta" "route-argv-$shape: the task record survived"
   done
+  ROUTE_TEARDOWN_PLANS=2
   pass "a record makes teardown's foreign and own nested release ask the driver with exactly the --pr route's options from the slot clone, and a copy with no record is asked exactly as before"
 }
 
@@ -7015,9 +7049,12 @@ route_teardown_release_branch() {
   printf '%s\n' 'base_branch=release' >> "$FOREIGN_CASE/state/task-x1.meta"
 }
 
-# One bad record on one foreign copy beside a good one on another. The good copy
-# goes first (reverse path order) and is released; the bad copy stays and the
-# teardown refuses, with no driver call for the bad copy.
+# One bad record on one foreign copy beside a good one on another. The entry plans
+# go in path order, so the bad copy is planned first: its record fails before any
+# driver call and the teardown refuses at entry, before any removal and with no
+# driver call at all, so both copies stay. Where the bad copy's record is valid
+# (base-control) or absent (other-copy), the entry plans pass and the releases go
+# in reverse path order: the good copy is released first.
 test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_the_driver() {
   local rc row phrase tip other second ok bad calls bad_pr pid
   other=$(printf '%040d' 0 | tr 0 b)
@@ -7072,9 +7109,10 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
         phrase="is not on origin/main (not landed)"
         ;;
       other-copy)
-        # The only record names the control copy; it binds nothing for this one.
+        # The only record names the control copy; it binds nothing for this one, so
+        # it is asked by the plain calls: its plans (allowed) and the execute.
         phrase="Vernant's closeout driver did not release foreign copy $bad (exit 3)"
-        calls=1
+        calls=$((ROUTE_TEARDOWN_PLANS + 1))
         ;;
       base-merge-off-base | base-control)
         route_teardown_release_branch
@@ -7089,8 +7127,16 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
         ;;
     esac
     run_foreign_teardown rc FM_TEARDOWN_FORGE_TIMEOUT=2
-    route_teardown_assert_execute "$ok" 7 "$row control"
-    assert_absent "$ok" "$row: the control copy was not released"
+    if [ "$row" = base-control ] || [ "$row" = other-copy ]; then
+      route_teardown_assert_execute "$ok" 7 "$row control"
+      assert_absent "$ok" "$row: the control copy was not released"
+    else
+      # The bad record refuses at the entry plan, before any removal and before the
+      # control copy (planned after it, in path order) is asked: the control stays.
+      route_teardown_assert_route_calls "$ok" 7 "$row control"
+      assert_present "$ok/.git" "$row: the control copy was removed beside a copy refused at entry"
+      assert_grep "cannot be released; nothing was removed" "$FOREIGN_CASE/stderr" "$row: the refusal is not the entry refusal before any removal"
+    fi
     if [ "$row" = base-control ]; then
       expect_code 0 "$rc" "$row: a PR merged onto the task's base must route: $(cat "$FOREIGN_CASE/stderr")"
       route_teardown_assert_execute "$bad" 8 "$row"
@@ -7109,7 +7155,7 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
       forge_reads_are_gone "$FOREIGN_CASE/forge" 3 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "$row: the timed-out read left a descendant running (pid$FORGE_ALIVE)"; }
     fi
   done
-  pass "a teardown keeps a foreign copy whose record has an empty row at its tip before or after the valid row, names another tip, a bad profile, a closed PR, an unreadable or hanging forge, or a merge commit that is missing or off the landing branch (origin/main, or the task's base_branch), with no driver call, after releasing a valid one; a PR merged onto the task's base routes"
+  pass "a teardown keeps a foreign copy whose record has an empty row at its tip before or after the valid row, names another tip, a bad profile, a closed PR, an unreadable or hanging forge, or a merge commit that is missing or off the landing branch (origin/main, or the task's base_branch), with no driver call, and refuses at entry before removing the valid one beside it; a copy no record names is asked by the plain calls after the valid one is released; a PR merged onto the task's base routes"
 }
 
 # Both of teardown's call sites: the driver would switch a primary checkout that is
@@ -7358,7 +7404,7 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown() {
     fi
     FM_TEARDOWN_TEST_PATH="$stub:$PATH" run_foreign_teardown rc FM_TEST_REFRESH_LAUNCH="$FOREIGN_CASE/state/.test-refresh-launch"
     expect_code 1 "$rc" "$label: with no record the copy must be kept: $(cat "$FOREIGN_CASE/stderr")"
-    assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" "$label: the call with no record is not the base call"
+    assert_equals "$(route_teardown_plain_calls "$FOREIGN_COPY")" "$(cat "$FOREIGN_CASE/closeout.log")" "$label: the calls with no record are not the base calls"
     assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed with no record"
     printf 'table: %s: teardown, no record -> kept, plain call\n' "$label"
     rm -f "$FOREIGN_CASE/closeout.log"

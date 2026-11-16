@@ -205,18 +205,20 @@ route_wait_for() {
   [ -e "$path" ]
 }
 
-# route_install_row_driver <slot> <log-dir>: a scripted driver, one answer set per
-# copy. It logs "<cwd>|<argv>" to <log-dir>/closeout.log and answers by the copy's
-# base name from <log-dir>/ans/<name>/: without --pr (the plain call) with the
-# answer d7 reported for these copies (allowed false,
-# verification_stale_or_uncovered_paths, exit 3); with --pr a plan answers
+# route_install_row_driver <slot> <log-dir> [plain-plan-allows]: a scripted driver,
+# one answer set per copy. It logs "<cwd>|<argv>" to <log-dir>/closeout.log and
+# answers by the copy's base name from <log-dir>/ans/<name>/: without --pr (the
+# plain call) with the answer d7 reported for these copies (allowed false,
+# verification_stale_or_uncovered_paths, exit 3), except that with
+# plain-plan-allows a plain plan answers {"allowed": true} at exit 0, as the
+# teardown suite's own fakes answer its entry plan; with --pr a plan answers
 # plan.out/plan.exit (after plan.hook, or hanging while plan.hang exists), an
 # execute answers exec.out/exec.exit (after exec.hook) after removing the copy
 # when exec.remove exists. Each call also logs "<copy>|<plan|execute>|<branch>" to
 # <log-dir>/startup.log, the slot's checkout when the driver started, and runs
 # plan.after or exec.after (when present) once its answer is printed.
 route_install_row_driver() {
-  local slot=$1 log=$2
+  local slot=$1 log=$2 plain_plan=${3:-}
   mkdir -p "$log/ans"
   cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
 export FAKE_DRIVER=1
@@ -229,6 +231,10 @@ printf '%s|%s|%s\n' "\${2##*/}" "\$stage" "\$(git -C "\$PWD" branch --show-curre
 route=0
 for arg in "\$@"; do [ "\$arg" != --pr ] || route=1; done
 if [ "\$route" = 0 ]; then
+  if [ "\$stage" = plan ] && [ "$plain_plan" = plain-plan-allows ]; then
+    echo '{"allowed": true}'
+    exit 0
+  fi
   echo '{"allowed": false, "reason": "verification_stale_or_uncovered_paths"}'
   exit 3
 fi
