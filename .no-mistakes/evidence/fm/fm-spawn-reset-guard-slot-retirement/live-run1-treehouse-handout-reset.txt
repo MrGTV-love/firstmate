@@ -1,0 +1,31 @@
+# Run 1 (before pinning treehouse base): real treehouse get itself reset slot 1 to origin tip ccf25dd at handout,
+# overwriting the ignored notes.local BEFORE fm-spawn looked. fm-spawn ran no move (no merge in its git log).
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fAwvqU
+warning: task lab-s3b-scout: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s3b-scout/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for lab-s3b-scout: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned lab-s3b-scout harness=sleep kind=scout window=primary:fm-lab-s3b-scout worktree=/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project
+exit=0
+## before
+HEAD 3567563aac5b9df9d465833dad185c699d5bedd9 sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/remotes/origin/HEAD
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/remotes/origin/main
+index cec3543c6bada831e6328310961f5480ef9bacc2ea2a35a887eb2973f8636418
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  d5fb6b3205cfe5ce ./notes.local
+## after
+HEAD ccf25dd861480164d107288ff1e502e5ad89b1aa sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index f13b7473dd1c6dacd0aa3c7c17e9b2f6b598e0abbcc339d07c7fc936fe1619cf
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  53f85fa2b099699e ./feature.txt
+  cc747dc5668e5087 ./notes.local

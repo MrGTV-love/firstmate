@@ -1,0 +1,51 @@
+# Live S1: slot handed out (lab stand-in for one get) with an extra detached commit 574c9e4 not in origin/main
+# real bin/fm-spawn.sh, real tmux -L fm-lab, real treehouse; lab FM_HOME; scratch repos; memory admission stubbed; worker=raw 'sleep 900'
+$ bin/fm-spawn.sh lab-s1b-live <project> --scout --harness 'sleep 900'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fAwvqU
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: task lab-s1b-live: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s1b-live/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project' was not moved (not_fast_forward): HEAD 574c9e450df6c8603664aad8f7f914fdabd6c049 is not an ancestor of the target ccf25dd861480164d107288ff1e502e5ad89b1aa (the copy holds commits the target lacks)
+skipped: copy /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project (not_fast_forward) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+skill selection for lab-s1b-live: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s1b-live/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project (not_fast_forward) held by firstmate-skipped:lab-s1b-live
+spawned lab-s1b-live harness=sleep kind=scout window=primary:fm-lab-s1b-live worktree=/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/5/project
+exit=0
+## target slot /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project BEFORE
+HEAD 574c9e450df6c8603664aad8f7f914fdabd6c049 sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index 23b60a58f84c5989fc0b8fdadd36c7dd37bde36578cdc7b94b945fdfb7b4e75c
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  a5b8ee2914881a39 ./wip.txt
+## AFTER
+HEAD 574c9e450df6c8603664aad8f7f914fdabd6c049 sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index 23b60a58f84c5989fc0b8fdadd36c7dd37bde36578cdc7b94b945fdfb7b4e75c
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  a5b8ee2914881a39 ./wip.txt
+## diff: IDENTICAL
+## skipped-copies.tsv
+/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project	not_fast_forward	firstmate-skipped:lab-s1b-live	1794787927
+## treehouse status
+base  lab-stale  (configured)
+1     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project  (detached)  (held by firstmate-skipped:lab-s3b-live)
+2     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project  (detached)
+3     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project  (detached)  (held by firstmate-skipped:lab-s1b-live)
+4     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/4/project  (detached)
+5     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/5/project  (detached)
+## forced git forms run by fm-spawn's tree: 0
+## moving git calls by fm-spawn's tree:
+ppid=96846(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/5/project -c core.hooksPath=/dev/null merge --ff-only --quiet ccf25dd861480164d107288ff1e502e5ad89b1aa

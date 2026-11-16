@@ -1,0 +1,151 @@
+# Live S3b + happy path: real bin/fm-spawn.sh, real tmux (-L fm-lab), real treehouse v3.1.7-fm, lab FM_HOME, scratch origin/project
+# treehouse base_branch=lab-stale (3567563); origin/main=ccf25dd tracks notes.local; slot 1 holds IGNORED notes.local='private captain notes'
+# host memory admission stubbed (FM_MEMORY_GUARD_BIN) because the real host reported pressure level 2; worker = raw launch 'sleep 900'
+$ bin/fm-spawn.sh lab-s3b-live <project> --scout --harness "sleep 900"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fAwvqU
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GFJ8V7XMC43MA48VHG9PGZ/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task lab-s3b-live: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s3b-live/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project' was not moved (ignored_collision): ignored work at a path the target tracks would be overwritten: notes.local
+skipped: copy /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project (ignored_collision) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+skill selection for lab-s3b-live: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s3b-live/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project (ignored_collision) held by firstmate-skipped:lab-s3b-live
+spawned lab-s3b-live harness=sleep kind=scout window=primary:fm-lab-s3b-live worktree=/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project
+exit=0
+
+## slot 1 snapshot BEFORE
+HEAD 3567563aac5b9df9d465833dad185c699d5bedd9 sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index cec3543c6bada831e6328310961f5480ef9bacc2ea2a35a887eb2973f8636418
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  d5fb6b3205cfe5ce ./notes.local
+## slot 1 snapshot AFTER
+HEAD 3567563aac5b9df9d465833dad185c699d5bedd9 sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index cec3543c6bada831e6328310961f5480ef9bacc2ea2a35a887eb2973f8636418
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  d5fb6b3205cfe5ce ./notes.local
+## diff: IDENTICAL
+## skipped-copies.tsv
+/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project	ignored_collision	firstmate-skipped:lab-s3b-live	1794787763
+## treehouse status
+base  lab-stale  (configured)
+1     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project  (detached)  (held by firstmate-skipped:lab-s3b-live)
+                   zsh (23231), treehouse (36427)
+2     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project  (detached)
+                   zsh (36972), sleep (50086)
+## slot 2 (taken next) HEAD reflog
+ccf25dd HEAD@{0}: merge ccf25dd861480164d107288ff1e502e5ad89b1aa: Fast-forward
+3567563 HEAD@{1}: 
+## every git call made by fm-spawn's own process tree (logging wrapper on PATH)
+ppid=16093(bash)	rev-parse --git-common-dir
+ppid=16459(bash)	-C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GFJ8V7XMC43MA48VHG9PGZ rev-parse --is-inside-work-tree
+ppid=16519(bash)	-C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7GFJ8V7XMC43MA48VHG9PGZ symbolic-ref --quiet --short HEAD
+ppid=18217(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project remote get-url origin
+ppid=18257(bash)	hash-object --stdin
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project config --get-regexp ^remote\.origin\.
+ppid=18333(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project ls-remote --symref origin HEAD refs/heads/*
+ppid=18517(bash)	hash-object --stdin
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project fetch --quiet --no-write-fetch-head --refmap= origin +refs/heads/main:refs/fm/spawn-base/2adeb573443ff211e52f10432ba53f0e8d08b016-15554
+ppid=18708(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --verify --quiet refs/fm/spawn-base/2adeb573443ff211e52f10432ba53f0e8d08b016-15554^{commit}
+ppid=20362(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --show-toplevel
+ppid=23103(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --show-toplevel
+ppid=27031(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --show-toplevel
+ppid=27099(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --absolute-git-dir
+ppid=27177(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=30548(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --show-toplevel
+ppid=30672(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --absolute-git-dir
+ppid=30779(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=30919(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --show-toplevel
+ppid=31039(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --absolute-git-dir
+ppid=31117(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=31294(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=31363(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --path-format=absolute --git-common-dir
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project -c core.quotePath=false status --porcelain
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project config --get-regexp ^remote\.origin\.
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --verify --quiet ccf25dd861480164d107288ff1e502e5ad89b1aa^{commit}
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --verify --quiet ccf25dd861480164d107288ff1e502e5ad89b1aa^{commit}
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project config --bool --get-regexp ^core\.(ignorecase|precomposeunicode)$
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project ls-tree -r --name-only -z ccf25dd861480164d107288ff1e502e5ad89b1aa --
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --verify HEAD
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project symbolic-ref -q HEAD
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project for-each-ref --format=%(refname)%09%(objectname)%09%(symref)
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project -c core.quotePath=false status --porcelain=v1 -z --untracked-files=all --ignore-submodules=none
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project ls-files -s -z
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project ls-files -v -z
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project ls-files -s -z
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project ls-files -o -i --exclude-standard --directory -z
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --verify HEAD
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project symbolic-ref -q HEAD
+ppid=32161(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project for-each-ref --format=%(refname)%09%(objectname)%09%(symref)
+ppid=34108(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project rev-parse --path-format=absolute --git-common-dir
+ppid=35714(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project worktree list --porcelain
+ppid=38448(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --show-toplevel
+ppid=38493(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --absolute-git-dir
+ppid=38555(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=40533(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --show-toplevel
+ppid=40589(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --absolute-git-dir
+ppid=40632(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=40672(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --show-toplevel
+ppid=40712(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --absolute-git-dir
+ppid=40756(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=40906(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project rev-parse --path-format=absolute --git-common-dir
+ppid=40959(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --path-format=absolute --git-common-dir
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project -c core.quotePath=false status --porcelain
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project config --get-regexp ^remote\.origin\.
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify --quiet ccf25dd861480164d107288ff1e502e5ad89b1aa^{commit}
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify --quiet ccf25dd861480164d107288ff1e502e5ad89b1aa^{commit}
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project config --bool --get-regexp ^core\.(ignorecase|precomposeunicode)$
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-tree -r --name-only -z ccf25dd861480164d107288ff1e502e5ad89b1aa --
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify HEAD
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project symbolic-ref -q HEAD
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project for-each-ref --format=%(refname)%09%(objectname)%09%(symref)
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project -c core.quotePath=false status --porcelain=v1 -z --untracked-files=all --ignore-submodules=none
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -s -z
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -v -z
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -s -z
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -o -i --exclude-standard --directory -z
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify HEAD
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project symbolic-ref -q HEAD
+ppid=41390(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project for-each-ref --format=%(refname)%09%(objectname)%09%(symref)
+ppid=42306(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --path-format=absolute --git-common-dir
+ppid=43332(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project worktree list --porcelain
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project merge-base --is-ancestor 3567563aac5b9df9d465833dad185c699d5bedd9 ccf25dd861480164d107288ff1e502e5ad89b1aa
+ppid=44326(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project -c core.hooksPath=/dev/null merge --ff-only --quiet ccf25dd861480164d107288ff1e502e5ad89b1aa
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify HEAD
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project symbolic-ref -q HEAD
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project for-each-ref --format=%(refname)%09%(objectname)%09%(symref)
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project -c core.quotePath=false status --porcelain=v1 -z --untracked-files=all --ignore-submodules=none
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -s -z
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -v -z
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -s -z
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project ls-files -o -i --exclude-standard --directory -z
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify HEAD
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project symbolic-ref -q HEAD
+ppid=44437(python3)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project for-each-ref --format=%(refname)%09%(objectname)%09%(symref)
+ppid=45614(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify --quiet HEAD
+ppid=45683(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --verify --quiet refs/remotes/origin/main
+ppid=45748(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project symbolic-ref --quiet refs/remotes/origin/HEAD
+ppid=46000(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project rev-parse --is-inside-work-tree
+ppid=49344(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project symbolic-ref --quiet --short HEAD
+ppid=49345(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project symbolic-ref --quiet --short HEAD
+ppid=15554(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project update-ref -d refs/fm/spawn-base/2adeb573443ff211e52f10432ba53f0e8d08b016-15554

@@ -1,0 +1,66 @@
+# Live S4(ii): a git worktree lock (reason lab-foreign-lock) sits on the slot
+# real bin/fm-spawn.sh, real tmux -L fm-lab, real treehouse; lab FM_HOME; scratch repos; memory admission stubbed; worker=raw 'sleep 900'
+$ bin/fm-spawn.sh lab-s4-lock <project> --scout --harness 'sleep 900'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fAwvqU
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: task lab-s4-lock: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s4-lock/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/15/project' was not moved (live_holder): a git worktree lock is set on the slot
+skipped: copy /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/15/project (live_holder) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+skill selection for lab-s4-lock: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s4-lock/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/15/project (live_holder) held by firstmate-skipped:lab-s4-lock
+spawned lab-s4-lock harness=sleep kind=scout window=primary:fm-lab-s4-lock worktree=/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/16/project
+exit=0
+## target slot /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/15/project BEFORE
+HEAD 3567563aac5b9df9d465833dad185c699d5bedd9 sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-owner
+  b1445aa668ff1e297c80604566919ee8de9aad4f refs/heads/lab-owner2
+  9b3ff8b14391cfaa833f52a5044adb020f2fb4da refs/heads/lab-owner3
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index e2384bfdbfa4b4e64e6bda9de7d02ab7feb98a79588e56f5476e7d9a39c02915
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+## AFTER
+HEAD 3567563aac5b9df9d465833dad185c699d5bedd9 sym=detached
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-owner
+  b1445aa668ff1e297c80604566919ee8de9aad4f refs/heads/lab-owner2
+  9b3ff8b14391cfaa833f52a5044adb020f2fb4da refs/heads/lab-owner3
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index e2384bfdbfa4b4e64e6bda9de7d02ab7feb98a79588e56f5476e7d9a39c02915
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+## diff: IDENTICAL
+## skipped-copies.tsv
+/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/15/project	live_holder	firstmate-skipped:lab-s4-lock	1794788719
+## treehouse status
+base  lab-stale  (configured)
+1     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project  (detached)  (held by firstmate-skipped:lab-s3b-live)
+2     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project  (detached)
+3     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project  (detached)  (held by firstmate-skipped:lab-s1b-live)
+4     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/4/project  (detached)
+5     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/5/project  (detached)
+6     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/6/project  [lab-owner]  (held by firstmate-skipped:lab-s2-live)
+7     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/7/project  (detached)
+8     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project  [lab-owner2]  (held by firstmate-skipped:lab-s2-live2)
+9     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/9/project  [lab-owner3]  (held by firstmate-skipped:lab-s2-live3)
+10    in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/10/project  (detached)
+11    leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/11/project  (detached)  (held by firstmate-skipped:lab-s3-mod)
+12    in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/12/project  (detached)
+13    leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/13/project  (detached)  (held by firstmate-skipped:lab-s4-proc)
+14    in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/14/project  (detached)
+15    leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/15/project  (detached)  (held by firstmate-skipped:lab-s4-lock)
+16    in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/16/project  (detached)
+## forced git forms run by fm-spawn's tree: 0
+## moving git calls by fm-spawn's tree:
+ppid=83221(bash)	-C /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/16/project -c core.hooksPath=/dev/null merge --ff-only --quiet ccf25dd861480164d107288ff1e502e5ad89b1aa

@@ -1,0 +1,65 @@
+# Live S4(i) incidental witness: my own driver bash (pid 12948, not in the spawn lineage) had its cwd in slot 8 -> live_holder skip, slot byte-identical. The later exit=1 is a SETUP fault: the lab pool hit treehouse max_trees=8, so the 2nd get could not allocate.
+# real bin/fm-spawn.sh, real tmux -L fm-lab, real treehouse; lab FM_HOME; scratch repos; memory admission stubbed; worker=raw 'sleep 900'
+$ bin/fm-spawn.sh lab-s2-live2 <project> --scout --harness 'sleep 900'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fAwvqU
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: task lab-s2-live2: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s2-live2/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' was not moved (live_holder): a live process (pid 12948, bash) has its working directory in the slot
+skipped: copy /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project (live_holder) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 64s; no path/output progress for 54s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 125s; no path/output progress for 115s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 185s; no path/output progress for 175s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 245s; no path/output progress for 235s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 305s; no path/output progress for 295s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 365s; no path/output progress for 355s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 425s; no path/output progress for 415s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 485s; no path/output progress for 475s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 545s; no path/output progress for 535s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 605s; no path/output progress for 595s; last path '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project' (the pane is still in a copy this spawn skipped)
+error: treehouse get did not enter an isolated worktree after 508 polls (no path or output progress for 600s) (last seen '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project': the pane is still in a copy this spawn skipped; spawning project '/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/project'; copies skipped by this spawn: /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project); aborting acquisition
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.fAwvqU/data/lab-s2-live2/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project (live_holder) held by firstmate-skipped:lab-s2-live2
+exit=1
+## target slot /Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project BEFORE
+HEAD b1445aa668ff1e297c80604566919ee8de9aad4f sym=refs/heads/lab-owner2
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-owner
+  b1445aa668ff1e297c80604566919ee8de9aad4f refs/heads/lab-owner2
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index 729cee655519da7bf38711e32382c71045fd73b20a5504f4a98d28f53dc63262
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  a9d82e3b3aa8677f ./owner.txt
+## AFTER
+HEAD b1445aa668ff1e297c80604566919ee8de9aad4f sym=refs/heads/lab-owner2
+show-ref:
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-owner
+  b1445aa668ff1e297c80604566919ee8de9aad4f refs/heads/lab-owner2
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/lab-stale
+  3567563aac5b9df9d465833dad185c699d5bedd9 refs/heads/main
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/HEAD
+  ccf25dd861480164d107288ff1e502e5ad89b1aa refs/remotes/origin/main
+index 729cee655519da7bf38711e32382c71045fd73b20a5504f4a98d28f53dc63262
+files:
+  ac0855210d1e8d49 ./.gitignore
+  f34848ca92665c34 ./README.md
+  a9d82e3b3aa8677f ./owner.txt
+## diff: IDENTICAL
+## skipped-copies.tsv
+/Users/charlesabrooker/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project	live_holder	firstmate-skipped:lab-s2-live2	1794787986
+## treehouse status
+base  lab-stale  (configured)
+1     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/1/project  (detached)  (held by firstmate-skipped:lab-s3b-live)
+2     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/2/project  (detached)
+3     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/3/project  (detached)  (held by firstmate-skipped:lab-s1b-live)
+4     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/4/project  (detached)
+5     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/5/project  (detached)
+6     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/6/project  [lab-owner]  (held by firstmate-skipped:lab-s2-live)
+7     in-use       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/7/project  (detached)
+8     leased       ~/tmp/fm-labworld.h3IMwV/thr/.treehouse/project-4b28fc/8/project  [lab-owner2]  (held by firstmate-skipped:lab-s2-live2)
+## forced git forms run by fm-spawn's tree: 0
+## moving git calls by fm-spawn's tree:
