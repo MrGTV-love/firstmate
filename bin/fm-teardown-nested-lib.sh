@@ -200,14 +200,32 @@
 # with the driver's words and the route and PR named. The driver stays the only
 # authority and is not widened. The lane's side effects are the driver's own
 # (closeout_pr.py at Vernant origin/main 1cf0e36): git fetch --prune origin in
-# the clone, for a plan too; the evidence files, which
-# --no-evidence-files suppresses; the closeout-state marker, which the driver
+# the clone, for a plan too; the verification report, one JSON file per copy in
+# the clone's ignored directory .claude/bug-evidence/tree-presence/, which the
+# driver creates and writes on every call, a plan too, whatever --no-evidence-files
+# says, so even a plan writes it into the clone's ignored area
+# (closeout_pr.py:2340-2341, verify_worktree.py:281-293); the evidence files, a
+# JSON and a markdown file in the clone's ignored directory
+# .claude/bug-evidence/pr-closeout/, which --no-evidence-files suppresses and the
+# route always passes, so a route call writes none; the closeout-state marker, which the driver
 # writes on any call, a plan too, whose state reaches DONE (its --verify-only mode
 # refuses --cleanup-worktree and still writes the marker, so no quieter plan
 # exists); a repair of the clone's primary checkout, which never runs because the
 # route is refused while that checkout is on the PR's head branch
 # (--repair-primary-base is never passed); and deletion of the PR's local branch
-# after an executed cleanup.
+# after an executed cleanup that removed the worktree (closeout_pr.py:3268-3353).
+# The driver keeps the branch and names the reason when the worktree was not
+# removed (worktree_not_removed), the branch is protected (protected_branch) or
+# absent (local_branch_absent), the PR is not MERGED (pr_not_merged), the tip
+# cannot be read (branch_tip_unresolvable), the tip is neither the PR head nor an
+# ancestor of it (branch_tip_not_contained_in_pr_head, or branch_ancestry_unproven
+# when the probe cannot settle), another worktree has the branch checked out
+# (checked_out_in_worktree, or worktree_list_failed), the landing proof fails
+# (landing_not_proven), or a remote counterpart has appeared
+# (remote_counterpart_alive); a delete that errors is reported as state failed.
+# It deletes by compare-and-swap at the exact tip it read just before, in one
+# update-ref transaction that also needs refs/remotes/origin/<branch> to be absent,
+# so a branch that moved keeps its commits (branch_moved_during_delete).
 #
 # Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh, bin/fm-refuse-lib.sh,
 # bin/fm-pr-lib.sh and bin/fm-timeout-lib.sh first,
