@@ -78,11 +78,45 @@ owner["run"](owner["private_root"](),duration={duration},process_source={source}
         self.assertEqual(reply.returncode, 0, reply.stderr)
         return json.loads(reply.stdout)["removed"]
 
+    def run_until_recorded(self, window, *kinds):
+        # records needs the owner stopped, so the poll reads the persisted
+        # observations table; the owner stops once every kind has a row.
+        root = self.state / "github-accounting"
+        owner = subprocess.Popen([sys.executable, str(OWNER), "run"], env=self.env, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True)
+        deadline = time.monotonic() + window
+        stopping = False
+        try:
+            while True:
+                found = set()
+                try:
+                    db = sqlite3.connect(f"file:{root / 'observations.sqlite'}?mode=ro", uri=True)
+                    try:
+                        found = {kind for (kind,) in db.execute("SELECT DISTINCT kind FROM observations")}
+                    finally:
+                        db.close()
+                except sqlite3.Error:
+                    pass
+                if found >= set(kinds):
+                    break
+                if time.monotonic() >= deadline:
+                    self.fail(f"owner recorded no {sorted(set(kinds) - found)} row within {window} s")
+                try:
+                    owner.wait(timeout=0.05)
+                except subprocess.TimeoutExpired:
+                    continue
+                self.fail(f"owner exited {owner.returncode} before recording {sorted(set(kinds) - found)}")
+            (root / "stop").write_text(json.loads(self.cli("status").stdout)["run_id"])
+            stopping = True
+        finally:
+            if not stopping and owner.poll() is None:
+                owner.terminate()
+            stdout, stderr = owner.communicate(timeout=60)
+        return subprocess.CompletedProcess(owner.args, owner.returncode, stdout, stderr)
+
     def assertProcessGone(self, pid):
         # A killed orphan can briefly remain a zombie; /proc on Linux or the
         # existing native identity table on Darwin distinguishes it from live.
-        import runpy
-        from types import SimpleNamespace
         shared = SimpleNamespace(**runpy.run_path(str(OWNER.with_name("fm-proc-budget-tree.py"))))
         rows = shared.Table().read()
         self.assertTrue(pid not in rows or rows[pid][3], f"process {pid} survived")
@@ -96,7 +130,8 @@ printf '%s\n' "201 100 Sun Nov  1 13:00:$born 2026 /fixture/gh pr checks --body 
 '202 999 Sun Nov  1 13:00:03 2026 /fixture/gh-axi api rate_limit --field payload=fixture-secret-three' \
 '100 0 Sun Nov  1 13:00:00 2026 /bin/sh /fixture/caller.sh -c fixture-secret-four'
 ''')
-        self.cli("run", "--duration", "1.8")
+        reply = self.run_until_recorded(1.8, "quota", "process_end")
+        self.assertEqual(reply.returncode, 0, (reply.stdout, reply.stderr))
         rows = self.records("process")
         self.assertEqual([(row["pid"], row["start"]) for row in rows], [
             (201, "Sun Nov 1 13:00:01 2026"), (202, "Sun Nov 1 13:00:03 2026"),
@@ -112,7 +147,7 @@ printf '%s\n' "201 100 Sun Nov  1 13:00:$born 2026 /fixture/gh pr checks --body 
         self.assertEqual(missing["ancestors"], [])
         self.assertEqual(missing["ancestor_end"], "unobserved")
         self.assertNotIn("fixture-secret", json.dumps(rows))
-        self.assertEqual(self.completed_quota("used=23 reset=1794000000 limit=5000 remaining=4977")["graphql"]["used"], 23)
+        self.assertEqual(self.records("quota")[0]["graphql"]["used"], 23)
 
     def test_injected_tables_filter_script_identity_and_ancestor_cycles(self):
         # Labeled table fixtures exercise the actual owner/filter/storage path,
@@ -610,11 +645,10 @@ exec sleep 600
         self.tool("gh-axi", ''': > "$FIXTURE_ROOT/quota-asked"
 printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
 ''')
-        reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "3"], env=self.env,
-                               capture_output=True, text=True, timeout=60)
+        reply = self.run_until_recorded(3, "quota")
         self.assertEqual(reply.returncode, 0, reply.stderr)
         self.assertTrue((self.root / "quota-asked").exists(), "the hung ps blocked the quota stream")
-        self.assertEqual(self.completed_quota("used=23 reset=1794000000 limit=5000 remaining=4977")["status"], "observed")
+        self.assertIn("observed", [row["status"] for row in self.records("quota")])
         self.assertHungPsEnded()
 
     def test_hung_ps_does_not_grow_verdicts_across_repeated_requests(self):
@@ -638,7 +672,7 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
         # completed child's metadata/body; persist and read the actual records.
         owner = runpy.run_path(str(OWNER))
         root = self.state / "github-accounting"
-        root.mkdir(mode=0o700, exist_ok=True)
+        root.mkdir(mode=0o700)
         db = owner["database"](root)
         try:
             owner["quota_result"](db, SimpleNamespace(pid=123, returncode=0),
@@ -647,7 +681,7 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
             db.commit()
         finally:
             db.close()
-        return self.records("quota")[-1]
+        return self.records("quota")[0]
 
     def test_malformed_quota_is_unavailable_not_zero(self):
         row = self.completed_quota("used=null reset=null limit=5000 remaining=0")
