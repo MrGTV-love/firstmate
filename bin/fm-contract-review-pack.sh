@@ -96,10 +96,12 @@
 # check: reads the run's session transcript (--log: the entrypoint's omp-session folder,
 #   or one of its .jsonl files) and judges every read it records. The report's own
 #   Inputs read list is the reviewer's declaration and is not evidence; a report
-#   (<work folder>/review.md) with no Inputs read list voids the round.
-#   Judged reads: read and edit paths and skill:// reads (a trailing :selector such as :raw:1-11 or :-1 is
-#   removed one segment at a time; the read is authorized when the path or one of these
-#   shorter forms is), every [<path>#...] target line of an edit with no path (an edit with
+#   (<work folder>/review.md) with no Inputs read list voids the round; a section number
+#   before the words, as in "## 2. Inputs read", is still that list.
+#   Judged reads: read and edit paths and skill:// reads (a trailing :selector such as :raw:1-11 or :-1,
+#   and for a path a ?q=... query suffix in its last component, is removed one segment at a
+#   time; the read is authorized when the path or one of these shorter forms is; a path
+#   under .git is not a tracked file), every [<path>#...] target line of an edit with no path (an edit with
 #   neither is unverified), and grep, glob and find roots.
 #   Every session record must name a folder under the recorded work folder, else the round
 #   is void: the transcript never chooses its own work folder.
@@ -654,12 +656,20 @@ def judge_read(raw, cwd):
             return "an internal " + scheme + ":// record, which cannot be proven to belong to this run"
         return "a " + scheme + ":// read outside the allowed inputs"
     p = os.path.normpath(os.path.join(cwd, os.path.expanduser(raw)))
-    forms = [p]
-    while True:
-        head, sep, tail = forms[-1].rpartition(":")
-        if not sep or "/" in tail or not head:
-            break
-        forms.append(head)
+    # Shorter forms: a trailing :selector segment, or a ?query suffix in the last path
+    # component (Main 2042 L-1), removed one at a time in any order.
+    forms, todo = [], [p]
+    while todo:
+        f = todo.pop(0)
+        if f in forms:
+            continue
+        forms.append(f)
+        head, sep, tail = f.rpartition(":")
+        if sep and "/" not in tail and head:
+            todo.append(head)
+        base = os.path.basename(f)
+        if "?" in base and not base.startswith("?"):
+            todo.append(f[:len(f) - len(base) + base.index("?")])
     # The exclusion and pinned-copy byte tests apply to every selector form before any clean
     # result, so a selector never turns an excluded path or an altered copy clean (Main 2034).
     for f in forms:
@@ -766,7 +776,8 @@ try:
     rep_text = open(report, encoding="utf-8", errors="replace").read()
 except OSError:
     rep_text = ""
-if not re.search(r"(?im)^[ \t>#*_`-]*inputs read\b", rep_text):
+# A section number such as 2., 2), 2 or 2.1 may come before the words (Main 2042 L-2).
+if not re.search(r"(?im)^[ \t>#*_`-]*(?:\d+(?:\.\d+)*(?:[.)][ \t]*|[ \t]+)[*_`]*)?inputs read\b", rep_text):
     leaks.append((report, "the report has no Inputs read list, so the round is void"))
 
 def uniq(xs):

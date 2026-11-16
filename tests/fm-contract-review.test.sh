@@ -845,6 +845,56 @@ test_report_with_no_inputs_read_voids() {
   pass "a report with no Inputs read list voids the round, and one with the list and a clean transcript is clean"
 }
 
+test_query_suffix_read_is_judged_by_its_file() {
+  local log="$TMP_ROOT/qry/s.jsonl" call n=0
+  make_leak_world
+  printf 'untracked\n' >"$LEAK_ROOT/notes/new.md"
+  # Main 2042 L-1: a ?q= suffix is removed like a :selector before the tracked test.
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")" \
+    "$(tool_call read path "$LEAK_ROOT/notes/plan.md?q=keys")" \
+    "$(tool_call read path "$LEAK_ROOT/notes/plan.md?q=.custody")" \
+    "$(tool_call read path "$LEAK_ROOT/notes/plan.md?q=.a:b:raw")" \
+    "$(tool_call read path "$LEAK_PACK/target.md?q=keys")"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "a ?q= read of a tracked file was flagged: $CHECK_OUT"
+  # Controls: the suffix never makes an untracked, ignored or excluded file clean, and a path
+  # under .git is not a tracked file (Main 2042 L-3).
+  for call in "$(tool_call read path "$LEAK_ROOT/notes/new.md?q=keys")" \
+    "$(tool_call read path "$LEAK_ROOT/secret.md?q=keys")" \
+    "$(tool_call read path "$LEAK_ROOT/sources/notes.md?q=keys")" \
+    "$(tool_call read path "$LEAK_ROOT/data/case/truth/r23-review.md?q=.x:raw")" \
+    "$(tool_call read path "$LEAK_ROOT/.git/HEAD")" \
+    "$(tool_call read path "$LEAK_ROOT/.git/config?q=keys")"; do
+    n=$((n + 1))
+    write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")" "$call"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "query-suffix control $n was not a leak: $call -> $CHECK_OUT"
+    assert_contains "$CHECK_OUT" "INPUT LEAK" "query-suffix control $n did not report a leak"
+  done
+  pass "a ?q= read is judged by its file: clean for a tracked file, a leak for an untracked, ignored, excluded or .git file"
+}
+
+test_numbered_inputs_read_heading_is_the_list() {
+  local log="$TMP_ROOT/nih/s.jsonl" h n=0
+  make_leak_world
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")"
+  # Main 2042 L-2: a section number before the words is still the Inputs read heading.
+  for h in '## 2. Inputs read' '## 2) Inputs read' '## 2 Inputs read' '### 2.1 Inputs read' '## 2. **Inputs read**' '2. Inputs read:'; do
+    n=$((n + 1))
+    printf '# Review\n\n%s\n\n- %s/target.md\n\nVERDICT: FAIL\n' "$h" "$LEAK_PACK" >"$LEAK_WORK/review.md"
+    run_check "$log"
+    assert_equals 0 "$CHECK_RC" "numbered heading $n ($h) was not taken as the list: $CHECK_OUT"
+  done
+  # Controls: no Inputs read heading, or the words inside prose, still void.
+  for h in '## 2. Findings' 'Section 2. Inputs read' '## 2. Inputs reading'; do
+    printf '# Review\n\n%s\n\n- %s/target.md\n\nVERDICT: FAIL\n' "$h" "$LEAK_PACK" >"$LEAK_WORK/review.md"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "a report with no Inputs read heading ($h) was not void: $CHECK_OUT"
+    assert_contains "$CHECK_OUT" "no Inputs read list" "the void for ($h) does not name the missing list"
+  done
+  pass "a numbered Inputs read heading is the list, and a report without the heading still voids"
+}
+
 fm_test_run_cases \
   test_known_sections_pass_byte_identical \
   test_every_round_finding_section_is_dropped \
@@ -880,4 +930,6 @@ fm_test_run_cases \
   test_report_with_no_inputs_read_voids \
   test_named_installed_skill_files_are_clean \
   test_work_folder_read_needs_the_allowed_set \
+  test_query_suffix_read_is_judged_by_its_file \
+  test_numbered_inputs_read_heading_is_the_list \
   -- "$@"
