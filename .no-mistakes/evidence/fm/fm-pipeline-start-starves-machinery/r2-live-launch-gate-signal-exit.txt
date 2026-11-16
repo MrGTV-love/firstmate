@@ -1,0 +1,9 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e
+drive-int.sh: line 28: kill: (96130) - No such process
+drive-int.sh: line 29: /private/tmp/nmlive-r2.fhYb/launcher/got: No such file or directory
+SIGINT to gate 96130: gate exit=75; agent recorded: 
+drive-int.sh: line 28: kill: (71547) - No such process
+drive-int.sh: line 29: /private/tmp/nmlive-r2.fhYb/launcher/got: No such file or directory
+SIGTERM to gate 71547: gate exit=75; agent recorded: 
+drive-int.sh: line 28: 61029 Hangup: 1               "$S/launcher/sig-launcher" -p < /dev/null > "$S/int.out" 2>&1  (wd: /private/tmp/nmlive-r2.fhYb/wt-ci)
+SIGHUP to gate 61029: gate exit=129; agent recorded: start int-disposition-was-default;got 1;

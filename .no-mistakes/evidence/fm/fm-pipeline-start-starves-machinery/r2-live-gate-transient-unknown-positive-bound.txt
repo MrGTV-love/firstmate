@@ -1,0 +1,19 @@
+try 1 gate=18931 exit=0
+admitted
+admitted
+try 2 gate=24553 exit=0
+admitted
+admitted
+try 3 gate=30657 exit=0
+admitted
+admitted
+try 4 gate=37344 exit=0
+admitted
+admitted
+try 5 gate=44884 exit=0
+unknown: process 50416 could be run runci's attempt and its memory is not joined
+admitted
+admitted
+try 6 gate=65921 exit=0
+admitted
+admitted

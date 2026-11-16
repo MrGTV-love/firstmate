@@ -1,0 +1,43 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; sandbox /private/tmp/nmlive-r2.fhYb
+## Isolated launcher copy /private/tmp/nmlive-r2.fhYb/launcher/claude-teamclaude, final line:
+exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nmlive-r2.fhYb/launcher/claude "$@"
+
+## 1. fix-round launch from a CI-step run worktree, host has room; stub claude exits 3
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=80321:1794776762170821000
+fm-cpu-pass: launch-gate admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_repo=repo start_branch=fm/ci hold_bound=0s budget=unreadable round_elapsed=unreadable ci_fix_p99=unreadable n=0 held=0 ambiguous=0 admitted_ns=1794776763559219000 published_ns=1794776764041807000 agent_started_ns=1794776764042921000 unlocked_ns=1794776764042925000
+STUB claude pid=86018 cwd=/private/tmp/nmlive-r2.fhYb/wt-ci argv=-p --flag stdin=the prompt
+exit=3
+
+## 2. review-step launch of a counted run: passes through
+STUB claude pid=88329 cwd=/private/tmp/nmlive-r2.fhYb/wt-review argv=-p stdin=p2
+exit=0
+
+## 3. unmapped directory: refused
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/elsewhere, attempt 89598:1794776765044388000; no run records /private/tmp/nmlive-r2.fhYb/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+
+## 4. SIGTERM to the gate (a process this script started) reaches claude
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=91716:1794776765662823000
+fm-cpu-pass: launch-gate refused: hold bound reached: run runci; hold_bound=0s budget=unreadable round_elapsed=unreadable ci_fix_p99=unreadable n=0 held=0 ambiguous=0; held 1s; last reading: unknown: process 93734 could be run runci's attempt and its memory is not joined; process 93734 could be run runrev's attempt and its memory is not joined; counted=2 priority=other (a decision waits until every fact reads); next action: this fix attempt ends and the run keeps its CI step; the daemon retries while auto_fix.ci allows, then parks the CI findings as an ask-user decision; answer it once capacity has returned
+sending TERM to gate pid 91716
+drive-gate.sh: line 31: kill: (91716) - No such process
+exit=75
+stub claude 88329 gone
+
+## 5. missing claude binary
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=7526:1794776769980416000
+fm-cpu-pass: launch-gate: agent not found: /private/tmp/nmlive-r2.fhYb/launcher/no-such-claude
+exit=127
+
+## durable gate lines (FM_HOME/state wake queue):
+1794776765	6	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/elsewhere, attempt 89598:1794776765044388000; no run records /private/tmp/nmlive-r2.fhYb/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794776766	7	check	launch-gate-runci	check: launch-gate: launch-gate refused: hold bound reached: run runci; hold_bound=0s budget=unreadable round_elapsed=unreadable ci_fix_p99=unreadable n=0 held=0 ambiguous=0; held 1s; last reading: unknown: process 93734 could be run runci's attempt and its memory is not joined; process 93734 could be run runrev's attempt and its memory is not joined; counted=2 priority=other (a decision waits until every fact reads); next action: this fix attempt ends and the run keeps its CI step; the daemon retries while auto_fix.ci allows, then parks the CI findings as an ask-user decision; answer it once capacity has returned
+
+## pool after:
+total 24
+drwxr-xr-x@  6 charlesabrooker  wheel  192 Nov 15 15:06 .
+drwx------@ 13 charlesabrooker  wheel  416 Nov 15 15:05 ..
+-rw-------@  1 charlesabrooker  wheel  349 Nov 15 15:06 attempt-6c650b9e6f71e9c24dfb932190e3a21d.json
+-rw-------@  1 charlesabrooker  wheel  336 Nov 15 15:06 attempt-ed7f09d1a7bfd800d1f25f44d0acd646.json
+-rw-------@  1 charlesabrooker  wheel  355 Nov 15 15:06 attempt-f42a53625905616937a004ef7f74fea5.json
+-rw-------@  1 charlesabrooker  wheel    0 Nov 15 15:06 pipeline-start.lock

@@ -1,0 +1,53 @@
+## Sandbox: HOME=/tmp/nmlive.9PbA/home (fixture run db, empty runs), FM_CPU_POOL_DIR=/tmp/nmlive.9PbA/pool, stub no-mistakes prints its args and exits 7; real host native memory reading
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent fix x
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+  STUB no-mistakes ran: axi run --intent fix x
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent=-
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+  STUB no-mistakes ran: axi run --intent=-
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --wait
+  STUB no-mistakes ran: axi run --wait
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes respond --run r1
+  STUB no-mistakes ran: respond --run r1
+  exit=7
+$ bin/fm-mem-guard.sh run -- echo other-command
+  other-command
+  exit=0
+$ bin/fm-mem-guard.sh run -- env FOO=1 nice -n 5 /tmp/nmlive.9PbA/stub/no-mistakes rerun
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+  STUB no-mistakes ran: rerun
+  exit=7
+$ bin/fm-mem-guard.sh run -- bash -c no-mistakes axi run --intent-file /tmp/x
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+  fm-cpu-pass: pipeline-start: this start was admitted by its enclosing start (pid 85575); not queued again
+  STUB no-mistakes ran: axi run --intent-file /tmp/x
+  exit=7
+$ python3 bin/fm-duration.py run live.key -- no-mistakes axi run --intent-file=/tmp/x
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+  calibration: "0 of 5 samples for live.key on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  STUB no-mistakes ran: axi run --intent-file=/tmp/x
+  progress: "live.key elapsed=0.0s output_bytes=51 tree_cpu=0.00s"
+  exit=7
+$ python3 bin/fm-duration.py run live.key -- no-mistakes axi run --wait
+  calibration: "0 of 5 samples for live.key on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  STUB no-mistakes ran: axi run --wait
+  progress: "live.key elapsed=0.1s output_bytes=37 tree_cpu=0.06s"
+  exit=7
+$ python3 bin/fm-duration.py run live.key -- bash -c no-mistakes axi run --intent y
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+  calibration: "0 of 5 samples for live.key on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  fm-cpu-pass: pipeline-start: this start was admitted by its enclosing start (pid 6803); not queued again
+  progress: "live.key elapsed=0.2s output_bytes=105 tree_cpu=0.09s"
+  STUB no-mistakes ran: axi run --intent y
+  exit=7
+## pool contents after (no stale waiter entries expected):
+total 0
+drwxr-xr-x@ 3 charlesabrooker  wheel   96 Nov 15 14:26 .
+drwx------@ 6 charlesabrooker  wheel  192 Nov 15 14:25 ..
+-rw-------@ 1 charlesabrooker  wheel    0 Nov 15 14:25 pipeline-start.lock

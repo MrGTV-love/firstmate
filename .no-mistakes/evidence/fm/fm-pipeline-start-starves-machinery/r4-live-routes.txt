@@ -1,0 +1,46 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; pool cannot fit a new run (available 2 GiB, 2 counted runs): a fresh start must WAIT; a reattachment/other command must run at once. stub no-mistakes exits 7
+## fresh shapes through bin/fm-mem-guard.sh run
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent fix x
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent=-
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent-file /private/tmp/nmlive-r4/routes/intent.txt
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent-file=/private/tmp/nmlive-r4/routes/intent.txt
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --wait --intent y
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+$ bin/fm-mem-guard.sh run -- no-mistakes rerun
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+$ bin/fm-mem-guard.sh run -- env FOO=1 nice -n 5 /private/tmp/nmlive-r4/routes/stub/no-mistakes axi run --intent y
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+## fresh shape through bin/fm-duration.py run, measured key names no intent
+$ python3 bin/fm-duration.py run --pipeline-priority machinery somekey -- no-mistakes axi run --intent z
+  pipeline-start waiting: counted=2
+  rc=124 (held: still waiting at 6s, command never ran)
+## reattachment and other commands (must run at once, no pipeline-start line)
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --wait
+  STUB no-mistakes ran: axi run --wait
+  rc=7
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run
+  STUB no-mistakes ran: axi run
+  rc=7
+$ bin/fm-mem-guard.sh run -- no-mistakes respond
+  STUB no-mistakes ran: respond
+  rc=7
+$ bin/fm-mem-guard.sh run -- no-mistakes status
+  STUB no-mistakes ran: status
+  rc=7
+$ bin/fm-mem-guard.sh run -- bash -c echo other command; exit 4
+  other: other command
+  rc=4
+$ bin/fm-mem-guard.sh run -- bash -c yes | head -1 >/dev/null; echo "PIPESTATUS=${PIPESTATUS[*]}"
+  other: PIPESTATUS=141 0
+  rc=0

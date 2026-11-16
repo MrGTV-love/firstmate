@@ -1,0 +1,42 @@
+# live launcher sha256 before: e93a04ddf9a22b530c9a0a3068a018190e220854aba7ece32c20b56892b9b6ae
+# diff live launcher -> isolated copy:
+8c8
+< exec /Users/charlesabrooker/.local/bin/tc run "$@"
+---
+> exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nmlive-r4/gate/launcher/claude "$@"
+## 1. fix-round launch of CI-step run runci (room on host); stub exits 3
+fm-cpu-pass: launch-gate run=runci branch=fm/runci step=ci:running counted=yes agent_pid=None attempt=68562:1794781336496321000
+fm-cpu-pass: launch-gate admitted: counted=4 projected=15451144847 budget=44023414784 available=42949672960 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[runrev:active:1073741824] holding_only=[amb1:ci-waiting:0:unseen,amb2:ci-waiting:0:unseen,runci:waiter:0:unseen] counted_runs=[amb1:0,amb2:0,runci:0,runrev:1073741824] priority=other
+STUB claude pid=69660 pgid=68562 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p --output-format stream-json stdin=the prompt
+exit=0
+## 1b. same, STUB_EXIT=3
+fm-cpu-pass: launch-gate run=runci branch=fm/runci step=ci:running counted=yes agent_pid=None attempt=71379:1794781337422225000
+fm-cpu-pass: launch-gate admitted: counted=4 projected=21646635171 budget=44023414784 available=42949672960 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[runci:ci-unproven:6195490324:unseen,runrev:active:1073741824] holding_only=[amb1:ci-waiting:0:unseen,amb2:ci-waiting:0:unseen] counted_runs=[amb1:0,amb2:0,runci:0,runrev:1073741824] pri
+STUB claude pid=73533 pgid=71379 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p --output-format stream-json stdin=the prompt
+exit=3
+## 2. review-step launch of counted run runrev: passes through (no launch-gate admitted line)
+STUB claude pid=76416 pgid=75090 cwd=/private/tmp/nmlive-r4/gate/wt-rev argv=-p --output-format stream-json stdin=the prompt
+exit=0
+## 3. unmapped directory
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r4/gate/elsewhere, attempt 78582:1794781340553935000; no run records /private/tmp/nmlive-r4/gate/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+## 4. ambiguous worktree
+fm-cpu-pass: launch-gate refused: ambiguous worktree: worktree /private/tmp/nmlive-r4/gate/wt-amb, attempt 81050:1794781341125902000; runs amb1,amb2 all record /private/tmp/nmlive-r4/gate/wt-amb; next action: resolve which run owns this worktree; the next fix round enters the gate again
+exit=75
+## 5. run database unreadable
+fm-cpu-pass: launch-gate refused: run database unreadable: worktree /private/tmp/nmlive-r4/gate/wt-ci, attempt 82157:1794781341578546000; file is not a database; next action: restore read access to the run database; the next fix round enters the gate again
+exit=75
+exit=75
+exit=1
+exit=75
+## 7. agent binary missing
+fm-cpu-pass: launch-gate run=runci branch=fm/runci step=ci:running counted=yes agent_pid=None attempt=91611:1794781347016599000
+fm-cpu-pass: launch-gate: agent not found: /private/tmp/nmlive-r4/gate/launcher/no-such-claude
+exit=127
+## durable gate lines in FM_HOME/state (wake queue + spills):
+1794781340	1	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r4/gate/elsewhere, attempt 78582:1794781340553935000; no run records /private/tmp/nmlive-r4/gate/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794781341	2	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: ambiguous worktree: worktree /private/tmp/nmlive-r4/gate/wt-amb, attempt 81050:1794781341125902000; runs amb1,amb2 all record /private/tmp/nmlive-r4/gate/wt-amb; next action: resolve which run owns this worktree; the next fix round enters the gate a
+1794781341	3	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: run database unreadable: worktree /private/tmp/nmlive-r4/gate/wt-ci, attempt 82157:1794781341578546000; file is not a database; next action: restore read access to the run database; the next fix round enters the gate again
+1794781343	4	check	launch-gate-runci	check: launch-gate: launch-gate refused: hold bound reached: run runci; hold_bound=0s budget=1800s round_elapsed=6s ci_fix_p99=unreadable n=0 held=0 ambiguous=0; held 0s; last reading: unknown: process 83723 could be run runci's attempt and its memory is not joined; process 83723 could be run
+## pool after: attempt-0d092939c9049bfdf0c40e59451b3e22.json attempt-178359658cdc15432c2cf8a5ef5f9dfa.json attempt-4e67a81ad0183ed57b0258c3bc32df74.json attempt-94c6159abfae32bb835ca27fb774c6f1.json attempt-a3e1495449a3a2a7129135e12b568753.json attempt-cb5913069c4a36e6a0f7615778d2f8e0.json gate-activation.json pipeline-start.lock 
+# live launcher sha256 after: e93a04ddf9a22b530c9a0a3068a018190e220854aba7ece32c20b56892b9b6ae

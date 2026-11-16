@@ -1,0 +1,6 @@
+# P4 a held pressure-2 start admits by itself when pressure turns 1 (no signal or human act)
+pressure set to 1 at 16:18:10
+   1 fm-cpu-pass: pipeline-start waiting: overload: memory: native memory pressure level 2 (2 or higher defers) counted=1 priority=other
+   1 fm-cpu-pass: pipeline-start admitted: counted=1 projected=15451144847 budget=65498251264 available=64424509440 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[a:active:1073741824] holding_only=[none] counted_runs=[a:
+   1 COMMAND ran at 16:18:11
+   1 rc=0

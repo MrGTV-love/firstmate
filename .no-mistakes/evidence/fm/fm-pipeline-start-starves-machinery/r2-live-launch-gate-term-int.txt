@@ -1,0 +1,8 @@
+gate pid=26108 agent pid=33518 agent parent=26108
+/private/tmp/nmlive-r3/sig.sh: line 9: 26108 Terminated: 15          $S/launcher/sig-launcher -p < /dev/null > $S/sig.out 2>&1  (wd: /private/tmp/nmlive-r3/wt-ci)
+SIGTERM to gate: gate exit=143; agent got signal 15; agent alive after: no
+fm-cpu-pass: launch-gate admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/wo
+gate pid=39412 agent pid=56928 agent parent=39412
+SIGINT to gate: gate exit=130; agent got signal 2; agent alive after: no
+fm-cpu-pass: launch-gate admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/wo
+lock free: yes

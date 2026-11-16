@@ -1,0 +1,24 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; pool cannot fit (available 1 GiB); starts queued in arrival order: other, vernant-build, machinery, merge-train
+## waiting lines while full:
+-- other:
+fm-cpu-pass: pipeline-start waiting: counted=1 priority=other behind a higher-priority or earlier start
+-- vernant-build:
+fm-cpu-pass: pipeline-start waiting: counted=1 priority=vernant-build behind a higher-priority or earlier start
+-- machinery:
+fm-cpu-pass: pipeline-start waiting: counted=1 priority=machinery behind a higher-priority or earlier start
+-- merge-train:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=15451144847 budget=2147483648 available=1073741824 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measure
+## pool files:
+gate-activation.json pipeline-start.lock pipeline-waiter-6dp8360n.lock pipeline-waiter-o19gzrnl.lock pipeline-waiter-yhq7tusu.lock pipeline-waiter-ysqa57_6.lock 
+## room freed at 16:19:54: available set to 40 GiB
+## admission order (COMMAND log):
+merge-train 16:19:54.895119000
+machinery 16:19:55.205154000
+vernant-build 16:19:55.398771000
+other 16:19:55.797229000
+## admitted lines:
+other: pipeline-start admitted: counted=1
+vernant-build: pipeline-start admitted: counted=1
+machinery: pipeline-start admitted: counted=1
+merge-train: pipeline-start admitted: counted=1
+## pool files after: gate-activation.json pipeline-start.lock 

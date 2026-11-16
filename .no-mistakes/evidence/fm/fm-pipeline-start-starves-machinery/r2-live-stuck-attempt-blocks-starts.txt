@@ -1,0 +1,16 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; date 2026-11-15T21:39:33Z; host pressure 1
+# sandbox runs table:
+[('b1', 'completed'), ('b2', 'completed'), ('b3', 'completed'), ('b4', 'completed'), ('b5', 'completed'), ('b6', 'completed'), ('runci', 'completed'), ('runrev', 'completed')]
+# the one unended attempt record (gate pid 65921 exited 0 at ~15:17 local; gate alive? no; root 80425 alive? no):
+{"coalition": 1425, "ended_us": null, "gate": [65921, 1794777441649065], "id": "9b8b3ffaeee7c30361bc06cf6105c23d", "members": [], "repo": "repo", "reserves": true, "root": [80425, 1794777446990718], "round_started": 1794777420, "run": "runci", "session_key": null, "step": "ci", "t0_us": 1794777446988765, "watcher": [80421, 1794777446988948]}
+## A. fresh start with that record present, 150s limit
+fm-cpu-pass: pipeline-start waiting: unknown: process 35130 could be run runci's attempt and its memory is not joined; counted=0 priority=other (a decision waits until every fact reads) checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_repo=unknown start_branch=unknown
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_repo=unknown start_branch=unknown
+STUB no-mistakes ran: axi run --intent fix x
+exit= waited=35s
+## B. control: only that record moved out of the pool
+mv: rename /private/tmp/nmlive-r2.fhYb/pool/attempt-9b8b3ffaeee7c30361bc06cf6105c23d.json to /private/tmp/nmlive-r2.fhYb/attempt-9b8b3ffaeee7c30361bc06cf6105c23d.json: No such file or directory
+(eval):1: no matches found: /private/tmp/nmlive-r2.fhYb/pool/pipeline-waiter-*.lock
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_repo=unknown start_branch=unknown
+STUB no-mistakes ran: axi run --intent fix x
+exit= waited=1s

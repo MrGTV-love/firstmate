@@ -1,0 +1,33 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; launcher copy started in its own process group as the daemon does; stub claude sleeps
+## SIGTERM sent to the gate process (94545) alone mid-run
+STUB claude pid=95852 pgid=94545 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p stdin=prompt
+STUB got SIGTERM
+exit=143
+stub claude processes left: 0
+start lock free: yes
+## SIGINT sent to the gate process (8683) alone mid-run
+STUB claude pid=12399 pgid=8683 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p stdin=prompt
+STUB got SIGINT
+stub claude processes left: 2
+start lock free: yes
+## SIGHUP sent to the gate process () alone mid-run
+kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]
+exit=75
+stub claude processes left: 0
+start lock free: yes
+## daemon cancel: SIGKILL to the whole process group (-) mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 10: kill: -: arguments must be process or job IDs
+stub claude processes left: 0
+start lock free: yes
+## SIGKILL to the gate process () alone mid-run
+kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]
+stub claude processes left: 0
+start lock free: yes
+## group kill mid-hold (host full: available 1 GiB)
+/private/tmp/nmlive-r4/scripts/sig.sh: line 16: kill: -: arguments must be process or job IDs
+stub claude processes left: 0
+start lock free: yes
+waiter files left (locked?):
+none
+## a later launch after these kills is admitted and runs
+exit=75

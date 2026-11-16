@@ -1,0 +1,69 @@
+## head 4c668d836fd29d57b190b92b43c68469ad04c34e; HOME=/private/tmp/nmlive-r2.fhYb/home (fixture run db, no running runs); FM_CPU_POOL_DIR=/private/tmp/nmlive-r2.fhYb/pool; stub no-mistakes prints args, exits 7
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent fix x
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_rep
+  STUB no-mistakes ran: axi run --intent fix x
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent=-
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_rep
+  STUB no-mistakes ran: axi run --intent=-
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent-file /tmp/x
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_rep
+  STUB no-mistakes ran: axi run --intent-file /tmp/x
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes rerun
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_rep
+  STUB no-mistakes ran: rerun
+  exit=7
+$ bin/fm-mem-guard.sh run -- env FOO=1 nice -n 5 /private/tmp/nmlive-r2.fhYb/stub/no-mistakes axi run --intent y
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_rep
+  STUB no-mistakes ran: axi run --intent y
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --wait
+  STUB no-mistakes ran: axi run --wait
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes respond --run r1
+  STUB no-mistakes ran: respond --run r1
+  exit=7
+$ bin/fm-mem-guard.sh run -- no-mistakes status
+  STUB no-mistakes ran: status
+  exit=7
+$ bin/fm-mem-guard.sh run -- echo other-command
+  other-command
+  exit=0
+$ python3 bin/fm-duration.py run live.key -- no-mistakes axi run --intent-file=/tmp/x
+  fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool start_rep
+  calibration: "0 of 5 samples for live.key on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  STUB no-mistakes ran: axi run --intent-file=/tmp/x
+  progress: "live.key elapsed=0.0s output_bytes=51 tree_cpu=0.00s"
+  exit=7
+$ python3 bin/fm-duration.py run live.key -- no-mistakes axi run --wait
+  calibration: "0 of 5 samples for live.key on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  STUB no-mistakes ran: axi run --wait
+  progress: "live.key elapsed=0.6s output_bytes=37 tree_cpu=0.00s"
+  exit=7
+## pool after:
+.
+..
+launch-holds.jsonl
+pipeline-start.lock
+slot-0.lock
+slot-1.lock
+slot-10.lock
+slot-11.lock
+slot-12.lock
+slot-13.lock
+slot-14.lock
+slot-15.lock
+slot-16.lock
+slot-17.lock
+slot-2.lock
+slot-3.lock
+slot-4.lock
+slot-5.lock
+slot-6.lock
+slot-7.lock
+slot-8.lock
+slot-9.lock

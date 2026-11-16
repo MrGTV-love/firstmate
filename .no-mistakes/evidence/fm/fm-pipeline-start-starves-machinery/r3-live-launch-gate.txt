@@ -1,0 +1,46 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; sandbox /private/tmp/nmlive-r3c; launcher copy final line: exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nmlive-r3c/launcher/claude "$@"
+## 1. fix-round launch from CI-step run worktree (runci), room on host; stub claude exits 3
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=87755:1794780007735784000
+fm-cpu-pass: launch-gate admitted: counted=3 limit=6 basis=fallback launched=0 pending=0 starts=4 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=repo start_branch=fm/ci hold_bound=14213s budget=14400s round_elapsed=126s ci_fix_p99=60s n=3 held=0 ambiguous=0 admitted_ns=1794780009223558000 published_ns=1794780009797794000 agent_started_ns=1794780009798845000 unlocked_ns=1794780009798849000
+STUB claude pid=93188 cwd=/private/tmp/nmlive-r3c/wt-ci argv=-p --flag stdin=the prompt
+exit=3
+## 2. review-step launch of counted run runrev: passes through (no launch-gate line)
+STUB claude pid=95319 cwd=/private/tmp/nmlive-r3c/wt-review argv=-p stdin=p2
+exit=0
+## 3. unmapped directory
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r3c/elsewhere, attempt 99775:1794780012423333000; no run records /private/tmp/nmlive-r3c/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+## 4. ambiguous worktree (two runs record /private/tmp/nmlive-r3c/wt-amb)
+fm-cpu-pass: launch-gate refused: ambiguous worktree: worktree /private/tmp/nmlive-r3c/wt-amb, attempt 3280:1794780013278929000; runs amb1,amb2 all record /private/tmp/nmlive-r3c/wt-amb; next action: resolve which run owns this worktree; the next fix round enters the gate again
+exit=75
+## 5. run database unreadable (HOME whose state.sqlite is not an SQLite file)
+fm-cpu-pass: launch-gate refused: run database unreadable: worktree /private/tmp/nmlive-r3c/wt-ci, attempt 9432:1794780016560782000; file is not a database; next action: restore read access to the run database; the next fix round enters the gate again
+exit=75
+## 6. missing agent binary (launcher copy pointing at a missing claude)
+exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nmlive-r3c/launcher/no-such-claude "$@"
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=16049:1794780018042342000
+fm-cpu-pass: launch-gate: agent not found: /private/tmp/nmlive-r3c/launcher/no-such-claude
+exit=127
+## 7. exit codes pass through: 0, 1, 75
+STUB_EXIT=0 -> exit=0
+STUB_EXIT=1 -> exit=1
+STUB_EXIT=75 -> exit=75
+## durable gate lines (FM_HOME/state wake queue and spills):
+.
+..
+.wake-queue
+.wake-queue.seq
+.watcher-down
+memory-readings.jsonl
+1794780012	1	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r3c/elsewhere, attempt 99775:1794780012423333000; no run records /private/tmp/nmlive-r3c/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794780013	2	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: ambiguous worktree: worktree /private/tmp/nmlive-r3c/wt-amb, attempt 3280:1794780013278929000; runs amb1,amb2 all record /private/tmp/nmlive-r3c/wt-amb; next action: resolve which run owns this worktree; the next fix round enters the gate again
+1794780016	3	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: run database unreadable: worktree /private/tmp/nmlive-r3c/wt-ci, attempt 9432:1794780016560782000; file is not a database; next action: restore read access to the run database; the next fix round enters the gate again
+(eval):27: no matches found: /private/tmp/nmlive-r3c/fmhome/state/.wake-spill.*
+## pool after:
+attempt-4fbbe37e2f7e52d7c00a4e5b6a111e0e.json
+attempt-512a0be3a77630e9a3d2a238521dbe1c.json
+attempt-575596461c1ced892d27a1a972d11535.json
+attempt-5bde781072fdd2217ff4a64bf2dd1eec.json
+attempt-c0b03780bc9b727886b5dda6c2d87e0c.json
+attempt-c6a1f0d224871e989557ce36fec413c1.json
+pipeline-start.lock

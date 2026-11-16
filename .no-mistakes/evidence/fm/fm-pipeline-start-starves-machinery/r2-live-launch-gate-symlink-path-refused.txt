@@ -1,0 +1,39 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; sandbox /tmp/nmlive-r2.fhYb
+## Isolated launcher copy /tmp/nmlive-r2.fhYb/launcher/claude-teamclaude, final line:
+exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /tmp/nmlive-r2.fhYb/launcher/claude "$@"
+
+## 1. fix-round launch from a CI-step run worktree, host has room; stub claude exits 3
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-ci, attempt 20376:1794776744745791000; no run records /private/tmp/nmlive-r2.fhYb/wt-ci; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+
+## 2. review-step launch of a counted run: passes through
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-review, attempt 22230:1794776745270341000; no run records /private/tmp/nmlive-r2.fhYb/wt-review; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+
+## 3. unmapped directory: refused
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/elsewhere, attempt 24316:1794776745822173000; no run records /private/tmp/nmlive-r2.fhYb/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+
+## 4. SIGTERM to the gate (a process this script started) reaches claude
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-ci, attempt 26192:1794776746329369000; no run records /private/tmp/nmlive-r2.fhYb/wt-ci; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+sending TERM to gate pid 26192
+drive-gate.sh: line 31: kill: (26192) - No such process
+exit=75
+cat: /tmp/nmlive-r2.fhYb/launcher/claude.pid: No such file or directory
+stub claude  gone
+
+## 5. missing claude binary
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-ci, attempt 42062:1794776750824328000; no run records /private/tmp/nmlive-r2.fhYb/wt-ci; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+
+## durable gate lines (FM_HOME/state wake queue):
+1794776744	1	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-ci, attempt 20376:1794776744745791000; no run records /private/tmp/nmlive-r2.fhYb/wt-ci; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794776745	2	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-review, attempt 22230:1794776745270341000; no run records /private/tmp/nmlive-r2.fhYb/wt-review; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794776745	3	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/elsewhere, attempt 24316:1794776745822173000; no run records /private/tmp/nmlive-r2.fhYb/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794776746	4	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-ci, attempt 26192:1794776746329369000; no run records /private/tmp/nmlive-r2.fhYb/wt-ci; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794776751	5	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r2.fhYb/wt-ci, attempt 42062:1794776750824328000; no run records /private/tmp/nmlive-r2.fhYb/wt-ci; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+
+## pool after:
+total 0
+drwxr-xr-x@  2 charlesabrooker  wheel   64 Nov 15 15:05 .
+drwx------@ 13 charlesabrooker  wheel  416 Nov 15 15:05 ..

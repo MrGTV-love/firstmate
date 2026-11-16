@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/tests/fm-cpu-pass-gate.py", line 23, in <module>
+    finish(child)
+    ~~~~~~^^^^^^^
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/tests/fm_cpu_pass_fixture.py", line 424, in finish
+    assert actual == code, (actual, code, records)
+           ^^^^^^^^^^^^^^
+AssertionError: (75, 0, [{'command': ['launch-gate', 'x'], 'stdout': '/tmp/fmcp-r2-gate.VvhQ/admission-lqwxxdq1/gate-map/gate-x.stdout', 'stderr': '/tmp/fmcp-r2-gate.VvhQ/admission-lqwxxdq1/gate-map/gate-x.stderr'}])
+exit=1 secs=0 head=4c668d836

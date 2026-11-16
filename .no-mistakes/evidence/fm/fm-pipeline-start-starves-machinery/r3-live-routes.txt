@@ -1,0 +1,72 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; HOME=/private/tmp/nmlive-r3c/home (fixture run db: runci at ci, runrev at review); FM_CPU_POOL_DIR=/private/tmp/nmlive-r3c/pool; stub no-mistakes prints args, exits 7
+## fresh shapes through bin/fm-mem-guard.sh run (expect pipeline-start line, then stub runs)
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent fix x
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unkn
+  STUB no-mistakes ran: axi run --intent fix x
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent=-
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unkn
+  STUB no-mistakes ran: axi run --intent=-
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent-file /private/tmp/nmlive-r3c/intent.txt
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unkn
+  STUB no-mistakes ran: axi run --intent-file /private/tmp/nmlive-r3c/intent.txt
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --intent-file=/private/tmp/nmlive-r3c/intent.txt
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unkn
+  STUB no-mistakes ran: axi run --intent-file=/private/tmp/nmlive-r3c/intent.txt
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --wait --intent y
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unkn
+  STUB no-mistakes ran: axi run --wait --intent y
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes rerun
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unkn
+  STUB no-mistakes ran: rerun
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- env FOO=1 nice -n 5 /private/tmp/nmlive-r3c/stub/no-mistakes axi run --intent y
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unkn
+  STUB no-mistakes ran: axi run --intent y
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+## fresh shape through bin/fm-duration.py run with no --intent in the measured key
+$ python3 bin/fm-duration.py run --pipeline-priority machinery somekey -- no-mistakes axi run --intent z
+  fm-cpu-pass: pipeline-start admitted: counted=2 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=machinery checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=
+  calibration: "0 of 5 samples for somekey on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  STUB no-mistakes ran: axi run --intent z
+  progress: "somekey elapsed=0.0s output_bytes=41 tree_cpu=0.00s"
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+## reattachment and other commands (expect NO pipeline-start line)
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run --wait
+  STUB no-mistakes ran: axi run --wait
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes axi run
+  STUB no-mistakes ran: axi run
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes respond
+  STUB no-mistakes ran: respond
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- no-mistakes status
+  STUB no-mistakes ran: status
+  exit=7
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- bash -c echo other command; exit 4
+  other command
+  exit=4
+  waiter/lock files: pipeline-start.lock 
+$ bin/fm-mem-guard.sh run -- bash -c yes | head -1; echo "PIPESTATUS=${PIPESTATUS[*]}"
+  y
+  PIPESTATUS=141 0
+  exit=0
+  waiter/lock files: pipeline-start.lock 

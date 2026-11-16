@@ -1,0 +1,45 @@
+# live launcher sha256 before: e93a04ddf9a22b530c9a0a3068a018190e220854aba7ece32c20b56892b9b6ae
+# diff live launcher -> isolated copy:
+8c8
+< exec /Users/charlesabrooker/.local/bin/tc run "$@"
+---
+> exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nmlive-r4/gate/launcher/claude "$@"
+## 1. fix-round launch of CI-step run runci (room on host); stub exits 3
+fm-cpu-pass: launch-gate run=runci branch=fm/runci step=ci:running counted=yes agent_pid=None attempt=18910:1794781409284951000
+fm-cpu-pass: launch-gate admitted: counted=4 projected=15451144847 budget=44023414784 available=42949672960 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[runrev:active:1073741824] holding_only=[amb1:ci-waiting:0:unseen,amb2:ci-waiting:0:unseen,runci:waiter:0:unseen] counted_runs=[amb1:0,amb2:0,runci:0,runrev:1073741824] priority=other
+STUB claude pid=19674 pgid=18910 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p --output-format stream-json stdin=the prompt
+exit=0
+## 1b. same, STUB_EXIT=3
+fm-cpu-pass: launch-gate run=runci branch=fm/runci step=ci:running counted=yes agent_pid=None attempt=21219:1794781410484206000
+fm-cpu-pass: launch-gate admitted: counted=4 projected=21646635171 budget=44023414784 available=42949672960 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[runci:ci-unproven:6195490324:unseen,runrev:active:1073741824] holding_only=[amb1:ci-waiting:0:unseen,amb2:ci-waiting:0:unseen] counted_runs=[amb1:0,amb2:0,runci:0,runrev:1073741824] pri
+STUB claude pid=27412 pgid=21219 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p --output-format stream-json stdin=the prompt
+exit=3
+## 2. review-step launch of counted run runrev: passes through (no launch-gate admitted line)
+STUB claude pid=29662 pgid=29173 cwd=/private/tmp/nmlive-r4/gate/wt-rev argv=-p --output-format stream-json stdin=the prompt
+exit=0
+## 3. unmapped directory
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r4/gate/elsewhere, attempt 31133:1794781414936916000; no run records /private/tmp/nmlive-r4/gate/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+## 4. ambiguous worktree
+fm-cpu-pass: launch-gate refused: ambiguous worktree: worktree /private/tmp/nmlive-r4/gate/wt-amb, attempt 32406:1794781415487636000; runs amb1,amb2 all record /private/tmp/nmlive-r4/gate/wt-amb; next action: resolve which run owns this worktree; the next fix round enters the gate again
+exit=75
+## 5. run database unreadable
+fm-cpu-pass: launch-gate refused: run database unreadable: worktree /private/tmp/nmlive-r4/gate/wt-ci, attempt 33243:1794781415914270000; file is not a database; next action: restore read access to the run database; the next fix round enters the gate again
+exit=75
+exit=0
+exit=1
+exit=75
+## 7. agent binary missing
+fm-cpu-pass: launch-gate run=runci branch=fm/runci step=ci:running counted=yes agent_pid=None attempt=50169:1794781425206280000
+fm-cpu-pass: launch-gate: agent not found: /private/tmp/nmlive-r4/gate/launcher/no-such-claude
+exit=127
+## durable gate lines in FM_HOME/state (wake queue + spills):
+1794781411	1	check	launch-gate-runci	check: launch-gate: run runci (fm/runci) held for capacity before its ci agent starts, waited 0.55s so far: unknown: process 20167 could be run runci's attempt and its memory is not joined; counted=4 priority=other (a decision waits until every fact reads); hold_bound=1737s budget=1800s round
+1794781413	2	check	launch-gate-runci	check: launch-gate: run runci (fm/runci) admitted after 2.23s held: counted=4 projected=21646635171 budget=44023414784 available=42949672960 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[runci:ci-unproven:6195490
+1794781415	3	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r4/gate/elsewhere, attempt 31133:1794781414936916000; no run records /private/tmp/nmlive-r4/gate/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+1794781415	4	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: ambiguous worktree: worktree /private/tmp/nmlive-r4/gate/wt-amb, attempt 32406:1794781415487636000; runs amb1,amb2 all record /private/tmp/nmlive-r4/gate/wt-amb; next action: resolve which run owns this worktree; the next fix round enters the gate a
+1794781416	5	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: run database unreadable: worktree /private/tmp/nmlive-r4/gate/wt-ci, attempt 33243:1794781415914270000; file is not a database; next action: restore read access to the run database; the next fix round enters the gate again
+1794781421	6	check	launch-gate-runci	check: launch-gate: run runci (fm/runci) held for capacity before its ci agent starts, waited 0.96s so far: unknown: process 38574 could be run runci's attempt and its memory is not joined; counted=4 priority=other (a decision waits until every fact reads); hold_bound=1727s budget=1800s round
+1794781424	7	check	launch-gate-runci	check: launch-gate: run runci (fm/runci) admitted after 3.50s held: counted=4 projected=27842125495 budget=44023414784 available=42949672960 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[runci:ci-unproven:6195490
+## pool after: attempt-7c36c64dd5d7bb2916706f464ee681f2.json attempt-802e6a6f4e2ee26bced44dd03fbd4d97.json attempt-8beb896c216de240785ab4ebb9eeb031.json attempt-b1a4fd1f93aa556d6b8f7a2405724236.json attempt-c1765315fb1e7e457a89235915076ab4.json attempt-fde02af6742f3288d48c007d28b4e77e.json attempt-ff3c41514403664aac0de4df5c43c56b.json gate-activation.json launch-holds.jsonl pipeline-start.lock 
+# live launcher sha256 after: e93a04ddf9a22b530c9a0a3068a018190e220854aba7ece32c20b56892b9b6ae

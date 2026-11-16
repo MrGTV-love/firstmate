@@ -1,0 +1,12 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; P2 reservation per run kind; R=5.77 GiB S=13.39 GiB A=1 GiB, available 40 GiB, pressure 1
+## p2-mixed rc=0 (124 = held at timeout)
+COMMAND ran
+fm-cpu-pass: pipeline-start admitted: counted=6 projected=50143743179 budget=59270548684 available=42949672960 held=16320875724 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[ci-agent-visible:active:1073741824,ci-pid-recorded:active:6195490324:unseen,ciwait-raised:active:16106127360,just-registered:step-unknown:6195490324:unseen,review-invisible:active:6195490324:unseen] holding_only=[ciwait:ci-waiting:0:unseen] counted_runs=[ci-agent-visible:214748364,ci-pid-recorded:0,ciwait:0,ciwait-raised:16106127360,just-registered:0,review-invisible:0] priority=other
+# P4 holds: pressure 2 with lots of room (held), control pressure 1 (admitted)
+## p4-pressure2 rc=124 (124 = held at timeout)
+fm-cpu-pass: pipeline-start waiting: overload: memory: native memory pressure level 2 (2 or higher defers) counted=1 priority=other
+## p4-pressure1 rc=0 (124 = held at timeout)
+COMMAND ran
+fm-cpu-pass: pipeline-start admitted: counted=1 projected=15451144847 budget=65498251264 available=64424509440 held=1073741824 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[a:active:1073741824] holding_only=[none] counted_runs=[a:1073741824] priority=other
+## p4-pressure4 rc=124 (124 = held at timeout)
+fm-cpu-pass: pipeline-start waiting: overload: memory: native memory pressure level 4 (2 or higher defers) counted=1 priority=other

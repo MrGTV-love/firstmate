@@ -1,0 +1,32 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; sandbox /private/tmp/nmlive-r3; host pressure 1
+## 1. three gated fix-round launches of CI run runci through the launcher copy, pool A
+fm-cpu-pass: launch-gate admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGR
+STUB claude pid=32854 stdin=prompt 1
+  launch 1 exit=0 at 21:44:22Z
+fm-cpu-pass: launch-gate admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGR
+STUB claude pid=64427 stdin=prompt 2
+  launch 2 exit=0 at 21:44:32Z
+fm-cpu-pass: launch-gate admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGR
+STUB claude pid=81295 stdin=prompt 3
+  launch 3 exit=0 at 21:44:38Z
+## attempt records in pool A after the three launches exited:
+  700ca6f1 gate 22071 ended_us 1794779071079979
+  709b1899 gate 66974 ended_us None
+  f70affbf gate 36660 ended_us 1794779076377598
+## 2. fresh start on pool A (with those records) and the same start on empty pool B (control), together, 300s cap
+start 21:44:38Z
+-- pool A start:
+A exit=7 waited=7s end 21:44:45Z
+STUB no-mistakes ran: axi run --intent a
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3/poolA start_repo=unknown start_branch=unknown
+-- pool B control:
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3/poolB start_repo=unknown start_branch=unknown
+STUB no-mistakes ran: axi run --intent b
+B exit=7 waited=5s end 21:44:43Z
+## attempt records in pool A after:
+attempt-700ca6f1b793ccf76814abdef762776f.json
+attempt-709b189959684f7dc444d3fc4f36df76.json
+attempt-f70affbfdda26fbf51a865b1695efb59.json
+  700ca6f1 ended_us 1794779071079979
+  709b1899 ended_us 1794779083585790
+  f70affbf ended_us 1794779076377598

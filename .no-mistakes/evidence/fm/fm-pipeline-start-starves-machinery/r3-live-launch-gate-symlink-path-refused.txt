@@ -1,0 +1,3 @@
+# run runsym records worktree_dir through the /tmp symlink: /tmp/nmlive-r3c/wt-sym
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive-r3c/wt-sym, attempt 14415:1794780640359336000; no run records /private/tmp/nmlive-r3c/wt-sym; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75

@@ -1,0 +1,39 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; launcher copy started in its own process group as the daemon does; stub claude sleeps
+## SIGTERM sent to the gate process (35011) alone mid-run
+STUB claude pid=37952 pgid=35011 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p stdin=prompt
+STUB got SIGTERM
+exit=143
+stub claude processes left: 0
+start lock free: yes
+## SIGINT sent to the gate process (48046) alone mid-run
+STUB claude pid=49933 pgid=48046 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p stdin=prompt
+STUB got SIGINT
+stub claude processes left: 2
+start lock free: yes
+## SIGHUP sent to the gate process (59493) alone mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 59490 Done                    echo prompt
+     59493 Hangup: 1               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys,signal; signal.signal(signal.SIGINT, signal.SIG_DFL); signal.signal(signal.SIGQUIT, signal.SIG_DFL); os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+exit=129
+stub claude processes left: 0
+start lock free: yes
+## daemon cancel: SIGKILL to the whole process group (-70601) mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 70600 Done                    echo prompt
+     70601 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys,signal; signal.signal(signal.SIGINT, signal.SIG_DFL); signal.signal(signal.SIGQUIT, signal.SIG_DFL); os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+## SIGKILL to the gate process (82654) alone mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 82652 Done                    echo prompt
+     82654 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys,signal; signal.signal(signal.SIGINT, signal.SIG_DFL); signal.signal(signal.SIGQUIT, signal.SIG_DFL); os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+## group kill mid-hold (host full: available 1 GiB)
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7:  8853 Done                    echo prompt
+      8861 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys,signal; signal.signal(signal.SIGINT, signal.SIG_DFL); signal.signal(signal.SIGQUIT, signal.SIG_DFL); os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+waiter files left (locked?):
+/private/tmp/nmlive-r4/gate/pool/pipeline-waiter-jse5pgp8.lock unlocked (inert)
+## a later launch after these kills is admitted and runs
+launch-gate admitted
+STUB claude pid=27286
+exit=0

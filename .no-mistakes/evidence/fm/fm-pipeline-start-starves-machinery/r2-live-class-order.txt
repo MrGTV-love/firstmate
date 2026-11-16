@@ -1,0 +1,7 @@
+## head 4c668d836fd29d57b190b92b43c68469ad04c34e; 6 counted runs (fallback limit 6); starts queued in arrival order other, vernant-build, machinery, merge-train
+-- after waiting, admitted so far: (none expected)
+[other] fm-cpu-pass: pipeline-start waiting: another start is registering checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool s
+[vernant-build] fm-cpu-pass: pipeline-start waiting: another start is registering checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool s
+[machinery] fm-cpu-pass: pipeline-start waiting: another start is registering checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r2.fhYb/pool s
+[merge-train] fm-cpu-pass: pipeline-start waiting: counted=6 limit=6 basis=fallback launched=0 pending=0 starts=6 priority=merge-train checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9
+-- admission order: merge-train machinery vernant-build other 

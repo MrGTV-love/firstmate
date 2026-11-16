@@ -1,0 +1,38 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; launcher copy started in its own process group as the daemon does; stub claude sleeps
+## SIGTERM sent to the gate process () alone mid-run
+kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]
+exit=75
+stub claude processes left: 0
+start lock free: yes
+## SIGINT sent to the gate process () alone mid-run
+kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]
+exit=75
+stub claude processes left: 0
+start lock free: yes
+## SIGHUP sent to the gate process (59431) alone mid-run
+STUB claude pid=60648 pgid=59431 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p stdin=prompt
+STUB got SIGHUP
+exit=129
+stub claude processes left: 0
+start lock free: yes
+## daemon cancel: SIGKILL to the whole process group (-72653) mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 72652 Done                    echo prompt
+     72653 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+## SIGKILL to the gate process (85243) alone mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 85241 Done                    echo prompt
+     85243 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+## group kill mid-hold (host full: available 1 GiB)
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 98360 Done                    echo prompt
+     98371 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+waiter files left (locked?):
+/private/tmp/nmlive-r4/gate/pool/pipeline-waiter-7hcfg136.lock unlocked (inert)
+## a later launch after these kills is admitted and runs
+launch-gate admitted
+STUB claude pid=18210
+exit=0

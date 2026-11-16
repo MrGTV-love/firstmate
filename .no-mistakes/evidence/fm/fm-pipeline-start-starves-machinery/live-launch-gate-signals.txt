@@ -1,0 +1,32 @@
+## send SIGTERM to the gate after claude has started
+cat: /private/tmp/nmlive.9PbA/launcher/claude.pid: No such file or directory
+ps: Invalid (zero-length) process id
+gate pid=51216 claude pid= claude parent=
+/private/tmp/nmlive.9PbA/drive-sig.sh: line 19: kill: (51216) - No such process
+gate exit=75
+claude  gone
+  fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=51216:1794774623815514000
+  fm-cpu-pass: launch-gate refused: hold bound reached: run runci; hold_bound=0s budget=unreadable round_elapsed=unreadable ci_fix_p99=unreadable n=0 held=0 ambiguous=0; held 0s; last reading: unknown: process 52549 could be run runci's attempt and its memory is not joined; counted=2 priority=other (a decision waits until every fact reads); next action: this fix attempt ends and the run keeps its CI step; the daemon retries while auto_fix.ci allows, then parks the CI findings as an ask-user decision; answer it once capacity has returned
+## send SIGINT to the gate after claude has started
+gate pid=51448 claude pid=52645 claude parent=51448
+gate exit=129
+claude 52645 gone
+  fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=51448:1794774701466998000
+  fm-cpu-pass: launch-gate admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=3 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive.9PbA/pool start_repo=repo start_branch=fm/ci hold_bound=0s budget=unreadable round_elapsed=unreadable ci_fix_p99=unreadable n=0 held=0 ambiguous=0 admitted_ns=1794774702238067000 published_ns=1794774702354463000 agent_started_ns=1794774702355229000 unlocked_ns=1794774702355231000
+  STUB claude pid=52645 cwd=/private/tmp/nmlive.9PbA/wt-ci argv=-p stdin=p
+## send SIGHUP to the gate after claude has started
+gate pid=60613 claude pid=63764 claude parent=60613
+/private/tmp/nmlive.9PbA/drive-sig.sh: line 19: 60611 Done                    echo p
+     60613 Hangup: 1               | STUB_SLEEP=60 "$L" -p > "$S/sig.out" 2>&1  (wd: /private/tmp/nmlive.9PbA/wt-ci)
+gate exit=129
+claude 63764 gone
+  fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=60613:1794774709136780000
+  fm-cpu-pass: launch-gate admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=4 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive.9PbA/pool start_repo=repo start_branch=fm/ci hold_bound=0s budget=unreadable round_elapsed=unreadable ci_fix_p99=unreadable n=0 held=0 ambiguous=0 admitted_ns=1794774710755213000 published_ns=1794774714645045000 agent_started_ns=1794774714647786000 unlocked_ns=1794774714647789000
+  STUB claude pid=63764 cwd=/private/tmp/nmlive.9PbA/wt-ci argv=-p stdin=p
+## SIGKILL to the gate alone after claude started
+gate pid=93653 claude pid=5574 claude parent=93653
+/private/tmp/nmlive.9PbA/drive-sig.sh: line 26: 93549 Done                    echo p
+     93653 Killed: 9               | STUB_SLEEP=60 "$L" -p > "$S/sig.out" 2>&1  (wd: /private/tmp/nmlive.9PbA/wt-ci)
+gate exit=137
+claude 5574 gone after ~0s
+lock free: yes

@@ -1,0 +1,25 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; pool full: 6 counted runs, fallback limit 6; four starts queued in order other, vernant-build, machinery, merge-train
+## waiting lines while full:
+-- other:
+fm-cpu-pass: pipeline-start waiting: another start is registering checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unknown start_branch=unk
+-- vernant-build:
+fm-cpu-pass: pipeline-start waiting: counted=6 priority=vernant-build behind a higher-priority or earlier start checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmliv
+-- machinery:
+fm-cpu-pass: pipeline-start waiting: another start is registering checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=unknown start_branch=unk
+-- merge-train:
+fm-cpu-pass: pipeline-start waiting: counted=6 limit=6 basis=fallback launched=0 pending=0 starts=6 priority=merge-train checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/
+## pool files: pipeline-start.lock pipeline-waiter-424u_e11.lock pipeline-waiter-73s6j29w.lock pipeline-waiter-7ili3zmy.lock pipeline-waiter-nlmb1hlw.lock 
+freed fill1 at 15:59:18
+freed fill2 at 15:59:26
+freed fill3 at 15:59:34
+freed fill4 at 15:59:42
+## admission order (order-cmd log):
+merge-train 15:59:19
+machinery 15:59:20
+vernant-build 15:59:22
+other 15:59:24
+## admitted lines:
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=5 priority=machinery checkout=/Users/char
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=5 priority=other checkout=/Users/charlesa
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=5 priority=merge-train checkout=/Users/ch
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=5 priority=vernant-build checkout=/Users/

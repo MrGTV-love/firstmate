@@ -1,0 +1,40 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; launcher copy started in its own process group as the daemon does; stub claude sleeps
+## SIGTERM sent to the gate process (56282) alone mid-run
+STUB claude pid=59749 pgid=56282 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p stdin=prompt
+STUB got SIGTERM
+exit=143
+stub claude processes left: 0
+start lock free: yes
+## SIGINT sent to the gate process (71211) alone mid-run
+STUB claude pid=74590 pgid=71211 cwd=/private/tmp/nmlive-r4/gate/wt-ci argv=-p stdin=prompt
+STUB got SIGINT
+stub claude processes left: 2
+start lock free: yes
+## SIGHUP sent to the gate process (84692) alone mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 84691 Done                    echo prompt
+     84692 Hangup: 1               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+exit=129
+stub claude processes left: 0
+start lock free: yes
+## daemon cancel: SIGKILL to the whole process group (-94764) mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 94763 Done                    echo prompt
+     94764 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+## SIGKILL to the gate process (11141) alone mid-run
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 11139 Done                    echo prompt
+     11141 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+## group kill mid-hold (host full: available 1 GiB)
+launch-gate waiting: unknown: process 
+/private/tmp/nmlive-r4/scripts/sig.sh: line 7: 27429 Done                    echo prompt
+     27430 Killed: 9               | STUB_SLEEP=${2:-60} $ENVV python3 -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' $D/launcher/claude-teamclaude -p > $D/sig-$1.out 2>&1
+stub claude processes left: 0
+start lock free: yes
+waiter files left (locked?):
+/private/tmp/nmlive-r4/gate/pool/pipeline-waiter-9s7viab4.lock unlocked (inert)
+## a later launch after these kills is admitted and runs
+launch-gate admitted
+STUB claude pid=42965
+exit=0

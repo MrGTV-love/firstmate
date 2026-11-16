@@ -1,0 +1,29 @@
+## Class order at the fallback limit (6): 6 counted runs at review, then other, vernant-build, machinery, merge-train queue in that arrival order
+-- after 4s, nothing admitted yet:
+(none)
+-- waiting lines:
+[other]
+fm-cpu-pass: pipeline-start waiting: counted=6 priority=other behind a higher-priority or earlier start checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+[vernant-build]
+fm-cpu-pass: pipeline-start waiting: another start is registering checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+[machinery]
+fm-cpu-pass: pipeline-start waiting: counted=6 priority=machinery behind a higher-priority or earlier start checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+[merge-train]
+fm-cpu-pass: pipeline-start waiting: counted=6 limit=6 basis=fallback launched=0 pending=0 starts=6 priority=merge-train checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+-- admission order:
+ADMITTED merge-train 1794774409.807401000
+ADMITTED machinery 1794774414.054981000
+ADMITTED vernant-build 1794774419.760700000
+ADMITTED other 1794774421.448491000
+[other]
+fm-cpu-pass: pipeline-start admitted: counted=4 limit=6 basis=fallback launched=0 pending=1 starts=5 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+exit=0
+[vernant-build]
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=5 priority=vernant-build checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+exit=0
+[machinery]
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=5 priority=machinery checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+exit=0
+[merge-train]
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=5 priority=merge-train checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/tmp/nmlive.9PbA/pool start_repo=unknown start_branch=unknown
+exit=0

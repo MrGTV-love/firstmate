@@ -1,0 +1,23 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; N=20 paired rounds; each round: one gated CI fix launch (stub claude exits 0) on pool A, then the same fresh start on pool A and on empty pool B at the same moment
+round 1 22:08:38Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 1 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 2 22:08:41Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 1 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 3 22:08:44Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 4 22:08:48Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 5 22:08:51Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 6 22:08:54Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 7 22:08:57Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 8 22:09:02Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 4 unknown_waits=1 | B rc,secs=7 2 unknown_waits=0
+fm-cpu-pass: pipeline-start waiting: unknown: process 1156 could be run runci's attempt and its memory is not joined; counted=2 priority=other (a decision waits until every fact reads) checkout=/Users
+round 9 22:09:07Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 3 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 10 22:09:11Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 11 22:09:16Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 3 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 12 22:09:20Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 13 22:09:24Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 14 22:09:27Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 15 22:09:30Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 16 22:09:33Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 17 22:09:35Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 1 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 18 22:09:37Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 1 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+round 19 22:09:40Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 2 unknown_waits=0
+round 20 22:09:43Z: launch exit=0 unended_after_launch=1 | A rc,secs=7 2 unknown_waits=0 | B rc,secs=7 1 unknown_waits=0
+SUMMARY rounds=20 launches_leaving_unended_record=20 A_rounds_with_unknown_wait=1 B_rounds_with_unknown_wait=0

@@ -1,0 +1,6 @@
+round 1 21:45:05Z: unended records before=1 | pool A: rc=7 t=4 waits=0 | pool B: rc=7 t=3 waits=0
+round 2 21:45:46Z: unended records before=2 | pool A: rc=7 t=34 waits=1 | pool B: rc=7 t=20 waits=0
+fm-cpu-pass: pipeline-start waiting: unknown: process 52752 could be run runci's attempt and its memory is not joined; counted=1 priority=other (a decision waits until every fact reads) checkout=/User
+round 3 21:45:58Z: unended records before=1 | pool A: rc=7 t=7 waits=0 | pool B: rc=7 t=6 waits=0
+round 4 21:46:07Z: unended records before=1 | pool A: rc=7 t=5 waits=0 | pool B: rc=7 t=4 waits=0
+round 5 21:46:15Z: unended records before=1 | pool A: rc=7 t=4 waits=0 | pool B: rc=7 t=4 waits=0

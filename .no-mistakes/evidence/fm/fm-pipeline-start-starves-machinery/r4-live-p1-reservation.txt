@@ -1,0 +1,10 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; P1(a) decisive shape: 11 counted runs (7 active at 2.5 GiB visible, 4 CI waiters at step ci, no process, no agent pid), R=5.77 GiB, S=13.39 GiB (calibration peaks), A=1 GiB, native pressure 1, FM_MEMORY_FIXTURE_DIR injection; COMMAND exits 3
+## head available=32.82GiB rc=3 (124 = still waiting at 12s timeout)
+fm-cpu-pass: pipeline-start admitted: counted=11 projected=33167884943 budget=54030680064 available=35240198144 held=18790481920 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[act0:active:2684354560,act1:active:2684354560,act2:active:2684354560,act3:active:2684354560,act4:active:2684354560,act5:active:2684354560,act6:active:2684354560] holding_only=[ciw0:ci-waiting:0:unseen,ciw1:ci-waiting:0:unseen,ciw2:ci-waiting:0:unseen,ciw3:ci-waiting:0:unseen] counted_runs=[act0:2684354560,act1:2684354560,act2:2684354560,act3:2684354560,act4:2684354560,act5:2684354560,act6:2684354560,ciw0:0,ciw1:0,ciw2:0,ciw3:0] priority=machinery 
+COMMAND ran
+# P1(c) control: same state, available lowered to 12 GiB (fit fails)
+## head available=12GiB rc=124 (124 = still waiting at 12s timeout)
+fm-cpu-pass: pipeline-start waiting: counted=11 projected=33167884943 budget=31675383808 available=12884901888 held=18790481920 reservation=6195490324 active_term=1073741824 slack=14377403023 runs_measured=13 readings_measured=1 reserved=[act0:active:2684354560,act1:active:2684354560,act2:active:2684354560,act3:active:2684354560,act4:active:2684354560,act5:active:2684354560,act6:active:2684354560] holding_only=[ciw0:ci-waiting:0:unseen,ciw1:ci-waiting:0:unseen,ciw2:ci-waiting:0:unseen,ciw3:ci-waiting:0:unseen] counted_runs=[act0:2684354560,act1:2684354560,act2:2684354560,act3:2684354560,act4:2684354560,act5:2684354560,act6:2684354560,ciw0:0,ciw1:0,ciw2:0,ciw3:0] priority=machinery 
+# P1(d) base 9d516486d on the same P1(a) state
+## base available=32.82GiB rc=124 (124 = still waiting at 12s timeout)
+fm-cpu-pass: pipeline-start waiting: counted=11 need=88723286911 budget=54030680064 reservation=6195490324 slack=14377403023 runs_measured=13 priority=machinery

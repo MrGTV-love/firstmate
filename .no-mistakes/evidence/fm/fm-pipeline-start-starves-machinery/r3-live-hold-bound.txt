@@ -1,0 +1,12 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; 6 counted runs (fallback limit 6: host full); agent_timeout 2m, ci p99 60s, round just started -> positive hold bound
+fm-cpu-pass: launch-gate refused: hold bound reached: run runci; hold_bound=59s budget=120s round_elapsed=0s ci_fix_p99=60s n=3 held=0 ambiguous=0; held 60s; last reading: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=6 priority=other; next action: this fix attempt ends and the run keeps its CI step; the daemon retries while auto_fix.ci allows, then parks the CI findings as an ask-user decision; answer
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=74801:1794780039478163000
+fm-cpu-pass: launch-gate waiting: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=6 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive-r3c/pool start_repo=repo start_branch=fm/ci
+exit= held_for=60s
+## durable lines for runci:
+1794780040	4	check	launch-gate-runci	check: launch-gate: run runci (fm/ci) held for capacity before its ci agent starts, waited 1.20s so far: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=6 priority=other; hold_bound=59s budget=120s round_elapsed=0s ci_fix_p99=60s n=3 held=0 ambiguous=0
+1794780099	5	check	launch-gate-runci	check: launch-gate: launch-gate refused: hold bound reached: run runci; hold_bound=59s budget=120s round_elapsed=0s ci_fix_p99=60s n=3 held=0 ambiguous=0; held 60s; last reading: counted=5 limit=6 basis=fallback launched=0 pending=0 starts=6 priority=other; next action: this fix attempt ends and the run keeps its CI step; the daemon retries while auto_fix.ci allows, then parks the
+## re-run of the hold-bound case with its exit status captured
+exit=75 held_for=60s
+fm-cpu-pass: launch-gate refused: hold bound reached: run runci; hold_bound=59s budget=120s round_elapsed=0s ci_fix_p99=
+## lock free after refusal? yes

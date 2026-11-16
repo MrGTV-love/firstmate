@@ -1,0 +1,13 @@
+# head 4c668d836fd29d57b190b92b43c68469ad04c34e; each case starts the launcher copy in its own process group (as the daemon does); stub claude sleeps 60s
+gate pid=12673 agent pid=34352 agent parent=12673 agent pgid=12673 gate pgid=12673
+SIGTERM to gate: gate exit=143; agent log: agent got signal 15 ; agent alive after: no; lock free: yes
+gate pid=39345 agent pid=56013 agent parent=39345 agent pgid=39345 gate pgid=39345
+SIGINT to gate: gate exit=130; agent log: agent got signal 2 ; agent alive after: no; lock free: yes
+gate pid=73500 agent pid=79110 agent parent=73500 agent pgid=73500 gate pgid=73500
+/private/tmp/nmlive-r3c/sig.sh: line 13: 73500 Hangup: 1               ( cd $S/wt-ci && exec perl -e 'setpgrp(0,0); exec @ARGV' env STUB_SLEEP=60 $L -p < /dev/null > $S/sig.out 2>&1 )
+SIGHUP to gate: gate exit=129; agent log: ; agent alive after: no; lock free: yes
+group kill: gate=82949 agent=90393
+TERM to whole group: gate exit=143 agent alive after: no; lock free: yes
+gate-only SIGKILL: gate=94287 agent=508
+/private/tmp/nmlive-r3c/sig.sh: line 18: 94287 Killed: 9               ( cd $S/wt-ci && exec perl -e 'setpgrp(0,0); exec @ARGV' env STUB_SLEEP=60 $L -p < /dev/null > $S/sig.out 2>&1 )
+SIGKILL to gate alone: gate exit=137; agent alive after: no (checked up to 20s; ended within 0s); lock free: yes

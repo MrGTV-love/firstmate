@@ -1,0 +1,41 @@
+## Isolated launcher copy /private/tmp/nmlive.9PbA/launcher/claude-teamclaude, final line:
+exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nmlive.9PbA/launcher/claude "$@"
+
+## 1. fix-round launch from a CI-step run worktree, host has room; stub claude exits 3
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=29634:1794774543897994000
+fm-cpu-pass: launch-gate admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5 pool=/private/tmp/nmlive.9PbA/pool start_repo=repo start_branch=fm/ci hold_bound=0s budget=unreadable round_elapsed=unreadable ci_fix_p99=unreadable n=0 held=0 ambiguous=0 admitted_ns=1794774553517266000 published_ns=1794774555080609000 agent_started_ns=1794774555083610000 unlocked_ns=1794774555083616000
+STUB claude pid=61363 cwd=/private/tmp/nmlive.9PbA/wt-ci argv=-p --flag stdin=the prompt
+exit=3
+
+## 2. review-step launch of a counted run: passes through
+STUB claude pid=68192 cwd=/private/tmp/nmlive.9PbA/wt-review argv=-p stdin=p2
+exit=0
+
+## 3. unmapped directory: refused
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive.9PbA/elsewhere, attempt 80206:1794774559578273000; no run records /private/tmp/nmlive.9PbA/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+exit=75
+
+## 4. SIGTERM to the gate (a process this script started) reaches claude
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=83015:1794774560659283000
+sending TERM to gate pid 83015
+/private/tmp/nmlive.9PbA/drive-gate.sh: line 31: 83014 Done                    echo p4
+     83015 Terminated: 15          | STUB_SLEEP=30 $L -p  (wd: /private/tmp/nmlive.9PbA/wt-ci)
+exit=143
+stub claude 68192 gone
+
+## 5. missing claude binary
+fm-cpu-pass: launch-gate run=runci branch=fm/ci step=ci:running counted=yes agent_pid=None attempt=95535:1794774564862314000
+fm-cpu-pass: launch-gate: agent not found: /private/tmp/nmlive.9PbA/launcher/no-such-claude
+exit=127
+
+## durable gate lines (FM_HOME/state wake queue):
+1794774559	1	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/nmlive.9PbA/elsewhere, attempt 80206:1794774559578273000; no run records /private/tmp/nmlive.9PbA/elsewhere; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+
+## pool after:
+total 24
+drwxr-xr-x@  6 charlesabrooker  wheel  192 Nov 15 14:29 .
+drwx------@ 16 charlesabrooker  wheel  512 Nov 15 14:29 ..
+-rw-------@  1 charlesabrooker  wheel  349 Nov 15 14:29 attempt-5f6d7adc469e23a8bafb54063d69481e.json
+-rw-------@  1 charlesabrooker  wheel  355 Nov 15 14:29 attempt-b66055ef3bee7d7765290a12068d9322.json
+-rw-------@  1 charlesabrooker  wheel  337 Nov 15 14:29 attempt-de84848ff84cb5bbe1d8a0f222a07304.json
+-rw-------@  1 charlesabrooker  wheel    0 Nov 15 14:25 pipeline-start.lock

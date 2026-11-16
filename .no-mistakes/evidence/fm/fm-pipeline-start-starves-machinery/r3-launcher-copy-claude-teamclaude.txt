@@ -1,0 +1,8 @@
+#!/bin/bash
+# NoM-only Claude launcher: use TeamClaude and suppress validation autostart.
+# This marker only restricts startup; it grants no identity or ownership.
+set -euo pipefail
+export NO_MISTAKES_GATE=1
+export DISABLE_AUTOUPDATER=1 TEAMCLAUDE_DISABLE_AUTOUPDATE=1
+unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7G8W8HF9RY0XFGGRMPF83E5/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/nmlive-r3c/launcher/claude "$@"

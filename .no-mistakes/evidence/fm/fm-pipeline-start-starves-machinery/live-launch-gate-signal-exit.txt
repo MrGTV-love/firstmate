@@ -1,0 +1,5 @@
+SIGINT to gate 94651: gate exit=130; agent recorded: start int-disposition-was-default;got 2;
+/private/tmp/nmlive.9PbA/drive-int.sh: line 28:  2343 Terminated: 15          "$S/launcher/sig-launcher" -p < /dev/null > "$S/int.out" 2>&1  (wd: /private/tmp/nmlive.9PbA/wt-ci)
+SIGTERM to gate 2343: gate exit=143; agent recorded: start int-disposition-was-default;got 15;
+/private/tmp/nmlive.9PbA/drive-int.sh: line 28: 13964 Hangup: 1               "$S/launcher/sig-launcher" -p < /dev/null > "$S/int.out" 2>&1  (wd: /private/tmp/nmlive.9PbA/wt-ci)
+SIGHUP to gate 13964: gate exit=129; agent recorded: start int-disposition-was-default;got 1;
