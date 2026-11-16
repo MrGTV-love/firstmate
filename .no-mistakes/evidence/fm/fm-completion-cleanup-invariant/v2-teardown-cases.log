@@ -1,0 +1,9 @@
+ok - the branch lookup records a merged PR only when its head is the copy's HEAD; a copy landed by its content alone records none
+ok - a detached copy with no pr= is judged landed through the record's branch (branch= or fm/<id>) and torn down
+ok - a detached copy holding a commit the merged PR lacks, or whose record branch matches a PR that lacks its work, is still refused and kept
+ok - a copy on a named branch is judged landed through that branch as before
+ok - a detached copy is judged against every PR of its branch: a newer open PR does not hide an older merged one, and a non-carrying one still refuses
+ok - a replayed patch over a pushed parent the merged PR and default branch lack is refused and kept, detached or named
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR refuses a pre-rebase copy whose a.txt the PR's review edit changed on the default branch
+rc=0

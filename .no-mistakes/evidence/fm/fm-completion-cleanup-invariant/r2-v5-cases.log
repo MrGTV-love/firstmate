@@ -1,0 +1,13 @@
+task acceptance                                     cleanup                                        ledger row (category | owner | next action)
+A t1 PR 7 MERGED at the forge; ledger: merged       record gone, copy gone; ledger: cleaned_up     
+B t-b unaccepted: 1 unlanded commit, 1 uncommitted file none: record kept, copy kept                   missing_worker|t-b|firstmate|true|false|recover the assigned worker without discarding work;unlanded_commit|t-b|firstmate|false|false|land this work through its PR, or obtain the captain's drop
+C t-c wait intact: paused [at=1794774489]: waiting on Main decision d9 until 20 none: record kept                              silent_report|t-c|firstmate|true|false|check in: progress, blockers, cross-workstream dependencies
+D mate1 idle secondmate, silent 31h                    none: record kept                              silent_report|mate1|firstmate|false|true|check in: progress, blockers, cross-workstream dependencies
+E t-e review PASS by openai-codex/gpt-6.1-sol at head 2c7e308a; PR 9 OPEN at the forge, merge state BEHIND; review step: waiting: forge merge state is BEHIND, not green none: record kept, pending merge               review_pass_not_merged|https://github.com/acme/widget/pull/9|firstmate|true|false|merge through bin/fm-pr-merge.sh under AGENTS.md section 7
+ok - five records survive silence, a restart and a completed review: A closed from the other lane's merge, B/C/D untouched and not stranded, E pending its merge with the review on record
+E with its hold: review step state: waiting: forge merge state is BEHIND, not green; PR 9 at the forge: OPEN; merge calls: 0
+E without its hold: review step state: merged https://github.com/acme/widget/pull/9; PR 9 at the forge: MERGED
+  event: 1794796170 77b1a3f060ce merged: https://github.com/acme/widget/pull/9 at 77b1a3f060ce
+ok - with only the forge's merge state changed from BEHIND to CLEAN and the same exact-head PASS, E waits and then merges
+ok - with no forge answer to its PR read, E stays open and unmerged, no wake names it, and the review step says the forge did not answer
+rc=0

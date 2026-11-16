@@ -1,0 +1,5 @@
+unregistered before housekeeping: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+unregistered after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+not ok - unregistered: a wake or signal named A outside its own merge report: 1794793048	1	signal	t1.status	signal: /Users/charlesabrooker/tmp/fm-merge-prune.HOeFNd/w1/home/state/t1.status
+1794793061	2	check	/Users/charlesabrooker/tmp/fm-merge-prune.HOeFNd/w1/home/state/contributions.check.sh	check: /Users/charlesabrooker/tmp/fm-merge-prune.HOeFNd/w1/home/state/contributions.check.sh: contributions: observation unavailable for https://github.com/acme/widget/pull/7
+rc=1

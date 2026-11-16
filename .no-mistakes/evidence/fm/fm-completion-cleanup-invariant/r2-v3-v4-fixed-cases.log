@@ -1,0 +1,13 @@
+unregistered before housekeeping: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+unregistered after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+poll-never-published before housekeeping: record=open pr=https://github.com/acme/widget/pull/7 poll=none prune-record=none copy=present ledger=[]
+poll-never-published after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+branch-pruned after supervision: record=open pr=none poll=none prune-record=none copy=present ledger=[task.status task.status ]
+ok - a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up; with the PR branch pruned the copy-only head is not registered, and the task keeps one owned cleanup row naming plain teardown
+unlanded-commit: kept refusal: /Users/charlesabrooker/tmp/fm-merge-prune.usKFGx/w4/th/pool1/1/repo has 1 commit(s) on no remote
+pending_cleanup	home:firstmate	the last recorded cleanup refusal (recorded by bin/fm-merge-prune.sh): /Users/charlesabrooker/tmp/fm-merge-prune.usKFGx/w4/th/pool1/1/repo has 1 commit(s) on no remote; the owning home clears that cause and runs plain bin/fm-teardown.sh t1 again (dropping the work needs the captain's own words)
+unlanded_commit	firstmate	land this work through its PR, or obtain the captain's drop; the last recorded cleanup refusal (recorded by bin/fm-merge-prune.sh): /Users/charlesabrooker/tmp/fm-merge-prune.usKFGx/w4/th/pool1/1/repo has 1 commit(s) on no remote; the owning home clears that cause and runs plain bin/fm-teardown.sh t1 again (dropping the work needs the captain's own words)
+dirty: kept refusal: REFUSED: worktree /Users/charlesabrooker/tmp/fm-merge-prune.usKFGx/w5/th/pool1/1/repo has uncommitted changes.
+pending_cleanup	home:firstmate	the last recorded cleanup refusal (recorded by bin/fm-merge-prune.sh): REFUSED: worktree /Users/charlesabrooker/tmp/fm-merge-prune.usKFGx/w5/th/pool1/1/repo has uncommitted changes.; the owning home clears that cause and runs plain bin/fm-teardown.sh t1 again (dropping the work needs the captain's own words)
+ok - a merged cross-lane PR whose copy still holds unlanded or changed work keeps the prune's refusal text on the task's ledger row
+rc=0
