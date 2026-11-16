@@ -90,6 +90,7 @@ test_lease_holders_compare_raw_never_tsv_escaped() (
     command jq -cn --arg p "$slot" --arg h "$state_holder" '{worktrees:[{name:"1",path:$p,leased:true,lease_holder:$h,lease_id:"i1"}]}' > "$dir/pool/treehouse-state.json"
     FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=$cap_holder
     fm_task_copy_pool_slot_lease "$slot" || true
+    # shellcheck disable=SC2030 # got is local to this test's own subshell body by design.
     got=$FM_TASK_COPY_LEASE_STATE
     [ "$got" = "$want" ] || fail "$case_name: the lease read as '$got', expected '$want' (the holders differ or match as raw values, not as @tsv text)"
     [ "$FM_TASK_COPY_LEASE_HOLDER" = "$state_holder" ] || fail "$case_name: the holder read back as '$FM_TASK_COPY_LEASE_HOLDER', not the raw '$state_holder'"
