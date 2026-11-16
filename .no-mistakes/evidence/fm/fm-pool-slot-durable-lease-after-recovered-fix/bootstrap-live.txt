@@ -1,19 +1,11 @@
-=== bootstrap with installed treehouse (v3.1.7-fm.8759019)
---- capabilities --json:
-unknown command "capabilities" for "treehouse"
---- bootstrap treehouse lines:
-BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
---- treehouse argv bootstrap ran:
-capabilities --json
+=== provider=installed (v3.1.7-fm.8759019)
+BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
+=== provider=b5d2805 (v3.1.7-fm.b5d2805)
+BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
+=== provider=fixture-proven (v3.1.7-fm.b5d2805)
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+=== provider=fixture-proven (capabilities publishes schema 2 + recovered_quarantine_holder; status/lease/get/return forbidden)
+(no treehouse line)
+--- treehouse argv seen by the fixture:
 get --help
-=== bootstrap with b5d2805 treehouse (v3.1.7-fm.b5d2805)
---- capabilities --json:
-{"schema_version":1,"version":"v3.1.7-fm.b5d2805","persistent_recovered_leases":true}
---- bootstrap treehouse lines:
-BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
---- treehouse argv bootstrap ran:
 capabilities --json
-get --help
-=== bootstrap with backend=orca (installed treehouse on PATH)
-treehouse lines: 0
-treehouse argv: 
