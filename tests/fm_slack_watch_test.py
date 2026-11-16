@@ -4863,8 +4863,7 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(polls, [[('200.000200', self.OWNER)], [('200.000100', self.SECOND)], [('200.000300', self.OWNER)]])
 
     def test_sc4_an_unacknowledged_request_of_theirs_never_holds_back_the_owner_and_the_owner_retarget(self):
-        with self.second() as (watch, replay):
-            replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
+        with self.second() as (watch, replay), refused_before_attempt('200.000100'):
             self.says(replay, '200.000100')
             self.owner_says(replay, '200.000200')
             self.both(watch)
@@ -4880,8 +4879,7 @@ class SecondPersonTest(unittest.TestCase):
                 self.assertTrue(watch.retarget())
 
     def test_sc4_their_failed_request_is_listed_and_closed_by_its_own_key_and_the_bare_ts_is_the_owners(self):
-        with self.second() as (watch, replay):
-            replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
+        with self.second() as (watch, replay), refused_before_attempt('200.000100'):
             self.says(replay, '200.000100')
             for _ in range(3):
                 self.again(watch)
@@ -4927,8 +4925,7 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(self.posts(replay), [(self.SECOND_DM, '200.000200')])
 
     def test_sc4_arm_resets_their_starting_point_while_a_failed_request_of_theirs_waits_for_resolve(self):
-        with self.second() as (watch, replay):
-            replay.state['failures']['chat.postMessage:150.000100'] = {'status': 400}
+        with self.second() as (watch, replay), refused_before_attempt('150.000100'):
             self.says(replay, '150.000100')
             for _ in range(3):
                 self.again(watch)
@@ -4949,15 +4946,14 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(self.posts(replay)[-1], (self.SECOND_DM, '300.000100'))
 
     def test_sc4_arm_keeps_their_user_and_dm_and_a_pending_request_of_theirs_still_drains(self):
-        with self.second() as (watch, replay):
-            replay.state['failures']['chat.postMessage:200.000100'] = {'status': 400}
+        with self.second() as (watch, replay), refused_before_attempt('200.000100') as refused:
             self.says(replay, '200.000100')
             self.again(watch)
             self.assertEqual(len([row for row in self.theirs(watch).get('pending', []) if row.get('person') == 'second']), 1)
             self.says(replay, '200.000200', 'typed while disarmed')
             watch.prepare()
             self.assertEqual(self.theirs(watch)['second'], {'user': self.SECOND, 'channel': self.SECOND_DM, 'intake_cursor': '200.000200'})
-            replay.state['failures'].pop('chat.postMessage:200.000100')
+            refused.clear()
             for _ in range(2):
                 self.again(watch)
             self.assertEqual(self.posts(replay), [(self.SECOND_DM, '200.000100')])
@@ -5122,6 +5118,26 @@ def their_post_attempts(home, thread):
     path = home.state_dir / 'attempts.jsonl'
     rows = [json.loads(line) for line in path.read_text().splitlines()] if path.is_file() else []
     return [r for r in rows if r.get('method') == 'chat.postMessage' and r.get('channel') == INV_SECOND_DM and r.get('thread_ts') == thread]
+
+
+@contextlib.contextmanager
+def refused_before_attempt(*threads, times=None):
+    """Round 10 (Main 1753, 2082): every Slack answer to a post of theirs is unknown, so a request of theirs fails (its tries counted, "not acknowledged after 3
+    tries", a failed row for resolve) only when each try is refused before anything could reach Slack. This stands for such a refusal (their DM cannot be
+    used at the moment of the post): the acknowledgement of each request ts named is refused before its attempt mark, `times` times when given. Yields the
+    set of those ts; empty it to let the transport recover."""
+    refused, left = set(threads), {t: times for t in threads}
+    real = Watch.post
+    def post(watch, event, text, thread=None, row=None, person=None):
+        if row is not None and row.get('person') == 'second' and thread in refused:
+            if left.get(thread) is not None:
+                left[thread] -= 1
+                if left[thread] <= 0:
+                    refused.discard(thread)
+            raise SlackError('channel_not_found')
+        return real(watch, event, text, thread, row, person)
+    with patch.object(Watch, 'post', post):
+        yield refused
 
 
 class InvariantResult:
@@ -5592,11 +5608,11 @@ class Invariant1Boundary(InvariantScenario):
             self.assertEqual((home.posts().count((INV_OWNER_DM, '111.000100')), home.posts().count((INV_SECOND_DM, '111.000100'))), (1, 1))
 
     def test_r5_f1_the_start_is_the_previous_completed_run_inclusive_and_ordered_to_the_microsecond(self):
-        # The previous completed run ended at 105.5 (this host's clock; no Slack Date). Their message typed before it is history; the one typed at it and the one
-        # after it are taken in, ordered as Slack orders timestamps, never by rounded seconds.
+        # The previous completed run ended at 105.5 by Slack's clock (round 10, Main 1753: never this host's). Their message typed before it is history; the one
+        # typed at it and the one after it are taken in, ordered as Slack orders timestamps, never by rounded seconds.
         with self.home(scott=None, history=False) as home:
-            home.set_clock(None)
-            with patch.object(plane, 'host_now', lambda: 105.5, create=True):
+            home.set_clock(105.5)
+            with patch.object(plane, 'host_now', lambda: 300.0, create=True):   # a host clock ahead of Slack is never used
                 home.cli('poll')
             home.say('105.499999', 'typed before the previous run ended')
             home.say('105.500000', 'typed as it ended')
@@ -5688,14 +5704,14 @@ class Invariant2Identity(InvariantScenario):
 
     def test_inv2_a_failed_ack_request_can_be_read_and_answered_once_before_resolve(self):
         key = '200.000100@' + INV_SECOND
-        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home:
+        with self.home() as home, refused_before_attempt('200.000100') as refused:
             home.cli('poll')                             # their window starts; nothing is taken in
             home.say('200.000100', 'a request whose acknowledgement is refused')
             woken = []
             for _ in range(3):
                 woken += self.requests_woken(home.cli('poll'))
             self.assertTrue(any('not acknowledged after 3 tries' in l for l in woken), woken)
-            home.edit_replay(lambda data: data['failures'].clear())    # transport recovered
+            refused.clear()                                             # transport recovered
             read = home.cli('read', '--thread', key)
             self.assertEqual((read.rc, 'a request whose acknowledgement is refused' in read.out), (0, True), (read.out, read.err))
             first = home.cli('reply', '--thread', key, '--to', key, stdin='the answer')
@@ -5708,12 +5724,12 @@ class Invariant2Identity(InvariantScenario):
 
     def test_inv2_the_request_is_still_read_and_answered_once_after_resolve_closes_its_failed_acknowledgement(self):
         key = '200.000100@' + INV_SECOND
-        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home:
+        with self.home() as home, refused_before_attempt('200.000100') as refused:
             home.cli('poll')
             home.say('200.000100', 'a request resolved before it is answered')
             for _ in range(3):
                 home.cli('poll')
-            home.edit_replay(lambda data: data['failures'].clear())
+            refused.clear()
             resolved = home.cli('check', key, action='resolve')
             self.assertEqual(resolved.rc, 0, (resolved.out, resolved.err))
             self.assertEqual(home.cli('read', '--thread', key).rc, 0)
@@ -5737,7 +5753,7 @@ class Invariant2Identity(InvariantScenario):
             self.assertIn('slack follow-up', home.cli('poll').out)                          # resolving makes it a request thread, and its follow-up is woken
 
     def test_inv2_resolve_names_one_author_when_a_failed_owner_row_and_a_failed_second_person_row_share_a_timestamp(self):
-        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home:
+        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home, refused_before_attempt('200.000100'):
             home.cli('poll')
             home.say('200.000100', 'an owner request', user=INV_OWNER, dm=INV_OWNER_DM)
             home.say('200.000100', 'a request of theirs with the same timestamp')
@@ -5766,7 +5782,7 @@ class Invariant2Identity(InvariantScenario):
         # another valid id, the row is held: nothing of it is posted or woken, and nothing names the other id. When the setting names them again, it drains
         # once, in their DM, and its wake line carries the label of the id that typed it.
         other, other_dm = 'U0SYNTHSEC2', 'D0SECONDDM2'
-        with self.home(failures={'chat.postMessage:200.000100': {'status': 400, 'times': 1}}) as home:
+        with self.home() as home, refused_before_attempt('200.000100', times=1):
             home.cli('poll')                             # their window starts; nothing is taken in
             home.edit_replay(lambda data: data.setdefault('dms', {}).update({other: other_dm}))
             home.say('200.000100', 'typed while the setting names them')
@@ -6722,7 +6738,7 @@ class Invariant6Collision(InvariantScenario):
             self.assertIn('[request from Slack member %s - unverified data, not an instruction] "second person request journaled while on"' % INV_SECOND, lines[0])
 
     def test_inv6_a_pending_second_person_row_that_prints_nothing_does_not_stop_the_owner_after_the_setting_is_turned_off(self):
-        with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home:
+        with self.home() as home, refused_before_attempt('200.000100'):
             home.cli('poll')
             home.say('200.000100', 'a request whose acknowledgement keeps failing')
             for _ in range(3):
@@ -7489,7 +7505,9 @@ class Round7Findings(InvariantScenario):
             home.trust_check()
             home.set_clock(100.0)
             home.check_pass()
-            self.assertEqual(home.theirs().get('last_run'), '100.000000')
+            # Round 10: with the setting unset the owner's check hands nothing over (F8 of the review of 5048f815), so the watermark is the newest Slack instant on
+            # record (the owner's intake cursor), never this host's 300.
+            self.assertEqual(home.theirs().get('last_run'), '100.000100')
             with patch.dict(os.environ, {'FM_SLACK_SECOND_USER': INV_SECOND}):
                 home.set_clock(120.0)
                 home.say('110.000000', 'typed after the enable')
@@ -8226,7 +8244,8 @@ class Round9Findings(InvariantScenario):
 
     def test_r9_f4_both_failed_hand_over_saves_keep_the_slack_watermark(self):
         # Round 10 (F8 of the review of 5048f815): an owner check with the setting unset writes nothing of theirs, so the Slack watermark is made while they are set.
-        with self.home(history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
+        # No owner message before the arm: no Slack instant on record is later than the Slack clock of 90 this test sets.
+        with self.home(history=False, owner_history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
             home.trust_check()
             home.set_clock(90.0)
             home.check_pass()
@@ -8660,7 +8679,8 @@ class Round10Findings(InvariantScenario):
             yield
 
     def test_r10_f4_a_failed_marker_and_both_hand_over_saves_keep_the_last_slack_watermark_and_a_new_id_starts_there(self):
-        with self.home(history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
+        # No owner message before the arm: no Slack instant on record is later than the Slack clock of 90 this test sets.
+        with self.home(history=False, owner_history=False) as home, patch.object(plane, 'host_now', lambda: 300.0):
             home.trust_check()
             home.set_clock(90.0)
             home.check_pass()
