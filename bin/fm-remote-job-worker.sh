@@ -113,11 +113,12 @@ worker_write_heartbeat() { # <owner-pid>
 }
 
 worker_heartbeat_loop() { # <account-home> <owner-pid>
-  local account_home=$1 owner=$2 ready owner_state
+  local account_home=$1 owner=$2 ready owner_state ps_bin
   ready=$(fm_remote_job_worker_ready_path)
+  ps_bin=$(fm_remote_job_ps_bin) || return 1
   trap 'exit 0' HUP INT TERM
   while kill -0 "$owner" 2>/dev/null &&
-    owner_state=$(/bin/ps -p "$owner" -o state= 2>/dev/null) &&
+    owner_state=$("$ps_bin" -p "$owner" -o state= 2>/dev/null) &&
     [ -n "$owner_state" ] && [[ "$owner_state" != *Z* ]] &&
     fm_remote_job_lock_owner_matches_process "$account_home" &&
     [ "$FM_REMOTE_JOB_OWNER_PID" = "$owner" ]; do

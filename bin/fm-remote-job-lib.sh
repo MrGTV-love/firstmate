@@ -991,9 +991,40 @@ fm_remote_job_worker_ready_path() { printf '%s\n' "$FM_REMOTE_JOB_STATE/worker.r
 fm_remote_job_worker_identity_path() { printf '%s\n' "$FM_REMOTE_JOB_STATE/worker.identity"; }
 fm_remote_job_worker_lock_path() { printf '%s\n' "$FM_REMOTE_JOB_STATE/worker.lock"; }
 
+# Fixed system paths only: no environment/PATH override may forge ownership.
+# Tests replace this function only in their disposable copy of the library.
+fm_remote_job_ps_bin() {
+  if [ -x /bin/ps ]; then printf '%s\n' /bin/ps
+  elif [ -x /usr/bin/ps ]; then printf '%s\n' /usr/bin/ps
+  else return 1
+  fi
+}
+
+# Refuse before launching a worker when its ownership proof cannot be read.
+# Exit 69 denotes an unavailable dependency, not invalid transport metadata (64).
+# Keep the dependency's status and stderr rather than hiding them in a timeout.
+fm_remote_job_require_process_inspection() {
+  local pid ps_bin field value status
+  pid=${BASHPID:-$(exec sh -c 'printf "%s\n" "$PPID"')}
+  ps_bin=$(fm_remote_job_ps_bin) || {
+    FM_REMOTE_JOB_ERROR="cannot inspect process ownership: no executable system ps"
+    return 69
+  }
+  for field in lstart= command=; do
+    if value=$("$ps_bin" -p "$pid" -o "$field" 2>&1); then
+      status=0
+      [ -n "$value" ] && continue
+    else
+      status=$?
+    fi
+    FM_REMOTE_JOB_ERROR="cannot inspect process ownership using $ps_bin ($field, exit $status): ${value:-no process identity returned}"
+    return 69
+  done
+}
+
 fm_remote_job_process_start() {
   local pid=$1 ps_bin value
-  if [ -x /bin/ps ]; then ps_bin=/bin/ps; elif [ -x /usr/bin/ps ]; then ps_bin=/usr/bin/ps; else return 1; fi
+  ps_bin=$(fm_remote_job_ps_bin) || return 1
   value=$("$ps_bin" -p "$pid" -o lstart= 2>/dev/null) || return 1
   [ -n "$value" ] || return 1
   case "$value" in *$'\n'*|*$'\r'*) return 1 ;; esac
@@ -1002,7 +1033,7 @@ fm_remote_job_process_start() {
 
 fm_remote_job_process_command() {
   local pid=$1 ps_bin value
-  if [ -x /bin/ps ]; then ps_bin=/bin/ps; elif [ -x /usr/bin/ps ]; then ps_bin=/usr/bin/ps; else return 1; fi
+  ps_bin=$(fm_remote_job_ps_bin) || return 1
   value=$("$ps_bin" -p "$pid" -o command= 2>/dev/null) || return 1
   [ -n "$value" ] || return 1
   case "$value" in *$'\n'*|*$'\r'*) return 1 ;; esac
@@ -1011,7 +1042,7 @@ fm_remote_job_process_command() {
 
 fm_remote_job_process_pgid() { # <pid>
   local pid=$1 ps_bin value
-  if [ -x /bin/ps ]; then ps_bin=/bin/ps; elif [ -x /usr/bin/ps ]; then ps_bin=/usr/bin/ps; else return 1; fi
+  ps_bin=$(fm_remote_job_ps_bin) || return 1
   value=$("$ps_bin" -p "$pid" -o pgid= 2>/dev/null) || return 1
   value=$(printf '%s' "$value" | tr -d '[:space:]')
   case "$value" in ''|*[!0-9]*) return 1 ;; esac
@@ -1134,7 +1165,7 @@ fm_remote_job_worker_owned_alive() {
   [ ! -e "$lock/pid" ] && [ ! -L "$lock/pid" ] &&
     [ ! -e "$lock/start" ] && [ ! -L "$lock/start" ] &&
     [ ! -e "$lock/command" ] && [ ! -L "$lock/command" ] || return 1
-  if [ -x /bin/ps ]; then ps_bin=/bin/ps; elif [ -x /usr/bin/ps ]; then ps_bin=/usr/bin/ps; else return 1; fi
+  ps_bin=$(fm_remote_job_ps_bin) || return 1
   command=$("$ps_bin" -p "$pid" -o command= 2>/dev/null) || return 1
   case "$command" in *"$root/bin/fm-remote-job-worker.sh"*) FM_REMOTE_JOB_OWNER_PID=$pid; return 0 ;; esac
   return 1
@@ -1491,6 +1522,7 @@ fm_remote_job_ensure_worker() { # <remote-root> <account-home>
     FM_REMOTE_JOB_ERROR="configured remote root has no safe executable remote job worker"
     return 1
   }
+  fm_remote_job_require_process_inspection || return $?
   platform=$(fm_remote_job_platform)
   if [ "$platform" = darwin ]; then
     uid=$(id -u 2>/dev/null || true)
