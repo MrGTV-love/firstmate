@@ -1,0 +1,8 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-record/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-x1's cleanup target /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-record/realroot/.treehouse/project-5fcba0/1/project/.claude/worktrees/fc-one is also task task-y1's recorded worktree (/Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-record/realroot/.treehouse/project-5fcba0/1/project/.claude/worktrees/fc-one); preserved worktree custody overlaps it, so nothing was changed - not even with --force.

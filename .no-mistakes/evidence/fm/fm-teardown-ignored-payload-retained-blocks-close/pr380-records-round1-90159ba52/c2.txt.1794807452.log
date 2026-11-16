@@ -1,0 +1,6 @@
+ok - an earlier preserve of a locked own copy is never removed: a failed copy, an identical one, a different one and an unwritable parent all keep it
+ok - a retry of a closed kept-copy task says it is already closed, names the record and asks the driver nothing
+ok - a damaged task record, one removed after a refused close and a pending backlog close are never reported as already closed; a completed close is
+ok - an unwritable retained record refuses every unchanged retry before the driver with a refusal record, and the close follows with one call once it is writable
+ok - a retry of an unchanged kept copy makes no driver call, writes no tar, no saved output and no second record, and closes once the slot can be leased
+not ok - retained-changed-link-newline: the link target's trailing newline was not preserved (expected '612e6a736f6e6c0a', got '')

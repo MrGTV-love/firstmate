@@ -1,0 +1,24 @@
+drwxr-xr-x@ 7 501  20  224 Nov 16 00:03 .
+drwxr-xr-x@ 3 501  20   96 Nov 16 00:03 ./.claude
+drwxr-xr-x@ 4 501  20  128 Nov 16 00:03 ./.claude/channel-outbox
+-rw-r--r--@ 1 501  20    4 Nov 16 00:03 ./.claude/channel-outbox/a.jsonl
+-rw-r--r--@ 1 501  20    4 Nov 16 00:03 ./.claude/channel-outbox/b.jsonl
+-rw-r--r--@ 1 501  20  104 Nov 16 00:03 ./.git
+drwxr-xr-x@ 3 501  20   96 Nov 16 00:03 ./.venv
+drwxr-xr-x@ 3 501  20   96 Nov 16 00:03 ./.venv/bin
+-rw-r--r--@ 1 501  20    8 Nov 16 00:03 ./.venv/bin/python
+drwxr-xr-x@ 3 501  20   96 Nov 16 00:03 ./node_modules
+drwxr-xr-x@ 3 501  20   96 Nov 16 00:03 ./node_modules/dep
+-rw-r--r--@ 1 501  20    8 Nov 16 00:03 ./node_modules/dep/index.js
+drwxr-xr-x@ 3 501  20   96 Nov 16 00:03 ./notes
+-rw-r--r--@ 1 501  20   10 Nov 16 00:03 ./notes/unique.dat
+2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  ./.claude/channel-outbox/a.jsonl
+27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a  ./.claude/channel-outbox/b.jsonl
+b45c9bb24164d4386f9f98ee4b16d4cde22061c24a7881318c9178dc9178af9f  ./.git
+2e7f1f7a9dd3f82765d297d667234b91f8a68fa534bc7e6a6a04c77ffee12376  ./.venv/bin/python
+2e7f1f7a9dd3f82765d297d667234b91f8a68fa534bc7e6a6a04c77ffee12376  ./node_modules/dep/index.js
+06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  ./notes/unique.dat
+HEAD 7b47bd9b0ab0fcb9b7095697b468c1afb9d2ecb29be01b3e0fd48af55b5120e9  -
+locked 78d6bc38b2a6ce73daf0c69327dfbb51919fb76925acadbf4393c0699dea8017  -
+gitdir c5e6f49d4760cb314dafe139b397a9ec39db853bf122100b05509690a22dc8ce  -
+commondir 340ddcb67a6204f742cd1e28e5b462622dde7daaa8ee36001897196aacdc6d47  -

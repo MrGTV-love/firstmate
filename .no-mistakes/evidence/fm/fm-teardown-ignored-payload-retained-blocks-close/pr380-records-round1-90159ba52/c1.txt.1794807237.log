@@ -1,0 +1,2 @@
+ok - a landed task whose own copy the driver keeps closes: the copy, the slot and its lease are untouched, the driver's verified archive and the task's preserve hold the unique files, and one record names the copy and the answer
+ok - the default interpreter and the explicit override close the kept-copy task the same way, and a missing default interpreter refuses with nothing removed

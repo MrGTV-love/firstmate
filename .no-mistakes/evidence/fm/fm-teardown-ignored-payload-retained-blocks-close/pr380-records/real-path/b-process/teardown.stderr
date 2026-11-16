@@ -1,0 +1,9 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 12s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-process/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-process/realroot/.treehouse/project-6400b7/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-process/realroot/.treehouse/project-6400b7/1/project: process 92772 is running in it.
+human-only-exit: Which task or person owns process 92772, which is running in /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-process/realroot/.treehouse/project-6400b7/1/project/.claude/worktrees/fc-one? Stop it or tell me it is yours.

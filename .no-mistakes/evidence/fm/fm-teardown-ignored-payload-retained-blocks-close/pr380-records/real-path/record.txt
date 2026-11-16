@@ -1,0 +1,6 @@
+head 8e4dbf8c4c46653b0e4681458c581d1c351544a2
+command: FM_REAL_EVIDENCE=/Users/charlesabrooker/.no-mistakes/evidence/01M7HCQB47A9NWAVTJ4NHH2T52/pr380-records/real-path bin/fm-proc-budget.sh -- bash tests/fm-teardown-real-treehouse.test.sh
+treehouse --version: v3.1.7-fm.8759019
+tmux -V: tmux 3.8
+docker: 29.9.3
+exit 0 ok 10 not_ok 0

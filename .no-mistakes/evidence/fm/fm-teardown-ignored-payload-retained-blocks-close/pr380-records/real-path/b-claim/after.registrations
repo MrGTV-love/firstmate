@@ -1,0 +1,13 @@
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-claim/project
+HEAD 0a8762fc253540faf5e5551daf9e6d8db8bf6478
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-claim/realroot/.treehouse/project-b3a285/1/project
+HEAD 0a8762fc253540faf5e5551daf9e6d8db8bf6478
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.eCG3Rm/real-b-claim/realroot/.treehouse/project-b3a285/1/project/.claude/worktrees/fc-one
+HEAD 0a8762fc253540faf5e5551daf9e6d8db8bf6478
+branch refs/heads/fm/task-x1-v2
+locked vernant-session-active owner=launcher:40896 launcher=40896
+
