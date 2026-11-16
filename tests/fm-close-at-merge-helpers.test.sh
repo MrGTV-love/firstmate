@@ -177,27 +177,19 @@ test_f7_an_unreadable_task_record_is_reported() {
 
 # The typed branch of bin/fm-tasks-axi.sh, run with every I/O and mutation stubbed: no
 # tasks-axi, no backlog, no runner. Only the replay is varied here.
-typed_branch() {  # <probe: done|missing|unreadable> <replay: ok|cut> [args...]
-  local probe=$1 replay=$2
-  shift 2
+typed_branch() {  # <replay: ok|cut> [args...]
+  local replay=$1
+  shift
   bash -c 'branch=$(awk "/^pf_form=0\$/ {copy=1} /^exec tasks-axi / {exit} copy {print}" "$1/bin/fm-tasks-axi.sh")
     . "$1/bin/fm-tasks-axi-lib.sh"; set -u
-    PROBE=$2 REPLAY=$3; shift 3
+    REPLAY=$2; shift 2
     ARGS=("$@") DATA=/dev/null
     mktemp() { builtin printf "/dev/null\n"; }
     rm() { :; }
     tasks-axi() { builtin printf "{\"ok\":true}\n"; }
     cat() { if [ "$REPLAY" = ok ]; then builtin printf "{\"ok\":true}\n"; else builtin printf "{\"ok\":"; return 74; fi; }
-    fm_backlog_row_probe() {
-      case "$PROBE" in
-        done) FM_BACKLOG_ROW_STATE=done FM_BACKLOG_ROW_RESULT=found; return 0 ;;
-        missing) FM_BACKLOG_ROW_RESULT=not_found; return 1 ;;
-        *) FM_BACKLOG_ROW_RESULT=error FM_BACKLOG_ROW_ERROR="simulated read failure"; return 1 ;;
-      esac
-    }
-    fm_backlog_row_states() { builtin printf "pf-x:done\n"; }
     fm_backlog_unblock_dependents() { builtin printf "UNBLOCK %s\n" "$2"; }
-    eval "$branch"' _ "$ROOT" "$probe" "$replay" "$@"
+    eval "$branch"' _ "$ROOT" "$replay" "$@"
 }
 
 # Real results of typed completions, printed by the installed tasks-axi command on a scratch
@@ -291,9 +283,9 @@ test_c4_no_tasks_axi_module_is_loaded() {
 # JSON caller is not handed cut output as success. Control: an intact replay exits 0 with it.
 test_f8_a_failed_replay_is_not_success() {
   local out rc
-  out=$(typed_branch "done" cut public-followup waive pf-x --reason r --approved-by captain --json 2>/dev/null); rc=$?
+  out=$(typed_branch cut public-followup waive pf-x --reason r --approved-by captain --json 2>/dev/null); rc=$?
   [ "$rc" -ne 0 ] && ok "f8: a cut replay does not exit 0 (status $rc)" || not_ok "f8: a cut replay exited 0 with '$out'"
-  out=$(typed_branch "done" ok public-followup waive pf-x --reason r --approved-by captain --json 2>/dev/null); rc=$?
+  out=$(typed_branch ok public-followup waive pf-x --reason r --approved-by captain --json 2>/dev/null); rc=$?
   check "f8 control: an intact replay exits 0 with the output" '0 {"ok":true}' "$rc $out"
 }
 
@@ -324,7 +316,7 @@ test_n1_the_retry_line_is_the_call_the_merge_made() {
 # A bare wrapper call has no arguments; under `set -u` the typed branch must not stop bash 3.2.
 test_f4_a_call_with_no_arguments_runs() {
   local out
-  out=$(typed_branch "done" ok 2>&1; printf 'rc=%s' "$?")
+  out=$(typed_branch ok 2>&1; printf 'rc=%s' "$?")
   case "$out" in *unbound*) not_ok "f4: a bare call stopped: $out" ;; *) ok "f4: a bare call passes the typed branch under set -u" ;; esac
 }
 
