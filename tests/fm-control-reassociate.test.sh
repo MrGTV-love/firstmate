@@ -1029,10 +1029,12 @@ test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
     copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail "$shape: reassociation changed unlanded work"
     git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
       || fail "$shape: reassociation changed branches"
-    # Only the nested scout with a prior copy reaches the capability probe: its
-    # teardown makes that read-only call before it decides whether a conditional
-    # return is planned. Every other shape must not call Treehouse at all.
-    if [ "$shape" = nested-scout-prior ]; then
+    # Only the nested scouts reach the capability probe: a scout copy nested in the
+    # unclaimed slot (named by its prior copy or, with no history, by the slot that
+    # encloses its copy) makes that read-only call before its teardown decides
+    # whether a conditional return is planned. Every other shape must not call
+    # Treehouse at all.
+    if [ "$shape" = nested-scout ] || [ "$shape" = nested-scout-prior ]; then
       assert_treehouse_log_probe_only "$dir/treehouse.log" "$shape: reassociation"
     else
       [ ! -e "$dir/treehouse.log" ] || fail "$shape: reassociation invoked Treehouse"

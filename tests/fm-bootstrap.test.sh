@@ -753,7 +753,8 @@ test_orca_backend_gates_orca_tool_only_when_selected() {
 }
 
 # Build a fake toolchain with tmux REMOVED and the named backend session CLI(s)
-# plus jq added, so a backend that must NOT require tmux can be proven silent
+# plus a working jq added (the real one, so the treehouse capability probe can
+# read the fake's answer), so a backend that must NOT require tmux can be proven silent
 # with tmux absent. Echoes the fakebin dir. The removed tmux is what makes these
 # cases catch the old "everything but orca demands tmux" bug: with the buggy
 # TOOLS list a herdr/zellij/cmux home would report MISSING: tmux here.
@@ -762,7 +763,8 @@ make_fake_toolchain_no_tmux() {  # <case-dir> <extra-cli...>
   shift
   fakebin=$(make_fake_toolchain "$dir")
   rm -f "$fakebin/tmux"
-  fm_fake_exit0 "$fakebin" jq "$@"
+  fm_fake_exit0 "$fakebin" "$@"
+  add_real_jq "$fakebin"
   printf '%s\n' "$fakebin"
 }
 
@@ -831,7 +833,8 @@ test_python3_is_required_for_every_backend() {
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
     printf '%s\n' "$backend" > "$case_dir/home/config/backend"
     fakebin=$(make_fake_toolchain "$case_dir")
-    fm_fake_exit0 "$fakebin" herdr jq zellij cmux orca
+    fm_fake_exit0 "$fakebin" herdr zellij cmux orca
+    add_real_jq "$fakebin"
     bash_env="$case_dir/no-python3.bash"
     cat > "$bash_env" <<'SH'
 command() {
