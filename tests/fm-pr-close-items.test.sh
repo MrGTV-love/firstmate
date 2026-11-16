@@ -999,15 +999,14 @@ SH
   # done, so its edge clears in the same run.
   [ "$(cx_deps "$case_dir" dep-of-pf-unread)" = none ] || fail "c4-pf: a finished waive left its edge though its show failed ($(cx_deps "$case_dir" dep-of-pf-unread))"
   assert_grep 'unblocked: dep-of-pf-unread no longer waits on pf-unread' "$case_dir/e2" "c4-pf: the same-run clear was not reported"
-  # A completion whose output does not say its state, with a failed read: every edge stays and
-  # the item is reported with the manual clear.
+  # A completion whose output does not say its state, with a failed read: exit 0 is the proof
+  # (Main 1795), so the edge clears in the same run and the report says the clear rests on it.
   PATH="$bin_dir:$PATH" wrapper public-followup waive pf-silent --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e3" \
     || fail "c4-pf: the silent waive changed its exit status"
-  # Main 2086: with no printed result there is nothing to decide from, so nothing clears.
-  [ "$(cx_deps "$case_dir" dep-of-pf-silent | sed 's/blocked-by://g; s/[ "]//g')" = pf-silent ] || fail "c4-pf: a silent waive changed its edge ($(cx_deps "$case_dir" dep-of-pf-silent))"
-  assert_match '^actionable: pf-silent: closed, edges kept: completion result unreadable; .*tasks-axi unblock <item> --by pf-silent' "$case_dir/e3" "c4-pf: the silent waive's kept edge was not reported"
-  assert_no_grep 'unblocked: dep-of-pf-silent' "$case_dir/e3" "c4-pf: the silent waive reported a clear"
-  pass "a typed completion clears the edge in the same run when the row is archived at once and when its show fails, because its own printed result decides; a completion that prints no result keeps every edge and is reported (Main 2086)"
+  [ "$(cx_deps "$case_dir" dep-of-pf-silent)" = none ] || fail "c4-pf: a finished silent waive left its edge"
+  assert_grep 'pf-silent: tasks-axi printed no result the wrapper can read for its waive, so the clear rests on its exit 0' "$case_dir/e3" "c4-pf: the silent waive's exit-0 clear was not said"
+  assert_grep 'unblocked: dep-of-pf-silent no longer waits on pf-silent' "$case_dir/e3" "c4-pf: the same-run clear of the silent waive was not reported"
+  pass "a typed completion clears the edge in the same run when the row is archived at once and when its show fails, from its own printed result, and when it prints no result, on its exit 0 (Main 1795, 2086)"
 }
 
 test_a_typed_completion_help_call_reports_nothing_to_act_on() {
@@ -2498,11 +2497,11 @@ SH
   pass "a waive whose capture file cannot be made does not run, changes nothing and says so; with the file it runs and clears the finished edge"
 }
 
-# Main 2086: the completion's own printed result decides the clear. When that output is lost and
-# the row's show fails, nothing shows the row done, so every edge and hold stays and the item is
-# reported with the manual clear, TOON and JSON. Controls: a readable waive clears in the same run;
-# a waive tasks-axi refuses keeps every edge.
-test_r6_f5_a_completion_whose_output_is_lost_keeps_every_edge_and_says_so() {
+# Main 1795 and 2086: when the completion's output is lost and the row's show fails, there is no
+# result to read, so the completion's exit 0 is the proof: the finished edge clears in the same run
+# and the other blocker and the hold stay, TOON and JSON, and the report says the clear rests on
+# exit 0. Controls: a readable waive clears; a waive tasks-axi refuses keeps every edge.
+test_r6_f5_a_completion_whose_output_is_lost_still_clears_in_the_same_run() {
   local case_dir rc=0 real
   case_dir=$(make_case r6-f5-lost)
   wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
@@ -2535,10 +2534,9 @@ SH
     expect_code 0 "$rc" "r6-lost: the $pf waive must succeed"
     [ ! -s "$case_dir/$pf.out" ] || fail "r6-lost: the fixture did not lose the $pf output"
     [ "$(cx_state "$case_dir" "$pf")" = "done" ] || fail "r6-lost: the $pf waive did not finish its row"
-    case "$(cx_deps "$case_dir" "waits-$pf" | sed 's/blocked-by://g; s/[ "]//g')" in "$pf,waits-$pf-other"|"waits-$pf-other,$pf") ;; *) fail "r6-lost: an edge of waits-$pf changed with no printed result ($(cx_deps "$case_dir" "waits-$pf"))" ;; esac
-    cx "$case_dir" show "waits-$pf" | grep -q 'hold_kind: future' || fail "r6-lost: the hold on waits-$pf was lost"
-    assert_match "^actionable: $pf: closed, edges kept: completion result unreadable; .*tasks-axi unblock <item> --by $pf" "$case_dir/$pf.err" "r6-lost: the kept edges of $pf were not reported"
-    assert_no_grep "unblocked: waits-$pf" "$case_dir/$pf.err" "r6-lost: a clear of $pf was reported"
+    assert_only_other_and_hold "$case_dir" "waits-$pf" "$pf" "r6-lost: $pf in the same run"
+    assert_grep "$pf: tasks-axi printed no result the wrapper can read for its waive, so the clear rests on its exit 0" "$case_dir/$pf.err" "r6-lost: the exit-0 clear of $pf was not said"
+    assert_grep "unblocked: waits-$pf no longer waits on $pf; it still waits on waits-$pf-other" "$case_dir/$pf.err" "r6-lost: the cleared edge of $pf was not reported"
   done
   # Control: a waive tasks-axi refuses is genuinely not done; every edge stays.
   rc=0
@@ -2549,7 +2547,7 @@ SH
   # Control: a readable waive clears in the same run.
   wrapper public-followup waive pf-readable --reason r --approved-by captain > "$case_dir/readable.out" 2> "$case_dir/readable.err" || fail "r6-lost: the readable waive failed"
   assert_only_other_and_hold "$case_dir" waits-pf-readable pf-readable "r6-lost: the readable waive"
-  pass "a waive whose output is lost keeps every edge and hold and is reported, TOON and JSON; a refused waive keeps every edge; a readable waive clears in the same run"
+  pass "a waive whose output is lost and whose show fails clears its finished edge in the same run on its exit 0, TOON and JSON, keeping the other blocker and hold, and says so; a refused waive keeps every edge; a readable waive clears"
 }
 
 # Main 2086: the completion's own printed result decides. A result that shows the row not done
@@ -2913,7 +2911,7 @@ test_r6_f2_a_nul_byte_refuses_the_whole_body
 test_r6_f3_a_parse_failure_is_reported_and_closes_nothing
 test_r6_f4_a_refusal_spells_each_id_exactly
 test_r6_f5_a_waive_whose_capture_file_cannot_be_made_does_not_run
-test_r6_f5_a_completion_whose_output_is_lost_keeps_every_edge_and_says_so
+test_r6_f5_a_completion_whose_output_is_lost_still_clears_in_the_same_run
 test_r7_f3_a_result_not_done_or_a_held_lock_keeps_every_edge
 test_r7_f4_every_typed_form_clears_and_is_guarded
 test_r7_f1_f2_a_failed_read_of_the_parse_or_its_result_closes_nothing

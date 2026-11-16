@@ -37,18 +37,23 @@ defs() {  # <script> <function...>
   done
 }
 
-# Main 1875 F1 (the reviewer's witness): the producer that feeds the member extractor prints a
-# cut list and fails while its consumer succeeds; the parse must still refuse the invalid
-# member. Controls: the same body without the injection refuses; a valid block is honored.
+# Main 1875 F1 and Main 2086 (3): the awk that reads the block's Train-member values for their
+# check prints a cut list (none of them) and fails; the parse must still refuse the invalid
+# member. The injection counts each time it fires, so the case cannot pass without reaching that
+# reader. Controls: the same body without the injection refuses; a valid block is honored.
 test_f1_a_failed_member_producer_refuses_the_block() {
-  local body=$TMP/f1.md valid=$TMP/f1-valid.md out
+  local body=$TMP/f1.md valid=$TMP/f1-valid.md fired=$TMP/f1-fired out
   printf '%s\n' "$BEGIN" 'Closes-backlog-item: guard-failed' 'Train-member: https://example.com/not-a-pr' "$END" > "$body"
   printf '%s\n' "$BEGIN" 'Closes-backlog-item: guard-valid' 'Train-member: https://github.com/example/repo/pull/7' "$END" > "$valid"
-  out=$(in_lib fm-pr-closes-lib.sh 'printf() {
-      if [ "${FUNCNAME[1]-}" = fm_pr_closes_values ]; then builtin printf "status\tblock\nid\tguard-failed\n"; return 74; fi
-      builtin printf "$@"; }
+  : > "$fired"
+  out=$(in_lib fm-pr-closes-lib.sh 'awk() {
+      if [ "${FUNCNAME[1]-}" = fm_pr_closes_values ] && [ "$*" != "${*#*t=member}" ]; then
+        builtin printf "fired\n" >> "'"$fired"'"; return 74
+      fi
+      command awk "$@"; }
     r=$(fm_pr_closes_parse "'"$body"'" '"$MERGED_URL"'); builtin printf "%s\n" "$r"')
-  check "f1: a cut, failed member producer still refuses the invalid member" "refused" "$(field "$out" status)"
+  check "f1: the injection reached the member-value reader" "1" "$(grep -c fired "$fired")"
+  check "f1: a cut, failed member-value reader still refuses the invalid member" "refused" "$(field "$out" status)"
   out=$(in_lib fm-pr-closes-lib.sh 'fm_pr_closes_parse "'"$body"'" '"$MERGED_URL")
   check "f1 control: the invalid member refuses without the injection" "refused" "$(field "$out" status)"
   out=$(in_lib fm-pr-closes-lib.sh 'fm_pr_closes_parse "'"$valid"'" '"$MERGED_URL")
@@ -265,13 +270,15 @@ newer_tasks_axi() {  # a copy of the installed package that says it is 0.2.7
   sed 's/"version": *"[^"]*"/"version": "0.2.7"/' "$TASKS_AXI_PKG/package.json" > "$TMP/tasks-axi-0.2.7/package.json"
 }
 
-# Main 2086 (1): a typed completion's own printed result decides the clear. tasks-axi prints the
-# completed row's state for a fresh and a repeated completion, plain and --json; when it shows
-# the row done, its dependents are cleared through the same clear as done and close, whatever
-# tasks-axi version is installed. A result that shows another state, names another row, or
-# cannot be read keeps every edge and hold, and says so.
+# Main 2086 (1): a typed completion's own result decides the clear. tasks-axi prints the completed
+# row's state for a fresh and a repeated completion, plain and --json; when it shows the row
+# done, its dependents are cleared through the same clear as done and close, whatever tasks-axi
+# version is installed. A readable result that shows another state or names another row keeps
+# every edge and hold, and says so. With no readable result, exit 0 alone is the proof
+# (Main 1795): the dependents are cleared and the report says the clear rests on it.
 test_c4_the_completions_own_result_decides_the_clear() {
   local dir out
+  command -v tasks-axi >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { ok "skipped: tasks-axi or jq is not installed"; return 0; }
   dir=$(completion_results) && newer_tasks_axi || { not_ok "c4 result: tasks-axi could not print real completion results here"; return 0; }
   check "c4 result: tasks-axi prints the waived row as done, plain and --json" "state: done | done" \
     "$(grep -x '  state: done' "$dir/waive.toon" | sed 's/^ *//') | $(jq -r .task.state "$dir/waive.json")"
@@ -287,24 +294,21 @@ test_c4_the_completions_own_result_decides_the_clear() {
     "actionable: tasks-axi accepted the waive of pf-x, but its own result shows pf-x as queued, not done, so every blocked-by edge and hold on it is kept" \
     "$(grep '^UNBLOCK\|^actionable' <<< "$out")"
   out=$(typed_branch_result "$dir/waive.json" public-followup waive pf-x --reason r --approved-by captain --json)
-  case "$out" in
-    *UNBLOCK*) not_ok "c4 result: a result for another row cleared pf-x" ;;
-    *'actionable: pf-x: closed, edges kept: completion result unreadable;'*) ok "c4 result: a result for another row keeps every edge and says so" ;;
-    *) not_ok "c4 result: a result for another row was not reported: $(tr '\n' '|' <<< "$out")" ;;
-  esac
+  check "c4 result: a result for another row keeps every edge and says so" \
+    "actionable: tasks-axi accepted the waive of pf-x, but its own result names the row pf-y, not pf-x, so every blocked-by edge and hold on pf-x is kept; once pf-x reads done, clear its dependents with tasks-axi unblock <item> --by pf-x" \
+    "$(grep '^UNBLOCK\|^actionable' <<< "$out" | tr '\n' '|' | sed 's/|$//')"
   : > "$TMP/empty.out"
   out=$(typed_branch_result "$TMP/empty.out" public-followup waive pf-x --reason r --approved-by captain)
-  case "$out" in
-    *UNBLOCK*) not_ok "c4 result: an empty result cleared pf-x" ;;
-    *'actionable: pf-x: closed, edges kept: completion result unreadable;'*) ok "c4 result: an empty result keeps every edge and says so" ;;
-    *) not_ok "c4 result: an empty result was not reported: $(tr '\n' '|' <<< "$out")" ;;
-  esac
+  check "c4 result: with no readable result, exit 0 clears and the report says so" \
+    "pf-x: tasks-axi printed no result the wrapper can read for its waive, so the clear rests on its exit 0, which tasks-axi gives only when the row is done|UNBLOCK pf-x" \
+    "$(grep '^UNBLOCK\|^pf-x:\|^actionable' <<< "$out" | tr '\n' '|' | sed 's/|$//')"
 }
 
 # Main 2086 (2): the clear loads no tasks-axi module: the typed branch never runs node, so no
 # private tasks-axi file is imported and no version of it is checked.
 test_c4_no_tasks_axi_module_is_loaded() {
   local dir
+  command -v tasks-axi >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { ok "skipped: tasks-axi or jq is not installed"; return 0; }
   dir=$(completion_results) && newer_tasks_axi || { not_ok "c4 modules: tasks-axi could not print real completion results here"; return 0; }
   rm -f "$TMP/node.log"
   typed_branch_result "$dir/waive.toon" public-followup waive pf-x --reason r --approved-by captain >/dev/null
