@@ -8933,12 +8933,12 @@ class Round10Findings(InvariantScenario):
     def test_r10_f8_a_stalled_owner_check_marker_write_never_keeps_the_owner_waiting_past_its_bound(self):
         elapsed, result = self.owner_check_with_a_stall(plane.OWNER_CHECK_FILE, 'write_atomically')
         self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
-        self.assertLess(elapsed, plane.OWNER_MARK_WAIT + 10.0, elapsed)
+        self.assertLess(elapsed, getattr(plane, 'OWNER_MARK_WAIT', 1.0) + 10.0, elapsed)   # the bound, read so that code without it fails on time
 
     def test_r10_f8_a_stalled_save_of_their_journal_never_keeps_the_owner_waiting_past_its_bound(self):
         elapsed, result = self.owner_check_with_a_stall(plane.SECOND_FILE, 'save')
         self.assertEqual(self.woken([result], INV_OWNER), ['200.000100'])
-        self.assertLess(elapsed, plane.OWNER_MARK_WAIT + plane.SECOND_IO_WAIT + 10.0, elapsed)
+        self.assertLess(elapsed, getattr(plane, 'OWNER_MARK_WAIT', 1.0) + getattr(plane, 'SECOND_IO_WAIT', 1.0) + 10.0, elapsed)
 
     # ---- F9: the blocked resolver is really entered; every later call is checked; a fresh check process each time has its own bound ----
 
