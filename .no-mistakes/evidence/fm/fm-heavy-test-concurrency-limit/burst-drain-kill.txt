@@ -1,0 +1,16 @@
+== B1 burst: 2 passes free; 8 one-pass requests (4 x free) submitted at once, each a 2 s CPU job
+completed:        8 of 8; nonzero exits: 0
+workers finished=8 peak_overlap_total=2 peak_per_outer={'b2': 1, 'b1': 1, 'b7': 1, 'b3': 1, 'b6': 1, 'b4': 1, 'b5': 1, 'b8': 1} worker_FM_CPU_PASS_HELD=['1']
+status: pool=18 held=16 free=2 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmburst.SPewrUidXs/pool
+
+== B2 killed waiter: a long holder takes both free passes; waiter W1 queues, is SIGTERMed while queued; waiter W2 queued behind it starts when the holder ends
+/tmp/fmiv-scripts/burst.sh: line 20: 60577 Terminated: 15          bin/fm-cpu-pass.sh run --label W1 -- bash -c 'echo W1 ran > "$1"' _ "$P/w1" 2> "$P/w1.err"
+W1 (killed while queued) exit=143 ran=no
+long holder ended
+W2 exit=0 started -0.04 s after holder end
+status: pool=18 held=16 free=2 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmburst.SPewrUidXs/pool
+
+== B3 killed holder command: a holder's command is SIGKILLed mid-run; the next waiter starts at once
+victim holder exit=137 (128+9 expected)
+next waiter exit=0 started 0.27 s after SIGKILL
+== final status: {"available": true, "dir": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmburst.SPewrUidXs/pool", "free": 18, "held": 0, "holders": [], "size": 18}

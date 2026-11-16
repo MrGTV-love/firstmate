@@ -1,0 +1,17 @@
+== head: pool 18; filler holds 16 (2 free); 3 outers x 1 pass, each starts 4 nested 2-second CPU workers at once
+pool=18 held=16 free=2 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmiv.VQISqEELRe/head/pool
+outer1 exit=0
+outer2 exit=0
+outer0 exit=0
+workers finished=12 peak_overlap_total=2 peak_per_outer={'outer1': 1, 'outer2': 1, 'outer0': 1} worker_FM_CPU_PASS_HELD=['1']
+status while filler still holds 16: pool=18 held=16 free=2 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmiv.VQISqEELRe/head/pool
+status after filler ends: {"available": true, "dir": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmiv.VQISqEELRe/head/pool", "free": 18, "held": 0, "holders": [], "size": 18}
+
+== base-5c91a7f38: pool 18; filler holds 16 (2 free); 3 outers x 1 pass, each starts 4 nested 2-second CPU workers at once
+pool=18 held=16 free=2 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmiv.VQISqEELRe/base-5c91a7f38/pool
+outer0 exit=0
+outer2 exit=0
+outer1 exit=0
+workers finished=12 peak_overlap_total=8 peak_per_outer={'outer0': 4, 'outer2': 4, 'outer1': 4} worker_FM_CPU_PASS_HELD=['1']
+status while filler still holds 16: pool=18 held=16 free=2 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmiv.VQISqEELRe/base-5c91a7f38/pool
+status after filler ends: {"available": true, "dir": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmiv.VQISqEELRe/base-5c91a7f38/pool", "free": 18, "held": 0, "holders": [], "size": 18}

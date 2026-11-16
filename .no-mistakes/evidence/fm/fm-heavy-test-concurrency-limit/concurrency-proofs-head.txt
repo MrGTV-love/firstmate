@@ -1,0 +1,365 @@
+python=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 tmp=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer0': 1, 'outer1': 1, 'outer2': 1}
+  sampled_max_passes_held = 2
+  samples = 132
+  sampler_gap_p99_ms = 95
+  sampler_gap_max_ms = 95
+  sampler_gap_p99_max_ms[nested] = 95/95
+  VIOLATION: nested: the sampler skipped too long (p99 gap 95 ms, max gap 95 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE H3 two-level: outer runner inside p passes -> suites that each run an inner runner --jobs 2 -> workers
+  sampler_gap_p99_max_ms[pool2-one-outer-2-passes] = 94/95
+  sampler_gap_p99_max_ms[pool2-two-outers-1-passes] = 95/95
+  pool2-one-outer-2-passes = {'outer_runners': 1, 'passes_each': 2, 'pool_size': 2, 'workers_started': 4, 'sampled_max_workers_total': 2, 'sampled_max_per_outer': {'outer0': 2}, 'sampled_max_passes_held': 2, 'samples': 28}
+  pool2-two-outers-1-passes = {'outer_runners': 2, 'passes_each': 1, 'pool_size': 2, 'workers_started': 8, 'sampled_max_workers_total': 2, 'sampled_max_per_outer': {'outer0': 1, 'outer1': 1}, 'sampled_max_passes_held': 2, 'samples': 53}
+  VIOLATION: pool2-one-outer-2-passes: the sampler skipped too long (p99 gap 94 ms, max gap 95 ms): it may have missed a short-lived worker
+  VIOLATION: pool2-two-outers-1-passes: the sampler skipped too long (p99 gap 95 ms, max gap 95 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE F1 nested key: gate test.K under fm-duration.py run test.other waits for an unnested test.K holder; under its own holder it runs at once
+  probe_exit = [0]
+  nested_ran_after_holder_end_s = 1.84
+  own_ancestry_exit = [0]
+  own_ancestry_seconds = 0.3
+  RESULT: PASS
+CASE F2 siblings: an outer suite under p passes starts several nested fm-test-run.sh at once; workers alive together never exceed p
+  sampler_gap_p99_max_ms[one-pass-two-siblings] = 95/95
+  sampler_gap_p99_max_ms[two-passes-three-siblings] = 95/95
+  one-pass-two-siblings = {'passes': 1, 'sibling_runners': 2, 'workers_started': 2, 'sampled_max_workers_total': 1, 'sampled_max_passes_held': 1}
+  two-passes-three-siblings = {'passes': 2, 'sibling_runners': 3, 'workers_started': 3, 'sampled_max_workers_total': 2, 'sampled_max_passes_held': 2}
+  VIOLATION: one-pass-two-siblings: the sampler skipped too long (p99 gap 95 ms, max gap 95 ms): it may have missed a short-lived worker
+  VIOLATION: two-passes-three-siblings: the sampler skipped too long (p99 gap 95 ms, max gap 95 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE F3 mixed cycle: gate test.A (holder) -> run test.B, while a pass holder calls gate test.A, pool of 1
+  exit_codes = [0, 0]
+  seconds = 4.4
+  RESULT: PASS
+CASE F3 lease cycle: under one pass: gate test.A -> fm-cpu-pass.sh run, while a sibling leaseholder calls gate test.A, pool of 1
+  exit_codes = [0]
+  seconds = 2.7
+  RESULT: PASS
+CASE case_holder_killed: SKIPPED - CI-only: it sends kill signals or injects faults, which no host runs (set CI, GITHUB_ACTIONS or FM_CONC_RUN_CI_ONLY to run it)
+CASE F7 one candidate: bin/fm-test-isolation-proof.sh --pool fam --jobs 2 over a single candidate, pool of 2
+  markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  recorded_concurrency = 1
+  jobs_enabled = False
+  RESULT: PASS
+CASE H4 unusable modes: no POSIX locks, a foreign-owned slot and pool directory, and no python3: the command runs without a slot or pass and the cause is named
+  no-flock_exit = [0]
+  no-flock_marker = 0
+  foreign-owner_exit = [0]
+  foreign-owner_marker = 0
+  no_python_run_exit = [0]
+  no_python_run_marker = 0
+  no_python_runner_exit = [0]
+  no_python_runner_end = ['FM_TEST_END 2026-11-16T18:35:07Z tests/fm-arm-pretool-check.test.sh exit=0 duration_ms=0 gate_skip=false']
+  RESULT: PASS
+CASE case_guard_unavailable: SKIPPED - CI-only: it sends kill signals or injects faults, which no host runs (set CI, GITHUB_ACTIONS or FM_CONC_RUN_CI_ONLY to run it)
+CASE case_guard_pipe_window: SKIPPED - CI-only: it sends kill signals or injects faults, which no host runs (set CI, GITHUB_ACTIONS or FM_CONC_RUN_CI_ONLY to run it)
+CASE F4 nested degrade: no POSIX locks and no python3, fresh and inside a held pass with tokens: the command runs and the notice is said once
+  no-flock-fresh_exit = [0]
+  no-flock-fresh_started = True
+  no-flock-fresh_notices = 1
+  no-flock-nested_exit = [0]
+  no-flock-nested_started = True
+  no-flock-nested_notices = 1
+  no-python-fresh_exit = [0]
+  no-python-fresh_started = True
+  no-python-fresh_notices = 1
+  no-python-nested_exit = [0]
+  no-python-nested_started = True
+  no-python-nested_notices = 1
+  RESULT: PASS
+CASE F2 pass counts: nested gate --passes 0 and -1, fresh --passes above the pool: exit 125, no command; the compliant controls run
+  sampler_gap_p99_max_ms[nested --passes 1] = 95/139
+  nested_1_outer = [0]
+  nested_1_child_exits = 0 0
+  nested_1_workers_started = 2
+  nested_1_peak = 1
+  nested_0_outer = [0]
+  nested_0_child_exits = 125 125
+  nested_0_workers_started = 0
+  nested_0_peak = 0
+  nested_-1_outer = [0]
+  nested_-1_child_exits = 125 125
+  nested_-1_workers_started = 0
+  nested_-1_peak = 0
+  fresh_2_in_1_exit = [125]
+  fresh_2_in_1_peak_held = 0
+  fresh_1_in_1_exit = [0]
+  fresh_1_in_1_peak_held = 1
+  fresh_2_in_2_exit = [0]
+  fresh_2_in_2_peak_held = 2
+  VIOLATION: nested --passes 1: the sampler skipped too long (p99 gap 95 ms, max gap 139 ms): it may have missed a short-lived worker
+  VIOLATION: nested --passes 0: the sampler skipped too long (p99 92 ms, max 93 ms)
+  VIOLATION: nested --passes -1: the sampler skipped too long (p99 93 ms, max 93 ms)
+  RESULT: FAIL
+CASE R6-1 missing-helper counts: fm-duration.py alone (no fm-cpu-pass.py beside it): nested --passes 2 in a one-pass reservation and fresh --passes above the CPU count exit 125 and run nothing; --passes 1 runs
+  nested-over-inherited_exit = [125]
+  nested-over-inherited_ran = False
+  nested-valid_exit = [0]
+  nested-valid_ran = True
+  fresh-over-pool_exit = [125]
+  fresh-over-pool_ran = False
+  fresh-valid_exit = [0]
+  fresh-valid_ran = True
+  RESULT: PASS
+CASE F3 proof contention: two candidates, --jobs 2, one of two tokens held by a sibling until the proof ends: concurrency is 1 and jobs stay disabled; uncontended it is 2 and enabled
+  sampler_gap_p99_max_ms[uncontended-control] = 95/95
+  uncontended-control_exit = [0]
+  uncontended-control_sampled_peak = 2
+  uncontended-control_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  uncontended-control_recorded = 2
+  uncontended-control_jobs_enabled = True
+  sampler_gap_p99_max_ms[contention] = 97/113
+  contention_exit = [0]
+  contention_sampled_peak = 1
+  contention_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=1']
+  contention_recorded = 1
+  contention_jobs_enabled = False
+  VIOLATION: uncontended-control: the sampler skipped too long (p99 gap 95 ms, max gap 95 ms): it may have missed a short-lived worker
+  VIOLATION: contention: the sampler skipped too long (p99 gap 97 ms, max gap 113 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE R6-2/3/4 proof: serialized launch records 1 (concurrent control 2); a contended skip fails like an uncontended one; a nested proof without python3 says it cannot lease
+  concurrent_exit = [0]
+  concurrent_recorded = 2
+  concurrent_jobs_enabled = True
+  serial_exit = [0]
+  serial_recorded = 1
+  serial_jobs_enabled = False
+  shell_launcher_exit = [0]
+  shell_launcher_recorded = 1
+  shell_launcher_jobs_enabled = False
+  background_child_exit = [0]
+  background_child_recorded = 1
+  background_child_jobs_enabled = False
+  skip_uncontended_exit = [1]
+  skip_uncontended_jobs_enabled = False
+  skip_uncontended_lease_notice_relayed = False
+  skip_contended_exit = [1]
+  skip_contended_jobs_enabled = False
+  skip_contended_lease_notice_relayed = True
+  nopython_exit = [0]
+  nopython_notices = 1
+  RESULT: PASS
+CASE R1 async cycle: two outer gates each start the other key in the background and wait on a sleep or a builtin timer: no extra copy while either outer runs
+  both-async_outer_exit = [0, 0]
+  both-async_inner_started = {'A': 'after', 'B': 'after'}
+  both-async_cycle_notices = {'A': False, 'B': False}
+  one-sync-one-async_outer_exit = [0, 0]
+  one-sync-one-async_inner_started = {'A': 'after', 'B': 'after'}
+  one-sync-one-async_cycle_notices = {'A': False, 'B': False}
+  builtin-timer_outer_exit = [0, 0]
+  builtin-timer_inner_started = {'A': 'after', 'B': 'after'}
+  builtin-timer_cycle_notices = {'A': False, 'B': False}
+  RESULT: PASS
+CASE A-4 gate chain cycle: gate A -> (exec) gate mid.A -> gate B while gate B -> (exec) gate mid.B -> gate A: both finish, each link being a gate that waits only for its command
+  exit_codes = [0, 0]
+  seconds = 1.1
+  RESULT: PASS
+CASE A-4 multi-holder cycle: FM_TEST_KEY_SLOTS=2: gates A1, A2 each (exec) gate mid -> gate B while B1, B2 each (exec) gate mid -> gate A: all four finish and one waiter is admitted; control: A2 runs free, nobody is admitted until it ends
+  cycle_exit_codes = [0, 0, 0, 0]
+  cycle_seconds = 2.0
+  cycle_admitted_beside_limit = ['A1']
+  free-holder-control_exit_codes = [0, 0, 0, 0]
+  free-holder-control_seconds = 6.8
+  free-holder-control_admitted_beside_limit = []
+  RESULT: PASS
+CASE A-4 cycle tail: election over registered records: W3 holds test.C and waits for test.A while gates of test.A and test.B wait on each other; W3 (and a second tail behind it) queued first: only the A/B member is elected
+  exit = 0
+  elected = {'tail': '[1100]', 'two-level-tail': '[1100]', 'cycle-only': '[1100]'}
+  RESULT: PASS
+CASE U6 mixed-version records: an old-format holder record and a new holder share a pool of 2: the new code counts both, drops neither while held, and frees the old one only when its lock ends
+  new_passes_taken = 1
+  status_held = 2
+  status_free = 0
+  holder_labels = ['new-code holder', 'old-code holder']
+  held_after_old_ends = [1]
+  RESULT: PASS
+CASE case_shell_between_waits: SKIPPED - CI-only: it sends kill signals or injects faults, which no host runs (set CI, GITHUB_ACTIONS or FM_CONC_RUN_CI_ONLY to run it)
+CASE R2 one reservation: same-key sibling runners, sibling isolation proofs and an oversized gate request under one held pass
+  sampler_gap_p99_max_ms[same-key] = 170/170
+  same-key_exit = [0]
+  same-key_workers_started = 2
+  same-key_peak_workers = 1
+  same-key_peak_passes = 1
+  sampler_gap_p99_max_ms[different-key-control] = 170/170
+  different-key-control_exit = [0]
+  different-key-control_workers_started = 2
+  different-key-control_peak_workers = 1
+  different-key-control_peak_passes = 1
+  sampler_gap_p99_max_ms[sibling proofs] = 170/170
+  proofs_exit = [0]
+  proofs_workers_started = 2
+  proofs_peak_workers = 1
+  proofs_peak_passes = 1
+  gate_passes_1_exit = [0]
+  gate_passes_1_command_started = True
+  gate_passes_2_exit = [125]
+  gate_passes_2_command_started = False
+  single_nesting_exit = [0]
+  VIOLATION: same-key: the sampler skipped too long (p99 gap 170 ms, max gap 170 ms): it may have missed a short-lived worker
+  VIOLATION: different-key-control: the sampler skipped too long (p99 gap 170 ms, max gap 170 ms): it may have missed a short-lived worker
+  VIOLATION: sibling proofs: the sampler skipped too long (p99 gap 170 ms, max gap 170 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE R3 jobs clamp: bin/fm-test-isolation-proof.sh --jobs of any length over one candidate, and over two candidates inside one held pass
+  jobs_0_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_0_recorded = 1
+  jobs_1_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_1_recorded = 1
+  jobs_2_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_2_recorded = 1
+  jobs_3_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_3_recorded = 1
+  sampler_gap_p99_max_ms[proof inside one held pass] = 171/204
+  held_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  held_recorded = 1
+  held_peak_workers = 1
+  VIOLATION: proof inside one held pass: the sampler skipped too long (p99 gap 171 ms, max gap 204 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE R5 duration sample: a script that waited about 4 s for the one pass records a sample near its own time (FM_TEST_KEY_SLOTS 1 and 0); FM_TEST_END still counts the wait
+  slots1_exit_codes = [0, 0]
+  slots1_ledger_samples_ms = [507]
+  slots1_fm_test_end_ms = [4431]
+  slots1_run_time_ms = 5127
+  slots0_exit_codes = [0, 0]
+  slots0_ledger_samples_ms = [416]
+  slots0_fm_test_end_ms = [4323]
+  slots0_run_time_ms = 4803
+  RESULT: PASS
+CASE H3 padded marker: FM_CPU_PASS_HELD=001 inside one genuinely held pass limits every participant to one worker
+  proof_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  proof_sampled_max_workers = 1
+  lint_sampled_max_shellchecks = 1
+  runner_sampled_max_workers = 1
+  RESULT: PASS
+CASE H8 key guard: an unverified FM_CPU_PASS_HELD, or an isolation proof that holds no pass, still waits for a held key slot
+  gate_waiter_ran_after_holder_end_s = 0.09
+  run_waiter_ran_after_holder_end_s = 2.08
+  gate-padded_waiter_ran_after_holder_end_s = -0.14
+  degraded-proof_candidate_marker = 0
+  degraded-proof_ran_after_holder_end_s = 0.4
+  genuine-proof_candidate_marker = 1
+  genuine-proof_ran_after_holder_end_s = 0.69
+  VIOLATION: gate-padded: a claimed FM_CPU_PASS_HELD=003 ran 0.14 s before the key slot holder ended
+  RESULT: FAIL
+CASE H4/H5 cross-key: gate A nests gate B while gate B nests gate A, one slot per key: neither waits for the other forever
+  no-pass-marker_exit_codes = [0, 0]
+  no-pass-marker_seconds = 1.2
+  degraded-marker-0_exit_codes = [0, 0]
+  degraded-marker-0_seconds = 1.0
+  genuine-marker-1_exit_codes = [0, 0]
+  genuine-marker-1_seconds = 1.4
+  RESULT: PASS
+CASE H3d: a malformed FM_CPU_PASS_HELD fails the participant that finds it
+  exit_codes = {'fm-cpu-pass.sh run [many]': 125, 'fm-cpu-pass.sh run [empty]': 125, 'fm-test-run.sh [many]': 125, 'fm-test-run.sh [empty]': 125, 'fm-duration.py gate [many]': 125, 'fm-duration.py gate [empty]': 125, 'fm-duration.py run [many]': 125, 'fm-duration.py run [empty]': 125, 'fm-lint.sh [many]': 125, 'fm-lint.sh [empty]': 125, 'fm-test-run.sh --check-coverage [many]': 125, 'fm-test-run.sh --check-coverage [empty]': 125}
+  RESULT: PASS
+CASE H2/H3 brief route: 3 x pool size different suites started as fm-duration.py run test.<suite> -- <command>, pool size 2
+  requests = 6
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-duration run test.suite0', 'fm-duration run test.suite1', 'fm-duration run test.suite2', 'fm-duration run test.suite3', 'fm-duration run test.suite4', 'fm-duration run test.suite5']
+  RESULT: PASS
+CASE H2 runner: an unnested fm-test-run.sh script takes a pass named in the holder list
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-test-run tests/fm-arm-pretool-check.test.sh', 'fm-test-run tests/fm-backend-herdr.test.sh']
+  per_key_slot_directories_created = 2
+  RESULT: PASS
+CASE H2 lint: two lint runs (--jobs 2) of 4 cold roots each, ShellCheck stub is a busy loop, pool size 2
+  lint_runs = 2
+  jobs_each = 2
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root0-0.sh', 'fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root0-1.sh', 'fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root0-2.sh', 'fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root0-3.sh', 'fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root1-0.sh', 'fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root1-1.sh', 'fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root1-2.sh', 'fm-lint /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/lint/root1-3.sh']
+  nested_lint_inside_one_pass_max_workers = 1
+  RESULT: PASS
+CASE H2 proof: bin/fm-test-isolation-proof.sh --jobs 4 over its candidate set, pool size 2
+  proof_jobs_requested = 4
+  pool_size = 2
+  candidates = 31
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-test-isolation-proof --pool portable']
+  family_jobs_4_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  family_jobs_4_jobs_enabled = False
+  family_jobs_2_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  family_jobs_2_jobs_enabled = True
+  three_candidates_default_jobs_markers = ['FM_ISOLATION_BEGIN planned=3', 'FM_ISOLATION_SUMMARY concurrency=3']
+  three_candidates_default_jobs_enabled = True
+  RESULT: PASS
+CASE H4: a waiter starts when a holder ends, not when time passes; an unusable pool runs the command and says so
+  wait_variable_seconds = 1
+  holder_seconds = 6
+  waiter_ran_after_start_s = 6.3
+  waiter_ran_after_holder_end_s = 0.15
+  fake_clock_default_setting = admitted=True sleeps=60 fake_hours=10.0
+  unusable_pool = {'fm-cpu-pass.sh run': (0, 'held=0', 1), 'fm-duration.py run': (0, 'held=0', 1), 'fm-duration.py gate --cpu-pass': (0, 'held=0', 1)}
+  off_switch_copies_alive_together = 3
+  one_slot_copies_alive_together = 1
+  slot_pass_cycle_exit_codes = [0, 0]
+  slot_pass_cycle_seconds = 0.8
+  RESULT: PASS
+CASE H5 burst: burst of 3 x pool size + 2 one-pass requests submitted at one barrier drains; the pool that ran it ends with nothing held or queued
+  sampler_gap_p99_max_ms[burst] = 192/246
+  requests = 8
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  start_order = q07 q06 q05 q00 q04 q01 q03 q02
+  completed = 8
+  final_status = m5k2z1qzsngr0000gn/T/fmconc.WfMqNk5S93/concurrency-a1z4cx8q/burst/pool", "free": 2, "held": 0, "holders": [], "size": 2}
+  VIOLATION: burst: the sampler skipped too long (p99 gap 192 ms, max gap 246 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE case_drain: SKIPPED - CI-only: it sends kill signals or injects faults, which no host runs (set CI, GITHUB_ACTIONS or FM_CONC_RUN_CI_ONLY to run it)
+CASE H7a control: a light start held back by a process pile-up for about a second is recorded with a capacity cause
+  exit_code = [0]
+  recorded_causes = ['overload: process pile-up: 20000 of 10666 user processes counted=0 priority=other']
+  sleeps = 6
+  first_notice_lines_printed_on_this_host = 0
+  RESULT: PASS
+CASE H5 start order: three same-class starts and one later machinery start wait behind a pile-up, then run in class and arrival order
+  arrival_order = other-1 other-2 other-3 machinery-4
+  exit_codes = [0, 0, 0, 0]
+  admitted_order = machinery-4 other-1 other-2 other-3
+  RESULT: PASS
+CASE validator controls: sampling_valid rejects a blind or slow sampler
+  blind_sampler_violations = 1
+  slow_sampler_violations = 1
+  sound_sampler_violations = 0
+  RESULT: PASS
+CASE H7a: sandbox soak: 4 lanes x 5 rounds, pool size 2, 1 pass-less burners, forced load 500
+  lanes = 4
+  rounds_per_lane = 5
+  pool_size = 2
+  background_burners_without_passes = 1
+  forced_load_average = 500
+  window_seconds = 38.5
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  samples = 238
+  sampler_gap_p99_ms = 239
+  sampler_gap_max_ms = 343
+  heavy_completed = 20 of 20
+  brief_route_completed = 40 of 40
+  light_starts_completed = 20 of 20
+  light_starts_admitted_at_once_counted_0 = 20
+  light_starts_with_a_wait_line = 0
+  admission_sleeps_waiting_for_another_start = 0
+  admission_sleeps_waiting_for_capacity_or_load = 0
+  sample_light_start_record = fm-cpu-pass: pipeline-start admitted: counted=0 limit=1 basis=fallback priority=other
+  final_status = held=0 free=2
+  final_queue_entries = []
+  sampler_gap_p99_max_ms[soak] = 239/343
+  VIOLATION: soak: the sampler skipped too long (p99 gap 239 ms, max gap 343 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+SUMMARY: 35 cases, 10 failed: H3abc, H3 two-level, F2 siblings, F2 pass counts, F3 proof contention, R2 one reservation, R3 jobs clamp, H8 key guard, H5 burst, H7a, 5 CI-only skipped (case_holder_killed, case_guard_unavailable, case_guard_pipe_window, case_shell_between_waits, case_drain)
+exit=1

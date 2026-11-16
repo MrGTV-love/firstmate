@@ -1,0 +1,48 @@
+== host: 18 cpus; 12:33  up 4 days, 21:09, 3 users, load averages: 11.52 11.29 11.76
+== pool size: 18
+== S1: hold every pass for 6 s, then a waiter asks for 1 pass
+pool=18 held=18 free=0 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmmanual.kg3CHijHPc/pool
+slot-0 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-1 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-2 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-3 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-4 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-5 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-6 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-7 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-8 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-9 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-10 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-11 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-12 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-13 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-14 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-15 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-16 pid=42726 passes=18 since=1794853986 label=holder-all
+slot-17 pid=42726 passes=18 since=1794853986 label=holder-all
+fm-cpu-pass: waiting 2s for 1 CPU pass(es) for waiter: all passes in use; pool size 18; holders: pid=42726 passes=18 since=1794853986 label=holder-all; pid=42726 passes=18 since=1794853986 label=holder-all; pid=42726 passes=18 since=1794853986 label=holder-all; pid=42726 passes=18 since=1794853986 label=holder-all; pid=42726 passes=18 since=1794853986 label=holder-all; and 13 more
+fm-cpu-pass: got 1 CPU pass(es) for waiter after 5s
+waiter started at +6.73s
+holder exit=0
+after: pool=18 held=0 free=18 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmmanual.kg3CHijHPc/pool
+
+== S2: nested runner asks for more than its outer reservation (outer holds 2, inner asks 5)
+fm-cpu-pass: --passes must not exceed FM_CPU_PASS_HELD (2)
+exit=125
+== S2b: nested inner asks 2 of outer 2
+inner FM_CPU_PASS_HELD=2
+exit=0
+== S3: malformed FM_CPU_PASS_HELD=abc
+fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer
+exit=125
+== S4: unusable pool dir (a regular file)
+fm-cpu-pass: running degraded without a CPU pass: pool directory /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmmanual.kg3CHijHPc/notadir is unusable: [Errno 17] File exists: '/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmmanual.kg3CHijHPc/notadir'
+ran with FM_CPU_PASS_HELD=0
+exit=0
+== S5: --passes 0 and --passes size+1
+fm-cpu-pass: --passes must be between 1 and the pool size (18)
+exit=125
+fm-cpu-pass: --passes must be between 1 and the pool size (18)
+exit=125
+== final status
+{"available": true, "dir": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmmanual.kg3CHijHPc/pool", "free": 18, "held": 0, "holders": [], "size": 18}

@@ -1,0 +1,8 @@
+Host timer limit on this macOS run host (2026-11-16):
+A bare python loop of time.sleep(0.02) wakes every ~169-170 ms in this agent shell
+(with and without `taskpolicy -l 0 -t 0`, and outside the tool sandbox).
+The concurrency fixture's sampler validity check requires <= 50 ms gaps, so every
+sampled case reports "sampler skipped too long" here. No case reported a cap
+violation: every sampled max (workers total, per outer runner, passes held) stayed
+at or below the pool size / held count. CI (ubuntu-latest, job cpu-pass-concurrency)
+is the owner of the 50 ms-cadence proof.

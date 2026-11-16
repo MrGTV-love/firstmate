@@ -1,0 +1,14 @@
+== S6: FM_TEST_KEY_SLOTS=1, FM_TEST_SLOT_WAIT_SECONDS=1 (old timeout); holder keeps test.demo for 8 s
+holder started
+fm-duration: waiting 3s for a free slot of test.demo (limit 1, FM_TEST_KEY_SLOTS); holders: pid=9939 alive held 5s
+holder ends at +10.80s
+fm-duration: got a slot of test.demo after 7s
+waiter started at +10.98s
+waiter exit=0 queued_ms=7731
+
+== S7: off switch FM_TEST_KEY_SLOTS=0: second copy starts at once
+second copy started at +0.82s
+== S8: malformed FM_TEST_KEY_SLOTS=abc
+fm-duration: FM_TEST_KEY_SLOTS='abc' must be a whole number from 0 (off) to 16
+exit=125
+== final pool: pool=18 held=0 free=18 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmslot.nGf0iWQ4Xw/pool

@@ -1,0 +1,35 @@
+CASE F6 holder kill: SIGKILL of only the gate / pass-holder process: a queued request does not start until the worker ends
+  gate --cpu-pass = {'queued_started_before_the_worker_ended': False, 'sampled_max_workers_total': 1, 'queued_exit': [0]}
+  fm-cpu-pass.sh run = {'queued_started_before_the_worker_ended': False, 'sampled_max_workers_total': 1, 'queued_exit': [0]}
+  RESULT: PASS
+CASE R6 guard and token faults: injected: the guard cannot start / the token directory cannot be created: the command runs without a pass, once-said, and the pass is free
+  guard-fork_gate_exit = [0]
+  guard-fork_gate_marker = 0
+  guard-fork_run_exit = [0]
+  guard-fork_run_marker = 0
+  guard-exits_gate_exit = [0]
+  guard-exits_gate_marker = 0
+  guard-exits_run_exit = [0]
+  guard-exits_run_marker = 0
+  token-storage_gate_exit = [0]
+  token-storage_gate_marker = 0
+  token-storage_run_exit = [0]
+  token-storage_run_marker = 0
+  RESULT: PASS
+CASE R6 guard pipe window: SIGKILL of the holder after the worker started, the worker having closed all inherited descriptors: a queued request starts only after the worker ended
+  gate = {'queued_exit': [0], 'first_end': [1794857829.634293], 'queued_start': [1794857829.97352]}
+  fm-cpu-pass.sh run = {'queued_exit': [0], 'first_end': [1794857833.65899], 'queued_start': [1794857833.959288]}
+  RESULT: PASS
+CASE A-4 shell between gates: two outer gates whose foreground gates run from a bash script that also has a live background helper: no inner starts while both outers are alive (cleanup kills the stuck outers)
+  outers_alive_after_6s = [True, True]
+  inner_started = {'A': False, 'B': False}
+  RESULT: PASS
+CASE H5 kill: SIGKILLed holder and waiters free the queue
+  sigkill_holder_to_next_start_s = 0.4
+  behind_killed_collector_exit = [0]
+  final_status = held=0 free=2 size=2
+  final_queue_entries = []
+  all_passes_collectable_at_once = True
+  RESULT: PASS
+SUMMARY: 5 cases, 0 failed
+exit=0

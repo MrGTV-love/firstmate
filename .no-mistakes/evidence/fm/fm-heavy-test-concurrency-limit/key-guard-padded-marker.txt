@@ -1,0 +1,9 @@
+fm-duration: waiting 2s for a free slot of test.kg1 (limit 1, FM_TEST_KEY_SLOTS); holders: pid=74700 alive held 3s
+fm-duration: got a slot of test.kg1 after 3s
+round 1: waiter(FM_CPU_PASS_HELD=003) exit=0 holder_end=1794856784.215 waiter_start=1794856784.397 waiter_minus_holder_end_s=0.182
+fm-duration: waiting 2s for a free slot of test.kg2 (limit 1, FM_TEST_KEY_SLOTS); holders: pid=87140 alive held 3s
+fm-duration: got a slot of test.kg2 after 4s
+round 2: waiter(FM_CPU_PASS_HELD=003) exit=0 holder_end=1794856788.892 waiter_start=1794856789.256 waiter_minus_holder_end_s=0.364
+fm-duration: waiting 2s for a free slot of test.kg3 (limit 1, FM_TEST_KEY_SLOTS); holders: pid=95957 alive held 3s
+fm-duration: got a slot of test.kg3 after 3s
+round 3: waiter(FM_CPU_PASS_HELD=003) exit=0 holder_end=1794856793.759 waiter_start=1794856793.847 waiter_minus_holder_end_s=0.088

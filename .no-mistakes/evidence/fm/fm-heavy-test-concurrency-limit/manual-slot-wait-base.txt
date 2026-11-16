@@ -1,0 +1,6 @@
+== BASE 5c91a7f38: same S6 (slots=1, wait seconds=1, holder 8 s)
+holder started
+fm-duration: waiting 1s for a free slot of test.demo (limit 1, FM_TEST_KEY_SLOTS; gives up after 1s); holders: pid=71185 alive held 2s
+fm-duration: waited 1s for a free slot of test.demo (limit 1); running it without a slot
+waiter started at +2.19s
+holder ends at +8.36s

@@ -1,0 +1,159 @@
+rerun of failed cases; 13:06  up 4 days, 21:42, 3 users, load averages: 12.76 10.96 12.00
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer0': 1, 'outer2': 1, 'outer1': 1}
+  sampled_max_passes_held = 2
+  samples = 108
+  sampler_gap_p99_ms = 219
+  sampler_gap_max_ms = 294
+  sampler_gap_p99_max_ms[nested] = 219/294
+  VIOLATION: nested: the sampler skipped too long (p99 gap 219 ms, max gap 294 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE H3 two-level: outer runner inside p passes -> suites that each run an inner runner --jobs 2 -> workers
+  sampler_gap_p99_max_ms[pool2-one-outer-2-passes] = 168/169
+  sampler_gap_p99_max_ms[pool2-two-outers-1-passes] = 170/170
+  pool2-one-outer-2-passes = {'outer_runners': 1, 'passes_each': 2, 'pool_size': 2, 'workers_started': 4, 'sampled_max_workers_total': 2, 'sampled_max_per_outer': {'outer0': 2}, 'sampled_max_passes_held': 2, 'samples': 19}
+  pool2-two-outers-1-passes = {'outer_runners': 2, 'passes_each': 1, 'pool_size': 2, 'workers_started': 8, 'sampled_max_workers_total': 2, 'sampled_max_per_outer': {'outer1': 1, 'outer0': 1}, 'sampled_max_passes_held': 2, 'samples': 32}
+  VIOLATION: pool2-one-outer-2-passes: the sampler skipped too long (p99 gap 168 ms, max gap 169 ms): it may have missed a short-lived worker
+  VIOLATION: pool2-two-outers-1-passes: the sampler skipped too long (p99 gap 170 ms, max gap 170 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE F2 siblings: an outer suite under p passes starts several nested fm-test-run.sh at once; workers alive together never exceed p
+  sampler_gap_p99_max_ms[one-pass-two-siblings] = 168/170
+  sampler_gap_p99_max_ms[two-passes-three-siblings] = 169/169
+  one-pass-two-siblings = {'passes': 1, 'sibling_runners': 2, 'workers_started': 2, 'sampled_max_workers_total': 1, 'sampled_max_passes_held': 1}
+  two-passes-three-siblings = {'passes': 2, 'sibling_runners': 3, 'workers_started': 3, 'sampled_max_workers_total': 2, 'sampled_max_passes_held': 2}
+  VIOLATION: one-pass-two-siblings: the sampler skipped too long (p99 gap 168 ms, max gap 170 ms): it may have missed a short-lived worker
+  VIOLATION: two-passes-three-siblings: the sampler skipped too long (p99 gap 169 ms, max gap 169 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE F2 pass counts: nested gate --passes 0 and -1, fresh --passes above the pool: exit 125, no command; the compliant controls run
+  sampler_gap_p99_max_ms[nested --passes 1] = 169/170
+  nested_1_outer = [0]
+  nested_1_child_exits = 0 0
+  nested_1_workers_started = 2
+  nested_1_peak = 1
+  nested_0_outer = [0]
+  nested_0_child_exits = 125 125
+  nested_0_workers_started = 0
+  nested_0_peak = 0
+  nested_-1_outer = [0]
+  nested_-1_child_exits = 125 125
+  nested_-1_workers_started = 0
+  nested_-1_peak = 0
+  fresh_2_in_1_exit = [125]
+  fresh_2_in_1_peak_held = 0
+  fresh_1_in_1_exit = [0]
+  fresh_1_in_1_peak_held = 1
+  fresh_2_in_2_exit = [0]
+  fresh_2_in_2_peak_held = 2
+  VIOLATION: nested --passes 1: the sampler skipped too long (p99 gap 169 ms, max gap 170 ms): it may have missed a short-lived worker
+  VIOLATION: nested --passes 0: the sampler skipped too long (p99 166 ms, max 166 ms)
+  VIOLATION: nested --passes -1: the sampler skipped too long (p99 136 ms, max 170 ms)
+  RESULT: FAIL
+CASE F3 proof contention: two candidates, --jobs 2, one of two tokens held by a sibling until the proof ends: concurrency is 1 and jobs stay disabled; uncontended it is 2 and enabled
+  sampler_gap_p99_max_ms[uncontended-control] = 252/368
+  uncontended-control_exit = [0]
+  uncontended-control_sampled_peak = 2
+  uncontended-control_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  uncontended-control_recorded = 2
+  uncontended-control_jobs_enabled = True
+  sampler_gap_p99_max_ms[contention] = 170/170
+  contention_exit = [0]
+  contention_sampled_peak = 1
+  contention_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=1']
+  contention_recorded = 1
+  contention_jobs_enabled = False
+  VIOLATION: uncontended-control: the sampler skipped too long (p99 gap 252 ms, max gap 368 ms): it may have missed a short-lived worker
+  VIOLATION: contention: the sampler skipped too long (p99 gap 170 ms, max gap 170 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE R2 one reservation: same-key sibling runners, sibling isolation proofs and an oversized gate request under one held pass
+  sampler_gap_p99_max_ms[same-key] = 170/181
+  same-key_exit = [0]
+  same-key_workers_started = 2
+  same-key_peak_workers = 1
+  same-key_peak_passes = 1
+  sampler_gap_p99_max_ms[different-key-control] = 169/170
+  different-key-control_exit = [0]
+  different-key-control_workers_started = 2
+  different-key-control_peak_workers = 1
+  different-key-control_peak_passes = 1
+  sampler_gap_p99_max_ms[sibling proofs] = 170/170
+  proofs_exit = [0]
+  proofs_workers_started = 2
+  proofs_peak_workers = 1
+  proofs_peak_passes = 1
+  gate_passes_1_exit = [0]
+  gate_passes_1_command_started = True
+  gate_passes_2_exit = [125]
+  gate_passes_2_command_started = False
+  single_nesting_exit = [0]
+  VIOLATION: same-key: the sampler skipped too long (p99 gap 170 ms, max gap 181 ms): it may have missed a short-lived worker
+  VIOLATION: different-key-control: the sampler skipped too long (p99 gap 169 ms, max gap 170 ms): it may have missed a short-lived worker
+  VIOLATION: sibling proofs: the sampler skipped too long (p99 gap 170 ms, max gap 170 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE R3 jobs clamp: bin/fm-test-isolation-proof.sh --jobs of any length over one candidate, and over two candidates inside one held pass
+  jobs_0_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_0_recorded = 1
+  jobs_1_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_1_recorded = 1
+  jobs_2_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_2_recorded = 1
+  jobs_3_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_3_recorded = 1
+  sampler_gap_p99_max_ms[proof inside one held pass] = 167/169
+  held_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  held_recorded = 1
+  held_peak_workers = 1
+  VIOLATION: proof inside one held pass: the sampler skipped too long (p99 gap 167 ms, max gap 169 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE H8 key guard: an unverified FM_CPU_PASS_HELD, or an isolation proof that holds no pass, still waits for a held key slot
+  gate_waiter_ran_after_holder_end_s = 2.08
+  run_waiter_ran_after_holder_end_s = 2.08
+  gate-padded_waiter_ran_after_holder_end_s = 1.94
+  degraded-proof_candidate_marker = 0
+  degraded-proof_ran_after_holder_end_s = 0.32
+  genuine-proof_candidate_marker = 1
+  genuine-proof_ran_after_holder_end_s = 1.19
+  RESULT: PASS
+CASE H5 burst: burst of 3 x pool size + 2 one-pass requests submitted at one barrier drains; the pool that ran it ends with nothing held or queued
+  sampler_gap_p99_max_ms[burst] = 169/169
+  requests = 8
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  start_order = q04 q01 q00 q05 q03 q07 q02 q06
+  completed = 8
+  final_status = m5k2z1qzsngr0000gn/T/fmconc.eUsKHihLcL/concurrency-gqve15dc/burst/pool", "free": 2, "held": 0, "holders": [], "size": 2}
+  VIOLATION: burst: the sampler skipped too long (p99 gap 169 ms, max gap 169 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE H7a: sandbox soak: 4 lanes x 5 rounds, pool size 2, 1 pass-less burners, forced load 500
+  lanes = 4
+  rounds_per_lane = 5
+  pool_size = 2
+  background_burners_without_passes = 1
+  forced_load_average = 500
+  window_seconds = 31.1
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  samples = 203
+  sampler_gap_p99_ms = 170
+  sampler_gap_max_ms = 173
+  heavy_completed = 20 of 20
+  brief_route_completed = 40 of 40
+  light_starts_completed = 20 of 20
+  light_starts_admitted_at_once_counted_0 = 20
+  light_starts_with_a_wait_line = 0
+  admission_sleeps_waiting_for_another_start = 0
+  admission_sleeps_waiting_for_capacity_or_load = 0
+  sample_light_start_record = fm-cpu-pass: pipeline-start admitted: counted=0 limit=1 basis=fallback priority=other
+  final_status = held=0 free=2
+  final_queue_entries = []
+  sampler_gap_p99_max_ms[soak] = 170/173
+  VIOLATION: soak: the sampler skipped too long (p99 gap 170 ms, max gap 173 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+SUMMARY: 10 cases, 9 failed: H3abc, H3 two-level, F2 siblings, F2 pass counts, F3 proof contention, R2 one reservation, R3 jobs clamp, H5 burst, H7a
+exit=1

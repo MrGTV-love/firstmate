@@ -1,0 +1,13 @@
+== S9: one outer reservation of 2 passes runs bin/fm-test-run.sh --jobs 6 over 4 proven-isolated scripts
+-- sample 1: new max held=2
+   holder {'holder': 'pid=72586 passes=2 since=1794854176 label=outer-suite', 'slot': 2}
+   holder {'holder': 'pid=72586 passes=2 since=1794854176 label=outer-suite', 'slot': 5}
+outer exit=0; max pool passes held=2 (pool 18)
+fm-test-run: reducing --jobs 6 to inherited FM_CPU_PASS_HELD=2
+FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=1027599
+
+== S10: unnested runner, one script: it takes its own pass (holder list)
+-- sample 5
+pool=18 held=1 free=17 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fmrun.4kq6pUgKOw/pool
+slot-11 pid=28837 passes=1 since=1794855209 label=fm-test-run tests/fm-captain-hold-archive.test.sh
+NOTE: S10 was stopped by the agent tool's 20-minute background limit after the holder sample above; the script's own result was not awaited. Temp dir removed.

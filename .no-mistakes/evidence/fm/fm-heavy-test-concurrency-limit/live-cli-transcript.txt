@@ -1,0 +1,46 @@
+## head 6440ab67f; private pool /tmp/fmlive.UbCS/pool; pool size 18
+## S1: all 18 passes held 5 s; a 1-pass waiter arrives at +0.5 s
+-- status while held:
+pool=18 held=18 free=0 dir=/tmp/fmlive.UbCS/pool
+slot-0 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-1 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-2 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-3 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-4 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-5 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-6 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-7 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-8 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-9 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-10 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-11 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-12 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-13 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-14 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-15 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-16 pid=45888 passes=18 since=1794857194 label=live-holder
+slot-17 pid=45888 passes=18 since=1794857194 label=live-holder
+fm-cpu-pass: waiting 2s for 1 CPU pass(es) for live-waiter: all passes in use; pool size 18; holders: pid=45888 passes=18 since=1794857194 label=live-holder; pid=45888 passes=18 since=1794857194 label=live-holder; pid=45888 passes=18 since=1794857194 label=live-holder; pid=45888 passes=18 since=1794857194 label=live-holder; pid=45888 passes=18 since=1794857194 label=live-holder; and 13 more
+holder_end 1794857199.70
+fm-cpu-pass: got 1 CPU pass(es) for live-waiter after 5s
+waiter_start 1794857200.28
+-- status after:
+pool=18 held=0 free=18 dir=/tmp/fmlive.UbCS/pool
+## S2: the 18-pass holder's command SIGKILLs itself after 2 s; waiter must start at once
+self_kill 1794857202.73
+holder exit=137
+waiter_start 1794857203.07
+-- status after:
+pool=18 held=0 free=18 dir=/tmp/fmlive.UbCS/pool
+## S3: per-key slot, FM_TEST_KEY_SLOTS=1, FM_TEST_SLOT_WAIT_SECONDS=1, holder runs 6 s
+fm-duration: waiting 2s for a free slot of test.live.key (limit 1, FM_TEST_KEY_SLOTS); holders: pid=62036 alive held 3s
+slot_holder_end 1794857209.53
+fm-duration: got a slot of test.live.key after 6s
+slot_waiter_start 1794857210.17
+## S4: FM_TEST_KEY_SLOTS=0 off switch: two copies run together
+off_a_start 1794857210.36
+off_b_start 1794857210.80
+## S5: unusable pool (pool path is a file): request runs without a pass and says so
+fm-cpu-pass: running degraded without a CPU pass: pool directory /tmp/fmlive.UbCS/afile is unusable: [Errno 17] File exists: '/tmp/fmlive.UbCS/afile'
+ran with FM_CPU_PASS_HELD=0
+exit=0
