@@ -1,0 +1,17 @@
+head=a456a4e5a2e7e56fe090b18b4d06ab3d50a71708
+== fake gh-axi answers the malformed body after 0s; owner window is 0.8 s (the base test's window)
+$ fm-github-accounting.py run --duration 0.8
+exit=0
+$ fm-github-accounting.py records --kind quota
+<no quota rows>
+-- what the base test did next: records('quota')[0]
+                                                                                        ~~~~^^^
+IndexError: list index out of range
+== fake gh-axi answers the malformed body after 1.5s; owner window is 0.8 s (the base test's window)
+$ fm-github-accounting.py run --duration 0.8
+exit=0
+$ fm-github-accounting.py records --kind quota
+<no quota rows>
+-- what the base test did next: records('quota')[0]
+                                                                                        ~~~~^^^
+IndexError: list index out of range

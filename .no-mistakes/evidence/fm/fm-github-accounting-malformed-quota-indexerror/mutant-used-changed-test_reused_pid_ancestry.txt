@@ -1,0 +1,31 @@
+# mutant: quota_result records int(value) + 1 (used=24 instead of 23)
+diff --git a/bin/fm-github-accounting.py b/bin/fm-github-accounting.py
+index d728c5da..723820e8 100755
+--- a/bin/fm-github-accounting.py
++++ b/bin/fm-github-accounting.py
+@@ -409,7 +409,7 @@ def quota_result(db, child, stream, began, run_id, timed_out):
+         match = QUOTA_BODY.search(projection)
+         if timed_out or child.returncode or match is None:
+             raise ValueError("unavailable")
+-        fields = {key: int(value) for key, value in zip(("used", "reset", "limit", "remaining"), match.groups())
++        fields = {key: int(value) + 1 for key, value in zip(("used", "reset", "limit", "remaining"), match.groups())
+                   if value != "null"}
+         status = "observed"
+     except (ValueError, KeyError, TypeError):
+# test run
+test_reused_pid_ancestry_and_private_arguments (__main__.ObserverTests.test_reused_pid_ancestry_and_private_arguments) ... FAIL
+
+======================================================================
+FAIL: test_reused_pid_ancestry_and_private_arguments (__main__.ObserverTests.test_reused_pid_ancestry_and_private_arguments)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7JV994CP29HWVV2HACBFT51/tests/fm-github-accounting.behavior.test.py", line 150, in test_reused_pid_ancestry_and_private_arguments
+    self.assertEqual(self.records("quota")[0]["graphql"]["used"], 23)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 24 != 23
+
+----------------------------------------------------------------------
+Ran 1 test in 2.171s
+
+FAILED (failures=1)
+exit=1

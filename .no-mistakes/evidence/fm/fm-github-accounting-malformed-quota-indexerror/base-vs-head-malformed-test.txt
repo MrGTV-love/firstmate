@@ -1,0 +1,56 @@
+base=514055849c41950108fcd45b1e295115eab9e1db (extracted to a temp dir)
+== try 1: base test_malformed_quota_is_unavailable_not_zero
+.
+----------------------------------------------------------------------
+Ran 1 test in 1.552s
+
+OK
+== try 2: base test_malformed_quota_is_unavailable_not_zero
+IndexError: list index out of range
+
+----------------------------------------------------------------------
+Ran 1 test in 1.531s
+
+FAILED (errors=1)
+== try 3: base test_malformed_quota_is_unavailable_not_zero
+.
+----------------------------------------------------------------------
+Ran 1 test in 1.529s
+
+OK
+== try 4: base test_malformed_quota_is_unavailable_not_zero
+IndexError: list index out of range
+
+----------------------------------------------------------------------
+Ran 1 test in 1.688s
+
+FAILED (errors=1)
+== try 5: base test_malformed_quota_is_unavailable_not_zero
+IndexError: list index out of range
+
+----------------------------------------------------------------------
+Ran 1 test in 1.725s
+
+FAILED (errors=1)
+
+head=a456a4e5a2e7e56fe090b18b4d06ab3d50a71708
+== try 1: head malformed + zero-control tests
+Ran 2 tests in 0.479s
+
+OK
+== try 2: head malformed + zero-control tests
+Ran 2 tests in 0.454s
+
+OK
+== try 3: head malformed + zero-control tests
+Ran 2 tests in 0.592s
+
+OK
+== try 4: head malformed + zero-control tests
+Ran 2 tests in 0.550s
+
+OK
+== try 5: head malformed + zero-control tests
+Ran 2 tests in 0.499s
+
+OK

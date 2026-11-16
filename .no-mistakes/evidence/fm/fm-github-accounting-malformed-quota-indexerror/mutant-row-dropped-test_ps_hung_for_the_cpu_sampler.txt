@@ -1,0 +1,33 @@
+# mutant: quota_result returns before recording (row dropped)
+diff --git a/bin/fm-github-accounting.py b/bin/fm-github-accounting.py
+index d728c5da..263e4782 100755
+--- a/bin/fm-github-accounting.py
++++ b/bin/fm-github-accounting.py
+@@ -403,7 +403,7 @@ def stop_without_progress(child, expired):
+ 
+ 
+ def quota_result(db, child, stream, began, run_id, timed_out):
+-    stream.seek(0)
++    return
+     try:
+         projection = stream.read(1024 * 1024).decode("utf-8", "replace")
+         match = QUOTA_BODY.search(projection)
+# test run
+test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working (__main__.ObserverTests.test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working) ... FAIL
+
+======================================================================
+FAIL: test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working (__main__.ObserverTests.test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7JV994CP29HWVV2HACBFT51/tests/fm-github-accounting.behavior.test.py", line 648, in test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working
+    reply = self.run_until_recorded(3, "quota")
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7JV994CP29HWVV2HACBFT51/tests/fm-github-accounting.behavior.test.py", line 103, in run_until_recorded
+    self.fail(f"owner recorded no {sorted(set(kinds) - found)} row within {window} s")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: owner recorded no ['quota'] row within 3 s
+
+----------------------------------------------------------------------
+Ran 1 test in 3.396s
+
+FAILED (failures=1)
+exit=1

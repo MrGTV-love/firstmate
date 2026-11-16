@@ -1,0 +1,49 @@
+head=a456a4e5a2e7e56fe090b18b4d06ab3d50a71708
+== case: malformed null counters (the reported input)
+== fake gh-axi body: 'used=null reset=null limit=5000 remaining=0' exit=0
+$ fm-github-accounting.py start
+{"state": "running", "pid": 63655, "run_id": "42d7731ded04432dbb6cfa7dd053f51e", "started_at": 1794861020.579077}
+$ fm-github-accounting.py stop
+{"state": "stopped"}
+$ fm-github-accounting.py records --kind quota
+{"status": "unavailable", "graphql": {}, "source": "REST rate_limit resources.graphql", "exit_code": 0}
+== case: zero counters (valid, control)
+== fake gh-axi body: 'used=0 reset=1794000000 limit=5000 remaining=0' exit=0
+$ fm-github-accounting.py start
+{"state": "running", "pid": 65618, "run_id": "4e6e3d63e1274e1295a4e355cf24a896", "started_at": 1794861026.441184}
+$ fm-github-accounting.py stop
+{"state": "stopped"}
+$ fm-github-accounting.py records --kind quota
+{"status": "observed", "graphql": {"limit": 5000, "remaining": 0, "reset": 1794000000, "used": 0}, "source": "REST rate_limit resources.graphql", "exit_code": 0}
+== case: malformed: non-numeric used
+== fake gh-axi body: 'used=abc reset=1794000000 limit=5000 remaining=4977' exit=0
+$ fm-github-accounting.py start
+{"state": "running", "pid": 68366, "run_id": "3531f7f5621e46b09f44d9e059d88e62", "started_at": 1794861034.373782}
+$ fm-github-accounting.py stop
+{"state": "stopped"}
+$ fm-github-accounting.py records --kind quota
+{"status": "unavailable", "graphql": {}, "source": "REST rate_limit resources.graphql", "exit_code": 0}
+== case: malformed: body missing fields
+== fake gh-axi body: 'garbage' exit=0
+$ fm-github-accounting.py start
+{"state": "running", "pid": 71209, "run_id": "3a9fd6c1357e4a3695ceee92d1cb506f", "started_at": 1794861042.005186}
+$ fm-github-accounting.py stop
+{"state": "stopped"}
+$ fm-github-accounting.py records --kind quota
+{"status": "unavailable", "graphql": {}, "source": "REST rate_limit resources.graphql", "exit_code": 0}
+== case: malformed: used=null only
+== fake gh-axi body: 'used=null reset=1794000000 limit=5000 remaining=4977' exit=0
+$ fm-github-accounting.py start
+{"state": "running", "pid": 75902, "run_id": "9abfe7b249ec482482136d8d92dea23d", "started_at": 1794861052.185627}
+$ fm-github-accounting.py stop
+{"state": "stopped"}
+$ fm-github-accounting.py records --kind quota
+{"status": "unavailable", "graphql": {}, "source": "REST rate_limit resources.graphql", "exit_code": 0}
+== case: valid counters but gh-axi exit 1
+== fake gh-axi body: 'used=23 reset=1794000000 limit=5000 remaining=4977' exit=1
+$ fm-github-accounting.py start
+{"state": "running", "pid": 79190, "run_id": "5c4d99e1f96f43189650b86cd5fb1bd4", "started_at": 1794861060.703775}
+$ fm-github-accounting.py stop
+{"state": "stopped"}
+$ fm-github-accounting.py records --kind quota
+{"status": "unavailable", "graphql": {}, "source": "REST rate_limit resources.graphql", "exit_code": 1}
