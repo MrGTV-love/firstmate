@@ -1,0 +1,57 @@
+== lab (base932-governed): spawn tree /Users/charlesabrooker/tmp/fm-base-tree.xw6RqD/fm at 932cecc21
+origin tip at start: 720b104ded1f1c222f5ff361315b7dae026beeea
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project
+watcher: HEAD=89c3ea9cd8b31f3e6e455e3cfc9cb78a811e5f34
+watcher: origin=fefde5b135d1cd90fc8d6a4c3454f4a1c2a6f01b
+-- slot 1 right after the watcher wrote
+HEAD=89c3ea9cd8b31f3e6e455e3cfc9cb78a811e5f34
+log: 89c3ea9 unlanded work;fefde5b add slot owner;720b104 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project/keep.local: No such file or directory
+status:
+
+-- fm-spawn.sh output
+warning: task lab-governed-base932-governed: /Users/charlesabrooker/tmp/fm-lab.8ZiaH7/data/lab-governed-base932-governed/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.8ZiaH7/data/lab-governed-base932-governed/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-governed-base932-governed
+warning: /Users/charlesabrooker/tmp/fm-lab.8ZiaH7/data/lab-governed-base932-governed/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode direct-PR - confirm its definition of done matches
+notice: lab-governed-base932-governed ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+{"state": "BLOCKED", "reason": "lab_stand_in_provisioner_refuses"}
+error: slot provisioner refused task lab-governed-base932-governed (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.8ZiaH7/data/lab-governed-base932-governed/slot-provision-spawn.19018.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project and endpoint primary:fm-lab-governed-base932-governed retained; no worker admitted
+SPAWN_EXIT=1
+-- slot 1 AFTER spawn
+HEAD=89c3ea9cd8b31f3e6e455e3cfc9cb78a811e5f34
+log: 89c3ea9 unlanded work;fefde5b add slot owner;720b104 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project/keep.local: No such file or directory
+status:
+
+provisioner calls: ["--repo-root", "/Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/project", "--worktree-path", "/Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project", "--owner-id", "lab-governed-base932-governed", "--branch", "fm/lab-governed-base932-governed", "--base-sha", "fefde5b135d1cd90fc8d6a4c3454f4a1c2a6f01b", "--owned-path", "scripts"]
+-- treehouse status AFTER
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project  (detached)
+                   zsh (23951)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project
+branch=fm/lab-governed-base932-governed
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project
+HEAD=89c3ea9cd8b31f3e6e455e3cfc9cb78a811e5f34
+log: 89c3ea9 unlanded work;fefde5b add slot owner;720b104 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project/keep.local: No such file or directory
+status:
+
+origin tip: fefde5b135d1cd90fc8d6a4c3454f4a1c2a6f01b
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project
+HEAD=89c3ea9cd8b31f3e6e455e3cfc9cb78a811e5f34
+log: 89c3ea9 unlanded work;fefde5b add slot owner;720b104 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project/keep.local: No such file or directory
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/tmp/fm-base-tree.xw6RqD/fm
+fm-lab-governed-base932-governed zsh /Users/charlesabrooker/tmp/fm-lab-world.xmXIFl/pool/.treehouse/project-a76fbf/1/project

@@ -1,0 +1,72 @@
+== lab (fixed-dirty): spawn tree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P at dc7b2f105
+origin tip at start: 7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project
+watcher: HEAD=7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+watcher: origin=7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+-- slot 1 right after the watcher wrote
+HEAD=7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+log: 7fe229f initial;
+mine.txt=UNIQUE uncommitted work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project/keep.local: No such file or directory
+status:
+?? mine.txt
+-- fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7Mjjqf
+warning: task lab-dirty-fixed-dirty: /Users/charlesabrooker/tmp/fm-lab.7Mjjqf/data/lab-dirty-fixed-dirty/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.7Mjjqf/data/lab-dirty-fixed-dirty/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-dirty-fixed-dirty
+warning: /Users/charlesabrooker/tmp/fm-lab.7Mjjqf/data/lab-dirty-fixed-dirty/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lab-dirty-fixed-dirty ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project' was not moved (dirty_tree): it is not clean, it holds uncommitted work (?? mine.txt)
+skipped: copy /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project (dirty_tree) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+local-only source: local=main@7fe229f33299fd68bd7fc251181ebcf4bf7245c8 origin=main@7fe229f33299fd68bd7fc251181ebcf4bf7245c8 selected=origin/main@7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+skill selection for lab-dirty-fixed-dirty: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.7Mjjqf/data/lab-dirty-fixed-dirty/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project (dirty_tree) held by firstmate-skipped:lab-dirty-fixed-dirty
+spawned lab-dirty-fixed-dirty harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-lab-dirty-fixed-dirty worktree=/Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project
+SPAWN_EXIT=0
+-- slot 1 AFTER spawn
+HEAD=7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+log: 7fe229f initial;
+mine.txt=UNIQUE uncommitted work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project/keep.local: No such file or directory
+status:
+?? mine.txt
+provisioner calls: none
+-- treehouse status AFTER
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project  (detached)  (held by firstmate-skipped:lab-dirty-fixed-dirty)
+                   zsh (57824), treehouse (65234)
+2     in-use       /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project  (detached)
+                   zsh (65716), sleep (83478)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project
+branch=fm/lab-dirty-fixed-dirty
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project
+HEAD=7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+log: 7fe229f initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project/keep.local: No such file or directory
+status:
+
+origin tip: 7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project
+HEAD=7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+log: 7fe229f initial;
+mine.txt=UNIQUE uncommitted work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/1/project/keep.local: No such file or directory
+status:
+?? mine.txt
+slot /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project
+HEAD=7fe229f33299fd68bd7fc251181ebcf4bf7245c8
+log: 7fe229f initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project/keep.local: No such file or directory
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P
+fm-lab-dirty-fixed-dirty sleep /Users/charlesabrooker/tmp/fm-lab-world.1LOkIS/pool/.treehouse/project-5fa9ad/2/project

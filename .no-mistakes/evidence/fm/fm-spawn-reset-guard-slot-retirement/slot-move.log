@@ -1,0 +1,146 @@
+ok - a clean slot behind the target moves to it
+ok - a detached HEAD with one commit the target lacks is skipped, the commit kept
+ok - a slot ahead of the target (the target is behind HEAD) is skipped
+ok - a branch with an unlanded commit that has diverged from the target is skipped
+ok - a branch behind the target moves forward
+ok - an origin default rewound behind the slot's HEAD skips the copy
+ok - a modified tracked file skips the copy
+ok - a staged file skips the copy
+ok - an untracked file inside an untracked directory skips the copy
+ok - the before/after comparison sees changed bytes under an equal git status
+ok - an ignored file at a path the target tracks skips the copy
+ok - an ignored regular file that is an ancestor of a path the target tracks skips the copy
+ok - an ignored entry inside a path the target tracks skips the copy
+ok - an ignored file at a path the target does not track passes
+ok - a failed ignored inventory skips the copy
+ok - a live process that started before the spawn with its working directory in the slot skips the copy
+ok - the same slot is used once the holder is gone
+ok - a git worktree lock on the slot skips the copy
+ok - the slot is used once the lock is released
+ok - a live lease held by another owner skips the copy
+ok - the slot is used once the lease holder is gone
+ok - a co-tenant contention row inside 24 hours skips the copy
+ok - a contention row older than 24 hours does not
+ok - an unreadable lease record skips the copy
+ok - an unavailable lsof skips the copy
+ok - a failing lsof skips the copy
+ok - a failed git status skips the copy
+ok - a target commit that cannot be read skips the copy
+ok - an ignored directory the target tracks as a file skips the copy, whatever its children are called
+ok - a checksum-valid archive that is a symlink to the ignored file does not hold its bytes
+ok - a refused provisioning leaves the owner branch and the commit where they were
+ok - no checkout hook runs while a slot is prepared
+ok - a clean slot behind the target moves although a post-merge hook exists
+ok - a live process in a slot already at the target still skips the copy
+ok - a process that started after the spawn but is not the spawn's own acquisition is a holder
+ok - the shell a treehouse launcher under the spawn's own pane opened is not a holder
+ok - a process under the pane that no launcher of this spawn opened is a holder
+ok - a launcher tree that started before the spawn is not its acquisition, even under the pane
+ok - an lsof row with no working directory for the pane's own pid is a holder
+ok - an lsof row with no working directory for a process under the spawn's own launcher is a holder
+ok - a launcher that is not under the pane the backend named is not the spawn's own
+ok - an lsof row that names a process but no working directory is a holder
+ok - a contention row that cannot be read counts as held
+ok - a process under a treehouse launcher that started after the spawn is the spawn's own shell
+ok - a process under a treehouse launcher that started before the spawn is somebody else's
+ok - a commit that appears after the proof is kept as HEAD and never merged over
+ok - a tracked edit that appears after the clean look fails the move and is kept
+ok - a failed HEAD read after the move is a failure, not an untouched skip
+ok - the snapshot fails when its git reads fail
+ok - no destroying git command runs on a clean move or a skip, and the checker flags one that does
+ok - a refused promotion keeps a commit made after its branch setup
+ok - a refusal leaves HEAD on a commit made after the provision step, as it found it
+ok - a copy the preparation detached is never called untouched
+ok - a refused provisioning returns a detached copy to detached
+ok - a tracked edit hidden by --assume-unchanged refuses the spawn
+ok - a tracked edit hidden by --skip-worktree refuses the spawn
+ok - a late edit inside a submodule fails the move and is kept
+ok - a move that changes a submodule pin succeeds; the stale checkout is for the next spawn to report
+ok - a forward attach never rewrites a file a writer created
+ok - an attach leaves HEAD on the commit it found
+ok - an attach from a commit that is not the expected one fails
+ok - a refusal leaves a symbolic HEAD another actor set as it found it
+ok - a refusal returns the provisioner's code
+ok - a rewind of an origin tracking ref does not fail the move of a detached copy
+ok - a failure names the other refs that changed
+ok - a refused move after a shared origin ref changed is a skip that names the ref as context
+ok - a copy whose refs changed is never called untouched
+ok - a move admits the anchor its own preparation wrote
+ok - an anchor ref the preparation did not write is another writer's ref, not a refusal
+ok - an anchor that ends at a commit other than the one it anchors fails the move
+ok - an assume-unchanged flag inside a submodule refuses the spawn
+ok - a skip-worktree flag inside a submodule refuses the spawn
+ok - an index flag on a submodule entry refuses the spawn
+ok - an index flag inside a nested submodule refuses the spawn
+ok - an lsof row with an empty working directory refuses the spawn
+ok - a complete lsof row outside the slot is no holder
+ok - a mode change hidden by assume-unchanged refuses the spawn
+ok - a flag on a file that is unchanged by blob and mode does not block the move
+ok - a submodule commit made after the proof fails the move
+ok - a ref outside the copy that changes during the proof does not fail the move
+ok - an expected anchor that is missing after the preparation fails the move
+ok - a retargeted shared symbolic ref does not fail the move
+ok - a refused move after preparation is a failure, not a skip
+ok - a refused move after preparation leaves the copy detached and the branch where it was
+ok - a refused move after preparation says the copy is left exactly as it is
+ok - a refused move after an anchor was written is a failure that names the anchor
+ok - an equal tree is left as is and the refusal says where the copy is
+ok - a tree that differs by one file is left as is and the refusal says where the copy is
+ok - a quiet refusal leaves the copy on the task branch the provision step set
+ok - a promotion refusal leaves a late ignored file's exact bytes and HEAD as found
+ok - a refusal after a detach, through fm_slot_move_forward, is a failure that names the detach
+ok - a refusal after an anchor, through fm_slot_move_forward, is a failure that names the anchor
+ok - a refusal after a preparation, through fm_slot_move_forward, leaves the copy as it is
+ok - a refusal on an untouched copy is still a skip
+ok - the clock seam fires on the spawn's custody scan line
+ok - the clock seam does nothing when no jump is asked for
+ok - a new copy's proof clears the reason of an earlier skip
+ok - a proof skip after a detach is a failure that names the detach
+ok - a proof skip after an anchor is a failure that names the anchor
+ok - a dirty copy nothing was written to is still skipped
+ok - a ref outside the copy that appears after the proof does not fail the move
+ok - a move that leaves HEAD somewhere other than the target fails
+ok - the changed-bytes witness fails when a snapshot cannot be taken
+ok - the snapshot sees a symlink that now points at another file
+ok - the git-call oracle flags every forced form and none of the safe calls
+ok - a sibling spawn's base ref and a sibling branch written during the move do not refuse it
+ok - a change to the copy's own branch during the move still refuses
+ok - a refusal names the other refs that changed, as context
+ok - ignored files under an ignored directory are compared by identity, and none of their content is read
+ok - an ignored file whose identity changes during the move fails it
+ok - the shell treehouse opened under the recorded endpoint, in the slot, is this task's own lineage
+ok - a foreign shell beside the recorded tree still holds the slot
+ok - an orphan reparented away from every tree still holds the slot
+ok - an agent inside the recorded tree still holds the slot
+ok - an agent whose executable is named by its version, under claude/versions/, still holds the slot
+ok - a node process whose argv0 names a harness still holds the slot
+ok - a node process whose first argument is a Gemini CLI script still holds the slot
+ok - a tree member with an empty argv is still judged by its executable path
+ok - with no readable recorded window, the recorded tree's shell holds the slot
+ok - a recorded endpoint whose start time does not match refuses
+ok - a failed comparison after the move records changed_during_move
+ok - an ignored file at a newly tracked path refuses before the merge
+ok - a copy that turns dirty after the proof is never prepared
+ok - a change of the checked-out branch during the move fails it
+ok - an ignored file below a directory the target replaces with a file skips the copy
+ok - a commit after the proof that makes git refuse is a failure, not a skip
+ok - a shell under a treehouse launcher that started after the spawn, under the pane, is the spawn's own
+ok - a launcher that started before the spawn is not the spawn's own
+ok - an ancestor that is not named treehouse does not make a shell the spawn's own
+ok - a launcher that does not run under the named pane does not own the shell
+ok - a shell whose parent chain cannot be read is a holder
+ok - with no pane pid, a shell under a later treehouse launcher is the spawn's own
+ok - a process in the recorded tree is reported with every member up to the root
+ok - a process whose chain does not reach the recorded root is a holder
+ok - a live process whose chain cannot be read is unknown, never excused
+ok - a recorded root whose start time does not match ends the probe
+ok - a tree member whose executable or argv cannot be read is unknown
+ok - a recorded tree of a shell and sleep is not a holder
+ok - an agent named by its executable path holds the slot
+ok - an agent whose path is under claude/versions holds the slot
+ok - a node process with a harness argv0 holds the slot
+ok - a node process whose arguments name the Gemini CLI holds the slot
+ok - an agent behind an ordinary first member holds the slot
+ok - with no agent classifier loaded, a recorded tree is unknown and refuses
+# all fm-spawn-slot-move tests passed
+exit=0

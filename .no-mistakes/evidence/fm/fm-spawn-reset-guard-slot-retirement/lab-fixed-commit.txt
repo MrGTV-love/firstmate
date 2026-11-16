@@ -1,0 +1,72 @@
+== lab (fixed-commit): spawn tree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P at dc7b2f105
+origin tip at start: d6d118fdc056cd41dc1cf41a0082dc7beb7992ed
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project
+watcher: HEAD=22a74e271d47a07e3f72b35c96af927f4d33978e
+watcher: origin=d6d118fdc056cd41dc1cf41a0082dc7beb7992ed
+-- slot 1 right after the watcher wrote
+HEAD=22a74e271d47a07e3f72b35c96af927f4d33978e
+log: 22a74e2 unlanded work;d6d118f initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project/keep.local: No such file or directory
+status:
+
+-- fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.M7P0oH
+warning: task lab-commit-fixed-commit: /Users/charlesabrooker/tmp/fm-lab.M7P0oH/data/lab-commit-fixed-commit/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.M7P0oH/data/lab-commit-fixed-commit/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-commit-fixed-commit
+warning: /Users/charlesabrooker/tmp/fm-lab.M7P0oH/data/lab-commit-fixed-commit/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lab-commit-fixed-commit ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@d6d118fdc056cd41dc1cf41a0082dc7beb7992ed origin=main@d6d118fdc056cd41dc1cf41a0082dc7beb7992ed selected=origin/main@d6d118fdc056cd41dc1cf41a0082dc7beb7992ed
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project' was not moved (head_not_target): HEAD 22a74e271d47a07e3f72b35c96af927f4d33978e is ahead of the target d6d118fdc056cd41dc1cf41a0082dc7beb7992ed and keeps its commits
+skipped: copy /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project (head_not_target) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+local-only source: local=main@d6d118fdc056cd41dc1cf41a0082dc7beb7992ed origin=main@d6d118fdc056cd41dc1cf41a0082dc7beb7992ed selected=origin/main@d6d118fdc056cd41dc1cf41a0082dc7beb7992ed
+skill selection for lab-commit-fixed-commit: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.M7P0oH/data/lab-commit-fixed-commit/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project (head_not_target) held by firstmate-skipped:lab-commit-fixed-commit
+spawned lab-commit-fixed-commit harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-lab-commit-fixed-commit worktree=/Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project
+SPAWN_EXIT=0
+-- slot 1 AFTER spawn
+HEAD=22a74e271d47a07e3f72b35c96af927f4d33978e
+log: 22a74e2 unlanded work;d6d118f initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project/keep.local: No such file or directory
+status:
+
+-- treehouse status AFTER
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project  (detached)  (held by firstmate-skipped:lab-commit-fixed-commit)
+                   treehouse (5051), zsh (90446)
+2     in-use       /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project  (detached)
+                   zsh (5909), sleep (20974)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project
+branch=fm/lab-commit-fixed-commit
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project
+HEAD=d6d118fdc056cd41dc1cf41a0082dc7beb7992ed
+log: d6d118f initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project/keep.local: No such file or directory
+status:
+
+origin tip: d6d118fdc056cd41dc1cf41a0082dc7beb7992ed
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project
+HEAD=22a74e271d47a07e3f72b35c96af927f4d33978e
+log: 22a74e2 unlanded work;d6d118f initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/1/project/keep.local: No such file or directory
+status:
+
+slot /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project
+HEAD=d6d118fdc056cd41dc1cf41a0082dc7beb7992ed
+log: d6d118f initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project/keep.local: No such file or directory
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P
+fm-lab-commit-fixed-commit sleep /Users/charlesabrooker/tmp/fm-lab-world.aLRIoW/pool/.treehouse/project-634d0b/2/project

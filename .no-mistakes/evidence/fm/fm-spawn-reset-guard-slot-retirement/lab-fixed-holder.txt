@@ -1,0 +1,73 @@
+== lab (fixed-holder): spawn tree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P at dc7b2f105
+origin tip at start: df8e3468eb810cc121d5d5e267830fd68346e7cd
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project
+watcher: HEAD=df8e3468eb810cc121d5d5e267830fd68346e7cd
+watcher: origin=df8e3468eb810cc121d5d5e267830fd68346e7cd
+-- slot 1 right after the watcher wrote
+HEAD=df8e3468eb810cc121d5d5e267830fd68346e7cd
+log: df8e346 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project/keep.local: No such file or directory
+status:
+
+holder pid 29896 cwd: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project
+-- fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.NtImlH
+warning: task lab-holder-fixed-holder: /Users/charlesabrooker/tmp/fm-lab.NtImlH/data/lab-holder-fixed-holder/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.NtImlH/data/lab-holder-fixed-holder/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-holder-fixed-holder
+warning: /Users/charlesabrooker/tmp/fm-lab.NtImlH/data/lab-holder-fixed-holder/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lab-holder-fixed-holder ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@df8e3468eb810cc121d5d5e267830fd68346e7cd origin=main@df8e3468eb810cc121d5d5e267830fd68346e7cd selected=origin/main@df8e3468eb810cc121d5d5e267830fd68346e7cd
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project' was not moved (live_holder): a live process (pid 29896, python3.13) has its working directory in the slot
+skipped: copy /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project (live_holder) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+local-only source: local=main@df8e3468eb810cc121d5d5e267830fd68346e7cd origin=main@df8e3468eb810cc121d5d5e267830fd68346e7cd selected=origin/main@df8e3468eb810cc121d5d5e267830fd68346e7cd
+skill selection for lab-holder-fixed-holder: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.NtImlH/data/lab-holder-fixed-holder/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project (live_holder) held by firstmate-skipped:lab-holder-fixed-holder
+spawned lab-holder-fixed-holder harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-lab-holder-fixed-holder worktree=/Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project
+SPAWN_EXIT=0
+-- slot 1 AFTER spawn
+HEAD=df8e3468eb810cc121d5d5e267830fd68346e7cd
+log: df8e346 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project/keep.local: No such file or directory
+status:
+
+-- treehouse status AFTER
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project  (detached)  (held by firstmate-skipped:lab-holder-fixed-holder)
+                   zsh (29861), python3.13 (29896), treehouse (34987)
+2     in-use       /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project  (detached)
+                   zsh (35804), sleep (48596)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project
+branch=fm/lab-holder-fixed-holder
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project
+HEAD=df8e3468eb810cc121d5d5e267830fd68346e7cd
+log: df8e346 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project/keep.local: No such file or directory
+status:
+
+origin tip: df8e3468eb810cc121d5d5e267830fd68346e7cd
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project
+HEAD=df8e3468eb810cc121d5d5e267830fd68346e7cd
+log: df8e346 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/1/project/keep.local: No such file or directory
+status:
+
+slot /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project
+HEAD=df8e3468eb810cc121d5d5e267830fd68346e7cd
+log: df8e346 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project/keep.local: No such file or directory
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P
+fm-lab-holder-fixed-holder sleep /Users/charlesabrooker/tmp/fm-lab-world.VLonFX/pool/.treehouse/project-828fa0/2/project

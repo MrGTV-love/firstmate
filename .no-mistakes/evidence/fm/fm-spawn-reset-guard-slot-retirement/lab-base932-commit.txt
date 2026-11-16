@@ -1,0 +1,57 @@
+== lab (base932-commit): spawn tree /Users/charlesabrooker/tmp/fm-base-tree.d8lSIi/fm at 932cecc21
+origin tip at start: 8246f879c3d01c4c76c2080698c3dc015b828945
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project
+watcher: HEAD=afb76adc0aae7efd5eb34dbc1a15d540eedde76b
+watcher: origin=8246f879c3d01c4c76c2080698c3dc015b828945
+-- slot 1 right after the watcher wrote
+HEAD=afb76adc0aae7efd5eb34dbc1a15d540eedde76b
+log: afb76ad unlanded work;8246f87 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project/keep.local: No such file or directory
+status:
+
+-- fm-spawn.sh output
+warning: task lab-commit-base932-commit: /Users/charlesabrooker/tmp/fm-lab.49QQkV/data/lab-commit-base932-commit/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.49QQkV/data/lab-commit-base932-commit/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-commit-base932-commit
+warning: /Users/charlesabrooker/tmp/fm-lab.49QQkV/data/lab-commit-base932-commit/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lab-commit-base932-commit ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@8246f879c3d01c4c76c2080698c3dc015b828945 origin=main@8246f879c3d01c4c76c2080698c3dc015b828945 selected=origin/main@8246f879c3d01c4c76c2080698c3dc015b828945
+skill selection for lab-commit-base932-commit: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned lab-commit-base932-commit harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-lab-commit-base932-commit worktree=/Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project
+SPAWN_EXIT=0
+-- slot 1 AFTER spawn
+HEAD=8246f879c3d01c4c76c2080698c3dc015b828945
+log: 8246f87 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project/keep.local: No such file or directory
+status:
+
+-- treehouse status AFTER
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project  (detached)
+                   zsh (9812), sleep (19132)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project
+branch=fm/lab-commit-base932-commit
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project
+HEAD=8246f879c3d01c4c76c2080698c3dc015b828945
+log: 8246f87 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project/keep.local: No such file or directory
+status:
+
+origin tip: 8246f879c3d01c4c76c2080698c3dc015b828945
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project
+HEAD=8246f879c3d01c4c76c2080698c3dc015b828945
+log: 8246f87 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project/keep.local: No such file or directory
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/tmp/fm-base-tree.d8lSIi/fm
+fm-lab-commit-base932-commit sleep /Users/charlesabrooker/tmp/fm-lab-world.pqxZPZ/pool/.treehouse/project-117819/1/project

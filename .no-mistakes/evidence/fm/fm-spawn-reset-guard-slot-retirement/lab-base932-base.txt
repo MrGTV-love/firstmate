@@ -1,0 +1,57 @@
+== lab (base932-base): spawn tree /Users/charlesabrooker/tmp/fm-base-tree.d8lSIi/fm at 932cecc21
+origin tip at start: 3aacd209aaeffa332f5eda5b4627896131e0b498
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project
+watcher: HEAD=3aacd209aaeffa332f5eda5b4627896131e0b498
+watcher: origin=8aa95bb653e04ff608d011c676b4944ffbdc0f56
+-- slot 1 right after the watcher wrote
+HEAD=3aacd209aaeffa332f5eda5b4627896131e0b498
+log: 3aacd20 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project/mine.txt: No such file or directory
+keep.local sha256=5385c5da8fc95a56 content=UNIQUE local work, exists only in slot 1
+status:
+!! keep.local
+-- fm-spawn.sh output
+warning: task lab-base-base932-base: /Users/charlesabrooker/tmp/fm-lab.rOm6VK/data/lab-base-base932-base/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.rOm6VK/data/projects.md; defaulting project to no-mistakes off
+warning: /Users/charlesabrooker/tmp/fm-lab.rOm6VK/data/lab-base-base932-base/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-base-base932-base
+warning: /Users/charlesabrooker/tmp/fm-lab.rOm6VK/data/lab-base-base932-base/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode direct-PR - confirm its definition of done matches
+notice: lab-base-base932-base ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for lab-base-base932-base: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned lab-base-base932-base harness=sleep kind=ship mode=direct-PR yolo=off window=primary:fm-lab-base-base932-base worktree=/Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project
+SPAWN_EXIT=0
+-- slot 1 AFTER spawn
+HEAD=8aa95bb653e04ff608d011c676b4944ffbdc0f56
+log: 8aa95bb feature tracks keep.local;3aacd20 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project/mine.txt: No such file or directory
+keep.local sha256=f326bc4908a88b68 content=tracked upstream content
+status:
+
+-- treehouse status AFTER
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project  (detached)
+                   zsh (27010), sleep (36013)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project
+branch=fm/lab-base-base932-base
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project
+HEAD=8aa95bb653e04ff608d011c676b4944ffbdc0f56
+log: 8aa95bb feature tracks keep.local;3aacd20 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project/mine.txt: No such file or directory
+keep.local sha256=f326bc4908a88b68 content=tracked upstream content
+status:
+
+origin tip: 8aa95bb653e04ff608d011c676b4944ffbdc0f56
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project
+HEAD=8aa95bb653e04ff608d011c676b4944ffbdc0f56
+log: 8aa95bb feature tracks keep.local;3aacd20 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project/mine.txt: No such file or directory
+keep.local sha256=f326bc4908a88b68 content=tracked upstream content
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/tmp/fm-base-tree.d8lSIi/fm
+fm-lab-base-base932-base sleep /Users/charlesabrooker/tmp/fm-lab-world.62Ml7r/pool/.treehouse/project-e40927/1/project

@@ -1,0 +1,103 @@
+== lab (fixed-commit-teardown): spawn tree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P at dc7b2f105
+origin tip at start: 64fb9ae3f1161a153a6c443891ebebf825f918b9
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project
+watcher: HEAD=36ac56cfeae9640114efd8fde57ea74ce3a10693
+watcher: origin=64fb9ae3f1161a153a6c443891ebebf825f918b9
+-- slot 1 right after the watcher wrote
+HEAD=36ac56cfeae9640114efd8fde57ea74ce3a10693
+log: 36ac56c unlanded work;64fb9ae initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project/keep.local: No such file or directory
+status:
+
+-- fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zWOVQn
+warning: task lab-commit-fixed-commit-teardown: /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/lab-commit-fixed-commit-teardown/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/lab-commit-fixed-commit-teardown/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-commit-fixed-commit-teardown
+warning: /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/lab-commit-fixed-commit-teardown/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lab-commit-fixed-commit-teardown ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@64fb9ae3f1161a153a6c443891ebebf825f918b9 origin=main@64fb9ae3f1161a153a6c443891ebebf825f918b9 selected=origin/main@64fb9ae3f1161a153a6c443891ebebf825f918b9
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project' was not moved (head_not_target): HEAD 36ac56cfeae9640114efd8fde57ea74ce3a10693 is ahead of the target 64fb9ae3f1161a153a6c443891ebebf825f918b9 and keeps its commits
+skipped: copy /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project (head_not_target) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+local-only source: local=main@64fb9ae3f1161a153a6c443891ebebf825f918b9 origin=main@64fb9ae3f1161a153a6c443891ebebf825f918b9 selected=origin/main@64fb9ae3f1161a153a6c443891ebebf825f918b9
+skill selection for lab-commit-fixed-commit-teardown: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/lab-commit-fixed-commit-teardown/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project (head_not_target) held by firstmate-skipped:lab-commit-fixed-commit-teardown
+spawned lab-commit-fixed-commit-teardown harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-lab-commit-fixed-commit-teardown worktree=/Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project
+SPAWN_EXIT=0
+-- slot 1 AFTER spawn
+HEAD=36ac56cfeae9640114efd8fde57ea74ce3a10693
+log: 36ac56c unlanded work;64fb9ae initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project/keep.local: No such file or directory
+status:
+
+-- treehouse status AFTER
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project  (detached)  (held by firstmate-skipped:lab-commit-fixed-commit-teardown)
+                   zsh (11379), treehouse (19839)
+2     in-use       /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project  (detached)
+                   zsh (20437), sleep (40529)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project
+branch=fm/lab-commit-fixed-commit-teardown
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project
+HEAD=64fb9ae3f1161a153a6c443891ebebf825f918b9
+log: 64fb9ae initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project/keep.local: No such file or directory
+status:
+
+origin tip: 64fb9ae3f1161a153a6c443891ebebf825f918b9
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project
+HEAD=36ac56cfeae9640114efd8fde57ea74ce3a10693
+log: 36ac56c unlanded work;64fb9ae initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project/keep.local: No such file or directory
+status:
+
+slot /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project
+HEAD=64fb9ae3f1161a153a6c443891ebebf825f918b9
+log: 64fb9ae initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project/keep.local: No such file or directory
+status:
+
+-- fm-teardown.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zWOVQn
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 22s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌳 Leased worktree 2 at /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project' to release it.
+/Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project
+teardown: reaping leaked worktree process(es) for lab-commit-fixed-commit-teardown: 20437 40529
+teardown: force-killing leaked worktree process(es) for lab-commit-fixed-commit-teardown: 20437
+🌳 Worktree returned to pool.
+teardown lab-commit-fixed-commit-teardown complete (window primary:fm-lab-commit-fixed-commit-teardown, worktree /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project)
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/lab-commit-fixed-commit-teardown/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/lab-commit-fixed-commit-teardown/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+warning: leaving /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project leased to firstmate-skipped:lab-commit-fixed-commit-teardown: its HEAD is not proved landed (skipped for: head_not_target)
+  release it by hand once it is landed or unwanted: (cd '/Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/project' && treehouse return '/Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project' --if-lease-holder 'firstmate-skipped:lab-commit-fixed-commit-teardown' </dev/null)
+Backlog: lab-commit-fixed-commit-teardown just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.zWOVQn/data/backlog.md - move lab-commit-fixed-commit-teardown to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+TEARDOWN_EXIT=0
+-- slot 1 AFTER teardown
+HEAD=36ac56cfeae9640114efd8fde57ea74ce3a10693
+log: 36ac56c unlanded work;64fb9ae initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project/keep.local: No such file or directory
+status:
+
+-- treehouse status AFTER teardown
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/1/project  (detached)  (held by firstmate-skipped:lab-commit-fixed-commit-teardown)
+2     available    /Users/charlesabrooker/tmp/fm-lab-world.3wx1rI/pool/.treehouse/project-8f04a3/2/project  (detached)
+-- lab windows
+bash bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P

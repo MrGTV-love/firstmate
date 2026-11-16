@@ -1,0 +1,69 @@
+== lab (fixed-governed): spawn tree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P at dc7b2f105
+origin tip at start: 1d0899070337f2b7dc9faae469e5cc72711f236a
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project
+watcher: HEAD=1199e9d98a0c3c17ca93e3fa3168308c69883c62
+watcher: origin=2b40e0e724e25ac7e5f0adcd6cefa30a2fd5a1da
+-- slot 1 right after the watcher wrote
+HEAD=1199e9d98a0c3c17ca93e3fa3168308c69883c62
+log: 1199e9d unlanded work;2b40e0e add slot owner;1d08990 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project/keep.local: No such file or directory
+status:
+
+-- fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.3Wrlcf
+warning: task lab-governed-fixed-governed: /Users/charlesabrooker/tmp/fm-lab.3Wrlcf/data/lab-governed-fixed-governed/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.3Wrlcf/data/lab-governed-fixed-governed/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-governed-fixed-governed
+warning: /Users/charlesabrooker/tmp/fm-lab.3Wrlcf/data/lab-governed-fixed-governed/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode direct-PR - confirm its definition of done matches
+notice: lab-governed-fixed-governed ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project' was not moved (head_not_target): HEAD 1199e9d98a0c3c17ca93e3fa3168308c69883c62 is ahead of the target 2b40e0e724e25ac7e5f0adcd6cefa30a2fd5a1da and keeps its commits
+skipped: copy /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project (head_not_target) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+{"state": "BLOCKED", "reason": "lab_stand_in_provisioner_refuses"}
+error: slot provisioner refused task lab-governed-fixed-governed (exit 2); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/lab-governed-fixed-governed at 2b40e0e724e25ac7e5f0adcd6cefa30a2fd5a1da); report: /Users/charlesabrooker/tmp/fm-lab.3Wrlcf/data/lab-governed-fixed-governed/slot-provision-spawn.93120.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project and endpoint primary:fm-lab-governed-fixed-governed retained; no worker admitted
+SPAWN_EXIT=1
+-- slot 1 AFTER spawn
+HEAD=1199e9d98a0c3c17ca93e3fa3168308c69883c62
+log: 1199e9d unlanded work;2b40e0e add slot owner;1d08990 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project/keep.local: No such file or directory
+status:
+
+provisioner calls: ["--repo-root", "/Users/charlesabrooker/tmp/fm-lab-world.57AdKO/project", "--worktree-path", "/Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project", "--owner-id", "lab-governed-fixed-governed", "--branch", "fm/lab-governed-fixed-governed", "--base-sha", "2b40e0e724e25ac7e5f0adcd6cefa30a2fd5a1da", "--owned-path", "scripts"]
+-- treehouse status AFTER
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project  (detached)  (held by firstmate-skipped:lab-governed-fixed-governed)
+                   treehouse (2160), zsh (96934)
+2     in-use       /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project  [fm/lab-governed-fixed-governed]
+                   zsh (4520)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project
+branch=fm/lab-governed-fixed-governed
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project
+HEAD=2b40e0e724e25ac7e5f0adcd6cefa30a2fd5a1da
+log: 2b40e0e add slot owner;1d08990 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project/keep.local: No such file or directory
+status:
+
+origin tip: 2b40e0e724e25ac7e5f0adcd6cefa30a2fd5a1da
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project
+HEAD=1199e9d98a0c3c17ca93e3fa3168308c69883c62
+log: 1199e9d unlanded work;2b40e0e add slot owner;1d08990 initial;
+mine.txt=UNIQUE unlanded work
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/1/project/keep.local: No such file or directory
+status:
+
+slot /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project
+HEAD=2b40e0e724e25ac7e5f0adcd6cefa30a2fd5a1da
+log: 2b40e0e add slot owner;1d08990 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project/mine.txt: No such file or directory
+keep.local sha256=shasum: /Users/c content=cat: /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project/keep.local: No such file or directory
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P
+fm-lab-governed-fixed-governed zsh /Users/charlesabrooker/tmp/fm-lab-world.57AdKO/pool/.treehouse/project-994178/2/project

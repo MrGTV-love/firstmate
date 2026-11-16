@@ -1,0 +1,71 @@
+== lab (fixed-base): spawn tree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P at dc7b2f105
+origin tip at start: 768aff8603296afb9fea9d494ecc9df457c02dd1
+pane treehouse pool-dir: /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded
+-- watcher
+watcher: slot=/Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project
+watcher: HEAD=768aff8603296afb9fea9d494ecc9df457c02dd1
+watcher: origin=a557058866363e3fd0a1be186be65fd3ac1bd6f3
+-- slot 1 right after the watcher wrote
+HEAD=768aff8603296afb9fea9d494ecc9df457c02dd1
+log: 768aff8 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project/mine.txt: No such file or directory
+keep.local sha256=5385c5da8fc95a56 content=UNIQUE local work, exists only in slot 1
+status:
+!! keep.local
+-- fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kZAOFw
+warning: task lab-base-fixed-base: /Users/charlesabrooker/tmp/fm-lab.kZAOFw/data/lab-base-fixed-base/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.kZAOFw/data/projects.md; defaulting project to no-mistakes off
+warning: /Users/charlesabrooker/tmp/fm-lab.kZAOFw/data/lab-base-fixed-base/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-base-fixed-base
+warning: /Users/charlesabrooker/tmp/fm-lab.kZAOFw/data/lab-base-fixed-base/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode direct-PR - confirm its definition of done matches
+notice: lab-base-fixed-base ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project' was not moved (ignored_collision): ignored work at a path the target tracks would be overwritten: keep.local
+skipped: copy /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project (ignored_collision) is leased in place for its owner; this spawn wrote nothing to it; taking another copy
+skill selection for lab-base-fixed-base: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: /Users/charlesabrooker/tmp/fm-lab.kZAOFw/data/lab-base-fixed-base/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project (ignored_collision) held by firstmate-skipped:lab-base-fixed-base
+spawned lab-base-fixed-base harness=sleep kind=ship mode=direct-PR yolo=off window=primary:fm-lab-base-fixed-base worktree=/Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project
+SPAWN_EXIT=0
+-- slot 1 AFTER spawn
+HEAD=768aff8603296afb9fea9d494ecc9df457c02dd1
+log: 768aff8 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project/mine.txt: No such file or directory
+keep.local sha256=5385c5da8fc95a56 content=UNIQUE local work, exists only in slot 1
+status:
+!! keep.local
+-- treehouse status AFTER
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project  (detached)  (held by firstmate-skipped:lab-base-fixed-base)
+                   zsh (24587), treehouse (27503)
+2     in-use       /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project  (detached)
+                   zsh (27688), sleep (37922)
+-- task meta
+worktree=/Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project
+branch=fm/lab-base-fixed-base
+-- task copy /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project
+HEAD=a557058866363e3fd0a1be186be65fd3ac1bd6f3
+log: a557058 feature tracks keep.local;768aff8 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project/mine.txt: No such file or directory
+keep.local sha256=f326bc4908a88b68 content=tracked upstream content
+status:
+
+origin tip: a557058866363e3fd0a1be186be65fd3ac1bd6f3
+-- every pool slot
+slot /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project
+HEAD=768aff8603296afb9fea9d494ecc9df457c02dd1
+log: 768aff8 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/1/project/mine.txt: No such file or directory
+keep.local sha256=5385c5da8fc95a56 content=UNIQUE local work, exists only in slot 1
+status:
+!! keep.local
+slot /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project
+HEAD=a557058866363e3fd0a1be186be65fd3ac1bd6f3
+log: a557058 feature tracks keep.local;768aff8 initial;
+mine.txt=cat: /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project/mine.txt: No such file or directory
+keep.local sha256=f326bc4908a88b68 content=tracked upstream content
+status:
+
+-- lab windows
+bash bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7HREQ1KNSZTA36CQCSPN00P
+fm-lab-base-fixed-base sleep /Users/charlesabrooker/tmp/fm-lab-world.EANJjg/pool/.treehouse/project-854ded/2/project
