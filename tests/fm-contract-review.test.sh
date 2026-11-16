@@ -16,8 +16,8 @@ mkdir -p "$TMPDIR"
 export REVIEW_WORK_ROOT="$TMP_ROOT/work"
 
 # The known sections of a fixture contract, each with a marker, in the order the pack keeps them.
-write_known_sections() { # <file>
-  cat >"$1" <<'EOF'
+write_known_sections() { # prints them on stdout, so a caller's redirect appends instead of reopening its file
+  cat <<'EOF'
 ## REQUEST (verbatim)
 
 ZZ-KEEP-REQUEST-ZZ the owner wants a thing.
@@ -68,7 +68,7 @@ write_fixture_contract() { # <file>
   {
     printf '# Fixture contract\n\nTask: fixture. ZZ-PREAMBLE-ZZ reviewed: pass.\n\n'
     printf '## Boundary dispositions\n\n- ZZ-RESPONSE-ZZ the author answered the earlier finding.\n\n'
-    write_known_sections /dev/stdout
+    write_known_sections
     # shellcheck disable=SC1112 # a curly apostrophe on purpose: the builder must read it as an apostrophe
     printf '## Author’s all-green candidate\n\nZZ-ALLGREEN-ZZ candidate.\n\n'
     printf '## Contract Review history\n\n- Revision 1: ZZ-PRIOR-FINDING-ZZ F1 was raised.\n\n### Definition Of Done\n\nZZ-HISTORY-UNDER-ZZ a known name below an unknown section.\n'
@@ -97,7 +97,7 @@ policy_block() { # <policy> <out>
 test_known_sections_pass_byte_identical() {
   local src="$TMP_ROOT/k.md" pack manifest m
   write_fixture_contract "$src"
-  write_known_sections "$TMP_ROOT/k.expected"
+  write_known_sections >"$TMP_ROOT/k.expected"
   build_pack pack --contract "$src" || fail "build failed: $(cat "$TMP_ROOT/build.err")"
   cmp -s "$TMP_ROOT/k.expected" "$pack/target.md" || fail "target.md is not exactly the known sections: $(diff "$TMP_ROOT/k.expected" "$pack/target.md")"
   manifest="$(dirname "$pack").excluded-paths"
@@ -115,7 +115,7 @@ test_every_round_finding_section_is_dropped() {
   for heading in "Author's all-green candidate" 'Contract Review' 'Contract review notes' 'Boundary dispositions notes' \
     'Revision history notes' 'Register notes' 'Suggested attack notes' 'Responses' 'Notes from the author' \
     'Context and earlier findings' 'Earlier findings and how I answered them' 'Owner background'; do
-    { write_known_sections /dev/stdout; printf '\n## %s\n\nZZ-AUTHOR-ZZ F1 answered: fixed, passes.\n' "$heading"; } >"$src"
+    { write_known_sections; printf '\n## %s\n\nZZ-AUTHOR-ZZ F1 answered: fixed, passes.\n' "$heading"; } >"$src"
     pack=''
     build_pack pack --contract "$src" || fail "build with '## $heading' failed: $(cat "$TMP_ROOT/build.err")"
     assert_no_grep "ZZ-AUTHOR-ZZ" "$pack/target.md" "the text under '## $heading' reached the pack"
