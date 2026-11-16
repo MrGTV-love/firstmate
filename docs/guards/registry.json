@@ -155,9 +155,11 @@
     "compact-adviser",
     "secondmate-inherit",
     "secondmate-sync",
+    "send-states-its-choice",
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
-    "slack-command-refusal-line"
+    "slack-command-refusal-line",
+    "teardown-entry-preflight"
   ],
   "guards": [
     {
@@ -1255,6 +1257,44 @@
       ]
     },
     {
+      "id": "send-states-its-choice",
+      "version": "1",
+      "owner": "bin/fm-send.sh",
+      "invariant": "A text send to a task with open keyed decisions states whether it answers one or answers none.",
+      "layer": "runtime-block",
+      "source": "the target task's status log folded by status_open_decisions (bin/fm-status-decision-lib.sh), the --resolve-key keys and the --answers-none flag on the command line",
+      "trigger": "a text send to a task selector whose open decision set (what status_open_decisions returns) is nonempty, or whose status log is past the status read limits so the fold returns no set, carrying neither --resolve-key nor --answers-none / --answers-none together with --resolve-key, both read as options by fm_send_tokenize (a split-form value that is exactly --answers-none counts as that flag). A status file that is absent, unreadable, or a symlink folds to the empty set and is not refused.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Resend with FM_HOME=<home> bash bin/fm-send.sh <task> --resolve-key <key> <message> to answer and close a listed key (one key per flag; repeat the flag per key), or with FM_HOME=<home> bash bin/fm-send.sh <task> --answers-none <message> to answer none of them; put -- before message text that starts with a flag (FM_HOME=<home> bash bin/fm-send.sh <task> --answers-none -- <message>).",
+      "budget": 1,
+      "budget_reason": "One refused invocation before the sender chooses a flag; no per-family cross-invocation counter is implemented, so repeated bare invocations refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; the refusal diagnostic names every open key and both flags on stderr. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-send-resolve-key.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent.\" >&2"
+        },
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: cannot tell whether $CHOICE_TASK_ID has open decisions: $CHOICE_STATUS_FILE is past the status read limits (bin/fm-status-cap-lib.sh), so a send that states no choice would be a guess. Re"
+        },
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: $CHOICE_TASK_ID has open keyed decisions in $CHOICE_STATUS_FILE, and this send states no choice. Refusing it; nothing was sent. Open keys:\""
+        }
+      ]
+    },
+    {
       "id": "safe-rm-rf-target",
       "version": "1",
       "owner": "bin/fm-teardown.sh",
@@ -2219,7 +2259,7 @@
       "invariant": "A proved held-close or slot-return route cannot silently change before removal.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:feccb8ae4f",
-      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies",
+      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies, or the slot-return route has no resolved pool slot or its durable lease is lost under custody, or a slot a return-pending record names is still claimed and unreturned when the task record would be retired",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2250,7 +2290,19 @@
         },
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot ${TEARDOWN_UNCLAIMED_SLOT:-$TEARDOWN_RECORD_SLOT}, which encloses task $ID's nested copy and carries no slot claim, was not returned"},
-        {"file": "bin/fm-teardown.sh", "match": "teardown_unclaimed_note \"treehouse refused the exact conditional return"}
+        {"file": "bin/fm-teardown.sh", "match": "teardown_unclaimed_note \"treehouse refused the exact conditional return"},
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: no pool slot was resolved for task $ID's return, so no durable lease can be proved; retaining the task record and contents\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID's return-pending record names $(teardown_owed_slot_text \"$owed\"), and this run did not return it; the task record and the return-pending record are kept for a retry\" >&2"
+        }
       ]
     },
     {
@@ -2936,7 +2988,7 @@
       "invariant": "Destructive teardown retains a replayable backlog transition before removing task records.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:7ae25c53b5",
-      "trigger": "refuses destructive teardown when the pending backlog transition is not replayable or the previous pending close marker cannot be cleared",
+      "trigger": "refuses destructive teardown when the pending backlog transition is not replayable, or the previous pending close marker cannot be cleared (the entry preflight, teardown-entry-preflight, refuses one that cannot be removed before any mutation)",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2960,6 +3012,44 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "teardown-entry-preflight",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "A teardown refusal that the state at entry already decides changes nothing: no drop record, slot lease, return-pending record, endpoint close, or copy, tasktmp, record or slot removal comes before it.",
+      "layer": "runtime-block",
+      "source": "the task's state records (pending-close, return-pending, task, busy-state, PR-poll, turn-end and status records), their file kinds and the operating system's delete permission, and the busy generation, as teardown_entry_preflight reads them",
+      "trigger": "refuses before any mutation when a record teardown later removes or replaces cannot be removed or replaced (a directory, a link to the wrong kind or place, an immutable or delete-denied entry), the busy generation would be rejected, or the PR-poll records are not retirable, or, before any protected step, a copy the release hands to Vernant's closeout driver has no driver or interpreter that can run, a copy to preserve cannot be listed or its preserve parent is unsafe, or a rename target's filesystem cannot be read or differs",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Fix the named record (remove the directory, clear the flag or access entry, or let the named owner finish), then retry FM_HOME=<home> bash bin/fm-teardown.sh <task>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-pool.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $TEARDOWN_PREFLIGHT_ERROR; nothing was changed and every task record is retained. Fix what is named and re-run.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy inspection-unavailable \"foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: foreign copy $(fm_refuse_text \"$copy\") in pool slot $(fm_refuse_text \"$slot\") cannot be released; nothing was removed.\" >&2"
         }
       ]
     },
@@ -4078,7 +4168,7 @@
       "invariant": "A held close records the foreign copies it preserves before removing its own task records.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:2d6419125d",
-      "trigger": "refuses a held close when data/held-foreign-copies.log cannot be written before removal (its call site is also a mapped site)",
+      "trigger": "refuses a held close when data/held-foreign-copies.log cannot be written before removal, and also checks at entry, before the slot is reserved, that the record can be written (both call sites are also mapped sites)",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -4098,6 +4188,10 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "[ \"$KIND\" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ \"$KIND\" = secondmate ] || teardown_held_copies_record_or_refuse check || return 1"
         },
         {
           "file": "bin/fm-teardown.sh",

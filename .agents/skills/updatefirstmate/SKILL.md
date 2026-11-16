@@ -81,8 +81,9 @@ This touches only the firstmate repo and its own worktrees, never anything under
 4. **Send the re-read message to the rest.**
    For every target on the `nudge-secondmates:` line (do nothing when it says `none`), send the one-line re-read steer:
    ```sh
-   FM_HOME=<this-firstmate-home> bin/fm-send.sh <id> 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
+   FM_HOME=<this-firstmate-home> bin/fm-send.sh <id> --answers-none 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
    ```
+   The steer answers none of the mate's open keyed decisions, so it states `--answers-none` (rule: the `bin/fm-send.sh` header, "Decision closure").
    These are the mates that are on the latest bytes but could not be restarted provably, so the steer is the most this pass can honestly do for them.
    It is a gentle steer, not an interruption: the mate already got a safe tracked-files fast-forward, and the steer never forces, tears down, or discards its work.
    Never describe one of these as reloaded; its agent is still running the wiring it launched with.
