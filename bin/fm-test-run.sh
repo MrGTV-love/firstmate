@@ -2042,11 +2042,6 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-typesafe-health.test.sh"
       printf '%s\n' "__script__:fm-watch-typesafe-health.test.sh"
       ;;
-    bin/fm-tasks-axi-locked-unblock.mjs)
-      # The typed-completion clear under tasks-axi's store lock (bin/fm-tasks-axi.sh).
-      printf '%s\n' "__script__:fm-close-at-merge-helpers.test.sh"
-      printf '%s\n' "__script__:fm-pr-close-items.test.sh"
-      ;;
     bin/fm-skill-pick.sh|bin/fm-skill-pick.mjs|\
     .agents/skills/hyper-jev/templates/starter/src/core/*.ts)
       # The picker imports the vendored hyper-jev client unchanged.

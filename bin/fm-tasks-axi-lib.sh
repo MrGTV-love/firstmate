@@ -296,84 +296,42 @@ fm_typed_completion_resolve() {
   return 0
 }
 
-# fm_tasks_axi_package_dir: the installed tasks-axi package directory, found from each tasks-axi
-# on PATH by its real path (symlinks followed), so a fixture shim named tasks-axi that sits first
-# on PATH is passed over, not trusted. Prints the directory, or returns 1.
-fm_tasks_axi_package_dir() {
-  local bin real link dir
-  while IFS= read -r bin; do
-    [ -n "$bin" ] || continue
-    real=$bin
-    while [ -L "$real" ]; do
-      link=$(readlink "$real") || continue 2
-      case "$link" in /*) real=$link ;; *) real=${real%/*}/$link ;; esac
-    done
-    dir=$(cd "${real%/*}/../.." 2>/dev/null && pwd -P) || continue
-    [ -f "$dir/package.json" ] && [ -f "$dir/dist/src/context.js" ] && [ -f "$dir/dist/src/backends/lock.js" ] || continue
-    grep -Eq '"name"[[:space:]]*:[[:space:]]*"tasks-axi"' "$dir/package.json" || continue
-    printf '%s\n' "$dir"
-    return 0
-  done <<< "$(type -ap tasks-axi 2>/dev/null)"
-  return 1
-}
-
-FM_TASKS_AXI_LOCKED_UNBLOCK="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-tasks-axi-locked-unblock.mjs"
-
-# fm_typed_completion_locked_clear <data-dir> <id>: Main 1873 and 1882. The finished-blocker
-# clear after a typed completion, decided and written under tasks-axi's own store lock by
-# bin/fm-tasks-axi-locked-unblock.mjs (its header names the tasks-axi APIs): an item with <id>
-# that is in the active backlog and not done keeps every edge and hold; otherwise every
-# blocked-by edge on <id> is removed in the same locked write. Prints an `unblocked:` line per
-# cleared dependent, in the same words as fm_backlog_unblock_dependents. Returns 0 when it
-# cleared (or there was nothing to clear), 3 when it kept the edges (FM_TYPED_COMPLETION_KEPT
-# holds the state it read), and 1 when it could not run or read (FM_TYPED_COMPLETION_CLEAR_ERROR
-# holds why); a failure changes nothing.
-# shellcheck disable=SC2034  # FM_TYPED_COMPLETION_KEPT and _CLEAR_ERROR are read by bin/fm-tasks-axi.sh.
-fm_typed_completion_locked_clear() {  # <data-dir> <id>
-  local id=$2 pkg out status first line dep left errf err
-  FM_TYPED_COMPLETION_KEPT='' FM_TYPED_COMPLETION_CLEAR_ERROR=''
-  if ! fm_backlog_tasks_axi_addressing "$1"; then
-    FM_TYPED_COMPLETION_CLEAR_ERROR="the backlog could not be addressed${FM_BACKLOG_TRANSITION_ERROR:+: $FM_BACKLOG_TRANSITION_ERROR}"
-    return 1
-  fi
-  if ! pkg=$(fm_tasks_axi_package_dir); then
-    FM_TYPED_COMPLETION_CLEAR_ERROR="the installed tasks-axi package could not be found"
-    return 1
-  fi
-  if ! command -v node >/dev/null 2>&1; then
-    FM_TYPED_COMPLETION_CLEAR_ERROR="node is not on PATH"
-    return 1
-  fi
-  # The answer is standard output alone; standard error (a node warning, or the reason for a
-  # failure) goes to its own file, so it can never be read as the answer.
-  if ! errf=$(mktemp "${TMPDIR:-/tmp}/fm-locked-clear.XXXXXX" 2>/dev/null); then
-    FM_TYPED_COMPLETION_CLEAR_ERROR="the locked clear could not make the file for its error output"
-    return 1
-  fi
-  out=$(cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && node "$FM_TASKS_AXI_LOCKED_UNBLOCK" "$pkg" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE" "$id" 2>"$errf")
-  status=$?
-  err=$(sed -n '1p' "$errf" 2>/dev/null) || err=''
-  rm -f -- "$errf"
-  first=${out%%$'\n'*}
-  if [ "$status" -ne 0 ]; then
-    FM_TYPED_COMPLETION_CLEAR_ERROR=${err:-the locked clear failed with status $status}
-    return 1
-  fi
-  case "$first" in
-    'keep '*) FM_TYPED_COMPLETION_KEPT=${first#keep }; return 3 ;;
-    clear) ;;
-    *) FM_TYPED_COMPLETION_CLEAR_ERROR="the locked clear answered '$first'"; return 1 ;;
+# fm_typed_completion_result_state <result-file> <id>: what tasks-axi's own printed result of a
+# typed public-followup completion says about the row <id> it completed (Main 2086). The result is
+# the output the completion printed, kept in <result-file>: with --json, one object with a `task`
+# object; otherwise its `public_followup:` block of `id:` and `state:` lines. It is read with the
+# shell's own file read, so a failed replay of the same file does not decide it, and it loads no
+# tasks-axi module. Prints the state and returns 0 when the result names <id> with one state;
+# returns 2 when a readable result names another row (FM_TYPED_COMPLETION_RESULT_ROW holds it);
+# returns 1 when there is no readable result for a row at all (the file cannot be read, is empty,
+# or holds neither form, or the row has no state).
+fm_typed_completion_result_state() {  # <result-file> <id>
+  local text answer
+  FM_TYPED_COMPLETION_RESULT_ROW=''
+  text=$(< "$1") || return 1
+  case "$text" in
+    '{'*)
+      answer=$(jq -r --arg id "$2" 'if type == "object" and (.task | type) == "object" and (.task.id | type) == "string" then
+          (if .task.id != $id then "other\t" + .task.id elif (.task.state | type) == "string" then "state\t" + .task.state else "none" end)
+          else "none" end' <<< "$text" 2>/dev/null) || return 1
+      ;;
+    *)
+      answer=$(LC_ALL=C awk -v id="$2" '
+        /^[^ ]/ { block = ($0 == "public_followup:"); next }
+        block && /^  id: / { v = substr($0, 7); if (v ~ /^".*"$/) v = substr(v, 2, length(v) - 2); ids++; row = v }
+        block && /^  state: [a-z_]+$/ { st = substr($0, 10); states++ }
+        END {
+          if (ids != 1) print "none"
+          else if (row != id) print "other\t" row
+          else if (states == 1) print "state\t" st
+          else print "none"
+        }' <<< "$text") || return 1
+      ;;
   esac
-  while IFS= read -r line; do
-    case "$line" in 'unblocked '*) ;; *) continue ;; esac
-    line=${line#unblocked }
-    dep=${line%% *}
-    left=${line#* }
-    if [ "$left" = - ]; then
-      printf 'unblocked: %s no longer waits on %s; no stored blocked-by edge remains\n' "$dep" "$id"
-    else
-      printf 'unblocked: %s no longer waits on %s; it still waits on %s\n' "$dep" "$id" "$left"
-    fi
-  done <<< "$out"
-  return 0
+  # shellcheck disable=SC2034  # FM_TYPED_COMPLETION_RESULT_ROW is read by bin/fm-tasks-axi.sh.
+  case "$answer" in
+    state$'\t'?*) printf '%s\n' "${answer#*$'\t'}"; return 0 ;;
+    other$'\t'*) FM_TYPED_COMPLETION_RESULT_ROW=${answer#*$'\t'}; return 2 ;;
+    *) return 1 ;;
+  esac
 }
