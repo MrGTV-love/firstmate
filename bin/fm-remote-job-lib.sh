@@ -1005,7 +1005,14 @@ fm_remote_job_ps_bin() {
 # Keep the dependency's status and stderr rather than hiding them in a timeout.
 fm_remote_job_require_process_inspection() {
   local pid ps_bin field value status
-  pid=${BASHPID:-$(exec sh -c 'printf "%s\n" "$PPID"')}
+  pid=${BASHPID:-$(exec sh -c 'printf "%s\n" "$PPID"')} || {
+    FM_REMOTE_JOB_ERROR="cannot inspect process ownership: cannot determine owner pid"
+    return 69
+  }
+  case "$pid" in ''|*[!0-9]*|0)
+    FM_REMOTE_JOB_ERROR="cannot inspect process ownership: invalid owner pid"
+    return 69 ;;
+  esac
   ps_bin=$(fm_remote_job_ps_bin) || {
     FM_REMOTE_JOB_ERROR="cannot inspect process ownership: no executable system ps"
     return 69

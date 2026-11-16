@@ -34,6 +34,31 @@ SSH_LOG="$TMP_ROOT/ssh.log"
 SSH_COUNT="$TMP_ROOT/ssh.count"
 mkdir -p "$LOCAL_HOME/data" "$REMOTE_ROOT/bin" "$REMOTE_HOME"
 printf 'fixture\n' > "$REMOTE_ROOT/AGENTS.md"
+
+# A failed stock-Bash PID probe must refuse before attempting ownership reads.
+mkdir "$TMP_ROOT/pid-probe-bin"
+printf '#!/bin/sh\nexit 1\n' > "$TMP_ROOT/pid-probe-bin/sh"
+chmod +x "$TMP_ROOT/pid-probe-bin/sh"
+pid_probe_result=$(
+  # shellcheck source=bin/fm-remote-job-lib.sh
+  . "$ROOT/bin/fm-remote-job-lib.sh"
+  unset BASHPID
+  PATH="$TMP_ROOT/pid-probe-bin:$PATH"
+  fm_remote_job_ps_bin() {
+    printf 'consulted\n' > "$TMP_ROOT/pid-probe-bin/ps-consulted"
+    return 1
+  }
+  if fm_remote_job_require_process_inspection; then
+    printf 'unexpected success\n'
+  else
+    printf '%s:%s\n' "$?" "$FM_REMOTE_JOB_ERROR"
+  fi
+)
+[ "$pid_probe_result" = '69:cannot inspect process ownership: cannot determine owner pid' ] &&
+  [ ! -e "$TMP_ROOT/pid-probe-bin/ps-consulted" ] \
+  || fail "failed ownership PID probe did not refuse with its named status: $pid_probe_result"
+pass "failed ownership PID probe reports unavailable without continuing to ps"
+
 cp "$ROOT/bin/fm-remote-entrypoint.sh" "$ROOT/bin/fm-remote-job-lib.sh" \
   "$ROOT/bin/fm-remote-job-worker.sh" "$REMOTE_ROOT/bin/"
 
