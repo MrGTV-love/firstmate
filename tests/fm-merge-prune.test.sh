@@ -4216,6 +4216,7 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
     # Firstmate already read the done report (its own signal is not the merge
     # notification): mark it seen with the watcher's own primitive, so any wake
     # below comes from discovery, which must need none.
+    # shellcheck disable=SC2016
     xl_env FM_STATE_OVERRIDE="$STATE" bash -c '. "$1/bin/fm-wake-lib.sh" && fm_wake_status_mark_current "$2" "$2/t1.status"' \
       _ "$ROOT" "$STATE" || fail "$variant: could not mark the done report seen"
     if [ "$variant" = poll-never-published ]; then
