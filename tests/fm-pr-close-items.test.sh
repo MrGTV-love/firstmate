@@ -2656,9 +2656,15 @@ test_r7_f1_f2_a_failed_read_of_the_parse_or_its_result_closes_nothing() {
   real_cat=$(command -v cat)
   cat > "$case_dir/fakebin/awk" <<SH
 #!/usr/bin/env bash
-# The member extractor: awk -v t=member <program>, its text on standard input.
+# The member extractor: awk -v t=member <program>, its text on standard input. Only the
+# parse's own member read fails (the first such call); the close step's later load of the
+# result reads normally, so the refusal the parse wrote is what gets reported.
 case "\${R7_FAIL:-}:\${1:-}:\${2:-}:\$#" in
-  member:-v:t=member:3) echo 'simulated member read failure' >&2; exit 42 ;;
+  member:-v:t=member:3)
+    if [ ! -e "$case_dir/member-read-failed" ]; then
+      : > "$case_dir/member-read-failed"
+      echo 'simulated member read failure' >&2; exit 42
+    fi ;;
 esac
 exec "$real_awk" "\$@"
 SH
@@ -2753,7 +2759,8 @@ test_r9_public_entry_reads_are_checked() {
   expect_code 0 "$rc" "r9-reads: the merge must succeed"
   [ "$(cx_state "$case_dir" r9-own)" = "done" ] || fail "r9-reads: the train's own item did not close"
   [ "$(cx_state "$case_dir" r9-locked)" = queued ] || fail "r9-reads: an item behind an unreadable task record closed"
-  assert_grep "could not read the body of train member $base/11 (the forge answered" "$case_dir/stderr" "r9-reads: a member record without a body field was not a failed read"
+  # jq prefixes an error() message with its own "jq: error (at <file>:1): " text.
+  assert_match "could not read the body of train member $base/11 \\(.*the forge answered: a record with no merged or no body field\\)" "$case_dir/stderr" "r9-reads: a member record without a body field was not a failed read"
   assert_grep "could not read the task record of r9-locked" "$case_dir/stderr" "r9-reads: the unreadable task record was not reported"
   # A byte count that fails: the parse fails and is reported with the ids it names.
   case_dir=$(gh_case r9-wc 194)
@@ -2766,7 +2773,7 @@ test_r9_public_entry_reads_are_checked() {
   rm -f "$case_dir/fakebin/wc"
   [ -n "$real_wc" ] || fail "r9-wc: wc is not installed"
   [ "$(cx_state "$case_dir" r9-wc)" = queued ] || fail "r9-wc: an item closed after a failed byte count"
-  assert_grep "could not parse the body of $REPO_URL/194, .*could not count the bytes of its snapshot; it names item ids: r9-wc" "$case_dir/err" "r9-wc: the failed count was not reported with its id"
+  assert_match "could not parse the body of $REPO_URL/194, .*could not count the bytes of its snapshot; it names item ids: r9-wc" "$case_dir/err" "r9-wc: the failed count was not reported with its id"
   pass "a member record without a body field and an unreadable task record are reported, a failed byte count is a reported parse failure, and the train's own item still closes"
 }
 
