@@ -365,7 +365,8 @@ test_clean_transcript_is_clean() {
   write_transcript "$log" "$LEAK_WORK" \
     "$(tool_call read path skill://assess-done-and-grade)" "$(tool_call read path skill://define-done-and-grading)" \
     "$(tool_call read path "$LEAK_PACK/contract.md:raw:1-11")" "$(tool_call read path "$LEAK_PACK/target.md:-1")" \
-    "$(tool_call read path "$LEAK_PACK/request.md")" "$(tool_call read path probe.txt)" \
+    "$(tool_call read path "$LEAK_PACK/request.md")" "$(tool_call write path probe.txt content scratch)" \
+    "$(tool_call read path probe.txt)" \
     "$(tool_call read path "$LEAK_SKILLS/define-done-and-grading/SKILL.md")" \
     "$(tool_call read path "$LEAK_ROOT/docs/review-rubric.md")" \
     "$(tool_call read path "https://raw.githubusercontent.com/owner/repo/$rev/docs/review-rubric.md")" \
@@ -705,13 +706,47 @@ test_patch_form_edit_is_judged() {
   write_transcript "$log" "$LEAK_WORK" "$(tool_call edit input $'*** Begin Patch\n['"$LEAK_ROOT"$'/data/case/truth/r23-review.md#1]\nPUT 1.=1:\n+x\n*** End Patch')"
   run_check "$log"
   assert_equals 3 "$CHECK_RC" "a patch to an ignored file was not a leak: $CHECK_OUT"
-  write_transcript "$log" "$LEAK_WORK" "$(tool_call edit input $'*** Begin Patch\n['"$LEAK_WORK"$'/probe.txt#1]\nPUT 1.=1:\n+x\n*** End Patch')"
+  # A patch to a file the run wrote first is clean (Main 2034: run-written work-folder files only).
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call write path "$LEAK_WORK/probe.txt" content scratch)" \
+    "$(tool_call edit input $'*** Begin Patch\n['"$LEAK_WORK"$'/probe.txt#1]\nPUT 1.=1:\n+x\n*** End Patch')"
   run_check "$log"
-  assert_equals 0 "$CHECK_RC" "a patch to a work-folder file was flagged: $CHECK_OUT"
+  assert_equals 0 "$CHECK_RC" "a patch to a run-written work-folder file was flagged: $CHECK_OUT"
   write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")" "$(tool_call edit input 'no target here')"
   run_check "$log"
   assert_equals 4 "$CHECK_RC" "an edit with no readable target was certified: $CHECK_OUT"
   pass "a patch-form edit is judged by its target lines, and one with no target is unverified"
+}
+
+test_work_folder_read_needs_the_allowed_set() {
+  local log="$TMP_ROOT/wfr/s.jsonl" call n=0
+  make_leak_world
+  printf 'an earlier review report\n' >"$LEAK_WORK/earlier-review.md"
+  printf 'changed\n' >"$LEAK_WORK/OPERATIONAL-BOUNDARIES.md"
+  # Main 2034 F1: a work-folder read is clean only for the report, the byte-equal pinned copy and
+  # the files the transcript wrote; the selector form of an altered copy is a leak too.
+  for call in "$(tool_call read path "$LEAK_WORK/earlier-review.md")" \
+    "$(tool_call read path "$LEAK_WORK/earlier-review.md:raw")" \
+    "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md:raw")" \
+    "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md:1-200")" \
+    "$(tool_call read path "$LEAK_ROOT/sources/notes.md:raw")"; do
+    n=$((n + 1))
+    write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_PACK/target.md")" "$call"
+    run_check "$log"
+    assert_equals 3 "$CHECK_RC" "work-folder read $n was not a leak: $call -> $CHECK_OUT"
+    assert_contains "$CHECK_OUT" "INPUT LEAK" "work-folder read $n did not report a leak"
+  done
+  # Controls: the byte-equal pinned copy and its selector forms, and a file the run wrote first.
+  cp "$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md" "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md"
+  rm -f "$LEAK_WORK/earlier-review.md"
+  printf 'falsifier\n' >"$LEAK_WORK/falsifier.py"
+  write_transcript "$log" "$LEAK_WORK" "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md")" \
+    "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md:raw")" \
+    "$(tool_call read path "$LEAK_WORK/OPERATIONAL-BOUNDARIES.md:1-200")" \
+    "$(tool_call write path "$LEAK_WORK/falsifier.py" content x)" \
+    "$(tool_call read path "$LEAK_WORK/falsifier.py")" "$(tool_call read path falsifier.py:1-5)"
+  run_check "$log"
+  assert_equals 0 "$CHECK_RC" "an allowed work-folder read was flagged: $CHECK_OUT"
+  pass "a work-folder read is clean only for the report, the byte-equal pinned copy and run-written files"
 }
 
 test_pinned_operational_boundaries_reads_are_clean() {
@@ -844,4 +879,5 @@ fm_test_run_cases \
   test_pinned_operational_boundaries_reads_are_clean \
   test_report_with_no_inputs_read_voids \
   test_named_installed_skill_files_are_clean \
+  test_work_folder_read_needs_the_allowed_set \
   -- "$@"

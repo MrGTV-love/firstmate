@@ -102,9 +102,11 @@
 #   neither is unverified), and grep, glob and find roots.
 #   Every session record must name a folder under the recorded work folder, else the round
 #   is void: the transcript never chooses its own work folder.
-#   Authorized: anything inside the pack; a read in the recorded work folder, except an
-#   OPERATIONAL-BOUNDARIES.md there whose bytes differ from the installed one; a search of
-#   the work folder that holds only that copy, the report and files the run wrote; the
+#   Authorized: anything inside the pack; in the recorded work folder, by one rule for reads
+#   and searches (Main 2034), only the report, the OPERATIONAL-BOUNDARIES.md copy while its
+#   bytes equal the installed one, and files the transcript wrote before the read; a search
+#   of the work folder that holds nothing else; the exclusion and copy-byte tests apply to
+#   every selector form of a read before any clean result; the
 #   transcript itself; the SKILL.md of assess-done-and-grade or define-done-and-grading, by
 #   path or as skill://<name>; the installed define-done-and-grading OPERATIONAL-BOUNDARIES.md
 #   and CLI-EXAMPLE.md, by path or as skill://; the review rubric, by path or by the pinned raw.githubusercontent.com
@@ -584,9 +586,15 @@ def why_file(p):
     if under(p, pack) or under(p, log_real):
         return None
     if under(p, work):
-        if p == opb_copy and not same_bytes(p, opb_installed):
+        # One rule for reads and searches (Main 2034): the report of the run, the byte-equal pinned
+        # copy and the files the transcript wrote; any other work-folder file is not trusted.
+        if p == opb_copy:
+            if same_bytes(p, opb_installed):
+                return None
             return "a work-folder OPERATIONAL-BOUNDARIES.md whose bytes differ from the installed file"
-        return None
+        if p == report or p in written:
+            return None
+        return "a work-folder file the run did not write"
     if p in skill_files or (rubric_real and p == rubric_real):
         return None
     if under(p, root):
@@ -645,16 +653,28 @@ def judge_read(raw, cwd):
             return "an internal " + scheme + ":// record, which cannot be proven to belong to this run"
         return "a " + scheme + ":// read outside the allowed inputs"
     p = os.path.normpath(os.path.join(cwd, os.path.expanduser(raw)))
-    first = None
+    forms = [p]
     while True:
-        w = why_file(real(p))
+        head, sep, tail = forms[-1].rpartition(":")
+        if not sep or "/" in tail or not head:
+            break
+        forms.append(head)
+    # The exclusion and pinned-copy byte tests apply to every selector form before any clean
+    # result, so a selector never turns an excluded path or an altered copy clean (Main 2034).
+    for f in forms:
+        rf = real(f)
+        x = excluded(rf)
+        if x:
+            return "excluded path " + x
+        if rf == opb_copy and not same_bytes(rf, opb_installed):
+            return "a work-folder OPERATIONAL-BOUNDARIES.md whose bytes differ from the installed file"
+    first = None
+    for f in forms:
+        w = why_file(real(f))
         if w is None:
             return None
         first = first or w
-        head, sep, tail = p.rpartition(":")
-        if not sep or "/" in tail or not head:
-            return first
-        p = head
+    return first
 
 def search_roots(raw, cwd):
     for part in [x.strip() for x in str(raw).split(";")]:
