@@ -303,14 +303,20 @@ SECOND_SCHEMA = 'fm-slack-second.v1'
 # Every member id the setting has named, as a one-way hash (so that a protected value equal to an id never stops it being recorded), one per line, append only:
 # a second record beside second.json, so that one failed write never forgets an id (finding 1 of the review of fca2a73d).
 SECOND_ID_FILE = 'second-ids'
-# The start time of the latest owner check, in its own file (F5 of the review of c5868b6f).
+# The start time of the latest owner check, in its own file (F5 of the review of c5868b6f), and the longest the owner's check waits for its write (F8 of the
+# review of 5048f815).
 OWNER_CHECK_FILE = 'owner-check-at'
+OWNER_MARK_WAIT = 1.0
+# The longest any run but their own check waits for one write of the second person's bookkeeping (Watch.second_io, Main 2082).
+SECOND_IO_WAIT = 1.0
+# The watcher's mark of the end of each sweep of the standing checks (bin/fm-watch.sh touches it after the last check of a sweep), in its state folder.
+WATCHER_SWEEP_MARK = '.last-check'
 # Refusals of theirs whose log row could not be written yet, kept apart from second.json with only hashed values (F2 of the review of c5868b6f).
 REFUSAL_QUEUE_FILE = 'refusal-queue.jsonl'
 # The fallback record of the same hashes, tried when SECOND_ID_FILE cannot be written (F1 of the review of c5868b6f).
 SECOND_ID_ALT = 'second-ids.alt'
-# The longest the early id record is waited for (F8 of the review of c5868b6f): its append and fsync run in a thread; a record still unfinished then ends
-# their check with nothing done, and lets the owner's run go on to its other record (second.json).
+# The longest each early id record is waited for (F8 of the review of c5868b6f): its append and fsync run in a thread; a record still unfinished then is not
+# counted and the fallback record is written in its place (F1 of the review of 5048f815). Both waits are inside their check's budget.
 ID_RECORD_WAIT = 2.0
 SECOND_ID_HASH = re.compile(r'[0-9a-f]{64}')
 
@@ -856,16 +862,15 @@ class SecondBudgetSpent(Exception):
         self.sent = sent
 
 
-# Slack errors after which a post of theirs surely did not happen (R9 of the review of 64ac348b; Main 1673 (3)): Slack answered that it refused the call
-# (rate limited, one of its named argument, scope, channel or token errors, or another named error of Slack's, api_error), or the call was never sent. Unknown
-# are slack_outcome_unknown (internal_error, fatal_error, service_unavailable, which Slack says can follow a partly successful operation), an HTTP 5xx, a
-# connection that broke (unreachable) and a cut-off after the connection was made. Premise: a Slack answer that names an error other than those three means
-# the post was not made; nothing is assumed about Slack's de-duplication of client_msg_id.
+# Failures after which a post of theirs surely did not happen: the call never left this host (the transport closed, or no token). Nothing is assumed about
+# Slack's de-duplication of client_msg_id.
 SURELY_ABSENT = frozenset({'network_closed', 'missing_token'})
-# Round 9 (F6, Main 1706): only a local failure before anything left the host is surely absent. Every Slack answer other than ok with a ts is unknown: an answer
-# that names an error (ANSWERED) is looked up in full before any retry and retried only when that lookup finds nothing; any other failure (an HTTP 5xx,
-# slack_outcome_unknown, a broken connection, a cut-off after the connection was made) stays unknown after an empty lookup and is never posted again.
-ANSWERED = frozenset({'rate_limited', 'ratelimited', 'api_error'}) | frozenset(SAFE_ERRORS)
+# Round 9 (F6, Main 1706) and round 10 (Main 1753, 2082): only a local failure before anything left the host is surely absent. Every Slack answer other than ok
+# with a ts is unknown, whatever it names (a rate limit, a named argument, scope, channel or token error, api_error, which the transport gives to an
+# unrecognized error and to ok:false with no error, an HTTP 5xx, slack_outcome_unknown), and so is a broken connection or a cut-off after the connection was made:
+# their post is then looked up once, never posted again, and woken once named unknown when the lookup finds nothing (an empty lookup proves no absence).
+# ANSWERED only names, in the attempt's record, the failures where Slack itself named a refusal; it permits nothing.
+ANSWERED = frozenset({'rate_limited', 'ratelimited'}) | frozenset(SAFE_ERRORS)
 
 
 def second_user():
@@ -885,7 +890,8 @@ def second_user():
 
 
 def host_now():
-    """This host's clock, used only to date a completed run that no Slack reply dated (Main's ruling e59cdb79 on the enable anchor)."""
+    """This host's clock, used only to seed the first completed-run time of a journal that has none, when no Slack reply dated the run (Main's ruling e59cdb79
+    on the enable anchor); it never replaces a recorded one (F4 of the review of 5048f815)."""
     return time.time()
 
 
@@ -1001,18 +1007,20 @@ def option_from_board(card):
     return result
 
 
-def record_setting_id():
+def record_setting_id(wait=None):
     """Record the id a valid second-person setting names (its one-way hash) before anything else a command does: a run that its own fixed-text check refuses
     still read the setting, and the id it read must never answer later (finding 1 of the review of d9861b24). Two independent append-only records are tried in
-    turn, `second-ids` and its fallback `second-ids.alt`, both before any refusal can happen (F1 of the review of c5868b6f); only the hash is written. A run
-    that can write neither refuses (second_id_unrecorded)."""
+    turn, `second-ids` and its fallback `second-ids.alt`, both before any refusal can happen (F1 of the review of c5868b6f); only the hash is written. Each
+    append is waited for at most `wait` seconds (None: as long as it takes): a first record that fails or is still unfinished then is not counted, and the
+    fallback is written in its place before the command goes on (F1 of the review of 5048f815: a run never returns, or goes on to a refusal, while the only
+    record of the id is an unfinished write). A run that writes neither refuses (second_id_unrecorded) and goes no further."""
     second, _ = second_user()
     if not second:
         return
     digest = id_hash(second)
     root = path_setting('FM_STATE_OVERRIDE', home_dir().resolve() / 'state') / STATE_KEY
     for name in (SECOND_ID_FILE, SECOND_ID_ALT):
-        if append_id(root, root / name, digest):
+        if bounded_append(root, root / name, digest, wait):
             return
     raise SlackError('second_id_unrecorded')
 
@@ -1034,22 +1042,16 @@ def write_atomically(path, text):
             os.unlink(name)
 
 
-def bounded_record(wait):
-    """record_setting_id in a thread, waited for at most `wait` seconds: True when it finished (raising its own refusal if both records failed), False when it
-    is still running. A record that finishes later still records the id; nothing waits for it."""
-    done, failure = [], []
-    def record():
-        try:
-            record_setting_id()
-            done.append(True)
-        except SlackError as error:
-            failure.append(error)
-    worker = threading.Thread(target=record, name='fm-slack-id-record', daemon=True)
+def bounded_append(root, path, digest, wait):
+    """append_id, waited for at most `wait` seconds (None: as long as it takes): True only when the record holds the id now. A write still unfinished at the
+    bound runs on in its own thread and is not counted; nothing waits for it."""
+    if wait is None:
+        return append_id(root, path, digest)
+    done = []
+    worker = threading.Thread(target=lambda: done.append(append_id(root, path, digest)), name='fm-slack-id-record', daemon=True)
     worker.start()
     worker.join(wait)
-    if failure:
-        raise failure[0]
-    return bool(done)
+    return bool(done) and done[0] is True
 
 
 def append_id(root, path, digest):
@@ -1073,14 +1075,6 @@ def append_id(root, path, digest):
         return False
 
 
-def early_recorded(record):
-    """The early id record (record_setting_id); its failure is not the run's failure while the Watch can still record the id in second.json."""
-    try:
-        record()
-    except SlackError:
-        pass
-
-
 def safe_author(author):
     """A member id as a refusal row and its journal keep it: itself, or, when a plane value is inside it, `sha256-id:` and its one-way hash, so the refusal is
     still logged and attributed and the value is never written (R2 of the review of 64ac348b)."""
@@ -1093,9 +1087,12 @@ class EarlyProof:
     """The second person's DM proof of this run, made while their check waits for the journal lock: Slack's own conversations.open for the id the setting
     names, inside the whole-call bound counted from the start of the run. The transport is used by nothing else until result() has joined it."""
 
-    def __init__(self, api, user, started):
-        self.api, self.user, self.ends = api, user, started + SECOND_CALL_BOUND
+    def __init__(self, api, user, started, gate):
+        self.api, self.user, self.ends, self.gate = api, user, started + SECOND_CALL_BOUND, gate
         self.found = []
+        # Set by result() when it stops waiting: a proof that has not begun its call by then never begins it (the transport is the run's again).
+        self.abandoned = False
+        self.turn = threading.Lock()
         self.thread = threading.Thread(target=self.prove, name='fm-slack-early-proof', daemon=True)
         self.thread.start()
 
@@ -1103,9 +1100,15 @@ class EarlyProof:
         earlier = self.api.__dict__.get('time_left')
         self.api.time_left = lambda: self.ends - monotonic()
         try:
-            channel = self.api.call('conversations.open', users=self.user, return_im=True).get('channel', {})
+            # The binding is checked again inside the binding fence, immediately before the call, and held to the end of it: an unbind between the run's first
+            # check and this call means no call at all (F7 of the review of 5048f815).
+            with self.gate() as bound:
+                with self.turn:
+                    if not bound or self.abandoned or monotonic() >= self.ends:
+                        return
+                channel = self.api.call('conversations.open', users=self.user, return_im=True).get('channel', {})
             self.found.append((self.user, channel))
-        except (SlackError, DeadlineSpent, OSError, ValueError):
+        except (SlackError, SecondBudgetSpent, DeadlineSpent, OSError, ValueError):
             pass
         finally:
             if earlier is None:
@@ -1116,6 +1119,8 @@ class EarlyProof:
     def result(self):
         """(user, channel) of this run's proof, or None; waits at most until the proof's own bound and its cancellation."""
         self.thread.join(max(0.0, self.ends - monotonic()) + CUTOFF_JOIN)
+        with self.turn:
+            self.abandoned = True
         return self.found[0] if self.found and not self.thread.is_alive() else None
 
 
@@ -1155,7 +1160,8 @@ class Watch:
         # bounded reader from the start of the run; it is used after the lock only for the id it was made for (second_channel, start_second).
         self.early_proof = None
         # Only for a bound source: an unbound run makes no Slack call (round 9, F7).
-        early = EarlyProof(self.api, second_user()[0], self.run_started) if self.lock_wait is not None and second_user()[0] and self.bound() else None
+        early = EarlyProof(self.api, second_user()[0], self.run_started, self.proof_gate) \
+            if self.lock_wait is not None and second_user()[0] and self.bound() else None
         try:
             self.take_lock(self.lock_wait)
         finally:
@@ -1301,13 +1307,46 @@ class Watch:
 
     def commit(self):
         try:
-            save(self.path, self.state)
+            if self.is_second and not getattr(self, 'their_check', False):
+                # Their journal in any run but their own check (the owner's check, arm, mirror, the manual poll): written from a copy, through second_io, so the
+                # owner never waits on it beyond one bound (Main 2082).
+                snapshot, path = copy.deepcopy(self.state), self.path
+                self.second_io(lambda: save(path, snapshot))
+            else:
+                save(self.path, self.state)
         except SecretCollision:
             # The journal refused the write: whatever the step changed in memory and did not commit is dropped, so that nothing later in this run reads a
             # state that the journal never held (the outbox line a refused commit left behind kept the one report from ever being written).
             self.restore()
             raise
         self.changed = True
+
+    def second_io(self, step):
+        """One write of the second person's bookkeeping (their journal, their id record, their refusal log or queue). In their own check it runs as it is. In
+        any other run it runs in a thread that is waited for at most SECOND_IO_WAIT (Main 2082: the owner's path never waits on second-person bookkeeping):
+        one that has not finished then fails this write (OSError), and no later write of theirs starts in this run, so an unfinished one never races another.
+        Every caller treats the failure as an unwritten step: nothing that the write was to come before is done (the journal commits before any effect)."""
+        if getattr(self, 'their_check', False):
+            return step()
+        owner = getattr(self, 'owner', self)
+        if getattr(owner, 'second_io_stalled', False):
+            raise OSError('second_bookkeeping_stalled')
+        outcome = []
+        def run():
+            try:
+                outcome.append((True, step()))
+            except BaseException as error:                             # handed back to the caller below, whatever it is
+                outcome.append((False, error))
+        worker = threading.Thread(target=run, name='fm-slack-second-io', daemon=True)
+        worker.start()
+        worker.join(SECOND_IO_WAIT)
+        if not outcome:
+            owner.second_io_stalled = True
+            raise OSError('second_bookkeeping_stalled')
+        finished, value = outcome[0]
+        if not finished:
+            raise value
+        return value
 
     def restore(self):
         """Memory equals the journal again (the second person's own journal for their pass)."""
@@ -1371,6 +1410,12 @@ class Watch:
                 if monotonic() >= deadline:
                     raise SecondBudgetSpent() from None
                 time.sleep(LOCK_POLL)
+
+    @contextlib.contextmanager
+    def proof_gate(self):
+        """The binding fence held, with whether the source is bound under it: the early DM proof's own check, made immediately before its call (F7)."""
+        with self.binding_held():
+            yield bool(self.bound())
 
     @contextlib.contextmanager
     def delivering(self):
@@ -1729,9 +1774,9 @@ class Watch:
                     found = self.look_up_ack(row, thread, channel, marker)
                     if found:
                         return found
-                    # A complete lookup that finds nothing: for an attempt Slack answered with an error, that proves it absent and it is posted again below; for
-                    # any other attempt it is no proof (a post Slack accepted may not be visible yet), so nothing is posted again with its client_msg_id and
-                    # the request is woken with its state named unknown (R9 of the review of 64ac348b; Main 1673 (3); F6 of the review of c5868b6f).
+                    # A complete lookup that finds nothing is no proof of absence (a post Slack accepted may not be visible yet; Main 1673 (3), Main 2082):
+                    # nothing is posted again with its client_msg_id and the request is woken with its state named unknown (R9 of the review of 64ac348b; F6 of
+                    # the reviews of c5868b6f and 5048f815).
                     if not row.get('clear'):
                         raise AckUnknown('ack_state_unknown')
                     earlier = []
@@ -1763,6 +1808,9 @@ class Watch:
                 row['attempted'] = True
                 row.pop('clear', None)
                 row.pop('looked_after', None)
+                # The class of an earlier attempt never speaks for this one: a run that dies during this post leaves no class, which counts as unknown, and the
+                # class is read back from this commit after a restart (F6 of the review of 5048f815).
+                row.pop('attempt_class', None)
                 self.commit()
             try:
                 answer = self.api.call('chat.postMessage', **args)
@@ -1826,9 +1874,10 @@ class Watch:
                 self.commit()
             if not cursor:
                 break
-        # The empty lookup and its consequence are one write (round 9, F6): an attempt Slack answered with an error is then proved absent and may be posted
-        # again; any other attempt stays unknown for good, so a run that dies after this commit can never post it twice.
-        if row.get('person') == 'second' and row.get('attempt_class') != 'answered':
+        # The empty lookup and its consequence are one write (round 9, F6). An empty lookup is never proof that their post is absent (Main 2082): whatever
+        # Slack answered, their attempt stays unknown for good and is never posted again, so a run that dies after this commit can never post it twice. Only a
+        # failure before anything left this host (surely_absent) lets their post be made again.
+        if row.get('person') == 'second':
             row['ack_unknown'] = True
         else:
             row['clear'] = True
@@ -2000,9 +2049,10 @@ class Watch:
             self.state['second'] = {}
             win = self.second_window()
         saved = self.state.get('windows', {}).get(id_hash(self.second)) if self.second else None
-        if not win and isinstance(saved, dict) and saved.get('user') == self.second and saved.get('intake_cursor') is not None:
+        if not win and isinstance(saved, dict) and saved.get('user') == self.second and (saved.get('intake_cursor') is not None or self.held_window(saved)):
             # The id named now had a window set aside: its own cursor comes back, so an arm never resets unread work of a person (F3 of the review of
-            # c5868b6f, Main 1627 (1)); its DM is proved again by the next run.
+            # c5868b6f, Main 1627 (1)); its DM is proved again by the next run. A held window (an earlier arm read no Slack clock, so it has a boundary and no
+            # cursor yet) comes back as it was too, and the first run with a Slack Date resolves it (F3 of the review of 5048f815).
             self.state['second'] = self.state['windows'].pop(id_hash(self.second))
             self.commit()
             return
@@ -2062,6 +2112,11 @@ class Watch:
                     # The span the plane cannot place is taken in, not dropped, and named (option A of main-scott-failed-arm-span).
                     kept['intake_cursor'] = just_before(slack_ts(carried))
                     kept['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(boundary)}
+
+    @staticmethod
+    def held_window(win):
+        """Whether a window is held with a usable boundary: an arm that read no Slack clock kept `hold` and its `after`, and no cursor."""
+        return bool(win.get('hold')) and isinstance(win.get('after'), str) and bool(SLACK_TS.fullmatch(win.get('after')))
 
     @staticmethod
     def unplaced_after(win):
@@ -2716,7 +2771,10 @@ class Watch:
                         raise
                     note = REQUEST_UNKNOWN
                 except SlackError as error:
-                    if not definite_refusal(error):
+                    if not definite_refusal(error) or (pending.get('person') == 'second' and pending.get('attempted')):
+                        # Their post that may have reached Slack (an attempt mark that surely_absent did not clear) is never counted as a refused try and never
+                        # named "not acknowledged": the next run looks it up, and an empty lookup wakes it once named unknown (F6 of the review of 5048f815: the
+                        # terminal message names the real class; Main 2082). A failure before their post, or one that surely never left the host, counts as before.
                         raise
                     pending['tries'] = pending.get('tries', 0) + 1
                     if pending['tries'] < REQUEST_TRIES:
@@ -3162,10 +3220,12 @@ class Watch:
             if digest in existing.split('\n'):
                 written = True
             elif not value_hits(existing + lead + digest + '\n'):
-                with open(path, 'a') as out:
-                    out.write(lead + digest + '\n')
-                    out.flush()
-                    os.fsync(out.fileno())
+                def append():
+                    with open(path, 'a') as out:
+                        out.write(lead + digest + '\n')
+                        out.flush()
+                        os.fsync(out.fileno())
+                self.second_io(append)
                 written = True
         except OSError:
             pass
@@ -3233,8 +3293,11 @@ class Watch:
                 self.second_journal.note_date(value)
 
     def record_run(self):
-        """The time of this completed run, in the second person's own journal (last_run): the latest Slack clock its replies reported, or this host's clock when
-        none did. A later run that first reads a new id starts that person's intake there (start_second). Kept on every plane, so that the first enable has it."""
+        """The time of this completed run, in the second person's own journal (last_run): the latest Slack clock its replies reported. A later run that first
+        reads a new id starts that person's intake there (start_second). A run whose replies carried no Slack clock keeps the last watermark as it is: this
+        host's clock never replaces one (F4 of the review of 5048f815); it only seeds a journal that has none yet, so that the first enable has a start."""
+        if self.clock_last is None and isinstance(self.state.get('last_run'), str):
+            return
         value = slack_ts(self.clock_last if self.clock_last is not None else host_now())
         if self.state.get('last_run') != value:
             self.state['last_run'] = value
@@ -3287,7 +3350,10 @@ class Watch:
     def leave_cap(self, left):
         """The owner's check leaves what it left of the one shared cap (SC4) for the second person's check of the same watcher pass, in their journal, with the
         Slack clock its replies reported (the time of the sweep, finding 4 of the review of d9861b24); a failure here never touches the owner. The owner's check
-        first leaves 0 (start_cap_hand_over), so a failed or interrupted hand-over leaves them nothing this sweep and never widens the cap (finding 8)."""
+        first leaves 0 (start_cap_hand_over), so a failed or interrupted hand-over leaves them nothing this sweep and never widens the cap (finding 8). With the
+        setting unset there is no one to leave it to: nothing is written (F8 of the review of 5048f815)."""
+        if not self.second:
+            return
         try:
             view = self.second_view()
             view.state['cap_left'] = {'left': max(0, left), 'fresh': True, 'clock_first': self.clock_first, 'clock_last': self.clock_last, 'complete': True,
@@ -3299,19 +3365,33 @@ class Watch:
     def start_cap_hand_over(self):
         """Before any owner work of the owner's check: their check of this sweep is left 0 until the owner's work ends and leave_cap records what it left. The
         start of this owner check is also written to its own small file (OWNER_CHECK_FILE), so a hand-over of an earlier, interrupted sweep is known as such
-        even when both writes of second.json fail (F5 of the review of c5868b6f)."""
-        try:
-            root = getattr(self, 'root', None)
-            if root is not None:
-                write_atomically(root / OWNER_CHECK_FILE, json.dumps({'sweep': getattr(self, 'sweep_id', None), 'at': getattr(self, 'run_wall', None)}))
-        except OSError:
-            pass
+        even when both writes of second.json fail (F5 of the review of c5868b6f). That file's write is waited for at most OWNER_MARK_WAIT; an unfinished one
+        goes on in its own thread and owner work starts (F8 of the review of 5048f815). A write that fails removes the file, so no earlier sweep's identity can
+        stay in it and prove an old hand-over (F5 of the review of 5048f815). With the setting unset nothing is written: the owner's check then makes no write
+        the base did not make (F8)."""
+        if not self.second:
+            return
         try:
             view = self.second_view()
             view.state['cap_left'] = {'left': 0, 'fresh': True, 'at': getattr(self, 'run_wall', None), 'sweep': getattr(self, 'sweep_id', None)}
             view.commit()
         except (SecretCollision, SlackError, OSError, ValueError):
             pass
+        root = getattr(self, 'root', None)
+        if root is None:
+            return
+        mark = json.dumps({'sweep': getattr(self, 'sweep_id', None), 'at': getattr(self, 'run_wall', None)})
+        def write_mark():
+            try:
+                write_atomically(root / OWNER_CHECK_FILE, mark)
+            except OSError:
+                try:
+                    (root / OWNER_CHECK_FILE).unlink()
+                except OSError:
+                    pass
+        worker = threading.Thread(target=write_mark, name='fm-slack-owner-mark', daemon=True)
+        worker.start()
+        worker.join(OWNER_MARK_WAIT)
 
     def second_check(self):
         """The second person's standing check: no owner work at all; their pass takes what the owner's check of this watcher pass left of the shared cap, which
@@ -3374,7 +3454,19 @@ class Watch:
             latest = json.loads((root / OWNER_CHECK_FILE).read_text()).get('sweep')
         except (OSError, ValueError, AttributeError):
             return True
-        return latest != sweep
+        if latest != sweep:
+            return True
+        # A watcher sweep that ended after the hand-over was written is a later sweep than the hand-over's: its second check did not take it, and this one
+        # never does (Main 1706: not accepted after that sweep's .last-check commit; F5 of the review of 5048f815, where the next owner check could write
+        # nothing at all). The mark is the watcher's own file beside the plane's state folder; with none yet, no sweep has ended.
+        try:
+            ended = (root.parent / WATCHER_SWEEP_MARK).stat().st_mtime
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+        at = ledger.get('at')
+        return not isinstance(at, (int, float)) or isinstance(at, bool) or at <= ended
 
     def remember_safely(self):
         """Record the id the setting names (record_second_id); kept as the one call every entry point makes. It raises when the id cannot be recorded at all."""
@@ -3623,9 +3715,10 @@ class Watch:
             return
         mark = self.state.get('last_run')
         if not same and not self.arming and isinstance(mark, str) and SLACK_TS.fullmatch(mark):
-            # The plane reads this id for the first time: the setting changed after its previous completed run, so that run's time (its Slack clock, or this
-            # host's clock when Slack gave none) is the start, inclusive, compared as Slack orders timestamps. Nothing typed after the enable is lost; at most one
-            # poll interval of earlier messages of theirs is also taken in, as data under their label (Main's ruling e59cdb79 on the enable anchor).
+            # The plane reads this id for the first time: the setting changed after its previous completed run, so that run's time (the last Slack clock on
+            # record, or this host's clock only when the journal had no completed run yet) is the start, inclusive, compared as Slack orders timestamps. Nothing
+            # typed after the enable is lost; earlier messages of theirs since that watermark are also taken in, as data under their label (Main's ruling
+            # e59cdb79 on the enable anchor). A watermark not advanced by runs with no Slack clock (record_run) only moves the start earlier, never later.
             self.state['second'] = {'user': self.second, 'intake_cursor': just_before(mark)}
             self.commit()
             win, same = self.second_window(), True
@@ -3735,6 +3828,7 @@ class Watch:
         """Name, once, the messages of theirs that an arm could not place before or after itself (window['unplaced'], a span [after, before) of Slack time): one
         durable row in the plane's log with their count and the span, and one notice line. They are not taken in; none is dropped without this record."""
         win = self.second_window()
+        self.finish_unplaced_report()
         span = win.get('unplaced')
         if not isinstance(span, dict) or not win.get('channel'):
             return
@@ -3767,16 +3861,34 @@ class Watch:
                 span['walk'] = min((m['ts'] for m in page), key=ts_key)
                 span['counted'] = count
                 self.commit()
-        # The row is written once (F10 of the review of c5868b6f): its event names the span, a row already in the log is not written again, and the span
-        # leaves the journal only after its row and notice.
-        event = 'unplaced:%s:%s' % (after, before)
-        if count and not self.refusal_logged(event) and not self.second_log('second_intake_unplaced', count=count, after=after, before=before, taken_in=True,
-                                                                           event=event):
-            return
+        # The journal first, then the row (Main 1706; F10 of the review of 5048f815): one commit removes the span, journals its one notice line and records the
+        # row still owed (unplaced_report); the row is appended after that commit, and a run that dies before it appends it later (finish_unplaced_report).
+        # The row's event names the person (the hash of their id) and the span, so an equal span of another configured person is its own row, and a row
+        # already in the log is never written again (F10 of the review of c5868b6f).
         if count:
             self.say('slack: second person unplaced: %d message(s) typed between %s and %s were taken in; the plane cannot tell whether they came before or after the arm'
                      % (count, after, before))
+            win['unplaced_report'] = {'event': 'unplaced:%s:%s:%s' % (id_hash(win.get('user') or self.second), after, before), 'count': count,
+                                      'after': after, 'before': before}
         win.pop('unplaced')
+        self.commit()
+        self.finish_unplaced_report()
+
+    def finish_unplaced_report(self):
+        """Append the row an unplaced span still owes (window['unplaced_report'], committed with the span's removal), once, then clear it."""
+        win = self.second_window()
+        report = win.get('unplaced_report')
+        if not isinstance(report, dict):
+            return
+        event = report.get('event')
+        if not isinstance(event, str):
+            win.pop('unplaced_report')
+            self.commit()
+            return
+        if not self.refusal_logged(event) and not self.second_log('second_intake_unplaced', count=report.get('count'), after=report.get('after'),
+                                                                 before=report.get('before'), taken_in=True, event=event):
+            return                                                     # kept: a later run appends it
+        win.pop('unplaced_report')
         self.commit()
 
     def second_episode(self, name):
@@ -3804,6 +3916,7 @@ class Watch:
         for entry in queued:
             reason = {'reply': 'decision_held_for_captain_reply', 'reaction': 'decision_held_for_captain_reaction'}.get(entry.get('kind'))
             fields = {k: entry[k] for k in ('attempt',) if entry.get(k) is not None}
+            fields.update(self.withheld_fields(entry))
             try:
                 logged = reason is not None and (self.refusal_logged(entry['event']) or self.second_log(
                     reason, detail=HELD_FOR_CAPTAIN, author=entry.get('author'), channel=entry.get('channel'), thread=entry.get('thread'), item=entry.get('item'),
@@ -3822,6 +3935,7 @@ class Watch:
             if reason is None:
                 continue
             fields = {k: entry[k] for k in ('attempt',) if entry.get(k) is not None}
+            fields.update(self.withheld_fields(entry))
             try:
                 logged = self.refusal_logged(entry['event']) or self.second_log(reason, detail=HELD_FOR_CAPTAIN, author=entry.get('author'), channel=entry.get('channel'),
                                                                              thread=entry.get('thread'), item=entry.get('item'), event=entry['event'], **fields)
@@ -3832,6 +3946,16 @@ class Watch:
                 if not self.state['second_unlogged']:
                     self.state.pop('second_unlogged')
                 self.commit()
+
+    def withheld_fields(self, entry):
+        """The Main 1719 reason of a queued refusal whose author is withheld (its `sha256-id:` form, kept because the id equals a protected value), so the row
+        that a later run writes is the row a direct write would have been: the hash form, the fixed reason, and the one owner notice (F2 of the review of
+        5048f815). A queued literal author carries none."""
+        author = entry.get('author')
+        if not (isinstance(author, str) and author.startswith('sha256-id:')):
+            return {}
+        self.notice_author_collision()
+        return {'withheld': AUTHOR_WITHHELD}
 
     def second_config(self):
         """Name, once per episode, why the second person is off: a setting that is not exactly one member id, or the owner's own id. The default, unset, is
@@ -3863,10 +3987,12 @@ class Watch:
             lead = '' if not existing or existing.endswith('\n') else '\n'
             if value_hits(existing + lead + line):
                 collision_outcome('record')
-            with open(path, 'a') as out:
-                out.write(lead + line)
-                out.flush()
-                os.fsync(out.fileno())
+            def append():
+                with open(path, 'a') as out:
+                    out.write(lead + line)
+                    out.flush()
+                    os.fsync(out.fileno())
+            self.second_io(append)
         except OSError:
             raise SlackError('refusal_log_unwritable') from None
 
@@ -3914,7 +4040,7 @@ class Watch:
             # F2 of the review of c5868b6f: their journal may hold a value the queue entry must not depend on).
             kind = 'reaction' if attempt is not None else 'reply'
             entry = {'event': event, 'kind': kind, 'author': author, 'channel': self.state.get('channel'), 'thread': record['ts'], 'item': item,
-                     'attempt': attempt}
+                     'attempt': attempt, **withheld}
             logged = self.queue_refusal(entry)
             if not logged:
                 return False
@@ -3952,10 +4078,12 @@ class Watch:
             lead = '' if not existing or existing.endswith('\n') else '\n'
             if value_hits(existing + lead + line):
                 return False
-            with open(path, 'a') as out:
-                out.write(lead + line)
-                out.flush()
-                os.fsync(out.fileno())
+            def append():
+                with open(path, 'a') as out:
+                    out.write(lead + line)
+                    out.flush()
+                    os.fsync(out.fileno())
+            self.second_io(append)
             return True
         except OSError:
             return False
@@ -4517,7 +4645,7 @@ def parse_flags(argv, names, usage, out, switches=None):
 def plane_watch(name, options, out):
     """The plane of a command that runs outside the poll: an unconfigured or refused plane stops it with the reason, a plane value inside the command's own
     fixed text stops it, and the owner must be the stored one. The id the setting names is recorded before any of these checks (record_setting_id)."""
-    record_setting_id()
+    record_setting_id(ID_RECORD_WAIT)
     refuse_a_value_that_the_marker_holds(COMMAND_FIXED_TEXT[name])
     state, reason = mode()
     if state != 'on':
@@ -4666,12 +4794,11 @@ def main(argv, out=None):
     code = 0
     try:
         # Before any check that can refuse the run: the id the setting names is recorded first, in one of two records (finding 1 of the review of d9861b24,
-        # R1 of the review of 64ac348b, F1 of the review of c5868b6f); a run that can write neither refuses. Their check counts this inside its budget (F8).
+        # R1 of the review of 64ac348b, F1 of the review of c5868b6f); a first record that fails or stalls is replaced by the fallback before the run goes on,
+        # and a run that can write neither refuses here, with nothing read or published (F1 of the review of 5048f815). Their check counts both waits inside its
+        # budget (F8).
         Watch.run_origin = monotonic()
-        if not bounded_record(ID_RECORD_WAIT):
-            if action == 'check-second':
-                Watch.run_origin = None
-                return 0
+        record_setting_id(ID_RECORD_WAIT)
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
         # Their check waits for the journal lock only inside its budget (take_lock); the token read below is the base's, unchanged (SC6).
@@ -4758,6 +4885,7 @@ def resolve_request(ts, out):
     """Close one failed request row that Main has dealt with. No Slack call: the transport is never used."""
     watch = None
     try:
+        record_setting_id(ID_RECORD_WAIT)                              # before anything that reads the setting can stop the run (F1 of the review of 5048f815)
         watch = Watch(replay=None, token='')
         watch.remember_safely()
         watch.close_request(ts)
