@@ -338,7 +338,9 @@ route_assert_digest_sees() {
 # ignored-payload retain key). Execute kinds: success, lie (the success envelope
 # after it unlocked the copy but left it in place), intact (the success envelope
 # with the copy and its lock untouched), success-done (state DONE), blocked (a cleanup_tip_unbound refusal), retained
-# (the archived-tree-retained refusal), temporary (a lease conflict), allowed-doc,
+# (the archived-tree-retained refusal), retained-both (that refusal in the stdout envelope and,
+# as R4(c) words it, once more on stderr, with the disposition key the plan shape would carry),
+# temporary (a lease conflict), allowed-doc,
 # and malformed or contradictory temporary refusals that must not read as one
 # (temporary-branch-delete and temporary-branch-reap carry a branch decision a BLOCKED
 # answer cannot have):
@@ -372,6 +374,7 @@ route_script_row() {
     intact) route_execute_success_envelope "$pr" > "$dir/exec.out"; printf 0 > "$dir/exec.exit" ;;
     blocked) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_tip_unbound"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     retained) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_ignored_payload_archived_tree_retained"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    retained-both) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_ignored_payload_archived_tree_retained"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit"; echo "closeout_pr: ignored_payload_disposition=archive_then_retain_tree cleanup_ignored_payload_archived_tree_retained" > "$dir/exec.err" ;;
     temporary) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary-string) route_envelope BLOCKED '"cleanup_gate"' true '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary-string-kept) route_envelope BLOCKED '"cleanup_gate"' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
@@ -540,4 +543,39 @@ route_assert_ignored_digest_sees() {
   [ "$(route_ignored_digest "$clone" all)" != "$before_all" ] || fail "$label: the leave-out control (digest of every ignored path) missed the tree-presence report, so the leave-out proves nothing"
   rm -f "$clone/.claude/bug-evidence/tree-presence/route-digest-control.json"
   assert_equals "$before" "$(route_ignored_digest "$clone")" "$label: the clone was not put back after the ignored-area digest control"
+}
+
+# route_plant_unique_ignored <copy>: unique ignored files in a copy, the kinds a real copy holds
+# that exist nowhere else (R4(c)): a text file, a binary file with a NUL and a high byte in a
+# nested ignored directory, an empty file, and a symlink. The caller names these paths in the
+# slot's info/exclude (unique.dat, unique-dir/, unique-link) so git ignores them.
+route_plant_unique_ignored() {
+  mkdir -p "$1/unique-dir/nested"
+  printf 'unique retained bytes\n' > "$1/unique.dat"
+  printf 'a\0b\377 binary\n' > "$1/unique-dir/nested/rows.bin"
+  : > "$1/unique-dir/empty.txt"
+  ln -s unique.dat "$1/unique-link"
+}
+
+# route_unique_sums <copy>: the planted files read directly, apart from route_ignored_digest:
+# each file's sha256, the symlink's target and the sorted listing of the planted paths, so a
+# missing, added or changed unique file shows in the text (stderr of a missing file is part of it).
+route_unique_sums() {
+  (
+    cd "$1" || exit 1
+    shasum -a 256 unique.dat unique-dir/nested/rows.bin unique-dir/empty.txt 2>&1
+    printf 'link %s\n' "$(readlink unique-link 2>&1)"
+    find unique.dat unique-dir unique-link 2>&1 | LC_ALL=C sort
+  )
+}
+
+# route_retained_bytes_ok <copy> <digest-before> <sums-before>: the R4(c) decision rule. Returns 0
+# only when the copy is still there and both its ignored-area digest and the planted files read
+# directly equal what they were before the route. A route that kept the copy but lost, changed or
+# added a unique ignored file returns 1.
+route_retained_bytes_ok() {
+  [ -d "$1" ] || return 1
+  [ "$(route_ignored_digest "$1")" = "$2" ] || return 1
+  [ "$(route_unique_sums "$1")" = "$3" ] || return 1
+  return 0
 }

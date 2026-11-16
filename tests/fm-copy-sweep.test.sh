@@ -6042,6 +6042,85 @@ SH
   pass "a path that takes no project lock cannot be stopped by the lock, but its switch of the slot checkout to the PR's head is refused before the driver with an empty argv log, and the same copy routes with no actor"
 }
 
+# R4(c), the retained ignored payload (review of c43fce54, finding 1): a route EXECUTE whose
+# scripted answer shows a retained ignored payload (the cleanup_ignored_payload_archived_tree_retained
+# refusal in the stdout envelope and again on stderr, with the disposition key) keeps the copy and
+# every unique ignored file byte for byte. The unique files are planted in the copy and hashed before
+# and after the route, two ways (route_ignored_digest and the planted files read directly). The
+# controls: (1) the digest can fail: an edited, a deleted and an added ignored file each change it;
+# (2) a scripted driver that retains the tree but rewrites a unique file fails the same decision rule;
+# (3) the release path: an eligible copy with no ignored payload and the success envelope is removed
+# by the same route code, so the keep above is the driver's answer and not the route's inability to
+# release. A sandbox check: the driver is a scripted stand-in and the forge and landing read are
+# stubbed (Main 1850, 2197); the sweep's receipt and release-slot rules for a retained copy are the
+# sweep's own and are the whole-route cases', owed to the pipeline and CI. On the base the route
+# does not exist, so the base's plain call never routes and the case is red there for the route's absence.
+test_a_route_execute_that_retains_the_tree_keeps_every_unique_ignored_file_byte_for_byte_and_a_payload_free_copy_is_released() {
+  local c m ctl admin lock_before before sums line
+  route_world route-retained-bytes
+  printf 'unique.dat\nunique-dir/\nunique-link\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  route_copy zz-payload 7 allowed retained-both
+  route_copy zz-mutant 7 allowed retained-both
+  route_copy aa-control 7
+  c=$(copy_path zz-payload)
+  m=$(copy_path zz-mutant)
+  ctl=$(copy_path aa-control)
+  route_plant_unique_ignored "$c"
+  route_plant_unique_ignored "$m"
+  [ "$(git -C "$c" status --porcelain --untracked-files=all | wc -l | tr -d ' ')" = 0 ] || fail "route-retained: the planted files are not ignored, so the copy is not clean: $(git -C "$c" status --porcelain --untracked-files=all)"
+  before=$(route_ignored_digest "$c")
+  sums=$(route_unique_sums "$c")
+  [ "$(printf '%s\n' "$sums" | grep -c 'unique')" -ge 7 ] || fail "route-retained: the planted files are not all there to be compared: $sums"
+  # Control 1: the comparison can fail.
+  printf 'x\n' >> "$c/unique.dat"
+  route_retained_bytes_ok "$c" "$before" "$sums" && fail "route-retained: the byte check missed an edit of a unique ignored file"
+  printf 'unique retained bytes\n' > "$c/unique.dat"
+  mv "$c/unique-dir/nested/rows.bin" "$c/unique-dir/nested/rows.bin.away"
+  route_retained_bytes_ok "$c" "$before" "$sums" && fail "route-retained: the byte check missed the deletion of a unique ignored file"
+  mv "$c/unique-dir/nested/rows.bin.away" "$c/unique-dir/nested/rows.bin"
+  printf 'added\n' > "$c/unique-dir/added.txt"
+  route_retained_bytes_ok "$c" "$before" "$sums" && fail "route-retained: the byte check missed an added unique ignored file"
+  rm -f "$c/unique-dir/added.txt"
+  route_retained_bytes_ok "$c" "$before" "$sums" || fail "route-retained: the copy was not put back after the byte-check controls"
+  admin=$(git -C "$c" rev-parse --absolute-git-dir)
+  [ -f "$admin/locked" ] || fail "route-retained: the payload copy is not locked as a Vernant copy is"
+  lock_before=$(shasum -a 256 "$admin/locked" | awk '{print $1}')
+  # The route execute on the payload copy.
+  route_trip_arm
+  route_closeout execute zz-payload "$(route_stub_before)"
+  [ "$CO_ROUTE" = pr ] || fail "route-retained: the copy with a record did not take the --pr route ($CO_ROUTE): $CO_OUT"
+  assert_equals 3 "$CO_RC" "route-retained: a retained-payload answer must keep the copy as the driver's exit 3 (the route said: $CO_OUT)"
+  assert_contains "$CO_OUT" "cleanup_ignored_payload_archived_tree_retained" "route-retained: the retained signal is not in the route's output"
+  assert_contains "$CO_OUT" "ignored_payload_disposition=archive_then_retain_tree" "route-retained: the stderr signal is not in the route's output"
+  assert_equals 1 "$(route_call_count zz-payload)" "route-retained: the driver was not asked exactly once (the execute): $(route_calls_for zz-payload)"
+  line=$(route_calls_for zz-payload | sed -n 1p)
+  # shellcheck disable=SC2086 # the argv words hold no spaces
+  route_argv_check execute 7 "$W/profiles/zz-payload.json" "$c" $line || fail "route-retained: the execute's argv is wrong: $ROUTE_ARGV_WHY ($line)"
+  [ -e "$c" ] && registered zz-payload || fail "route-retained: the copy with a retained ignored payload was removed or unregistered"
+  assert_equals "$lock_before" "$(shasum -a 256 "$admin/locked" | awk '{print $1}')" "route-retained: the copy's creation lock changed"
+  route_retained_bytes_ok "$c" "$before" "$sums" || fail "route-retained: a unique ignored file of the kept copy changed, went missing or was added: $(route_unique_sums "$c")"
+  assert_equals 'unique retained bytes' "$(cat "$c/unique.dat")" "route-retained: the text file's bytes changed"
+  # Control 2: a driver that retains the tree but rewrites a unique file fails the same rule.
+  cat > "$W/ans/zz-mutant/exec.hook" <<SH
+printf 'rewritten by the driver\n' > "$m/unique.dat"
+SH
+  route_trip_arm
+  route_closeout execute zz-mutant "$(route_stub_before)"
+  assert_equals 3 "$CO_RC" "route-retained: the rewriting driver's retained answer must still keep the copy ($CO_OUT)"
+  [ -e "$m" ] || fail "route-retained: the rewriting driver's copy was removed"
+  route_retained_bytes_ok "$m" "$before" "$sums" && fail "route-retained: the byte check passed a copy whose unique file the driver rewrote"
+  # Control 3: the release path. The same route code removes a copy with no ignored payload.
+  route_trip_arm
+  route_closeout execute aa-control "$(route_stub_before)"
+  [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "route-retained: the control copy with no payload was not released ($CO_RC $CO_ROUTE): $CO_OUT"
+  [ ! -e "$ctl" ] || fail "route-retained: the control copy with no ignored payload is still there after the success envelope"
+  ! registered aa-control || fail "route-retained: the control copy is still registered after its release"
+  assert_equals 1 "$(route_call_count aa-control)" "route-retained: the control was not asked exactly once: $(route_calls_for aa-control)"
+  route_trip_check "retained payload bytes"
+  printf 'retained: copy kept; unique.dat, unique-dir/nested/rows.bin, unique-dir/empty.txt and unique-link unchanged (digest and direct sums equal); controls: an edit, a deletion and an added file each fail the check, a rewriting driver fails it, the payload-free copy is removed\n'
+  pass "a route execute whose answer shows a retained ignored payload keeps the copy and every unique ignored file byte for byte (digest and direct hashes), the byte check fails on an edited, deleted, added or driver-rewritten file, and the same route removes a copy with no ignored payload"
+}
+
 # R2(d): the real 60 s forge-read default, through the real forge-read path and the real
 # bounder, on GitHub CI only (Main 2197). A hung read with FM_TEARDOWN_FORGE_TIMEOUT unset ends at
 # the 60 s default, the copy is kept with no driver call, and a timely control routes.
@@ -6267,6 +6346,7 @@ test_each_ancestor_copy_of_the_recorded_table_gets_its_own_generated_tip_that_is
 test_the_ci_only_gate_prints_one_named_skip_off_github_ci_and_lets_the_case_run_on_it
 test_a_plan_leaves_every_ignored_path_of_the_slot_clone_unchanged_except_the_trees_presence_report
 test_a_firstmate_path_that_takes_no_project_lock_and_switches_the_slot_checkout_is_refused_before_the_driver
+test_a_route_execute_that_retains_the_tree_keeps_every_unique_ignored_file_byte_for_byte_and_a_payload_free_copy_is_released
 test_the_real_60_second_forge_default_keeps_a_copy_whose_read_hangs_and_a_timely_control_routes_on_github_ci
 test_the_real_120_second_plan_default_holds_a_hung_plan_at_its_boundary_on_github_ci
 pass "fm-copy-sweep"
