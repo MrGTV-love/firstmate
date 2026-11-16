@@ -4066,6 +4066,52 @@ xl_assert_no_stray_wake_for_a() {  # <label>
   [ -z "$stray" ] || fail "$1: a wake or signal named A outside its own merge report: $stray"
 }
 
+# xl_install_contributions_forge: the shared forge also answers the contributions
+# observer's reads of PR 7 (registering pr= arms bin/fm-contributions.sh), as a
+# real forge does: a PR with no comments, reviews or checks, so a good observation
+# has no event to report. Without it the observer reads "observation unavailable"
+# and wakes for A, a wake the forge double, not the product, causes.
+xl_install_contributions_forge() {
+  cat > "$W/bin/gh-contrib.py" <<PYD
+#!/usr/bin/env python3
+import hashlib, json, sys, time
+args = sys.argv[1:]
+state = open('$W/forge.state').read().strip()
+pr = 'repos/acme/widget/pulls/7'
+if args[:2] == ['pr', 'view']:
+    sys.stdout.write(json.dumps({'headRefOid': '$XL_HEAD', 'reviewDecision': ''}) + '\n')
+    sys.exit(0)
+path = args[-1].lstrip('/').split('?')[0]
+if path == pr:
+    value = dict(number=7, html_url='$XL_PR', state='closed' if state in ('MERGED', 'CLOSED') else 'open',
+                 merged_at='2026-11-03T00:00:00Z' if state == 'MERGED' else None, draft=False, mergeable=None,
+                 user=dict(login='fm-worker'), head=dict(sha='$XL_HEAD', ref='fm/t1'))
+elif path in ('repos/acme/widget/issues/7/comments', pr + '/reviews', pr + '/comments',
+              'repos/acme/widget/commits/$XL_HEAD/statuses'):
+    value = []
+elif path == 'repos/acme/widget/commits/$XL_HEAD/check-runs':
+    value = {'check_runs': []}
+elif path == 'repos/acme/widget':
+    value = {'permissions': {'push': False}}
+else:
+    sys.exit(3)
+body = json.dumps(value)
+sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: "%s"\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4000\r\n'
+                 'X-Ratelimit-Reset: %d\r\nX-Ratelimit-Resource: core\r\n\r\n%s' % (hashlib.sha1(body.encode()).hexdigest()[:8], int(time.time()) + 3600, body))
+PYD
+  chmod +x "$W/bin/gh-contrib.py"
+  mv "$W/bin/gh" "$W/bin/gh.forge"
+  cat > "$W/bin/gh" <<SH
+#!/usr/bin/env bash
+case "\${1:-} \$*" in
+  "api "*) "$W/bin/gh-contrib.py" "\$@"; rc=\$?; [ "\$rc" -eq 3 ] || exit "\$rc" ;;
+  "pr "*"--json headRefOid,reviewDecision"*) exec "$W/bin/gh-contrib.py" "\$@" ;;
+esac
+exec "$W/bin/gh.forge" "\$@"
+SH
+  chmod +x "$W/bin/gh"
+}
+
 # xl_t1_rows: t1's rows in O's open-work ledger, one "category | owner | informational | next action" line each.
 xl_t1_rows() {
   xl_env "$ROOT/bin/fm-open-loops.sh" --json 2> "$W/ledger.err" \
@@ -4164,8 +4210,14 @@ test_xlane_merge_by_another_lane_reaches_safe_closeout() {
   local rows
   for variant in unregistered poll-never-published; do
     make_xlane_world
+    xl_install_contributions_forge
     xl_merge_in_lane_m
     xl_write_done_note
+    # Firstmate already read the done report (its own signal is not the merge
+    # notification): mark it seen with the watcher's own primitive, so any wake
+    # below comes from discovery, which must need none.
+    xl_env FM_STATE_OVERRIDE="$STATE" bash -c '. "$1/bin/fm-wake-lib.sh" && fm_wake_status_mark_current "$2" "$2/t1.status"' \
+      _ "$ROOT" "$STATE" || fail "$variant: could not mark the done report seen"
     if [ "$variant" = poll-never-published ]; then
       # The registrar committed pr= and was interrupted before it published the poll.
       printf 'pr=%s\npr_head=%s\n' "$XL_PR" "$XL_HEAD" >> "$STATE/t1.meta"
@@ -4437,7 +4489,7 @@ test_xlane_protections_still_refuse() {
 # Another lane merges t1's PR and the copy still holds work the merged head does
 # not carry. O's own merge prune runs plain teardown, which refuses, and keeps the
 # refusal; the ledger row that owns the task (unlanded_commit for the commit,
-# pending_acceptance for the changed file) carries that exact refusal text.
+# pending_cleanup for the changed file) carries that exact refusal text.
 test_xlane_refused_prune_keeps_its_reason_on_the_ledger_row() {
   local what reason ledger category
   for what in unlanded-commit dirty; do
@@ -4463,8 +4515,10 @@ PYJ
     ledger="$W/ledger-$what.json"
     xl_env GIT_CONFIG_COUNT=1 "GIT_CONFIG_KEY_0=url.$ORIGIN.insteadOf" GIT_CONFIG_VALUE_0=https://github.com/acme/widget.git \
       "$ROOT/bin/fm-open-loops.sh" --json > "$ledger" 2> "$W/ledger.err" || fail "$what: the ledger failed: $(cat "$W/ledger.err")"
+    # Both variants merged (the merge-notified marker): a dirty copy is the owned
+    # pending_cleanup row (Main 1871 P-D); an unlanded commit keeps unlanded_commit.
     category=unlanded_commit
-    [ "$what" != dirty ] || category=pending_acceptance
+    [ "$what" != dirty ] || category=pending_cleanup
     jq -r '.rows[] | select(.subject == "t1") | [.category, .owner, .next_action] | @tsv' "$ledger"
     jq -e --arg c "$category" --arg r "$reason" \
       'any(.rows[]; .subject == "t1" and .category == $c and (.next_action | contains($r)) and (.evidence | contains($r[0:120])))' \
