@@ -1049,6 +1049,7 @@ fm_slot_apply_move() {
   fi
   if ! out=$(fm_slot_snapshot "$slot" "$after" "$([ "$mode" = moved ] && echo 1 || echo 0)" "$snap" "$FM_SLOT_PROOF_DIR"); then
     fm_slot_proof_drop
+    FM_SLOT_SKIP_REASON=unreadable_after_move
     echo "error: pooled copy '$slot' could not be read after the move ($(printf '%s' "$out" | sed -n '1p')); its state is unknown, so it is left exactly as it is and no worker is admitted" >&2
     return 1
   fi
@@ -1058,6 +1059,7 @@ fm_slot_apply_move() {
   esac
   fm_slot_proof_drop
   if [ "$rc" != 0 ]; then
+    FM_SLOT_SKIP_REASON=changed_during_move
     echo "error: pooled copy '$slot' differs from the proven state beyond the expected move ($out); it is left exactly as it is and no worker is admitted" >&2
     return 1
   fi

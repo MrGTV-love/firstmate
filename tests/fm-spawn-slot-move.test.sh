@@ -1545,6 +1545,128 @@ test_a_dirty_copy_nothing_was_written_to_is_still_a_skip_after_the_n2_change() {
   pass "a dirty copy nothing was written to is still skipped"
 }
 
+# --- Main 2027 (review of c38c0ec72): F-6 the refusal reason, F-5 the target-path control, F-1 dirt after the proof ----------
+
+# F-6: a comparison that fails after the move began records WHY (changed_during_move). The refusal record
+# (slot_refusal_reason=${FM_SLOT_SKIP_REASON:-provisioner_refused}) must not say provisioner_refused when no provisioner ran.
+test_a_failed_comparison_after_a_move_records_changed_during_move() {
+  make_world f6-reason
+  advance_origin advanced.txt
+  local bin="$W_DIR/f6shim" real_git rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) printf "late edit\\n" >>%s ;; esac\nexec %s "$@"\n' \
+    "'$W_SLOT/README.md'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  FM_SLOT_SKIP_REASON=
+  PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" >"$W_DIR/f6.out" 2>&1 || rc=$?
+  [ "$rc" = 1 ] || fail "a late edit during the move returned $rc, not 1: $(cat "$W_DIR/f6.out")"
+  [ "${FM_SLOT_SKIP_REASON:-}" = changed_during_move ] || fail "the reason after a failed comparison is '${FM_SLOT_SKIP_REASON:-empty}', not changed_during_move"
+  pass "a failed comparison after the move records changed_during_move"
+}
+
+# F-5: an ignored file sits at a path the target newly tracks, and its bytes change after the first look. The proof refuses
+# such a copy as an ignored collision before any merge runs, so the merge is never reached and the bytes are never
+# overwritten. The shim would change the bytes and leave a marker if the merge ran.
+test_an_ignored_file_at_a_newly_tracked_path_is_refused_before_the_merge() {
+  make_world f5-target-path
+  advance_origin notes.local
+  printf 'private bytes\n' >"$W_SLOT/notes.local"
+  local bin="$W_DIR/f5shim" real_git
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) : >%s; printf "changed bytes\\n" >%s ;; esac\nexec %s "$@"\n' \
+    "'$W_DIR/merge-reached'" "'$W_SLOT/notes.local'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  MOVE_PATH="$bin:$PATH" expect_skip "an ignored file at a newly tracked path refuses before the merge" ignored_collision
+  [ ! -e "$W_DIR/merge-reached" ] || fail "the merge ran over an ignored file at a target-tracked path"
+  grep -q 'private bytes' "$W_SLOT/notes.local" || fail "the ignored bytes changed"
+}
+
+# F-1: a copy that turns dirty BETWEEN the proof and the preparation is never prepared: the preparation reads the status
+# first and refuses before it detaches HEAD or writes an anchor. The dirt appears at the preparation's own status read
+# (fm_test_late_dirt_shim), which comes after the proof read the status.
+test_a_copy_that_turns_dirty_after_the_proof_is_never_prepared() {
+  make_branch_slot f1-dirty-after-proof
+  advance_origin advanced.txt
+  fm_slot_prove_idle "$W_SLOT" "$W_TARGET" "$W_PROJ" || fail "the proof did not pass"
+  local fakebin="$W_DIR/f1bin" out rc=0 refs_before refs_after
+  mkdir -p "$fakebin"
+  fm_test_late_dirt_shim "$fakebin" "$W_SLOT" "$W_SLOT/README.md" 'late private dirt'
+  refs_before=$(git -C "$W_SLOT" for-each-ref --format='%(refname) %(objectname)'; git -C "$W_SLOT" rev-parse HEAD)
+  out=$(PATH="$fakebin:$PATH" fm_slot_prepare_base "$W_PROJ" "$W_SLOT" tid 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "the preparation admitted a copy that turned dirty after the proof: $out"
+  assert_contains "$out" "dirty_worktree" "the preparation did not name the dirt"
+  grep -q 'late private dirt' "$W_SLOT/README.md" || fail "the late dirt is gone"
+  [ "$(git -C "$W_SLOT" symbolic-ref -q HEAD)" = refs/heads/old-owner ] || fail "the copy was detached although it was never prepared"
+  refs_after=$(git -C "$W_SLOT" for-each-ref --format='%(refname) %(objectname)'; git -C "$W_SLOT" rev-parse HEAD)
+  [ "$refs_before" = "$refs_after" ] || fail "a ref or HEAD changed (an anchor was written) for a copy that was never prepared"
+  pass "a copy that turns dirty after the proof is never prepared"
+}
+
+# F-7: the checked-out branch itself changing during the move is a failure of its own, whatever the commit. The shim attaches the
+# copy to another branch at the same commit after the merge.
+test_the_checked_out_branch_changing_during_the_move_fails_it() {
+  make_branch_slot f7-symref
+  advance_origin advanced.txt
+  git -C "$W_SLOT" branch other "$W_BASE"
+  local bin="$W_DIR/f7symref" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  # shellcheck disable=SC2016 # The shim's own shell expands $* and $@.
+  printf '#!/bin/sh\ncase " $* " in *" merge --ff-only "*) %s "$@"; rc=$?; %s -C %s update-ref refs/heads/other %s; %s -C %s symbolic-ref HEAD refs/heads/other; exit $rc ;; esac\nexec %s "$@"\n' \
+    "'$real_git'" "'$real_git'" "'$W_SLOT'" "$W_TARGET" "'$real_git'" "'$W_SLOT'" "'$real_git'" >"$bin/git"
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 1 ] || fail "a change of the checked-out branch during the move was admitted (rc $rc): $out"
+  assert_contains "$out" "checked-out branch" "the failure did not name the checked-out branch"
+  pass "a change of the checked-out branch during the move fails it"
+}
+
+# F-7: an ignored file strictly below a path the target tracks. The slot tracks dir/a.txt and holds an ignored dir/x.local; the
+# target removes dir/a.txt and tracks dir as a file. The listing names dir/x.local itself (the directory is not wholly ignored),
+# so only the below-a-written-path rule can see it.
+test_an_ignored_file_below_a_directory_the_target_replaces_with_a_file_is_skipped() {
+  make_world f7-below
+  mkdir -p "$W_PUB/dir"
+  printf 'a\n' >"$W_PUB/dir/a.txt"
+  git -C "$W_PUB" add dir/a.txt
+  git -C "$W_PUB" "${GITID[@]}" commit -qm 'add dir/a.txt'
+  git -C "$W_PUB" push --quiet origin main
+  git -C "$W_PROJ" fetch --quiet origin
+  git -C "$W_SLOT" checkout --quiet --detach "$(git -C "$W_PROJ" rev-parse origin/main)"
+  git -C "$W_PUB" rm -q dir/a.txt
+  printf 'now a file\n' >"$W_PUB/dir"
+  git -C "$W_PUB" add -f dir
+  git -C "$W_PUB" "${GITID[@]}" commit -qm 'dir becomes a file'
+  git -C "$W_PUB" push --quiet origin main
+  git -C "$W_PROJ" fetch --quiet origin
+  W_TARGET=$(git -C "$W_PROJ" rev-parse origin/main)
+  printf 'my ignored work\n' >"$W_SLOT/dir/x.local"
+  expect_skip "an ignored file below a directory the target replaces with a file skips the copy" ignored_collision
+  grep -q 'my ignored work' "$W_SLOT/dir/x.local" || fail "the ignored bytes changed"
+}
+
+# F-7: a commit that appears after the proof, so git refuses the merge, is a failure (code 1) for the head comparison, never a
+# skip: the copy changed under the move.
+test_a_commit_after_the_proof_that_makes_git_refuse_is_a_failure_not_a_skip() {
+  make_world f7-late-commit-code
+  advance_origin advanced.txt
+  local bin="$W_DIR/latecode" real_git out rc=0
+  real_git=$(command -v git)
+  mkdir -p "$bin"
+  cat >"$bin/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *' merge '*) if [ ! -e '$W_DIR/late-done' ]; then : >'$W_DIR/late-done'; printf 'late\n' >'$W_SLOT/late.txt'; '$real_git' -C '$W_SLOT' add late.txt; '$real_git' -C '$W_SLOT' -c user.name=T -c user.email=t@example.invalid commit -qm late; fi ;; esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$bin/git"
+  out=$(PATH="$bin:$PATH" fm_slot_move_forward "$W_SLOT" "$W_TARGET" "$W_PROJ" 2>&1) || rc=$?
+  [ "$rc" = 1 ] || fail "a late commit that made git refuse the merge returned $rc, not the failure code 1: $out"
+  assert_contains "$out" "head changed" "the failure did not name the head"
+  pass "a commit after the proof that makes git refuse is a failure, not a skip"
+}
+
 # D-E: any initialized submodule with an index flag (assume-unchanged, skip-worktree) is doubt, whatever its files hold.
 test_an_assume_unchanged_flag_inside_a_submodule_skips_the_copy() {
   make_submodule_world e1-assume
@@ -1924,6 +2046,12 @@ CASES=(
   test_a_tree_member_with_an_empty_argv_is_still_judged_by_its_path
   test_an_unreadable_recorded_window_excuses_nobody
   test_a_recorded_endpoint_whose_start_time_does_not_match_refuses
+  test_a_failed_comparison_after_a_move_records_changed_during_move
+  test_an_ignored_file_at_a_newly_tracked_path_is_refused_before_the_merge
+  test_a_copy_that_turns_dirty_after_the_proof_is_never_prepared
+  test_the_checked_out_branch_changing_during_the_move_fails_it
+  test_an_ignored_file_below_a_directory_the_target_replaces_with_a_file_is_skipped
+  test_a_commit_after_the_proof_that_makes_git_refuse_is_a_failure_not_a_skip
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

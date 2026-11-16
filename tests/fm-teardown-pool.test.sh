@@ -3690,6 +3690,67 @@ assert_skipped_copy_kept() { # <label>: not returned, record still there
   grep -Fq "$CASE_DIR_X/skip-copy" "$REC_X" 2>/dev/null || fail "$1: the copy's record was dropped"
 }
 
+# Main 2027 F-2: the pass that releases skipped copies never changes the exit status. A skipped copy whose landing proof
+# needs the no-mistakes run record, while that record is locked past SQLite's busy wait, is unknown: its lease stays, its
+# record stays, a true message names the copy and the retry, and teardown still completes with status 0. (Before the
+# fix the proof's own exit for a retry ended the whole script with 75 and `|| true` could not catch an exit.)
+# The task's own copy sits at the merged PR head, so its proof needs no record; the skipped copy sits on another commit.
+test_a_skipped_copy_whose_run_record_is_locked_stays_leased_and_teardown_still_completes() {
+  local case_dir task_head skip_log skip_rec skip_canon rc=0 holder real_python
+  case_dir=$(make_case skipped-locked-record)
+  write_meta "$case_dir" no-mistakes ship
+  task_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' "pr_head=$task_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$task_head"
+  write_nm_run_record "$case_dir" 01RUNLOCKED "https://github.com/example/repo/pull/7" "$task_head" "$task_head"
+  mkdir -p "$case_dir/data/task-x1" "$case_dir/user-home"
+  git -C "$case_dir/project" worktree add -q --detach "$case_dir/skip-copy" main
+  printf 'only in the skipped copy\n' > "$case_dir/skip-copy/only-here.txt"
+  git -C "$case_dir/skip-copy" add only-here.txt
+  git -C "$case_dir/skip-copy" -c user.email=t@t -c user.name=t commit -q -m 'work only here'
+  skip_canon=$(cd "$case_dir/skip-copy" && pwd -P)
+  skip_log="$case_dir/treehouse.log"
+  skip_rec="$case_dir/data/task-x1/skipped-copies.tsv"
+  : > "$skip_log"
+  printf '%s\tskipped\tfirstmate-skipped:task-x1\t1\n' "$case_dir/skip-copy" > "$skip_rec"
+  printf '[{"path": "%s", "lease_holder": "firstmate-skipped:task-x1", "processes": []}]\n' "$skip_canon" > "$case_dir/pool.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$skip_log'
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  real_python=$(python3 -c 'import sys; print(sys.executable)')
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ]; then
+  exec "$real_python" -I -c 'import sqlite3, sys
+connect = sqlite3.connect
+sqlite3.connect = lambda *args, **kwargs: connect(*args, **dict(kwargs, timeout=0.2))
+exec(compile(sys.stdin.read(), "<stdin>", "exec"), {"__name__": "__main__"})' "\${@:3}"
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+  "$real_python" -I -c 'import sqlite3, sys, time
+db = sqlite3.connect(sys.argv[1], isolation_level=None)
+db.execute("BEGIN EXCLUSIVE")
+open(sys.argv[2], "w").close()
+time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked" &
+  holder=$!
+  fm_test_wait_until --while-alive "$holder" -- test -e "$case_dir/locked" || fail "skipped-locked-record: the lock holder never took the lock"
+  HOME="$case_dir/user-home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  expect_code 0 "$rc" "skipped-locked-record: a locked run record for a skipped copy must not change the exit status"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -Fq "return $skip_canon" "$skip_log" || fail "skipped-locked-record: the skipped copy was released on an unknown proof"
+  grep -Fq "$case_dir/skip-copy" "$skip_rec" || fail "skipped-locked-record: the skipped copy's record was dropped"
+  grep -Fq "leaving $case_dir/skip-copy leased" "$case_dir/stderr" || fail "skipped-locked-record: no message names the kept copy"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fq "retry teardown" "$case_dir/stderr" || fail "skipped-locked-record: no message names the retry"
+  pass "a skipped copy whose run record is locked stays leased and teardown still completes"
+}
+
 test_a_skipped_copy_whose_pool_row_has_no_process_list_stays_leased() {
   skipped_unknown_custody_case unknown-missing OMIT
   assert_skipped_copy_kept unknown-missing
@@ -3963,6 +4024,7 @@ test_a_skipped_copy_with_only_a_venv_is_released_without_origin_head
 test_a_skipped_copy_with_a_collision_stays_leased_without_origin_head
 test_a_skipped_copy_stays_leased_when_the_reset_target_is_unreadable
 test_a_user_config_base_branch_is_ignored_when_the_repo_has_a_treehouse_toml
+test_a_skipped_copy_whose_run_record_is_locked_stays_leased_and_teardown_still_completes
 )
 
 # In the combined tests/fm-teardown.test.sh run,
