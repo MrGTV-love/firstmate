@@ -1626,10 +1626,13 @@ teardown_closeout_plan_verdict_retains_tree() {  # <driver output>
 # recheck, since its answer can change during the run. Like the release call it
 # has no time bound of its own.
 TEARDOWN_CLOSEOUT_PLAN_WHY=
+TEARDOWN_CLOSEOUT_PLAN_RC=
 teardown_closeout_plan_allows() {  # <slot> <copy>
   local rc=0 said
   TEARDOWN_CLOSEOUT_PLAN_WHY=
+  TEARDOWN_CLOSEOUT_PLAN_RC=
   teardown_run_closeout "$1" "$2" plan || rc=$?
+  TEARDOWN_CLOSEOUT_PLAN_RC=$rc
   said=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
   said=${said:0:600}
   if [ "$rc" != 0 ] || ! teardown_closeout_plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; then
@@ -1640,6 +1643,22 @@ teardown_closeout_plan_allows() {  # <slot> <copy>
     TEARDOWN_CLOSEOUT_PLAN_WHY="Vernant's closeout driver would archive its ignored files and keep the tree (ignored_payload_disposition=archive_then_retain_tree): $said"
     return 1
   fi
+}
+
+# The entry plan check for an own nested copy Vernant's creation lock holds (Main 2056): as
+# teardown_closeout_plan_allows, except that an allowed plan (exit 0, allowed=true) whose
+# disposition is archive_then_retain_tree is not a refusal. That answer means the driver will
+# archive the copy's unique ignored files and keep the tree: the kept route ("Kept own copies")
+# then judges it after the execute, landed and clean, every unique ignored file saved, one
+# record, and closes or refuses by name, touching nothing in the copy. Every other plan refusal
+# (not allowed, a non-zero exit, no verdict) still refuses at entry, and foreign copies and the
+# sweep keep refusing on archive_then_retain_tree.
+teardown_own_closeout_plan_allows() {  # <slot> <copy>
+  teardown_closeout_plan_allows "$1" "$2" && return 0
+  [ "${TEARDOWN_CLOSEOUT_PLAN_RC:-}" = 0 ] \
+    && teardown_closeout_plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT" \
+    && teardown_closeout_plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_STDOUT" || return 1
+  TEARDOWN_CLOSEOUT_PLAN_WHY=
 }
 
 # Saves a refused driver's full output privately, then shows its last 20 lines.
@@ -1815,16 +1834,11 @@ teardown_own_preserve_list() {  # <copy> <out> <selected|wide> [named entry...]
   return "$rc"
 }
 
-# The folder of preserve <dir> that holds the files of <copy>: <dir> itself, laid out as
-# teardown_preserve_ignored lays it out, unless the copy has a root entry named copy-path or
-# SHA256SUMS, the names of the preserve's own two files; then the files go in <dir>/files, so a
-# preserved byte and a preserve file never stand for each other.
-teardown_own_preserve_root() {  # <dir> <copy>
-  if [ -e "$2/copy-path" ] || [ -L "$2/copy-path" ] || [ -e "$2/SHA256SUMS" ] || [ -L "$2/SHA256SUMS" ]; then
-    printf '%s/files\n' "$1"
-  else
-    printf '%s\n' "$1"
-  fi
+# The folder of preserve <dir> that holds the preserved files: <dir>/files, laid out as
+# teardown_preserve_ignored lays it out. The preserve's own two files are <dir>/meta/copy-path
+# and <dir>/meta/SHA256SUMS, so a preserved file of any name never meets them.
+teardown_own_preserve_root() {  # <dir> [copy]
+  printf '%s/files\n' "$1"
 }
 
 # Does preserve <dir> hold every file, symlink and FIFO of <list> as <copy> has it now: a
@@ -1871,46 +1885,49 @@ teardown_own_preserve_current() {  # <copy> <dir> <out>
   fi
   if [ "$rc" = 0 ]; then
     perl -e '
-      my ($copy, $flat) = @ARGV; local $/ = "\0";
-      while (<STDIN>) { chomp; next if $flat && ($_ eq "./copy-path" || $_ eq "./SHA256SUMS"); my $rel = $_; $rel =~ s{^\./}{}; print "$_\0" if lstat("$copy/$rel") }
-    ' "$copy" "$([ "$root" = "$dir" ] && echo 1)" < "$out.held" | cat "$out.sel" - | LC_ALL=C sort -z -u > "$out" || rc=1
+      my ($copy) = @ARGV; local $/ = "\0";
+      while (<STDIN>) { chomp; my $rel = $_; $rel =~ s{^\./}{}; print "$_\0" if lstat("$copy/$rel") }
+    ' "$copy" < "$out.held" | cat "$out.sel" - | LC_ALL=C sort -z -u > "$out" || rc=1
   fi
   rm -f "$out.sel" "$out.held"
   return "$rc"
 }
 
-# Writes <dir>/SHA256SUMS anew in sha256sum's form for every regular file under the payload
-# folder of preserve <dir>, each path relative to <dir>. Only a preserve being built, before it
-# is renamed into place, is written this way.
+# Writes <dir>/meta/SHA256SUMS anew in sha256sum's form for every regular file under
+# <dir>/files, each path relative to <dir>/files. Only a preserve being built, before it is
+# renamed into place, is written this way.
 teardown_own_preserve_sums() {  # <copy> <dir>
   local copy=$1 dir=$2 root rc=0
   root=$(teardown_own_preserve_root "$dir" "$copy") || return 1
-  if [ "$root" = "$dir" ]; then
-    find "$dir" -type f ! -path "$dir/copy-path" ! -path "$dir/SHA256SUMS" -print0 > "$dir.files" || rc=1
-  else
-    find "$root" -type f -print0 > "$dir.files" || rc=1
-  fi
+  find "$root" -type f -print0 > "$dir.files" || rc=1
   if [ "$rc" = 0 ]; then
-    : > "$dir/SHA256SUMS" && teardown_sums_write "$dir" "$dir.files" "$dir/SHA256SUMS" || rc=1
+    : > "$dir/meta/SHA256SUMS" && teardown_sums_write "$root" "$dir.files" "$dir/meta/SHA256SUMS" || rc=1
   fi
   rm -f "$dir.files"
   return "$rc"
 }
 
 # Builds the preserve <dir> (which must not exist) of <copy>'s selected entries, copied as
-# teardown_preserve_ignored copies them, with copy-path and SHA256SUMS, in a staging directory
-# beside it; checks it byte for byte against the copy and only then renames it into place.
+# teardown_preserve_ignored copies them, with meta/copy-path and meta/SHA256SUMS, in a staging
+# directory (the teardown's private run directory when there is one, otherwise beside it); checks
+# it byte for byte against the copy and only then renames it into place.
 # Returns 1, leaving nothing at <dir>, when anything cannot be copied, hashed or checked (a copy
 # that changed meanwhile included).
 teardown_own_preserve_build() {  # <copy> <dir>
   local copy=$1 dir=$2 stage root entry rc=0
-  stage="${dir%/*}/.staging-own-${dir##*/}"
+  # A teardown stages in its private run directory (bin/fm-teardown.sh's
+  # teardown_run_dir_prepare, whose filesystem the entry check proved); otherwise beside.
+  if [ -n "${TEARDOWN_RUN_DIR:-}" ]; then
+    stage="$TEARDOWN_RUN_DIR/ignored-own-${dir##*/}"
+  else
+    stage="${dir%/*}/.staging-own-${dir##*/}"
+  fi
   rm -rf "$stage" || return 1
   teardown_ignored_list "$copy" || return 1
   root=$(teardown_own_preserve_root "$stage" "$copy") || return 1
   (
-    mkdir -p "$root" || exit 1
-    printf '%s\n' "$copy" > "$stage/copy-path" || exit 1
+    mkdir -p "$root" "$stage/meta" || exit 1
+    printf '%s\n' "$copy" > "$stage/meta/copy-path" || exit 1
     for entry in ${TEARDOWN_IGNORED_LIST[@]+"${TEARDOWN_IGNORED_LIST[@]}"}; do
       case "$entry" in /*|..|../*|*/..|*/../*) exit 1 ;; esac
       case "$entry" in */*) mkdir -p "$root/${entry%/*}" || exit 1 ;; esac
@@ -1940,7 +1957,7 @@ teardown_own_preserve_adopt() {  # <copy> <dir> <list>
     (set -o pipefail; cd "$copy" && COPYFILE_DISABLE=1 tar -cf - --null -T "$list.missing" | tar -xpkf - -C "$root") || rc=1
     if [ "$rc" = 0 ]; then
       perl -e 'my $r = shift; local $/ = "\0"; while (<STDIN>) { chomp; my $rel = $_; $rel =~ s{^\./}{}; my $f = "$r/$rel"; print "$f\0" if -f $f && !-l $f }' "$root" < "$list.missing" > "$list.abs" \
-        && teardown_sums_write "$dir" "$list.abs" "$dir/SHA256SUMS" || rc=1
+        && teardown_sums_write "$root" "$list.abs" "$dir/meta/SHA256SUMS" || rc=1
     fi
   fi
   rm -f "$list.missing" "$list.abs"
@@ -1960,7 +1977,14 @@ teardown_own_preserve() {  # <copy>
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-own-preserve.XXXXXX") || return 1
   teardown_own_preserve_list "$copy" "$work/list" selected || { rm -rf "$work"; return 1; }
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || { rm -rf "$work"; return 1; }
-  base="$DATA/$ID/nested-copy-preserved/$hash"
+  base="$(teardown_preserve_parent)/$hash"
+  # The preserve parent must be a real directory outside what this teardown removes
+  # (teardown_preserve_parent_safe), before anything is read from or written into it.
+  if [ -s "$work/list" ] && ! teardown_preserve_parent_safe "$copy"; then
+    rm -rf "$work"
+    printf 'error: %s\n' "$(fm_refuse_text "$TEARDOWN_PRESERVE_WHY")" >&2
+    return 1
+  fi
   for cand in "$base" "$base".*; do
     { [ -d "$cand" ] && [ ! -L "$cand" ]; } || continue
     if teardown_own_preserve_current "$copy" "$cand" "$work/current" \
@@ -1992,7 +2016,7 @@ teardown_own_preserve() {  # <copy>
 # then <sha256>.<those 16 characters>.<n> for n = 2, 3, ...; an existing name is never reused.
 teardown_own_preserve_dir_new() {  # <copy>
   local base payload n=2
-  base="$DATA/$ID/nested-copy-preserved/$(printf '%s' "$1" | teardown_ignored_sha256)" || return 1
+  base="$(teardown_preserve_parent)/$(printf '%s' "$1" | teardown_ignored_sha256)" || return 1
   if [ ! -e "$base" ] && [ ! -L "$base" ]; then
     TEARDOWN_PRESERVE_DIR=$base
     return 0
@@ -2020,6 +2044,10 @@ teardown_own_preserve_widen() {  # <copy> [named entry...]
         && teardown_own_preserve_holds "$copy" "$dir" "$work/current"; } || rc=1
   fi
   [ "$rc" != 0 ] || teardown_own_preserve_list "$copy" "$work/wide" wide "$@" || rc=1
+  if [ "$rc" = 0 ] && [ -s "$work/wide" ] && ! teardown_preserve_parent_safe "$copy"; then
+    printf 'error: %s\n' "$(fm_refuse_text "$TEARDOWN_PRESERVE_WHY")" >&2
+    rc=1
+  fi
   if [ "$rc" = 0 ] && [ -s "$work/wide" ] && [ -z "$dir" ]; then
     { teardown_own_preserve_dir_new "$copy" && dir=$TEARDOWN_PRESERVE_DIR \
         && mkdir -p "${dir%/*}" && teardown_own_preserve_build "$copy" "$dir"; } || rc=1
@@ -2569,7 +2597,7 @@ teardown_foreign_copies_release() {
 # A copy this task's record says the driver kept, unchanged since, gets the same proof,
 # but nothing it would queue for the retire signal is kept: no signal reaches a kept copy.
 teardown_own_locked_copies_prove() {
-  local copy rc queued slot
+  local copy rc queued slot held
   slot=${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -d "$copy" ] || continue
@@ -2588,16 +2616,21 @@ teardown_own_locked_copies_prove() {
       teardown_foreign_copy_unowned "$copy" || true
       FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
     fi
+    # A copy whose record still matches is judged from that record and asks the
+    # driver nothing, in plan mode too (Main 2056).
+    held=0
+    [ -n "$TEARDOWN_FOREIGN_WHY" ] || ! teardown_retained_copy_held "$copy" || held=1
     # The release hands this copy to Vernant's closeout driver, run from the
     # slot; one that cannot start, or that the driver in plan mode would not
-    # release, refuses here, before any protected step.
-    if [ -z "$TEARDOWN_FOREIGN_WHY" ] && ! teardown_closeout_ready_in "$slot"; then
+    # release, refuses here, before any protected step. A plan that keeps the
+    # tree goes to the kept route (teardown_own_closeout_plan_allows).
+    if [ "$held" = 0 ] && [ -z "$TEARDOWN_FOREIGN_WHY" ] && ! teardown_closeout_ready_in "$slot"; then
       TEARDOWN_FOREIGN_RULE=inspection-unavailable
       TEARDOWN_FOREIGN_WHY="$TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
     fi
     # The driver's own answer, asked in plan mode now; the release asks again.
-    if [ -z "$TEARDOWN_FOREIGN_WHY" ] \
-        && ! teardown_closeout_plan_allows "$(fm_task_copy_canonical_dir "$slot")" "$copy"; then
+    if [ "$held" = 0 ] && [ -z "$TEARDOWN_FOREIGN_WHY" ] \
+        && ! teardown_own_closeout_plan_allows "$(fm_task_copy_canonical_dir "$slot")" "$copy"; then
       TEARDOWN_FOREIGN_RULE=inspection-unavailable
       TEARDOWN_FOREIGN_WHY=$TEARDOWN_CLOSEOUT_PLAN_WHY
     fi
@@ -2605,7 +2638,7 @@ teardown_own_locked_copies_prove() {
       teardown_refuse_copy "${TEARDOWN_FOREIGN_RULE:-creation-lock-owner}" "own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." "$copy"
       return 1
     fi
-    if [ "${#TEARDOWN_FOREIGN_PROCS[@]}" -gt "$queued" ] && teardown_retained_copy_held "$copy"; then
+    if [ "${#TEARDOWN_FOREIGN_PROCS[@]}" -gt "$queued" ] && [ "$held" = 1 ]; then
       TEARDOWN_FOREIGN_PROCS=("${TEARDOWN_FOREIGN_PROCS[@]:0:$queued}")
     fi
   done
