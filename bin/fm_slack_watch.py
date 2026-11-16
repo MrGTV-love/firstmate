@@ -3949,12 +3949,11 @@ class Watch:
 
     def withheld_fields(self, entry):
         """The Main 1719 reason of a queued refusal whose author is withheld (its `sha256-id:` form, kept because the id equals a protected value), so the row
-        that a later run writes is the row a direct write would have been: the hash form, the fixed reason, and the one owner notice (F2 of the review of
-        5048f815). A queued literal author carries none."""
+        that a later run writes is the row a direct write would have been: the hash form and the fixed reason (F2 of the review of 5048f815). The one owner
+        notice was given when the attempt was refused (refuse_second) and is not given again. A queued literal author carries none."""
         author = entry.get('author')
         if not (isinstance(author, str) and author.startswith('sha256-id:')):
             return {}
-        self.notice_author_collision()
         return {'withheld': AUTHOR_WITHHELD}
 
     def second_config(self):
