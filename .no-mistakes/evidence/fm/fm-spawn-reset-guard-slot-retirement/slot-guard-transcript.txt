@@ -1,0 +1,67 @@
+== S1 clean slot behind origin (control)
+ before:
+  HEAD=ce72e89 sym=detached refs=main@ce72e89 
+ guard rc=0
+  | 
+ after:
+  HEAD=6574112 sym=detached refs=main@ce72e89 
+== S2 detached HEAD with unlanded commit
+ before:
+  HEAD=a18ca33 sym=detached refs=main@00d89d7 
+ guard rc=20
+  | skip: pooled copy '/Users/charlesabrooker/tmp/fm-live-guard.sKEkq2/s2/slot' was not moved (not_fast_forward): HEAD a18ca33085f76145dd1ff607e38c593ddf7a8703 is not an ancestor of the target 5b84eb4d201af43cf297d6069c47ade486c36b99 (the copy holds commits the target lacks)
+ after:
+  HEAD=a18ca33 sym=detached refs=main@00d89d7 
+== S3 attached owner branch with unlanded commit
+ before:
+  HEAD=52962be sym=owner refs=main@109d102 owner@52962be 
+ guard rc=20
+  | skip: pooled copy '/Users/charlesabrooker/tmp/fm-live-guard.sKEkq2/s3/slot' was not moved (not_fast_forward): HEAD 52962be7a39e69513f117a573df986e9aae75735 is not an ancestor of the target 2bd4c70aa270a5f7da9912c9d2c4626f4c8de755 (the copy holds commits the target lacks)
+ after:
+  HEAD=52962be sym=owner refs=main@109d102 owner@52962be 
+== S4 modified tracked file
+ before:
+  HEAD=e5d2935 sym=detached refs=main@e5d2935 
+ guard rc=20
+  | skip: pooled copy '/Users/charlesabrooker/tmp/fm-live-guard.sKEkq2/s4/slot' was not moved (dirty_tree): it is not clean, it holds uncommitted work ( M README.md)
+ after:
+  HEAD=e5d2935 sym=detached refs=main@e5d2935 
+  README now: edited
+== S5 ignored file at a path the target tracks
+ before:
+  HEAD=93660d6 sym=detached refs=main@93660d6 
+ guard rc=20
+  | skip: pooled copy '/Users/charlesabrooker/tmp/fm-live-guard.sKEkq2/s5/slot' was not moved (ignored_collision): ignored work at a path the target tracks would be overwritten: cfg.local
+ after:
+  HEAD=93660d6 sym=detached refs=main@93660d6 
+  cfg.local now: precious
+== S6 ignored file at an untouched path (control)
+ before:
+  HEAD=b2ccedc sym=detached refs=main@b2ccedc 
+ guard rc=0
+  | 
+ after:
+  HEAD=3a306f3 sym=detached refs=main@b2ccedc 
+  other.local now: keep
+== S7 live holder process with cwd in the slot
+ before:
+  HEAD=6b5f6e5 sym=detached refs=main@6b5f6e5 
+ guard rc=20
+  | skip: pooled copy '/Users/charlesabrooker/tmp/fm-live-guard.sKEkq2/s7/slot' was not moved (live_holder): a live process (pid 42555, sleep) has its working directory in the slot
+ after:
+  HEAD=6b5f6e5 sym=detached refs=main@6b5f6e5 
+== S8 holder list unreadable (lsof fails)
+ before:
+  HEAD=d58a0e5 sym=detached refs=main@d58a0e5 
+ guard rc=21
+  | skip: pooled copy '/Users/charlesabrooker/tmp/fm-live-guard.sKEkq2/s8/slot' was not moved (unknown_holders): the holder list cannot be read (lsof exit 1: )
+ after:
+  HEAD=d58a0e5 sym=detached refs=main@d58a0e5 
+== S9 attached owner branch behind origin (control)
+ before:
+  HEAD=31b0293 sym=owner refs=main@31b0293 owner@31b0293 
+ guard rc=0
+  | 
+ after:
+  HEAD=09ae602 sym=owner refs=main@31b0293 owner@09ae602 
+/Users/charlesabrooker/.no-mistakes/evidence/01M7HZ04YJJ169YD5Y4Y28CNBM/drive-slot-guard.sh: line 42: 42555 Terminated: 15          ( cd "$S" && exec sleep 60 )

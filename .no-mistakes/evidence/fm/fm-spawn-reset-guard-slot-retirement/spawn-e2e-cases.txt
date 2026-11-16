@@ -1,0 +1,10 @@
+ok - a dirty copy is leased in place, left byte-identical, and a second copy is taken and launched from
+ok - a copy holding an unlanded commit is skipped with the commit kept, and the task runs on another copy
+ok - with no other copy the spawn refuses, names the skipped copy and its reason, and launches nothing
+ok - an unknown refuses the whole spawn and the copy is leased and recorded
+ok - a skipped governed copy keeps its branch and every byte
+ok - a refused move leaves every ref as it found it
+ok - a dirty pooled worktree is refused without discarding its local work
+ok - a stale pooled worktree refreshes to current origin/main before a crew branch is created
+ok - every copy a spawn leases is recorded and listed
+bash tests/fm-spawn-pool-base-freshen.test.sh           15.35s user 24.59s system 35% cpu 1:52.83 total

@@ -1,0 +1,9 @@
+ok - no destroying git command runs on a clean move or a skip, and the checker flags one that does
+ok - a process whose chain does not reach the recorded root is a holder
+ok - a tree member whose executable or argv cannot be read is unknown
+ok - a recorded tree of a shell and sleep is not a holder
+ok - an agent named by its executable path holds the slot
+ok - an agent whose path is under claude/versions holds the slot
+ok - a node process with a harness argv0 holds the slot
+ok - a node process whose arguments name the Gemini CLI holds the slot
+# all fm-spawn-slot-move tests passed
