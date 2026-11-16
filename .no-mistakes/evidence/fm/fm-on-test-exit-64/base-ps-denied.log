@@ -1,0 +1,2 @@
+not ok - remote exit status was not preserved (got 64)
+exit=1 duration_s=263

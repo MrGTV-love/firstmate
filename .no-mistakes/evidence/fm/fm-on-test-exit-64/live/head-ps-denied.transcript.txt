@@ -1,0 +1,12 @@
+== head-ps-denied exit23: fm-on.sh ios fm-probe-one.sh 23
+exit=69 duration_s=5
+-- stdout:
+-- stderr:
+error: cannot inspect process ownership: no executable system ps
+-- state: worker.pid=absent jobs=absent mutation=absent
+== head-ps-denied mutate: fm-on.sh ios fm-mutate.sh /private/tmp/fmon-drive.7kPdiV/remote-home/mut
+exit=69 duration_s=5
+-- stdout:
+-- stderr:
+error: cannot inspect process ownership: no executable system ps
+-- state: worker.pid=absent jobs=absent mutation=absent

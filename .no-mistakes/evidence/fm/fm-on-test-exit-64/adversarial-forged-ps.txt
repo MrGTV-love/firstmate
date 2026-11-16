@@ -1,0 +1,3 @@
+selected ps: /bin/ps
+PATH-first ps: /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.hdPk93mx37/ps
+inspection rc=0 err=none

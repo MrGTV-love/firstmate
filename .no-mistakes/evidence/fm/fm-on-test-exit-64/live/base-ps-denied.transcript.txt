@@ -1,0 +1,12 @@
+== base-ps-denied exit23: fm-on.sh ios fm-probe-one.sh 23
+exit=64 duration_s=249
+-- stdout:
+-- stderr:
+error: remote job worker did not report ready after startup
+-- state: worker.pid=absent jobs=0 mutation=absent
+== base-ps-denied mutate: fm-on.sh ios fm-mutate.sh /private/tmp/fmon-drive.VEB4sM/remote-home/mut
+exit=64 duration_s=181
+-- stdout:
+-- stderr:
+error: remote job worker did not report ready after startup
+-- state: worker.pid=absent jobs=0 mutation=absent

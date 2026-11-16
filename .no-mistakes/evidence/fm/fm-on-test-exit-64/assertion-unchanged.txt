@@ -1,0 +1,12 @@
+base:
+147-  < "$TMP_ROOT/stdin" > "$TMP_ROOT/stdout" 2> "$TMP_ROOT/stderr"
+148-rc=$?
+149-set -e
+150:[ "$rc" -eq 23 ] || fail "remote exit status was not preserved (got $rc)"
+head:
+230-  < "$TMP_ROOT/stdin" > "$TMP_ROOT/stdout" 2> "$TMP_ROOT/stderr"
+231-rc=$?
+232-set -e
+233:[ "$rc" -eq 23 ] || fail "remote exit status was not preserved (got $rc)"
+removed lines in test diff:
+-    . "$ROOT/bin/fm-remote-job-lib.sh"

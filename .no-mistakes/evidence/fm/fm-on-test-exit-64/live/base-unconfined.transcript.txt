@@ -1,0 +1,12 @@
+== base-unconfined exit23: fm-on.sh ios fm-probe-one.sh 23
+exit=23 duration_s=10
+-- stdout:
+remote stdout line
+-- stderr:
+remote stderr line
+-- state: worker.pid=present jobs=0 mutation=absent
+== base-unconfined mutate: fm-on.sh ios fm-mutate.sh /private/tmp/fmon-drive.3A5DOp/remote-home/mut
+exit=0 duration_s=10
+-- stdout:
+-- stderr:
+-- state: worker.pid=present jobs=0 mutation=ran

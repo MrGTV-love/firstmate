@@ -1,0 +1,5 @@
+/bin/bash: /bin/ps: Operation not permitted
+ps rc=126
+true rc=0
+-x false
+-rwsr-xr-x  1 root  wheel  170432 Sep 24 21:06 /bin/ps
