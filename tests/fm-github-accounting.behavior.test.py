@@ -84,23 +84,31 @@ owner["run"](owner["private_root"](),duration={duration},process_source={source}
         root = self.state / "github-accounting"
         owner = subprocess.Popen([sys.executable, str(OWNER), "run"], env=self.env, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, text=True)
-        deadline = time.monotonic() + window
+        startup = time.monotonic() + 60
+        deadline = None
         stopping = False
         try:
             while True:
-                found = set()
+                found, started_at = set(), None
                 try:
-                    db = sqlite3.connect(f"file:{root / 'observations.sqlite'}?mode=ro", uri=True)
+                    db = sqlite3.connect(f"file:{root / 'observations.sqlite'}?mode=ro", uri=True, timeout=0)
                     try:
                         found = {kind for (kind,) in db.execute("SELECT DISTINCT kind FROM observations")}
+                        started_at = db.execute("SELECT json_extract(payload,'$.started_at') FROM observations "
+                                                "WHERE kind='owner' AND json_extract(payload,'$.action')='start'"
+                                                ).fetchone()
                     finally:
                         db.close()
                 except sqlite3.Error:
                     pass
+                if deadline is None and started_at is not None:
+                    deadline = time.monotonic() + window - (time.time() - started_at[0])
                 if found >= set(kinds):
                     break
-                if time.monotonic() >= deadline:
-                    self.fail(f"owner recorded no {sorted(set(kinds) - found)} row within {window} s")
+                if deadline is None and time.monotonic() >= startup:
+                    self.fail("owner recorded no start row within 60 s")
+                if deadline is not None and time.monotonic() >= deadline:
+                    self.fail(f"owner recorded no {sorted(set(kinds) - found)} row within {window} s of its start")
                 try:
                     owner.wait(timeout=0.05)
                 except subprocess.TimeoutExpired:
@@ -111,7 +119,12 @@ owner["run"](owner["private_root"](),duration={duration},process_source={source}
         finally:
             if not stopping and owner.poll() is None:
                 owner.terminate()
-            stdout, stderr = owner.communicate(timeout=60)
+            try:
+                stdout, stderr = owner.communicate(timeout=60)
+            except subprocess.TimeoutExpired:
+                owner.kill()
+                owner.communicate()
+                self.fail("owner did not stop within 60 s")
         return subprocess.CompletedProcess(owner.args, owner.returncode, stdout, stderr)
 
     def assertProcessGone(self, pid):
