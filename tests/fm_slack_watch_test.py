@@ -5400,8 +5400,11 @@ class Invariant1Boundary(InvariantScenario):
             time.tzset()
 
     def test_inv1_control_a_failed_arm_time_read_with_nothing_typed_wakes_nothing(self):
-        with self.home() as home:
+        # Round 10: the run before the failed arm is dated by Slack's clock (an arm that reads their DM), never by this host's, so their message from before it
+        # is placed before the failed arm.
+        with self.home(arm=False) as home:
             home.set_clock(150.0)
+            self.assertEqual(home.cli('check', action='arm').rc, 0)
             call = self.failing_history_read()
             with patch.object(Replay, 'call', call):
                 self.assertEqual(home.cli('check', action='arm').rc, 0)

@@ -889,6 +889,11 @@ def second_user():
     return raw, ''
 
 
+def host_now():
+    """This host's clock: only the marked seed of a completed-run time when no Slack instant exists at all (record_run); never in place of Slack's."""
+    return time.time()
+
+
 def just_before(ts):
     """The Slack timestamp one microsecond before ts: a cursor that takes in ts itself and everything after it (Slack orders timestamps to the microsecond)."""
     whole, _, part = ts.partition('.')
@@ -3288,21 +3293,28 @@ class Watch:
                 self.second_journal.note_date(value)
 
     def record_run(self):
-        """The time of this completed run, in the second person's own journal (last_run), from Slack's clock only (F4 of the review of 5048f815, Main 1753:
-        this host's clock is never used): the latest Slack clock this run's replies reported, else the newest Slack instant the owner's journal holds (its intake
-        cursor, a message ts Slack gave). A later run that first reads a new id starts that person's intake there (start_second). The watermark only moves
-        forward; with no Slack instant at all, nothing is written and the first enable follows the owner path's first-run rule."""
+        """The time of this completed run, in the second person's own journal (last_run), from Slack's clock (F4 of the review of 5048f815, Main 1753: this
+        host's clock never replaces Slack's): the latest Slack clock this run's replies reported, else the newest Slack instant the owner's journal holds (its
+        intake cursor, a message ts Slack gave). A later run that first reads a new id starts that person's intake there (start_second). A Slack watermark only
+        moves forward. Only when no Slack instant exists at all is this host's clock written, marked as such (last_run_host), so that a first enable still has a
+        start (Main's ruling e59cdb79); any Slack instant later replaces it, earlier or not, and it never replaces a Slack one."""
         found = [self.clock_last] if self.clock_last is not None else []
         cursor = (getattr(getattr(self, 'owner', self), 'state', None) or {}).get('intake_cursor')
         if isinstance(cursor, str) and SLACK_TS.fullmatch(cursor) and cursor != '0':
             found.append(float(cursor))
+        last = self.state.get('last_run')
+        from_host = bool(self.state.get('last_run_host'))
         if not found:
+            if isinstance(last, str):
+                return
+            self.state['last_run'], self.state['last_run_host'] = slack_ts(host_now()), True
+            self.commit()
             return
         value = slack_ts(max(found))
-        last = self.state.get('last_run')
-        if isinstance(last, str) and SLACK_TS.fullmatch(last) and ts_key(last) >= ts_key(value):
+        if not from_host and isinstance(last, str) and SLACK_TS.fullmatch(last) and ts_key(last) >= ts_key(value):
             return
-        if self.state.get('last_run') != value:
+        self.state.pop('last_run_host', None)
+        if self.state.get('last_run') != value or from_host:
             self.state['last_run'] = value
             self.commit()
 
