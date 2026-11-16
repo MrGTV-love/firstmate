@@ -1664,15 +1664,21 @@ test_an_ignored_file_whose_identity_changes_during_the_move_fails_it() {
 
 # start_recorded_endpoint [<inner-path> [<argv0>] [<arg>] [<source>]]: the real treehouse shape. A pane shell standing in
 # the project folder runs a `treehouse` launcher, which opens a shell in the slot; that shell runs <inner-path> (a copy of
-# <source>, default sleep, at that path under the launcher directory; default sleep itself) with <argv0> (default: its own
-# path) and the one argument <arg> (default 300).
+# <source>, default bash, at that path under the launcher directory; default sleep itself) with <argv0> (default: its own
+# path) and the one argument <arg> (default 300 for sleep; for a copy, a script that sleeps in a loop). A copy is of bash,
+# not sleep: a multi-call coreutils (Linux) refuses to run a sleep renamed to anything but a coreutils program name.
 # The launcher started before the spawn (start_marker runs after), so only the recorded tree can excuse it.
 # Sets ENDPOINT_PID (the pane shell) and ENDPOINT_START (its start time, read by the probe).
 start_recorded_endpoint() {
   local inner=${1:-sleep} dir="$W_DIR/launcher" bin argv0 arg=${3:-300}
   make_launcher "$dir" || return 1
-  bin=${4:-$(command -v sleep)}
+  bin=$(command -v sleep)
   if [ "$inner" != sleep ]; then
+    bin=${4:-$(command -v bash)}
+    if [ -z "${3:-}" ]; then
+      arg="$dir/loop.sh"
+      printf 'while :; do sleep 1; done\n' >"$arg"
+    fi
     mkdir -p "$(dirname "$dir/$inner")"
     cp "$bin" "$dir/$inner" || return 1
     [ "$(uname)" != Darwin ] || codesign -f -s - "$dir/$inner" >/dev/null 2>&1 || true

@@ -3723,9 +3723,18 @@ test_a_skipped_copy_with_an_explicit_empty_process_list_is_released() {
 
 # Main 1886 N1: the release runs the same index-flag check the spawn's proof runs (fm_slot_hidden_work). A tracked edit hidden
 # from status by assume-unchanged or skip-worktree, by blob or by mode, keeps the copy leased and recorded.
-hide_blob_edit() { local f; f=$(git -C "$1" ls-files | head -n 1); git -C "$1" update-index --assume-unchanged "$f"; printf 'hidden private edit\n' >> "$1/$f"; }
-hide_skip_worktree_edit() { local f; f=$(git -C "$1" ls-files | head -n 1); git -C "$1" update-index --skip-worktree "$f"; printf 'hidden private edit\n' >> "$1/$f"; }
-hide_mode_edit() { local f; f=$(git -C "$1" ls-files | head -n 1); git -C "$1" update-index --assume-unchanged "$f"; chmod +x "$1/$f"; }
+# The fixture's origin baseline is an empty commit, so the copy first lands one tracked file on origin's default branch:
+# the copy stays clean and landed, and the hidden edit is the only thing that can keep it.
+land_tracked_file() {
+  printf 'tracked\n' > "$1/tracked.txt"
+  git -C "$1" add tracked.txt
+  git -C "$1" -c user.email=t@t -c user.name=t commit -q -m 'tracked file'
+  git -C "$1" push -q origin HEAD:main
+  git -C "$1" fetch -q origin
+}
+hide_blob_edit() { land_tracked_file "$1"; git -C "$1" update-index --assume-unchanged tracked.txt; printf 'hidden private edit\n' >> "$1/tracked.txt"; }
+hide_skip_worktree_edit() { land_tracked_file "$1"; git -C "$1" update-index --skip-worktree tracked.txt; printf 'hidden private edit\n' >> "$1/tracked.txt"; }
+hide_mode_edit() { land_tracked_file "$1"; git -C "$1" update-index --assume-unchanged tracked.txt; chmod +x "$1/tracked.txt"; }
 vanish_copy() { rm -rf "$1"; }
 
 test_a_skipped_copy_with_an_assume_unchanged_edit_stays_leased() {

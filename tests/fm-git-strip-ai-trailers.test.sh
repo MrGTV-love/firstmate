@@ -416,13 +416,26 @@ SH
   chmod +x "$fakebin/tmux" "$fakebin/omp"
   cat > "$dir/rc" <<SH
 export PATH='$fakebin:$PATH'
-treehouse() { if [ "\${1:-}" = get ]; then cd '$wt'; fi; }
 PS1='fixture> '
 SH
   case "$shell_name" in
     bash) shell_command="'$shell_path' --noprofile --rcfile '$dir/rc' -i" ;;
     ksh) shell_command="'$shell_path' -i" ;;
   esac
+  # The real `treehouse` is a native program whose `get` opens a child shell in the copy, so the kernel names the launcher
+  # `treehouse` and the slot rules can tell the shell this spawn opened from any other process in the copy. The fake runs
+  # its body under a renamed copy of bash and keeps that child shell under it.
+  mkdir -p "$dir/launcher"
+  cp /bin/bash "$dir/launcher/treehouse" || fail "cannot copy bash for the treehouse launcher"
+  [ "$(uname)" != Darwin ] || codesign -f -s - "$dir/launcher/treehouse" >/dev/null 2>&1 || true
+  # shellcheck disable=SC2016 # $? and $status expand in the launcher, not here.
+  printf 'cd %q || exit 1\n%s\nstatus=$?\nexit "$status"\n' "$wt" "$shell_command" > "$dir/launcher/get.sh"
+  cat > "$fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = get ] || exit 0
+exec -a treehouse '$dir/launcher/treehouse' '$dir/launcher/get.sh'
+SH
+  chmod +x "$fakebin/treehouse"
   # The socket and every terminal belong to this fixture; no shared tmux
   # environment, user shell startup file, or live worker is read or changed.
   env -i HOME="$home/user-home" PATH="$fakebin:$PATH" TERM=xterm ENV="$dir/rc" \

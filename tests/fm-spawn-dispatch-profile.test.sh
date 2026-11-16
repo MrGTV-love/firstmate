@@ -2766,7 +2766,8 @@ PY
   [ ! -s "$LAUNCH_LOG" ] || fail 'a refused provisioner sent a harness launch'
   [ "$(git -C "$WT_DIR" rev-parse refs/heads/wt-slot-refused)" = "$retained_head" ] || fail 'freshness reset moved the previous task branch'
   [ "$(git -C "$WT_DIR" rev-parse HEAD)" = "$tip" ] || fail 'refused spawn moved the assigned checkout off the tip it was moved to'
-  ! git -C "$WT_DIR" symbolic-ref -q HEAD >/dev/null || fail 'a refusal after a successful move switched the copy onto a branch'
+  # Main 1886 CUT: a refusal switches nothing back. The copy stays on the task branch the provisioning set, at that tip.
+  [ "$(git -C "$WT_DIR" symbolic-ref -q HEAD)" = "refs/heads/fm/$id" ] || fail 'a refusal moved the copy off the task branch the provisioning set'
   [ "$(cat "$common/foreign-manifest")" = 'foreign manifest bytes' ] || fail 'refused spawn changed foreign data'
   assert_present "$WT_DIR/retained.txt" 'refused spawn lost retained work'
   assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'refused spawn lost retained-copy custody'

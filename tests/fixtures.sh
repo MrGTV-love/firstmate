@@ -394,6 +394,24 @@ fm_test_spawn_script() {
   printf '%s\n' "$tree/bin/fm-spawn.sh"
 }
 
+# fm_test_late_dirt_shim <fakebin> <copy> <file> <content>: a git wrapper that writes <content> to <file> the
+# first time the governed preparation reads the status of <copy> (bin/fm-slot-provision-lib.sh fm_slot_check_copy: the
+# one status read without -z), which is AFTER the proof has read the copy's status. It models work that appears between
+# the two, the only way left to make a governed preparation refuse for dirt, since a copy that is dirty at the proof is
+# skipped.
+fm_test_late_dirt_shim() {
+  local real_git
+  real_git=$(command -v git)
+  cat > "$1/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'-C $2 status --porcelain=v1 --untracked-files=all --ignore-submodules=none')
+  if [ ! -e '$1/late-dirt.done' ]; then : > '$1/late-dirt.done'; printf '%s\\n' '$4' > '$3'; fi ;;
+esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$1/git"
+}
+
 fm_test_run_spawn() {
   local home=$1 pane=$2 fakebin=$3 spawn_script
   shift 3

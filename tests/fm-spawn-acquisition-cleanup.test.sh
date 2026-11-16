@@ -129,8 +129,10 @@ fi
 cd "\$DEST" || exit 1
 touch "\$ARRIVED"
 if [ "\$MODE" = busy ]; then
-  # Hold the pane in a foreground program that never reads a typed line.
-  while [ ! -e "\$ALLOW" ]; do /bin/sleep 0.02; done
+  # Hold the pane in a foreground program that never reads a typed line. It is one long-lived process: a short-lived
+  # child in the copy can exit while the idle proof reads it, and a process the proof cannot read is never excused.
+  python3 -c 'import os, sys, time
+while not os.path.exists(sys.argv[1]): time.sleep(0.02)' "\$ALLOW"
 fi
 HISTFILE='$TMP_ROOT/get-history' /bin/bash --noprofile --norc -i
 SH
@@ -550,12 +552,12 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   parent_pane=$(printf '%s' "$parent_out" | jq -er '.result.root_pane.pane_id') || fail 'missing refusal parent pane'
   socket=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_presentation_session_socket_path "$HERDR_LAB_SESSION") || fail 'missing exact lab socket'
   printf 'MODE=%q\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\n' \
-    slow "$A_LEASE" "$A_PIDFILE" "$A_ALLOW" "$A_ARRIVED" "$DIRTY" > "$TMP_ROOT/get-config"
+    slow "$A_LEASE" "$A_PIDFILE" "$A_ALLOW" "$A_ARRIVED" "$FOREIGN" > "$TMP_ROOT/get-config"
   fm_test_spawn_brief "$FM_HOME" "$A_ID" 'Projected refusal must retain its endpoint when session custody is unavailable.'
   FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$A_CASE/claude" PATH="$FAKEBIN:$PATH" \
     HERDR_PANE_ID="$parent_pane" HERDR_SOCKET_PATH="$socket" \
     FM_TEST_POLL_READY="$A_POLL_READY" FM_TEST_REAL_CLEANUP_SLEEP=1 \
-    bash "$ROOT/bin/fm-spawn.sh" "$A_ID" "$PROJECT" --backend herdr --harness codex --allow-api-key --mode no-mistakes --yolo off \
+    bash "$ROOT/bin/fm-spawn.sh" "$A_ID" "$PROJECT" --backend herdr --harness claude --allow-api-key --mode no-mistakes --yolo off \
     > "$A_OUT" 2>&1 &
   A_SPAWN_PID=$!
   for _ in $(seq 1 1000); do
@@ -586,7 +588,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   a_rc=$?
   A_SPAWN_PID=
   [ "$a_rc" -ne 0 ] || fail "projected refused caller launched: $(cat "$A_OUT")"
-  assert_contains "$(cat "$A_OUT")" 'not clean' 'projected caller missed acquired-copy dirty refusal'
+  assert_contains "$(cat "$A_OUT")" 'could not pre-register Claude workspace trust' 'projected caller missed the acquired-copy refusal'
   [ "$(cat "$SESSION_LOCK/pid")" = "$$" ] || fail 'projected refusal changed fixture custody'
   assert_projected_retained() {
     cmp -s "$A_JOURNAL" "$A_CASE/journal-before" || fail 'projected refusal changed its exact journal or projection identity'
@@ -604,7 +606,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
     if [ ! -e "$protected_lease" ] || ! kill -0 "$protected_pid" 2>/dev/null; then
       fail 'projected refusal ended sibling get lease'
     fi
-    [ -e "$A_ARRIVED" ] || fail 'projected get never reached the dirty acquired copy'
+    [ -e "$A_ARRIVED" ] || fail 'projected get never reached the acquired copy'
   }
   assert_projected_retained
   fm_lock_release "$SESSION_LOCK" || fail 'cannot release projected fixture custody'
@@ -729,7 +731,7 @@ PY
   # Each case owns its project, copy, endpoint and task id; its clock moves only
   # once the owned gate opens, so a busy host cannot spend a budget early.
   run_slot_wait_case() { # <busy|stalled>
-    local shape=$1 wid="get-slot-wait-$1-$$" wcase="$TMP_ROOT/case-slot-wait-$1" wproject wcopy before gate get_mode lock out rc pid
+    local shape=$1 wid="get-slot-wait-$1-$$" wcase="$TMP_ROOT/case-slot-wait-$1" wproject wcopy before tip gate get_mode lock out rc pid
     wproject="$wcase/project" wcopy="$wcase/copy"
     mkdir -p "$wcase"
     fm_git_worktree "$wproject" "$wcopy" "slot-wait-$shape-before"
@@ -751,6 +753,8 @@ PY
     git -C "$wproject" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture stalled provisioner'
     git -C "$wproject" push -q origin main
     before=$(git -C "$wcopy" rev-parse HEAD)
+    # The copy sits behind origin's new tip, so the spawn moves it forward before it provisions.
+    tip=$(git -C "$wproject" rev-parse HEAD)
     get_mode=success
     gate="$wcase/provisioner.pid"
     if [ "$shape" = busy ]; then
@@ -779,8 +783,8 @@ PY
     fi
     assert_contains "$out" 'its helper is stopped and no worker admitted' "$shape refusal did not confirm its helper stopped"
     assert_grep 'recovery=slot-provision-refused' "$FM_HOME/state/$wid.meta" "$shape refusal lost recovery metadata"
-    [ "$(git -C "$wcopy" rev-parse HEAD)" = "$before" ] || fail "$shape refusal did not restore the assigned checkout"
-    # Main 1886 CUT: nothing is switched back. The preparation detached the copy at the same commit; the prior branch is where it was.
+    [ "$(git -C "$wcopy" rev-parse HEAD)" = "$tip" ] || fail "$shape refusal moved the assigned checkout off the tip it was moved to"
+    # Main 1886 CUT: nothing is switched back. The preparation detached the copy before the move; the prior branch is where it was.
     [ "$(git -C "$wcopy" rev-parse "refs/heads/slot-wait-$shape-before")" = "$before" ] || fail "$shape refusal moved the prior branch"
     [ -e "$wcase/lease" ] || fail "$shape refusal released its assigned copy lease"
     "$REAL_TMUX" list-windows -t firstmate -F '#{window_name}' | grep -qx "fm-$wid" || fail "$shape refusal closed its retained endpoint"
@@ -825,34 +829,38 @@ exec '$SLOT_CASE/native/codex' "\$@"
 SH
   chmod +x "$FAKEBIN/codex"
   "$REAL_TMUX" kill-window -t "firstmate:fm-$SLOT_ID"
-  slot_base=$(git -C "$SLOT_COPY" rev-parse HEAD)
   git -C "$SLOT_COPY" checkout -qb retained-ahead
   printf 'prior work must survive recovery\n' >> "$SLOT_COPY/README.md"
   git -C "$SLOT_COPY" add README.md
   git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture retained ahead work'
   prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  # A copy whose HEAD neither origin's default branch nor the selected base holds is skipped untouched, so the earlier
+  # work is first landed on origin and on the project's main; it is the baseline every preparation below starts from.
+  git -C "$SLOT_COPY" push -q origin "HEAD:refs/heads/main"
+  git -C "$SLOT_PROJECT" pull -q --ff-only origin main
+  slot_base=$prior_head
   cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
   cp "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before"
   touch "$SLOT_CASE/refuse"
   "$REAL_TMUX" set-environment -g FM_TEST_SLOT_REFUSE "$SLOT_CASE/refuse"
   RETRY_ID="get-slot-recovery-$$"
   fm_test_spawn_brief "$FM_HOME" "$RETRY_ID" 'Recover the same retained copy and exact declared scope.'
-  printf 'uncommitted prior work must survive\n' >> "$SLOT_COPY/README.md"
+  # A copy that is dirty at the proof is skipped, so the dirt appears after the proof, at the preparation's own read.
+  fm_test_late_dirt_shim "$FAKEBIN" "$SLOT_COPY" "$SLOT_COPY/README.md" 'uncommitted prior work must survive'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
     bash "$ROOT/bin/fm-spawn.sh" "$RETRY_ID" "$SLOT_PROJECT" --backend tmux --harness codex --allow-api-key \
       --mode local-only --yolo off --owned-path scripts --owned-path README.md 2>&1)
   rc=$?
+  rm -f "$FAKEBIN/git" "$FAKEBIN/late-dirt.done"
   [ "$rc" -ne 0 ] || fail 'dirty pre-preparation refusal admitted the task'
   assert_contains "$out" dirty_worktree 'initial refusal did not stop before preparation'
   assert_absent "$SLOT_CASE/admitted" 'refused task entered the harness'
   cmp -s "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before" || fail 'refusal overwrote the prior declaration'
-  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'dirty refusal moved the prior ahead checkout'
-  # Preserve the dirty work by committing it on its original branch, then let
-  # the public retry finish first-admission preparation but refuse provision.
-  git -C "$SLOT_COPY" add README.md
-  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture preserve initially dirty prior work'
-  prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
-  cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'dirty refusal moved the prior checkout'
+  # Preserve the dirty work outside the copy and restore the tracked file (a commit would put HEAD ahead of the recorded
+  # base, which the move refuses), then let the public retry finish first-admission preparation but refuse provision.
+  cp "$SLOT_COPY/README.md" "$SLOT_CASE/preserved-dirt"
+  git -C "$SLOT_COPY" checkout -q -- README.md
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
     bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'Prior dirty work is committed; finish the original preparation without replacing its owner.' 2>&1)
   rc=$?
@@ -919,5 +927,5 @@ PY
   expect_code 0 "$rc" 'relaunch changed the retained scope, copy or task identity'
   [ -e "$SLOT_CASE/lease" ] || fail 'relaunch released its assigned copy lease'
   assert_absent "$SLOT_COPY/.claude/worktrees" 'relaunch created nested isolation'
-  pass 'tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work'
+  pass 'tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior work'
 fi

@@ -68,7 +68,21 @@ for lane in $LANES; do
   fi
 done
 printf 'bravo\n' > "$TEST_DIR/home-bravo/.fm-secondmate-home"
-mkdir "$TEST_DIR/fakebin"
+mkdir "$TEST_DIR/fakebin" "$TEST_DIR/launcher"
+cp /bin/bash "$TEST_DIR/launcher/treehouse"
+[ "$(uname)" != Darwin ] || codesign -f -s - "$TEST_DIR/launcher/treehouse" >/dev/null 2>&1 || true
+# Absolute paths are written in, so the pane's own environment is never read.
+cat > "$TEST_DIR/launcher/get.sh" <<GET
+cd -- "\$1" || exit 1
+HISTFILE='$TEST_DIR/tmp/get-history' /bin/bash --noprofile --norc -i
+status=\$?
+exit "\$status"
+GET
+cat > "$TEST_DIR/launcher/get" <<GET
+#!/usr/bin/env bash
+exec '$TEST_DIR/launcher/treehouse' '$TEST_DIR/launcher/get.sh' "\$1"
+GET
+chmod +x "$TEST_DIR/launcher/get"
 cat > "$TEST_DIR/fakebin/herdr" <<'WRAPPER'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -101,7 +115,9 @@ for arg in "$@"; do
       [ -e "$TEST_DIR/release-$lane" ] || exit 1
     fi
     [ ! -e "$TEST_DIR/fail-$lane" ] || exit 1
-    printf -v command 'cd -- %q' "$TEST_DIR/copy-$lane"
+    # The real `treehouse get` is a native program that opens a child shell in the copy, so the idle proof can tell the
+    # shell this spawn opened from any other process there. The pane runs a renamed copy of bash that does the same.
+    printf -v command '%q %q' "$TEST_DIR/launcher/get" "$TEST_DIR/copy-$lane"
     set -- pane "$2" "$3" "$command"
     break
   fi
@@ -201,6 +217,9 @@ export REAL_LSOF
 cat > "$TEST_DIR/fakebin/lsof" <<'WRAPPER'
 #!/usr/bin/env bash
 set -euo pipefail
+# The spawn's idle proof lists every process's working directory (bin/fm-slot-provision-lib.sh holders): a read-only
+# listing, passed to the real lsof as is.
+[ "$*" != '-n -P -w -d cwd -F pcn' ] || exec "$REAL_LSOF" "$@"
 [ "$*" = '-a -d cwd -Fpn' ] || exit 1
 if [ -n "${FIXTURE_REAP_LANE:-}" ] && [ -e "$TEST_DIR/hold-reap-$FIXTURE_REAP_LANE" ]; then
   touch "$TEST_DIR/$FIXTURE_REAP_LANE-at-reap"
@@ -244,8 +263,8 @@ for form in run send-text send send-keys; do
   if HERDR_LAB_HELPER="$TEST_DIR/probe" herdr pane "$form" primary 'treehouse  get' --session "$HERDR_LAB_SESSION"; then fail "unmatched allocation form was forwarded"; fi
 done
 if HERDR_LAB_HELPER="$TEST_DIR/probe" herdr pane run foreign 'treehouse get' --session "$HERDR_LAB_SESSION"; then fail "foreign cwd was accepted"; fi
-grep -F "pane run primary cd -- $TEST_DIR/copy-primary" "$TEST_DIR/probe-calls" >/dev/null || fail "submitted allocation was not intercepted"
-grep -F "pane send-text bravo cd -- $TEST_DIR/copy-bravo" "$TEST_DIR/probe-calls" >/dev/null || fail "literal allocation was not intercepted"
+grep -F "pane run primary $TEST_DIR/launcher/get $TEST_DIR/copy-primary" "$TEST_DIR/probe-calls" >/dev/null || fail "submitted allocation was not intercepted"
+grep -F "pane send-text bravo $TEST_DIR/launcher/get $TEST_DIR/copy-bravo" "$TEST_DIR/probe-calls" >/dev/null || fail "literal allocation was not intercepted"
 if grep -E '(^|[[:space:];/])treehouse([[:space:];]|$)' "$TEST_DIR/probe-calls" >/dev/null; then fail "unmatched Treehouse command reached probe"; fi
 [ "$(command -v treehouse)" = "$TEST_DIR/fakebin/treehouse" ] || fail "generated return interception is not first on PATH"
 [ "$(PATH="$TEST_DIR/teardownbin:$PATH" command -v no-mistakes)" = "$TEST_DIR/teardownbin/no-mistakes" ] || fail "teardown run-query stub is not first on PATH"
