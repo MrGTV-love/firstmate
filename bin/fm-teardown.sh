@@ -2512,14 +2512,12 @@ TEARDOWN_UNPROVEN_COMMITS=
 # default branch does not visibly hold, one "<short sha> <subject>" line each, for
 # a refusal to name the work. A non-merge commit is left out when its own patch
 # applies in reverse to the default branch's tree; a merge commit is always named.
-# This only words the refusal; it never proves anything landed. Every commit of
-# <ref> is named when the default branch could not be resolved.
+# This only words the refusal; it never proves anything landed. With no default
+# branch it names nothing: the refusal's "the landing proof could not be
+# completed" line names that cause instead.
 teardown_commits_beyond_default() {  # <dir> <ref> <default-ref|empty>
   local dir=$1 ref=$2 default_ref=$3 line commit parents index
-  if [ -z "$default_ref" ]; then
-    git -C "$dir" log --format='%h %s' "$ref" -- 2>/dev/null
-    return 0
-  fi
+  [ -n "$default_ref" ] || return 0
   index=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-index.XXXXXX") || index=
   git -C "$dir" rev-list --parents "$ref" --not "$default_ref" -- 2>/dev/null | while read -r commit parents; do
     [ -n "$commit" ] || continue

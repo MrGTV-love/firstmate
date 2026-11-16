@@ -1607,12 +1607,14 @@ test_exact_head_proof_reads_a_refreshed_default_branch() {
     [ -d "$case_dir/wt" ] || fail "$shape: the copy was removed"
   done
   assert_grep "origin's default branch could not be read" "$TMP_ROOT/stale-default-unreachable/stderr" "unreachable: the refusal does not say origin's default branch could not be read"
+  ! grep -q 'commits whose change the default branch does not hold' "$TMP_ROOT/stale-default-unreachable/stderr" \
+    || fail "unreachable: with no readable default branch the refusal still listed commits: $(cat "$TMP_ROOT/stale-default-unreachable/stderr")"
   case_dir=$(stale_default_case stale-default-intact intact)
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "control: a head the refreshed default branch holds was refused: $(cat "$case_dir/stderr")"
   assert_copy_returned "$case_dir" "control: the copy stayed" https://github.com/example/repo/pull/7
-  pass "the exact-head proof refuses when the refreshed default branch lacks the head or cannot be refreshed; an intact one lands"
+  pass "the exact-head proof refuses when the refreshed default branch lacks the head or cannot be refreshed, then names the cause and lists no commits; an intact one lands"
 }
 
 # Main 1820 F4(b): a completion PR is recorded only when its merged head is the

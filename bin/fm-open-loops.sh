@@ -20,6 +20,9 @@
 # Printing the list delivers nothing.
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.
+# For a working ship whose copy's content is on the default branch with no done
+# report and no merged PR, the request also asks the worker to report done if its
+# work is finished.
 # A pending request suppresses repeats under the same ledger lock. Secondmate sends
 # use fm-send's existing pending-reply correlation, recovery and escalation; ordinary
 # workers report before moving the inbox record into handled/, whose absence is
