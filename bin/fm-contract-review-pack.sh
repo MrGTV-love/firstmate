@@ -28,7 +28,8 @@
 # Known limits: author text inside a request, a context file or a known section reaches the
 # reviewer; shell, eval, other tools and unrecorded subagents leave a round unverified; a
 # read that leaves no record cannot be seen; a falsifier saved through bash, or a file a
-# falsifier creates, makes a later search of the work folder void the round.
+# falsifier creates, makes a later read of that file or search of the work folder void the
+# round (only write-tool paths count as written).
 #
 # usage:
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
