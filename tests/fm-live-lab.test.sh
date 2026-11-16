@@ -6,6 +6,9 @@
 # and real processes, with no harness: it passes on a lab in the shape up builds
 # and fails, by name, on the recorded lab miss it exists to catch. The live
 # end-to-end run on the real harnesses is the builder's own `up`.
+# Fixture startup waits up to 10 seconds for the actual primary path and reply;
+# `up` already gates its ready verdict on these same inputs. To exercise only
+# the controlled startup cases: bash tests/fm-live-lab.test.sh --fixture-readiness
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -90,7 +93,7 @@ make_lab() {
 
   lab_tmux "$root" new-session -d -s firstmate -n lab -c "$root" 'exec sleep 600'
   record_pid "$root" "$(lab_tmux "$root" display-message -p '#{pid}')"
-  lab_tmux "$root" new-window -d -t firstmate: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
+  start_main "$root" "$home" || return 1
   lab_tmux "$root" new-window -d -t firstmate: -n "fm-$MATE_ID" -c "$root/mate" 'exec sleep 600'
   lab_tmux "$root" new-window -d -t firstmate: -n "fm-$WORKER_ID" -c "$root" 'exec sleep 600'
   fm_write_meta "$home/state/$MATE_ID.meta" "window=firstmate:fm-$MATE_ID" "tasktmp=/tmp/fm-$MATE_ID"
@@ -160,9 +163,106 @@ set_record() {  # <root> <key> <value>
   sed -i.bak "s|^$2=.*|$2=$3|" "$1/.fm-live-lab" && rm -f "$1/.fm-live-lab.bak"
 }
 
+# Shared by make_lab and the controlled startup cases below.
+start_main() {  # <root> <home>
+  local root=$1 home deadline current='' reply=''
+  home=$(cd "$2" && pwd -P) || return 1
+  lab_tmux "$root" new-window -d -t firstmate: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600" || return 1
+  # new-window can return before its child has changed directory or printed.
+  # Observe both inputs of the one-shot check; do not retry that verdict.
+  deadline=$((SECONDS + 10))
+  while :; do
+    current=$(lab_tmux "$root" display-message -p -t firstmate:=main '#{pane_current_path}')
+    reply=$(lab_tmux "$root" capture-pane -p -t firstmate:=main -S -200)
+    if [ "$current" = "$home" ] && [[ "$reply" == *"LABREADY-$NONCE"* ]]; then return 0; fi
+    [ "$SECONDS" -lt "$deadline" ] || break
+    sleep 0.05
+  done
+  printf 'fail fixture readiness: window main did not reach lab home %s with LABREADY-%s within 10 seconds (path=%s)\n' \
+    "$home" "$NONCE" "$current" >&2
+  return 1
+}
+
+# Hold the real pane before chdir, then before its reply, until each pending
+# condition is observed. No elapsed-time delay determines whether this races.
+fixture_startup_case() (
+  local mode=$1 root="$TMP_ROOT/startup-$1" home dir output rc current reply
+  home="$root/home"
+  mkdir -p "$root"
+  "$ROOT/bin/fm-lab-home.sh" create "$home" >/dev/null || fail "startup home create"
+  dir=$("$ROOT/bin/fm-lab-home.sh" tmux-dir "$home") || fail "startup tmux dir"
+  printf '%s\n' "$dir" >> "$TMP_ROOT/tmux-dirs"
+  printf 'tmux_dir=%s\n' "$dir" > "$root/.fm-live-lab"
+  root=$(cd "$root" && pwd -P)
+  home=$(cd "$home" && pwd -P)
+  cat > "$root/primary.sh" <<'SH'
+#!/usr/bin/env bash
+while [ ! -f "$1/directory" ]; do sleep 0.01; done
+cd "$2" || exit 1
+while [ ! -f "$1/reply" ]; do sleep 0.01; done
+printf 'LABREADY-%s\n' "$3"
+exec sleep 600
+SH
+  # This override changes only main's initial working directory and gates its
+  # progress. All observations still come from the real private tmux server.
+  lab_tmux() {
+    local snapshot
+    shift
+    if [ "$1" = new-window ]; then
+      env -u TMUX TMUX_TMPDIR="$dir" tmux new-window -d -t firstmate: -n main -c "$root" \
+        "bash '$root/primary.sh' '$root' '$home' '$NONCE'"
+      return
+    fi
+    snapshot=$(env -u TMUX TMUX_TMPDIR="$dir" tmux "$@") || return 1
+    if [ "$1" = display-message ] && [ "${*: -1}" = '#{pane_current_path}' ] && [ "$snapshot" = "$root" ]; then
+      : > "$root/saw-directory-pending"
+      [ "$mode" = never-directory ] || : > "$root/directory"
+    elif [ "$1" = capture-pane ] && [[ "$snapshot" != *"LABREADY-$NONCE"* ]] &&
+         [ "$(env -u TMUX TMUX_TMPDIR="$dir" tmux display-message -p -t firstmate:=main '#{pane_current_path}')" = "$home" ]; then
+      : > "$root/saw-reply-pending"
+      [ "$mode" = never-reply ] || : > "$root/reply"
+    fi
+    printf '%s\n' "$snapshot"
+  }
+  lab_tmux "$root" new-session -d -s firstmate -n lab -c "$root" 'exec sleep 600'
+  output=$(start_main "$root" "$home" 2>&1)
+  rc=$?
+  current=$(lab_tmux "$root" display-message -p -t firstmate:=main '#{pane_current_path}')
+  reply=$(lab_tmux "$root" capture-pane -p -t firstmate:=main -S -200)
+  case "$mode" in
+    delayed)
+      expect_code 0 "$rc" "delayed fixture producer succeeds: $output"
+      [ "$current" = "$home" ] && [[ "$reply" == *"LABREADY-$NONCE"* ]] ||
+        fail "fixture producer returned before main reached lab home and replied (path=$current, reply=$reply)"
+      assert_present "$root/saw-directory-pending" "delay exposed the old directory"
+      assert_present "$root/saw-reply-pending" "delay exposed the pending reply separately"
+      pass "fixture producer waits for both real directory and probe reply"
+      ;;
+    never-directory|never-reply)
+      expect_code 1 "$rc" "fixture producer fails when $mode never becomes ready"
+      assert_contains "$output" "fail fixture readiness:" "startup timeout names fixture readiness"
+      printf '%s\n' "$output"
+      if [ "$mode" = never-directory ]; then
+        assert_equals "$root" "$current" "timed-out pane never entered the lab home"
+      else
+        assert_equals "$home" "$current" "missing reply is tested in the correct directory"
+        assert_not_contains "$reply" "LABREADY-$NONCE" "timed-out pane never replied"
+      fi
+      pass "fixture producer bounds $mode with a named failure"
+      ;;
+  esac
+)
+
+# --fixture-readiness exercises only the producer, without the unrelated host
+# process/kill checks that need an unconfined runner. Normal runs include both.
+fixture_startup_case delayed || exit $?
+fixture_startup_case never-directory || exit $?
+fixture_startup_case never-reply || exit $?
+[ "${1:-}" != --fixture-readiness ] || exit 0
+
 # ---- Claude lab: every check passes on the shape up builds -----------------
 
-C=$(make_lab c claude)
+C=$(make_lab c claude) || fail "Claude fixture startup"
 CH="$C/home"
 run_check "$C"
 expect_code 0 "$CHECK_RC" "a Claude lab in up's shape is ready: $CHECK_OUT"
@@ -191,7 +291,7 @@ lab_tmux "$C" rename-window -t firstmate:=wtmain main
 run_check "$WT_CASE"
 assert_contains "$CHECK_OUT" "fail primary: the lab home is not a primary checkout" "primary refuses a linked-worktree home"
 lab_tmux "$C" kill-window -t firstmate:=main
-lab_tmux "$C" new-window -d -t firstmate: -n main -c "$CH" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
+start_main "$C" "$CH" || fail "restored Claude fixture startup"
 lab_tmux "$C" display-message -p -t firstmate:=main '#{pane_pid}' > "$CH/state/.lock"
 pass "primary fails when the primary runs in a linked worktree instead of the lab's primary checkout"
 
