@@ -4537,6 +4537,401 @@ PY
   pass 'Vernant retirement honors landing proof, recorded branch, lock-free forge proof, kept records, live owners, both copies, refusals, and old checkouts'
 }
 
+# Copies a spawn skipped and left leased (bin/fm-spawn.sh) are released by teardown, and only by it, and only
+# when the copy is clean and landed, nobody runs in it, and its lease still names this task's holder.
+test_skipped_copies_are_released_only_when_clean_and_landed() {
+  local case_dir landed unlanded other busy log rec rc=0 canon
+  case_dir=$(make_case skipped-copies)
+  write_meta "$case_dir" no-mistakes ship
+  mkdir -p "$case_dir/data/task-x1"
+  landed="$case_dir/skip-landed" unlanded="$case_dir/skip-unlanded" other="$case_dir/skip-other-holder" busy="$case_dir/skip-busy"
+  for dir in "$landed" "$unlanded" "$other" "$busy"; do
+    git -C "$case_dir/project" worktree add -q --detach "$dir" main
+  done
+  printf 'work only in this copy\n' > "$unlanded/only-here.txt"
+  git -C "$unlanded" add only-here.txt
+  git -C "$unlanded" -c user.email=t@t -c user.name=t commit -q -m 'work only here'
+  log="$case_dir/treehouse.log"
+  rec="$case_dir/data/task-x1/skipped-copies.tsv"
+  : > "$rec"
+  : > "$log"
+  {
+    printf '['
+    sep=
+    for dir in "$landed" "$unlanded" "$other" "$busy"; do
+      canon=$(cd "$dir" && pwd -P)
+      holder='firstmate-skipped:task-x1'
+      [ "$dir" != "$other" ] || holder='someone-else'
+      procs='[]'
+      [ "$dir" != "$busy" ] || procs='[{"pid": 1}]'
+      printf '%s{"path": "%s", "lease_holder": "%s", "processes": %s}' "$sep" "$canon" "$holder" "$procs"
+      sep=,
+      printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+    done
+    printf ']\n'
+  } > "$case_dir/pool.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$log'
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "skipped-copies: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  canon=$(cd "$landed" && pwd -P)
+  grep -Fq "return $canon --if-lease-holder firstmate-skipped:task-x1" "$log" || fail "skipped-copies: the clean, landed copy was not released"$'\n'"$(cat "$log")"
+  for dir in "$unlanded" "$other" "$busy"; do
+    canon=$(cd "$dir" && pwd -P)
+    ! grep -Fq "return $canon" "$log" || fail "skipped-copies: $dir was released although it is not clean and landed, or not this task's"
+  done
+  grep -Fq "$unlanded" "$rec" || fail "skipped-copies: the unlanded copy's record was dropped"
+  grep -Fq "$busy" "$rec" || fail "skipped-copies: the busy copy's record was dropped"
+  ! grep -Fq "$landed" "$rec" || fail "skipped-copies: the released copy's record was kept"
+  grep -Fq "release it by hand" "$case_dir/stderr" || fail "skipped-copies: no manual release command was printed for a kept copy"
+  pass "teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease"
+}
+
+# D4 (review of 8c6c20ece): a skipped copy is released only on teardown_landed proof. An anchor makes a commit
+# recoverable; it does not make it landed. An ignored file at a path the copy's HEAD would be reset to is work.
+test_skipped_copies_with_an_anchor_or_ignored_work_are_kept() {
+  local case_dir anchored ignored log rec rc=0 canon short sha
+  case_dir=$(make_case skipped-copies-keep)
+  write_meta "$case_dir" no-mistakes ship
+  mkdir -p "$case_dir/data/task-x1"
+  anchored="$case_dir/skip-anchored" ignored="$case_dir/skip-ignored"
+  for dir in "$anchored" "$ignored"; do
+    git -C "$case_dir/project" worktree add -q --detach "$dir" main
+  done
+  printf 'work only in this copy\n' > "$anchored/only-here.txt"
+  git -C "$anchored" add only-here.txt
+  git -C "$anchored" -c user.email=t@t -c user.name=t commit -q -m 'work only here'
+  sha=$(git -C "$anchored" rev-parse HEAD)
+  short=$(git -C "$anchored" rev-parse --short "$sha")
+  git -C "$case_dir/project" update-ref "refs/fm/anchor/task-x1-$short" "$sha"
+  # The reset target (origin's default branch) tracks notes.local, so the ignored file there is in a return's way (R4-4).
+  put_ignored_at_reset_path "$ignored"
+  log="$case_dir/treehouse.log"
+  rec="$case_dir/data/task-x1/skipped-copies.tsv"
+  : > "$rec"; : > "$log"
+  {
+    printf '['
+    sep=
+    for dir in "$anchored" "$ignored"; do
+      canon=$(cd "$dir" && pwd -P)
+      printf '%s{"path": "%s", "lease_holder": "firstmate-skipped:task-x1", "processes": []}' "$sep" "$canon"
+      sep=,
+      printf '%s\tskipped\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+    done
+    printf ']\n'
+  } > "$case_dir/pool.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$log'
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "skipped-copies-keep: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  for dir in "$anchored" "$ignored"; do
+    canon=$(cd "$dir" && pwd -P)
+    ! grep -Fq "return $canon" "$log" || fail "skipped-copies-keep: $dir was released although it is anchored-but-unlanded or holds ignored work"
+    grep -Fq "$dir" "$rec" || fail "skipped-copies-keep: the record of $dir was dropped"
+  done
+  grep -Fq 'private ignored bytes' "$ignored/notes.local" || fail "skipped-copies-keep: the ignored bytes changed"
+  pass "teardown keeps a skipped copy that is only anchored, and one holding ignored work"
+}
+
+# Main 1823 D-C: unknown is never "none". A holder inventory that is missing, null or not a list, or a pool listing
+# with a row that cannot be read, leaves every skipped copy leased and its record in place.
+# skipped_unknown_custody_case <label> <processes-json | OMIT> [<extra-row-json>]: one clean, landed copy whose pool
+# row carries the given processes field. Sets CASE_DIR_X, LOG_X, REC_X and CANON_X; teardown has run.
+skipped_unknown_custody_case() {
+  local label=$1 processes=$2 extra=${3:-} rc=0 row
+  CASE_DIR_X=$(make_case "$label")
+  write_meta "$CASE_DIR_X" no-mistakes ship
+  mkdir -p "$CASE_DIR_X/data/task-x1"
+  git -C "$CASE_DIR_X/project" worktree add -q --detach "$CASE_DIR_X/skip-copy" main
+  CANON_X=$(cd "$CASE_DIR_X/skip-copy" && pwd -P)
+  # An optional step that shapes the copy (a hidden edit, a vanished directory) before the pool listing is written.
+  [ -z "${SKIPPED_CASE_PREP:-}" ] || "$SKIPPED_CASE_PREP" "$CASE_DIR_X/skip-copy"
+  LOG_X="$CASE_DIR_X/treehouse.log"
+  REC_X="$CASE_DIR_X/data/task-x1/skipped-copies.tsv"
+  : > "$LOG_X"
+  printf '%s\tskipped\tfirstmate-skipped:task-x1\t1\n' "$CASE_DIR_X/skip-copy" > "$REC_X"
+  row="{\"path\": \"$CANON_X\", \"lease_holder\": \"firstmate-skipped:task-x1\""
+  [ "$processes" = OMIT ] || row="$row, \"processes\": $processes"
+  row="$row}"
+  printf '[%s%s]\n' "$row" "${extra:+,$extra}" > "$CASE_DIR_X/pool.json"
+  cat > "$CASE_DIR_X/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$LOG_X'
+case "\${1:-}" in status) cat '$CASE_DIR_X/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$CASE_DIR_X/fakebin/treehouse"
+  # A private HOME: the user config treehouse reads ($HOME/.config/treehouse/config.toml) never leaks in from the real home.
+  mkdir -p "$CASE_DIR_X/user-home"
+  HOME="$CASE_DIR_X/user-home" run_teardown "$CASE_DIR_X" > "$CASE_DIR_X/stdout" 2> "$CASE_DIR_X/stderr" || rc=$?
+  expect_code 0 "$rc" "$label: teardown should complete"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+}
+
+assert_skipped_copy_kept() { # <label>: not returned, record still there
+  ! grep -Fq "return $CANON_X" "$LOG_X" || fail "$1: the copy was released on an inventory that does not say nobody is in it"
+  grep -Fq "$CASE_DIR_X/skip-copy" "$REC_X" 2>/dev/null || fail "$1: the copy's record was dropped"
+}
+
+# Main 2027 F-2: the pass that releases skipped copies never changes the exit status. A skipped copy whose landing proof
+# needs the no-mistakes run record, while that record is locked past SQLite's busy wait, is unknown: its lease stays, its
+# record stays, a true message names the copy and the retry, and teardown still completes with status 0. (Before the
+# fix the proof's own exit for a retry ended the whole script with 75 and `|| true` could not catch an exit.)
+# The task's own copy sits at the merged PR head, so its proof needs no record; the skipped copy sits on another commit.
+test_a_skipped_copy_whose_run_record_is_locked_stays_leased_and_teardown_still_completes() {
+  local case_dir task_head skip_log skip_rec skip_canon rc=0 holder real_python
+  case_dir=$(make_case skipped-locked-record)
+  write_meta "$case_dir" no-mistakes ship
+  task_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' "pr_head=$task_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$task_head"
+  write_nm_run_record "$case_dir" 01RUNLOCKED "https://github.com/example/repo/pull/7" "$task_head" "$task_head"
+  mkdir -p "$case_dir/data/task-x1" "$case_dir/user-home"
+  git -C "$case_dir/project" worktree add -q --detach "$case_dir/skip-copy" main
+  printf 'only in the skipped copy\n' > "$case_dir/skip-copy/only-here.txt"
+  git -C "$case_dir/skip-copy" add only-here.txt
+  git -C "$case_dir/skip-copy" -c user.email=t@t -c user.name=t commit -q -m 'work only here'
+  skip_canon=$(cd "$case_dir/skip-copy" && pwd -P)
+  skip_log="$case_dir/treehouse.log"
+  skip_rec="$case_dir/data/task-x1/skipped-copies.tsv"
+  : > "$skip_log"
+  printf '%s\tskipped\tfirstmate-skipped:task-x1\t1\n' "$case_dir/skip-copy" > "$skip_rec"
+  printf '[{"path": "%s", "lease_holder": "firstmate-skipped:task-x1", "processes": []}]\n' "$skip_canon" > "$case_dir/pool.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$skip_log'
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  real_python=$(python3 -c 'import sys; print(sys.executable)')
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ]; then
+  exec "$real_python" -I -c 'import sqlite3, sys
+connect = sqlite3.connect
+sqlite3.connect = lambda *args, **kwargs: connect(*args, **dict(kwargs, timeout=0.2))
+exec(compile(sys.stdin.read(), "<stdin>", "exec"), {"__name__": "__main__"})' "\${@:3}"
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+  "$real_python" -I -c 'import sqlite3, sys, time
+db = sqlite3.connect(sys.argv[1], isolation_level=None)
+db.execute("BEGIN EXCLUSIVE")
+open(sys.argv[2], "w").close()
+time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked" &
+  holder=$!
+  fm_test_wait_until --while-alive "$holder" -- test -e "$case_dir/locked" || fail "skipped-locked-record: the lock holder never took the lock"
+  HOME="$case_dir/user-home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  expect_code 0 "$rc" "skipped-locked-record: a locked run record for a skipped copy must not change the exit status"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -Fq "return $skip_canon" "$skip_log" || fail "skipped-locked-record: the skipped copy was released on an unknown proof"
+  grep -Fq "$case_dir/skip-copy" "$skip_rec" || fail "skipped-locked-record: the skipped copy's record was dropped"
+  grep -Fq "leaving $case_dir/skip-copy leased" "$case_dir/stderr" || fail "skipped-locked-record: no message names the kept copy"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fq "retry teardown" "$case_dir/stderr" || fail "skipped-locked-record: no message names the retry"
+  pass "a skipped copy whose run record is locked stays leased and teardown still completes"
+}
+
+test_a_skipped_copy_whose_pool_row_has_no_process_list_stays_leased() {
+  skipped_unknown_custody_case unknown-missing OMIT
+  assert_skipped_copy_kept unknown-missing
+  pass "a pool row with no processes field keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_whose_process_list_is_null_stays_leased() {
+  skipped_unknown_custody_case unknown-null null
+  assert_skipped_copy_kept unknown-null
+  pass "a null processes field keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_whose_process_list_is_an_object_stays_leased() {
+  skipped_unknown_custody_case unknown-object '{}'
+  assert_skipped_copy_kept unknown-object
+  pass "a processes field that is not a list keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_stays_leased_when_another_pool_row_has_no_path() {
+  skipped_unknown_custody_case unknown-pathless '[]' '{"lease_holder": "someone"}'
+  assert_skipped_copy_kept unknown-pathless
+  pass "a pool listing with a row that has no path keeps every skipped copy leased and recorded"
+}
+
+# The control for the four cases above: an explicit empty list is the one thing that says nobody is in the copy.
+test_a_skipped_copy_with_an_explicit_empty_process_list_is_released() {
+  skipped_unknown_custody_case unknown-control '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "unknown-control: a clean, landed copy with an explicit empty process list was not released"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "an explicit empty process list still releases a clean, landed skipped copy"
+}
+
+# Main 1886 N1: the release runs the same index-flag check the spawn's proof runs (fm_slot_hidden_work). A tracked edit hidden
+# from status by assume-unchanged or skip-worktree, by blob or by mode, keeps the copy leased and recorded.
+# The fixture's origin baseline is an empty commit, so the copy first lands one tracked file on origin's default branch:
+# the copy stays clean and landed, and the hidden edit is the only thing that can keep it.
+land_tracked_file() {
+  printf 'tracked\n' > "$1/tracked.txt"
+  git -C "$1" add tracked.txt
+  git -C "$1" -c user.email=t@t -c user.name=t commit -q -m 'tracked file'
+  git -C "$1" push -q origin HEAD:main
+  git -C "$1" fetch -q origin
+}
+hide_blob_edit() { land_tracked_file "$1"; git -C "$1" update-index --assume-unchanged tracked.txt; printf 'hidden private edit\n' >> "$1/tracked.txt"; }
+hide_skip_worktree_edit() { land_tracked_file "$1"; git -C "$1" update-index --skip-worktree tracked.txt; printf 'hidden private edit\n' >> "$1/tracked.txt"; }
+hide_mode_edit() { land_tracked_file "$1"; git -C "$1" update-index --assume-unchanged tracked.txt; chmod +x "$1/tracked.txt"; }
+vanish_copy() { rm -rf "$1"; }
+
+test_a_skipped_copy_with_an_assume_unchanged_edit_stays_leased() {
+  SKIPPED_CASE_PREP=hide_blob_edit skipped_unknown_custody_case hidden-blob '[]'
+  assert_skipped_copy_kept hidden-blob
+  pass "an edit hidden by assume-unchanged keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_with_a_skip_worktree_edit_stays_leased() {
+  SKIPPED_CASE_PREP=hide_skip_worktree_edit skipped_unknown_custody_case hidden-skipwt '[]'
+  assert_skipped_copy_kept hidden-skipwt
+  pass "an edit hidden by skip-worktree keeps the skipped copy leased and recorded"
+}
+
+test_a_skipped_copy_with_a_hidden_mode_change_stays_leased() {
+  SKIPPED_CASE_PREP=hide_mode_edit skipped_unknown_custody_case hidden-mode '[]'
+  assert_skipped_copy_kept hidden-mode
+  pass "a mode change hidden by an index flag keeps the skipped copy leased and recorded"
+}
+
+# Main 1886 N7: a row whose path holds a NUL cannot name a file; the listing is not trusted and every record stays.
+test_a_skipped_copy_stays_leased_when_another_pool_row_path_holds_a_nul() {
+  skipped_unknown_custody_case unknown-nul '[]' '{"path": "/x\u0000y", "lease_holder": "someone", "processes": []}'
+  assert_skipped_copy_kept unknown-nul
+  pass "a pool row whose path holds a NUL keeps every skipped copy leased and recorded"
+}
+
+# Main 1886 N7: a recorded path that cannot be resolved proves nothing about the lease. The copy stays leased and its record stays.
+test_a_skipped_copy_whose_path_cannot_be_resolved_keeps_its_record() {
+  SKIPPED_CASE_PREP=vanish_copy skipped_unknown_custody_case unknown-canon '[]'
+  ! grep -Fq "return $CANON_X" "$LOG_X" || fail "unknown-canon: a copy whose path cannot be resolved was released"
+  grep -Fq "$CASE_DIR_X/skip-copy" "$REC_X" 2>/dev/null || fail "unknown-canon: the record was dropped"
+  pass "a path that cannot be resolved keeps the record"
+}
+
+# R4-4: ignored files keep a skipped copy only when the tree a return resets to (origin's default branch) tracks a path they
+# sit at, inside or above. A .venv-style ignored directory the reset never writes does not keep the copy.
+add_venv_only() {
+  printf '.venv/\n' >> "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  mkdir -p "$1/.venv/bin"
+  printf 'interpreter\n' > "$1/.venv/bin/python"
+}
+
+test_a_skipped_copy_with_only_an_ignored_venv_is_released() {
+  SKIPPED_CASE_PREP=add_venv_only skipped_unknown_custody_case venv-only '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "venv-only: a clean, landed copy whose only ignored files sit where the reset writes nothing was kept"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "a skipped copy whose only ignored files are a .venv directory the reset never writes is released"
+}
+
+# R4-4 control: an ignored file at a path origin's default branch tracks keeps the copy leased and its bytes unchanged.
+put_ignored_at_reset_path() {
+  local copy=$1 pub
+  pub="$(dirname "$copy")/publisher"
+  git clone -q "$(dirname "$copy")/origin.git" "$pub"
+  printf 'tracked by the reset target\n' > "$pub/notes.local"
+  git -C "$pub" add -f notes.local
+  git -C "$pub" -c user.email=t@t -c user.name=t commit -q -m 'track notes.local'
+  git -C "$pub" push -q origin HEAD
+  git -C "$copy" fetch -q origin
+  printf '*.local\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  printf 'private ignored bytes\n' > "$copy/notes.local"
+}
+
+test_a_skipped_copy_with_an_ignored_file_at_a_reset_path_stays_leased() {
+  SKIPPED_CASE_PREP=put_ignored_at_reset_path skipped_unknown_custody_case reset-collide '[]'
+  assert_skipped_copy_kept reset-collide
+  grep -Fq 'private ignored bytes' "$CANON_X/notes.local" || fail "reset-collide: the ignored bytes changed"
+  pass "an ignored file at a path the reset target tracks keeps the skipped copy leased and recorded"
+}
+
+# R5-1: the reset target is the branch treehouse return resets to, by the rule treehouse owns: its configured base_branch,
+# else origin/HEAD, else the main checkout's branch, else init.defaultBranch. A project with no origin/HEAD whose main
+# checkout is on its default branch still has a readable target.
+# A git that fetches recreates origin/HEAD unless remote.origin.followRemoteHEAD is never, so the case sets it.
+drop_origin_head() {
+  git -C "$1" config remote.origin.followRemoteHEAD never
+  git -C "$1" symbolic-ref --delete refs/remotes/origin/HEAD
+}
+
+drop_origin_head_with_venv() {
+  drop_origin_head "$(dirname "$1")/project"
+  add_venv_only "$1"
+}
+
+test_a_skipped_copy_with_only_a_venv_is_released_without_origin_head() {
+  SKIPPED_CASE_PREP=drop_origin_head_with_venv skipped_unknown_custody_case no-origin-head-venv '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "no-origin-head-venv: a clean, landed copy holding only a .venv was kept although the main checkout names the reset branch"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "with no origin/HEAD, the main checkout's branch is the reset target and a copy holding only a .venv is released"
+}
+
+# R5-1 control: with no origin/HEAD, an ignored file at a path the reset branch tracks still keeps the copy.
+drop_origin_head_with_collision() {
+  put_ignored_at_reset_path "$1"
+  drop_origin_head "$(dirname "$1")/project"
+}
+
+test_a_skipped_copy_with_a_collision_stays_leased_without_origin_head() {
+  SKIPPED_CASE_PREP=drop_origin_head_with_collision skipped_unknown_custody_case no-origin-head-collide '[]'
+  assert_skipped_copy_kept no-origin-head-collide
+  grep -Fq 'private ignored bytes' "$CANON_X/notes.local" || fail "no-origin-head-collide: the ignored bytes changed"
+  pass "with no origin/HEAD, an ignored file at a path the reset branch tracks keeps the skipped copy leased"
+}
+
+# R5-1 control: a treehouse.toml that cannot be parsed hides the configured base_branch, so the reset target is unknown and
+# the copy stays leased, even with origin/HEAD absent and a main checkout that names a branch.
+make_reset_target_unreadable() {
+  local proj
+  proj="$(dirname "$1")/project"
+  drop_origin_head "$proj"
+  printf 'base_branch = [unterminated\n' > "$proj/treehouse.toml"
+  add_venv_only "$1"
+}
+
+test_a_skipped_copy_stays_leased_when_the_reset_target_is_unreadable() {
+  SKIPPED_CASE_PREP=make_reset_target_unreadable skipped_unknown_custody_case unreadable-reset-target '[]'
+  assert_skipped_copy_kept unreadable-reset-target
+  pass "a reset target that cannot be read keeps the skipped copy leased"
+}
+
+# R6-1: a repo treehouse.toml is read alone; treehouse takes no base_branch from the user config then
+# (internal/config/config.go:157-187). The user config names a branch that tracks the copy's ignored file; the repo file names
+# none, so the reset branch is origin/HEAD's, which does not track it, and the copy is released.
+user_base_ignored_under_repo_config() {
+  local copy=$1 case_dir proj
+  case_dir=$(dirname "$copy")
+  proj="$case_dir/project"
+  git -C "$proj" checkout -q -b decoy
+  printf 'decoy\n' > "$proj/notes.local"
+  git -C "$proj" add -f notes.local
+  git -C "$proj" -c user.email=t@t -c user.name=t commit -q -m 'decoy tracks notes.local'
+  git -C "$proj" checkout -q main
+  printf 'max_trees = 4\n' > "$proj/treehouse.toml"
+  mkdir -p "$case_dir/user-home/.config/treehouse"
+  printf 'base_branch = "decoy"\n' > "$case_dir/user-home/.config/treehouse/config.toml"
+  printf '*.local\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  printf 'private ignored bytes\n' > "$copy/notes.local"
+}
+
+test_a_user_config_base_branch_is_ignored_when_the_repo_has_a_treehouse_toml() {
+  SKIPPED_CASE_PREP=user_base_ignored_under_repo_config skipped_unknown_custody_case user-base-ignored '[]'
+  grep -Fq "return $CANON_X --if-lease-holder firstmate-skipped:task-x1" "$LOG_X" || fail "user-base-ignored: the user config's base_branch was used although the repo has a treehouse.toml"$'\n'"$(cat "$CASE_DIR_X/stderr")"
+  pass "a user config base_branch is ignored when the repo has a treehouse.toml, as treehouse does"
+}
+
 teardown_test_cases=(
 test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
@@ -4637,6 +5032,25 @@ test_forced_descendant_reassociated_copy_preserves_checkout_and_storage
 test_cleanup_roots_preserve_foreign_copy_git_storage
 test_tasktmp_preserves_reassociated_copy_git_storage
 test_subordinate_slot_cleanup_preserves_ancestor_custody
+test_skipped_copies_are_released_only_when_clean_and_landed
+test_skipped_copies_with_an_anchor_or_ignored_work_are_kept
+test_a_skipped_copy_whose_pool_row_has_no_process_list_stays_leased
+test_a_skipped_copy_whose_process_list_is_null_stays_leased
+test_a_skipped_copy_whose_process_list_is_an_object_stays_leased
+test_a_skipped_copy_stays_leased_when_another_pool_row_has_no_path
+test_a_skipped_copy_with_an_explicit_empty_process_list_is_released
+test_a_skipped_copy_with_an_assume_unchanged_edit_stays_leased
+test_a_skipped_copy_with_a_skip_worktree_edit_stays_leased
+test_a_skipped_copy_with_a_hidden_mode_change_stays_leased
+test_a_skipped_copy_stays_leased_when_another_pool_row_path_holds_a_nul
+test_a_skipped_copy_whose_path_cannot_be_resolved_keeps_its_record
+test_a_skipped_copy_with_only_an_ignored_venv_is_released
+test_a_skipped_copy_with_an_ignored_file_at_a_reset_path_stays_leased
+test_a_skipped_copy_with_only_a_venv_is_released_without_origin_head
+test_a_skipped_copy_with_a_collision_stays_leased_without_origin_head
+test_a_skipped_copy_stays_leased_when_the_reset_target_is_unreadable
+test_a_user_config_base_branch_is_ignored_when_the_repo_has_a_treehouse_toml
+test_a_skipped_copy_whose_run_record_is_locked_stays_leased_and_teardown_still_completes
 )
 
 # In the combined tests/fm-teardown.test.sh run,

@@ -952,10 +952,10 @@
       "id": "pooled-copy-no-discard",
       "version": "1",
       "owner": "bin/fm-spawn.sh",
-      "invariant": "Refreshing a pooled launch base never discards dirty or stale-submodule content.",
+      "invariant": "Refreshing a pooled launch base moves a copy only after a read-only proof that it is clean (submodules and index flags counted) and idle, and only by a fast-forward that git itself refuses to complete over lost work. A copy proved untouched by a known state (dirty, a holder, an ignored file in the way, HEAD not an ancestor, a stale submodule) is skipped, leased and recorded, and its record is read back before another copy is taken. Any unknown (an unreadable status, a holder row with no directory, a flagged path, a failed record write, a path that cannot be resolved) refuses the whole spawn and leases the copy where it stands. Once a move has begun, any later failed check stops the spawn, leaves HEAD, refs and files exactly as they are, holds the copy and refuses; no undo runs. The copy's own refs (HEAD, the branch it had at the first snapshot, the branch the move advances and the anchor its preparation created) are compared exactly from the first snapshot; a change to any other ref in the namespace the pool shares is reported as context, never a refusal. Ignored entries are compared by identity (type, size, mtime, inode) and read for content only at or under a path the target tracks. A fresh Orca worktree, created by the spawn and no pool slot, is moved by the same fast-forward without the idle proof. One window is not excluded and not detected: an ignored file or a holder that appears after the proof and before the merge is in neither inventory, so the second snapshot does not report it and the merge may overwrite it.",
       "layer": "runtime-block",
       "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: site:bin/fm-spawn.sh:6eceab4636",
-      "trigger": "refreshing a pooled worktree's base when it is dirty or has a stale submodule checkout; leaves it untouched",
+      "trigger": "refreshing a pooled worktree's base when it is dirty, holds commits the target lacks, has ignored work at a path the target tree tracks, has an index flag on a tracked file or inside a submodule, has a live holder (any process in it outside the spawn's own pane or launcher and, on a relaunch, outside the agent-free tree of the task's recorded endpoint (the holder rule in bin/fm-slot-provision-lib.sh), a lock, a lease, or a contention row, readable or not), or has a stale submodule checkout; skips or refuses it with nothing written to it, and leases a skipped copy in place",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
@@ -974,11 +974,40 @@
       "sites": [
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched\" >&2"
+          "match": "echo \"error: could not release this spawn's claim on skipped copy $skipped; refusing to take another copy\" >&2"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "echo \"error: git refused the move of pooled copy '$slot' to $target after this spawn had prepared it"
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_skip \"$slot\" not_fast_forward \"git refused the move to $target and a second read shows no change"
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while refreshing its base\" >&2"
+          "match": "echo \"error: origin/HEAD of pooled worktree '$worktree' cannot be read (git exit $head_rc) after the move"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: skipped copy '$skipped' cannot be resolved to a real path"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not write and read back the record of skipped copy $real"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: copy held and the spawn refused ($1); nothing more was written to it\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "spawn_hold_and_refuse \"${FM_SLOT_SKIP_REASON:-unknown}\"",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "if [ \"$SPAWN_APPLY_FAILED\" = 1 ]; then spawn_hold_and_refuse changed_during_move; fi"
         }
       ]
     },
@@ -1946,7 +1975,7 @@
       "invariant": "A pooled worker starts only from the proven current selected base.",
       "layer": "runtime-block",
       "source": "the fetched origin default or named base ref, resolved SHA and final pooled-copy HEAD; existing decision points: site:bin/fm-spawn.sh:7e39eaec88",
-      "trigger": "launching from a pooled worktree whose base cannot be fetched/resolved/reset to origin's current default (or named) branch, or ends at a different commit",
+      "trigger": "launching from a pooled worktree whose base cannot be fetched/resolved/moved to origin's current default (or named) branch, or ends at a different commit",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
@@ -1965,35 +1994,31 @@
       "sites": [
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: $SPAWN_BASE_ERROR for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+          "match": "echo \"error: $SPAWN_BASE_ERROR for project '$PROJ_ABS'; refusing to launch from a potentially stale base (no copy was acquired)\" >&2"
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+          "match": "fm_slot_skip \"$worktree\" unknown_base \"$SPAWN_BASE_ERROR for pooled worktree '$worktree'; refusing to launch from a potentially stale base\""
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not determine origin's default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+          "match": "fm_slot_skip \"$worktree\" unknown_base \"could not fetch 'origin/$default' for pooled worktree '$worktree'; refusing to launch from a potentially stale base\""
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+          "match": "fm_slot_skip \"$worktree\" unknown_base \"could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base\""
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+          "match": "echo \"error: could not move pooled worktree '$worktree' to '$SPAWN_MOVE_TARGET'; refusing to launch\" >&2"
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base\" >&2"
+          "match": "fm_slot_skip \"$worktree\" unknown_base \"could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\""
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
-        },
-        {
-          "file": "bin/fm-spawn.sh",
-          "match": "echo \"error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch\" >&2"
+          "match": "echo \"error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$SPAWN_MOVE_TARGET' ('$SPAWN_MOVE_EXPECTED'); refusing to launch\" >&2"
         }
       ]
     },
@@ -5390,7 +5415,6 @@
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refused slot has an invalid prepared commit identity", "count": 2},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refusing to reset or overwrite it"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner refused task"},
-        {"file": "bin/fm-slot-provision-lib.sh", "match": "created by this refused promotion"},
         {"file": "bin/fm-spawn.sh", "match": "could not record the refused slot checkpoint"},
         {"file": "bin/fm-spawn.sh", "match": "could not be confirmed stopped"},
         {"file": "bin/fm-control.sh", "match": "refused invalid --owned-path"},
