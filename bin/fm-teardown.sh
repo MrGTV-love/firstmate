@@ -482,7 +482,9 @@
 # unknown, never "no run is parked", "still parked" or "not landed". A run-record
 # read the landing proof needed prints "unknown: the no-mistakes run record did not
 # answer; retry teardown", fires no unlanded-work guard event and exits
-# FM_PROJECT_LOCK_BUSY_EXIT. A silent parked-run lookup or abort confirmation
+# FM_PROJECT_LOCK_BUSY_EXIT, except in the skipped-copy release pass
+# (teardown_skipped_copies), which keeps that copy's lease and leaves the exit
+# status alone. A silent parked-run lookup or abort confirmation
 # prints an UNKNOWN line and exits FM_PROJECT_LOCK_BUSY_EXIT with nothing more closed,
 # except under --force, where the captain's authorized discard goes on and prints
 # and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown;
@@ -914,6 +916,9 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# The one index-flag check and the one pool-row validation shared with the spawn's proof (Main 1886 N1, N7).
+# shellcheck source=bin/fm-slot-provision-lib.sh
+. "$SCRIPT_DIR/fm-slot-provision-lib.sh"
 # shellcheck source=bin/fm-refuse-lib.sh
 . "$SCRIPT_DIR/fm-refuse-lib.sh"
 # shellcheck source=bin/fm-teardown-nested-lib.sh
@@ -3200,6 +3205,9 @@ work_is_landed() {
   fi
   if [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ]; then
     echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2
+    # The release pass for skipped copies must never end the teardown: it asks for a return, and reads
+    # TEARDOWN_NM_RECORD_SILENT=1 afterwards to tell this unknown from a proof that came back unlanded.
+    [ "${TEARDOWN_LANDED_RETURN_BUSY:-0}" != 1 ] || return 1
     exit "$FM_PROJECT_LOCK_BUSY_EXIT"
   fi
   work_is_landed_bundle "$branch" "$dir" "$head" hint
@@ -3380,6 +3388,162 @@ EOF
 teardown_landed() {  # <dir> <ref> <branch>
   local TEARDOWN_LANDED_DIR=$1 TEARDOWN_LANDED_REF=$2
   work_is_landed "$3"
+}
+
+# The branch `treehouse return` resets a copy to, by the rule treehouse owns: its configured base_branch (treehouse.toml
+# in the main checkout, else the user config), else refs/remotes/origin/HEAD, else the main checkout's current branch,
+# else init.defaultBranch (projects/treehouse internal/vcs/gitvcs/gitvcs.go:47-110 GetDefaultBranch,
+# internal/pool/pool.go:910-932 and :1078-1104, internal/config/config.go:157-187 Load and :207-229 the user config path,
+# cmd/init.go:45). Prints the branch;
+# nonzero when it cannot be read.
+teardown_return_base_branch() { # <copy>
+  local common main conf branch
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  main=$1
+  [ "$(basename "$common")" != .git ] || main=$(dirname "$common")
+  conf="$main/treehouse.toml"
+  [ -e "$conf" ] || conf="${HOME:-}/.config/treehouse/config.toml"
+  if [ -e "$conf" ]; then
+    branch=$(python3 -I -c 'import sys, tomllib
+v = tomllib.load(open(sys.argv[1], "rb")).get("base_branch", "")
+if not isinstance(v, str):
+    sys.exit(2)
+print(v)' "$conf" 2>/dev/null) || return 1
+    [ -z "$branch" ] || { printf '%s\n' "$branch"; return 0; }
+  fi
+  if git -C "$main" remote 2>/dev/null | grep -qx origin &&
+    branch=$(git -C "$main" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null) && [ -n "${branch#refs/remotes/origin/}" ] &&
+    [ "${branch#refs/remotes/origin/}" != "$branch" ]; then
+    printf '%s\n' "${branch#refs/remotes/origin/}"
+    return 0
+  fi
+  if branch=$(git -C "$main" symbolic-ref -q HEAD 2>/dev/null) && [ -n "${branch#refs/heads/}" ] && [ "${branch#refs/heads/}" != "$branch" ]; then
+    printf '%s\n' "${branch#refs/heads/}"
+    return 0
+  fi
+  branch=$(git -C "$main" config init.defaultBranch 2>/dev/null) && [ -n "$branch" ] || return 1
+  printf '%s\n' "$branch"
+}
+
+# Ignored entries of <copy> that a return to <branch> would overwrite. Treehouse resets to the local branch or its origin
+# tracking ref, whichever is ahead (gitvcs.go:146 branchRef), so both are compared; at least one must exist.
+teardown_return_collisions() { # <copy> <branch>
+  local ref sha out found='' seen=0
+  for ref in "refs/heads/$2" "refs/remotes/origin/$2"; do
+    sha=$(git -C "$1" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || continue
+    seen=1
+    out=$(fm_slot_ignored_collisions "$1" "$sha") || return 1
+    [ -z "$out" ] || found="${found:+$found, }$out"
+  done
+  [ "$seen" = 1 ] || return 1
+  printf '%s' "$found"
+}
+
+# Copies this task's spawn skipped and left leased in place (bin/fm-spawn.sh spawn_skip_copy writes one
+# $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch).
+# This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
+# sweep, and only when that copy passes the same landed-work test as any other copy: a clean worktree
+# root whose HEAD is landed (teardown_landed, with no recorded bundle accepting it; an anchor alone never releases), with no process running in it, no ignored file where the
+# branch a return resets it to tracks a path (teardown_return_collisions, the proof's own comparison), and its
+# lease still held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
+# Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
+# whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
+teardown_skipped_copies() {
+  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok reset_branch
+  local keep="$record.keep.${BASHPID:-$$}" changed=0
+  [ -f "$record" ] && [ ! -L "$record" ] || return 0
+  : > "$keep" || return 0
+  if ! fm_task_copy_current_pool_listing "$PROJ"; then
+    echo "warning: treehouse status cannot be read from $PROJ, so the copies this task's spawn skipped and left leased (listed in $record) stay leased; release one with: (cd '$PROJ' && treehouse return '<copy>' --if-lease-holder 'firstmate-skipped:$ID' </dev/null) once it is landed or unwanted" >&2
+    rm -f "$keep"
+    return 0
+  fi
+  # Unknown is never "none" (Main 1823 D-C). One row that cannot be read means the holder of any copy is unknown, so every
+  # record stays; a row that does not say who holds the lease, or whose processes field is not a list, keeps its copy.
+  if ! fm_slot_pool_rows_valid "$FM_TASK_COPY_CURRENT_POOL_JSON"; then
+    echo "warning: the pool listing from $PROJ has a row that cannot be read, so every copy this task's spawn skipped (listed in $record) stays leased; release one with: (cd '$PROJ' && treehouse return '<copy>' --if-lease-holder 'firstmate-skipped:$ID' </dev/null) once it is landed or unwanted" >&2
+    rm -f "$keep"
+    return 0
+  fi
+  while IFS=$'\t' read -r copy reason holder when || [ -n "$copy" ]; do
+    [ -n "$copy" ] || continue
+    canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=
+    if [ -z "$canonical" ]; then
+      # A path that cannot be resolved proves nothing about the lease. The copy stays leased and its record stays (rule Q).
+      echo "warning: leaving $copy leased to $holder: its recorded path cannot be resolved, so nothing proves it is released (skipped for: $reason)" >&2
+      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      continue
+    fi
+    row=$(jq -r --arg p "$canonical" '[.[] | select(.path == $p)] as $m
+      | if ($m | length) == 0 then empty
+        elif ($m | length) > 1 then ["", "?", "0"]
+        else $m[0] | [(if (.lease_holder | type) == "string" then .lease_holder else "" end),
+          (if (.processes | type) == "array" then (.processes | length | tostring) else "?" end),
+          (if (.lease_holder | type) == "string" then "1" else "0" end)] end | @tsv' <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" 2>/dev/null | sed -n 1p)
+    if [ -z "$row" ]; then
+      echo "notice: skipped copy $copy is no longer a leased slot of this pool; its record is dropped" >&2
+      changed=1
+      continue
+    fi
+    lease_holder=${row%%$'\t'*}
+    procs=${row#*$'\t'}
+    holder_known=${procs#*$'\t'}
+    procs=${procs%%$'\t'*}
+    if [ "$holder_known" != 1 ]; then
+      echo "warning: leaving $copy leased to $holder: its pool row does not say who holds the lease, or the pool lists it more than once (skipped for: $reason)" >&2
+      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      continue
+    fi
+    if [ "$lease_holder" != "$holder" ]; then
+      echo "notice: skipped copy $copy is now leased to '${lease_holder:-nobody}', not $holder; it is not this task's to release, and its record is dropped" >&2
+      changed=1
+      continue
+    fi
+    ok=0
+    if [ "$procs" = '?' ]; then
+      echo "warning: leaving $copy leased to $holder: its pool row has no list of the processes running in it, so nobody is not proved (skipped for: $reason)" >&2
+    elif [ "${procs:-1}" != 0 ]; then
+      echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it (skipped for: $reason)" >&2
+    elif ! dirt=$(git -C "$canonical" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) || [ -n "$dirt" ]; then
+      echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2
+    elif ! hidden_work=$(fm_slot_hidden_work "$canonical") || [ -n "$hidden_work" ]; then
+      echo "warning: leaving $copy leased to $holder: a tracked edit is hidden by an index flag, or the flags cannot be read (skipped for: $reason)" >&2
+    elif ! reset_branch=$(teardown_return_base_branch "$canonical") || [ -z "$reset_branch" ]; then
+      echo "warning: leaving $copy leased to $holder: the branch a return resets it to cannot be read, so its ignored files cannot be compared with it (skipped for: $reason)" >&2
+    elif ! ignored_files=$(teardown_return_collisions "$canonical" "$reset_branch") || [ -n "$ignored_files" ]; then
+      echo "warning: leaving $copy leased to $holder: ignored files sit where the branch a return resets it to tracks a path${ignored_files:+ ($ignored_files)}, or they cannot be compared with it (skipped for: $reason)" >&2
+    else
+      # Only the landed-work test releases a copy. An anchor makes a commit recoverable; it does not make it landed.
+      # The proof runs in this shell, so its proof cache and its pending backlog restage are kept. work_is_landed returns
+      # instead of ending the teardown when the no-mistakes run record does not answer (TEARDOWN_LANDED_RETURN_BUSY), so this
+      # pass never changes the exit status; that unknown keeps the lease and is never read as landed.
+      TEARDOWN_BUNDLE_ACCEPTED=
+      TEARDOWN_NM_RECORD_SILENT=0
+      TEARDOWN_LANDED_RETURN_BUSY=1
+      if teardown_landed "$canonical" HEAD "" && [ -z "$TEARDOWN_BUNDLE_ACCEPTED" ]; then
+        ok=1
+      elif [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ]; then
+        echo "warning: leaving $copy leased to $holder: the no-mistakes run record did not answer, so its HEAD is not proved landed; retry teardown to release it (skipped for: $reason)" >&2
+      else
+        echo "warning: leaving $copy leased to $holder: its HEAD is not proved landed (skipped for: $reason)" >&2
+      fi
+      TEARDOWN_LANDED_RETURN_BUSY=0
+    fi
+    if [ "$ok" = 1 ] && (cd "$PROJ" && treehouse return "$canonical" --if-lease-holder "$holder" </dev/null) >/dev/null 2>&1; then
+      echo "teardown: released the lease on skipped copy $canonical (clean and landed)" >&2
+      changed=1
+      continue
+    fi
+    [ "$ok" = 0 ] || echo "warning: could not release the lease on skipped copy $canonical" >&2
+    echo "  release it by hand once it is landed or unwanted: (cd '$PROJ' && treehouse return '$canonical' --if-lease-holder '$holder' </dev/null)" >&2
+    printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+  done < "$record"
+  if [ "$changed" = 1 ]; then
+    if [ -s "$keep" ]; then mv -f "$keep" "$record" 2>/dev/null || rm -f "$keep"; else rm -f "$keep" "$record"; fi
+  else
+    rm -f "$keep"
+  fi
+  return 0
 }
 
 TEARDOWN_DROPPING=0
@@ -7524,5 +7688,6 @@ fi
 for teardown_prior_copy in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
   echo "notice: $ID's prior copy $teardown_prior_copy (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted"
 done
+[ "$KIND" = secondmate ] || teardown_skipped_copies || true
 backlog_refresh_reminder
 [ "$TEARDOWN_POOL_SLOT_LOST" = 0 ] || exit "$TEARDOWN_LOST_SLOT_EXIT"

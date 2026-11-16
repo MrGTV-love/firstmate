@@ -578,7 +578,9 @@ write_mr_json() {
     "$state" "$detail" "$conflicts" > "$file"
   printf '"blocking_discussions_resolved":%s,"sha":"%s","head_pipeline":%s,"diff_refs":{"head_sha":"%s","base_sha":"0000000000000000000000000000000000000000"},' \
     "$discussions" "$head" "$pipeline" "$head" >> "$file"
-  printf '"merge_when_pipeline_succeeds":%s,"merge_after":%s}\n' \
+  # A real merge request record always has a description field (null or text); the close step
+  # reads a record without one as a failed read (Main 1875 F6).
+  printf '"merge_when_pipeline_succeeds":%s,"merge_after":%s,"description":""}\n' \
     "$merge_when_pipeline_succeeds" "$merge_after" >> "$file"
 }
 
@@ -715,7 +717,9 @@ write_forgejo_pr_json() {
       *) fail "write_forgejo_pr_json: unknown field '$key'" ;;
     esac
   done
-  printf '{"state":"%s","mergeable":%s,"merged":%s,"draft":%s,"base":{"ref":"main","sha":"0000000000000000000000000000000000000000"},"head":{"sha":"%s"}}\n' \
+  # A real pull request record always has a body field; the close step reads a record without
+  # one as a failed read (Main 1875 F6).
+  printf '{"state":"%s","mergeable":%s,"merged":%s,"draft":%s,"base":{"ref":"main","sha":"0000000000000000000000000000000000000000"},"head":{"sha":"%s"},"body":""}\n' \
     "$state" "$mergeable" "$merged" "$draft" "$head" > "$file"
 }
 
