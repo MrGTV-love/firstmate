@@ -960,6 +960,7 @@ hold_fixture_task() {
     TASKS_AXI_BACKEND=markdown \
     "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
       --title 'Fixture captain call' \
+      --boundary owner-rule-change --if-no 'Keep the existing landing rule' \
       --reason 'the captain has not chosen the landing yet' >/dev/null \
     || fail "could not place the fixture task under a captain hold"
 }
@@ -970,6 +971,7 @@ hold_fixture_task_owned() {
   FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/state" TASKS_AXI_BACKEND=markdown \
     "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
       --title 'Fixture call' --owner captain \
+      --boundary owner-rule-change --if-no 'Keep the existing landing rule' \
       --reason 'the landing choice has not been made yet' >/dev/null \
     || fail "could not place the fixture task under a captain-owned hold"
 }

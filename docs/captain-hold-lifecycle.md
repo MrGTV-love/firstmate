@@ -54,13 +54,15 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 The `hold` subcommand is the mandatory captain-hold creation path.
 It works in this order:
 
-1. It uses an existing task, or creates one when nothing exists to hold.
-2. It records the task's UTC hold-set timestamp as the leading line of the task body.
+1. It validates the new-hold boundary and if-no action before changing an existing task or creating one when nothing exists to hold; unresolved re-holds retain their recorded fields without requiring new ones.
+2. It records the task's UTC hold-set timestamp as the leading line of the task body, with the supplied boundary and JSON-string-valued if-no action in the header.
 3. When `--origin` is supplied, it records the origin on the task, replacing any previous association.
 4. It invokes the underlying tasks-axi hold operation.
 5. It verifies the hold and timestamp.
 
 Publishing the stamp first ensures a snapshot cannot observe a newly captain-held task without the timestamp that defines its age.
+The optional exact recommendation is a separate JSON-string-valued header field, not a guess from the four-part card's human-readable recommendation and reasons.
+The script's `--help` owns the filing fields and delay-log contract.
 
 Repeat and edge cases:
 
@@ -89,6 +91,7 @@ It then works in this order:
 2. It retains the leading hold-set stamp until the selected `tasks-axi done` or `tasks-axi unhold` transition succeeds.
 3. It then restores the successful record's resolution-first body ordering.
    The previous body remains preserved below the block and archived through tasks-axi `--archive-body`.
+4. It appends any delay record planned in that resolution header to the owning home's error log before publishing resolution; an exact answer replay can finish an interrupted append without creating a second record.
 
 If the close is interrupted, the still-held task therefore keeps its original age basis.
 A matching retry also completes any resolution-first normalization left unfinished after the close itself succeeded.
