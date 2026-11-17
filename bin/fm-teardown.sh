@@ -43,14 +43,21 @@
 # squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
 # on a remote yet the change is fully in main. A task whose meta records
 # base_branch= (bin/fm-spawn.sh) runs that content check against origin's copy of
-# its base branch instead of the default branch.
+# its base branch instead of the default branch. When that branch edited a
+# landed path again after the squash, the content still counts when every path
+# the copy changed since its merge base holds the copy's exact entry in some
+# default-branch commit after that base, read from that commit's own tree
+# (fm_task_copy_content_in_default_history); a path whose content is in no such
+# commit refuses.
 # Squash merges collapse the branch's commits, so per-commit patch ids against main
 # no longer match, and a pipeline rebase can leave the local worktree diverged from
-# the PR head. A diverged copy is not treated as landed: path-set coverage, git
-# cherry, and merge-tree containment each fail to prove content landed without also
+# the PR head. Path-set coverage, git cherry, and merge-tree containment do not
+# make a diverged copy landed: each fails to prove content landed without also
 # accepting unlanded edits to the same paths. Teardown still accepts a merged PR
 # whose head contains the current local work (ancestor or equivalent patch ids),
-# or a clean content-in-default tree match. A copy left on pre-rebase commits
+# a clean content-in-default tree match, or, for a diverged copy, the history route
+# above; an edit whose exact content is in no default-branch commit still refuses.
+# A copy left on pre-rebase commits
 # (even ones pushed to another remote) is also accepted when every commit the PR
 # head and the default branch lack has a patch id among the PR head's own commits
 # and each merge commit is exactly what git produces from its parents; a refusal
@@ -112,29 +119,21 @@
 # while it holds an ignored file outside teardown_preservable_ignored's allow-list:
 # land the task's commit to leave the bundle route, or move the file out.
 # Landed-only cleanup and --force keep their existing rules.
-# Those commits still go to the captain to land or drop, so the bundle route
-# also requires the captain's call to be filed already: this task's backlog row
-# must be held for the captain, and an open captain-held task in this home
-# (this row, or a separate one when this row is held on another question) must
-# have a hold reason that names the bundle path and every recorded tip in full.
-# Teardown only reads held rows; it never creates or changes a hold. Without
-# that call it refuses and prints the exact bin/fm-captain-hold.sh hold command
-# (with --title and the ship's --repo when the task has no row, so it files a
-# captain-kind row under that project), whose reason
-# names the copy's unlanded tips apart from the bundle's recorded advertised
-# tips, since an advertised tip may already be landed. A home whose backlog
-# transition does not apply (Orca cleanup recovery or a manual backlog) has no
-# row that can hold the call, and a closed row cannot be held, so the route
-# refuses there with that predicate and no command. Work that the
-# ordinary landing proof accepts never reaches this requirement. The held row
-# then takes the captain-held retention described above, recording
-# "Deliverable of the finished work: preserved in bundle <bundle path>, not
-# landed", never a PR or "local main". A later proof that changes the close's
-# links restages the pending close. The captain's answer closes the row with no
-# note, and its captain hold kind keeps it out of Recently Landed; a replay
-# that finds the hold already released closes it on the bundle note, which
-# bin/fm-landed-lib.sh keeps out of Recently Landed without marking it a drop.
-# A Vernant-locked copy still needs its driver's independent landing verdict.
+# No captain call is filed first: the preserved commits are recoverable from the
+# stored bundle, so the attended route is a safe leftover that teardown closes
+# itself, and it never creates, changes or releases a captain hold. A row
+# already held for the captain takes the captain-held retention described above,
+# recording "Deliverable of the finished work: preserved in bundle <bundle
+# path>, not landed", never a PR or "local main", and the captain's answer closes
+# it with no note. Any other row, or a replay that finds the hold already
+# released, closes on the note "preserved in bundle <bundle path>, not landed",
+# which bin/fm-landed-lib.sh keeps out of Recently Landed without marking it a
+# drop. A later proof that changes the close's links restages the pending close.
+# The route needs no backlog row, so it also passes in a manual-backlog home; an
+# Orca-backed task, a cleanup_recovery=orca record included, refuses it by name
+# (Main 1843 (c)). A Vernant-locked copy keeps its driver's independent
+# landing verdict whenever the driver can run, except its uncovered-content
+# verdict on a lock whose launcher is gone (see the creation-lock paragraph).
 # To create a self-contained bundle and its record (no creator is run by teardown),
 # choose an absolute source bundle path (temporary locations are supported),
 # set copy, task and FM_HOME explicitly, then run under bash:
@@ -145,16 +144,14 @@
 #   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
 #   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
 #   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$FM_HOME/data/$task/preservation-bundles.tsv"
-# then file the captain's call with the command a refusal prints, for example
-#   bin/fm-captain-hold.sh hold "$task" --owner captain \
-#     --reason "Land or drop the unlanded commits of $task: preserved in bundle $bundle, recorded tips $tips."
-# The original record remains the held call's identity; its SHA-256 names the
+# then run ordinary attended teardown; no captain call is filed first.
+# The original record stays the identity of the preservation; its SHA-256 names the
 # fixed stored path, which the close note also names. The original bundle may be
 # deleted after admission. Keep data/<task> until the commits are no longer
 # needed; ordinary task cleanup retains it. Retiring a firstmate home (a
 # secondmate home, or a forced child home) refuses before any removal while any
 # data/*/preserved-bundles/*.bundle remains in it, and lists each one: remove a
-# stored bundle once its land-or-drop call is answered, or move it to a durable
+# stored bundle once its preserved commits are landed or no longer needed, or move it to a durable
 # location outside that home and update its record. Restore from the stored path:
 # git -C <restore-repo> fetch <stored-bundle-path> <tip-sha>:refs/heads/recovered.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
@@ -301,7 +298,9 @@
 # no record of this task names is a foreign copy (Vernant's
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
 # and teardown releases it only after it proves all of: no other active task
-# record names it; no process outside this teardown runs in it and no live
+# record names it; no process outside this teardown runs in it, no other process
+# holds a file in it open (a macOS search indexer, which only reads, is exempt),
+# and no live
 # process outside this teardown is its lock launcher (a process is teardown's
 # own when it, or an ancestor by parent chain, has a cwd exactly at a root retire
 # sweeps, and a launcher pid that started after the lock file was written is a
@@ -318,23 +317,54 @@
 # recorded bundle stays, with the reason written, and refuses the close unless
 # the held-copy rule below applies.
 # A copy locked by Vernant's creation lock (vernant-session-active
-# owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
+# owner=<id> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
 # --execute-cleanup, run from the slot (FM_TEARDOWN_VERNANT_PYTHON names the
-# interpreter); an unlocked copy is removed with a plain non-forced git worktree
-# remove. Removal deletes the copy's checkout and the allow-listed ignored files
+# interpreter) with the one credit teardown proved, printed before the call:
+# --pr <N> when a merged GitHub pull request holds the whole copy head (the
+# driver reads --pr with gh pr view; a merged pull request on another forge is
+# named on the credit line instead), else
+# --bundle-record <file> when a verified recorded bundle holds it and every
+# commit of git rev-list HEAD --not --remotes is both recorded and advertised as
+# a bundle head (the record is built by teardown from its own proof in a private
+# file under data/<task>, and removed after the call), else none; the driver
+# rejects the two together. When the driver or its interpreter is unavailable
+# (exit 127), or it names the verdict verification_stale_or_uncovered_paths, and
+# the lock names a launcher that is gone (absent from a readable process table,
+# or a pid that started after the lock was written), teardown makes its own
+# proofs again, then scans for processes in the copy, reads its HEAD and, when a
+# bundle proved it, the record and stored bundle again, reads the lock and the
+# process table once more immediately before the unlock, and then releases the
+# lock itself with a non-forced git worktree unlock followed by a non-forced git
+# worktree remove; a removal that fails puts the lock back and says it is back
+# only when it reads back, and otherwise that the copy is now unlocked. The
+# release is printed with its lock text and proof. At entry the driver is asked
+# in plan mode with the same credit; a driver that cannot start, or a plan that
+# declines, refuses before any protected step, unless it is a refusal the direct
+# release takes over and the launcher is already gone.
+# A live launcher, an unreadable process table, a process that runs in the copy
+# or holds a file in it open, a failed scan for one, or any other driver verdict
+# keeps the copy locked and names that fact. An unlocked copy is removed with a
+# plain non-forced git worktree remove. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); any other ignored entry is
 # preserved first in data/<task>/nested-copy-preserved with its SHA-256. It loses
 # no commit, because the work is landed or held by a recorded bundle, and no
-# tracked change, because the clean proof refuses one. The clean proof skips
-# untracked files under .claude only; the ignored-file proof skips ignored files
+# tracked change, because the clean proof refuses one. The clean proof counts
+# every untracked file except the files Firstmate itself writes
+# (FM_TASK_COPY_MANAGED_FILES, bin/fm-task-copy-lib.sh) and the exact untracked
+# entry of a worktree registered to the same repository under the copy's
+# .claude/worktrees/ (an unreadable worktree list counts it); the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
-# the final project-lock wait, so the driver never runs while the lock is held,
-# except when teardown keeps project custody through the return. A lock in any
-# other format, a driver refusal, or a copy still registered afterwards refuses.
+# the final project-lock wait, so the driver never runs while the lock is held;
+# when teardown keeps project custody through the return (the slot's state
+# cannot be proved), a locked copy is deferred and named instead, and is not
+# released in that pass. A lock in any
+# other format, a driver refusal (except the dead-launcher takeover in the
+# creation-lock paragraph above, which releases the copy itself), or a copy still
+# registered afterwards refuses.
 # A driver refusal saves its complete combined output unchanged in a private
 # data/<task>/vernant-closeout.XXXXXX file, names that file (or the data/<task>
 # directory it could not save into), and prints the last 20 lines with control
@@ -344,10 +374,33 @@
 # driver route instead of a forced removal, before the final project-lock wait
 # like a foreign copy, after the clean and landed proof and the same ignored-file,
 # record, process and launcher proofs; an own copy that is not locked is removed
-# as before.
+# with a plain git worktree remove, so Git itself refuses any untracked byte or
+# checked-out submodule, after the final removal proof.
+# The final removal proof (teardown_removal_final_proof) runs immediately before
+# every removal: after the direct release's last unlock, just before the
+# driver's execute call (after the lock is read again and found unchanged), and
+# just before each foreign and own nested git worktree remove. It refuses on any
+# input it cannot prove: the HEAD; the status, under the dirt rule a plain git
+# worktree remove applies (an untracked managed hook file or turn-end marker
+# counts, as it does for Git; only the task's own nested copies, removed first,
+# are left out); every proof that admitted the copy in this run, rechecked,
+# never replaced by another: an anchor, a landing proof together with the
+# default-branch ref and commit it read, a bundle (the driver's bundle credit
+# included) with its record, stored bytes and real location; the bundle that
+# admitted the cleanup; the ignored files, listed NUL-framed so any name keeps
+# its bytes, preserved again outside every removal root, with every scan
+# checked, the published preserve verified before an earlier one is deleted, and
+# the preserved payload hashed against its one manifest line each and the copy
+# (or, for a copy only a bundle or default-branch history admitted, none outside
+# the allow-list); and a locked copy's launcher by pid and start time. Before
+# the driver the whole lock file is compared by SHA-256 with the one first proved
+# and the copy is scanned again for any holder. A scout's or
+# secondmate's copy, declared scratch, and an operator --force keep the forced
+# removal and skip that proof, as they skip the landed-work rule.
 # Apart from the held-copy rule below and the kept-own-copy rule after it, every
 # other case, including a half-removed copy, refuses as before; --force never
-# waives these proofs. The by-hand route is in docs/agent-control.md.
+# waives these proofs. The by-hand route for the facts that remain is in
+# docs/agent-control.md.
 # Held copies. A foreign copy that is clean, owned by no record, process or live
 # launcher, and held back only by ignored files that exist nowhere else or by a
 # HEAD that is not proved landed does not stop the close of a task whose own copy
@@ -3140,6 +3193,10 @@ pr_is_merged() {
 # refuses for a fresh proof on retry rather than doing network work under it.
 TEARDOWN_LANDED_DIRS=()
 TEARDOWN_LANDED_HEADS=()
+# The default-branch ref and commit each cached proof read, taken right after
+# the proof (teardown_default_ref_snapshot): a reuse admits with the snapshot of
+# the proof it reuses, so the final proof sees a default branch that moved since.
+TEARDOWN_LANDED_SNAPS=()
 # Why a failed proof could not ask the question (forge, fetch, HEAD or content
 # comparison), empty when it answered "not landed". A reader that types
 # refusals must not count an unasked proof as a policy refusal.
@@ -3150,6 +3207,9 @@ TEARDOWN_BUNDLE_PROOF=
 TEARDOWN_BUNDLE_SWEEP_PROOF=
 work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
   teardown_bundle_preserved "$2" "$3" "${4:-}" || return 1
+  teardown_admit "$2" bundle "$3" "$TEARDOWN_BUNDLE_ACCEPTED"
+  # The latest bundle proof is the one in force for the cleanup.
+  TEARDOWN_SWEEP_RECORD=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv") || TEARDOWN_SWEEP_RECORD=''
   TEARDOWN_BUNDLE_SWEEP_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
   [ -z "$1" ] || TEARDOWN_BUNDLE_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
 }
@@ -3158,7 +3218,7 @@ work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
 # work_is_landed exits for a retry instead of letting any caller refuse it.
 TEARDOWN_NM_RECORD_SILENT=0
 work_is_landed() {
-  local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
+  local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i snap
   TEARDOWN_LANDED_UNASKED=
   head=$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null) || {
     TEARDOWN_LANDED_UNASKED="HEAD of $dir cannot be resolved"
@@ -3168,6 +3228,7 @@ work_is_landed() {
   TEARDOWN_PIPELINE_INPUT_REASON=
   for i in "${!TEARDOWN_LANDED_DIRS[@]}"; do
     if [ "${TEARDOWN_LANDED_DIRS[$i]}" = "$dir" ] && [ "${TEARDOWN_LANDED_HEADS[$i]}" = "$head" ]; then
+      teardown_admit "$dir" landed "$head" "${TEARDOWN_LANDED_SNAPS[$i]-}"
       return 0
     fi
   done
@@ -3184,8 +3245,11 @@ work_is_landed() {
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
   TEARDOWN_NM_RECORD_SILENT=0
   if work_is_landed_proof "$branch"; then
+    snap=${TEARDOWN_LANDED_PROOF_SNAP:-}
     TEARDOWN_LANDED_DIRS+=("$dir")
     TEARDOWN_LANDED_HEADS+=("$head")
+    TEARDOWN_LANDED_SNAPS+=("$snap")
+    teardown_admit "$dir" landed "$head" "$snap"
     return 0
   fi
   if [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ]; then
@@ -3200,21 +3264,49 @@ work_is_landed() {
 
 # A pushed branch proves recoverability, not delivery: require the landing
 # proofs documented in this script's header even when every commit is pushed.
+# What the last successful landing proof rests on, for the final recheck:
+# "<ref> <commit>" for a proof that read the default branch (the commit it read,
+# resolved once inside the proof), or "pr <url>" for a merged pull request, which
+# the forge answers and which needs no default-branch ref.
+TEARDOWN_LANDED_PROOF_SNAP=
 work_is_landed_proof() {
   local branch=$1
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   # Each call reports on its own directory and ref, never on an earlier call's.
   TEARDOWN_UNPROVEN_COMMITS=
   TEARDOWN_PIPELINE_INPUT_REASON=
+  TEARDOWN_LANDED_PROOF_SNAP=
   if [ "$MODE" = local-only ]; then
-    local name
+    local name local_commit
     name=$(fm_task_copy_default_branch "$PROJ") || name=
-    if [ -n "$name" ] && git -C "$dir" merge-base --is-ancestor "$ref" "refs/heads/$name" 2>/dev/null; then
+    local_commit=
+    [ -z "$name" ] || local_commit=$(git -C "$dir" rev-parse --quiet --verify "refs/heads/$name^{commit}" 2>/dev/null) || local_commit=
+    if [ -n "$local_commit" ] && git -C "$dir" merge-base --is-ancestor "$ref" "$local_commit" 2>/dev/null; then
+      TEARDOWN_LANDED_PROOF_SNAP="refs/heads/$name $local_commit"
       return 0
     fi
   fi
-  pr_is_merged "$branch" && return 0
-  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" && return 0
+  if pr_is_merged "$branch"; then
+    TEARDOWN_LANDED_PROOF_SNAP="pr ${PR_URL:-$branch}"
+    return 0
+  fi
+  local content_snap
+  if fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"; then
+    echo "teardown: landed by content: every change of $dir at ${ref:0:12} is already in ${FM_TASK_COPY_COMPARED%% *} (${FM_TASK_COPY_COMPARED##* })" >&2
+    TEARDOWN_LANDED_PROOF_SNAP="refs/${FM_TASK_COPY_COMPARED%% *} ${FM_TASK_COPY_COMPARED##* }"
+    return 0
+  fi
+  # The history rule reads the same commit the content check read; record it
+  # before the history rule rewrites FM_TASK_COPY_COMPARED to name the merge base.
+  content_snap="refs/${FM_TASK_COPY_COMPARED%% *} ${FM_TASK_COPY_COMPARED##* }"
+  if [ -z "$FM_TASK_COPY_UNASKED" ] && { [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; }; then
+    echo "teardown: landing by default-branch history is not admitted for an Orca-backed task (Main 1843); $dir needs a merged pull request or content equal to the default branch" >&2
+  elif [ -z "$FM_TASK_COPY_UNASKED" ] && fm_task_copy_content_in_default_history "$dir" "$ref"; then
+    echo "teardown: landed by content: every change of $dir at ${ref:0:12} is in a commit of ${FM_TASK_COPY_COMPARED%% *} after merge base ${FM_TASK_COPY_COMPARED##* }" >&2
+    TEARDOWN_LANDED_PROOF_SNAP=$content_snap
+    teardown_history_admit "$dir"
+    return 0
+  fi
   [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
   return 1
 }
@@ -3967,6 +4059,7 @@ validate_worktree_teardown_safety() {
   if [ ! -d "$WT" ] || [ "$(git -C "$WT" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
     if teardown_nested_slot landed; then
       [ -z "$TEARDOWN_BUNDLE_PROOF" ] || teardown_bundle_swept_ignored_kept "$wt_real" || return 1
+      teardown_history_swept_ignored_kept "$wt_real" || return 1
       return 0
     fi
     if [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ] \
@@ -4040,6 +4133,7 @@ validate_worktree_teardown_safety() {
     if [ -n "$TEARDOWN_BUNDLE_PROOF" ]; then
       teardown_bundle_swept_ignored_kept "$wt_real" || return 1
     fi
+    teardown_history_swept_ignored_kept "$wt_real" || return 1
   fi
 }
 
@@ -4317,34 +4411,80 @@ conclude_task_no_mistakes_run() {  # <worktree>
 # `lsof -a -d cwd` scan (never the recursive +D file-tree walk). Never $$.
 # Empty output when nothing matches; failure means no safe result was established.
 pids_with_cwd_under() {  # <dir>
-  local dir=$1 out pid path line
+  lsof_pids_under "$1" -a -d cwd -Fpn
+}
+
+# The same for every process with any file open at or under $1, its working
+# directory included: one system-wide listing of open files, filtered by the
+# path prefix, never the recursive +D walk. One line per process, naming the
+# first matching path. A system search indexer only reads and is left out
+# (fm_task_copy_indexer_pid).
+pids_with_open_file_under() {  # <dir>
+  local out pid path
+  out=$(pids_with_open_file_under_all "$1") || return 1
+  while IFS=$'\t' read -r pid path; do
+    [ -n "$pid" ] || continue
+    fm_task_copy_indexer_pid "$pid" || printf '%s\t%s\n' "$pid" "$path"
+  done <<< "$out"
+}
+
+# The same listing with no process left out, the search indexer included, for a
+# caller that decides the exemption itself (teardown_copy_holder_free).
+pids_with_open_file_under_all() {  # <dir>
+  lsof_pids_under "$1" -nP -Fpfn
+}
+
+lsof_pids_under() {  # <dir> <lsof-arguments...>
+  local dir=$1 spelled out
+  shift
   [ -n "$dir" ] && [ -d "$dir" ] || return 0
   dir=$(cd "$dir" && pwd -P) || return 1
-  out=$(lsof -a -d cwd -Fpn 2>/dev/null) || return 1
+  # lsof spells each name byte by byte in the C locale (a non-ASCII byte as
+  # \xNN, a backslash doubled, a control byte escaped); fm_control_lsof_path
+  # spells the root the same way, and failing to spell it fails the scan.
+  spelled=$(fm_control_lsof_path "$dir") || return 1
+  out=$(LC_ALL=C lsof "$@" 2>/dev/null) || return 1
   [ -n "$out" ] || return 0
-  pid=
-  while IFS= read -r line; do
-    case "$line" in
-      p*)
-        pid=${line#p}
-        case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-        ;;
-      fcwd) [ -n "$pid" ] || return 1 ;;
-      n*)
-        [ -n "$pid" ] || return 1
-        path=${line#n}
-        case "$path" in
-          "$dir"|"$dir"/*)
-            [ -n "$pid" ] && [ "$pid" != "$$" ] && printf '%s\t%s\n' "$pid" "$path"
-            ;;
-        esac
-        ;;
-      '') ;;
-      *) return 1 ;;
-    esac
-  done <<EOF
-$out
-EOF
+  # One awk pass over the -F listing (a system-wide one holds tens of thousands
+  # of lines): the spelled root is compared as a literal string prefix, the first
+  # matching name of each pid is printed as the root followed by the rest of the
+  # name (its \xNN bytes of 127 and above and doubled backslashes decoded; a
+  # control-byte escape stays as text, so every line stays one line), this
+  # shell is left out, and a line of any other shape, or a
+  # file or name line with no pid before it, fails.
+  FM_LSOF_DIR=$dir FM_LSOF_SPELLED=$spelled FM_LSOF_SELF=$$ LC_ALL=C awk '
+    function decode(text,    out, i, c, n, hex, v) {
+      out = ""
+      for (i = 1; i <= length(text); i++) {
+        c = substr(text, i, 1)
+        if (c != "\\" || i == length(text)) { out = out c; continue }
+        n = substr(text, i + 1, 1)
+        if (n == "x" && substr(text, i + 2, 2) ~ /^[0-9a-fA-F][0-9a-fA-F]$/) {
+          hex = tolower(substr(text, i + 2, 2))
+          v = (index("0123456789abcdef", substr(hex, 1, 1)) - 1) * 16 + index("0123456789abcdef", substr(hex, 2, 1)) - 1
+          if (v >= 127) { out = out sprintf("%c", v); i += 3; continue }
+        }
+        if (n == "\\") { out = out "\\"; i++; continue }
+        out = out c
+      }
+      return out
+    }
+    BEGIN { dir = ENVIRON["FM_LSOF_DIR"]; spelled = ENVIRON["FM_LSOF_SPELLED"]; self = ENVIRON["FM_LSOF_SELF"]; prefix = spelled "/"; plen = length(prefix); pid = ""; printed = "" }
+    {
+      kind = substr($0, 1, 1); rest = substr($0, 2)
+      if (kind == "p") { if (rest !~ /^[0-9]+$/) exit 1; pid = rest; next }
+      if (kind == "f") { if (pid == "") exit 1; next }
+      if (kind == "n") {
+        if (pid == "") exit 1
+        if ((rest == spelled || substr(rest, 1, plen) == prefix) && pid != self && pid != printed) {
+          printf "%s\t%s%s\n", pid, dir, decode(substr(rest, length(spelled) + 1))
+          printed = pid
+        }
+        next
+      }
+      if ($0 == "") next
+      exit 1
+    }' <<< "$out"
 }
 
 task_process_identity() {  # <pid>
@@ -4939,6 +5079,13 @@ require_cleanup_copy_clearance() {
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      # A record that cannot be read leaves the custody it records unknown,
+      # never absent; one that vanished since the listing records nothing.
+      if ! { : < "$other_meta"; } 2>/dev/null; then
+        [ -e "$other_meta" ] || continue
+        echo "REFUSED: task record $other_meta cannot be read, so the custody it records over task $record_id's cleanup target $canonical is unknown; nothing was changed - not even with --force." >&2
+        return 1
+      fi
       retiring=0
       own=0
       if [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ]; then
@@ -5450,7 +5597,7 @@ teardown_peer_claim_handoff() {
 # Removes this task's proven own nested copies that Vernant's creation lock does
 # not hold (those the closeout driver already removed are skipped).
 teardown_remove_own_nested_copies() {  # <slot-label>
-  local copy known root
+  local copy known root mode remove_err lock_rc lock_state
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     known=0
     for root in ${TEARDOWN_OWN_RELEASED[@]+"${TEARDOWN_OWN_RELEASED[@]}"}; do
@@ -5459,32 +5606,112 @@ teardown_remove_own_nested_copies() {  # <slot-label>
     # A copy the closeout driver kept is never removed: the task closes around it.
     ! teardown_copy_retained "$copy" || known=1
     [ "$known" = 0 ] || continue
-    git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
-      echo "error: could not remove $ID's nested copy $copy $1; teardown aborted" >&2
+    # A scout's or secondmate's copy is declared scratch and skips the
+    # landed-work rule (validate_worktree_teardown_safety), and an operator
+    # --force keeps its own meaning: both keep the forced removal.
+    if [ "$FORCE" = "--force" ] || [ "$KIND" = scout ] || [ "$KIND" = secondmate ]; then
+      git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
+        echo "error: could not remove $ID's nested copy $copy $1; teardown aborted" >&2
+        exit 1
+      }
+      continue
+    fi
+    # The final proof, immediately before a plain removal, so Git itself still
+    # refuses any untracked byte: a copy admitted by a bundle or by default-branch
+    # history keeps a unique ignored file (refuse); any other copy's ignored
+    # files are preserved again first.
+    # Only a copy that is unlocked now and was never seen locked in this run takes
+    # the plain removal: a lock that vanished, or one that cannot be read, refuses.
+    lock_rc=0
+    teardown_copy_lock_file "$copy" || lock_rc=$?
+    if [ "$lock_rc" != 1 ] || teardown_lock_was_seen "$copy"; then
+      case "$lock_rc" in
+        0) lock_state='is still held' ;;
+        1) lock_state='was held when it was proved and now reads absent' ;;
+        *) lock_state='cannot be read' ;;
+      esac
+      echo "REFUSED: $ID's nested copy $copy was not removed $1: its lock $lock_state; teardown aborted" >&2
       exit 1
-    }
+    fi
+    mode=preserve
+    if [ -n "$TEARDOWN_BUNDLE_SWEEP_PROOF" ] || teardown_history_admitted "$copy"; then mode=refuse; fi
+    if ! teardown_removal_final_proof "$copy" "$mode" unlocked; then
+      if [ -n "$TEARDOWN_FINAL_STABLE" ]; then
+        echo "REFUSED: $ID's nested copy $copy was not removed $1: $TEARDOWN_FINAL_WHY. Land or move that content, then re-run teardown; teardown aborted" >&2
+      else
+        echo "REFUSED: $ID's nested copy $copy was not removed $1: the final proof before its removal failed: $TEARDOWN_FINAL_WHY; re-run teardown for a fresh proof; teardown aborted" >&2
+      fi
+      exit 1
+    fi
+    if ! remove_err=$(git -C "$PROJ" worktree remove "$copy" 2>&1 >/dev/null); then
+      echo "REFUSED: $ID's nested copy $copy was not removed $1: git worktree remove (without force) refused: $(fm_refuse_text "$remove_err"); teardown aborted" >&2
+      exit 1
+    fi
   done
 }
 # A recorded bundle holds only commits: every own copy its cleanup removes
 # still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
-  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED} lock_rc=0
+  local lock_rc=0
   # A copy Vernant's creation lock holds is released or kept only through
   # teardown_own_copy_dispose, which preserves its ignored files before the driver
   # is asked and, when the driver keeps the copy, checks that preserve against the
   # copy; the bundle's ignored-file refusal is for a copy that would be removed
-  # with them unpreserved.
+  # with them unpreserved (#380). A copy only default-branch history admits keeps
+  # its refusal locked or not (teardown_admitted_ignored_kept).
   teardown_copy_lock_file "$1" || lock_rc=$?
   [ "$lock_rc" != 0 ] || return 0
-  if unique=$(teardown_preservable_ignored "$1"); then
-    [ -n "$unique" ] || return 0
-    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
+  teardown_admitted_ignored_kept "$1" "$2" "recorded bundle ${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}" "${3:-}"
+}
+# The refusal both admissions share: <copy> holds an ignored file outside the
+# preserve allow-list (teardown_preservable_ignored) that its admission does not
+# hold, or its ignored files cannot be listed.
+teardown_admitted_ignored_kept() {  # <copy> <refusal-subject> <admission> [proof-outcome]
+  local unique
+  unique=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || unique=
+  if [ -n "$unique" ] && teardown_preservable_ignored_z "$1" >"$unique"; then
+    [ -s "$unique" ] || { rm -f "$unique"; return 0; }
+    echo "REFUSED: $2 $1, during cleanup admitted by $3, but it holds ignored files no hash record preserves: $(teardown_nul_list_text "$unique")${4:+; $4}." >&2
   else
-    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but its ignored files cannot be listed${3:+; $3}." >&2
+    echo "REFUSED: $2 $1, during cleanup admitted by $3, but its ignored files cannot be listed${4:+; $4}." >&2
   fi
+  [ -z "$unique" ] || rm -f "$unique"
   echo "Land that commit, or move those ignored files out of the copy, then re-run teardown." >&2
   return 1
+}
+# Each copy the squash-history landing alone proved (canonical paths). That
+# proof holds the copy's committed content in default-branch history; its
+# ignored files exist nowhere else, so every such copy a cleanup removes needs
+# the ignored-file proof, as a bundle-admitted copy does.
+TEARDOWN_HISTORY_ADMITTED=()
+teardown_history_admit() {  # <copy>
+  local copy
+  copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  TEARDOWN_HISTORY_ADMITTED+=("$copy")
+}
+teardown_history_admitted() {  # <copy>
+  local copy admitted
+  copy=$(fm_task_copy_canonical_dir "$1") || copy=$1
+  for admitted in ${TEARDOWN_HISTORY_ADMITTED[@]+"${TEARDOWN_HISTORY_ADMITTED[@]}"}; do
+    [ "$admitted" != "$copy" ] || return 0
+  done
+  return 1
+}
+# Every copy this cleanup removes that only default-branch history proved:
+# <copy> and each of the task's own nested and proof copies, never the
+# returned slot.
+teardown_history_swept_ignored_kept() {  # <copy> [proof-outcome]
+  local copy
+  [ "$FORCE" != "--force" ] || return 0
+  [ "${#TEARDOWN_HISTORY_ADMITTED[@]}" -gt 0 ] || return 0
+  for copy in "$1" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
+      ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
+    [ -n "$copy" ] && [ "$copy" != "$TEARDOWN_RETURN_SLOT" ] && [ -d "$copy" ] || continue
+    teardown_history_admitted "$copy" || continue
+    teardown_admitted_ignored_kept "$copy" 'history-landed teardown would remove copy' \
+      'default-branch history (its committed content only)' "${2:-}" || return 1
+  done
 }
 teardown_bundle_swept_ignored_kept() {  # <admitted-copy> [proof-outcome]
   local copy
@@ -5504,7 +5731,7 @@ teardown_own_copy_disposable() {  # <canonical-copy>
   fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 \
     ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} || rc=$?
   case "$rc" in
-    0) return 0 ;;
+    0) teardown_admit "$copy" anchor "$FM_TASK_COPY_HEAD"; return 0 ;;
     2)
       TEARDOWN_BUNDLE_ACCEPTED=
       if teardown_landed "$copy" HEAD ""; then
@@ -5672,6 +5899,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       if [ "$FORCE" != "--force" ] && [ -n "$TEARDOWN_BUNDLE_SWEEP_PROOF" ]; then
         teardown_bundle_swept_ignored_kept "$WT" "$TEARDOWN_PROOF_OUTCOME" || return 1
       fi
+      teardown_history_swept_ignored_kept "$WT" "$TEARDOWN_PROOF_OUTCOME" || return 1
       ;;
     retire)
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
@@ -5980,7 +6208,7 @@ EOF
   if [ "${#stored[@]}" -gt 0 ]; then
     echo "REFUSED: $label $abs_home_path holds bundle-preserved commits that only its data/ keeps:" >&2
     printf '  %s\n' "${stored[@]}" >&2
-    echo "Remove each stored bundle once its land-or-drop call is answered, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown." >&2
+    echo "Remove each stored bundle once its preserved commits are landed or no longer needed, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown." >&2
     return 1
   fi
   printf '%s\n' "$abs_home_path"

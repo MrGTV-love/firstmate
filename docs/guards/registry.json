@@ -479,6 +479,46 @@
       "status": "active",
       "sites": [
         {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy final-removal-proof \"foreign copy $copy was not removed: the final proof before its removal failed: $TEARDOWN_FINAL_WHY.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy creation-lock-owner \"foreign copy $copy was locked when it was proved and now reads unlocked"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy creation-lock-owner \"own nested copy $copy was locked when it was proved and now reads unlocked"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy inspection-unavailable \"the lock state of own nested copy $copy cannot be read; it was not removed.\""
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: its lock $lock_state; teardown aborted\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: $TEARDOWN_FINAL_WHY. Land or move that content, then re-run teardown; teardown aborted\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: the final proof before its removal failed: $TEARDOWN_FINAL_WHY; re-run teardown for a fresh proof; teardown aborted\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $ID's nested copy $copy was not removed $1: git worktree remove (without force) refused: $(fm_refuse_text \"$remove_err\"); teardown aborted\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy nonforced-removal \"foreign copy $copy was not removed: $TEARDOWN_FINAL_WHY.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "REFUSED: teardown did not run Vernant's closeout driver for %s copy %s, which keeps its lock: %s."
+        },
+        {
           "file": "bin/fm-copy-sweep.sh",
           "match": "echo \"REFUSED: $2 changed HEAD or creation-lock bytes after its plan; it was not released.\" >&2"
         },
@@ -3640,6 +3680,10 @@
         },
         {
           "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task record $other_meta cannot be read, so the custody it records over task $record_id's cleanup target $canonical is unknown; nothing was changed - not even with --force.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename \"$other_meta\" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force.\" >&2"
         }
       ]
@@ -6325,9 +6369,9 @@
       "sites": [
         {"file":"bin/fm-teardown.sh","match":"teardown-unlanded bypass"},
         {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
-        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
+        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 8},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
-        {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2},
+        {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by $3, but", "count": 2},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: cannot inspect worktree $WT for commits not on a remote.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: cannot inspect worktree $WT for uncommitted changes.\" >&2"},

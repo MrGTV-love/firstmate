@@ -122,8 +122,10 @@ fm_task_copy_default_branch() {
 # merge conflict is that comparison's answer. With no-fetch the same rule reads
 # the refs already here: merge-tree adds objects only, and no ref or worktree moves.
 FM_TASK_COPY_UNASKED=
+# The ref and commit the last content check compared with, for the caller to print.
+FM_TASK_COPY_COMPARED=
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>] [no-fetch]
-  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref default_tree merged_tree
+  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref commit default_tree merged_tree
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
@@ -138,9 +140,14 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   else
     return 1
   fi
-  default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
+  # The ref is read once: the tree, the comparison and FM_TASK_COPY_COMPARED all
+  # use that one commit, so a ref that moves during the check cannot mix two.
+  commit=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{commit}" 2>/dev/null) || return 1
+  [ -n "$commit" ] || return 1
+  default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$commit^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || {
+  FM_TASK_COPY_COMPARED="${ref#refs/} $commit"
+  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$commit" "$head" 2>/dev/null) || {
     [ "$?" != 1 ] || FM_TASK_COPY_UNASKED=
     return 1
   }
@@ -149,23 +156,122 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   [ "$merged_tree" = "$default_tree" ]
 }
 
-# The porcelain status lines of <copy> that are its own uncommitted work:
-# Firstmate's hook files do not count, and neither does the untracked entry of
-# each of the task's own <nested-copy> paths inside <copy>, since each of those
-# is preserved or proved on its own.
+# The squash-landed shape the tree comparison above refuses once the default
+# branch edits a landed path again: every path <head> changed since its merge
+# base with the commit that comparison read holds, in some default-branch commit
+# after that base, exactly the entry (mode, type and object) it holds in <head>,
+# or is absent there as in <head>. Each commit's own tree decides, never
+# ancestry or merge reachability, so a path whose content is in no such commit
+# refuses. Call it only after fm_task_copy_content_in_default compared and
+# answered no; on success FM_TASK_COPY_COMPARED names the ref and the merge base.
+fm_task_copy_content_in_default_history() {  # <worktree> [<head-ref>]
+  local worktree=$1 head=${2:-HEAD} name=${FM_TASK_COPY_COMPARED%% *} tip=${FM_TASK_COPY_COMPARED##* } base path want commits commit have found complete=
+  FM_TASK_COPY_UNASKED='the content check could not read the default branch history'
+  [ -n "$tip" ] && base=$(git -C "$worktree" merge-base "$tip" "$head" 2>/dev/null) || return 1
+  while IFS= read -r -d '' path; do
+    [ -n "$path" ] || { complete=1; continue; }
+    want=$(git -C "$worktree" --literal-pathspecs ls-tree "$head" -- "$path" 2>/dev/null) || return 1
+    commits=$(git -C "$worktree" --literal-pathspecs rev-list --full-history "$base..$tip" -- "$path" 2>/dev/null) || return 1
+    found=
+    for commit in $commits; do
+      have=$(git -C "$worktree" --literal-pathspecs ls-tree "$commit" -- "$path" 2>/dev/null) || return 1
+      if [ "${have%%$'\t'*}" = "${want%%$'\t'*}" ]; then
+        found=1
+        break
+      fi
+    done
+    [ -n "$found" ] || { FM_TASK_COPY_UNASKED=; return 1; }
+  done < <(git -C "$worktree" diff-tree -r -z --name-only --no-renames "$base" "$head" 2>/dev/null && printf '\0')
+  [ -n "$complete" ] || return 1
+  FM_TASK_COPY_UNASKED=
+  FM_TASK_COPY_COMPARED="$name $base"
+}
+
+# A system search indexer (macOS Spotlight) holds a recently written tree open
+# for as long as a minute while it reads it. It only reads, deleting the tree
+# under it harms nothing, and counting it would keep nearly every fresh copy on a
+# Mac. A process that cannot be read is not one.
+fm_task_copy_indexer_pid() {  # <pid>
+  local comm
+  comm=$(ps -o comm= -p "$1" 2>/dev/null) || return 1
+  comm=${comm##*/}
+  case "$comm" in
+    mdworker|mdworker_shared|mds|mds_stores|mdsync) return 0 ;;
+  esac
+  return 1
+}
+
+# The files Firstmate itself writes into a task copy (bin/fm-spawn.sh writes and
+# git-excludes them; teardown removes the turn-end plugin), by exact path. They
+# are the only untracked entries that are not the task's own work.
+FM_TASK_COPY_MANAGED_FILES=(
+  .claude/settings.local.json
+  .fm-busy-stop
+  .fm-grok-turnend
+  .fm-kimi-turnend
+  .opencode/plugins/fm-busy-state.js
+  .opencode/plugins/fm-turn-end.js
+)
+
+# The porcelain status lines of <copy> that are its own uncommitted work, read
+# from a status taken with --untracked-files=all: only an untracked entry that is
+# exactly one of FM_TASK_COPY_MANAGED_FILES does not count, and neither does the
+# untracked entry of each of the task's own <nested-copy> paths inside <copy>,
+# since each of those is preserved or proved on its own, nor the exact "?? <rel>/"
+# entry, with <rel> under <copy>'s .claude/worktrees/, of a worktree that
+# `git worktree list --porcelain -z`, read once, names for <copy>'s repository
+# (canonical paths compared); a registered worktree anywhere else, and every such
+# entry when the list cannot be read, counts. Any other untracked file,
+# under .claude or anywhere else, is the copy's own work.
 fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
-  local status=$1 copy=${2:-} line nested
+  local status=$1 copy=${2:-} line nested managed rel inner token listed=
+  local -a registered=() entries=()
   shift
   [ "$#" -eq 0 ] || shift
   while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      ''|'?? .claude/'*|'?? .fm-grok-turnend'|'?? .fm-kimi-turnend') continue ;;
-    esac
+    [ -n "$line" ] || continue
+    for managed in "${FM_TASK_COPY_MANAGED_FILES[@]}"; do
+      [ "$line" != "?? $managed" ] || continue 2
+    done
     for nested in "$@"; do
       case "$nested" in
         "$copy"/*) [ "$line" != "?? ${nested#"$copy"/}/" ] || continue 2 ;;
       esac
     done
+    case "$line" in
+      '?? .claude/worktrees/'?*/)
+        if [ -n "$copy" ] && [ -z "$listed" ]; then
+          listed=bad
+          entries=()
+          while IFS= read -r -d '' token; do
+            entries+=("$token")
+          done < <(git -C "$copy" worktree list --porcelain -z 2>/dev/null && printf 'fm-worktree-list-complete\0')
+          if [ "${#entries[@]}" -gt 0 ] && [ "${entries[${#entries[@]}-1]}" = fm-worktree-list-complete ]; then
+            for token in "${entries[@]}"; do
+              case "$token" in
+                'worktree '?*)
+                  listed=ok
+                  inner=$(fm_task_copy_canonical_dir "${token#worktree }") && registered+=("$inner")
+                  ;;
+              esac
+            done
+          fi
+        fi
+        if [ "$listed" = ok ]; then
+          rel=${line#'?? '}
+          rel=${rel%/}
+          if inner=$(fm_task_copy_canonical_dir "$copy/$rel"); then
+            case "$inner" in
+              "$copy"/.claude/worktrees/?*)
+                for token in ${registered[@]+"${registered[@]}"}; do
+                  [ "$token" != "$inner" ] || continue 2
+                done
+                ;;
+            esac
+          fi
+        fi
+        ;;
+    esac
     printf '%s\n' "$line"
   done <<< "$status"
 }
@@ -352,9 +458,10 @@ fm_task_copy_registered_nested() {  # <canonical-clone>
 
 # The local copies a task record names, one "<field> <path>" line each: the
 # last worktree= and home= values (the values every reader of those fields
-# uses) and every prior_worktree= line.
+# uses) and every prior_worktree= line. Fails when the record cannot be read.
 fm_task_copy_record_paths() {  # <meta>
   local meta=$1 value line
+  { : < "$meta"; } 2>/dev/null || return 1
   for value in worktree home; do
     line=$(fm_meta_get "$meta" "$value")
     [ -z "$line" ] || printf '%s %s\n' "$value" "$line"
@@ -363,7 +470,7 @@ fm_task_copy_record_paths() {  # <meta>
     case "$line" in
       prior_worktree=?*) printf 'prior_worktree %s\n' "${line#prior_worktree=}" ;;
     esac
-  done < "$meta" 2>/dev/null || true
+  done < "$meta" 2>/dev/null || return 1
 }
 
 fm_task_copy_ancestor_current() {
@@ -402,7 +509,8 @@ fm_task_copy_ancestor_current() {
 # re-points together in one call, and checks those against each other itself.
 # Returns 0 on overlap, setting FM_TASK_COPY_OTHER_ID and
 # FM_TASK_COPY_OTHER_FIELD;
-# 1 for no overlap or a missing path; 2 when the scan cannot be completed.
+# 1 for no overlap or a missing path; 2 when the scan cannot be completed,
+# including when a task record cannot be read.
 #
 # Identity, not spelling: the same record reached through a differently
 # resolved state dir (e.g. a symlinked $FM_HOME) is still <record-meta>. A
@@ -418,7 +526,7 @@ FM_TASK_COPY_OTHER_FIELD=
 FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
 fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
-  local target state_dir other_meta line field other_path other_real skip
+  local target state_dir other_meta line field other_path other_real skip paths
   shift 3
   FM_TASK_COPY_OTHER_ID=
   FM_TASK_COPY_OTHER_FIELD=
@@ -434,7 +542,14 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
       for skip in "$@"; do
         [ "${other_meta##*/}" = "${skip##*/}" ] && [ "$other_meta" -ef "$skip" ] && continue 2
       done
+      # A record that cannot be read leaves its owner unknown, never absent; one
+      # that vanished since the listing names nothing.
+      if ! paths=$(fm_task_copy_record_paths "$other_meta"); then
+        [ -e "$other_meta" ] || [ -L "$other_meta" ] || continue
+        return 2
+      fi
       while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] || continue
         field=${line%% *}
         other_path=${line#* }
         [ -n "$other_path" ] || continue
@@ -449,7 +564,7 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
         FM_TASK_COPY_OTHER_ID=$(basename "$other_meta" .meta)
         FM_TASK_COPY_OTHER_FIELD=$field
         return 0
-      done < <(fm_task_copy_record_paths "$other_meta")
+      done <<< "$paths"
     done
   done
   return 1
