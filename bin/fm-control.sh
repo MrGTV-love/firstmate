@@ -12,7 +12,7 @@
 #                                            (--note <text> | --note-file <path>)
 # Reassociation holds the task control lock, so it makes one nonwaiting
 # bin/fm-project-lock-lib.sh attempt that never jumps a queued waiter.
-#        fm-control.sh <task-id> successor --branch <successor-branch>
+#        fm-control.sh <task-id> successor --branch <successor-branch> [--tip <sha>]
 #                                          (--note <text> | --note-file <path>)
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
@@ -104,12 +104,18 @@
 # fm_successor_proof proves it: the ref exists in the project's ref store, it is
 # not checked out in any worktree but the task's own recorded copy (read from the
 # project's worktree list, never from a copy), and it is proved to be this task's
-# by one of two routes: it is checked out in the task's recorded copy and contains
-# the recorded branch's tip (route=checked-out), or its history contains the tip
-# of one of the task's own custody archive branches
-# archive/<id>-(submitted|pipeline)-<8 hex> (route=archive-tip); it also needs
-# every other task record to be readable and the recorded copy to share the
-# project's ref store. For a successor the record already names, the name rule
+# by one of two routes, each anchored to the --tip <sha> Main passes, which Main
+# reads itself (the task's submitted or pipeline head from its no-mistakes run
+# record, or the recorded branch's tip) and never takes from a ref the worker can
+# write: it is checked out in the task's recorded copy and contains the recorded
+# branch's tip, which is the --tip (route=checked-out), or its history contains
+# the --tip, which is the tip of one of the task's own custody archive branches
+# archive/<id>-(submitted|pipeline)-<8 hex> (route=archive-tip); a first
+# admission without --tip, or with one no route matches, refuses and prints the
+# command to rerun. Either tip must lie outside the project's default and base
+# branches. It also needs every other task record to be readable and the
+# recorded copy to share the project's ref store; the record's
+# successor_proved_tip= is the --tip. For a successor the record already names, the name rule
 # runs again and the successor is re-admitted while its history still contains
 # the recorded proved tip and that tip is still the task's own (route=proved-tip);
 # that call is a no-op that says so.
@@ -534,6 +540,7 @@ ALSO_IDS=()
 ALSO_COPIES=()
 SUCC_BRANCH=
 SUCC_BRANCH_SET=0
+SUCC_TIP=
 # --also <task-id>=<replacement-copy>: another task reassociate re-points in the same call.
 parse_also() {  # <value>
   local value=$1 also_id also_copy existing
@@ -567,6 +574,7 @@ for control_arg in "$@"; do
       owned-path) OWNED_PATHS+=("$control_arg") ;;
       also) parse_also "$control_arg" ;;
       branch) SUCC_BRANCH=$control_arg; SUCC_BRANCH_SET=1 ;;
+      tip) SUCC_TIP=$control_arg ;;
       note_file)
         if [ "$VERB" = successor ]; then
           # Read only after admission, and only when a record is made: a refusal
@@ -604,6 +612,14 @@ for control_arg in "$@"; do
       SUCC_BRANCH=${control_arg#--branch=}
       SUCC_BRANCH_SET=1
       ;;
+    --tip)
+      [ "$VERB" = successor ] || die "unexpected argument '$control_arg'"
+      control_want_value=tip
+      ;;
+    --tip=*)
+      [ "$VERB" = successor ] || die "unexpected argument '$control_arg'"
+      SUCC_TIP=${control_arg#--tip=}
+      ;;
     --also) control_want_value=also ;;
     --also=*) parse_also "${control_arg#--also=}" ;;
     --note) control_want_value=note ;;
@@ -635,7 +651,7 @@ fi
   || die "--owned-path applies to 'relaunch' only and cannot be combined with --recover-launch"
 if [ "$VERB" = successor ]; then
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
-    || die "successor takes only --branch and --note (or --note-file); the relaunch options apply to 'relaunch' only"
+    || die "successor takes only --branch, --tip and --note (or --note-file); the relaunch options apply to 'relaunch' only"
 elif [ "$VERB" = reassociate ]; then
   # reassociate takes --worktree, --also, and --note; every other relaunch option stays refused.
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
@@ -811,7 +827,7 @@ successor_note_check() {  # <note-text>
 
 do_successor() {
   local project wt kind kind_count branch_count succ_count old_branch recorded_succ base_branch reason
-  local proof su_route su_archive route_text proof_text next_cmd effect_text harness_now recorded_tip proved_tip
+  local proof su_route su_archive route_text proof_text next_cmd effect_text harness_now recorded_tip proved_tip rerun tip_text
   local line brief_branch_other=0 succ_sha prior_sha="" stamp brief_text meta_text next_note su_outcome action
   local inserted=0
   local -a homes=()
@@ -895,8 +911,9 @@ do_successor() {
   else
     reason=$(fm_successor_name_refusal "$SUCC_BRANCH" "$old_branch" "$base_branch" "$META" "$project" "${homes[@]}") \
       || successor_refuse name "successor branch '$SUCC_BRANCH' is not admissible: $reason; nothing was changed"
-    proof=$(fm_successor_proof "$project" "$ID" "$old_branch" "$SUCC_BRANCH" "$wt" "$base_branch") \
-      || successor_refuse proof "$proof; nothing was changed"
+    rerun=$(printf 'FM_HOME=%q bash %q %q successor --branch %q --tip %q --note %q' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$SUCC_BRANCH" '<sha>' '<why>')
+    proof=$(fm_successor_proof "$project" "$ID" "$old_branch" "$SUCC_BRANCH" "$wt" "$base_branch" anchor "$SUCC_TIP") \
+      || successor_refuse proof "$proof; nothing was changed. Rerun with the tip you read yourself, never from a ref the worker can write: $rerun, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip (git -C $project rev-parse refs/heads/$old_branch)"
   fi
   su_route=$(printf '%s\n' "$proof" | sed -n 's/^route=//p')
   su_archive=$(printf '%s\n' "$proof" | sed -n 's/^archive=//p')
@@ -1011,6 +1028,12 @@ do_successor() {
   printf 'action: task=%s prior_branch=%s successor_branch=%s; %s; proof: %s; no work tree, ref, index, process, run record or profile file was touched\n' \
     "$ID" "$old_branch" "$SUCC_BRANCH" "$action" "$proof_text"
   printf 'route: %s successor=%s successor_sha=%s proved_tip=%s\n' "$route_text" "$SUCC_BRANCH" "$succ_sha" "$proved_tip"
+  if [ "$su_outcome" = successor-already-recorded ]; then
+    tip_text="none needed: re-admitted from the record's successor_proved_tip=$proved_tip"
+  else
+    tip_text="--tip $proved_tip"
+  fi
+  printf 'tip: %s\n' "$tip_text"
   harness_now=$(fm_meta_get "$META" harness)
   next_cmd=$(printf 'FM_HOME=%q bash %q %q relaunch --note %q' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$next_note")
   case "$(uname -s):$harness_now" in

@@ -3115,7 +3115,12 @@ Task ids come from the `state/<id>.meta` records of this home and of every other
 Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
 In that shared Git directory the task keeps its own declared branch and the two recovery archives of the custody-return route in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md), `archive/<task>-submitted-<8 lowercase hex>` and `archive/<task>-pipeline-<8 lowercase hex>`, each with its lock file and reflog.
 When the task's record names one `successor_branch=` (written only by [`fm-control successor`](agent-control.md#recording-a-successor-branch)), the launch also keeps that one branch as an exact literal ref, lock file and reflog, and never a pattern, folder or prefix of it.
-The launch re-admits the successor before it keeps it: the name must be in the task's own name family (the recorded branch name, `-`, then letters, digits, `.`, `_` or `-`), the name rule of `fm-control successor` must still hold, and the branch's history must still contain the `successor_proved_tip=` its admission recorded, or the launch refuses and no profile line for that name is written.
+The launch re-admits the successor before it keeps it, and refuses, writing no profile line for that name, unless all of these hold (`bin/fm-successor-branch-lib.sh` owns the rule):
+
+- the name is in the task's own name family (the recorded branch name, `-`, then letters, digits, `.`, `_` or `-`) and passes the rest of the name rule of `fm-control successor`, so no other task records it as its branch or successor;
+- the branch exists in the project's ref store, which the recorded copy shares, and is checked out in no work tree but the task's recorded copy;
+- its history contains the `successor_proved_tip=` its admission recorded;
+- that proved tip is the task's own: the tip of one of its `archive/<task>-(submitted|pipeline)-<8 hex>` branches or a commit of its recorded branch, in either case one that neither the project's default branch nor the task's recorded base branch contains.
 The profile builder repeats the name-family bound on the name it is handed.
 Both archive names are anchored at both ends on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
 That holds for a task created after the profile was built, because the profile names only these two exact shapes and never a prefix.

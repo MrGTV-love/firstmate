@@ -92,6 +92,12 @@ SH
   printf '%s\n' "$dir"
 }
 
+# The pipeline head P the successor was cut at, as Main reads it from the task's run
+# record (the fixture's run binding names the successor's local tip as P).
+scott_tip() {  # <case-dir>
+  git -C "$1/fx/project" rev-parse "refs/heads/$SUCC"
+}
+
 sc() {  # <case-dir> <args...>: the verb as the lock-owning main session
   local dir=$1
   shift
@@ -176,7 +182,7 @@ test_scott_admission_proves_the_successor_by_the_task_own_archive_branch() {
   assert_contains "$out" "is not proved to be this task's successor" "the refusal must name the missing proof"
   P=$(git -C "$dir/fx/project" rev-parse "refs/heads/$SUCC")
   rc=0
-  out=$(sc "$dir" --branch "$SUCC" --note "the successor of the Scott shape") || rc=$?
+  out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "the successor of the Scott shape") || rc=$?
   expect_code 0 "$rc" "the successor of the Scott shape must be admitted"$'\n'"$out"
   assert_contains "$out" "successor-recorded $TASK" "the record names its outcome"
   assert_contains "$out" "route=archive-tip archive=archive/$TASK-pipeline-" "the successor is proved by the task's own pipeline archive"
@@ -202,7 +208,7 @@ test_scott_name_family_bounds_the_archive_route() {
   done
   git -C "$dir/fx/project" branch "$OLD-copy" "$tip"
   rc=0
-  out=$(sc "$dir" --branch "$OLD-copy" --note why) || rc=$?
+  out=$(sc "$dir" --branch "$OLD-copy" --tip "$tip" --note why) || rc=$?
   expect_code 0 "$rc" "a name in the family at the same archive tip is the matched control and must be admitted"$'\n'"$out"
   assert_contains "$out" "route=archive-tip" "the control is proved by the archive-tip route"
   pass "the Scott shape: develop, release/1.x and another lineage's name at a task archive tip are refused for the name family, and a name in the family there is admitted"
@@ -215,7 +221,7 @@ test_scott_operation_then_relaunch_keeps_every_custody_relationship() {
   pid=$(cat "$dir/sentinel-pid")
   snap_scott "$dir" before
   rc=0
-  out=$(sc "$dir" --branch "$SUCC" --note "Main's custody step needs the successor in this copy") || rc=$?
+  out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "Main's custody step needs the successor in this copy") || rc=$?
   expect_code 0 "$rc" "recording the Scott successor should succeed"$'\n'"$out"
   snap_scott "$dir" op
   # The operation writes the record and the brief and nothing else.
@@ -269,7 +275,7 @@ test_scott_record_revocation_restores_the_launch_profile() {
   fx=$dir/fx
   sb=$dir/home/state/$TASK.write-confinement.sb
   rc=0
-  out=$(sc "$dir" --branch "$SUCC" --note "needed") || rc=$?
+  out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "needed") || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
   rc=0
   out=$(run_control "$dir" "$TASK" relaunch --note "apply") || rc=$?
@@ -318,7 +324,7 @@ test_scott_receipt_and_events_name_the_archive_tip_route() {
   dir=$(new_scott_case route)
   : > "$FM_GUARD_EVENT_LOG"
   rc=0
-  out=$(sc "$dir" --branch "$SUCC" --note "route evidence") || rc=$?
+  out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "route evidence") || rc=$?
   expect_code 0 "$rc" "recording the Scott successor should succeed"$'\n'"$out"
   archive=$(printf '%s\n' "$out" | sed -n 's/^route: route=archive-tip archive=\([^ ]*\) .*/\1/p')
   case "$archive" in
@@ -440,7 +446,7 @@ test_scott_archive_at_shared_history_proves_nothing() {
   git -C "$fx/project" branch "archive/$TASK-pipeline-$hex" "$root"
   git -C "$fx/project" branch "$OLD-foo" main
   cp -p "$dir/home/state/$TASK.meta" "$dir/meta.before"
-  rc=0; out=$(sc "$dir" --branch "$OLD-foo" --note "planted archive") || rc=$?
+  rc=0; out=$(sc "$dir" --branch "$OLD-foo" --tip "$root" --note "planted archive") || rc=$?
   expect_code 1 "$rc" "a branch whose only archive proof is shared history must refuse at admission"$'\n'"$out"
   assert_contains "$out" "is not proved to be this task's successor" "the admission refusal must name the missing proof"
   cmp -s "$dir/meta.before" "$dir/home/state/$TASK.meta" || fail "the admission refusal changed the record"
@@ -484,7 +490,7 @@ test_scott_repeat_re_admits_a_recorded_successor_past_its_proved_tip() {
   fx=$dir/fx
   proved=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
   rc=0
-  out=$(sc "$dir" --branch "$SUCC" --note "recorded") || rc=$?
+  out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "recorded") || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
   cp -p "$dir/home/state/$TASK.meta" "$dir/meta.recorded"
   scott_advance_successor "$dir" >/dev/null
@@ -519,7 +525,7 @@ test_scott_relaunch_admits_a_successor_past_its_proved_tip_and_refuses_one_witho
   fx=$dir/fx
   sb=$dir/home/state/$TASK.write-confinement.sb
   proved=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
-  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "custody") || rc=$?
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "custody") || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
   scott_advance_successor "$dir" >/dev/null
   : > "$FM_GUARD_EVENT_LOG"
@@ -553,7 +559,7 @@ test_scott_relaunch_refuses_a_successor_another_task_records() {
   fi
   dir=$(new_scott_case owned)
   sb=$dir/home/state/$TASK.write-confinement.sb
-  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "owned later") || rc=$?
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "owned later") || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
   printf 'kind=ship\nbranch=%s\n' "$SUCC" > "$dir/home/state/other-owner.meta"
   rm -f "$sb"
@@ -579,7 +585,7 @@ test_scott_launch_refusal_is_the_successor_guards() {
   dir=$(new_scott_case spawn-refusal)
   fx=$dir/fx
   proved=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
-  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "launch owner") || rc=$?
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "launch owner") || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
   git -C "$fx/project" update-ref "refs/heads/$SUCC" "$(git -C "$fx/project" rev-parse main)"
   : > "$FM_GUARD_EVENT_LOG"
@@ -626,7 +632,7 @@ test_scott_relaunch_changes_the_copy_only_as_a_relaunch_without_the_successor_do
   snap_scott "$dir" c2
   cp "$copy/.claude/settings.local.json" "$dir/wiring.c2"
   delta_control=$(copy_delta "$dir/snap/c1/copy" "$dir/snap/c2/copy")
-  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "twin check") || rc=$?
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "twin check") || rc=$?
   expect_code 0 "$rc" "recording the Scott successor should succeed"$'\n'"$out"
   snap_scott "$dir" op
   same "$dir" c2 op "the operation" copy gate project-git binding custody
@@ -720,7 +726,7 @@ test_scott_launch_event_log_failure_does_not_change_the_launch() {
   fi
   dir=$(new_scott_case launch-sink)
   sb=$dir/home/state/$TASK.write-confinement.sb
-  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "event sink") || rc=$?
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --tip "$(scott_tip "$dir")" --note "event sink") || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
   mkdir -p "$dir/event-sink-dir"
   rm -f "$sb"
