@@ -1996,7 +1996,7 @@ class Watch:
         return False
 
     def scrubbed(self, read):
-        """Run one read of owner text (a request, a follow-up or what came before it) and return its result."""
+        """Run one read of a person's Slack text (the owner's or the second person's: a request, a follow-up or what came before it) and return its result."""
         if not hasattr(self.api, 'scrub_with'):
             return read()
         # The transport removes the plane's token from a response before it is decoded (a defense that stays); here it
@@ -2276,8 +2276,9 @@ class Watch:
 
     def followup_from(self, thread, message, allowlisted=True):
         """The journal row for one reply inside a recorded request thread, or None when it is not a follow-up: a thread reply of an allowlisted human
-        (never a bot or an app, never this plane's own message, never the root), with text. allowlisted=False is for the retarget's look at the old DM
-        only: the stored owner counts as well as the current allowlist, so that a follow-up of the old owner is never lost to a changed list."""
+        (never a bot or an app, never this plane's own message, never the root), with text. In the second person's pass (SC8) it is a reply of the id the
+        setting names now, in a thread of their own request, under their follow-up label and with no authority. allowlisted=False is for the retarget's
+        look at the old DM only: the stored owner counts as well as the current allowlist, so that a follow-up of the old owner is never lost to a changed list."""
         ts = message.get('ts') if isinstance(message, dict) else None
         if not isinstance(ts, str) or not SLACK_TS.fullmatch(ts) or ts == thread or message.get('thread_ts') != thread:
             return None
@@ -2543,7 +2544,8 @@ class Watch:
 
     def thread_context(self, thread, ts, messages):
         """What came before one message of a recorded request thread, oldest first, so that a follow-up that does not restate its subject can be understood:
-        the owner's request and earlier follow-ups and this plane's own earlier answers, as (kind, ts, author, full text), from the messages of that thread as read_message read them; the
+        the request and earlier follow-ups of the person whose thread it is (the owner's, or the second person's in their own DM) and this plane's own earlier
+        answers, as (kind, ts, author, full text), from the messages of that thread as read_message read them; the
         plane's fixed acknowledgement, a stranger's, a bot's and an app's message are left out."""
         ack = hashlib.sha256(('ack:' + self.request_event(thread)).encode()).hexdigest()
         earlier = []
@@ -4611,7 +4613,8 @@ def segment_units(text):
 
 def request_text(text):
     """Whether a printed text is a request or follow-up wake line, also behind the event prefix of the check-event protocol (`fm-check-event <identity>` TAB
-    payload): the hold of settle_lines withholds every later owner text, so an event text must count as one."""
+    payload): the hold of settle_lines withholds every later request or follow-up text, the second person's included (their wake lines start with the same
+    prefixes), so an event text must count as one."""
     if text.startswith(CHECK_EVENT_PREFIX):
         text = text.split('\t', 1)[-1]
     return text.startswith(OWNER_PREFIXES)
