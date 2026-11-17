@@ -930,6 +930,12 @@ reassociate_check() {  # <record-index>
         failed:?*)
           rollback=$(fm_backend_meta_exact_value "$journal" rollback) || rollback=
           case "$rollback" in
+            instructions-restored-agent-state-*)
+              case "${rollback#instructions-restored-agent-state-}" in
+                ''|*[!A-Za-z0-9._-]*) rollback= ;;
+              esac ;;
+          esac
+          case "$rollback" in
             prior-record-kept|prior-record-kept-agent-dead|instructions-restored|instructions-restored-agent-alive|instructions-restored-agent-state-?*)
               case "$(fm_backend_agent_state "$FM_BACKEND_VALIDATED_BACKEND" "$FM_BACKEND_VALIDATED_TARGET")" in
                 dead|missing) closed=1; RA_JOURNALS[m]=$journal ;;

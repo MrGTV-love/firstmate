@@ -663,7 +663,7 @@ test_restored_relaunch_journal_is_archived() {
 
 test_unproven_relaunch_journal_refuses_unchanged() {
   local scenario id dir new journal out rc fragment
-  for scenario in ${FM_TEST_JOURNAL_SCENARIO:-none-new-agent-confirmed none-new-record-kept missing unreadable symlink foreign complete-foreign unknown-rollback empty-state launching stopping live-agent unreadable-agent backlog-close}; do
+  for scenario in ${FM_TEST_JOURNAL_SCENARIO:-none-new-agent-confirmed none-new-record-kept missing unreadable symlink foreign complete-foreign unknown-rollback empty-state invalid-state invalid-state-tail launching stopping live-agent unreadable-agent backlog-close}; do
     id=reassoc-unproven
     dir=$(new_case "journal-negative-$scenario" "$id")
     new="$dir/new"
@@ -679,6 +679,8 @@ test_unproven_relaunch_journal_refuses_unchanged() {
       complete-foreign) write_relaunch_journal "$dir" "$id" complete someone-else ;;
       unknown-rollback) printf 'rollback=not-restored\n' >> "$journal" ;;
       empty-state) printf 'rollback=instructions-restored-agent-state-\n' >> "$journal" ;;
+      invalid-state) printf 'rollback=instructions-restored-agent-state-!\n' >> "$journal" ;;
+      invalid-state-tail) printf 'rollback=instructions-restored-agent-state-unknown!\n' >> "$journal" ;;
       launching|stopping) write_relaunch_journal "$dir" "$id" "$scenario"; printf 'rollback=prior-record-kept\n' >> "$journal" ;;
       *)
         printf 'rollback=prior-record-kept\n' >> "$journal"
