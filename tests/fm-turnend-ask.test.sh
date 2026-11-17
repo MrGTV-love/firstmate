@@ -321,7 +321,14 @@ test_continuation_warns_without_reblocking() {
   out=$(run_stop "$home" "$(stop_payload 'Ordinary text with no ask.' true)"); status=$?
   expect_code 0 "$status" 'clean text on an active hook is still an unchecked turn'
   expect_unchecked "$home"
-  pass 'rubber-stamp, missing-text and clean-text continuation skips each record one unchecked warn'
+  home=$(ask_home continuation-camel)
+  out=$(run_stop "$home" "$(stop_payload 'needs input: A routine question?' false | jq '.stopHookActive=true')"); status=$?
+  expect_code 0 "$status" 'camelCase true must take precedence over snake_case false and skip the ask'
+  expect_unchecked "$home"
+  home=$(ask_home continuation-camel-false)
+  out=$(run_stop "$home" "$(stop_payload 'needs input: A routine question?' true | jq '.stopHookActive=false')"); status=$?
+  expect_code 2 "$status" 'camelCase false must take precedence over snake_case true and check the ask'
+  pass 'both loop-flag spellings use the shared precedence; active continuations record one unchecked warn'
 }
 
 test_fences_and_quotes_warn_once() {

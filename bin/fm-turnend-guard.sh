@@ -211,13 +211,13 @@ fm_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
 # It never uses that predicate's event function or changes its block budget.
 # A form-compliant question is not evidence of captain ownership.
 if [ "$CLAUDE_MODE" -eq 1 ]; then
-  ASK_RESULT=$(printf '%s' "$PAYLOAD" | jq -c '
+  ASK_RESULT=$(printf '%s' "$PAYLOAD" | jq -c --argjson stop_hook_active "$STOP_HOOK_ACTIVE" '
     def ask_line:
       ascii_downcase | test("^[ \\t]*(?:(?:[-*+]|[0-9]+\\.)[ \\t]*)?[*_]*(?:needs input[*_]*:|needs-input[*_]*:?)");
     def example_ask:
       sub("^[ \\t]*(?:>[ \\t]*)+"; "") | ask_line;
     .last_assistant_message as $text
-    | if .stop_hook_active == true then
+    | if $stop_hook_active then
         {unchecked:true, source_ok:($text | type == "string"), line:null}
       elif ($text | type) != "string" or ($text | test("[^ \\t\\r\\n]") | not) then
         {unchecked:true, source_ok:false, line:null}

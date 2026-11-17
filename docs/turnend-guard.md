@@ -78,7 +78,7 @@ An unclosed fence hides later lines through end of text, a stated evasion limit.
 Lines beginning with `>` after optional whitespace are quoted; a fence marker inside a quote opens nothing, while a `>` line inside a fence remains fence content.
 An actual ask outside all fences and quotes is checked, including a four-space or tab-indented ask.
 
-Three skip cases record UNCHECKED once for the turn: missing, null, non-string or empty assistant text; `stop_hook_active` true, even with clean text; or a fenced/quoted ask line.
+Three skip cases record UNCHECKED once for the turn: missing, null, non-string or empty assistant text; the shared loop flag true (`stopHookActive` takes precedence over `stop_hook_active`), even with clean text; or a fenced/quoted ask line.
 The record is one best-effort `warn` event under `turnend-ask-gate`, rule `ask-gate-unchecked`, through the existing guard-event writer, never an `allow` or clean-result event.
 A checked failure takes precedence over skipped lines and records only one `deny`, rule `ask-gate-rubber-stamp`; checked text with no failure and no skipped ask records nothing.
 The loop flag therefore skips turns started by a rewake or gate continuation, including the corrective continuation itself; this check cannot force an endless loop.
