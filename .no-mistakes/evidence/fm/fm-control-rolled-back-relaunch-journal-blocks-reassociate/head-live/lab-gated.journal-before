@@ -1,0 +1,9 @@
+v1
+task=lab-gated
+phase=failed:launching
+ts=2026-01-01T00:00:00Z
+backend=tmux
+endpoint=fmlab:fm-lab-gated
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gated-old
+kind=ship
+rollback=instructions-restored-agent-alive

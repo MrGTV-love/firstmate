@@ -1,0 +1,63 @@
+D data 755
+D data/lab-complete 755
+F data/lab-complete/brief.md 600 4ea546ae978d8aea
+D data/lab-counter 755
+F data/lab-counter/brief.md 600 c215310c67579fec
+D data/lab-r1 755
+F data/lab-r1/brief.md 644 aad47a161ef15ea4
+D data/lab-r2 755
+F data/lab-r2/brief.md 644 13653ec5df1fbef4
+D data/lab-r3 755
+F data/lab-r3/brief.md 644 eda209ae114cd7c6
+D data/lab-r4 755
+F data/lab-r4/brief.md 644 6f10fd325f7fee79
+D data/lab-r5 755
+F data/lab-r5/brief.md 644 bf3cb45c9e184ca3
+D data/lab-r6 755
+F data/lab-r6/brief.md 644 017f3a132794cb0b
+D data/lab-vernant 755
+F data/lab-vernant/brief.md 600 7f37724d346d6cf1
+D state 755
+F state/.fm-lab-tmux-dir 600 596eaeb22e963f7f
+F state/.lock 644 181a1f8bc3994b53
+F state/.lock-session 600 e70d3cf71ed26e1e
+F state/lab-complete.control-relaunch 644 e54ddbaf537487ff
+F state/lab-complete.meta 600 10d848ebe27c77c4
+F state/lab-counter.control-relaunch.archived-2026-11-17T123321Z.0 644 2f6dbc8217c88633
+F state/lab-counter.control-relaunch.archived-2026-11-17T123322Z.0 644 93af7be03a8bb7cc
+F state/lab-counter.control-relaunch.archived-2026-11-17T123323Z.0 644 eb8bf9d3faee9976
+F state/lab-counter.control-relaunch.archived-2026-11-17T123324Z.0 644 151bdf845d4251cb
+F state/lab-counter.control-relaunch.archived-2026-11-17T123325Z.0 644 d7e8ae742c796ca8
+F state/lab-counter.control-relaunch.archived-2026-11-17T123326Z.0 644 5d12e27f97a5317a
+F state/lab-counter.control-relaunch.archived-2026-11-17T123327Z.0 644 0e63503aecc37734
+F state/lab-counter.control-relaunch.archived-2026-11-17T123328Z.0 644 43dd23c180f7044c
+F state/lab-counter.control-relaunch.archived-2026-11-17T123329Z.0 644 4d01c4dababee300
+F state/lab-counter.control-relaunch.archived-2026-11-17T123330Z.0 644 075cd9ad5c143385
+F state/lab-counter.control-relaunch.archived-2026-11-17T123331Z.0 644 877744a26330a695
+F state/lab-counter.control-relaunch.archived-2026-11-17T123331Z.1 644 dfad5a1a083d9130
+F state/lab-counter.control-relaunch.archived-2026-11-17T123332Z.0 644 c7b7f13d33742f02
+F state/lab-counter.control-relaunch.archived-2026-11-17T123333Z.0 644 dba81e1df68139b0
+F state/lab-counter.control-relaunch.archived-2026-11-17T123334Z.0 644 d10543320fd0bddf
+F state/lab-counter.control-relaunch.archived-2026-11-17T123335Z.0 644 e8c6995f1f03243c
+F state/lab-counter.control-relaunch.archived-2026-11-17T123336Z.0 644 4ac786aeb7d1be89
+F state/lab-counter.control-relaunch.archived-2026-11-17T123337Z.0 644 c5956046b3a6934e
+F state/lab-counter.control-relaunch.archived-2026-11-17T123338Z.0 644 8cad2ae40e606109
+F state/lab-counter.control-relaunch.archived-2026-11-17T123339Z.0 644 3d06f8493b1422ea
+F state/lab-counter.control-relaunch.archived-2026-11-17T123340Z.0 644 1b5130fb61f278fb
+F state/lab-counter.control-relaunch.archived-2026-11-17T123341Z.0 644 654137a806c18d5d
+F state/lab-counter.meta 600 37e21775698a8748
+F state/lab-r1.control-relaunch 644 780f4706f484f33d
+F state/lab-r1.meta 644 6fb6e969a0fd8584
+F state/lab-r2.control-relaunch 644 626f99a99507e881
+F state/lab-r2.meta 644 7cc66b0ac4a88381
+F state/lab-r3.control-relaunch 644 066cdee55554a69f
+F state/lab-r3.meta 644 0d8f60815997ddec
+F state/lab-r4.control-relaunch 644 bced2484eaaf1b0d
+F state/lab-r4.meta 644 88a1858adf9fa526
+D state/lab-r5.control-relaunch 755
+F state/lab-r5.control-relaunch/entry 644 4d54211da0b1475e
+F state/lab-r5.meta 644 15374ebc1204e455
+L state/lab-r6.control-relaunch -> /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r6.journal-target
+F state/lab-r6.meta 644 c963ed6d85db102e
+F state/lab-vernant.control-relaunch.archived-2026-11-17T123251Z.0 644 95818c3c0b083618
+F state/lab-vernant.meta 600 5ac5333847aae062

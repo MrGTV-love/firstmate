@@ -1,0 +1,218 @@
+== tag=head-live code=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MPJSRYMH2DNEGFVNKTR2WD (936a73e0)
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Cyb7DO TMUX_TMPDIR=/tmp/fml.Om2H13 work=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU
+lock acquired: harness pid 85308
+lock: lock: held by live harness pid 85308
+tmux: fmlab:placeholder zsh;
+-- vernant shape: phase=failed:launching rollback=prior-record-kept, no agent window (lab-vernant)
+  agent_state=missing
+  $ fm-control.sh lab-vernant reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-new --note lab: work moved to v2 -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-vernant worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-new branch=fm/lab-vernant-v2 prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-old slot=none
+  PASS: vernant: exit 0
+  PASS: vernant: worktree= now /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-new
+  PASS: vernant: active journal path retired
+  PASS: vernant: archive name lab-vernant.control-relaunch.archived-2026-11-17T123251Z.0 (UTC stamp + counter)
+  PASS: vernant: archive sha256 95818c3c0b083618ea46072d3c68b71da9880f931a00ae2f1dbb226587c6bbca == journal-before sha256
+  PASS: vernant: note written into brief
+-- vernant: reassociate back to the old copy (archive must not block)
+  $ fm-control.sh lab-vernant reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-old --note lab: move back -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-vernant worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-old branch=fm/lab-vernant prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-new slot=none
+  PASS: vernant-again: exit 0
+  PASS: vernant-again: archive kept, unchanged, no new archive
+-- phase=complete journal (lab-complete)
+  $ fm-control.sh lab-complete reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-complete-new --note lab complete -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-complete worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-complete-new branch=fm/lab-complete-v2 prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-complete-old slot=none
+  PASS: complete: exit 0
+  PASS: complete: journal untouched in place
+  PASS: complete: no archive made
+-- archive counter: earlier archives already hold the .0 name for the next seconds (lab-counter)
+  $ fm-control.sh lab-counter reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-counter-new --note lab counter -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-counter worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-counter-new branch=fm/lab-counter-v2 prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-counter-old slot=none
+  PASS: counter: exit 0
+  new archive: lab-counter.control-relaunch.archived-2026-11-17T123331Z.1
+  PASS: counter: new archive took counter .1 (no collision)
+  PASS: counter: new archive is byte-exact
+  PASS: counter: all 21 pre-existing archives byte-unchanged
+-- refusal: none-new-agent-confirmed (lab-r1)
+  $ fm-control.sh lab-r1 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r1-new --note lab refusal none-new-agent-confirmed -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r1 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r1.control-relaunch; reconcile it before reassociating
+  PASS: none-new-agent-confirmed: refused (exit 1)
+  PASS: none-new-agent-confirmed: reason contains 'unfinished relaunch transaction'
+  PASS: none-new-agent-confirmed: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r1
+  PASS: none-new-agent-confirmed: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: none-new-record-kept (lab-r2)
+  $ fm-control.sh lab-r2 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r2-new --note lab refusal none-new-record-kept -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r2 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r2.control-relaunch; reconcile it before reassociating
+  PASS: none-new-record-kept: refused (exit 1)
+  PASS: none-new-record-kept: reason contains 'unfinished relaunch transaction'
+  PASS: none-new-record-kept: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r2
+  PASS: none-new-record-kept: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: no-rollback (lab-r3)
+  $ fm-control.sh lab-r3 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r3-new --note lab refusal no-rollback -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r3 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r3.control-relaunch; reconcile it before reassociating
+  PASS: no-rollback: refused (exit 1)
+  PASS: no-rollback: reason contains 'unfinished relaunch transaction'
+  PASS: no-rollback: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r3
+  PASS: no-rollback: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: mode000 (lab-r4)
+  $ fm-control.sh lab-r4 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r4-new --note lab refusal mode000 -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r4 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r4.control-relaunch; reconcile it before reassociating
+  PASS: mode000: refused (exit 1)
+  PASS: mode000: reason contains 'unfinished relaunch transaction'
+  PASS: mode000: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r4
+  PASS: mode000: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: directory (lab-r5)
+  $ fm-control.sh lab-r5 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r5-new --note lab refusal directory -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r5 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r5.control-relaunch; reconcile it before reassociating
+  PASS: directory: refused (exit 1)
+  PASS: directory: reason contains 'unfinished relaunch transaction'
+  PASS: directory: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r5
+  PASS: directory: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: symlink (lab-r6)
+  $ fm-control.sh lab-r6 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r6-new --note lab refusal symlink -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r6 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r6.control-relaunch; reconcile it before reassociating
+  PASS: symlink: refused (exit 1)
+  PASS: symlink: reason contains 'unfinished relaunch transaction'
+  PASS: symlink: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r6
+  PASS: symlink: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: foreign-task (lab-r7)
+  $ fm-control.sh lab-r7 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r7-new --note lab refusal foreign-task -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r7 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r7.control-relaunch; reconcile it before reassociating
+  PASS: foreign-task: refused (exit 1)
+  PASS: foreign-task: reason contains 'unfinished relaunch transaction'
+  PASS: foreign-task: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r7
+  PASS: foreign-task: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: empty-task (lab-r8)
+  $ fm-control.sh lab-r8 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r8-new --note lab refusal empty-task -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r8 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r8.control-relaunch; reconcile it before reassociating
+  PASS: empty-task: refused (exit 1)
+  PASS: empty-task: reason contains 'unfinished relaunch transaction'
+  PASS: empty-task: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r8
+  PASS: empty-task: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: malformed-prior (lab-r9)
+  $ fm-control.sh lab-r9 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r9-new --note lab refusal malformed-prior -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r9 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r9.control-relaunch; reconcile it before reassociating
+  PASS: malformed-prior: refused (exit 1)
+  PASS: malformed-prior: reason contains 'unfinished relaunch transaction'
+  PASS: malformed-prior: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r9
+  PASS: malformed-prior: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: malformed-instructions (lab-r10)
+  $ fm-control.sh lab-r10 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r10-new --note lab refusal malformed-instructions -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r10 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r10.control-relaunch; reconcile it before reassociating
+  PASS: malformed-instructions: refused (exit 1)
+  PASS: malformed-instructions: reason contains 'unfinished relaunch transaction'
+  PASS: malformed-instructions: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r10
+  PASS: malformed-instructions: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: phase-launching (lab-r11)
+  $ fm-control.sh lab-r11 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r11-new --note lab refusal phase-launching -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r11 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r11.control-relaunch; reconcile it before reassociating
+  PASS: phase-launching: refused (exit 1)
+  PASS: phase-launching: reason contains 'unfinished relaunch transaction'
+  PASS: phase-launching: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r11
+  PASS: phase-launching: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- refusal: bad-state-suffix (lab-r12)
+  $ fm-control.sh lab-r12 reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-r12-new --note lab refusal bad-state-suffix -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-r12 has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/state/lab-r12.control-relaunch; reconcile it before reassociating
+  PASS: bad-state-suffix: refused (exit 1)
+  PASS: bad-state-suffix: reason contains 'unfinished relaunch transaction'
+  PASS: bad-state-suffix: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-r12
+  PASS: bad-state-suffix: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- instructions-restored-agent-alive with a REAL claude in fmlab:fm-lab-gated (lab-gated)
+  agent_state=alive; windows: fmlab:placeholder zsh;fmlab:fm-lab-gated 2.1.326;
+  $ fm-control.sh lab-gated reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gated-new --note lab gated -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-gated's agent is not proven stopped; reconcile it before archiving its rolled-back relaunch journal and reassociating
+  PASS: gated-alive(live claude): refused (exit 1)
+  PASS: gated-alive(live claude): reason contains 'agent is not proven stopped'
+  PASS: gated-alive(live claude): state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-gated
+  PASS: gated-alive(live claude): tmux endpoints unchanged (fmlab:placeholder zsh;fmlab:fm-lab-gated 2.1.326;)
+  stopping the real claude: window keeps an idle shell
+  agent_state=dead
+  $ fm-control.sh lab-gated reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gated-new --note lab gated after stop -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-gated worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gated-new branch=fm/lab-gated-v2 prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gated-old slot=none
+  PASS: gated-alive(agent dead): exit 0
+  PASS: gated-alive(agent dead): worktree= now /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gated-new
+  PASS: gated-alive(agent dead): active journal path retired
+  PASS: gated-alive(agent dead): archive name lab-gated.control-relaunch.archived-2026-11-17T123752Z.0 (UTC stamp + counter)
+  PASS: gated-alive(agent dead): archive sha256 66fd4b8c70d3aef0e4265c21f2397307128d7bb9e53a929e89a53b124491a57e == journal-before sha256
+-- instructions-restored-agent-state-unknown with an ambiguous foreground (sleep) (lab-gstate)
+  agent_state=ambiguous
+  $ fm-control.sh lab-gstate reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gstate-new --note lab gstate -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | error: task lab-gstate's agent is not proven stopped; reconcile it before archiving its rolled-back relaunch journal and reassociating
+  PASS: gated-state(ambiguous): refused (exit 1)
+  PASS: gated-state(ambiguous): reason contains 'agent is not proven stopped'
+  PASS: gated-state(ambiguous): state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-gstate
+  PASS: gated-state(ambiguous): tmux endpoints unchanged (fmlab:placeholder zsh;fmlab:fm-lab-gated zsh;fmlab:fm-lab-gstate sleep;)
+  window removed; agent_state=missing
+  $ fm-control.sh lab-gstate reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gstate-new --note lab gstate missing -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-gstate worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gstate-new branch=fm/lab-gstate-v2 prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gstate-old slot=none
+  PASS: gated-state(missing): exit 0
+  PASS: gated-state(missing): worktree= now /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gstate-new
+  PASS: gated-state(missing): active journal path retired
+  PASS: gated-state(missing): archive name lab-gstate.control-relaunch.archived-2026-11-17T123825Z.0 (UTC stamp + counter)
+  PASS: gated-state(missing): archive sha256 e4ee039fc2fa070827cdf05569048b45328de5cece00a7bbb0ec320151a7493a == journal-before sha256
+-- instructions-restored (not gated) with a REAL live claude in fmlab:fm-lab-ungated (lab-ungated)
+  agent_state=alive
+  $ fm-control.sh lab-ungated reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-ungated-new --note lab ungated live -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-ungated worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-ungated-new branch=fm/lab-ungated-v2 prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-ungated-old slot=none
+  PASS: ungated-live: exit 0
+  PASS: ungated-live: worktree= now /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-ungated-new
+  PASS: ungated-live: active journal path retired
+  PASS: ungated-live: archive name lab-ungated.control-relaunch.archived-2026-11-17T123840Z.0 (UTC stamp + counter)
+  PASS: ungated-live: archive sha256 9638884636af4bbc5999c6271cc3824f7f0385674655d6754f920926439e991c == journal-before sha256
+  PASS: ungated-live: live worker untouched (still alive)
+-- staging failure after the archive copy: data/lab-fail made read-only (lab-fail)
+  $ fm-control.sh lab-fail reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-fail-new --note lab fail -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | mktemp: mkstemp failed on /Users/charlesabrooker/tmp/fm-lab.Cyb7DO/data/lab-fail/.brief.reassociate.Lx5Uit: Permission denied
+    | error: could not stage task lab-fail's instructions
+  PASS: failure: refused (exit 1)
+  PASS: failure: active journal still in place, byte-exact
+  PASS: failure: task record and brief unchanged
+  archives after failed attempt: lab-fail.control-relaunch.archived-2026-11-17T123853Z.0 
+-- re-run after fixing the cause
+  $ fm-control.sh lab-fail reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-fail-new --note lab fail rerun -> exit 0
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+    | reassociated lab-fail worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-fail-new branch=fm/lab-fail-v2 prior=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-fail-old slot=none
+  PASS: failure-rerun: exit 0
+  PASS: failure-rerun: worktree= now /Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-fail-new
+  PASS: failure-rerun: active journal path retired
+  PASS: failure-rerun: archive name lab-fail.control-relaunch.archived-2026-11-17T123904Z.0 (UTC stamp + counter)
+  PASS: failure-rerun: archive sha256 8de74b10f2a8b438150daf50eb33c68931b664253fbff6493a9f1db8fe8748ca == journal-before sha256
+  archives now: lab-fail.control-relaunch.archived-2026-11-17T123853Z.0 lab-fail.control-relaunch.archived-2026-11-17T123904Z.0 
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MPJSRYMH2DNEGFVNKTR2WD/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.Cyb7DO && rm -rf /Users/charlesabrooker/tmp/fm-lab.Cyb7DO
+lab removed: yes
+RESULT tag=head-live pass=95 fail=0

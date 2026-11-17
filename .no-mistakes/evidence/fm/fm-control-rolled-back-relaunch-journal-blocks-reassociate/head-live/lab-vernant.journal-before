@@ -1,0 +1,9 @@
+v1
+task=lab-vernant
+phase=failed:launching
+ts=2026-01-01T00:00:00Z
+backend=tmux
+endpoint=fmlab:fm-lab-vernant
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-vernant-old
+kind=ship
+rollback=prior-record-kept

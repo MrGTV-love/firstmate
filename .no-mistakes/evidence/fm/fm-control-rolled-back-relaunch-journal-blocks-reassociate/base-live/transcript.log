@@ -1,0 +1,27 @@
+== tag=base-live code=/Users/charlesabrooker/tmp/fm-base-code.xSYKRl (df896569)
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.l6QlNY TMUX_TMPDIR=/tmp/fml.tvI0LW work=/Users/charlesabrooker/tmp/fm-lab-work.BrGCab
+lock acquired: harness pid 85308
+lock: lock: held by live harness pid 85308
+tmux: fmlab:placeholder zsh;
+-- vernant shape on BASE (lab-vernant)
+  $ fm-control.sh lab-vernant reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.BrGCab/lab-vernant-new --note lab: work moved to v2 -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.l6QlNY
+    | error: task lab-vernant has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.l6QlNY/state/lab-vernant.control-relaunch; reconcile it before reassociating
+  PASS: vernant-on-base: refused (exit 1)
+  PASS: vernant-on-base: reason contains 'unfinished relaunch transaction'
+  PASS: vernant-on-base: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-vernant
+  PASS: vernant-on-base: tmux endpoints unchanged (fmlab:placeholder zsh;)
+-- instructions-restored with live claude on BASE (lab-ungated)
+  agent_state=alive
+  $ fm-control.sh lab-ungated reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-work.BrGCab/lab-ungated-new --note lab ungated live -> exit 1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.l6QlNY
+    | error: task lab-ungated has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.l6QlNY/state/lab-ungated.control-relaunch; reconcile it before reassociating
+  PASS: ungated-on-base: refused (exit 1)
+  PASS: ungated-on-base: reason contains 'unfinished relaunch transaction'
+  PASS: ungated-on-base: state+data byte-identical (excluding *.lock.holds, guard-events.jsonl); no archive
+  only telemetry appended: guard-event: gate-agent-containment allow gate-context lab-ungated
+  PASS: ungated-on-base: tmux endpoints unchanged (fmlab:placeholder zsh;fmlab:fm-lab-ungated 2.1.326;)
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MPJSRYMH2DNEGFVNKTR2WD/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.l6QlNY && rm -rf /Users/charlesabrooker/tmp/fm-lab.l6QlNY
+lab removed: yes
+RESULT tag=base-live pass=8 fail=0

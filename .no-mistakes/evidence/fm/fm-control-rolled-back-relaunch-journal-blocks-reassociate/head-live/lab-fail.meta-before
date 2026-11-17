@@ -1,0 +1,13 @@
+window=fmlab:fm-lab-fail
+endpoint_task_id=lab-fail
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-fail-old
+project=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/lab-fail
+tasktmp=/tmp/fm-lab-fail
+model=default
+effort=default
+spawn_gen=s1.1.1

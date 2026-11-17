@@ -1,0 +1,9 @@
+v1
+task=lab-gstate
+phase=failed:checkpoint
+ts=2026-01-01T00:00:00Z
+backend=tmux
+endpoint=fmlab:fm-lab-gstate
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-gstate-old
+kind=ship
+rollback=instructions-restored-agent-state-unknown

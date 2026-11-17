@@ -1,0 +1,8 @@
+v1
+task=lab-complete
+phase=complete
+ts=2026-01-01T00:00:00Z
+backend=tmux
+endpoint=fmlab:fm-lab-complete
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.1Bf9yU/lab-complete-old
+kind=ship

@@ -1,0 +1,9 @@
+D data 755
+D data/lab-vernant 755
+F data/lab-vernant/brief.md 644 afa4fc7a80cc44d6
+D state 755
+F state/.fm-lab-tmux-dir 600 5213ab33cd842bb7
+F state/.lock 644 181a1f8bc3994b53
+F state/.lock-session 600 e70d3cf71ed26e1e
+F state/lab-vernant.control-relaunch 644 fb73d78138ec6f37
+F state/lab-vernant.meta 644 638ed7a75dc55023
