@@ -12,7 +12,10 @@
 # them. Every other command is staged after the worker is ready. On Darwin, a
 # missing Aqua session fails before staging with the doctor-actionable
 # console-login diagnostic. Linux uses the same queue and worker shape without
-# an Aqua requirement.
+# an Aqua requirement. Unavailable ownership inspection (an unresolvable owner
+# PID, or a missing or failing system ps) fails before worker startup or
+# staging with exit 69 and its diagnostic, including any ps status and stderr;
+# it is not reported as protocol-usage exit 64.
 #
 # stdin is captured as bounded job input. The completed worker result is relayed
 # with stdout and stderr kept separate and its exit status preserved. An SSH
@@ -172,8 +175,12 @@ if [ "$COMMAND" = fm-remote-doctor.sh ]; then
   exec "${DOCTOR_ENV[@]}" "$COMMAND_PATH" "${ARGV[@]:1}"
 fi
 
-if ! fm_remote_job_ensure_worker "$ROOT" "$ACCOUNT_HOME"; then
-  die "${FM_REMOTE_JOB_ERROR:-remote job worker is unavailable; run fm-on.sh <route> fm-remote-doctor.sh --fix}"
+if fm_remote_job_ensure_worker "$ROOT" "$ACCOUNT_HOME"; then
+  :
+else
+  worker_status=$?
+  [ "$worker_status" -eq 69 ] || worker_status=64
+  die "${FM_REMOTE_JOB_ERROR:-remote job worker is unavailable; run fm-on.sh <route> fm-remote-doctor.sh --fix}" "$worker_status"
 fi
 if ! JOB_ID=$(fm_remote_job_stage "$ACCOUNT_HOME" "$ROOT" "$HOME_PATH" "$COMMAND" "${ARGV[@]:1}"); then
   JOB_ID=

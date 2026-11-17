@@ -5,6 +5,11 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# The proof takes CPU passes: use a private pool and never inherit an outer runner's pass count.
+unset FM_CPU_PASS_HELD
+FM_CPU_POOL_DIR=$(fm_test_tmproot fm-isolation-proof-pool)
+export FM_CPU_POOL_DIR
+
 PROOF="$ROOT/bin/fm-test-isolation-proof.sh"
 RUNNER="$ROOT/bin/fm-test-run.sh"
 
@@ -142,7 +147,8 @@ assert artifact["summary"]["failed"] == 0
 import json, sys
 artifact = json.load(open(sys.argv[1], encoding="utf-8"))
 assert artifact["pool"] == "admitted-family"
-assert artifact["concurrency"] == 3
+assert artifact["planned_concurrency"] == 3
+assert 1 <= artifact["concurrency"] <= 3  # the peak the candidates reached, not the plan
 assert artifact["fm_test_run_jobs_enabled"] is False
 assert artifact["summary"]["failed"] == 0
 ' "$capped_json" || fail "over-cap family pool artifact metadata is incorrect"
