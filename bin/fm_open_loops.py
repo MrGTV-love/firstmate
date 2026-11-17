@@ -1243,9 +1243,38 @@ class Collector:
         self.add("coverage", "ledger stale", "wait for the GitHub quota window to reset; the next run refreshes every row",
                  None, evidence=reason, informational=True)
 
+    def consumer_observations(self):
+        """Reuse this collection's liveness, bound to the captured task generation."""
+        observations = {}
+        for task in self.direct_reports:
+            if not task.get("spawn_gen") or task["current_state"].get("detail") == "task generation changed during snapshot":
+                continue
+            meta = self.state / (task["id"] + ".meta")
+            try:
+                if meta.is_symlink() or not meta.is_file():
+                    continue
+                text = meta.read_text()
+                fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+                if fields.get("spawn_gen") != task["spawn_gen"]:
+                    continue
+            except SOURCE_ERRORS:
+                continue  # optional/unknown availability is not proof of a healthy consumer
+            endpoint = task["endpoint"]
+            unavailable = endpoint.get("exists") is False or endpoint.get("agent_alive") in ("dead", "missing")
+            available = False if unavailable else True if endpoint.get("agent_alive") == "alive" else None
+            observations[task["id"]] = dict(
+                source=dict(self.source_context(), task=task["id"], generation=fingerprint(text)),
+                spawn_gen=task["spawn_gen"], available=available)
+        return observations
+
     def result(self):
         rows = sorted(self.rows.values(), key=lambda r: (r["category"], r["subject"]))
+        consumers = self.consumer_observations()
         for row in rows:
+            source = row.get("source")
+            observed = consumers.get(source.get("task")) if isinstance(source, dict) else None
+            if observed and all(source.get(key) == value for key, value in observed["source"].items()):
+                row["consumer"] = observed
             row["current_identity"] = row_digest(row)
         report = dict(schema="fm-open-loops.v1", generated_epoch=self.stale_generated or self.now,
                       home=str(self.home), complete=not self.degraded and not self.stale_reason,
@@ -1300,6 +1329,11 @@ class Collector:
             for row in report["rows"]:
                 if captain_visible(handling["actions"].get(row["id"], {}), row, self.now):
                     row["captain_visible"] = True
+        for row in report["rows"]:
+            action = report.get("handling", {}).get("actions", {}).get(row["id"], {})
+            if steer_needs_followup(action, row, self.now):
+                action["requires_followup"] = True
+            row["current_identity"] = notification_identity(row, action, self.now)
         write_ledger(self.state, report)
         try:
             (self.state / ".open-loops-stale-surfaced").unlink()
@@ -1809,10 +1843,55 @@ def same_work(action, row, now):
         age is not None and now - age > action.get("clock_start", action.get("at_epoch", now)))
 
 
+def steer_source(row):
+    """Bind the actual launch, not mutable metadata bytes or a task name alone."""
+    source, observed = row.get("source"), row.get("consumer")
+    if not isinstance(source, dict) or not isinstance(observed, dict) or not observed.get("spawn_gen"):
+        return None
+    proof = observed.get("source")
+    keys = ("home", "state", "data", "config", "task", "generation")
+    if not isinstance(proof, dict) or not all(key in source and proof.get(key) == source[key] for key in keys):
+        return None
+    return dict({key: source[key] for key in keys if key != "generation"}, spawn_gen=observed["spawn_gen"])
+
+
+def steer_stands(action, row, now):
+    """Delivery buys a bounded reconciliation window, never proof of its intended result."""
+    sent = action.get("sent_epoch", action.get("at_epoch"))
+    limit = row.get("limit_seconds")
+    if type(sent) is not int or type(limit) is not int or limit < 0:
+        return False
+    elapsed = now - sent
+    # Zero-limit work may be handled in its delivery instant, not indefinitely.
+    if elapsed < 0 or (elapsed != 0 and elapsed >= limit):
+        return False
+    observed = row.get("consumer")
+    return not (not row.get("stale") and isinstance(observed, dict) and observed.get("available") is False
+                and action.get("consumer_source") is not None
+                and steer_source(row) == action["consumer_source"])
+
+
+def steer_needs_followup(action, row, now):
+    return action.get("kind") == "steered" and same_work(action, row, now) \
+        and (action.get("requires_followup") or not steer_stands(action, row, now))
+
+
+def notification_identity(row, action, now):
+    """Expose one due-follow-up transition to the existing opaque-token watcher."""
+    identity = row_digest(row)
+    if same_work(action, row, now):
+        previous = action.get("notification_identity")
+        if isinstance(previous, str) and re.fullmatch(r"[0-9a-f]{24}", previous):
+            identity = previous
+    if steer_needs_followup(action, row, now):
+        return fingerprint([identity, "steer-result-due", action.get("sent_epoch", action.get("at_epoch"))])[:24]
+    return identity
+
+
 def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
-    A standing receipt answers its row on unchanged evidence; a reviewed green PR never has one.
+    A steer buys only its bounded result-follow-up window; a reviewed green PR never has standing cover.
     An escalation never stands: only a bound captain hold is proof it waits on the captain,
     and the end of that hold is a change that needs firstmate's next action.
     A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
@@ -1830,7 +1909,9 @@ def receipt_covers(action, row, now, waits=None):
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not captain_visible(action, row, now)
-    return kind in ("steered", "merged")
+    if kind == "steered":
+        return steer_stands(action, row, now)
+    return kind == "merged"
 
 
 def needs_no_action(action, row, now, waits=None):
@@ -1852,6 +1933,9 @@ def action_answers(action, row, required, now, waits):
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
     if kind == "waiting" or action.get("hold"):
         return receipt_covers(action, row, now, waits)
+    if kind == "steered":
+        return steer_stands(action, row, now) and (row.get("category") != "review_pass_not_merged"
+                                                  or 0 <= now - answered_at(action) < RECEIPT_SECONDS)
     return 0 <= now - answered_at(action) < RECEIPT_SECONDS
 
 
@@ -1921,10 +2005,14 @@ def render_digest(rows, actions, captain_waiting):
     return "\n".join(lines)
 
 
-def render_overdue(rows):
+def render_overdue(rows, actions=None, now=None):
     fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "captain_visible"]
     lines = ["OVERDUE:", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
-    lines += ["  " + ",".join(json.dumps(r.get(f), ensure_ascii=False) for f in fields) for r in rows]
+    for row in rows:
+        shown = dict(row)
+        if actions is not None and steer_needs_followup(actions.get(row["id"], {}), row, now):
+            shown["evidence"] = str(row.get("evidence", "")) + "; steered, result not observed"
+        lines.append("  " + ",".join(json.dumps(shown.get(field), ensure_ascii=False) for field in fields))
     return "\n".join(lines)
 
 
@@ -2000,7 +2088,7 @@ def ledger_action(args, state, now, batch=()):
             print("note: PR source unreadable this pass for " + ", ".join(sorted(waits.unread))
                   + "; its standing wait is unchanged and the read repeats next pass", file=sys.stderr)
         if needing:
-            print(render_overdue(needing))
+            print(render_overdue(needing, actions, now))
             if standing and args.include_standing:
                 print(render_overdue(standing).replace(
                     "OVERDUE:", "STANDING (unchanged since its last action; no action needed):", 1))
@@ -2031,13 +2119,13 @@ def ledger_action(args, state, now, batch=()):
                              or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
-            print(render_overdue(missing))
+            print(render_overdue(missing, actions, now))
             return 1
         return 0
     if args.report:
         print(f"generated_epoch: {report['generated_epoch']}")
         print("complete: " + str(report.get("complete", False)).lower())
-        print(render_overdue(rows) if rows else "OVERDUE: none")
+        print(render_overdue(rows, actions, now) if rows else "OVERDUE: none")
         return 0
     if args.batch:
         return record_batch(batch, state, now, report, waits, waits_error)
@@ -2109,6 +2197,13 @@ def record_action(args, state, now, report, waits, waits_error):
                              " or its evidence last changed")
         if now - sent >= RECEIPT_SECONDS:
             raise ValueError("steered evidence is older than four hours; send a new delivery")
+        if old.get("kind") == "steered" and old.get("requires_followup") \
+                and same_work(old, by_id[ident], now) and sent <= answered_at(old):
+            raise ValueError("this delivery already needs result follow-up; old evidence cannot renew it")
+        candidate = dict(sent_epoch=sent, consumer_source=steer_source(by_id[ident]))
+        if not steer_stands(candidate, by_id[ident], now):
+            raise ValueError("steered delivery needs result follow-up: its row limit has elapsed or its consumer"
+                             " is unavailable; reconcile the outcome or use an applicable explicit wait")
     if args.kind == "merged" and not merge_recorded(state, by_id[ident], args.evidence):
         raise ValueError("merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh")
     recheck = epoch(args.recheck)
@@ -2191,8 +2286,15 @@ def record_action(args, state, now, report, waits, waits_error):
                          sequence=controls["sequence"], deferrals=prior_deferrals
                          + int(args.kind == "deferred"), captain_visible=visible,
                          digest=row_digest(by_id[ident]), cited=cited)
+    previous_identity = by_id[ident].get("current_identity")
+    if same and isinstance(previous_identity, str) and re.fullmatch(r"[0-9a-f]{24}", previous_identity):
+        # Handling the due notification is not another notification; the next due result is.
+        actions[ident]["notification_identity"] = previous_identity
     if sent is not None:
         actions[ident]["sent_epoch"] = sent
+        consumer = steer_source(by_id[ident])
+        if consumer is not None:
+            actions[ident]["consumer_source"] = consumer
     if by_id[ident].get("age_seconds") is not None:
         actions[ident]["clock_start"] = max(now, report["generated_epoch"]) - by_id[ident]["age_seconds"]
     if wait_history:
@@ -2208,6 +2310,7 @@ def record_action(args, state, now, report, waits, waits_error):
     shown = captain_visible(actions[ident], by_id[ident], now)
     for row in report["rows"]:
         if row["id"] == ident:
+            row["current_identity"] = notification_identity(row, actions[ident], now)
             if shown:
                 row["captain_visible"] = True
             else:

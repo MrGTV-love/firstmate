@@ -362,14 +362,14 @@ for kind in ('steered', 'escalated', 'deferred', 'bound', 'waiting', 'task-wait'
     home.check(False)
     print('ok - current unstamped ' + kind + ' survives restart, no-op and unrelated progress', flush=True)
 
-# Default lifetimes remain unchanged: a steer covers unchanged work, but stale
-# deliveries cannot be recorded again; bounded waits/deferrals expire on time.
+# Delivery is bounded result-follow-up evidence, while existing input-age and
+# explicit wait/deferral controls retain their own deadlines.
 home = Home('steer-lifetime')
 home.act()
 home.clock += 5 * 3600
 home.collect()
-home.present(False)
-home.check(False)
+home.present(True)
+home.check(True)
 assert 'older than four hours' in home.call('action', home.row['id'], 'steered', '--evidence', '001.msg', expected=1).stdout
 for kind in ('deferred', 'waiting', 'task-wait'):
     home = Home('expires-' + kind)
@@ -377,7 +377,7 @@ for kind in ('deferred', 'waiting', 'task-wait'):
     home.clock = now + 7200
     home.present(True)
     home.check(True)
-print('ok - production steer evidence age and wait/deferral deadlines are unchanged', flush=True)
+print('ok - expired steering requires result follow-up; delivery input-age and explicit wait/deferral controls remain intact', flush=True)
 
 # Prerequisite truth is rechecked without publication: its end must not be
 # hidden by the unchanged source question or the still-future recheck deadline.
@@ -443,8 +443,9 @@ home.call('action', captain['id'], 'escalated', '--evidence', 'asked the owner')
 home.act()
 home.clock += 2 * 86400
 home.collect()
-home.present(False)
-home.check(False)
+home.present(True)
+home.check(True)
+assert captain['id'] not in home.call('--present-overdue').stdout
 assert home.snapshot['backlog']['records'][0]['hold_kind'] == 'captain'
 print('ok - unchanged captain_hold survives provenance addition without releasing the hold', flush=True)
 

@@ -926,7 +926,7 @@ for part in ('state','data','config','projects','user','tmp'):
     (home/part).mkdir(parents=True)
 ledgers.mkdir()
 snapshot=code/'bin/fm-fleet-snapshot.sh'
-snapshot.write_text('#!/usr/bin/env python3\nimport json\nprint(json.dumps(dict(schema="fm-fleet-home-input.v1",tasks=[],backlog=dict(present=True,records=[]))))\n')
+snapshot.write_text('#!/usr/bin/env python3\nimport json,os\nfrom pathlib import Path\np=Path(os.environ["FM_HOME"])/"snapshot.json"\nprint(p.read_text() if p.exists() else json.dumps(dict(schema="fm-fleet-home-input.v1",tasks=[],backlog=dict(present=True,records=[]))))\n')
 snapshot.chmod(0o755)
 for tool in ('ssh','gh','gh-axi','claude','codex','dsh','omp'):
     blocked=fixture/'fakebin'/tool
@@ -959,6 +959,11 @@ def heartbeat(name):
     return row
 first=heartbeat('first')
 assert first['id'] in call('--present-overdue')
+failed=subprocess.run([str(cli),'action',first['id'],'steered','--evidence','999.msg'],env=env,text=True,capture_output=True,timeout=30)
+assert failed.returncode==1,(failed.stdout,failed.stderr)
+assert heartbeat('failed-delivery')['current_identity'] == first['current_identity']
+missing=subprocess.run([str(cli),'--check-actions'],env=env,text=True,capture_output=True,timeout=30)
+assert missing.returncode==1 and first['id'] in missing.stdout
 inbox=home/'state/worker.inbox';inbox.mkdir()
 at=dt.datetime.fromtimestamp(now,dt.timezone.utc).isoformat()
 (inbox/'001.msg').write_text('schema=fm-task-inbox.v1\nat='+at+'\n--\nanswer predecessor\n')
@@ -976,6 +981,56 @@ for name in ('first','reopened','new-question'):
     report=json.loads((ledgers/(name+'.json')).read_text())
     for row in report['rows']:row.pop('current_identity',None)
     (ledgers/('legacy-'+name+'.json')).write_text(json.dumps(report))
+# The same producer also owns a due-result transition with no new question opening.
+call('--present-overdue')
+(inbox/'002.msg').write_text('schema=fm-task-inbox.v1\nat='+at+'\n--\napply the current decision\n')
+call('action',new['id'],'steered','--evidence','002.msg')
+heartbeat('steer-current')
+env['FM_OPEN_LOOPS_NOW']=str(now+1799)
+heartbeat('steer-before')
+env['FM_OPEN_LOOPS_NOW']=str(now+1800)
+due=heartbeat('steer-due')
+assert new['id'] in call('--present-overdue')
+assert due['current_identity'] != new['current_identity']
+with status.open('a') as f:f.write('working: unrelated progress after the result deadline\n')
+heartbeat('steer-due-unrelated')
+env['FM_OPEN_LOOPS_NOW']=str(now+2000)
+(inbox/'003.msg').write_text('schema=fm-task-inbox.v1\nat='+dt.datetime.fromtimestamp(now+2000,dt.timezone.utc).isoformat()+'\n--\napply the still-open decision\n')
+call('action',new['id'],'steered','--evidence','003.msg')
+assert heartbeat('steer-renewed')['current_identity'] == due['current_identity']
+env['FM_OPEN_LOOPS_NOW']=str(now+3799)
+heartbeat('steer-renewed-before')
+env['FM_OPEN_LOOPS_NOW']=str(now+3800)
+assert heartbeat('steer-renewed-due')['current_identity'] != due['current_identity']
+with status.open('a') as f:f.write('working: unrelated progress after the second deadline\n')
+heartbeat('steer-renewed-unrelated')
+with status.open('a') as f:f.write(f'needs-decision [at={stamp}] [key=after-result]: distinct later question\n')
+heartbeat('steer-next-question')
+if not degraded:
+    # Bind an actual shared snapshot observation, with missing-worker age still below its deadline.
+    task=dict(id='worker',kind='ship',spawn_gen='synthetic-recurrence',project='',branch='',backend='fixture',
+              current_state=dict(state='blocked',source='fixture'),endpoint=dict(exists=True,agent_alive='alive'),
+              pr=dict(url=None),paths=dict(worktree=dict(path=None)),hints={})
+    def consumer(alive, offset):
+        env['FM_OPEN_LOOPS_NOW']=str(now+offset)
+        task['endpoint']=dict(exists=alive,agent_alive='alive' if alive else 'dead')
+        task['current_state']=dict(state='blocked' if alive else 'unknown',source='fixture',
+                                   detail='' if alive else 'backend target gone: fixture')
+        (home/'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',tasks=[task],backlog=dict(present=True,records=[]))))
+        os.utime(status,(now+offset,now+offset))
+    consumer(True,10000);heartbeat('available-before-recording');call('--present-overdue')
+    (inbox/'004.msg').write_text('at='+dt.datetime.fromtimestamp(now+10000,dt.timezone.utc).isoformat()+'\n--\napply the original decision\n')
+    call('action',new['id'],'steered','--evidence','004.msg');heartbeat('available-current')
+    consumer(False,10001);first_negative=heartbeat('unavailable-due')
+    assert first_negative['consumer']['available'] is False
+    assert not next(r for r in json.loads((ledgers/'unavailable-due.json').read_text())['rows'] if r['category']=='missing_worker')['overdue']
+    consumer(True,10002);heartbeat('available-recovery');call('--present-overdue')
+    (inbox/'005.msg').write_text('at='+dt.datetime.fromtimestamp(now+10002,dt.timezone.utc).isoformat()+'\n--\nreconcile and apply the same decision\n')
+    call('action',new['id'],'steered','--evidence','005.msg')
+    assert heartbeat('available-renewed')['current_identity'] == first_negative['current_identity']
+    consumer(False,10003)
+    assert heartbeat('unavailable-again')['current_identity'] != first_negative['current_identity']
+    heartbeat('unavailable-unchanged')
 PY
 }
 
@@ -1105,7 +1160,109 @@ test_legacy_projection_migrates_once_then_current_identity_settles() {
   pass "absent identity preserves exact legacy projection; one migration wake settles before a genuine new question"
 }
 
+test_result_followup_notifies_once_then_settles() {
+  local kind dir first cycle settled state out pid marker periodic
+  for kind in regular degraded; do
+    dir=$(make_case "result-followup-$kind")
+    prepare_canonical_ledgers "$dir" "$kind" || fail "$kind result ledger preparation failed"
+    first=$(make_case "failed-delivery-$kind")
+    publish_recorded_ledger "$dir/ledgers/failed-delivery.json" "$first/state"
+    watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind failed delivery lost the original actionable notification"; }
+    assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger
+    first=$(make_case "result-first-$kind")
+    publish_recorded_ledger "$dir/ledgers/steer-current.json" "$first/state"
+    watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind initial result fixture did not notify"; }
+    cycle=$(make_case "result-cycle-$kind");state="$cycle/state";out="$cycle/watch.out"
+    copy_delivered_cooldowns "$first/state" "$state"
+    marker=$(cat "$state/.open-loops-surfaced");periodic=$(file_mtime "$state/.open-loops-resurfaced")
+    publish_recorded_ledger "$dir/ledgers/steer-before.json" "$state"
+    watch_canonical_ledger "$state" "$dir/fakebin" "$out" "$dir/collector-home";pid=$!
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind current delivery woke early"; }
+    [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      || { reap "$pid"; fail "$kind result wait did not stay quiet before its deadline"; }
+    publish_recorded_ledger "$dir/ledgers/steer-due.json" "$state"
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind due result follow-up did not notify"; }
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
+      || fail "$kind result follow-up relied on periodic rescue"
+    settled=$(make_case "result-settled-$kind");state="$settled/state";out="$settled/watch.out"
+    copy_delivered_cooldowns "$cycle/state" "$state"
+    marker=$(cat "$state/.open-loops-surfaced")
+    publish_recorded_ledger "$dir/ledgers/steer-due.json" "$state"
+    watch_canonical_ledger "$state" "$dir/fakebin" "$out" "$dir/collector-home";pid=$!
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind due result replayed a notification"; }
+    publish_recorded_ledger "$dir/ledgers/steer-due-unrelated.json" "$state"
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind unrelated progress replayed result follow-up"; }
+    [ ! -s "$state/.wake-queue" ] && [ ! -s "$out" ] \
+      && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      || { reap "$pid"; fail "$kind due result did not settle"; }
+    publish_recorded_ledger "$dir/ledgers/steer-renewed.json" "$state"
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind renewal itself replayed its notification"; }
+    publish_recorded_ledger "$dir/ledgers/steer-renewed-before.json" "$state"
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind renewed delivery woke before its own deadline"; }
+    [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      || { reap "$pid"; fail "$kind current renewal did not stay quiet"; }
+    publish_recorded_ledger "$dir/ledgers/steer-renewed-due.json" "$state"
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind second result deadline did not notify"; }
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    cycle="$state"
+    settled=$(make_case "result-second-settled-$kind");state="$settled/state";out="$settled/watch.out"
+    copy_delivered_cooldowns "$cycle" "$state"
+    publish_recorded_ledger "$dir/ledgers/steer-renewed-unrelated.json" "$state"
+    watch_canonical_ledger "$state" "$dir/fakebin" "$out" "$dir/collector-home";pid=$!
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind second due result did not settle"; }
+    [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "$kind second result replayed"; }
+    publish_recorded_ledger "$dir/ledgers/steer-next-question.json" "$state"
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind settled result lost distinct-question notification"; }
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    [ ! -s "$dir/forbidden-calls" ] || fail "$kind result fixture called an external backend"
+  done
+  pass "a due result follow-up notifies through the existing watcher, settles, and preserves new-question delivery"
+}
+
+test_unavailable_result_notifies_again_after_recovery() {
+  local dir first cycle state out pid previous marker periodic stage current due
+  dir=$(make_case consumer-result-followup)
+  prepare_canonical_ledgers "$dir" regular || fail "consumer result ledger preparation failed"
+  first=$(make_case consumer-result-first)
+  publish_recorded_ledger "$dir/ledgers/available-current.json" "$first/state"
+  watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home";pid=$!
+  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "consumer result initial notification failed"; }
+  previous="$first/state"
+  for stage in first second; do
+    if [ "$stage" = first ]; then current=available-current;due=unavailable-due
+    else current=available-renewed;due=unavailable-again;fi
+    cycle=$(make_case "consumer-result-$stage");state="$cycle/state";out="$cycle/watch.out"
+    copy_delivered_cooldowns "$previous" "$state"
+    marker=$(cat "$state/.open-loops-surfaced");periodic=$(file_mtime "$state/.open-loops-resurfaced")
+    publish_recorded_ledger "$dir/ledgers/$current.json" "$state"
+    watch_canonical_ledger "$state" "$dir/fakebin" "$out" "$dir/collector-home";pid=$!
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$stage current consumer result did not stay quiet"; }
+    [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      || { reap "$pid"; fail "$stage recovery/new delivery itself replayed the result wake"; }
+    publish_recorded_ledger "$dir/ledgers/$due.json" "$state"
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$stage authoritative unavailability did not notify"; }
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
+      || fail "$stage consumer result depended on periodic rescue"
+    previous="$state"
+  done
+  cycle=$(make_case consumer-result-settled);state="$cycle/state";out="$cycle/watch.out"
+  copy_delivered_cooldowns "$previous" "$state"
+  publish_recorded_ledger "$dir/ledgers/unavailable-unchanged.json" "$state"
+  watch_canonical_ledger "$state" "$dir/fakebin" "$out" "$dir/collector-home";pid=$!
+  wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "unchanged unavailable result did not settle"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "unchanged unavailable result replayed"; }
+  reap "$pid"
+  [ ! -s "$dir/forbidden-calls" ] || fail "consumer result fixture called an external backend"
+  pass "same-generation unavailability notifies before its separate age deadline and can notify again after recovery"
+}
+
 tests=(
+  test_unavailable_result_notifies_again_after_recovery
+  test_result_followup_notifies_once_then_settles
   test_canonical_reopening_notifies_without_an_absence_observation
   test_legacy_projection_migrates_once_then_current_identity_settles
   test_overdue_row_wakes_with_a_durable_row
