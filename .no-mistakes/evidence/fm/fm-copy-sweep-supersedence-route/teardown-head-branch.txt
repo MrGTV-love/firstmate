@@ -1,0 +1,14 @@
+argv: route-argv-foreign: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-foreign: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-foreign: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+ok - a record makes teardown's foreign and own nested release ask the driver with exactly the --pr route's options from the slot clone, and a copy with no record is asked exactly as before
+ok - a teardown's foreign and own nested release keep the copy, with no driver call, while the primary checkout is on the PR's head branch, and leave that checkout's branch and working tree as they were; the working-tree digest sees a switch to main, a tracked edit and an untracked file
+rc=0

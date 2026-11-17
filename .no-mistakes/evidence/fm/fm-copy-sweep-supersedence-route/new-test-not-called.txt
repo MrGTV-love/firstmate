@@ -1,0 +1,4 @@
+## call count of the new test name in tests/fm-copy-sweep.test.sh
+1
+## coverage guard
+FM_TEST_COVERAGE ok total=396 parallel=31 parallel_max_ms=3088788 parallel_imbalance_ms=26570 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030514 parallel_budget_ms=1200000 serial=347 serial_shards=25 serial_unhinted=15 serial_max_ms=1169223 serial_budget_ms=1200000 serial_indivisible_ms=1005601 herdr=18

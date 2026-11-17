@@ -1,0 +1,4 @@
+not ok - route-linked-slot: the reason does not name the head branch (missing: 'checkout is on PR 7's head branch fm/pr-7-head')
+--- output ---
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep.kUWUjn/route-linked-slot/th/pool1/2/repo/.claude/worktrees/a-twin	its closeout driver would not release it (exit 1): the primary checkout of the slot was switched during the route of /Users/charlesabrooker/tmp/fm-copy-sweep.kUWUjn/route-linked-slot/th/pool1/2/repo/.claude/worktrees/a-twin: the clone's primary checkout is on the PR's head branch fm/pr-7-head at the read made just before the driver was entered; Vernant's closeout driver was not called
+rc=1
