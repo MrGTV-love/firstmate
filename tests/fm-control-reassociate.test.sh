@@ -71,9 +71,11 @@ make_fakebin() {  # <case-dir>
 #!/usr/bin/env bash
 primary=$(cat "$FM_FAKE_DIR/primary-pid")
 case "$*" in
-  "-o comm= -p $primary"|"-o args= -p $primary") printf 'omp\n'; exit 0 ;;
+  "-o comm= -p $primary"|"-o args= -p $primary") printf 'omp\n' ;;
+  "-o ppid= -p $primary") printf '1\n' ;;
+  '-o comm= -p '*|'-o args= -p '*) printf 'bash\n' ;;
+  '-o ppid= -p '*) printf '%s\n' "$primary" ;;
 esac
-exec /bin/ps "$@"
 SH
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -575,7 +577,7 @@ write_relaunch_journal() {  # <case-dir> <id> <phase> [task]
 }
 
 test_finished_relaunch_journal_does_not_block_reassociation() {
-  local id=reassoc-journal dir new new_real phase out rc=0
+  local id=reassoc-journal dir new new_real phase out archive rc=0
   dir=$(new_case journal "$id")
   new="$dir/new"
   add_copy "$dir" "$new" "fm/$id-v2"
@@ -597,7 +599,332 @@ test_finished_relaunch_journal_does_not_block_reassociation() {
   assert_equals "$new_real" "$(meta_field "$dir" "$id" worktree)" "worktree= did not follow the replacement copy"
   assert_equals "$dir/old" "$(meta_field "$dir" "$id" prior_worktree)" "the copy left behind was not recorded"
   cmp -s "$dir/journal.before" "$dir/home/state/$id.control-relaunch" || fail "reassociate changed the relaunch journal"
+  for archive in "$dir/home/state/$id.control-relaunch".archived-*; do
+    [ ! -e "$archive" ] && [ ! -L "$archive" ] || fail "a complete relaunch journal was archived"
+  done
   pass "a finished relaunch journal does not block reassociation, and an unfinished one refuses without changes"
+}
+
+# Journal cases observe only a fake endpoint, never a host process or agent.
+make_journal_endpoint() {  # <case-dir> <id> [missing|alive|unreadable]
+  cat > "$1/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  'list-windows '*)
+    case '${3:-missing}' in
+      alive) printf 'fm-%s\n' '$2' ;;
+      unreadable) exit 1 ;;
+    esac ;;
+  *'#{pane_current_command}') printf 'claude\n' ;;
+  *'#{pane_tty}') : ;;
+  *) printf '%s\n' "\$*" >> '$1/fake/endpoint-calls'; exit 1 ;;
+esac
+SH
+  chmod +x "$1/fakebin/tmux"
+}
+
+assert_journal_archive() {  # <case-dir> <id>
+  local archive count=0 before after counter
+  for archive in "$1/home/state/$2.control-relaunch".archived-*; do
+    [ -f "$archive" ] || continue
+    count=$((count + 1))
+    case "${archive##*.archived-}" in
+      ????-??-??T??????Z.*)
+        counter=${archive##*.}
+        case "$counter" in
+          ''|*[!0-9]*) fail "journal archive has no numeric counter: $archive" ;;
+        esac ;;
+      *) fail "journal archive is not UTC dated: $archive" ;;
+    esac
+    before=$(shasum -a 256 < "$1/journal.before")
+    after=$(shasum -a 256 < "$archive")
+    assert_equals "$before" "$after" "archive did not preserve the journal bytes"
+    printf 'journal-sha256=%s archive-sha256=%s archive=%s\n' "$before" "$after" "${archive##*/}"
+  done
+  assert_equals 1 "$count" "the rolled-back journal needs one dated archive"
+}
+
+test_restored_relaunch_journal_is_archived() {
+  local rollback id dir new out rc
+  for rollback in ${FM_TEST_ROLLBACK:-prior-record-kept prior-record-kept-agent-dead instructions-restored instructions-restored-agent-alive instructions-restored-agent-state-ambiguous instructions-restored-agent-state-unreadable instructions-restored-agent-state-unverified instructions-restored-agent-state-missing instructions-restored-agent-state-unknown}; do
+    id=reassoc-restored
+    dir=$(new_case "restored-$rollback" "$id")
+    new="$dir/new"
+    add_copy "$dir" "$new" "fm/$id-v2"
+    make_journal_endpoint "$dir" "$id"
+    write_relaunch_journal "$dir" "$id" failed:launching
+    printf 'rollback=%s\n' "$rollback" >> "$dir/home/state/$id.control-relaunch"
+    cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
+    rc=0
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note restored) || rc=$?
+    expect_code 0 "$rc" "$rollback must permit reassociation after the agent is gone"$'\n'"$out"
+    assert_equals "$new" "$(meta_field "$dir" "$id" worktree)" "restored journal did not permit publication"
+    assert_journal_archive "$dir" "$id"
+    [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "closed journal still occupies the active path"
+    out=$(run_control "$dir" "$id" reassociate --worktree "$dir/old" --note back) \
+      || fail "the archived journal blocked a later reassociation: $out"
+    assert_journal_archive "$dir" "$id"
+    pass "restored journal $rollback is archived byte-exact and does not block another reassociation"
+  done
+}
+
+test_restored_journal_with_live_worker_reassociates_as_without_journal() {
+  local rollback id dir new out rc
+  for rollback in ${FM_TEST_LIVE_ROLLBACK:-no-journal prior-record-kept prior-record-kept-agent-dead instructions-restored}; do
+    id=reassoc-live-restored
+    dir=$(new_case "live-restored-$rollback" "$id")
+    new="$dir/new"
+    add_copy "$dir" "$new" "fm/$id-v2"
+    make_journal_endpoint "$dir" "$id" alive
+    if [ "$rollback" != no-journal ]; then
+      write_relaunch_journal "$dir" "$id" failed:checkpoint
+      printf 'rollback=%s\n' "$rollback" >> "$dir/home/state/$id.control-relaunch"
+      cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
+    fi
+    rc=0
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note live) || rc=$?
+    expect_code 0 "$rc" "$rollback with a live worker must reassociate as a task with no journal does"$'\n'"$out"
+    assert_equals "$new" "$(meta_field "$dir" "$id" worktree)" "$rollback with a live worker did not publish the replacement"
+    if [ "$rollback" != no-journal ]; then
+      assert_journal_archive "$dir" "$id"
+      [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "$rollback journal still occupies the active path"
+    fi
+    pass "$rollback with a live worker reassociates without a liveness gate"
+  done
+}
+
+test_unproven_relaunch_journal_refuses_unchanged() {
+  local scenario id dir new journal out rc fragment
+  for scenario in ${FM_TEST_JOURNAL_SCENARIO:-none-new-agent-confirmed none-new-record-kept missing unreadable symlink foreign complete-foreign unknown-rollback malformed-prior malformed-instructions empty-state invalid-state invalid-state-tail directory empty-task launching stopping live-agent live-state-agent unreadable-agent unreadable-state-agent backlog-close}; do
+    id=reassoc-unproven
+    dir=$(new_case "journal-negative-$scenario" "$id")
+    new="$dir/new"
+    add_copy "$dir" "$new" "fm/$id-v2"
+    make_journal_endpoint "$dir" "$id"
+    journal="$dir/home/state/$id.control-relaunch"
+    write_relaunch_journal "$dir" "$id" failed:launching
+    fragment='unfinished relaunch transaction'
+    case "$scenario" in
+      none-new-*) printf 'rollback=%s\n' "$scenario" >> "$journal" ;;
+      missing) : ;;
+      foreign) write_relaunch_journal "$dir" "$id" failed:launching someone-else; printf 'rollback=prior-record-kept\n' >> "$journal" ;;
+      complete-foreign) write_relaunch_journal "$dir" "$id" complete someone-else ;;
+      unknown-rollback) printf 'rollback=not-restored\n' >> "$journal" ;;
+      malformed-prior) printf 'rollback=prior-record-keptX\n' >> "$journal" ;;
+      malformed-instructions) printf 'rollback=instructions-restored-garbage\n' >> "$journal" ;;
+      directory) mv "$journal" "$dir/journal.input"; mkdir "$journal"; printf 'not a journal\n' > "$journal/entry" ;;
+      empty-task) printf 'v1\ntask=\nphase=failed:launching\nrollback=prior-record-kept\n' > "$journal" ;;
+      live-agent|unreadable-agent|live-state-agent|unreadable-state-agent)
+        case "$scenario" in
+          *-state-agent) printf 'rollback=instructions-restored-agent-state-unknown\n' >> "$journal" ;;
+          *) printf 'rollback=instructions-restored-agent-alive\n' >> "$journal" ;;
+        esac
+        case "$scenario" in
+          live-*) make_journal_endpoint "$dir" "$id" alive ;;
+          *) make_journal_endpoint "$dir" "$id" unreadable ;;
+        esac
+        fragment='agent is not proven stopped' ;;
+      empty-state) printf 'rollback=instructions-restored-agent-state-\n' >> "$journal" ;;
+      invalid-state) printf 'rollback=instructions-restored-agent-state-!\n' >> "$journal" ;;
+      invalid-state-tail) printf 'rollback=instructions-restored-agent-state-unknown!\n' >> "$journal" ;;
+      launching|stopping) write_relaunch_journal "$dir" "$id" "$scenario"; printf 'rollback=prior-record-kept\n' >> "$journal" ;;
+      *)
+        printf 'rollback=prior-record-kept\n' >> "$journal"
+        case "$scenario" in
+          unreadable) : ;;
+          symlink) mv "$journal" "$dir/journal.target"; ln -s "$dir/journal.target" "$journal" ;;
+          backlog-close) printf 'pending\n' > "$dir/home/state/$id.backlog-close"; fragment='pending authoritative backlog close' ;;
+        esac ;;
+    esac
+    snapshot_case "$dir"
+    [ "$scenario" != unreadable ] || chmod 000 "$journal"
+    rc=0
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note refused) || rc=$?
+    expect_code 1 "$rc" "$scenario must refuse"$'\n'"$out"
+    assert_contains "$out" "$fragment" "$scenario refused for the wrong reason"
+    if [ "$scenario" = unreadable ]; then
+      chmod 644 "$journal"
+    fi
+    assert_case_unchanged "$dir" "$scenario refusal"
+    if [ "$scenario" = symlink ]; then
+      assert_equals "$dir/journal.target" "$(readlink "$journal")" "refusal changed the journal symlink"
+    fi
+    pass "unproven journal $scenario refuses without changing or archiving state"
+  done
+}
+
+test_journal_archive_precedes_writes_and_survives_failure() {
+  local id=reassoc-archive-failure dir new out rc real_mv
+  dir=$(new_case archive-failure "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  make_journal_endpoint "$dir" "$id"
+  write_relaunch_journal "$dir" "$id" failed:launching
+  printf 'rollback=prior-record-kept\n' >> "$dir/home/state/$id.control-relaunch"
+  cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
+  snapshot_case "$dir"
+  real_mv=$(command -v mv)
+  cat > "$dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  case "\$arg" in
+    */.$id.meta.reassociate.*)
+      for archive in '$dir/home/state/$id.control-relaunch'.archived-*; do
+        [ -f "\$archive" ] || continue
+        cmp -s '$dir/journal.before' "\$archive" || exit 2
+        cmp -s '$dir/journal.before' '$dir/home/state/$id.control-relaunch' || exit 2
+        printf 'archived-before-publication\n' > '$dir/order-proof'
+      done
+      exit 1 ;;
+  esac
+done
+exec '$real_mv' "\$@"
+SH
+  chmod +x "$dir/fakebin/mv"
+  rc=0
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) || rc=$?
+  expect_code 1 "$rc" "failed metadata publication must refuse"$'\n'"$out"
+  [ -f "$dir/order-proof" ] || fail "journal was not archived before metadata publication"
+  assert_journal_archive "$dir" "$id"
+  cmp -s "$dir/journal.before" "$dir/home/state/$id.control-relaunch" || fail "failed reassociation lost its active journal"
+  cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" || fail "failure changed the task record"
+  cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" || fail "failure changed the instructions"
+  # Stop injecting the write failure; the same active journal remains recoverable.
+  rm "$dir/fakebin/mv"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note retry) \
+    || fail "retry after the failed reassociation was blocked: $out"
+  [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "retry did not close the active journal"
+  pass "journal is archived before publication, retained on failure, and a retry succeeds"
+}
+
+test_journal_archive_failure_boundaries() {
+  local boundary id dir new out rc real_git real_mv
+  real_git=$(command -v git)
+  real_mv=$(command -v mv)
+  for boundary in ${FM_TEST_ARCHIVE_BOUNDARY:-anchor finalize}; do
+    id=reassoc-archive-boundary
+    dir=$(new_case "archive-boundary-$boundary" "$id")
+    new="$dir/new"
+    add_copy "$dir" "$new" "fm/$id-v2"
+    make_journal_endpoint "$dir" "$id"
+    write_relaunch_journal "$dir" "$id" failed:launching
+    printf 'rollback=prior-record-kept\n' >> "$dir/home/state/$id.control-relaunch"
+    cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
+    snapshot_case "$dir"
+    if [ "$boundary" = anchor ]; then
+      cat > "$dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+if [ "\${3:-}" = update-ref ]; then
+  for archive in '$dir/home/state/$id.control-relaunch'.archived-*; do
+    [ -f "\$archive" ] || continue
+    cmp -s '$dir/journal.before' "\$archive" || exit 2
+    printf 'archive-before-first-write\n' > '$dir/order-proof'
+  done
+  exit 1
+fi
+exec '$real_git' "\$@"
+SH
+      chmod +x "$dir/fakebin/git"
+    else
+      cat > "$dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  case "\$arg" in
+    '$dir/home/state/$id.control-relaunch') printf 'finalize-attempted\n' > '$dir/order-proof'; exit 1 ;;
+  esac
+done
+exec '$real_mv' "\$@"
+SH
+      chmod +x "$dir/fakebin/mv"
+    fi
+    rc=0
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) || rc=$?
+    expect_code 1 "$rc" "$boundary failure must refuse"$'\n'"$out"
+    [ -f "$dir/order-proof" ] || fail "$boundary failure did not reach the intended boundary: $out"
+    assert_journal_archive "$dir" "$id"
+    cmp -s "$dir/journal.before" "$dir/home/state/$id.control-relaunch" || fail "$boundary failure lost the active journal"
+    cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" || fail "$boundary failure changed metadata"
+    cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" || fail "$boundary failure changed instructions"
+    rm -f "$dir/fakebin/git" "$dir/fakebin/mv"
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note retry) \
+      || fail "$boundary failure blocked retry: $out"
+    pass "$boundary failure retains the archived and active journal and a retry succeeds"
+  done
+}
+
+test_joint_journal_finalization_failure_restores_active_paths() {
+  local ida=journal-joint-a idb=journal-joint-b id dir slot na nb out rc real_mv archive count
+  dir=$(new_joint_case journal-joint "$ida" "$idb")
+  slot=$(joint_slot "$dir")
+  na="$slot/.claude/worktrees/$ida"
+  nb="$slot/.claude/worktrees/$idb"
+  make_journal_endpoint "$dir" "$ida"
+  for id in "$ida" "$idb"; do
+    write_relaunch_journal "$dir" "$id" failed:launching
+    printf 'rollback=prior-record-kept\n' >> "$dir/home/state/$id.control-relaunch"
+  done
+  snapshot_case "$dir"
+  real_mv=$(command -v mv)
+  cat > "$dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  case "\$arg" in
+    '$dir/home/state/$idb.control-relaunch') printf 'second-journal-finalize\n' > '$dir/order-proof'; exit 1 ;;
+  esac
+done
+exec '$real_mv' "\$@"
+SH
+  chmod +x "$dir/fakebin/mv"
+  rc=0
+  out=$(run_control "$dir" "$ida" reassociate --worktree "$na" --also "$idb=$nb" --note moved) || rc=$?
+  expect_code 1 "$rc" "second journal finalization failure must refuse"$'\n'"$out"
+  [ -f "$dir/order-proof" ] || fail "joint finalization did not reach its injected failure: $out"
+  for id in "$ida" "$idb"; do
+    cmp -s "$dir/before/state/$id.control-relaunch" "$dir/home/state/$id.control-relaunch" || fail "$id lost its original journal on joint failure"
+    cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" || fail "$id metadata did not roll back"
+    cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" || fail "$id instructions did not roll back"
+    count=0
+    for archive in "$dir/home/state/$id.control-relaunch".archived-*; do
+      [ -f "$archive" ] || continue
+      cmp -s "$dir/before/state/$id.control-relaunch" "$archive" || fail "$id archived journal changed"
+      count=$((count + 1))
+    done
+    assert_equals 1 "$count" "$id archive was lost"
+  done
+  rm "$dir/fakebin/mv"
+  out=$(run_control "$dir" "$ida" reassociate --worktree "$na" --also "$idb=$nb" --note retry) \
+    || fail "joint finalization failure blocked retry: $out"
+  pass "a second journal finalization failure restores both active journals, records and instructions; retry succeeds"
+}
+
+test_journal_archive_collision_preserves_earlier_archive() {
+  local id=reassoc-archive-collision dir new out real_date prior
+  dir=$(new_case archive-collision "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  make_journal_endpoint "$dir" "$id"
+  write_relaunch_journal "$dir" "$id" failed:launching
+  printf 'rollback=prior-record-kept\n' >> "$dir/home/state/$id.control-relaunch"
+  cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
+  prior="$dir/home/state/$id.control-relaunch.archived-2026-11-16T120000Z.0"
+  printf 'older transaction\n' > "$prior"
+  real_date=$(command -v date)
+  cat > "$dir/fakebin/date" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  '-u +%Y-%m-%dT%H%M%SZ') printf '2026-11-16T120000Z\n' ;;
+  *) exec '$real_date' "\$@" ;;
+esac
+SH
+  chmod +x "$dir/fakebin/date"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) \
+    || fail "archive collision should not block safe reassociation: $out"
+  assert_equals 'older transaction' "$(cat "$prior")" "an earlier dated archive was overwritten"
+  [ -f "${prior%.0}.1" ] || fail "the colliding archive candidate did not advance to counter 1"
+  # Exclude the independently checked older record from the current-byte check.
+  mv "$prior" "$dir/earlier-archive"
+  assert_journal_archive "$dir" "$id"
+  pass "a dated archive collision preserves the earlier journal"
 }
 
 test_failed_publication_keeps_brief_recovery_until_restored() {
@@ -2609,9 +2936,19 @@ test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_r
   pass "a rerun finishes a teardown whose copy is already removed, refuses an unlanded one, and a slot reassigned to a stranger keeps its copies"
 }
 
+fm_test_only
+
 test_probe_only_log_assertion_fails_closed
 test_shared_root_without_pr_proves_its_own_branch
 test_non_github_pr_reassociation_refuses
+
+test_restored_relaunch_journal_is_archived
+test_restored_journal_with_live_worker_reassociates_as_without_journal
+test_unproven_relaunch_journal_refuses_unchanged
+test_journal_archive_precedes_writes_and_survives_failure
+test_journal_archive_failure_boundaries
+test_joint_journal_finalization_failure_restores_active_paths
+test_journal_archive_collision_preserves_earlier_archive
 test_recovered_shared_slot_has_no_nonforcing_lease_remedy
 test_unleased_shared_slot_gates_only_the_claimant
 test_unleased_shared_slot_names_the_remaining_lease_holder
