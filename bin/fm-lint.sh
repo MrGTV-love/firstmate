@@ -295,7 +295,9 @@
 # it is ended and takes the memory retry described below, and the roots log's
 # last end-record column counts the libproc reader's samples and names any
 # attempt that gave up its reader, with the reason; the reader is the only source
-# of a sample, and a tick it cannot answer is a miss. The root is never signalled
+# of a sample, and a tick it cannot answer is a miss. A late or unconfirmed reply
+# is read once more in the same tick (at most 1 s more) before it is a miss; no
+# other source and no older sample is used. The root is never signalled
 # by its pid or by a group taken from input: the watch records its root's exact
 # start time before the root executes and signals only that root's group, after
 # proving the group's leader unchanged (to end it, or to stop and resume it while

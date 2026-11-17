@@ -1193,9 +1193,12 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # size and its physical footprint, read by a long-lived libproc reader
 # (fm-proc-info.py rss-tree) started at the first tick, under the interpreter
 # fm-lint.sh resolved once (FM_LINT_INTERNAL_PYTHON, else python3). A reader's first
-# reply may take 2 s; each later reply has 0.5 s.
-# The reader is the only source of a sample. A tick whose reply is late,
-# malformed or cannot be bound to the processes it measured is a miss, never a
+# reply may take 2 s; each later reply has 0.5 s. A reply that is late, or that
+# cannot be bound to the processes it measured, is read once more in the same tick:
+# a late reply is given 1 s more, an unbound one a new request with 1 s; no tick
+# has more than that one retry, and no older sample is reused.
+# The reader is the only source of a sample. A tick whose reply (after that retry)
+# is late, malformed or cannot be bound to the processes it measured is a miss, never a
 # zero and never a guess from another table: the reply is discarded and a new
 # reader starts for the next tick. A replacement that cannot start, or fails before
 # it replies, is one failed restart; the reader is given up for the rest of the
@@ -1429,39 +1432,46 @@ PYTHON
     };
     # KiB of the root's tree as the reader measured it (the larger of footprint and
     # resident size), plus each member the watch knows by exact identity that left
-    # the tree, or undef (a miss) when the reader cannot give a bound reply.
-    my $tree_rss = sub {
-        my ($root_pid) = @_;
+    # the tree, or undef (a miss) when the reader cannot give a bound reply. A late
+    # or unconfirmed reply is read once more in the same tick (the retry), which
+    # waits at most 1 s: a late reply gets 1 s more, an unconfirmed one a new
+    # request with 1 s; a retry that also misses is the tick's miss.
+    my $tree_rss;
+    $tree_rss = sub {
+        my ($root_pid, $retry) = @_;
         $start_reader->($root_pid) unless $reader_pid || $reader_down;
         return undef unless $reader_pid;
         local $SIG{PIPE} = 'IGNORE';
         my ($answer, $ready) = ('', '');
         vec($ready, fileno($from_reader), 1) = 1;
         my $gone = !syswrite($to_reader, "\n");
-        my $wait = $reader_answered ? 0.5 : 2;
-        while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
-            $gone = !sysread($from_reader, $answer, 64, length $answer);
+        my $wait = $retry ? 1 : $reader_answered ? 0.5 : 2;
+        while (1) {
+            while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
+                $gone = !sysread($from_reader, $answer, 64, length $answer);
+            }
+            last if $gone || $answer =~ /\n/ || $retry++;
+            $wait = 1;
         }
         if ($answer =~ /\A\{"rss_kib":([0-9]+),[^\n]*\}\n\z/) {
             my $kib = $1 + 0;
             ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
             my $named = eval { require JSON::PP; JSON::PP::decode_json($answer)->{members} };
-            return undef unless ref $named eq 'ARRAY' && @$named
-                && !grep { ref $_ ne 'ARRAY' || @$_ < 3 || grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
-            my %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) } @$named;
-            return undef unless $verify_members->($root_pid, %reply);
+            my %reply;
+            %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) } @$named
+                if ref $named eq 'ARRAY' && @$named
+                    && !grep { ref $_ ne 'ARRAY' || @$_ < 3 || grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
             # A restarted reader knows only the root's group and its descendants: a
             # member the watch already knew that left the tree is read again by its
             # exact identity, with its descendants; one that still runs with that
             # identity is counted, any other answer is a miss.
-            my @missing = grep { !$reply{$_} } keys %known;
-            if (@missing) {
-                my $found = $exact_members->(map { "$_:$known{$_}[0]:$known{$_}[1]" } @missing) or return undef;
-                for my $pid (keys %$found) {
-                    next if $reply{$pid};
-                    $kib += $found->{$pid}[2];
-                    $reply{$pid} = [@{$found->{$pid}}[0, 1]];
-                }
+            my $found = %reply && $verify_members->($root_pid, %reply)
+                ? $exact_members->(map { "$_:$known{$_}[0]:$known{$_}[1]" } grep { !$reply{$_} } keys %known) : undef;
+            return $retry ? undef : $tree_rss->($root_pid, 1) unless $found;
+            for my $pid (keys %$found) {
+                next if $reply{$pid};
+                $kib += $found->{$pid}[2];
+                $reply{$pid} = [@{$found->{$pid}}[0, 1]];
             }
             %known = %reply;
             $libproc_samples++;
