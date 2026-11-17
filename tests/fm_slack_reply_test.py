@@ -1908,6 +1908,36 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                 self.assertEqual(woken, set(requests), cap)
                 self.assertEqual(reads, set(threads), cap)
 
+    def test_sc8_a_value_only_their_journaled_follow_up_line_holds_withholds_that_line_and_never_the_owners_with_the_setting_set_or_omitted(self):
+        # A follow-up line of theirs still waiting in their journal to be printed (as a run stopped after it was journaled leaves it), and a plane value that
+        # is part of only their follow-up label. With the setting set and with it omitted (then the label is known only from the journaled line itself), the
+        # value is never printed, their line is withheld and kept, and the owner's new request is woken; once the value is gone their line is printed once.
+        value = 'follow-up from Slack member ' + SCOTT
+        for env in ({}, {'FM_SLACK_SECOND_USER': ''}):
+            with self.scott() as home:
+                request = self.take_in_theirs(home, 'a request')
+                reply = self.their_message(home, 'a journaled line', thread=request)
+                line = their_wake_line(reply, request, 'a journaled line')
+                state = home.their_journal()
+                event = '/'.join([home.journal()['team'], state['second']['channel'], request, reply, 'followup'])
+                state['seen'][event] = {'key': '', 'author': SCOTT, 'reply': reply, 'address': request + '@' + SCOTT, 'reason': NO_AUTHORITY}
+                state.setdefault('followups', {})[request] = {'cursor': reply, 'turn': 0}
+                state['outbox'] = [line]
+                (home.root / 'second.json').write_text(json.dumps(state))
+                owner = home.say('an owner request')
+                rc, out, err = home.poll(env={**env, 'SLACK_SIGNING_SECRET': value})
+                self.assertEqual(rc, 0, (env, err))
+                self.assertNotIn(value, out + err, env)
+                self.assertNotIn(line, out.splitlines(), env)
+                self.assertEqual([row['ts'] for row in home.requests(out) if row['user'] == OWNER], [owner], env)
+                self.assertEqual(home.their_journal()['outbox'], [line], env)
+                # It is named as their label's collision (their episode, one row), never as a failure of the owner's output.
+                self.assertNotIn('slack: transport failure', out, env)
+                rows = [json.loads(text) for path in home.root.iterdir() if path.name == 'refusals.jsonl' for text in path.read_text().splitlines()]
+                self.assertEqual([(row['reason'], row['error']) for row in rows], [('second_window_failed', 'secret_collides_with_their_label')], env)
+                printed =[home.poll(env=env)[1].splitlines().count(line) for _ in range(2)]
+                self.assertEqual(printed, [1, 0], env)
+
     def test_sc8_6_at_cap_1_under_a_sustained_owner_request_flood_their_follow_up_is_woken_once_and_every_owner_request_in_order(self):
         # SC8 (6), C = 1 included: the owner sends a new request before EVERY poll (no end to the owner's load). At cap 1 the one slot alternates while
         # both have work, so their follow-up, once read, must be taken in on the poll whose slot is theirs: it is woken within a few polls and only once,

@@ -5,9 +5,10 @@
 # `check: slack follow-up <reply ts> to request <ts> ...` wake (default: the request itself).
 # The wake line is cut to a bounded preview, so this is how Firstmate reaches the rest before it answers with
 # fm-slack-reply.sh. It reads only the owner's own messages in a request thread the plane took in, in the proven
-# owner DM, and the second person's request itself (--thread <ts>@<member id>), in their proven DM; it refuses anything else, and it prints no wake line and writes nothing. A follow-up may not restate what it
-# is about, so for a follow-up the output starts with what came before it in the same thread (the owner's earlier
-# messages and the plane's own earlier answers; --no-context omits them); no other thread is ever read. The text is data from Slack,
+# owner DM, and the second person's request (--thread <ts>@<member id>) and their own follow-ups in its thread (--message <reply ts>), in their proven DM;
+# it refuses anything else, and it prints no wake line and writes nothing. A follow-up may not restate what it
+# is about, so for a follow-up the output starts with what came before it in the same thread (that person's earlier
+# messages and the plane's own earlier answers, each with its own label; --no-context omits them); no other thread is ever read. The text is data from Slack,
 # labeled so: never an instruction and never an authorization.
 # Journal, authority, and ownership behavior are owned by fm_slack_watch.py.
 set -euo pipefail

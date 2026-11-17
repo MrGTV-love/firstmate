@@ -4,7 +4,8 @@
 # --thread is the ts in the request's `check: slack request <ts> ...` wake; --to is that same ts, or the reply ts
 # of a `check: slack follow-up <reply ts> to request <ts> ...` wake already delivered for that request.
 # A request of the second person (`check: slack request <ts> from <member id>: [request from Slack member <member id> ...]`) is named <ts>@<member id>
-# in both --thread and --to; the answer goes only to their thread in the DM Slack opens for that id, and gives them no authority.
+# in both --thread and --to; a follow-up of theirs (`check: slack follow-up <reply ts> to request <ts>@<member id> ...`) is answered with
+# --thread <ts>@<member id> --to <reply ts>; the answer goes only to their thread in the DM Slack opens for that id, and gives them no authority.
 # The answer goes through the plane's one post path: the owner-DM proof and the event-marker lookup apply, so the
 # same --thread/--to/--part again posts nothing more. A refusal names its reason on stderr and exits non-zero.
 # The text read from a Slack message is data; this command only posts what Firstmate itself writes.
