@@ -867,7 +867,7 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
 # (its run is alive), whose pid is an ancestor of this process and runs this lint.
 # Anything else exits 2 and starts nothing.
 fm_lint_load_run_entry() {  # <mode>
-  local mode=$1 entry=${FM_LINT_INTERNAL_RUN_ENTRY:-} name owner perl python bounded memory rss rest
+  local mode=$1 entry=${FM_LINT_INTERNAL_RUN_ENTRY:-} name owner perl python bounded memory_kib rss rest
   name=${entry##*/}
   case "$entry" in
     "$HOST_LEDGER_DIR/$name") ;;
@@ -878,7 +878,7 @@ fm_lint_load_run_entry() {  # <mode>
     *) entry= ;;
   esac
   if [ -z "$entry" ] || [ -L "$entry" ] || [ ! -f "$entry" ] \
-    || ! IFS=$'\t' read -r owner perl python bounded memory rss rest < "$entry"; then
+    || ! IFS=$'\t' read -r owner perl python bounded memory_kib rss rest < "$entry"; then
     printf 'fm-lint.sh: %s starts a command only for a lint run whose entry is in the host ledger %s.\n' "$mode" "$HOST_LEDGER_DIR" >&2
     exit 2
   fi
@@ -886,7 +886,7 @@ fm_lint_load_run_entry() {  # <mode>
   case "$perl" in /*) [ -x "$perl" ] || owner= ;; *) owner= ;; esac
   case "$python" in /*|python3) ;; *) owner= ;; esac
   case "$bounded" in none|perl) ;; *) owner= ;; esac
-  case "$memory" in ''|0*|*[!0-9]*) owner= ;; esac
+  case "$memory_kib" in ''|0*|*[!0-9]*) owner= ;; esac
   case "$rss" in ''|0*|*[!0-9]*) owner= ;; esac
   if [ -z "$owner" ] || [ -n "$rest" ] || [ "${#rss}" -gt 7 ] || [ "$rss" -gt 8388608 ] \
     || ! "$perl" "$SELF_DIR/fm-lint-cache.pl" admitted-run "$HOST_LEDGER_DIR" "$entry"; then
@@ -896,7 +896,7 @@ fm_lint_load_run_entry() {  # <mode>
   FM_LINT_PERL_BIN=$perl
   FM_LINT_INTERNAL_PYTHON=$python
   FM_LINT_INTERNAL_BOUNDED=$bounded
-  FM_LINT_INTERNAL_MEMORY_KIB=$memory
+  FM_LINT_INTERNAL_MEMORY_KIB=$memory_kib
   FM_LINT_INTERNAL_RSS_KIB=$rss
   export FM_LINT_PERL_BIN FM_LINT_INTERNAL_PYTHON FM_LINT_INTERNAL_BOUNDED FM_LINT_INTERNAL_MEMORY_KIB FM_LINT_INTERNAL_RSS_KIB
 }
