@@ -161,7 +161,7 @@ file="$dir/pr-\$3"
 [ -f "\$file" ] || { echo "no such pull request" >&2; exit 1; }
 case "\$(head -n 1 "\$file")" in
   FAIL) echo "forge unavailable" >&2; exit 1 ;;
-  HANG) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; exec sleep 30 ;;
+  HANG) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; exec sleep "\${ROUTE_HANG_LIFE:-30}" ;;
   HANGCHILD) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; sleep 60 & printf '%s\\n' "\$!" >> "$dir/gh.pids"; wait ;;
   GARBAGE) echo "not a state row"; exit 0 ;;
   EARLYEXIT) sleep "\${ROUTE_EARLYEXIT_LIFE:-20}" & printf '%s\\n' "\$!" >> "$dir/gh.pids"; date +%s >> "$dir/gh.times"; tail -n +2 "\$file"; exit 0 ;;

@@ -595,7 +595,8 @@ if [ "\${3:-}" != --execute-cleanup ]; then
     exit 0
   fi
   if [ -e "$log/plan-hang" ]; then
-    sleep 30 &
+    life=\$(cat "$log/plan-hang" 2>/dev/null)
+    sleep "\${life:-30}" &
     printf '%s\n' "\$!" >> "$log/driver.pids"
     wait
     exit 0
@@ -3670,7 +3671,7 @@ test_a_linked_worktree_slot_on_the_prs_head_branch_is_a_plain_hold_and_the_run_g
   route_assert_kept a-twin route-linked-slot
   assert_equals "" "$(route_calls_for a-twin)" "route-linked-slot: the copy reached the driver"
   line=$(route_line_of a-twin)
-  assert_contains "$line" "checkout is on PR 7's head branch $head" "route-linked-slot: the reason does not name the head branch"
+  assert_contains "$line" "own checkout (a linked worktree's HEAD) is on PR 7's head branch $head" "route-linked-slot: the reason does not name the head branch"
   assert_not_contains "$line" "was switched" "route-linked-slot: a slot that stayed on the head branch was reported as a switch"
   assert_not_contains "$OUT" "was switched" "route-linked-slot: a switch was reported" && assert_not_contains "$OUT" "SKIPPED" "route-linked-slot: the run stopped and skipped a pending copy"
   route_assert_released b-later route-linked-slot
@@ -6168,7 +6169,7 @@ test_the_real_60_second_forge_default_keeps_a_copy_whose_read_hangs_and_a_timely
   route_copy hang 8
   unset FM_TEARDOWN_FORGE_TIMEOUT
   t0=$(date +%s)
-  route_closeout plan hang
+  ROUTE_HANG_LIFE=130 route_closeout plan hang
   t1=$(date +%s)
   [ "$CO_RC" != 0 ] || fail "a forge read that hangs was treated as merged: $CO_OUT"
   assert_contains "$CO_OUT" "timed out after 60s" "the hung read did not end at the 60 s default: $CO_OUT"
@@ -6191,7 +6192,7 @@ test_the_real_120_second_plan_default_holds_a_hung_plan_at_its_boundary_on_githu
   route_ci_only_gate "R3(d) the real 120 s plan default" || return 0
   make_locked_copy_case plan120 dead
   install_driver "$SLOT" "$W"
-  : > "$W/plan-hang"
+  printf '200\n' > "$W/plan-hang"
   (
     unset FM_COPY_SWEEP_PLAN_TIMEOUT
     rc=0
