@@ -1873,7 +1873,7 @@ apply_removals() {
       REMOVAL_REPORT="${REMOVAL_REPORT}SKIPPED"$'\t'"$copy"$'\t'"not released: this run stopped after $stop_why"$'\n'
       continue
     fi
-    TEARDOWN_CKO_OPEN=0
+    teardown_route_checkout_close
     scan_processes
     classify "$copy" "$clone" "$pool" "$container"
     case "$CLASS" in

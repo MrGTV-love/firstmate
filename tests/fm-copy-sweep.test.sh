@@ -127,6 +127,9 @@ case " $* " in
   *" rev-parse HEAD "*)
     [ -z "${FAKE_GIT_HEAD_HOOK:-}" ] || bash "$FAKE_GIT_HEAD_HOOK" "$@"
     ;;
+  *" remote get-url origin "*)
+    [ -z "${FAKE_GIT_ORIGIN_URL_HOOK:-}" ] || bash "$FAKE_GIT_ORIGIN_URL_HOOK" "$@"
+    ;;
   *" rev-parse --absolute-git-dir "*)
     [ -z "${FAKE_GIT_SLEEP_ABSDIR:-}" ] || sleep "$FAKE_GIT_SLEEP_ABSDIR"
     ;;
@@ -5824,6 +5827,59 @@ $ROUTE_KILLED_SCRIPT" 2>&1)
   pass "the loader opens the window of a plan killed while proving, and the post-timeout check accepts a quiet checkout and stops on a switch and restore even though the PR's head branch is not known yet"
 }
 
+# F1: a plan killed after its first publish and before its window opened leaves the parent
+# no window for that copy. The sweep plans copies in reverse path order. Copy A in slot 2 (its
+# own clone, on its own branch) is planned through the route and refused, so the parent
+# loaded A's window and ran no execute that would close it. Copy B in slot 1 then hangs in the
+# route's lock step (its read of the slot's origin), which comes after the first publish and
+# before the window opens, and is killed at the plan bound. The parent must not read slot 1
+# against A's window of slot 2: no switch, no stopped run, and a later copy is released.
+test_a_plan_killed_before_its_window_opened_is_not_read_against_the_previous_copys_window() {
+  local project slot2 line
+  route_world route-killed-before-window
+  project=$SLOT
+  slot2="$TH/pool1/2/repo"
+  mkdir -p "$TH/pool1/2"
+  git clone -q "$W/origin.git" "$slot2"
+  git -C "$slot2" config "url.file://$(cd "$W/origin.git" && pwd).insteadOf" "$ROUTE_REMOTE_URL"
+  git -C "$slot2" remote set-url origin "$ROUTE_REMOTE_URL"
+  git -C "$slot2" fetch -q origin
+  git -C "$slot2" checkout -q -b fm/slot-2 "$ROUTE_MERGE"
+  printf '{"worktrees":[{"name":"1","path":"%s"},{"name":"2","path":"%s"}]}\n' "$project" "$slot2" > "$TH/pool1/treehouse-state.json"
+  install_driver "$slot2" "$W"
+  route_install_row_driver "$slot2" "$W"
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_set_pr "$W/forge" 8 MERGED "$ROUTE_MERGE"
+  route_copy z-killed 8
+  route_copy c-later 8
+  SLOT=$slot2
+  route_copy a-refused 7 refuse
+  SLOT=$project
+  cat > "$W/origin-url-hook" <<EOF
+[ "\$2" = "$project" ] || exit 0
+[ ! -e "$W/origin-url-hung" ] || exit 0
+: > "$W/origin-url-hung"
+sleep 30
+EOF
+  FAKE_GIT_ORIGIN_URL_HOOK=$W/origin-url-hook FM_COPY_SWEEP_PLAN_TIMEOUT=5 FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  [ "$RC" = 0 ] || fail "killed before window: the run failed ($RC): $OUT"
+  [ -e "$W/origin-url-hung" ] || fail "killed before window: copy B's plan never reached the route's lock step: $OUT"
+  SLOT=$slot2
+  route_assert_kept a-refused "killed before window"
+  assert_contains "$(route_line_of a-refused)" "verification_stale_or_uncovered_paths" "killed before window: copy A was not held by its refused plan"
+  SLOT=$project
+  route_assert_kept z-killed "killed before window"
+  assert_equals "" "$(route_calls_for z-killed)" "killed before window: copy B reached the driver"
+  line=$(route_line_of z-killed)
+  assert_contains "$line" "did not answer within 5s" "killed before window: copy B's plan was not killed at the plan bound"
+  assert_not_contains "$line" "was switched" "killed before window: copy B was read against copy A's window"
+  assert_not_contains "$OUT" "was switched" "killed before window: a switch was reported"
+  assert_not_contains "$OUT" "SKIPPED" "killed before window: the run stopped and skipped a pending copy"
+  route_assert_released c-later "killed before window"
+  route_assert_calls c-later 8 "killed before window"
+  pass "a plan killed after its first publish and before its window opened is not read against the previous copy's window: no switch is reported, the run goes on and a later eligible copy is released"
+}
+
 # F4 (Main 1887): a claimed outer hold at another path refuses. There is no fall-through to
 # the computed lock, which stays free.
 read -r -d '' ROUTE_CLAIM_SCRIPT <<'EOS' || true
@@ -6375,6 +6431,7 @@ test_the_r5_table_fails_when_the_staged_cases_variable_names_a_directory_or_tabl
 test_the_content_proof_refuses_git_output_it_cannot_parse_and_accepts_a_genuine_empty_change
 test_the_route_publishes_its_checkout_window_while_proving_and_reports_a_switch_when_a_proof_refuses
 test_a_plan_killed_while_proving_is_read_for_a_checkout_change_by_the_parent
+test_a_plan_killed_before_its_window_opened_is_not_read_against_the_previous_copys_window
 test_a_claimed_outer_hold_at_another_path_refuses_and_never_falls_through_to_the_computed_lock
 test_the_parent_releases_a_killed_plans_lock_only_when_its_owner_is_gone_and_the_record_names_it
 test_the_route_keys_its_lock_by_the_slots_registered_project_and_refuses_a_slot_whose_origin_differs

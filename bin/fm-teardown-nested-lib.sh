@@ -179,8 +179,8 @@
 # for the lock library's dead-owner recovery, and the parent has no path to record it; (b)
 # a plan killed before it published its first file, or before its window opened, leaves
 # the parent with no window for that copy, so the parent makes no read after the kill:
-# the sweep clears the window before each copy (TEARDOWN_CKO_OPEN=0 in bin/fm-copy-sweep.sh)
-# and loads the plan's file only when it exists, and teardown_closeout_route_file_load
+# the sweep clears the whole window, every field, before each copy (teardown_route_checkout_close
+# in bin/fm-copy-sweep.sh) and loads the plan's file only when it exists, and teardown_closeout_route_file_load
 # closes the window for an empty copy or a route that is neither pr nor proving, so the
 # parent never holds the previous copy's window; and no driver was called, because the
 # route enters the driver only after its window opened and was published.
@@ -1969,8 +1969,8 @@ teardown_route_checkout_open() {  # <slot> <copy>
   TEARDOWN_CKO_ANCHOR=$TEARDOWN_CKO_NOW_ANCHOR
 }
 teardown_route_checkout_close() {
-  TEARDOWN_CKO_OPEN=0
-  TEARDOWN_CKO_COPY=
+  TEARDOWN_CKO_OPEN=0 TEARDOWN_CKO_COPY=
+  TEARDOWN_CKO_BRANCH= TEARDOWN_CKO_HEAD= TEARDOWN_CKO_POS= TEARDOWN_CKO_ANCHOR=
 }
 # 0 when the checkout is as the first read left it. Otherwise 1 with CKO_WHY naming
 # the switch. <prhead> is the PR's head branch (forge headRefName).
