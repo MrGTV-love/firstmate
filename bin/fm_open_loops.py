@@ -1054,12 +1054,12 @@ class Collector:
                 continue
             try:
                 out = self.bash('[ -r "$2" ] || exit 1; '
-                                '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
+                                '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2" "" --with-opening', BIN, status)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
                 continue
             for line in out.splitlines():
-                key, verb, opened, summary = (line.split("\t", 3) + ["", "", "", ""])[:4]
+                key, verb, opened, _opening, summary = (line.split("\t", 4) + [""] * 5)[:5]
                 self.add("unanswered_question", f"{status.stem}:{key}",
                          "answer or close this question, or record why it no longer applies",
                          int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}",
@@ -1360,9 +1360,13 @@ def overdue_rows(report, now):
 
 
 def row_digest(row):
-    # Preserve the original escalation/deferral receipt identity. A waiting receipt
-    # separately compares its full collected source and authoritative dependency.
+    # Preserve ordinary receipt identity, except that a status question belongs
+    # to its canonical opening, not just its display text or available clock.
+    # Waiting also verifies its full collected source and dependency live.
     fields = [row.get(f) for f in ("category", "subject", "owner", "next_action", "evidence")]
+    source = row.get("source")
+    if row.get("category") == "unanswered_question" and isinstance(source, dict) and source.get("kind") == "status":
+        fields.append([source.get(key) for key in ("stream", "key", "decision")])
     if row.get("category") == "stalled_worker" and isinstance(fields[-1], str):
         fields[-1] = ELAPSED_TIME.sub("<age>", fields[-1])  # a heartbeat's growing age is not a changed obligation
     return hashlib.sha256(json.dumps(fields).encode()).hexdigest()[:24]
@@ -1555,7 +1559,7 @@ class WaitVerifier:
                 if path.is_symlink() or not path.is_file():
                     raise ValueError("prerequisite status is unavailable")
                 self.decisions[task] = c.bash('. "$1/fm-status-decision-lib.sh"; '
-                    'status_open_decisions_dated "$2"', BIN, path).splitlines()
+                    'status_open_decisions_dated "$2" "" --with-opening', BIN, path).splitlines()
             decision = next((line for line in self.decisions[task]
                              if line.split("\t", 1)[0] == source.get("key")), None)
             if decision is None:

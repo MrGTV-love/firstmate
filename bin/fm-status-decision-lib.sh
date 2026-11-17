@@ -546,10 +546,18 @@ EOF
 # outside the open set. Only surviving openings have their dates parsed;
 # historical transitions neither fork nor reread every retained summary.
 # A summary never ends in a tab: the tab is this output's field separator.
+# With --with-opening as the third argument, insert the surviving opening's
+# zero-based transition ordinal before the summary. Together with the status
+# stream identity it distinguishes equal-clock or unstamped reopenings without
+# changing on a no-op read or a later unrelated append.
 # Regression coverage: tests/fm-classify-decision-key.test.sh.
-status_open_decisions_dated() {  # <status-file> [<kind>]
-  local f=$1 open='' key verb summary line kind resolve held index=0 epoch tab=$'\t' text rc
+status_open_decisions_dated() {  # <status-file> [<kind>] [--with-opening]
+  local f=$1 open='' key verb summary line kind resolve held index=0 epoch tab=$'\t' text rc opening=${3:-}
   local -a opened summaries
+  case "$opening" in
+    ''|--with-opening) ;;
+    *) printf 'fm-status: unknown dated-decision option: %s\n' "$opening" >&2; return 2 ;;
+  esac
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" "${2:-}" kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
@@ -574,7 +582,11 @@ EOF
     _fm_status_at_epoch "${opened[index]}" epoch || epoch=
     summary=${summaries[index]}
     summary=${summary%"${summary##*[!"$tab"]}"}
-    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$summary"
+    if [ "$opening" = --with-opening ]; then
+      printf '%s\t%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$index" "$summary"
+    else
+      printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$summary"
+    fi
   done <<EOF
 $open
 EOF
