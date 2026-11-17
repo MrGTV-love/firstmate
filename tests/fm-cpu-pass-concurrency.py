@@ -698,12 +698,12 @@ def proof_family_repo(world, scripts, body=None, folder='family-repo'):
 
 
 def proof_markers(text):
-    """The BEGIN line's planned (or, on older code, concurrency) word and the SUMMARY line's concurrency word."""
+    """The BEGIN line's planned word and the SUMMARY line's concurrency word."""
     out = []
     for line in text.splitlines():
         words = line.split()
         if line.startswith('FM_ISOLATION_BEGIN '):
-            out.append('FM_ISOLATION_BEGIN ' + next((w for w in words if w.startswith(('planned=', 'concurrency='))), '?'))
+            out.append('FM_ISOLATION_BEGIN ' + next((w for w in words if w.startswith('planned=')), '?'))
         elif line.startswith('FM_ISOLATION_SUMMARY '):
             out.append('FM_ISOLATION_SUMMARY ' + next((w for w in words if w.startswith('concurrency=')), '?'))
     return out
