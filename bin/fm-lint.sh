@@ -447,7 +447,8 @@ PROBE_RESERVE_KIB=65536
 # The probe's time bound: a probe still running after it, and every run waiting for
 # the lane that long, report on stderr that they are blocked and keep waiting
 # (nothing is ended; the lane frees only when the probe it records by exact
-# identity has provably ended). `shellcheck --version` takes about 0.02 s.
+# identity has provably ended). `shellcheck --version` takes about 0.1 s.
+# measured: value=30 date=2026-11-16 host=Mac-Studio.local margin=333x (five `shellcheck --version` runs, slowest 0.09 s wall)
 PROBE_BOUND_SECONDS=30
 ROOTS_RSS_KIB=$((HOST_RSS_KIB - PROBE_RESERVE_KIB))
 # The host ledger: gate entries (entry.*) and each lint run's entry (run.*), which
