@@ -6130,7 +6130,7 @@ test_a_route_execute_that_retains_the_tree_keeps_every_unique_ignored_file_byte_
   line=$(route_calls_for zz-payload | sed -n 1p)
   # shellcheck disable=SC2086 # the argv words hold no spaces
   route_argv_check execute 7 "$W/profiles/zz-payload.json" "$c" $line || fail "route-retained: the execute's argv is wrong: $ROUTE_ARGV_WHY ($line)"
-  [ -e "$c" ] && registered zz-payload || fail "route-retained: the copy with a retained ignored payload was removed or unregistered"
+  if [ ! -e "$c" ] || ! registered zz-payload; then fail "route-retained: the copy with a retained ignored payload was removed or unregistered"; fi
   assert_equals "$lock_before" "$(shasum -a 256 "$admin/locked" | awk '{print $1}')" "route-retained: the copy's creation lock changed"
   route_retained_bytes_ok "$c" "$before" "$sums" || fail "route-retained: a unique ignored file of the kept copy changed, went missing or was added: $(route_unique_sums "$c")"
   assert_equals 'unique retained bytes' "$(cat "$c/unique.dat")" "route-retained: the text file's bytes changed"
