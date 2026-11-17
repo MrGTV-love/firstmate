@@ -13,7 +13,9 @@
 # profile. A record edited by hand therefore never widens a launch beyond one
 # branch in the task's name family that no other task records, that is checked
 # out in no other work tree, and whose history contains a commit of the task's
-# own (see fm_successor_tip_is_own).
+# own: an archive tip of the task or a commit of its recorded branch, never one
+# the project's default or base branch contains (see fm_successor_tip_is_own), so
+# an archive branch the worker points at shared history proves nothing.
 #
 # A fresh spawn and a reassociation of another task ask fm_successor_claimant
 # whether some task's record already names their branch as its successor_branch=,
@@ -69,8 +71,10 @@
 #           is the recorded branch's tip;
 #         archive-tip: the tip of one of the task's own custody archive branches
 #           archive/<task>-(submitted|pipeline)-<8 hex>, whose hex is the first
-#           eight digits of that archive's own tip, is an ancestor of, or equal
-#           to, its tip; the proved tip is that archive's tip;
+#           eight digits of that archive's own tip and which neither the
+#           default nor the base branch contains (fm_successor_tip_unshared), is
+#           an ancestor of, or equal to, its tip; the proved tip is that
+#           archive's tip;
 #     - or, with <proved-tip> (a successor the record already names, with the
 #       tip proved at its admission), route proved-tip: that commit is an
 #       ancestor of, or equal to, its tip and is still the task's own
@@ -80,10 +84,12 @@
 # fm_successor_tip_is_own <copy> <task-id> <recorded-tip> <base-branch> <tip>
 #   True when <tip> is a commit of this task's own: the tip of one of its own
 #   archive/<task>-(submitted|pipeline)-<8 hex> branches, or a commit in the
-#   recorded branch's history that the project's default branch and the task's
-#   recorded base branch (local or origin) do not contain. A commit every branch
-#   shares, such as the project's first commit, is never the task's own; when
-#   neither the default nor the base branch resolves, only an archive tip is.
+#   recorded branch's history, and in either case one that the project's default
+#   branch and the task's recorded base branch (local or origin) do not contain
+#   (fm_successor_tip_unshared). A commit every branch shares, such as the
+#   project's first commit, is never the task's own, even when an archive branch
+#   points at it; when neither the default nor the base branch resolves, no tip
+#   is. The archive-tip route skips an archive whose tip fails the same test.
 #
 # fm_successor_claimant <branch> <own-meta> <state-dir>...
 #   Prints the id of a task other than <own-meta>'s whose record names <branch>
@@ -253,8 +259,8 @@ fm_successor_checkout_paths() {  # <project> <successor>
 # the middle word is one of two, the hex is eight lowercase digits and must equal
 # the archive's own tip's first eight.
 # With `exact`, the archive's tip must equal <successor-sha>.
-fm_successor_archive_match() {  # <project> <task-id> <successor-sha> [exact]
-  local project=$1 id=$2 sha=$3 exact=${4-} name tip rest
+fm_successor_archive_match() {  # <project> <task-id> <successor-sha> <base-branch> [exact]
+  local project=$1 id=$2 sha=$3 base=$4 exact=${5-} name tip rest
   while read -r name tip; do
     rest=${name#"archive/$id-"}
     [ "$rest" != "$name" ] || continue
@@ -265,16 +271,19 @@ fm_successor_archive_match() {  # <project> <task-id> <successor-sha> [exact]
     else
       git -C "$project" merge-base --is-ancestor "$tip" "$sha" 2>/dev/null || continue
     fi
+    fm_successor_tip_unshared "$project" "$base" "$tip" || continue
     printf '%s %s\n' "$name" "$tip"
     return 0
   done < <(git -C "$project" for-each-ref --format='%(refname:short) %(objectname)' "refs/heads/archive/$id-submitted-*" "refs/heads/archive/$id-pipeline-*" 2>/dev/null)
   return 1
 }
 
-fm_successor_tip_is_own() {  # <copy> <task-id> <recorded-tip> <base-branch> <tip>
-  local copy=$1 id=$2 prior=$3 base=$4 tip=$5 name ref shared seen=0
-  fm_successor_archive_match "$copy" "$id" "$tip" exact >/dev/null && return 0
-  [ -n "$prior" ] && git -C "$copy" merge-base --is-ancestor "$tip" "$prior" 2>/dev/null || return 1
+# True when <tip> is in neither the project's default branch nor the task's
+# recorded base branch (local or origin/<name>), and at least one of them resolves.
+# A tip either contains, such as the project's first commit, is shared history and
+# never proves that anything is the task's own.
+fm_successor_tip_unshared() {  # <copy> <base-branch> <tip>
+  local copy=$1 base=$2 tip=$3 name ref shared seen=0
   for name in "$(fm_successor_default_branch "$copy")" "$base"; do
     [ -n "$name" ] || continue
     for ref in "refs/heads/$name" "refs/remotes/origin/$name"; do
@@ -284,6 +293,13 @@ fm_successor_tip_is_own() {  # <copy> <task-id> <recorded-tip> <base-branch> <ti
     done
   done
   [ "$seen" = 1 ]
+}
+
+fm_successor_tip_is_own() {  # <copy> <task-id> <recorded-tip> <base-branch> <tip>
+  local copy=$1 id=$2 prior=$3 base=$4 tip=$5
+  fm_successor_archive_match "$copy" "$id" "$tip" "$base" exact >/dev/null && return 0
+  [ -n "$prior" ] && git -C "$copy" merge-base --is-ancestor "$tip" "$prior" 2>/dev/null || return 1
+  fm_successor_tip_unshared "$copy" "$base" "$tip"
 }
 
 # The git common directory of a path, canonical; empty when it has none.
@@ -362,7 +378,7 @@ fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <cop
     printf 'route=checked-out\nsuccessor_sha=%s\nprior_sha=%s\nproved_tip=%s\n' "$succ_sha" "$prior_sha" "$prior_sha"
     return 0
   fi
-  archive_match=$(fm_successor_archive_match "$copy" "$id" "$succ_sha") || {
+  archive_match=$(fm_successor_archive_match "$copy" "$id" "$succ_sha" "$base") || {
     echo "successor branch '$successor' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy and containing the recorded branch's tip) fails because $why1; the archive-tip route (its tip $succ_sha contains the tip of one of the task's own archive/$id-(submitted|pipeline)-<8 hex> branches) fails because no such archive tip is in its history"
     return 1
   }
