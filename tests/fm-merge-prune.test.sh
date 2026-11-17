@@ -4331,11 +4331,14 @@ test_xlane_same_lane_path_completes_as_before() {
   pass "the same-lane path (fm-pr-check.sh, own-home fm-pr-merge.sh, prune) still ends pr_ready, merged, cleaned_up with the copy and record gone"
 }
 
-# A teardown that fails after it cleared the merge poll but before it retired the
-# record leaves pr= on the record. The merge-notified marker stays until the record
-# is gone, so reconciliation does not re-arm a poll for the merge it already
-# reported, and the merge is reported once; the retried teardown then removes it.
-xl_merge_reported() { [ -e "$STATE/t1.pr-poll-merge-notified" ] && xl_has_event task.merged; }
+# A teardown that fails after the watcher reported the merge and retired its poll,
+# but before it retired the record, leaves pr= on the record. The merge-notified
+# marker stays until the record is gone, so reconciliation does not re-arm a poll
+# for the merge it already reported, and the merge is reported once; the retried
+# teardown then removes it. The watcher writes the marker and the ledger row before
+# it retires the poll, so "reported" waits for that retirement too: a watcher
+# stopped between the two would leave a poll no reconciliation armed.
+xl_merge_reported() { [ -e "$STATE/t1.pr-poll-merge-notified" ] && xl_has_event task.merged && [ ! -e "$STATE/t1.check.sh" ]; }
 xl_event_count() { xl_ledger_events | tr ' ' '\n' | grep -cx "$1" || true; }
 # A stopped watcher's poll step can still hold t1's control lock for a moment.
 xl_wait_control_free() {

@@ -1462,8 +1462,12 @@ test_no_pr_recorded_discovers_merged_pr_by_branch_allows() {
 
   expect_code 0 "$rc" "no-pr-branch-discovery: teardown should succeed by discovering the merged PR from the branch name"
   ! grep -q REFUSED "$case_dir/stderr" || fail "no-pr-branch-discovery: teardown printed a REFUSED line"
-  assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
-    "no-pr-branch-discovery: resolved PR URL was not recorded on completion"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "no-pr-branch-discovery: the backlog item is not done: $(backlog_row_state "$case_dir")"
+  # Main 1820 F4(b): the merged head carries the pipeline's auto-fix commit, so it
+  # is not the copy's HEAD and the found PR is not named as the completion PR.
+  ! grep -q 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
+    || fail "no-pr-branch-discovery: a merged PR whose head is not the copy's HEAD was recorded as its completion PR"
   pass "teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded"
 }
 
