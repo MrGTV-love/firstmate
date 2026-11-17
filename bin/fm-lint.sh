@@ -84,9 +84,10 @@
 # PROBE_RESERVE_KIB = 65536 KiB (one probe at a time on the host), and the roots'
 # admission works with the rest, ROOTS_RSS_KIB = 3604480 KiB; the total stays
 # 3670016 KiB. The two parts sum to B only while the probe holds at most 64 MiB.
-# That is measured for the real `shellcheck --version` (about 15 MB for 0.02 s) and
-# enforced only by the macOS resident watch, from its first sample one second after
-# the probe starts; a probe that holds more than 64 MiB under the enforced envelope,
+# That is measured for the real `shellcheck --version` (about 15 MB, for the
+# time noted at PROBE_BOUND_SECONDS) and enforced only by the macOS resident
+# watch, from its first sample one second after the probe starts; a probe that
+# holds more than 64 MiB under the enforced envelope,
 # or before that first sample, can put the total above B by its excess (for example
 # 64 MiB over B for a 128 MiB probe). That gap is arithmetic, not a measurement:
 # no probe above 64 MiB has been measured; it is stated, not claimed closed. Tests get no seam either: a test uses a private
@@ -164,9 +165,10 @@
 # between runs: nothing proves which ShellCheck a script or a compiled launcher
 # runs), in the probe's own lane of the budget above: one probe at a time on the
 # host, held to 64 MiB by the resident watch on native macOS (it holds about
-# 15 MB for 0.02 s); under the enforced envelope the probe is held only to the
-# per-root address-space limit, not to 64 MiB, and on another host without the
-# envelope nothing holds it (see the non-macOS rule below). It is never queued
+# 15 MB, for the time noted at PROBE_BOUND_SECONDS); under the enforced
+# envelope the probe is held only to the per-root address-space limit, not to
+# 64 MiB, and on another host without the envelope nothing holds it (see the
+# non-macOS rule below). It is never queued
 # behind roots, so a run with no root to analyse reserves nothing in the
 # roots' budget; the probe's own bounded wait for its lane is the one wait such a
 # run has, an allowed wait inside B (Main 1775). Every run probes its own ShellCheck:
