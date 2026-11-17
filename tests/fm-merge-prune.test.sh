@@ -4346,6 +4346,27 @@ xl_wait_control_free() {
   done
 }
 xl_merge_wakes() { { grep -F 'check: merge landed: t1 ' "$STATE/.wake-queue" 2>/dev/null || true; } | wc -l | tr -d ' '; }
+# The late failure: teardown's entry preflight refuses a status manifest it
+# cannot retire before any change, so the bad row must arrive after it. The
+# ledger's cleaned_up write is the last step before the status retirement, so a
+# one-shot jq wrapper on the task's PATH adds an unparseable cursor row there.
+xl_arm_late_status_failure() {
+  local real_jq
+  real_jq=$(command -v jq) || fail "jq is not on PATH"
+  cat > "$W/bin/jq" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" task.cleaned_up "*)
+    if [ -e "$W/late-fail.armed" ]; then
+      rm -f "$W/late-fail.armed"
+      printf 'bogus\\tident\\tnot-an-offset\\t0\\n' >> "$STATE/.status-presentation-cursor"
+    fi ;;
+esac
+exec "$real_jq" "\$@"
+SH
+  chmod +x "$W/bin/jq"
+  : > "$W/late-fail.armed"
+}
 
 test_xlane_late_teardown_failure_reports_the_merge_once() {
   local rc=0 cursor
@@ -4359,7 +4380,7 @@ test_xlane_late_teardown_failure_reports_the_merge_once() {
   # The status presenter's cursor holds a row teardown cannot parse, so teardown
   # stops at the status retirement, after the poll cleanup and before the record goes.
   cp "$cursor" "$W/cursor.saved" 2>/dev/null || : > "$W/cursor.saved"
-  printf 'bogus\tident\tnot-an-offset\t0\n' >> "$cursor"
+  xl_arm_late_status_failure
   xl_wait_control_free
   xl_env FM_MERGE_PRUNE=0 "$W/bin/teardown-real" t1 > "$W/teardown.out" 2> "$W/teardown.err" || rc=$?
   cp "$W/cursor.saved" "$cursor"
@@ -4393,7 +4414,7 @@ test_xlane_late_teardown_failure_before_the_merge_report_keeps_the_poll() {
   xl_merge_in_lane_m
   [ ! -e "$STATE/t1.pr-poll-merge-notified" ] || fail "the merge was reported before the teardown"
   cp "$cursor" "$W/cursor.saved" 2>/dev/null || : > "$W/cursor.saved"
-  printf 'bogus\tident\tnot-an-offset\t0\n' >> "$cursor"
+  xl_arm_late_status_failure
   xl_wait_control_free
   xl_env FM_MERGE_PRUNE=0 "$W/bin/teardown-real" t1 > "$W/teardown.out" 2> "$W/teardown.err" || rc=$?
   cp "$W/cursor.saved" "$cursor"

@@ -3198,6 +3198,10 @@
           "match": "echo \"REFUSED: $TEARDOWN_PREFLIGHT_ERROR; nothing was changed and every task record is retained. Fix what is named and re-run.\" >&2"
         },
         {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe task PR-check artifact: task $id's PR merge-notified record at $artifact is not a regular file; preserving task state.\" >&2"
+        },
+        {
           "file": "bin/fm-teardown-nested-lib.sh",
           "match": "teardown_refuse_copy inspection-unavailable \"foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY.\" \"$copy\""
         },

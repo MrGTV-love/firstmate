@@ -783,6 +783,8 @@ SH
 test_marker_unlink_failure_after_the_rename_leaves_a_retry() {
   local case_dir rc
   case_dir=$(detached_copy_case marker-unlink-fails - no own)
+  # As above, the marker's record names the PR its poll reported merged.
+  append_pr_meta_url "$case_dir"
   printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
   chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
   cat > "$case_dir/fakebin/rm" <<SH
@@ -840,6 +842,8 @@ test_record_removal_failure_restores_the_marker() {
   local case_dir rc marker bytes variant
   for variant in restored unrestorable; do
     case_dir=$(detached_copy_case "record-removal-fails-$variant" - no own)
+    # The marker's record names the PR its poll reported merged.
+    append_pr_meta_url "$case_dir"
     marker="$case_dir/state/task-x1.pr-poll-merge-notified"
     printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$marker"
     chmod 600 "$marker"
