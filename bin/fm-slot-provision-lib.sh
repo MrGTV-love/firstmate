@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Existing-copy lifecycle integration for fm-spawn.sh and fm-promote.sh.
-# Projects carrying scripts/git-stability/provision_existing_slot.py must attest
-# the assigned isolated copy before admission. --owned-path is an explicit,
+# Run scripts/git-stability/provision_existing_slot.py from the registered project
+# clone passed as project, never from the task copy; refuse if the clone lacks it.
+# Governed projects must attest the assigned isolated copy before admission.
+# --owned-path is an explicit,
 # repeatable task scope, never inferred from prose or expanded to the whole repo.
 # The provisioner owns schema, default origin/main merge-base validation, explicit
 # local-default qualification, same-owner adoption and lease/liveness-gated replacement.
@@ -123,8 +125,8 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   FM_SLOT_PREPARED_HEAD=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
-  [ -f "$copy/scripts/git-stability/provision_existing_slot.py" ] || {
-    echo "error: slot provisioner is missing from assigned copy $copy" >&2
+  [ -f "$project/scripts/git-stability/provision_existing_slot.py" ] || {
+    echo "error: slot provisioner is missing from project clone $project" >&2
     return 1
   }
   git check-ref-format --branch "$branch" >/dev/null || return 1
@@ -167,7 +169,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
-  "$runner" "$project" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
+  "$runner" "$project" "$report" "$project/scripts/git-stability/provision_existing_slot.py" \
     --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
     --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
   if [ "$rc" -eq 0 ]; then

@@ -956,6 +956,9 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
   git -C "$publisher" commit -qm 'advance owner fixture'
   git -C "$publisher" push --quiet origin main
   advanced=$(git -C "$publisher" rev-parse HEAD)
+  # Provisioning now executes the registered clone's owner, not the freshly
+  # moved copy's owner. Supply that authoritative fixture for these cases.
+  case "$shape" in introduced) write_refusing_slot_owner "$project" ;; esac
   if [ "$kind" = scout ]; then args+=(--scout); else args+=(--mode local-only --yolo off); fi
   [ "$shape" = missing-scope ] || [ "$shape" = absent ] || args+=(--owned-path scripts)
   temp="/tmp/fm-$id"
@@ -2313,18 +2316,319 @@ test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
   pass "the branch the preparation detached from is where it was"
 }
 
+# Source provenance is observed inside the executed Python file, not inferred
+# from a manifest or from the runner's command construction.
+write_source_slot_owner() { # <repository> <A|B> [<exit-code>]
+  local repo=$1 identity=$2 code=${3:-0}
+  mkdir -p "$repo/scripts/git-stability"
+  {
+    printf 'IDENTITY = "%s"\nEXIT_CODE = %s\n' "$identity" "$code"
+    cat <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+arg = lambda flag: sys.argv[sys.argv.index(flag) + 1]
+with open(os.environ['FM_TEST_SOURCE_RECORD'], 'a', encoding='utf-8') as output:
+    output.write(json.dumps(dict(identity=IDENTITY, realpath=os.path.realpath(__file__), argv=sys.argv)) + '\n')
+if EXIT_CODE:
+    print(json.dumps(dict(state='BLOCKED', reason='stale_copy_guard')))
+    sys.exit(EXIT_CODE)
+record = dict(worktree_path=os.path.realpath(arg('--worktree-path')), owner_id=arg('--owner-id'),
+              branch=arg('--branch'), base_sha=arg('--base-sha'),
+              owned_paths=[value for flag, value in zip(sys.argv, sys.argv[1:]) if flag == '--owned-path'],
+              lifecycle_state='worktree_active')
+if '--base-source' in sys.argv:
+    record.update(base_source=arg('--base-source'), base_ref='refs/heads/main')
+manifest = Path(os.environ['FM_TEST_SLOT_RECORD'])
+manifest.write_text(json.dumps(record), encoding='utf-8')
+print(json.dumps(dict(state='PASS', manifest_path=str(manifest), **record)))
+PY
+  } > "$repo/scripts/git-stability/provision_existing_slot.py"
+}
+
+# A and B are committed independently: spawn refreshes the copy to B from the
+# fixture origin while the registered clone keeps A, just as a task can carry a
+# different guard from its fleet-synced project. No real pane or pool is used.
+make_source_case() { # <shape> <entrypoint>
+  local shape=$1 entry=$2 rec id publisher
+  id="source-$shape-$entry-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  printf 'manual\n' > "$HOME_DIR/config/backlog-backend"
+  publisher="$CASE_DIR/publisher"
+  write_source_slot_owner "$publisher" B
+  git -C "$publisher" add scripts
+  git -C "$publisher" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'copy guard B'
+  git -C "$publisher" push -q origin main
+  git -C "$PROJECT_DIR" fetch -q origin
+  git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
+  write_source_slot_owner "$PROJECT_DIR" A
+  git -C "$PROJECT_DIR" add scripts
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'clone guard A'
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git -C "$POOL_DIR" merge --ff-only origin/main >/dev/null
+  # Exercise intact quoting in both runners and through relaunch metadata.
+  git -C "$PROJECT_DIR" worktree move "$POOL_DIR" "$CASE_DIR/copy with space"
+  POOL_DIR="$CASE_DIR/copy with space"
+  SOURCE_ID=$id
+  SOURCE_TARGET="$PROJECT_DIR/scripts/git-stability/provision_existing_slot.py"
+  case "$shape" in
+    identical) cp "$SOURCE_TARGET" "$POOL_DIR/scripts/git-stability/provision_existing_slot.py" ;;
+    symlink)
+      cp "$SOURCE_TARGET" "$CASE_DIR/external-owner.py"
+      rm "$SOURCE_TARGET"
+      ln -s "$CASE_DIR/external-owner.py" "$SOURCE_TARGET"
+      ;;
+    missing) rm "$SOURCE_TARGET" ;;
+    copy-missing) git -C "$POOL_DIR" rm -q scripts/git-stability/provision_existing_slot.py ;;
+  esac
+  if [ "$entry" = relaunch ] && [ "$shape" != missing ]; then
+    write_source_slot_owner "$POOL_DIR" B 2
+  fi
+  if ! git -C "$POOL_DIR" diff --quiet HEAD; then
+    git -C "$POOL_DIR" add -A
+    git -C "$POOL_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'task guard variant'
+  fi
+  git -C "$POOL_DIR" checkout -q -b "fm/$id"
+  SOURCE_BASE=$(git -C "$POOL_DIR" merge-base origin/main HEAD)
+  SOURCE_LOCAL_REF=
+  SOURCE_SELECTED=
+  if [ "$entry" = spawn ] && [ "$shape" = local-default ]; then
+    # The selected default contains A, but the copy has the distinct B guard.
+    git -C "$POOL_DIR" merge --ff-only main >/dev/null
+    write_source_slot_owner "$POOL_DIR" B
+    git -C "$POOL_DIR" add scripts
+    git -C "$POOL_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'local task guard B'
+    SOURCE_LOCAL_REF=refs/heads/main
+    SOURCE_SELECTED=$(git -C "$PROJECT_DIR" rev-parse main)
+    SOURCE_BASE=$SOURCE_SELECTED
+  fi
+  SOURCE_REALPATH=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$SOURCE_TARGET")
+  export FM_TEST_SOURCE_RECORD="$CASE_DIR/executed.jsonl"
+  export FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json"
+  export FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log"
+  # Explicit recorded-copy spawn avoids a freshness move replacing the task
+  # branch before the source-provenance assertion; this is also spawn's runner.
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=firstmate:fm-%s\nbranch=fm/%s\nharness=codex\nmode=scout\nyolo=off\nslot_owned_path=README.md\nslot_owned_path=scripts\n' \
+    "$PROJECT_DIR" "$POOL_DIR" "$id" "$id" > "$HOME_DIR/state/$id.meta"
+  if [ -n "$SOURCE_LOCAL_REF" ]; then
+    # Local-default declarations belong only to local-only ships.
+    printf 'kind=ship\nproject=%s\nworktree=%s\nwindow=firstmate:fm-%s\nbranch=fm/%s\nharness=codex\nmode=local-only\nyolo=off\nslot_owned_path=README.md\nslot_owned_path=scripts\nslot_source_ref=%s\nslot_base_sha=%s\n' \
+      "$PROJECT_DIR" "$POOL_DIR" "$id" "$id" "$SOURCE_LOCAL_REF" "$SOURCE_SELECTED" > "$HOME_DIR/state/$id.meta"
+  fi
+  [ "$entry" != fresh ] || rm "$HOME_DIR/state/$id.meta"
+  preflight_task_temp "$id"
+}
+
+assert_source_execution() { # <entrypoint>
+  python3 - "$FM_TEST_SOURCE_RECORD" "$SOURCE_TARGET" "$SOURCE_REALPATH" "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "$SOURCE_BASE" "$SOURCE_LOCAL_REF" "$1" <<'PY'
+import json, os, sys
+record, target, realpath, project, copy, owner, base, local_ref, entry = sys.argv[1:]
+rows = [json.loads(line) for line in open(record, encoding='utf-8')]
+assert len(rows) == 1, ('expected exactly one clone execution, never B', rows)
+r = rows[0]
+print('source-record', entry, json.dumps(r, sort_keys=True), flush=True)
+assert r['identity'] == 'A', ('copy guard B ran instead of clone guard A', r)
+assert r['argv'][0] == target, ('executed script pathname is not the exact clone pathname', r)
+assert r['realpath'] == realpath, ('executed realpath differs from clone file', r)
+expected = ['--repo-root', project, '--worktree-path', os.path.realpath(copy), '--owner-id', owner,
+            '--branch', 'fm/' + owner, '--base-sha', base]
+if local_ref:
+    expected += ['--base-source', 'local-default']
+expected += ['--owned-path', 'README.md', '--owned-path', 'scripts']
+assert r['argv'][1:] == expected, ('provisioner argv changed', r['argv'], expected)
+print('source-proof', entry, json.dumps(r, sort_keys=True))
+PY
+}
+
+run_source_entry() { # <fresh|spawn|promotion|relaunch>
+  case "$1" in
+    fresh)
+      run_spawn "$SOURCE_ID" --mode no-mistakes --yolo off --owned-path README.md --owned-path scripts
+      ;;
+    spawn)
+      run_relaunch "$SOURCE_ID"
+      ;;
+    promotion)
+      FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+        FM_CONFIG_OVERRIDE="$HOME_DIR/config" PATH="$FAKEBIN_DIR:$PATH" \
+        bash "$ROOT/bin/fm-promote.sh" "$SOURCE_ID" --mode local-only --yolo off 2>&1
+      ;;
+    relaunch)
+      # Control is real; only its endpoint and launched harness are fixtures.
+      FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+        FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 \
+        FM_FAKE_PANE_PATH="$POOL_DIR" FM_FAKE_DUPLICATE_WINDOW="fm-$SOURCE_ID" \
+        PATH="$CASE_DIR/stopped:$FAKEBIN_DIR:$PATH" FM_BACKEND=tmux TMUX=fake,1,0 \
+        bash "$ROOT/bin/fm-control.sh" "$SOURCE_ID" relaunch --note 'exercise stale task guard' 2>&1
+      ;;
+  esac
+}
+
+source_entry_case() { # <shape> <entry>
+  local shape=$1 entry=$2 out rc=0
+  make_source_case "$shape" "$entry"
+  case "$entry" in spawn|relaunch) make_stopped_tmux "$CASE_DIR/stopped" ;; esac
+  if [ "$entry" = relaunch ]; then
+    export FM_TEST_SOURCE_PANE_COMMAND="$CASE_DIR/pane-command"
+    printf 'zsh\n' > "$FM_TEST_SOURCE_PANE_COMMAND"
+    mv "$CASE_DIR/stopped/tmux" "$CASE_DIR/stopped/tmux.original"
+    cat > "$CASE_DIR/stopped/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$*" in *'#{pane_current_command}'*) cat "$FM_TEST_SOURCE_PANE_COMMAND"; exit 0 ;; esac
+"$(dirname "$0")/tmux.original" "$@"
+rc=$?
+# A fake launch is a state transition only, never execution of the harness.
+if [ -f "$FM_FAKE_LAUNCH_LOG" ] && grep -q 'codex' "$FM_FAKE_LAUNCH_LOG"; then
+  printf 'codex\n' > "$FM_TEST_SOURCE_PANE_COMMAND"
+fi
+exit "$rc"
+SH
+    chmod +x "$CASE_DIR/stopped/tmux"
+  fi
+  if [ -f "$HOME_DIR/state/$SOURCE_ID.meta" ]; then
+    cp "$HOME_DIR/state/$SOURCE_ID.meta" "$CASE_DIR/meta.before"
+  fi
+  out=$(run_source_entry "$entry") || rc=$?
+  printf '%s\n' "$out" > "$CASE_DIR/entry.out"
+  if [ "$shape" = missing ]; then
+    # Emit the base's actual execution before any admission assertion can end
+    # the case and fixture cleanup removes its record.
+    if [ -e "$FM_TEST_SOURCE_RECORD" ]; then
+      python3 - "$FM_TEST_SOURCE_RECORD" "$POOL_DIR" <<'PY' || fail 'missing-clone execution record is not the expected copy control'
+import json, os, sys
+rows = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
+print('missing-clone-runtime-record', json.dumps(rows, sort_keys=True), flush=True)
+assert len(rows) == 1 and rows[0]['identity'] == 'B', rows
+expected = sys.argv[2] + '/scripts/git-stability/provision_existing_slot.py'
+assert rows[0]['argv'][0] == expected, rows
+assert rows[0]['realpath'] == os.path.realpath(expected), rows
+PY
+      fail 'missing clone executed copy guard B instead of refusing'
+    fi
+    [ "$rc" -ne 0 ] || fail "$entry admitted a copy when the clone owner is missing"
+    assert_contains "$out" "slot provisioner is missing from project clone $PROJECT_DIR" 'missing clone refusal must name the clone'
+    [ ! -e "$FM_TEST_SOURCE_RECORD" ] || fail 'missing clone ran a provisioner'
+    [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail 'missing clone wrote a manifest'
+    [ ! -s "$FM_FAKE_LAUNCH_LOG" ] || fail 'missing clone launched an agent'
+    if [ "$entry" = promotion ]; then
+      assert_grep kind=scout "$HOME_DIR/state/$SOURCE_ID.meta" 'missing clone admitted promotion'
+      assert_absent "$HOME_DIR/data/$SOURCE_ID/ship-instructions.md" 'missing clone published ship instructions'
+    else
+      assert_grep 'slot provisioning refused before admission' "$HOME_DIR/state/$SOURCE_ID.status" 'missing clone lost slot refusal status'
+      assert_contains "$out" 'retained; no worker admitted' 'missing clone lost retained-copy refusal'
+    fi
+  else
+    assert_source_execution "$entry" || fail "$entry violated clone execution or argv contract: $out"
+    expect_code 0 "$rc" "$entry refused the clone owner: $out"
+    # An optional immutable base export lets delivery evidence replay the real
+    # entrypoint on the very same repositories, paths, owner, branch and base.
+    if [ -n "${FM_TEST_SOURCE_COMPARE_ROOT:-}" ] && { [ "$shape" = different ] || [ "$shape" = stale ] || [ "$shape" = local-default ]; }; then
+      cp "$FM_TEST_SOURCE_RECORD" "$CASE_DIR/head.argv.jsonl"
+      if [ -f "$CASE_DIR/meta.before" ]; then
+        cp "$CASE_DIR/meta.before" "$HOME_DIR/state/$SOURCE_ID.meta"
+      else
+        rm "$HOME_DIR/state/$SOURCE_ID.meta"
+      fi
+      rm "$FM_TEST_SOURCE_RECORD" "$FM_TEST_SLOT_RECORD"
+      rm -f "$FM_FAKE_LAUNCH_LOG"
+      [ "$entry" != relaunch ] || printf 'zsh\n' > "$FM_TEST_SOURCE_PANE_COMMAND"
+      local head_root=$ROOT base_rc=0
+      ROOT=$FM_TEST_SOURCE_COMPARE_ROOT
+      run_source_entry "$entry" > "$CASE_DIR/base.out" 2>&1 || base_rc=$?
+      ROOT=$head_root
+      if [ "$shape" = stale ]; then
+        [ "$base_rc" -ne 0 ] || fail 'base admitted the stale rejecting guard'
+        assert_grep stale_copy_guard "$CASE_DIR/base.out" 'base refusal was not the stale guard'
+      else
+        expect_code 0 "$base_rc" "base comparison setup failed: $(cat "$CASE_DIR/base.out")"
+      fi
+      python3 - "$CASE_DIR/head.argv.jsonl" "$FM_TEST_SOURCE_RECORD" "$PROJECT_DIR" "$POOL_DIR" <<'PY' || fail 'same-input base/head argv comparison failed'
+import json, sys
+head_file, base_file, project, copy = sys.argv[1:]
+head = [json.loads(line) for line in open(head_file)]
+base = [json.loads(line) for line in open(base_file)]
+assert len(head) == len(base) == 1, (head, base)
+a, b = head[0]['argv'], base[0]['argv']
+assert base[0]['identity'] == 'B', ('base did not execute B', base)
+assert a[0] == project + '/scripts/git-stability/provision_existing_slot.py', a
+assert b[0] == copy + '/scripts/git-stability/provision_existing_slot.py', b
+assert a[1:] == b[1:], ('argv changed beyond executed source', a, b)
+print('same-input-argv-comparison PASS', json.dumps(dict(head=a, base=b), sort_keys=True))
+PY
+    fi
+  fi
+  pass "project provisioner: $shape $entry"
+}
+
+test_project_provisioner_spawn() { source_entry_case different fresh; }
+test_project_provisioner_promotion() { source_entry_case different promotion; }
+test_project_provisioner_relaunch() { source_entry_case stale relaunch; }
+test_project_provisioner_identical() { source_entry_case identical spawn; }
+test_project_provisioner_symlink() { source_entry_case symlink spawn; }
+test_project_provisioner_local_default() { source_entry_case local-default spawn; }
+test_project_provisioner_copy_missing() { source_entry_case copy-missing spawn; }
+test_project_provisioner_missing_spawn() { source_entry_case missing fresh; }
+test_project_provisioner_missing_promotion() { source_entry_case missing promotion; }
+test_project_provisioner_missing_relaunch() { source_entry_case missing relaunch; }
+
+test_project_provisioner_missing_preserves_copy() {
+  local before after rc=0 out
+  make_source_case missing direct
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  # shellcheck source=bin/fm-slot-provision-lib.sh
+  . "$ROOT/bin/fm-slot-provision-lib.sh"
+  before=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  out=$(fm_slot_provision fm_slot_run_local "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "fm/new-$SOURCE_ID" "$CASE_DIR/report" '' '' README.md scripts 2>&1) || rc=$?
+  after=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  if [ -e "$FM_TEST_SOURCE_RECORD" ]; then
+    printf 'direct-missing-clone-runtime-record '
+    cat "$FM_TEST_SOURCE_RECORD"
+  fi
+  [ "$before" = "$after" ] || fail 'missing clone changed HEAD, symbolic HEAD or refs before refusing'
+  [ "$rc" -ne 0 ] || fail 'missing clone admitted direct provisioning'
+  assert_contains "$out" "slot provisioner is missing from project clone $PROJECT_DIR" 'missing clone diagnostic lost'
+  [ ! -e "$FM_TEST_SOURCE_RECORD" ] || fail 'missing clone fell back to B'
+  [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail 'missing clone wrote a manifest'
+  # Preparation may already have detached the copy before the call boundary.
+  fm_slot_prepare_base "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" || fail 'fixture preparation failed'
+  before=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  rc=0
+  fm_slot_provision fm_slot_run_local "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "fm/new-$SOURCE_ID" "$CASE_DIR/report" '' '' README.md scripts >"$CASE_DIR/prepared.out" 2>&1 || rc=$?
+  after=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  [ "$rc" -ne 0 ] && [ "$before" = "$after" ] || fail 'missing clone changed the prepared copy'
+  [ ! -e "$FM_TEST_SOURCE_RECORD" ] && [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail 'prepared missing clone ran an owner or wrote a manifest'
+  rm "$POOL_DIR/scripts/git-stability/provision_existing_slot.py"
+  if fm_slot_required "$PROJECT_DIR" "$POOL_DIR"; then fail 'neither side has a provisioner but governance was required'; fi
+  pass 'missing clone refuses before any provisioning, branch, HEAD, ref or manifest mutation, including after preparation'
+}
+
+# Scratch exports let the same behavioral cases discriminate base and mutants.
+ROOT=${FM_TEST_SOURCE_IMPLEMENTATION_ROOT:-$ROOT}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
-  for selected_test in "$@"; do
-    case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
-      test_*) if declare -F "$selected_test" >/dev/null 2>&1; then "$selected_test"; else fail "unknown selected test: $selected_test"; fi ;;
-      *) fail "unknown selected acquisition test: $selected_test" ;;
-    esac
-  done
+  fm_test_run_cases -- "$@"
   exit 0
 fi
 
+test_project_provisioner_spawn
+test_project_provisioner_promotion
+test_project_provisioner_relaunch
+test_project_provisioner_identical
+test_project_provisioner_symlink
+test_project_provisioner_local_default
+test_project_provisioner_copy_missing
+test_project_provisioner_missing_spawn
+test_project_provisioner_missing_promotion
+test_project_provisioner_missing_relaunch
+test_project_provisioner_missing_preserves_copy
 test_local_only_source_selection
 test_local_only_source_binding
 test_local_only_unprepared_retry
