@@ -393,6 +393,34 @@ test_unusable_pool_degrades_with_notice() {
   assert_equals $'fm-cpu-pass: running bash without a CPU pass: python3 not found\nchild stderr' \
     "$(cat "$log")" "default stderr must contain one degradation notice and the child's stderr"
   pass "an unusable pool or missing python3 runs the command without a pass and says so"
+
+  # A nested request without python3 says it runs without leasing only when there was a reservation to lease from.
+  local tokens shape
+  tokens="$TMP_ROOT/no-python-tokens"
+  mkdir -p "$tokens"
+  for shape in "held=0 tokens=dir" "held=2 tokens=unset" "held=2 tokens=missing" "held=2 tokens=dir"; do
+    : >"$log"
+    rc=0
+    case "$shape" in
+      "held=0 tokens=dir") out=$(PATH="$fakebin" FM_CPU_PASS_HELD=0 FM_CPU_PASS_TOKENS=$tokens "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+      "held=2 tokens=unset") out=$(env -u FM_CPU_PASS_TOKENS PATH="$fakebin" FM_CPU_PASS_HELD=2 "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+      "held=2 tokens=missing") out=$(PATH="$fakebin" FM_CPU_PASS_HELD=2 FM_CPU_PASS_TOKENS=$TMP_ROOT/no-such-tokens "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+      "held=2 tokens=dir") out=$(PATH="$fakebin" FM_CPU_PASS_HELD=2 FM_CPU_PASS_TOKENS=$tokens "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+    esac
+    assert_equals 4 "$rc" "a nested run without python3 ($shape) must keep the command's status"
+    assert_equals "${shape%% *}" "$out" "a nested run without python3 ($shape) must keep the inherited marker and clean output"
+    if [ "$shape" = "held=2 tokens=dir" ]; then
+      assert_equals "fm-cpu-pass: running bash without leasing from its reservation: python3 not found" "$(cat "$log")" \
+        "a nested run with a reservation to lease from must say once that it runs without leasing"
+    else
+      assert_equals "" "$(cat "$log")" "a nested run with nothing to lease ($shape) must not claim it runs without leasing"
+    fi
+  done
+  pass "a nested run without python3 names the missing lease only when there was a reservation to lease from"
 }
 
 test_no_python_validates_pass_counts() {
