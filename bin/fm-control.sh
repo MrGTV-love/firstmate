@@ -107,7 +107,8 @@
 # every other task record to be readable and the recorded copy to share the
 # project's ref store. For a successor the record already names, the name rule
 # runs again and the successor is re-admitted while its history still contains
-# the recorded proved tip (route=proved-tip); that call is a no-op that says so.
+# the recorded proved tip and that tip is still the task's own (route=proved-tip);
+# that call is a no-op that says so.
 # relaunch runs the same re-admission before it stops the live worker, and
 # fm-spawn.sh runs it again at the launch that applies the grant. The receipt
 # names the route and the proved tip, and so does the best-effort
@@ -882,7 +883,7 @@ do_successor() {
   # while it still descends from the tip proved at its admission, as the next
   # launch re-admits it.
   fm_local_firstmate_state_dirs "$STATE" \
-    || die "cannot list the local Firstmate homes to compare successor names against: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed"
+    || successor_refuse homes "cannot list the local Firstmate homes to compare successor names against: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed"
   homes=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
   if [ "$su_outcome" = successor-already-recorded ]; then
     proof=$(fm_successor_recorded_proof "$ID" "$old_branch" "$base_branch" "$META" "$project" "$wt" "$SUCC_BRANCH" "$recorded_tip" "${homes[@]}") \
@@ -890,7 +891,7 @@ do_successor() {
   else
     reason=$(fm_successor_name_refusal "$SUCC_BRANCH" "$old_branch" "$base_branch" "$META" "$project" "${homes[@]}") \
       || successor_refuse name "successor branch '$SUCC_BRANCH' is not admissible: $reason; nothing was changed"
-    proof=$(fm_successor_proof "$project" "$ID" "$old_branch" "$SUCC_BRANCH" "$wt") \
+    proof=$(fm_successor_proof "$project" "$ID" "$old_branch" "$SUCC_BRANCH" "$wt" "$base_branch") \
       || successor_refuse proof "$proof; nothing was changed"
   fi
   su_route=$(printf '%s\n' "$proof" | sed -n 's/^route=//p')
@@ -1248,7 +1249,7 @@ reassociate_list() {
 # Validate record <m> against the world and work out which pool slots it
 # claims and leaves and which of its copies a reset could reach. Writes nothing.
 reassociate_check() {  # <record-index>
-  local m=$1 old_wt project kind kind_count branch_count old_branch new_wt new_branch="" pr recorded_succ=""
+  local m=$1 old_wt project kind kind_count branch_count old_branch new_wt new_branch="" pr recorded_succ="" claimant
   local old_real="" old_state=present slot_result=none old_released=0 set_branch=0 brief_branch_other=0
   local line slot registered prior_real j brief
   local -a left_slots=() new_slots=() own_copies=() proofs=()
@@ -1333,6 +1334,12 @@ reassociate_check() {  # <record-index>
     recorded_succ=$(fm_meta_get "$META" successor_branch)
     [ -z "$recorded_succ" ] || [ "$new_branch" = "$recorded_succ" ] \
       || die "task $ID records successor branch $recorded_succ, and replacement copy $new_wt is on '$new_branch'; while a successor is recorded a ship may be reassociated only onto a copy on that successor branch, which drops the successor record; nothing was changed"
+    fm_local_firstmate_state_dirs "$STATE" tolerant
+    if claimant=$(fm_successor_claimant "$new_branch" "$META" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
+      "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule reassociate --task "$ID" \
+        --source-ok true --successor "$new_branch" 2>/dev/null || true
+      die "replacement copy $new_wt is on refs/heads/$new_branch, which task $claimant records as its successor branch, so task $ID may not take it; nothing was changed"
+    fi
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         "Ship branch: $old_branch") ;;

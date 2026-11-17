@@ -1066,6 +1066,36 @@ test_successor_note_cannot_add_a_ship_branch_line() {
   pass "successor: a note with a Ship branch line is refused, and the instructions keep one Ship branch line through a record and its repeat"
 }
 
+# R2-2: once a task records a successor, a fresh spawn of another task whose branch
+# is that ref (task <id>-v2 ships fm/<id>-v2 by default) refuses before it creates
+# anything, names the recording task and the ref, and writes a deny event. With no
+# record anywhere the same spawn goes on exactly as a spawn of an unclaimed id does.
+# The project path does not exist, so a spawn that passes the check stops at its
+# ordinary project error and launches nothing.
+test_successor_fresh_spawn_refuses_a_branch_another_task_records() {
+  local id=suc-spawn dir out rc before unclaimed
+  dir=$(new_successor_case spawn "$id")
+  : > "$FM_GUARD_EVENT_LOG"
+  rc=0; before=$(run_spawn "$dir" "$id-v2" "$dir/no-such-project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 1 "$rc" "the no-record control stops at its project error"$'\n'"$before"
+  rc=0; unclaimed=$(run_spawn "$dir" "$id-v9" "$dir/no-such-project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 1 "$rc" "the unclaimed control stops at its project error"$'\n'"$unclaimed"
+  assert_equals "$(printf '%s\n' "$unclaimed" | sed "s/$id-v9/$id-v2/g")" "$before" "with no record anywhere the spawn must go on as a spawn of an unclaimed id does"
+  case "$before" in *"spawn refused"*) fail "a spawn with no successor record anywhere was refused: $before" ;; esac
+  [ -z "$(jq -c 'select(.guard == "successor-branch-admission")' "$FM_GUARD_EVENT_LOG")" ] || fail "a spawn with no record wrote a successor-branch-admission event"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --note "successor before the collision") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  snap "$dir" before-spawn
+  rc=0; out=$(run_spawn "$dir" "$id-v2" "$dir/no-such-project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 1 "$rc" "a fresh spawn onto another task's recorded successor must refuse"$'\n'"$out"
+  assert_contains "$out" "task $id records refs/heads/fm/$id-v2 as its successor branch" "the refusal must name the recording task and the ref"
+  snap "$dir" after-spawn
+  same "$dir" before-spawn after-spawn "the refused spawn" state data wt wt-other proj-git nm fake sentinel
+  [ -n "$(jq -c --arg b "fm/$id-v2" 'select(.guard == "successor-branch-admission" and .rule == "spawn" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
+    || fail "the refused spawn wrote no successor-branch-admission deny event naming the ref"
+  pass "successor: a fresh spawn onto another task's recorded successor refuses and changes nothing, and with no record it goes on as before"
+}
+
 # F6 (d): the receipt says what the launch will do for a launch that no profile governs.
 test_successor_receipt_matches_what_the_launch_will_do() {
   local id=suc-receipt2 dir out rc
@@ -1101,6 +1131,7 @@ test_successor_refuses_a_copy_outside_the_projects_ref_store
 test_successor_post_rename_publication_failure_restores_everything
 test_successor_refusals_write_no_file_under_the_default_event_log
 test_successor_event_log_failure_changes_neither_a_refusal_nor_a_record
+test_successor_fresh_spawn_refuses_a_branch_another_task_records
 test_successor_reads_the_note_file_only_after_admission
 test_successor_keeps_the_composer_dialog_file
 test_successor_note_cannot_add_a_ship_branch_line

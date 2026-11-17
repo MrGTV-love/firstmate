@@ -346,8 +346,11 @@ test_scott_receipt_and_events_name_the_archive_tip_route() {
 }
 
 # C4: the relaunch re-runs the re-admission and fails closed. Each hand-edited
-# record below names the archived pipeline head as its proved tip; each is refused
-# at the relaunch, and no line for its name reaches a profile.
+# record below names the task's own archived pipeline head as its proved tip, and
+# each bad branch fails another part of the re-admission: it is missing, checked
+# out in another work tree, lacks that tip in its history, or is outside the name
+# family. Each is refused at the relaunch, and no line for its name reaches a
+# profile. A proved tip that is not the task's own is the next test's case.
 test_scott_launch_re_proves_the_whole_admission() {
   local dir out rc fx sb tip bad want proved
   if [ "$(uname -s)" != Darwin ]; then
@@ -388,6 +391,38 @@ test_scott_launch_re_proves_the_whole_admission() {
   assert_contains "$out" "no successor_proved_tip=" "the refusal must name the missing proved tip"
   [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "a line for a successor with no proved tip reached the launch profile"
   pass "Scott shape: a hand-edited record naming a missing branch, a branch checked out in another work tree, a branch without the proved tip, a name outside the family or no proved tip is refused at the relaunch with no profile line for it"
+}
+
+# R2-1: a proved tip must be the task's own. A hand-edited record names an in-family
+# branch and, as its proved tip, the project's first commit, which every branch
+# contains; the relaunch and the launch owner each refuse it.
+test_scott_relaunch_and_launch_refuse_a_proved_tip_that_is_not_the_task_own() {
+  local dir out rc fx sb first
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the successor is re-admitted only for a confined launch, which is macOS only\n'
+    return 0
+  fi
+  dir=$(new_scott_case foreign-tip)
+  fx=$dir/fx
+  sb=$dir/home/state/$TASK.write-confinement.sb
+  first=$(git -C "$fx/project" rev-list --max-parents=0 main | head -n 1)
+  git -C "$fx/project" branch "$OLD-foo" "$OLD"
+  git -C "$fx/project" merge-base --is-ancestor "$first" "$OLD-foo" || fail "the fixture's branch must contain the first commit"
+  printf 'successor_branch=%s\nsuccessor_proved_tip=%s\n' "$OLD-foo" "$first" >> "$dir/home/state/$TASK.meta"
+  rm -f "$sb"
+  : > "$FM_GUARD_EVENT_LOG"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "hand edited tip") || rc=$?
+  [ "$rc" != 0 ] || fail "the relaunch must refuse a proved tip that is not the task's own"$'\n'"$out"
+  assert_contains "$out" "is not a commit of task $TASK's own" "the relaunch refusal must say the tip is not the task's"
+  assert_contains "$out" "refused before stopping the running agent" "the relaunch must refuse before it stops the worker"
+  [ ! -f "$sb" ] || ! grep -qF "$OLD-foo\"" "$sb" || fail "a line for the branch reached the profile at the relaunch"
+  printf 'zsh' > "$dir/fake/command"
+  rc=0; out=$(run_spawn "$dir" "$TASK" --relaunch --harness claude) || rc=$?
+  [ "$rc" != 0 ] || fail "the launch owner must refuse a proved tip that is not the task's own"$'\n'"$out"
+  assert_contains "$out" "is not a commit of task $TASK's own" "the launch refusal must say the tip is not the task's"
+  [ ! -f "$sb" ] || ! grep -qF "$OLD-foo\"" "$sb" || fail "a line for the branch reached the profile at the launch"
+  [ -n "$(admission_event launch deny)" ] || fail "the launch refusal wrote no successor-branch-admission deny event"
+  pass "Scott shape: a hand-edited record whose proved tip is the project's first commit is refused at the relaunch and by the launch owner"
 }
 
 # One commit on top of the archived pipeline head, the shape a custody return or a
@@ -664,6 +699,7 @@ test_scott_launch_re_proves_the_whole_admission
 test_scott_repeat_re_admits_a_recorded_successor_past_its_proved_tip
 test_scott_relaunch_admits_a_successor_past_its_proved_tip_and_refuses_one_without_it_before_stopping
 test_scott_relaunch_refuses_a_successor_another_task_records
+test_scott_relaunch_and_launch_refuse_a_proved_tip_that_is_not_the_task_own
 test_scott_launch_refusal_is_the_successor_guards
 test_scott_relaunch_changes_the_copy_only_as_a_relaunch_without_the_successor_does
 test_scott_launch_refuses_when_another_task_record_cannot_be_read

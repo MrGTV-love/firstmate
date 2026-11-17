@@ -10,8 +10,14 @@
 # Three callers apply the same rule: fm-control.sh `successor` at admission and
 # when it is repeated for an already-recorded successor, fm-control.sh `relaunch`
 # before it stops the live worker, and fm-spawn.sh each time it builds a launch's
-# profile, so a record edited by hand to name a branch the operation would have
-# refused never widens a launch.
+# profile. A record edited by hand therefore never widens a launch beyond one
+# branch in the task's name family that no other task records, that is checked
+# out in no other work tree, and whose history contains a commit of the task's
+# own (see fm_successor_tip_is_own).
+#
+# A fresh spawn and a reassociation of another task ask fm_successor_claimant
+# whether some task's record already names their branch as its successor_branch=,
+# and refuse when one does, so no later task takes over a recorded successor ref.
 #
 # fm_successor_name_refusal <name> <recorded-branch> <base-branch> <own-meta> <project> <state-dir>...
 #   Prints the reason and returns 1 when <name> may not be the successor of the task whose record is <own-meta>;
@@ -40,7 +46,7 @@
 #   refused, on any file system. bin/fm-write-confinement.py repeats the family
 #   bound on the name it is handed.
 #
-# fm_successor_proof <project> <task-id> <recorded-branch> <successor> <copy> [<proved-tip>]
+# fm_successor_proof <project> <task-id> <recorded-branch> <successor> <copy> <base-branch> [<proved-tip>]
 #   Prints, on success, the lines `route=checked-out`, `route=archive-tip` or
 #   `route=proved-tip`, `archive=<name>` (the matched archive branch, for the
 #   archive route only), `successor_sha=<sha>`, `prior_sha=<sha>` (the recorded
@@ -57,17 +63,33 @@
 #     - no work tree other than the recorded copy has it checked out (every
 #       worktree on the branch is checked, not the first one listed);
 #     - and, without <proved-tip> (a first admission), one of two routes holds:
-#         checked-out: it is the branch checked out in the recorded copy and the
-#           recorded branch's tip is an ancestor of, or equal to, its tip; the
-#           proved tip is the recorded branch's tip;
+#         checked-out: it is the branch checked out in the recorded copy, the
+#           recorded branch's tip is an ancestor of, or equal to, its tip, and
+#           that tip is the task's own (fm_successor_tip_is_own); the proved tip
+#           is the recorded branch's tip;
 #         archive-tip: the tip of one of the task's own custody archive branches
 #           archive/<task>-(submitted|pipeline)-<8 hex>, whose hex is the first
 #           eight digits of that archive's own tip, is an ancestor of, or equal
 #           to, its tip; the proved tip is that archive's tip;
 #     - or, with <proved-tip> (a successor the record already names, with the
 #       tip proved at its admission), route proved-tip: that commit is an
-#       ancestor of, or equal to, its tip. A successor whose history no longer
-#       contains the proved tip is refused.
+#       ancestor of, or equal to, its tip and is still the task's own
+#       (fm_successor_tip_is_own). A successor whose history no longer contains
+#       the proved tip, or a proved tip that is not the task's own, is refused.
+#
+# fm_successor_tip_is_own <copy> <task-id> <recorded-tip> <base-branch> <tip>
+#   True when <tip> is a commit of this task's own: the tip of one of its own
+#   archive/<task>-(submitted|pipeline)-<8 hex> branches, or a commit in the
+#   recorded branch's history that the project's default branch and the task's
+#   recorded base branch (local or origin) do not contain. A commit every branch
+#   shares, such as the project's first commit, is never the task's own; when
+#   neither the default nor the base branch resolves, only an archive tip is.
+#
+# fm_successor_claimant <branch> <own-meta> <state-dir>...
+#   Prints the id of a task other than <own-meta>'s whose record names <branch>
+#   as its successor_branch= (case ignored) and returns 0; returns 1 when no
+#   readable record does. A record or folder that cannot be read is skipped, so
+#   a home with no recorded successor behaves as it always did.
 #
 # fm_successor_recorded_proof <task-id> <recorded-branch> <base-branch> <own-meta> <project> <copy> <successor> <proved-tip> <state-dir>...
 #   The admission of a successor the record already names: the name rule, then
@@ -82,6 +104,39 @@ fi
 
 fm_successor_lc() {  # <string>: the string in lower case (bash 3.2 has no ${var,,})
   printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]'
+}
+
+# The project's default branch name: origin/HEAD's, else main or master when it
+# exists locally; empty when none does.
+fm_successor_default_branch() {  # <project>
+  local default
+  default=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  default=${default#origin/}
+  if [ -z "$default" ]; then
+    for default in main master; do
+      git -C "$1" show-ref --verify --quiet "refs/heads/$default" 2>/dev/null && break
+      default=
+    done
+  fi
+  printf '%s' "$default"
+}
+
+fm_successor_claimant() {  # <branch> <own-meta> <state-dir>...
+  local lname own=$2 state meta succ
+  lname=$(fm_successor_lc "$1")
+  shift 2
+  for state in "$@"; do
+    for meta in "$state"/*.meta; do
+      [ -f "$meta" ] && [ -r "$meta" ] || continue
+      [ "$meta" != "$own" ] && [ ! "$meta" -ef "$own" ] || continue
+      while IFS= read -r succ; do
+        [ -n "$succ" ] && [ "$lname" = "$(fm_successor_lc "$succ")" ] || continue
+        basename "$meta" .meta
+        return 0
+      done < <(LC_ALL=C sed -n 's/^successor_branch=//p' "$meta" 2>/dev/null)
+    done
+  done
+  return 1
 }
 
 fm_successor_name_refusal() {
@@ -111,14 +166,7 @@ fm_successor_name_refusal() {
     lbase=$(fm_successor_lc "$base")
     [ "$lname" != "$lbase" ] || { echo "it equals the task's recorded base branch"; return 1; }
   fi
-  default=$(git -C "$project" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
-  default=${default#origin/}
-  if [ -z "$default" ]; then
-    for default in main master; do
-      git -C "$project" show-ref --verify --quiet "refs/heads/$default" 2>/dev/null && break
-      default=
-    done
-  fi
+  default=$(fm_successor_default_branch "$project")
   if [ -n "$default" ]; then
     ldefault=$(fm_successor_lc "$default")
     [ "$lname" != "$ldefault" ] || { echo "it is the project's default branch"; return 1; }
@@ -204,18 +252,38 @@ fm_successor_checkout_paths() {  # <project> <successor>
 # matches. No other name can match: the task id is anchored by the trailing '-',
 # the middle word is one of two, the hex is eight lowercase digits and must equal
 # the archive's own tip's first eight.
-fm_successor_archive_match() {  # <project> <task-id> <successor-sha>
-  local project=$1 id=$2 sha=$3 name tip rest
+# With `exact`, the archive's tip must equal <successor-sha>.
+fm_successor_archive_match() {  # <project> <task-id> <successor-sha> [exact]
+  local project=$1 id=$2 sha=$3 exact=${4-} name tip rest
   while read -r name tip; do
     rest=${name#"archive/$id-"}
     [ "$rest" != "$name" ] || continue
     [[ $rest =~ ^(submitted|pipeline)-([0-9a-f]{8})$ ]] || continue
     [ "${tip:0:8}" = "${BASH_REMATCH[2]}" ] || continue
-    git -C "$project" merge-base --is-ancestor "$tip" "$sha" 2>/dev/null || continue
+    if [ -n "$exact" ]; then
+      [ "$tip" = "$sha" ] || continue
+    else
+      git -C "$project" merge-base --is-ancestor "$tip" "$sha" 2>/dev/null || continue
+    fi
     printf '%s %s\n' "$name" "$tip"
     return 0
   done < <(git -C "$project" for-each-ref --format='%(refname:short) %(objectname)' "refs/heads/archive/$id-submitted-*" "refs/heads/archive/$id-pipeline-*" 2>/dev/null)
   return 1
+}
+
+fm_successor_tip_is_own() {  # <copy> <task-id> <recorded-tip> <base-branch> <tip>
+  local copy=$1 id=$2 prior=$3 base=$4 tip=$5 name ref shared seen=0
+  fm_successor_archive_match "$copy" "$id" "$tip" exact >/dev/null && return 0
+  [ -n "$prior" ] && git -C "$copy" merge-base --is-ancestor "$tip" "$prior" 2>/dev/null || return 1
+  for name in "$(fm_successor_default_branch "$copy")" "$base"; do
+    [ -n "$name" ] || continue
+    for ref in "refs/heads/$name" "refs/remotes/origin/$name"; do
+      shared=$(git -C "$copy" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null) || continue
+      seen=1
+      ! git -C "$copy" merge-base --is-ancestor "$tip" "$shared" 2>/dev/null || return 1
+    done
+  done
+  [ "$seen" = 1 ]
 }
 
 # The git common directory of a path, canonical; empty when it has none.
@@ -226,8 +294,8 @@ fm_successor_store_of() {  # <path>
   (cd "$common" 2>/dev/null && pwd -P)
 }
 
-fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <copy> [<proved-tip>]
-  local project=$1 id=$2 recorded=$3 successor=$4 wt=$5 proved=${6-}
+fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <copy> <base-branch> [<proved-tip>]
+  local project=$1 id=$2 recorded=$3 successor=$4 wt=$5 base=$6 proved=${7-}
   local succ_sha copy paths path elsewhere="" in_copy=0 why1 archive_match archive_name prior_sha="" copy_store project_store
   copy=$(fm_task_copy_canonical_dir "$wt") || {
     echo "task $id's recorded copy $wt is not a directory, so the successor cannot be proved to be this task's"
@@ -273,6 +341,10 @@ fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <cop
       echo "successor branch '$successor' at $succ_sha no longer contains the tip $proved proved at its admission"
       return 1
     }
+    fm_successor_tip_is_own "$copy" "$id" "$prior_sha" "$base" "$proved" || {
+      echo "the tip $proved recorded as proved at the successor's admission is not a commit of task $id's own: it is neither the tip of one of its archive/$id-(submitted|pipeline)-<8 hex> branches nor a commit of the recorded branch '$recorded' that the project's default or base branch does not contain"
+      return 1
+    }
     printf 'route=proved-tip\nsuccessor_sha=%s\nprior_sha=%s\nproved_tip=%s\n' "$succ_sha" "$prior_sha" "$proved"
     return 0
   fi
@@ -283,6 +355,8 @@ fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <cop
     why1="the recorded branch '$recorded' does not exist in the project's ref store"
   elif ! git -C "$copy" merge-base --is-ancestor "$prior_sha" "$succ_sha" 2>/dev/null; then
     why1="the recorded tip $prior_sha is not an ancestor of the successor tip $succ_sha"
+  elif ! fm_successor_tip_is_own "$copy" "$id" "$prior_sha" "$base" "$prior_sha"; then
+    why1="the recorded tip $prior_sha is shared with the project's default or base branch, so it is not a commit of the task's own"
   fi
   if [ -z "$why1" ]; then
     printf 'route=checked-out\nsuccessor_sha=%s\nprior_sha=%s\nproved_tip=%s\n' "$succ_sha" "$prior_sha" "$prior_sha"
@@ -308,7 +382,7 @@ fm_successor_recorded_proof() {  # <task-id> <recorded-branch> <base-branch> <ow
     echo "task $id records successor branch '$successor' but no successor_proved_tip=, so the tip proved at its admission is unknown"
     return 1
   }
-  reason=$(fm_successor_proof "$project" "$id" "$recorded" "$successor" "$copy" "$proved") || {
+  reason=$(fm_successor_proof "$project" "$id" "$recorded" "$successor" "$copy" "$base" "$proved") || {
     echo "task $id records successor branch '$successor', which is no longer proved to be this task's: $reason"
     return 1
   }
