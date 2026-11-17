@@ -6391,10 +6391,33 @@ spawn_acquire_pool_slot() {
           last_reason="the pane reported no path"
           continue
         fi
+        # Non-tmux captures can retain physical wraps, even inside the prefix
+        # or decision delimiter. Reassemble only checked-candidate records;
+        # never change the capture seen by other consumers or join samples.
+        acquire_record=''
+        acquire_record_prefix='treehouse: checked /'
         while IFS= read -r output_line; do
-          [[ "$output_line" =~ $acquire_progress_pattern ]] || continue
+          if [ -z "$output_line" ]; then
+            acquire_record=''
+            continue
+          fi
+          case "$output_line" in
+            'treehouse: checked /'*) acquire_record=$output_line ;;
+            *) acquire_record+=$output_line ;;
+          esac
+          case "$acquire_record" in
+            "$acquire_record_prefix"*) ;;
+            *)
+              # A short prefix can itself wrap. Anything else is noise.
+              case "$acquire_record_prefix" in "$acquire_record"*) continue ;; esac
+              acquire_record=''
+              continue
+              ;;
+          esac
+          [[ "$acquire_record" =~ $acquire_progress_pattern ]] || continue
           # Take the first decision delimiter, not a later one inside the reason.
-          acquire_candidate=${output_line#'treehouse: checked '}
+          acquire_candidate=${acquire_record#'treehouse: checked '}
+          acquire_record=''
           acquire_candidate=${acquire_candidate%%: accepted: *}
           acquire_candidate=${acquire_candidate%%: refused: *}
           acquire_candidate=${acquire_candidate%%: skipped: *}

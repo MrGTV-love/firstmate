@@ -72,10 +72,37 @@ case "${1:-} ${2:-}" in
   'workspace create') printf '{"result":{"workspace":{"workspace_id":"wsnew"},"tab":{"tab_id":"seedtab"}}}\n' ;;
   'tab list') printf '{"result":{"tabs":[]}}\n' ;;
   'tab create') printf '{"result":{"tab":{"tab_id":"tabnew"},"root_pane":{"pane_id":"%%9"}}}\n' ;;
-  'pane get') jq -nc --arg pane "${3:-}" --arg cwd "$(cat "$D/cwd")" '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}' ;;
+  'pane get')
+    cwd=$(cat "$D/cwd")
+    if [ -n "${FM_FAKE_PROGRESS_MODE:-}" ]; then
+      n=0
+      [ ! -f "$D/path-reads" ] || n=$(cat "$D/path-reads")
+      n=$((n + 1))
+      printf '%s\n' "$n" > "$D/path-reads"
+      [ "$n" -gt 14 ] || cwd=$FM_FAKE_PROJECT
+    fi
+    jq -nc --arg pane "${3:-}" --arg cwd "$cwd" '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}' ;;
   'agent get') printf '{"error":{"code":"agent_not_found"}}\n' ;;
   'pane process-info') printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%9","shell_pid":4242,"foreground_processes":[]}}}\n' ;;
   'pane read')
+    if [ -n "${FM_FAKE_PROGRESS_MODE:-}" ]; then
+      k=0
+      [ ! -f "$D/progress-samples" ] || k=$(cat "$D/progress-samples")
+      k=$((k + 1))
+      printf '%s\n' "$k" > "$D/progress-samples"
+      {
+        [ ! -f "$D/acquisition-marker" ] || cat "$D/acquisition-marker"
+        if [ "$FM_FAKE_PROGRESS_MODE" = noise ]; then
+          printf 'waiting: treehouse get sample %s\n' "$k"
+        else
+          candidate=$k
+          [ "$FM_FAKE_PROGRESS_MODE" != repeat ] || candidate=0
+          printf 'treehouse: checked /fixture/%0120d/candidate-%04d: skipped: dirty copy sample %s\n' 0 "$candidate" "$k"
+        fi
+      } | fold -w "$FM_FAKE_PROGRESS_WIDTH" | tail -n 200 > "$D/progress-capture"
+      cat "$D/progress-capture"
+      exit 0
+    fi
     if [ -f "$D/acquisition-marker" ]; then
       if [ -n "${FM_FAKE_BOUNDARY_WIDTH:-}" ]; then
         fold -w "$FM_FAKE_BOUNDARY_WIDTH" "$D/acquisition-marker" | tail -n 200 > "$D/boundary-capture"
@@ -305,7 +332,47 @@ test_wrapped_command_echo_does_not_acknowledge_boundary() {
   pass 'wrapped command echo cannot acknowledge the boundary or dispatch get'
 }
 
+test_wrapped_non_tmux_candidate_progress() {
+  local width out status
+  for width in 400 40 12; do
+    make_case "candidate-wrap-$width" ship
+    status=0
+    out=$(FM_FAKE_DIR="$CASE_DIR" FM_FAKE_PROJECT="$PROJ_DIR" \
+      FM_FAKE_PROGRESS_MODE=distinct FM_FAKE_PROGRESS_WIDTH=$width \
+      FM_TEST_TICK_SECONDS=100 BASH_ENV="$ROOT/tests/skip-clock.sh" \
+      fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$ID" "$PROJ_DIR" \
+        --mode local-only --yolo off --backend herdr --harness codex 2>&1) || status=$?
+    expect_code 0 "$status" "new non-tmux candidates at width $width must permit completion beyond 600s: $out"
+    assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$ID.meta" \
+      'a progressing non-tmux get did not accept its isolated copy'
+    [ "$(cat "$CASE_DIR/path-reads")" -gt 14 ] || fail 'the copy arrived before the long-walk seam'
+    pass "non-tmux $width-column candidate records permit a progressing walk beyond 600s"
+  done
+}
+
+test_wrapped_non_tmux_repeats_and_noise_stall() {
+  local mode width out status
+  for mode in repeat noise; do
+    for width in 40 12; do
+      make_case "candidate-$mode-$width" ship
+      status=0
+      out=$(FM_FAKE_DIR="$CASE_DIR" FM_FAKE_PROJECT="$PROJ_DIR" \
+        FM_FAKE_PROGRESS_MODE=$mode FM_FAKE_PROGRESS_WIDTH=$width \
+        FM_TEST_TICK_SECONDS=100 BASH_ENV="$ROOT/tests/skip-clock.sh" \
+        fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$ID" "$PROJ_DIR" \
+          --mode local-only --yolo off --backend herdr --harness codex 2>&1) || status=$?
+      expect_code 1 "$status" "wrapped $mode must not renew acquisition: $out"
+      assert_contains "$out" 'no path or output progress for 600s' 'wrapped activity lost its stall refusal'
+      [ ! -e "$HOME_DIR/state/$ID.meta" ] || fail 'wrapped activity without new candidates published a copy'
+      [ "$(cat "$CASE_DIR/path-reads")" -lt 14 ] || fail 'wrapped activity escaped the stall window'
+      pass "non-tmux $width-column $mode stops without accepting a copy"
+    done
+  done
+}
+
 fm_test_only
+test_wrapped_non_tmux_candidate_progress
+test_wrapped_non_tmux_repeats_and_noise_stall
 test_claude_staged_native_hook_suppression
 test_wrapped_non_tmux_acquisition_boundary
 test_wrapped_command_echo_does_not_acknowledge_boundary
