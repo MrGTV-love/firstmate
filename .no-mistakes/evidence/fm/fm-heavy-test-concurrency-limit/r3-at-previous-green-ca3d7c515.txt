@@ -1,0 +1,16 @@
+CASE R3 jobs clamp: bin/fm-test-isolation-proof.sh --jobs of any length over one candidate, and over two candidates inside one held pass
+  jobs_0_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_0_recorded = 1
+  jobs_1_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_1_recorded = 1
+  jobs_2_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_2_recorded = 1
+  jobs_3_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_3_recorded = 1
+  sampler_gap_p99_max_ms[proof inside one held pass] = 169/170
+  held_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  held_recorded = 1
+  held_peak_workers = 1
+  VIOLATION: proof inside one held pass: the sampler skipped too long (p99 gap 169 ms, max gap 170 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: R3 jobs clamp

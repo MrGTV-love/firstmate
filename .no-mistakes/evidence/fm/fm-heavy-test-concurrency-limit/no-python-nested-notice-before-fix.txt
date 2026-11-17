@@ -1,0 +1,5 @@
+# Before-fix comparison: bin/fm-cpu-pass.sh from 8d6b9527f~1, same no-python3 PATH
+## base shape: HELD=0 + TOKENS dir
+exit=0 stderr: [fm-cpu-pass: running printenv without leasing from its reservation: python3 not found]
+## base shape: HELD=2, TOKENS unset
+exit=0 stderr: [fm-cpu-pass: running printenv without leasing from its reservation: python3 not found]

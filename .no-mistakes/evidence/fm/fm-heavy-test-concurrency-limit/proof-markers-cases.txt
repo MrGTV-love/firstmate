@@ -1,0 +1,35 @@
+CASE F7 one candidate: bin/fm-test-isolation-proof.sh --pool fam --jobs 2 over a single candidate, pool of 2
+  markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  recorded_concurrency = 1
+  jobs_enabled = False
+  RESULT: PASS
+CASE R3 jobs clamp: bin/fm-test-isolation-proof.sh --jobs of any length over one candidate, and over two candidates inside one held pass
+  jobs_0_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_0_recorded = 1
+  jobs_1_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_1_recorded = 1
+  jobs_2_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_2_recorded = 1
+  jobs_3_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  jobs_3_recorded = 1
+  sampler_gap_p99_max_ms[proof inside one held pass] = 173/180
+  held_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  held_recorded = 1
+  held_peak_workers = 1
+  VIOLATION: proof inside one held pass: the sampler skipped too long (p99 gap 173 ms, max gap 180 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+CASE H2 proof: bin/fm-test-isolation-proof.sh --jobs 4 over its candidate set, pool size 2
+  proof_jobs_requested = 4
+  pool_size = 2
+  candidates = 31
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-test-isolation-proof --pool portable']
+  family_jobs_4_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  family_jobs_4_jobs_enabled = False
+  family_jobs_2_markers = ['FM_ISOLATION_BEGIN planned=2', 'FM_ISOLATION_SUMMARY concurrency=2']
+  family_jobs_2_jobs_enabled = True
+  three_candidates_default_jobs_markers = ['FM_ISOLATION_BEGIN planned=3', 'FM_ISOLATION_SUMMARY concurrency=3']
+  three_candidates_default_jobs_enabled = True
+  RESULT: PASS
+SUMMARY: 3 cases, 1 failed: R3 jobs clamp

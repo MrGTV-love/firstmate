@@ -1,0 +1,72 @@
+# Live: real bin/fm-cpu-pass.sh run, PATH has no python3 (tool dir: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.qHnYskUSvy/bin = bash sh env sysctl getconf echo dirname cat true printenv basename uname)
+python3: absent on PATH
+
+## shape: HELD=2 + TOKENS dir exists (lease shape -> notice expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [2]
+stderr: [fm-cpu-pass: running printenv without leasing from its reservation: python3 not found]
+
+## shape: HELD=0 + TOKENS dir exists (silent expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [0]
+stderr: []
+
+## shape: HELD=00 (zero-padded) + TOKENS dir (silent expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [00]
+stderr: []
+
+## shape: HELD=02 (zero-padded positive) + TOKENS dir (notice expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [02]
+stderr: [fm-cpu-pass: running printenv without leasing from its reservation: python3 not found]
+
+## shape: HELD=2, TOKENS unset (silent expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [2]
+stderr: []
+
+## shape: HELD=2, TOKENS empty string (silent expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [2]
+stderr: []
+
+## shape: HELD=2, TOKENS names missing dir (silent expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [2]
+stderr: []
+
+## shape: HELD=2, TOKENS names a regular file (silent expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [2]
+stderr: []
+
+## shape: HELD unset, not nested (top-level notice expected, child gets HELD=0)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [0]
+stderr: [fm-cpu-pass: running printenv without a CPU pass: python3 not found]
+
+## shape: HELD=abc (malformed -> exit 125 expected)
+exit=125
+child stdout (FM_CPU_PASS_HELD seen by child): []
+stderr: [fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer]
+
+## shape: HELD=1 with --passes 2 (exceeds held -> exit 125 expected)
+exit=0
+child stdout (FM_CPU_PASS_HELD seen by child): [1]
+stderr: [fm-cpu-pass: running printenv without leasing from its reservation: python3 not found]
+
+## shape: HELD=1 with --passes 2 (exceeds held -> exit 125 expected)
+fm-cpu-pass: --passes must not exceed FM_CPU_PASS_HELD (1)
+exit=125
+
+# Parity: silent shapes with python3 present (bin/fm-cpu-pass.py path), temp FM_CPU_POOL_DIR
+## python path shape: HELD=0 + TOKENS dir
+0
+exit=0 stderr: []
+## python path shape: HELD=2, TOKENS unset
+2
+exit=0 stderr: []
+## python path shape: HELD=2, TOKENS missing dir
+2
+exit=0 stderr: []
