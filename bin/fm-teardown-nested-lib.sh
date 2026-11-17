@@ -1070,25 +1070,30 @@ teardown_preserved_payload_check() {  # <copy> <mode> <list-file> <files-file>
   teardown_path_outside_removal_roots "$copy" "$real" \
     || { TEARDOWN_PRESERVE_WHY="the preserve resolves inside $TEARDOWN_ROOT_LABEL $TEARDOWN_ROOT_HIT"; return 1; }
   [ -f "$dest/meta/SHA256SUMS" ] && [ ! -L "$dest/meta/SHA256SUMS" ] || { TEARDOWN_PRESERVE_WHY='the preserve has no manifest'; return 1; }
+  # Git can list a directory and an ignored entry inside it (notes/ and
+  # notes/unique.dat), so the files of every entry are gathered and each file is
+  # checked and counted once.
+  : >"$files" || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be written'; return 1; }
   while IFS= read -r -d '' entry; do
     [ -n "$entry" ] || continue
-    find "$copy/$entry" -type f -print0 >"$files" 2>/dev/null \
+    find "$copy/$entry" -type f -print0 >>"$files" 2>/dev/null \
       || { TEARDOWN_PRESERVE_WHY="the files of $(teardown_nul_list_text <(printf '%s\0' "$entry")) cannot be listed"; return 1; }
-    while IFS= read -r -d '' file; do
-      rel=${file#"$copy/"}
-      sum=$(teardown_ignored_sha256 "$file") || { TEARDOWN_PRESERVE_WHY="${rel//$'\n'/\\n} cannot be hashed"; return 1; }
-      grep -qxF -- "$(teardown_manifest_line "$sum" "$rel")" "$dest/meta/SHA256SUMS" \
-        || { TEARDOWN_PRESERVE_WHY="the manifest does not hold ${rel//$'\n'/\\n} as it is in the copy"; return 1; }
-      kept="$dest/files/$rel"
-      [ -f "$kept" ] && [ ! -L "$kept" ] || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} is missing"; return 1; }
-      dir=$(fm_task_copy_canonical_dir "${kept%/*}") \
-        || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} cannot be resolved"; return 1; }
-      case "$dir/" in "$real"/*) ;; *) TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} resolves outside the preserve"; return 1 ;; esac
-      [ "$(teardown_ignored_sha256 "$kept")" = "$sum" ] \
-        || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} does not match the copy"; return 1; }
-      count=$((count + 1))
-    done <"$files"
   done <"$list"
+  LC_ALL=C sort -z -u -o "$files" "$files" || { TEARDOWN_PRESERVE_WHY='the files of the ignored entries cannot be sorted'; return 1; }
+  while IFS= read -r -d '' file; do
+    rel=${file#"$copy/"}
+    sum=$(teardown_ignored_sha256 "$file") || { TEARDOWN_PRESERVE_WHY="${rel//$'\n'/\\n} cannot be hashed"; return 1; }
+    grep -qxF -- "$(teardown_manifest_line "$sum" "$rel")" "$dest/meta/SHA256SUMS" \
+      || { TEARDOWN_PRESERVE_WHY="the manifest does not hold ${rel//$'\n'/\\n} as it is in the copy"; return 1; }
+    kept="$dest/files/$rel"
+    [ -f "$kept" ] && [ ! -L "$kept" ] || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} is missing"; return 1; }
+    dir=$(fm_task_copy_canonical_dir "${kept%/*}") \
+      || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} cannot be resolved"; return 1; }
+    case "$dir/" in "$real"/*) ;; *) TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} resolves outside the preserve"; return 1 ;; esac
+    [ "$(teardown_ignored_sha256 "$kept")" = "$sum" ] \
+      || { TEARDOWN_PRESERVE_WHY="the preserved payload of ${rel//$'\n'/\\n} does not match the copy"; return 1; }
+    count=$((count + 1))
+  done <"$files"
   lines=$(wc -l < "$dest/meta/SHA256SUMS") || { TEARDOWN_PRESERVE_WHY='the manifest cannot be read'; return 1; }
   lines=${lines//[!0-9]/}
   [ "${lines:-x}" = "$count" ] || { TEARDOWN_PRESERVE_WHY="the manifest holds ${lines:-no} lines for the $count files the copy holds"; return 1; }

@@ -9352,6 +9352,44 @@ BODY
   pass 'the root dirt rule skips only a registered worktree of the same repository under .claude/worktrees; one elsewhere, an unregistered directory or repository, or an unreadable worktree list, is dirt'
 }
 
+# CI shard 23 (retained-bundle): Git lists an ignored directory and an ignored
+# file inside it (notes/ and notes/unique.dat). The preserve readback counts
+# each file once, so a whole preserve verifies; a payload changed after the
+# preserve still refuses.
+test_pr400_overlapping_ignored_entries_count_each_file_once() {
+  local body=$TMP_ROOT/pr400-body-overlap.sh
+  cat > "$body" <<'BODY'
+for shape in dirpattern overlap; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  exclude=$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)
+  if [ "$shape" = overlap ]; then
+    printf '%s\n' 'notes/unique.dat' >> "$exclude"
+  else
+    printf '%s\n' 'notes/' >> "$exclude"
+  fi
+  mkdir -p "$copy/notes"
+  printf 'only here\n' > "$copy/notes/unique.dat"
+  r5_reset "$copy"
+  rc=0
+  { teardown_preserve_ignored "$copy" && teardown_ignored_preserved_current "$copy"; } 2>/dev/null || rc=$?
+  echo "$shape readback=$rc"
+  printf 'changed\n' > "$(r5_dest "$copy")/files/notes/unique.dat"
+  rc=0
+  teardown_ignored_preserved_current "$copy" || rc=$?
+  echo "$shape changed=$rc"
+done
+BODY
+  r5_harness pr400-overlap "$body"
+  r5_expect 'dirpattern readback=0' 'pr400-overlap: a plain ignored directory did not verify'
+  r5_expect 'overlap readback=0' 'pr400-overlap: an ignored file Git also lists under its directory was counted twice'
+  r5_expect 'dirpattern changed=1' 'pr400-overlap: a changed payload verified'
+  r5_expect 'overlap changed=1' 'pr400-overlap: a changed payload verified when entries overlap'
+  pass 'the preserve readback counts each ignored file once when Git lists a directory and a file inside it, and still refuses a changed payload'
+}
+
 # R5-1: a launcher's start time is read and converted in UTC, so the hour that
 # repeats when clocks go back cannot move it. Two launchers start at 01:30 EDT
 # and at 01:30 EST on 2026-11-01 in America/New_York; ps prints the same local
@@ -9467,9 +9505,15 @@ TEARDOWN_NESTED_COPIES=("$KC/copy")
 teardown_copy_lock_file() {
   TEARDOWN_FOREIGN_LOCK_FILE=$KC/lock
   TEARDOWN_FOREIGN_LOCK=$(cat "$KC/lock")
+  TEARDOWN_FOREIGN_LOCK_SHA=$(teardown_ignored_sha256 "$KC/lock")
   return 0
 }
 teardown_vernant_lock_pid() { printf '%s\n' 1; }
+# The lock's launcher is gone and no process runs in the copy or holds a file in it open
+# (the scans live in bin/fm-teardown.sh, which this route does not source).
+teardown_launcher_live_since() { return 1; }
+pids_with_cwd_under() { :; }
+pids_with_open_file_under_all() { :; }
 teardown_landed() { [ ! -e "$KC/unlanded" ]; }
 teardown_own_nested_other_repos() { return 0; }
 teardown_friction_outcome() { :; }
@@ -9545,9 +9589,13 @@ kept_helper_dispose() {
   for run in $(seq 1 "$runs"); do
     KC=$kc ROOT=$ROOT COPY=$copy bash -c "$(kept_helper_env)"'
 TEARDOWN_NESTED_COPIES=("$COPY")
-# A product whose dispose needs the proof'"'"'s lock note (round 4) gets it here, so the round-4
-# product is judged on the same path; the current product has no such note.
-! declare -F teardown_lock_proved_note >/dev/null || { teardown_copy_lock_file "$COPY"; teardown_lock_proved_note "$COPY"; }
+# What the entry proof leaves for the copy before dispose (bin/fm-teardown-nested-lib.sh,
+# teardown_removal_final_proof): its lock as first proved and a landing admission (a merged
+# pull request, so no default-branch ref is read). The kept answer'"'"'s judge checks the landing
+# again through teardown_landed.
+teardown_copy_lock_file "$COPY"
+teardown_lock_seen "$COPY" "$TEARDOWN_FOREIGN_LOCK"
+teardown_admit "$COPY" landed "$(git -C "$COPY" rev-parse --verify "HEAD^{commit}" 2>/dev/null)" "pr https://example.invalid/pull/1"
 teardown_own_copy_dispose "$KC" "$COPY" 2>>"$KC/stderr"
 rc=$?
 kept=no
@@ -9739,7 +9787,7 @@ teardown_run_closeout() { TEARDOWN_CLOSEOUT_STDOUT="{\"allowed\": true}"; TEARDO
 teardown_own_locked_copies_prove; rc=$?
 printf "rc=%s\n" "$rc"
 printf "%s\n" "${TEARDOWN_FOREIGN_PROCS[@]}"
-' 2>&1)
+' 2>"$tmp/stderr")
   assert_equals "rc=0"$'\n'"4242	identity	$tmp/other" "$out" "kept-helper-queue: the proof kept a signal queued for the matching kept copy, or dropped another copy's"
   rm -rf "$tmp"
   pass "on a retry whose record matches, the kept copy's proof runs but queues nothing for the retire signal, and another copy's queue stays"
@@ -10089,7 +10137,12 @@ TEARDOWN_NESTED_COPIES=("$COPY")
 mkdir -p "$KC/slot"
 TEARDOWN_RETURN_SLOT=$KC/slot
 TEARDOWN_FOREIGN_PROCS=()
-teardown_foreign_copy_unowned() { return 0; }
+# The real teardown_foreign_copy_unowned records the lock it proved; the landing proof
+# admits the copy (a merged pull request, so no default-branch ref is read).
+teardown_foreign_copy_unowned() {
+  teardown_lock_seen "$1" "$TEARDOWN_FOREIGN_LOCK"
+  teardown_admit "$1" landed "$(git -C "$1" rev-parse --verify "HEAD^{commit}" 2>/dev/null)" "pr https://example.invalid/pull/1"
+}
 prove=0; teardown_own_locked_copies_prove 2>>"$KC/stderr" || prove=$?
 dispose=-
 if [ "$prove" = 0 ]; then dispose=0; teardown_own_copy_dispose "$KC/slot" "$COPY" 2>>"$KC/stderr" || dispose=$?; fi
@@ -11369,6 +11422,7 @@ test_pr400_newline_copy_path_reaches_disposal_whole
 test_pr400_root_return_retry_rechecks_safety
 test_pr400_forgejo_only_landing_is_held
 test_pr400_registered_nested_worktree_is_not_root_dirt
+test_pr400_overlapping_ignored_entries_count_each_file_once
 test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour
 test_pr400_orca_keeps_base_behaviour
 test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
