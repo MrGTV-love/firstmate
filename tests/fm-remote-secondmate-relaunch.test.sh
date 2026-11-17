@@ -827,4 +827,45 @@ for EXPECTED_CASE in unset matching moved; do
 done
 pass "a remote relaunch is bound to the compared endpoint: unset unchanged, matching dispatches, moved refuses"
 
+# --- the host endpoint load digests its record with shasum or sha256sum -------
+# A Linux host may carry sha256sum without shasum. The route verb runs the real
+# endpoint load from a PATH where only sha256sum exists, then from one where
+# neither exists, which must keep refusing.
+digest_path() { # <dir> <with-sha256sum:0|1>
+  local dir=$1 entry name
+  mkdir -p "$dir"
+  IFS=: read -r -a PATH_DIRS <<< "$PATH"
+  for entry in "${PATH_DIRS[@]}"; do
+    [ -d "$entry" ] || continue
+    for name in "$entry"/*; do
+      case "${name##*/}" in shasum|shasum5*|sha256sum) continue ;; esac
+      [ -x "$name" ] && [ ! -e "$dir/${name##*/}" ] && ln -s "$name" "$dir/${name##*/}"
+    done
+  done
+  if [ "$2" = 1 ]; then
+    REAL_DIGEST=$(command -v shasum || command -v sha256sum) || fail "no digest tool to back the sha256sum shim"
+    case "$REAL_DIGEST" in
+      */shasum) printf '#!/bin/sh\nexec %s -a 256 "$@"\n' "$REAL_DIGEST" > "$dir/sha256sum" ;;
+      *) printf '#!/bin/sh\nexec %s "$@"\n' "$REAL_DIGEST" > "$dir/sha256sum" ;;
+    esac
+    chmod +x "$dir/sha256sum"
+  fi
+}
+digest_path "$TMP/digest-sha256sum" 1
+digest_path "$TMP/digest-none" 0
+relaunch_endpoint p1
+for DIGEST_CASE in sha256sum none; do
+  OUT=$(env -i PATH="$TMP/digest-$DIGEST_CASE" HOME="$TMP/user-home" TMPDIR="$TMP/tmp" \
+    FM_HOME="$DEST_HOME" "$TMP/host-root/bin/fm-remote-secondmate-control.sh" route ios 2>&1); RC=$?
+  case "$DIGEST_CASE" in
+    sha256sum)
+      expect_code 0 "$RC" "the endpoint load should succeed where only sha256sum exists"$'\n'"$OUT"
+      assert_contains "$OUT" 'target=fm-remote:p1' "the route did not print the loaded endpoint" ;;
+    none)
+      [ "$RC" -ne 0 ] || fail "the endpoint load accepted a record it could not digest"$'\n'"$OUT"
+      assert_contains "$OUT" 'endpoint metadata is invalid' "the undigestable record did not refuse as invalid" ;;
+  esac
+done
+pass "the host endpoint load digests with sha256sum when shasum is absent and refuses with neither"
+
 echo "ALL TESTS PASSED"

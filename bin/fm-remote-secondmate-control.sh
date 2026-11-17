@@ -131,6 +131,16 @@ remote_endpoint_field() { # <key>
   fm_launch_proof_bytes_field "$REMOTE_ENDPOINT_RECORD" "$1"
 }
 
+remote_sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum
+  else
+    return 1
+  fi | cut -d' ' -f1
+}
+
 remote_endpoint_load() {
   local id=$1 herdr_session bytes copy valid=0
   REMOTE_ENDPOINT_ERROR=
@@ -145,7 +155,7 @@ remote_endpoint_load() {
     valid=1
   else
     REMOTE_ENDPOINT_RECORD=${bytes%x}
-    REMOTE_ENDPOINT_DIGEST=$(set -o pipefail; printf '%s' "$REMOTE_ENDPOINT_RECORD" | shasum -a 256 | cut -d' ' -f1) || REMOTE_ENDPOINT_DIGEST=''
+    REMOTE_ENDPOINT_DIGEST=$(set -o pipefail; printf '%s' "$REMOTE_ENDPOINT_RECORD" | remote_sha256) || REMOTE_ENDPOINT_DIGEST=''
     copy=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-remote-record.XXXXXX") || copy=''
     if [ -z "$REMOTE_ENDPOINT_DIGEST" ] || [ -z "$copy" ] || ! printf '%s' "$REMOTE_ENDPOINT_RECORD" > "$copy" \
       || ! fm_backend_validate_task_endpoint "$copy" "$id" 2>/dev/null; then
@@ -230,10 +240,11 @@ cmd_attribution() { # <id> <recorded-target> [<record-sha256>]
   if cause=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" \
-    FM_LAUNCH_PROOF_VERB_PATH=1 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" || exit 1
+    FM_LAUNCH_PROOF_VERB_PATH=1 bash -c "$(declare -f remote_sha256)"'
+      . "$1/fm-backend.sh" && fm_backend_source herdr && . "$1/fm-launch-proof-lib.sh" || exit 1
       fm_launch_proof_record_read "$2"
       [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ] \
-        && [ "$(set -o pipefail; printf "%s" "$FM_LAUNCH_PROOF_RECORD_BYTES" | shasum -a 256 | cut -d" " -f1)" = "$4" ] \
+        && [ "$(set -o pipefail; printf "%s" "$FM_LAUNCH_PROOF_RECORD_BYTES" | remote_sha256)" = "$4" ] \
         || { printf "its record changed after its endpoint was read"; exit 1; }
       fm_launch_proof_herdr_refusal "$2" "$3"' \
     _ "$SCRIPT_DIR" "$meta" "$target" "$REMOTE_ENDPOINT_DIGEST" 2>/dev/null); then
