@@ -94,8 +94,11 @@ Delivery contract: mode=no-mistakes
 EOF
   done
 
+  fm_test_fake_tmux_acquisition_support "$fakebin" || return
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 case "$*" in *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;; esac
 case "${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
 exit 0
@@ -497,6 +500,8 @@ interrupt_kimi_readiness() {  # <case-dir>
   fm_fake_exit0 "$case_dir/fakebin" kimi
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+. "\${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "\$@" || exit \$?
 case "\$*" in
   *"#{pane_current_path}"*) printf '%s\\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
   *"#{cursor_y}"*) printf '1\\n'; exit 0 ;;
@@ -3577,6 +3582,8 @@ test_fresh_spawn_respects_task_control_custody() (
   cp "$(backlog_of "$case_dir")" "$case_dir/backlog-before"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+. "\${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "\$@" || exit \$?
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;

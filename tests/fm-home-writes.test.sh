@@ -115,6 +115,8 @@ export FM_HOME_WRITE_COPY="$copy" FM_HOME_WRITE_PROCESS="$TMP_ROOT/foreground" \
 printf 'claude\n' > "$FM_HOME_WRITE_PROCESS"
 cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 case "$*" in
   *cursor_y*) printf '1\n'; exit 0 ;;
   *'#{pane_current_path}'*) printf '%s\n' "$FM_HOME_WRITE_COPY"; exit 0 ;;

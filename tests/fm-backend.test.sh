@@ -858,10 +858,13 @@ test_peek_conformance_old_vs_new() {
 make_spawn_fakebin() {  # <dir> <fake-worktree-path> -> echoes fakebin dir
   local dir=$1 wt=$2 fb="$1/fakebin"
   mkdir -p "$fb"
+  fm_test_fake_tmux_acquisition_support "$fb" || return
   cat > "$fb/tmux" <<SH
 #!/usr/bin/env bash
 set -u
 { printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${FM_TMUX_LOG:?}"
+. "\${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "\$@" || exit \$?
 case "\${1:-}" in
   display-message)
     for a in "\$@"; do case "\$a" in *pane_current_path*) printf '%s\\n' "$wt"; exit 0 ;; esac; done
@@ -921,11 +924,14 @@ run_spawn_case() {  # <bin-root> <fakebin> <log> <state> <data> <config> <proj> 
 make_spawn_symlink_fakebin() {  # <dir> <initial-project-path> <worktree-path> -> echoes fakebin dir
   local dir=$1 initial_path=$2 wt=$3 fb="$1/fakebin" counter="$1/poll-count"
   mkdir -p "$fb"
+  fm_test_fake_tmux_acquisition_support "$fb" || return
   : > "$counter"
   cat > "$fb/tmux" <<SH
 #!/usr/bin/env bash
 set -u
 { printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${FM_TMUX_LOG:?}"
+. "\${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "\$@" || exit \$?
 case "\${1:-}" in
   display-message)
     for a in "\$@"; do case "\$a" in *pane_current_path*)

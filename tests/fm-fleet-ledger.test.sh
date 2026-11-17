@@ -14,8 +14,11 @@ TMP_ROOT=$(fm_test_tmproot fm-fleet-ledger)
 make_fakebin() {  # <dir>
   local fakebin
   fakebin=$(fm_fakebin "$1")
+  fm_test_fake_tmux_acquisition_support "$fakebin" || return
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
