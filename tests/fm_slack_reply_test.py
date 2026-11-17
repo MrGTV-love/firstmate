@@ -1631,17 +1631,33 @@ class SecondPersonFollowUpTest(unittest.TestCase):
             self.assertEqual(home.journal().get('followups', {}), {})
 
     def test_sc8_3_follow_ups_that_look_like_answers_are_data_with_no_intake_and_a_journal_row_each(self):
-        with self.scott() as home:
+        # An open decision is held for the captain the whole time (SC8 (3) with a held decision): a live card in the owner's DM, whose hold one follow-up
+        # names. Their follow-ups leave it unchanged, and a positive control shows the same fixture does reach the intake for the owner's answer on the card.
+        with self.scott() as home, patch.object(plane.Watch, 'probe', return_value=(0, 'id')), patch.object(plane.Watch, 'backlog', return_value=[]):
+            card = '300.000100'
+            home.add({'ts': card, 'user': 'UBOT0123456', 'text': 'a decision card'})
+            state = home.journal()
+            state['threads']['task-card:id'] = {'key': 'task-card', 'identity': 'id', 'ts': card, 'options': [{'value': 'v', 'label': 'l', 'hint': ''}],
+                                                'mode': 'done', 'reactions': False, 'retired': False}
+            (home.root / 'state.json').write_text(json.dumps(state))
             request = self.take_in_theirs(home, 'a request')
+            held = home.journal()['threads']['task-card:id']
             del home.children.calls[:]
-            for text in ('approve', '1', 'merge it', 'answer hold h-20261117-1 with 2'):
+            for text in ('approve', '1', 'merge it', 'answer hold h-20261117-1 with 2', 'answer hold task-card with 1'):
                 reply = self.their_message(home, text, thread=request)
                 rc, out, _ = home.poll()
+                self.assertEqual(rc, 0)
                 self.assertEqual([line for line in out.splitlines() if line.startswith('check: slack follow-up')], [their_wake_line(reply, request, text)])
                 event = next(event for event, row in self.their_rows(home).items() if row['reply'] == reply)
                 self.assertEqual(self.their_rows(home)[event]['reason'], NO_AUTHORITY)
             self.assertEqual(self.intake_calls(home), [])
+            self.assertEqual(home.journal()['threads']['task-card:id'], held)
+            self.assertEqual(home.posts(card), [])
+            self.assertEqual(home.journal()['pending'], [])
             self.assertFalse(any(path.name == 'refusals.jsonl' and path.read_text().strip() for path in home.root.iterdir()))
+            home.reply_in(card, '1')                                       # the control: the owner's answer on the same open card
+            home.poll()
+            self.assertIn(('fm-captain-hold.sh', ('answers', '--any-origin', '--source', 'slack-dm')), self.intake_calls(home))
 
     def test_sc8_3_a_secret_shaped_follow_up_is_handled_as_the_owners_is(self):
         secret = DEFAULT_ENV['SLACK_SIGNING_SECRET']
@@ -1879,18 +1895,50 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                 self.assertIn(fresh, [r['ts'] for r in home.requests(out)], env)
 
     def test_sc8_6_liveness_three_times_the_cap_of_their_requests_and_threads_are_all_taken_in_and_read_within_three_polls(self):
-        cap = 2
-        with self.scott() as home:
-            _, threads = self.build(home, 0, 3 * cap)
-            requests = [self.their_message(home, 'a new request %d' % index) for index in range(3 * cap)]
-            woken, reads = set(), set()
-            for _ in range(3):
-                Traced.TRACE.clear()
-                out = home.poll(env={'FM_SLACK_POLL_MAX_ANSWERS': str(cap)})[1]
-                woken |= {ts for ts in requests if 'check: slack request %s from %s' % (ts, SCOTT) in out}
-                reads |= set(self.thread_reads(home, set(threads)))
-            self.assertEqual(woken, set(requests))
-            self.assertEqual(reads, set(threads))
+        for cap in (1, 2, 3):                                           # the (6b) LIVENESS rule is stated per cap C
+            with self.scott() as home:
+                _, threads = self.build(home, 0, 3 * cap)
+                requests = [self.their_message(home, 'a new request %d' % index) for index in range(3 * cap)]
+                woken, reads = set(), set()
+                for _ in range(3):
+                    Traced.TRACE.clear()
+                    out = home.poll(env={'FM_SLACK_POLL_MAX_ANSWERS': str(cap)})[1]
+                    woken |= {ts for ts in requests if 'check: slack request %s from %s' % (ts, SCOTT) in out}
+                    reads |= set(self.thread_reads(home, set(threads)))
+                self.assertEqual(woken, set(requests), cap)
+                self.assertEqual(reads, set(threads), cap)
+
+    def test_sc8_6_at_cap_1_under_a_sustained_owner_request_flood_their_follow_up_is_woken_once_and_every_owner_request_in_order(self):
+        # SC8 (6), C = 1 included: the owner sends a new request before EVERY poll (no end to the owner's load). At cap 1 the one slot alternates while
+        # both have work, so their follow-up, once read, must be taken in on the poll whose slot is theirs: it is woken within a few polls and only once,
+        # and the owner's requests are all woken, each once, in the order sent. Both ways a poll runs: the manual poll, and the two standing checks of one
+        # watcher sweep (the owner's check, then theirs, with the sweep's token).
+        for mode in ('poll', 'checks'):
+            with self.scott(cap='1') as home:
+                (home.dir / 'slacksecond.check.sh').write_text('')
+                (home.dir / 'slacksecond.check-trust').write_text('')
+                request = self.take_in_theirs(home, 'their request')
+                reply = self.their_message(home, 'their follow-up', thread=request)
+                sent, woken_at, owner_woken = [], [], []
+                for poll in range(1, 13):
+                    sent.append(home.say('owner request %d' % poll))
+                    if mode == 'poll':
+                        rc, out, _ = home.poll()
+                        self.assertEqual(rc, 0)
+                    else:
+                        out = ''
+                        for action in ('check', 'check-second'):
+                            rc, part, _ = home.run(['check', '--replay', str(home.transcript)],
+                                                   env={'FM_SLACK_CHECK_ACTION': action, 'FM_CHECK_SWEEP': 'sweep.%d' % poll})
+                            self.assertEqual(rc, 0)
+                            out += part.replace('; ', '\n') + '\n'
+                    if their_wake_line(reply, request, 'their follow-up') in out.splitlines():
+                        woken_at.append(poll)
+                    owner_woken += [row['ts'] for row in home.requests(out) if row['user'] == OWNER]
+                self.assertEqual(len(woken_at), 1, (mode, woken_at))
+                self.assertLessEqual(woken_at[0], 4, (mode, woken_at))
+                self.assertEqual(owner_woken, sent[:len(owner_woken)], mode)
+                self.assertGreaterEqual(len(owner_woken), 6, (mode, owner_woken))
 
     def test_sc8_6_with_slow_calls_of_theirs_each_poll_still_takes_in_their_new_request_and_their_threads_are_read_in_turn(self):
         # Each call into their DM takes 3 s on their budget's clock, so their pass's budget (SECOND_BUDGET, 21 s) holds about seven calls. Their history

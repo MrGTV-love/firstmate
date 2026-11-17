@@ -3655,6 +3655,10 @@ class Watch:
         self.notices_handled = 0
         deferred = deferred or start_error
         if remaining <= 0:
+            # Nothing of the cap is the owner's this poll (at cap 1, the slot their turn reserved): the owner can read nothing to take in, so this poll's
+            # thread reads are theirs (split_reads, as take_in decides them); else their follow-up would be read only on polls whose slot is the owner's
+            # and never taken in (SC8 (6): their threads make progress at every C, C = 1 included, under any owner load). The read turn is not moved.
+            self.split_reads(False)
             self.owner_deferred = deferred
             return 0
         if self.state['threads'] and not self.state.get('channel'):
