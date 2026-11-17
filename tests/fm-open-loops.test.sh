@@ -3835,7 +3835,7 @@ import tempfile
 import time
 
 root = Path(sys.argv[1]).resolve()
-world = Path(tempfile.mkdtemp(prefix='ledger-receipts-'))
+world = Path(tempfile.mkdtemp(prefix='ledger-receipts-')).resolve()
 code = world / 'code'
 shutil.copytree(root / 'bin', code / 'bin')
 # Count the actual local snapshot reader, not a fabricated snapshot.
@@ -3899,8 +3899,10 @@ try:
                    + [dict(row_id='absent', kind='escalated', evidence='not a row'),
                       dict(row_id='row-0', kind='unknown', evidence='invalid kind')])
     assert result.returncode == 1, result
+    assert runs.is_file(), (result.stdout, result.stderr)
     assert len(runs.read_text().splitlines()) == 1, 'a 50-row batch must read one snapshot'
     assert len(stored()['handling']['actions']) == 50, result
+    assert not any(action.get('unverified') for action in stored()['handling']['actions'].values()), result
     assert 'absent' in result.stdout and 'unknown' in result.stdout, result
     assert len(result.stdout.splitlines()) == 53, result.stdout
     call(loops, '--check-actions')
