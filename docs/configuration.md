@@ -1286,6 +1286,59 @@ Each metric's own `observed_at` is authoritative for freshness.
 For each canonical metric the newest observation wins, and a tie goes to the embedded full-precision value; a rounded eval-leaderboard value (`1803`) can therefore win over a full-precision value (`1802.99`) when it is newer.
 Run `bin/fm-model-picker.sh --selftest` for the fixture suite; [`tests/fm-model-picker.test.sh`](../tests/fm-model-picker.test.sh) covers the executable.
 
+### Daily collection
+
+[`bin/fm-model-picker-daily.sh`](../bin/fm-model-picker-daily.sh) `run` collects once with `bin/fm-model-picker.sh --sweep --stale-after-hours 24 --chartdiff --db` through `bin/fm-proc-budget.sh`; its `check` verb tests how old the snapshot is.
+Its header owns the run order, the staging and promotion rules, the wake keys, and the test seams.
+The collector rewrites `aa.sqlite`, `verdict.json`, and `projection/` in place, so `run` works in a staged copy and promotes it only when the collector exits 0.
+A run that exits 1, 2, 3, or 4, or that a budget stop ends, changes nothing under the data root: the last good `aa.sqlite`, `verdict.json`, and `projection/` stay byte-identical.
+`dispatch_log` and `outcomes` are never replaced, including rows the shadow picker writes while a run is under way.
+Promotion writes an `UNTRUSTED` verdict first, installs the staged files, commits the matrix in one database transaction, and only then replaces the verdict; `bin/fm_model_picker/daily.py` `promote` owns the order.
+A failure before the commit undoes every step and returns the previous verdict only when every undo succeeded, so a failed promotion leaves the last good snapshot byte-identical; if an undo fails too, the verdict stays `UNTRUSTED`.
+A failure or kill after the commit leaves the complete new generation under an `UNTRUSTED` verdict.
+A trusted verdict therefore never sits over a mixed generation, and the next good run repairs any `UNTRUSTED` leftover.
+The wake names the outcome first and the verdict a reader actually sees, read back from the file.
+A signal that ends the whole runner during that short window leaves the verdict `UNTRUSTED` with no wake until the next daily run repairs it.
+A run removes only its own staging directory, and a stale one only when its owner record names a process that is gone; it never touches another directory beside the data root.
+
+Two kinds of `check:` wake come from it.
+Both are queued with `fm_wake_append` and kind `check` from `bin/fm-wake-lib.sh`, the call `bin/fm-mem-guard.sh` and `bin/fm-merge-prune.sh` already make from outside a session, and both read `check: model-picker-daily: ...`.
+
+| Wake | When | Names |
+| --- | --- | --- |
+| Failed run | The collector exits with anything but 0 | The exit code, the first stderr line (the chart-diff line when stderr is empty, as for an `UNTRUSTED` verdict), and the failed run's newest `observed_at` |
+| Stale snapshot | The newest `observed_at` in `aa.sqlite` is older than 36 hours, or the snapshot is missing, empty, or unreadable | The age in hours, or why the snapshot is missing |
+
+A wake key names its UTC day, so a repeat in one day raises nothing and the next day's failure or staleness raises one more.
+The last run's output, and the verdict, reconcile report and newest `observed_at` of a failed run, are in `state/.model-picker-daily.last.*`; none of them is written into the live `aa.sqlite`.
+`check` reads only and takes no run lock, so it still raises its wake while a collection hangs.
+
+The scheduler is two per-user launchd agents for one home, installed by [`bin/fm-model-picker-daily-install.sh`](../bin/fm-model-picker-daily-install.sh) from [`examples/fm-model-picker-daily.plist`](examples/fm-model-picker-daily.plist).
+The installer has the shape of the [out-of-session watchdog](watchdog.md) installer (`install [--print]`, `uninstall`, `status`) because that agent already survives session death and reboot, while a different program on its own interval needs its own labels.
+Nothing else fits: the watcher's `state/<id>.check.sh` checks run only while a session supervises, and session start arms no recurring collection.
+
+| Agent | Runs | Interval | At load |
+| --- | --- | --- | --- |
+| `run` | `fm-model-picker-daily.sh run` | 86400 seconds | Yes, so it also runs at login after a reboot |
+| `check` | `fm-model-picker-daily.sh check` | 3600 seconds | No, so installing raises no stale wake before the first collection can finish |
+
+The check has its own agent because a check made only after a collection would see ages near 24, 48, and 72 hours, and launchd never starts a second instance of a job that is still running.
+`FM_MODEL_PICKER_DATA` and `FM_DATA_OVERRIDE`, when set where `install` runs, are written into both agents' environment, since launchd gives an agent no other.
+The check notices a hung, stopped, or failed daily run, which is the scheduler failure this schedule covers; total launchd death is the inherent limit.
+Both agents unloaded, or the machine off, raises nothing; `status` shows whether each is loaded.
+
+Installing is the captain's decision, and nothing in this repository installs the agents.
+Run this once from the checkout of the home that owns the data root; the `run` agent's first collection starts when it is installed:
+
+```sh
+bin/fm-model-picker-daily-install.sh install
+```
+
+A second install replaces each agent and never duplicates one.
+Switching the picker from shadow to live is a separate decision that this schedule does not make.
+The `--stale-after-hours 24` flag is fixed by the daily command: a page fetched a few minutes into one run is just under 24 hours old when the next run reaches it, so compare pages refresh about every other day.
+[`tests/fm-model-picker-daily.test.sh`](../tests/fm-model-picker-daily.test.sh) covers the runner and the installer against fakes and an injected clock.
+
 ## Shadow model picker (FM_MODEL_PICKER_SHADOW)
 
 `bin/fm-model-picker-shadow.sh` is Phase 2 of the model-picker chain: it observes a dispatch, decides what the picker WOULD have chosen from the trusted Artificial Analysis snapshot plus bounded Jev judgments, and records that beside the dispatch's route: the route that actually launched, or the route `config/crew-dispatch.json` chose when no launch was attached.
