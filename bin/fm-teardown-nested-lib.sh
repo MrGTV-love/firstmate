@@ -96,10 +96,10 @@
 # from the clone's origin URL (GitHub only), shows that PR MERGED with a merge
 # commit that the clone has and that is an ancestor of origin/<landing branch>,
 # read with git and no fetch; and the copy's own changes are proved landed in that
-# merge commit (Content proof, below); and neither the clone's primary checkout nor
-# the clone's own checkout (a linked worktree's HEAD) is on that PR's head branch
-# (forge headRefName), where the driver's DONE-state finish
-# would switch it to the base branch even on a plan (Project lock and checkout,
+# merge commit (Content proof, below); and the clone's primary checkout is not on that
+# PR's head branch (forge headRefName), where the driver's DONE-state finish would
+# switch it to the base branch even on a plan, nor is the clone's own checkout (a linked
+# worktree's HEAD) on it, which the pre-entry read refuses (Project lock and checkout,
 # below). The landing branch is the remote's own default branch, asked of the remote
 # itself (git ls-remote --symref origin HEAD, bounded like the forge read, no fetch)
 # and used only when the clone holds refs/remotes/origin/<branch>. The clone's local
@@ -2324,7 +2324,7 @@ teardown_route_pr_landed() {  # <slot> <pr>
   fi
   current=$(git -C "$slot" symbolic-ref --quiet --short HEAD 2>/dev/null) || current=
   if [ "$current" = "$head" ]; then
-    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's checkout is on PR $pr's head branch $head, which the driver would switch to the base branch even on a plan"
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's own checkout (a linked worktree's HEAD) is on PR $pr's head branch $head, which the read made just before the driver is entered refuses"
     return 1
   fi
   TEARDOWN_ROUTE_HEADREF=$head
