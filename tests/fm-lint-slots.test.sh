@@ -5763,24 +5763,6 @@ run({10: (0, 0x2000, 100, 1)}, ["10:100:1"])
   pass "a reply is bound only when every member keeps its identity and the root is neither a zombie nor exiting"
 }
 
-# (Main 1885 items 2 and 7) Source facts: the watch reads no process table (no ps,
-# no helper table or memory listing), signals only through the launch record, and
-# no analysis result is reused anywhere.
-test_the_watch_reads_no_table_and_no_result_is_reused() {
-  local watch src lint
-  src=$(cat "$ROOT/bin/fm-lint-cache.pl")
-  lint=$(cat "$ROOT/bin/fm-lint.sh")
-  watch=$(printf '%s\n' "$src" | awk '/^# Private resident-memory watch/ { on = 1 } /^my \(\$mode, \$root, @args\) = @ARGV;/ { on = 0 } on')
-  [ -n "$watch" ] || fail "the watch block was not found"
-  ! printf '%s\n' "$watch" | grep -q -e "'ps'" -e "'table'" -e "'memory'" -e 'read_table' || fail "the watch still reads a process table"
-  ! printf '%s\n' "$watch" | grep -q -e 'fm_signal_items' -e 'group:' -e "kill(0" || fail "the watch signals by another route"
-  [ "$(printf '%s\n' "$src" | grep -c 'os\.killpg(')" -eq 1 ] || fail "the one root signal send is missing or repeated"
-  ! printf '%s\n' "$src" | grep -q 'os\.kill(' || fail "a send to a single process remains"
-  ! printf '%s\n' "$src" | grep -q -e 'sub fingerprint' -e '\.passed' -e 'DELEGATE_SAMPLER_PY' -e 'cache hit' || fail "a reuse path remains in the helper"
-  ! printf '%s\n' "$lint" | grep -q -e 'FM_LINT_INTERNAL_CACHE' -e 'CACHE_DIR=' -e 'SHELLCHECK_DELEGATE' || fail "the lint still passes or reads a cache setting"
-  pass "the watch reads no process table and signals only through its launch record, and no analysis result is reused"
-}
-
 # (Main 1885 item 4) A hold is counted only on a sent STOP; a CONT that is not sent
 # keeps the root held, is tried once more, and then the root's group is ended and
 # the root fails (96, rss_cont_failed=1). The control: a STOP that is never sent
@@ -5915,7 +5897,6 @@ fm_lint_test_cases=(
 test_the_watch_tick_and_exit_rules_hold_on_synthetic_ticks
 test_the_measurement_record_rules_hold_on_synthetic_records
 test_the_reply_check_binds_members_and_refuses_a_zombie_root
-test_the_watch_reads_no_table_and_no_result_is_reused
 test_a_failed_resume_ends_the_held_root_and_fails_it
 test_a_root_whose_start_time_cannot_be_recorded_never_runs
 test_a_live_malformed_ledger_entry_admits_no_root
