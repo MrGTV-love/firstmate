@@ -285,9 +285,8 @@ WT_CASE="$TMP_ROOT/wtcase"
 fm_git_worktree "$WT_CASE/project" "$WT_CASE/wt" lab-wt
 cp "$C/.fm-live-lab" "$WT_CASE/.fm-live-lab"
 set_record "$WT_CASE" home "$WT_CASE/wt"
-lab_tmux "$C" new-window -d -t firstmate: -n wtmain -c "$WT_CASE/wt" 'exec sleep 600'
 lab_tmux "$C" kill-window -t firstmate:=main
-lab_tmux "$C" rename-window -t firstmate:=wtmain main
+start_main "$C" "$WT_CASE/wt" || fail "linked-worktree fixture startup"
 run_check "$WT_CASE"
 assert_contains "$CHECK_OUT" "fail primary: the lab home is not a primary checkout" "primary refuses a linked-worktree home"
 lab_tmux "$C" kill-window -t firstmate:=main
@@ -410,7 +409,7 @@ pass "treehouse fails when a pool lands in ~/.treehouse"
 
 # ---- Pi lab: extensions and the session-only trust store -------------------
 
-P=$(make_lab p pi)
+P=$(make_lab p pi) || fail "Pi fixture startup"
 PH="$P/home"
 run_check "$P"
 expect_code 0 "$CHECK_RC" "a Pi lab in up's shape is ready: $CHECK_OUT"
@@ -492,7 +491,7 @@ pass "down stops only recorded lab processes, removes trust entries and task tem
 # shell with another CLAUDE_CONFIG_DIR, and a symlinked store stays a symlink.
 SC="$TMP_ROOT/claude-config"
 mkdir -p "$SC"
-S=$(make_lab s claude "$SC")
+S=$(make_lab s claude "$SC") || fail "custom-config Claude fixture startup"
 mv "$SC/.claude.json" "$TMP_ROOT/claude-store-target.json"
 ln -s "$TMP_ROOT/claude-store-target.json" "$SC/.claude.json"
 HOME_STORE_BEFORE=$(digest "$HOME/.claude.json")
@@ -509,7 +508,7 @@ pass "check and down use the recorded Claude store and keep a symlinked store li
 
 # TERM handlers may write trust again, and an uncooperative lab process must
 # be killed before the store or lab directory is removed.
-X=$(make_lab x claude)
+X=$(make_lab x claude) || fail "x fixture startup"
 cat > "$TMP_ROOT/exit-rewriter.sh" <<'SH'
 store=$1 key=$2 marker=$3
 trap 'sleep 1; node -e "const fs=require(\"node:fs\");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,\"utf8\"));j.projects[k]={hasTrustDialogAccepted:true};fs.writeFileSync(s,JSON.stringify(j))" "$store" "$key"; echo rewrote > "$marker"; exit 0' TERM
@@ -535,7 +534,7 @@ pass "down waits for TERM handlers and escalates before removing trust"
 
 # A pane root may exit on TERM while its child remains alive, reparented and
 # still able to write Claude trust. Teardown must wait for the captured child.
-ORPHAN=$(make_lab orphan claude)
+ORPHAN=$(make_lab orphan claude) || fail "orphan fixture startup"
 cat > "$TMP_ROOT/orphan-rewriter.sh" <<'SH'
 store=$1 key=$2 marker=$3
 trap 'sleep 1; node -e "const fs=require(\"node:fs\");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,\"utf8\"));j.projects[k]={hasTrustDialogAccepted:true};fs.writeFileSync(s,JSON.stringify(j))" "$store" "$key"; echo rewrote > "$marker"; exit 0' TERM
@@ -557,7 +556,7 @@ assert_equals "" "$lab_keys" "reparented child cannot re-add trust after down"
 pass "down waits for captured descendants after their root exits"
 
 # A recorded process can create a new descendant only after TERM arrives.
-LATE=$(make_lab late claude)
+LATE=$(make_lab late claude) || fail "late fixture startup"
 cat > "$TMP_ROOT/late-rewriter.sh" <<'SH'
 store=$1 key=$2 marker=$3
 trap 'bash -c '\''sleep 1; node -e "const fs=require(\"node:fs\");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,\"utf8\"));j.projects[k]={hasTrustDialogAccepted:true};fs.writeFileSync(s,JSON.stringify(j))" "$1" "$2"'\'' _ "$store" "$key" >/dev/null 2>&1 & echo $! > "$marker"; exit 0' TERM
@@ -584,7 +583,7 @@ assert_equals "" "$lab_keys" "TERM-spawned child cannot re-add trust after down"
 pass "down tracks descendants spawned during TERM"
 
 # A reused PID with a different start time must not own its new process tree.
-Y=$(make_lab y claude)
+Y=$(make_lab y claude) || fail "y fixture startup"
 # shellcheck disable=SC2016 # Positional parameters expand in the launched shell.
 start_group bash -c 'sleep 600 & echo $! > "$1"; wait' _ "$TMP_ROOT/reused-child"; REUSED=$!
 until [ -s "$TMP_ROOT/reused-child" ]; do sleep 0.1; done
@@ -600,7 +599,7 @@ pass "down ignores roots with mismatched start times"
 # A group observed empty must not be admitted again if its id is later reused.
 # The ps shim hides the first group's only member on pass 2, then presents an
 # unrelated process under that pgid on pass 3 while another lab group waits.
-GROUP_REUSE=$(make_lab group-reuse claude)
+GROUP_REUSE=$(make_lab group-reuse claude) || fail "group-reuse fixture startup"
 start_group python3 -c 'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)'
 GROUP_ROOT=$!
 start_group python3 -c 'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)'
@@ -638,7 +637,7 @@ pass "down drops empty groups permanently before their ids can be reused"
 
 # Simulate a recorded PID changing identity after TERM: the first process
 # snapshot matches its start time, subsequent snapshots describe a reused PID.
-Z=$(make_lab z claude)
+Z=$(make_lab z claude) || fail "z fixture startup"
 start_group python3 -c 'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)'
 REPLACED=$!
 printf '%s\n' "$REPLACED" >> "$TMP_ROOT/pids"
