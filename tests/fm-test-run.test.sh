@@ -2479,12 +2479,17 @@ shard_fixture_init() {
   cp "$RUNNER" "$dir/bin/fm-test-run.sh"
   # Keep coverage fixtures independent of production duration growth. The
   # optional boundary weight changes only the script tested at that boundary.
+  # Unhinted scripts weigh the same 1 ms as hinted ones, so the count of new
+  # unmeasured tests in the repository cannot move the fixture's packing.
   python3 - "$dir/bin/fm-test-run.sh" "$weight" <<'PY' \
     || fail "could not seed the fixture's measured timing input"
 from pathlib import Path
 import re, sys
 runner = Path(sys.argv[1])
 text = runner.read_text()
+text, n = re.subn(r"(?m)^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=[0-9]+$", "PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=1", text)
+if n != 1:
+    sys.exit("expected one PORTABLE_SERIAL_DEFAULT_WEIGHT_MS assignment")
 start = text.index("portable_serial_weight_hints() {")
 end = text.index("\nEOF", start)
 text = text[:start] + re.sub(

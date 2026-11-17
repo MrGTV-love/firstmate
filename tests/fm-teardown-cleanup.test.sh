@@ -7168,7 +7168,7 @@ test_kept_copy_helper_the_retire_step_leaves_a_matching_kept_copy_out() {
   log=$tmp/log
   # The extraction runs outside the -c text: bash 3.2 misparses a parenthesis in a sed
   # pattern inside eval "$(...)".
-  sed -n '/^teardown_nested_slot() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" > "$tmp/fn.sh"
+  sed -n '/^teardown_nested_slot() {/,/^}/p; /^teardown_unclaimed_pass() {/,/^}/p' "$ROOT/bin/fm-teardown.sh" > "$tmp/fn.sh"
   KC=$tmp ROOT=$ROOT LOG=$log bash -c '
 set +e
 for l in fm-task-copy-lib fm-lock-lib fm-refuse-lib fm-teardown-nested-lib; do . "$ROOT/bin/$l.sh" || exit 9; done
