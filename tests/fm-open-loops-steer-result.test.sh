@@ -166,7 +166,30 @@ c.now = base + 3599
 c.actionable(False, refresh=False)
 c.now = base + 3600
 c.actionable(True, refresh=False)
-print('PASS: ordinary non-question steering also returns for result follow-up at its own limit', flush=True)
+c = Case('ordinary-work-resumed', category='stalled_worker')
+c.delivery(); c.steer()
+c.now = base + 3500
+with c.status.open('a') as stream:
+    stream.write(f'working [at={c.now}]: resumed the requested validation step\n')
+os.utime(c.status, (c.now, c.now))
+c.now = base + 3600
+assert not any(row['id'] == c.ident for row in c.collect()['rows'])
+assert c.ident not in c.cli('--present-overdue').stdout
+print('PASS: stalled work returns at its own limit unless existing progress evidence shows it resumed', flush=True)
+
+# Batch and single actions must enforce the same deadline and unchanged owner/action.
+c = Case('batch-delivery')
+c.delivery()
+batch = c.home / 'actions.jsonl'
+batch.write_text(json.dumps(dict(row_id=c.ident, kind='steered', evidence='001.msg'))+'\n')
+c.cli('action', '--batch', str(batch))
+c.now = base + 1799
+c.actionable(False, refresh=False)
+c.now = base + 1801
+row = c.actionable(True)
+assert (row['owner'], row['next_action'], row['subject']) == (c.row['owner'], c.row['next_action'], c.row['subject'])
+c.cli('action', '--batch', str(batch), expected=1)
+print('PASS: batch steering shares the row deadline and cannot renew expired evidence', flush=True)
 
 # Refused delivery never covers the original obligation, even before its deadline.
 c = Case('failed-delivery')
@@ -222,6 +245,18 @@ c.now += 1
 c.unavailable()
 c.actionable(True)
 print('PASS: unrelated metadata updates do not conceal same-spawn consumer unavailability', flush=True)
+
+# The current verified successor launch, not a stale predecessor, owns current availability.
+c = Case('verified-successor-launch')
+c.delivery(); c.steer()
+(c.home / 'state/worker.meta').write_text('kind=ship\nspawn_gen=successor-generation\n')
+c.task['spawn_gen'] = 'successor-generation'
+c.save_snapshot(); c.now += 1
+c.actionable(False)
+c.now += 1
+c.unavailable('successor-generation')
+c.actionable(True)
+print('PASS: a verified current successor launch becoming unavailable cannot hide behind its predecessor delivery', flush=True)
 
 # Missing generation and unknown liveness do not manufacture proof of a healthy consumer.
 for mode in ('legacy', 'unknown'):

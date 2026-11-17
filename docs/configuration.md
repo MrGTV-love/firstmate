@@ -1020,9 +1020,9 @@ The four-hour input-freshness and new-delivery rules remain recording requiremen
 A zero-limit row permits the delivery's own instant only, and a future delivery timestamp is refused rather than extending the window.
 The same rule governs standing coverage, current-turn action acceptance, and recording a delivery; expiry requests owner reconciliation, not a blind resend or interruption of useful work.
 The collector reuses its existing worker observations to publish optional `consumer` evidence only when the captured `spawn_gen` still matches the actual metadata and its full source identity matches the row.
-An authoritative unavailable consumer with the same source generation returns the steered obligation for follow-up immediately, even before a separate missing-worker row becomes overdue; an absent, unknown, stale or different-generation observation is not evidence of consumer health or an early invalidation.
-A new steer records its optional `consumer_source`, binding the source roots, task and actual `spawn_gen` rather than mutable metadata bytes; unrelated metadata updates therefore cannot mask unavailability of the same launched consumer.
-Older receipts without that binding retain the bounded deadline rather than borrowing a name-only negative.
+An authoritative unavailable consumer returns the steered obligation for follow-up immediately, even before a separate missing-worker row becomes overdue.
+The observation must match the row's current source roots and verified launch, including a verified successor when the obligation survives relaunch; an absent, unknown, stale or mismatched observation is not evidence of health or an early invalidation.
+This reuses current fleet-snapshot and crew-state evidence; a name-only match is never enough.
 A publication marks a delivery requiring follow-up with the existing `requires_followup` flag, so subsequent consumer recovery cannot silently revive it and the same old delivery cannot renew it.
 The existing opaque notification token changes once when result follow-up becomes due and settles on unchanged observations.
 A current new action on the same obligation retains that notification token as its seed rather than replaying the handled notification; another unmet delivery deadline or authoritative unavailability derives a new token for the same still-open obligation.

@@ -441,7 +441,8 @@ class Collector:
         if not stamps:
             evidence += "; no report yet: clock starts at dispatch"
         self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
-                 since, evidence=evidence, informational=informational)
+                 since, evidence=evidence, informational=informational,
+                 source=self.source("report provenance " + ident, self.task_source, ident))
         if long_wait:
             row = next(r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident)
             row["limit_seconds"] = pause_limit
@@ -540,7 +541,8 @@ class Collector:
                                      + (task["current_state"].get("detail") or "observation unavailable"))
             if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
-                         mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
+                         mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")),
+                         source=self.source("worker provenance " + task["id"], self.task_source, task["id"]))
             state = task["current_state"].get("state")
             if state == "failed":
                 # A scout's report is output to consume, not proof its failed
@@ -548,7 +550,8 @@ class Collector:
                 if not self.captain_dropped(task) and (task["kind"] == "scout" or not self.source(
                         "failed deliverable " + task["id"], self.deliverable_landed, task)):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
-                             mtime(self.state / (task["id"] + ".status")))
+                             mtime(self.state / (task["id"] + ".status")),
+                             source=self.source("worker provenance " + task["id"], self.task_source, task["id"]))
             elif ((state == "done" or (state == "unknown" and stopped)) and not task["pr"].get("url")
                   and not self.captain_dropped(task)
                   # The durable status log, not the live pane, owns the completion declaration: a closed
@@ -650,7 +653,8 @@ class Collector:
         if signatures:
             evidence += "; " + signatures[-1][:150]
         self.add("stalled_worker", task["id"], "follow up on the recorded wait and recover the worker", since,
-                 owner="worker:" + task["id"], evidence=evidence)
+                 owner="worker:" + task["id"], evidence=evidence,
+                 source=self.source("worker provenance " + task["id"], self.task_source, task["id"]))
 
     def task_worktree(self, task):
         worktree = task["paths"]["worktree"].get("path")
@@ -1017,7 +1021,9 @@ class Collector:
         meta = self.state / (task + ".meta")
         if meta.is_symlink():
             raise ValueError(f"task metadata {meta.name} must not be a symbolic link")
-        source["generation"] = fingerprint(meta.read_text()) if meta.exists() else None
+        if meta.exists() and not meta.is_file():
+            raise ValueError(f"task metadata {meta.name} must be a regular file")
+        source["generation"] = fingerprint(meta.read_text()) if meta.is_file() else None
         return source
 
     @staticmethod
@@ -1843,16 +1849,15 @@ def same_work(action, row, now):
         age is not None and now - age > action.get("clock_start", action.get("at_epoch", now)))
 
 
-def steer_source(row):
-    """Bind the actual launch, not mutable metadata bytes or a task name alone."""
+def consumer_unavailable(row):
+    """Use only the current collected launch bound to this row, not a name match or old launch."""
     source, observed = row.get("source"), row.get("consumer")
-    if not isinstance(source, dict) or not isinstance(observed, dict) or not observed.get("spawn_gen"):
-        return None
+    if row.get("stale") or not isinstance(source, dict) or not isinstance(observed, dict) \
+            or observed.get("available") is not False or not observed.get("spawn_gen"):
+        return False
     proof = observed.get("source")
     keys = ("home", "state", "data", "config", "task", "generation")
-    if not isinstance(proof, dict) or not all(key in source and proof.get(key) == source[key] for key in keys):
-        return None
-    return dict({key: source[key] for key in keys if key != "generation"}, spawn_gen=observed["spawn_gen"])
+    return isinstance(proof, dict) and all(source.get(key) and proof.get(key) == source[key] for key in keys)
 
 
 def steer_stands(action, row, now):
@@ -1865,10 +1870,7 @@ def steer_stands(action, row, now):
     # Zero-limit work may be handled in its delivery instant, not indefinitely.
     if elapsed < 0 or (elapsed != 0 and elapsed >= limit):
         return False
-    observed = row.get("consumer")
-    return not (not row.get("stale") and isinstance(observed, dict) and observed.get("available") is False
-                and action.get("consumer_source") is not None
-                and steer_source(row) == action["consumer_source"])
+    return not consumer_unavailable(row)
 
 
 def steer_needs_followup(action, row, now):
@@ -2200,8 +2202,7 @@ def record_action(args, state, now, report, waits, waits_error):
         if old.get("kind") == "steered" and old.get("requires_followup") \
                 and same_work(old, by_id[ident], now) and sent <= answered_at(old):
             raise ValueError("this delivery already needs result follow-up; old evidence cannot renew it")
-        candidate = dict(sent_epoch=sent, consumer_source=steer_source(by_id[ident]))
-        if not steer_stands(candidate, by_id[ident], now):
+        if not steer_stands(dict(sent_epoch=sent), by_id[ident], now):
             raise ValueError("steered delivery needs result follow-up: its row limit has elapsed or its consumer"
                              " is unavailable; reconcile the outcome or use an applicable explicit wait")
     if args.kind == "merged" and not merge_recorded(state, by_id[ident], args.evidence):
@@ -2292,9 +2293,6 @@ def record_action(args, state, now, report, waits, waits_error):
         actions[ident]["notification_identity"] = previous_identity
     if sent is not None:
         actions[ident]["sent_epoch"] = sent
-        consumer = steer_source(by_id[ident])
-        if consumer is not None:
-            actions[ident]["consumer_source"] = consumer
     if by_id[ident].get("age_seconds") is not None:
         actions[ident]["clock_start"] = max(now, report["generated_epoch"]) - by_id[ident]["age_seconds"]
     if wait_history:
