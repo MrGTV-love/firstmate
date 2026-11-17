@@ -197,8 +197,8 @@ fixture_startup_case() (
   home=$(cd "$home" && pwd -P)
   cat > "$root/primary.sh" <<'SH'
 #!/usr/bin/env bash
-while [ ! -f "$1/directory" ]; do sleep 0.01; done
-cd "$2" || exit 1
+while [ ! -f "$1/directory" ] && [ ! -f "$1/reply" ]; do sleep 0.01; done
+[ ! -f "$1/directory" ] || cd "$2" || exit 1
 while [ ! -f "$1/reply" ]; do sleep 0.01; done
 printf 'LABREADY-%s\n' "$3"
 exec sleep 600
@@ -216,7 +216,7 @@ SH
     snapshot=$(env -u TMUX TMUX_TMPDIR="$dir" tmux "$@") || return 1
     if [ "$1" = display-message ] && [ "${*: -1}" = '#{pane_current_path}' ] && [ "$snapshot" = "$root" ]; then
       : > "$root/saw-directory-pending"
-      [ "$mode" = never-directory ] || : > "$root/directory"
+      if [ "$mode" = never-directory ]; then : > "$root/reply"; else : > "$root/directory"; fi
     elif [ "$1" = capture-pane ] && [[ "$snapshot" != *"LABREADY-$NONCE"* ]] &&
          [ "$(env -u TMUX TMUX_TMPDIR="$dir" tmux display-message -p -t firstmate:=main '#{pane_current_path}')" = "$home" ]; then
       : > "$root/saw-reply-pending"
@@ -244,6 +244,7 @@ SH
       printf '%s\n' "$output"
       if [ "$mode" = never-directory ]; then
         assert_equals "$root" "$current" "timed-out pane never entered the lab home"
+        assert_contains "$reply" "LABREADY-$NONCE" "the reply alone does not make main ready outside the lab home"
       else
         assert_equals "$home" "$current" "missing reply is tested in the correct directory"
         assert_not_contains "$reply" "LABREADY-$NONCE" "timed-out pane never replied"
