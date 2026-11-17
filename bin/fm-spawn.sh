@@ -6259,9 +6259,20 @@ spawn_acquire_pool_slot() {
   fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
   # Keep earlier gets' scrollback, but distinguish their records from this get's.
   SPAWN_ACQUIRE_EPOCH=$((SPAWN_ACQUIRE_EPOCH + 1))
-  acquire_marker="__firstmate_acquire_${ID}_${SPAWN_ACQUIRE_EPOCH}__"
+  acquire_marker_prefix=__firstmate_acquire_
+  acquire_marker_suffix="$$_${SPAWN_ACQUIRE_EPOCH}__"
+  acquire_marker="$acquire_marker_prefix$acquire_marker_suffix"
+  # Only this control record tolerates physical wraps. Its compact identity
+  # stays within the bounded capture even when the task id is very long.
+  acquire_marker_pattern=$'\n'
+  for ((acquire_marker_index=0; acquire_marker_index<${#acquire_marker}; acquire_marker_index++)); do
+    [ "$acquire_marker_index" -eq 0 ] || acquire_marker_pattern+=$'\n''?'
+    acquire_marker_pattern+="${acquire_marker:acquire_marker_index:1}"
+  done
+  acquire_marker_pattern+=$'\n'
+  # Separate arguments prevent the echoed command from containing the marker.
   spawn_send_or_abort "treehouse get boundary" spawn_send_text_line "$WT_TARGET" \
-    "printf '\n%s\n' $(shell_quote "$acquire_marker")"
+    "printf '\n%s%s\n' $(shell_quote "$acquire_marker_prefix") $(shell_quote "$acquire_marker_suffix")"
 
   # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
   # Target the stable window id, not the name: if the name is ever lost (e.g. an
@@ -6360,13 +6371,13 @@ spawn_acquire_pool_slot() {
         # A first sample may mix retained records and this get's new completions.
         # Cut at the emitted boundary, never discard that entire first sample.
         output=$'\n'"$output"$'\n'
-        case "$output" in
-          *$'\n'"$acquire_marker"$'\n'*)
-            output=${output##*$'\n'"$acquire_marker"$'\n'}
-            acquire_epoch_seen=1
-            ;;
-          *) [ "$acquire_epoch_seen" = 1 ] || output='' ;;
-        esac
+        if [[ "$output" =~ $acquire_marker_pattern ]]; then
+          acquire_marker_capture=${BASH_REMATCH[0]}
+          output=${output##*"$acquire_marker_capture"}
+          acquire_epoch_seen=1
+        else
+          [ "$acquire_epoch_seen" = 1 ] || output=''
+        fi
         if [ "$acquire_get_sent" = 0 ] && [ "$acquire_epoch_seen" = 1 ]; then
           # Use this same poll loop for the acknowledgement. Get cannot emit a
           # burst and scroll the marker out of the bounded capture before it is seen.

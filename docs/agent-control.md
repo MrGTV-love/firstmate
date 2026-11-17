@@ -514,7 +514,7 @@ Its identity is the path field compared exactly, counted only once per get.
 Pane-path changes have a separate per-get seen set: returning to a pane path already observed does not renew, but a stale pane observation cannot suppress a later genuine completion of that candidate.
 Both sets start empty for each get.
 Acquisition capture joins tmux soft wraps into logical records; all other capture consumers retain physical lines.
-The pane acknowledges a per-get output boundary before `treehouse get` is sent, so even a burst larger than the bounded capture cannot hide the boundary before it is established.
+The pane acknowledges a compact per-get output boundary across physical line wraps before `treehouse get` is sent, so even a burst larger than the bounded capture cannot hide the boundary before it is established.
 That boundary excludes inherited records without clearing pane history, including when the first get sample also contains a current completion.
 Changed counters, timestamps, decisions or reasons for a seen candidate, scrolling it out and back, `waiting:` messages and all non-matching output renew nothing.
 A get without those progress lines is judged by pane path alone.

@@ -75,9 +75,25 @@ case "${1:-} ${2:-}" in
   'pane get') jq -nc --arg pane "${3:-}" --arg cwd "$(cat "$D/cwd")" '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}' ;;
   'agent get') printf '{"error":{"code":"agent_not_found"}}\n' ;;
   'pane process-info') printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%9","shell_pid":4242,"foreground_processes":[]}}}\n' ;;
-  'pane read') [ ! -f "$D/acquisition-marker" ] || cat "$D/acquisition-marker" ;;
+  'pane read')
+    if [ -f "$D/acquisition-marker" ]; then
+      if [ -n "${FM_FAKE_BOUNDARY_WIDTH:-}" ]; then
+        fold -w "$FM_FAKE_BOUNDARY_WIDTH" "$D/acquisition-marker" | tail -n 200 > "$D/boundary-capture"
+        cat "$D/boundary-capture"
+      else
+        cat "$D/acquisition-marker"
+      fi
+    fi ;;
   'pane run')
-    case "${4:-}" in printf*__firstmate_acquire_*) bash -c "${4:-}" > "$D/acquisition-marker" ;; esac ;;
+    printf '%s\n' "${4:-}" >> "$D/pane-commands"
+    case "${4:-}" in
+      printf*__firstmate_acquire_*)
+        if [ "${FM_FAKE_BOUNDARY_ECHO_ONLY:-0}" = 1 ]; then
+          printf '%s\n' "${4:-}" > "$D/acquisition-marker"
+        else
+          bash -c "${4:-}" > "$D/acquisition-marker"
+        fi ;;
+    esac ;;
   'pane send-text')
     printf '%s\n' "${4:-}" >> "$D/pane-input.sh"
     case "${4:-}" in
@@ -257,8 +273,42 @@ SH
   done
 }
 
+test_wrapped_non_tmux_acquisition_boundary() {
+  local width name
+  for width in 12 1; do
+    name=wrapped-boundary
+    [ "$width" != 1 ] || printf -v name 'wrapped-%038d' 0
+    make_case "$name" ship
+    FM_FAKE_BOUNDARY_WIDTH=$width FM_TEST_TICK_SECONDS=100 \
+      BASH_ENV="$ROOT/tests/skip-clock.sh" run_spawn ship codex
+    assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$ID.meta" \
+      'wrapped non-tmux boundary prevented acceptance of the isolated copy'
+    [ "$(wc -l < "$CASE_DIR/boundary-capture" | tr -d ' ')" -gt 2 ] \
+      || fail 'the boundary control did not span multiple physical lines'
+    pass "a $width-column non-tmux boundary permits get and isolated-copy acceptance"
+  done
+}
+
+test_wrapped_command_echo_does_not_acknowledge_boundary() {
+  local out status=0
+  make_case boundary-echo ship
+  out=$(FM_FAKE_DIR="$CASE_DIR" FM_FAKE_BOUNDARY_WIDTH=1 \
+    FM_FAKE_BOUNDARY_ECHO_ONLY=1 FM_TEST_TICK_SECONDS=100 \
+    BASH_ENV="$ROOT/tests/skip-clock.sh" \
+    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$ID" "$PROJ_DIR" \
+      --mode local-only --yolo off --backend herdr --harness codex 2>&1) || status=$?
+  expect_code 1 "$status" "command echo must not acknowledge a get: $out"
+  assert_contains "$out" "the pane has not acknowledged this get's output boundary" \
+    'echo-only refusal lost its boundary reason'
+  [ ! -e "$HOME_DIR/state/$ID.meta" ] || fail 'command echo published an acquired copy'
+  ! grep -Fxq 'treehouse get' "$CASE_DIR/pane-commands" || fail 'command echo dispatched get'
+  pass 'wrapped command echo cannot acknowledge the boundary or dispatch get'
+}
+
 fm_test_only
 test_claude_staged_native_hook_suppression
+test_wrapped_non_tmux_acquisition_boundary
+test_wrapped_command_echo_does_not_acknowledge_boundary
 
 if [ -n "$ZSH_BIN" ]; then
   make_case zsh-ship ship
