@@ -52,9 +52,66 @@ A live identity-matched daemon with a fresh beacon then satisfies that boundary 
 The guard remains a backstop.
 [`watcher-continuity.md`](watcher-continuity.md) owns normal continuity.
 
+## Claude final-message ask check
+
+Only the **claude** adapter feeds assistant text into this form check: the existing Claude Code Stop registration passes its original `last_assistant_message` to `bin/fm-turnend-guard.sh --claude` in a primary home, including a secondmate primary.
+It runs after the base's silent input/host/scope exits, but before supervision-need exits, healthy-watcher exits or the auto-arm wait, without charging or resetting the supervision block budget.
+Detection compels a corrective continuation after publication: exit 2 blocks the stop with a reason naming the first failing line, but does not prevent publication or retract text already published.
+The check catches only asks that fail the form; passing the form is not evidence that the captain owns the question, and Main keeps that judgment.
+A lexically correct but substantively empty ask passes this necessary backstop, a stated limit.
+No pass, UNCHECKED turn, uncovered harness or draft state is approval or verified coverage.
+No live Claude run verified this check.
+
+A checked physical line, ignoring case, begins after any spaces or tabs, at most one optional list marker (`-`, `*`, `+`, or digits plus `.`), optional spaces/tabs and emphasis (`*`, `_`), with `needs input:` or `needs-input` (optional colon for the hyphenated form), allowing emphasis before the colon as in `**Needs input**:`.
+An ordinary prose line beginning `needs-input` is also checked, a stated false-positive limit.
+Before the first `if no:` marker it must name exactly one distinct boundary from `credential`, `spend`, `destructive`, `irreversible`, `tool-denial`, and `owner-rule-change`; the text after that marker must contain a letter or digit, on the same physical line.
+Case is ignored; boundary-token neighbors cannot be letters or digits, and spaces, underscores or hyphens inside the two compound boundary names are equivalent.
+Thus `non-destructive` names a boundary, `nondestructive` does not, and repeating one boundary does not name a second distinct boundary.
+The action marker accepts one or more spaces between `if` and `no` and optional spaces before its colon, but not `if-no:` or `if no -`.
+Boundary words in the action do not count as the authority boundary.
+Matching is ASCII-only; the first failing line is reported verbatim cut at 200 bytes in the C locale, and non-ASCII matching is not verified.
+The hold CLI's separate boundary argument still requires its exact lower-case spelling.
+
+Fenced and blockquoted examples are not checked: fences open with at least three backticks or tildes and up to three spaces of indentation, and close with the same character, at least that length, with no trailing info string.
+A four-space or tab-indented fence marker is not an opener; a shorter, different-character or `>`-prefixed marker does not close a fence.
+An unclosed fence hides later lines through end of text, a stated evasion limit.
+Lines beginning with `>` after optional whitespace are quoted; a fence marker inside a quote opens nothing, while a `>` line inside a fence remains fence content.
+An actual ask outside all fences and quotes is checked, including a four-space or tab-indented ask.
+
+Three skip cases record UNCHECKED once for the turn: missing, null, non-string or empty assistant text; `stop_hook_active` true, even with clean text; or a fenced/quoted ask line.
+The record is one best-effort `warn` event under `turnend-ask-gate`, rule `ask-gate-unchecked`, through the existing guard-event writer, never an `allow` or clean-result event.
+A checked failure takes precedence over skipped lines and records only one `deny`, rule `ask-gate-rubber-stamp`; checked text with no failure and no skipped ask records nothing.
+The loop flag therefore skips turns started by a rewake or gate continuation, including the corrective continuation itself; this check cannot force an endless loop.
+The base's malformed/non-JSON input, missing-`jq`, foreign-host, invalid-loop-flag and child-worktree exits stay silent and record nothing.
+These rules do not bypass the existing supervision-health policy or its separate bounded recovery.
+No dialog mirror, new log, daemon, transcript reader or additional adapter process participates.
+`tests/fm-turnend-ask.test.sh` exercises the registered Stop command with native-shaped fixtures and contains the separately confined live-watcher case for downstream execution, not a claimed local live proof.
+
+Every non-Claude harness below is **NOT covered** by this ask check, for its stated integration reason; native text availability is not being denied.
+
+| Harness | Ask-check limit |
+| --- | --- |
+| codex | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| opencode | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| pi | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| pi-signed | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| grok | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| kimi | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| cursor | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| omp | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| dsh | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| muse | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| gemini | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| rovo | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| agy | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+| devin | NOT covered: the adapter does not feed assistant text to the ask check by design. |
+
+Every other or unknown harness is likewise NOT covered without an explicitly implemented and verified assistant-text integration.
+The existing cross-harness supervision backstop below is unchanged.
+
 ## Guard predicates
 
-The turn-end guard checks primary scope first, then supervision need, then watcher health.
+For supervision, the turn-end guard checks primary scope first, then supervision need, then watcher health.
 The mid-turn pull warning in `bin/fm-guard.sh` shares that health check, as described under [pull-warning verdict by supervision model](#pull-warning-verdict-by-supervision-model).
 
 ### Primary scope
@@ -292,7 +349,8 @@ In the default Codex mode, a true value lets the second stop finish after one fo
 
 ### Claude cooperative mode
 
-Claude runs the guard with `--claude`, which ignores `stop_hook_active` and cooperates with the Stop-owned auto-arm.
+Claude runs the guard with `--claude`, whose supervision-health policy ignores `stop_hook_active` and cooperates with the Stop-owned auto-arm.
+The separate [final-message ask check](#claude-final-message-ask-check) honors that flag to bound its corrective continuation.
 Claude Code sets `stop_hook_active=true` on every stop after any stop-hook continuation, including `asyncRewake` rewakes.
 Under the default one-shot behavior, that re-opened the 2026-07-21 blind window.
 
