@@ -109,9 +109,10 @@ fm_test_fake_gh_axi() {
 # appended (every fixture allocation names its pool root), the command found first
 # on PATH, EOF on stdin. Like a real pane, the fixture keeps a LIVE subshell: the
 # command runs in the background, its last output line is the slot the command itself
-# chose, and the subshell cd's into that slot, records its own working directory in
+# chose, and the subshell (under a launcher named treehouse, as a real interactive get
+# is) cd's into that slot, records its own working directory in
 # FM_FAKE_PANE_PATH_FILE (which pane_current_path then reports) and stays alive,
-# touching FM_FAKE_PANE_PATH_FILE.beat every 0.2 s, until the test removes
+# touching FM_FAKE_PANE_PATH_FILE.beat every second, until the test removes
 # FM_FAKE_PANE_PATH_FILE.alive (or about two minutes pass): no signal is ever sent.
 # tmux does not wait for it to exit. A get that fails or names no directory leaves no
 # path file and fails the send. The call is appended to FM_FAKE_TMUX_GET_LOG. Without
@@ -223,14 +224,27 @@ case "${1:-}" in
             else
               chosen=$(cd "$FM_FAKE_TMUX_GET_DIR" && treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null) || exit 1
             fi
-            cd "${chosen##*$'\n'}" || exit 1
-            pwd -P > "$pane_file"
-            n=0
-            while [ -e "$pane_file.alive" ] && [ "$n" -lt 600 ]; do
-              : > "$pane_file.beat"
-              n=$((n + 1))
-              /bin/sleep 0.2
-            done
+            # A real pane's shell in the slot runs under the interactive `treehouse get`
+            # launcher, which the spawn's live-holder rule (bin/fm-slot-provision-lib.sh
+            # is_own) knows by its process name. The fake get is a bash script, so the
+            # live subshell runs under a copy of bash named treehouse instead. It waits
+            # between beats on a read timeout of an idle FIFO, never a forked sleep: a
+            # short-lived child in the slot can exit between the holder scan and its
+            # parent-chain read, and an unreadable chain is a holder.
+            launcher=$pane_file.launcher/treehouse
+            mkdir -p "${launcher%/*}" && cp /bin/bash "$launcher" || exit 1
+            [ "$(uname)" != Darwin ] || codesign -f -s - "$launcher" >/dev/null 2>&1 || true
+            rm -f "$pane_file.tick"
+            mkfifo "$pane_file.tick" && exec 3<>"$pane_file.tick" && rm -f "$pane_file.tick" || exit 1
+            # shellcheck disable=SC2016 # The single-quoted program expands its own positional arguments.
+            exec "$launcher" -c 'cd "$1" || exit 1
+              pwd -P > "$2"
+              n=0
+              while [ -e "$2.alive" ] && [ "$n" -lt 120 ]; do
+                : > "$2.beat"
+                n=$((n + 1))
+                read -r -t 1 -u 3 _ || :
+              done' get "${chosen##*$'\n'}" "$pane_file"
           ) </dev/null >/dev/null 2>&1 &
           n=0
           while [ ! -s "$pane_file" ] && [ "$n" -lt 100 ]; do

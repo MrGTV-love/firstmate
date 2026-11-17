@@ -1378,9 +1378,9 @@ assert_spawn_took_the_slot_its_own_get_chose() {  # <name> <free-slot> <label>
   [ -e "$CASE_DIR/pane-path.getbeat" ] || fail "$3: the get returned as soon as it printed its slot, so it never held the allocation"
   [ "$(grep -c '^get ' "$CASE_DIR/treehouse-calls")" = 1 ] || fail "$3: the spawn's get did not run exactly once: $(cat "$CASE_DIR/treehouse-calls")"
   grep -Fxq "get --root $CASE_DIR/real-root" "$CASE_DIR/treehouse-calls" || fail "$3: the get did not carry the explicit fixture root: $(cat "$CASE_DIR/treehouse-calls")"
-  [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$3: a pool diagnostic command ran: $(cat "$CASE_DIR/treehouse-calls")"
   [ "$chosen" != "$SLOT_DIR" ] || fail "$3: the get chose the recovered slot $SLOT_DIR"
   [ "$chosen" = "$2" ] || fail "$3: the get chose $chosen, not the free slot $2"
+  [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$3: a pool diagnostic command ran: $(cat "$CASE_DIR/treehouse-calls")"
   assert_grep "task=new-$1" "${chosen%/*}/.fm-slot-owner" "$3: the spawn did not claim the slot its get chose"
   [ ! -e "${SLOT_DIR%/*}/.fm-slot-owner" ] || fail "$3: the spawn claimed the recovered slot"
   retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$3: the recovered slot's copy changed"
@@ -1876,37 +1876,41 @@ test_unreadable_local_home_warns_and_proceeds() {
   pass "an unavailable registered local home is named in one warning and the spawn proceeds"
 }
 
-test_conflicting_unleased_alias_refuses_before_allocation || exit 1
-test_unsupported_entry_paths_are_unproved || exit 1
-test_unleased_alias_beside_leased_entry_is_not_held || exit 1
-test_prefiltered_leased_alias_still_needs_repair || exit 1
-test_missing_jq_refusal_names_install || exit 1
-test_unleased_directory_identity_aliases_are_not_held || exit 1
-test_recovered_alias_beside_leased_entry_is_not_held || exit 1
-test_slot_holding_live_nested_current_copy_refuses
-test_conflicting_recovered_alias_refuses_before_allocation
-test_unprovable_entry_path_refusal_names_no_lease
-test_unprovable_slot_hold_still_refuses
-test_recovered_slot_refuses_without_proven_capability
-test_unproven_provider_admits_only_ordinary_leases
-test_unproved_fresh_read_and_blank_version_are_refused
-test_unproven_allocation_runs_no_status_to_place_a_slot
-test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn
-test_missing_state_slot_under_a_dot_treehouse_path_refuses
-test_retained_fingerprint_sees_the_nested_copy_head
-test_lease_entry_oracle_checks_every_field
-test_fixture_provider_gets_name_a_root
-test_forged_capability_holder_cannot_collapse_to_the_old_literal
-test_recovered_slot_allows_allocation_with_proven_capability
-test_proven_capability_does_not_relax_other_refusals
-test_old_holder_is_adopted_and_old_session_exit_cannot_sweep
-test_unadopted_old_holder_refuses_and_adoption_runs_once
-test_home_seed_guard_follows_the_protected_holder
-test_combined_rollout_keeps_recovered_and_new_copies
-test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose
-test_real_provider_recovered_slot_allows_free_slot_allocation
-test_nested_copy_in_leased_slot_allows_allocation
-test_nested_copy_in_superseded_slot_allows_allocation
-test_secondmate_home_slot_with_other_project_copy_allows_allocation
-test_slot_left_by_reassociated_task_is_allocatable
-test_unreadable_local_home_warns_and_proceeds
+# The first case to fail ends the file with a nonzero status (fm_test_run_cases), also for
+# the cases that run in a subshell.
+fm_test_run_cases \
+  test_conflicting_unleased_alias_refuses_before_allocation \
+  test_unsupported_entry_paths_are_unproved \
+  test_unleased_alias_beside_leased_entry_is_not_held \
+  test_prefiltered_leased_alias_still_needs_repair \
+  test_missing_jq_refusal_names_install \
+  test_unleased_directory_identity_aliases_are_not_held \
+  test_recovered_alias_beside_leased_entry_is_not_held \
+  test_slot_holding_live_nested_current_copy_refuses \
+  test_conflicting_recovered_alias_refuses_before_allocation \
+  test_unprovable_entry_path_refusal_names_no_lease \
+  test_unprovable_slot_hold_still_refuses \
+  test_recovered_slot_refuses_without_proven_capability \
+  test_unproven_provider_admits_only_ordinary_leases \
+  test_unproved_fresh_read_and_blank_version_are_refused \
+  test_unproven_allocation_runs_no_status_to_place_a_slot \
+  test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn \
+  test_missing_state_slot_under_a_dot_treehouse_path_refuses \
+  test_retained_fingerprint_sees_the_nested_copy_head \
+  test_lease_entry_oracle_checks_every_field \
+  test_fixture_provider_gets_name_a_root \
+  test_forged_capability_holder_cannot_collapse_to_the_old_literal \
+  test_recovered_slot_allows_allocation_with_proven_capability \
+  test_proven_capability_does_not_relax_other_refusals \
+  test_old_holder_is_adopted_and_old_session_exit_cannot_sweep \
+  test_unadopted_old_holder_refuses_and_adoption_runs_once \
+  test_home_seed_guard_follows_the_protected_holder \
+  test_combined_rollout_keeps_recovered_and_new_copies \
+  test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose \
+  test_real_provider_recovered_slot_allows_free_slot_allocation \
+  test_nested_copy_in_leased_slot_allows_allocation \
+  test_nested_copy_in_superseded_slot_allows_allocation \
+  test_secondmate_home_slot_with_other_project_copy_allows_allocation \
+  test_slot_left_by_reassociated_task_is_allocatable \
+  test_unreadable_local_home_warns_and_proceeds \
+  -- "$@"
