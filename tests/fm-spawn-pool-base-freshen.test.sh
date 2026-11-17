@@ -57,8 +57,13 @@ EOF
 run_spawn() {
   local id=$1
   shift
-  fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" \
-    "$id" "$PROJECT_DIR" "$@"
+  (
+    if [ -n "${FM_TEST_SPAWN:-}" ]; then
+      fm_test_spawn_script() { printf '%s\n' "$FM_TEST_SPAWN"; }
+    fi
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" \
+      "$id" "$PROJECT_DIR" "$@"
+  )
 }
 
 # A copy the slot rules skip is left as found and another is requested; this fake world has no other
@@ -1622,7 +1627,39 @@ make_skip_transport() {
   cat > "$FAKEBIN_DIR/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in
-  *'#{pane_current_path}'*) cat '$CASE_DIR/panepath'; exit 0 ;;
+  *'#{pane_current_path}'*)
+    if [ "\${FM_TEST_FIRST_GET_WALK:-0}" = 1 ] && [ "\$(cat '$CASE_DIR/get-count')" = 1 ]; then
+      reads=0
+      [ ! -e '$CASE_DIR/walk-reads' ] || reads=\$(cat '$CASE_DIR/walk-reads')
+      reads=\$((reads + 1))
+      printf '%s\\n' "\$reads" > '$CASE_DIR/walk-reads'
+      if [ "\$reads" -lt "\${FM_TEST_WALK_READS:-9}" ]; then printf '%s\\n' '$PROJECT_DIR'; exit 0; fi
+    fi
+    if [ "\${FM_TEST_REVISIT_CANDIDATE:-0}" = 1 ]; then
+      get=\$(cat '$CASE_DIR/get-count')
+      reads=0
+      [ ! -e '$CASE_DIR/revisit-'"\$get" ] || reads=\$(cat '$CASE_DIR/revisit-'"\$get")
+      reads=\$((reads + 1))
+      printf '%s\\n' "\$reads" > '$CASE_DIR/revisit-'"\$get"
+      if [ "\$get" = 1 ] && [ "\$reads" = 1 ]; then printf '%s\\n' '$PROJECT_DIR'; exit 0; fi
+      if [ "\$get" = 2 ] && [ "\$reads" -lt 9 ]; then sed -n '1p' '$CASE_DIR/slots'; exit 0; fi
+    fi
+    cat '$CASE_DIR/panepath'; exit 0 ;;
+  *capture-pane*)
+    if [ "\${FM_TEST_REVISIT_CANDIDATE:-0}" = 1 ]; then
+      get=\$(cat '$CASE_DIR/get-count')
+      reads=\$(cat '$CASE_DIR/revisit-'"\$get")
+      if [ "\$get" = 1 ] || [ "\$reads" -ge 6 ]; then
+        printf 'treehouse: checked /fixture/revisited: skipped: same candidate in each get\\n'
+      else
+        printf 'Setting up worktree...\\n'
+      fi
+      exit 0
+    fi
+    if [ "\${FM_TEST_FIRST_GET_WALK:-0}" = 1 ]; then
+      printf 'treehouse: checked /fixture/candidate-%s: skipped: fixture reason\\n' "\$(cat '$CASE_DIR/walk-reads' 2>/dev/null)"
+      exit 0
+    fi ;;
   *send-keys*'treehouse get'*)
     n=\$(( \$(cat '$CASE_DIR/get-count') + 1 ))
     echo "\$n" > '$CASE_DIR/get-count'
@@ -1940,34 +1977,33 @@ test_a_dirty_governed_copy_is_skipped_and_another_is_taken() {
   pass "a dirty governed copy is skipped like any other and another copy is requested"
 }
 
-test_the_loop_budget_is_one_bound_across_all_gets() {
-  local id out
+test_multiple_skips_end_only_when_the_get_stalls() {
+  local id out slot
   id='pool-skip-budget'
   make_skip_case skip-budget "$id" 5
   for slot in "${SKIP_SLOTS[@]}"; do printf 'work\n' > "$slot/uncommitted.txt"; done
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=1000 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=300 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
   assert_no_launch "$CASE_DIR/launch.log"
-  [ "$(cat "$CASE_DIR/get-count")" -le 2 ] || fail "the loop went on to get $(cat "$CASE_DIR/get-count") copies past the absolute bound"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  pass "one absolute bound covers every get in the skip loop"
+  [ "$(cat "$CASE_DIR/get-count")" = 6 ] || fail "not every skipped copy was tried: $out"
+  assert_contains "$out" 'no path or output progress for 600s' 'the exhausted pool did not stall'
+  assert_not_contains "$out" 'absolute extreme' 'total age stopped the skip loop'
+  pass 'multiple skips retain their leases and end only when the next get stalls'
 }
 
-# The bound is also read before a get is typed: when the time is spent between two gets (here, while the first
-# skipped copy is recorded), no second get is typed at all.
-test_no_get_is_typed_once_the_bound_was_spent_between_two_gets() {
+# Slow skip recording is not a reason to refuse the next copy.
+test_a_get_is_typed_after_slow_skip_recording() {
   local id out
   id='pool-bound-between-gets'
   make_skip_case skip-bound-between "$id" 3
   printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_MKDIR_JUMP=2000 FM_TEST_MKDIR_JUMP_PATH="$HOME_DIR/data/$id" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
-  assert_no_launch "$CASE_DIR/launch.log"
-  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was typed after the absolute bound was spent: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  pass "no get is typed once the bound was spent between two gets"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_FIRST_GET_WALK=1 FM_TEST_WALK_READS=3 FM_TEST_TICK_SECONDS=300 FM_TEST_MKDIR_JUMP=2400 FM_TEST_MKDIR_JUMP_PATH="$HOME_DIR/data/$id" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "slow recording prevented a legitimate second get: $out"
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "a second get was not typed: $out"
+  [ -s "$CASE_DIR/launch.log" ] || fail "the second copy was not launched: $out"
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" 'the skipped copy lost its lease'
+  pass 'a second get finishes after 2400 seconds spent recording the first skip'
 }
 
-# Main 1886 N9: the absolute bound is read immediately before each get, AFTER the custody scan. The clock jumps while the scan
-# runs for the second get: at 1799 of 1800 the get is sent (control); at 1800 no get is sent and nothing is launched.
+# Custody remains checked before each get, regardless of the scan duration.
 test_a_get_is_sent_when_the_scan_ends_at_1799() {
   local id out
   id='pool-bound-scan-1799'
@@ -1980,17 +2016,16 @@ test_a_get_is_sent_when_the_scan_ends_at_1799() {
   pass "a get is sent when the custody scan ends at 1799 of 1800"
 }
 
-test_no_get_is_sent_when_the_scan_crosses_the_bound() {
+test_a_get_is_sent_after_a_slow_custody_scan() {
   local id out
   id='pool-bound-scan-1800'
   make_skip_case skip-bound-scan-1800 "$id" 3
   printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1800 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
-  [ -f "$CASE_DIR/jumped" ] || fail "the clock seam never fired, so the 1800 crossing was not simulated"$'\n'"$out"
-  assert_no_launch "$CASE_DIR/launch.log"
-  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was sent after the custody scan crossed the bound: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  pass "no get is sent when the custody scan crosses the bound"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=2400 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "a slow custody scan prevented the next get: $out"
+  [ -f "$CASE_DIR/jumped" ] || fail 'the custody scan seam never fired'
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "no second get after the scan: $out"
+  [ -s "$CASE_DIR/launch.log" ] || fail "the second copy was not launched: $out"
+  pass 'a get is sent after a 2400-second custody scan'
 }
 
 # Main 1886 rule Q: a copy that fails an unknown check (here a failed git status) refuses the whole spawn. It is leased where it
@@ -2207,45 +2242,64 @@ test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_tak
   pass "a stale-submodule copy with an unlanded commit is leased where it stands and another copy is requested"
 }
 
-# 5b. The absolute bound is checked before a copy is accepted: a jump of the whole bound between the two agreeing
-# reads must stop the spawn, not launch it.
-test_the_bound_is_checked_before_a_copy_is_accepted() {
+# Two agreeing reads still establish a settled copy after a slow confirming poll.
+test_a_copy_is_accepted_after_a_long_confirming_poll() {
   local rec id out status
   id='pool-bound-before-accept'
   rec=$(make_case bound-before-accept "$id")
   read_case_record "$rec"
   out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  [ "$status" -ne 0 ] || fail "spawn accepted a copy after the absolute bound was spent"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  assert_no_launch "$CASE_DIR/launch.log"
-  pass "the absolute bound is enforced before a copy is accepted"
+  expect_code 0 "$status" "two agreeing reads were refused because of elapsed time: $out"
+  [ -s "$CASE_DIR/launch.log" ] || fail 'the confirmed copy was not launched'
+  pass 'a long confirming poll does not prevent accepting a settled isolated copy'
 }
 
-# Main 1823 D-D / F6: the bound is read again immediately before the copy is accepted. The clock jumps to the very
-# second the bound ends (1800 of 1800) at the moment the second agreeing read would accept the copy.
-test_the_bound_is_rechecked_just_before_a_copy_is_accepted() {
+# Slow isolation proof is not harm when the pane has reached its isolated copy.
+test_a_copy_is_accepted_after_a_slow_isolation_check() {
   local rec id out status
   id='pool-bound-at-accept'
   rec=$(make_case bound-at-accept "$id")
   read_case_record "$rec"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  [ "$status" -ne 0 ] || fail "spawn accepted a copy at the second the absolute bound ended"$'\n'"$out"
-  pass "the absolute bound is enforced at the moment a copy would be accepted"
+  expect_code 0 "$status" "a slow isolation check prevented accepting a settled copy: $out"
+  [ -f "$CASE_DIR/jumped" ] || fail 'the acceptance clock seam never fired'
+  [ -s "$CASE_DIR/launch.log" ] || fail 'the confirmed copy was not launched'
+  pass 'elapsed time during isolation proof does not prevent accepting a settled copy'
 }
 
-test_the_bound_refusal_at_accept_launches_nothing() {
-  local rec id out
-  id='pool-bound-at-accept-none'
-  rec=$(make_case bound-at-accept-none "$id")
-  read_case_record "$rec"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
-  assert_no_launch "$CASE_DIR/launch.log"
-  pass "no harness is launched when the bound ends as a copy would be accepted"
+# The second get observes the SAME candidate 500 seconds after it starts. That
+# observation must renew its own allowance, allowing arrival at 800 and confirmation
+# at 900; carrying the first get's history would refuse at 600 instead.
+test_each_get_starts_with_empty_candidate_history() {
+  local id out
+  id='pool-candidate-history-reset'
+  make_skip_case candidate-history-reset "$id" 2
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(FM_TEST_REVISIT_CANDIDATE=1 FM_TEST_TICK_SECONDS=100 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "candidate history leaked across gets: $out"
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail 'the second get was not requested'
+  [ "$(cat "$CASE_DIR/revisit-2")" -ge 10 ] || fail 'the second get did not exercise its delayed observation'
+  assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" 'the second copy was not accepted'
+  pass 'each get counts an earlier get candidate anew and finishes its delayed walk'
 }
 
-# The control: ten seconds inside the bound, the same copy is accepted and launched.
+test_a_long_walk_then_skip_requests_and_accepts_another_copy() {
+  local id out
+  id='pool-long-walk-skip'
+  make_skip_case long-walk-skip "$id" 2
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_FIRST_GET_WALK=1 FM_TEST_TICK_SECONDS=300 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "long walk or cross-get age stopped progress: $out"
+  [ "$(cat "$CASE_DIR/walk-reads")" -ge 10 ] || fail 'first get did not walk beyond 2400 scaled seconds'
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "the second get was not sent: $out"
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" 'skipped copy was not leased'
+  assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" 'the second copy was not accepted'
+  [ -s "$CASE_DIR/launch.log" ] || fail 'the second copy was not launched'
+  assert_not_contains "$out" 'absolute extreme' 'long progress hit an elapsed-time ceiling'
+  pass 'a 2400-second candidate walk can skip its first copy and accept the second'
+}
+
+# A shorter isolation proof also accepts and launches the same copy.
 test_a_copy_accepted_inside_the_bound_is_launched() {
   local rec id out
   id='pool-bound-inside'
@@ -2378,8 +2432,8 @@ test_a_copy_that_changes_during_the_move_is_leased_where_it_stands
 test_a_nondefault_base_ref_does_not_move_before_a_skip
 test_a_governed_attached_copy_keeps_its_branch_when_skipped
 test_a_dirty_governed_copy_is_skipped_and_another_is_taken
-test_the_loop_budget_is_one_bound_across_all_gets
-  test_no_get_is_typed_once_the_bound_was_spent_between_two_gets
+test_multiple_skips_end_only_when_the_get_stalls
+  test_a_get_is_typed_after_slow_skip_recording
 test_skipped_copies_are_recorded_and_listed
 test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_new_foreign_ref
@@ -2390,13 +2444,14 @@ test_slot_digest_sees_a_symlink_retarget
 test_slot_digest_fails_when_git_cannot_be_read
 test_the_no_launch_check_fails_when_a_launch_was_logged
 test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_taken
-test_the_bound_is_checked_before_a_copy_is_accepted
-test_the_bound_is_rechecked_just_before_a_copy_is_accepted
-test_the_bound_refusal_at_accept_launches_nothing
+test_a_copy_is_accepted_after_a_long_confirming_poll
+test_a_copy_is_accepted_after_a_slow_isolation_check
+test_each_get_starts_with_empty_candidate_history
+test_a_long_walk_then_skip_requests_and_accepts_another_copy
 test_a_copy_accepted_inside_the_bound_is_launched
 test_a_refused_move_leaves_every_ref_unchanged
 test_a_get_is_sent_when_the_scan_ends_at_1799
-test_no_get_is_sent_when_the_scan_crosses_the_bound
+test_a_get_is_sent_after_a_slow_custody_scan
 test_an_unreadable_copy_refuses_the_whole_spawn_and_is_leased
 test_a_failed_record_write_refuses_the_spawn
 test_a_failed_origin_head_read_after_a_move_refuses

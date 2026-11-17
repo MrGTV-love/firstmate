@@ -508,11 +508,17 @@ A slot is recognized by the rule teardown uses: Treehouse's `<pool>/<slot>/<repo
 A slot a task merely left holds no record's current copy, so it never blocks allocation.
 
 After sending `treehouse get`, a fresh spawn polls the pane until two reads agree on an isolated worktree of the project.
-The wait ends only after ten minutes without a changed pane path or changed output, or at the absolute thirty-minute extreme.
+The wait ends only after 600 seconds without observing a changed pane path or a newly finished candidate.
+A finished candidate is reported at column zero as `treehouse: checked <absolute copy path>: <accepted|refused|skipped>: <reason>`.
+Its identity is the path field compared exactly, counted only once per get; each new get starts with an empty seen set.
+Changed counters, timestamps, decisions or reasons for a seen candidate, scrolling it out and back, `waiting:` messages and all non-matching output renew nothing.
+A get without those progress lines is judged by pane path alone.
+There is no absolute acquisition ceiling: a get that keeps finishing new candidates may finish however long the walk takes, including across skipped copies.
+The separate slot-provisioning thirty-minute absolute bound is unchanged.
 A live `treehouse get` does not expire at a short wall-clock window, but liveness alone does not reset the no-progress clock.
 The same rule applies when the foreground cannot be read, as on zellij and cmux.
 A waiting line every minute names the foreground evidence, elapsed time, idle time and last rejected path.
-A refusal names the no-progress or absolute limit, the poll count, the last path seen, why it was rejected, and the spawning project.
+A refusal names the no-progress limit, the poll count, the last path seen, why it was rejected, and the spawning project.
 Existing acquisition cleanup remains responsible for ending only the refused attempt and its process lease.
 The [measurement record](verification/runtime-backends.md#treehouse-get-entry-wait) retains the earlier acquisition timings and their limitations; those timings did not justify the former short hard cutoff.
 The shared project-lock wait follows observed holder progress rather than total hold age; [`bin/fm-project-lock-lib.sh`](../bin/fm-project-lock-lib.sh) owns its sampling and idle allowance.
@@ -644,7 +650,7 @@ Uncommitted changes in the vanished copy are not recoverable, and the progress n
 **Why the caller prepares the copy.**
 The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
 It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration, which changes repository administration that every lane's worktrees share, or force the checkout on the caller's behalf.
-It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a progress-based isolation poll (pane path or output) that has an absolute extreme, and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
+It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a progress-based isolation poll (changed pane path or newly finished candidate), and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 The caller prepares the copy from the lease, never after `git worktree prune`: run `treehouse get` with no `-b` from the recorded project, then run `git checkout --ignore-other-worktrees <branch>` inside the slot it enters, and pass that slot.
 `treehouse get -b <branch>` fails because the branch already exists, and a plain `git checkout <branch>` refuses while the vanished copy's registration still names the branch.

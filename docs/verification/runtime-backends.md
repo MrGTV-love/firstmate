@@ -710,7 +710,9 @@ What it leaves unproven:
 - How long a get takes on the Studio's Vernant pool under its real load. No run here used it. Only its `treehouse status --json` was timed there, read-only: 31.2 and 34.3 seconds at load 27 to 36 on a pool of 128 records.
 
 `tests/fm-spawn-acquisition-cleanup.test.sh` exercises late acquisition and abort cleanup with a private terminal and a fake process-leased get.
-`tests/fm-spawn-worktree-settle.test.sh` covers no-progress refusal, ongoing output progress and the absolute extreme with a scaled clock.
+`tests/fm-spawn-worktree-settle.test.sh` covers 600-second no-progress refusal, repeated-candidate stalls and newly finished candidates accepted beyond 5400 scaled seconds without an absolute acquisition ceiling.
+Verified 2026-11-17 with fake panes and a scaled clock: `FM_TEST_ONLY=test_new_candidates_finish_after_5400_seconds bash tests/fm-spawn-worktree-settle.test.sh` exited 0 and printed `ok - distinct same-length finished-candidate lines finish at 5405 scaled seconds`.
+The acquisition rule is owned by [agent control](../agent-control.md#reassociating-a-task-with-a-replacement-copy); the separate slot-provisioning absolute bound is unchanged.
 
 ## TeamClaude launcher
 
