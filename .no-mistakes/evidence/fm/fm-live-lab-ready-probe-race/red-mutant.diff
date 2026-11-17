@@ -1,0 +1,27 @@
+15c15
+< . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+---
+> . "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7KG3M0D5CP1J2Y4C1P53GTQ/tests/fixtures.sh"
+167,168c167,168
+< start_main() {  # <root> <home>
+<   local root=$1 home deadline current='' reply=''
+---
+> start_main() {  # BASE one-shot: no wait (mutant)
+>   local root=$1 home
+170,183c170
+<   lab_tmux "$root" new-window -d -t firstmate: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600" || return 1
+<   # new-window can return before its child has changed directory or printed.
+<   # Observe both inputs of the one-shot check; do not retry that verdict.
+<   deadline=$((SECONDS + 10))
+<   while :; do
+<     current=$(lab_tmux "$root" display-message -p -t firstmate:=main '#{pane_current_path}')
+<     reply=$(lab_tmux "$root" capture-pane -p -t firstmate:=main -S -200)
+<     if [ "$current" = "$home" ] && [[ "$reply" == *"LABREADY-$NONCE"* ]]; then return 0; fi
+<     [ "$SECONDS" -lt "$deadline" ] || break
+<     sleep 0.05
+<   done
+<   printf 'fail fixture readiness: window main did not reach lab home %s with LABREADY-%s within 10 seconds (path=%s)\n' \
+<     "$home" "$NONCE" "$current" >&2
+<   return 1
+---
+>   lab_tmux "$root" new-window -d -t firstmate: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600"

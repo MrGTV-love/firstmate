@@ -1,0 +1,8 @@
+== mutant: reply-only
+>     if [[ "$reply" == *"LABREADY-$NONCE"* ]]; then return 0; fi  # MUTANT reply-only
+
+ok - fixture producer waits for both real directory and probe reply
+
+not ok - fixture producer fails when never-directory never becomes ready: expected exit 1, got 0
+bash $M/$k.test.sh --fixture-readiness  1.49s user 3.00s system 25% cpu 17.572 total
+exit=1

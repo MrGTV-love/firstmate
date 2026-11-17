@@ -1,0 +1,4 @@
+
+not ok - fixture producer returned before main reached lab home and replied (path=/Users/charlesabrooker/tmp/fm-live-lab.4Nw2CB/startup-delayed, reply=)
+bash $M/red.test.sh --fixture-readiness  1.22s user 2.45s system 35% cpu 10.390 total
+exit=1

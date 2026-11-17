@@ -1,0 +1,36 @@
+
+ok - fixture producer waits for both real directory and probe reply
+
+fail fixture readiness: window main did not reach lab home /Users/charlesabrooker/tmp/fm-live-lab.rGH6rt/startup-never-directory/home with LABREADY-abc12345 within 10 seconds (path=/Users/charlesabrooker/tmp/fm-live-lab.rGH6rt/startup-never-directory)
+ok - fixture producer bounds never-directory with a named failure
+
+fail fixture readiness: window main did not reach lab home /Users/charlesabrooker/tmp/fm-live-lab.rGH6rt/startup-never-reply/home with LABREADY-abc12345 within 10 seconds (path=/Users/charlesabrooker/tmp/fm-live-lab.rGH6rt/startup-never-reply/home)
+ok - fixture producer bounds never-reply with a named failure
+ok - a ready Claude lab passes every readiness check
+ok - primary fails when session start never took the lab lock
+ok - primary fails when the primary runs in a linked worktree instead of the lab's primary checkout
+ok - probe fails when the primary never answered its nonce
+ok - trust fails when the lab home has no registered Claude trust
+ok - mirror fails when the feed is unwired or has not recorded a whole turn
+ok - host passes and fails according to --expect-host
+ok - watcher fails on a stale beacon
+ok - mate fails when its window is gone or it never reached its charter
+ok - mate off readiness requires inherited material and a disabled home gate
+ok - worker readiness follows current crew state and the recorded accessible gate
+ok - treehouse fails when a pool lands in ~/.treehouse
+ok - extensions fail when the Pi lab lacks the branch extension or loads a stale build
+ok - down refuses anything up did not build
+ok - down stops only recorded lab processes, removes trust entries and task temp dirs
+ok - check and down use the recorded Claude store and keep a symlinked store linked
+tests/fm-live-lab.test.sh: line 527: 71792 Killed: 9               perl -e 'setpgrp(0,0); exec @ARGV' "$@" > /dev/null 2>&1
+ok - down waits for TERM handlers and escalates before removing trust
+ok - down waits for captured descendants after their root exits
+ok - down tracks descendants spawned during TERM
+ok - down ignores roots with mismatched start times
+tests/fm-live-lab.test.sh: line 634: 11076 Killed: 9               perl -e 'setpgrp(0,0); exec @ARGV' "$@" > /dev/null 2>&1
+tests/fm-live-lab.test.sh: line 634: 11077 Killed: 9               perl -e 'setpgrp(0,0); exec @ARGV' "$@" > /dev/null 2>&1
+ok - down drops empty groups permanently before their ids can be reused
+not ok - down waited on a PID with a different start time
+tests/lib.sh: line 526: 28060 Killed: 9               perl -e 'setpgrp(0,0); exec @ARGV' "$@" > /dev/null 2>&1
+bash tests/fm-live-lab.test.sh  43.36s user 74.70s system 33% cpu 5:50.88 total
+exit=1
