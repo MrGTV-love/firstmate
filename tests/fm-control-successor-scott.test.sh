@@ -165,20 +165,23 @@ test_scott_fixture_has_the_shape_the_amendment_names() {
 }
 
 test_scott_admission_proves_the_successor_by_the_task_own_archive_branch() {
-  local dir out rc
+  local dir out rc P
   dir=$(new_scott_case admission)
-  rc=0
-  out=$(sc "$dir" --branch "$SUCC" --check) || rc=$?
-  expect_code 0 "$rc" "the successor of the Scott shape must be admitted by --check"$'\n'"$out"
-  assert_contains "$out" "successor-check $TASK" "--check names its outcome"
-  # The same fixture refuses a branch with no proof tying it to the task: in the
-  # task's name family, but at no archive tip and checked out nowhere.
+  # The fixture refuses a branch with no proof tying it to the task: in the task's
+  # name family, but with no archive tip in its history and checked out nowhere.
   git -C "$dir/fx/project" branch "$OLD-unproved" "$(git -C "$dir/fx/project" rev-parse main)"
   rc=0
-  out=$(sc "$dir" --branch "$OLD-unproved" --check) || rc=$?
+  out=$(sc "$dir" --branch "$OLD-unproved" --note why) || rc=$?
   expect_code 1 "$rc" "an unproved branch must refuse on the Scott shape"$'\n'"$out"
   assert_contains "$out" "is not proved to be this task's successor" "the refusal must name the missing proof"
-  pass "the Scott shape: the successor is admitted by the task's own archive branch, and a branch with no proof is refused"
+  P=$(git -C "$dir/fx/project" rev-parse "refs/heads/$SUCC")
+  rc=0
+  out=$(sc "$dir" --branch "$SUCC" --note "the successor of the Scott shape") || rc=$?
+  expect_code 0 "$rc" "the successor of the Scott shape must be admitted"$'\n'"$out"
+  assert_contains "$out" "successor-recorded $TASK" "the record names its outcome"
+  assert_contains "$out" "route=archive-tip archive=archive/$TASK-pipeline-" "the successor is proved by the task's own pipeline archive"
+  assert_equals "successor_proved_tip=$P" "$(grep '^successor_proved_tip=' "$dir/home/state/$TASK.meta")" "the record must carry the archived pipeline head as the proved tip"
+  pass "the Scott shape: the successor is admitted by the task's own archive branch with the archived head as its proved tip, and a branch with no proof is refused"
 }
 
 # C1: the archive-tip route proves a tip, not a name, so it admits only a name in
@@ -193,13 +196,13 @@ test_scott_name_family_bounds_the_archive_route() {
   for name in develop release/1.x fm/scott-s-copy; do
     git -C "$dir/fx/project" branch "$name" "$tip"
     rc=0
-    out=$(sc "$dir" --branch "$name" --check) || rc=$?
+    out=$(sc "$dir" --branch "$name" --note why) || rc=$?
     expect_code 1 "$rc" "$name at a task archive tip is outside the task's name family and must refuse"$'\n'"$out"
     assert_contains "$out" "outside the task's own name family" "the refusal for $name must name the bound"
   done
   git -C "$dir/fx/project" branch "$OLD-copy" "$tip"
   rc=0
-  out=$(sc "$dir" --branch "$OLD-copy" --check) || rc=$?
+  out=$(sc "$dir" --branch "$OLD-copy" --note why) || rc=$?
   expect_code 0 "$rc" "a name in the family at the same archive tip is the matched control and must be admitted"$'\n'"$out"
   assert_contains "$out" "route=archive-tip" "the control is proved by the archive-tip route"
   pass "the Scott shape: develop, release/1.x and another lineage's name at a task archive tip are refused for the name family, and a name in the family there is admitted"
@@ -273,8 +276,8 @@ test_scott_record_revocation_restores_the_launch_profile() {
   expect_code 0 "$rc" "relaunch with the successor should succeed"$'\n'"$out"
   common=$(cd "$(git -C "$fx/project" rev-parse --path-format=absolute --git-common-dir)" && pwd -P)
   grep -qF "$common/refs/heads/$SUCC\"" "$sb" || fail "the profile must carry the successor"
-  # Removing the record's line (Main's own record edit) and relaunching drops the grant.
-  sed -i.bak '/^successor_branch=/d' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
+  # Removing the record's lines (Main's own record edit) and relaunching drops the grant.
+  sed -i.bak -e '/^successor_branch=/d' -e '/^successor_proved_tip=/d' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
   rc=0
   out=$(run_control "$dir" "$TASK" relaunch --note "revoked") || rc=$?
   expect_code 0 "$rc" "relaunch without the successor should succeed"$'\n'"$out"
@@ -334,19 +337,19 @@ test_scott_receipt_and_events_name_the_archive_tip_route() {
   if [ "$(uname -s)" = Darwin ]; then
     row=$(admission_event launch allow)
     [ -n "$row" ] || fail "no successor-branch-admission allow event was written at the launch that applies the grant"
-    assert_equals archive-tip "$(printf '%s' "$row" | jq -r .route)" "the launch event must name the route"
+    assert_equals proved-tip "$(printf '%s' "$row" | jq -r .route)" "the launch event must name the route that re-admitted the recorded successor"
     assert_equals "$SUCC" "$(printf '%s' "$row" | jq -r .successor)" "the launch event must name the successor"
   else
     printf 'skip: the launch grant is applied on macOS only; Linux remains unconfined\n'
   fi
-  pass "Scott shape: the receipt names route=archive-tip and the matched archive, and the guard writes an event with route and successor at record time and at the launch that applies the grant"
+  pass "Scott shape: the receipt names route=archive-tip and the matched archive, and the guard writes an event with route and successor at record time (archive-tip) and at the launch that applies the grant (proved-tip)"
 }
 
-# C4: the launch re-runs the whole admission and fails closed. Each hand-edited
-# record below passes the name rule; each is refused at the launch, and no line
-# for its name reaches a profile.
+# C4: the relaunch re-runs the re-admission and fails closed. Each hand-edited
+# record below names the archived pipeline head as its proved tip; each is refused
+# at the relaunch, and no line for its name reaches a profile.
 test_scott_launch_re_proves_the_whole_admission() {
-  local dir out rc fx sb tip bad want
+  local dir out rc fx sb tip bad want proved
   if [ "$(uname -s)" != Darwin ]; then
     printf 'skip: the write profile is generated on macOS only; Linux remains unconfined\n'
     return 0
@@ -355,6 +358,7 @@ test_scott_launch_re_proves_the_whole_admission() {
   fx=$dir/fx
   sb=$dir/home/state/$TASK.write-confinement.sb
   tip=$(git -C "$fx/project" rev-parse "refs/heads/$OLD")
+  proved=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
   git -C "$fx/project" branch "$OLD-unproved" "$(git -C "$fx/project" rev-parse main)"
   git -C "$fx/project" worktree add -q -b "$OLD-elsewhere" "$dir/wt-elsewhere" "$tip"
   git -C "$fx/project" branch develop "$tip"
@@ -362,11 +366,11 @@ test_scott_launch_re_proves_the_whole_admission() {
     case "$bad" in
       "$OLD-ghost") want="does not exist in the project's ref store" ;;
       "$OLD-elsewhere") want="which is not this task's recorded copy" ;;
-      "$OLD-unproved") want="is not proved to be this task's successor" ;;
+      "$OLD-unproved") want="no longer contains the tip $proved proved at its admission" ;;
       develop) want="outside the task's own name family" ;;
     esac
-    sed -i.bak '/^successor_branch=/d' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
-    printf 'successor_branch=%s\n' "$bad" >> "$dir/home/state/$TASK.meta"
+    sed -i.bak -e '/^successor_branch=/d' -e '/^successor_proved_tip=/d' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
+    printf 'successor_branch=%s\nsuccessor_proved_tip=%s\n' "$bad" "$proved" >> "$dir/home/state/$TASK.meta"
     rm -f "$sb"
     rc=0
     out=$(run_control "$dir" "$TASK" relaunch --note "hand edited") || rc=$?
@@ -374,29 +378,147 @@ test_scott_launch_re_proves_the_whole_admission() {
     assert_contains "$out" "$want" "the launch refusal of '$bad' must name the missing proof"
     [ ! -f "$sb" ] || ! grep -qF -e "$bad\"" -e "$bad.lock\"" "$sb" || fail "a line for '$bad' reached the launch profile"
   done
-  pass "Scott shape: a hand-edited record naming a missing branch, a branch checked out in another work tree, a branch neither route proves or a name outside the family is refused at the launch with no profile line for it"
+  # A record that names a successor with no proved tip is refused as well.
+  sed -i.bak -e '/^successor_branch=/d' -e '/^successor_proved_tip=/d' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
+  printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  rm -f "$sb"
+  rc=0
+  out=$(run_control "$dir" "$TASK" relaunch --note "hand edited") || rc=$?
+  [ "$rc" != 0 ] || fail "a hand-edited successor with no proved tip must refuse the launch"$'\n'"$out"
+  assert_contains "$out" "no successor_proved_tip=" "the refusal must name the missing proved tip"
+  [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "a line for a successor with no proved tip reached the launch profile"
+  pass "Scott shape: a hand-edited record naming a missing branch, a branch checked out in another work tree, a branch without the proved tip, a name outside the family or no proved tip is refused at the relaunch with no profile line for it"
 }
 
-# C4: --check on a successor the record already names proves it again.
-test_scott_check_proves_a_recorded_successor_again() {
-  local dir out rc fx
+# One commit on top of the archived pipeline head, the shape a custody return or a
+# worker's own commit leaves on the successor branch.
+scott_advance_successor() {  # <case-dir>
+  local fx=$1/fx tip next
+  tip=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
+  next=$(git -C "$fx/project" -c user.name=fmtest -c user.email=fmtest@example.invalid \
+    commit-tree -m "custody fix" -p "$tip" "$tip^{tree}")
+  git -C "$fx/project" update-ref "refs/heads/$SUCC" "$next" "$tip"
+  printf '%s\n' "$next"
+}
+
+# F1: a repeated call re-admits the recorded successor while its history contains
+# the tip proved at its admission, and refuses once it does not.
+test_scott_repeat_re_admits_a_recorded_successor_past_its_proved_tip() {
+  local dir out rc fx proved
   dir=$(new_scott_case recheck)
   fx=$dir/fx
+  proved=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
   rc=0
   out=$(sc "$dir" --branch "$SUCC" --note "recorded") || rc=$?
   expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  cp -p "$dir/home/state/$TASK.meta" "$dir/meta.recorded"
+  scott_advance_successor "$dir" >/dev/null
   rc=0
-  out=$(sc "$dir" --branch "$SUCC" --check) || rc=$?
-  expect_code 0 "$rc" "--check of a still proved recorded successor should succeed"$'\n'"$out"
-  assert_contains "$out" "route=archive-tip" "--check of a recorded successor must show the route it proved again"
-  # The ref moves off every archive tip after it was recorded.
+  out=$(sc "$dir" --branch "$SUCC" --note "repeat") || rc=$?
+  expect_code 0 "$rc" "a recorded successor one commit past its proved tip must be re-admitted"$'\n'"$out"
+  assert_contains "$out" "successor-already-recorded $TASK" "the repeat names its outcome"
+  assert_contains "$out" "route: route=proved-tip successor=$SUCC" "the repeat names the proved-tip route"
+  assert_contains "$out" "proved_tip=$proved" "the repeat names the tip proved at admission"
+  cmp -s "$dir/meta.recorded" "$dir/home/state/$TASK.meta" || fail "the repeat changed the record"
+  # The ref is reset onto history that lacks the proved tip.
   git -C "$fx/project" update-ref "refs/heads/$SUCC" "$(git -C "$fx/project" rev-parse main)"
   rc=0
-  out=$(sc "$dir" --branch "$SUCC" --check) || rc=$?
-  expect_code 1 "$rc" "--check of a recorded successor that is no longer proved must refuse"$'\n'"$out"
+  out=$(sc "$dir" --branch "$SUCC" --note "repeat") || rc=$?
+  expect_code 1 "$rc" "a recorded successor that no longer contains its proved tip must refuse"$'\n'"$out"
   assert_contains "$out" "is no longer proved" "the refusal must say the recorded successor no longer holds"
-  case "$out" in *"recorded earlier"*) fail "the check must not report a stale proof: $out" ;; esac
-  pass "Scott shape: --check on a recorded successor proves it again and refuses once it is no longer proved"
+  assert_contains "$out" "no longer contains the tip $proved" "the refusal must name the proved tip"
+  cmp -s "$dir/meta.recorded" "$dir/home/state/$TASK.meta" || fail "the refusal changed the record"
+  pass "Scott shape: a repeated call re-admits the recorded successor one commit past its proved tip and refuses it once its history lacks that tip"
+}
+
+# F1 and F2 at the relaunch: after the custody return moves the successor one commit
+# past its proved tip, the relaunch admits it and the profile carries it; a successor
+# reset onto history without that tip is refused before the running worker is stopped.
+test_scott_relaunch_admits_a_successor_past_its_proved_tip_and_refuses_one_without_it_before_stopping() {
+  local dir out rc fx sb proved row
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the successor is re-admitted only for a confined launch, which is macOS only\n'
+    return 0
+  fi
+  dir=$(new_scott_case past)
+  fx=$dir/fx
+  sb=$dir/home/state/$TASK.write-confinement.sb
+  proved=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "custody") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  scott_advance_successor "$dir" >/dev/null
+  : > "$FM_GUARD_EVENT_LOG"
+  rm -f "$sb"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "apply after custody") || rc=$?
+  expect_code 0 "$rc" "a relaunch with the successor one commit past its proved tip must succeed"$'\n'"$out"
+  grep -qF "refs/heads/$SUCC\"" "$sb" || fail "the profile of the admitted relaunch must carry the successor"
+  row=$(admission_event launch allow)
+  assert_equals proved-tip "$(printf '%s' "$row" | jq -r .route)" "the launch event must name the proved-tip route"
+  git -C "$fx/project" update-ref "refs/heads/$SUCC" "$(git -C "$fx/project" rev-parse main)"
+  cp -p "$sb" "$dir/sb.before"
+  snap_scott "$dir" before-refusal
+  : > "$FM_GUARD_EVENT_LOG"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "after reset") || rc=$?
+  [ "$rc" != 0 ] || fail "a relaunch whose successor lacks its proved tip must refuse"$'\n'"$out"
+  assert_contains "$out" "no longer contains the tip $proved" "the refusal must name the proved tip"
+  assert_contains "$out" "refused before stopping the running agent" "the refusal must come before the worker is stopped"
+  snap_scott "$dir" after-refusal
+  same "$dir" before-refusal after-refusal "the refused relaunch" state data fake copy custody
+  cmp -s "$dir/sb.before" "$sb" || fail "the refused relaunch changed the write profile"
+  [ -n "$(admission_event relaunch deny)" ] || fail "the refused relaunch wrote no successor-branch-admission deny event"
+  pass "Scott shape: the relaunch admits the successor one commit past its proved tip, and refuses one without it before stopping the worker, changing nothing"
+}
+
+# F1 at the relaunch: another task's ref is still refused, whatever the proof.
+test_scott_relaunch_refuses_a_successor_another_task_records() {
+  local dir out rc sb
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the successor is re-admitted only for a confined launch, which is macOS only\n'
+    return 0
+  fi
+  dir=$(new_scott_case owned)
+  sb=$dir/home/state/$TASK.write-confinement.sb
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "owned later") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  printf 'kind=ship\nbranch=%s\n' "$SUCC" > "$dir/home/state/other-owner.meta"
+  rm -f "$sb"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "owned by another task") || rc=$?
+  [ "$rc" != 0 ] || fail "a successor another task records as its branch must refuse the relaunch"$'\n'"$out"
+  assert_contains "$out" "task other-owner already records it as its branch" "the refusal must name the other task"
+  [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "a line for another task's branch reached the profile"
+  rm -f "$dir/home/state/other-owner.meta"
+  rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "owned by no other task") || rc=$?
+  expect_code 0 "$rc" "with no other owner the relaunch must succeed"$'\n'"$out"
+  grep -qF "refs/heads/$SUCC\"" "$sb" || fail "the control relaunch must carry the successor"
+  pass "Scott shape: a recorded successor that another task records as its branch is refused at the relaunch, and admitted once no other task records it"
+}
+
+# F3 at the launch owner: a successor refusal in bin/fm-spawn.sh is the successor
+# guard's, with a repair that fits a recorded successor.
+test_scott_launch_refusal_is_the_successor_guards() {
+  local dir out rc fx proved
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: the successor is re-admitted only for a confined launch, which is macOS only\n'
+    return 0
+  fi
+  dir=$(new_scott_case spawn-refusal)
+  fx=$dir/fx
+  proved=$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")
+  rc=0; out=$(sc "$dir" --branch "$SUCC" --note "launch owner") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  git -C "$fx/project" update-ref "refs/heads/$SUCC" "$(git -C "$fx/project" rev-parse main)"
+  : > "$FM_GUARD_EVENT_LOG"
+  # The launch owner relaunches only an agent-free endpoint: the fake pane runs a shell.
+  printf 'zsh' > "$dir/fake/command"
+  rc=0; out=$(run_spawn "$dir" "$TASK" --relaunch --harness claude) || rc=$?
+  [ "$rc" != 0 ] || fail "the launch owner must refuse a successor that lacks its proved tip"$'\n'"$out"
+  assert_contains "$out" "no longer contains the tip $proved" "the launch refusal must name the proved tip"
+  assert_contains "$out" "successor_proved_tip=" "the repair must name the recorded proved tip"
+  case "$out" in *"measured root contract"*) fail "the launch refusal printed the fresh-spawn repair: $out" ;; esac
+  [ -n "$(admission_event launch deny)" ] || fail "the launch refusal wrote no successor-branch-admission deny event"
+  [ -z "$(jq -c 'select(.guard == "spawn-write-confinement" and .decision == "deny")' "$FM_GUARD_EVENT_LOG")" ] \
+    || fail "the successor refusal was logged under spawn-write-confinement"
+  pass "Scott shape: the launch owner refuses a successor without its proved tip under successor-branch-admission, with a repair for the record"
 }
 
 # --- Round 2 (outside review of 71d56288f): failing-first tests on the Scott shape ---
@@ -459,7 +581,7 @@ test_scott_launch_refuses_when_another_task_record_cannot_be_read() {
   sb=$dir/home/state/$TASK.write-confinement.sb
   other=$dir/home/state/other-owner.meta
   printf 'kind=ship\nbranch=%s\n' "$SUCC" > "$other"
-  printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  printf 'successor_branch=%s\nsuccessor_proved_tip=%s\n' "$SUCC" "$(git -C "$dir/fx/project" rev-parse "refs/heads/$SUCC")" >> "$dir/home/state/$TASK.meta"
   chmod 000 "$other"
   rm -f "$sb"
   rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "owner unreadable") || rc=$?
@@ -494,7 +616,7 @@ test_scott_launch_refuses_a_copy_outside_the_projects_ref_store() {
   # which refuses a copy that is not a worktree of the project, so for omp the proof is the
   # only guard between the record and the profile.
   sed -i.bak -e "s#^worktree=.*#worktree=$dir/other-copy#" -e 's#^harness=.*#harness=omp#' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
-  printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  printf 'successor_branch=%s\nsuccessor_proved_tip=%s\n' "$SUCC" "$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")" >> "$dir/home/state/$TASK.meta"
   # The control relaunches only an endpoint that sits in the recorded copy, so the fake
   # endpoint is moved into the other repository's copy as well; the proof is then what stops the launch.
   printf '%s' "$dir/other-copy" > "$dir/fake/cwd"
@@ -506,7 +628,7 @@ test_scott_launch_refuses_a_copy_outside_the_projects_ref_store() {
   # Matched control: the copy that shares the project's ref store, with the same record, launches.
   cp -p "$dir/meta.good" "$dir/home/state/$TASK.meta"
   sed -i.bak 's#^harness=.*#harness=omp#' "$dir/home/state/$TASK.meta" && rm -f "$dir/home/state/$TASK.meta.bak"
-  printf 'successor_branch=%s\n' "$SUCC" >> "$dir/home/state/$TASK.meta"
+  printf 'successor_branch=%s\nsuccessor_proved_tip=%s\n' "$SUCC" "$(git -C "$fx/project" rev-parse "refs/heads/$SUCC")" >> "$dir/home/state/$TASK.meta"
   printf '%s' "$fx/slots/22/project" > "$dir/fake/cwd"
   rc=0; out=$(run_control "$dir" "$TASK" relaunch --note "matching repositories") || rc=$?
   expect_code 0 "$rc" "the copy that shares the project's ref store must launch"$'\n'"$out"
@@ -514,9 +636,9 @@ test_scott_launch_refuses_a_copy_outside_the_projects_ref_store() {
   pass "Scott shape: a launch refuses the grant for a copy outside the project's ref store, and carries it for the matching copy"
 }
 
-# F5 at the launch: the event that applies the grant is not best-effort.
-test_scott_launch_requires_its_event_to_be_written() {
-  local dir out rc sb log
+# F5 at the launch: the event that applies the grant is best-effort.
+test_scott_launch_event_log_failure_does_not_change_the_launch() {
+  local dir out rc sb
   if [ "$(uname -s)" != Darwin ]; then
     printf 'skip: the write profile is generated on macOS only; Linux remains unconfined\n'
     return 0
@@ -528,15 +650,9 @@ test_scott_launch_requires_its_event_to_be_written() {
   mkdir -p "$dir/event-sink-dir"
   rm -f "$sb"
   rc=0; out=$(FM_GUARD_EVENT_LOG="$dir/event-sink-dir" run_control "$dir" "$TASK" relaunch --note "sink broken") || rc=$?
-  [ "$rc" != 0 ] || fail "a launch whose grant event cannot be written must refuse"$'\n'"$out"
-  assert_contains "$out" "event" "the launch refusal must name the event"
-  [ ! -f "$sb" ] || ! grep -qF "$SUCC\"" "$sb" || fail "the profile kept the successor although its event was not written"
-  log=$dir/launch-events.jsonl
-  rc=0; out=$(FM_GUARD_EVENT_LOG="$log" run_control "$dir" "$TASK" relaunch --note "sink fine") || rc=$?
-  expect_code 0 "$rc" "a writable sink must let the launch through"$'\n'"$out"
-  jq -e 'select(.guard == "successor-branch-admission" and .rule == "launch" and .decision == "allow")' "$log" >/dev/null \
-    || fail "the launch event was not written to the sink"
-  pass "Scott shape: a launch whose grant event cannot be written refuses and keeps no profile line, and a writable sink lets it through with the event"
+  expect_code 0 "$rc" "a launch whose grant event cannot be written must still launch"$'\n'"$out"
+  grep -qF "refs/heads/$SUCC\"" "$sb" || fail "the profile must carry the successor although its event could not be written"
+  pass "Scott shape: a launch whose grant event cannot be written launches with the successor in its profile"
 }
 
 control_relaunch_test_cases=(
@@ -545,11 +661,14 @@ test_scott_admission_proves_the_successor_by_the_task_own_archive_branch
 test_scott_name_family_bounds_the_archive_route
 test_scott_receipt_and_events_name_the_archive_tip_route
 test_scott_launch_re_proves_the_whole_admission
-test_scott_check_proves_a_recorded_successor_again
+test_scott_repeat_re_admits_a_recorded_successor_past_its_proved_tip
+test_scott_relaunch_admits_a_successor_past_its_proved_tip_and_refuses_one_without_it_before_stopping
+test_scott_relaunch_refuses_a_successor_another_task_records
+test_scott_launch_refusal_is_the_successor_guards
 test_scott_relaunch_changes_the_copy_only_as_a_relaunch_without_the_successor_does
 test_scott_launch_refuses_when_another_task_record_cannot_be_read
 test_scott_launch_refuses_a_copy_outside_the_projects_ref_store
-test_scott_launch_requires_its_event_to_be_written
+test_scott_launch_event_log_failure_does_not_change_the_launch
 test_scott_operation_then_relaunch_keeps_every_custody_relationship
 test_scott_record_revocation_restores_the_launch_profile
 test_scott_hand_edited_record_cannot_widen_a_launch

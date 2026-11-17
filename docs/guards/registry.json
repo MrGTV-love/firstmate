@@ -5569,13 +5569,13 @@
       "invariant": "a task's next launch gets write access to one recorded successor branch only when that branch is proved to be the task's own",
       "layer": "runtime-block",
       "source": "the task record's branch= and successor_branch= lines, the project's ref store and worktree list, the task's own archive/<task>-(submitted|pipeline)-<8 hex> branches and every local home's task records, read by fm_successor_name_refusal and fm_successor_proof in bin/fm-successor-branch-lib.sh",
-      "trigger": "bin/fm-control.sh successor (recording, --check, or repeating a recorded successor) or bin/fm-spawn.sh relaunching a ship whose record names successor_branch= finds the name outside the task's name family (the recorded branch name, '-', then letters, digits, '.', '_' or '-'), not a plain valid branch name, equal to the recorded, base or default branch (case ignored), another task's branch or successor (case ignored), missing, checked out in another work tree, or proved by neither the checked-out route nor the archive-tip route",
+      "trigger": "bin/fm-control.sh successor (recording, or repeating a recorded successor), bin/fm-control.sh relaunch before it stops the worker, or bin/fm-spawn.sh relaunching a ship whose record names successor_branch= finds the name outside the task's name family (the recorded branch name, '-', then letters, digits, '.', '_' or '-'), not a plain valid branch name, equal to the recorded, base or default branch (case ignored), another task's branch or successor (case ignored), missing, checked out in another work tree, proved at admission by neither the checked-out route nor the archive-tip route (its history containing the task's own archive tip), or, once recorded, no longer containing the successor_proved_tip= its admission recorded",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "preserve the task's worktree and record; run bash bin/fm-control.sh <task-id> successor --branch <successor> --check to see which proof fails, repair the branch or remove successor_branch= from the task record, then run bash bin/fm-control.sh <task-id> relaunch --note <why>",
+      "remedy": "preserve the task's worktree and record; read the refusal for the proof that fails, make the successor branch contain its recorded successor_proved_tip= again or remove successor_branch= and successor_proved_tip= from the task record, then run bash bin/fm-control.sh <task-id> relaunch --note <why>",
       "budget": 1,
       "budget_reason": "one refusal per invocation; no retry loop and no fallback to an unproved or unconfined launch; Main owns repairing the branch or the record",
-      "telemetry": "state/guard-events.jsonl; one allow event at record time and one at the launch that applies the grant, each with guard, rule, task, decision, successor and route and each written strictly (a sink that cannot take it rolls the record back or refuses the launch); a refusal writes no event, so it is visible in the refusal text and exit status only; the kernel's enforcement of the profile text is not instrumented per decision",
+      "telemetry": "state/guard-events.jsonl; one allow event at record time and one at the launch that applies the grant, each with guard, rule, task, decision, successor and route, and one deny event per refusal with guard, rule, task, decision and successor; every event is best-effort, so a log that cannot take it changes neither the refusal, the record nor the launch; the kernel's enforcement of the profile text is not instrumented per decision",
       "test": "tests/fm-control-successor.test.sh",
       "tier": "C",
       "harm": "irreversible",
@@ -5589,23 +5589,25 @@
         {
           "file": "bin/fm-control.sh",
           "match": "successor_refuse ",
-          "count": 4
+          "count": 7
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "successor-branch-admission deny",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "die \"$2; refused before stopping the running agent"
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "confinement_refuse false \"cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR\""
+          "match": "successor_launch_refuse ",
+          "count": 2
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "confinement_refuse true \"task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason\""
-        },
-        {
-          "file": "bin/fm-spawn.sh",
-          "match": "confinement_refuse true \"task $ID records successor branch '$SUCCESSOR_BRANCH', which is no longer proved to be this task's: $confinement_successor_proof\""
-        },
-        {
-          "file": "bin/fm-spawn.sh",
-          "match": "confinement_refuse true \"the successor-branch-admission event for task $ID's successor branch"
+          "match": "successor-branch-admission deny"
         }
       ]
     },

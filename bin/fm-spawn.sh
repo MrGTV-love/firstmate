@@ -1160,9 +1160,11 @@ BACKEND_ARG=
 MODE=
 YOLO=
 BRANCH=
-# The one successor branch a ship's record names (successor_branch=), read on a
+# The one successor branch a ship's record names (successor_branch=) and the tip
+# its admission proved it descends from (successor_proved_tip=), read on a
 # relaunch only; bin/fm-control.sh successor is the only writer of that record.
 SUCCESSOR_BRANCH=
+SUCCESSOR_PROVED_TIP=
 BRANCH_PREFIX=fm/
 TRACEPARENT_ARG=
 HARNESS_SET=0
@@ -2711,11 +2713,13 @@ if [ "$RELAUNCH" -eq 1 ]; then
       echo "error: task $ID has an invalid recorded ship branch '$BRANCH'" >&2
       exit 1
     fi
-    if [ "$(grep -c '^successor_branch=' "$RELAUNCH_META" 2>/dev/null || true)" -gt 1 ]; then
-      echo "error: task $ID records more than one successor branch" >&2
+    if [ "$(grep -c '^successor_branch=' "$RELAUNCH_META" 2>/dev/null || true)" -gt 1 ] \
+      || [ "$(grep -c '^successor_proved_tip=' "$RELAUNCH_META" 2>/dev/null || true)" -gt 1 ]; then
+      echo "error: task $ID records more than one successor branch or proved tip" >&2
       exit 1
     fi
     SUCCESSOR_BRANCH=$(fm_meta_get "$RELAUNCH_META" successor_branch)
+    SUCCESSOR_PROVED_TIP=$(fm_meta_get "$RELAUNCH_META" successor_proved_tip)
   fi
   RELAUNCH_WT=$(fm_meta_get "$RELAUNCH_META" worktree)
   if [ "$RELOCATE_SET" -eq 1 ]; then
@@ -7031,6 +7035,16 @@ confinement_refuse() {
   "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok "$source_ok" \
     --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" 2>/dev/null || true
 }
+# A recorded successor branch that fails its re-admission refuses the launch under
+# its own guard, successor-branch-admission, with the repair that fits a record.
+successor_launch_refuse() {
+  local source_ok=$1
+  shift
+  echo "error: $*" >&2
+  echo "repair: preserve this task's worktree and record; make the successor branch contain its recorded successor_proved_tip= again, or remove its successor_branch= and successor_proved_tip= lines from the task record, then run bash bin/fm-control.sh $ID relaunch --note <why>" >&2
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule launch --source-ok "$source_ok" \
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
+}
 if [ "$KIND" != secondmate ]; then
   confinement_os=$(uname -s) || { confinement_refuse false "cannot identify worker OS"; exit 1; }
   case "$confinement_os:$HARNESS" in
@@ -7077,21 +7091,18 @@ if [ "$KIND" != secondmate ]; then
       [ -z "${BRANCH:-}" ] || confinement_args+=(--branch "$BRANCH")
       confinement_successor_route=
       if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
-        # The whole admission fm-control.sh successor applied runs again at every
-        # launch that would apply the grant: the name rule, then the proof. A
-        # record edited by hand, or a branch that moved since it was recorded,
-        # that fails either never reaches the profile; the generator then
-        # re-checks that the name is one exact literal in the task's name family.
+        # The re-admission fm-control.sh successor and relaunch apply runs again at
+        # every launch that would apply the grant: the name rule, then the proof
+        # that the branch still contains the tip proved at its admission. A record
+        # edited by hand, or a branch reset since it was recorded, that fails
+        # either never reaches the profile; the generator then re-checks that the
+        # name is one exact literal in the task's name family.
         if ! fm_local_firstmate_state_dirs "$STATE"; then
-          confinement_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
+          successor_launch_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
           exit 1
         fi
-        if ! confinement_successor_reason=$(fm_successor_name_refusal "$SUCCESSOR_BRANCH" "$BRANCH" "$BASE_BRANCH" "$STATE/$ID.meta" "$PROJ_ABS" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
-          confinement_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is not admissible: $confinement_successor_reason"
-          exit 1
-        fi
-        if ! confinement_successor_proof=$(fm_successor_proof "$PROJ_ABS" "$ID" "$BRANCH" "$SUCCESSOR_BRANCH" "$WT"); then
-          confinement_refuse true "task $ID records successor branch '$SUCCESSOR_BRANCH', which is no longer proved to be this task's: $confinement_successor_proof"
+        if ! confinement_successor_proof=$(fm_successor_recorded_proof "$ID" "$BRANCH" "$BASE_BRANCH" "$STATE/$ID.meta" "$PROJ_ABS" "$WT" "$SUCCESSOR_BRANCH" "$SUCCESSOR_PROVED_TIP" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
+          successor_launch_refuse true "$confinement_successor_proof"
           exit 1
         fi
         confinement_successor_route=$(printf '%s\n' "$confinement_successor_proof" | sed -n 's/^route=//p')
@@ -7138,16 +7149,9 @@ if [ "$KIND" != secondmate ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
       if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
-        # The event that applies the grant is owed, not best-effort: a sink that cannot take
-        # it refuses the launch, and the profile just written is removed so no line for
-        # the successor outlives the refusal.
-        if ! "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --strict --rule launch --source-ok true \
+        "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --rule launch --source-ok true \
           --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed \
-          --route "$confinement_successor_route" --successor "$SUCCESSOR_BRANCH" 2>/dev/null; then
-          rm -f "$WRITE_CONFINEMENT_PROFILE"
-          confinement_refuse true "the successor-branch-admission event for task $ID's successor branch '$SUCCESSOR_BRANCH' could not be written to $("$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --log-path 2>/dev/null || echo 'the guard event log'); the launch was refused and no write profile was kept"
-          exit 1
-        fi
+          --route "$confinement_successor_route" --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
       fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true

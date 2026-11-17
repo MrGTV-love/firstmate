@@ -7,11 +7,11 @@
 # successor branch. docs/agent-control.md "Recording a successor branch" owns the
 # contract; bin/fm-control.sh `successor` is the only writer of the record.
 #
-# Three callers apply the same rule and the same proof: fm-control.sh at
-# admission, fm-control.sh `successor --check` (also on an already-recorded
-# successor), and fm-spawn.sh each time it builds a launch's profile, so a record
-# edited by hand to name a branch the operation would have refused never widens a
-# launch.
+# Three callers apply the same rule: fm-control.sh `successor` at admission and
+# when it is repeated for an already-recorded successor, fm-control.sh `relaunch`
+# before it stops the live worker, and fm-spawn.sh each time it builds a launch's
+# profile, so a record edited by hand to name a branch the operation would have
+# refused never widens a launch.
 #
 # fm_successor_name_refusal <name> <recorded-branch> <base-branch> <own-meta> <project> <state-dir>...
 #   Prints the reason and returns 1 when <name> may not be the successor of the task whose record is <own-meta>;
@@ -40,11 +40,13 @@
 #   refused, on any file system. bin/fm-write-confinement.py repeats the family
 #   bound on the name it is handed.
 #
-# fm_successor_proof <project> <task-id> <recorded-branch> <successor> <copy>
-#   Prints, on success, the lines `route=checked-out` or `route=archive-tip`,
-#   `archive=<name>` (the matched archive branch, for the second route only),
-#   `successor_sha=<sha>` and `prior_sha=<sha>` (the recorded branch's tip, when
-#   it exists), and returns 0. On failure prints one reason line and returns 1.
+# fm_successor_proof <project> <task-id> <recorded-branch> <successor> <copy> [<proved-tip>]
+#   Prints, on success, the lines `route=checked-out`, `route=archive-tip` or
+#   `route=proved-tip`, `archive=<name>` (the matched archive branch, for the
+#   archive route only), `successor_sha=<sha>`, `prior_sha=<sha>` (the recorded
+#   branch's tip, when it exists) and `proved_tip=<sha>` (the commit the successor
+#   was proved to descend from), and returns 0. On failure prints one reason line
+#   and returns 1.
 #   It reads the project's ref store and worktree list and never opens a work
 #   tree. Refs, archives and the worktree list are read through the recorded copy,
 #   the repository whose common directory the profile generator grants. The
@@ -54,12 +56,24 @@
 #     - refs/heads/<successor> exists as a commit in the project's ref store;
 #     - no work tree other than the recorded copy has it checked out (every
 #       worktree on the branch is checked, not the first one listed);
-#     - and one of two routes holds:
+#     - and, without <proved-tip> (a first admission), one of two routes holds:
 #         checked-out: it is the branch checked out in the recorded copy and the
-#           recorded branch's tip is an ancestor of, or equal to, its tip;
-#         archive-tip: its tip equals the tip of one of the task's own custody
-#           archive branches archive/<task>-(submitted|pipeline)-<8 hex>, whose
-#           hex is the first eight digits of that archive's own tip.
+#           recorded branch's tip is an ancestor of, or equal to, its tip; the
+#           proved tip is the recorded branch's tip;
+#         archive-tip: the tip of one of the task's own custody archive branches
+#           archive/<task>-(submitted|pipeline)-<8 hex>, whose hex is the first
+#           eight digits of that archive's own tip, is an ancestor of, or equal
+#           to, its tip; the proved tip is that archive's tip;
+#     - or, with <proved-tip> (a successor the record already names, with the
+#       tip proved at its admission), route proved-tip: that commit is an
+#       ancestor of, or equal to, its tip. A successor whose history no longer
+#       contains the proved tip is refused.
+#
+# fm_successor_recorded_proof <task-id> <recorded-branch> <base-branch> <own-meta> <project> <copy> <successor> <proved-tip> <state-dir>...
+#   The admission of a successor the record already names: the name rule, then
+#   the proof from the tip proved at its admission. Prints the proof's lines on
+#   success; prints one reason naming the task and the successor and returns 1
+#   on failure, also when the record names no proved tip.
 
 if ! declare -F fm_task_copy_canonical_dir >/dev/null 2>&1; then
   # shellcheck source=bin/fm-task-copy-lib.sh
@@ -183,12 +197,13 @@ fm_successor_checkout_paths() {  # <project> <successor>
   return 0
 }
 
-# The archive route of the proof: the successor's tip is the tip of one of this
-# task's own custody archive branches, archive/<id>-(submitted|pipeline)-<8 hex>
-# whose hex is the first eight digits of its own tip. Prints the matching
-# archive name; fails when none matches. No other name can match: the task id is
-# anchored by the trailing '-', the middle word is one of two, the hex is eight
-# lowercase digits and must equal the archive's own tip's first eight.
+# The archive route of the proof: the tip of one of this task's own custody
+# archive branches, archive/<id>-(submitted|pipeline)-<8 hex> whose hex is the
+# first eight digits of its own tip, is an ancestor of, or equal to, the
+# successor's tip. Prints the matching archive name and its tip; fails when none
+# matches. No other name can match: the task id is anchored by the trailing '-',
+# the middle word is one of two, the hex is eight lowercase digits and must equal
+# the archive's own tip's first eight.
 fm_successor_archive_match() {  # <project> <task-id> <successor-sha>
   local project=$1 id=$2 sha=$3 name tip rest
   while read -r name tip; do
@@ -196,8 +211,8 @@ fm_successor_archive_match() {  # <project> <task-id> <successor-sha>
     [ "$rest" != "$name" ] || continue
     [[ $rest =~ ^(submitted|pipeline)-([0-9a-f]{8})$ ]] || continue
     [ "${tip:0:8}" = "${BASH_REMATCH[2]}" ] || continue
-    [ "$tip" = "$sha" ] || continue
-    printf '%s\n' "$name"
+    git -C "$project" merge-base --is-ancestor "$tip" "$sha" 2>/dev/null || continue
+    printf '%s %s\n' "$name" "$tip"
     return 0
   done < <(git -C "$project" for-each-ref --format='%(refname:short) %(objectname)' "refs/heads/archive/$id-submitted-*" "refs/heads/archive/$id-pipeline-*" 2>/dev/null)
   return 1
@@ -211,9 +226,9 @@ fm_successor_store_of() {  # <path>
   (cd "$common" 2>/dev/null && pwd -P)
 }
 
-fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <copy>
-  local project=$1 id=$2 recorded=$3 successor=$4 wt=$5
-  local succ_sha copy paths path elsewhere="" in_copy=0 why1 archive_name prior_sha="" copy_store project_store
+fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <copy> [<proved-tip>]
+  local project=$1 id=$2 recorded=$3 successor=$4 wt=$5 proved=${6-}
+  local succ_sha copy paths path elsewhere="" in_copy=0 why1 archive_match archive_name prior_sha="" copy_store project_store
   copy=$(fm_task_copy_canonical_dir "$wt") || {
     echo "task $id's recorded copy $wt is not a directory, so the successor cannot be proved to be this task's"
     return 1
@@ -248,6 +263,19 @@ fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <cop
     return 1
   fi
   prior_sha=$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$recorded^{commit}" 2>/dev/null || true)
+  if [ -n "$proved" ]; then
+    if ! [[ $proved =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] \
+      || [ "$(git -C "$copy" rev-parse --verify --quiet "$proved^{commit}" 2>/dev/null)" != "$proved" ]; then
+      echo "the tip $proved proved at the successor's admission is not a commit in the project's ref store"
+      return 1
+    fi
+    git -C "$copy" merge-base --is-ancestor "$proved" "$succ_sha" 2>/dev/null || {
+      echo "successor branch '$successor' at $succ_sha no longer contains the tip $proved proved at its admission"
+      return 1
+    }
+    printf 'route=proved-tip\nsuccessor_sha=%s\nprior_sha=%s\nproved_tip=%s\n' "$succ_sha" "$prior_sha" "$proved"
+    return 0
+  fi
   why1=
   if [ "$in_copy" = 0 ]; then
     why1="it is not checked out in the recorded copy $wt"
@@ -257,13 +285,32 @@ fm_successor_proof() {  # <project> <task-id> <recorded-branch> <successor> <cop
     why1="the recorded tip $prior_sha is not an ancestor of the successor tip $succ_sha"
   fi
   if [ -z "$why1" ]; then
-    printf 'route=checked-out\nsuccessor_sha=%s\nprior_sha=%s\n' "$succ_sha" "$prior_sha"
+    printf 'route=checked-out\nsuccessor_sha=%s\nprior_sha=%s\nproved_tip=%s\n' "$succ_sha" "$prior_sha" "$prior_sha"
     return 0
   fi
-  archive_name=$(fm_successor_archive_match "$copy" "$id" "$succ_sha") || {
-    echo "successor branch '$successor' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy and containing the recorded branch's tip) fails because $why1; the archive-tip route (its tip $succ_sha is the tip of one of the task's own archive/$id-(submitted|pipeline)-<8 hex> branches) fails because none points there"
+  archive_match=$(fm_successor_archive_match "$copy" "$id" "$succ_sha") || {
+    echo "successor branch '$successor' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy and containing the recorded branch's tip) fails because $why1; the archive-tip route (its tip $succ_sha contains the tip of one of the task's own archive/$id-(submitted|pipeline)-<8 hex> branches) fails because no such archive tip is in its history"
     return 1
   }
-  printf 'route=archive-tip\narchive=%s\nsuccessor_sha=%s\nprior_sha=%s\n' "$archive_name" "$succ_sha" "$prior_sha"
+  archive_name=${archive_match%% *}
+  printf 'route=archive-tip\narchive=%s\nsuccessor_sha=%s\nprior_sha=%s\nproved_tip=%s\n' "$archive_name" "$succ_sha" "$prior_sha" "${archive_match#* }"
   return 0
+}
+
+fm_successor_recorded_proof() {  # <task-id> <recorded-branch> <base-branch> <own-meta> <project> <copy> <successor> <proved-tip> <state-dir>...
+  local id=$1 recorded=$2 base=$3 own_meta=$4 project=$5 copy=$6 successor=$7 proved=$8 reason
+  shift 8
+  reason=$(fm_successor_name_refusal "$successor" "$recorded" "$base" "$own_meta" "$project" "$@") || {
+    echo "task $id records successor branch '$successor', which is not admissible: $reason"
+    return 1
+  }
+  [ -n "$proved" ] || {
+    echo "task $id records successor branch '$successor' but no successor_proved_tip=, so the tip proved at its admission is unknown"
+    return 1
+  }
+  reason=$(fm_successor_proof "$project" "$id" "$recorded" "$successor" "$copy" "$proved") || {
+    echo "task $id records successor branch '$successor', which is no longer proved to be this task's: $reason"
+    return 1
+  }
+  printf '%s\n' "$reason"
 }

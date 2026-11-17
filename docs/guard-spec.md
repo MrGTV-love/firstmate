@@ -243,7 +243,6 @@ An affected task supplied by the emitter takes precedence over the invoking work
 The session is that task id, otherwise the physical home plus the harness session; an unavailable harness session is explicitly `unattributed`, never a new process id.
 Claude's `CLAUDE_CODE_SESSION_ID` is accepted only through the ancestry validation owned by `bin/fm-session-lock-lib.sh`, so an inherited id from another harness is not borrowed.
 `rule` defaults to the guard id for legacy emitters, and legacy rows without a task cannot prove task-level recurrence.
-A caller that owes a row passes `--strict`, which makes the writer exit nonzero when the row cannot be written, and `--log-path` prints the log a call would append to without writing; every other call stays best-effort and exits 0.
 A row carries `route` and `successor` only when its emitter passes `--route` or `--successor`; `successor-branch-admission` uses them to name how it proved a branch and which branch it names, and every other row keeps the fields above unchanged.
 The merge refusals the read-only detector reads (`MERGE_REFUSAL_GUARDS` in `bin/fm-guard-workarounds.py`) record `head` and `base`; empty fields are missing evidence, not an inferred commit or branch.
 

@@ -2583,41 +2583,75 @@ test_record_containment_refusals_preserve_both_copies
 test_slot_claim_containment_refusals_preserve_both_copies
 test_refusals_change_nothing
 test_finished_relaunch_journal_does_not_block_reassociation
-# A publication that fails after the rename has already replaced the record must
-# still restore it: the rollback cannot rely on a flag that is set only once the
-# publication reports success.
-test_failed_publication_after_the_rename_restores_the_record() {
-  local id=reassoc-late dir new out rc real_mv leftovers
-  real_mv=$(command -v mv)
-  dir=$(new_case "late" "$id")
+# A recorded successor branch is bound to the task's branch: reassociation onto a
+# copy on that successor ends the succession and drops both successor lines.
+test_reassociation_onto_the_recorded_successor_drops_the_successor_record() {
+  local id=reassoc-succ dir new out rc=0 new_real tip
+  dir=$(new_case succ "$id")
   new="$dir/new"
   add_copy "$dir" "$new" "fm/$id-v2"
+  new_real=$(cd "$new" && pwd -P)
+  tip=$(git -C "$dir/old" rev-parse HEAD)
+  printf 'successor_branch=fm/%s-v2\nsuccessor_proved_tip=%s\n' "$id" "$tip" >> "$dir/home/state/$id.meta"
   snapshot_case "$dir"
-  cat > "$dir/fakebin/mv" <<SH
-#!/usr/bin/env bash
-"$real_mv" "\$@" || exit \$?
-for arg in "\$@"; do
-  case "\$arg" in
-    */.$id.meta.reassociate.*) rm -f "\${!#}" ;;
-  esac
-done
-exit 0
-SH
-  chmod +x "$dir/fakebin/mv"
-  rc=0
-  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) || rc=$?
-  expect_code 1 "$rc" "a publication that fails after the rename must refuse"$'\n'"$out"
-  cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" \
-    || fail "the task record is not back to its prior bytes after a post-rename failure: $(cat "$dir/home/state/$id.meta" 2>&1 | head -3)"
-  cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" \
-    || fail "the instructions are not back to their prior bytes after a post-rename failure"
-  leftovers=$(find "$dir/home/state" "$dir/home/data/$id" -maxdepth 1 \( -name '*.meta.prior.*' -o -name '*.brief.prior.*' -o -name '*.meta.reassociate.*' -o -name '*.brief.reassociate.*' \) -print)
-  [ -z "$leftovers" ] || fail "the failed reassociation left staging or backup files behind: $leftovers"
-  copy_fingerprint "$dir/old" | cmp -s - "$dir/before/old.fp" || fail "the failed reassociation changed the original copy"
-  pass "a publication that fails after the rename restores the record and the instructions and leaves no backup"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "moved onto the successor") || rc=$?
+  expect_code 0 "$rc" "reassociation onto the recorded successor should succeed"$'\n'"$out"
+  assert_contains "$out" "reassociated $id worktree=$new_real branch=fm/$id-v2 dropped_successor_branch=fm/$id-v2 prior=$dir/old slot=none" \
+    "reassociate did not report the dropped successor"
+  assert_equals "fm/$id-v2" "$(meta_field "$dir" "$id" branch)" "branch= did not follow the successor copy"
+  assert_equals 0 "$(grep -c -e '^successor_branch=' -e '^successor_proved_tip=' "$dir/home/state/$id.meta")" "the successor lines must be dropped"
+  grep -v -e '^worktree=' -e '^branch=' -e '^prior_worktree=' "$dir/home/state/$id.meta" > "$dir/after.rest"
+  grep -v -e '^worktree=' -e '^branch=' -e '^successor_branch=' -e '^successor_proved_tip=' "$dir/before/state/$id.meta" > "$dir/before.rest"
+  cmp -s "$dir/before.rest" "$dir/after.rest" || fail "reassociate changed fields it does not own"
+  assert_line "Ship branch: fm/$id-v2" "$dir/home/data/$id/brief.md" "the brief's Ship branch line did not follow the record"
+  pass "reassociation onto the recorded successor branch makes it the task's branch and drops the successor lines"
+}
+
+# While a successor is recorded, reassociation onto any other branch refuses, names
+# the successor and changes nothing.
+test_reassociation_onto_another_branch_refuses_while_a_successor_is_recorded() {
+  local id=reassoc-succ-other dir new out rc=0 tip
+  dir=$(new_case succ-other "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v3"
+  tip=$(git -C "$dir/old" rev-parse HEAD)
+  printf 'successor_branch=fm/%s-v2\nsuccessor_proved_tip=%s\n' "$id" "$tip" >> "$dir/home/state/$id.meta"
+  snapshot_case "$dir"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "moved elsewhere") || rc=$?
+  expect_code 1 "$rc" "reassociation onto another branch while a successor is recorded must refuse"$'\n'"$out"
+  assert_contains "$out" "records successor branch fm/$id-v2" "the refusal must name the recorded successor"
+  assert_contains "$out" "nothing was changed" "the refusal must say nothing changed"
+  assert_case_unchanged "$dir" "the successor refusal"
+  pass "reassociation onto a branch other than the recorded successor refuses, names the successor and changes nothing"
+}
+
+# A task with no recorded successor publishes exactly the record and receipt it
+# always did: worktree= and branch= re-pointed, one prior_worktree= appended, and
+# every other byte unchanged.
+test_reassociation_without_a_successor_publishes_the_unchanged_record() {
+  local id=reassoc-nosucc dir new out rc=0 new_real
+  dir=$(new_case nosucc "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  new_real=$(cd "$new" && pwd -P)
+  snapshot_case "$dir"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "a plain move") || rc=$?
+  expect_code 0 "$rc" "reassociation without a successor should succeed"$'\n'"$out"
+  assert_equals "reassociated $id worktree=$new_real branch=fm/$id-v2 prior=$dir/old slot=none" \
+    "$(printf '%s\n' "$out" | grep '^reassociated ')" "the receipt of a task without a successor changed"
+  awk -v wt="$new_real" -v br="fm/$id-v2" -v prior="$dir/old" '
+    /^worktree=/ { print "worktree=" wt; next }
+    /^branch=/ { print "branch=" br; next }
+    { print }
+    END { print "prior_worktree=" prior }' "$dir/before/state/$id.meta" > "$dir/expected.meta"
+  cmp -s "$dir/expected.meta" "$dir/home/state/$id.meta" \
+    || fail "the record of a task without a successor changed: $(diff "$dir/expected.meta" "$dir/home/state/$id.meta")"
+  pass "reassociation of a task without a successor publishes the record it always did"
 }
 test_failed_publication_keeps_brief_recovery_until_restored
-test_failed_publication_after_the_rename_restores_the_record
+test_reassociation_onto_the_recorded_successor_drops_the_successor_record
+test_reassociation_onto_another_branch_refuses_while_a_successor_is_recorded
+test_reassociation_without_a_successor_publishes_the_unchanged_record
 test_unchanged_ship_branch_requires_consistent_brief
 test_dirty_current_copy_refuses_without_publication
 test_provider_reset_preserves_spawned_copy_commits_via_anchor
