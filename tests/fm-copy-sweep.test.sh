@@ -6252,7 +6252,7 @@ test_the_real_120_second_plan_default_holds_a_hung_plan_at_its_boundary_on_githu
   (
     unset FM_COPY_SWEEP_PLAN_TIMEOUT
     rc=0
-    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" sweep_cmd --apply > "$W/real120.out" 2>&1 || rc=$?
+    ( FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" sweep_cmd --apply ) > "$W/real120.out" 2>&1 || rc=$?
     printf '%s' "$rc" > "$W/real120.rc"
   ) &
   sweep=$!

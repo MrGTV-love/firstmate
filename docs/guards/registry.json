@@ -537,6 +537,10 @@
           "match": "refusal=$(printf '%s\\n' \"$err\" | sed -n '/^REFUSED:/,$p')"
         },
         {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "TEARDOWN_CLOSEOUT_ROUTE_WHY=\"the clone's own checkout (a linked worktree's HEAD) is on PR $pr's head branch $head, which the read made just before the driver is entered refuses\""
+        },
+        {
           "file": "bin/fm-copy-sweep.sh",
           "match": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $RETRY_PRESERVE; the next sweep run plans it again.\" >&2"
         },
