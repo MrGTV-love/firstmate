@@ -1559,24 +1559,42 @@ A presentation manifest larger than one tail window, and the legacy open-decisio
 ## Test slots per key (FM_TEST_KEY_SLOTS)
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
-The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many scripts run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
-`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
-`--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
+The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many CPU-bound workers run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot and one pool pass, together, before it starts its clock, and `bin/fm-test-run.sh` takes the same slot and a pass around every script it runs through `python3 bin/fm-duration.py gate`, which takes the pass by default.
+The wait for the slot is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots and `--pass-wait-file` the milliseconds it waited for a pass or a token lease, and the runner subtracts the slot wait from the script's duration (its `FM_TEST_END` line and its timing record).
+The wait for the pass (or, inside a pass, for a lease of its tokens) stays in the runner's `FM_TEST_END` duration, as it did before the gate took the pass, but it is left out of the `test.<script>` sample, which measures the script's own execution (with `FM_TEST_KEY_SLOTS=0` too, where the runner reads the pool wrapper's own wait file), and out of the stop clocks and the per-script bound, because those start after the pass is held.
+`--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count both waits.
+The slot and the pass are one acquisition: a waiter holds neither while it queues, so a process that took its slot through `gate` or `run` never waits for a pass while it holds that slot; inside a pass whose holder exported tokens, `gate` and `run` lease tokens in the same acquisition instead, so they never wait for a lease while they hold a slot either.
+A claim in `FM_CPU_PASS_HELD` never skips a slot; only the same key already held by the command's own ancestry (`FM_TEST_SLOT_HELD`) does, and even that request still takes its tokens from the reservation it runs inside, so same-key sibling runners under one pass run one worker at a time.
+Every other nested key counts all holders of that key, so `gate test.K` under another key waits for an unnested `test.K` holder exactly as it does when nothing is nested.
+The one other way out of a wait is a proven wait cycle, and the proof is constructive: gates that each hold one key and reach each other's key through gates alone (a gate whose command is the next gate, directly or through `exec`) cannot end while the nested gate waits, because a gate does nothing but wait for its one command, and each gate registers its command's pid in its own slot record.
+The cycle is closed when every holder of every waiting key is such a gate, whatever `FM_TEST_KEY_SLOTS` is, and a waiter that only waits on the cycle, holding nothing a member waits for, is not part of it; the earliest queued waiter in it, seen on two polls in a row, runs beside the limit and says so (the [`fm-duration.py` header](../bin/fm-duration.py) owns the rule).
+Any other shape gets no exception, because nothing available shows what a user shell, a pass wrapper or a runner between two gates is waiting on: that waiter starts only when a holder ends.
+So a real cycle with a user shell between the gates waits until a holder ends, which in a true cycle nobody does; no timeout, reaper or other mechanism is added for it.
+Amendment A-4 decided this rule: the one constructive exception for a proven wait cycle of gates, and no other exception, timeout or reaper.
 A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
-The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the bounded wait, the nested-run rule and the exit codes.
+The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the wait until a holder ends, the nested-run and wait-cycle rules and the exit codes.
 
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
 | `FM_TEST_KEY_SLOTS` | 2 | 0..16 | Concurrent copies of one `test.*` key allowed host-wide; `0` turns the gate off. Other keys are never gated. |
-| `FM_TEST_SLOT_WAIT_SECONDS` | 7200 | at least 1 | How long a waiter queues before it runs without a slot and says so. |
+| `FM_TEST_SLOT_WAIT_SECONDS` | retired | none | No longer read: a waiter waits until a holder ends and is never admitted by elapsed time, so any value is ignored. |
 | `FM_TEST_SLOT_DIR` | `$HOME/.cache/fm-test-slots` | an absolute path | Where the per-key slot directories live; tests point it at a fixture directory. |
 
-**Why two copies and 7200 seconds**
+**Why two copies, and no wait limit**
 
 A day of the host's own timings (`data/command-durations.jsonl`, 2026-10-17) shows `tests/fm-teardown.test.sh` run 6 times for 13,276 seconds in total, with a median of 2,175 seconds and a longest run of 6,884, and three copies alive at once in three worktrees.
 One slot would queue those six runs behind each other for about 3.7 hours of waiting between them; two slots cap the overlap at two copies while the third waits for the first of the two to finish, typically one median run.
-A waiter gives up after 7,200 seconds, a little longer than the longest run seen, so a queued copy outlasts a holder that is merely slow, and a holder that never finishes can delay a copy by at most that long.
-The gate shapes throughput and is not a safety boundary: a waiter that gives up, a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so.
+The pool, not this cap, bounds the CPU-bound workers; the cap bounds how much of the pool one suite can fill and that suite's process churn.
+Two is the largest per-key count at which the fleet's peak mix of suites, all running at the cap, still fits the CPUs by measured demand.
+The six heavy scripts measured use between 0.15 and 0.67 of a CPU each (0.69 for the duration suite; the one suite that averaged 1.66 runs runners of its own and reserves their passes, so it is not the one-worker copy counted here), the host has 18 logical CPUs (`sysctl -n hw.logicalcpu`), and the most distinct `test.*` keys the host's own ledger shows running together is 12 (a sweep of the intervals `recorded_at` minus `duration_ms` in `data/command-durations.jsonl` since 2026-10-14).
+With the largest of the six measured demands, 12 keys of K copies each need 12 x K x 0.67 CPUs, which fits 18 CPUs only for K up to floor(18 / (12 x 0.67)) = 2 (16.2 CPUs); K = 3 would need 24.3, so three copies of a suite would let the peak mix of suites ask for more CPU than the host has even though the pool would still cap the workers at 18.
+The result holds while the largest per-copy demand stays at or below 0.75 CPU (18 / (12 x 2)); a heavier suite mix derives a smaller number, so re-derive the default from the same three measurements when the host or the suite mix changes.
+On a host with fewer CPUs the pool is smaller but the cap still applies per key: with four passes and two slots a third request for one key waits while two passes are free, because the slot cap and the pass pool are separate limits and a request waits for whichever is full.
+The accepted default stays at 2 on every host; the formula is how it was derived here, not a per-host recomputation.
+A waiter used to give up after 7,200 seconds and run beside the limit, so a day of slow holders let every copy through together, which is the harm the gate exists to prevent.
+Waiting is now by capacity alone: a waiter starts when a holder ends, whatever time has passed, and a holder that never ends is bounded only by the stop rules of its own runner.
+The gate shapes throughput and is not a safety boundary: a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so, and never blocks it.
 A native Windows bash (`uname` MINGW, MSYS or CYGWIN) never calls the gate.
 
 **Release and stale holders**
@@ -4905,7 +4923,7 @@ FM_GITHUB_ACCOUNTING=1   # 0 stops a primary home's watcher from keeping the sta
 FM_GITHUB_ACCOUNTING_BIN=   # test seam: the owner the watcher starts instead of bin/fm-github-accounting.py
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
-FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
+FM_TEST_SLOT_WAIT_SECONDS=   # retired and ignored: a waiter waits for a slot until a holder ends (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
 FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
 FM_HOME_SUMMARY_TIMEOUT=900    # no-output/no-CPU seconds for home-summary initialization through atomic publication, never a wall-clock cutoff; independent failure-accounting bounds are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 900
