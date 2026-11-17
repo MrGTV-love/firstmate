@@ -572,6 +572,7 @@ Your own machinery publishes the durable facts about your crew's work for you (\
 What only you can append is judgement: the answer to a marked request below, a recommendation or caveat on a delivered outcome, a blocker or failure of your own, and anything else you would otherwise say to the captain.
 A call the main firstmate owns is never held: append it as a \`needs-decision\` line for the main firstmate and keep working where you can, and the work continues on its answer.
 \`bin/fm-captain-hold.sh hold\` is only for a real boundary that needs the captain's own words; use its \`--help\` for the required boundary and if-no fields, and here also say \`--owner captain\`; only the captain's words release it.
+When the card carries a \`Recommendation:\`, also pass \`--recommendation <exact-answer-text>\`: the exact string the captain sends to choose that option (typed words, or for a keyed or Slack answer the option key, number or label exactly as shown on the card); an answer equal to it after trimming surrounding whitespace records the wait as a delay mistake.
 
 # Requests from the main firstmate
 You are a firstmate in your own home, so an incoming message reaches you in your own chat.

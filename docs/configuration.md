@@ -462,7 +462,10 @@ Captain rows have no Beads due semantics, so that create path waives a Beads `du
 New captain holds require a named authority boundary and a concrete if-no action, stored on the task and visible through `tasks-axi show <id> --full`; [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the flags and allowed names.
 A call without those facts is Main's to decide, not the captain's to hold.
 Existing holds remain readable and resolvable without the new fields, and an unresolved hold may be deferred again without supplying them.
-The answer path also accounts for an avoidable wait when the answer matches the hold's separately recorded exact recommendation; the script header owns that optional field and the home-local delay-log contract.
+The answer path also accounts for an avoidable wait when the answer matches the hold's separately recorded exact recommendation; the script header owns that field and the home-local delay-log contract.
+The tool accepts a hold without `--recommendation`, but every filer whose card carries a `Recommendation:` is expected to supply it.
+Its value is the exact string the captain sends to choose the recommended option: the typed words, or for a keyed or Slack answer the option key, number or label exactly as shown on the card.
+An answer equal to that value after trimming surrounding whitespace records one delay row; any other answer records none.
 
 Do not register a Beads `types.custom` `captain` type for this: captain is a hold kind, and the fleet Beads `due.required` policy for ordinary work stays in the federated beads config.
 

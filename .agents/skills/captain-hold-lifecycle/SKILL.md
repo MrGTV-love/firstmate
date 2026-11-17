@@ -32,6 +32,10 @@ Only `answer` with the captain's words, an evidence-backed `reconcile close`, or
 A new hold is only for a real authority boundary that needs the captain's own words, with a concrete action the fleet would take if the answer were no; otherwise Main decides and proceeds without a captain wait.
 `bin/fm-captain-hold.sh --help` owns the required boundary and if-no fields and the allowed boundary names.
 A boundary name is an assertion by the filing agent, not proof that the boundary applies.
+When the card carries a `Recommendation:`, also pass `--recommendation <exact-answer-text>`; the tool accepts a hold without it, but every filer whose card recommends an option is expected to supply it.
+Its value is the exact string the captain sends to choose the recommended option: the typed words, or for a keyed or Slack answer the answer value that option sends (its key, number or label exactly as shown on the card), never a paraphrase or the card's reasons.
+An answer equal to that value after trimming surrounding whitespace records the wait as a delay mistake; a value that does not match what the captain sends records nothing.
+For example: `bin/fm-captain-hold.sh hold T42 --reason $'Decision sought: raise the monthly API spend cap?\nRecommendation: wait, usage drops after the batch ends' --boundary spend --if-no 'keep the current cap and slow the batch' --recommendation wait`.
 A secondmate home must also say whose words it needs with `--owner captain`.
 A call the main firstmate owns is never held: the home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
 A captain-owned hold is released only by the captain's own words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling that names it.

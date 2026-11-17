@@ -1991,14 +1991,17 @@ append_recorded_delay() {  # <id> <shown-body>
     flock($log, LOCK_EX) or die "delay log lock: $!\n";
     seek($log, 0, 0) or die "delay log seek: $!\n";
     local $/ = "\n";
+    my $separator = "";
     while (my $existing = <$log>) {
-      my $row = $json->decode($existing);
+      $separator = $existing =~ /\n\z/ ? "" : "\n";
+      my $row = eval { $json->decode($existing) };
+      next unless ref($row) eq "HASH";
       next unless ($row->{kind} // "") eq "delay" && ($row->{hold_id} // "") eq $record->{hold_id} && ($row->{at} // "") eq $record->{at};
       die "conflicting delay event\n" unless $json->encode($row) eq $line;
       close $log or die "delay log close: $!\n";
       exit 0;
     }
-    print {$log} "$line\n" or die "delay log append: $!\n";
+    print {$log} "$separator$line\n" or die "delay log append: $!\n";
     close $log or die "delay log close: $!\n";
   ' "$FM_HOME/data/error-log.jsonl" "$id" || fail "could not append delay accounting for $id"
 }

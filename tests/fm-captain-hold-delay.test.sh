@@ -138,8 +138,32 @@ test_retry_finishes_an_interrupted_delay_append() {
   pass 'an exact replay finishes an interrupted delay append without duplicating the record'
 }
 
+test_foreign_log_rows_do_not_block_the_delay_append() {
+  local home
+  home=$(make_home foreign-rows-delay)
+  delay_hold "$home" call --recommendation approve
+  mkdir -p "$home/data"
+  printf '\n{"kind":"note","hold_id":"other"}\nnot json\n[1,2]\n"text"\n{"kind":"delay","hold_id":"call"' > "$home/data/error-log.jsonl"
+  cp "$home/data/error-log.jsonl" "$home/before.jsonl"
+  printf 'approve' > "$home/answer.txt"
+  delay_cli "$home" answer call --decision-file "$home/answer.txt" >/dev/null || fail 'a foreign log row blocked the recommended answer'
+  delay_cli "$home" answer call --decision-file "$home/answer.txt" >/dev/null || fail 'a foreign log row blocked the answer replay'
+  python3 - "$home/before.jsonl" "$home/data/error-log.jsonl" <<'PY' || fail 'foreign rows were changed or the delay row was not appended once'
+import json
+import pathlib
+import sys
+before, after = (pathlib.Path(p).read_bytes() for p in sys.argv[1:])
+assert after.startswith(before + b'\n'), after
+rows = after[len(before) + 1:].decode().splitlines()
+assert len(rows) == 1, rows
+row = json.loads(rows[0])
+assert row['kind'] == 'delay' and row['hold_id'] == 'call' and row['answer'] == 'approve', row
+PY
+  pass 'blank, malformed and non-object log rows are kept and skipped, and the delay row is appended once'
+}
+
 tests=(test_recommended_answer_logs_once test_different_answer_logs_nothing
   test_reason_prose_is_not_a_recommendation_value test_keyed_answer_logs_payload_once_in_own_home
   test_long_unicode_answer_is_cut_at_200_characters test_recommendation_is_kept_only_for_the_unresolved_hold
-  test_retry_finishes_an_interrupted_delay_append)
+  test_retry_finishes_an_interrupted_delay_append test_foreign_log_rows_do_not_block_the_delay_append)
 fm_test_run_cases "${tests[@]}" -- "$@"

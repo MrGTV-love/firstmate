@@ -8,7 +8,7 @@ metadata:
 
 # Backlog maintenance
 
-A decision is simply a task held for the captain: create the task with `bin/fm-tasks-axi.sh add` when needed, then always hold it through `bin/fm-captain-hold.sh hold <id> --reason "<reason>" --boundary <boundary> --if-no "<action>"`, with `--until <date>` when the captain defers it and `--owner captain` in a secondmate home; a call the main firstmate owns is never held (`captain-hold-lifecycle` owns that rule).
+A decision is simply a task held for the captain: create the task with `bin/fm-tasks-axi.sh add` when needed, then always hold it through `bin/fm-captain-hold.sh hold <id> --reason "<reason>" --boundary <boundary> --if-no "<action>" --recommendation "<exact-answer-text>"`, dropping `--recommendation` only when the card recommends no option, with `--until <date>` when the captain defers it and `--owner captain` in a secondmate home; a call the main firstmate owns is never held (`captain-hold-lifecycle` owns that rule and the `--recommendation` value).
 When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.
 Captain calls discovered by investigations or visual reviews follow `captain-hold-lifecycle`, which owns their completion gate and recorded-answer rules.
 

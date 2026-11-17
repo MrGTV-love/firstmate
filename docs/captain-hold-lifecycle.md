@@ -61,7 +61,10 @@ It works in this order:
 5. It verifies the hold and timestamp.
 
 Publishing the stamp first ensures a snapshot cannot observe a newly captain-held task without the timestamp that defines its age.
-The optional exact recommendation is a separate JSON-string-valued header field, not a guess from the four-part card's human-readable recommendation and reasons.
+The exact recommendation is a separate JSON-string-valued header field, not a guess from the four-part card's human-readable recommendation and reasons.
+The tool accepts a hold without `--recommendation`, but every filer whose card carries a `Recommendation:` is expected to supply it.
+Its value is the exact string the captain sends to choose the recommended option: the typed words, or for a keyed or Slack answer the option key, number or label exactly as shown on the card.
+An answer equal to that value after trimming surrounding whitespace records the wait as one delay row.
 The script's `--help` owns the filing fields and delay-log contract.
 
 Repeat and edge cases:
