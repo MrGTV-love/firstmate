@@ -2449,6 +2449,7 @@ test_teardown_after_a_joint_reassociation_releases_a_vernant_locked_copy_through
       | { IFS= read -r exclude; printf '%s\n' scripts/ >> "$exclude"; }
     mkdir -p "$slot/scripts/git-stability"
     cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
+if [ "\${3:-}" != --execute-cleanup ]; then echo '{"allowed": true}'; exit 0; fi
 printf '%s|%s\n' "\$PWD" "\$*" >> "$dir/closeout.log"
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
   echo '{"allowed": false, "reason": "stub_refusal"}'
@@ -2478,8 +2479,11 @@ SH
       assert_equals "$slot|--cleanup-worktree $na --execute-cleanup" "$(cat "$dir/closeout.log")" "$shape: the driver did not run once"
       rm -f "$dir/closeout.log"
       # A refusal after cleanup began keeps both records and marks this one
-      # for a retry; the copies, the lease and the claim stay as they were.
+      # for a retry; the copies and the lease stay as they were. The claim was
+      # already handed to the peer, which runs before any copy is removed.
       [ -f "$dir/home/state/$ida.teardown-return-pending" ] || fail "$shape: the refusal left no retry marker"
+      assert_line "task=$idb" "$dir/pool/139/.fm-slot-owner" "$shape: the claim was not handed to the peer before the copy release"
+      cp "$dir/pool/139/.fm-slot-owner" "$dir/claim-before"
       for id in "$ida" "$idb"; do
         cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" || fail "$shape: task $id's record changed"
         cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" || fail "$shape: task $id's instructions changed"
@@ -2488,7 +2492,7 @@ SH
       [ ! -e "$dir/treehouse.log" ] || fail "$shape: the pool slot was returned: $(cat "$dir/treehouse.log")"
     fi
   done
-  pass "a joint-reassociated task's Vernant-locked copy is released through the closeout driver, and a driver refusal keeps both records, copies, the lease and the claim"
+  pass "a joint-reassociated task's Vernant-locked copy is released through the closeout driver, and a driver refusal keeps both records, copies and the lease, with the claim already handed to the peer"
 }
 
 test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_reassigned_slot() {

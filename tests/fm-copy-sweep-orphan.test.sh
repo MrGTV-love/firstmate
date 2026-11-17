@@ -287,9 +287,9 @@ test_preserved_classes() {
     for preserved in "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"; do
       [ -d "$preserved" ] || continue
       found=$((found + 1))
-      assert_equals "$source_hash" "$(shasum -a 256 "$preserved/$rel" | cut -d ' ' -f 1)" "$name preserved bytes differ"
-      assert_contains "$(cat "$preserved/SHA256SUMS")" "$source_hash  $rel" "$name manifest misses the actual bytes"
-      printf 'class=%s source_sha256=%s preserved=%s preserved_sha256=%s disposition=removed\n' "$name" "$source_hash" "$preserved/$rel" "$source_hash"
+      assert_equals "$source_hash" "$(shasum -a 256 "$preserved/files/$rel" | cut -d ' ' -f 1)" "$name preserved bytes differ"
+      assert_contains "$(cat "$preserved/meta/SHA256SUMS")" "$source_hash  $rel" "$name manifest misses the actual bytes"
+      printf 'class=%s source_sha256=%s preserved=%s preserved_sha256=%s disposition=removed\n' "$name" "$source_hash" "$preserved/files/$rel" "$source_hash"
     done
     assert_equals 1 "$found" "$name needs exactly one concrete preservation"
     assert_absent "$CLONE/.claude/worktrees/$name" "$name copy was not reclaimed"
@@ -385,16 +385,16 @@ test_regenerable_class() {
   assert_contains "$(printf '%s\n' "$OUT" | grep -F "REMOVED"$'\t'"$unlocked")" 'preserved 0.00 GiB, net freed 0.01 GiB' 'regenerable bytes were not freed'
 
   key=$(printf '%s' "$unlocked" | shasum -a 256 | cut -d ' ' -f 1)
-  preserve=$(printf '%s\n' "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key")
+  preserve=$(printf '%s\n' "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key")/files
   assert_equals 'keep me' "$(cat "$preserve/.claude/deep/er/keep.txt")" 'other ignored bytes were not preserved'
   assert_equals 'near name' "$(cat "$preserve/.claude/deep/er/node_modules2/keep.txt")" 'a near name was treated as the class'
   assert_equals 'plain file with a class name' "$(cat "$preserve/.claude/file/.cache")" 'a plain file was treated as the class'
   [ -L "$preserve/.claude/file/venv" ] || fail 'a symlink was treated as the class'
   assert_equals '' "$(class_dirs_in "$preserve")" 'unlocked preserve holds a regenerable directory'
-  assert_contains "$(cat "$preserve/SHA256SUMS")" '.claude/deep/er/keep.txt' 'manifest misses a preserved file'
+  assert_contains "$(cat "${preserve%/files}/meta/SHA256SUMS")" '.claude/deep/er/keep.txt' 'manifest misses a preserved file'
 
   key=$(printf '%s' "$locked" | shasum -a 256 | cut -d ' ' -f 1)
-  preserve=$(printf '%s\n' "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key")
+  preserve=$(printf '%s\n' "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key")/files
   assert_equals 'keep build output' "$(cat "$preserve/build/keep.txt")" 'locked ignored bytes were not preserved'
   assert_equals 'keep unique bytes' "$(cat "$preserve/unique.dat")" 'locked unique bytes were not preserved'
   assert_equals '' "$(class_dirs_in "$preserve")" 'locked preserve holds a regenerable directory'
@@ -454,8 +454,8 @@ SH
     for preserve in "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"; do
       [ -d "$preserve" ] || continue
       found=$((found + 1))
-      assert_equals 'keep unique bytes' "$(cat "$preserve/unique.dat")" "$name: unique bytes were not preserved"
-      assert_equals '' "$(class_dirs_in "$preserve")" "$name: a preserve holds a regenerable directory"
+      assert_equals 'keep unique bytes' "$(cat "$preserve/files/unique.dat")" "$name: unique bytes were not preserved"
+      assert_equals '' "$(class_dirs_in "$preserve/files")" "$name: a preserve holds a regenerable directory"
     done
     assert_equals 1 "$found" "$name: the release after WAITING needs exactly one concrete preserve"
   done
@@ -541,7 +541,7 @@ SH
   done
   assert_contains "$OUT" "FAILED"$'\t'"$evidence"$'\t'"git worktree remove refused" 'the later runs did not reach the evidence copy'
   key=$(printf '%s' "$evidence" | shasum -a 256 | cut -d ' ' -f 1)
-  assert_equals 'original evidence bytes' "$(cat "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"/.claude/keep.txt)" 'the mismatch preserve changed'
+  assert_equals 'original evidence bytes' "$(cat "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"/files/.claude/keep.txt)" 'the mismatch preserve changed'
   assert_equals 'changed original' "$(cat "$evidence/.claude/keep.txt")" 'the changed original was lost'
   pass 'three refused applies add no preserve, keep mismatch evidence, and leave originals and held copies unchanged'
 }
@@ -593,7 +593,7 @@ SH
     assert_absent "$CLONE/.claude/worktrees/$name" "$name was not removed once quiet"
     assert_equals 1 "$(preserve_count "$CLONE/.claude/worktrees/$name")" "$name needs exactly one preserve after its removal"
     key=$(printf '%s' "$CLONE/.claude/worktrees/$name" | shasum -a 256 | cut -d ' ' -f 1)
-    assert_equals "original $name bytes" "$(cat "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"/.claude/keep.txt)" "$name preserve misses its original"
+    assert_equals "original $name bytes" "$(cat "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"/files/.claude/keep.txt)" "$name preserve misses its original"
   done
   pass 'three applies with only activity or new content add no preserve, and the quiet release preserves once'
 }
