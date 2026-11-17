@@ -29,12 +29,50 @@ crew.write_text('#!/usr/bin/env python3\nimport os,pathlib,sys\n'
                 'p=pathlib.Path(os.environ["FM_HOME"])/"prerequisite-state"\n'
                 'print("state: "+p.read_text().strip()+" · source: pane · synthetic prerequisite")\n')
 crew.chmod(0o755)
+read_bin = world / 'read-bin'
+read_bin.mkdir()
+reader = read_bin / 'bash'
+reader.write_text('#!/usr/bin/env python3\n' + f'REAL_BASH={shutil.which("bash")!r}\n' + r'''
+import json,os,pathlib,subprocess,sys
+home=pathlib.Path(os.environ['FM_HOME']).resolve()
+trigger=home/'read-change.json'
+args=sys.argv[1:]
+relevant=any('status_open_decisions_dated' in arg for arg in args) and args[-1]==str(home/'state/job.status')
+change=None
+if relevant and trigger.exists():
+    change=json.loads(trigger.read_text())
+    change['calls']+=1
+    path=home/'state/job.status'
+    if change['remaining']:
+        assert path.is_file() and not path.is_symlink() and path.resolve()==home/'state/job.status'
+        change['remaining']-=1
+        if change['mode'] in ('before','twice'):
+            stage=home/'state/job.status.replacement'
+            saved=home/('state/job.status.preserved-'+str(change['calls']))
+            assert stage.absolute()==home/'state/job.status.replacement' and not stage.exists() and not saved.exists()
+            os.link(path,saved)
+            stage.write_text('needs-decision [key=gate]: choose validation action\n')
+            assert path.resolve()==home/'state/job.status' and stage.resolve()==home/'state/job.status.replacement'
+            os.replace(stage,path)
+        elif change['mode']=='after':
+            change['remove_after_read']=True
+    trigger.write_text(json.dumps(change))
+run=subprocess.run([REAL_BASH,*args],capture_output=True)
+if change and change.get('remove_after_read'):
+    removed=home/'state/job.status.removed-after-read'
+    assert path.resolve()==home/'state/job.status' and not removed.exists()
+    assert removed.absolute()==home/'state/job.status.removed-after-read'
+    path.rename(removed)
+sys.stdout.buffer.write(run.stdout);sys.stderr.buffer.write(run.stderr);sys.exit(run.returncode)
+''')
+reader.chmod(0o755)
 now = 1800000000
 iso = lambda value: dt.datetime.fromtimestamp(value, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
 class Home:
-    def __init__(self, name, opening='stamped'):
+    def __init__(self, name, opening='stamped', degraded=False):
+        self.degraded = degraded
         self.path = world / name
         for directory in ('state', 'data', 'config', 'projects', 'user', 'tmp'):
             (self.path / directory).mkdir(parents=True)
@@ -49,12 +87,21 @@ class Home:
         self.snapshot = dict(schema='fm-fleet-home-input.v1', tasks=[], backlog=dict(present=True, records=[]))
         self.save_snapshot()
         self.status = self.path / 'state/job.status'
-        (self.path / 'state/job.meta').write_text('kind=scout\nspawn_gen=synthetic-job\n')
+        self.metadata = self.path / 'state/job.meta'
+        self.metadata_text = 'kind=scout\nspawn_gen=synthetic-job\n'
+        if degraded:
+            target = self.path / 'synthetic-meta'
+            target.write_text(self.metadata_text)
+            self.metadata.symlink_to(target)
+        else:
+            self.metadata.write_text(self.metadata_text)
         self.open(opening)
         self.collect()
         self.row = self.question()
         assert self.row['overdue'], self.row
         self.present(True)
+        if degraded:
+            self.route_coverage()
 
     def call(self, *args, expected=0):
         run = subprocess.run([str(code / 'bin/fm-open-loops.sh'), *map(str, args)],
@@ -76,8 +123,30 @@ class Home:
 
     def collect(self):
         report = json.loads(self.call('--heartbeat', '--json').stdout)
-        assert report['complete'], report
+        assert report['complete'] == (not self.degraded), report
+        if self.degraded:
+            question = next(row for row in report['rows'] if row['subject'] == 'job:gate')
+            assert question['overdue'] and not question.get('stale') and not question.get('informational'), question
+            assert question.get('source') is None, 'unsafe full provenance must remain unavailable'
+            assert any(row['category'] == 'coverage' and 'must not be a symbolic link' in row['evidence']
+                       for row in report['rows']), report
         return report
+
+    def route_coverage(self):
+        for row in self.ledger()['rows']:
+            if row['category'] == 'coverage':
+                self.call('action', row['id'], 'escalated', '--evidence', 'rejected source shape routed for repair')
+
+    def recover_metadata(self):
+        preserved = self.path / 'state/job.meta.rejected'
+        assert self.metadata.absolute() == self.path / 'state/job.meta'
+        assert self.metadata.is_symlink() and self.metadata.resolve() == self.path / 'synthetic-meta'
+        assert preserved.absolute() == self.path / 'state/job.meta.rejected' and not preserved.exists()
+        self.metadata.rename(preserved)
+        self.metadata.write_text(self.metadata_text)
+        self.degraded = False
+        self.clock += 1
+        self.collect()
 
     def ledger(self):
         return json.loads((self.path / 'state/open-loops.json').read_text())
@@ -142,6 +211,86 @@ class Home:
         self.clock += 1801
         self.collect()
 
+
+# Bind canonical output to the stream actually read, not the pathname's older
+# stat. A regular-file replacement is injected immediately before the real
+# dated reader. A second change must not create an unbounded retry loop.
+for mode in ('before', 'unchanged', 'after', 'twice'):
+    home = Home('read-' + mode, 'unstamped')
+    home.act()
+    original = home.question()['opening']
+    home.clock += 1
+    home.append('resolved [key=gate]: predecessor answered' if mode in ('before', 'twice')
+                else 'working: unrelated progress continues')
+    home.env['PATH'] = str(read_bin) + ':' + home.env['PATH']
+    trigger = home.path / 'read-change.json'
+    trigger.write_text(json.dumps(dict(mode=mode, calls=0, remaining=2 if mode == 'twice' else int(mode != 'unchanged'))))
+    report = json.loads(home.call('--heartbeat', '--json').stdout)
+    observed = home.question()
+    change = json.loads(trigger.read_text())
+    if mode == 'before':
+        home.present(True)
+        home.check(True)
+        actual = home.status.stat()
+        assert observed['opening']['stream'] == [actual.st_dev, actual.st_ino]
+        assert observed['opening']['stream'] != original['stream'] and change['calls'] == 2
+        assert report['complete']
+        print('ok - pre-reader stream replacement gets one fresh canonical read and rejects predecessor receipt', flush=True)
+    elif mode == 'twice':
+        assert change['calls'] == 2 and not report['complete'], report
+        assert observed.get('stale') and not observed['overdue'], observed
+        assert any(row['category'] == 'coverage' and 'stream changed' in row['evidence'] for row in report['rows'])
+        home.call('--present-overdue')
+        home.check(True)
+        print('ok - continued stream replacement ends after the bounded reread with explicit coverage uncertainty', flush=True)
+    else:
+        assert observed['opening'] == original and change['calls'] == 1
+        if mode == 'after':
+            assert not report['complete'] and observed.get('source') is None, report
+        else:
+            assert report['complete'] and observed.get('source'), report
+        home.present(False)
+        if mode == 'after':
+            home.route_coverage()
+        home.check(False)
+        print('ok - ' + mode + '-reader control preserves the confirmed opening without extra reads', flush=True)
+
+# Full task provenance is optional, not the identity of an observed opening.
+# Rejected metadata must still refuse waits while ordinary valid receipts cover
+# only their own canonical episode. No source or opening identity is fabricated.
+for kind in ('steered', 'escalated', 'deferred', 'bound'):
+    home = Home('degraded-' + kind, 'unstamped', degraded=True)
+    refused = home.call('action', home.row['id'], 'waiting', '--prerequisite-task', 'helper',
+                        '--evidence', 'unproved binding', '--recheck', iso(now + 7200), expected=1)
+    assert home.row['id'] not in home.ledger()['handling']['actions'], refused.stdout
+    home.act(kind)
+    home.clock += 1
+    home.append('working: unrelated progress continues')
+    home.collect()
+    home.present(False)
+    home.check(False)
+    home.reopen()
+    assert home.question()['id'] == home.row['id']
+    home.present(True)
+    home.check(True)
+    if kind == 'steered':
+        home.message(name='002.msg')
+        home.call('action', home.row['id'], 'steered', '--evidence', '002.msg')
+        home.check(False)
+    else:
+        home.act(kind)
+    home.recover_metadata()
+    assert home.question().get('source'), 'only recovery may restore full provenance'
+    home.present(False)
+    home.check(False)
+    print('ok - degraded ' + kind + ' preserves unchanged work, rejects recurrence and survives source recovery', flush=True)
+
+home = Home('degraded-recovery-without-reopen', 'unstamped', degraded=True)
+home.act()
+home.recover_metadata()
+home.present(False)
+home.check(False)
+print('ok - metadata-only recovery does not replay an unchanged degraded question', flush=True)
 
 # E1: every supported question receipt form must refer to the surviving opening.
 # The same stamped value deliberately appears on both sides of one close/reopen;

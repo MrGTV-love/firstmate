@@ -299,7 +299,7 @@ class Collector:
         return self.run(["bash", "-c", script, "open-loops", *args])
 
     def add(self, category, subject, action, since=None, owner="firstmate", evidence="", informational=False,
-            source=None):
+            source=None, opening=None):
         """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
@@ -311,6 +311,8 @@ class Collector:
             row["informational"] = True
         if source is not None:
             row["source"] = source
+        if opening is not None:
+            row["opening"] = opening
         self.rows[identity] = row
 
     def source(self, name, reader, *args):
@@ -1018,13 +1020,38 @@ class Collector:
         source["generation"] = fingerprint(meta.read_text()) if meta.exists() else None
         return source
 
-    def decision_source(self, task, key, decision, observed_pr=None):
+    @staticmethod
+    def decision_identity(stream, key, decision):
+        """The canonical opening's identity, independent of optional task provenance."""
+        return dict(stream=stream, key=key, decision=fingerprint(decision))
+
+    def status_decisions(self, task, reread=True):
         path = self.state / (task + ".status")
         if path.is_symlink() or not path.is_file():
             raise ValueError("decision status must be a regular file")
         stat = path.stat()
-        source = dict(self.task_source(task), kind="status", key=key, decision=fingerprint(decision),
-                      stream=[stat.st_dev, stat.st_ino])
+        out = self.bash('[ -r "$2" ] || exit 1; . "$1/fm-status-decision-lib.sh"; '
+                        'status_open_decisions_dated "$2" "" --with-opening', BIN, path)
+        try:
+            after = path.stat()
+        except FileNotFoundError:
+            after = None  # keep the observed opening; full provenance still reports the missing source
+        if after is not None and (stat.st_dev, stat.st_ino) != (after.st_dev, after.st_ino):
+            if reread:
+                return self.status_decisions(task, reread=False)
+            raise ValueError("decision status stream changed during bounded canonical read")
+        decisions = []
+        for line in out.splitlines():
+            key, verb, opened, _opening, summary = (line.split("\t", 4) + [""] * 5)[:5]
+            decisions.append(dict(key=key, verb=verb, opened=opened, summary=summary,
+                                  identity=self.decision_identity([stat.st_dev, stat.st_ino], key, line)))
+        return decisions
+
+    def decision_source(self, task, identity, observed_pr=None):
+        path = self.state / (task + ".status")
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("decision status must be a regular file")
+        source = dict(self.task_source(task), kind="status", **identity)
         if observed_pr is None:
             assigned = next((t for t in self.tasks if t["id"] == task), {})
             pr = self.prs.get(assigned.get("pr", {}).get("url"))
@@ -1053,18 +1080,18 @@ class Collector:
             if status.is_symlink():
                 continue
             try:
-                out = self.bash('[ -r "$2" ] || exit 1; '
-                                '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2" "" --with-opening', BIN, status)
+                decisions = self.status_decisions(status.stem)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
                 continue
-            for line in out.splitlines():
-                key, verb, opened, _opening, summary = (line.split("\t", 4) + [""] * 5)[:5]
+            for decision in decisions:
+                key, opened = decision["key"], decision["opened"]
                 self.add("unanswered_question", f"{status.stem}:{key}",
                          "answer or close this question, or record why it no longer applies",
-                         int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}",
+                         int(opened) if opened.isdigit() else None,
+                         evidence=f"{decision['verb']}: {decision['summary']}", opening=decision["identity"],
                          source=self.source("question provenance " + status.name,
-                                            self.decision_source, status.stem, key, line))
+                                            self.decision_source, status.stem, decision["identity"]))
 
     def board_answer_rows(self):
         inbox = self.state / "procevent-inbox"
@@ -1364,9 +1391,12 @@ def row_digest(row):
     # to its canonical opening, not just its display text or available clock.
     # Waiting also verifies its full collected source and dependency live.
     fields = [row.get(f) for f in ("category", "subject", "owner", "next_action", "evidence")]
-    source = row.get("source")
-    if row.get("category") == "unanswered_question" and isinstance(source, dict) and source.get("kind") == "status":
-        fields.append([source.get(key) for key in ("stream", "key", "decision")])
+    source, opening = row.get("source"), row.get("opening")
+    if row.get("category") == "unanswered_question":
+        if not isinstance(opening, dict) and isinstance(source, dict) and source.get("kind") == "status":
+            opening = source  # an already identified receipt from before identity was retained separately
+        if isinstance(opening, dict):
+            fields.append([opening.get(key) for key in ("stream", "key", "decision")])
     if row.get("category") == "stalled_worker" and isinstance(fields[-1], str):
         fields[-1] = ELAPSED_TIME.sub("<age>", fields[-1])  # a heartbeat's growing age is not a changed obligation
     return hashlib.sha256(json.dumps(fields).encode()).hexdigest()[:24]
@@ -1555,18 +1585,14 @@ class WaitVerifier:
             raise ValueError("waiting source has no task identity; recollect before binding it")
         if kind == "status":
             if task not in self.decisions:
-                path = c.state / (task + ".status")
-                if path.is_symlink() or not path.is_file():
-                    raise ValueError("prerequisite status is unavailable")
-                self.decisions[task] = c.bash('. "$1/fm-status-decision-lib.sh"; '
-                    'status_open_decisions_dated "$2" "" --with-opening', BIN, path).splitlines()
-            decision = next((line for line in self.decisions[task]
-                             if line.split("\t", 1)[0] == source.get("key")), None)
+                self.decisions[task] = c.status_decisions(task)
+            decision = next((record for record in self.decisions[task]
+                             if record["key"] == source.get("key")), None)
             if decision is None:
                 raise ValueError("prerequisite decision is no longer open")
             # PR identity is the collector's latest forge observation; full source
             # comparisons invalidate a changed head on publication, while this read rechecks the live local key.
-            return c.decision_source(task, source["key"], decision, source.get("pr"))
+            return c.decision_source(task, decision["identity"], source.get("pr"))
         if kind in ("pr", "commits"):
             current = dict(source, **c.task_source(task))
             if kind == "commits":

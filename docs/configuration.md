@@ -1037,7 +1037,7 @@ When the backlog or the home's ledger cannot be read, an escalation of such a ro
 A bound hold ending or becoming unreadable restores the action requirement immediately, including within the turn the escalation was recorded.
 An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
-Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
+Legacy status-question receipts without a canonical opening identity require one current reconciliation action after refresh; optional full provenance recovery does not replay an unchanged identified opening, captain-hold provenance additions preserve existing escalation and deferral receipts, and bound waits still verify their full source and dependency.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; a wait on a named task may also bind a `red_check` row, whose worker is parked on purpose until that task lands.
 It is never a task-wide ownership inference or an answer to its prerequisite, and the red checks stay red: the row's evidence still names them, so a changed set of failing checks ends the wait.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
