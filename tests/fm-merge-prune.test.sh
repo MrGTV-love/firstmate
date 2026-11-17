@@ -4627,8 +4627,11 @@ make_v5_world() {
     "branch=fm/t-e" "pr=$V5_E_PR" "pr_head=$e_head"
   fm_write_meta "$STATE/mate1.meta" "window=firstmate:fm-mate1" "kind=secondmate" "mode=secondmate" "backend=tmux" "harness=claude" "home=$mate_home"
   printf 'working [at=%s]: building\n' "$((V5_NOW - 21600))" > "$STATE/t-b.status"
-  printf 'paused [at=%s]: waiting on Main decision d9 until %s\n' "$((V5_NOW - 21600))" \
-    "$(date -u -r "$((V5_NOW + 172800))" +%Y-%m-%dT%H:%MZ)" > "$STATE/t-c.status"
+  local c_until_epoch=$((V5_NOW + 172800)) c_until
+  c_until=$(date -u -r "$c_until_epoch" +%Y-%m-%dT%H:%MZ 2>/dev/null || date -u -d "@$c_until_epoch" +%Y-%m-%dT%H:%MZ)
+  printf 'paused [at=%s]: waiting on Main decision d9 until %s\n' "$((V5_NOW - 21600))" "$c_until" > "$STATE/t-c.status"
+  grep -Eq ' until [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}Z$' "$STATE/t-c.status" \
+    || fail "V5 fixture: C's declared wait has no deadline: $(cat "$STATE/t-c.status")"
   printf 'done [at=%s]: PR %s checks green\n' "$((V5_NOW - 7200))" "$V5_E_PR" > "$STATE/t-e.status"
   printf 'working [at=%s]: idle\n' "$((V5_NOW - 90000))" > "$STATE/mate1.status"
   # C's worker and D's secondmate are live: their windows are in the inventory, so the
