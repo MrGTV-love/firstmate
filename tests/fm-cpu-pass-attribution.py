@@ -468,9 +468,24 @@ def m1759_visible_attempt_masks_predecessor():
 
 
 def m1759_two_passive_attempts():
-    w = World('m1759-passive', available=13).run('x').proved('x').process(10, parent=200, start=100100000).process(11, parent=200, start=100100000)
-    w.record('a', 'x', reserves=False).record('b', 'x', reserves=False, root=[11, 100100000])
-    waits('m1759-two-passive', w, 14)
+    # Main 2422 (R12-2): a counted run's passive attempts are charged once, as the active run, never each alone: seen at
+    # 3 GiB with two passive attempts of 0.4 GiB each, it is charged max(3, 0.8, A) = 3, plus 8: 11 against 8.5 + 3
+    # admits; each attempt alone would be 1 + 1 + 2.2 + 8 = 12.2 and wait. Control: the same attempts of an uncounted
+    # run are each charged alone (A each, beside the run's other 2.2 GiB): 12.2.
+    def world(name, counted):
+        w = World(name, available=8.5).run('x', step=('review', 'running', None), counted=counted).proved('x')
+        w.process(10, parent=200, start=100100000).process(11, parent=200, start=100100000)
+        w.record('a', 'x', reserves=False, step='review').record('b', 'x', reserves=False, step='review', root=[11, 100100000])
+        w.rss['x'], w.own[10], w.own[11] = 3, 0.4, 0.4
+        return w
+    w = world('m1759-passive', True)
+    out = settle(w)
+    w.close()
+    harm('m1759-two-passive', out['admit'] and abs(out['projected'] - 11) < 1e-6, 'passive attempts charged alone', out)
+    w = world('m1759-passive-uncounted', False)
+    out = settle(w)
+    w.close()
+    control(out['projected'] is not None and abs(out['projected'] - 12.2) < 1e-6, 'an uncounted run\'s attempts are each charged', out)
 
 
 def m1759_fallback_counts_attempts():
@@ -1651,7 +1666,7 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1759 a missing step row holds the count fallback too', m1759_missing_step_row_fallback),
          ('Main 1759 a live unrecorded agent is no waiter', m1759_live_unrecorded_agent_waiter),
          ('Main 1759 a visible attempt never masks an unproven predecessor', m1759_visible_attempt_masks_predecessor),
-         ('Main 1759 two passive live attempts count twice', m1759_two_passive_attempts),
+         ('Main 2422 a counted run\'s passive attempts are charged once', m1759_two_passive_attempts),
          ('Main 1759 the fallback counts attempts', m1759_fallback_counts_attempts),
          ('Main 1759 an uncounted requesting run keeps its history', m1759_uncounted_self),
          ('Main 1759 a partial bulk read holds', m1759_partial_bulk),

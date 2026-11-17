@@ -1626,6 +1626,31 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         (folder / 'release-hold-a').touch()
         finish(a)
 
+    def started_run_charged_once():
+        # Main 2422 (R12-1): a start with no --launch-nonce whose client registers its own run (the bound repository,
+        # branch and intent) is charged once, by that row: with 6 cores (limit 2) a probe is admitted beside it while
+        # its client still runs (counted=1 pending=0). Control: before its row appears the same start is counted as
+        # pending, so a probe beside it and another counted run waits.
+        folder, db, env = case('bind-charged-once', cores=6)
+        checkout = bound_repo(folder, db, env)
+        row(db, 'other-run', 'something else')
+        a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], env, folder / 'a', checkout)
+        wait_for(lambda: (folder / 'pid-hold-a').exists(), 'A runs')
+        early = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'early')], env, folder / 'early')
+        wait_for(lambda: 'waiting: counted=1 limit=2 basis=fallback launched=0 pending=1' in (folder / 'early.stderr').read_text(),
+                 'the unregistered start is counted as pending')
+        assert not (folder / 'early').exists()
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'other-run'")
+        finish(early)
+        row(db, 'run-hold-a', 'hold-a')
+        probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+        finish(probe)
+        text = (folder / 'probe.stderr').read_text()
+        harm('r12-1-charged-once', 'counted=1 limit=2 basis=fallback launched=0 pending=0' in text, 'the started run was charged twice', text)
+        assert a.poll() is None, 'A is still alive: its own row ended its reservation'
+        (folder / 'release-hold-a').touch()
+        finish(a)
+
     def named_collision():
         # P5.lock's named collision (R = 3 GiB, S = 8 GiB, budget 12 GiB): B claims through the interception and is killed
         # after its push, so its reservation ends (K7); A is admitted and has not claimed; B's delayed row appears. The next
@@ -1886,6 +1911,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
     for name, body in (('P5.errors.fallback no A counts visible runs at R', no_term_counts_r),
                        ('P5.preempt.cancel a cancel before COMMAND begins', cancel_before_command),
                        ('P5.lock a reservation ends by its own row only', own_row_binding),
+                       ('Main 2422 a started run is charged once by its own row', started_run_charged_once),
                        ('P5.lock the named collision', named_collision),
                        ('P1 the line recomputes the base rule', p1_old_rule_recomputed),
                        ('P6(a) lines name the checkout, the pool and the start', lines_name_checkout_pool_and_start),

@@ -125,9 +125,17 @@ Pipeline starts:
     admitting pid, the admitted no-mistakes arguments and the running run IDs
     of the decision), then is released. Every later decision counts each
     admitted start that has not registered a run yet at the full R, and as one
-    run in the count fallback and the one-start minimum (live_pending). Each
-    new running run ID releases one pending start, the oldest still unreleased;
-    a pending start also ends when its COMMAND returns, or when the client that
+    run in the count fallback and the one-start minimum (live_pending). A new
+    running run ID releases the one pending start whose client it is: the row
+    carries the client's own --launch-nonce, or, with none, the row has no nonce
+    and the repository, branch and intent the start was bound to when it was
+    admitted or claimed (start_binding), and no other pending start shares that
+    nonce or binding. Its run is then charged once, by its own row. A start with
+    neither (rerun, an intent read from standard input or an unreadable file, a
+    directory that is no registered repository's) is released by no row; and the
+    late row of an earlier start with the same binding, whose pending start has
+    already ended, can release a later one. A pending
+    start also ends when its COMMAND returns, or when the client that
     claimed it through the interception has exited (its run, if any, is then in
     the run database). It does not reserve a run's lifetime; status changes
     release capacity. A registered run whose process tree the reading cannot
@@ -1026,7 +1034,9 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     attempt, the requesting run (self_run) and every queued run, whatever their status.
     Each run's demand is the sum of:
       its held attempts, each counted alone: R while unseen, the larger of its own resident
-        memory and A once seen, and the run's other resident memory beside them;
+        memory and A once seen, and the run's other resident memory beside them (a counted
+        run's passive attempts, its passed-through non-CI launches, are not counted alone:
+        the run is active, the larger of what it and they hold and A once seen, R unseen);
       or, with no held attempt, its current state while counted: no step facts or no open
         step row, R beside what it holds (at least A); queued at CI with no live agent but its
         own gate (no pid, a dead one, or its queued gate's), what it holds; waiting on CI (status
@@ -1050,6 +1060,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         size = seen["rss_bytes"] if seen and type(seen.get("rss_bytes")) is int else 0
         visible = bool(seen) and seen.get("processes", 0) > 0
         attempts = (launches.get(run) or {}).get("attempts") or []
+        passive = [a for a in attempts if a.get("passive")] if run in counted else []
+        attempts = [a for a in attempts if not (run in counted and a.get("passive"))]
         # A run whose history was not built is never zero (Main 1876 H): one charge.
         units = history[run] if history is not None and type(history.get(run)) is int else 1
         held += size
@@ -1063,6 +1075,11 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
             kind, demand = "uncounted", size
         elif step is None:
             kind, demand = "step-unknown", max(reservation + size, term)
+        elif passive:
+            kind = "active"
+            demand = max(size, sum(a["own"] for a in passive), term) \
+                if visible or all(a["seen"] for a in passive) else reservation
+            visible = visible or all(a["seen"] for a in passive)
         elif step[0] == CI_STEP and (run == self_run or run in waiting) and (
                 step[2] is None or proven_agentless(step, clock)
                 or step[2] in queued_pids.get(run, ()) or (run == self_run and step[2] == os.getpid())):
@@ -1574,7 +1591,8 @@ def attempt_reservations(states: Dict[str, dict], report: Optional[dict]) -> Tup
     reading by pid and exact start time, from a figure of that same read only (rss_source task, Main 1656, P3); the
     attempt is seen only when every one of those processes joins, and a possible process left unjoined is unknown:
     noted, so the decision waits (Main 1876 J). A passed-through attempt (a counted run's non-CI launch) is marked
-    passive: project() counts it only when its run is not counted.
+    passive: project() counts it alone only when its run is not counted; a counted run with passive attempts is
+    charged once, as an active run.
     """
     rows = {}
     for row in (report or {}).get("processes", []) or []:
@@ -1839,31 +1857,58 @@ def read_pending(fd: int) -> Optional[dict]:
     return entry if isinstance(entry, dict) else None
 
 
-def run_rows(running: set, since_ns: Optional[int] = None) -> Dict[str, Optional[str]]:
-    """run -> launch_nonce for every running run and, with SINCE_NS, every run created since then whatever its status."""
+def run_rows(running: set, since_ns: Optional[int] = None) -> Dict[str, tuple]:
+    """run -> (launch_nonce, repo_id, branch, intent, created_at) for every running run and, with SINCE_NS, every run
+    created since then whatever its status."""
+    columns = "SELECT id, repo_id, branch, intent, created_at, launch_nonce FROM runs"
     if since_ns is None:
         if not running:
             return {}
         marks = ",".join("?" * len(running))
-        return {run: nonce for run, nonce in read_host_db(
-            "SELECT id, launch_nonce FROM runs WHERE id IN (%s)" % marks, tuple(sorted(running)))}
-    return {run: nonce for run, nonce in read_host_db(
-        "SELECT id, launch_nonce FROM runs WHERE status = 'running' OR created_at >= ?", (since_ns // 1000000000 - 1,))}
+        return {row[0]: (row[5],) + tuple(row[1:5]) for row in read_host_db(
+            columns + " WHERE id IN (%s)" % marks, tuple(sorted(running)))}
+    return {row[0]: (row[5],) + tuple(row[1:5]) for row in read_host_db(
+        columns + " WHERE status = 'running' OR created_at >= ?", (since_ns // 1000000000 - 1,))}
+
+
+def binding_key(binding) -> Optional[tuple]:
+    """(repo, branch, intent, bound) of a start's binding (start_binding), or None when any of them is not told."""
+    if not isinstance(binding, dict):
+        return None
+    repo, branch, intent, bound = (binding.get(field) for field in ("repo", "branch", "intent", "bound"))
+    if not (isinstance(repo, str) and isinstance(branch, str) and isinstance(intent, str) and intent
+            and type(bound) is int):
+        return None
+    return repo, branch, intent, bound
+
+
+def binds(row: tuple, key: tuple) -> bool:
+    """Whether a run row is the run a start bound to KEY starts: no launch nonce, the same repository, branch and
+    intent, created no earlier than the second before the binding."""
+    nonce, repo, branch, intent, created = row
+    return (nonce is None and repo == key[0] and branch == key[1] and isinstance(intent, str)
+            and intent.strip() == key[2] and type(created) is int and created >= key[3] - 1)
 
 
 def pending_census(directory: str, running: set) -> List[dict]:
     """One read of every pending admitted start, its claim and its release, oldest first (Main 1759, 1812).
 
     Each item: path, entry (None when unreadable), claim (None when none or unreadable),
-    known (its claimant's identity is read), nonce (the claimant's own launch nonce or None),
+    known (its claimant's identity is read), key (the claimant's own launch nonce or binding, or None),
     released, own (the run whose row released it). The claimant is the client the
-    reservation is for: the client of a final claim (its own --launch-nonce), or, with no
-    claim, the client a direct route runs as its one program (client_nonce). An entry or a
-    claim that cannot be read or lacks a field of its type is unknown: noted (the decision
-    waits), counted, never released, and while any claimant is unknown no row releases any
-    start. A row releases a start only when it carries the claimant's own nonce, that nonce
-    is carried by no other start's claimant and no other running run, and the row was
-    neither running when the start was admitted nor read when its claim was made final. K7
+    reservation is for: the client of a final claim (its own --launch-nonce and binding), or,
+    with no claim, the client a direct route runs as its one program (client_nonce, and the
+    entry's binding). An entry or a claim that cannot be read or lacks a field of its type is
+    unknown: noted (the decision waits), counted, never released, and while any claimant is
+    unknown no row releases any start. A row releases a start only when it is the one running
+    row of the claimant's own key, and that key is no other start's claimant's: its nonce
+    when it carries one, otherwise its binding (repository, branch and intent, the row having
+    no nonce and created since the binding); and the row was neither running when the start
+    was admitted nor read when its claim was made final. A start with neither (rerun, an
+    intent read from standard input or a file that cannot be read, a directory that is no
+    registered repository's) is released by no row. Limit: a binding names no single client,
+    so the late row of an earlier start with the same binding, whose pending start has
+    already ended, can release a later one. K7
     ends a start whose known claimant's pid is dead. A locked file is a live start; an
     unlocked one belongs to a start that no longer exists and is removed. OSError when the
     pool cannot be listed.
@@ -1905,17 +1950,26 @@ def pending_census(directory: str, running: set) -> List[dict]:
                 note_unknown("claim %s.claimed unreadable or malformed" % path)
         else:
             known, nonce = True, entry["client_nonce"]
-        found.append(dict(path=path, entry=entry, claim=claim if known else None, known=known, nonce=nonce, claimed=claimed,
+        if not known:
+            key = None
+        elif nonce:
+            key = ("nonce", nonce)
+        else:
+            bound = binding_key((claim or {}).get("binding") if claimed else entry.get("binding"))
+            key = None if bound is None else ("binding",) + bound
+        found.append(dict(path=path, entry=entry, claim=claim if known else None, known=known, claimed=claimed, key=key,
                           order=(entry["created_ns"] if entry else 0, path)))
     found.sort(key=lambda item: item["order"])
     all_known = all(item["known"] for item in found)
-    carried = [item["nonce"] for item in found if item["known"] and item["nonce"]]
-    nonces = run_rows(running) if carried and running and all_known else {}
+    carried = [item["key"][:4] for item in found if item["key"]]
+    rows_now = run_rows(running) if carried and running and all_known else {}
     for item in found:
         claim = item["claim"]
         item["own"] = None
-        if all_known and item["nonce"] and carried.count(item["nonce"]) == 1:
-            rows = [run for run, carries in nonces.items() if carries == item["nonce"]]
+        key = item["key"]
+        if all_known and key and carried.count(key[:4]) == 1:
+            rows = [run for run, row in rows_now.items()
+                    if (row[0] == key[1] if key[0] == "nonce" else binds(row, key[1:]))]
             if len(rows) == 1 and rows[0] not in item["entry"]["before"] and rows[0] not in ((claim or {}).get("seen") or ()):
                 item["own"] = rows[0]
         # K7 by the claim's bound client, the one client the reservation is for (Main 1876 C); a shell claim with no
@@ -2337,7 +2391,8 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
             if claim["pid"] in mine and claim["client"] is None:
                 # The first client below a shell its claimant admitted: it binds the claim, the shell's one client.
                 try:
-                    publish_claim(path, dict(claim, client=me, nonce=launch_nonce_of(list(args))))  # client and nonce together
+                    publish_claim(path, dict(claim, client=me, nonce=launch_nonce_of(list(args)),  # client and nonce together
+                                             binding=start_binding(os.getcwd(), list(args))))
                 except OSError:
                     return None
                 return holder
