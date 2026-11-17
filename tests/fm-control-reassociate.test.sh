@@ -577,7 +577,7 @@ write_relaunch_journal() {  # <case-dir> <id> <phase> [task]
 }
 
 test_finished_relaunch_journal_does_not_block_reassociation() {
-  local id=reassoc-journal dir new new_real phase out rc=0
+  local id=reassoc-journal dir new new_real phase out archive rc=0
   dir=$(new_case journal "$id")
   new="$dir/new"
   add_copy "$dir" "$new" "fm/$id-v2"
@@ -599,6 +599,9 @@ test_finished_relaunch_journal_does_not_block_reassociation() {
   assert_equals "$new_real" "$(meta_field "$dir" "$id" worktree)" "worktree= did not follow the replacement copy"
   assert_equals "$dir/old" "$(meta_field "$dir" "$id" prior_worktree)" "the copy left behind was not recorded"
   cmp -s "$dir/journal.before" "$dir/home/state/$id.control-relaunch" || fail "reassociate changed the relaunch journal"
+  for archive in "$dir/home/state/$id.control-relaunch".archived-*; do
+    [ ! -e "$archive" ] && [ ! -L "$archive" ] || fail "a complete relaunch journal was archived"
+  done
   pass "a finished relaunch journal does not block reassociation, and an unfinished one refuses without changes"
 }
 
@@ -621,12 +624,16 @@ SH
 }
 
 assert_journal_archive() {  # <case-dir> <id>
-  local archive count=0 before after
+  local archive count=0 before after counter
   for archive in "$1/home/state/$2.control-relaunch".archived-*; do
     [ -f "$archive" ] || continue
     count=$((count + 1))
     case "${archive##*.archived-}" in
-      ????-??-??T??????Z.*) ;;
+      ????-??-??T??????Z.*)
+        counter=${archive##*.}
+        case "$counter" in
+          ''|*[!0-9]*) fail "journal archive has no numeric counter: $archive" ;;
+        esac ;;
       *) fail "journal archive is not UTC dated: $archive" ;;
     esac
     before=$(shasum -a 256 < "$1/journal.before")
@@ -663,7 +670,7 @@ test_restored_relaunch_journal_is_archived() {
 
 test_unproven_relaunch_journal_refuses_unchanged() {
   local scenario id dir new journal out rc fragment
-  for scenario in ${FM_TEST_JOURNAL_SCENARIO:-none-new-agent-confirmed none-new-record-kept missing unreadable symlink foreign complete-foreign unknown-rollback empty-state invalid-state invalid-state-tail launching stopping live-agent unreadable-agent backlog-close}; do
+  for scenario in ${FM_TEST_JOURNAL_SCENARIO:-none-new-agent-confirmed none-new-record-kept missing unreadable symlink foreign complete-foreign unknown-rollback malformed-prior malformed-instructions empty-state invalid-state invalid-state-tail directory empty-task launching stopping live-agent live-state-agent unreadable-agent backlog-close}; do
     id=reassoc-unproven
     dir=$(new_case "journal-negative-$scenario" "$id")
     new="$dir/new"
@@ -678,6 +685,14 @@ test_unproven_relaunch_journal_refuses_unchanged() {
       foreign) write_relaunch_journal "$dir" "$id" failed:launching someone-else; printf 'rollback=prior-record-kept\n' >> "$journal" ;;
       complete-foreign) write_relaunch_journal "$dir" "$id" complete someone-else ;;
       unknown-rollback) printf 'rollback=not-restored\n' >> "$journal" ;;
+      malformed-prior) printf 'rollback=prior-record-keptX\n' >> "$journal" ;;
+      malformed-instructions) printf 'rollback=instructions-restored-garbage\n' >> "$journal" ;;
+      directory) mv "$journal" "$dir/journal.input"; mkdir "$journal"; printf 'not a journal\n' > "$journal/entry" ;;
+      empty-task) printf 'v1\ntask=\nphase=failed:launching\nrollback=prior-record-kept\n' > "$journal" ;;
+      live-state-agent)
+        printf 'rollback=instructions-restored-agent-state-unknown\n' >> "$journal"
+        make_journal_endpoint "$dir" "$id" alive
+        fragment='agent is not proven stopped' ;;
       empty-state) printf 'rollback=instructions-restored-agent-state-\n' >> "$journal" ;;
       invalid-state) printf 'rollback=instructions-restored-agent-state-!\n' >> "$journal" ;;
       invalid-state-tail) printf 'rollback=instructions-restored-agent-state-unknown!\n' >> "$journal" ;;
@@ -867,7 +882,7 @@ test_journal_archive_collision_preserves_earlier_archive() {
   write_relaunch_journal "$dir" "$id" failed:launching
   printf 'rollback=prior-record-kept\n' >> "$dir/home/state/$id.control-relaunch"
   cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
-  prior="$dir/home/state/$id.control-relaunch.archived-2026-11-16T120000Z.existing"
+  prior="$dir/home/state/$id.control-relaunch.archived-2026-11-16T120000Z.0"
   printf 'older transaction\n' > "$prior"
   real_date=$(command -v date)
   cat > "$dir/fakebin/date" <<SH
@@ -881,6 +896,7 @@ SH
   out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) \
     || fail "archive collision should not block safe reassociation: $out"
   assert_equals 'older transaction' "$(cat "$prior")" "an earlier dated archive was overwritten"
+  [ -f "${prior%.0}.1" ] || fail "the colliding archive candidate did not advance to counter 1"
   # Exclude the independently checked older record from the current-byte check.
   mv "$prior" "$dir/earlier-archive"
   assert_journal_archive "$dir" "$id"

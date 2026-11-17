@@ -420,8 +420,8 @@ Before publishing the replacement, it anchors the HEAD of the existing current c
 Every reassociation holds the shared project lock through both copies' ownership scans and record publication, whether or not either copy is a pool slot.
 Reassociation already holds the task's control lock, so it makes one nonwaiting attempt through [`bin/fm-project-lock-lib.sh`](../bin/fm-project-lock-lib.sh): a concurrent allocation, return, or reassociation, or any operation queued for the lock, makes it refuse rather than race the ownership proof, which runs only under the acquired lock.
 
-For a proven rolled-back journal, after every read-only check and before anchoring or staging any reassociation write, it preserves an identical copy beside the journal at `state/<id>.control-relaunch.archived-<UTC-date>.<unique-suffix>`.
-The unique name never overwrites an earlier archive.
+For a proven rolled-back journal, after every read-only check and before anchoring or staging any reassociation write, it preserves an identical copy beside the journal at `state/<id>.control-relaunch.archived-<UTC-timestamp>.<counter>`.
+Exclusive creation reserves the timestamp and numeric counter, advancing past existing entries without overwriting an earlier archive.
 The active journal stays in place through staging and publication; after all records publish, it is renamed over that attempt's own archive before committing the reassociation.
 If a later step fails, the original journal remains at its active path, or is restored from its retained archive if a joint call already moved it; a failed restoration reports that archive's recovery path.
 Archives remain durable even after a failed attempt, and no journal is deleted.

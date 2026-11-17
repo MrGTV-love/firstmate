@@ -1261,7 +1261,7 @@ reassociate_stage() {  # <record-index> <timestamp>
 }
 
 do_reassociate() {
-  local m x slot stamp copy backup guard_keep
+  local m slot stamp copy backup guard_keep archive_stamp archive_counter
   local -a left_slots=()
 
   [ "$RELOCATE_SET" = 1 ] \
@@ -1342,8 +1342,22 @@ do_reassociate() {
   for ((m=0; m<${#RA_IDS[@]}; m++)); do
     [ -n "${RA_JOURNALS[m]:-}" ] || continue
     reassociate_select "$m"
-    RA_JOURNAL_ARCHIVES[m]=$(mktemp "${RA_JOURNALS[m]}.archived-$(date -u +%Y-%m-%dT%H%M%SZ).XXXXXX") \
-      || die "could not reserve task $ID's dated relaunch journal archive"
+    archive_stamp=$(date -u +%Y-%m-%dT%H%M%SZ) \
+      || die "could not date task $ID's relaunch journal archive"
+    archive_counter=0
+    while :; do
+      RA_JOURNAL_ARCHIVES[m]="${RA_JOURNALS[m]}.archived-$archive_stamp.$archive_counter"
+      # Reserve exclusively: existing files, directories and symlinks are
+      # collisions, never destinations to overwrite or follow.
+      if [ ! -e "${RA_JOURNAL_ARCHIVES[m]}" ] && [ ! -L "${RA_JOURNAL_ARCHIVES[m]}" ] \
+         && (set -C; : > "${RA_JOURNAL_ARCHIVES[m]}") 2>/dev/null; then
+        break
+      fi
+      if [ ! -e "${RA_JOURNAL_ARCHIVES[m]}" ] && [ ! -L "${RA_JOURNAL_ARCHIVES[m]}" ]; then
+        die "could not reserve task $ID's dated relaunch journal archive"
+      fi
+      archive_counter=$((archive_counter + 1))
+    done
     cp -p -- "${RA_JOURNALS[m]}" "${RA_JOURNAL_ARCHIVES[m]}" \
       || die "could not archive task $ID's relaunch journal; its active journal is unchanged"
   done
