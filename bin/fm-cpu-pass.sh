@@ -23,9 +23,10 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
   shift
   log_fd=2
   passes=1
+  wait_file=
   while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
     case "$1" in
-      --passes|--label|--log-fd)
+      --passes|--label|--log-fd|--wait-file)
         if [ "$#" -lt 2 ]; then
           echo "fm-cpu-pass: $1 needs a value" >&2
           exit 125
@@ -33,11 +34,13 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
         case "$1" in
           --passes) passes=$2 ;;
           --log-fd) log_fd=$2 ;;
+          --wait-file) wait_file=$2 ;;
         esac
         shift ;;
       --passes=*) passes=${1#--passes=} ;;
       --label=*) ;;
       --log-fd=*) log_fd=${1#--log-fd=} ;;
+      --wait-file=*) wait_file=${1#--wait-file=} ;;
       --*) exit 125 ;;
       *) break ;;
     esac
@@ -81,8 +84,17 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
       echo "fm-cpu-pass: --passes must not exceed FM_CPU_PASS_HELD ($held)" >&2
       exit 125
     fi
+    [ -z "$wait_file" ] || printf '0\n' >"$wait_file" 2>/dev/null || true
+    # Rule 7 for a nested request too: it cannot lease without Python, so it runs under the inherited marker.
+    # It says so once, and only when there was a reservation to lease from (a positive count and a token
+    # directory), the same shapes in which bin/fm-cpu-pass.py would lease; otherwise it runs silently as Python does.
+    if [ -n "$held" ] && [ -n "${FM_CPU_PASS_TOKENS:-}" ] && [ -d "$FM_CPU_PASS_TOKENS" ] &&
+      { : >&"$log_fd"; } 2>/dev/null; then
+      printf '%s\n' "fm-cpu-pass: running $1 without leasing from its reservation: python3 not found" >&"$log_fd" || true
+    fi
     exec "$@"
   fi
+  [ -z "$wait_file" ] || printf '0\n' >"$wait_file" 2>/dev/null || true
   if { : >&"$log_fd"; } 2>/dev/null; then
     printf '%s\n' "fm-cpu-pass: running $1 without a CPU pass: python3 not found" >&"$log_fd" || true
   fi

@@ -4,7 +4,10 @@
 # degraded runs, and the behavior-test runner's use of the pool.
 #
 # Every case drives bin/fm-cpu-pass.sh or bin/fm-test-run.sh as a separate
-# process against a private pool directory, so the host's real pool is never
+# process against a private pool directory (tests/fm-cpu-pass-admission.py
+# does the same for the pipeline-start proofs; the concurrency proofs in
+# tests/fm-cpu-pass-concurrency.py run as their own CI job, under the passes
+# they use), so the host's real pool is never
 # touched and no case reads implementation source.
 # Child commands are single-quoted on purpose: they expand in the child bash.
 # shellcheck disable=SC2016
@@ -15,9 +18,9 @@ set -u
 
 PASS_TOOL="$ROOT/bin/fm-cpu-pass.sh"
 TMP_ROOT=$(fm_test_tmproot fm-cpu-pass)
-# A case below may inherit FM_CPU_PASS_HELD from an outer runner; every case
-# states the pass environment it needs instead.
-unset FM_CPU_PASS_HELD FM_CPU_POOL_DIR
+# A case below may inherit FM_CPU_PASS_HELD or the slots an outer runner holds;
+# every case states the pass and slot environment it needs instead.
+unset FM_CPU_PASS_HELD FM_CPU_PASS_TOKENS FM_CPU_POOL_DIR FM_TEST_SLOT_HELD FM_TEST_SLOT_PIDS
 
 REAL_PYTHON=$(python3 -c 'import sys; print(sys.executable)')
 mkdir -p "$TMP_ROOT/test-bin"
@@ -245,7 +248,7 @@ PY
   pass "a multi-pass request keeps collected passes and runs once it holds all"
 }
 
-test_killed_owner_releases_reservation() {
+test_killed_owner_keeps_reservation_until_its_command_ends() {
   local pool dir holder child
   dir="$TMP_ROOT/crash"
   mkdir -p "$dir"
@@ -258,12 +261,15 @@ test_killed_owner_releases_reservation() {
   wait_held "$pool" 1 1 "crash holder"
   kill -KILL "$holder"
   wait "$holder" 2>/dev/null || true
-  wait_held "$pool" 1 0 "after the reservation owner exits"
   child=$(cat "$dir/child.pid")
+  # Killing only the owner must not free the pass while its command still runs: a second worker would share the CPU.
+  sleep 1.5
   kill -0 "$child" 2>/dev/null || fail "the isolated workload should still be alive for this observation"
+  assert_equals 1 "$(held_count "$pool" 1)" "the pass must stay held while the command of a killed owner runs"
   kill "$child" 2>/dev/null || true
+  wait_held "$pool" 1 0 "after the command of the killed owner ends"
   reap_bg
-  pass "owner death releases passes without inherited child lock copies"
+  pass "a killed owner keeps its pass until its command ends, then frees it with no stale state"
 }
 
 test_cleanup_terminates_running_work() {
@@ -394,6 +400,34 @@ test_unusable_pool_degrades_with_notice() {
   assert_equals $'fm-cpu-pass: running bash without a CPU pass: python3 not found\nchild stderr' \
     "$(cat "$log")" "default stderr must contain one degradation notice and the child's stderr"
   pass "an unusable pool or missing python3 runs the command without a pass and says so"
+
+  # A nested request without python3 says it runs without leasing only when there was a reservation to lease from.
+  local tokens shape
+  tokens="$TMP_ROOT/no-python-tokens"
+  mkdir -p "$tokens"
+  for shape in "held=0 tokens=dir" "held=2 tokens=unset" "held=2 tokens=missing" "held=2 tokens=dir"; do
+    : >"$log"
+    rc=0
+    case "$shape" in
+      "held=0 tokens=dir") out=$(PATH="$fakebin" FM_CPU_PASS_HELD=0 FM_CPU_PASS_TOKENS=$tokens "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+      "held=2 tokens=unset") out=$(env -u FM_CPU_PASS_TOKENS PATH="$fakebin" FM_CPU_PASS_HELD=2 "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+      "held=2 tokens=missing") out=$(PATH="$fakebin" FM_CPU_PASS_HELD=2 FM_CPU_PASS_TOKENS=$TMP_ROOT/no-such-tokens "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+      "held=2 tokens=dir") out=$(PATH="$fakebin" FM_CPU_PASS_HELD=2 FM_CPU_PASS_TOKENS=$tokens "$PASS_TOOL" run --log-fd 3 -- \
+        bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 4' 3>"$log" 2>&1) || rc=$? ;;
+    esac
+    assert_equals 4 "$rc" "a nested run without python3 ($shape) must keep the command's status"
+    assert_equals "${shape%% *}" "$out" "a nested run without python3 ($shape) must keep the inherited marker and clean output"
+    if [ "$shape" = "held=2 tokens=dir" ]; then
+      assert_equals "fm-cpu-pass: running bash without leasing from its reservation: python3 not found" "$(cat "$log")" \
+        "a nested run with a reservation to lease from must say once that it runs without leasing"
+    else
+      assert_equals "" "$(cat "$log")" "a nested run with nothing to lease ($shape) must not claim it runs without leasing"
+    fi
+  done
+  pass "a nested run without python3 names the missing lease only when there was a reservation to lease from"
 }
 
 test_no_python_validates_pass_counts() {
@@ -625,12 +659,16 @@ else
   pass "SKIP: every other launch-gate case needs macOS kernel process facts; this host is $(uname -s)"
 fi
 
+# The concurrency proofs (tests/fm-cpu-pass-concurrency.py) run up to three CPU-bound processes at once, more
+# than the one pass this script holds, so they are not launched here: CI runs them as their own job under
+# three passes (.github/workflows/ci.yml job cpu-pass-concurrency), and the fixture refuses a smaller reservation.
+
 test_size_follows_host
 test_run_passes_status_and_marks_child
 test_invalid_pass_counts_never_run_work
 test_passes_are_exclusive_and_waiters_queue
 test_multi_pass_request_collects_all
-test_killed_owner_releases_reservation
+test_killed_owner_keeps_reservation_until_its_command_ends
 test_cleanup_terminates_running_work
 test_term_to_holder_keeps_pass_with_running_work
 test_term_to_waiter_never_runs_command
