@@ -464,7 +464,8 @@ A call without those facts is Main's to decide, not the captain's to hold.
 Existing holds remain readable and resolvable without the new fields, and an unresolved hold may be deferred again without supplying them.
 The answer path also accounts for an avoidable wait when the answer matches the hold's separately recorded exact recommendation; the script header owns that field and the home-local delay-log contract.
 The tool accepts a hold without `--recommendation`, but every filer whose card carries a `Recommendation:` is expected to supply it.
-Its value is the exact string the captain sends to choose the recommended option: the typed words, or for a keyed or Slack answer the option key, number or label exactly as shown on the card.
+Its value is the exact answer value that choosing the recommended option sends: the typed words for a typed answer, or for a keyed or Slack answer the option's answer value, never its number and never its display label.
+On a Slack card the answer value is the text in parentheses after the label, so `1. Approve the charge (approve)` gives `approve`: a tap or a typed `1` is converted to `approve` before intake.
 An answer equal to that value after trimming surrounding whitespace records one delay row; any other answer records none.
 
 Do not register a Beads `types.custom` `captain` type for this: captain is a hold kind, and the fleet Beads `due.required` policy for ordinary work stays in the federated beads config.
