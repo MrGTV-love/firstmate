@@ -631,6 +631,8 @@ root = sys.argv[1]
 text = sys.stdin.read()
 for form in (re.escape(root), root, re.sub(r"[^A-Za-z0-9]", "-", root)):
     text = text.replace(form, "<CASE>")
+# the relaunch makes one sibling temp folder with mktemp; its random suffix is not part of the profile rules
+text = re.sub(r"fm-control-relaunch\.[A-Za-z0-9]+", "fm-control-relaunch.<RAND>", text)
 sys.stdout.write(text)' "$dir" | shasum -a 256 | cut -d' ' -f1 > "$dir/profile.digest"
   printf 'DIGEST no-successor-relaunch-profile=%s\n' "$(cat "$dir/profile.digest")"
   pass "successor: a relaunch of a task with no successor generates the profile it always did"
