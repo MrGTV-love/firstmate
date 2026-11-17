@@ -1697,7 +1697,10 @@ make_real_candidate_progress() {
   printf -v pool_segment '%0180d' 0
   pool_root="$CASE_DIR/pool-$pool_segment"
   mkdir -p "$CASE_DIR/producer-home" "$CASE_DIR/producer-tmp"
-  for ((n=1; n<=19; n++)); do
+  # The default cap is 16. Check 19 existing leased candidates, then create
+  # the twentieth copy; a newly created copy need not be a checked candidate.
+  printf 'max_trees = 20\n' > "$PROJECT_DIR/treehouse.toml"
+  for ((n=1; n<=20; n++)); do
     (
       cd "$PROJECT_DIR" || exit 1
       env -i PATH="$PATH" HOME="$CASE_DIR/producer-home" \
@@ -1706,15 +1709,15 @@ make_real_candidate_progress() {
         "$binary" --root "$pool_root" get --lease --json --no-fetch --lease-holder "private-fixture-$n"
     ) > "$CASE_DIR/producer-$n.json" 2> "$CASE_DIR/producer-$n.stderr" || fail "private TG8 acquisition $n failed: $(cat "$CASE_DIR/producer-$n.stderr")"
   done
-  grep '^treehouse: checked ' "$CASE_DIR/producer-19.stderr" > "$CASE_DIR/real-progress-lines"
-  [ "$(wc -l < "$CASE_DIR/real-progress-lines" | tr -d ' ')" = 19 ] || fail 'the actual private get did not finish all 19 candidate checks'
-  accepted=$(jq -er .path "$CASE_DIR/producer-19.json") || fail 'actual producer did not return its private copy'
+  printf 'actual TG8 producer %s\n' "$binary"
+  shasum -a 256 "$binary"
+  cat "$CASE_DIR/producer-20.stderr" "$CASE_DIR/producer-20.json"
+  grep '^treehouse: checked ' "$CASE_DIR/producer-20.stderr" > "$CASE_DIR/real-progress-lines"
+  [ "$(wc -l < "$CASE_DIR/real-progress-lines" | tr -d ' ')" -ge 19 ] || fail 'the actual private get did not finish at least 19 existing candidate checks'
+  accepted=$(jq -er .path "$CASE_DIR/producer-20.json") || fail 'actual producer did not return its private copy'
   case "$accepted" in "$pool_root"/*) ;; *) fail 'actual producer escaped its explicit private pool' ;; esac
   SKIP_SLOTS[0]=$accepted
   printf '%s\n' "${SKIP_SLOTS[@]}" > "$CASE_DIR/slots"
-  printf 'actual TG8 producer %s\n' "$binary"
-  shasum -a 256 "$binary"
-  cat "$CASE_DIR/real-progress-lines" "$CASE_DIR/producer-19.json"
 }
 
 # Real rendering, fake acquisition: only capture-pane reaches this private tmux
