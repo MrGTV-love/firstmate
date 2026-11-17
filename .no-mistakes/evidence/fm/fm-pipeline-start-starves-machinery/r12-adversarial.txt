@@ -1,0 +1,23 @@
+A probe line: fm-cpu-pass: pipeline-start waiting: counted=1 limit=2 basis=fallback launched=0 pending=2 starts=3 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-shared-binding/pool start_repo=unknown start_branch=unknown
+== A shared binding releases neither -> pass
+B probe line: fm-cpu-pass: pipeline-start waiting: counted=1 limit=2 basis=fallback launched=0 pending=1 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-other-branch/pool start_repo=unknown start_branch=unknown
+== B other-branch row releases nothing -> pass
+C probe line: fm-cpu-pass: pipeline-start waiting: counted=1 limit=2 basis=fallback launched=0 pending=1 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-foreign-nonce/pool start_repo=unknown start_branch=unknown
+== C foreign-nonce row releases nothing -> pass
+D probe line: fm-cpu-pass: pipeline-start admitted: counted=1 limit=2 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-intent-file/pool start_repo=unknown start_branch=unknown
+== D readable --intent-file binds -> pass
+E before row: fm-cpu-pass: pipeline-start waiting: counted=1 limit=2 basis=fallback launched=0 pending=1 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-duration-route/pool start_repo=unknown start_branch=unknown
+E after own row: fm-cpu-pass: pipeline-start admitted: counted=1 limit=2 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-duration-route/pool start_repo=unknown start_branch=unknown
+E A stderr: ['fm-cpu-pass: pipeline-start admitted: counted=0 limit=2 basis=fallback launched=0 pending=0 starts=0 priority=machinery checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-duration-route/pool start_repo=repo start_branch=main', 'calibration: "0 of 5 samples for no-mistakes.run on Mac-Studio.local"', 'fallback: "no destructive deadline; collect samples"']
+== E fm-duration.py run route charged once -> pass
+F before row: fm-cpu-pass: pipeline-start waiting: counted=1 limit=2 basis=fallback launched=0 pending=1 starts=2 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-memguard-route/pool start_repo=unknown start_branch=unknown
+F after own row: fm-cpu-pass: pipeline-start admitted: counted=1 limit=2 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KJVB6HCARMFZBTKWE4AP29 pool=/tmp/fmscen/root/admission-czq9tizf/adv-memguard-route/pool start_repo=unknown start_branch=unknown
+== F fm-mem-guard.sh run route charged once -> pass
+{
+ "A shared binding releases neither": "pass",
+ "B other-branch row releases nothing": "pass",
+ "C foreign-nonce row releases nothing": "pass",
+ "D readable --intent-file binds": "pass",
+ "E fm-duration.py run route charged once": "pass",
+ "F fm-mem-guard.sh run route charged once": "pass"
+}
