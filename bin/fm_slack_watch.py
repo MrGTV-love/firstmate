@@ -2445,33 +2445,41 @@ class Watch:
         view.followup_reads = other
         self.owner_reads = own
 
-    def read_their_followups(self, count):
+    def second_time_for(self, calls):
+        """Whether calls more calls of theirs, each as slow as the slowest call of theirs in this run, still end inside their time budget (always true outside
+        it): the test the budget itself makes before each call (second_budget), for several calls at once."""
+        return self.budget_deadline is None or monotonic() + calls * self.slowest_call <= self.budget_deadline
+
+    def read_their_followups(self, count, keep=0):
         """Read up to count of the second person's request threads (their share of this poll's reads, split_reads), in their own read order and their own
         proven DM: ([(thread, its new messages), ...], the first per-thread read error), as read_followups returns the owner's. Their order works as the
-        owner's: when they have more threads than reads, the threads read go to the back, whether their read works or not."""
+        owner's: the threads read go to the back, whether their read works or not. Inside their time budget a thread is read only while that read and keep
+        more calls (the acknowledgement their pass still has to post) fit, and a read the budget cuts off ends the thread reads only: their history read
+        and one acknowledgement still fit in every poll (finding 3 of the review of d0b0c216), and a thread not read keeps its place for the next poll."""
         threads = self.their_threads()
         if count <= 0 or not threads:
             return [], None
         channel = self.second_channel()
         entries = self.state.setdefault('followups', {})
-        if len(threads) > count:
-            last = max((item.get('turn', 0) for item in entries.values()), default=0)
-            for thread in threads:
-                if thread not in entries:
-                    last += 1
-                    entries[thread] = {'cursor': thread, 'turn': last}
-        order = sorted(threads, key=lambda t: (entries.get(t, {}).get('turn', 0), ts_key(t)))[:count]
-        read, deferred = [], None
-        for thread in order:
+        # A thread with a turn goes by its turn; a thread new to their order has none yet and goes to the back, oldest first.
+        order = sorted(threads, key=lambda t: (t not in entries, entries.get(t, {}).get('turn', 0), ts_key(t)))
+        read, deferred, done = [], None, []
+        for thread in order[:count]:
+            if not self.second_time_for(1 + keep):
+                break
             try:
                 read.append((thread, self.new_replies(thread, self.followup_cursor(thread), channel)))
+            except SecondBudgetSpent:
+                break
             except SlackError as error:
                 if str(error) not in THREAD_ERRORS:
                     raise
                 deferred = deferred or error
-        if len(threads) > count:
-            for thread in order:
-                entries[thread]['turn'] = max(item.get('turn', 0) for item in entries.values()) + 1
+            done.append(thread)
+        if len(done) < len(threads):
+            # The threads read go to the back; the others keep their order (every thread of theirs gets a turn, numbered from 1 in the new order).
+            for turn, thread in enumerate([t for t in order if t not in done] + done, start=1):
+                entries.setdefault(thread, {'cursor': thread})['turn'] = turn
             self.commit()
         return read, deferred
 
@@ -3930,13 +3938,16 @@ class Watch:
         """Their pass's take-in, as the owner's take_in: the follow-ups in the threads of theirs the owner's check picked from the one read order (SC8 (6)), and
         their new requests (their one history read), share what the cap leaves them (share). Their one history read is made even when nothing of the cap is
         left: it takes nothing in then, and records whether more of theirs waits than this pass can take (backlog), which the next owner check reads at cap 1
-        (reserve_for_second). Returns the first per-thread read error, to be reported after their other work."""
-        read, deferred = self.read_their_followups(getattr(self, 'followup_reads', 0) or 0)
+        (reserve_for_second). Their history read is made first, and their thread reads leave time for one acknowledgement when a request of theirs is
+        ready (read_their_followups): their thread reads never take the time of the base's one useful step. Returns the first per-thread read error, to be
+        reported after their other work."""
         reads = self.second_reads
         plan = self.read_requests(max(remaining, 1), True)
+        ready = self.ready_requests(plan)
+        read, deferred = self.read_their_followups(getattr(self, 'followup_reads', 0) or 0, keep=1 if ready and remaining > 0 else 0)
         waiting = self.ready_followups(read)
         if self.second_reads > reads:
-            self.state['backlog'] = plan is None or self.ready_requests(plan) + waiting > max(remaining, 0)
+            self.state['backlog'] = plan is None or ready + waiting > max(remaining, 0)
             if remaining <= 0 and self.state['backlog']:
                 self.state['turn'] = 'second'               # the owner's work had this sweep's slot: the next contested one is theirs
             self.commit()

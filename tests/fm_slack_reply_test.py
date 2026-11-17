@@ -1530,9 +1530,11 @@ class SecondPersonFollowUpTest(unittest.TestCase):
     def scott(self, cap='20', env=None):
         # The owner's bounded wait for a write of their journal (SECOND_IO_WAIT, 2 s) is a wall-clock bound: on a loaded host a write that takes longer
         # gives them no read that poll (the owner never waits). These tests grade the scheduling rule, not the host, so the wait is made long enough that
-        # every write finishes; the stalled write is its own test (test_sc8_6_an_unwritten_share_...).
+        # every write finishes; the stalled write is its own test (test_sc8_6_an_unwritten_share_...). Their pass's time budget (SECOND_BUDGET, 21 s) is
+        # wall clock too: on a loaded host their share of a large cap does not fit it and is read over more polls. It is made long here for the same reason;
+        # the real budget with slow calls is its own test (test_sc8_6_with_slow_calls_...).
         with case(cap=cap, extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT, **(env or {})}) as home, \
-                patch.object(plane, 'SECOND_IO_WAIT', 600.0):
+                patch.object(plane, 'SECOND_IO_WAIT', 600.0), patch.object(plane, 'SECOND_BUDGET', 600.0):
             self.assertEqual(home.poll()[0], 0)
             yield home
 
@@ -1888,6 +1890,30 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                 woken |= {ts for ts in requests if 'check: slack request %s from %s' % (ts, SCOTT) in out}
                 reads |= set(self.thread_reads(home, set(threads)))
             self.assertEqual(woken, set(requests))
+            self.assertEqual(reads, set(threads))
+
+    def test_sc8_6_with_slow_calls_of_theirs_each_poll_still_takes_in_their_new_request_and_their_threads_are_read_in_turn(self):
+        # Each call into their DM takes 3 s on their budget's clock, so their pass's budget (SECOND_BUDGET, 21 s) holds about seven calls. Their history
+        # read and one acknowledgement still fit in every poll (finding 3 of the review of d0b0c216), and their thread reads use only the time that leaves:
+        # a thread read that cannot fit is left for the next poll, in its place in their read order, so every thread of theirs is still read in turn.
+        with self.scott() as home:
+            _, threads = self.build(home, 0, 10)
+            clock, real = [0.0], Traced.call
+
+            def slow(replay, method, **fields):
+                if fields.get('channel') == SCOTT_DM:
+                    clock[0] += 3.0
+                return real(replay, method, **fields)
+            reads = set()
+            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN             # the plane's own budget, not the long one of scott()
+            with patch.object(Traced, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+                for index in range(4):
+                    request = self.their_message(home, 'a slow request %d' % index)
+                    Traced.TRACE.clear()
+                    rc, out, _ = home.poll()
+                    self.assertEqual(rc, 0)
+                    self.assertIn('check: slack request %s from %s' % (request, SCOTT), out, index)
+                    reads |= set(self.thread_reads(home, set(threads)))
             self.assertEqual(reads, set(threads))
 
     def test_sc8_6_split_checks_read_their_picked_threads_only_with_the_proven_hand_over_of_the_same_sweep(self):
