@@ -6121,6 +6121,178 @@ test_unclaimed_custody_refuses_an_independent_clone_in_an_own_copy_and_a_process
   pass 'the custody walk refuses an ignored independent clone inside an own copy and a live process or a failed scan in the task temp folder, and passes the clean control'
 }
 
+# The unclaimed route with an own nested copy that Vernant's closeout driver kept: the route's
+# prove, cleanup and release steps run with their real functions and the real held-slot rule
+# (teardown_retained_hold); the driver, the reprove and the provider are stubs.
+# <owner>: own (the kept copy is this task's) | foreign (another task's copy is held in the slot).
+# <lease>: recovered (the protected holder) | ordinary (this task's own lease id).
+# <provider>: proven | unproven. <attempt>: first (the driver keeps the copy at cleanup) |
+# retry (its record already applies at the prove step).
+# The functions eval'd from bin/fm-teardown.sh read these variables and call these stubs.
+# shellcheck disable=SC2030,SC2031,SC2034,SC2329
+unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt>
+  local name=$1 owner=$2 lease=$3 provider=$4 attempt=$5 dir
+  dir=$TMP_ROOT/unc7-kept-$name
+  rm -rf "$dir"
+  mkdir -p "$dir/tmp" "$dir/state" "$dir/data"
+  git init -q "$dir/pool/1/proj" && git -C "$dir/pool/1/proj" -c user.email=t@t -c user.name=t commit -q --allow-empty -m root
+  git init -q "$dir/pool/1/proj/nested" && git -C "$dir/pool/1/proj/nested" -c user.email=t@t -c user.name=t commit -q --allow-empty -m own
+  printf 'nested/\nother/\n' > "$dir/pool/1/proj/.git/info/exclude"
+  [ "$owner" != foreign ] || mkdir -p "$dir/pool/1/proj/other"
+  [ "$attempt" != retry ] || : > "$dir/data/retained-record"
+  : > "$dir/state/meta"
+  (
+    set -u
+    # shellcheck source=bin/fm-refuse-lib.sh
+    . "$ROOT/bin/fm-refuse-lib.sh"
+    # shellcheck source=bin/fm-task-copy-lib.sh
+    . "$ROOT/bin/fm-task-copy-lib.sh"
+    eval "$(unc6_functions teardown_unclaimed_note teardown_unclaimed_step teardown_unclaimed_lease_matches \
+      teardown_unclaimed_lease_is_the_gated_one teardown_unclaimed_lease_durable teardown_unclaimed_holds_kept_copy \
+      teardown_unclaimed_read_lease teardown_unclaimed_prove_custody teardown_slot_other_repo \
+      teardown_unclaimed_slot_prove teardown_unclaimed_slot_forget teardown_unclaimed_slot_cleanup \
+      teardown_unclaimed_slot_release)"
+    eval "$(sed -n '/^teardown_own_nested_other_repos() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
+    eval "$(sed -n '/^teardown_retained_hold() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
+    eval "$(sed -n '/^teardown_retained_own_present() {/,/^}/p' "$ROOT/bin/fm-teardown-nested-lib.sh")"
+    ID=task-x1 KIND=ship FORCE='' PROJ=$dir/project WT=$dir/pool/1/proj/nested TASK_TMP=$dir/tmp
+    META=$dir/state/meta STATE=$dir/state DATA=$dir/data
+    SLOT=$dir/pool/1/proj KEPT=$WT FOREIGN=$dir/pool/1/proj/other
+    FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: old' FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=''
+    if [ "$lease" = recovered ]; then
+      LHOLDER='protected: new' TEARDOWN_SLOT_CUSTODY=project
+    else
+      LHOLDER=$ID TEARDOWN_SLOT_CUSTODY=lease
+    fi
+    TEARDOWN_UNCLAIMED_SLOT=$SLOT TEARDOWN_UNCLAIMED_WHY=''
+    TEARDOWN_UNCLAIMED_EARLY="$lease|$LHOLDER|id-1|1" TEARDOWN_UNCLAIMED_SEEN="$lease|$LHOLDER|id-1|1"
+    TEARDOWN_UNCLAIMED_KIND='' TEARDOWN_UNCLAIMED_NAME='' TEARDOWN_UNCLAIMED_HOLDER='' TEARDOWN_UNCLAIMED_LEASE_ID=''
+    TEARDOWN_RETURN_SLOT='' TEARDOWN_NESTED_COPIES=() TEARDOWN_PROOF_COPIES=() TEARDOWN_FOREIGN_COPIES=() TEARDOWN_HELD_SLOT=''
+    TEARDOWN_FOREIGN_HELD=() TEARDOWN_RETAINED=() TEARDOWN_PRIOR_COPIES=() TEARDOWN_PEER_IDS=() TEARDOWN_PEER_SLOT=''
+    TEARDOWN_PROOF_OUTCOME=''
+    fm_task_copy_treehouse_persists_recovered_leases() {
+      [ "$provider" = proven ] || { FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER=''; return 1; }
+      FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER='protected: new'
+    }
+    fm_task_copy_pool_slot_lease() {
+      FM_TASK_COPY_LEASE_STATE=$lease FM_TASK_COPY_LEASE_HOLDER=$LHOLDER FM_TASK_COPY_LEASE_ID=id-1 FM_TASK_COPY_LEASE_NAME=1
+    }
+    fm_treehouse_slot_owner_state() { FM_TREEHOUSE_SLOT_OWNER=absent; }
+    teardown_slot_peers_detect() { TEARDOWN_PEER_IDS=(); }
+    require_exclusive_worktree_slot_record() { return 0; }
+    teardown_landed() { return 0; }
+    pids_with_cwd_under() { return 0; }
+    validate_worktree_teardown_safety() { return 0; }
+    teardown_retained_receipt() { printf '%s\n' "$DATA/retained-record"; }
+    teardown_retained_copy_held() { [ -e "$DATA/retained-record" ] && [ "$1" = "$KEPT" ]; }
+    # The reprove's held branches as main has them: a held foreign copy, or an own copy the driver kept.
+    teardown_nested_slot() {
+      TEARDOWN_HELD_SLOT=''
+      TEARDOWN_FOREIGN_HELD=()
+      if [ "$owner" = foreign ]; then
+        TEARDOWN_FOREIGN_HELD=("$FOREIGN"$'\t'"its HEAD is not proved landed")
+        TEARDOWN_HELD_SLOT=$TEARDOWN_RETURN_SLOT
+      elif teardown_retained_own_present; then
+        TEARDOWN_HELD_SLOT=$TEARDOWN_RETURN_SLOT
+      fi
+      return 0
+    }
+    teardown_own_locked_copies_release() {
+      echo "DRIVER asked"
+      : > "$DATA/retained-record"
+      TEARDOWN_RETAINED+=("$KEPT")
+      teardown_retained_hold
+    }
+    teardown_remove_own_nested_copies() { echo "REMOVE $*"; }
+    teardown_retire_slot_manifest() { echo "MANIFEST"; }
+    treehouse() { echo "PROVIDER $*"; }
+    teardown_unclaimed_step prove || { echo "PROVE_REFUSED"; exit 1; }
+    teardown_unclaimed_slot_cleanup
+    teardown_unclaimed_step release || { echo "RELEASE_REFUSED"; exit 1; }
+    echo "RELEASE_EXIT=0 HELD=$TEARDOWN_HELD_SLOT RETAINED=${TEARDOWN_RETAINED[*]-}"
+  ) 2>&1
+}
+
+test_unclaimed_route_closes_held_for_an_own_copy_the_driver_kept() {
+  local out dir slot attempt
+  for attempt in first retry; do
+    dir=$TMP_ROOT/unc7-kept-own-$attempt
+    out=$(unc7_kept_copy_case "own-$attempt" own recovered proven "$attempt")
+    slot=$dir/pool/1/proj
+    assert_contains "$out" "RELEASE_EXIT=0 HELD=$slot RETAINED=$slot/nested" \
+      "own-$attempt: the unclaimed route did not close held for this task's own kept copy under a durable recovered lease:"$'\n'"$out"
+    assert_not_contains "$out" "PROVIDER" "own-$attempt: the held close called the provider (a return):"$'\n'"$out"
+    assert_not_contains "$out" "MANIFEST" "own-$attempt: the held close retired the slot manifest:"$'\n'"$out"
+    assert_not_contains "$out" "REFUSED" "own-$attempt: the held close refused:"$'\n'"$out"
+    [ -d "$slot/nested" ] || fail "own-$attempt: the kept copy is gone"
+  done
+  out=$(unc7_kept_copy_case own-ordinary own ordinary proven retry)
+  assert_contains "$out" "PROVE_REFUSED" "own-ordinary: an own kept copy under an ordinary lease was not refused:"$'\n'"$out"
+  assert_contains "$out" "this task's own nested copy $TMP_ROOT/unc7-kept-own-ordinary/pool/1/proj/nested was kept by Vernant's closeout driver" \
+    "own-ordinary: the refusal did not name the kept copy as this task's own:"$'\n'"$out"
+  assert_not_contains "$out" "another task's copy" "own-ordinary: the refusal called the own copy another task's:"$'\n'"$out"
+  assert_not_contains "$out" "PROVIDER" "own-ordinary: the provider was called:"$'\n'"$out"
+  out=$(unc7_kept_copy_case own-unproven own recovered unproven retry)
+  assert_contains "$out" "PROVE_REFUSED" "own-unproven: an own kept copy on an unproven provider was not refused:"$'\n'"$out"
+  assert_contains "$out" "this task's own nested copy $TMP_ROOT/unc7-kept-own-unproven/pool/1/proj/nested" \
+    "own-unproven: the refusal did not name the kept copy as this task's own:"$'\n'"$out"
+  out=$(unc7_kept_copy_case foreign foreign recovered proven retry)
+  assert_contains "$out" "PROVE_REFUSED" "foreign: another task's held copy did not refuse:"$'\n'"$out"
+  assert_contains "$out" "another task's copy $TMP_ROOT/unc7-kept-foreign/pool/1/proj/other remains inside it" \
+    "foreign: the refusal did not name the copy and its owner:"$'\n'"$out"
+  assert_not_contains "$out" "DRIVER" "foreign: the own-copy cleanup ran after the refusal:"$'\n'"$out"
+  assert_not_contains "$out" "PROVIDER" "foreign: the provider was called:"$'\n'"$out"
+  pass 'the unclaimed route closes held, with no return, for this task'"'"'s own copy the closeout driver kept under a durable recovered lease of a proven treehouse, on the first run and on a retry; an ordinary lease, an unproven provider and another task'"'"'s held copy refuse and name the copy and whose it is'
+}
+
+# The retire step of the unclaimed route on a retry: the own copy the closeout driver kept (WT, which the
+# route lists in no nested-copy array before its custody walk) and a kept prior copy inside the slot are no
+# swept or retired root, so no run is concluded, no agent retired and no process reaped in them.
+# The functions eval'd from bin/fm-teardown.sh read these variables and call these stubs.
+# shellcheck disable=SC2030,SC2031,SC2034,SC2329
+test_unclaimed_retire_step_leaves_a_kept_own_copy_alone() {
+  local dir out
+  dir=$TMP_ROOT/unc7-retire-kept
+  rm -rf "$dir"
+  mkdir -p "$dir/pool/1/proj/nested" "$dir/pool/1/proj/prior-kept" "$dir/pool/1/proj/prior-plain" "$dir/tmp" "$dir/state"
+  : > "$dir/state/meta"
+  out=$(
+    set -u
+    exec 2>&1
+    # shellcheck source=bin/fm-refuse-lib.sh
+    . "$ROOT/bin/fm-refuse-lib.sh"
+    # shellcheck source=bin/fm-task-copy-lib.sh
+    . "$ROOT/bin/fm-task-copy-lib.sh"
+    eval "$(unc6_functions teardown_nested_slot)"
+    ID=task-x1 KIND=ship FORCE='' PROJ=$dir/project WT=$dir/pool/1/proj/nested TASK_TMP=$dir/tmp META=$dir/state/meta STATE=$dir/state
+    SLOT=$dir/pool/1/proj
+    TEARDOWN_UNCLAIMED_SLOT=$SLOT TEARDOWN_UNCLAIMED_EARLY='recovered|protected: new|id-1|1'
+    TEARDOWN_RETURN_SLOT='' TEARDOWN_NESTED_COPIES=() TEARDOWN_PROOF_COPIES=() TEARDOWN_PRIOR_COPIES=()
+    teardown_unclaimed_retire_gate() { return 0; }
+    teardown_unclaimed_pass() { return 0; }
+    teardown_mark_return_pending() { :; }
+    teardown_unclaimed_root_is_own() { return 0; }
+    fm_task_copy_priors_inside() { printf '%s\n' "$SLOT/prior-kept" "$SLOT/prior-plain"; }
+    teardown_retained_copy_held() { [ "$1" = "$WT" ] || [ "$1" = "$SLOT/prior-kept" ]; }
+    conclude_task_no_mistakes_run() { echo "CONCLUDE $1"; }
+    retire_task_private_nm_launch_agents() { echo "AGENTS $1"; }
+    teardown_foreign_procs_retire() { :; }
+    reap_task_worktree_processes() { shift; echo "REAP $*"; }
+    teardown_nested_slot retire
+    echo RETIRE_DONE
+  ) 2>&1
+  assert_contains "$out" "RETIRE_DONE" "the retire step did not finish:"$'\n'"$out"
+  assert_contains "$out" "own nested copy $dir/pool/1/proj/nested was kept by Vernant's closeout driver" \
+    "the retire step did not name the kept own copy it leaves alone:"$'\n'"$out"
+  assert_not_contains "$out" "CONCLUDE $dir/pool/1/proj/nested" "a run was concluded in the kept own copy:"$'\n'"$out"
+  assert_not_contains "$out" "AGENTS $dir/pool/1/proj/nested" "an agent was retired in the kept own copy:"$'\n'"$out"
+  assert_not_contains "$out" "REAP $dir/pool/1/proj/nested" "processes were reaped in the kept own copy:"$'\n'"$out"
+  assert_not_contains "$out" "$dir/pool/1/proj/prior-kept" "the kept prior copy was retired:"$'\n'"$out"
+  assert_contains "$out" "CONCLUDE $dir/pool/1/proj/prior-plain" "the plain prior copy lost its run conclusion:"$'\n'"$out"
+  assert_contains "$out" "CONCLUDE $dir/pool/1/proj"$'\n' "the slot root lost its run conclusion:"$'\n'"$out"
+  pass 'the unclaimed retire step leaves the own copy and a prior copy the closeout driver kept out of every run conclusion, agent retirement and reap, and still retires the slot root and the plain prior copy'
+}
+
 # Copies a spawn skipped and left leased (bin/fm-spawn.sh) are released by teardown, and only by it, and only
 # when the copy is clean and landed, nobody runs in it, and its lease still names this task's holder.
 test_skipped_copies_are_released_only_when_clean_and_landed() {
@@ -6532,6 +6704,8 @@ test_retry_compares_the_slot_with_the_marker_lease_and_never_rebinds
 test_retry_binds_the_early_proof_to_the_marker_lease_not_the_present_one
 test_unplanned_unclaimed_copy_refuses_before_any_helper
 test_unclaimed_custody_refuses_an_independent_clone_in_an_own_copy_and_a_process_in_the_task_temp
+test_unclaimed_route_closes_held_for_an_own_copy_the_driver_kept
+test_unclaimed_retire_step_leaves_a_kept_own_copy_alone
 test_unclaimed_successor_runs_no_retirement_helper
 test_unclaimed_old_holder_adoption_failure_refuses_before_cleanup
 test_unclaimed_release_concludes_runs_and_agents_on_the_slot

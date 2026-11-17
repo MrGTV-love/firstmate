@@ -5204,6 +5204,10 @@ teardown_release_enclosing_slot() {
 #      entry back as unleased;
 #   5. only then does the caller retire the task record and its return-pending
 #      marker. Any refusal keeps both for a retry.
+# A slot that keeps this task's own nested copy Vernant's closeout driver kept is
+# never returned: under a durable recovered lease of a proven treehouse, the release
+# step closes it as a held slot after the same checks, with no return, the copy
+# untouched and the lease in place; any other kept or foreign copy refuses by name.
 # A recovered quarantine (no lease id) is released by its holder literal alone;
 # an entry still on the old literal is first adopted under the protected one by
 # one treehouse status, so the return names the holder the provider keeps.
@@ -5428,6 +5432,46 @@ teardown_unclaimed_lease_is_the_gated_one() {
   return 1
 }
 
+# Whether the slot's entry, read fresh, is a durable recovered lease: the protected
+# holder of a proven treehouse, exactly the lease the retirement gate proved.
+teardown_unclaimed_lease_durable() {
+  [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && [ -n "$TEARDOWN_UNCLAIMED_EARLY" ] || return 1
+  fm_task_copy_treehouse_persists_recovered_leases || return 1
+  [ -n "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" ] || return 1
+  fm_task_copy_pool_slot_lease "$TEARDOWN_UNCLAIMED_SLOT" || true
+  [ "$FM_TASK_COPY_LEASE_STATE" = recovered ] \
+    && [ "$FM_TASK_COPY_LEASE_HOLDER" = "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" ] \
+    && [ "$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME" = "$TEARDOWN_UNCLAIMED_EARLY" ]
+}
+
+# Whether a slot the reprove holds closes held: the copy that keeps it is this task's
+# own nested copy that Vernant's closeout driver kept, unchanged since, no other task's
+# copy is in it, and its entry is a durable recovered lease. Otherwise it names the copy
+# and whose it is.
+teardown_unclaimed_holds_kept_copy() {
+  local copy kept=''
+  if [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ]; then
+    teardown_unclaimed_note "another task's copy $(fm_refuse_text "${TEARDOWN_FOREIGN_HELD[0]%%$'\t'*}") remains inside it"
+    return 1
+  fi
+  if [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ]; then
+    teardown_unclaimed_note "another task's copy $(fm_refuse_text "${TEARDOWN_FOREIGN_COPIES[0]}") remains inside it"
+    return 1
+  fi
+  for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    teardown_retained_copy_held "$copy" || continue
+    kept=$copy
+    break
+  done
+  if [ -z "$kept" ]; then
+    teardown_unclaimed_note "a copy that is not proved this task's own remains inside it"
+    return 1
+  fi
+  teardown_unclaimed_lease_durable && return 0
+  teardown_unclaimed_note "this task's own nested copy $(fm_refuse_text "$kept") was kept by Vernant's closeout driver (record $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "$kept")")) and stays inside it, and its entry is not a durable recovered lease of a proven treehouse, so the slot can be neither returned nor held"
+  return 1
+}
+
 # Read the slot's lease fresh. <phase> bind records it, and only when it is the lease
 # the gate proved; verify requires the recorded path, holder, and lease id unchanged.
 teardown_unclaimed_read_lease() {  # bind | verify
@@ -5540,13 +5584,13 @@ teardown_unclaimed_prove_custody() {
     TEARDOWN_FOREIGN_COPIES=()
     return 1
   fi
-  if [ -n "$TEARDOWN_HELD_SLOT" ] || [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ]; then
+  if { [ -n "$TEARDOWN_HELD_SLOT" ] || [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ]; } \
+      && ! teardown_unclaimed_holds_kept_copy; then
     TEARDOWN_RETURN_SLOT=
     TEARDOWN_NESTED_COPIES=()
     TEARDOWN_PROOF_COPIES=()
     TEARDOWN_HELD_SLOT=
     TEARDOWN_FOREIGN_COPIES=()
-    teardown_unclaimed_note "another task's copy remains inside it"
     return 1
   fi
   # An independent repository inside an own copy (a separate clone, ignored by the
@@ -5745,18 +5789,21 @@ teardown_unclaimed_slot_forget() {
 
 # The task's own proven copies, removed through the existing nested-copy path.
 teardown_unclaimed_slot_cleanup() {
+  local custody=${TEARDOWN_SLOT_CUSTODY:-}
   [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
-  teardown_own_locked_copies_release || exit 1
+  ! teardown_unclaimed_lease_durable || custody=lease
+  TEARDOWN_SLOT_CUSTODY=$custody teardown_own_locked_copies_release || exit 1
   teardown_remove_own_nested_copies "before returning pool slot $TEARDOWN_UNCLAIMED_SLOT" plain
 }
 
 # After own-copy cleanup, still under project custody.
 teardown_unclaimed_slot_release() {
-  local slot=$TEARDOWN_UNCLAIMED_SLOT out rc=0 prior prior_real
+  local slot=$TEARDOWN_UNCLAIMED_SLOT out rc=0 prior prior_real held
   local -a args kept=()
   teardown_unclaimed_read_lease verify || return 1
   teardown_unclaimed_prove_custody || return 1
-  if [ "$TEARDOWN_UNCLAIMED_KIND" != unleased ]; then
+  held=${TEARDOWN_HELD_SLOT:-}
+  if [ -z "$held" ] && [ "$TEARDOWN_UNCLAIMED_KIND" != unleased ]; then
     teardown_retire_slot_manifest "$slot" || {
       "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
       teardown_unclaimed_note "its slot manifest could not be retired"
@@ -5773,9 +5820,11 @@ teardown_unclaimed_slot_release() {
       return 1
     fi
   fi
-  fm_task_copy_pool_slot_lease "$slot" || true
-  [ "$FM_TASK_COPY_LEASE_STATE" = unleased ] \
-    || { teardown_unclaimed_note "its pool entry reads '$FM_TASK_COPY_LEASE_STATE' after the return, not unleased"; return 1; }
+  if [ -z "$held" ]; then
+    fm_task_copy_pool_slot_lease "$slot" || true
+    [ "$FM_TASK_COPY_LEASE_STATE" = unleased ] \
+      || { teardown_unclaimed_note "its pool entry reads '$FM_TASK_COPY_LEASE_STATE' after the return, not unleased"; return 1; }
+  fi
   for prior in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
     prior_real=$(fm_task_copy_canonical_dir "$prior") || prior_real=$prior
     case "$prior_real" in
@@ -5785,6 +5834,7 @@ teardown_unclaimed_slot_release() {
   done
   TEARDOWN_PRIOR_COPIES=(${kept[@]+"${kept[@]}"})
   teardown_unclaimed_slot_forget
+  TEARDOWN_HELD_SLOT=$held
   return 0
 }
 
@@ -6400,12 +6450,10 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       # in it. A process found in it through the slot's scan refuses by name instead.
       still=()
       for root in "${swept[@]}"; do
-        for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
-          if [ "$root" -ef "$copy" ] && teardown_retained_copy_held "$copy"; then
-            echo "teardown: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and is unchanged since; nothing in it is ended or signalled" >&2
-            continue 2
-          fi
-        done
+        if teardown_retained_copy_held "$root"; then
+          echo "teardown: own nested copy $(fm_refuse_text "$root") was kept by Vernant's closeout driver and is unchanged since; nothing in it is ended or signalled" >&2
+          continue
+        fi
         still+=("$root")
       done
       swept=(${still[@]+"${still[@]}"})
@@ -6414,7 +6462,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && teardown_unclaimed_root_is_own; then
         [ "$TEARDOWN_UNCLAIMED_SLOT" -ef "$WT" ] || retired+=("$TEARDOWN_UNCLAIMED_SLOT")
         while IFS= read -r root; do
-          [ "$root" -ef "$WT" ] || retired+=("$root")
+          [ "$root" -ef "$WT" ] || teardown_retained_copy_held "$root" || retired+=("$root")
         done < <(fm_task_copy_priors_inside "$META" "$TEARDOWN_UNCLAIMED_SLOT")
       fi
       teardown_unclaimed_pass "the run conclusion" || exit 1
