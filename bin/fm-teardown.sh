@@ -2677,12 +2677,7 @@ teardown_entry_checks() {
     TEARDOWN_PREFLIGHT_ERROR="task $ID's PR-poll records are not in a shape cleanup can retire"
     return 1
   fi
-  path="$STATE/$ID.pr-poll-merge-notified"
-  if { [ -e "$path" ] || [ -L "$path" ]; } && { [ ! -f "$path" ] || [ -L "$path" ]; }; then
-    TEARDOWN_PREFLIGHT_ERROR="task $ID's PR merge-notified record at $path is not a regular file"
-    return 1
-  fi
-  for path in "$path" "$STATE/$ID.check.sh" "$STATE/$ID.pr-poll" "$STATE/$ID.pr-poll-registration" \
+  for path in "$STATE/$ID.pr-poll-merge-notified" "$STATE/$ID.check.sh" "$STATE/$ID.pr-poll" "$STATE/$ID.pr-poll-registration" \
       "$STATE/$ID.pr-poll-retirement" "$STATE/$ID.merge-authority" "$STATE/$ID.check-trust" \
       "$STATE/.pr-ready-reconcile/$ID.refused" "$STATE/$ID.check-stopped"; do
     teardown_preflight_removable "$path" "PR-poll record" || return 1
@@ -2758,6 +2753,13 @@ validate_pr_poll_cleanup() {
     "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
     "$state_dir/$id.pr-poll-merge-notified" "$state_dir/$id.pr-poll-merge-notified.retiring"; do
     [ -e "$artifact" ] || [ -L "$artifact" ] || continue
+    case "$artifact" in
+      *.pr-poll-merge-notified|*.pr-poll-merge-notified.retiring)
+        if [ ! -f "$artifact" ] || [ -L "$artifact" ]; then
+          echo "REFUSED: unsafe task PR-check artifact: task $id's PR merge-notified record at $artifact is not a regular file; preserving task state." >&2
+          return 1
+        fi ;;
+    esac
     if [ ! -f "$artifact" ] || [ -L "$artifact" ] \
       || [ "$(fm_pr_file_device "$artifact")" != "$state_device" ] \
       || [ "$(fm_pr_file_link_count "$artifact")" != 1 ] \

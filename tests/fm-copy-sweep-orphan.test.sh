@@ -125,8 +125,12 @@ make_later_edit_world() {
   TIP=$(git -C "$SOURCE" rev-parse HEAD)
   git -C "$CLONE" merge --squash fm/squashed >/dev/null
   git -C "$CLONE" commit -qm 'squash delivered change'
-  sed 's/^line 50$/line 50 later main edit/' "$CLONE/shared.txt" > "$W/edit" && cat "$W/edit" > "$CLONE/shared.txt"
-  git -C "$CLONE" commit -qam 'later edit to the same file'
+  # The later main edit touches another file: a path the default branch changed
+  # after the squash is unproved by the blob rule (Main 1871 P-B), so that case
+  # belongs to the landing-rule tests, not to this report/apply agreement check.
+  printf 'later main edit\n' > "$CLONE/later.txt"
+  git -C "$CLONE" add later.txt
+  git -C "$CLONE" commit -qm 'later edit to another file'
   git -C "$CLONE" push -q origin main
   git -C "$CLONE" worktree remove "$SOURCE"
   for name in locked unlocked; do
@@ -174,7 +178,7 @@ test_report_predicts_apply_after_later_main_edit() {
   assert_equals HELD-UNPUSHED "$(class_of "$unique")" 'apply label differs from report for the unique commit'
   assert_present "$conflict/shared.txt" 'conflicting unlanded work was lost'
   assert_present "$unique/shared.txt" 'unique unlanded work was lost'
-  pass 'after a later main edit to a squash-merged path, report and apply agree on every copy'
+  pass 'after a later main edit beside a squash-merged change, report and apply agree on every copy'
 }
 
 test_confined_launcher_observation() {

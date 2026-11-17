@@ -3800,8 +3800,9 @@ test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy() {
   assert_not_destroyed "e2e unmerged"
   [ "$(wake_count_real)" = 1 ] || fail "want exactly one wake, got $(wake_count_real): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'not in the merged pull request' || fail "the wake does not name the copy and that its commit is not in the merged pull request: $(cat "$STATE/.wake-queue")"
-  # The prune's own verdict keeps the copy (bin/fm-merge-prune-lib.sh), before any teardown.
-  assert_nothing_forced "e2e unmerged" not-called
+  # Teardown is asked plainly and refuses; the fallback's own verdict
+  # (bin/fm-merge-prune-lib.sh) then keeps the copy before anything is stopped.
+  assert_nothing_forced "e2e unmerged"
   prune_real run t1 --now >/dev/null 2>&1; prune_real run t1 --now >/dev/null 2>&1
   [ "$(wake_count_real)" = 1 ] || fail "repeat attempts raised more wakes"
   pass "end to end: a copy with a pushed follow-up commit that is not merged stays before anything is stopped, forces nothing and raises exactly one wake"

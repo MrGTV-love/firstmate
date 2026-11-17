@@ -749,6 +749,10 @@ test_unsafe_merge_notified_marker_keeps_the_record() {
 test_unremovable_merge_notified_marker_leaves_a_retry() {
   local case_dir rc
   case_dir=$(detached_copy_case marker-unremovable - no own)
+  # A merge-notified marker exists only for a record whose pr= poll reported the
+  # merge, so the record names that PR; the retry, whose copy the first run
+  # returned, proves the landing through it.
+  append_pr_meta_url "$case_dir"
   printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
   chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
   for tool in rm mv; do

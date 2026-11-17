@@ -1791,9 +1791,11 @@ test_check_replacement_needs_proof_by_content() {
   fm_pr_poll_cleanup
   [ "$(cat "$state/task-a.check.sh")" = "$(printf '#!/usr/bin/env bash\necho unrelated check')" ] \
     || fail "the unrelated check was changed"
-  # An earlier template version: the registration on record names its hash.
+  # A poll version whose bytes carry no generator mark: only the registration on
+  # record can name its hash. (A version with the mark is ours by that mark;
+  # tests/fm-pr-lib-rollback.test.sh covers it.)
   [ -f "$reg" ] || fail "fixture: the refused publication removed the registration on record"
-  { cat "$POLL"; printf '# an earlier template version\n'; } > "$state/task-a.check.sh"
+  { printf '#!/usr/bin/env bash\n# an earlier template version\n'; tail -n +2 "$POLL"; } > "$state/task-a.check.sh"
   chmod 700 "$state/task-a.check.sh"
   old_sum=$(shasum -a 256 "$state/task-a.check.sh" | cut -d' ' -f1)
   ! fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" \

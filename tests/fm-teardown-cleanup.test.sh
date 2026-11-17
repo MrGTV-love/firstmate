@@ -4582,14 +4582,14 @@ test_landing_check_that_could_not_ask_the_forge_is_a_plain_error() {
 
 test_landing_check_that_could_not_compare_with_the_default_branch_is_a_plain_error() {
   local rc way subcommand cause
-  for way in fetch merge-tree; do
+  for way in fetch diff-tree; do
     make_foreign_copy_case "foreign-landing-no-compare-$way"
     printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
     git -C "$FOREIGN_COPY" add unlanded.txt
     git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
     case "$way" in
-      fetch) subcommand=fetch cause='origin/main could not be fetched' ;;
-      *) subcommand=merge-tree cause='the content check could not compare with the default branch' ;;
+      fetch) subcommand=fetch cause='origin/main could not be refreshed' ;;
+      *) subcommand=diff-tree cause='the content check could not read the trees it compares' ;;
     esac
     cat > "$FOREIGN_CASE/fakebin/git" <<SH
 #!/usr/bin/env bash
