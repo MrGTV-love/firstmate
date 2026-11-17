@@ -1,0 +1,20 @@
+ok - teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease
+ok - teardown keeps a skipped copy that is only anchored, and one holding ignored work
+ok - a pool row with no processes field keeps the skipped copy leased and recorded
+ok - a null processes field keeps the skipped copy leased and recorded
+ok - a processes field that is not a list keeps the skipped copy leased and recorded
+ok - a pool listing with a row that has no path keeps every skipped copy leased and recorded
+ok - an explicit empty process list still releases a clean, landed skipped copy
+ok - an edit hidden by assume-unchanged keeps the skipped copy leased and recorded
+ok - an edit hidden by skip-worktree keeps the skipped copy leased and recorded
+ok - a mode change hidden by an index flag keeps the skipped copy leased and recorded
+ok - a pool row whose path holds a NUL keeps every skipped copy leased and recorded
+ok - a path that cannot be resolved keeps the record
+ok - a skipped copy whose only ignored files are a .venv directory the reset never writes is released
+ok - an ignored file at a path the reset target tracks keeps the skipped copy leased and recorded
+ok - with no origin/HEAD, the main checkout's branch is the reset target and a copy holding only a .venv is released
+ok - with no origin/HEAD, an ignored file at a path the reset branch tracks keeps the skipped copy leased
+ok - a reset target that cannot be read keeps the skipped copy leased
+ok - a user config base_branch is ignored when the repo has a treehouse.toml, as treehouse does
+ok - a skipped copy whose run record is locked stays leased and teardown still completes
+exit=0

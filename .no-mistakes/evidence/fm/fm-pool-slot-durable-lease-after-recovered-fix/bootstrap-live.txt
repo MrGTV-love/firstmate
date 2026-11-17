@@ -1,11 +1,12 @@
-=== provider=installed (v3.1.7-fm.8759019)
+== bootstrap with inst treehouse ==
 BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
-=== provider=b5d2805 (v3.1.7-fm.b5d2805)
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+treehouse calls:
+get --help
+capabilities --json
+== bootstrap with built treehouse ==
 BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
-=== provider=fixture-proven (v3.1.7-fm.b5d2805)
-MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
-=== provider=fixture-proven (capabilities publishes schema 2 + recovered_quarantine_holder; status/lease/get/return forbidden)
-(no treehouse line)
---- treehouse argv seen by the fixture:
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+treehouse calls:
 get --help
 capabilities --json

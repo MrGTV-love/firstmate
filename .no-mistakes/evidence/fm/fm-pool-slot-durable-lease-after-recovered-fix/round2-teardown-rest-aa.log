@@ -1,0 +1,21 @@
+ok - a pool-slot-root close with an unremovable previous pending-close record (directory immutable) refuses before any lease or marker write, and the fixed retry closes
+ok - a self-clearing index-lock retry re-proves the slot: new unproved work refuses the return and is kept, a clean slot is returned once, for a plain and a prior-shape record
+ok - a stale busy generation refuses a plain and a prior-shape nested close before the endpoint close and any removal; matching generations close
+ok - an unreadable Supabase project_id refuses a plain and a prior-shape nested close before any lease, marker or record change; a valid one closes
+ok - a return-pending path that is a directory refuses a plain and a prior-shape nested close before any lease or write, and the retry closes
+ok - a delete-denied pending-close record refuses a plain and a prior-shape nested close with the state unchanged, and the retry closes
+ok - a forced plain or prior-shape nested close that refuses at entry neither creates nor replaces the captain's drop record
+ok - a removable pending-close record lets a plain and a prior-shape nested close finish where hard links fail
+ok - the entry preflight refuses a plain and a prior-shape nested close before any mutation (busy-state-directory merge-notified-directory turn-ended-directory immutable-meta immutable-return-pending forced), and each repaired retry closes
+ok - a lock retry closes a clean slot with a tracked hook and refuses a late change to it, for a plain and a prior-shape record
+ok - a return-pending link to a regular file in the state directory closes with its target unchanged; dangling, directory and outside links refuse before any mutation, and each retry without the link closes
+ok - a forced plain or prior-shape nested close whose lease fails leaves no drop record, and the working retry retains the words and closes
+ok - a record naming the nested copy through an alias recovers like its physical path, with and without a recorded merged PR
+ok - a shared status manifest that is a directory refuses a plain and a prior-shape nested close before any mutation, and the retry closes
+ok - a busy-state path with no generation does not stop a prior-shape ship or a scout
+ok - with the pool on another filesystem, a teardown routes when the claim names the peer and refuses at entry when it must hand its own claim over
+ok - a data folder on another filesystem does not stop a clean nested close that writes nothing there
+ok - a return-pending record, regular or a link, naming a slot the task still claims is kept with the task record when no route returns that slot
+ok - a plain nested record gets the prior shape's result for every claim state and fixture
+ok - a scout with a plain nested copy in its claimed slot keeps its own route: ordinary copy cleanup, claim kept, no slot returned
+exit=0

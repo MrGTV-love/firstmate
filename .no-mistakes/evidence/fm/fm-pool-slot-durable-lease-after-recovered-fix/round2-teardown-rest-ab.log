@@ -1,0 +1,21 @@
+ok - the recorded gate-409 case tears down, returns the slot and clears both leftover files
+ok - the recorded gate-409 case refuses naming the slot root and its HEAD, with every file left as it was
+ok - a plain re-run of a landed local-only nested ship is recorded as landed, not dropped
+ok - a refusal at the slot proof, the retire step, either proof before removal or the return is safe to re-run with a plain teardown
+ok - a removed nested copy is judged by its own branch ref: unlanded refuses, content landed by squash passes
+ok - a removed nested copy whose branch is gone is settled by its recorded PR: merged finishes as landed, otherwise it refuses
+ok - the enclosing slot is measured at its own HEAD, not proven by the nested copy's pipeline-input record
+ok - a removed nested copy whose branch was the merged run's input is proven by the run record
+ok - an endpoint-refused retry keeps the reservation until closure and records the nested ship landed
+ok - the post-lock proof does not refuse over nested copies teardown itself already removed
+ok - other home and prior custody overlap refuses in both directions, another task's worktree only on an exact match, and siblings never
+ok - forced descendant admission preserves prior copies inside child worktrees and retiring homes before any cascade cleanup
+ok - tasktmp admission preserves both the current nested replacement and a nested prior copy before signalling
+ok - tasktmp admission counts all cross-home copy fields in both containment directions
+ok - secondmate retirement preserves original copy custody in this home and registered peer homes
+ok - recursive retirement admits locked copies, preserves reassigned external slots, and refuses overlapping home custody
+ok - forced retirement preserves reassociated non-pool copies and refuses their checkout or shared-storage destruction before mutation
+ok - home, worktree, and tasktmp roots preserve Git storage of every foreign copy field in local and peer homes
+ok - tasktmp protects external reassociated current and prior copies' Git storage before endpoint or copy mutation
+ok - ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage
+exit=0

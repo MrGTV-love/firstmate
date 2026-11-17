@@ -1,0 +1,27 @@
+FM_TEST_BEGIN 2026-11-17T06:02:21Z tests/fm-teardown-pool.test.sh family=pr-forge expected_gate_skip=none
+skip - R3/R6 real-provider release: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched
+skip - R4 real-provider interruptions: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id, before or after the verify, is never cleared
+skip - R5 real-provider custody refusals: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry
+skip - unclaimed-route gate on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - on an unproven treehouse the unclaimed-slot route stays inert: teardown completes, keeps the reassociated copy, and writes no return-pending marker
+skip - ordinary lease of another holder on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - an ordinary lease held by another task stays outside the unclaimed-slot route: no marker, no return, the copy and slot left as they were
+ok - the early-refusal assertion needs the facts (the claim or home, that it cannot be read or reached, and its path) in any wording: a generic refusal, the other early refusal, or another path does not pass
+skip - unclaimed route for a record without slot history on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - a nested copy whose record names no slot (no history, an unrelated released_worktree, an unrelated prior_worktree) is returned only by the exact non-forced conditional return, with no --force in any git or treehouse command, and a failed first attempt leaves the marker and is rediscovered through the marker on retry
+ok - retry discovery finds the slot through prior_worktree=, released_worktree= or a current pending-return marker that encloses the recorded path, and finds nothing for a missing, stale or non-enclosing marker
+ok - the final bind refuses a same-holder successor with a new lease id and another holder after the gate, with no cleanup and no provider call, and returns by the gate's own id when the lease is unchanged
+ok - no run, launch-agent, foreign-process or reap helper runs unless one pass (lease state, holder, lease id and name, landed check, live process outside the own folders, readable scans) just held; a successor or a process that appears between helpers stops the next one; a process under the own copy stays the reap's job
+not ok - the marker did not record exactly one lease line (missing: 'lease_lines=1')
+--- output ---
+tests/fm-teardown-pool.test.sh: line 5950: TEARDOWN_RUN_DIR: unbound variable
+FM_TEST_END 2026-11-17T06:10:28Z tests/fm-teardown-pool.test.sh exit=1 duration_ms=487178 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KKA9STCDNQGMNXWMQZYTA6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=492104
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=487178 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-teardown-pool.test.sh duration_ms=487178
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KKA9STCDNQGMNXWMQZYTA6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=1

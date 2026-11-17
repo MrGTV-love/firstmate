@@ -1,0 +1,47 @@
+FM_TEST_BEGIN 2026-11-17T05:27:19Z tests/fm-spawn-retained-copy.test.sh family=backend-dispatch expected_gate_skip=none
+ok - mixed leased/unleased aliases refuse with upgrade and repair guidance, and no status read, in both entry orders on an unproven provider
+ok - escaped or relative entry paths cannot prove a slot held beside a clean leased alias
+ok - jq checks unleased aliases; without jq the check refuses before alias logic
+ok - prefiltered leased aliases and duplicate unleased names require repair, not a lease
+ok - the shared public allocation guard tells a jq-free caller to install jq
+ok - symlink unleased alias beside a leased entry prevents a held verdict
+ok - case-variant unleased alias beside a leased entry prevents a held verdict
+ok - all recovered-lease path spellings beside a leased entry remain unsafe off a Firstmate home
+ok - a pool slot holding a live record's nested current copy refuses allocation until that record is retired
+ok - conflicting recovered-lease aliases refuse a spawn before allocation without changing pool state
+ok - unsupported entry refusals identify the entry and path, and require removal or renaming, never a lease
+ok - a pool slot whose hold Treehouse's state cannot prove still refuses allocation and names how to inspect or hold it
+ok - a recovered lease keeps refusing allocation on a treehouse that does not prove persistent recovered leases, names the upgrade, and runs no pool command
+ok - an ordinary lease with a lease id is admitted without the proof; id-less, recovery-reason, recovered-prefix, holderless and duplicate entries refuse, and with the proof only an entry on the published protected holder is admitted
+ok - a failed fresh read refuses on an unproven provider (an ordinary entry still admits), and a whitespace-only version is not a proof
+ok - an unproven provider is never asked for status to place an unleased slot (the refusal names the upgrade), while a proven provider may use the listing
+ok - a recorded copy in a pool slot with no state file refuses (pool-dir evidence), while a copy under the project's own checkout and a home with no pool use still spawn
+ok - a recorded copy in a linked worktree with no state file refuses when the pool is evidenced by a .treehouse path or by treehouse pool-dir, and when pool-dir cannot say; it is not taken for a pool slot only when pool-dir names another folder
+ok - the preservation fingerprint reads the nested copy's HEAD: a same-bytes HEAD move changes it, and the old enclosing-slot-only fingerprint did not
+ok - the lease-entry oracle accepts the named holder rewrite and unrelated slots changing, and rejects a change to the lease id, lease time, leased flag, recovery reason, owner fields or a second entry
+ok - the real-provider fixture wrapper refuses a treehouse get with no explicit --root before the binary runs, and passes rooted gets and other commands through unchanged
+ok - a capability answer whose holder is the old holder plus a newline, or only a newline, is not proof and cannot make an old-holder slot pass; a distinct protected holder still needs its adoption
+ok - with a proven persistent-recovered-lease capability a recovered slot on the protected holder holding a current copy stays untouched while the spawn takes the free slot, whatever its root's state or state order
+ok - a proven capability relaxes only the recovered lease: unleased, missing, and unreadable entries still refuse
+ok - an old holder adopted under the protected holder survives an old session's exit before and after the allocation, with the new owner's lease and copy intact
+ok - an old holder the provider did not adopt refuses before treehouse get with a named cause, and adoption runs once per process
+ok - the shared guard bin/fm-home-seed.sh runs refuses an old recovered holder until the provider adopts it, and passes beside a protected slot
+ok - the combined rollout keeps the recovered copy and the new owner's copy intact at every step
+not ok - normal: the spawn beside a recovered quarantine failed
+warning: task new-own-get-normal: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.xGwWRK/own-get-normal/home/data/new-own-get-normal/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skip: pooled copy '/Users/charlesabrooker/tmp/fm-spawn-retained-copy.xGwWRK/own-get-normal/pool/2/project' was not moved (live_holder): a live process (pid 79577, bash) has its working directory in the slot
+error: could not lease skipped copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.xGwWRK/own-get-normal/pool/2/project durably (); its endpoint firstmate:fm-new-own-get-normal stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted
+error: could not lease skipped copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.xGwWRK/own-get-normal/pool/2/project durably (); its endpoint firstmate:fm-new-own-get-normal stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted
+error: copy held and the spawn refused (live_holder); nothing more was written to it: expected exit 0, got 1
+skip - real-provider recovered-slot allocation: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the case did NOT run
+ok - a nested current copy inside a slot Treehouse's state leases does not stop an unrelated spawn
+ok - a spawn never receives a superseded slot holding a nested copy, and refuses before treehouse get once Treehouse names that folder current
+ok - an ordinary leased secondmate home slot holding another project's task copy does not stop a spawn, and a recovered one gets no exemption on an unproven provider
+ok - a pool slot a reassociated task left is acquired and claimed by a new task
+ok - an unavailable registered local home is named in one warning and the spawn proceeds
+FM_TEST_END 2026-11-17T05:34:26Z tests/fm-spawn-retained-copy.test.sh exit=0 duration_ms=425985 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KKA9STCDNQGMNXWMQZYTA6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=431740
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=425985 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-retained-copy.test.sh duration_ms=425985
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KKA9STCDNQGMNXWMQZYTA6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

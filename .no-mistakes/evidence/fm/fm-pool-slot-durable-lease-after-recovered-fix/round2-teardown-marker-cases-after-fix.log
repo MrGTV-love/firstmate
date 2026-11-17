@@ -1,0 +1,4 @@
+ok - the return-pending marker records the lease the gate proved (any characters, exactly), carries it across later writes of the same slot, never overwrites it with an unleased tuple, records none for another slot or for a tuple that was never bindable
+ok - a retry refuses when the lease is not the one the marker recorded (new id for the same holder, another holder, an unreadable entry, an undecodable record), converges when the slot is already returned, and has nothing to compare when the marker records no lease
+ok - on a retry the early proof binds to the lease the marker recorded (the present lease is only what it saw, so any difference refuses at the gate), and an already-returned slot converges unbound
+rc=0

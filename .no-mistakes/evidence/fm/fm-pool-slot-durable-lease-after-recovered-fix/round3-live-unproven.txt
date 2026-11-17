@@ -1,0 +1,32 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.BqDAuF TMUX_TMPDIR=/tmp/fml.JmBZPe
+=== installed provider capability answer (via wrapper)
+unknown command "capabilities" for "treehouse"
+exit=1
+=== SCENARIO A: real bin/fm-spawn.sh new-live --scout on unproven provider, pane cwd = free slot 2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KKA9STCDNQGMNXWMQZYTA6/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task new-live: /Users/charlesabrooker/tmp/fm-lab.BqDAuF/data/new-live/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-live-fix.pR6Nim/pool/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-live-fix.pR6Nim/pool/1/project/.claude/worktrees/nested-holder and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-live-fix.pR6Nim/pool/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+spawn exit=1
+--- treehouse calls made by spawn:
+capabilities --json
+no status/lease/get/return ran
+recovered slot 1, nested copy HEAD, pool state and holder record: byte-identical before/after
+no new-live.meta published
+slot 1 not claimed
+=== SCENARIO B: real bin/fm-bootstrap.sh with installed (unproven) treehouse
+BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
+bootstrap pipeline done
+--- treehouse calls made by bootstrap:
+get --help
+capabilities --json
+no status/lease/get/return ran
+pool unchanged after bootstrap
+=== teardown
+lab removed: yes, fixture removed: yes

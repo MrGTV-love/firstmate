@@ -1,0 +1,94 @@
+FM_TEST_BEGIN 2026-11-17T06:11:45Z tests/fm-teardown-pool.test.sh family=pr-forge expected_gate_skip=none
+skip - R3/R6 real-provider release: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched
+skip - R4 real-provider interruptions: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id, before or after the verify, is never cleared
+skip - R5 real-provider custody refusals: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry
+skip - unclaimed-route gate on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - on an unproven treehouse the unclaimed-slot route stays inert: teardown completes, keeps the reassociated copy, and writes no return-pending marker
+skip - ordinary lease of another holder on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - an ordinary lease held by another task stays outside the unclaimed-slot route: no marker, no return, the copy and slot left as they were
+ok - the early-refusal assertion needs the facts (the claim or home, that it cannot be read or reached, and its path) in any wording: a generic refusal, the other early refusal, or another path does not pass
+skip - unclaimed route for a record without slot history on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - a nested copy whose record names no slot (no history, an unrelated released_worktree, an unrelated prior_worktree) is returned only by the exact non-forced conditional return, with no --force in any git or treehouse command, and a failed first attempt leaves the marker and is rediscovered through the marker on retry
+ok - retry discovery finds the slot through prior_worktree=, released_worktree= or a current pending-return marker that encloses the recorded path, and finds nothing for a missing, stale or non-enclosing marker
+ok - the final bind refuses a same-holder successor with a new lease id and another holder after the gate, with no cleanup and no provider call, and returns by the gate's own id when the lease is unchanged
+ok - no run, launch-agent, foreign-process or reap helper runs unless one pass (lease state, holder, lease id and name, landed check, live process outside the own folders, readable scans) just held; a successor or a process that appears between helpers stops the next one; a process under the own copy stays the reap's job
+ok - the return-pending marker records the lease the gate proved (any characters, exactly), carries it across later writes of the same slot, never overwrites it with an unleased tuple, records none for another slot or for a tuple that was never bindable
+ok - a retry refuses when the lease is not the one the marker recorded (new id for the same holder, another holder, an unreadable entry, an undecodable record), converges when the slot is already returned, and has nothing to compare when the marker records no lease
+ok - on a retry the early proof binds to the lease the marker recorded (the present lease is only what it saw, so any difference refuses at the gate), and an already-returned slot converges unbound
+ok - a no-history copy in a pool slot nobody claims, with the route not planned (an unproven provider or a lease that is another task's), refuses before any helper; a record with history stays inert, a claimed slot, a shared slot, a gone copy and a secondmate are untouched
+ok - the custody walk refuses an ignored independent clone inside an own copy and a live process or a failed scan in the task temp folder, and passes the clean control
+ok - the unclaimed route closes held, with no return, for this task's own copy the closeout driver kept under a durable recovered lease of a proven treehouse, on the first run and on a retry; an ordinary lease, an unproven provider and another task's held copy refuse and name the copy and whose it is
+ok - the unclaimed retire step leaves the own copy and a prior copy the closeout driver kept out of every run conclusion, agent retirement and reap, and still retires the slot root and the plain prior copy
+ok - the held close leaves only processes inside the own copy the closeout driver kept out of its slot scan (real processes, real scan); a process elsewhere in the slot, and any process on the returned-slot path, still refuses
+ok - the retirement gate refuses before any retirement, launch-agent or process-reaping helper when a successor appears before or after the planning (different holder, or the same holder with a new lease id) or when an old-holder adoption fails or rewrites nothing, and lets an unchanged lease, a protected adoption and an interrupted release retire; another holder from the start stays outside the route
+skip - old-holder adoption failure on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - an old recovered holder that the adopting status does not rewrite (a failed status, or one that rewrites nothing) refuses before the own-copy cleanup and any retirement, with the copy, slot and record untouched; a retry converges when slot A was adopted in between and refuses when it then carries a new lease id or another holder
+skip - unclaimed-route retirement on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - the unclaimed-slot route aborts the parked run and retires the launch agent rooted in the slot before it returns the slot
+skip - unclaimed-route refusal retirement on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - a slot root the read-only checks do not show as this task alone keeps its parked run and launch agent while the custody walk refuses
+ok - Vernant retirement honors landing proof, recorded branch, lock-free forge proof, kept records, live owners, both copies, refusals, and old checkouts
+ok - the shared project lock path is the same from an unresolvable git directory and from the recorded project
+ok - a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally
+ok - an interrupted legacy pool teardown keeps its record through session start and its retry returns the slot once
+ok - a rolled-back legacy stamp leaves its return-pending record bound to the unstamped record
+ok - a failed return-pending record write refuses before any destruction and the retry returns the slot once
+ok - a stale directory at the return-pending path refuses before any lease or destruction and the retry returns the slot once
+ok - an unreadable return-pending generation refuses before any destruction and the retry returns the slot once
+ok - an endpoint refusal after reservation keeps its record through session start and the retry returns the slot
+ok - a waited return that meets a project-lock error exits 1, not the contention exit
+ok - a closed task whose return stalled survives session start and the next sweep finishes it behind a queued waiter
+ok - a refusal before cleanup leaves the pool slot unreserved, and the clean retry still returns it
+ok - recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot
+ok - an unleased pool slot is reserved only when the installed Treehouse has a lease command, else project custody covers the return
+ok - a copy in a superseded pool folder is returned by path and no slot of the current pool is leased, returned or changed
+ok - a lease this task took on a same-named slot of the current pool is released by the conditional return, and no other holder is touched
+ok - only the current-pool slot that shares the recorded slot name is released; another lease this task holds stays byte-identical
+grep: /Users/charlesabrooker/tmp/fm-teardown-tests.ZDBX7e/pool-superseded-unlanded-dirty/treehouse.log: No such file or directory
+grep: /Users/charlesabrooker/tmp/fm-teardown-tests.ZDBX7e/pool-superseded-unlanded-commit/treehouse.log: No such file or directory
+ok - an unlanded copy in a superseded pool folder is refused without touching any pool, and the landed retry returns it by path
+grep: /Users/charlesabrooker/tmp/fm-teardown-tests.ZDBX7e/pool-superseded-unique-work/treehouse.log: No such file or directory
+ok - unique unlanded work in an older pool folder is refused before any return or lease release, and every byte stays as it was
+ok - an unreadable Treehouse status keeps project custody and never leases a slot by name
+ok - a copy in the pool folder treehouse pool-dir names is reserved by name with no listing, and the same folder name under another root is returned by path
+ok - the current-pool proof follows the directory treehouse pool-dir prints, and otherwise reads one status listing per project
+ok - an automatic teardown that has closed its endpoint waits for project custody and returns its slot
+ok - ordinary pool return preserves dirt and new commits produced while final project custody is queued
+ok - a completed teardown records one landed-work allow and a forced one only its escape
+ok - a lease command without durable state proof cannot reap processes or return the slot, even with authorized discard
+ok - every forced return checks registered copies without pool inventory, and recovery names the owning home
+ok - an uncanonicalizable return target reports an explicit refusal and preserves its record
+ok - a custody refusal at a non-pool child return keeps the child worktree and its parked copy
+ok - a custody refusal at a deferred child pool return keeps the slot, its claim and its parked copy
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+ok - a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records
+ok - a fresh allocation in the reservation window retires only the retiring record, preserving the new owner
+ok - a slot reassigned in the reservation window is proved again from the retiring record, never from the claimant copy
+ok - a fresh allocation in the enclosing-slot window leaves the claimant slot and the retiring copy untouched
+ok - a slot claim decides slot administration while the retiring copy decides runtime retirement, for every claimant and copy shape
+ok - teardown of a reassociated record keeps the non-pool current copy and every prior copy untouched
+ok - teardown of a reassociated record still refuses unlanded work in the current copy
+ok - teardown of a record whose old slot was released keeps the non-pool current copy
+ok - teardown refuses to return a pool slot another record preserves as a prior copy
+ok - own prior copies refuse only a pool return that cannot prove them landed; a prior that is or encloses the slot does not block it, with or without --force
+ok - the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot
+ok - returning the enclosing slot aborts its parked run and retires its launch agent before the return
+ok - a forced teardown over a silent daemon waits one stall interval, not one per root
+ok - shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work
+ok - a stale-lock cleanup in the enclosing slot proves it again before the reset, with or without --force
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands, for a prior and a plain record
+ok - a plain nested copy in the task's own claimed slot is removed and the slot returned
+ok - a plain nested copy in the task's own claimed slot is removed and the slot returned under --force --drop-file
+ok - an entry refusal for the slot root's unlanded commit or the nested copy's dirt changes nothing, for a prior and a plain record
+ok - a pending-close path that is a directory refuses a plain nested close before any lease or marker write, and the retry closes
+ok - a pending-close path that is a directory refuses a prior-shape nested close before any lease or marker write, and the retry closes
+ok - a pending-close path that is a dangling link refuses a plain nested close before any lease or marker write, and the retry closes
+ok - a pending-close path that is a dangling link refuses a prior-shape nested close before any lease or marker write, and the retry closes
+ok - an unremovable pending-close record refuses a plain nested close before any lease or marker write, with the return-pending marker absent, and the retry closes
+ok - an unremovable pending-close record refuses a plain nested close before any lease or marker write, with the return-pending marker present, and the retry closes
+ok - an unremovable pending-close record refuses a enclosing nested close before any lease or marker write, with the return-pending marker absent, and the retry closes
+ok - an unremovable pending-close record refuses a enclosing nested close before any lease or marker write, with the return-pending marker present, and the retry closes
+ok - a read-only but removable pending-close record lets a plain and a prior-shape nested close finish
