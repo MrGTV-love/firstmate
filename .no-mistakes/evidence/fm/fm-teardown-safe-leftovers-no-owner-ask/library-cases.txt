@@ -1,0 +1,29 @@
+head 6b49e565a11de34ff8a34430f04d7f7b1a6be363
+ok - a copy that only a merged Forgejo pull request admits is held with a named reason unless the content proof holds it; GitHub, content, bundle-held and Forgejo-plus-content controls are released
+ok - the landing admission carries the commit its proof read: a ref moved after the proof refuses, unchanged it passes, and a merged-PR landing needs no default-branch ref
+ok - the last holder check before the unlock refuses any cwd holder, an indexer name included; an open-file-only indexer not recorded as own is exempt; with none the release proceeds
+ok - a launcher start time in the hour repeated when clocks go back converts to its exact epoch
+ok - the nested-repository guard finds an independent repository under a path that holds a newline, as it finds an ordinary one
+ok - a copy path that holds a newline reaches foreign and own disposal as one path
+ok - an Orca-backed task, an Orca cleanup-recovery record included, keeps base behaviour: the no-hold bundle route, the history landing and the direct release refuse it with a named reason; another backend keeps them
+ok - a successful preserve replacement keeps an earlier preserve with a file the new one lacks, and drops one the new preserve fully covers
+ok - the root dirt rule skips only a registered worktree of the same repository under .claude/worktrees; one elsewhere, an unregistered directory or repository, or an unreadable worktree list, is dirt
+ok - an untracked file under .claude is the copy's own work on the root check and the anchor proof; only Firstmate's managed files are exempt
+ok - the root return takes its safety check again before each retry: a changed result stops the retry, an unchanged one retries
+ok - a lock proved earlier that now reads absent or unreadable refuses on the foreign, own-release and own-removal routes; never-locked and still-locked controls take their routes
+ok - teardown's cleanup-target custody scan refuses when another task's record cannot be read; readable and elsewhere, or absent, it clears
+ok - a failed scan of the staged preserve or of the copy refuses, alone or hiding a changed payload; working scans pass an intact preserve
+ok - a history-admitted copy keeps a unique ignored file whose name is a newline, as it keeps an ordinary one; clean, it passes
+ok - a process found in or holding a file of a locked copy after the retire phase refuses before the driver, named and unsignalled; with none, the driver runs
+ok - an ignored file whose name holds a newline is preserved byte for byte, a changed payload of it refuses, and the one-per-line list refuses that name
+ok - a failed or interrupted preserve publication keeps every earlier preserve; a successful one is published and verified
+ok - a landing admission refuses at the removal when the default ref it read moved or cannot be read, as a retry; unchanged, it passes
+ok - a reused landing proof keeps the default ref it read: moved before the reuse, the final proof refuses as a retry; unchanged, it passes
+ok - a local-only landing with an origin remote present watches the local branch its proof read: unchanged it passes, rewound it refuses
+ok - a lock changed after its first line, or holding more than Vernant's one line, refuses before the driver; unchanged, the driver runs
+ok - the own nested removal refuses an untracked managed hook file at the final proof before Git is asked; clean or excluded, the copy is removed without force
+ok - a preserve whose leaf resolves inside the copy refuses and the original stays; an external preserve passes and survives the removal
+ok - bundle credit for the driver is rechecked at the final proof: a credited bundle truncated after the credit keeps the copy and the driver never runs; intact, it runs
+ok - a stored bundle whose directory resolves inside the copy refuses at the final proof; an external one passes and restores
+ok - an unreadable active task record means its owner is unknown and the copy is refused; readable it owns the copy, absent it does not
+ok - the final proof refuses what a plain git worktree remove refuses: an untracked managed hook file or turn-end marker keeps the copy, an excluded one is removed
