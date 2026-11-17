@@ -2378,14 +2378,15 @@ assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a
 clock['now'] = now
 # A steer delivered in an earlier overdue episode cannot answer a row whose age clock restarted with unchanged text:
 # the episode follows the row's obligation clock as well as its digest.
-home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker')
+home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker', age_seconds=3660)
 _, boundary = drain()
 inbox(home, '001.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
 assert ack(boundary).returncode == 0
-clock['now'] = now + 8000
+clock['now'] = now + 120
+ok(code / 'bin/fm-open-loops.sh', '--check-actions')  # the delivery is still within its row limit
 record = json.loads(ledger.read_text())
-record['generated_epoch'] = now + 8000
+record['generated_epoch'] = now + 120
 ledger.write_text(json.dumps(record))
 restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock is changed work', restarted)
@@ -2624,7 +2625,8 @@ assert reused.returncode == 0, ('the same unchanged row needs no newer message',
 assert ack(boundary).returncode == 0
 # A steer on a reviewed green PR answers its presentation for four hours from its delivery, not from the action.
 home, ledger, row, call, ok, drain, ack = case('steer-remaining', category='review_pass_not_merged', subject=PR,
-                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+                                               owner='firstmate', source=dict(task='worker'),
+                                               age_seconds=93600, limit_seconds=86400)
 _, boundary = drain()
 inbox(home, '005.msg', offset=-600)
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
@@ -2651,7 +2653,7 @@ for handled in (False, True):
     inbox(home, '002.msg', handled=handled, offset=-3700)
     refused = call(*args, '002.msg')
     assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
-    inbox(home, '003.msg', handled=handled, offset=1)
+    inbox(home, '003.msg', handled=handled)
     ok(*args, '003.msg')
     action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
     assert action['kind'] == 'steered' and action['evidence'] == '003.msg', action

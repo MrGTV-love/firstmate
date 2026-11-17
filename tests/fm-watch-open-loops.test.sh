@@ -210,8 +210,8 @@ SH
   chmod +x "$1/fake-open-loops"
 }
 
-assert_ledger_queue_reason() {  # <state> <out> <key>
-  local state=$1 out=$2 key=$3 payload reason
+assert_ledger_queue_reason() {  # <state> <out> <key> [expected-overdue-count for ordinary wake]
+  local state=$1 out=$2 key=$3 expected_count=${4:-} payload reason
   payload=$(awk -F '\t' -v key="$key" '$3 == "check" && $4 == key { print $5 }' "$state/.wake-queue")
   reason=$(cat "$out")
   case "$reason" in
@@ -219,6 +219,10 @@ assert_ledger_queue_reason() {  # <state> <out> <key>
     *) fail "ledger wake did not use its canonical check reason: $reason" ;;
   esac
   [ "$payload" = "$reason" ] || fail "queued ledger reason differs from watcher output: $payload / $reason"
+  if [ -n "$expected_count" ]; then
+    [ "$payload" = "check: open-loop-ledger ($expected_count overdue assigned obligations; read state/open-loops.json)" ] \
+      || fail "unexpected overdue count in queued ledger reason: $payload"
+  fi
 }
 
 test_overdue_row_wakes_with_a_durable_row() {
@@ -1169,7 +1173,7 @@ test_result_followup_notifies_once_then_settles() {
     publish_recorded_ledger "$dir/ledgers/failed-delivery.json" "$first/state"
     watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
     wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind failed delivery lost the original actionable notification"; }
-    assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger
+    assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger 1
     first=$(make_case "result-first-$kind")
     publish_recorded_ledger "$dir/ledgers/steer-current.json" "$first/state"
     watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
@@ -1184,7 +1188,7 @@ test_result_followup_notifies_once_then_settles() {
       || { reap "$pid"; fail "$kind result wait did not stay quiet before its deadline"; }
     publish_recorded_ledger "$dir/ledgers/steer-due.json" "$state"
     wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind due result follow-up did not notify"; }
-    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger 2
     [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
       || fail "$kind result follow-up relied on periodic rescue"
     settled=$(make_case "result-settled-$kind");state="$settled/state";out="$settled/watch.out"
@@ -1206,7 +1210,7 @@ test_result_followup_notifies_once_then_settles() {
       || { reap "$pid"; fail "$kind current renewal did not stay quiet"; }
     publish_recorded_ledger "$dir/ledgers/steer-renewed-due.json" "$state"
     wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind second result deadline did not notify"; }
-    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger 2
     cycle="$state"
     settled=$(make_case "result-second-settled-$kind");state="$settled/state";out="$settled/watch.out"
     copy_delivered_cooldowns "$cycle" "$state"
@@ -1226,7 +1230,7 @@ test_unavailable_result_notifies_again_after_recovery() {
   local dir first cycle state out pid previous marker periodic stage current due
   dir=$(make_case consumer-result-followup)
   prepare_canonical_ledgers "$dir" regular || fail "consumer result ledger preparation failed"
-  first=$(make_case consumer-result-first)
+  first=$(make_case consumer-result-baseline)
   publish_recorded_ledger "$dir/ledgers/available-current.json" "$first/state"
   watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home";pid=$!
   wait_watch_exit "$pid" 400 || { reap "$pid"; fail "consumer result initial notification failed"; }
@@ -1244,7 +1248,7 @@ test_unavailable_result_notifies_again_after_recovery() {
       || { reap "$pid"; fail "$stage recovery/new delivery itself replayed the result wake"; }
     publish_recorded_ledger "$dir/ledgers/$due.json" "$state"
     wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$stage authoritative unavailability did not notify"; }
-    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger 3
     [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
       || fail "$stage consumer result depended on periodic rescue"
     previous="$state"
