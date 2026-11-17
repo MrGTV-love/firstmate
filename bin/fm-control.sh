@@ -917,8 +917,9 @@ reassociate_check() {  # <record-index>
   [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
     || die "task $ID has a pending authoritative backlog close from an interrupted cleanup; finish or repair it before reassociating"
   # A failed attempt is closed only if its prior incarnation remained the
-  # authoritative record and no agent can still be using it. The historical
-  # rollback's agent observation alone is not a current liveness proof.
+  # authoritative record. Those rollbacks need no liveness proof, as with no
+  # journal, except the two that left the old agent alive or unproven stopped:
+  # those still need the backend to prove it stopped or its endpoint missing.
   local journal="$STATE/$ID.control-relaunch" phase rollback closed=0
   if [ -e "$journal" ] || [ -L "$journal" ]; then
     if [ -f "$journal" ] && [ ! -L "$journal" ] && [ -r "$journal" ] \
@@ -936,7 +937,9 @@ reassociate_check() {  # <record-index>
               esac ;;
           esac
           case "$rollback" in
-            prior-record-kept|prior-record-kept-agent-dead|instructions-restored|instructions-restored-agent-alive|instructions-restored-agent-state-?*)
+            prior-record-kept|prior-record-kept-agent-dead|instructions-restored)
+              closed=1; RA_JOURNALS[m]=$journal ;;
+            instructions-restored-agent-alive|instructions-restored-agent-state-?*)
               case "$(fm_backend_agent_state "$FM_BACKEND_VALIDATED_BACKEND" "$FM_BACKEND_VALIDATED_TARGET")" in
                 dead|missing) closed=1; RA_JOURNALS[m]=$journal ;;
                 *) die "task $ID's agent is not proven stopped; reconcile it before archiving its rolled-back relaunch journal and reassociating" ;;

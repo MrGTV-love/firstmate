@@ -668,9 +668,34 @@ test_restored_relaunch_journal_is_archived() {
   done
 }
 
+test_restored_journal_with_live_worker_reassociates_as_without_journal() {
+  local rollback id dir new out rc
+  for rollback in ${FM_TEST_LIVE_ROLLBACK:-no-journal prior-record-kept prior-record-kept-agent-dead instructions-restored}; do
+    id=reassoc-live-restored
+    dir=$(new_case "live-restored-$rollback" "$id")
+    new="$dir/new"
+    add_copy "$dir" "$new" "fm/$id-v2"
+    make_journal_endpoint "$dir" "$id" alive
+    if [ "$rollback" != no-journal ]; then
+      write_relaunch_journal "$dir" "$id" failed:checkpoint
+      printf 'rollback=%s\n' "$rollback" >> "$dir/home/state/$id.control-relaunch"
+      cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
+    fi
+    rc=0
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note live) || rc=$?
+    expect_code 0 "$rc" "$rollback with a live worker must reassociate as a task with no journal does"$'\n'"$out"
+    assert_equals "$new" "$(meta_field "$dir" "$id" worktree)" "$rollback with a live worker did not publish the replacement"
+    if [ "$rollback" != no-journal ]; then
+      assert_journal_archive "$dir" "$id"
+      [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "$rollback journal still occupies the active path"
+    fi
+    pass "$rollback with a live worker reassociates without a liveness gate"
+  done
+}
+
 test_unproven_relaunch_journal_refuses_unchanged() {
   local scenario id dir new journal out rc fragment
-  for scenario in ${FM_TEST_JOURNAL_SCENARIO:-none-new-agent-confirmed none-new-record-kept missing unreadable symlink foreign complete-foreign unknown-rollback malformed-prior malformed-instructions empty-state invalid-state invalid-state-tail directory empty-task launching stopping live-agent live-state-agent unreadable-agent backlog-close}; do
+  for scenario in ${FM_TEST_JOURNAL_SCENARIO:-none-new-agent-confirmed none-new-record-kept missing unreadable symlink foreign complete-foreign unknown-rollback malformed-prior malformed-instructions empty-state invalid-state invalid-state-tail directory empty-task launching stopping live-agent live-state-agent unreadable-agent unreadable-state-agent backlog-close}; do
     id=reassoc-unproven
     dir=$(new_case "journal-negative-$scenario" "$id")
     new="$dir/new"
@@ -689,9 +714,15 @@ test_unproven_relaunch_journal_refuses_unchanged() {
       malformed-instructions) printf 'rollback=instructions-restored-garbage\n' >> "$journal" ;;
       directory) mv "$journal" "$dir/journal.input"; mkdir "$journal"; printf 'not a journal\n' > "$journal/entry" ;;
       empty-task) printf 'v1\ntask=\nphase=failed:launching\nrollback=prior-record-kept\n' > "$journal" ;;
-      live-state-agent)
-        printf 'rollback=instructions-restored-agent-state-unknown\n' >> "$journal"
-        make_journal_endpoint "$dir" "$id" alive
+      live-agent|unreadable-agent|live-state-agent|unreadable-state-agent)
+        case "$scenario" in
+          *-state-agent) printf 'rollback=instructions-restored-agent-state-unknown\n' >> "$journal" ;;
+          *) printf 'rollback=instructions-restored-agent-alive\n' >> "$journal" ;;
+        esac
+        case "$scenario" in
+          live-*) make_journal_endpoint "$dir" "$id" alive ;;
+          *) make_journal_endpoint "$dir" "$id" unreadable ;;
+        esac
         fragment='agent is not proven stopped' ;;
       empty-state) printf 'rollback=instructions-restored-agent-state-\n' >> "$journal" ;;
       invalid-state) printf 'rollback=instructions-restored-agent-state-!\n' >> "$journal" ;;
@@ -702,13 +733,6 @@ test_unproven_relaunch_journal_refuses_unchanged() {
         case "$scenario" in
           unreadable) : ;;
           symlink) mv "$journal" "$dir/journal.target"; ln -s "$dir/journal.target" "$journal" ;;
-          live-agent|unreadable-agent)
-            if [ "$scenario" = live-agent ]; then
-              make_journal_endpoint "$dir" "$id" alive
-            else
-              make_journal_endpoint "$dir" "$id" unreadable
-            fi
-            fragment='agent is not proven stopped' ;;
           backlog-close) printf 'pending\n' > "$dir/home/state/$id.backlog-close"; fragment='pending authoritative backlog close' ;;
         esac ;;
     esac
@@ -2864,6 +2888,7 @@ test_shared_root_without_pr_proves_its_own_branch
 test_non_github_pr_reassociation_refuses
 
 test_restored_relaunch_journal_is_archived
+test_restored_journal_with_live_worker_reassociates_as_without_journal
 test_unproven_relaunch_journal_refuses_unchanged
 test_journal_archive_precedes_writes_and_survives_failure
 test_journal_archive_failure_boundaries
