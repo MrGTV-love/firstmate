@@ -2814,6 +2814,9 @@ SH
 # stands in for Vernant's driver: it logs its directory and arguments, and with
 # FM_STUB_CLOSEOUT=ok unlocks and plainly removes only a copy under the scratch
 # root, as the real driver's cleanup does; any other value refuses with exit 3.
+# The slot also ignores .claude/bug-evidence/, where the driver writes its
+# archives, as a Vernant checkout does (bin/fm-merge-prune-lib.sh classifies it
+# as an ignored entry): the root dirt rule counts every other untracked file.
 # With FM_STUB_LOCK naming the shared project lock, it also records in
 # closeout.lock-state whether that lock is held while it runs.
 # vernant-python, the interpreter run_foreign_teardown names, runs it as a shell
@@ -2835,7 +2838,7 @@ make_foreign_copy_case() {
   add_lsof_no_holder "$case_dir"
   tmp_real=$(cd "$TMP_ROOT" && pwd -P)
   exclude=$(git -C "$NESTED_SLOT" rev-parse --path-format=absolute --git-path info/exclude)
-  printf '%s\n' scripts/ .venv/ >> "$exclude"
+  printf '%s\n' scripts/ .venv/ .claude/bug-evidence/ >> "$exclude"
   mkdir -p "$NESTED_SLOT/scripts/git-stability"
   cat > "$NESTED_SLOT/scripts/git-stability/closeout_pr.py" <<SH
 # A plan call (no --execute-cleanup, wherever a credit puts it) only answers; it
