@@ -1,0 +1,18 @@
+=== S11-BASE same raw-command secondmate, base: 2026-11-17T03:53:28Z scripts=/tmp/fm-base-01M7
+foreground before: [{"pid":61694,"argv0":"claude"},{"pid":59315,"argv0":"node"}]
+lab state before: .fm-lab-tmux-dir .reboot-recovery-cursor guard-events.jsonl k1lab.meta sm1lab.meta 
+mate home state before: 
+--- $ bin/fm-secondmate-restart.sh sm1lab
+nudged: sm1lab: its worker runtime 'mylauncher' has no verified restart mechanics for a second mate
+summary: 0 of 1 restarted, 1 nudged, 0 unreached
+exit=3
+foreground after: [{"pid":61694,"argv0":"claude"},{"pid":59315,"argv0":"node"}]
+lab state after: .fm-lab-tmux-dir .guard-watcher-stale-banner .reboot-recovery-cursor guard-events.jsonl k1lab.meta pending-replies sm1lab.inbox sm1lab.meta 
+mate home state after: 
+pane tail after:
+ Claude Code'll be able to read, edit, and execute files here.
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel

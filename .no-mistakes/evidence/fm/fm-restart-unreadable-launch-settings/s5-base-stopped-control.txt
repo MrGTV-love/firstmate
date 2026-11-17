@@ -1,0 +1,20 @@
+=== S5-BASE control: versioned record, shell-only pane, base: 2026-11-17T03:47:23Z head=base-b09c46b0c
+foreground before: [{"pid":84413,"argv0":"zsh"}]
+--- $ exit
+already-stopped d1lab harness=claude backend=herdr endpoint=fm-lab-restartattr-5001-12763:w1:p1 worktree=/Users/charlesabrooker/tmp/fm-lab.qQvhsb/wt
+exit=0
+--- $ recover
+exit=0
+foreground after: [{"pid":84413,"argv0":"zsh"}]
+meta unchanged: yes
+state files before: .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+state files after:  .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+pane tail after:
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel
+Claude Code didn't start because this folder isn't trusted.
+Run claude again and choose Yes, or run it in another folder.
+charlesabrooker@Mac-Studio wt %

@@ -1,0 +1,27 @@
+=== S6 adversarial: claude pinned to ANOTHER launch generation, head: 2026-11-17T03:47:41Z head=cc45d0f2e
+foreground before: [{"pid":3974,"argv0":"claude"},{"pid":3905,"argv0":"node"}]
+--- $ recover
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qQvhsb
+REBOOT_RECOVERY: d1lab: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+exit=1
+--- $ interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qQvhsb
+error: task d1lab cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+exit=1
+--- $ exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qQvhsb
+error: task d1lab cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+exit=1
+foreground after: [{"pid":3974,"argv0":"claude"},{"pid":3905,"argv0":"node"}]
+meta unchanged: yes
+state files before: .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+state files after:  .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+pane tail after:
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+ Claude Code'll be able to read, edit, and execute files here.
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel

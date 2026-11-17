@@ -1,0 +1,21 @@
+=== S3-BASE control (k): pinned claude whose FM_SPAWN_GEN matches, base scripts: 2026-11-17T03:46:20Z head=base-b09c46b0c
+foreground before: [{"pid":78424,"argv0":"claude"},{"pid":78142,"argv0":"node"}]
+--- $ recover
+REBOOT_RECOVERY: d1lab: live launch settings are unreadable; no lifecycle action taken
+exit=1
+--- $ interrupt
+error: task k1lab's agent is 'dead' after its interrupt key; an interrupt must leave the agent running
+exit=1
+foreground after: [{"pid":50247,"argv0":"zsh"}]
+meta unchanged: yes
+state files before: .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+state files after:  .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+pane tail after:
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel
+Claude Code didn't start because this folder isn't trusted.
+Run claude again and choose Yes, or run it in another folder.
+charlesabrooker@Mac-Studio wt2 %

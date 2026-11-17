@@ -1,0 +1,21 @@
+=== S2-BASE same controlled fault, base: 2026-11-17T03:52:56Z head=base-b09c46b0c
+foreground before: [{"pid":50381,"argv0":"claude"}]
+--- $ recover
+REBOOT_RECOVERY: sm1lab: live launch settings are unreadable; no lifecycle action taken
+exit=1
+--- $ interrupt
+error: task sm1lab cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+exit=1
+foreground after: [{"pid":50381,"argv0":"claude"}]
+meta unchanged: yes
+state files before: .fm-lab-tmux-dir .reboot-recovery-cursor guard-events.jsonl k1lab.meta sm1lab.meta 
+state files after:  .fm-lab-tmux-dir .reboot-recovery-cursor guard-events.jsonl k1lab.meta sm1lab.meta 
+pane tail after:
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+ Claude Code'll be able to read, edit, and execute files here.
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel

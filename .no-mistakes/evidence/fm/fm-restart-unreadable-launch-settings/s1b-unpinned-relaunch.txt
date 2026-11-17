@@ -1,0 +1,19 @@
+=== S1b unpinned d1-shape: relaunch with a note: 2026-11-17T03:45:14Z head=cc45d0f2e
+foreground before: [{"pid":474,"argv0":"claude"},{"pid":99458,"argv0":"node"}]
+--- $ relaunch --note lab-check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qQvhsb
+error: task d1lab cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1lab relaunch", or decide the lane by hand
+exit=1
+foreground after: [{"pid":474,"argv0":"claude"},{"pid":99458,"argv0":"node"}]
+meta unchanged: yes
+state files before: .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl 
+state files after:  .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl 
+pane tail after:
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+ Claude Code'll be able to read, edit, and execute files here.
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel

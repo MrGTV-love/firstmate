@@ -1,0 +1,23 @@
+=== S3 control (k): pinned claude whose FM_SPAWN_GEN matches, head scripts: 2026-11-17T03:46:41Z head=cc45d0f2e
+foreground before: [{"pid":65279,"argv0":"claude"},{"pid":65015,"argv0":"node"}]
+--- $ recover
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qQvhsb
+REBOOT_RECOVERY: d1lab: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1lab relaunch", or decide the lane by hand
+exit=1
+--- $ interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qQvhsb
+interrupt-delivered k1lab harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+exit=0
+foreground after: [{"pid":65279,"argv0":"claude"},{"pid":65015,"argv0":"node"}]
+meta unchanged: yes
+state files before: .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+state files after:  .fm-lab-tmux-dir .reboot-recovery-cursor d1lab.meta d1lab.reboot-notice guard-events.jsonl k1lab.meta 
+pane tail after:
+ Claude Code'll be able to read, edit, and execute files here.
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel
+Claude Code didn't start because this folder isn't trusted.
+Run claude again and choose Yes, or run it in another folder.
