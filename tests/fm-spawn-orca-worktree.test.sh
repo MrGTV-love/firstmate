@@ -67,6 +67,18 @@ case "$1 $2" in
     exit 0
     ;;
   "terminal create")
+    # A real Orca terminal runs a shell whose working directory is the worktree. With FM_TEST_ORCA_SHELL=1 the fake
+    # starts one (its pid goes to terminal-pids for the test to stop).
+    if [ "${FM_TEST_ORCA_SHELL:-0}" = 1 ]; then
+      id=
+      prev=
+      for a in "$@"; do
+        [ "$prev" = --worktree ] && id=${a#id:}
+        prev=$a
+      done
+      ( cd "$DIR/orca-worktrees/${id#wt-}" && exec sh -c 'while :; do sleep 1; done' ) </dev/null >/dev/null 2>&1 &
+      printf '%s\n' "$!" >>"$DIR/terminal-pids"
+    fi
     printf '{"ok":true,"result":{"terminal":{"handle":"term-1"}}}\n'
     exit 0
     ;;
@@ -164,7 +176,81 @@ EOF
   pass "a relaunch against an Orca-backed task is refused before the RELAUNCH+orca worktree carve-out could run"
 }
 
+# R4-2: a fresh Orca worktree is created by this spawn; it is not a Treehouse pool slot, so the pool slot's idle proof does
+# not run on it. The Orca terminal's own shell sits in the worktree, and the spawn still proceeds. With an origin ahead of
+# the project, the worktree is moved forward to origin's tip.
+stop_orca_shells() { # <case-dir>: stops only the shells the fake recorded
+  local pid
+  [ -f "$1/terminal-pids" ] || return 0
+  while IFS= read -r pid; do
+    kill "$pid" 2>/dev/null || true
+  done <"$1/terminal-pids"
+  rm -f "$1/terminal-pids"
+}
+
+orca_shell_case() { # <name> <id> <with-origin 0|1>: runs the spawn; sets ORCA_OUT ORCA_STATUS ORCA_HOME ORCA_TIP
+  local case_dir home id=$2 fb pub
+  case_dir="$TMP_ROOT/$1"
+  home="$case_dir/home"
+  mkdir -p "$home/data" "$home/projects" "$home/state" "$home/config"
+  touch "$home/state/.last-watcher-beat"
+  printf 'codex\n' > "$home/config/crew-harness"
+  printf 'manual\n' > "$home/config/backlog-backend"
+  fm_git_init_commit "$case_dir/project"
+  ORCA_TIP=
+  if [ "$3" = 1 ]; then
+    git clone --quiet --bare "$case_dir/project" "$case_dir/origin.git"
+    git -C "$case_dir/project" remote add origin "file://$case_dir/origin.git"
+    git -C "$case_dir/project" fetch --quiet origin
+    git -C "$case_dir/project" remote set-head origin --auto >/dev/null
+    pub="$case_dir/publisher"
+    git clone --quiet "file://$case_dir/origin.git" "$pub"
+    printf 'from origin\n' > "$pub/advanced.txt"
+    git -C "$pub" add advanced.txt
+    git -C "$pub" -c user.name=Tests -c user.email=tests@example.invalid commit -qm advance
+    git -C "$pub" push --quiet origin HEAD
+    ORCA_TIP=$(git -C "$pub" rev-parse HEAD)
+  fi
+  mkdir -p "$home/data/$id"
+  cat > "$home/data/$id/brief.md" <<EOF
+# Task
+## Captain's intent
+Exercise an Orca-backed spawn for $id.
+
+## Firstmate spec
+Confirm the launch proceeds while the Orca terminal's shell sits in the worktree.
+EOF
+  fb=$(make_orca_fakebin "$case_dir")
+  ORCA_OUT=$(FM_ROOT_OVERRIDE='' FM_HOME="$home" HOME="$case_dir/user-home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
+    FM_SPAWN_NO_GUARD=1 FM_TEST_ORCA_DIR="$case_dir" FM_TEST_ORCA_SHELL=1 PATH="$fb:$PATH" \
+    "$SPAWN" "$id" "$case_dir/project" --mode no-mistakes --yolo off --backend orca 2>&1)
+  ORCA_STATUS=$?
+  [ -s "$case_dir/terminal-pids" ] || { stop_orca_shells "$case_dir"; fail "the fake Orca terminal started no shell, so the case proves nothing"; }
+  stop_orca_shells "$case_dir"
+  ORCA_HOME=$home
+}
+
+test_orca_fresh_spawn_proceeds_with_its_terminal_shell_in_the_worktree() {
+  orca_shell_case orca-shell orca-shell-a3 0
+  expect_code 0 "$ORCA_STATUS" "an Orca spawn whose terminal shell sits in its worktree should proceed"$'\n'"$ORCA_OUT"
+  assert_contains "$ORCA_OUT" "spawned orca-shell-a3" "spawn did not report success"$'\n'"$ORCA_OUT"
+  pass "a fresh Orca spawn proceeds while its own terminal's shell sits in the worktree it created"
+}
+
+test_orca_fresh_spawn_with_an_origin_moves_to_origins_tip() {
+  local wt
+  orca_shell_case orca-origin orca-origin-a4 1
+  expect_code 0 "$ORCA_STATUS" "an Orca spawn with an origin should proceed"$'\n'"$ORCA_OUT"
+  wt=$(grep '^worktree=' "$ORCA_HOME/state/orca-origin-a4.meta" | cut -d= -f2-)
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$ORCA_TIP" ] || fail "the Orca worktree is at $(git -C "$wt" rev-parse HEAD), not origin's tip $ORCA_TIP"
+  pass "a fresh Orca spawn with an origin moves its worktree forward to origin's tip"
+}
+
 test_orca_fresh_spawn_enters_the_worktree_it_created
 test_orca_relaunch_is_refused_before_the_worktree_carveout_could_run
+test_orca_fresh_spawn_proceeds_with_its_terminal_shell_in_the_worktree
+test_orca_fresh_spawn_with_an_origin_moves_to_origins_tip
 
 echo "# all fm-spawn-orca-worktree tests passed"
