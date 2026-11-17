@@ -5842,8 +5842,13 @@ unc6_marker_env() {  # <name>; prints the case dir
 }
 
 unc6_marker_functions() {
+  # The script initializes this global before any function runs (empty until the
+  # entry preflight makes the per-run directory); the marker writer reads it.
+  printf 'TEARDOWN_RUN_DIR=\n'
   unc6_functions teardown_hex_encode teardown_hex_decode teardown_marker_lease teardown_mark_return_pending \
-    teardown_unclaimed_marker_refusal teardown_unclaimed_lease_matches
+    teardown_unclaimed_marker_refusal teardown_unclaimed_lease_matches teardown_return_pending_target_ok
+  sed -n '/^fm_backlog_canonical_existing() {/,/^}/p' "$ROOT/bin/fm-backlog-transition-lib.sh"
+  sed -n '/^fm_backlog_path_deletable() {/,/^}/p' "$ROOT/bin/fm-backlog-transition-lib.sh"
   sed -n '/^fm_teardown_return_pending_gen() {/,/^}/p' "$ROOT/bin/fm-wake-lib.sh"
   sed -n '/^fm_teardown_return_pending() {/,/^}/p' "$ROOT/bin/fm-wake-lib.sh"
 }
