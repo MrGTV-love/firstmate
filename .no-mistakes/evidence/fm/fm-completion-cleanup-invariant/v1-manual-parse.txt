@@ -1,0 +1,6 @@
+"PR https://github.com/o/r/pull/9 head abc"             -> [https://github.com/o/r/pull/9] rc=0
+"https://github.com/o/r/pull/9 merged by another lane"  -> [https://github.com/o/r/pull/9] rc=0
+"https://gitlab.com/g/p/-/merge_requests/3 ready"       -> [https://gitlab.com/g/p/-/merge_requests/3] rc=0
+"https://github.com/o/r/issues/9"                       -> [] rc=1
+"see https://github.com/o/r/pull/9"                     -> [] rc=1
+""                                                      -> [] rc=1

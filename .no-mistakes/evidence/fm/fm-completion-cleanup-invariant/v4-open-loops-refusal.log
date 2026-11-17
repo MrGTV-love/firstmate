@@ -1,0 +1,6 @@
+ok - a working ship with a dirty copy and only a check-in row keeps the last recorded refusal; a covering row takes it when present
+ok - a memo replaced just after the reader opens it never pairs old text with a newer time (hook on os.open and os.fdopen fired; a path-then-stat mutant is caught)
+ok - an unreadable refusal record makes the last refusal unknown and degrades coverage; absence and a tie are controls
+ok - a merged task whose cleanup is refused (dirty copy) is an owned pending_cleanup row carrying the refusal; a clean copy and a declared wait are controls
+ok - the ledger's landing check compares blobs: a merge driver cannot land a differing line; a squash is landed
+ok - kind (d): a scout with a delivered report and a done report whose pane reads working gets an owned pending_cleanup row with the scout action

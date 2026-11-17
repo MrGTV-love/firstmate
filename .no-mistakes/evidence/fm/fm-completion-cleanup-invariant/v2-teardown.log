@@ -1,0 +1,8 @@
+ok - a detached copy with no pr= whose merged PR replayed and reverted its change is refused and kept; a carried one is torn down
+ok - a complete list of 1000 PRs is read; a full page of 1001 is incomplete, named in a refusal, and only the content check can still land the copy
+ok - a copy landed by its content closes with its recorded PR; a newer merged PR at another head does not hide the older one at the copy's HEAD
+ok - a detached copy with no pr= is judged landed through the record's branch (branch= or fm/<id>) and torn down
+ok - a detached copy holding a commit the merged PR lacks, or whose record branch matches a PR that lacks its work, is still refused and kept
+ok - a copy on a named branch is judged landed through that branch as before
+ok - a detached copy is judged against every PR of its branch: a newer open PR does not hide an older merged one, and a non-carrying one still refuses
+ok - a replayed patch over a pushed parent the merged PR and default branch lack is refused and kept, detached or named

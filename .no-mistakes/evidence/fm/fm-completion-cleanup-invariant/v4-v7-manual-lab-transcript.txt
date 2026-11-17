@@ -1,0 +1,58 @@
+t-landed.meta: slot_base_sha=dc9c0ea10b0c3e83bc376115c1ed3648d63e0cde
+$ bin/fm-open-loops.sh --json  (before teardown)
+completed_task	t-acc	firstmate	advance the committed candidate through its selected delivery path	worker completion is a handoff, not final acceptance
+pending_cleanup	t-landed	home:firstmate	run plain bin/fm-teardown.sh t-landed; the record stays open until it succeeds	finished: its work is already on the default branch; the record is still open
+unlanded_commit	t-acc	firstmate	land this work through its PR, or obtain the captain's drop	1 commit(s) not on refs/remotes/origin/main; newest: acc work
+
+$ bin/fm-teardown.sh t-acc   (copy holds an unlanded commit)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.3ZvsEq
+error: task t-acc's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.3ZvsEq/state/t-acc.meta has 0 spawn generation fields; exactly one is required); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less
+exit=1
+
+$ bin/fm-teardown.sh t-landed   (content on origin/main)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.3ZvsEq
+error: task t-landed's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.3ZvsEq/state/t-landed.meta has 0 spawn generation fields; exactly one is required); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less
+exit=1
+
+records: t-acc.meta t-acc.status t-landed.meta t-landed.status 
+copies: acc=present landed=present
+acc commit still there: ac74a4b acc work
+
+$ bin/fm-open-loops.sh --json  (after teardown)
+completed_task	t-acc	firstmate	advance the committed candidate through its selected delivery path	worker completion is a handoff, not final acceptance
+pending_cleanup	t-landed	home:firstmate	run plain bin/fm-teardown.sh t-landed; the record stays open until it succeeds	finished: its work is already on the default branch; the record is still open
+unlanded_commit	t-acc	firstmate	land this work through its PR, or obtain the captain's drop	1 commit(s) not on refs/remotes/origin/main; newest: acc work
+(records now carry spawn_gen=; t-landed carries slot_base_sha=)
+$ bin/fm-teardown.sh t-acc   (copy holds an unlanded commit)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.3ZvsEq
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7KK9CN23TZ4GBNC5T3H05JQ/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.3ZvsEq/data/t-acc/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.3ZvsEq/data/t-acc/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ac74a4b acc work
+the landing proof could not be completed: the PR list for branch fm/t-acc could not be read
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+
+$ bin/fm-teardown.sh t-landed   (content on origin/main)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.3ZvsEq
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+worktree /Users/charlesabrooker/tmp/fm-lab-w.3e8sZ2/landed-copy is not managed by treehouse
+error: treehouse return failed for worktree /Users/charlesabrooker/tmp/fm-lab-w.3e8sZ2/landed-copy; teardown aborted
+exit=1
+
+records: t-acc.meta t-acc.status t-landed.meta t-landed.status 
+copies: acc=present landed=present
+acc commit still there: ac74a4b acc work
+
+$ bin/fm-open-loops.sh --json  (after teardown)
+completed_task	t-acc	firstmate	advance the committed candidate through its selected delivery path	worker completion is a handoff, not final acceptance
+pending_cleanup	t-landed	home:firstmate	run plain bin/fm-teardown.sh t-landed; the record stays open until it succeeds	finished: its work is already on the default branch; the record is still open
+unlanded_commit	t-acc	firstmate	land this work through its PR, or obtain the captain's drop	1 commit(s) not on refs/remotes/origin/main; newest: acc work
