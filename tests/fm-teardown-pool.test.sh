@@ -6124,14 +6124,18 @@ test_unclaimed_custody_refuses_an_independent_clone_in_an_own_copy_and_a_process
 # The unclaimed route with an own nested copy that Vernant's closeout driver kept: the route's
 # prove, cleanup and release steps run with their real functions and the real held-slot rule
 # (teardown_retained_hold); the driver, the reprove and the provider are stubs.
-# <owner>: own (the kept copy is this task's) | foreign (another task's copy is held in the slot).
+# <owner>: own (the kept copy is this task's) | foreign (another task's copy is held in the slot) |
+# released (the driver releases the own copy, so the slot is returned).
 # <lease>: recovered (the protected holder) | ordinary (this task's own lease id).
 # <provider>: proven | unproven. <attempt>: first (the driver keeps the copy at cleanup) |
 # retry (its record already applies at the prove step).
+# [<proc>]: none (the process scan is stubbed empty) | kept | slot: a real sleep is started with its
+# working directory inside the kept copy or elsewhere in the slot, scanned by the real
+# pids_with_cwd_under, and stopped before the case returns.
 # The functions eval'd from bin/fm-teardown.sh read these variables and call these stubs.
 # shellcheck disable=SC2030,SC2031,SC2034,SC2329
-unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt>
-  local name=$1 owner=$2 lease=$3 provider=$4 attempt=$5 dir
+unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt> [<proc>]
+  local name=$1 owner=$2 lease=$3 provider=$4 attempt=$5 proc=${6:-none} dir pid='' rc=0
   dir=$TMP_ROOT/unc7-kept-$name
   rm -rf "$dir"
   mkdir -p "$dir/tmp" "$dir/state" "$dir/data"
@@ -6141,13 +6145,21 @@ unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt>
   [ "$owner" != foreign ] || mkdir -p "$dir/pool/1/proj/other"
   [ "$attempt" != retry ] || : > "$dir/data/retained-record"
   : > "$dir/state/meta"
+  mkdir -p "$dir/pool/1/proj/loose"
+  case "$proc" in
+    kept) (cd "$dir/pool/1/proj/nested" && exec sleep 300) & pid=$! ;;
+    slot) (cd "$dir/pool/1/proj/loose" && exec sleep 300) & pid=$! ;;
+  esac
+  [ -z "$pid" ] || { sleep 0.3; kill -0 "$pid" || fail "$name: the real process did not start"; }
   (
     set -u
     # shellcheck source=bin/fm-refuse-lib.sh
     . "$ROOT/bin/fm-refuse-lib.sh"
     # shellcheck source=bin/fm-task-copy-lib.sh
     . "$ROOT/bin/fm-task-copy-lib.sh"
+    [ "$proc" = none ] || eval "$(unc6_functions pids_with_cwd_under)"
     eval "$(unc6_functions teardown_unclaimed_note teardown_unclaimed_step teardown_unclaimed_lease_matches \
+      teardown_unclaimed_outside_kept_copies \
       teardown_unclaimed_lease_is_the_gated_one teardown_unclaimed_lease_durable teardown_unclaimed_holds_kept_copy \
       teardown_unclaimed_read_lease teardown_unclaimed_prove_custody teardown_slot_other_repo \
       teardown_unclaimed_slot_prove teardown_unclaimed_slot_forget teardown_unclaimed_slot_cleanup \
@@ -6181,7 +6193,7 @@ unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt>
     teardown_slot_peers_detect() { TEARDOWN_PEER_IDS=(); }
     require_exclusive_worktree_slot_record() { return 0; }
     teardown_landed() { return 0; }
-    pids_with_cwd_under() { return 0; }
+    [ "$proc" != none ] || pids_with_cwd_under() { return 0; }
     validate_worktree_teardown_safety() { return 0; }
     teardown_retained_receipt() { printf '%s\n' "$DATA/retained-record"; }
     teardown_retained_copy_held() { [ -e "$DATA/retained-record" ] && [ "$1" = "$KEPT" ]; }
@@ -6199,6 +6211,7 @@ unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt>
     }
     teardown_own_locked_copies_release() {
       echo "DRIVER asked"
+      [ "$owner" != released ] || return 0
       : > "$DATA/retained-record"
       TEARDOWN_RETAINED+=("$KEPT")
       teardown_retained_hold
@@ -6210,7 +6223,12 @@ unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt>
     teardown_unclaimed_slot_cleanup
     teardown_unclaimed_step release || { echo "RELEASE_REFUSED"; exit 1; }
     echo "RELEASE_EXIT=0 HELD=$TEARDOWN_HELD_SLOT RETAINED=${TEARDOWN_RETAINED[*]-}"
-  ) 2>&1
+  ) 2>&1 || rc=$?
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  fi
+  return "$rc"
 }
 
 test_unclaimed_route_closes_held_for_an_own_copy_the_driver_kept() {
@@ -6243,6 +6261,29 @@ test_unclaimed_route_closes_held_for_an_own_copy_the_driver_kept() {
   assert_not_contains "$out" "DRIVER" "foreign: the own-copy cleanup ran after the refusal:"$'\n'"$out"
   assert_not_contains "$out" "PROVIDER" "foreign: the provider was called:"$'\n'"$out"
   pass 'the unclaimed route closes held, with no return, for this task'"'"'s own copy the closeout driver kept under a durable recovered lease of a proven treehouse, on the first run and on a retry; an ordinary lease, an unproven provider and another task'"'"'s held copy refuse and name the copy and whose it is'
+}
+
+# The held close's slot process scan, with real processes and the real lsof scan: a process inside
+# the own copy the closeout driver kept does not refuse the held close; one elsewhere in the slot
+# still refuses; and on the returned-slot path a process at the own copy's place still refuses.
+test_unclaimed_held_close_leaves_only_the_kept_copy_out_of_the_process_scan() {
+  local out slot
+  if ! command -v lsof >/dev/null 2>&1; then
+    printf 'skip - the held-close process scan: lsof is not installed\n'
+    return 0
+  fi
+  out=$(unc7_kept_copy_case proc-kept own recovered proven retry kept)
+  slot=$TMP_ROOT/unc7-kept-proc-kept/pool/1/proj
+  assert_contains "$out" "RELEASE_EXIT=0 HELD=$slot" "a live process inside the kept own copy refused the held close:"$'\n'"$out"
+  assert_not_contains "$out" "PROVIDER" "the held close with a process in the kept copy called the provider:"$'\n'"$out"
+  out=$(unc7_kept_copy_case proc-slot own recovered proven retry slot)
+  assert_contains "$out" "PROVE_REFUSED" "a live process elsewhere in the held slot did not refuse:"$'\n'"$out"
+  assert_contains "$out" "a live process runs inside it" "the refusal did not name the live process in the slot:"$'\n'"$out"
+  out=$(unc7_kept_copy_case proc-returned released recovered proven first kept)
+  assert_contains "$out" "PROVE_REFUSED" "a live process at the own copy's place did not refuse the returned-slot path:"$'\n'"$out"
+  assert_contains "$out" "a live process runs inside it" "the returned-slot refusal did not name the live process:"$'\n'"$out"
+  assert_not_contains "$out" "PROVIDER" "the returned-slot path called the provider with a live process in the slot:"$'\n'"$out"
+  pass 'the held close leaves only processes inside the own copy the closeout driver kept out of its slot scan (real processes, real scan); a process elsewhere in the slot, and any process on the returned-slot path, still refuses'
 }
 
 # The retire step of the unclaimed route on a retry: the own copy the closeout driver kept (WT, which the
@@ -6706,6 +6747,7 @@ test_unplanned_unclaimed_copy_refuses_before_any_helper
 test_unclaimed_custody_refuses_an_independent_clone_in_an_own_copy_and_a_process_in_the_task_temp
 test_unclaimed_route_closes_held_for_an_own_copy_the_driver_kept
 test_unclaimed_retire_step_leaves_a_kept_own_copy_alone
+test_unclaimed_held_close_leaves_only_the_kept_copy_out_of_the_process_scan
 test_unclaimed_successor_runs_no_retirement_helper
 test_unclaimed_old_holder_adoption_failure_refuses_before_cleanup
 test_unclaimed_release_concludes_runs_and_agents_on_the_slot

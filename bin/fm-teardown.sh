@@ -5472,6 +5472,26 @@ teardown_unclaimed_holds_kept_copy() {
   return 1
 }
 
+# The lines of <pids> (pid, tab, working directory) whose working directory is outside
+# every own nested copy Vernant's closeout driver kept, unchanged since its record.
+# Only the held close asks: its slot is never returned, so the kept copy stays alive.
+teardown_unclaimed_outside_kept_copies() {  # <pids>
+  local line path copy inside
+  local -a kept=()
+  for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    ! teardown_retained_copy_held "$copy" || kept+=("$copy")
+  done
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path=${line#*$'\t'}
+    inside=0
+    for copy in ${kept[@]+"${kept[@]}"}; do
+      case "$path" in "$copy"|"$copy"/*) inside=1 ;; esac
+    done
+    [ "$inside" = 1 ] || printf '%s\n' "$line"
+  done <<< "$1"
+}
+
 # Read the slot's lease fresh. <phase> bind records it, and only when it is the lease
 # the gate proved; verify requires the recorded path, holder, and lease id unchanged.
 teardown_unclaimed_read_lease() {  # bind | verify
@@ -5637,6 +5657,7 @@ teardown_unclaimed_prove_custody() {
     teardown_unclaimed_note "the live-process scan under it could not complete"
     return 1
   fi
+  [ -z "$TEARDOWN_HELD_SLOT" ] || [ -z "$pids" ] || pids=$(teardown_unclaimed_outside_kept_copies "$pids")
   [ -z "$pids" ] || { teardown_unclaimed_note "a live process runs inside it: $(printf '%s' "$pids" | tr '\n\t' '  ')"; return 1; }
   # The same strict scan over the task's private temp folder, after the reap and before
   # any return or removal: a process left there, or a scan that fails, refuses.
