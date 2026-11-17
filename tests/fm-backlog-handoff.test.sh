@@ -110,6 +110,41 @@ EOF
   pass "a routed handoff wakes once and a successful rerun stays idempotent"
 }
 
+# The receiver wake answers no decision (fm-send header, "Decision closure"), so it
+# states --answers-none and still lands when the receiver has an open keyed
+# decision.
+test_handoff_wakes_a_receiver_that_has_an_open_keyed_decision() {
+  local home="$TMP_ROOT/open-key-main" sub="$TMP_ROOT/open-key-sub" fakebin out before
+  setup_homes "$home" "$sub"
+  mkdir -p "$sub/state" "$sub/data"
+  cat > "$home/data/backlog.md" <<'EOF'
+## Queued
+- [ ] wake-item - routed to a receiver with an open decision (repo: alpha)
+
+## Done
+EOF
+  printf '## Queued\n\n## Done\n' > "$sub/data/backlog.md"
+  printf 'needs-decision [key=shard-plan]: shard by team or by repo\n' > "$home/state/design.status"
+  before=$(cat "$home/state/design.status")
+  fakebin=$(make_fake_tmux "$TMP_ROOT/open-key-fake")
+  out="$TMP_ROOT/open-key.out"
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
+    FM_FAKE_TMUX_WINDOW='firstmate:fm-design' \
+    FM_FAKE_TMUX_LOG="$TMP_ROOT/open-key-tmux.log" \
+    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/open-key-fake/pane.txt" \
+    FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 FM_SEND_RETRIES=1 \
+    "$ROOT/bin/fm-backlog-handoff.sh" design wake-item > "$out" 2>&1 \
+    || fail "handoff to a receiver with an open keyed decision failed: $(cat "$out")"
+  assert_contains "$(inbox_body_stream "$home/state" design)" \
+    'New routed work is in your backlog.' \
+    "the receiver wake was refused by the open keyed decision"
+  assert_equals "$before" "$(cat "$home/state/design.status")" \
+    "the receiver wake closed or appended something in the receiver's status log"
+  assert_contains "$(FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-wake-drain.sh" 2>/dev/null)" "[key=shard-plan]" \
+    "the open decision no longer lists as open after the receiver wake"
+  pass "a routed handoff wakes a receiver that has an open keyed decision and leaves it open"
+}
+
 test_failed_wake_retries_when_the_item_is_already_present() {
   local home="$TMP_ROOT/retry-wake-main" sub="$TMP_ROOT/retry-wake-sub" out corr rc=0
   setup_homes "$home" "$sub"
@@ -1370,6 +1405,7 @@ EOF
 
 test_handoff_wakes_live_local_receiver
 test_cwd_tasks_toml_does_not_redirect_handoff
+test_handoff_wakes_a_receiver_that_has_an_open_keyed_decision
 test_failed_wake_retries_when_the_item_is_already_present
 test_known_receiver_failure_remains_retryable_after_grace
 test_known_failure_restores_retry_after_reconciliation_race
