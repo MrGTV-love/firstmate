@@ -2958,6 +2958,25 @@ test_reassociation_onto_another_branch_refuses_while_a_successor_is_recorded() {
   pass "reassociation onto a branch other than the recorded successor refuses, names the successor and changes nothing"
 }
 
+# Another task's recorded successor ref is not free: reassociation onto a copy on it
+# refuses, names that task and the ref, writes a deny event and changes nothing.
+test_reassociation_onto_another_tasks_recorded_successor_refuses() {
+  local id=reassoc-claimed dir new out rc=0
+  dir=$(new_case claimed "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/owner-$id-v2"
+  printf 'kind=ship\nbranch=fm/owner-%s\nsuccessor_branch=fm/owner-%s-v2\n' "$id" "$id" > "$dir/home/state/owner-$id.meta"
+  snapshot_case "$dir"
+  : > "$FM_GUARD_EVENT_LOG"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "onto a claimed ref") || rc=$?
+  expect_code 1 "$rc" "reassociation onto another task's recorded successor must refuse"$'\n'"$out"
+  assert_contains "$out" "refs/heads/fm/owner-$id-v2, which task owner-$id records as its successor branch" "the refusal must name the ref and the recording task"
+  assert_case_unchanged "$dir" "the claimed-ref refusal"
+  [ -n "$(jq -c --arg b "fm/owner-$id-v2" 'select(.guard == "successor-branch-admission" and .rule == "reassociate" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
+    || fail "the refusal wrote no successor-branch-admission deny event naming the ref"
+  pass "reassociation onto another task's recorded successor ref refuses, names it and changes nothing"
+}
+
 # A task with no recorded successor publishes exactly the record and receipt it
 # always did: worktree= and branch= re-pointed, one prior_worktree= appended, and
 # every other byte unchanged.
@@ -2984,6 +3003,7 @@ test_reassociation_without_a_successor_publishes_the_unchanged_record() {
 test_failed_publication_keeps_brief_recovery_until_restored
 test_reassociation_onto_the_recorded_successor_drops_the_successor_record
 test_reassociation_onto_another_branch_refuses_while_a_successor_is_recorded
+test_reassociation_onto_another_tasks_recorded_successor_refuses
 test_reassociation_without_a_successor_publishes_the_unchanged_record
 test_unchanged_ship_branch_requires_consistent_brief
 test_dirty_current_copy_refuses_without_publication

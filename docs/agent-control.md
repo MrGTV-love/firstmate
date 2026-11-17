@@ -278,6 +278,7 @@ It refuses without changing the record, instructions, or copies when:
 - the replacement copy is not an isolated worktree root of the project's own repository, or is the project or primary checkout itself;
 - a ship's replacement copy has a detached HEAD, or any brief `Ship branch:` line disagrees with the recorded branch, even when the replacement keeps that branch;
 - a ship records a `successor_branch=` ([Recording a successor branch](#recording-a-successor-branch)) and its replacement copy is on any other branch; the refusal names the successor;
+- the replacement copy is on a branch that another task's record, in this home or a locally registered home, names as its `successor_branch=` (case ignored); the refusal names that task and the ref and writes a best-effort `deny` event of `successor-branch-admission`. This is the one refusal reassociation adds; with no such record anywhere it behaves as it always did;
 - either copy equals, contains, or is contained by another task record's `worktree=`, `home=`, or `prior_worktree=` in this home or any locally registered home, other than a record named with `--also` in the same call, which the joint route below checks instead; physical paths are compared, including aliases;
 - either copy overlaps a managed pool worktree whose owner claim names another task or cannot be read;
 - the existing current copy, a pool slot it leaves, or a prior copy inside such a slot is not a Git worktree root, has uncommitted or untracked-unignored changes (the refusal names them), cannot be inspected, or the current copy does not share the project's Git ref store; the dirty check is teardown's, from [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh)'s `fm_task_copy_preserve`, so only untracked `.claude/` contents, the exact `.fm-grok-turnend` and `.fm-kimi-turnend` files, and the paths of the task's own copies nested inside are exempt;
@@ -551,10 +552,12 @@ It takes the task's lifecycle lock, then the record lock, and refuses without ch
 
 The commit the route proved the branch descends from is its proved tip: the recorded branch's tip for `route=checked-out`, the matched archive's tip for `route=archive-tip`.
 The proofs read the project's ref store and its worktree list and never open a work tree; a note file named with `--note-file` is read only after admission, when a record is made, never for a refusal, and a note that carries a line starting with `Ship branch:` is refused so the instructions keep exactly one.
-A refusal changes no task file and leaves the composer-dialog file in place; it writes a best-effort `deny` event of `successor-branch-admission`, and a log that cannot take it changes neither the refusal nor any file.
+A refusal changes no task file and leaves the composer-dialog file in place.
+A refusal of the name, the proof, a second successor, a recorded successor that no longer passes, or a home list that cannot be read writes a best-effort `deny` event of `successor-branch-admission`, and a log that cannot take it changes neither the refusal nor any file; the verb's other preconditions (caller, task kind and placement, pending close or relaunch, instructions) refuse as `reassociate` does.
 
 A successor the record already names is re-admitted, not proved again from the start: the name rule runs again, and the branch passes as `route=proved-tip` while its history still contains the proved tip recorded at its admission, so a successor that has moved on with new commits, such as a custody return or a worker's own commit, stays admitted.
 A successor whose history no longer contains the proved tip, for example one reset onto other work, is refused, and so is a record that names a successor without a proved tip.
+The proved tip must also still be the task's own: the tip of one of its own `archive/<task>-(submitted|pipeline)-<8 hex>` branches, or a commit of its recorded branch that neither the project's default branch nor the task's recorded base branch contains. A commit every branch shares, such as the project's first commit, never admits a successor, so a record edited by hand to name such a tip is refused; the checked-out route applies the same test to the recorded branch's tip at admission.
 Repeating the call for the recorded successor is a no-op that says so and prints the proved tip; naming a different successor refuses, because a task has one.
 
 The operation records `successor_branch=` and then `successor_proved_tip=<the proved tip>` directly after `branch=`, keeps the prior `branch=` and the brief's `Ship branch:` line unchanged, and appends a dated section naming the successor and the note to the instructions.
@@ -568,6 +571,8 @@ When it passes, the relaunch generates a profile that permits exactly the task's
 Removing the `successor_branch=` and `successor_proved_tip=` lines from the record and relaunching drops the grant.
 Readers that take the branch from `branch=` (landing, pruning, teardown and relocation) keep reading the prior branch.
 To make the successor the task's recorded branch, reassociate the task onto a copy on the successor branch: that drops both successor lines; reassociation onto any other branch is refused while a successor is recorded ([Reassociating a task with a replacement copy](#reassociating-a-task-with-a-replacement-copy)).
+While a task records a successor, no other task may take that ref: a fresh `bin/fm-spawn.sh` of a ship whose branch (its branch prefix and id) is named by another task's `successor_branch=` in this home or a locally registered home, case ignored, refuses before it creates anything, names that task and the ref, and writes a best-effort `deny` event of `successor-branch-admission`, and a reassociation onto a copy on such a ref refuses the same way.
+These are the only changes to a fresh spawn and to reassociation: with no `successor_branch=` record anywhere both behave as they always did.
 
 ### Reclaiming a task whose endpoint is gone
 

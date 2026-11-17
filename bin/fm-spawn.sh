@@ -2366,6 +2366,13 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
     echo "error: --branch-prefix and task id must form a valid git branch (got '$BRANCH')" >&2
     exit 1
   fi
+  fm_local_firstmate_state_dirs "$STATE" tolerant
+  if spawn_successor_claimant=$(fm_successor_claimant "$BRANCH" "$STATE/$ID.meta" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
+    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule spawn --task "$ID" \
+      --source-ok true --successor "$BRANCH" 2>/dev/null || true
+    echo "error: spawn refused: task $spawn_successor_claimant records refs/heads/$BRANCH as its successor branch, so task $ID may not take that branch; nothing was changed. Spawn this task under another id or --branch-prefix, or let Main end task $spawn_successor_claimant's succession first" >&2
+    exit 1
+  fi
 fi
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   fm_backlog_directory_present "$STATE" "state directory" || {

@@ -5566,16 +5566,16 @@
         "bin/fm-control.sh",
         "bin/fm-spawn.sh"
       ],
-      "invariant": "a task's next launch gets write access to one recorded successor branch only when that branch is proved to be the task's own",
+      "invariant": "a task's next launch gets write access to one recorded successor branch only when that branch is in the task's name family, no other task records it, it is checked out in no other work tree, and its history contains a commit of the task's own (an archive tip of the task, or a commit of its recorded branch that the default and base branches do not contain); and no other task's fresh spawn or reassociation takes a ref a task records as its successor",
       "layer": "runtime-block",
       "source": "the task record's branch= and successor_branch= lines, the project's ref store and worktree list, the task's own archive/<task>-(submitted|pipeline)-<8 hex> branches and every local home's task records, read by fm_successor_name_refusal and fm_successor_proof in bin/fm-successor-branch-lib.sh",
-      "trigger": "bin/fm-control.sh successor (recording, or repeating a recorded successor), bin/fm-control.sh relaunch before it stops the worker, or bin/fm-spawn.sh relaunching a ship whose record names successor_branch= finds the name outside the task's name family (the recorded branch name, '-', then letters, digits, '.', '_' or '-'), not a plain valid branch name, equal to the recorded, base or default branch (case ignored), another task's branch or successor (case ignored), missing, checked out in another work tree, proved at admission by neither the checked-out route nor the archive-tip route (its history containing the task's own archive tip), or, once recorded, no longer containing the successor_proved_tip= its admission recorded",
+      "trigger": "bin/fm-control.sh successor (recording, or repeating a recorded successor), bin/fm-control.sh relaunch before it stops the worker, or bin/fm-spawn.sh relaunching a ship whose record names successor_branch= finds the name outside the task's name family (the recorded branch name, '-', then letters, digits, '.', '_' or '-'), not a plain valid branch name, equal to the recorded, base or default branch (case ignored), another task's branch or successor (case ignored), missing, checked out in another work tree, proved at admission by neither the checked-out route nor the archive-tip route (its history containing the task's own archive tip), or, once recorded, no longer containing the successor_proved_tip= its admission recorded or with a proved tip that is not the task's own; or bin/fm-spawn.sh freshly spawning a ship, or bin/fm-control.sh reassociate re-pointing a task, onto a branch another task records as its successor_branch=",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "preserve the task's worktree and record; read the refusal for the proof that fails, make the successor branch contain its recorded successor_proved_tip= again or remove successor_branch= and successor_proved_tip= from the task record, then run bash bin/fm-control.sh <task-id> relaunch --note <why>",
       "budget": 1,
       "budget_reason": "one refusal per invocation; no retry loop and no fallback to an unproved or unconfined launch; Main owns repairing the branch or the record",
-      "telemetry": "state/guard-events.jsonl; one allow event at record time and one at the launch that applies the grant, each with guard, rule, task, decision, successor and route, and one deny event per refusal with guard, rule, task, decision and successor; every event is best-effort, so a log that cannot take it changes neither the refusal, the record nor the launch; the kernel's enforcement of the profile text is not instrumented per decision",
+      "telemetry": "state/guard-events.jsonl; one allow event at record time and one at the launch that applies the grant, each with guard, rule, task, decision, successor and route, and one deny event per refusal with guard, rule (one-successor, name, proof, recorded, homes, relaunch, launch, spawn or reassociate), task, decision and successor; every event is best-effort, so a log that cannot take it changes neither the refusal, the record nor the launch; the kernel's enforcement of the profile text is not instrumented per decision",
       "test": "tests/fm-control-successor.test.sh",
       "tier": "C",
       "harm": "irreversible",
@@ -5589,12 +5589,12 @@
         {
           "file": "bin/fm-control.sh",
           "match": "successor_refuse ",
-          "count": 7
+          "count": 8
         },
         {
           "file": "bin/fm-control.sh",
           "match": "successor-branch-admission deny",
-          "count": 2
+          "count": 3
         },
         {
           "file": "bin/fm-control.sh",
@@ -5607,7 +5607,12 @@
         },
         {
           "file": "bin/fm-spawn.sh",
-          "match": "successor-branch-admission deny"
+          "match": "successor-branch-admission deny",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused: task $spawn_successor_claimant records refs/heads/$BRANCH as its successor branch"
         }
       ]
     },
