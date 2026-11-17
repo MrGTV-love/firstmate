@@ -3644,6 +3644,40 @@ SH
   pass "a plan never asks the driver while the slot's checkout is on the PR's head branch, so the slot's branch, HEAD, working tree and marker stay as they were, and a PR with another head branch still routes from that slot; the working-tree digest sees a switch to main, a tracked edit and an untracked file"
 }
 
+# A Treehouse slot is a linked worktree of the project. Its own branch, not only the
+# project's main worktree, is read against the PR's head branch, so a slot that stays
+# on the head branch is a plain hold before the route's window, never a reported
+# switch that stops the run; a later eligible copy in the same run is still released.
+test_a_linked_worktree_slot_on_the_prs_head_branch_is_a_plain_hold_and_the_run_goes_on() {
+  local head project line
+  route_world route-linked-slot
+  head=fm/pr-7-head
+  project=$SLOT
+  SLOT="$TH/pool1/2/repo"
+  mkdir -p "$TH/pool1/2"
+  git -C "$project" worktree add -q -b "$head" "$SLOT" "$ROUTE_MERGE"
+  printf '{"worktrees":[{"name":"2","path":"%s"}]}\n' "$SLOT" > "$TH/pool1/treehouse-state.json"
+  install_driver "$SLOT" "$W"
+  route_install_row_driver "$SLOT" "$W"
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE" "$head"
+  route_set_pr "$W/forge" 8 MERGED "$ROUTE_MERGE"
+  route_copy a-twin 7
+  route_copy b-later 8
+  route_sweep --apply
+  [ "$RC" = 0 ] || fail "route-linked-slot: the run failed ($RC): $OUT"
+  assert_equals main "$(git -C "$project" branch --show-current)" "route-linked-slot: the project's main worktree left main"
+  assert_equals "$head" "$(git -C "$SLOT" branch --show-current)" "route-linked-slot: the slot left the PR's head branch"
+  route_assert_kept a-twin route-linked-slot
+  assert_equals "" "$(route_calls_for a-twin)" "route-linked-slot: the copy reached the driver"
+  line=$(route_line_of a-twin)
+  assert_contains "$line" "checkout is on PR 7's head branch $head" "route-linked-slot: the reason does not name the head branch"
+  assert_not_contains "$line" "was switched" "route-linked-slot: a slot that stayed on the head branch was reported as a switch"
+  assert_not_contains "$OUT" "was switched" "route-linked-slot: a switch was reported" && assert_not_contains "$OUT" "SKIPPED" "route-linked-slot: the run stopped and skipped a pending copy"
+  route_assert_released b-later route-linked-slot
+  route_assert_calls b-later 8 route-linked-slot
+  pass "a linked worktree slot on the PR's head branch, with the project's main worktree on main, holds the copy with no driver call and the head-branch reason, not a switch, and a later eligible copy in the same run is still released"
+}
+
 # A row that names this copy at its live tip but leaves the PR or the profile empty,
 # gives a PR that is no decimal integer, or disagrees with another such row is not
 # the owner's word, so the copy is held with no driver call whatever the order of

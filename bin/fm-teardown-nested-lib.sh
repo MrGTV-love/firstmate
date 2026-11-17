@@ -96,8 +96,9 @@
 # from the clone's origin URL (GitHub only), shows that PR MERGED with a merge
 # commit that the clone has and that is an ancestor of origin/<landing branch>,
 # read with git and no fetch; and the copy's own changes are proved landed in that
-# merge commit (Content proof, below); and the clone's primary checkout is not on
-# that PR's head branch (forge headRefName), where the driver's DONE-state finish
+# merge commit (Content proof, below); and neither the clone's primary checkout nor
+# the clone's own checkout (a linked worktree's HEAD) is on that PR's head branch
+# (forge headRefName), where the driver's DONE-state finish
 # would switch it to the base branch even on a plan (Project lock and checkout,
 # below). The landing branch is the remote's own default branch, asked of the remote
 # itself (git ls-remote --symref origin HEAD, bounded like the forge read, no fetch)
@@ -201,9 +202,9 @@
 # authority and is not widened. The lane's side effects are the driver's own
 # (closeout_pr.py at Vernant origin/main 1cf0e36): git fetch --prune origin in
 # the clone, for a plan too; the verification report, one JSON file per copy in
-# the clone's ignored directory .claude/bug-evidence/tree-presence/, which the
-# driver creates and writes on every call, a plan too, whatever --no-evidence-files
-# says, so even a plan writes it into the clone's ignored area
+# the clone's ignored directory .claude/bug-evidence/tree-presence/, written only
+# when a cleanup target is named, the state is DONE or DONE_WITH_SUPERSEDENCE and
+# --verify-only is off, whatever --no-evidence-files says, so a plan can write it
 # (closeout_pr.py:2340-2341, verify_worktree.py:281-293); the evidence files, a
 # JSON and a markdown file in the clone's ignored directory
 # .claude/bug-evidence/pr-closeout/, which --no-evidence-files suppresses and the
@@ -2319,6 +2320,11 @@ teardown_route_pr_landed() {  # <slot> <pr>
   current=$(printf '%s\n' "$current" | awk 'NF == 0 { exit } $1 == "branch" { sub(/^refs\/heads\//, "", $2); print $2 }')
   if [ "$current" = "$head" ]; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's primary checkout is on PR $pr's head branch $head, which the driver would switch to the base branch even on a plan"
+    return 1
+  fi
+  current=$(git -C "$slot" symbolic-ref --quiet --short HEAD 2>/dev/null) || current=
+  if [ "$current" = "$head" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's checkout is on PR $pr's head branch $head, which the driver would switch to the base branch even on a plan"
     return 1
   fi
   TEARDOWN_ROUTE_HEADREF=$head
