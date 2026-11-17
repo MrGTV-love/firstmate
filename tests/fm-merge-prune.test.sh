@@ -238,7 +238,10 @@ case "$mode" in
   leaked-worktree) echo "REFUSED: leaked worktree processes for $1 remain after 3 reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2; exit 1 ;;
   leaked-tasktmp) echo "REFUSED: leaked tasktmp processes for $1 remain after 3 reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2; exit 1 ;;
   launchd-loaded) echo "REFUSED: no-mistakes launch agent com.example.nm.$1 (rooted in $1's copy) is still loaded after launchctl bootout; preserving the worktree and /tmp/agent.plist." >&2; exit 1 ;;
-  ownership-unproven) echo "REFUSED: process 4242 (identity unavailable) matched path $copy/.claude/worktrees/n1 beneath scan root $copy, whose ownership by $1 is not proven; preserving it and task $1 without signalling." >&2; exit 1 ;;
+  # The paths are relative to the copy: bin/fm-merge-prune.sh caps a recorded reason at 300
+  # characters, and a long temp path (a native run keeps it on a cache volume) would push the
+  # clause the case asserts past the cap and cut it.
+  ownership-unproven) echo "REFUSED: process 4242 (identity unavailable) matched path ./.claude/worktrees/n1 beneath scan root ., whose ownership by $1 is not proven; preserving it and task $1 without signalling." >&2; exit 1 ;;
   unknown-new) echo "REFUSED: a refusal text that teardown did not have when this list was written" >&2; exit 1 ;;
   mixed)
     echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
