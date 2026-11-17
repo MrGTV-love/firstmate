@@ -1,0 +1,24 @@
+argv: answer success-done: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer success-done: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer success-done: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer success-done: exit 0; 
+argv: answer blocked: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer blocked: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer blocked: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer blocked: exit 1; REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.PVsnMP
+    route words:   supersedence route (--pr 7): the execute did not answer with exit 0 and the driver's fifteen-key success envelope (DONE or DONE_WITH_SUPERSEDENCE, the called PR, no failed predicate, worktree_removed true, no recovery reason)
+argv: answer retained: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer retained: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer retained: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer retained: exit 1; REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: <case>/data/task-x1/vernant-closeout.1C4ZTj
+    route words:   supersedence route (--pr 7): the driver keeps a tree with unique ignored files after archiving them and never removes it automatically
+argv: answer allowed-doc: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer allowed-doc: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer allowed-doc: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer allowed-doc: exit 1; REFUSED: Vernant's closeout driver did not release foreign copy <case>/pool/1/project/.claude/worktrees/fc-one (exit 1): full output: <case>/data/task-x1/vernant-closeout.t2S3Hh
+    route words:   supersedence route (--pr 7): the execute did not answer with exit 0 and the driver's fifteen-key success envelope (DONE or DONE_WITH_SUPERSEDENCE, the called PR, no failed predicate, worktree_removed true, no recovery reason)
+argv: answer lie: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer lie: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: answer lie: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+answer lie: exit 1; REFUSED: foreign copy <case>/pool/1/project/.claude/worktrees/fc-one is still present or registered after its release; the pool slot was not returned.
+ok - a teardown releases a copy by the route only on exit 0 with the success envelope and a removed copy; a BLOCKED answer, the plain call's answer shape, a retained tree or a copy left in place refuses with the driver's words and the route named

@@ -1,0 +1,86 @@
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): teardown, no record -> kept, plain call
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): teardown, no record -> kept, plain call
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): teardown, no record -> kept, plain call
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): teardown, no record -> kept, plain call
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3405 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): teardown, no record -> kept, plain call
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3257 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3257 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3257 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3015 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3015 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3015 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3077 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3077 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3077 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3082 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3082 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3082 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): teardown, no record -> kept, plain call
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3046 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3046 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3046 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): teardown, no record -> kept, plain call
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3005 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3005 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3005 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): teardown, no record -> kept, plain call
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): teardown, record -> kept by the forge check, driver never called
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): teardown, no record -> kept, plain call
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): teardown, no record -> kept, plain call
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): teardown, record -> kept by the forge check, driver never called
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): teardown, no record -> kept, plain call
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): teardown, record -> kept by the forge check, driver never called
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): teardown, no record -> kept, plain call
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): teardown, record -> kept by the content proof, driver never called (misattributed-record negative)
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): teardown, no record -> kept, plain call
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3149 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3149 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3149 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): teardown, no record -> kept, plain call
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3446 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 3446 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 3446 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): teardown, record -> released by the route (scripted allowing envelope)
+ok - the staged cases through teardown: 5 twins, 4 ancestors and the PR 3446 twin are released through the route; 9 merged-nearest reject rows are kept by the content proof and 8 closed or open rows by the forge check, each with or without a record (reduced evidence: scripted driver answers; adapted by reading, not run on this host)
+rc=0

@@ -1,0 +1,2 @@
+retained: copy kept; unique.dat, unique-dir/nested/rows.bin, unique-dir/empty.txt and unique-link unchanged (digest and direct sums equal); controls: an edit, a deletion and an added file each fail the check, a rewriting driver fails it, the payload-free copy is removed
+ok - a route execute whose answer shows a retained ignored payload keeps the copy and every unique ignored file byte for byte (digest and direct hashes), the byte check fails on an edited, deleted, added or driver-rewritten file, and the same route removes a copy with no ignored payload

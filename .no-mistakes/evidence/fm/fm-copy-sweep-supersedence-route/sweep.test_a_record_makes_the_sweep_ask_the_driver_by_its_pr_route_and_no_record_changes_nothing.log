@@ -1,0 +1,3 @@
+argv: route-argv: plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+argv: route-argv: execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+ok - a record makes the sweep's plan and execute ask the driver with exactly the --pr route's options from the slot clone, and a copy with no record is asked exactly as before

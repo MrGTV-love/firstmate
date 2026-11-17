@@ -1,0 +1,1 @@
+ok - with a driver scripted to allow, a copy whose lines the merge commit lacks is kept with an empty driver argv (with no config, and with a configured text driver that never runs), and the legitimate twin routes in both

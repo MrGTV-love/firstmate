@@ -1,0 +1,76 @@
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): no record -> kept, plain call, base reason
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): no record -> kept, plain call, base reason
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): no record -> kept, plain call, base reason
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): no record -> kept, plain call, base reason
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): no record -> kept, plain call, base reason
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): no record -> kept, plain call, base reason
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): no record -> kept, plain call, base reason
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): no record -> kept, plain call, base reason
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): no record -> kept, plain call, base reason
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): no record -> kept, plain call, base reason
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): no record -> kept, plain call, base reason
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): no record -> kept, plain call, base reason
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): no record -> kept, plain call, base reason
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): no record -> kept, plain call, base reason
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): no record -> kept, plain call, base reason
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): no record -> kept, plain call, base reason
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): no record -> kept, plain call, base reason
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): no record -> kept, plain call, base reason
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-4 --pr 3405 --supersedence-profile <world>/profiles/row-4.json --no-evidence-files
+argv: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-4 --execute-cleanup --pr 3405 --supersedence-profile <world>/profiles/row-4.json --no-evidence-files
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): record -> kept by the forge check, driver never called
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-9 --pr 3405 --supersedence-profile <world>/profiles/row-9.json --no-evidence-files
+argv: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-9 --execute-cleanup --pr 3405 --supersedence-profile <world>/profiles/row-9.json --no-evidence-files
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-11 --pr 3257 --supersedence-profile <world>/profiles/row-11.json --no-evidence-files
+argv: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-11 --execute-cleanup --pr 3257 --supersedence-profile <world>/profiles/row-11.json --no-evidence-files
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-12 --pr 3015 --supersedence-profile <world>/profiles/row-12.json --no-evidence-files
+argv: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-12 --execute-cleanup --pr 3015 --supersedence-profile <world>/profiles/row-12.json --no-evidence-files
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-13 --pr 3077 --supersedence-profile <world>/profiles/row-13.json --no-evidence-files
+argv: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-13 --execute-cleanup --pr 3077 --supersedence-profile <world>/profiles/row-13.json --no-evidence-files
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-14 --pr 3082 --supersedence-profile <world>/profiles/row-14.json --no-evidence-files
+argv: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-14 --execute-cleanup --pr 3082 --supersedence-profile <world>/profiles/row-14.json --no-evidence-files
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-16 --pr 3046 --supersedence-profile <world>/profiles/row-16.json --no-evidence-files
+argv: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-16 --execute-cleanup --pr 3046 --supersedence-profile <world>/profiles/row-16.json --no-evidence-files
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-18 --pr 3005 --supersedence-profile <world>/profiles/row-18.json --no-evidence-files
+argv: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-18 --execute-cleanup --pr 3005 --supersedence-profile <world>/profiles/row-18.json --no-evidence-files
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): record -> kept by the forge check, driver never called
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): record -> kept by the forge check, driver never called
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-26 --pr 3149 --supersedence-profile <world>/profiles/row-26.json --no-evidence-files
+argv: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-26 --execute-cleanup --pr 3149 --supersedence-profile <world>/profiles/row-26.json --no-evidence-files
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-adopt-existing-branch --pr 3446 --supersedence-profile <world>/profiles/row-adopt-existing-branch.json --no-evidence-files
+argv: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/row-adopt-existing-branch --execute-cleanup --pr 3446 --supersedence-profile <world>/profiles/row-adopt-existing-branch.json --no-evidence-files
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+ok - the staged cases: 5 twins, 4 ancestors and the PR 3446 twin are released through the route; 9 merged-nearest reject rows are kept by the content proof and 8 closed or open rows by the forge check, each with or without a record and none reaching the driver by the route (reduced evidence: scripted driver answers, generated sandbox commits)
+rc=0

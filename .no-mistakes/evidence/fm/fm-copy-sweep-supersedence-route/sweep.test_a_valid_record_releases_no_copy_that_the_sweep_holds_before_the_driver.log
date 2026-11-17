@@ -1,0 +1,15 @@
+hold dirty: with a record: HELD-DIRTY: 1 uncommitted or untracked path(s), first: ?? untracked.txt
+hold dirty: without a record: HELD-DIRTY: 1 uncommitted or untracked path(s), first: ?? untracked.txt
+hold unpushed: with a record: HELD-UNPUSHED: 1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is
+hold unpushed: without a record: HELD-UNPUSHED: 1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is
+hold live: with a record: HELD-LIVE-TASK: task live-task's active record names it as its worktree
+hold live: without a record: HELD-LIVE-TASK: task live-task's active record names it as its worktree
+hold orphan: with a record: ORPHAN-NO-RECORD: it is not a readable git worktree root
+hold orphan: without a record: ORPHAN-NO-RECORD: it is not a readable git worktree root
+hold live-launcher: with a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:63147 launcher=63147 (launcher 63147 is alive; start age=<n>s; lock mtime=1794889188)
+hold live-launcher: without a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:63147 launcher=63147 (launcher 63147 is alive; start age=<n>s; lock mtime=1794889188)
+hold no-interpreter: with a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it); closeout driv
+hold no-interpreter: without a record: HELD-LOCKED: worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it); closeout driv
+hold retained-receipt: with a record: HELD-LOCKED: driver retained this copy: exit 3: cleanup_tip_unbound: supersedence route (--pr 7): the execute did not answer with exit 0 and the driver's fifteen-key success
+hold retained-receipt: without a record: HELD-LOCKED: driver retained this copy: exit 3: cleanup_tip_unbound: supersedence route (--pr 7): the execute did not answer with exit 0 and the driver's fifteen-key success
+ok - a dirty, unpushed, live-task, orphaned, live-launcher, no-interpreter or retained-receipt copy is held exactly as it is with no record, and the route never reaches the driver for it

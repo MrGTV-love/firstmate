@@ -1,0 +1,3 @@
+hold process-inside: exit 1 with and without a record; refusal: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=foreign copy <case>/pool/1/project/.claude/worktrees/fc-one stays in pool slot <case>/pool/1/project: process 2932 is running in 
+hold live-launcher: exit 1 with and without a record; refusal: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=foreign copy <case>/pool/1/project/.claude/worktrees/fc-one stays in pool slot <case>/pool/1/project: its creation-lock launche
+ok - a foreign copy with a process in it or a live lock launcher is held exactly as with no record, and the driver is never asked

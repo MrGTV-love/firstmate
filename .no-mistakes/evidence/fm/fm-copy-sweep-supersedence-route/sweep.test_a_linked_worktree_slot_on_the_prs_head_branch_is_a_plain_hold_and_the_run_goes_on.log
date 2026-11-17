@@ -1,0 +1,3 @@
+argv: route-linked-slot: plan: --cleanup-worktree <world>/th/pool1/2/repo/.claude/worktrees/b-later --pr 8 --supersedence-profile <world>/profiles/b-later.json --no-evidence-files
+argv: route-linked-slot: execute: --cleanup-worktree <world>/th/pool1/2/repo/.claude/worktrees/b-later --execute-cleanup --pr 8 --supersedence-profile <world>/profiles/b-later.json --no-evidence-files
+ok - a linked worktree slot on the PR's head branch, with the project's main worktree on main, holds the copy with no driver call and the head-branch reason, not a switch, and a later eligible copy in the same run is still released

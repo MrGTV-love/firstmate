@@ -1,0 +1,1 @@
+ok - a copy with no record is asked exactly as before: --cleanup-worktree <copy>, plus --execute-cleanup at the execute, and no --no-evidence-files

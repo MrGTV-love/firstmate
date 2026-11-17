@@ -1,0 +1,15 @@
+argv: route-argv-foreign: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-foreign: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-foreign: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-enclosing: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: route-argv-reverse: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+ok - a record makes teardown's foreign and own nested release ask the driver with exactly the --pr route's options from the slot clone, and a copy with no record is asked exactly as before
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.SYPceM/route-argv-reverse: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.SYPceM: Directory not empty
+rc=1

@@ -1,0 +1,1 @@
+ok - a teardown's foreign and own nested release keep the copy, with no driver call, while the primary checkout is on the PR's head branch, and leave that checkout's branch and working tree as they were; the working-tree digest sees a switch to main, a tracked edit and an untracked file

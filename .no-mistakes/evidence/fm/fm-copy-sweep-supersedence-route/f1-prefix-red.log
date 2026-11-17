@@ -1,0 +1,4 @@
+not ok - killed before window: copy B was read against copy A's window (unexpected: 'was switched')
+--- output ---
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep.hFJQg3/route-killed-before-window/th/pool1/1/repo/.claude/worktrees/z-killed	its closeout driver did not answer within 5s (supersedence route --pr 8); the primary checkout of the slot was switched meanwhile: the clone's primary checkout moved from fm/slot-2 at 228056f2139a to main at 228056f2139a during the route
+prefix rc=1

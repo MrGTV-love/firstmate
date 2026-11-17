@@ -1,0 +1,54 @@
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): no record -> kept, plain call, base reason
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): no record -> kept, plain call, base reason
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): no record -> kept, plain call, base reason
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): no record -> kept, plain call, base reason
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): no record -> kept, plain call, base reason
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): no record -> kept, plain call, base reason
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): no record -> kept, plain call, base reason
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): no record -> kept, plain call, base reason
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): no record -> kept, plain call, base reason
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): no record -> kept, plain call, base reason
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): no record -> kept, plain call, base reason
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): no record -> kept, plain call, base reason
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): no record -> kept, plain call, base reason
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): no record -> kept, plain call, base reason
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): no record -> kept, plain call, base reason
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): no record -> kept, plain call, base reason
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): no record -> kept, plain call, base reason
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): no record -> kept, plain call, base reason
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): no record -> kept, plain call, base reason
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): no record -> kept, plain call, base reason
+table: row 1 (tip 723e1da4d1, class b, PR 2957 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 2 (tip 1e0e320fa7, class b, PR 2959 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 3 (tip 47d3ef8702, class b, PR 3081 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 4 (tip b2e7058f61, class a, PR 3405 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 5 (tip 3889c93fd4, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 6 (tip f6921351a0, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 7 (tip e9cfc54f73, class b, PR 3405 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 8 (tip c58c3a8a5f, class b, PR 3262 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 9 (tip 395404d704, class a, PR 3405 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 10 (tip a88081c4f1, class b, PR 3070 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 11 (tip a0af025671, class other (history), PR 3257 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 12 (tip f6a5ccb8f6, class a, PR 3015 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 13 (tip ed54c73f23, class other (history), PR 3077 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 14 (tip 2caf50331d, class other (history), PR 3082 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 15 (tip 011c4ab137, class b, PR 3082 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 16 (tip 0c4e77b08c, class other (history), PR 3046 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 17 (tip 4bc7fa9612, class b, PR 3005 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 18 (tip c48285a237, class a, PR 3005 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row 19 (tip e7008be298, class b, PR 2984 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 20 (tip 5ad6b47e8a, class b, PR 2980 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 21 (tip 44b1ae84cf, class b, PR 2964 CLOSED, reject): record -> kept by the forge check, driver never called
+table: row 22 (tip d35135b3a7, class b, PR 2970 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 23 (tip 45e730b51a, class b, PR 3511 OPEN, reject): record -> kept by the forge check, driver never called
+table: row 24 (tip dd8a6d6b37, class other, PR 3435 OPEN, reject): record -> kept by the forge check, driver never called
+table: row 25 (tip 8eef3602ce, class b, PR 3189 MERGED, reject): record naming the nearest merged PR (misattributed-record negative) -> kept by the content proof, driver never called
+table: row 26 (tip 06b81183cc, class a, PR 3149 MERGED, accept): record -> released by the route (scripted allowing envelopes)
+table: row adopt-existing-branch (tip 4a5f15ca, class twin, PR 3446 MERGED, accept): record -> released by the route (scripted allowing envelopes)

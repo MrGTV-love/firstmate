@@ -1,0 +1,3 @@
+argv: killed before window: plan: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/c-later --pr 8 --supersedence-profile <world>/profiles/c-later.json --no-evidence-files
+argv: killed before window: execute: --cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/c-later --execute-cleanup --pr 8 --supersedence-profile <world>/profiles/c-later.json --no-evidence-files
+ok - a plan killed after its first publish and before its window opened is not read against the previous copy's window: no switch is reported, the run goes on and a later eligible copy is released
