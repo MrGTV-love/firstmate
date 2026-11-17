@@ -131,8 +131,8 @@
 # writes a resolution block while preserving the leading hold-set stamp until
 # the close succeeds (the previous body is preserved and archived through
 # tasks-axi --archive-body). It closes a question with `tasks-axi done` (and then clears
-# the finished id from every other item's blocked-by list, as `answer` and `withdraw`
-# both do) - or,
+# the finished id from every other item's blocked-by list, as `withdraw` and
+# `reconcile close` do too) - or,
 # with `--release`, lifts the hold with `tasks-axi unhold` so a captain-gated
 # WORK item resumes without closing - and restores resolution-first body
 # ordering. For direct callers, an exact retry also completes unfinished ordering

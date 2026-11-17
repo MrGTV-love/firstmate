@@ -437,9 +437,59 @@ make_spawn_fakebin() {
 # Common spawn env. Extra variables in the caller (GROK_HOME, FM_FAKE_LAUNCH_LOG,
 # CLAUDE_CONFIG_DIR, ...) are inherited. Does not add --mode/--yolo; ship tests
 # that need a delivery contract pass those flags themselves.
+# fm_test_spawn_script: the fm-spawn.sh a test runs. With FM_TEST_STUB_SUMMARY_REFRESH=1 it is the same code in a
+# private copy of this checkout whose detached home-summary refresh does nothing: the real refresh reaches
+# fm_run_timed, which signals processes, and this host's rules keep tests from doing that. The copy keeps its git
+# history (spawn's own history gate reads it) and is named by the checkout's HEAD, diff and untracked files (name and
+# content), so it is built once per distinct state of the code under test.
+fm_test_spawn_script() {
+  local key tree
+  if [ "${FM_TEST_STUB_SUMMARY_REFRESH:-0}" != 1 ]; then
+    printf '%s\n' "$ROOT/bin/fm-spawn.sh"
+    return
+  fi
+  key=$(
+    set -o pipefail
+    { git -C "$ROOT" rev-parse HEAD; git -C "$ROOT" diff HEAD; git -C "$ROOT" ls-files -o --exclude-standard -z | sort -z |
+      while IFS= read -r -d '' untracked; do
+        hash=$(git -C "$ROOT" hash-object -- "$untracked") || exit 1
+        printf '%s %s\n' "$hash" "$untracked"
+      done; } 2>/dev/null | shasum -a 256 | cut -c1-16
+  ) || return 1
+  tree="${TMPDIR:-/tmp}/fm-spawn-tree-$(id -u)-$key"
+  if [ ! -x "$tree/bin/fm-spawn.sh" ]; then
+    rm -rf "$tree.part"
+    git clone -q --no-hardlinks "$ROOT" "$tree.part" >/dev/null 2>&1 || return 1
+    (cd "$ROOT" && tar --exclude=.git --exclude=graft --exclude=node_modules -cf - .) | (cd "$tree.part" && tar -xf -) || return 1
+    printf '#!/bin/sh\nexit 0\n' > "$tree.part/bin/fm-home-summary-refresh.sh"
+    chmod +x "$tree.part/bin/fm-home-summary-refresh.sh"
+    mv "$tree.part" "$tree" 2>/dev/null || rm -rf "$tree.part"
+  fi
+  printf '%s\n' "$tree/bin/fm-spawn.sh"
+}
+
+# fm_test_late_dirt_shim <fakebin> <copy> <file> <content>: a git wrapper that writes <content> to <file> the
+# first time the governed preparation reads the status of <copy> (bin/fm-slot-provision-lib.sh fm_slot_check_copy: the
+# one status read without -z), which is AFTER the proof has read the copy's status. It models work that appears between
+# the two, the only way left to make a governed preparation refuse for dirt, since a copy that is dirty at the proof is
+# skipped.
+fm_test_late_dirt_shim() {
+  local real_git
+  real_git=$(command -v git)
+  cat > "$1/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'-C $2 status --porcelain=v1 --untracked-files=all --ignore-submodules=none')
+  if [ ! -e '$1/late-dirt.done' ]; then : > '$1/late-dirt.done'; printf '%s\\n' '$4' > '$3'; fi ;;
+esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$1/git"
+}
+
 fm_test_run_spawn() {
-  local home=$1 pane=$2 fakebin=$3
+  local home=$1 pane=$2 fakebin=$3 spawn_script
   shift 3
+  spawn_script=$(fm_test_spawn_script) || { echo "error: the stubbed spawn tree could not be built; no spawn was run" >&2; return 1; }
   # A claude spawn pre-registers workspace trust in the launching user's own
   # store (bin/fm-claude-trust.sh), so every spawn here runs against a throwaway
   # HOME; without it the suite would write the developer's real ~/.claude.json.
@@ -459,7 +509,7 @@ fm_test_run_spawn() {
     FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$pane" TMUX="${TMUX:-fake,1,0}" \
     FM_CLAUDE_START_POLL_INTERVAL="${FM_CLAUDE_START_POLL_INTERVAL:-0.02}" \
     PATH="$fakebin:$PATH" \
-    "$ROOT/bin/fm-spawn.sh" "$@" 2>&1
+    "$spawn_script" "$@" 2>&1
 }
 
 # --- TeamClaude launcher stubs ----------------------------------------------

@@ -1851,6 +1851,10 @@ test_slot_left_by_reassociated_task_is_allocatable() {
   git -C "$SLOT_DIR" commit -qm unlanded
   git -C "$PROJECT_DIR" update-ref "refs/fm/anchor/mover-$(git -C "$SLOT_DIR" rev-parse --short HEAD)" \
     "$(git -C "$SLOT_DIR" rev-parse HEAD)"
+  # This case is about allocation, not about moving the base. A copy holding a commit the origin's
+  # default lacks is skipped, not used (tests/fm-spawn-slot-move.test.sh and the skip cases in
+  # tests/fm-spawn-pool-base-freshen.test.sh own that), so the left-behind commit is landed first.
+  git -C "$SLOT_DIR" push --quiet origin HEAD:refs/heads/main
   git -C "$PROJECT_DIR" worktree add --quiet -b mover-v2 "$CASE_DIR/replacement"
   fm_write_meta "$HOME_DIR/state/mover.meta" "window=fmses:fm-mover" \
     "worktree=$CASE_DIR/replacement" "released_worktree=$SLOT_DIR" "project=$PROJECT_DIR" "kind=ship"
