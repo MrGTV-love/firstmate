@@ -1025,26 +1025,20 @@ class Collector:
         """The canonical opening's identity, independent of optional task provenance."""
         return dict(stream=stream, key=key, decision=fingerprint(decision))
 
-    def status_decisions(self, task, reread=True):
+    def status_decisions(self, task):
         path = self.state / (task + ".status")
         if path.is_symlink() or not path.is_file():
             raise ValueError("decision status must be a regular file")
-        stat = path.stat()
         out = self.bash('[ -r "$2" ] || exit 1; . "$1/fm-status-decision-lib.sh"; '
-                        'status_open_decisions_dated "$2" "" --with-opening', BIN, path)
-        try:
-            after = path.stat()
-        except FileNotFoundError:
-            after = None  # keep the observed opening; full provenance still reports the missing source
-        if after is not None and (stat.st_dev, stat.st_ino) != (after.st_dev, after.st_ino):
-            if reread:
-                return self.status_decisions(task, reread=False)
-            raise ValueError("decision status stream changed during bounded canonical read")
+                        'status_open_decisions_dated "$2" "" --with-identity', BIN, path)
         decisions = []
         for line in out.splitlines():
-            key, verb, opened, _opening, summary = (line.split("\t", 4) + [""] * 5)[:5]
+            key, verb, opened, opening, stream, summary = line.split("\t", 5)
+            device, inode = stream.split(":")
+            # Preserve the existing decision digest; only the stream's owner changes.
+            decision = "\t".join((key, verb, opened, opening, summary))
             decisions.append(dict(key=key, verb=verb, opened=opened, summary=summary,
-                                  identity=self.decision_identity([stat.st_dev, stat.st_ino], key, line)))
+                                  identity=self.decision_identity([int(device), int(inode)], key, decision)))
         return decisions
 
     def decision_source(self, task, identity, observed_pr=None):
@@ -1251,6 +1245,8 @@ class Collector:
 
     def result(self):
         rows = sorted(self.rows.values(), key=lambda r: (r["category"], r["subject"]))
+        for row in rows:
+            row["current_identity"] = row_digest(row)
         report = dict(schema="fm-open-loops.v1", generated_epoch=self.stale_generated or self.now,
                       home=str(self.home), complete=not self.degraded and not self.stale_reason,
                       rows=rows)

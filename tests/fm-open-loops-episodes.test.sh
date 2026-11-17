@@ -37,7 +37,8 @@ import json,os,pathlib,subprocess,sys
 home=pathlib.Path(os.environ['FM_HOME']).resolve()
 trigger=home/'read-change.json'
 args=sys.argv[1:]
-relevant=any('status_open_decisions_dated' in arg for arg in args) and args[-1]==str(home/'state/job.status')
+relevant=(any('status_open_decisions_dated' in arg for arg in args) and args[-1]==str(home/'state/job.status')
+          and not os.environ.get('FM_TEST_REPLACE_AT_OPEN'))
 change=None
 if relevant and trigger.exists():
     change=json.loads(trigger.read_text())
@@ -46,7 +47,7 @@ if relevant and trigger.exists():
     if change['remaining']:
         assert path.is_file() and not path.is_symlink() and path.resolve()==home/'state/job.status'
         change['remaining']-=1
-        if change['mode'] in ('before','twice'):
+        if change['mode'] in ('before','combined'):
             stage=home/'state/job.status.replacement'
             saved=home/('state/job.status.preserved-'+str(change['calls']))
             assert stage.absolute()==home/'state/job.status.replacement' and not stage.exists() and not saved.exists()
@@ -54,8 +55,10 @@ if relevant and trigger.exists():
             stage.write_text('needs-decision [key=gate]: choose validation action\n')
             assert path.resolve()==home/'state/job.status' and stage.resolve()==home/'state/job.status.replacement'
             os.replace(stage,path)
-        elif change['mode']=='after':
+        if change['mode'] in ('after','combined'):
             change['remove_after_read']=True
+    stat=path.stat()
+    change['input_stream']=[stat.st_dev,stat.st_ino]
     trigger.write_text(json.dumps(change))
 run=subprocess.run([REAL_BASH,*args],capture_output=True)
 if change and change.get('remove_after_read'):
@@ -66,6 +69,27 @@ if change and change.get('remove_after_read'):
 sys.stdout.buffer.write(run.stdout);sys.stderr.buffer.write(run.stderr);sys.exit(run.returncode)
 ''')
 reader.chmod(0o755)
+opened_reader = read_bin / 'perl'
+opened_reader.write_text('#!/usr/bin/env python3\n' + f'REAL_PERL={shutil.which("perl")!r}\n' + r'''
+import json,os,pathlib,subprocess,sys
+home=pathlib.Path(os.environ['FM_HOME']).resolve()
+trigger=home/'read-change.json';path=home/'state/job.status';args=sys.argv[1:]
+if os.environ.get('FM_TEST_REPLACE_AT_OPEN') and str(path) in args and trigger.exists():
+    change=json.loads(trigger.read_text())
+    if change['remaining']:
+        assert path.resolve()==home/'state/job.status' and path.is_file() and not path.is_symlink()
+        stage=home/'state/job.status.replacement';saved=home/'state/job.status.preserved-at-open'
+        assert not stage.exists() and not saved.exists() and stage.absolute()==home/'state/job.status.replacement'
+        os.link(path,saved)
+        stage.write_text('working: '+('x'*(6000 if change['mode']=='over-cap' else 300))+'\nneeds-decision [key=gate]: choose validation action\n')
+        assert path.resolve()==home/'state/job.status' and stage.resolve()==home/'state/job.status.replacement'
+        os.replace(stage,path)
+        stat=path.stat();change.update(remaining=0,input_stream=[stat.st_dev,stat.st_ino])
+        trigger.write_text(json.dumps(change))
+run=subprocess.run([REAL_PERL,*args],capture_output=True)
+sys.stdout.buffer.write(run.stdout);sys.stderr.buffer.write(run.stderr);sys.exit(run.returncode)
+''')
+opened_reader.chmod(0o755)
 now = 1800000000
 iso = lambda value: dt.datetime.fromtimestamp(value, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -212,39 +236,43 @@ class Home:
         self.collect()
 
 
-# Bind canonical output to the stream actually read, not the pathname's older
-# stat. A regular-file replacement is injected immediately before the real
-# dated reader. A second change must not create an unbounded retry loop.
-for mode in ('before', 'unchanged', 'after', 'twice'):
+# Bind canonical output to the actual read input, including a new stream that
+# disappears after reading. Pathname stats cannot distinguish that new opening
+# from the legitimate deletion-only control. These assert outcomes, not retries.
+for mode in ('combined', 'before', 'whole', 'over-cap', 'unchanged', 'after'):
     home = Home('read-' + mode, 'unstamped')
     home.act()
     original = home.question()['opening']
     home.clock += 1
-    home.append('resolved [key=gate]: predecessor answered' if mode in ('before', 'twice')
+    home.append('resolved [key=gate]: predecessor answered' if mode in ('before', 'combined', 'whole', 'over-cap')
                 else 'working: unrelated progress continues')
     home.env['PATH'] = str(read_bin) + ':' + home.env['PATH']
+    if mode in ('whole', 'over-cap'):
+        home.env.update(FM_TEST_REPLACE_AT_OPEN='1', FM_STATUS_CAP_BYTES='4096', FM_STATUS_CAP_RESERVE_BYTES='512')
     trigger = home.path / 'read-change.json'
-    trigger.write_text(json.dumps(dict(mode=mode, calls=0, remaining=2 if mode == 'twice' else int(mode != 'unchanged'))))
+    trigger.write_text(json.dumps(dict(mode=mode, calls=0, remaining=int(mode != 'unchanged'))))
     report = json.loads(home.call('--heartbeat', '--json').stdout)
     observed = home.question()
     change = json.loads(trigger.read_text())
-    if mode == 'before':
+    if mode in ('before', 'combined', 'whole'):
         home.present(True)
+        if mode == 'combined':
+            assert not report['complete'] and observed.get('source') is None, report
+            home.route_coverage()
+        else:
+            assert report['complete'] and observed.get('source'), report
         home.check(True)
-        actual = home.status.stat()
-        assert observed['opening']['stream'] == [actual.st_dev, actual.st_ino]
-        assert observed['opening']['stream'] != original['stream'] and change['calls'] == 2
-        assert report['complete']
-        print('ok - pre-reader stream replacement gets one fresh canonical read and rejects predecessor receipt', flush=True)
-    elif mode == 'twice':
-        assert change['calls'] == 2 and not report['complete'], report
-        assert observed.get('stale') and not observed['overdue'], observed
-        assert any(row['category'] == 'coverage' and 'stream changed' in row['evidence'] for row in report['rows'])
+        assert observed['opening']['stream'] == change['input_stream']
+        assert observed['opening']['stream'] != original['stream']
+        print('ok - ' + mode + '-reader stream replacement rejects predecessor receipt using actual input identity', flush=True)
+    elif mode == 'over-cap':
+        assert not report['complete'] and observed.get('stale') and not observed['overdue'], report
+        assert any(row['category'] == 'coverage' and 'read limit' in row['evidence'] for row in report['rows']), report
         home.call('--present-overdue')
         home.check(True)
-        print('ok - continued stream replacement ends after the bounded reread with explicit coverage uncertainty', flush=True)
+        print('ok - actual opened whole-file cap is enforced without claiming a clipped prefix complete', flush=True)
     else:
-        assert observed['opening'] == original and change['calls'] == 1
+        assert observed['opening'] == original
         if mode == 'after':
             assert not report['complete'] and observed.get('source') is None, report
         else:
@@ -253,7 +281,18 @@ for mode in ('before', 'unchanged', 'after', 'twice'):
         if mode == 'after':
             home.route_coverage()
         home.check(False)
-        print('ok - ' + mode + '-reader control preserves the confirmed opening without extra reads', flush=True)
+        print('ok - ' + mode + '-reader control preserves the confirmed opening', flush=True)
+
+home = Home('raw-malformed-resolution', 'unstamped')
+home.act()
+original = home.question()['opening']
+with home.status.open('ab') as stream:
+    stream.write(b'resol\x00ved [key=gate]: malformed\n')
+home.collect()
+assert home.question()['opening'] == original
+home.present(False)
+home.check(False)
+print('ok - raw malformed resolution cannot erase a confirmed question or replay its unchanged receipt', flush=True)
 
 # Full task provenance is optional, not the identity of an observed opening.
 # Rejected metadata must still refuse waits while ordinary valid receipts cover

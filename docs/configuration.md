@@ -884,6 +884,7 @@ An existing ledger is left untouched while recording is disabled.
 Ordinary reconciliation never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
+The publisher's opaque `current_identity` identifies the row's current reconciliation evidence, not a past handling episode or an action receipt.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
 
 | Category | A row exists when | Default limit |
@@ -976,7 +977,10 @@ For an early maintenance wake, progression is committed only after successful ou
 [`tests/fm-watch-triage.test.sh`](../tests/fm-watch-triage.test.sh) contains the between-cycle and in-cycle signal, late-signal routing and output-failure, and bounded-maintenance-deferral regressions.
 The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
-When the ids or digested evidence of overdue rows change, the watcher queues one durable `check` wake keyed `open-loop-ledger`; unchanged evidence queues no change wake.
+When an overdue row's existing notification fields (`id`, `category`, `subject`, `owner`, `next_action`, `evidence`) or its published `current_identity` change, the watcher queues one durable `check` wake keyed `open-loop-ledger`; unchanged work and unrelated status appends queue no change wake.
+This includes a resolved status question reopened under the same key and text before the next publication, even when its clock is missing or unchanged and full task provenance is unavailable.
+The watcher uses the opaque token without reconstructing identity from mutable source or handling history; a legacy row with no token retains exactly the six-field comparison, while a present token that is not 24 lowercase hexadecimal characters makes that observation invalid and preserves existing cooldowns.
+Upgrading a legacy notification marker can produce one conservative change wake, after which an unchanged identified row settles.
 While overdue rows exist, the watcher independently queues the periodic waiting-list wake keyed `open-loop-ledger-resurface` every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600), counted from the first surfaced overdue row; only that wake restamps its `state/.open-loops-resurfaced` cooldown, so a change wake never resets or replaces the period.
 When a change and the periodic deadline coincide, both wakes queue in that cycle and the watcher exits with the periodic wake reason; otherwise it exits with the reason of the wake it queued.
 A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
@@ -1037,6 +1041,7 @@ When the backlog or the home's ledger cannot be read, an escalation of such a ro
 A bound hold ending or becoming unreadable restores the action requirement immediately, including within the turn the escalation was recorded.
 An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
+A new canonical status opening changes the question's reconciliation identity even with an absent or identical timestamp; its stream identity and whole-file endpoint come from the same bounded regular input actually read, and unavailable optional task provenance does not erase a confirmed question.
 Legacy status-question receipts without a canonical opening identity require one current reconciliation action after refresh; optional full provenance recovery does not replay an unchanged identified opening, captain-hold provenance additions preserve existing escalation and deferral receipts, and bound waits still verify their full source and dependency.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; a wait on a named task may also bind a `red_check` row, whose worker is parked on purpose until that task lands.
 It is never a task-wide ownership inference or an answer to its prerequisite, and the red checks stay red: the row's evidence still names them, so a changed set of failing checks ends the wait.

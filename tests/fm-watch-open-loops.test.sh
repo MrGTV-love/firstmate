@@ -849,7 +849,9 @@ test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery() {
   local filter number=0 dir state fakebin out pid digest surfaced stale_mtime
   for filter in empty malformed multiple 'del(.schema)' '.schema = "other.v1"' \
     '.generated_epoch = null' 'del(.home)' '.home = ""' '.complete = null' \
-    '.rows = {}' '.rows[0].id = null' '.rows[0].overdue = "true"'; do
+    '.rows = {}' '.rows[0].id = null' '.rows[0].overdue = "true"' \
+    '.rows[0].current_identity = null' '.rows[0].current_identity = 7' \
+    '.rows[0].current_identity = ""' '.rows[0].current_identity = "gggggggggggggggggggggggg"'; do
     number=$((number + 1))
     dir=$(make_case "ledger-corrupt-recovery-$number")
     state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
@@ -904,7 +906,208 @@ test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery() {
   pass "fresh corrupt ledgers preserve continuous-outage and overdue cooldowns while valid degraded reports rearm stale incidents"
 }
 
+# Real collector projections are prepared outside the watched state so raw
+# status delivery cannot rescue this dedicated ledger notification test.
+prepare_canonical_ledgers() {  # <fixture-dir> <regular|degraded>
+  python3 - "$ROOT" "$1" "$2" <<'PY'
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+root, fixture = map(Path, sys.argv[1:3])
+degraded = sys.argv[3] == 'degraded'
+code, home, ledgers = fixture/'collector-code', fixture/'collector-home', fixture/'ledgers'
+shutil.copytree(root/'bin', code/'bin', ignore=lambda _p, _n: {'fm-fleet-snapshot.sh'})
+for part in ('state','data','config','projects','user','tmp'):
+    (home/part).mkdir(parents=True)
+ledgers.mkdir()
+snapshot=code/'bin/fm-fleet-snapshot.sh'
+snapshot.write_text('#!/usr/bin/env python3\nimport json\nprint(json.dumps(dict(schema="fm-fleet-home-input.v1",tasks=[],backlog=dict(present=True,records=[]))))\n')
+snapshot.chmod(0o755)
+for tool in ('ssh','gh','gh-axi','claude','codex','dsh','omp'):
+    blocked=fixture/'fakebin'/tool
+    blocked.write_text('#!/usr/bin/env python3\nimport os,sys\nwith open(os.environ["FORBIDDEN_CALLS"],"a") as f:f.write(sys.argv[0]+"\\n")\nsys.exit(97)\n')
+    blocked.chmod(0o755)
+meta=home/'state/worker.meta'
+text='kind=ship\nspawn_gen=synthetic-recurrence\n'
+if degraded:
+    target=home/'metadata-target';target.write_text(text);meta.symlink_to(target)
+else:
+    meta.write_text(text)
+now=int(time.time())
+stamp=dt.datetime.fromtimestamp(now-7200,dt.timezone.utc).isoformat()
+opening=f'needs-decision [at={stamp}] [key=engine]: exact unchanged decision text\n'
+status=home/'state/worker.status';status.write_text(opening)
+env=dict(PATH=str(fixture/'fakebin')+':'+os.environ['PATH'],HOME=str(home/'user'),TMPDIR=str(home/'tmp'),
+         FM_HOME=str(home),NM_HOME=str(home/'nm'),FM_OPEN_LOOPS_NOW=str(now),FM_DURATION_FILE='off',
+         PYTHONDONTWRITEBYTECODE='1',FORBIDDEN_CALLS=str(fixture/'forbidden-calls'))
+cli=code/'bin/fm-open-loops.sh'
+def call(*args):
+    p=subprocess.run([str(cli),*args],env=env,text=True,capture_output=True,timeout=30)
+    assert p.returncode==0,(args,p.returncode,p.stdout,p.stderr)
+    return p.stdout
+def heartbeat(name):
+    body=call('--heartbeat','--json');report=json.loads(body)
+    assert report['complete'] is not degraded,report
+    row=next(r for r in report['rows'] if r['subject']=='worker:engine')
+    assert row['overdue'] and (row.get('source') is None)==degraded,row
+    (ledgers/(name+'.json')).write_text(body)
+    return row
+first=heartbeat('first')
+assert first['id'] in call('--present-overdue')
+inbox=home/'state/worker.inbox';inbox.mkdir()
+at=dt.datetime.fromtimestamp(now,dt.timezone.utc).isoformat()
+(inbox/'001.msg').write_text('schema=fm-task-inbox.v1\nat='+at+'\n--\nanswer predecessor\n')
+call('action',first['id'],'steered','--evidence','001.msg')
+with status.open('a') as f:f.write('working: unrelated progress\n')
+heartbeat('unrelated')
+with status.open('a') as f:f.write(f'resolved [at={stamp}] [key=engine]: predecessor answered\n'+opening)
+new=heartbeat('reopened')
+assert first['id']==new['id'] and first['id'] in call('--present-overdue')
+with status.open('a') as f:f.write('working: unrelated progress after the new opening\n')
+heartbeat('reopened-unrelated')
+with status.open('a') as f:f.write(f'needs-decision [at={stamp}] [key=other]: distinct question\n')
+heartbeat('new-question')
+for name in ('first','reopened','new-question'):
+    report=json.loads((ledgers/(name+'.json')).read_text())
+    for row in report['rows']:row.pop('current_identity',None)
+    (ledgers/('legacy-'+name+'.json')).write_text(json.dumps(report))
+PY
+}
+
+publish_recorded_ledger() {  # <recorded-json> <fixture-state>
+  case "$2" in "$TMP_ROOT"/*/state) ;; *) fail "ledger target is not fixture state" ;; esac
+  cp "$1" "$2/open-loops.next.json" && mv -f "$2/open-loops.next.json" "$2/open-loops.json"
+}
+
+# Keep normal terminal polling and both ledger cooldowns. Existing fake-tmux
+# eligibility is unchanged; no periodic/stale/raw-status rescue is due.
+watch_canonical_ledger() {
+  local state=$1 fakebin=$2 out=$3 home=$4
+  watch_ledger "$state" "$fakebin" "$out" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+    FM_POLL=15 FM_OPEN_LOOPS_INTERVAL=600 FM_OPEN_LOOPS_RESURFACE=21600 \
+    FM_TYPESAFE_HEALTH_BIN=/usr/bin/true FM_MEMORY_GUARD_BIN=/usr/bin/true \
+    FM_TEST_HARNESS=codex FM_FAKE_TMUX_WINDOWS='' FM_FAKE_TMUX_WINDOW='' \
+    FORBIDDEN_CALLS="${home%/collector-home}/forbidden-calls"
+}
+
+copy_delivered_cooldowns() {
+  cp "$1/.open-loops-surfaced" "$2/.open-loops-surfaced"
+  cp -p "$1/.open-loops-resurfaced" "$2/.open-loops-resurfaced"
+}
+
+test_canonical_reopening_notifies_without_an_absence_observation() {
+  local kind dir state fakebin out pid first cycle settled marker marker_time periodic
+  for kind in regular degraded; do
+    dir=$(make_case "canonical-recurrence-$kind")
+    prepare_canonical_ledgers "$dir" "$kind" || fail "$kind canonical ledger preparation failed"
+    first=$(make_case "canonical-first-$kind")
+    publish_recorded_ledger "$dir/ledgers/first.json" "$first/state"
+    watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind predecessor did not notify"; }
+    assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger
+    cycle=$(make_case "canonical-cycle-$kind");state="$cycle/state";out="$cycle/watch.out";fakebin="$dir/fakebin"
+    copy_delivered_cooldowns "$first/state" "$state"
+    marker=$(cat "$state/.open-loops-surfaced");periodic=$(file_mtime "$state/.open-loops-resurfaced")
+    publish_recorded_ledger "$dir/ledgers/first.json" "$state"
+    watch_canonical_ledger "$state" "$fakebin" "$out" "$dir/collector-home";pid=$!
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind unchanged episode woke"; }
+    [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      || { reap "$pid"; fail "$kind unchanged episode lost suppression"; }
+    publish_recorded_ledger "$dir/ledgers/unrelated.json" "$state"
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind unrelated append woke"; }
+    [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      || { reap "$pid"; fail "$kind unrelated append changed notification identity"; }
+    # Resolution and identical reopening both precede this one publication.
+    publish_recorded_ledger "$dir/ledgers/reopened.json" "$state"
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind new opening inherited predecessor notification"; }
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    [ "$(cat "$state/.open-loops-surfaced")" != "$marker" ] || fail "$kind recurrence did not advance its dedicated marker"
+    [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] || fail "$kind recurrence used periodic rescue"
+    # Continue from that successful modern delivery's markers, without an absent
+    # publication or rescue boundary, and prove the new opening now stays quiet.
+    settled=$(make_case "canonical-settled-$kind");state="$settled/state";out="$settled/watch.out"
+    copy_delivered_cooldowns "$cycle/state" "$state"
+    marker=$(cat "$state/.open-loops-surfaced");marker_time=$(file_mtime "$state/.open-loops-surfaced")
+    publish_recorded_ledger "$dir/ledgers/reopened.json" "$state"
+    watch_canonical_ledger "$state" "$fakebin" "$out" "$dir/collector-home";pid=$!
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind new opening reread did not settle"; }
+    [ ! -s "$state/.wake-queue" ] && [ ! -s "$out" ] \
+      && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      && [ "$(file_mtime "$state/.open-loops-surfaced")" = "$marker_time" ] \
+      && [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
+      || { reap "$pid"; fail "$kind unchanged new opening queued or committed another notification"; }
+    publish_recorded_ledger "$dir/ledgers/reopened-unrelated.json" "$state"
+    wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind new opening unrelated append woke"; }
+    [ ! -s "$state/.wake-queue" ] && [ ! -s "$out" ] \
+      && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+      && [ "$(file_mtime "$state/.open-loops-surfaced")" = "$marker_time" ] \
+      && [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
+      || { reap "$pid"; fail "$kind unrelated append replayed the modern notification"; }
+    publish_recorded_ledger "$dir/ledgers/new-question.json" "$state"
+    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind settled consumer lost genuine new-question eligibility"; }
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+    [ ! -s "$dir/forbidden-calls" ] || fail "$kind fixture called an external backend"
+    python3 - "$dir/ledgers" <<'PY' || fail "$kind publication did not identify the current row independently of old handling history"
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1])
+def report(name):return json.loads((p/(name+'.json')).read_text())
+def row(name):return next(r for r in report(name)['rows'] if r['subject']=='worker:engine')
+a,b,c=map(row,('first','unrelated','reopened'))
+assert isinstance(a.get('current_identity'),str) and a['current_identity']==b['current_identity']!=c['current_identity']
+assert c['current_identity']!=report('reopened')['handling']['episodes'][c['id']]['digest']
+assert c['current_identity']==row('reopened-unrelated')['current_identity']
+PY
+  done
+  pass "canonical recurrence wakes and then settles across unchanged/unrelated observations, including real sourceNone"
+}
+
+test_legacy_projection_migrates_once_then_current_identity_settles() {
+  local dir first cycle settled state out pid marker periodic
+  dir=$(make_case canonical-legacy)
+  prepare_canonical_ledgers "$dir" regular || fail "legacy canonical projection preparation failed"
+  first=$(make_case canonical-legacy-first)
+  publish_recorded_ledger "$dir/ledgers/legacy-first.json" "$first/state"
+  watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home";pid=$!
+  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "legacy initial projection did not notify"; }
+  assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger
+  cycle=$(make_case canonical-legacy-cycle);state="$cycle/state";out="$cycle/watch.out"
+  copy_delivered_cooldowns "$first/state" "$state"
+  marker=$(cat "$state/.open-loops-surfaced");periodic=$(file_mtime "$state/.open-loops-resurfaced")
+  # The six legacy fields match although the real current source/opening differs.
+  publish_recorded_ledger "$dir/ledgers/legacy-reopened.json" "$state"
+  watch_canonical_ledger "$state" "$dir/fakebin" "$out" "$dir/collector-home";pid=$!
+  wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "legacy consumer rehashed mutable source"; }
+  [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+    || { reap "$pid"; fail "absent-token fallback changed its exact six-field identity"; }
+  publish_recorded_ledger "$dir/ledgers/reopened.json" "$state"
+  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "upgrading the legacy marker did not notify"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  [ "$(cat "$state/.open-loops-surfaced")" != "$marker" ] || fail "migration did not advance its marker"
+  [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] || fail "migration used a periodic rescue"
+  settled=$(make_case canonical-upgraded-cycle);state="$settled/state";out="$settled/watch.out"
+  copy_delivered_cooldowns "$cycle/state" "$state"
+  marker=$(cat "$state/.open-loops-surfaced")
+  publish_recorded_ledger "$dir/ledgers/reopened.json" "$state"
+  watch_canonical_ledger "$state" "$dir/fakebin" "$out" "$dir/collector-home";pid=$!
+  wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "upgraded unchanged opening did not settle"; }
+  [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
+    || { reap "$pid"; fail "migration caused repeated unchanged notifications"; }
+  publish_recorded_ledger "$dir/ledgers/new-question.json" "$state"
+  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "quiet upgraded consumer lost new-question eligibility"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  [ ! -s "$dir/forbidden-calls" ] || fail "legacy fixture called an external backend"
+  pass "absent identity preserves exact legacy projection; one migration wake settles before a genuine new question"
+}
+
 tests=(
+  test_canonical_reopening_notifies_without_an_absence_observation
+  test_legacy_projection_migrates_once_then_current_identity_settles
   test_overdue_row_wakes_with_a_durable_row
   test_unchanged_overdue_set_stays_quiet_then_new_row_wakes
   test_resurface_wake_is_periodic_and_separate_from_changes
