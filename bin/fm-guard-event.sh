@@ -21,36 +21,28 @@
 #                           carries a route field only when this is given
 #   --successor <branch>    the branch an admission or launch grant names; the row carries a
 #                           successor field only when this is given
-#   --strict                exit nonzero when the row cannot be written (a missing home state
-#                           folder, an unusable log, a failed append); for an event the caller
-#                           owes, so it can refuse instead of continuing without it
-#   --log-path              print the log this call would append to and exit, writing nothing
 #   --log <path>            default FM_GUARD_EVENT_LOG, else home's state log
 # Session identity is the task, else physical home plus harness session.
 # Without a harness session it is home:unattributed, never a new process id.
 # The default home log is written only when that home's state directory already
 # exists: the writer never creates a home, so a home check after it still refuses.
-# Exit always 0, even with malformed arguments, missing tools or failed writes,
-# except under --strict (which exits 1 when the row is not written) and --log-path.
-# Callers that do not pass --strict must also use || true so an unavailable writer
-# never changes policy.
+# Exit always 0, even with malformed arguments, missing tools or failed writes.
+# Callers must also use || true so an unavailable writer never changes policy.
 set -u
 
-usage() { sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; }
 case "${1:-}" in ''|-h|--help) usage; exit 0 ;; esac
 GUARD=$1 DECISION=${2:-}
 case "$DECISION" in deny|warn|allow|error|bypass) ;; *) exit 0 ;; esac
 shift 2
 SOURCE_OK=true ELAPSED_MS=0 CLEARED_BY='' REPEAT=1 OVERRIDE=false
 SYSTEM=firstmate GUARD_VERSION=1 SESSION='' LOG='' RULE=$GUARD TASK=${FM_TASK_ID:-}
-HEAD='' BASE='' ACTOR=${FM_TASK_ID:+worker} OPPORTUNITY=true ROUTE='' SUCCESSOR='' STRICT=0 LOG_PATH_ONLY=0
+HEAD='' BASE='' ACTOR=${FM_TASK_ID:+worker} OPPORTUNITY=true ROUTE='' SUCCESSOR=''
 ACTOR=${ACTOR:-main}
 while [ $# -gt 0 ]; do
   case "$1" in
     --override) OVERRIDE=true; shift; continue ;;
     --no-opportunity) OPPORTUNITY=false; shift; continue ;;
-    --strict) STRICT=1; shift; continue ;;
-    --log-path) LOG_PATH_ONLY=1; shift; continue ;;
     --source-ok|--elapsed-ms|--cleared-by|--repeat|--system|--guard-version|--session|--log|--rule|--task|--head|--base|--actor|--route|--successor)
       [ $# -ge 2 ] || exit 0 ;;
     *) shift; continue ;;
@@ -74,9 +66,6 @@ while [ $# -gt 0 ]; do
   esac
   shift 2
 done
-# A row the caller owes (--strict) that cannot be written is a failure; every other
-# row stays best-effort and exits 0.
-unwritten() { [ "$STRICT" = 1 ] && exit 1; exit 0; }
 case "$SOURCE_OK" in true|false) ;; *) SOURCE_OK=false ;; esac
 case "$ELAPSED_MS" in ''|*[!0-9]*) ELAPSED_MS=0 ;; esac
 case "$REPEAT" in ''|*[!0-9]*|0) REPEAT=1 ;; esac
@@ -88,14 +77,10 @@ HOME_LOG=false
 if [ -z "$LOG" ]; then
   LOG=${FM_GUARD_EVENT_LOG:-}
   if [ -z "$LOG" ]; then
-    [ -d "$HOME_KEY/state" ] || { [ "$LOG_PATH_ONLY" = 1 ] && exit 1; unwritten; }
+    [ -d "$HOME_KEY/state" ] || exit 0
     LOG=$HOME_KEY/state/guard-events.jsonl
     HOME_LOG=true
   fi
-fi
-if [ "$LOG_PATH_ONLY" = 1 ]; then
-  printf '%s\n' "$LOG"
-  exit 0
 fi
 if [ -n "$TASK" ]; then
   SESSION=$TASK
@@ -124,13 +109,12 @@ LINE=$(jq -nc --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     cleared_by:$cleared_by,repeat:($repeat|tonumber),override:$override,head:$head,base:$base,
     actor:$actor,opportunity:$opportunity}
    + (if $route != "" then {route:$route} else {} end)
-   + (if $successor != "" then {successor:$successor} else {} end)' 2>/dev/null) || unwritten
+   + (if $successor != "" then {successor:$successor} else {} end)' 2>/dev/null) || exit 0
 # Never open a pipe or device: best-effort telemetry must not wait for a reader.
-if [ -e "$LOG" ] && [ ! -f "$LOG" ]; then unwritten; fi
+if [ -e "$LOG" ] && [ ! -f "$LOG" ]; then exit 0; fi
 LOG_DIR=${LOG%/*}
 [ "$LOG_DIR" != "$LOG" ] || LOG_DIR=.
 if ! { { [ "$HOME_LOG" = true ] || mkdir -p "$LOG_DIR" 2>/dev/null; } && printf '%s\n' "$LINE" >>"$LOG" 2>/dev/null; }; then
   echo "fm-guard-event: cannot append to $LOG" >&2
-  unwritten
 fi
 exit 0
