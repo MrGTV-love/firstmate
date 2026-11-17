@@ -1102,11 +1102,13 @@ task_json_one() {  # <captured-meta> - prints one task record
       actions:(
         if $kind == "secondmate" then
           {send:"bin/fm-send.sh fm-\($id) \u0027<request>\u0027",
+           choice:"An open keyed decision needs a stated choice: add `--resolve-key <key>` after the target (one key per flag) when the send answers it, or `--answers-none` when it answers none. Rule: bin/fm-send.sh header, \"Decision closure\".",
            watch:"read status/doc return channel; do not routinely fm-peek a secondmate for answers",
            return_channel_note:"Secondmate answers come back through status/doc paths after a marked fm-send request."}
         else
           {watch:"bin/fm-peek.sh fm-\($id)",
            steer:"bin/fm-send.sh fm-\($id) \u0027<instruction>\u0027",
+           choice:"An open keyed decision needs a stated choice: add `--resolve-key <key>` after the target (one key per flag) when the send answers it, or `--answers-none` when it answers none. Rule: bin/fm-send.sh header, \"Decision closure\".",
            return_channel_note:null}
         end)
     }'
