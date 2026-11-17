@@ -1646,6 +1646,7 @@ case "\$*" in
     fi
     cat '$CASE_DIR/panepath'; exit 0 ;;
   *capture-pane*)
+    [ ! -f '$CASE_DIR/acquisition-marker' ] || cat '$CASE_DIR/acquisition-marker'
     if [ "\${FM_TEST_REVISIT_CANDIDATE:-0}" = 1 ]; then
       get=\$(cat '$CASE_DIR/get-count')
       reads=\$(cat '$CASE_DIR/revisit-'"\$get")
@@ -1660,6 +1661,11 @@ case "\$*" in
       printf 'treehouse: checked /fixture/candidate-%s: skipped: fixture reason\\n' "\$(cat '$CASE_DIR/walk-reads' 2>/dev/null)"
       exit 0
     fi ;;
+  *send-keys*'__firstmate_acquire_'*)
+    for arg in "\$@"; do
+      case "\$arg" in printf*) bash -c "\$arg" > '$CASE_DIR/acquisition-marker' ;; esac
+    done
+    exit 0 ;;
   *send-keys*'treehouse get'*)
     n=\$(( \$(cat '$CASE_DIR/get-count') + 1 ))
     echo "\$n" > '$CASE_DIR/get-count'
@@ -1679,6 +1685,272 @@ exit 0
 SH
   chmod +x "$FAKEBIN_DIR/treehouse"
 }
+
+# Opt-in actual TG8 producer. No PATH lookup/install and no inherited HOME or
+# Treehouse configuration; --root and every repository stay in this test's tmp.
+make_real_candidate_progress() {
+  local binary=${FM_TEST_TREEHOUSE_PRODUCER:-} n pool_segment pool_root accepted
+  [ -n "$binary" ] || fail 'actual TG8 producer path was not supplied'
+  case "$binary" in /*) ;; *) fail 'TG8 producer must be an absolute binary path' ;; esac
+  [ -x "$binary" ] || fail 'supplied TG8 producer is not executable'
+  case "$CASE_DIR" in /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*) ;; *) fail 'refusing a producer pool outside scratch storage' ;; esac
+  printf -v pool_segment '%0180d' 0
+  pool_root="$CASE_DIR/pool-$pool_segment"
+  mkdir -p "$CASE_DIR/producer-home" "$CASE_DIR/producer-tmp"
+  for ((n=1; n<=19; n++)); do
+    (
+      cd "$PROJECT_DIR" || exit 1
+      env -i PATH="$PATH" HOME="$CASE_DIR/producer-home" \
+        XDG_CONFIG_HOME="$CASE_DIR/producer-home/.config" XDG_DATA_HOME="$CASE_DIR/producer-home/.local/share" \
+        TMPDIR="$CASE_DIR/producer-tmp" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null SHELL=/bin/bash \
+        "$binary" --root "$pool_root" get --lease --json --no-fetch --lease-holder "private-fixture-$n"
+    ) > "$CASE_DIR/producer-$n.json" 2> "$CASE_DIR/producer-$n.stderr" || fail "private TG8 acquisition $n failed: $(cat "$CASE_DIR/producer-$n.stderr")"
+  done
+  grep '^treehouse: checked ' "$CASE_DIR/producer-19.stderr" > "$CASE_DIR/real-progress-lines"
+  [ "$(wc -l < "$CASE_DIR/real-progress-lines" | tr -d ' ')" = 19 ] || fail 'the actual private get did not finish all 19 candidate checks'
+  accepted=$(jq -er .path "$CASE_DIR/producer-19.json") || fail 'actual producer did not return its private copy'
+  case "$accepted" in "$pool_root"/*) ;; *) fail 'actual producer escaped its explicit private pool' ;; esac
+  SKIP_SLOTS[0]=$accepted
+  printf '%s\n' "${SKIP_SLOTS[@]}" > "$CASE_DIR/slots"
+  printf 'actual TG8 producer %s\n' "$binary"
+  shasum -a 256 "$binary"
+  cat "$CASE_DIR/real-progress-lines" "$CASE_DIR/producer-19.json"
+}
+
+# Real rendering, fake acquisition: only capture-pane reaches this private tmux
+# socket. Pane paths, gets, leases and agent launch remain fixture transports.
+make_acquisition_capture_lab() { # <width>
+  local width=$1 real_tmux
+  real_tmux=$(command -v tmux)
+  LAB_SOCKET_DIR=$(TMPDIR=/tmp fm_test_tmproot fm-acquire) || fail 'cannot create private socket directory'
+  LAB_SOCKET="$LAB_SOCKET_DIR/s"
+  trap '"$real_tmux" -S "$LAB_SOCKET" kill-server 2>/dev/null || true; rm -rf "$LAB_SOCKET_DIR"' EXIT
+  LAB_RENDER="$CASE_DIR/render.fifo"
+  mkfifo "$LAB_RENDER" || fail 'cannot create private rendering FIFO'
+  "$real_tmux" -S "$LAB_SOCKET" -f /dev/null new-session -d -s capture -x "$width" -y 24 \
+    "exec 3<> '$LAB_RENDER'; exec /bin/cat <&3" || fail 'cannot create private rendering pane'
+  LAB_PANE=$("$real_tmux" -S "$LAB_SOCKET" display-message -p -t capture '#{pane_id}') || fail 'cannot identify private rendering pane'
+  printf '0\n' > "$CASE_DIR/scaled-time"
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.transport"
+  cat > "$CASE_DIR/lab-clock.sh" <<'SH'
+__fm_lab_time=0
+__fm_lab_clock() {
+  # First parser observation is at 5, while the current get emits A at 4.
+  case "$BASH_COMMAND" in
+    'output=$(spawn_acquisition_output '* )
+      if [ "${FM_LAB_MODE:-}" = epoch-mixed ] && [ "$(cat "$FM_LAB_CASE/get-count")" = 2 ] && [ ! -e "$FM_LAB_CASE/mixed-first-sample" ]; then
+        : > "$FM_LAB_CASE/mixed-first-sample"
+        __fm_lab_time=$((__fm_lab_time + 4))
+        printf '%s\n' "$__fm_lab_time" > "$FM_LAB_CASE/scaled-time"
+        tmux capture-pane -p -t ignored -S -200 >/dev/null
+        __fm_lab_time=$((__fm_lab_time + 1))
+        printf '%s\n' "$__fm_lab_time" > "$FM_LAB_CASE/scaled-time"
+      fi ;;
+  esac
+  SECONDS=$__fm_lab_time
+}
+set -T
+trap '__fm_lab_clock' DEBUG
+sleep() {
+  if [ "${1:-}" = 1 ]; then
+    if { [ "${FM_LAB_MODE:-}" = wrap ] || [ "${FM_LAB_MODE:-}" = producer ]; } && [ "$__fm_lab_time" -lt 5400 ]; then
+      __fm_lab_time=$((__fm_lab_time + 300))
+    elif [ "${FM_LAB_MODE:-}" = burst ] && [ "$__fm_lab_time" -lt 900 ]; then
+      __fm_lab_time=$((__fm_lab_time + 100))
+    else
+      __fm_lab_time=$((__fm_lab_time + 5))
+    fi
+    printf '%s\n' "$__fm_lab_time" > "$FM_LAB_CASE/scaled-time"
+    return 0
+  fi
+  command sleep "$@"
+}
+SH
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+set -eu
+real_tmux='$real_tmux'
+socket='$LAB_SOCKET'
+pane='$LAB_PANE'
+case_dir='$CASE_DIR'
+transport='$FAKEBIN_DIR/tmux.transport'
+# The shared outcome wait supplies synchronization, not a guessed render sleep.
+render() {
+  . '$ROOT/tests/lib.sh'
+  local text=\$1 n=0 ack
+  [ ! -e "\$case_dir/render-count" ] || n=\$(cat "\$case_dir/render-count")
+  n=\$((n + 1))
+  printf '%s\n' "\$n" > "\$case_dir/render-count"
+  ack="__fm_test_render_\${n}__"
+  printf '%s\n%s\n' "\$text" "\$ack" > "\$case_dir/render.fifo"
+  render_ready() { "\$real_tmux" -S "\$socket" capture-pane -p -J -t "\$pane" -S -200 | grep -qxF "\$ack"; }
+  fm_test_wait_until --progress-file "\$case_dir/render-count" -- render_ready || exit 1
+}
+now=\$(cat "\$case_dir/scaled-time")
+get=\$(cat "\$case_dir/get-count")
+start=0
+[ ! -e "\$case_dir/get-start-\$get" ] || start=\$(cat "\$case_dir/get-start-\$get")
+elapsed=\$((now - start))
+case "\$*" in
+  *'#{pane_current_path}'*)
+    if [ "\$get" = 0 ]; then printf '%s\n' '$PROJECT_DIR'; exit 0; fi
+    case "\${FM_LAB_MODE:?}" in
+      wrap|producer) if [ "\$elapsed" -lt 5400 ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi ;;
+      wrap-repeat) printf '%s\n' '$PROJECT_DIR' ;;
+      burst) if [ "\$elapsed" -lt 900 ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi ;;
+      fresh|epoch|epoch-repeat|epoch-history|epoch-mixed)
+        if [ "\$get" = 1 ] && [ "\$FM_LAB_MODE" != fresh ]; then
+          if [ "\$elapsed" = 0 ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi
+        elif [ "\$elapsed" -lt 1700 ]; then
+          if [ "\$FM_LAB_MODE" = fresh ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi
+        else sed -n 2p "\$case_dir/slots"
+        fi ;;
+    esac
+    exit 0 ;;
+  *send-keys*'treehouse get'*)
+    "\$transport" "\$@"
+    get=\$(cat "\$case_dir/get-count")
+    printf '%s\n' "\$now" > "\$case_dir/get-start-\$get"
+    exit 0 ;;
+  *send-keys*'__firstmate_acquire_'*)
+    for arg in "\$@"; do
+      case "\$arg" in printf*) text=\$(bash -c "\$arg"); render "\$text" ;; esac
+    done
+    exit 0 ;;
+esac
+if [ "\${1:-}" = capture-pane ]; then
+  text=''
+  case "\${FM_LAB_MODE:?}" in
+    producer)
+      index=\$((elapsed / 300 + 1))
+      [ "\$index" -le 19 ] || index=19
+      text=\$(sed -n "\${index}p" "\$case_dir/real-progress-lines")
+      ;;
+    burst)
+      if [ "\$elapsed" -ge 500 ]; then
+        printf -v text 'treehouse: checked /fixture/%0180d/last-candidate: accepted: late completion' 0
+      else
+        text=\$(for ((i=0; i<100; i++)); do printf 'treehouse: checked /fixture/%0180d/candidate-%04d: skipped: initial burst\n' 0 "\$i"; done)
+      fi ;;
+    wrap|wrap-repeat)
+      candidate=\$((elapsed / 300))
+      [ "\$FM_LAB_MODE" != wrap-repeat ] || candidate=0
+      printf -v long_path '/fixture/%0180d/candidate-%04d' 0 "\$candidate"
+      printf -v text 'treehouse: checked %s: skipped: reason at %s' "\$long_path" "\$elapsed"
+      ;;
+    epoch|epoch-repeat|epoch-history|epoch-mixed|fresh)
+      if [ "\$get" = 1 ] && [ "\$FM_LAB_MODE" != fresh ]; then
+        text=\$(printf 'treehouse: checked /fixture/%s: skipped: get1-owned\n' A B C; seq 1 30)
+      elif [ "\$FM_LAB_MODE" = epoch-mixed ]; then
+        if [ "\$elapsed" -ge 4 ]; then
+          text='treehouse: checked /fixture/A: skipped: get2-emitted-at-4'
+          [ -e "\$case_dir/mixed-emission-time" ] || printf '%s\n' "\$elapsed" > "\$case_dir/mixed-emission-time"
+        fi
+      elif [ "\$FM_LAB_MODE" != epoch-history ]; then
+        if [ "\$elapsed" -ge 1300 ] && [ "\$FM_LAB_MODE" != epoch-repeat ]; then text='treehouse: checked /fixture/C: skipped: get2-owned'
+        elif [ "\$elapsed" -ge 800 ] && [ "\$FM_LAB_MODE" != epoch-repeat ]; then text='treehouse: checked /fixture/B: skipped: get2-owned'
+        elif [ "\$elapsed" -ge 595 ]; then text='treehouse: checked /fixture/A: refused: changed reason in get2'
+        elif [ "\$elapsed" -ge 300 ]; then text='treehouse: checked /fixture/A: skipped: get2-owned'
+        fi
+      fi ;;
+  esac
+  if [ "\$get" = 0 ] && [ "\${FM_LAB_RENDER_WITHOUT_GET:-0}" != 1 ]; then text=''; fi
+  previous=''
+  [ ! -e "\$case_dir/last-rendered" ] || previous=\$(cat "\$case_dir/last-rendered")
+  if [ -n "\$text" ] && [ "\$text" != "\$previous" ]; then
+    render "\$text"
+    printf '%s' "\$text" > "\$case_dir/last-rendered"
+  fi
+  args=()
+  while [ "\$#" -gt 0 ]; do
+    if [ "\$1" = -t ]; then args+=(-t "\$pane"); shift 2; else args+=("\$1"); shift; fi
+  done
+  "\$real_tmux" -S "\$socket" "\${args[@]}" > "\$case_dir/raw-capture"
+  cat "\$case_dir/raw-capture"
+  exit 0
+fi
+exec "\$transport" "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+}
+
+run_private_capture_case() { # <mode> <width> <expected-exit> [expected-relative-stop]
+  (
+    local mode=$1 width=$2 expected=$3 stop=${4:-} id out rc=0 real_tmux start
+    command -v tmux >/dev/null || { echo 'skip: tmux not found'; exit 0; }
+    real_tmux=$(command -v tmux)
+    id="pool-capture-$mode-$width"
+    make_skip_case "capture-$mode-$width" "$id" 2
+    [ "$mode" != producer ] || make_real_candidate_progress
+    case "$mode" in epoch*) printf 'keep local work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt" ;; esac
+    make_acquisition_capture_lab "$width"
+    trap '"$real_tmux" -S "$LAB_SOCKET" kill-server 2>/dev/null || true; rm -rf "$LAB_SOCKET_DIR"' EXIT
+    out=$(FM_LAB_MODE="$mode" FM_LAB_CASE="$CASE_DIR" BASH_ENV="$CASE_DIR/lab-clock.sh" \
+      run_spawn "$id" --mode no-mistakes --yolo off) || rc=$?
+    expect_code "$expected" "$rc" "private $mode/$width acquisition disagreed: $out"
+    if [ "$expected" = 0 ]; then
+      if [ "$mode" = wrap ] || [ "$mode" = burst ] || [ "$mode" = producer ]; then
+        assert_grep "worktree=${SKIP_SLOTS[0]}" "$HOME_DIR/state/$id.meta" 'wrapped walk did not accept its copy'
+      else
+        assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" 'the current get did not accept the second copy'
+      fi
+    else
+      assert_contains "$out" 'no path or output progress for 600s' 'private capture refusal lost the stall reason'
+      start=$(cat "$CASE_DIR/get-start-$(cat "$CASE_DIR/get-count")")
+      [ "$(( $(cat "$CASE_DIR/scaled-time") - start ))" = "$stop" ] || fail "private $mode stopped at wrong scaled deadline: $out"
+    fi
+    if [ "$mode" = epoch-mixed ]; then
+      [ "$(cat "$CASE_DIR/mixed-emission-time")" = 4 ] || fail 'mixed candidate was not emitted at scaled second four'
+    fi
+    if [[ "$mode" = epoch* ]]; then
+      "$real_tmux" -S "$LAB_SOCKET" capture-pane -p -J -t "$LAB_PANE" -S -200 > "$CASE_DIR/retained-history"
+      assert_grep 'get1-owned' "$CASE_DIR/retained-history" 'an epoch change cleared pane history'
+      assert_grep 'get1-owned' "$CASE_DIR/raw-capture" 'acquisition hid inherited scrollback instead of marking its boundary'
+    fi
+    printf '%s\n' "$out"
+    pass "private tmux $mode width=$width gives the hand-derived acquisition decision"
+  ) || fail "private capture case $1 failed"
+}
+test_other_tmux_capture_consumers_keep_physical_lines() {
+  (
+    local id real_tmux direct dispatched joined
+    command -v tmux >/dev/null || { echo 'skip: tmux not found'; exit 0; }
+    real_tmux=$(command -v tmux)
+    id='pool-capture-unjoined-consumers'
+    make_skip_case capture-unjoined-consumers "$id" 1
+    make_acquisition_capture_lab 40
+    trap '"$real_tmux" -S "$LAB_SOCKET" kill-server 2>/dev/null || true; rm -rf "$LAB_SOCKET_DIR"' EXIT
+    export FM_LAB_MODE=wrap FM_LAB_CASE="$CASE_DIR" FM_LAB_RENDER_WITHOUT_GET=1
+    # Both retained production entry points use the same real narrow pane.
+    direct=$(PATH="$FAKEBIN_DIR:$PATH" bash -c '. "$1/bin/fm-backend.sh"; fm_backend_source tmux; fm_backend_tmux_capture "$2" 200' _ "$ROOT" "$LAB_PANE") || fail 'normal tmux helper failed'
+    dispatched=$(PATH="$FAKEBIN_DIR:$PATH" bash -c '. "$1/bin/fm-backend.sh"; fm_backend_source tmux; fm_backend_capture tmux "$2" 200' _ "$ROOT" "$LAB_PANE") || fail 'generic capture caller failed'
+    joined=$("$real_tmux" -S "$LAB_SOCKET" capture-pane -p -J -t "$LAB_PANE" -S -200) || fail 'joined control failed'
+    assert_contains "$joined" 'treehouse: checked /fixture/' 'the pane never rendered its long record'
+    assert_not_contains "$direct" "$(cat "$CASE_DIR/last-rendered")" 'normal tmux helper joined a wrapped record'
+    assert_not_contains "$dispatched" "$(cat "$CASE_DIR/last-rendered")" 'generic capture caller joined a wrapped record'
+    assert_contains "$joined" "$(cat "$CASE_DIR/last-rendered")" 'the joined control did not distinguish physical from logical capture'
+    [ "$direct" = "$dispatched" ] || fail 'generic capture changed the retained helper output'
+    pass 'ordinary tmux capture and its generic production caller retain unjoined physical lines'
+  ) || fail 'ordinary capture control failed'
+}
+
+test_actual_tg8_producer_in_narrow_pane() {
+  [ -n "${FM_TEST_TREEHOUSE_PRODUCER:-}" ] || { echo 'skip: FM_TEST_TREEHOUSE_PRODUCER absolute scratch binary not supplied'; return 0; }
+  run_private_capture_case producer 40 0
+}
+test_actual_tg8_producer_in_wide_pane() {
+  [ -n "${FM_TEST_TREEHOUSE_PRODUCER:-}" ] || { echo 'skip: FM_TEST_TREEHOUSE_PRODUCER absolute scratch binary not supplied'; return 0; }
+  run_private_capture_case producer 400 0
+}
+test_initial_candidate_burst_cannot_hide_the_get_boundary() { run_private_capture_case burst 40 0; }
+test_wrapped_candidates_finish_in_a_narrow_pane() { run_private_capture_case wrap 40 0; }
+test_wrapped_candidates_finish_in_a_wide_pane() { run_private_capture_case wrap 400 0; }
+test_wrapped_repeated_candidate_stalls() { run_private_capture_case wrap-repeat 40 1 600; }
+test_inherited_candidates_do_not_consume_new_get_identity() { run_private_capture_case epoch 400 0; }
+test_inherited_history_alone_does_not_renew_the_get() { run_private_capture_case epoch-history 400 1 600; }
+test_mixed_first_sample_keeps_current_get_completion() { run_private_capture_case epoch-mixed 400 1 605; }
+test_current_get_repeat_does_not_renew_again() { run_private_capture_case epoch-repeat 400 1 900; }
+test_fresh_pane_candidate_epoch_control() { run_private_capture_case fresh 400 0; }
 
 # slot_digest <slot>: HEAD, its branch, EVERY ref of the repository (the refs are shared by every copy), the index, and
 # every file outside .git (a regular file by sha256, a symlink by its target). It FAILS (nonzero) when any read fails,
@@ -2369,13 +2641,7 @@ test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
 
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
-  for selected_test in "$@"; do
-    case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
-      test_*) if declare -F "$selected_test" >/dev/null 2>&1; then "$selected_test"; else fail "unknown selected test: $selected_test"; fi ;;
-      *) fail "unknown selected acquisition test: $selected_test" ;;
-    esac
-  done
+  fm_test_run_cases -- "$@"
   exit 0
 fi
 
@@ -2447,6 +2713,18 @@ test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_tak
 test_a_copy_is_accepted_after_a_long_confirming_poll
 test_a_copy_is_accepted_after_a_slow_isolation_check
 test_each_get_starts_with_empty_candidate_history
+test_other_tmux_capture_consumers_keep_physical_lines
+test_actual_tg8_producer_in_narrow_pane
+test_actual_tg8_producer_in_wide_pane
+test_initial_candidate_burst_cannot_hide_the_get_boundary
+test_wrapped_candidates_finish_in_a_narrow_pane
+test_wrapped_candidates_finish_in_a_wide_pane
+test_wrapped_repeated_candidate_stalls
+test_inherited_candidates_do_not_consume_new_get_identity
+test_inherited_history_alone_does_not_renew_the_get
+test_mixed_first_sample_keeps_current_get_completion
+test_current_get_repeat_does_not_renew_again
+test_fresh_pane_candidate_epoch_control
 test_a_long_walk_then_skip_requests_and_accepts_another_copy
 test_a_copy_accepted_inside_the_bound_is_launched
 test_a_refused_move_leaves_every_ref_unchanged

@@ -38,7 +38,9 @@ sleep() {
     if [ "$__fm_scaled_polls" = 1 ]; then
       __fm_scaled_time=$((__fm_scaled_time + ${FM_SETTLE_FIRST_TICK:-${FM_SETTLE_TICK:-60}}))
     else
-      if [ "${FM_SETTLE_MODE:-}" = novel ] && [ "$__fm_scaled_time" -ge 5400 ]; then
+      if [ "${FM_SETTLE_MODE:-}" = stalecompletion ] && [ "$__fm_scaled_time" = 1 ]; then
+        __fm_scaled_time=599
+      elif [ "${FM_SETTLE_MODE:-}" = novel ] && [ "$__fm_scaled_time" -ge 5400 ]; then
         __fm_scaled_time=$((__fm_scaled_time + 5))
       else
         __fm_scaled_time=$((__fm_scaled_time + ${FM_SETTLE_TICK:-60}))
@@ -70,8 +72,14 @@ case "$*" in
     printf '%s\n' "$n" > "$countfile"
     if [ -n "${FM_SETTLE_MODE:-}" ]; then
       now=$(cat "$FM_SETTLE_CLOCK_FILE" 2>/dev/null || printf 0)
-      if [ "$now" -ge "${FM_SETTLE_ENTER_AT:-5400}" ]; then
+      if [ "$FM_SETTLE_MODE" = stalecompletion ] && [ "$now" = 0 ]; then
         printf '%s\n' "$FM_FAKE_PANE_PATH"
+      elif [ "$now" -ge "${FM_SETTLE_ENTER_AT:-5400}" ]; then
+        printf '%s\n' "$FM_FAKE_PANE_PATH"
+      elif [ "$FM_SETTLE_MODE" = pathcycle ] && [ "$now" -ge 300 ] && [ "$(((now / 5) % 2))" = 0 ]; then
+        printf '%s/not-a-copy\n' "$FM_FAKE_PANE_STALE"
+      elif [ "$FM_SETTLE_MODE" = newpath ] && [ "$now" -ge 850 ]; then
+        printf '%s/new-path\n' "$FM_FAKE_PANE_STALE"
       else
         printf '%s\n' "$FM_FAKE_PANE_STALE"
       fi
@@ -88,6 +96,7 @@ esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
   capture-pane)
+    [ ! -f "$FM_FAKE_PANE_COUNTFILE.marker" ] || cat "$FM_FAKE_PANE_COUNTFILE.marker"
     now=$(cat "${FM_SETTLE_CLOCK_FILE:-/dev/null}" 2>/dev/null || printf 0)
     case "${FM_SETTLE_MODE:-}" in
       novel) printf 'treehouse: checked /fixture/candidate-%04d: skipped: fixture reason\n' "$((now / 300))"; exit 0 ;;
@@ -97,6 +106,14 @@ case "${1:-}" in
         printf 'treehouse: checked /fixture/same: %s: counter=%s timestamp=%s: refused: still the same candidate\n' "$decision" "$now" "$now"
         exit 0 ;;
       alternate) printf 'treehouse: checked /fixture/%s: skipped: reason\n' "$(((now / 5) % 2))"; exit 0 ;;
+      finite) printf 'treehouse: checked /fixture/%s: skipped: reason\n' "$(((now / 300) % 2))"; exit 0 ;;
+      pathcycle) printf 'treehouse: checked %s/not-a-copy: skipped: already observed candidate\n' "$FM_FAKE_PANE_STALE"; exit 0 ;;
+      newpath)
+        [ "$now" -lt 300 ] || printf 'treehouse: checked /fixture/A: skipped: one candidate\n'
+        exit 0 ;;
+      stalecompletion)
+        [ "$now" -lt 599 ] || printf 'treehouse: checked %s: skipped: genuine completion\n' "$FM_FAKE_PANE_PATH"
+        exit 0 ;;
       waiting) printf 'waiting: treehouse get to enter an isolated worktree; elapsed %ss\n' "$now"; exit 0 ;;
       noise)
         printf 'Setting up worktree... %s\n' "$now"
@@ -131,6 +148,9 @@ case "${1:-}" in
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
+    for arg in "$@"; do
+      case "$arg" in printf*__firstmate_acquire_*) bash -c "$arg" > "$FM_FAKE_PANE_COUNTFILE.marker" ;; esac
+    done
     if [ -n "${FM_COMPAT_LAUNCH_LOG:-}" ]; then
       for arg in "$@"; do
         case "$arg" in '. '*) printf '%s\n' "$arg" > "$FM_COMPAT_LAUNCH_LOG" ;; esac
@@ -352,7 +372,10 @@ run_content_stall_case() { # <mode> <deadline> [first-tick] [tick]
   expect_code 1 "$status" "stalled capture was not refused: $out"
   assert_contains "$out" 'no path or output progress for 600s' "wrong refusal: $out"
   assert_contains "$out" "$STALE_DIR" 'last path absent from refusal'
-  assert_contains "$out" "repository's primary checkout" 'rejection reason absent'
+  case "$mode" in
+    pathcycle|newpath) ;;
+    *) assert_contains "$out" "repository's primary checkout" 'rejection reason absent' ;;
+  esac
   assert_contains "$out" "spawning project '$PROJ_DIR'" 'project absent from refusal'
   assert_contains "$out" 'copies skipped by this spawn: none' 'skipped-copy context absent'
   [ "$(cat "$HOME_DIR/acquisition-clock")" = "$deadline" ] || fail "$mode stopped at $(cat "$HOME_DIR/acquisition-clock"), expected $deadline: $out"
@@ -365,6 +388,10 @@ test_new_content_observed_at_595_resets_stall() { run_content_stall_case boundar
 test_new_content_emitted_at_599_is_observed_at_600() { run_content_stall_case boundary599 1200; }
 test_repeated_candidate_with_changing_reason_stalls() { run_content_stall_case churn 600; }
 test_alternating_seen_captures_stall() { run_content_stall_case alternate 605; }
+test_fixed_pool_candidates_end_after_one_walk() { run_content_stall_case finite 900; }
+test_cycling_seen_pane_paths_does_not_renew() { run_content_stall_case pathcycle 900; }
+test_new_pane_path_renews_once() { run_content_stall_case newpath 1450; }
+test_stale_pane_path_does_not_suppress_genuine_completion() { run_content_stall_case stalecompletion 1199 1 1; }
 test_waiting_messages_do_not_renew_progress() { run_content_stall_case waiting 600; }
 test_nonmatching_output_does_not_renew_progress() { run_content_stall_case noise 600; }
 test_candidate_paths_are_compared_exactly() { run_content_stall_case exact 900; }
@@ -1178,6 +1205,10 @@ test_new_content_observed_at_595_resets_stall
 test_new_content_emitted_at_599_is_observed_at_600
 test_repeated_candidate_with_changing_reason_stalls
 test_alternating_seen_captures_stall
+test_fixed_pool_candidates_end_after_one_walk
+test_cycling_seen_pane_paths_does_not_renew
+test_new_pane_path_renews_once
+test_stale_pane_path_does_not_suppress_genuine_completion
 test_waiting_messages_do_not_renew_progress
 test_nonmatching_output_does_not_renew_progress
 test_candidate_paths_are_compared_exactly

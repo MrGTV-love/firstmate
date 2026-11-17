@@ -83,7 +83,9 @@
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
 #   A fresh spawn's `treehouse get` wait is progress-based: it ends after ten
-#   minutes with no changed pane path or newly finished candidate.
+#   minutes with no newly observed pane path or newly finished candidate.
+#   Separate per-get path sets reject repeats without letting a stale pane path
+#   suppress a later completion; a per-get output boundary excludes older records.
 #   Repeated candidates are not progress; there is no absolute acquisition ceiling.
 #   docs/agent-control.md owns the rule, and
 #   docs/verification/runtime-backends.md "Treehouse get entry wait" records
@@ -5702,7 +5704,8 @@ spawn_current_path() { # <target>
 }
 spawn_acquisition_output() { # <target>
   case "$BACKEND" in
-  tmux) fm_backend_tmux_capture "$1" 200 ;;
+  # Acquisition alone needs logical records; other capture consumers keep physical lines.
+  tmux) tmux capture-pane -p -J -t "$1" -S -200 ;;
   herdr) fm_backend_herdr_capture "$1" 200 ;;
   zellij) fm_backend_zellij_capture "$1" 200 "$W" ;;
   cmux) fm_backend_cmux_capture "$1" 200 "$W" ;;
@@ -6216,6 +6219,7 @@ SPAWN_SKIPPED_INFO=()
 SPAWN_PROVEN_COPY=
 SPAWN_APPLY_FAILED=0
 SPAWN_ACQUIRE_T0=
+SPAWN_ACQUIRE_EPOCH=0
 # The pid of the shell this spawn's pane was started with (tmux and herdr report it); nothing for a backend
 # that does not, which makes the holder rule fall back to the `treehouse` launcher (bin/fm-slot-provision-lib.sh).
 spawn_pane_pid() {
@@ -6253,7 +6257,11 @@ spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
 }
 spawn_acquire_pool_slot() {
   fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
-  spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
+  # Keep earlier gets' scrollback, but distinguish their records from this get's.
+  SPAWN_ACQUIRE_EPOCH=$((SPAWN_ACQUIRE_EPOCH + 1))
+  acquire_marker="__firstmate_acquire_${ID}_${SPAWN_ACQUIRE_EPOCH}__"
+  spawn_send_or_abort "treehouse get boundary" spawn_send_text_line "$WT_TARGET" \
+    "printf '\n%s\n' $(shell_quote "$acquire_marker")"
 
   # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
   # Target the stable window id, not the name: if the name is ever lost (e.g. an
@@ -6298,46 +6306,80 @@ spawn_acquire_pool_slot() {
   acquire_stall=$SPAWN_ACQUIRE_STALL
   acquire_notice=60
   # Retain total elapsed time for waiting notices, not as a stop condition.
-  [ -n "$SPAWN_ACQUIRE_T0" ] || SPAWN_ACQUIRE_T0=$SECONDS
-  acquire_start=$SPAWN_ACQUIRE_T0
+  acquire_start=${SPAWN_ACQUIRE_T0:-$SECONDS}
   acquire_progress=$SECONDS
   acquire_next_output=$SECONDS
   acquire_next_notice=$((SECONDS + acquire_notice))
-  # New get, new candidate history; newline delimiters keep path comparisons exact
-  # without associative arrays (stock macOS Bash 3.2).
+  # Separate per-get histories: a transient stale pane path must not suppress
+  # the later genuine completion of that candidate. Literal newline delimiters
+  # keep exact comparisons without associative arrays (stock macOS Bash 3.2).
+  acquire_seen_pane_paths=$'\n'
   acquire_seen_candidates=$'\n'
+  acquire_epoch_seen=0
+  acquire_get_sent=0
   acquire_progress_pattern='^treehouse: checked (/.*): (accepted|refused|skipped): .+$'
   acquire_stop=''
   candidate=""
   last_seen=""
-  last_reason="the pane reported no path"
+  last_reason="the pane has not acknowledged this get's output boundary"
   tick=0
   while :; do
-    tick=$((tick + 1))
-    p=$(spawn_current_path "$WT_TARGET" || true)
-    if [ -n "$p" ] && [ "$p" != "$last_seen" ]; then
-      acquire_progress=$SECONDS
-      last_seen="$p"
-    fi
-    p_skipped=0
-    [ -z "$p" ] || ! spawn_slot_skipped "$p" || p_skipped=1
-    if [ "$p_skipped" = 1 ]; then
-      candidate=""
-      last_reason="the pane is still in a copy this spawn skipped"
-    elif [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
-      p_real=$(real_path_or_raw "$p")
-      last_reason="it is an isolated worktree, but no second read agreed with it"
-      if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
-        WT="$p"
-        break
+    if [ "$acquire_get_sent" = 1 ]; then
+      tick=$((tick + 1))
+      p=$(spawn_current_path "$WT_TARGET" || true)
+      if [ -n "$p" ] && [ "$p" != "$last_seen" ]; then
+        last_seen="$p"
+        case "$acquire_seen_pane_paths" in
+          *$'\n'"$p"$'\n'*) ;;
+          *)
+            acquire_seen_pane_paths+="$p"$'\n'
+            acquire_progress=$SECONDS
+            ;;
+        esac
       fi
-      candidate="$p_real"
-    else
-      candidate=""
-      [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
+      p_skipped=0
+      [ -z "$p" ] || ! spawn_slot_skipped "$p" || p_skipped=1
+      if [ "$p_skipped" = 1 ]; then
+        candidate=""
+        last_reason="the pane is still in a copy this spawn skipped"
+      elif [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
+        p_real=$(real_path_or_raw "$p")
+        last_reason="it is an isolated worktree, but no second read agreed with it"
+        if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
+          WT="$p"
+          break
+        fi
+        candidate="$p_real"
+      else
+        candidate=""
+        [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
+      fi
     fi
     if [ "$SECONDS" -ge "$acquire_next_output" ]; then
       if output=$(spawn_acquisition_output "$WT_TARGET" 2>/dev/null) && [ -n "$output" ]; then
+        # A first sample may mix retained records and this get's new completions.
+        # Cut at the emitted boundary, never discard that entire first sample.
+        output=$'\n'"$output"$'\n'
+        case "$output" in
+          *$'\n'"$acquire_marker"$'\n'*)
+            output=${output##*$'\n'"$acquire_marker"$'\n'}
+            acquire_epoch_seen=1
+            ;;
+          *) [ "$acquire_epoch_seen" = 1 ] || output='' ;;
+        esac
+        if [ "$acquire_get_sent" = 0 ] && [ "$acquire_epoch_seen" = 1 ]; then
+          # Use this same poll loop for the acknowledgement. Get cannot emit a
+          # burst and scroll the marker out of the bounded capture before it is seen.
+          spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
+          acquire_get_sent=1
+          [ -n "$SPAWN_ACQUIRE_T0" ] || SPAWN_ACQUIRE_T0=$SECONDS
+          acquire_start=$SPAWN_ACQUIRE_T0
+          acquire_progress=$SECONDS
+          acquire_next_output=$SECONDS
+          acquire_next_notice=$((SECONDS + acquire_notice))
+          last_reason="the pane reported no path"
+          continue
+        fi
         while IFS= read -r output_line; do
           [[ "$output_line" =~ $acquire_progress_pattern ]] || continue
           # Take the first decision delimiter, not a later one inside the reason.

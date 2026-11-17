@@ -75,6 +75,9 @@ case "${1:-} ${2:-}" in
   'pane get') jq -nc --arg pane "${3:-}" --arg cwd "$(cat "$D/cwd")" '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}' ;;
   'agent get') printf '{"error":{"code":"agent_not_found"}}\n' ;;
   'pane process-info') printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%9","shell_pid":4242,"foreground_processes":[]}}}\n' ;;
+  'pane read') [ ! -f "$D/acquisition-marker" ] || cat "$D/acquisition-marker" ;;
+  'pane run')
+    case "${4:-}" in printf*__firstmate_acquire_*) bash -c "${4:-}" > "$D/acquisition-marker" ;; esac ;;
   'pane send-text')
     printf '%s\n' "${4:-}" >> "$D/pane-input.sh"
     case "${4:-}" in

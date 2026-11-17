@@ -510,7 +510,12 @@ A slot a task merely left holds no record's current copy, so it never blocks all
 After sending `treehouse get`, a fresh spawn polls the pane until two reads agree on an isolated worktree of the project.
 The wait ends only after 600 seconds without observing a changed pane path or a newly finished candidate.
 A finished candidate is reported at column zero as `treehouse: checked <absolute copy path>: <accepted|refused|skipped>: <reason>`.
-Its identity is the path field compared exactly, counted only once per get; each new get starts with an empty seen set.
+Its identity is the path field compared exactly, counted only once per get.
+Pane-path changes have a separate per-get seen set: returning to a pane path already observed does not renew, but a stale pane observation cannot suppress a later genuine completion of that candidate.
+Both sets start empty for each get.
+Acquisition capture joins tmux soft wraps into logical records; all other capture consumers retain physical lines.
+The pane acknowledges a per-get output boundary before `treehouse get` is sent, so even a burst larger than the bounded capture cannot hide the boundary before it is established.
+That boundary excludes inherited records without clearing pane history, including when the first get sample also contains a current completion.
 Changed counters, timestamps, decisions or reasons for a seen candidate, scrolling it out and back, `waiting:` messages and all non-matching output renew nothing.
 A get without those progress lines is judged by pane path alone.
 There is no absolute acquisition ceiling: a get that keeps finishing new candidates may finish however long the walk takes, including across skipped copies.
