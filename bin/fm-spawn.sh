@@ -246,9 +246,10 @@
 #   focus-sensitive presentation mutation.
 #   Every single-task invocation holds one task-id-scoped lock across backend
 #   creation through metadata publication, so concurrent same-id spawns serialize
-#   even when they select different backends. A fresh spawn first takes the
-#   per-home task-set lock and refuses rather than waits when another operation
-#   owns it. The refusal names another spawn or forced teardown when the recorded
+#   even when they select different backends. A fresh worker spawn takes the
+#   per-home task-set lock only around task record publication; a secondmate
+#   takes it before its per-task locks. Both refuse rather than wait when another
+#   operation owns it. The refusal names another spawn or forced teardown when the recorded
 #   holder role is known, otherwise another operation. --relaunch is exempt
 #   because the existing task's control lock covers it.
 #   A fresh Treehouse-backed spawn also takes the project-identity lock in the local
@@ -289,8 +290,9 @@
 #   A relocating relaunch already holds the task's control lock, so it makes one
 #   nonwaiting attempt that never jumps a queued waiter. A fresh worker spawn
 #   waits holding only this task's own control and spawn-task locks, and takes
-#   the home task-set lock after the project lock, so its wait never refuses
-#   another fresh spawn of the same home. Other lifecycle/task-set lock
+#   the home task-set lock only at publication, so neither the project-lock
+#   wait nor treehouse get refuses another project's fresh spawn of this home.
+#   Other lifecycle/task-set lock
 #   refusals are unchanged.
 #   Project capacity: when this machine declares how many workers a project
 #   admits at once (config/project-capacity; bin/fm-project-capacity-lib.sh owns
@@ -2440,15 +2442,18 @@ spawn_require_relocated_queued_work
 # teardown's per-task preflight but visible to its cleanup, and gets mutated
 # while never lifecycle-locked (bin/fm-wake-lib.sh's fm_task_set_lock_path
 # owns the evidence; bin/fm-teardown.sh holds the same lock from enumeration
-# through cleanup). Held through publication. The away spend cap and relocated
-# queued-work checks run under it so concurrent spawns cannot both publish.
+# through cleanup). The away spend cap and relocated queued-work checks run
+# early without it and again under it, immediately before publication, so
+# concurrent spawns cannot both publish from stale admission checks.
 #
 # A secondmate spawn takes it before this task's own locks, matching the
-# acquisition order documented there. A worker spawn takes it only after the
-# shared project lock: it is the one lock every task of this home shares, so
-# holding it through a project-queue wait would refuse every other fresh spawn
-# of this home, for any project. Every other lock it holds is a single try,
-# so neither order can wait in a cycle.
+# acquisition order documented there. A worker spawn takes it only around
+# publishing its fresh task record, after the shared project lock, treehouse
+# get, and launch preparation. It is the one lock every task of this home
+# shares: neither a project-queue wait nor a slow get may retain it and refuse
+# every other project's fresh spawn. A publish refusal uses the existing
+# post-acquisition EXIT cleanup to close this attempt's endpoint and release
+# its process lease and locks. The task-set acquisition never waits.
 #
 # A relaunch is exempt: it republishes a task that already exists, so it is
 # already covered by that task's control lock, which the teardown preflight
@@ -4620,9 +4625,6 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
   spawn_validate_local_base || exit 1
 fi
-if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
-  spawn_take_task_set_lock
-fi
 if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
   if ! fm_project_capacity_occupants "$SPAWN_TREEHOUSE_PROJECT_LOCK" "$PROJ_ABS" "$STATE" "$ID"; then
     echo "error: spawn refused: project $(basename "$PROJ_ABS") declares a capacity of $SPAWN_PROJECT_CAPACITY, but this machine's task records cannot all be read to count it ($FM_PROJECT_CAPACITY_ERROR)" >&2
@@ -6378,6 +6380,8 @@ spawn_acquire_pool_slot() {
   done
   if [ -z "$WT" ]; then
     echo "error: treehouse get did not enter an isolated worktree after ${tick} polls ($acquire_stop) (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'; copies skipped by this spawn: ${SPAWN_SKIPPED_SLOTS[*]:-none}); aborting acquisition" >&2
+    echo 'treehouse get output:' >&2
+    [ -z "$acquire_output" ] || printf '%s\n' "$acquire_output" | tail -n 20 >&2
     spawn_report_leased_copies >&2
     exit 1
   fi
@@ -7897,6 +7901,7 @@ fi
   exit 1
 }
 if [ "$RELAUNCH" -eq 0 ]; then
+  [ "$KIND" = secondmate ] || spawn_take_task_set_lock
   if ! fm_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE"; then
     echo "error: task record for $ID could not be published ($FM_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1
