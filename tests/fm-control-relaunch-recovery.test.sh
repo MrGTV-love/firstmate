@@ -70,7 +70,14 @@ test_tmux_worktree_local_recovery_with_real_lsof() {
       add_ship_task "$dir" "$id" claude fmses "$wt"
       stage_gone "$dir" "$id" window-absent
       prepare_herdr_reclaim "$dir"
-      rm "$dir/fakebin/lsof"
+      # The replacement agent's pid exists only in the fixture's process
+      # table, so the fixture answers its launch-proof cwd read (-F pn0); every
+      # other read, including the worktree-holder scan, is real lsof.
+      mv "$dir/fakebin/lsof" "$dir/fakebin/lsof-fixture"
+      # shellcheck disable=SC2016 # the wrapper expands its own arguments
+      printf '#!/usr/bin/env bash\n[ "${*: -1}" != pn0 ] || exec %q "$@"\nexec %q "$@"\n' \
+        "$dir/fakebin/lsof-fixture" "$(command -v lsof)" > "$dir/fakebin/lsof"
+      chmod +x "$dir/fakebin/lsof"
       mkdir -p "$wt/sub"
       head_before=$(git -C "$wt" rev-parse HEAD)
       printf 'unlanded content\n' > "$wt/dirty.txt"

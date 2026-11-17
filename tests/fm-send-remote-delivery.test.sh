@@ -766,6 +766,17 @@ test_remote_expected_route_binds_delivery() {
   for case in unset match meta-root meta-home registry endpoint; do
     dir="$TMP_ROOT/remote-expected-route-$case"; mkdir -p "$dir"
     fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+    # The host's attribution reads the endpoint through herdr. A pinned fake
+    # reports the recorded pane gone, so the result never depends on whether
+    # the test host has a real herdr client installed.
+    cat > "$fb/herdr" <<'SH'
+#!/usr/bin/env bash
+case "$1 ${2:-}" in
+  'pane get') printf '{"error":{"code":"pane_not_found"}}\n' ;;
+  *) exit 1 ;;
+esac
+SH
+    chmod +x "$fb/herdr"
     rhome=$(setup_remote_secondmate_home "remote-expected-route-$case")
     home=$(setup_remote_parent_home "remote-expected-route-$case" "$rhome")
     printf 'home=%s\n' "$rhome" >> "$home/state/rsm.meta"

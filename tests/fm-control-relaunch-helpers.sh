@@ -171,9 +171,16 @@ SH
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+# Real lsof escapes backslashes and nonprinting bytes in a name, even with -F0.
+encode_cwd() {
+  local path=$1
+  path=${path//\\/\\\\}
+  path=${path//$'\xc3\xa9'/\\xc3\\xa9}
+  printf '%s' "$path"
+}
 if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
   [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
-  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
+  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(encode_cwd "$(cat "$D/adoption-cwd")")"
   exit 0
 fi
 # The kernel cwd a claude refusal check reads for a fake agent (Main 1709
@@ -204,15 +211,9 @@ if [ "${*: -1}" = pn0 ]; then
     [ -n "$cwd" ] || [ ! -f "$D/cwd" ] || cwd=$(cat "$D/cwd")
   fi
   [ -n "$cwd" ] || exit 1
-  printf 'p%s\0\nfcwd\0n%s\0\n' "$agent" "$cwd"
+  printf 'p%s\0\nfcwd\0n%s\0\n' "$agent" "$(encode_cwd "$cwd")"
   exit 0
 fi
-encode_cwd() {
-  local path=$1
-  path=${path//\\/\\\\}
-  path=${path//$'\xc3\xa9'/\\xc3\\xa9}
-  printf '%s' "$path"
-}
 excluded=
 while [ "$#" -gt 0 ]; do
   if [ "$1" = -p ]; then excluded=${2:-}; shift; fi
