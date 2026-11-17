@@ -1970,7 +1970,7 @@ teardown_route_checkout_open() {  # <slot> <copy>
 }
 teardown_route_checkout_close() {
   TEARDOWN_CKO_OPEN=0 TEARDOWN_CKO_COPY=
-  TEARDOWN_CKO_BRANCH= TEARDOWN_CKO_HEAD= TEARDOWN_CKO_POS= TEARDOWN_CKO_ANCHOR=
+  TEARDOWN_CKO_BRANCH='' TEARDOWN_CKO_HEAD='' TEARDOWN_CKO_POS='' TEARDOWN_CKO_ANCHOR=''
 }
 # 0 when the checkout is as the first read left it. Otherwise 1 with CKO_WHY naming
 # the switch. <prhead> is the PR's head branch (forge headRefName).
