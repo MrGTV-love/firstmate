@@ -87,7 +87,7 @@
 #   newly finished candidate or Git start.
 #   Separate per-get path sets reject repeats without letting a stale pane path
 #   suppress a later completion; a per-get output boundary excludes older records.
-#   Repeated candidates are not progress; there is no absolute acquisition ceiling.
+#   Repeated candidates are not progress; there is no default absolute acquisition ceiling.
 #   docs/agent-control.md owns the rule, and
 #   docs/verification/runtime-backends.md "Treehouse get entry wait" records
 #   the earlier acquisition timings and their limits.
