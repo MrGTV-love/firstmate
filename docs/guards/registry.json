@@ -1038,6 +1038,14 @@
         },
         {
           "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: copy '$passed' cannot be resolved to a real path"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not write and read back the record of passed-over copy $real"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
           "match": "echo \"error: copy held and the spawn refused ($1); nothing more was written to it\" >&2"
         },
         {
