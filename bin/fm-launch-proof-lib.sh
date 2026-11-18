@@ -355,11 +355,13 @@ try:
     if len(sys.argv) > 5 and sys.argv[4]:
         # A Bun-shaped process publishes nothing about its session and a registration is
         # not proof of it, so the live process must hold the task's session file open for
-        # writing: omp's session writer keeps that descriptor for the life of the session.
+        # writing, and no other session file (which session is current cannot be proved
+        # otherwise; whether the installed omp releases an old descriptor after a switch is
+        # unverified here and owned by the live guard, E3).
         held = subprocess.run([sys.executable, "-I", sys.argv[5], "holds", str(pid), str(live)],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         require(held.returncode == 0,
-                "session proof needs the live Bun process to hold the registered task session file open for writing; a registration alone is not proof of the live session")
+                "session proof needs the live Bun process to hold the registered task session file open for writing and no other session file; a registration alone is not proof of the live session")
     print(json.dumps(dict(version=1, spawn_gen=gen, pid=pid,
                           task_session_file=task, current_session_file=str(live))))
 except (OSError, ValueError, TypeError, subprocess.SubprocessError):

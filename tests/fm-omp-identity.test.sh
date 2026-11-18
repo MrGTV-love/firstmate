@@ -16,6 +16,7 @@ if [ "$(uname -s)" != Darwin ] || ! command -v cc >/dev/null 2>&1; then
   exit 0
 fi
 TMP=$(fm_test_tmproot fm-omp-identity)
+TMP=$(cd "$TMP" && pwd -P) # the rule compares raw argument bytes with a canonical path, so the fixtures live under one
 HOLDERS=()
 cleanup() {
   local pid
@@ -30,7 +31,30 @@ PROCINFO="$ROOT/bin/fm-proc-info.py"
 build_tree() { # <root> -> a runtime stub, an entry script and a launcher
   local root=$1 bun=$1/runtime/node_modules/@oven/bun-darwin-aarch64/bin
   mkdir -p "$bun" "$root/src/node_modules/@oh-my-pi/pi-coding-agent/src"
-  printf '#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\nint main(int c,char**v){for(int i=1;i<c;i++)if(!strcmp(v[i],"--version")){puts("9.9.9");return 0;}alarm(900);for(;;)pause();}\n' > "$root/stub.c"
+  cat > "$root/stub.c" <<'C'
+#include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+static volatile sig_atomic_t switched;
+static void on_usr1(int sig) { (void)sig; switched = 1; }
+int main(int c, char **v) {
+  for (int i = 1; i < c; i++) if (!strcmp(v[i], "--version")) { puts("9.9.9"); return 0; }
+  signal(SIGUSR1, on_usr1);
+  alarm(900);
+  for (;;) {
+    pause();
+    if (!switched) continue;
+    switched = 0;
+    /* a session switch in this same process: open the next file; optionally release the old descriptor */
+    const char *next = getenv("SWITCH_TO"), *old = getenv("HELD_FD");
+    if (next) open(next, O_WRONLY | O_APPEND);
+    if (getenv("SWITCH_RELEASE") && old) close(atoi(old));
+  }
+}
+C
   cc -o "$bun/bun" "$root/stub.c" || fail "could not compile the runtime stand-in"
   printf '{"name":"@oven/bun-darwin-aarch64"}\n' > "${bun%/bin}/package.json"
   local package="$root/src/node_modules/@oh-my-pi/pi-coding-agent"
@@ -74,7 +98,10 @@ else:
     stdin = subprocess.DEVNULL
 hold = os.environ.get("HOLD_FILE")
 held = [os.open(hold, os.O_WRONLY | os.O_APPEND)] if hold else []
-child = subprocess.Popen(argv, executable=executable, stdin=stdin, stdout=subprocess.DEVNULL, pass_fds=held)
+env = dict(os.environ)
+if held:
+    env["HELD_FD"] = str(held[0])
+child = subprocess.Popen(argv, executable=executable, stdin=stdin, stdout=subprocess.DEVNULL, pass_fds=held, env=env)
 signal.signal(signal.SIGTERM, lambda *_: (child.kill(), os._exit(0)))
 open(pidfile, "w").write(str(child.pid))
 time.sleep(600)
@@ -353,7 +380,7 @@ test_captured_facts_replay_without_the_tree() {
   }
   replay good.json 0 0 "the genuine process replays as recognized with its tree gone"
   replay worker.json 1 0 "a worker role replays as refused, and may still own a record"
-  replay foreign.json 1 1 "a foreign executable presenting the installed words replays as another program"
+  replay foreign.json 1 0 "a foreign executable presenting the installed words replays as refused, and may still own a record (its path is read now, not held by the kernel)"
   replay no-exe.json 2 0 "a capture without the executable path is unresolved"
   replay no-evidence.json 2 0 "a capture without the tree evidence is unresolved"
   replay missing.json 2 0 "a capture that cannot be read is unresolved"
@@ -474,11 +501,15 @@ test_fail_closed_runs_recover_when_the_evidence_returns() {
   rc=0; verdict "$foreign" || rc=$?
   [ "$rc" -ne 0 ] || fail "a foreign process must be refused with the evidence unreadable"
   mv "$t/saved.json" "$t/tree/$script_pkg/package.json"
-  assert_verdict 0 "$pid" "the same process is admitted again once the evidence returns"
+  # The tree changed after these processes started, so the compliant one cannot be tied to what it loaded:
+  # it stays unresolved. A fresh launch from the restored tree is admitted again.
+  assert_verdict 2 "$pid" "the process that started before the tree changed stays unresolved once the evidence returns"
+  spawn tty /bin/sh /bin/sh "$t/tree/omp" --no-title
+  assert_verdict 0 "$SPAWNED" "a fresh launch from the restored tree is admitted"
   assert_verdict 1 "$helper" "a helper stays refused once the evidence returns"
   assert_verdict 1 "$foreign" "a foreign process stays refused once the evidence returns"
   export FM_OMP_INSTALLED_ROOT="$TREE"
-  pass "fail closed: unreadable evidence admits nothing and the compliant process is admitted again once it returns"
+  pass "fail closed: unreadable evidence admits nothing; a process that started before the tree changed stays unresolved, and a fresh launch is admitted once the evidence returns"
 }
 
 # --- 6. record ownership and the library predicates -----------------------------
@@ -628,6 +659,10 @@ SH
   out=$(walk "$oldpid" "$oldbun" "$oldbun $oldscript --no-title"); [ "$out" = other ] || fail "the old tree's live omp keeps the pane occupied while its tree is complete, got $out"
   rm "$dir/old/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli-commands.ts"
   out=$(walk "$oldpid" "$oldbun" "$oldbun $oldscript --no-title"); [ "$out" = other ] || fail "a live omp whose tree lost cli-commands.ts after it started must still keep the pane occupied, got $out"
+  # N1: its script link retargeted to a foreign file after it started
+  mv "$oldscript" "$oldscript.orig"
+  ln -s main.ts "$oldscript"
+  out=$(walk "$oldpid" "$oldbun" "$oldbun $oldscript --no-title"); [ "$out" = other ] || fail "a live omp whose script link was retargeted after it started must still keep the pane occupied, got $out"
   pass "walk: a live or unreadable Bun descendant keeps the pane occupied; an unrelated Bun job and an empty shell keep today's outcome"
 }
 
@@ -743,6 +778,99 @@ test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
   pass "classifier: every recognized name keeps its verdict and the installed Bun shape stays other, owned by the identity rule"
 }
 
+
+# --- N1: a script path resolved after launch is not evidence of what the process loaded ---
+test_a_script_path_retargeted_after_launch_proves_nothing() {
+  local t="$TMP/n1" script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent a b c d rc
+  mkdir -p "$t"
+  # shellcheck source=bin/fm-launch-proof-lib.sh
+  . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
+  ps() { case "$*" in '-p '*' -o comm=') python3 -I "$PROCINFO" comm "$2" ;; '-p '*' -o args=') python3 -I "$PROCINFO" args "$2" ;; *) return 1 ;; esac; }
+  # A: a live writer whose script link is retargeted to a foreign file after it started
+  build_tree "$t/a"
+  tree_launch "$t/a" --no-title; a=$SPAWNED
+  FM_OMP_INSTALLED_ROOT="$t/a" assert_tree 0 0 "$a" "control: before the retarget the process is the installed agent"
+  mv "$t/a/$script_pkg/src/cli.ts" "$t/a/$script_pkg/src/cli.ts.orig"
+  ln -s main.ts "$t/a/$script_pkg/src/cli.ts"
+  assert_tree 1 0 "$a" "a script link retargeted after launch is never proof the process is another program"
+  FM_OMP_INSTALLED_ROOT="$t/a" assert_tree 1 0 "$a" "a script link retargeted after launch is not admitted even where its tree is the installed one"
+  fm_launch_proof_pid_may_own_record "$a" || fail "a live writer whose script link was retargeted after launch may still own its record"
+  # the genuinely unrelated control: the raw arguments name no omp entry at all
+  mkdir -p "$t/other/bin"; cp "$BUN" "$t/other/bin/bun"
+  spawn tty "$t/other/bin/bun" "$t/other/bin/bun" /elsewhere/app.ts
+  assert_tree 1 1 "$SPAWNED" "a bun on a script that is lexically not the entry is unrelated"
+  rc=0; fm_launch_proof_pid_may_own_record "$SPAWNED" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a bun on a script that is lexically not the entry may be replaced as an unrelated reused pid"
+  # B: a foreign process whose script link is retargeted to the installed entry after launch stays refused
+  mkdir -p "$t/b/foreign" "$t/b/lnk/src"
+  : > "$t/b/foreign/cli.ts"
+  ln -s "$t/b/foreign/cli.ts" "$t/b/lnk/src/cli.ts"
+  spawn tty "$BUN" "$BUN" "$t/b/lnk/src/cli.ts" --no-title; b=$SPAWNED
+  assert_tree 1 0 "$b" "control: a process started on a link to a foreign script is refused"
+  ln -sfn "$SCRIPT" "$t/b/lnk/src/cli.ts"
+  assert_tree 1 0 "$b" "a link retargeted to the installed entry after launch must not admit the process"
+  # C: a directory of the installed path swapped for another after launch
+  build_tree "$t/c"
+  mv "$t/c/$script_pkg/src" "$t/c/real-src"
+  mkdir -p "$t/c/foreign-src"; : > "$t/c/foreign-src/cli.ts"
+  ln -s "$t/c/foreign-src" "$t/c/$script_pkg/src"
+  tree_launch "$t/c" --no-title; c=$SPAWNED
+  rm "$t/c/$script_pkg/src"
+  mv "$t/c/real-src" "$t/c/$script_pkg/src"
+  FM_OMP_INSTALLED_ROOT="$t/c" assert_tree 2 0 "$c" "a directory swapped into the installed path after launch leaves the process unresolved, never admitted"
+  # D: the fail-closed policy for an unrelated write into a directory of the installed path
+  build_tree "$t/d"
+  tree_launch "$t/d" --no-title; d=$SPAWNED
+  FM_OMP_INSTALLED_ROOT="$t/d" assert_tree 0 0 "$d" "control: an untouched installed tree admits"
+  : > "$t/d/$script_pkg/src/extra.txt"
+  FM_OMP_INSTALLED_ROOT="$t/d" assert_tree 2 0 "$d" "a write into a directory of the installed path after launch fails closed (named policy)"
+  pass "N1: a script path or link changed after launch is never proof of another program or of the installed one; only the raw arguments prove unrelated"
+}
+
+# --- N3: which session a process currently writes cannot be read from one descriptor ---
+test_a_process_that_switched_sessions_is_not_tied_to_the_old_one() {
+  local t="$TMP/switch" mode pid rc i
+  mkdir -p "$t/task"; : > "$t/task.jsonl"; : > "$t/personal.jsonl"; : > "$t/task/__advisor.jsonl"
+  holds_rc() { rc=0; python3 -I "$IDENT" holds "$1" "$2" >/dev/null 2>&1 || rc=$?; }
+  wait_for_switch() { # <pid> <file>: the same process now holds <file>
+    for i in $(seq 1 100); do
+      holds_rc "$1" "$2"
+      [ "$rc" -ne 1 ] && return 0
+      sleep 0.05
+    done
+    fail "the stand-in did not switch sessions"
+  }
+  # the real shape (three of the eleven captures): the task session and its own advisor file
+  HOLD_FILE="$t/task.jsonl" SWITCH_TO="$t/task/__advisor.jsonl" launch tty --no-title; pid=$SPAWNED
+  kill -USR1 "$pid"
+  for i in $(seq 1 100); do
+    [ "$(python3 -I "$PROCINFO" writable "$pid" | python3 -I -c 'import json,sys;print(sum(1 for e in json.load(sys.stdin) if e["path"].endswith("__advisor.jsonl")))')" = 1 ] && break
+    sleep 0.05
+  done
+  holds_rc "$pid" "$t/task.jsonl"; [ "$rc" -eq 0 ] || fail "a process holding its task session and that session's own advisor file is tied to the task session (exit $rc)"
+  for mode in retain release; do
+    if [ "$mode" = release ]; then
+      HOLD_FILE="$t/task.jsonl" SWITCH_TO="$t/personal.jsonl" SWITCH_RELEASE=1 launch tty --no-title
+    else
+      HOLD_FILE="$t/task.jsonl" SWITCH_TO="$t/personal.jsonl" launch tty --no-title
+    fi
+    pid=$SPAWNED
+    holds_rc "$pid" "$t/task.jsonl"; [ "$rc" -eq 0 ] || fail "before the switch ($mode) the process holds the task session (exit $rc)"
+    holds_rc "$pid" "$t/personal.jsonl"; [ "$rc" -eq 1 ] || fail "before the switch ($mode) the process does not hold the other session (exit $rc)"
+    kill -USR1 "$pid"
+    wait_for_switch "$pid" "$t/personal.jsonl"
+    case "$mode" in
+      retain)
+        holds_rc "$pid" "$t/task.jsonl"; [ "$rc" -eq 2 ] || fail "a process that switched but kept its old descriptor cannot prove the task session is current (exit $rc)"
+        holds_rc "$pid" "$t/personal.jsonl"; [ "$rc" -eq 2 ] || fail "a process holding two sessions cannot prove either is current (exit $rc)" ;;
+      release)
+        holds_rc "$pid" "$t/task.jsonl"; [ "$rc" -eq 1 ] || fail "a process that switched and released the old descriptor no longer holds the task session (exit $rc)"
+        holds_rc "$pid" "$t/personal.jsonl"; [ "$rc" -eq 0 ] || fail "a process that released the old descriptor holds only the new session (exit $rc)" ;;
+    esac
+  done
+  pass "session binding: a retained old descriptor cannot prove the current session (fails closed), a released one does, and a session's own advisor file is not another session"
+}
+
 fm_test_only
 test_classifier_keeps_its_names_and_the_bun_shape_stays_other
 test_session_binding_needs_the_session_file_held_open_for_writing
@@ -758,3 +886,5 @@ test_verdict_does_not_depend_on_the_omp_on_path
 test_a_helper_failure_is_never_proof_of_no_writer
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free
 test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable
+test_a_script_path_retargeted_after_launch_proves_nothing
+test_a_process_that_switched_sessions_is_not_tied_to_the_old_one

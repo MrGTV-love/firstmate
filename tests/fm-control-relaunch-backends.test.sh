@@ -1992,7 +1992,7 @@ BUN_TREE=
 BUN_PIDS=()
 bun_tree() { # one scratch installation per run
   [ -z "$BUN_TREE" ] || return 0
-  BUN_TREE="$TMP_ROOT/bun-tree"
+  BUN_TREE="$(cd "$TMP_ROOT" && pwd -P)/bun-tree" # canonical: the rule compares raw argument bytes with a canonical path
   # The one trusted installed identity (bin/fm-omp-identity.py installed_identity) is this scratch tree.
   export FM_OMP_INSTALLED_ROOT="$BUN_TREE"
   local bin="$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin"
@@ -2019,8 +2019,7 @@ if kind == "tty":
     master, slave = pty.openpty(); keep.append(master); stdin = slave
 else:
     stdin = subprocess.DEVNULL
-hold = os.environ.get("BUN_HOLD_FILE")
-held = [os.open(hold, os.O_WRONLY | os.O_APPEND)] if hold else []
+held = [os.open(path, os.O_WRONLY | os.O_APPEND) for path in (os.environ.get("BUN_HOLD_FILE"), os.environ.get("BUN_HOLD_FILE_2")) if path]
 child = subprocess.Popen(sys.argv[4:], executable=executable, stdin=stdin, stdout=subprocess.DEVNULL, pass_fds=held)
 signal.signal(signal.SIGTERM, lambda *_: (child.kill(), os._exit(0)))
 open(pidfile, "w").write(str(child.pid))
@@ -2185,7 +2184,7 @@ test_omp_bun_adoption_keeps_every_other_proof() {
 
 test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
   local shape dir id record out before pid_a old oldbun oldscript
-  for shape in protocol-writer interactive-writer unreadable-writer old-tree-edited table-unreadable; do
+  for shape in protocol-writer interactive-writer unreadable-writer old-tree-edited script-retargeted table-unreadable; do
     prepare_bun_adoption "writer-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
     pid_a=
@@ -2209,6 +2208,17 @@ test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
         bun_spawn "a-$shape" tty "$oldbun" "$oldbun" "$oldscript" --config "$dir/other.yml" --no-title
         pid_a=$BUN_PID
         rm "$old/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli-commands.ts" ;;
+      script-retargeted)
+        # The same old tree, but its script link is retargeted to another file after A started: the path now
+        # resolves elsewhere, which says nothing about what the running process loaded.
+        old="$dir/old-tree"
+        cp -R "$BUN_TREE" "$old"
+        oldbun="$old/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
+        oldscript="$old/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
+        bun_spawn "a-$shape" tty "$oldbun" "$oldbun" "$oldscript" --config "$dir/other.yml" --no-title
+        pid_a=$BUN_PID
+        mv "$oldscript" "$oldscript.orig"
+        ln -s main.ts "$oldscript" ;;
       table-unreadable)
         # A live Bun omp whose process-table entry cannot be read while the kernel still knows the pid.
         bun_launch "a-$shape" --config "$dir/other.yml" --no-title 'another agent'
@@ -2428,13 +2438,16 @@ test_omp_bun_adoption_binds_the_adopted_incarnation() {
 
 test_omp_bun_adoption_needs_positive_live_session_evidence() {
   local shape dir id record out rc pid_p pid_q start_q msg
-  msg='session proof needs the live Bun process to hold the registered task session file open for writing'
-  for shape in holds-nothing holds-another-session; do
+  msg='session proof needs the live Bun process to hold the registered task session file open for writing and no other session file'
+  for shape in holds-nothing holds-another-session holds-task-and-another-session; do
     prepare_omp_adoption "bun-session-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
     write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
     case "$shape" in
       holds-nothing) bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
+      holds-task-and-another-session)
+        # A process that holds the task session and another one cannot show which is current (a retained old descriptor).
+        BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" BUN_HOLD_FILE_2="$dir/wt/personal-session.jsonl" bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
       holds-another-session)
         BUN_HOLD_FILE="$dir/wt/personal-session.jsonl" bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
     esac

@@ -14,32 +14,49 @@ the single owner of that identity rule. bin/fm-launch-proof-lib.sh calls
 `interactive` and `holds`; bin/fm-agent-process-lib.sh calls `writer` for the
 record-owner check and the Herdr descendant walk.
 
-Identity. One trusted installed identity, held in one place (INSTALLED_RUNTIME and
-INSTALLED_SCRIPT below, resolved by installed_identity(); the test override is the
-single variable FM_OMP_INSTALLED_ROOT, which names a replacement root with the same
-layout). It never consults a launcher or PATH, so an `omp update` that replaces a
-launcher cannot change the verdict on a process that is already running, and no
-version is pinned. A process is the installed omp's interactive agent only when ALL of
-these hold: its kernel executable path (fm-proc-info.py exe, never an argument word)
-resolves to the installed runtime's realpath; argv[1] is an absolute path that resolves
-to the installed script's realpath; those two real paths also pass the structural
-checks, kept as extra proof (a regular executable named bun in a directory named bin
-whose parent holds a package.json named @oven/bun-*; a regular file named cli.ts in a
-directory named src whose parent holds a regular package.json named
+Identity. Every input is one of two kinds, and the rule is kept in one place.
+Held by the kernel for this PID, unchangeable after launch: the start identity, the
+raw argument vector (argv[0] and argv[1] exactly as exec received them), the standard-
+input type and the open-descriptor table. Read from the filesystem NOW, so anything
+may have changed since the process loaded it: every realpath, lstat and package.json,
+the marker files, and the path string the kernel reports for the executable (it follows
+a rename of any directory above the file). "Positively another program" (Foreign, and
+so `writer` exit 1, "unrelated" and "agent-free") rests only on the first kind: argv[0]
+whose basename is not bun, no script argument, or a raw argv[1] that is lexically not a
+cli.ts in a src directory. A script path resolved after launch can never prove it:
+a link retargeted after the process loaded its script changes what the path resolves to,
+not what the process loaded. A differently named link to the entry that the process
+loaded is the named residual (it reads as may-own, never as unrelated).
+Admission (`interactive`) needs every filesystem input tied to launch time, and
+otherwise fails closed. One trusted installed identity is held in one place
+(INSTALLED_RUNTIME and INSTALLED_SCRIPT below, resolved by installed_identity(); the
+test override is the single variable FM_OMP_INSTALLED_ROOT, which names a replacement
+root with the same layout). It is its own canonical path: the root must be a real
+directory (a link there redefines nothing) and neither the runtime nor the script may
+be reached through a link. It never consults a launcher or PATH, so an `omp update`
+that replaces a launcher cannot change the verdict on a process that is already
+running, and no version is pinned. A process is the installed omp's interactive agent
+only when ALL of these hold: its raw argv[1] is, byte for byte, the installed script
+path; its kernel executable path resolves to the installed runtime; the structural
+checks pass, kept as extra proof (a regular executable named bun in a directory named
+bin whose parent holds a package.json named @oven/bun-*; a regular file named cli.ts in
+a directory named src whose parent holds a regular package.json named
 @oh-my-pi/pi-coding-agent and the regular files src/cli-commands.ts and src/main.ts);
-its role is the interactive agent; and its standard input is a terminal. A complete
-omp-shaped tree at any other path is refused for `interactive` but is never "positively
-another program" for `writer`: it may own a session record. Only the process's own
-executable path (not a bun in a bin directory) and the script path in its argument vector
-(no script, or not a cli.ts in a src directory) can prove it positively another program;
-what the package files around them say now can only refuse adoption, because an
-already-running Bun keeps what it loaded after those files change. Anything that cannot be
-read, or an
+every inode from the installed root down to the installed runtime and to the installed
+script has an inode-change time at or before the process start (tree_settled: a path
+swapped, retargeted, edited or renamed into place after launch moves the changed
+inode's time past the start, which is measured on this host for ln -sfn, mv of an older
+file, link or directory, replace-by-rename and in-place edit; an unrelated write into
+one of those directories also moves it, which fails closed); its role is the
+interactive agent; and its standard input is a terminal. A complete omp-shaped tree at
+any other path is refused for `interactive` but is never "positively another program"
+for `writer`: it may own a session record. Anything that cannot be read, or an
 executable or script path that no longer exists, or an installed identity that cannot
-be derived (or that resolves outside its own root), is unresolved, never interactive.
-`facts` stores what it read, including the installed pair it compared with, in the
-record, and every verdict on a `--facts` record is judged from that record alone, so a
-capture replays without the tree; a live PID never takes its identity from input.
+be derived, or an installed tree that changed after the process started, is
+unresolved, never interactive. `facts` stores what it read, including the installed
+pair it compared with and tree_settled, in the record, and every verdict on a `--facts`
+record is judged from that record alone, so a capture replays without the tree; a live
+PID never takes its identity from input.
 
 Role. The role is decided by a port of the installed CLI's own dispatch, over
 the argument ARRAY so boundaries survive: profile-flag extraction
@@ -57,13 +74,18 @@ CLI's; tests/fm-omp-identity.test.sh pins them to a fixture and the live guard
 
 Session binding. An unpinned process has no publication of the session it runs, and a
 registration or a resume argument is not proof of it (a conversation can switch
-after launch). The installed omp's session writer opens its session file for
-append once and keeps the descriptor for the life of the session
-(session/session-storage.ts, FileSessionStorageWriter), so `holds` reports whether the
-process holds a given regular file open for writing, by device and inode, read from
-the kernel (fm-proc-info.py writable). Exit 0 holds it, 1 does not, 2 unreadable.
-Adoption of a Bun-shaped process requires it, so a process that is not positively
-tied to the task's preserved session stays unadopted.
+after launch). `holds` reports whether the process holds a given regular file open for
+writing, by device and inode, read from the kernel (fm-proc-info.py writable). Whether
+the installed omp keeps writing its session file after a switch, and whether it releases
+the old descriptor, is UNVERIFIED here: nothing in this repository observed the real
+harness switching a session (the live guard runs with --no-session), so that fact is
+owned by Main's live guard (E3). `holds` therefore fails closed when the process holds
+the file AND another writable `.jsonl` outside that session's own artifact directory
+(the session file's name without `.jsonl`, where omp keeps its advisor file): it then
+cannot tell which session is current, and exit 2 refuses adoption. Exit 0 holds it and
+no other session file, 1 does not hold it, 2 unreadable or ambiguous. Adoption of a
+Bun-shaped process requires exit 0, so a process that is not positively tied to the
+task's preserved session stays unadopted.
 
 Exit status. interactive: 0 the process is the installed omp's interactive
 agent (stdout is JSON carrying the incarnation `start`), 1 refused (a foreign
@@ -416,15 +438,16 @@ def _package_name(directory):
 
 
 def installed_identity():
-    """The one trusted installed identity: {"runtime": realpath, "script": realpath}, or None.
+    """The one trusted installed identity, or None.
 
-    The root is the override FM_OMP_INSTALLED_ROOT when set, else the installed omp's root
-    under the account's home directory (the passwd entry, never $HOME, so the environment
-    holds no second override). The root is anchored by resolving its PARENT and keeping its
-    own final name: a root that is itself a link is not the trusted root, because following
-    it would let the link redefine what "inside the root" means. None when it cannot be
-    derived: no home, a missing or linked root, a missing runtime or script, or a runtime or
-    script whose real path leaves the anchored root.
+    {"root", "runtime", "script"}, each a canonical path: the identity is its own
+    canonical form, so no link inside it can be retargeted after a process starts and
+    change which file the identity names. The root is the override FM_OMP_INSTALLED_ROOT
+    when set, else the installed omp's root under the account's home directory (the passwd
+    entry, never $HOME, so the environment holds no second override). The root is anchored
+    by resolving its PARENT and keeping its own final name; a root that is itself a link is
+    not the trusted root. None when it cannot be derived: no home, a missing or linked
+    root, a missing runtime or script, or a runtime or script reached through any link.
     """
     root = os.environ.get(INSTALLED_ROOT_VARIABLE)
     if not root:
@@ -445,13 +468,44 @@ def installed_identity():
             return None
     except OSError:
         return None
-    runtime = _existing_real(os.path.join(anchored, INSTALLED_RUNTIME))
-    script = _existing_real(os.path.join(anchored, INSTALLED_SCRIPT))
-    if not (runtime and script):
+    runtime = os.path.join(anchored, INSTALLED_RUNTIME)
+    script = os.path.join(anchored, INSTALLED_SCRIPT)
+    if _existing_real(runtime) != runtime or _existing_real(script) != script:
         return None
-    if any(os.path.commonpath([anchored, path]) != anchored for path in (runtime, script)):
+    return {"root": anchored, "runtime": runtime, "script": script}
+
+
+def _start_ns(start):
+    """The process start identity "SECONDS.MICROSECONDS" as nanoseconds, or None."""
+    try:
+        seconds, _, micros = str(start).partition(".")
+        return int(seconds) * 1_000_000_000 + int((micros + "000000")[:6]) * 1000
+    except (TypeError, ValueError):
         return None
-    return {"runtime": runtime, "script": script}
+
+
+def tree_settled(installed, start):
+    """True when every inode from the installed root down to the runtime and to the script
+    has an inode-change time at or before the process start; False when any is later; None
+    when that cannot be read. This is the launch-time tie for admission: what a process
+    loaded through these paths cannot have been replaced since it started unless one of
+    these inodes changed."""
+    started = _start_ns(start)
+    if started is None or not isinstance(installed, dict):
+        return None
+    root = installed.get("root")
+    if not isinstance(root, str) or not root:
+        return None
+    paths = [root]
+    for target in (installed.get("runtime"), installed.get("script")):
+        if not isinstance(target, str) or os.path.commonpath([root, target]) != root:
+            return None
+        parts = os.path.relpath(target, root).split(os.sep)
+        paths += [os.path.join(root, *parts[:n]) for n in range(1, len(parts) + 1)]
+    try:
+        return all(os.lstat(path).st_ctime_ns <= started for path in paths)
+    except OSError:
+        return None
 
 
 def read_evidence(exe, argv):
@@ -484,19 +538,37 @@ def live_facts(pid):
         facts["argv"] = None
     facts["evidence"] = read_evidence(facts["exe"], facts["argv"])
     facts["installed"] = installed_identity()
+    facts["evidence"]["tree_settled"] = tree_settled(facts["installed"], facts["start"])
     return facts
 
 
 def holds_file(writable, path):
-    """True when one of the process's writable regular files is the file at path."""
+    """True when one of the process's writable regular files is the file at path and it holds
+    no other session file. Raises Unresolved when it holds the file AND another writable
+    .jsonl outside that session's own artifact directory: which session is current cannot
+    then be proved (a retained old descriptor and a legitimate second file look the same)."""
     try:
         target = os.stat(path)
     except OSError:
         return False
     if not isinstance(writable, list):
         raise Unresolved("the process's open files cannot be read")
-    return any(isinstance(entry, dict) and entry.get("ino") == target.st_ino
-               and entry.get("dev") == (target.st_dev & 0xFFFFFFFF) for entry in writable)
+    device = target.st_dev & 0xFFFFFFFF
+    entries = [entry for entry in writable if isinstance(entry, dict)]
+
+    def same(entry):
+        return entry.get("ino") == target.st_ino and entry.get("dev") == device
+
+    if not any(same(entry) for entry in entries):
+        return False
+    artifacts = os.path.splitext(os.path.realpath(path))[0] + os.sep
+    for entry in entries:
+        name = entry.get("path")
+        if same(entry) or not isinstance(name, str) or not name.endswith(".jsonl"):
+            continue
+        if not (name.startswith(artifacts) or os.path.realpath(name).startswith(artifacts)):
+            raise Unresolved("the process holds another session file open for writing, so which session is current cannot be proved")
+    return True
 
 
 def _settled(value, what):
@@ -508,32 +580,37 @@ def _settled(value, what):
 def decide(facts):
     """Raise Refused or Unresolved unless facts are the installed omp's interactive agent.
 
-    Foreign (positively another program) is raised only from facts that a running process
-    cannot have changed: its own executable path and the script path in its argument vector.
-    What the files around them say NOW (package names, marker files, whether the script file
-    is still regular) is mutable: an already-running Bun keeps what it loaded after those
-    files change, so a failure there refuses adoption (Refused) but never proves the process
-    is not an omp session writer.
+    Foreign (positively another program) is raised only from the raw argument vector the
+    kernel holds for the process. Everything read from the filesystem now (the executable's
+    path, the script's resolution, package names, marker files, the installed identity and
+    its change times) can only refuse adoption (Refused) or leave it unresolved, because a
+    running process keeps what it loaded after those files change.
     """
     exe, argv, evidence = facts.get("exe"), facts.get("argv"), facts.get("evidence")
     if not facts.get("start"):
         raise Unresolved("the process start identity cannot be read")
     if not exe:
         raise Unresolved("the actual executable path cannot be read")
-    if not isinstance(argv, list) or not all(isinstance(word, str) for word in argv):
+    if not isinstance(argv, list) or not argv or not all(isinstance(word, str) for word in argv):
         raise Unresolved("the argument vector cannot be read with its boundaries")
     if not isinstance(evidence, dict):
         raise Unresolved("the installed tree evidence cannot be read")
     exe_real = _settled(evidence.get("exe_real"), "the actual executable path")
-    if os.path.basename(exe_real) != "bun" or os.path.basename(os.path.dirname(exe_real)) != "bin":
-        raise Foreign("the executable is not a bun in a bin directory")
+    # Foreign: raw argument bytes only.
+    if os.path.basename(argv[0]) != "bun":
+        raise Foreign("argv[0] is not a bun")
     if len(argv) < 2:
         raise Foreign("the runtime runs no script")
     if not os.path.isabs(argv[1]):
         raise Unresolved("the script argument is not an absolute path")
+    if os.path.basename(argv[1]) != "cli.ts" or os.path.basename(os.path.dirname(argv[1])) != "src":
+        raise Foreign("the script argument is not a cli.ts in a src directory")
+    # From here on only Refused or Unresolved: what the files say now never proves a program foreign.
     script_real = _settled(evidence.get("script_real"), "the script path")
+    if os.path.basename(exe_real) != "bun" or os.path.basename(os.path.dirname(exe_real)) != "bin":
+        raise Refused("the executable is not a bun in a bin directory now")
     if os.path.basename(script_real) != "cli.ts" or os.path.basename(os.path.dirname(script_real)) != "src":
-        raise Foreign("the script is not a cli.ts in a src directory")
+        raise Refused("the script argument does not resolve to a cli.ts in a src directory now")
     if not _settled(evidence.get("exe_regular_executable"), "the executable file"):
         raise Refused("the executable is not a regular executable file now")
     if not _settled(evidence.get("runtime_package"), "the runtime package").startswith(RUNTIME_PACKAGE_PREFIX):
@@ -550,8 +627,12 @@ def decide(facts):
     runtime, script = installed.get("runtime"), installed.get("script")
     if not (isinstance(runtime, str) and isinstance(script, str) and runtime and script):
         raise Unresolved("the installed identity cannot be read")
-    if exe_real != runtime or script_real != script:
-        raise Refused("an omp-shaped program that is not the installed omp's runtime on its entry script")
+    if argv[1] != script:
+        raise Refused("the script argument is not, byte for byte, the installed omp's entry script")
+    if exe_real != runtime:
+        raise Refused("an omp-shaped program that is not the installed omp's runtime")
+    if not _settled(evidence.get("tree_settled"), "whether the installed tree changed after the process started"):
+        raise Unresolved("the installed tree changed after the process started, so what the process loaded through it cannot be proved")
     decide_role(argv[2:], facts.get("stdin"))
 
 
