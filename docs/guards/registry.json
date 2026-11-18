@@ -6991,7 +6991,7 @@
       "owner": "bin/fm-status-cap-lib.sh",
       "sites": [
         {"file": "bin/fm-status-append.sh", "match": "refusing a symbolic link"},
-        {"file": "bin/fm-status-cap-lib.sh", "match": "past the read limit of"},
+        {"file": "bin/fm-status-cap-lib.sh", "match": "past the read limit of", "count": 2},
         {"file": "bin/fm-status-cap-lib.sh", "match": "past the line-by-line read limit"},
         {"file": "bin/fm-status-cap-lib.sh", "match": "stayed locked by another writer"},
         {"file": "bin/fm-status-cap-lib.sh", "match": "this line would pass the limit of"}
