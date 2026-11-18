@@ -19,7 +19,7 @@
 # Orca currently supports Enter and C-c only, and rejects Escape.
 # Help: fm-send.sh --help (or -h) as the first word prints this paragraph and exits 0
 # without FM_HOME, resolving no target and sending nothing; a gate agent is still
-# refused, and every other call still needs an explicit FM_HOME.
+# refused, and a send without FM_HOME still meets the refusal.
 #
 # Two data planes:
 #
@@ -277,10 +277,12 @@ FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
 
 # Help is a read: it prints this header's first paragraph, resolves no target, and
-# sends nothing, so it needs no home; a gate agent is still refused above, and the
-# gate-agent allow event that check writes for every call is unchanged. Help writes
-# no other guard event. Only a leading --help or -h counts; the same word after a
-# target is message text and meets every check below.
+# sends nothing, so it needs no home. A gate agent is still refused above. The check
+# above is unchanged from base: an ordinary non-bypass caller emits its best-effort
+# gate-agent allow event when logging is available, while a bypass, a relaunch
+# transaction and a gate refusal keep their own behavior. Help writes no other guard
+# event. Only a leading --help or -h counts; the same word after a target is message
+# text, so a send without FM_HOME still meets the refusal below.
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
   sed -n '2,/^#$/{/^#$/d;s/^# \{0,1\}//;p;}' "${BASH_SOURCE[0]}"
   exit 0

@@ -133,36 +133,61 @@ test_unset_fm_home_fails() {
 # The FM_HOME refusal exists to stop a send that resolves a target against the
 # wrong home; a leading --help or -h resolves nothing. Only that leading word is
 # help: the same word after a target is message text and meets every refusal.
-# The caller here is a normal one, with no test bypass, run from a scratch
-# directory, so the gate-agent allow event every fm-send call writes is visible;
-# the only guard event help may add is that one.
+# The caller here is a normal one, with no test bypass, run from a scratch root.
+# Help must make no transport call at all (every tmux, herdr or ssh invocation is
+# logged by a tripwire and the log must stay empty), change nothing under the
+# scratch root and HOME (path list and content hashes before and after), and add
+# no guard event except the best-effort gate-agent allow an ordinary caller
+# already emits on base.
+help_tripwire_stubs() {  # <dir> -> echoes a bin dir whose tmux, herdr and ssh log every call
+  local fb="$1/tripwire" tool
+  mkdir -p "$fb"
+  cat > "$fb/tmux" <<'SH'
+#!/usr/bin/env bash
+printf '%s %s\n' "$(basename "$0")" "$*" >> "$FM_TMUX_LOG"
+exit 0
+SH
+  chmod +x "$fb/tmux"
+  for tool in herdr ssh; do cp "$fb/tmux" "$fb/$tool"; done
+  printf '%s' "$fb"
+}
+
+help_root_snapshot() {  # <root> -> one line per path, with a content hash for each file
+  (cd "$1" && find . | LC_ALL=C sort | while IFS= read -r path; do
+    if [ -f "$path" ]; then printf '%s %s\n' "$path" "$(shasum -a 256 < "$path")"; else printf '%s\n' "$path"; fi
+  done)
+}
+
 test_leading_help_prints_usage_without_a_home() {
-  local dir fb err out log events rc flag label rows
-  dir="$TMP_ROOT/help-nohome"; mkdir -p "$dir"
-  fb=$(make_stubs "$dir"); err="$dir/send.err"; log="$dir/tmux.log"; events="$dir/guard-events.jsonl"
+  local dir fb err out log events root before after rc flag label rows
+  dir="$TMP_ROOT/help-nohome"; mkdir -p "$dir/root/home"; root="$dir/root"
+  fb=$(help_tripwire_stubs "$dir"); err="$dir/send.err"; log="$dir/tmux.log"; events="$dir/guard-events.jsonl"
 
   for flag in --help -h; do
     for label in unset empty; do
       : > "$log"; : > "$events"
+      before=$(help_root_snapshot "$root")
       if [ "$label" = unset ]; then
-        out=$(cd "$dir" && env -u FM_HOME -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" \
-          FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
+        out=$(cd "$root" && env -u FM_HOME -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" HOME="$root/home" \
+          FM_ROOT_OVERRIDE="$root" FM_TMUX_LOG="$log" FM_HERDR_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
       else
-        out=$(cd "$dir" && env -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" FM_HOME='' FM_ROOT_OVERRIDE="$dir" \
-          FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
+        out=$(cd "$root" && env -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" HOME="$root/home" FM_HOME='' \
+          FM_ROOT_OVERRIDE="$root" FM_TMUX_LOG="$log" FM_HERDR_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
       fi
+      after=$(help_root_snapshot "$root")
       expect_code 0 "$rc" "$flag with FM_HOME $label should exit 0"
       assert_contains "$out" "Usage: fm-send.sh <target>" "$flag with FM_HOME $label should print the usage"
       [ ! -s "$err" ] || fail "$flag with FM_HOME $label should print nothing on stderr"$'\n'"$(cat "$err")"
-      [ ! -s "$log" ] || fail "$flag with FM_HOME $label touched the terminal"$'\n'"$(cat "$log")"
-      # Every event row help adds must be the gate-agent allow every call writes, and nothing else.
+      [ ! -s "$log" ] || fail "$flag with FM_HOME $label made a transport call"$'\n'"$(cat "$log")"
+      [ "$before" = "$after" ] || fail "$flag with FM_HOME $label changed the scratch root"$'\n'"$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+      # Every event row help adds must be the gate-agent allow an ordinary caller already writes on base, and nothing else.
       rows=$(grep -c . "$events")
       [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"allow"' "$events")" -eq "$rows" ] \
         || fail "$flag with FM_HOME $label wrote a guard event other than the gate-agent allow"$'\n'"$(cat "$events")"
       [ "$rows" -le 1 ] || fail "$flag with FM_HOME $label wrote more than one guard event"$'\n'"$(cat "$events")"
     done
   done
-  pass "fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME, adding no guard event but the gate-agent allow"
+  pass "fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME, with no transport call, no scratch change and no guard event but the gate-agent allow"
 }
 
 test_help_is_refused_for_a_gate_agent_like_a_send() {
