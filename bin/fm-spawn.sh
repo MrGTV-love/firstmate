@@ -596,9 +596,10 @@
 #   remains the owner. Spawn executes it through the acquired shell, retaining
 #   the primary-project Python cwd, so get/bash holders are actual ancestors;
 #   unrelated live holders remain the provisioner's refusal, not a PID allow-list.
-#   The shell must start that helper within the same ten-minute no-progress
-#   budget as treehouse get, and the attempt ends at the thirty-minute absolute
-#   extreme. Either stop, or a vanished endpoint, ends only that attempt's own
+#   The shell must start that helper within its fixed ten-minute allowance,
+#   and provisioning ends at its fixed thirty-minute absolute extreme.
+#   Acquisition overrides do not change either provisioning bound.
+#   Either stop, or a vanished endpoint, ends only that attempt's own
 #   provisioner process group before any lock release or refusal record,
 #   and a shell that starts late finds the attempt already claimed and runs nothing.
 #   It uses the assigned copy, never another worktree. Governed
@@ -5730,7 +5731,7 @@ spawn_acquisition_output() { # <target>
 # unknown (the backend cannot say, the read failed, or a non-shell helper is
 # the only thing listed). zellij and cmux expose no foreground process, so they
 # always read unknown. Only the minute waiting line reads this; path/output
-# progress governs the wait.
+# and Git-start progress govern the wait.
 spawn_get_state() { # <target>
   local lines line first shells=0 other=0
   case "$BACKEND" in
