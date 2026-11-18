@@ -2913,6 +2913,7 @@ printf 'ok - SECOND-2\n'
 # by three real polls through fm-slack-lib.sh (poll-refused-before-attempt). The control: a Slack answer (HTTP 400) leaves the post unknown, so it is woken
 # once named unknown, never listed as failed and never resolvable.
 refused_spoll() {  # <their request ts>: one poll whose acknowledgement of that request is refused before its attempt mark
+  # shellcheck disable=SC2016  # the inner shell expands its own positional arguments
   env FM_SLACK_SECOND_USER="$SECOND_ID" bash -c '. "$1/bin/fm-slack-lib.sh"; exec python3 "$2" poll-refused-before-attempt "$3" --replay "$4"' _ "$ROOT" "$HELPER" "$1" "$SECOND_TS"
 }
 second_home
