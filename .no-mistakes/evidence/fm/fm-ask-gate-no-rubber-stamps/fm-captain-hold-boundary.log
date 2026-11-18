@@ -1,0 +1,9 @@
+ok - missing refuses both paths without changing the backlog
+ok - unknown refuses both paths without changing the backlog
+ok - case refuses both paths without changing the backlog
+ok - no-action refuses both paths without changing the backlog
+ok - empty refuses both paths without changing the backlog
+ok - whitespace refuses both paths without changing the backlog
+ok - all six boundaries round trip on both filing paths and survive deferral
+ok - portable legacy records remain readable, listable, deferrable, answerable, completable, reconcilable and withdrawable
+ok - a released legacy hold is not an exemption for a new captain call

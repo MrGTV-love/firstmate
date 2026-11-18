@@ -1,0 +1,2 @@
+{"ts":"2026-11-18T00:17:58Z","guard":"turnend-ask-gate","decision":"deny","rule":"ask-gate-rubber-stamp","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:e8260e8b-514b-4beb-8461-247b7bd50c15"}
+{"ts":"2026-11-18T00:18:04Z","guard":"turnend-ask-gate","decision":"warn","rule":"ask-gate-unchecked","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:e8260e8b-514b-4beb-8461-247b7bd50c15"}

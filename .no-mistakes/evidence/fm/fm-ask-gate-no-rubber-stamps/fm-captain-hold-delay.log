@@ -1,0 +1,8 @@
+ok - a recommendation match records the verbatim direct answer exactly once
+ok - an answer differing from the recorded exact recommendation writes no delay
+ok - no machine-readable recommendation means no delay, even with card prose
+ok - keyed matches compare and log the payload once in the owning mate home only
+ok - the answer is truncated at 200 Unicode characters, not bytes
+ok - deferral keeps the recommendation, but a released task starts without it
+ok - an exact replay finishes an interrupted delay append without duplicating the record
+ok - blank, malformed and non-object log rows are kept and skipped, and the delay row is appended once

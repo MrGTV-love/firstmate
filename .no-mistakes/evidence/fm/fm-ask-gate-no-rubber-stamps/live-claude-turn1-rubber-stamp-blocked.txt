@@ -1,0 +1,27 @@
+ ▐▛███▛█   Claude Code v2.1.327
+▝▜██████▀  Opus 5.5 with low effort · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-askclone.vWQthZ/fm
+  Updated: 11 features, 234 fixes, 122 other changes
+  code.claude.com/docs/en/changelog for details
+❯ This is a test of a Stop hook. Do not run any tools. Reply with exactly these two lines and nothing else:
+  Cleanup plan is ready.
+  needs input: should I proceed with the cleanup? Recommendation: yes
+⏺ Cleanup plan is ready.
+  needs input: should I proceed with the cleanup? Recommendation: yes
+⏺ Ran 4 stop hooks
+  ⎿  Stop hook reported a problem
+     [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude]: ASK FORM BLOCK - the text was already published; this corrective
+     continuation does not prevent publication.
+     Each needs input: or needs-input line requires one distinct boundary (credential, spend, destructive, irreversible, tool-denial, owner-rule-change) before if no:, followed by an action containing
+     a letter or digit. Main owns whether the question belongs to the captain; decide routine calls yourself.
+     needs input: should I proceed with the cleanup? Recommendation: yes
+⏺ Captain, the guard blocked my last question because it was in the wrong form.
+  This was only a test of the Stop hook. There is no real cleanup plan. I ran no tools. I changed no files.
+  If a real cleanup that deletes files needs your yes, the correct form looks like this:
+  needs input: should I proceed with the cleanup? destructive if no: keep all files as they are and take no action
+✻ Brewed for 1m 2s · done 6:18 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 5% 50k/1.0M fm:e8260e8b
+  ⏵⏵ auto mode on (shift+tab to cycle)

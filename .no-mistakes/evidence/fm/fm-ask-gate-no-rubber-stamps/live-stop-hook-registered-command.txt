@@ -1,0 +1,67 @@
+Registered Stop command: [ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude
+CLAUDE_PROJECT_DIR=/Users/charlesabrooker/tmp/fm-askclone.vWQthZ/fm (plain clone of 7be35882), FM_HOME=lab
+
+--- last_assistant_message:
+    | Done with step 1.
+    | needs input: should I proceed? Recommendation: yes
+    ASK FORM BLOCK - the text was already published; this corrective continuation does not prevent publication.
+    Each needs input: or needs-input line requires one distinct boundary (credential, spend, destructive, irreversible, tool-denial, owner-rule-change) before if no:, followed by an action containing a letter or digit. Main owns whether the question belongs to the captain; decide routine calls yourself.
+    needs input: should I proceed? Recommendation: yes
+    [exit 2]
+
+--- last_assistant_message:
+    | needs input: spend 400 USD on a GPU? if no: keep using the CPU runner
+    [exit 0]
+
+--- last_assistant_message:
+    | needs input: spend and credential? if no: skip
+    ASK FORM BLOCK - the text was already published; this corrective continuation does not prevent publication.
+    Each needs input: or needs-input line requires one distinct boundary (credential, spend, destructive, irreversible, tool-denial, owner-rule-change) before if no:, followed by an action containing a letter or digit. Main owns whether the question belongs to the captain; decide routine calls yourself.
+    needs input: spend and credential? if no: skip
+    [exit 2]
+
+--- last_assistant_message:
+    | **Needs input**: shall I continue?
+    ASK FORM BLOCK - the text was already published; this corrective continuation does not prevent publication.
+    Each needs input: or needs-input line requires one distinct boundary (credential, spend, destructive, irreversible, tool-denial, owner-rule-change) before if no:, followed by an action containing a letter or digit. Main owns whether the question belongs to the captain; decide routine calls yourself.
+    **Needs input**: shall I continue?
+    [exit 2]
+
+--- last_assistant_message:
+    | needs input: spending more? if no: x
+    ASK FORM BLOCK - the text was already published; this corrective continuation does not prevent publication.
+    Each needs input: or needs-input line requires one distinct boundary (credential, spend, destructive, irreversible, tool-denial, owner-rule-change) before if no:, followed by an action containing a letter or digit. Main owns whether the question belongs to the captain; decide routine calls yourself.
+    needs input: spending more? if no: x
+    [exit 2]
+
+--- last_assistant_message:
+    | needs input: tool denial on rm -rf? if no: leave the files
+    [exit 0]
+
+--- last_assistant_message:
+    | Example:
+    | ```
+    | needs input: proceed?
+    | ```
+    | All done.
+    [exit 0]
+
+--- last_assistant_message:
+    | > needs input: quoted example
+    [exit 0]
+
+--- last_assistant_message:
+    | No question this turn.
+    [exit 0]
+
+--- stop_hook_active=true with rubber stamp:
+    [exit 0]
+
+$ grep turnend-ask-gate state/guard-events.jsonl
+{"guard":"turnend-ask-gate","decision":"deny","rule":"ask-gate-rubber-stamp","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:lab-direct"}
+{"guard":"turnend-ask-gate","decision":"deny","rule":"ask-gate-rubber-stamp","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:lab-direct"}
+{"guard":"turnend-ask-gate","decision":"deny","rule":"ask-gate-rubber-stamp","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:lab-direct"}
+{"guard":"turnend-ask-gate","decision":"deny","rule":"ask-gate-rubber-stamp","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:lab-direct"}
+{"guard":"turnend-ask-gate","decision":"warn","rule":"ask-gate-unchecked","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:lab-direct"}
+{"guard":"turnend-ask-gate","decision":"warn","rule":"ask-gate-unchecked","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:lab-direct"}
+{"guard":"turnend-ask-gate","decision":"warn","rule":"ask-gate-unchecked","source_ok":true,"session":"/Users/charlesabrooker/tmp/fm-lab.LNdHbB:lab-direct"}

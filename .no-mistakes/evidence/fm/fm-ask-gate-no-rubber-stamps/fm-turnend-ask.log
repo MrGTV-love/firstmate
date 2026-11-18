@@ -1,0 +1,26 @@
+Paired control: real supervision block observed with stop_hook_active true.
+ok - real supervision control blocks on base/head; idle rubber-stamp ask requires new enforcement
+ok - plain primary and marked secondmate primary both check idle asks
+ok - a real live watcher-lock holder satisfies supervision but does not bypass the ask check
+ok - in-flight ask blocks before supervision without charging its budget
+ok - a genuine linked child checkout remains unchecked by the primary guard
+ok - each single boundary and action satisfies the mechanical form, not ownership judgment
+ok - case, punctuation and compound-name separators normalize without asserting authority
+ok - whole-token, single-boundary and alphanumeric-action rules are enforced on the physical line
+ok - required indentation, list markers, emphasis and prefix spellings cannot bypass the form check
+ok - the first failing line is named after an earlier form-compliant line
+ok - boundary and action facts must be on the checked physical line
+ok - a lexically correct but substantively empty ask is not blocked or recorded as approval
+ok - examined ordinary text emits no pass, approval or chat result
+ok - missing, null, number, object and empty text each produce one unchecked warn, never allow
+ok - malformed or absent payload remains silent, without an unchecked event
+ok - both loop-flag spellings use the shared precedence; active continuations record one unchecked warn
+ok - fences and quotes mark unchecked once but do not conceal an outside ask
+ok - skipped plus compliant text records unchecked; skipped plus failing text records only deny
+ok - a quoted fence marker cannot hide a subsequent real ask
+ok - an unclosed fence marks skipped asks unchecked through the end
+ok - if-no marker case and specified whitespace variants satisfy the form
+ok - the first of two failing physical lines is reported
+ok - fence indentation, marker, length and quoted-content boundaries are honored
+ok - the reason preserves the first 200 of 300 ASCII bytes verbatim
+ok - default, --cursor and foreign compatibility deliveries remain outside this check

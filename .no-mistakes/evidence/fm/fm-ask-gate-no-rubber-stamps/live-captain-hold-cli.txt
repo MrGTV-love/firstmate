@@ -1,0 +1,89 @@
+LAB FM_HOME=/Users/charlesabrooker/tmp/fm-lab.LNdHbB
+### Scenario: refusals on a NEW task (no task row may appear)
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh hold buy-gpu --title Buy a GPU --reason Decision sought: buy?
+fm-captain-hold: Main decides: a new captain hold requires --boundary credential, spend, destructive, irreversible, tool-denial, or owner-rule-change
+[exit 1]
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh hold buy-gpu --title Buy a GPU --reason Decision sought: buy? --boundary convenience --if-no Skip it
+fm-captain-hold: Main decides: a new captain hold requires --boundary credential, spend, destructive, irreversible, tool-denial, or owner-rule-change
+[exit 1]
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh hold buy-gpu --title Buy a GPU --reason Decision sought: buy? --boundary Spend --if-no Skip it
+fm-captain-hold: Main decides: a new captain hold requires --boundary credential, spend, destructive, irreversible, tool-denial, or owner-rule-change
+[exit 1]
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh hold buy-gpu --title Buy a GPU --reason Decision sought: buy? --boundary spend --if-no    
+fm-captain-hold: Main decides: a captain hold requires a nonempty --if-no action
+[exit 1]
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh hold buy-gpu --title Buy a GPU --reason Decision sought: buy? --boundary spend
+fm-captain-hold: Main decides: a captain hold requires a nonempty --if-no action
+[exit 1]
+
+backlog unchanged after refusals?
+YES: backlog byte-identical
+
+### Scenario: valid hold stores boundary, if-no, recommendation
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh hold buy-gpu --title Buy a GPU --reason Decision sought: buy a GPU for 400 USD?
+Recommendation: approve --boundary spend --if-no Keep using the CPU runner --recommendation approve
+buy-gpu
+[exit 0]
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh hold rotate-key --title Rotate the API key --reason Decision sought: rotate?
+Recommendation: rotate-now --boundary credential --if-no Leave the old key in place --recommendation rotate-now
+rotate-key
+[exit 0]
+
+$ tasks-axi show buy-gpu --full
+task:
+  id: buy-gpu
+  title: Buy a GPU
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:RGVjaXNpb24gc291Z2h0OiBidXkgYSBHUFUgZm9yIDQwMCBVU0Q/ClJlY29tbWVuZGF0aW9uOiBhcHByb3Zl"
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: firstmate
+  priority: "-"
+  created: 2026-11-17
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-11-18T00:12:23Z\nCaptain hold boundary: spend\nCaptain hold if-no: \"Keep using the CPU runner\"\nCaptain hold recommendation: \"approve\""
+
+### Scenario: captain answers with the recommendation -> one delay row
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh answer buy-gpu --decision-file /Users/charlesabrooker/tmp/fm-lab.LNdHbB/ans1.txt
+answered: buy-gpu
+[exit 0]
+$ cat data/error-log.jsonl
+{"answer":"approve\n","at":"2026-11-18T00:13:17.776662Z","hold_id":"buy-gpu","hours_open":0.02,"kind":"delay"}
+
+### Scenario: exact replay of the same answer -> still one row
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh answer buy-gpu --decision-file /Users/charlesabrooker/tmp/fm-lab.LNdHbB/ans1.txt
+answered: buy-gpu
+[exit 0]
+$ wc -l data/error-log.jsonl
+       1
+
+### Scenario: captain answers differently -> no new row
+
+$ env -u NO_MISTAKES_GATE bin/fm-captain-hold.sh answer rotate-key --decision-file /Users/charlesabrooker/tmp/fm-lab.LNdHbB/ans2.txt
+answered: rotate-key
+[exit 0]
+$ wc -l data/error-log.jsonl
+       1
+$ jq . data/error-log.jsonl
+{
+  "answer": "approve\n",
+  "at": "2026-11-18T00:13:17.776662Z",
+  "hold_id": "buy-gpu",
+  "hours_open": 0.02,
+  "kind": "delay"
+}
