@@ -34,9 +34,23 @@ Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run)
       4. fit or the trend cannot be judged (no record, too few recorded
          steps for a window, a kind with fewer than MIN_VALUES recorded
          runs, a missing previous probe reading or one older than the
-         window): the start defers with that reason and the recovery text
-         (RECOVERY). The one exception is a host with no fleet run running,
-         where one start is admitted so that the record can begin.
+         window): the start defers with that reason, the recovery text
+         (RECOVERY) and the calibration run (calibrate_hint). The one
+         bootstrap admit: the host is idle (no fleet run is running, so the
+         start is the only run) and available memory exceeds the largest peak
+         recorded for ANY kind (largest_peak). A host with no recorded peak
+         admits nothing on an unjudged input. No other admit is made with an
+         unjudged input.
+      5. calibrate (the wrapper's calibrate mode) is how a first measurement
+         is made: one operator-chosen representative command runs once, its
+         process tree's largest resident size is read from the same census the
+         probe reads, and the result is recorded in the calibration as a run of
+         the named kind (name calibration/<start>-<pid>), so the next admit
+         sees it. It starts only when the readings are readable, swap and the
+         compressor are not growing, more memory is available than the largest
+         recorded peak (or, with none recorded, no fleet run is running), and
+         no other calibration is measuring. A command read fewer than
+         MIN_VALUES times is not recorded.
     Quantile values come from this host's own record at the moment of the
     decision and are never seeded or guessed. Fewer values than
     1 / (1 - quantile) make the nearest-rank quantile the largest recorded
@@ -616,15 +630,57 @@ def trail_limits(calibration):
 
 
 RECOVERY = ("the root home's probe (bin/fm-mem-guard.sh probe, run by its watcher about every 8 minutes) records the "
-            "missing readings from real work, so start again after it runs; while no fleet run is running a start is "
-            "admitted so that the record can begin")
+            "missing readings from real work, so start again after it runs")
+
+
+def calibrate_hint(kind):
+    """How an operator records the first measurement of a kind (the calibrate mode owns the details)."""
+    return (f"to record it now, run one representative command of that kind once on this host as "
+            f"`bin/fm-mem-guard.sh calibrate --kind {kind or 'task|no-mistakes'} -- <command>`; its largest resident "
+            f"size is recorded as calibration and the next admit sees it")
+
+
+def largest_peak(calibration):
+    """The largest recorded run peak of ANY kind, or None when none was ever measured."""
+    peaks = [run["peak_bytes"] for run in (calibration or {}).get("runs", {}).values()
+             if isinstance(run, dict) and type(run.get("peak_bytes")) is int and run["peak_bytes"] > 0]
+    return max(peaks) if peaks else None
+
+
+def trend_evaluate(report, record, limits):
+    """(reasons, unjudged, detail) for swap and compressor growth since the last probe reading inside the window."""
+    gib = 1024 ** 3
+    reasons, unjudged, detail = [], [], {}
+    trail = record.get("trail")
+    last = trail.get("last") if isinstance(trail, dict) else None
+    try:
+        gap = (datetime.fromisoformat(report["checked_at"]) - datetime.fromisoformat(last["at"])).total_seconds()
+        swap_delta = report["swap_used_bytes"] - last["swap_used_bytes"]
+        compressor_delta = report["compressor_bytes"] - last["compressor_bytes"]
+        if type(swap_delta) is not int or type(compressor_delta) is not int:
+            raise TypeError("sizes are not integers")
+    except (KeyError, TypeError, ValueError):
+        unjudged.append("trend: no usable previous probe reading")
+        return reasons, unjudged, detail
+    if not 0 <= gap <= limits["window_seconds"]:
+        unjudged.append(f"trend: the previous probe reading is {gap:.0f} s old, outside the "
+                        f"{limits['window_seconds']} s window")
+        return reasons, unjudged, detail
+    detail.update(compared_at=last["at"], swap_delta_bytes=swap_delta, compressor_delta_bytes=compressor_delta)
+    if swap_delta > 0:
+        reasons.append(f"swap used grew by {swap_delta} bytes ({swap_delta / gib:.3f} GiB) in the {gap:.0f} s since the last probe reading")
+    if compressor_delta > 0:
+        reasons.append(f"compressor grew by {compressor_delta} bytes ({compressor_delta / gib:.3f} GiB) in the {gap:.0f} s since the last probe reading")
+    return reasons, unjudged, detail
 
 
 def harm_evaluate(report, calibration, kind):
     """Reasons to defer from the harm itself, and the numbers behind them.
 
-    Every part must be judged. A part that cannot be judged defers the start with its reason and the recovery,
-    except on a host with no fleet run running, where one start is admitted so the record can begin.
+    Every part must be judged. A part that cannot be judged defers the start with its reason, the recovery and the
+    calibration run. The one bootstrap admit: the host is idle (no fleet run is running, so the start is the only
+    run), and available memory exceeds the largest peak recorded for ANY kind, so a single run no larger than any
+    ever measured cannot exhaust it. With no peak ever recorded nothing is admitted on an unjudged input.
     """
     record, missing = calibration
     gib = 1024 ** 3
@@ -656,33 +712,28 @@ def harm_evaluate(report, calibration, kind):
                     f"recorded) does not fit in {report['available_bytes'] / gib:.2f} GiB available minus a "
                     f"{limits['reserve_bytes'] / gib:.2f} GiB reserve (p{RESERVE_QUANTILE * 100:g} of recorded drops)")
     if record is not None and limits is not None and "window_seconds" in limits:
-        trail = record.get("trail")
-        last = trail.get("last") if isinstance(trail, dict) else None
-        try:
-            gap = (datetime.fromisoformat(report["checked_at"]) - datetime.fromisoformat(last["at"])).total_seconds()
-            swap_delta = report["swap_used_bytes"] - last["swap_used_bytes"]
-            compressor_delta = report["compressor_bytes"] - last["compressor_bytes"]
-            if type(swap_delta) is not int or type(compressor_delta) is not int:
-                raise TypeError("sizes are not integers")
-        except (KeyError, TypeError, ValueError):
-            unjudged.append("trend: no usable previous probe reading")
-        else:
-            if not 0 <= gap <= limits["window_seconds"]:
-                unjudged.append(f"trend: the previous probe reading is {gap:.0f} s old, outside the "
-                                f"{limits['window_seconds']} s window")
-            else:
-                detail.update(compared_at=last["at"], swap_delta_bytes=swap_delta, compressor_delta_bytes=compressor_delta)
-                if swap_delta > 0:
-                    reasons.append(f"swap used grew by {swap_delta / gib:.3f} GiB in the {gap:.0f} s since the last probe reading")
-                if compressor_delta > 0:
-                    reasons.append(f"compressor grew by {compressor_delta / gib:.3f} GiB in the {gap:.0f} s since the last probe reading")
+        trend_reasons, trend_unjudged, trend_detail = trend_evaluate(report, record, limits)
+        reasons += trend_reasons
+        unjudged += trend_unjudged
+        detail.update(trend_detail)
     if reasons:
         return reasons, detail
-    if unjudged:
-        if not report.get("runs"):
-            detail["bootstrap"] = "no fleet run is running, so one start is admitted while the record is incomplete"
-            return [], detail
-        return [f"the harm cannot be judged: {'; '.join(unjudged)}; {RECOVERY}"], detail
+    if not unjudged:
+        return [], detail
+    stated = f"the harm cannot be judged: {'; '.join(unjudged)}"
+    if report.get("runs"):
+        return [f"{stated}; {RECOVERY}; {calibrate_hint(kind)}"], detail
+    peak = largest_peak(record)
+    if peak is None:
+        return [f"{stated}; no run peak has ever been recorded on this host, so no start is admitted on an "
+                f"unjudged input; {calibrate_hint(kind)}"], detail
+    detail["largest_peak_bytes"] = peak
+    if report["available_bytes"] <= peak:
+        return [f"{stated}; the host is idle but its {report['available_bytes'] / gib:.2f} GiB available does not "
+                f"exceed the largest recorded run peak of {peak / gib:.2f} GiB; {RECOVERY}; {calibrate_hint(kind)}"], detail
+    detail["bootstrap"] = (f"no fleet run is running and {report['available_bytes'] / gib:.2f} GiB available exceeds the "
+                           f"largest recorded run peak of {peak / gib:.2f} GiB, so this one start is admitted while the "
+                           f"record is incomplete")
     return [], detail
 
 
@@ -816,6 +867,12 @@ def admission_main(argv):
     report["top_processes"] = sorted((p for p in report["processes"] if p["rss_bytes"] is not None),
                                      key=lambda p: p["rss_bytes"], reverse=True)[:10]
     del report["processes"]
+    print(append_reading(state, report), end="")
+    return 75 if reasons and args.mode in ("admit", "baseline") else 0
+
+
+def append_reading(state, report):
+    """Append one JSONL reading to the state's log and return its line."""
     payload = (json.dumps(report, ensure_ascii=True) + "\n").encode()
     # One append syscall per reading keeps concurrent starts' JSONL rows intact.
     fd = os.open(state / "memory-readings.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
@@ -824,12 +881,153 @@ def admission_main(argv):
             raise OSError("short memory reading append")
     finally:
         os.close(fd)
-    print(payload.decode(), end="")
-    return 75 if reasons and args.mode in ("admit", "baseline") else 0
+    return payload.decode()
+
+
+def tree_rss(root_pid):
+    """(resident bytes of a process and all its descendants, whether the process was found, readable members).
+
+    It reads the same census the probe reads (fm-proc-info.py memory) from the real host, never the test
+    fixture: a calibration run is measured, so its tree is read where it runs. A member whose size is
+    unreadable counts for nothing and is reported by the caller as an incomplete reading.
+    """
+    out = subprocess.run([sys.executable, str(Path(__file__).with_name("fm-proc-info.py")), "memory"],
+                         capture_output=True, text=True, check=True, env={**os.environ, "LC_ALL": "C"}).stdout
+    rows = {row["pid"]: row for row in json.loads(out)}
+    tree = {root_pid} & rows.keys()
+    while True:
+        more = {pid for pid, row in rows.items() if row["ppid"] in tree} - tree
+        if not more:
+            break
+        tree |= more
+    members = [rows[pid] for pid in tree]
+    return sum(row["rss_bytes"] or 0 for row in members), bool(members), all(row["rss_bytes"] is not None for row in members)
+
+
+def calibration_gate(report, recorded):
+    """Reasons an operator calibration run may not start now (empty: it may).
+
+    It is the way to get a first measurement, so an unjudged fit or trend does not stop it. It still needs readable
+    facts, no growth of swap or the compressor, and room: more available memory than the largest recorded run
+    peak of any kind, or, with no peak recorded yet, an idle host so that it is the only run.
+    """
+    if report["errors"]:
+        return list(report["errors"])
+    record, _ = recorded
+    gib = 1024 ** 3
+    reasons = []
+    peak = largest_peak(record)
+    if peak is None:
+        if report.get("runs"):
+            reasons.append("no run peak has ever been recorded on this host and fleet runs are running; "
+                           "calibrate when none runs, so that the calibration run is the only one")
+    elif report["available_bytes"] <= peak:
+        reasons.append(f"{report['available_bytes'] / gib:.2f} GiB available does not exceed the largest recorded "
+                       f"run peak of {peak / gib:.2f} GiB")
+    if record is not None:
+        limits, _ = trail_limits(record)
+        if limits and "window_seconds" in limits:
+            reasons += trend_evaluate(report, record, limits)[0]
+    return reasons
+
+
+def calibration_run_record(path, report, kind, name, run):
+    """Fold one measured calibration run into this host's calibration record as a run of KIND."""
+    fresh = {"schema": "fm-memory-calibration.v1", "host": report["host"],
+             "total_bytes": report["total_bytes"], "runs": {}, "pressured": None}
+    calibration, _ = host_record(path, report, "calibration", "fm-memory-calibration.v1", ())
+    calibration = calibration if calibration and isinstance(calibration.get("runs"), dict) else fresh
+    calibration["runs"][f"{kind}:{name}"] = run
+    temp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+    temp.write_text(json.dumps(calibration))
+    os.replace(temp, path)
+
+
+def calibrate_main(argv):
+    """Run one operator-chosen representative command and record its largest resident tree as a run of its kind."""
+    parser = argparse.ArgumentParser(prog="fm-mem-guard.sh calibrate",
+                                     description="Measure one representative run of a kind and record it as calibration")
+    parser.add_argument("--state", type=Path, required=True)
+    parser.add_argument("--calibration", type=Path, required=True)
+    parser.add_argument("--kind", choices=RUN_KINDS, required=True)
+    parser.add_argument("command", nargs=argparse.REMAINDER)
+    args = parser.parse_args(argv)
+    command = args.command[1:] if args.command[:1] == ["--"] else args.command
+    if not command:
+        parser.error("a command is required after --")
+    report = admission_sample()
+    report["source"] = "calibrate"
+    args.state.mkdir(parents=True, exist_ok=True)
+    recorded = host_record(args.calibration, report, "calibration", "fm-memory-calibration.v1", ())
+    reasons = calibration_gate(report, recorded)
+    report["admission"] = "defer" if reasons else "admit"
+    report["reasons"] = reasons
+    del report["processes"]
+    line = append_reading(args.state, report)
+    if reasons:
+        print(line, end="", file=sys.stderr)
+        print("calibration run not started: " + "; ".join(reasons), file=sys.stderr)
+        return 75
+    import fcntl
+    lock = os.open(args.calibration.with_name(".memory-calibrating.lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("calibration run not started: another calibration run is measuring", file=sys.stderr)
+        return 75
+    started = datetime.now(timezone.utc)
+    child = subprocess.Popen(command)
+    peak = samples = incomplete = 0
+    first = last = started
+    max_gap = 0.0
+    code = 130
+    try:
+        while child.poll() is None:
+            began = monotonic()
+            try:
+                total, alive, complete = tree_rss(child.pid)
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+                total, alive, complete = 0, False, False
+            if not complete:
+                incomplete += 1
+            if alive and total > 0:
+                now = datetime.now(timezone.utc)
+                if samples:
+                    max_gap = max(max_gap, (now - last).total_seconds())
+                else:
+                    first = now
+                peak, samples, last = max(peak, total), samples + 1, now
+            # A reading costs a process listing; wait as long as one took, so the measurement is at most half a core.
+            try:
+                child.wait(timeout=max(monotonic() - began, 0.01))
+            except subprocess.TimeoutExpired:
+                pass
+        code = child.returncode
+    except KeyboardInterrupt:
+        child.wait()
+        code = 130
+    if samples < MIN_VALUES:
+        print(f"calibration run not recorded: {samples} resident readings while it ran; {MIN_VALUES} are needed, "
+              f"so run a longer representative command", file=sys.stderr)
+        return code if code else 1
+    name = f"calibration/{int(started.timestamp())}-{child.pid}"
+    calibration_run_record(args.calibration, report, args.kind, name,
+                           {"peak_bytes": peak, "samples": samples, "incomplete_samples": incomplete,
+                            "first_seen": first.isoformat(), "last_seen": last.isoformat(),
+                            "max_gap_seconds": max_gap})
+    print(f"calibration recorded: {args.kind}:{name} largest resident tree {peak} bytes "
+          f"({peak / 1024 ** 3:.2f} GiB) in {samples} readings", file=sys.stderr)
+    return code
 
 
 def main():
     sys.stdout.reconfigure(errors="replace")
+    if len(sys.argv) > 1 and sys.argv[1] == "calibrate":
+        try:
+            sys.exit(calibrate_main(sys.argv[2:]))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"memory calibration unreadable: {exc}", file=sys.stderr)
+            sys.exit(75)
     if len(sys.argv) > 1 and sys.argv[1] in ("sample", "admit", "probe", "baseline"):
         try:
             sys.exit(admission_main(sys.argv[1:]))

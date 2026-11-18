@@ -209,13 +209,30 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     def rows(key, where=state):
         return queue(where).count(f"\t{key}\t")
 
+    # The harm test needs a measured host: this home's record is written by hand with the shape the probe
+    # leaves (25 task and 25 no-mistakes run peaks, 200 steps 300 s apart, a fresh last reading), so the
+    # alarm-baseline cases below exercise their own outcomes and not the unmeasured-host deferral.
+    import datetime as _dt0, socket as _socket0
+    def seed(path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stamp = _dt0.datetime.now(_dt0.timezone.utc)
+        peaks = lambda kind, size: {f"{kind}:r{i}": {"peak_bytes": (i + 1) * size, "samples": 2, "incomplete_samples": 0,
+                                                    "first_seen": stamp.isoformat(), "last_seen": stamp.isoformat(),
+                                                    "max_gap_seconds": 0} for i in range(25)}
+        path.write_text(json.dumps({
+            "schema": "fm-memory-calibration.v1", "host": _socket0.gethostname(), "total_bytes": 32 * gib,
+            "runs": {**peaks("task", 100 * 1024 ** 2), **peaks("no-mistakes", 200 * 1024 ** 2)}, "pressured": None,
+            "trail": {"last": {"at": (stamp - _dt0.timedelta(seconds=60)).isoformat(), "available_bytes": 8 * gib,
+                               "compressor_bytes": gib // 2, "swap_used_bytes": int(1565.88 * 1024 ** 2)},
+                      "steps": [[300, k * 10 * 1024 ** 2, k * 5 * 1024 ** 2, 0] for k in range(1, 201)]}}))
+    seed(state / ".memory-calibration.json")
     facts()
     report = call("baseline",code=75)
     assert any("at least two probe readings" in r and "has 0" in r for r in report["reasons"]), report
     assert not (state / ".memory-baseline.json").exists()
     report = call("admit")
     assert report["admission"] == "admit" and report["baseline"] is None
-    assert "no baseline" in report["calibration"] and "no calibration" in report["headroom_calibration"], report
+    assert "no baseline" in report["calibration"] and report["headroom_calibration"], report
     assert report["headroom"] is None and report["available_bytes"] == 8*gib and queue() == ""
     call("probe")
     call("probe")
@@ -510,7 +527,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
 
     # swap growth defers even with abundant memory; a shrink or no change does not
     report = decide(available=30*gib, last_swap=swap_now - 100*mib, code=75)
-    assert report["reasons"][0].startswith("swap used grew by 0.098 GiB in the 12"), report["reasons"]
+    assert report["reasons"][0].startswith(f"swap used grew by {100 * mib} bytes (0.098 GiB) in the 12"), report["reasons"]
     assert report["harm"]["swap_delta_bytes"] == 100 * mib, report["harm"]
     decide(available=30*gib, last_swap=swap_now + 100*mib)
     decide(available=30*gib)
@@ -518,7 +535,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
 
     # any compressor increase defers, however small; no change or a fall admits
     report = decide(available=30*gib, compressor=compressor_now + 16384, code=75)
-    assert report["reasons"][0].startswith("compressor grew by 0.000 GiB in the 12"), report["reasons"]
+    assert report["reasons"][0].startswith("compressor grew by 16384 bytes (0.000 GiB) in the 12"), report["reasons"]
     assert report["harm"]["compressor_delta_bytes"] == 16384, report["harm"]
     decide(available=30*gib, compressor=compressor_now + 950*mib, code=75)
     decide(available=30*gib, compressor=compressor_now + gib, code=75)
@@ -526,25 +543,90 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     decide(available=30*gib, last_compressor=compressor_now + gib)
     print("ok - a compressor increase of one page, 950 MiB or 1 GiB defers; no change or a fall admits")
 
-    # what cannot be judged defers with its reason and the recovery, except on an idle host
-    for name, moves in (("no calibration record", dict(recorded=False)),
-                        ("a previous probe reading 2000 s old outside the 300 s window", dict(last_swap=swap_now - 100*mib, age=2000)),
-                        ("a record of 50 steps", dict(steps=50)),
-                        ("another host's record", dict(host="another-host"))):
+    # what cannot be judged defers with its reason, the recovery and the calibration run. The one
+    # bootstrap admit: an idle host whose available memory exceeds the largest peak recorded for ANY kind
+    # (here 5000 MiB, the no-mistakes p100; 2500 MiB with task peaks only).
+    for name, moves in (("a previous probe reading 2000 s old outside the 300 s window", dict(last_swap=swap_now - 100*mib, age=2000)),
+                        ("a record of 50 steps", dict(steps=50))):
         report = decide(available=30*gib, busy=True, code=75, **moves)
         reason = report["reasons"][0]
         assert reason.startswith("the harm cannot be judged: ") and "bin/fm-mem-guard.sh probe" in reason, (name, reason)
+        assert "bin/fm-mem-guard.sh calibrate --kind task -- <command>" in reason, (name, reason)
         assert report["harm"]["not_judged"] and "bootstrap" not in report["harm"], (name, report["harm"])
         idle = decide(available=30*gib, busy=False, **moves)
         assert idle["reasons"] == [] and "no fleet run is running" in idle["harm"]["bootstrap"], (name, idle["harm"])
+        assert idle["harm"]["largest_peak_bytes"] == 5000 * mib, (name, idle["harm"])
     report = decide(available=30*gib, busy=True, age=2000, code=75, last_swap=swap_now - 100*mib)
     assert "outside the 300 s window" in report["reasons"][0] and "2000 s old" in report["reasons"][0], report["reasons"]
     report = decide(available=30*gib, busy=True, steps=50, code=75)
     assert "50 recorded probe steps; 100 are needed for a window" in report["reasons"][0], report["reasons"]
+    # the task-only record's largest peak is 2500 MiB: an idle host above it admits, below it defers
+    report = decide(None, available=3000*mib, busy=False, kinds=("task",), steps=50)
+    assert report["harm"]["largest_peak_bytes"] == 2500 * mib and "bootstrap" in report["harm"], report["harm"]
+    report = decide(None, available=2000*mib, busy=False, kinds=("task",), steps=50, code=75)
+    assert "1.95 GiB available does not exceed the largest recorded run peak of 2.44 GiB" in report["reasons"][0], report["reasons"]
+    assert "bootstrap" not in report["harm"], report["harm"]
+    # no record, an unusable record, or one with no run peak: nothing was ever measured, so an idle host admits nothing
+    # either, and the reading names the calibration run
+    for name, moves in (("no calibration record", dict(recorded=False)),
+                        ("another host's record", dict(host="another-host")),
+                        ("a record without a run peak", dict(kinds=()))):
+        for busy in (True, False):
+            report = decide(available=30*gib, busy=busy, code=75, **moves)
+            reason = report["reasons"][0]
+            assert reason.startswith("the harm cannot be judged: ") and "bootstrap" not in report["harm"], (name, busy, report["harm"])
+            assert "bin/fm-mem-guard.sh calibrate --kind task -- <command>" in reason, (name, busy, reason)
+            assert ("no run peak has ever been recorded" in reason) == (not busy), (name, busy, reason)
+    # a busy host never takes the bootstrap path, whatever is available or recorded
+    report = decide(available=31*gib, busy=True, steps=50, code=75)
+    assert "bootstrap" not in report["harm"] and "bin/fm-mem-guard.sh probe" in report["reasons"][0], report
     # a judged harm still defers an idle host with an incomplete record
     report = decide(None, available=30*gib, busy=False, kinds=("task",), last_swap=swap_now - 100*mib, code=75)
     assert report["reasons"][0].startswith("swap used grew") and "bootstrap" not in report["harm"], report
-    print("ok - an unjudged fit or trend defers a busy host with its reason and how the record is filled, and admits one start on an idle host so the record can begin")
+    print("ok - an unjudged fit or trend defers a busy host with its reason, the recovery and the calibration run; an idle host admits one start only above the largest recorded peak, and a host with no recorded peak admits nothing")
+
+    # the calibration run is how a host with no measurement gets one, and how the deadlock case (a task
+    # running, no no-mistakes run ever recorded) is resolved: each run is recorded as a measured run of its kind
+    grow = ("--", sys.executable, "-c",
+            "import time; b = bytearray(120 * 1024 * 1024)\nfor i in range(0, len(b), 4096): b[i] = 1\ntime.sleep(10)")
+    def calibrate(kind, code=0, command=grow):
+        result = subprocess.run(["bash", wrapper, "calibrate", "--kind", kind, *command], capture_output=True, text=True, env=harm_env)
+        assert result.returncode == code, (kind, result.returncode, result.stdout, result.stderr)
+        return result
+    # nothing recorded and a fleet run running: refused; nothing recorded and idle: measured and recorded
+    facts(available=30*gib, rss=busy_rows); record_path.unlink(missing_ok=True)
+    refused = calibrate("task", code=75)
+    assert "no run peak has ever been recorded" in refused.stderr and not record_path.exists(), refused.stderr
+    facts(available=30*gib); record_path.unlink(missing_ok=True)
+    done = calibrate("task")
+    runs = json.loads(record_path.read_text())["runs"]
+    assert list(runs) and all(name.startswith("task:calibration/") for name in runs), runs
+    measured = next(iter(runs.values()))
+    assert measured["peak_bytes"] >= 100 * mib and measured["samples"] >= 2, measured
+    assert "calibration recorded: task:calibration/" in done.stderr, done.stderr
+    # the deadlock case: a task is running, only task peaks exist, a no-mistakes start defers and names the route
+    facts(available=30*gib, rss=busy_rows); record(kinds=("task",))
+    refused = subprocess.run(["bash", wrapper, "run", "--kind", "no-mistakes", "--", sys.executable, "-c", "pass"],
+                             capture_output=True, text=True, env=harm_env)
+    report = json.loads(refused.stderr)
+    assert refused.returncode == 75 and "0 recorded no-mistakes runs" in report["reasons"][0], refused.stderr
+    assert "calibrate --kind no-mistakes -- <command>" in report["reasons"][0], report
+    calibrate("no-mistakes")
+    report = call("admit", "--kind", "no-mistakes", code=75, environ=harm_env)
+    assert "1 recorded no-mistakes runs" in report["reasons"][0], report["reasons"]
+    calibrate("no-mistakes")
+    facts(available=30*gib, rss=busy_rows)
+    report = call("admit", "--kind", "no-mistakes", environ=harm_env)
+    assert report["admission"] == "admit" and report["harm"]["projection_runs"] == 2 and report["harm"]["not_judged"] == [], report
+    # the run is refused while swap grows, and a command too short to read twice records nothing
+    facts(available=30*gib, rss=busy_rows); record(last_swap=swap_now - 100*mib)
+    refused = calibrate("task", code=75)
+    assert "swap used grew by" in refused.stderr, refused.stderr
+    facts(available=30*gib, rss=busy_rows); record(kinds=("task",))
+    before = json.loads(record_path.read_text())["runs"]
+    short = calibrate("task", code=1, command=("--", "true"))
+    assert json.loads(record_path.read_text())["runs"] == before and "not recorded" in short.stderr, short.stderr
+    print("ok - calibrate records a measured run of its kind (refused on a busy unmeasured host, while swap grows, or when too short to read twice), and two calibration runs resolve the task-running, no-mistakes-unmeasured deadlock")
 
     # a failed or inconsistent read keeps its fail-closed 75 whatever the record says
     facts(available=30*gib); record()
@@ -560,7 +642,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     # a probe decides from the record before it folds in, then folds one step in
     facts(available=30*gib, compressor=compressor_now + gib); record()
     report = call("probe",environ=harm_env)
-    assert report["admission"] == "defer" and "compressor grew by 1.000 GiB" in report["reasons"][0], report
+    assert report["admission"] == "defer" and f"compressor grew by {gib} bytes (1.000 GiB)" in report["reasons"][0], report
     folded = json.loads(record_path.read_text())
     assert len(folded["trail"]["steps"]) == 201 and folded["trail"]["steps"][-1][2] == gib, folded["trail"]["steps"][-1]
     assert folded["trail"]["last"]["compressor_bytes"] == compressor_now + gib

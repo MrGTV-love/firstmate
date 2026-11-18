@@ -352,7 +352,7 @@ test_growing_swap_refuses_a_new_secondmate_but_not_its_respawn() {
     run_secondmate_spawn "$CASE_SM" --captain-model-pin "$STALE_MODEL" 2>&1)
   status=$?
   [ "$status" -eq 75 ] || fail "growing swap must defer a new secondmate with 75 (got $status)"$'\n'"$out"
-  assert_contains "$out" "swap used grew by 0.098 GiB" "the deferral must name the measured harm"
+  assert_contains "$out" "swap used grew by 104857600 bytes (0.098 GiB)" "the deferral must name the measured harm"
   [ ! -e "$CASE_HOME/state/sm-memory-a1.meta" ] || fail "a deferred secondmate must leave no task record"
   fm_test_memory_record "$CASE_HOME/state" steady
   printf '34359738368\n4\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"

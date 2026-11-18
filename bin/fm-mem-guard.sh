@@ -4,13 +4,16 @@
 #        fm-mem-guard.sh sample|baseline|probe
 #        fm-mem-guard.sh admit [--kind task|no-mistakes]
 #        fm-mem-guard.sh run [--kind task|no-mistakes] -- <new-run command...>
+#        fm-mem-guard.sh calibrate --kind task|no-mistakes -- <representative command...>
 # Legacy flags retain the fail-open diagnostic contract in the engine header.
 # sample records facts only; admit returns 75 if the harm itself is measured
 # (the run's projected resident size does not fit in available memory minus the
 # reserve, or swap used or the compressor grew since the last probe reading),
 # if that cannot be judged (the reading says why and how the record is filled;
-# a host with no fleet run running admits one start so the record can begin),
-# or if required facts are unreadable. The kernel pressure level is recorded,
+# the one bootstrap admit is a host with no fleet run running and more available
+# memory than the largest run peak recorded for any kind, and a host with no
+# peak recorded admits nothing), or if required facts are unreadable. The
+# kernel pressure level is recorded,
 # never judged. No new work
 # runs after that return, and no existing work is stopped. Neither the recorded
 # one-run peak and headroom margin shown in each reading nor the non-fleet RSS
@@ -19,6 +22,13 @@
 # contents, the harm test and every derivation. --kind names the run being
 # admitted; run defaults it to no-mistakes, and admit without it needs both
 # kinds' projections and judges fit against the larger.
+# calibrate is the one-time operator run that gets a first measurement: it runs
+# the given representative command once, measures the largest resident size of
+# its process tree, and records it as a run of --kind in the root home's
+# calibration, so the next admit sees it. It starts only when the facts are
+# readable, swap and the compressor are not growing, and more memory is
+# available than the largest recorded peak (or, with none recorded, no fleet
+# run is running); one calibration measures at a time.
 # run checks once and execs a NEW run only; reattach/respond directly so a
 # measured overload cannot prevent supervising existing work. admit, run and
 # sample only record a reading in the invoking home's state.
@@ -41,11 +51,11 @@ if [ "${1:-}" = --help ] || [ "${2:-}" = --help ]; then
   exec python3 "$SCRIPT_DIR/fm-mem-guard.py" --help
 fi
 case "${1:-}" in
-  sample|baseline|admit|probe|run) mode=$1; shift ;;
+  sample|baseline|admit|probe|run|calibrate) mode=$1; shift ;;
   *) exec python3 "$SCRIPT_DIR/fm-mem-guard.py" "$@" ;;
 esac
 kind=
-if [ "$mode" = admit ] || [ "$mode" = run ]; then
+if [ "$mode" = admit ] || [ "$mode" = run ] || [ "$mode" = calibrate ]; then
   if [ "${1:-}" = --kind ]; then
     case "${2:-}" in
       task|no-mistakes) kind=$2; shift 2 ;;
@@ -53,7 +63,10 @@ if [ "$mode" = admit ] || [ "$mode" = run ]; then
     esac
   fi
 fi
-if [ "$mode" = run ]; then
+if [ "$mode" = calibrate ]; then
+  [ -n "$kind" ] && [ "${1:-}" = -- ] && [ "$#" -gt 1 ] || { echo 'usage: fm-mem-guard.sh calibrate --kind task|no-mistakes -- <representative command...>' >&2; exit 2; }
+  shift
+elif [ "$mode" = run ]; then
   [ "${1:-}" = -- ] && [ "$#" -gt 1 ] || { echo 'usage: fm-mem-guard.sh run [--kind task|no-mistakes] -- <new-run command...>' >&2; exit 2; }
   shift
   [ -n "$kind" ] || kind=no-mistakes
@@ -61,7 +74,7 @@ else
   [ "$#" -eq 0 ] || { echo 'unexpected memory guard arguments' >&2; exit 2; }
 fi
 if [ "$(uname -s)" != Darwin ] && [ -z "${FM_MEMORY_FIXTURE_DIR:-}" ]; then
-  if [ "$mode" = run ]; then exec "$@"; fi
+  if [ "$mode" = run ] || [ "$mode" = calibrate ]; then exec "$@"; fi
   exit 0
 fi
 # shellcheck source=bin/fm-wake-lib.sh
@@ -72,6 +85,10 @@ if [ "$root" = "$(cd "$FM_HOME" && pwd -P)" ]; then
   host_state="$STATE"
 elif [ "$mode" = probe ]; then
   exit 0
+fi
+if [ "$mode" = calibrate ]; then
+  FM_MEMORY_FLEET_ROOT="$root" exec python3 "$SCRIPT_DIR/fm-mem-guard.py" calibrate --state "$STATE" \
+    --calibration "$host_state/.memory-calibration.json" --kind "$kind" -- "$@"
 fi
 engine_mode=$mode
 [ "$mode" != run ] || engine_mode=admit

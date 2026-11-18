@@ -958,6 +958,15 @@ def facts(folder, available=40 * GIB, total=128 * GIB):
         'Anonymous pages: 1048576.\nFile-backed pages: %d.\n'
         'Pages purgeable: 100.\nPages occupied by compressor: 32768.\n' % (available // 16384 - 1100))
     (fixture / 'processes.json').write_text(json.dumps([dict(pid=101, ppid=1, comm='daemon', started='s101', rss_bytes=GIB, fleet=False, run=None)]))
+    # The guard's harm test admits nothing on a host with no recorded run peak, so the root home holds a short
+    # but valid record (one no-mistakes run of 3 GiB): an idle host with more available than that peak admits.
+    import socket
+    state = folder / 'fmhome' / 'state'
+    state.mkdir(parents=True, exist_ok=True)
+    (state / '.memory-calibration.json').write_text(json.dumps(dict(
+        schema='fm-memory-calibration.v1', host=socket.gethostname(), total_bytes=total, pressured=None,
+        runs={'no-mistakes:repo/run-0': dict(peak_bytes=3 * GIB, samples=2, incomplete_samples=0, first_seen='x', last_seen='x',
+                                              max_gap_seconds=0)})))
 
 
 def case_soak():

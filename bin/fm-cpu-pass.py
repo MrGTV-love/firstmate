@@ -150,6 +150,43 @@ FIRST_NOTICE_SECS = 2.0
 NOTICE_EVERY_SECS = 60.0
 POLL_MIN_SECS = 0.05
 POLL_MAX_SECS = 0.5
+SLEEP_SLICE_SECS = 0.05
+
+
+class Cancellation:
+    """A SIGINT that a waiting start remembers, so that no code path can lose it.
+
+    Python raises KeyboardInterrupt from a signal handler into whatever code is running. When
+    that code is a weakref callback or a finalizer (the garbage collector runs them at any
+    allocation), the interpreter prints "Exception ignored" and the exception goes no further:
+    the waiter would sleep on and never exit 130. The handler therefore records the signal
+    first, and the wait loop raises the exception itself from `check()`; `sleep()` wakes in
+    slices so that a recorded signal ends the wait at once. A SIGINT that the caller's shell
+    left ignored stays ignored, as for any Python process.
+    """
+
+    def __init__(self) -> None:
+        self.signalled = False
+        self.installed = signal.getsignal(signal.SIGINT) is not signal.SIG_IGN
+        if self.installed:
+            signal.signal(signal.SIGINT, self.handle)
+
+    def handle(self, signum: int, frame: object) -> None:
+        self.signalled = True
+        raise KeyboardInterrupt
+
+    def check(self) -> None:
+        if self.signalled:
+            raise KeyboardInterrupt
+
+    def sleep(self, seconds: float) -> None:
+        deadline = time.monotonic() + seconds
+        while True:
+            self.check()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(SLEEP_SLICE_SECS, remaining))
 
 
 class PoolUnavailable(Exception):
@@ -838,6 +875,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         return 125
     waiter_fd = admission_fd = None
     waiter_path = None
+    cancellation = Cancellation()
     try:
         directory = pool_dir()
         ensure_pool_dir(directory)
@@ -852,6 +890,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         next_notice = time.monotonic() + FIRST_NOTICE_SECS
         delay = POLL_MIN_SECS
         while True:
+            cancellation.check()
             reason = "another start is registering"
             if try_lock(admission_fd):
                 before, cores = pipeline_observation()
@@ -871,8 +910,9 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             if now >= next_notice:
                 log(2, "pipeline-start waiting: " + reason)
                 next_notice = now + NOTICE_EVERY_SECS
-            time.sleep(delay)
+            cancellation.sleep(delay)
             delay = min(POLL_MAX_SECS, delay * 2)
+        cancellation.check()
         os.unlink(waiter_path)
         waiter_path = None
         log(2, "pipeline-start admitted: " + reason)

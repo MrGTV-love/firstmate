@@ -2119,7 +2119,7 @@ test_memory_admission_defers_before_dispatch_then_admits_recovery() {
   out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
     run_spawn "$case_dir" "$home" "$case_dir/no-new-copy" later "$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
   expect_code 75 "$rc" "growing swap must defer actual spawn: $out"
-  assert_contains "$out" 'swap used grew by 0.098 GiB' "the deferral did not name the measured harm"
+  assert_contains "$out" 'swap used grew by 104857600 bytes (0.098 GiB)' "the deferral did not name the measured harm"
   assert_nothing_created "$case_dir" "$home" later "$before" "$worktrees"
   cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'memory deferral changed running work'
   jq -es '.[-1].pressure_level == 4 and .[-1].admission == "defer" and .[-1].source == "admit" and .[-1].harm.swap_delta_bytes > 0' \
@@ -2155,6 +2155,8 @@ test_healthy_memory_admits_within_declared_capacity() {
   printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
   printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
   printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  # The harm test admits nothing on a host with no recorded run peak, so the home holds a complete record.
+  mkdir -p "$home/state"; fm_test_memory_record "$home/state" steady
   declare_capacity "$home" "project 2"
   write_live "$home" live-a "$case_dir/project"
   rc=0

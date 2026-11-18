@@ -146,7 +146,12 @@ def swap(folder, growing, peaks=PEAKS):
     calibrate(folder, peaks=peaks, last_swap=SWAP_USED - 100 * 2 ** 20 if growing else SWAP_USED)
 
 
-def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
+def case(name, cores=18, running=0, load=0, measured=False, available=None):
+    # An unmeasured case writes a short but valid record (one no-mistakes run): the guard's harm test admits
+    # the start on an idle host only when more is available than the largest recorded peak (the 64 GiB task
+    # peak), so these cases read 100 GiB, and the pool's own formula falls back to the counted-run limit.
+    if available is None:
+        available = 40 * GIB if measured else 100 * GIB
     folder = root / name
     folder.mkdir()
     db = folder / 'state.sqlite'
@@ -157,8 +162,7 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     write_json(load_file, [0, load, 0])
     facts(folder, available=available)
     procs(folder)
-    if measured:
-        calibrate(folder)
+    calibrate(folder) if measured else calibrate(folder, peaks=[3.0])
     (folder / 'fmhome').mkdir(exist_ok=True)
     env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'),
                CASE_CORES=str(cores), CASE_PROCS=str(folder / 'procs.json'), FM_MEMORY_FIXTURE_DIR=str(folder / 'native'),
@@ -289,20 +293,34 @@ try:
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
     finish(child)
     assert marker.exists()
-    # One qualifying recorded run, a record for another host, and unreadable text all
-    # fall back; none refuses and none reads as an empty host.
-    for name, record in (('one-run', lambda f: calibrate(f, peaks=[3.0])), ('other-host', lambda f: calibrate(f, host='other-host')),
+    # One qualifying recorded run still falls back to the counted-run limit (the idle host's bootstrap admit
+    # above the largest recorded peak, then the pool's own formula); it neither refuses nor reads as an empty host.
+    folder, db, env = case('fallback-one-run', running=6)
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=6 limit=6 basis=fallback' in (folder / 'f.stderr').read_text(), 'one-run fallback count')
+    assert child.poll() is None
+    change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+    finish(child)
+    # A record for another host or RAM size, unreadable text, a record the root-home walk cannot reach, and no
+    # record at all are no measurement of this host: the start waits with the harm's reason and the calibration
+    # run, and never reads as an empty host or runs.
+    for name, record in (('other-host', lambda f: calibrate(f, host='other-host')),
                          ('other-ram', lambda f: calibrate(f, total=64 * GIB)),
                          ('garbage', lambda f: (f / 'fmhome/state').mkdir(parents=True, exist_ok=True) or (f / 'fmhome/state/.memory-calibration.json').write_text('{')),
+                         ('absent', lambda f: (f / 'fmhome/state/.memory-calibration.json').unlink()),
                          ('walk-fails', lambda f: calibrate(f) or (f / 'fmhome/.fm-secondmate-parent').write_text('garbage\n'))):
-        folder, db, env = case('fallback-' + name, running=6)
+        folder, db, env = case('unmeasured-' + name, running=6)
         record(folder)
         child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
         pending(folder, 1)
-        wait_for(lambda: 'waiting: counted=6 limit=6 basis=fallback' in (folder / 'f.stderr').read_text(), name + ' fallback count')
-        assert child.poll() is None
-        change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
-        finish(child)
+        wait_for(lambda: 'waiting: overload: memory: the harm cannot be judged: ' in (folder / 'f.stderr').read_text(), name + ' unjudged harm')
+        text = (folder / 'f.stderr').read_text()
+        assert 'bin/fm-mem-guard.sh calibrate --kind no-mistakes -- <command>' in text and 'no run peak has ever been recorded' in text, text
+        time.sleep(0.6)
+        assert not (folder / 'm').exists() and child.poll() is None
+        os.killpg(child.pid, signal.SIGTERM)
+        finish(child, -signal.SIGTERM)
     # A secondmate home reads its parent's record (the root home owns the calibration).
     folder, db, env = case('root-home', running=6)
     calibrate(folder)
@@ -347,7 +365,7 @@ try:
     marker = folder / 'floor.marker'
     child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'floor')
     pending(folder, 1)
-    wait_for(lambda: 'waiting: overload: memory: swap used grew by 0.098 GiB' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
+    wait_for(lambda: 'waiting: overload: memory: swap used grew by 104857600 bytes (0.098 GiB)' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
     time.sleep(0.6)
     assert not marker.exists() and child.poll() is None
     swap(folder, growing=False)
@@ -470,7 +488,7 @@ try:
     wait_for(lambda: (folder / 'already-running.started').exists(), 'a run already started')
     before_hash = hashlib.sha256(db.read_bytes()).hexdigest()
     for label, bad, good, expected in (
-            ('swap', lambda: swap(folder, growing=True), lambda: swap(folder, growing=False), 'memory: swap used grew by 0.098 GiB'),
+            ('swap', lambda: swap(folder, growing=True), lambda: swap(folder, growing=False), 'memory: swap used grew by 104857600 bytes (0.098 GiB)'),
             ('pileup', lambda: procs(folder, count=6400), lambda: procs(folder, count=6399), 'process pile-up: 6400 of 10666'),
             ('memory-unreadable', lambda: facts(folder, broken=True), lambda: facts(folder, available=100 * GIB), 'memory: '),
             ('procs-unreadable', lambda: procs(folder, error=True), lambda: procs(folder), 'process count unreadable'),
@@ -502,7 +520,7 @@ try:
     for label, bad, good in (
             ('swap', lambda f: swap(f, growing=True, peaks=[]), lambda f: swap(f, growing=False, peaks=[])),
             ('pileup', lambda f: procs(f, count=6400), lambda f: procs(f, count=100)),
-            ('memory-unreadable', lambda f: facts(f, broken=True), lambda f: facts(f)),
+            ('memory-unreadable', lambda f: facts(f, broken=True), lambda f: facts(f, available=100 * GIB)),
             ('procs-unreadable', lambda f: procs(f, error=True), lambda f: procs(f))):
         folder, db, env = case('transition-' + label, cores=3, running=1)
         marker, log = folder / 'transition.marker', folder / 'transition.stderr'

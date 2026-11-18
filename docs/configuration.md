@@ -2446,8 +2446,11 @@ The harm is starting work that exhausts host memory and makes the host thrash or
 It is measured in two ways: the projected resident size of a run of that kind does not fit in available memory minus a reserve, or swap used or the compressor grew at all since the last probe reading.
 The native memory-pressure level is recorded in each reading and never judged, because it does not track available bytes: in the recorded readings it deferred work at 10.9 to 39.0 GiB available while readings that were admitted ran down to 18.2 GiB.
 The projection, reserve and comparison window are quantiles of this host's own records, derived at each decision, so the [engine header](../bin/fm-mem-guard.py) owns them.
-A part that cannot be judged defers the start too, with its reason and how the record is filled (a new or short record, a kind with too few recorded runs, or a previous probe reading older than the window), and the reading's `harm` object names it.
-The one exception is a host with no fleet run running, which admits one start so that the record can begin.
+A part that cannot be judged defers the start too, with its reason, how the record is filled (a new or short record, a kind with too few recorded runs, or a previous probe reading older than the window) and the calibration run below, and the reading's `harm` object names it.
+The one bootstrap admit is a host that is idle (no fleet run is running, so the start is the only run) whose available memory exceeds the largest peak recorded for any kind; a host with no recorded peak admits nothing on an unjudged input.
+A host with no measurement, or a busy one with a kind that has too few recorded runs, gets its first measurement from the one-time operator calibration run: `bin/fm-mem-guard.sh calibrate --kind task|no-mistakes -- <representative command>` runs that command once, reads its process tree's largest resident size, and records it in the root home's calibration as a run of that kind, so the next admit sees it.
+Each calibration run counts as one recorded run, and a kind needs two before its fit is judged, so run it again when the deferral says one is still missing.
+It starts only when the readings are readable, swap and the compressor are not growing, more memory is available than the largest recorded peak (with none recorded, no fleet run is running), and no other calibration is measuring; a command that ends before two readings is not recorded.
 A deferred spawn prints the reasons with their numbers.
 Every fresh pipeline start through the CPU pass pool meets the same test as a no-mistakes run before its own reservation formula, and its one-start minimum never overrides it.
 The generated worker brief names two routes for a new no-mistakes run.
