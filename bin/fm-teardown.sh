@@ -2197,6 +2197,7 @@ teardown_preserves_reassociated_copy() {
   done < "$meta"
   # The retry shape of the unclaimed route: the own copy is already gone and a
   # current pending-return marker names the pool slot that encloses its path.
+  [ "$meta" = "$META" ] || return 1
   [ -d "$worktree" ] || ! teardown_pending_marker_slot "$project" "$worktree" >/dev/null || return 0
   return 1
 }

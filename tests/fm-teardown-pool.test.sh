@@ -6022,7 +6022,7 @@ test_retry_binds_the_early_proof_to_the_marker_lease_not_the_present_one() {
 # The functions eval'd from bin/fm-teardown.sh read these variables and call these stubs.
 # shellcheck disable=SC2030,SC2031,SC2034,SC2329
 test_unplanned_unclaimed_copy_refuses_before_any_helper() {
-  local dir out scenario name want rc bad=''
+  local dir out scenario name want rc bad='' mode case_dir
   # name|keep-copy|owner|proven|force|wd-exists|shared|kind|expected exit
   for scenario in \
       'unproven-no-history|0|absent|no||yes|0|ship|1' \
@@ -6054,13 +6054,39 @@ test_unplanned_unclaimed_copy_refuses_before_any_helper() {
     ) 2>&1
     rc=$(printf '%s\n' "$out" | sed -n 's/^exit=//p')
     [ "$rc" = "$want" ] || bad="$bad"$'\n'"$name: exit $rc, expected $want"$'\n'"$out"
+    if [ "$want" = 1 ]; then
+      case "$out" in
+        *'nothing was removed, returned, retired or signalled'*) ;;
+        *) bad="$bad"$'\n'"$name: the refusal does not say nothing was touched"$'\n'"$out" ;;
+      esac
+    fi
   done
   [ -z "$bad" ] || fail "the unplanned unclaimed copy was not handled as ruled:$bad"
-  out=$(unc6_functions teardown_unplanned_unclaimed_refusal)
-  assert_contains "$out" 'nothing was removed, returned, retired or signalled' "the refusal does not say nothing was touched"
-  # both planning points call it, each before any retirement helper
-  [ "$(grep -c 'teardown_unplanned_unclaimed_refusal || exit 1' "$ROOT/bin/fm-teardown.sh")" = 2 ] \
-    || fail "the refusal is not called at both planning points of bin/fm-teardown.sh"
+  for mode in unproven other-holder; do
+    UNC_HISTORY=none unc_pool_case "unplanned-run-$mode" ordinary fake || fail "$mode: cannot build the pool"
+    case_dir=$UNC_CASE
+    sed 's/^kind=ship$/kind=scout/' "$case_dir/state/task-x1.meta" > "$case_dir/meta.tmp" \
+      && mv "$case_dir/meta.tmp" "$case_dir/state/task-x1.meta" || fail "$mode: cannot make the record a scout"
+    if [ "$mode" = unproven ]; then
+      : > "$case_dir/capability-old"
+    else
+      jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= (.lease_holder = "other-task")' "$UNC_STATE" > "$UNC_STATE.tmp" \
+        && mv "$UNC_STATE.tmp" "$UNC_STATE" || fail "$mode: cannot give slot A to another holder"
+    fi
+    unc_copy_snapshot "$UNC_NESTED" "$case_dir/own-copy.before"
+    unc_a_entry > "$case_dir/a-entry.before"
+    : > "$case_dir/git.argv"
+    rc=0
+    out=$(unc_run_teardown "$case_dir") || rc=$?
+    [ "$rc" -ne 0 ] || fail "$mode: teardown completed for an unplanned unclaimed copy"$'\n'"$out"
+    assert_contains "$out" 'nothing was removed, returned, retired or signalled' "$mode: teardown did not refuse with the unplanned-copy refusal"
+    assert_present "$case_dir/state/task-x1.meta" "$mode: the record was retired"
+    unc_copy_snapshot "$UNC_NESTED" "$case_dir/own-copy.after"
+    cmp -s "$case_dir/own-copy.before" "$case_dir/own-copy.after" || fail "$mode: the task's own copy changed"
+    unc_a_entry | cmp -s - "$case_dir/a-entry.before" || fail "$mode: slot A's lease changed"
+    ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$mode: a return was sent: $(cat "$case_dir/treehouse.argv")"
+    ! grep -E -- ' worktree remove ' "$case_dir/git.argv" >/dev/null || fail "$mode: a worktree removal ran: $(grep 'worktree remove' "$case_dir/git.argv")"
+  done
   pass 'a no-history copy in a pool slot nobody claims, with the route not planned (an unproven provider or a lease that is another task'"'"'s), refuses before any helper; a record with history stays inert, a claimed slot, a shared slot, a gone copy and a secondmate are untouched'
 }
 
