@@ -2454,9 +2454,11 @@ class Watch:
     def read_their_followups(self, count, keep=0):
         """Read up to count of the second person's request threads (their share of this poll's reads, split_reads), in their own read order and their own
         proven DM: ([(thread, its new messages), ...], the first per-thread read error), as read_followups returns the owner's. Their order works as the
-        owner's: the threads read go to the back, whether their read works or not. Inside their time budget a thread is read only while that read and keep
-        more calls (the acknowledgement their pass still has to post) fit, and a read the budget cuts off ends the thread reads only: their history read
-        and one acknowledgement still fit in every poll (finding 3 of the review of d0b0c216), and a thread not read keeps its place for the next poll."""
+        owner's: the threads read go to the back, whether their read works or not. Inside their time budget their ready requests come first: a thread is read
+        only while that read and keep more calls (the acknowledgements of every request the cap lets their pass take in now) fit, and a read the budget cuts
+        off ends the thread reads only. So their history read and their acknowledgements keep the time they had before thread reads existed (finding 3 of
+        the review of d0b0c216), and a thread not read keeps its place for the next poll: with slow calls their thread reads wait for a poll in which their
+        new requests leave the time, and never cost the owner anything."""
         threads = self.their_threads()
         if count <= 0 or not threads:
             return [], None
@@ -3944,13 +3946,13 @@ class Watch:
         """Their pass's take-in, as the owner's take_in: the follow-ups in the threads of theirs the owner's check picked from the one read order (SC8 (6)), and
         their new requests (their one history read), share what the cap leaves them (share). Their one history read is made even when nothing of the cap is
         left: it takes nothing in then, and records whether more of theirs waits than this pass can take (backlog), which the next owner check reads at cap 1
-        (reserve_for_second). Their history read is made first, and their thread reads leave time for one acknowledgement when a request of theirs is
-        ready (read_their_followups): their thread reads never take the time of the base's one useful step. Returns the first per-thread read error, to be
-        reported after their other work."""
+        (reserve_for_second). Their history read is made first, and their thread reads leave time for the acknowledgements of the requests of theirs the cap
+        lets them take in now (read_their_followups): their thread reads never take the time of the base's useful steps. Returns the first per-thread read
+        error, to be reported after their other work."""
         reads = self.second_reads
         plan = self.read_requests(max(remaining, 1), True)
         ready = self.ready_requests(plan)
-        read, deferred = self.read_their_followups(getattr(self, 'followup_reads', 0) or 0, keep=1 if ready and remaining > 0 else 0)
+        read, deferred = self.read_their_followups(getattr(self, 'followup_reads', 0) or 0, keep=min(ready, max(remaining, 0)))
         waiting = self.ready_followups(read)
         if self.second_reads > reads:
             self.state['backlog'] = plan is None or ready + waiting > max(remaining, 0)

@@ -1994,6 +1994,31 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                     reads |= set(self.thread_reads(home, set(threads)))
             self.assertEqual(reads, set(threads))
 
+    def test_sc8_6_with_slow_calls_their_ready_requests_keep_their_time_and_their_threads_are_read_after(self):
+        # The same 3 s per call and the plane's real 21 s budget, with five requests of theirs ready at once: the poll takes in all five (their thread reads
+        # give way to the acknowledgements the cap lets them post now, never the other way round), and the later polls, with no request waiting, read every
+        # thread of theirs in turn.
+        with self.scott() as home:
+            _, threads = self.build(home, 0, 10)
+            clock, real = [0.0], Traced.call
+
+            def slow(replay, method, **fields):
+                if fields.get('channel') == SCOTT_DM:
+                    clock[0] += 3.0
+                return real(replay, method, **fields)
+            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN
+            with patch.object(Traced, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+                requests = [self.their_message(home, 'a slow request %d' % index) for index in range(5)]
+                reads = []
+                for poll in range(4):
+                    Traced.TRACE.clear()
+                    rc, out, _ = home.poll()
+                    self.assertEqual(rc, 0)
+                    if poll == 0:
+                        self.assertEqual([ts for ts in requests if 'check: slack request %s from %s' % (ts, SCOTT) in out], requests)
+                    reads.append(set(self.thread_reads(home, set(threads))))
+            self.assertEqual(set().union(*reads), set(threads))
+
     def test_sc8_6_split_checks_read_their_picked_threads_only_with_the_proven_hand_over_of_the_same_sweep(self):
         for second_token, expected in (('sweep.1', True), ('sweep.other', False)):
             with self.scott() as home:
