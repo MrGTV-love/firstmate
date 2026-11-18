@@ -11,6 +11,8 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
+# Pin the documented override for the existing scaled 600s boundary cases.
+export SPAWN_ACQUIRE_STALL=600 SPAWN_ACQUIRE_CEILING=0
 TMP_ROOT=$(fm_test_tmproot fm-spawn-pool-base-freshen)
 # Every spawn in this file runs with its detached home-summary refresh stubbed (tests/fixtures.sh fm_test_spawn_script).
 export FM_TEST_STUB_SUMMARY_REFRESH=1

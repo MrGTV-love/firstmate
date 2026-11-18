@@ -3,6 +3,8 @@ set -eu
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
+# These scaled boundary cases select the supported historical stall override.
+export SPAWN_ACQUIRE_STALL=600 SPAWN_ACQUIRE_CEILING=0
 TMP_ROOT=$(fm_test_tmproot fm-spawn-herdr-shell)
 SPAWN_TMP_DIRS=()
 cleanup() {

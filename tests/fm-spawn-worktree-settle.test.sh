@@ -24,6 +24,9 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
+# Historical boundary cases exercise the supported 600s override, not the
+# measured production default; all elapsed time still comes from clock.sh.
+export SPAWN_ACQUIRE_STALL=600 SPAWN_ACQUIRE_CEILING=0
 SPAWN="${FM_TEST_SPAWN:-$ROOT/bin/fm-spawn.sh}"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-worktree-settle)
 # Scale only the acquisition's one-second sleeps; fixture commands keep real time.
@@ -40,7 +43,7 @@ sleep() {
     else
       if [ "${FM_SETTLE_MODE:-}" = stalecompletion ] && [ "$__fm_scaled_time" = 1 ]; then
         __fm_scaled_time=599
-      elif [ "${FM_SETTLE_MODE:-}" = novel ] && [ "$__fm_scaled_time" -ge 5400 ]; then
+      elif { [ "${FM_SETTLE_MODE:-}" = novel ] || [ "${FM_SETTLE_MODE:-}" = gitactive ]; } && [ "$__fm_scaled_time" -ge 5400 ]; then
         __fm_scaled_time=$((__fm_scaled_time + 5))
       else
         __fm_scaled_time=$((__fm_scaled_time + ${FM_SETTLE_TICK:-60}))
@@ -99,6 +102,18 @@ case "${1:-}" in
     [ ! -f "$FM_FAKE_PANE_COUNTFILE.marker" ] || cat "$FM_FAKE_PANE_COUNTFILE.marker"
     now=$(cat "${FM_SETTLE_CLOCK_FILE:-/dev/null}" 2>/dev/null || printf 0)
     case "${FM_SETTLE_MODE:-}" in
+      gitactive|gitidle|gitnoise)
+        trace=$(cat "$FM_FAKE_PANE_COUNTFILE.tracepath" 2>/dev/null || true)
+        if [ -n "$trace" ]; then
+          if [ "$FM_SETTLE_MODE" = gitactive ] ||
+            { [ "$FM_SETTLE_MODE" = gitidle ] && [ "$now" -le 300 ]; }; then
+            printf '{"event":"start","argv":["git","status"]}\n' >> "$trace"
+          elif [ "$FM_SETTLE_MODE" = gitnoise ]; then
+            printf '{"event":"region_enter","label":"still alive"}\n' >> "$trace"
+          fi
+        fi
+        printf 'treehouse: checked /fixture/repeated: skipped: counter=%s\n' "$now"
+        exit 0 ;;
       novel) printf 'treehouse: checked /fixture/candidate-%04d: skipped: fixture reason\n' "$((now / 300))"; exit 0 ;;
       churn)
         decision=skipped
@@ -150,7 +165,12 @@ case "${1:-}" in
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
     for arg in "$@"; do
-      case "$arg" in printf*__firstmate_acquire_*) bash -c "$arg" > "$FM_FAKE_PANE_COUNTFILE.marker" ;; esac
+      case "$arg" in
+        printf*__firstmate_acquire_*) bash -c "$arg" > "$FM_FAKE_PANE_COUNTFILE.marker" ;;
+        GIT_TRACE2_EVENT=*' treehouse get')
+          bash -c "${arg% treehouse get}; printf '%s\\n' \"\$GIT_TRACE2_EVENT\"" > "$FM_FAKE_PANE_COUNTFILE.tracepath" ;;
+        'unset GIT_TRACE2_EVENT') : > "$FM_FAKE_PANE_COUNTFILE.trace-cleared" ;;
+      esac
     done
     if [ -n "${FM_COMPAT_LAUNCH_LOG:-}" ]; then
       for arg in "$@"; do
@@ -381,8 +401,53 @@ run_content_stall_case() { # <mode> <deadline> [first-tick] [tick]
   assert_contains "$out" 'copies skipped by this spawn: none' 'skipped-copy context absent'
   [ "$(cat "$HOME_DIR/acquisition-clock")" = "$deadline" ] || fail "$mode stopped at $(cat "$HOME_DIR/acquisition-clock"), expected $deadline: $out"
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'refusal published task metadata'
+  assert_absent "$(cat "$COUNTFILE.tracepath")" 'refusal retained its private acquisition trace'
   printf '%s\n' "$out"
   pass "$mode stops at $deadline scaled seconds"
+}
+test_git_starts_keep_a_silent_walk_alive() {
+  local rec id out trace
+  id=settle-git-active
+  rec=$(make_primary_case git-active "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(FM_SETTLE_MODE=gitactive FM_SETTLE_TICK=300 run_settle_spawn "$id")
+  expect_code 0 "$?" "actual start observations did not renew: $out"
+  assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$id.meta" 'silent walk did not reach its copy'
+  assert_equals 5405 "$(cat "$HOME_DIR/acquisition-clock")" 'active walk ended at the wrong time'
+  assert_present "$COUNTFILE.trace-cleared" 'successful acquisition did not clear inherited tracing'
+  trace=$(cat "$COUNTFILE.tracepath")
+  assert_absent "$trace" 'successful acquisition retained its private trace'
+  pass 'Git starts keep repeated-candidate walk alive past 5400; tracing is cleared'
+}
+test_git_activity_stops_then_stalls() { run_content_stall_case gitidle 905; }
+test_nonstart_trace_growth_is_not_progress() { run_content_stall_case gitnoise 600; }
+test_explicit_acquisition_ceiling_is_honored() {
+  local rec id out status
+  id=settle-explicit-ceiling
+  rec=$(make_primary_case explicit-ceiling "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  # A first isolated read at1500 must not be confirmed at the1800 ceiling.
+  out=$(SPAWN_ACQUIRE_CEILING=1800 FM_SETTLE_MODE=novel FM_SETTLE_TICK=300 FM_SETTLE_ENTER_AT=1500 run_settle_spawn "$id")
+  status=$?
+  expect_code 1 "$status" "explicit ceiling did not stop: $out"
+  assert_contains "$out" 'explicit SPAWN_ACQUIRE_CEILING override' 'operator limit not identified'
+  assert_equals 1800 "$(cat "$HOME_DIR/acquisition-clock")" 'explicit limit ignored'
+  pass 'positive ceiling is an explicit operator override, not a default'
+}
+test_stall_override_selects_the_idle_allowance() {
+  local rec id out status
+  id=settle-stall-override
+  rec=$(make_primary_case stall-override "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(SPAWN_ACQUIRE_STALL=900 FM_SETTLE_MODE=unchanged FM_SETTLE_TICK=5 run_settle_spawn "$id")
+  status=$?
+  expect_code 1 "$status" "stall override did not refuse: $out"
+  assert_contains "$out" 'no path or output progress for 900s' 'stall override was not applied'
+  assert_equals 900 "$(cat "$HOME_DIR/acquisition-clock")" 'stall override ended at the wrong time'
+  pass 'positive stall override controls idle refusal'
 }
 test_unchanged_capture_stops_at_600() { run_content_stall_case unchanged 600; }
 test_new_content_observed_at_595_resets_stall() { run_content_stall_case boundary595 1195; }
@@ -1201,6 +1266,11 @@ test_transient_primary_checkout_is_not_accepted
 test_primary_checkout_that_never_settles_fails_at_the_deadline
 test_slow_progressing_get_survives_old_window
 test_new_candidates_finish_after_5400_seconds
+test_git_starts_keep_a_silent_walk_alive
+test_git_activity_stops_then_stalls
+test_nonstart_trace_growth_is_not_progress
+test_explicit_acquisition_ceiling_is_honored
+test_stall_override_selects_the_idle_allowance
 test_unchanged_capture_stops_at_600
 test_new_content_observed_at_595_resets_stall
 test_new_content_emitted_at_599_is_observed_at_600

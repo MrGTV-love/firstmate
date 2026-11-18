@@ -508,7 +508,10 @@ A slot is recognized by the rule teardown uses: Treehouse's `<pool>/<slot>/<repo
 A slot a task merely left holds no record's current copy, so it never blocks allocation.
 
 After sending `treehouse get`, a fresh spawn polls the pane until two reads agree on an isolated worktree of the project.
-The wait ends only after 600 seconds without observing a changed pane path or a newly finished candidate.
+The wait ends after the acquisition stall allowance without a new pane path, a newly finished candidate or a Git call started by the walking get.
+The default allowance is 1605 seconds, three times the reported 535-second maximum pool walk at load about 100; `SPAWN_ACQUIRE_STALL` selects a positive decimal number of seconds.
+Acquisition samples Git Trace2 start events from a private per-get file, so Git calls that finish between polls still count; merely remaining alive or using CPU does not count.
+Tracing is cleared in the acquired shell before provisioning or worker launch, and the attempt's private trace files are removed on exit.
 A finished candidate is reported at column zero as `treehouse: checked <absolute copy path>: <accepted|refused|skipped>: <reason>`.
 Its identity is the path field compared exactly, counted only once per get.
 Pane-path changes have a separate per-get seen set: returning to a pane path already observed does not renew, but a stale pane observation cannot suppress a later genuine completion of that candidate.
@@ -520,12 +523,14 @@ A non-tmux text capture cannot distinguish a wrapped non-empty reason from a mal
 Acquisition interprets that ambiguous alignment as the valid wrapped record, rather than stopping a legitimate progressing walk.
 An empty reason violates the producer format; this interpretation does not let a candidate path already seen in the get renew again.
 Acquisition requires a readable capture: the pane must acknowledge a compact per-get output boundary across physical line wraps before `treehouse get` is sent, so even a burst larger than the bounded capture cannot hide the boundary before it is established.
-If that boundary cannot be read, no get is sent and the same 600-second no-progress stop refuses the acquisition.
+If that boundary cannot be read, no get is sent and the same configured no-progress allowance refuses the acquisition.
 That boundary excludes inherited records without clearing pane history, including when the first get sample also contains a current completion.
 Changed counters, timestamps, decisions or reasons for a seen candidate, scrolling it out and back, `waiting:` messages and all non-matching output renew nothing.
-A get without those progress lines is judged by pane path alone.
-There is no absolute acquisition ceiling: a get that keeps finishing new candidates may finish however long the walk takes, including across skipped copies.
-The separate slot-provisioning thirty-minute absolute bound is unchanged.
+A get without those progress lines is judged by pane path and actual Git starts.
+Repeated candidates alone cannot keep a get alive; a walk that keeps starting Git can, and the finite-walk guarantee applies only after that activity also stops.
+There is no default absolute acquisition ceiling, including across skipped copies.
+An operator can explicitly set `SPAWN_ACQUIRE_CEILING` to a positive decimal number of seconds to impose a total acquisition limit; unset or zero disables it.
+The separate slot-provisioning 600-second start allowance and thirty-minute absolute bound are fixed and unaffected by either acquisition override.
 A live `treehouse get` does not expire at a short wall-clock window, but liveness alone does not reset the no-progress clock.
 The same rule applies when the foreground cannot be read, as on zellij and cmux.
 A waiting line every minute names the foreground evidence, elapsed time, idle time and last rejected path.
