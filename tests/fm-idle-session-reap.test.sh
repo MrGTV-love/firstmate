@@ -722,7 +722,7 @@ test_captain_holds() {
   home=$(make_home captain)
   mk_task "$home" held scout idle "done [at=$OLD]: report written"
   scout_report "$home" held
-  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold held --title "Captain call" --reason "choose next action" --repo sample >/dev/null || fail "hold failed"
+  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold held --title "Captain call" --boundary owner-rule-change --if-no 'Keep the existing owner rule' --reason "choose next action" --repo sample >/dev/null || fail "hold failed"
   out=$(TASKS_AXI_BACKEND=markdown run_reap "$home" scan) || fail "scan failed"
   expect_class "$out" held parked "durable captain hold overrides an old done event"
   out=$(FM_HOME="$home" TASKS_AXI_BACKEND=markdown FM_IDLE_REAP_ADMISSION=1 "$ROOT/bin/fm-teardown.sh" held 2>&1) || rc=$?
@@ -760,7 +760,7 @@ test_project_freeze() {
   expect_class "$out" vernant-merged reap "with no hold, the finished task is reap-ready"
 
   FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
-    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null || fail "hold failed"
+    --title "Vernant freeze" --boundary owner-rule-change --if-no 'Keep the existing project rule' --reason "captain froze the Vernant lanes" --repo vernant >/dev/null || fail "hold failed"
   out=$(run_reap "$home" scan) || fail "scan failed: $out"
   expect_class "$out" vernant-merged reap "a hold that declares no project freezes nothing, whatever its repo"
 
@@ -827,7 +827,7 @@ test_secondmate_parent_freeze() {
   expect_class "$out" vernant-mate-merged reap "with no parent hold, the mate's finished task is reap-ready"
 
   FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
-    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
+    --title "Vernant freeze" --boundary owner-rule-change --if-no 'Keep the existing project rule' --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
     || fail "parent hold failed"
   FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
     || fail "parent freeze declaration failed"
@@ -886,7 +886,7 @@ test_grandchild_mate_root_freeze() {
   expect_class "$out" vernant-grand-merged reap "with no freeze anywhere, the grandchild's finished task is reap-ready"
 
   FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
-    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
+    --title "Vernant freeze" --boundary owner-rule-change --if-no 'Keep the existing project rule' --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
     || fail "root hold failed"
   FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
     || fail "root freeze declaration failed"

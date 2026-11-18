@@ -2378,14 +2378,15 @@ assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a
 clock['now'] = now
 # A steer delivered in an earlier overdue episode cannot answer a row whose age clock restarted with unchanged text:
 # the episode follows the row's obligation clock as well as its digest.
-home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker')
+home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker', age_seconds=3660)
 _, boundary = drain()
 inbox(home, '001.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
 assert ack(boundary).returncode == 0
-clock['now'] = now + 8000
+clock['now'] = now + 120
+ok(code / 'bin/fm-open-loops.sh', '--check-actions')  # the delivery is still within its row limit
 record = json.loads(ledger.read_text())
-record['generated_epoch'] = now + 8000
+record['generated_epoch'] = now + 120
 ledger.write_text(json.dumps(record))
 restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock is changed work', restarted)
@@ -2624,7 +2625,8 @@ assert reused.returncode == 0, ('the same unchanged row needs no newer message',
 assert ack(boundary).returncode == 0
 # A steer on a reviewed green PR answers its presentation for four hours from its delivery, not from the action.
 home, ledger, row, call, ok, drain, ack = case('steer-remaining', category='review_pass_not_merged', subject=PR,
-                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+                                               owner='firstmate', source=dict(task='worker'),
+                                               age_seconds=93600, limit_seconds=86400)
 _, boundary = drain()
 inbox(home, '005.msg', offset=-600)
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
@@ -2651,7 +2653,7 @@ for handled in (False, True):
     inbox(home, '002.msg', handled=handled, offset=-3700)
     refused = call(*args, '002.msg')
     assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
-    inbox(home, '003.msg', handled=handled, offset=1)
+    inbox(home, '003.msg', handled=handled)
     ok(*args, '003.msg')
     action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
     assert action['kind'] == 'steered' and action['evidence'] == '003.msg', action
@@ -2664,7 +2666,7 @@ print('PASS: PR provenance steers use own inbox or handled records, reject forei
 for index, damaged in enumerate(('a string', None, ['worker'], 7)):
     home, ledger, row, call, ok, drain, ack = case('damaged-source-' + str(index), source=damaged)
     _, boundary = drain()
-    inbox(home, '001.msg', offset=1)
+    inbox(home, '001.msg', offset=0)
     ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
     action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
     assert action['kind'] == 'steered' and action['evidence'] == '001.msg', (damaged, action)
@@ -3835,7 +3837,7 @@ import tempfile
 import time
 
 root = Path(sys.argv[1]).resolve()
-world = Path(tempfile.mkdtemp(prefix='ledger-receipts-'))
+world = Path(tempfile.mkdtemp(prefix='ledger-receipts-')).resolve()
 code = world / 'code'
 shutil.copytree(root / 'bin', code / 'bin')
 # Count the actual local snapshot reader, not a fabricated snapshot.
@@ -3899,8 +3901,10 @@ try:
                    + [dict(row_id='absent', kind='escalated', evidence='not a row'),
                       dict(row_id='row-0', kind='unknown', evidence='invalid kind')])
     assert result.returncode == 1, result
+    assert runs.is_file(), (result.stdout, result.stderr)
     assert len(runs.read_text().splitlines()) == 1, 'a 50-row batch must read one snapshot'
     assert len(stored()['handling']['actions']) == 50, result
+    assert not any(action.get('unverified') for action in stored()['handling']['actions'].values()), result
     assert 'absent' in result.stdout and 'unknown' in result.stdout, result
     assert len(result.stdout.splitlines()) == 53, result.stdout
     call(loops, '--check-actions')
@@ -3954,7 +3958,7 @@ try:
         assert ack(boundary, good=False).returncode == 1, field
     print('PASS: every obligation identity change requires new evidence', flush=True)
 
-    # Firstmate escalations and steers cover unchanged work across turns with no time bound; a change gates again.
+    # Escalations retain their unchanged-work behavior; steers require result follow-up after their row limit.
     for kind in ('escalated', 'steered'):
         publish([rows[0]])
         _, boundary = drain()
@@ -3967,7 +3971,11 @@ try:
         receipt_time = clock
         for clock in (receipt_time + 14399, receipt_time + 14400, receipt_time + 3 * 14400):
             result = call(drain_cli)
-            assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, (kind, result)
+            if kind == 'steered':
+                assert 'row-0' in result.stdout and 'WAKE_ACK_REQUIRED' in result.stderr, (kind, result)
+                assert call(loops, '--check-actions', good=False).returncode == 1
+            else:
+                assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, (kind, result)
         record = stored()
         record['rows'][0]['evidence'] += '-changed'
         ledger.write_text(json.dumps(record))
@@ -3975,7 +3983,7 @@ try:
         assert ack(boundary, good=False).returncode == 1, kind
         act('row-0')
         ack(boundary)
-    print('PASS: firstmate escalations and steers need no new action on unchanged work, only on changed work', flush=True)
+    print('PASS: unchanged escalations retain their behavior while delivered steers require bounded result follow-up', flush=True)
 
     # Free-text escalation is not proof it reached the captain, even after its turn closes.
     # Exercise the exact receipt text the away daemon used to emit through the real CLI.
@@ -4030,7 +4038,7 @@ try:
             heartbeat(4800, wait='lint failed: 3 errors')
             result, boundary = drain()
             assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1
-    print('PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do', flush=True)
+    print('PASS: display counters do not change an obligation; current bounded steers, deferrals and escalations remain valid', flush=True)
 
     # A timer the worker's own pane paints, in any unit and shape, is elapsed time too.
     def retime(timer, work='Running lint…'):
@@ -4256,7 +4264,7 @@ def case(name, actor='main', **fields):
 # 1. A delivery sent after the row's overdue episode began keeps counting when the unchanged row is presented again.
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('represent')
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 assert act('steered', '001.msg').returncode == 0
 assert ack(boundary).returncode == 0
 clock['now'] = now + 120
@@ -4270,7 +4278,7 @@ home, ledger, row, call, ok, wake, drain, ack, act, stored = case(
     'represent-reviewed', category='review_pass_not_merged', subject=PR, owner='firstmate',
     source=dict(task='worker'), limit_seconds=600)
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 assert act('steered', '001.msg').returncode == 0
 assert ack(boundary).returncode == 0
 clock['now'] = now + 120
@@ -4293,7 +4301,7 @@ print('PASS: a steer delivered after the overdue episode began counts on every r
 # A delivery older than the receipt window, and one sent before the episode, never counts.
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('old-steer', age_seconds=100000)
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 inbox(home, '002.msg', offset=-96500)
 before = act('steered', '002.msg')
 assert before.returncode == 1 and 'new delivery' in before.stdout, before
@@ -4304,7 +4312,7 @@ clock['now'] = now
 # Materially changed evidence opens a new episode: the earlier delivery no longer answers it.
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('changed-evidence')
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 assert act('steered', '001.msg').returncode == 0 and ack(boundary).returncode == 0
 record = stored()
 record['rows'][0]['evidence'] = 'waiting for lint.full.whole and a new failing step; declaration age 7200s'
@@ -4314,7 +4322,7 @@ wake('changed')
 _, boundary = drain()
 stale = act('steered', '001.msg')
 assert stale.returncode == 1 and 'new delivery' in stale.stdout, stale
-inbox(home, '002.msg', offset=1)
+inbox(home, '002.msg', offset=0)
 assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
 clock['now'] = now
 print('PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused', flush=True)
@@ -4337,7 +4345,7 @@ _, boundary = drain()
 assert stored()['handling']['episodes'][row['id']]['start'] == now, stored()['handling']['episodes']
 early = act('steered', '001.msg')
 assert early.returncode == 1 and 'became overdue' in early.stdout, early
-inbox(home, '002.msg', offset=1)
+inbox(home, '002.msg', offset=0)
 assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
 print('PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say',
       flush=True)
@@ -4355,13 +4363,17 @@ _, boundary = drain()
 reply_record(home, '0123456789abcdef', delivered='')
 undelivered = act('steered', '0123456789abcdef')
 assert undelivered.returncode == 1 and 'task inbox' in undelivered.stdout, undelivered
-reply_record(home, 'fedcba9876543210', task='other', delivered=str(now + 5))
+reply_record(home, 'fedcba9876543210', task='other', delivered=str(now))
 foreign = act('steered', 'fedcba9876543210')
-assert foreign.returncode == 1, foreign
+assert foreign.returncode == 1 and 'task inbox' in foreign.stdout, foreign
 reply_record(home, '0011223344556677', delivered=str(now - 3700))
 early = act('steered', '0011223344556677')
 assert early.returncode == 1 and 'new delivery' in early.stdout, early
-reply_record(home, 'aabbccddeeff0011', delivered=str(now + 5))
+reply_record(home, '0123012301230123', delivered=str(now + 5))
+future = act('steered', '0123012301230123')
+assert future.returncode == 1 and 'result follow-up' in future.stdout, future
+assert ack(boundary).returncode == 1, 'an unconfirmed or future delivery must leave the row actionable'
+reply_record(home, 'aabbccddeeff0011', delivered=str(now))
 accepted = act('steered', 'aabbccddeeff0011')
 assert accepted.returncode == 0, ('a delivered pending-reply id is a remote secondmate delivery record', accepted.stdout)
 assert stored()['handling']['actions'][row['id']]['evidence'] == 'aabbccddeeff0011'
@@ -4372,11 +4384,11 @@ home2, ledger2, row2, call2, ok2, wake2, drain2, ack2, act2, stored2 = case(
     'remote-link', category='silent_report', subject='mini', owner='firstmate',
     next_action='check in: progress, blockers, cross-workstream dependencies', evidence='last heard')
 _, boundary2 = drain2()
-reply_record(home2, 'aabbccddeeff0011', delivered=str(now + 5))
+reply_record(home2, 'aabbccddeeff0011', delivered=str(now))
 (home2 / 'state/pending-replies/2211221122112211').symlink_to(home2 / 'state/pending-replies/aabbccddeeff0011')
 linked = act2('steered', '2211221122112211')
-assert linked.returncode == 1, linked
-print('PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused', flush=True)
+assert linked.returncode == 1 and 'task inbox' in linked.stdout, linked
+print('PASS: a confirmed remote delivery is accepted; undelivered, foreign, early, future and linked records are refused', flush=True)
 
 # 3. One owner decides captain visibility: the printed row and the deferral check agree.
 def printed_visibility(result, ident):
