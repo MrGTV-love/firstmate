@@ -633,9 +633,11 @@ def decide(facts):
         raise Refused("the script argument is not, byte for byte, the installed omp's entry script")
     if exe_real != runtime:
         raise Refused("an omp-shaped program that is not the installed omp's runtime")
+    # The role is judged from the raw arguments and the descriptor table the kernel holds, so a worker or
+    # print role is refused whatever happened to the tree; the tie to launch time is the last gate.
+    decide_role(argv[2:], facts.get("stdin"))
     if not _settled(evidence.get("tree_settled"), "whether the installed tree changed after the process started"):
         raise Unresolved("the installed tree changed after the process started, so what the process loaded through it cannot be proved")
-    decide_role(argv[2:], facts.get("stdin"))
 
 
 def _valid_source(source):

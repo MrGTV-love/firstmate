@@ -810,9 +810,10 @@ test_a_foreign_process_whose_link_is_retargeted_to_the_installed_entry_stays_ref
   : > "$t/foreign/cli.ts"
   ln -s "$t/foreign/cli.ts" "$t/lnk/src/cli.ts"
   spawn tty "$BUN" "$BUN" "$t/lnk/src/cli.ts" --no-title; b=$SPAWNED
-  assert_tree 1 0 "$b" "control: a process started on a link to a foreign script is refused"
+  assert_verdict 1 "$b" "control: a process started on a link to a foreign script is refused"
   ln -sfn "$SCRIPT" "$t/lnk/src/cli.ts"
-  assert_tree 1 0 "$b" "a link retargeted to the installed entry after launch must not admit the process"
+  assert_verdict 1 "$b" "a link retargeted to the installed entry after launch must not admit the process"
+  assert_tree 1 0 "$b" "and it may still own a record, because only its raw arguments could prove otherwise"
   pass "N1 B: a foreign process whose link is retargeted to the installed entry after launch stays refused"
 }
 test_a_directory_swapped_into_the_installed_path_after_launch_is_not_admitted() {
