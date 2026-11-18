@@ -532,7 +532,7 @@ This operation widens what the write guard permits by one ref, so the guard `suc
 The actual lock-owning main Firstmate runs `fm-control <task-id> successor --branch <successor> --tip <sha> --note <why>`.
 `--tip` anchors the first admission to a commit Main reads itself, never to the worker's own archive branches:
 
-- for `route=archive-tip`, the task's submitted or pipeline head from its no-mistakes run record, which the confined worker cannot write, read with `no-mistakes axi status --run <run-id>` (`branch_sync.pipeline.submitted_head`, `current_head`, `pushed_head` or `run.head_sha`); for the Scott task these are its submitted head S and its pipeline head P;
+- for `route=archive-tip`, the task's submitted or pipeline head from its no-mistakes run record, which the confined worker cannot write, read with `no-mistakes axi status --run <run-id>` (`branch_sync.pipeline.submitted_head`, `current_head`, `pushed_head` or `run.head_sha`); after the custody return in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md) these are its submitted head S and its pipeline head P;
 - for `route=checked-out`, the recorded branch's tip as Main observes it, read with `git -C <project> rev-parse refs/heads/<recorded-branch>`. The worker's profile grants that ref, so the worker can move it, and this anchor proves only that Main observed that tip. It is the weaker route: its control is Main choosing the branch, with the Main-only verb, the name family, the unclaimed and checked-out-nowhere-else rules, and the record the worker cannot write.
 
 The sha must be a full 40 or 64 lowercase hex commit in the project's ref store.
