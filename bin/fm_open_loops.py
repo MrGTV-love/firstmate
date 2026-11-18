@@ -129,6 +129,7 @@ class Collector:
                         GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
         self.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.rows = {}
+        self.consumer_tasks = {}
         self.stale_reason = None
         self.stale_generated = None
         self.degraded = []
@@ -299,7 +300,7 @@ class Collector:
         return self.run(["bash", "-c", script, "open-loops", *args])
 
     def add(self, category, subject, action, since=None, owner="firstmate", evidence="", informational=False,
-            source=None, opening=None):
+            source=None, opening=None, consumer_task=None):
         """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
@@ -314,6 +315,8 @@ class Collector:
         if opening is not None:
             row["opening"] = opening
         self.rows[identity] = row
+        if consumer_task is not None:
+            self.consumer_tasks[identity] = consumer_task
 
     def source(self, name, reader, *args):
         """Run one reader; its failure marks the ledger partly blind and never aborts the others."""
@@ -441,8 +444,7 @@ class Collector:
         if not stamps:
             evidence += "; no report yet: clock starts at dispatch"
         self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
-                 since, evidence=evidence, informational=informational,
-                 source=self.source("report provenance " + ident, self.task_source, ident))
+                 since, evidence=evidence, informational=informational, consumer_task=ident)
         if long_wait:
             row = next(r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident)
             row["limit_seconds"] = pause_limit
@@ -542,7 +544,7 @@ class Collector:
             if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")),
-                         source=self.source("worker provenance " + task["id"], self.task_source, task["id"]))
+                         consumer_task=task["id"])
             state = task["current_state"].get("state")
             if state == "failed":
                 # A scout's report is output to consume, not proof its failed
@@ -551,7 +553,7 @@ class Collector:
                         "failed deliverable " + task["id"], self.deliverable_landed, task)):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")),
-                             source=self.source("worker provenance " + task["id"], self.task_source, task["id"]))
+                             consumer_task=task["id"])
             elif ((state == "done" or (state == "unknown" and stopped)) and not task["pr"].get("url")
                   and not self.captain_dropped(task)
                   # The durable status log, not the live pane, owns the completion declaration: a closed
@@ -654,7 +656,7 @@ class Collector:
             evidence += "; " + signatures[-1][:150]
         self.add("stalled_worker", task["id"], "follow up on the recorded wait and recover the worker", since,
                  owner="worker:" + task["id"], evidence=evidence,
-                 source=self.source("worker provenance " + task["id"], self.task_source, task["id"]))
+                 consumer_task=task["id"])
 
     def task_worktree(self, task):
         worktree = task["paths"]["worktree"].get("path")
@@ -1278,8 +1280,13 @@ class Collector:
         consumers = self.consumer_observations()
         for row in rows:
             source = row.get("source")
-            observed = consumers.get(source.get("task")) if isinstance(source, dict) else None
-            if observed and all(source.get(key) == value for key, value in observed["source"].items()):
+            task = source.get("task") if isinstance(source, dict) else self.consumer_tasks.get(row["id"])
+            observed = consumers.get(task)
+            if observed and (source is None or all(source.get(key) == value for key, value in observed["source"].items())):
+                # These direct-report rows are bound by their producer. Missing optional liveness
+                # provenance must not change the existing collector coverage verdict.
+                if source is None:
+                    row["source"] = observed["source"]
                 row["consumer"] = observed
             row["current_identity"] = row_digest(row)
         report = dict(schema="fm-open-loops.v1", generated_epoch=self.stale_generated or self.now,
