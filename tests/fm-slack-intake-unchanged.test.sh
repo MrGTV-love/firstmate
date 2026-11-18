@@ -27,7 +27,7 @@ printf '## In flight\n\n## Queued\n\n## Done\n' > "$home/data/backlog.md"
 )
 export FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
   FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config"
-"$ROOT/bin/fm-captain-hold.sh" hold held-call --reason "captain choice" >/dev/null
+"$ROOT/bin/fm-captain-hold.sh" hold held-call --boundary owner-rule-change --if-no 'Keep the existing owner rule' --reason "captain choice" >/dev/null
 "$ROOT/bin/fm-captain-hold.sh" bind slack-dm >/dev/null
 
 rows=$'held-call\treconcile\t\nwork-call\tyes\t\nunknown-key\tyes\t\n'

@@ -4,6 +4,7 @@
   "spec": "docs/guard-spec.md",
   "audited": 30,
   "beyond_audit_active": [
+    "turnend-ask-gate",
     "live-lab-processes-stopped-before-remove",
     "merge-local-ff-only",
     "merge-unproved-outcome",
@@ -163,6 +164,46 @@
     "teardown-entry-preflight"
   ],
   "guards": [
+    {
+      "id": "turnend-ask-gate",
+      "version": "1",
+      "owner": "bin/fm-turnend-guard.sh",
+      "invariant": "An in-scope Claude primary's first Stop cannot settle after an unquoted final-text ask fails the authority-boundary and if-no form.",
+      "layer": "runtime-block",
+      "source": "The registered Claude Stop hook's original JSON last_assistant_message, stop_hook_active and primary-scope verdict.",
+      "trigger": "A checked final-message line lacks exactly one distinct named boundary before its first if no: marker or an alphanumeric action after it.",
+      "decision": "deny",
+      "fail_direction": "open",
+      "remedy": "Decide a routine call instead of waiting; when Main judges a captain-owned boundary exists, rewrite the question with its one boundary and concrete if no: action as described in docs/turnend-guard.md.",
+      "budget": 1,
+      "budget_reason": "One corrective continuation after publication; stop_hook_active true records UNCHECKED and cannot reblock for this check. It never charges or resets the separate supervision block budget.",
+      "telemetry": "state/guard-events.jsonl: deny/ask-gate-rubber-stamp for a failing line, otherwise one warn/ask-gate-unchecked for a skipped turn; never allow. Examined text without failure or skipped asks records nothing.",
+      "test": "tests/fm-turnend-ask.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": true,
+      "proxy_reason": "The final-text form is only a necessary backstop against obvious rubber stamps. Semantic question ownership is Main's judgment, not machine-readable authority; a lexically correct empty ask can pass.",
+      "precheck_gap": "The native Stop hook receives final assistant text after publication; this corrective check is not a pre-publication gate.",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "fm-guard-event.sh\" turnend-ask-gate",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "key": "site:bin/fm-turnend-guard.sh:f05ba9904f",
+          "within": "if printf '%s' \"$ASK_RESULT\" | jq -e '.line != null'",
+          "match": "exit 2",
+          "count": 1
+        }
+      ],
+      "layer_note": "Only the existing --claude primary path participates. Fenced/quoted examples, missing text and hook continuations are UNCHECKED, not approval; the base's silent input/host/scope exits stay silent. The live-watcher fixture is locally omitted under confinement and is owed to the unconfined pipeline/CI.",
+      "remedy_verified": "fixture"
+    },
     {
       "id": "backlog-transition",
       "owner": "bin/fm-backlog-transition-lib.sh",
@@ -5671,6 +5712,7 @@
             "file": "bin/fm-turnend-guard.sh",
             "match": "exit 2",
             "key": "site:bin/fm-turnend-guard.sh:f05ba9904f",
+            "within": "block_stop",
             "count": 1
           },
           {

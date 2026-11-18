@@ -459,6 +459,15 @@ A home may instead select another tasks-axi adapter such as Beads through its ow
 Captain-hold row creation is owned by [`bin/fm-captain-hold.sh`](../bin/fm-captain-hold.sh) `hold`: when no work item exists, it creates an ordinary backlog row (`--kind captain` metadata; Beads native type `task`) and then applies the captain hold.
 Captain rows have no Beads due semantics, so that create path waives a Beads `due.required` setting rather than passing a synthetic `--due`; `--until` remains the optional hold deferral.
 
+New captain holds require a named authority boundary and a concrete if-no action, stored on the task and visible through `tasks-axi show <id> --full`; [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the flags and allowed names.
+A call without those facts is Main's to decide, not the captain's to hold.
+Existing holds remain readable and resolvable without the new fields, and an unresolved hold may be deferred again without supplying them.
+The answer path also accounts for an avoidable wait when the answer matches the hold's separately recorded exact recommendation; the script header owns that field and the home-local delay-log contract.
+The tool accepts a hold without `--recommendation`, but every filer whose card carries a `Recommendation:` is expected to supply it.
+Its value is the exact answer value that choosing the recommended option sends: the typed words for a typed answer, or for a keyed or Slack answer the option's answer value, never its number and never its display label.
+On a Slack card the answer value is the text in parentheses after the label, so `1. Approve the charge (approve)` gives `approve`: a tap or a typed `1` is converted to `approve` before intake.
+An answer equal to that value after trimming surrounding whitespace records one delay row; any other answer records none.
+
 Do not register a Beads `types.custom` `captain` type for this: captain is a hold kind, and the fleet Beads `due.required` policy for ordinary work stays in the federated beads config.
 
 ### Automatic dispatch and completion
@@ -1244,7 +1253,7 @@ Explicit reopening or successful new-work start or dispatch retires the previous
 The same transitions retire every earlier `Deliverable of the finished work:` line to `Historical deliverable of the finished work:`, keeping its text, so only the current cycle's deliverable stays active.
 A ship whose commits only a recorded verified bundle holds is removed only while its row is held for the captain's land-or-drop call, and teardown keeps that row open and held, as [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header describes.
 A home with a manual backlog, or an Orca cleanup recovery, has no row that can hold that call, so the bundle route refuses there.
-A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project> --owner captain --reason <reason>`.
+A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project> --owner captain --reason <reason> --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'`.
 The captain's answer closes the row with no note, and its captain hold kind keeps it out of Recently Landed.
 A row closed on that bundle instead, by a replay that finds the hold released or by hand, carries the note `preserved in bundle <path>, not landed`; it is never presented as recently landed, and it is not marked as the captain's drop.
 The same transitions retire that line to `Historical preserved in bundle <path>, not landed`, so a row restarted after a bundle close and then closed again is judged on its new close.

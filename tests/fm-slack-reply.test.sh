@@ -249,7 +249,7 @@ printf 'ok - REPLY-4\n'
 # REPLY-5: a decision-card answer shaped reply in a request thread is a follow-up; the card thread is unchanged
 new_home
 (cd "$FM_HOME" && tasks-axi add card-call "Card call" --kind captain --repo sample >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold card-call --reason "Select the release approach" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold card-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Select the release approach" >/dev/null
 say_owner 2000.000100 'a request beside an open card'
 ipoll >/dev/null
 card=$(python3 "$HELPER" thread-field "$(state_file)" card-call ts)
@@ -309,7 +309,7 @@ seen_followups() { python3 -c 'import json, sys; print(sum(1 for e in json.load(
 card_home() {  # a home with an open decision card beside the plane
   new_home
   (cd "$FM_HOME" && tasks-axi add card-call "Card call" --kind captain --repo sample >/dev/null)
-  FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold card-call --reason "Select the release approach" >/dev/null
+  FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold card-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Select the release approach" >/dev/null
 }
 other_dm() {  # <name> <messages-json>: a transcript whose owner DM is not the stored channel
   python3 "$HELPER" set-transcript "$INTAKE" "$TMP/$1-1.json" messages "$2"
