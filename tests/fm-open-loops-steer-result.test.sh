@@ -188,6 +188,43 @@ assert not any(row['id'] == c.ident for row in c.collect()['rows'])
 assert c.ident not in c.cli('--present-overdue').stdout
 print('PASS: stalled work returns at its own limit unless existing progress evidence shows it resumed', flush=True)
 
+# A check-in acknowledgement or a pending delivery is not the requested report.
+for mode in ('ack-only', 'actual-report', 'pending-reply'):
+    c = Case('silence-' + mode, category='silent_report', kind='secondmate' if mode == 'pending-reply' else 'ship')
+    assert c.row['limit_seconds'] == 900
+    if mode == 'pending-reply':
+        reply_dir = c.home / 'state/pending-replies'
+        reply_dir.mkdir()
+        proof = 'abcd0123456789ef'
+        reply = reply_dir / proof
+        delivery = f'task_id=worker\ndelivered_epoch={base}\n'
+        reply.write_text(delivery + 'phase=delivered\n')
+        c.steer(proof)
+    else:
+        message = c.delivery(); c.steer()
+        c.now = base + 800
+        handled = c.home / 'state/worker.inbox/handled'
+        handled.mkdir()
+        destination = handled / '001.msg'
+        assert message.resolve() == c.home / 'state/worker.inbox/001.msg'
+        assert destination.resolve() == c.home / 'state/worker.inbox/handled/001.msg' and not destination.exists()
+        message.rename(destination)
+        os.utime(handled, (c.now, c.now))
+        if mode == 'actual-report':
+            with c.status.open('a') as stream:
+                stream.write(f'working [at={c.now}]: reported the validation outcome and remaining blocker\n')
+    c.now = base + 899
+    c.actionable(False)
+    c.now = base + 900
+    row = c.actionable(mode != 'actual-report', refresh=False)
+    assert (row['id'], row['owner'], row['next_action']) == (c.ident, c.row['owner'], c.row['next_action'])
+    c.actionable(mode != 'actual-report')
+    if mode == 'pending-reply':
+        c.now = base + 901
+        reply.write_text(delivery + f'phase=resolved\nresolved_epoch={c.now}\n')
+        c.actionable(False)
+print('PASS: formal silence steers ignore transport-only activity but keep genuine reports and resolved replies', flush=True)
+
 # Loss of a source that requires a live worker is not evidence that the steer succeeded.
 for category, kind in (('stalled_worker', 'ship'), ('silent_report', 'ship'), ('silent_report', 'secondmate')):
     c = Case('worker-loss-' + category + '-' + kind, category=category, kind=kind)

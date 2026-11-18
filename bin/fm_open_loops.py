@@ -130,6 +130,7 @@ class Collector:
         self.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.rows = {}
         self.consumer_tasks = {}
+        self.silence_transport = {}
         self.stale_reason = None
         self.stale_generated = None
         self.degraded = []
@@ -317,6 +318,7 @@ class Collector:
         self.rows[identity] = row
         if consumer_task is not None:
             self.consumer_tasks[identity] = consumer_task
+        return row
 
     def source(self, name, reader, *args):
         """Run one reader; its failure marks the ledger partly blind and never aborts the others."""
@@ -443,10 +445,14 @@ class Collector:
             evidence += "; " + excluded
         if not stamps:
             evidence += "; no report yet: clock starts at dispatch"
-        self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
-                 since, evidence=evidence, informational=informational, consumer_task=ident)
+        row = self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
+                       since, evidence=evidence, informational=informational, consumer_task=ident)
+        if not excluded and (pending or (ack_at is not None and since == ack_at)):
+            # Transport activity may reset the ordinary check-in cadence, but
+            # only a report or resolved reply can settle a recorded steer.
+            self.silence_transport[row["id"]] = max(
+                (stamp for stamp in (status_at, reply_at) if stamp is not None and stamp <= self.now), default=-1)
         if long_wait:
-            row = next(r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident)
             row["limit_seconds"] = pause_limit
             row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit)
 
@@ -1319,7 +1325,7 @@ class Collector:
             previous = None
         if previous and "handling" in previous:
             handling = report["handling"] = previous["handling"]
-            current = {row["id"] for row in report["rows"]}
+            current = {row["id"]: idx for idx, row in enumerate(report["rows"])}
             unfinished = {task["id"] for task in self.tasks
                           if task["current_state"].get("state") not in STOP_STATES | {"failed"}}
             losses = {row["source"]["task"]: row["consumer"] for row in report["rows"]
@@ -1334,26 +1340,49 @@ class Collector:
                         and task["current_state"].get("state") not in STOP_STATES | {"failed"}:
                     losses[task["id"]] = observed
             for row in previous["rows"]:
-                # These producers require a live worker and stop emitting on endpoint loss.
-                # That loss is not a report or resumed work. Reopen the outstanding steer
-                # until handling catches up; don't resurrect questions or completed work.
-                if row["id"] in current or not row.get("overdue") or row.get("stale") \
+                ident = row["id"]
+                if not row.get("overdue") or row.get("stale") \
                         or row.get("category") not in ("silent_report", "stalled_worker"):
                     continue
-                action = handling["actions"].get(row["id"], {})
+                action = handling["actions"].get(ident, {})
+                if action.get("kind") != "steered" or not same_work(action, row, previous["generated_epoch"]):
+                    continue
                 source = row.get("source")
-                if action.get("kind") != "steered" or not same_work(action, row, previous["generated_epoch"]) \
-                        or not isinstance(source, dict):
+                if source is not None and not isinstance(source, dict):
                     continue
-                loss = losses.get(source.get("task"))
-                if not loss or not all(source.get(key) == loss["source"][key]
-                                       for key in ("home", "state", "data", "config", "task")):
-                    continue
-                retained = dict(row, source=loss["source"], consumer=loss)
+                source = source or {}
+                slot = current.get(ident)
+                if slot is not None:
+                    # The silence producer's ordinary cadence is transport-aware.
+                    # Preserve the original result clock and evidence while only
+                    # transport changed, not a report, reply, or intentional wait.
+                    observed = report["rows"][slot]
+                    sent = action.get("sent_epoch", action.get("at_epoch"))
+                    if ident not in self.silence_transport or type(sent) is not int \
+                            or self.silence_transport[ident] >= sent or observed.get("stale") \
+                            or observed["limit_seconds"] != row["limit_seconds"]:
+                        continue
+                    new_source = observed.get("source") or {}
+                    if source and new_source and any(source.get(key) != new_source.get(key)
+                                                     for key in ("home", "state", "data", "config", "task")):
+                        continue
+                    retained = dict(observed, age_seconds=row["age_seconds"], overdue=True, evidence=row["evidence"])
+                    retained.pop("informational", None)
+                else:
+                    # Endpoint loss stops these live-only producers, but is
+                    # not a report or resumed work. Keep only verified losses.
+                    loss = losses.get(source.get("task"))
+                    if not loss or not all(source.get(key) == loss["source"][key]
+                                           for key in ("home", "state", "data", "config", "task")):
+                        continue
+                    retained = dict(row, source=loss["source"], consumer=loss)
                 if type(retained.get("age_seconds")) is int:
                     retained["age_seconds"] += max(0, self.now - previous["generated_epoch"])
-                report["rows"].append(retained)
-                current.add(row["id"])
+                if slot is None:
+                    current[ident] = len(report["rows"])
+                    report["rows"].append(retained)
+                else:
+                    report["rows"][slot] = retained
             if not report["complete"]:
                 presented = {ident for actor in handling["presentations"].values() for ident in actor}
                 for row in previous["rows"]:

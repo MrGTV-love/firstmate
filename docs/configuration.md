@@ -1026,6 +1026,8 @@ This reuses current fleet-snapshot and crew-state evidence; a name-only match is
 For a steered `stalled_worker` or `silent_report` row whose live-only source stops emitting on unexpected endpoint loss, the publisher keeps the original obligation actionable against the verified endpoint observation instead of treating its disappearance as the result.
 This includes a local secondmate's `silent_report`, even though secondmates do not emit ordinary `missing_worker` rows.
 A recorded stop or completed or failed state is not such a loss; existing outcome and wait handling still applies.
+For a recorded `silent_report` steer, an inbox acknowledgement or an unresolved check-in reply is not the requested report and does not extend the delivery deadline.
+The regular silence clock and repeat-send suppression are unchanged when no formal steer is recorded.
 A publication marks a delivery requiring follow-up with the existing `requires_followup` flag, so subsequent consumer recovery cannot silently revive it and the same old delivery cannot renew it.
 The existing opaque notification token changes once when result follow-up becomes due and settles on unchanged observations.
 A current new action on the same obligation retains that notification token as its seed rather than replaying the handled notification; another unmet delivery deadline or authoritative unavailability derives a new token for the same still-open obligation.
