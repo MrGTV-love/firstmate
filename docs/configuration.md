@@ -1023,6 +1023,8 @@ The collector reuses its existing worker observations to publish optional `consu
 An authoritative unavailable consumer returns the steered obligation for follow-up immediately, even before a separate missing-worker row becomes overdue.
 The observation must match the row's current source roots and verified launch, including a verified successor when the obligation survives relaunch; an absent, unknown, stale or mismatched observation is not evidence of health or an early invalidation.
 This reuses current fleet-snapshot and crew-state evidence; a name-only match is never enough.
+For a steered `stalled_worker` or `silent_report` row whose live-only source stops emitting on unexpected endpoint loss, the publisher keeps the original obligation actionable against the verified missing-worker observation instead of treating its disappearance as the result.
+A recorded stop or completed or failed state is not such a loss; existing outcome and wait handling still applies.
 A publication marks a delivery requiring follow-up with the existing `requires_followup` flag, so subsequent consumer recovery cannot silently revive it and the same old delivery cannot renew it.
 The existing opaque notification token changes once when result follow-up becomes due and settles on unchanged observations.
 A current new action on the same obligation retains that notification token as its seed rather than replaying the handled notification; another unmet delivery deadline or authoritative unavailability derives a new token for the same still-open obligation.

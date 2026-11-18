@@ -177,6 +177,23 @@ assert not any(row['id'] == c.ident for row in c.collect()['rows'])
 assert c.ident not in c.cli('--present-overdue').stdout
 print('PASS: stalled work returns at its own limit unless existing progress evidence shows it resumed', flush=True)
 
+# Loss of a source that requires a live worker is not evidence that the steer succeeded.
+for category in ('stalled_worker', 'silent_report'):
+    c = Case('worker-loss-' + category, category=category)
+    c.delivery(); c.steer()
+    c.now += 1
+    os.utime(c.status, (c.now, c.now))  # missing-worker age alone will not wake the owner yet
+    c.unavailable()
+    for _ in range(2):
+        row = c.actionable(True)
+        assert (row['id'], row['owner'], row['next_action']) == (c.ident, c.row['owner'], c.row['next_action'])
+        assert not next(row for row in c.report['rows'] if row['category'] == 'missing_worker')['overdue']
+        c.now += 1
+    c.task['current_state'] = dict(state='done', source='fixture')
+    c.save_snapshot()
+    assert not any(row['id'] == c.ident and row['overdue'] for row in c.collect()['rows'])
+print('PASS: live-only steered obligations remain actionable on endpoint loss, but are not resurrected after completion', flush=True)
+
 # Batch and single actions must enforce the same deadline and unchanged owner/action.
 c = Case('batch-delivery')
 c.delivery()
@@ -296,6 +313,9 @@ for limit in (17, 0):
     c = Case('limit-' + str(limit), limit=limit)
     assert c.row['limit_seconds'] == limit
     c.delivery(); c.steer(); c.actionable(False)
+    if limit:
+        c.now = base + limit - 1
+        c.actionable(False, refresh=False)
     c.now = base + (limit if limit else 1)
     c.actionable(True, refresh=False)
     c.steer(expected=1)
@@ -339,6 +359,9 @@ for mode in ('source-less', 'legacy-receipt', 'remote'):
         (pending / record).write_text('task_id=worker\ndelivered_epoch='+str(base)+'\n')
         c.now = base + 900
         c.steer(record)
+        c.now = base + 1799
+        c.steer(record)
+        c.actionable(False, refresh=False)
     else:
         c.delivery(); c.steer()
     if mode == 'legacy-receipt':

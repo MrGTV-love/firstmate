@@ -1317,8 +1317,34 @@ class Collector:
             previous = None
         if previous and "handling" in previous:
             handling = report["handling"] = previous["handling"]
+            current = {row["id"] for row in report["rows"]}
+            unfinished = {task["id"] for task in self.tasks
+                          if task["current_state"].get("state") not in STOP_STATES | {"failed"}}
+            losses = {row["source"]["task"]: row for row in report["rows"]
+                      if row["category"] == "missing_worker" and consumer_unavailable(row)
+                      and row["source"]["task"] in unfinished}
+            for row in previous["rows"]:
+                # These producers require a live worker and stop emitting on endpoint loss.
+                # That loss is not a report or resumed work. Reopen the outstanding steer
+                # until handling catches up; don't resurrect questions or completed work.
+                if row["id"] in current or not row.get("overdue") or row.get("stale") \
+                        or row["category"] not in ("silent_report", "stalled_worker"):
+                    continue
+                action = handling["actions"].get(row["id"], {})
+                source = row.get("source")
+                if action.get("kind") != "steered" or not same_work(action, row, previous["generated_epoch"]) \
+                        or not isinstance(source, dict):
+                    continue
+                loss = losses.get(source.get("task"))
+                if not loss or not all(source.get(key) == loss["source"][key]
+                                       for key in ("home", "state", "data", "config", "task")):
+                    continue
+                retained = dict(row, source=loss["source"], consumer=loss["consumer"])
+                if type(retained.get("age_seconds")) is int:
+                    retained["age_seconds"] += max(0, self.now - previous["generated_epoch"])
+                report["rows"].append(retained)
+                current.add(row["id"])
             if not report["complete"]:
-                current = {row["id"] for row in report["rows"]}
                 presented = {ident for actor in handling["presentations"].values() for ident in actor}
                 for row in previous["rows"]:
                     # Unconfirmed either way: shown stale, never an overdue obligation needing a receipt.
