@@ -17,11 +17,7 @@
 # Special keys instead of text: fm-send.sh <target> --key Enter
 # Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
 # Orca currently supports Enter and C-c only, and rejects Escape.
-# Help: fm-send.sh --help (or -h) as the first word prints this paragraph and exits 0,
-# with or without FM_HOME, resolving no target and sending nothing. A gate caller
-# outside the permitted disposable lab is refused (exit 3) before help; a gate caller
-# inside that lab, a test-bypass caller and a relaunch transaction reach it. A send
-# without FM_HOME that passes the gate check still meets the FM_HOME refusal.
+# Help: a leading --help or -h prints usage and exits 0 without FM_HOME, after the existing gate-agent containment check; every other call keeps the existing behavior, including the FM_HOME check.
 #
 # Two data planes:
 #
@@ -278,14 +274,8 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
 
-# Help is a read: it prints this header's first paragraph, resolves no target, makes
-# no transport call and writes no send-home-fail-closed event, so it needs no home.
-# The gate check above is unchanged and still decides who reaches this branch: a gate
-# caller outside the permitted lab is refused (exit 3) before it, and the events that
-# check emits (an ordinary allow, a bypass, a lab allow, a deny) are the same as on
-# base, while a relaunch transaction emits none. Only a leading --help or -h counts;
-# the same word after a target is message text, so a send without FM_HOME that passes
-# the gate check still meets the refusal below.
+# Leading --help or -h: print the header's help paragraph and exit 0 (header, "Help:").
+# It runs after the containment check and before the FM_HOME check.
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
   sed -n '2,/^#$/{/^#$/d;s/^# \{0,1\}//;p;}' "${BASH_SOURCE[0]}"
   exit 0
