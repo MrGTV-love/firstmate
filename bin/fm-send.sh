@@ -17,9 +17,11 @@
 # Special keys instead of text: fm-send.sh <target> --key Enter
 # Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
 # Orca currently supports Enter and C-c only, and rejects Escape.
-# Help: fm-send.sh --help (or -h) as the first word prints this paragraph and exits 0
-# without FM_HOME, resolving no target and sending nothing; a gate agent is still
-# refused, and a send without FM_HOME still meets the refusal.
+# Help: fm-send.sh --help (or -h) as the first word prints this paragraph and exits 0,
+# with or without FM_HOME, resolving no target and sending nothing. A gate caller
+# outside the permitted disposable lab is refused (exit 3) before help; a gate caller
+# inside that lab, a test-bypass caller and a relaunch transaction reach it. A send
+# without FM_HOME that passes the gate check still meets the FM_HOME refusal.
 #
 # Two data planes:
 #
@@ -276,13 +278,14 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
 
-# Help is a read: it prints this header's first paragraph, resolves no target, and
-# sends nothing, so it needs no home. A gate agent is still refused above. The check
-# above is unchanged from base: an ordinary non-bypass caller emits its best-effort
-# gate-agent allow event when logging is available, while a bypass, a relaunch
-# transaction and a gate refusal keep their own behavior. Help writes no other guard
-# event. Only a leading --help or -h counts; the same word after a target is message
-# text, so a send without FM_HOME still meets the refusal below.
+# Help is a read: it prints this header's first paragraph, resolves no target, makes
+# no transport call and writes no send-home-fail-closed event, so it needs no home.
+# The gate check above is unchanged and still decides who reaches this branch: a gate
+# caller outside the permitted lab is refused (exit 3) before it, and the events that
+# check emits (an ordinary allow, a bypass, a lab allow, a deny) are the same as on
+# base, while a relaunch transaction emits none. Only a leading --help or -h counts;
+# the same word after a target is message text, so a send without FM_HOME that passes
+# the gate check still meets the refusal below.
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
   sed -n '2,/^#$/{/^#$/d;s/^# \{0,1\}//;p;}' "${BASH_SOURCE[0]}"
   exit 0
