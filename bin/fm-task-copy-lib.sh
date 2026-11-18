@@ -559,6 +559,10 @@ FM_TASK_COPY_SLOT_NAME=
 FM_TASK_COPY_SLOT_HOLDER=
 FM_TASK_COPY_SLOT_STATE=
 FM_TASK_COPY_SLOT_REASON=
+# How many state rows record <slot>'s directory (by any spelling of its path) and how many carry its name; a caller that
+# needs one consistent record reads both, since FM_TASK_COPY_SLOT_HOLDER is only the last leased row's holder.
+FM_TASK_COPY_SLOT_MATCHED=0
+FM_TASK_COPY_SLOT_NAME_ROWS=0
 FM_TASK_COPY_POOL_STATE_FILE=
 FM_TASK_COPY_POOL_STATE_ENTRIES=
 fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
@@ -571,6 +575,8 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   FM_TASK_COPY_SLOT_HOLDER=
   FM_TASK_COPY_SLOT_STATE=unknown
   FM_TASK_COPY_SLOT_REASON=
+  FM_TASK_COPY_SLOT_MATCHED=0
+  FM_TASK_COPY_SLOT_NAME_ROWS=0
   if ! command -v jq >/dev/null 2>&1; then
     FM_TASK_COPY_SLOT_STATE=missing-jq
     FM_TASK_COPY_SLOT_REASON="cannot be proved leased: reading Treehouse state $state needs jq, which is not installed"
@@ -631,6 +637,12 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
       has_recovered=1
     fi
   done <<< "$entries"
+  FM_TASK_COPY_SLOT_MATCHED=$matched
+  if [ -n "$FM_TASK_COPY_SLOT_NAME" ]; then
+    while IFS=$'\t' read -r _ _ name _; do
+      [ "${name#N}" != "$FM_TASK_COPY_SLOT_NAME" ] || FM_TASK_COPY_SLOT_NAME_ROWS=$((FM_TASK_COPY_SLOT_NAME_ROWS + 1))
+    done <<< "$entries"
+  fi
   if [ "$has_unleased" = 1 ]; then
     if [ "$matched" = 1 ]; then
       # Ordinary leases safely skipped on the held path still affect the

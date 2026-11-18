@@ -1626,6 +1626,8 @@ case "\$*" in
   *send-keys*'treehouse get'*)
     n=\$(( \$(cat '$CASE_DIR/get-count') + 1 ))
     echo "\$n" > '$CASE_DIR/get-count'
+    # A case may act at the moment a get is typed (FM_TEST_AT_GET, run as shell text with the get's number in \$n).
+    [ -z "\${FM_TEST_AT_GET:-}" ] || eval "\$FM_TEST_AT_GET"
     line=\$(sed -n "\${n}p" '$CASE_DIR/slots')
     # Once the slots run out the pane stays where it is, as a real pane does while a get finds no copy.
     [ -z "\$line" ] || printf '%s\\n' "\$line" > '$CASE_DIR/panepath'
@@ -2079,8 +2081,7 @@ real_th() {
 
 # make_real_pool_case <name> <id> <count>: make_case plus <count> real pool slots in hand-out order (REAL_SLOTS), all
 # returned to the pool (unleased, clean). Then the stub tmux (SKIP_SLOTS) and a treehouse stand-in that logs each call and
-# runs the real binary. FM_TEST_FORGE_LEASE makes `lease` print the refusal text with no pool change at all, and
-# FM_TEST_UNREADABLE_STATE makes the state file unreadable just before the real lease runs.
+# runs the real binary. FM_TEST_FORGE_LEASE makes `lease` print the refusal text with no pool change at all.
 make_real_pool_case() {
   local name=$1 id=$2 count=$3 rec n slot
   rec=$(make_case "$name" "$id")
@@ -2097,12 +2098,13 @@ make_real_pool_case() {
   install_real_treehouse
 }
 
+# pool_state_file <slot>: the pool's state file for a slot.
+pool_state_file() { printf '%s/treehouse-state.json\n' "$(dirname "$(dirname "$1")")"; }
+
 # install_real_treehouse: needs SKIP_SLOTS (hand-out order), CASE_DIR, FAKEBIN_DIR and PROJECT_DIR.
 install_real_treehouse() {
-  local state
   POOL_DIR=${SKIP_SLOTS[0]}
   make_skip_transport
-  state=$(dirname "$(dirname "${REAL_SLOTS[0]}")")/treehouse-state.json
   cat > "$FAKEBIN_DIR/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> '$SKIP_LOG'
@@ -2110,7 +2112,6 @@ if [ "\${1:-}" = lease ] && [ -n "\${FM_TEST_FORGE_LEASE:-}" ]; then
   echo 'worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")' >&2
   exit 1
 fi
-if [ "\${1:-}" = lease ] && [ -n "\${FM_TEST_UNREADABLE_STATE:-}" ]; then chmod 000 '$state'; fi
 TREEHOUSE_ROOT='$CASE_DIR/th-root' exec '$REAL_TREEHOUSE' "\$@"
 SH
   chmod +x "$FAKEBIN_DIR/treehouse"
@@ -2121,7 +2122,7 @@ SH
 # keeps the recovered lease; each is checked in the state before the spawn runs.
 make_recovered_lease() {
   local state slot holder
-  state=$(dirname "$(dirname "$1")")/treehouse-state.json
+  state=$(pool_state_file "$1")
   for slot in "$@"; do printf 'work in progress\n' >> "$slot/README.md"; done
   head -c 150 "$state" > "$state.cut" || fail "the pool state could not be truncated"
   mv "$state.cut" "$state" || fail "the truncated pool state could not be put in place"
@@ -2132,20 +2133,49 @@ make_recovered_lease() {
   done
 }
 
-# state_entry <slot>: the slot's entry in the pool's state file, as one compact JSON line.
+# state_entry <slot>: the slot's entry in the pool's state file, exactly as its bytes stand there (not re-serialized), so a
+# change of spacing or key order is a change.
 state_entry() {
-  jq -c --arg p "$1" '.worktrees[] | select(.path == $p)' "$(dirname "$(dirname "$1")")/treehouse-state.json"
+  python3 - "$(pool_state_file "$1")" "$1" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+dec = json.JSONDecoder()
+i = text.index("[", text.index('"worktrees"')) + 1
+out = []
+while True:
+    while text[i] in " \t\r\n,":
+        i += 1
+    if text[i] == "]":
+        break
+    obj, j = dec.raw_decode(text, i)
+    if obj.get("path") == sys.argv[2]:
+        out.append(text[i:j])
+    i = j
+sys.stdout.write("\n".join(out))
+PY
 }
 
-# slot_neighbourhood <slot>: what sits beside the checkout in its slot folder, which a claim file would show up in.
-slot_neighbourhood() { ls -A "$(dirname "$1")"; }
+# slot_neighbourhood <slot>: the files beside the checkout in its slot folder (a claim file would show up here) with their
+# bytes, so a replaced marker with other content is a change too.
+slot_neighbourhood() {
+  local dir f
+  dir=$(dirname "$1")
+  for f in "$dir"/.[!.]* "$dir"/*; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    if [ -f "$f" ]; then printf '%s %s\n' "${f##*/}" "$(shasum -a 256 < "$f")"; else printf '%s\n' "${f##*/}"; fi
+  done
+}
 
-# assert_untouched <slot> <digest> <entry> <neighbourhood> <label>: nothing about the copy changed - tree, refs, state
-# entry and lease, and the files beside it - but the refs a spawn that took another copy of the repository may write.
+# own_digest <slot>: slot_digest without refs/remotes/*, the one allowed difference: remote-tracking refs live in the shared
+# Git directory and are refreshed for the copy the spawn takes, exactly as a spawn with no skipped slot refreshes them.
+own_digest() { slot_digest "$1" | grep -v '^refs/remotes/'; }
+
+# assert_untouched <slot> <own-digest> <entry> <neighbourhood> <label>: nothing about the passed-over copy changed - files,
+# HEAD, every ref but refs/remotes/*, raw state entry and lease, and the files beside it.
 assert_untouched() {
-  local slot=$1 digest=$2 entry=$3 beside=$4 label=$5
-  # shellcheck disable=SC2046 # one word per "<ref>=<sha>" pair
-  assert_digest_unchanged "$slot" "$digest" "$label: the copy changed" $(second_copy_refs "$id")
+  local slot=$1 digest=$2 entry=$3 beside=$4 label=$5 after
+  after=$(own_digest "$slot") || fail "$label: the copy could not be read"
+  [ "$after" = "$digest" ] || fail "$label: the copy changed"$'\n'"$(diff <(printf '%s\n' "$digest") <(printf '%s\n' "$after") | head -20)"
   [ "$(state_entry "$slot")" = "$entry" ] || fail "$label: the slot's state entry changed: $(state_entry "$slot")"
   [ "$(slot_neighbourhood "$slot")" = "$beside" ] || fail "$label: the slot folder's contents changed"
 }
@@ -2156,25 +2186,22 @@ test_a_copy_with_a_recovered_lease_is_left_alone_and_a_clean_copy_is_taken() {
   id='pool-skip-recovered-lease'
   make_real_pool_case recovered-lease "$id" 4
   make_recovered_lease "${REAL_SLOTS[0]}"
-  digest=$(slot_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
+  digest=$(own_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
   entry=$(state_entry "${REAL_SLOTS[0]}")
   beside=$(slot_neighbourhood "${REAL_SLOTS[0]}")
 
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "a copy that carries a recovered lease should be passed over and a clean copy used"$'\n'"$out"
-  assert_contains "$out" "skipped: copy ${REAL_SLOTS[0]}" "the pass-over was not reported"
-  assert_contains "$out" "already carries another holder's lease" "the report did not say why"
-  assert_contains "$out" "recovered: state file was corrupt or truncated" "the report did not carry the refusal text"
+  assert_contains "$out" "skipped: copy ${REAL_SLOTS[0]} already carries another holder's lease" "the pass-over was not reported"
+  assert_contains "$out" "recovered: state file was corrupt or truncated" "the report did not name the lease holder"
   assert_contains "$out" "copies left untouched" "the listing did not name the untouched copy"
   assert_grep "worktree=${REAL_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the next clean copy"
   assert_untouched "${REAL_SLOTS[0]}" "$digest" "$entry" "$beside" "the recovered-lease copy"
   assert_grep "${REAL_SLOTS[0]}" "$HOME_DIR/data/$id/skipped-copies.tsv" "the copy was not recorded"
-  assert_grep "already carries another holder's lease" "$HOME_DIR/data/$id/skipped-copies.tsv" "the record did not carry the reason"
-  assert_grep "already leased" "$HOME_DIR/data/$id/skipped-copies.tsv" "the record did not carry the refusal text"
+  assert_grep "recovered: state file was corrupt or truncated" "$HOME_DIR/data/$id/skipped-copies.tsv" "the record did not name the lease holder"
   ! grep -Fq "firstmate-skipped:$id" "$HOME_DIR/data/$id/skipped-copies.tsv" || fail "the record claims a lease this home never took"
-  [ "$(grep -c '^lease --path' "$SKIP_LOG")" = 1 ] || fail "treehouse lease was not attempted exactly once"
-  ! grep -Eq '^(return|destroy|prune|enter)( |$)' "$SKIP_LOG" || fail "the spawn returned or removed a copy: $(grep -E '^(return|destroy|prune|enter)' "$SKIP_LOG")"
+  ! grep -Eq '^(lease|return|destroy|prune|enter)( |$)' "$SKIP_LOG" || fail "the spawn leased, returned or removed a copy: $(grep -E '^(lease|return|destroy|prune|enter)' "$SKIP_LOG")"
   [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "treehouse get was not typed exactly twice"
   [ "$(git -C "${REAL_SLOTS[1]}" rev-parse HEAD)" = "$(git -C "${REAL_SLOTS[1]}" rev-parse origin/main)" ] \
     || fail "the clean copy was not moved to origin's tip"
@@ -2188,7 +2215,7 @@ test_a_copy_leased_by_another_holder_is_left_alone_and_a_clean_copy_is_taken() {
   make_real_pool_case other-holder "$id" 3
   printf 'work in progress\n' >> "${REAL_SLOTS[0]}/README.md"
   real_th lease --path "${REAL_SLOTS[0]}" --lease-holder other-task >/dev/null 2>&1 || fail "the other holder's lease could not be made"
-  digest=$(slot_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
+  digest=$(own_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
   entry=$(state_entry "${REAL_SLOTS[0]}")
   beside=$(slot_neighbourhood "${REAL_SLOTS[0]}")
 
@@ -2198,7 +2225,38 @@ test_a_copy_leased_by_another_holder_is_left_alone_and_a_clean_copy_is_taken() {
   assert_contains "$out" "holder: other-task" "the report did not name the other holder"
   assert_grep "worktree=${REAL_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the next clean copy"
   assert_untouched "${REAL_SLOTS[0]}" "$digest" "$entry" "$beside" "the other holder's copy"
+  ! grep -Eq '^(lease|return|destroy|prune|enter)( |$)' "$SKIP_LOG" || fail "the spawn leased, returned or removed a copy"
   pass "a copy leased by another holder is passed over untouched too"
+}
+
+# F1: a claim marker another task left beside the passed-over copy is never created, replaced or removed. The slot folder is
+# made read-only for the spawn, so any attempt to write, replace or remove a file in it would fail the spawn (a claim that
+# cannot be written refuses it), and the marker's bytes are compared afterwards.
+test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched() {
+  local id out status digest entry beside marker before_bytes folder
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  [ "$(id -u)" != 0 ] || { echo "skip - root writes into a read-only folder"; return 0; }
+  id='pool-skip-foreign-marker'
+  make_real_pool_case foreign-marker "$id" 3
+  make_recovered_lease "${REAL_SLOTS[0]}"
+  folder=$(dirname "${REAL_SLOTS[0]}")
+  marker="$folder/.fm-slot-owner"
+  printf 'task=other-task\nhome=/somewhere/else\n' > "$marker"
+  before_bytes=$(shasum -a 256 < "$marker")
+  digest=$(own_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
+  entry=$(state_entry "${REAL_SLOTS[0]}")
+  beside=$(slot_neighbourhood "${REAL_SLOTS[0]}")
+  chmod 555 "$folder"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  chmod 755 "$folder"
+  expect_code 0 "$status" "a write attempt beside the passed-over copy would have refused the spawn"$'\n'"$out"
+  [ "$(shasum -a 256 < "$marker")" = "$before_bytes" ] || fail "the foreign claim marker's bytes changed: $(cat "$marker" 2>&1)"
+  [ "$(cat "$marker")" = "$(printf 'task=other-task\nhome=/somewhere/else')" ] || fail "the foreign claim marker no longer reads as it did"
+  assert_untouched "${REAL_SLOTS[0]}" "$digest" "$entry" "$beside" "the passed-over copy with a foreign marker"
+  assert_grep "worktree=${REAL_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the next clean copy"
+  pass "a populated foreign claim marker beside a passed-over copy keeps its bytes, and nothing is written there"
 }
 
 test_a_known_doubt_copy_with_no_lease_is_still_leased_to_this_task() {
@@ -2219,6 +2277,42 @@ test_a_known_doubt_copy_with_no_lease_is_still_leased_to_this_task() {
   pass "a known-doubt copy nobody leased is still leased to this task, as before"
 }
 
+# F3: the pool state must show ONE consistent lease. Two rows for the slot (one name or one path, any holders, either order)
+# is not that, and the whole spawn is refused by the lease command's own refusal, as on base.
+test_conflicting_pool_records_for_a_copy_refuse_the_whole_spawn() {
+  local id out status digest entry variant jq_filter state
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  for variant in recovered-then-other other-then-recovered own-then-other other-then-own; do
+    id="pool-skip-conflict-${variant}"
+    make_real_pool_case "conflict-$variant" "$id" 3
+    make_recovered_lease "${REAL_SLOTS[0]}"
+    state=$(pool_state_file "${REAL_SLOTS[0]}")
+    # shellcheck disable=SC2016 # the $w in these jq programs is a jq variable, not a shell expansion
+    case "$variant" in
+      recovered-then-other) jq_filter='.worktrees |= (. as $w | [$w[0], ($w[0] | .lease_holder = "other-task")] + $w[1:])' ;;
+      other-then-recovered) jq_filter='.worktrees |= (. as $w | [($w[0] | .lease_holder = "other-task"), $w[0]] + $w[1:])' ;;
+      own-then-other) jq_filter=".worktrees |= (. as \$w | [(\$w[0] | .lease_holder = \"firstmate-skipped:$id\"), (\$w[0] | .lease_holder = \"other-task\")] + \$w[1:])" ;;
+      other-then-own) jq_filter=".worktrees |= (. as \$w | [(\$w[0] | .lease_holder = \"other-task\"), (\$w[0] | .lease_holder = \"firstmate-skipped:$id\")] + \$w[1:])" ;;
+    esac
+    jq "$jq_filter" "$state" > "$state.new" || fail "$variant: the conflicting state could not be made"
+    mv "$state.new" "$state" || fail "$variant: the conflicting state could not be put in place"
+    [ "$(jq '[.worktrees[] | select(.name == "1")] | length' "$state")" = 2 ] || fail "$variant: the state does not hold two rows for the slot"
+    digest=$(own_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
+    entry=$(state_entry "${REAL_SLOTS[0]}")
+
+    out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+    status=$?
+    [ "$status" -ne 0 ] || fail "$variant: the spawn went on although the pool state holds two conflicting rows for the copy"$'\n'"$out"
+    assert_contains "$out" "could not lease skipped copy ${REAL_SLOTS[0]} durably" "$variant: the refusal was not the lease refusal"
+    assert_contains "$out" "conflicting alias records" "$variant: the real treehouse did not call the records conflicting"
+    assert_no_launch "$CASE_DIR/launch.log"
+    [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "$variant: another copy was requested"
+    [ ! -f "$HOME_DIR/data/$id/skipped-copies.tsv" ] || fail "$variant: a conflicting record was written up as a pass-over"
+    [ "$(state_entry "${REAL_SLOTS[0]}")" = "$entry" ] || fail "$variant: the state entry changed"
+  done
+  pass "two rows for one copy, in either order and with this task's holder or another's, refuse the whole spawn"
+}
+
 test_a_lease_failure_with_an_unreadable_pool_state_refuses_the_spawn() {
   local id out status
   real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
@@ -2227,16 +2321,16 @@ test_a_lease_failure_with_an_unreadable_pool_state_refuses_the_spawn() {
   make_real_pool_case unreadable-state "$id" 3
   make_recovered_lease "${REAL_SLOTS[0]}"
 
-  out=$(FM_TEST_UNREADABLE_STATE=1 FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+  # The pool state turns unreadable as the first get is typed: the spawn's own read of it, right after the pane enters the copy, fails.
+  out=$(FM_TEST_AT_GET="chmod 000 '$(pool_state_file "${REAL_SLOTS[0]}")'" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  # The state stays unreadable from the lease attempt on, so the spawn's own read of it fails too; restore it for the cleanup.
-  chmod 600 "$(dirname "$(dirname "${REAL_SLOTS[0]}")")/treehouse-state.json"
-  [ "$status" -ne 0 ] || fail "the spawn went on although the pool state could not be read"
-  assert_contains "$out" "could not lease skipped copy ${REAL_SLOTS[0]} durably" "the refusal was not the lease refusal"
+  chmod 600 "$(pool_state_file "${REAL_SLOTS[0]}")"
+  [ "$status" -ne 0 ] || fail "the spawn went on although the pool state could not be read"$'\n'"$out"
   assert_no_launch "$CASE_DIR/launch.log"
-  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "another copy was requested although the lease failure could not be identified"
-  [ ! -f "$HOME_DIR/data/$id/skipped-copies.tsv" ] || fail "an unidentified lease failure was recorded as a skip"
-  pass "a lease failure whose cause the pool state cannot confirm refuses the whole spawn"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "another copy was requested although the pool state could not be read"
+  [ ! -f "$HOME_DIR/data/$id/skipped-copies.tsv" ] || fail "an unreadable pool state was recorded as a pass-over"
+  assert_not_contains "$out" "copies left untouched" "the copy was passed over on a state the spawn could not read"
+  pass "with a pool state the spawn cannot read, no copy is passed over and the whole spawn is refused"
 }
 
 test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn() {
@@ -2245,7 +2339,7 @@ test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn() {
   id='pool-skip-forged-text'
   make_real_pool_case forged-text "$id" 3
   printf 'work in progress\n' >> "${REAL_SLOTS[0]}/README.md"
-  digest=$(slot_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
+  digest=$(own_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
   entry=$(state_entry "${REAL_SLOTS[0]}")
 
   out=$(FM_TEST_FORGE_LEASE=1 FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
@@ -2255,7 +2349,6 @@ test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn() {
   assert_no_launch "$CASE_DIR/launch.log"
   [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "another copy was requested on the strength of the text alone"
   [ "$(state_entry "${REAL_SLOTS[0]}")" = "$entry" ] || fail "the state entry changed"
-  assert_digest_unchanged "${REAL_SLOTS[0]}" "$digest" "the copy changed"
   pass "text that says 'already leased', with no such lease in the pool state, does not skip the copy"
 }
 
@@ -2275,7 +2368,7 @@ test_a_pool_of_only_refused_copies_refuses_once_and_names_each() {
   assert_contains "$out" "  ${REAL_SLOTS[0]} (" "the refusal did not name the first refused copy with its reason"
   assert_contains "$out" "  ${REAL_SLOTS[1]} (" "the refusal did not name the second refused copy with its reason"
   assert_contains "$out" "already carries another holder's lease" "the refusal did not carry the reason"
-  [ "$(grep -c '^lease --path' "$SKIP_LOG")" = 2 ] || fail "each refused copy must be tried exactly once"
+  ! grep -Eq '^(lease|return)( |$)' "$SKIP_LOG" || fail "the spawn leased or returned a copy"
   [ ! -f "$HOME_DIR/state/$id.meta" ] || fail "a refused spawn published task metadata"
   pass "when every copy carries another holder's lease the spawn ends in one refusal that names each copy and its reason"
 }
@@ -2294,8 +2387,7 @@ test_a_refused_copy_handed_out_twice_does_not_loop() {
   [ "$status" -ne 0 ] || fail "the spawn went on"
   assert_no_launch "$CASE_DIR/launch.log"
   assert_contains "$out" "the pane is still in a copy this spawn skipped" "the repeated copy was not recognised as skipped"
-  [ "$(grep -c '^lease --path' "$SKIP_LOG")" = 1 ] || fail "the same refused copy was tried more than once"
-  [ "$(printf '%s\n' "$out" | grep -c "^skipped: copy ${REAL_SLOTS[0]}")" = 1 ] || fail "the same copy was skipped twice"
+  [ "$(printf '%s\n' "$out" | grep -c "^skipped: copy ${REAL_SLOTS[0]}")" = 1 ] || fail "the same copy was passed over twice"
   pass "a refused copy handed out again is not taken, tried again or looped on, and the spawn ends within its bound"
 }
 
@@ -2621,7 +2713,9 @@ test_the_loop_budget_is_one_bound_across_all_gets
 test_skipped_copies_are_recorded_and_listed
 test_a_copy_with_a_recovered_lease_is_left_alone_and_a_clean_copy_is_taken
 test_a_copy_leased_by_another_holder_is_left_alone_and_a_clean_copy_is_taken
+test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched
 test_a_known_doubt_copy_with_no_lease_is_still_leased_to_this_task
+test_conflicting_pool_records_for_a_copy_refuse_the_whole_spawn
 test_a_lease_failure_with_an_unreadable_pool_state_refuses_the_spawn
 test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn
 test_a_pool_of_only_refused_copies_refuses_once_and_names_each

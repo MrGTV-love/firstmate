@@ -3425,7 +3425,8 @@ teardown_return_collisions() { # <copy> <branch>
 }
 
 # Copies this task's spawn skipped and left leased in place (bin/fm-spawn.sh spawn_skip_copy writes one
-# $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch).
+# $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch; a copy passed over
+# because another holder's lease was already there has that holder instead and is never returned here).
 # This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
 # sweep, and only when that copy passes the same landed-work test as any other copy: a clean worktree
 # root whose HEAD is landed (teardown_landed, with no recorded bundle accepting it; an anchor alone never releases), with no process running in it, no ignored file where the
@@ -3452,6 +3453,13 @@ teardown_skipped_copies() {
   fi
   while IFS=$'\t' read -r copy reason holder when || [ -n "$copy" ]; do
     [ -n "$copy" ] || continue
+    if [ "$holder" != "firstmate-skipped:$ID" ]; then
+      # Only the exact holder this task's spawn leased under is this task's to return. A row naming anyone else (a copy the
+      # spawn passed over because another holder's lease was already there) is never returned, whatever the pool says.
+      echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is" >&2
+      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      continue
+    fi
     canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=
     if [ -z "$canonical" ]; then
       # A path that cannot be resolved proves nothing about the lease. The copy stays leased and its record stays (rule Q).
