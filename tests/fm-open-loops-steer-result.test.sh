@@ -267,6 +267,32 @@ c.now = base + 900
 c.actionable(False)
 print('PASS: a typed report after an acknowledgement and a plain working line still settles a silence steer', flush=True)
 
+# A reply resolved in the delivery's own second cannot be ordered after it; only a later-second reply settles.
+for mode in ('reply-same-second', 'reply-later-second'):
+    c = Case('silence-' + mode, category='silent_report')
+    reply_dir = c.home / 'state/pending-replies'
+    reply_dir.mkdir()
+    reply = reply_dir / '0123456789abcdef'
+    question = 'corr_id=0123456789abcdef\ntask_id=worker\ndelivered_epoch=' + str(base - 60) + '\n'
+    reply.write_text(question + 'phase=delivered\n')
+    message = c.delivery()
+    if mode == 'reply-same-second':
+        reply.write_text(question + f'phase=resolved\nresolved_epoch={base}\n')
+    c.steer()
+    if mode == 'reply-later-second':
+        c.now = base + 1
+        reply.write_text(question + f'phase=resolved\nresolved_epoch={c.now}\n')
+    c.now = base + 800
+    handled = c.home / 'state/worker.inbox/handled'
+    handled.mkdir()
+    message.rename(handled / '001.msg')
+    os.utime(handled, (c.now, c.now))
+    c.now = base + 899
+    c.actionable(False)
+    c.now = base + 900
+    c.actionable(mode == 'reply-same-second')
+print('PASS: a reply resolved in the steer second never settles it; a later-second reply still does', flush=True)
+
 # Loss of a source that requires a live worker is not evidence that the steer succeeded.
 for category, kind in (('stalled_worker', 'ship'), ('silent_report', 'ship'), ('silent_report', 'secondmate')):
     c = Case('worker-loss-' + category + '-' + kind, category=category, kind=kind)
