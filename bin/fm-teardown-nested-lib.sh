@@ -782,7 +782,8 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
     {
       printf 'File the land-or-drop call as its own task, then retry ordinary teardown:'
       printf ' %q' bin/fm-captain-hold.sh hold "$ID-bundle" --title "$title" \
-        --origin "$ID" --owner captain --reason "$reason"
+        --origin "$ID" --owner captain --reason "$reason" \
+        --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'
       printf '\n'
     } >&2
   elif fm_backlog_row_probe "$DATA" "$ID"; then
@@ -793,7 +794,8 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
     teardown_bundle_refuse "$1: task $ID is not held for the captain's land-or-drop call naming the bundle and every recorded tip"
     {
       printf 'Hold it for the captain, then retry ordinary teardown:'
-      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason"
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason" \
+        --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'
       printf '\n'
     } >&2
   elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
@@ -801,7 +803,8 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
     teardown_bundle_refuse "$1: task $ID has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip"
     {
       printf 'File the land-or-drop call as its row, then retry ordinary teardown:'
-      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --title "$title" ${repo[@]+"${repo[@]}"} --owner captain --reason "$reason"
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --title "$title" ${repo[@]+"${repo[@]}"} --owner captain --reason "$reason" \
+        --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'
       printf '\n'
     } >&2
   else

@@ -72,10 +72,10 @@ test_hook_claude_mode_emits_allow_after_an_unhealthy_episode() {
     fail "could not identify the recovery watcher"
   }
   # A stop that is supervised from the very start of the episode is not a
-  # recovery: it must allow and emit nothing at all.
+  # recovery: with examined ordinary text it must allow and emit no event.
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
-  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode"}' \
+  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode","last_assistant_message":"Ordinary completed work."}' \
     | CLAUDECODE=1 FM_HOME="$dir" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 FM_GUARD_EVENT_LOG="$log" \
       bash "$dir/bin/fm-turnend-guard.sh" --claude 2>/dev/null
   status=$?
@@ -87,7 +87,7 @@ test_hook_claude_mode_emits_allow_after_an_unhealthy_episode() {
   # Now drop supervision: the same session blocks and opens the episode.
   rm -rf "$dir/state/.watch.lock"
   rm -f "$dir/state/.last-watcher-beat"
-  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode"}' \
+  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode","last_assistant_message":"Ordinary completed work."}' \
     | CLAUDECODE=1 FM_HOME="$dir" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 FM_GUARD_EVENT_LOG="$log" \
       bash "$dir/bin/fm-turnend-guard.sh" --claude 2>/dev/null
   status=$?
@@ -96,7 +96,7 @@ test_hook_claude_mode_emits_allow_after_an_unhealthy_episode() {
   # an unhealthy episode and must carry cleared-by continue.
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
-  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode"}' \
+  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode","last_assistant_message":"Ordinary completed work."}' \
     | CLAUDECODE=1 FM_HOME="$dir" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 FM_GUARD_EVENT_LOG="$log" \
       bash "$dir/bin/fm-turnend-guard.sh" --claude 2>/dev/null
   status=$?

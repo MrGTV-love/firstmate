@@ -157,6 +157,7 @@
 #   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$FM_HOME/data/$task/preservation-bundles.tsv"
 # then file the captain's call with the command a refusal prints, for example
 #   bin/fm-captain-hold.sh hold "$task" --owner captain \
+#     --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits' \
 #     --reason "Land or drop the unlanded commits of $task: preserved in bundle $bundle, recorded tips $tips."
 # The original record remains the held call's identity; its SHA-256 names the
 # fixed stored path, which the close note also names. The original bundle may be

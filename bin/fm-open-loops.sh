@@ -40,7 +40,8 @@
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: for steered, an inbox record (NNN.msg), or a remote
 # secondmate's delivered pending-reply id, sent after the row's overdue episode began and within four hours,
-# the row's PR URL for merged, or free text for escalated/deferred. An escalation never
+# the row's PR URL for merged, or free text for escalated/deferred. A steer is bounded delivery evidence,
+# not its intended result; the configuration owner below defines result follow-up. An escalation never
 # stands; one without a bound captain hold has no proof it
 # reached the captain, so its unchanged row stays in the periodic waiting list as
 # "escalated, no proof it reached the captain", and the end of a bound hold returns the row for a new action.
