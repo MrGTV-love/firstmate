@@ -6295,7 +6295,7 @@
       "invariant": "a steer never resolves task targets against the wrong firstmate home",
       "layer": "runtime-block",
       "source": "presence and value of FM_HOME",
-      "trigger": "FM_HOME is unset or empty",
+      "trigger": "FM_HOME is unset or empty and the first argument is not --help or -h",
       "remedy": "FM_HOME=<home> bin/fm-send.sh <task> <message>",
       "budget": 1,
       "test": "tests/fm-send-strict.test.sh",
