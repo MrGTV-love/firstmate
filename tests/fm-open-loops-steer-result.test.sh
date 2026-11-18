@@ -367,6 +367,15 @@ for limit in (17, 0):
     c.now = base + (limit if limit else 1)
     c.actionable(True, refresh=False)
     c.steer(expected=1)
+for limit in (17, 0):
+    c = Case('deferral-remedy-' + str(limit), limit=limit)
+    c.cli('action', c.ident, 'deferred', '--evidence', 'awaiting vendor', '--recheck', iso(c.now + 3600))
+    refused = c.cli('action', c.ident, 'deferred', '--evidence', 'awaiting vendor', '--recheck', iso(c.now + 3600),
+                    expected=1)
+    assert 'second deferral refused' in refused.stdout, refused
+    assert ('steer' in refused.stdout) is bool(limit), refused.stdout
+    assert 'escalate it' in refused.stdout, refused.stdout
+print('PASS: a zero-limit second deferral names only remedies that can stand, not an expiring steer', flush=True)
 c = Case('long-row-limit', limit=86400)
 c.delivery(); c.steer()
 c.now = base + 14400

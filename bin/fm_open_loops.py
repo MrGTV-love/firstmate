@@ -1049,7 +1049,8 @@ class Collector:
         for line in out.splitlines():
             key, verb, opened, opening, stream, summary = line.split("\t", 5)
             device, inode = stream.split(":")
-            # Preserve the existing decision digest; only the stream's owner changes.
+            # The digest now includes the opening ordinal, so a binding recorded under the older digest
+            # no longer matches and that question needs one fresh action to reconcile it.
             decision = "\t".join((key, verb, opened, opening, summary))
             decisions.append(dict(key=key, verb=verb, opened=opened, summary=summary,
                                   identity=self.decision_identity([int(device), int(inode)], key, decision)))
@@ -2323,9 +2324,11 @@ def record_action(args, state, now, report, waits, waits_error):
                     marked[ident] = now
             write_ledger(state, report, receipt=True)
             category = by_id[ident]["category"]
-            remedy = ("steer, merge, wait on a named live task or escalate it" if category in REASON_WAITABLE
-                      else "steer, wait on a task through a delivery naming the row or escalate it"
-                      if category in TASK_WAITABLE else "steer, merge or escalate it")
+            remedy = ("merge, wait on a named live task or escalate it" if category in REASON_WAITABLE
+                      else "wait on a task through a delivery naming the row or escalate it"
+                      if category in TASK_WAITABLE else "merge or escalate it")
+            if by_id[ident].get("limit_seconds") != 0:
+                remedy = "steer, " + remedy
             raise ValueError("second deferral refused; row is captain-visible; " + remedy)
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
