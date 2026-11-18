@@ -1,0 +1,123 @@
+[
+ {
+  "case": "genuine interactive on tty (expect interactive rc0)",
+  "pid": 31900,
+  "alive": true,
+  "ps": "/Users/charlesab /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun /Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts --no-session ",
+  "verdict": {
+   "interactive": {
+    "rc": 0,
+    "out": "{\"verdict\": \"interactive\", \"start\": \"1795017749.757965\", \"pid\": 31900}"
+   },
+   "writer": {
+    "rc": 0,
+    "out": "may own: the installed omp interactive agent"
+   }
+  }
+ },
+ {
+  "case": "genuine + one arg value containing '--mode rpc' (expect admitted)",
+  "pid": 67801,
+  "alive": true,
+  "ps": "/Users/charlesab /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun /Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts --no-session ",
+  "verdict": {
+   "interactive": {
+    "rc": 0,
+    "out": "{\"verdict\": \"interactive\", \"start\": \"1795017765.019278\", \"pid\": 67801}"
+   },
+   "writer": {
+    "rc": 0,
+    "out": "may own: the installed omp interactive agent"
+   }
+  }
+ },
+ {
+  "case": "genuine + split --mode rpc, pipe stdin (expect refused)",
+  "pid": 93047,
+  "alive": true,
+  "ps": "/Users/charlesab /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun /Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts --no-session ",
+  "verdict": {
+   "interactive": {
+    "rc": 1,
+    "out": "refused: a --mode run is a protocol or text role"
+   },
+   "writer": {
+    "rc": 0,
+    "out": "may own: a --mode run is a protocol or text role"
+   }
+  }
+ },
+ {
+  "case": "genuine + --mode=rpc, pipe stdin (expect refused)",
+  "pid": 15019,
+  "alive": false,
+  "ps": "",
+  "verdict": {
+   "exited": 1
+  }
+ },
+ {
+  "case": "genuine on non-tty stdin, writer open, no prompt (expect refused)",
+  "pid": 24897,
+  "alive": true,
+  "ps": "/Users/charlesab /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun /Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts --no-session ",
+  "verdict": {
+   "interactive": {
+    "rc": 1,
+    "out": "refused: standard input is pipe, not a terminal: omp runs this as headless print mode"
+   },
+   "writer": {
+    "rc": 0,
+    "out": "may own: standard input is pipe, not a terminal: omp runs this as headless print mode"
+   }
+  }
+ },
+ {
+  "case": "installed bun running another script (expect refused; writer unrelated)",
+  "pid": 44107,
+  "alive": true,
+  "ps": "/Users/charlesab /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun /Users/charlesabrooker/tmp/fmomp-xxuwza3m/other.ts",
+  "verdict": {
+   "interactive": {
+    "rc": 1,
+    "out": "refused: the script argument is not a cli.ts in a src directory"
+   },
+   "writer": {
+    "rc": 1,
+    "out": "unrelated: the script argument is not a cli.ts in a src directory"
+   }
+  }
+ },
+ {
+  "case": "installed bun running cli.ts outside omp tree (expect refused)",
+  "pid": 70485,
+  "alive": true,
+  "ps": "/Users/charlesab /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun /Users/charlesabrooker/tmp/fmomp-xxuwza3m/fake/pkg/src/cli.ts",
+  "verdict": {
+   "interactive": {
+    "rc": 1,
+    "out": "refused: the script is not in the omp package now"
+   },
+   "writer": {
+    "rc": 0,
+    "out": "may own: the script is not in the omp package now"
+   }
+  }
+ },
+ {
+  "case": "foreign exe (/bin/sleep) presenting installed bun+cli argv words (expect refused)",
+  "pid": 96431,
+  "alive": true,
+  "ps": "/Users/charlesab /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun /Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts",
+  "verdict": {
+   "interactive": {
+    "rc": 1,
+    "out": "refused: the executable is not a bun in a bin directory now"
+   },
+   "writer": {
+    "rc": 0,
+    "out": "may own: the executable is not a bun in a bin directory now"
+   }
+  }
+ }
+]

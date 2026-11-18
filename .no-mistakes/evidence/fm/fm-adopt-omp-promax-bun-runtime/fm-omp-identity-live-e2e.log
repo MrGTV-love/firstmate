@@ -1,0 +1,5 @@
+# the Bun launcher /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax is not first on PATH (/Users/charlesabrooker/.bun/bin/omp is); this run starts /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax
+ok - the installed omp's Bun runtime is recognized as the interactive agent ({"verdict": "interactive", "start": "1795017535.903410", "pid": 41695})
+ok - the installed CLI's subcommand and flag tables match the role rule's copy
+ok - the Herdr descendant walk keeps a pane holding the installed omp occupied
+# checked 6 invariants against omp omp/18.15.0 at /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax
