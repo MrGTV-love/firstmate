@@ -511,29 +511,10 @@ fm_slot_adopt_refuse() { # <reason> <detail>
   return 1
 }
 
-# Judge the recorded manifest against the task's own record, copy and branch. Returns 0 and sets
-# FM_SLOT_MANIFEST, FM_SLOT_BASE_SHA, FM_SLOT_BASE_REF and FM_SLOT_ADOPTED=1 only when every check holds;
-# otherwise prints the refusal by name and returns 1.
-fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
-  local project=$1 copy=$2 id=$3 branch=$4 meta=$5 state=$6
-  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker slot rc
-  local -a scope=()
-  FM_SLOT_ADOPTED=0
-  manifest=$(fm_meta_get "$meta" slot_manifest)
-  base=$(fm_meta_get "$meta" slot_base_sha)
-  ref=$(fm_meta_get "$meta" slot_source_ref)
-  while IFS= read -r line; do scope+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$meta")
-  [ -n "$manifest" ] || { fm_slot_adopt_refuse manifest_not_recorded 'the task record names no slot manifest'; return 1; }
-  [ -n "$base" ] || { fm_slot_adopt_refuse base_not_recorded 'the task record names no slot base'; return 1; }
-  [ "${#scope[@]}" -gt 0 ] || { fm_slot_adopt_refuse scope_not_recorded 'the task record names no slot scope'; return 1; }
-  fm_slot_require_scope "${scope[@]}" >/dev/null 2>&1 || { fm_slot_adopt_refuse scope_invalid 'the recorded scope is not valid'; return 1; }
-  fm_task_copy_isolated "$copy" "$project" || { fm_slot_adopt_refuse not_isolated "$FM_TASK_COPY_REASON"; return 1; }
-  common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { fm_slot_adopt_refuse repository_unreadable "$project"; return 1; }
-  slot_common=$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { fm_slot_adopt_refuse repository_unreadable "$copy"; return 1; }
-  [ "$common" = "$slot_common" ] || { fm_slot_adopt_refuse repository_mismatch "$copy is not a checkout of $project's repository"; return 1; }
-  real_copy=$(CDPATH='' cd -- "$copy" 2>/dev/null && pwd -P) || { fm_slot_adopt_refuse copy_unreadable "$copy"; return 1; }
-  [ -f "$manifest" ] && [ ! -L "$manifest" ] || { fm_slot_adopt_refuse manifest_missing "$manifest"; return 1; }
-  verdict=$(python3 - "$manifest" "$real_copy" "$branch" "$base" "${scope[@]}" <<'PY'
+# The manifest-versus-record comparison of the adoption decision, as one reusable function so a replay of recorded
+# manifests runs exactly the code a relaunch runs. Prints "ok<TAB><repo_root>" or "<reason><TAB><detail>".
+fm_slot_adopt_verdict() { # <manifest> <real-copy> <branch> <base-sha> <owned-path>...
+  python3 - "$@" <<'PY'
 import json
 import os
 import sys
@@ -567,6 +548,31 @@ elif not field("repo_root"):
 else:
     print("ok\t" + field("repo_root"))
 PY
+}
+
+# Judge the recorded manifest against the task's own record, copy and branch. Returns 0 and sets
+# FM_SLOT_MANIFEST, FM_SLOT_BASE_SHA, FM_SLOT_BASE_REF and FM_SLOT_ADOPTED=1 only when every check holds;
+# otherwise prints the refusal by name and returns 1.
+fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
+  local project=$1 copy=$2 id=$3 branch=$4 meta=$5 state=$6
+  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker slot rc
+  local -a scope=()
+  FM_SLOT_ADOPTED=0
+  manifest=$(fm_meta_get "$meta" slot_manifest)
+  base=$(fm_meta_get "$meta" slot_base_sha)
+  ref=$(fm_meta_get "$meta" slot_source_ref)
+  while IFS= read -r line; do scope+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$meta")
+  [ -n "$manifest" ] || { fm_slot_adopt_refuse manifest_not_recorded 'the task record names no slot manifest'; return 1; }
+  [ -n "$base" ] || { fm_slot_adopt_refuse base_not_recorded 'the task record names no slot base'; return 1; }
+  [ "${#scope[@]}" -gt 0 ] || { fm_slot_adopt_refuse scope_not_recorded 'the task record names no slot scope'; return 1; }
+  fm_slot_require_scope "${scope[@]}" >/dev/null 2>&1 || { fm_slot_adopt_refuse scope_invalid 'the recorded scope is not valid'; return 1; }
+  fm_task_copy_isolated "$copy" "$project" || { fm_slot_adopt_refuse not_isolated "$FM_TASK_COPY_REASON"; return 1; }
+  common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { fm_slot_adopt_refuse repository_unreadable "$project"; return 1; }
+  slot_common=$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { fm_slot_adopt_refuse repository_unreadable "$copy"; return 1; }
+  [ "$common" = "$slot_common" ] || { fm_slot_adopt_refuse repository_mismatch "$copy is not a checkout of $project's repository"; return 1; }
+  real_copy=$(CDPATH='' cd -- "$copy" 2>/dev/null && pwd -P) || { fm_slot_adopt_refuse copy_unreadable "$copy"; return 1; }
+  [ -f "$manifest" ] && [ ! -L "$manifest" ] || { fm_slot_adopt_refuse manifest_missing "$manifest"; return 1; }
+  verdict=$(fm_slot_adopt_verdict "$manifest" "$real_copy" "$branch" "$base" "${scope[@]}"
   ) || { fm_slot_adopt_refuse manifest_unreadable "$manifest"; return 1; }
   if [ "${verdict%%$'\t'*}" != ok ]; then
     fm_slot_adopt_refuse "${verdict%%$'\t'*}" "${verdict#*$'\t'}"
