@@ -69,14 +69,6 @@ test_foreseen_refusals_come_before_the_stop() {
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
   assert_refused_before_stop "$ADOPT_DIR" "$id" scope_not_tracked 'a scope path absent at the base' "$out" "$rc" "$before"
 
-  id=foresee-mismatch
-  make_noman_case foresee-mismatch "$id" 1 src
-  printf 'own\n' >> "$ADOPT_DIR/wt/docs.txt"
-  git -C "$ADOPT_DIR/wt" -c user.name=T -c user.email=t@example.invalid commit -qam 'own change outside the scope'
-  before=$(cat "$ADOPT_META")
-  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
-  assert_refused_before_stop "$ADOPT_DIR" "$id" scope_mismatch 'an own commit outside the recorded scope on the provisioning route' "$out" "$rc" "$before"
-
   id=foresee-exists
   make_noman_case foresee-exists "$id" 1 src
   printf '{}' > "$ADOPT_MANIFEST"

@@ -196,25 +196,42 @@ fm_session_end_refusal_reason() {  # <control-output>
   printf '%s' "$reason"
 }
 
-# A digest of the recorded inputs the named refusal depends on. The reason alone does not classify a cause: a
-# commit wholly inside the recorded scope changes HEAD without changing a manifest_exists cause, while the same
-# commit can clear a scope refusal, so only the inputs that can clear that reason are folded in.
-fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason>
-  local state=$1 id=$2 reason=$3 meta wt manifest
+# A digest of the effective inputs the named refusal depends on. Neither the busy generation nor the raw HEAD is an
+# input: an unrelated commit or a new generation leaves the same obstruction in place, while a real change to the
+# obstruction (the uncovered paths, the tracked state of a scope path, a collision file, the manifest, the copy's dirt)
+# or its clearing changes the digest and permits one new attempt.
+fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason> [<obstruction-path>]
+  local state=$1 id=$2 reason=$3 obstruction=${4:-} meta wt manifest base path scope marker inside
+  local -a scopes=()
   meta="$state/$id.meta"
   wt=$(fm_meta_get "$meta" worktree 2>/dev/null || true)
   manifest=$(fm_meta_get "$meta" slot_manifest 2>/dev/null || true)
+  while IFS= read -r scope; do scopes+=("$scope"); done < <(sed -n 's/^slot_owned_path=//p' "$meta" 2>/dev/null)
   {
     printf 'reason=%s\n' "$reason"
     grep -e '^worktree=' -e '^branch=' -e '^project=' -e '^slot_' "$meta" 2>/dev/null || true
     if [ -n "$manifest" ] && [ -f "$manifest" ]; then shasum -a 256 < "$manifest"; else printf 'no-manifest-file\n'; fi
+    if [ -n "$obstruction" ]; then
+      if [ -e "$obstruction" ]; then printf 'obstruction=%s\n' "$obstruction"; shasum -a 256 < "$obstruction" 2>/dev/null || true; else printf 'obstruction-gone\n'; fi
+    fi
     case "$reason" in
-      manifest_exists|repository_mismatch|manifest_*|worktree_path_mismatch|lifecycle_state_mismatch|custody_*) ;;
+      scope_mismatch|scope_not_tracked|scope_*)
+        base=$(git -C "$wt" merge-base origin/main HEAD 2>/dev/null || true)
+        printf 'base=%s\n' "$base"
+        git -C "$wt" diff --name-only --no-renames -z "${base:-HEAD}" HEAD 2>/dev/null | tr '\0' '\n' | while IFS= read -r path; do
+          [ -n "$path" ] || continue
+          inside=0
+          for scope in ${scopes[@]+"${scopes[@]}"}; do case "$path" in "${scope%/}"|"${scope%/}"/*) inside=1 ;; esac; done
+          [ "$inside" = 1 ] || printf 'uncovered=%s\n' "$path"
+        done | sort
+        for scope in ${scopes[@]+"${scopes[@]}"}; do
+          printf 'tracked-at-base=%s:%s\n' "$scope" "$(git -C "$wt" ls-tree -r --name-only "${base:-HEAD}" -- ":(literal)${scope%/}" 2>/dev/null | wc -l | tr -d ' ')"
+        done ;;
+      manifest_exists|repository_mismatch|manifest_*|worktree_path_mismatch|lifecycle_state_mismatch|branch_*|base_mismatch|custody_*) ;;
       dirty_worktree|operation_in_progress)
-        git -C "$wt" rev-parse --verify HEAD 2>/dev/null || true
         git -C "$wt" status --porcelain=v1 -z --untracked-files=all 2>/dev/null | shasum -a 256
         for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply sequencer; do
-          [ -e "$(git -C "$wt" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null)" ] && printf 'op=%s\n' "$marker"
+          if [ -e "$(git -C "$wt" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null)" ]; then printf 'op=%s\n' "$marker"; fi
         done ;;
       *)
         git -C "$wt" rev-parse --verify HEAD 2>/dev/null || true
@@ -222,6 +239,13 @@ fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason>
         git -C "$wt" status --porcelain=v1 -z --untracked-files=all 2>/dev/null | shasum -a 256 ;;
     esac
   } | shasum -a 256 | awk '{print $1}'
+}
+
+# Write the complete drift report from a control output to its stable durable path and print that path.
+fm_session_end_write_drift() {  # <state-dir> <id> <control-output>
+  local file="$1/$2.relaunch-drift"
+  printf '%s\n' "$3" | sed -n -e '/^relaunch drift report for /,$p' > "$file" 2>/dev/null || true
+  printf '%s' "$file"
 }
 
 # The complete drift report inside a control output, on one line: "header | entry | entry ...". Empty when the
@@ -258,7 +282,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
   local bin out rc=0 reason key which quota_event busy_record
-  local refusal_file r_gen r_seq r_reason r_fp cause drift
+  local refusal_file r_gen r_seq r_reason r_fp r_obstruction cause drift drift_file
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
   case "$id" in
@@ -293,10 +317,10 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   # ledger row, no blocked line and no wake. The record outlives this process, so a successor scanner sees it.
   refusal_file=$(fm_session_end_refusal_path "$state" "$id")
   if [ -f "$refusal_file" ] && [ ! -L "$refusal_file" ]; then
-    r_gen='' r_seq='' r_reason='' r_fp=''
-    IFS=$'\t' read -r r_gen r_seq r_reason r_fp < "$refusal_file" || true
-    if [ "$r_gen" = "$gen" ] && [ -n "$r_reason" ] && [ -n "$r_fp" ]; then
-      cause=$(fm_session_end_cause_fingerprint "$state" "$id" "$r_reason") || cause=
+    r_gen='' r_seq='' r_reason='' r_fp='' r_obstruction=''
+    IFS=$'\t' read -r r_gen r_seq r_reason r_fp r_obstruction < "$refusal_file" || true
+    if [ -n "$r_reason" ] && [ -n "$r_fp" ]; then
+      cause=$(fm_session_end_cause_fingerprint "$state" "$id" "$r_reason" "$r_obstruction") || cause=
       [ -n "$cause" ] && [ "$cause" != "$r_fp" ] || return 0
     fi
     rm -f "$refusal_file"
@@ -398,10 +422,12 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
       reason="check: $id auto-relaunched after session-end"
     fi
     key="session-end-relaunch-$id-$gen-$seq"
+    rm -f "$refusal_file"
     drift=$(fm_session_end_drift_summary "$out")
     if [ -n "$drift" ]; then
-      printf '%s\n' "$out" | sed -n -e '/^relaunch drift report for /,$p' > "$state/$id.relaunch-drift" 2>/dev/null || true
-      reason="$reason; $drift (state/$id.relaunch-drift)"
+      # The stable durable reference comes first, so the wake's length cap can only ever cut the repeated content after it.
+      drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
+      reason="$reason (the complete drift report is in $drift_file); $drift"
     fi
     fm_session_end_queue_wake "$key" "$reason" || return 1
     printf '%s\t%s\trelaunched\n' "$gen" "$seq" > "$handled" || return 1
@@ -410,20 +436,23 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     return 0
   fi
   fm_session_end_ledger_add "$state" "$id" failed || return 1
-  reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi): $(fm_session_end_first_line "$out")"
+  reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi)"
+  drift=$(fm_session_end_drift_summary "$out")
+  if [ -n "$drift" ]; then
+    drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
+    reason="$reason (the complete drift report is in $drift_file)"
+  fi
+  reason="$reason: $(fm_session_end_first_line "$out")"
   cause=$(fm_session_end_refusal_reason "$out")
   if [ -n "$cause" ]; then
-    r_fp=$(fm_session_end_cause_fingerprint "$state" "$id" "$cause") || r_fp=
+    r_obstruction=$(printf '%s\n' "$out" | sed -n 's/.*"manifest_path": "\([^"]*\)".*/\1/p' | head -n 1)
+    r_fp=$(fm_session_end_cause_fingerprint "$state" "$id" "$cause" "$r_obstruction") || r_fp=
     if [ -n "$r_fp" ]; then
-      printf '%s\t%s\t%s\t%s\n' "$gen" "$seq" "$cause" "$r_fp" > "$refusal_file" || return 1
+      printf '%s\t%s\t%s\t%s\t%s\n' "$gen" "$seq" "$cause" "$r_fp" "$r_obstruction" > "$refusal_file" || return 1
       reason="$reason [refused: $cause: $(fm_session_end_first_line "$(printf '%s\n' "$out" | grep -m 1 -e 'refused')"); not retried by the scan until its cause changes; bin/fm-control.sh $id relaunch tries again]"
     fi
   fi
-  drift=$(fm_session_end_drift_summary "$out")
-  if [ -n "$drift" ]; then
-    printf '%s\n' "$out" | sed -n -e '/^relaunch drift report for /,$p' > "$state/$id.relaunch-drift" 2>/dev/null || true
-    reason="$reason; $drift (state/$id.relaunch-drift)"
-  fi
+  [ -z "$drift" ] || reason="$reason; $drift"
   key="session-end-relaunch-failed-$id-$gen-$seq"
   fm_session_end_queue_wake "$key" "$reason" || return 1
   printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$handled" || return 1

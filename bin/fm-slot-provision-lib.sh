@@ -124,6 +124,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
   provisioner=$copy/scripts/git-stability/provision_existing_slot.py
+  FM_SLOT_PYARGS=()
   if [ ! -f "$provisioner" ]; then
     # A relaunch of a task whose copy predates the provisioner runs the primary clone's current main (D7); every
     # other caller still requires the script in the assigned copy.
@@ -174,9 +175,14 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
-  "$runner" "$project" "$report" "$provisioner" \
+  "$runner" "$project" "$report" ${FM_SLOT_PYARGS[@]+"${FM_SLOT_PYARGS[@]}"} "$provisioner" \
     --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
     --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
+  if ! fm_slot_export_verify; then
+    echo '{"state": "BLOCKED", "reason": "provisioner_source_changed"}' >"$report"
+    rc=1
+  fi
+  fm_slot_export_drop
   if [ "$rc" -eq 0 ]; then
     python3 - "$report" "$copy" "$id" "$branch" "$base" "$local_ref" "$@" <<'PY' || rc=$?
 import json
@@ -235,6 +241,7 @@ root = sys.argv[1]
 entry = os.path.join(root, "scripts/git-stability/provision_existing_slot.py")
 seen = []
 queue = [entry]
+relative = []
 
 
 def candidates(module, base_dir):
@@ -250,6 +257,13 @@ while queue:
     if path in seen:
         continue
     seen.append(path)
+    # Python runs every ancestor package's __init__.py before the module, so those files are part of the closure too.
+    ancestor = os.path.dirname(path)
+    while os.path.commonpath([root, ancestor]) == root and ancestor != root:
+        init = os.path.join(ancestor, "__init__.py")
+        if os.path.isfile(init) and init not in seen:
+            queue.append(init)
+        ancestor = os.path.dirname(ancestor)
     try:
         with open(path, encoding="utf-8") as handle:
             tree = ast.parse(handle.read())
@@ -263,12 +277,37 @@ while queue:
         elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
             names.append(node.module)
             names += [node.module + "." + alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level:
+            # A relative import resolves from the importing file's own package directory.
+            package = os.path.dirname(path)
+            for _ in range(node.level - 1):
+                package = os.path.dirname(package)
+            stem = [node.module] if node.module else []
+            relative.append((package, ".".join(stem), [alias.name for alias in node.names]))
     for name in names:
         for found in candidates(name, os.path.dirname(path)):
             if os.path.isfile(found) and os.path.commonpath([root, os.path.realpath(found)]) == root:
                 queue.append(found)
                 break
+    for package, module, imported in relative:
+        for target in ([module] if module else []) + [(module + "." if module else "") + name for name in imported]:
+            stem = os.path.join(package, *target.split("."))
+            for found in (stem + ".py", os.path.join(stem, "__init__.py")):
+                if os.path.isfile(found) and os.path.commonpath([root, os.path.realpath(found)]) == root:
+                    queue.append(found)
+                    break
+    relative.clear()
+final = []
 for path in seen:
+    directory = os.path.dirname(path)
+    while os.path.commonpath([root, directory]) == root and directory != root:
+        init = os.path.join(directory, "__init__.py")
+        if os.path.isfile(init) and init not in final:
+            final.append(init)
+        directory = os.path.dirname(directory)
+    if path not in final:
+        final.append(path)
+for path in final:
     print("file\t" + os.path.relpath(path, root))
 FMCLOSUREPY
 )
@@ -308,7 +347,53 @@ fm_slot_primary_provisioner() { # <project>
       return 1
     }
   done <<<"$closure"
-  FM_SLOT_PROVISIONER=$primary/scripts/git-stability/provision_existing_slot.py
+  # The bytes that run are the tip's, from a private read-only export of exactly the verified closure (written from the
+  # tip's blobs, never from the working tree), run with an interpreter cache prefix that is a fresh empty directory so no
+  # bytecode that existed before the run can load. Its hashes are checked again after the run (fm_slot_export_verify).
+  FM_SLOT_EXPORT=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-export.XXXXXX") || return 1
+  FM_SLOT_PYCACHE=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-pycache.XXXXXX") || return 1
+  FM_SLOT_EXPORT_SUMS=$FM_SLOT_EXPORT.sums
+  : >"$FM_SLOT_EXPORT_SUMS" || return 1
+  while IFS=$'\t' read -r kind rel; do
+    if mkdir -p "$FM_SLOT_EXPORT/$(dirname "$rel")" && git -C "$primary" show "$tip:$rel" >"$FM_SLOT_EXPORT/$rel"; then
+      printf '%s %s\n' "$(shasum -a 256 <"$FM_SLOT_EXPORT/$rel" | awk '{print $1}')" "$rel" >>"$FM_SLOT_EXPORT_SUMS"
+    else
+      echo "error: slot provisioner source is not the primary clone's current main: $rel could not be exported from $default's tip" >&2
+      fm_slot_export_drop
+      return 1
+    fi
+  done <<<"$closure"
+  chmod -R a-w "$FM_SLOT_EXPORT" 2>/dev/null || true
+  FM_SLOT_PROVISIONER=$FM_SLOT_EXPORT/scripts/git-stability/provision_existing_slot.py
+  FM_SLOT_PYARGS=(-X "pycache_prefix=$FM_SLOT_PYCACHE")
+}
+
+FM_SLOT_EXPORT=
+FM_SLOT_EXPORT_SUMS=
+FM_SLOT_PYCACHE=
+FM_SLOT_PYARGS=()
+# Refuse by name when any exported file changed or appeared since the export (a substitution after the check).
+fm_slot_export_verify() {
+  local want got rel count
+  [ -n "$FM_SLOT_EXPORT" ] || return 0
+  while read -r want rel; do
+    got=$(shasum -a 256 <"$FM_SLOT_EXPORT/$rel" 2>/dev/null | awk '{print $1}')
+    [ "$got" = "$want" ] || {
+      echo "error: slot provisioner source changed after it was verified: $rel; the run is refused" >&2
+      return 1
+    }
+  done <"$FM_SLOT_EXPORT_SUMS"
+  count=$(find "$FM_SLOT_EXPORT" -type f | wc -l | tr -d ' ')
+  [ "$count" = "$(wc -l <"$FM_SLOT_EXPORT_SUMS" | tr -d ' ')" ] || {
+    echo "error: slot provisioner source gained files after it was verified; the run is refused" >&2
+    return 1
+  }
+}
+fm_slot_export_drop() {
+  [ -z "$FM_SLOT_EXPORT" ] || { chmod -R u+w "$FM_SLOT_EXPORT" 2>/dev/null; rm -rf -- "$FM_SLOT_EXPORT" "$FM_SLOT_EXPORT_SUMS"; }
+  [ -z "$FM_SLOT_PYCACHE" ] || rm -rf -- "$FM_SLOT_PYCACHE"
+  FM_SLOT_EXPORT='' FM_SLOT_EXPORT_SUMS='' FM_SLOT_PYCACHE=''
+  FM_SLOT_PYARGS=()
 }
 
 # The refusals the provisioning route foresees from the task's recorded facts, named before the running agent is
@@ -351,12 +436,23 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
       return 1
     }
   done <<<"$out"
+  # The provisioner that would really run: the copy's own, or for a copy that predates it the verified primary
+  # clone export (D7). Its read-only manifest check, when it has one, names a manifest collision before the stop.
   script=$copy/scripts/git-stability/provision_existing_slot.py
-  [ -f "$script" ] || return 0
-  grep -q -e '--check-manifest-only' "$script" 2>/dev/null || return 0
+  FM_SLOT_PYARGS=()
+  if [ ! -f "$script" ]; then
+    fm_slot_primary_provisioner "$project" || return 1
+    script=$FM_SLOT_PROVISIONER
+  fi
+  if ! grep -q -e '--check-manifest-only' "$script" 2>/dev/null; then
+    fm_slot_export_drop
+    return 0
+  fi
   for path in "$@"; do args+=(--owned-path "$path"); done
-  out=$(cd "$project" && PYTHONDONTWRITEBYTECODE=1 python3 "$script" --check-manifest-only --repo-root "$project" \
+  out=$(cd "$project" && PYTHONDONTWRITEBYTECODE=1 python3 ${FM_SLOT_PYARGS[@]+"${FM_SLOT_PYARGS[@]}"} "$script" --check-manifest-only --repo-root "$project" \
     --worktree-path "$copy" --owner-id "$id" --branch "$branch" --base-sha "$base" "${args[@]}" 2>/dev/null) || true
+  fm_slot_export_verify || { fm_slot_export_drop; return 1; }
+  fm_slot_export_drop
   reason=$(printf '%s' "$out" | python3 -c 'import json, sys
 try:
     r = json.load(sys.stdin)
@@ -510,7 +606,13 @@ PY
   if [ -n "$slot" ]; then
     fm_treehouse_slot_owner_state "$slot" "$id"
     case "$FM_TREEHOUSE_SLOT_OWNER" in
-      mine|absent) ;;
+      absent) ;;
+      mine)
+        # A claim for this task ID from another home is not this task's own (the relocation path's rule).
+        fm_treehouse_slot_claim_home_is_this_home || {
+          fm_slot_adopt_refuse custody_slot_claim "pool slot $slot is claimed for task $id by another home (${FM_TREEHOUSE_SLOT_OWNER_HOME:-no home recorded})"
+          return 1
+        } ;;
       other)
         fm_slot_adopt_sibling_claim "$slot" "$real_copy" "$state" ||
           { fm_slot_adopt_refuse custody_slot_claim "pool slot $slot is claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID"; return 1; } ;;
@@ -631,6 +733,27 @@ for tip_head in heads:
         exclusive = set(names(git("log", "--cc", "--name-only", "-z", "--format=", tip_head, "--not", tip).stdout))
         for path in exclusive - net:
             add(path, "reverted-to-base")
+# What the branch's own reflog records the task committing counts as the task's work even when the default branch later
+# absorbed and reverted it (the merge base then moves past it and no net diff remains). Pulls, merges, fast-forwards
+# and rebase picks are not "commit" entries, so work that only came in from the default branch is not attributed here.
+reflog = subprocess.run(["git", "-C", copy, "reflog", "show", "--format=%H%x09%gs", "refs/heads/" + branch],
+                        capture_output=True, stdin=subprocess.DEVNULL, env=env)
+if reflog.returncode != 0:
+    limits.append("the task branch reflog cannot be read, so a change the default branch absorbed and reverted may be missing from the list")
+else:
+    seen_commits = set()
+    for row in reflog.stdout.decode("utf-8", "replace").splitlines():
+        sha, _, subject = row.partition("\t")
+        if not (subject.startswith("commit") or subject.startswith("cherry-pick")) or sha in seen_commits:
+            continue
+        seen_commits.add(sha)
+        shown = git("show", "--cc", "--name-only", "-z", "--format=", sha, ok=(0, 128))
+        for path in names(shown.stdout):
+            if in_scope(path):
+                continue
+            now = git("rev-parse", "--verify", "--quiet", "HEAD:" + os.fsdecode(path), ok=(0, 1)).stdout.strip()
+            then = git("rev-parse", "--verify", "--quiet", base + ":" + os.fsdecode(path), ok=(0, 1)).stdout.strip()
+            add(path, *(("reverted-to-base",) if now == then else ()))
 if shallow:
     limits.append("the copy is a shallow clone, so history before its cut-off cannot show who changed a path; the list may be incomplete")
 # The working copy: modified, deleted, untracked (every file), renamed or copied (both ends), and ignored.
@@ -669,7 +792,8 @@ for flagged in names(git("ls-files", "-v", "-z").stdout):
         continue
     mode = entry[0].decode()
     if os.path.islink(full):
-        differs = mode != "120000"
+        blob = subprocess.run(["git", "-C", copy, "hash-object", "--stdin"], input=os.readlink(full), capture_output=True, env=env)
+        differs = mode != "120000" or blob.stdout.decode().strip() != entry[1].decode()
     else:
         blob = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True, env=env)
         want_mode = "100755" if os.stat(full).st_mode & 0o100 else "100644"

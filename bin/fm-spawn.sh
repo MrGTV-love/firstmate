@@ -7012,12 +7012,58 @@ exclude_path() {
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >>"$EXCL"
 }
 # The identity of a launch artifact for the edit check: a regular file by its bytes, a symlink by its target text.
-spawn_wiring_sha() { # <path>
-  if [ -L "$1" ]; then
-    printf 'link:%s' "$(readlink "$1")" | shasum -a 256 | awk '{print $1}'
-  else
-    shasum -a 256 <"$1" | awk '{print $1}'
-  fi
+spawn_wiring_sha() { # <path>: type, mode and bytes (a symlink by its target text), so a mode-only edit is an edit
+  python3 - "$1" <<'PY'
+import hashlib, os, stat, sys
+path = sys.argv[1]
+info = os.lstat(path)
+if stat.S_ISLNK(info.st_mode):
+    body = b"link:" + os.fsencode(os.readlink(path))
+elif stat.S_ISREG(info.st_mode):
+    with open(path, "rb") as handle:
+        body = handle.read()
+else:
+    body = b"other"
+print("%s:%o:%o" % (hashlib.sha256(body).hexdigest(), stat.S_IFMT(info.st_mode), stat.S_IMODE(info.st_mode)))
+PY
+}
+SPAWN_KEPT_SETTINGS=
+# The worker's kept settings are not lost to the fresh wiring: their parseable protections stay effective beside it.
+# Firstmate's own previous entries (busy and guard hooks of this task) are dropped from the kept side so they do not
+# pile up; every other key and hook of the worker's file survives, and its mode is restored. A kept file that does not
+# parse stays byte for byte at its kept path, the fresh wiring is written without it, and the report says so.
+spawn_merge_kept_settings() { # <kept-path> <active-path>
+  python3 - "$1" "$2" "$ID" <<'PY' || return 1
+import json, os, stat, sys
+kept, active, task = sys.argv[1:4]
+try:
+    with open(kept, encoding="utf-8") as handle:
+        old = json.load(handle)
+    if not isinstance(old, dict):
+        raise ValueError("not a JSON object")
+except (OSError, ValueError) as exc:
+    print("the kept settings %s do not parse (%s): they stay byte for byte at that path, the fresh wiring is written without them, and protections that exist only in those bytes are NOT effective" % (kept, exc), file=sys.stderr)
+    sys.exit(0)
+with open(active, encoding="utf-8") as handle:
+    fresh = json.load(handle)
+ours = ("fm-busy-event.sh", "fm-jev-guard-hook.sh")
+def foreign(entry):
+    hooks = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(hooks, list):
+        return True
+    return not all(isinstance(h, dict) and any(m in str(h.get("command", "")) for m in ours) and task in str(h.get("command", "")) for h in hooks)
+merged = dict(old)
+merged_hooks = dict(old.get("hooks") if isinstance(old.get("hooks"), dict) else {})
+for event, entries in (fresh.get("hooks") or {}).items():
+    kept_entries = [e for e in merged_hooks.get(event, []) if foreign(e)] if isinstance(merged_hooks.get(event, []), list) else []
+    merged_hooks[event] = kept_entries + entries
+merged["hooks"] = merged_hooks
+with open(active, "w", encoding="utf-8") as handle:
+    json.dump(merged, handle, separators=(",", ":"))
+    handle.write("\n")
+os.chmod(active, stat.S_IMODE(os.stat(kept).st_mode))
+print("merged the worker's kept settings into the fresh wiring at %s; their own hooks, permissions and keys stay effective" % active, file=sys.stderr)
+PY
 }
 # state/<id>.wiring-sha records each worktree launch artifact as it was written. A relaunch into the same copy that
 # finds one differing from its record, or with no record, keeps the original beside it under a collision-safe name,
@@ -7031,12 +7077,22 @@ spawn_keep_edited_wiring() { # <prior-harness>
     rel=${path#"$WT"/}
     got=$(spawn_wiring_sha "$path") || return 1
     want=$(awk -v r="$rel" '$2 == r { v = $1 } END { print v }' "$STATE_REAL/$ID.wiring-sha" 2>/dev/null || true)
-    [ -z "$want" ] || [ "$want" != "$got" ] || continue
+    if [ -n "$want" ] && [ "$want" = "$got" ]; then
+      # Unchanged since written. A settings file that already carries the worker's merged entries is the base for
+      # the next merge, so those entries survive the regeneration; no new kept copy is needed (the first one stays).
+      if [ "$rel" = .claude/settings.local.json ] &&
+        [ "$(awk -v r="$rel" '$2 == r { v = $3 } END { print v }' "$STATE_REAL/$ID.wiring-sha" 2>/dev/null)" = merged ]; then
+        cp -p -- "$path" "$STATE_REAL/$ID.settings-merge-base" || return 1
+        SPAWN_KEPT_SETTINGS=$STATE_REAL/$ID.settings-merge-base
+      fi
+      continue
+    fi
     n=0
     kept="$path.fm-kept.$(date +%s).$n"
     while [ -e "$kept" ] || [ -L "$kept" ]; do n=$((n + 1)); kept="$path.fm-kept.$(date +%s).$n"; done
     cp -pP -- "$path" "$kept" || return 1
     [ "$(spawn_wiring_sha "$kept")" = "$got" ] || return 1
+    [ "$rel" != .claude/settings.local.json ] || SPAWN_KEPT_SETTINGS=$kept
     exclude_path "${kept#"$WT"/}"
     echo "kept the worker's edited launch artifact $rel byte for byte at ${kept#"$WT"/}; the fresh wiring is written beside it" >&2
   done <<EOF
@@ -7050,6 +7106,11 @@ spawn_record_wiring() {
     case "$path" in "$WT"/*) ;; *) continue ;; esac
     [ -e "$path" ] || [ -L "$path" ] || continue
     rel=${path#"$WT"/}
+    # A merged settings file carries the worker's own entries: its record says so, so the next relaunch merges from it.
+    if [ -n "$SPAWN_KEPT_SETTINGS" ] && [ "$rel" = .claude/settings.local.json ]; then
+      printf '%s %s merged\n' "$(spawn_wiring_sha "$path")" "$rel" >>"$STATE_REAL/$ID.wiring-sha.tmp"
+      continue
+    fi
     printf '%s %s\n' "$(spawn_wiring_sha "$path")" "$rel" >>"$STATE_REAL/$ID.wiring-sha.tmp"
   done <<EOF
 $(fm_control_harness_wiring_paths "$(fm_control_harness_family "$HARNESS" 2>/dev/null || true)" "$WT" "$STATE_REAL" "$ID" "$KIND")
@@ -7373,6 +7434,9 @@ BUSY_GEN=
       mkdir -p "$WT/.claude"
       printf '{%s}\n' "$hooks_json" >"$WT/.claude/settings.local.json"
       exclude_path '.claude/settings.local.json'
+      if [ -n "$SPAWN_KEPT_SETTINGS" ]; then
+        spawn_merge_kept_settings "$SPAWN_KEPT_SETTINGS" "$WT/.claude/settings.local.json" || exit 1
+      fi
     fi
     ;;
   devin)

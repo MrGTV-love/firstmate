@@ -50,7 +50,8 @@ make_adopt_case() {
   ADOPT_DIR=$(new_case "$name" "$id")
   add_ship_task "$ADOPT_DIR" "$id" claude
   ADOPT_META="$ADOPT_DIR/home/state/$id.meta"
-  ADOPT_MANIFEST="$ADOPT_DIR/manifest.json"
+  mkdir -p "$ADOPT_DIR/manifests"
+  ADOPT_MANIFEST="$ADOPT_DIR/manifests/manifest.json"
   ADOPT_SENTINEL="$ADOPT_DIR/provisioner.called"
   : > "$ADOPT_DIR/fake/run-slot-provision"
   mkdir -p "$ADOPT_DIR/proj/src"
@@ -83,7 +84,7 @@ make_adopt_case() {
 run_adopt_control() { # <case-dir> <id> [args...]
   local dir=$1 id=$2
   shift 2
-  FM_TEST_PROVISION_CALLED="$dir/provisioner.called" FM_TEST_SLOT_RECORD="$dir/manifest.json" \
+  FM_TEST_PROVISION_CALLED="$dir/provisioner.called" FM_TEST_SLOT_RECORD="$dir/manifests/manifest.json" \
     run_control "$dir" "$id" relaunch --note 'resume after the reboot' "$@"
 }
 
@@ -97,7 +98,8 @@ make_noman_case() {
   ADOPT_DIR=$(new_case "$name" "$id")
   add_ship_task "$ADOPT_DIR" "$id" claude
   ADOPT_META="$ADOPT_DIR/home/state/$id.meta"
-  ADOPT_MANIFEST="$ADOPT_DIR/manifest.json"
+  mkdir -p "$ADOPT_DIR/manifests"
+  ADOPT_MANIFEST="$ADOPT_DIR/manifests/manifest.json"
   ADOPT_SENTINEL="$ADOPT_DIR/provisioner.called"
   : > "$ADOPT_DIR/fake/run-slot-provision"
   : > "$ADOPT_SENTINEL"

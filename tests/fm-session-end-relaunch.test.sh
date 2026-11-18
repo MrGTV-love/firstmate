@@ -146,6 +146,7 @@ test_relaunch_hands_control_the_watcher_home() {
   (
     export -n FM_HOME
     unset FM_STATE_OVERRIDE FM_WAKE_QUEUE
+    # shellcheck disable=SC2030 # The unexported assignment is meant to stay local to this subshell.
     FM_HOME="$dir"
     export PATH="$fakebin:$PATH" FM_TEST_SEAM=1 FM_SESSION_END_CONTROL="$recorder" \
       FM_SESSION_END_CONTROL_LOG="$dir/control.log" \
@@ -522,8 +523,81 @@ test_drift_report_reaches_the_observer() {
   pass "the complete drift report reaches the observer on a relaunch and on a dirty refusal"
 }
 
+# A fresh session-end generation for the lane, as a later worker death produces.
+new_generation() {  # <dir>
+  local dir=$1 gen
+  "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state idle --source claude-hook --event launch-brief >/dev/null
+  gen=$(cat "$dir/state/lane.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$dir/state" lane idle --gen "$gen" --source claude-hook --event session-end >/dev/null
+}
+
+# F5: the memory is keyed on the obstruction, not on the busy generation or the raw HEAD.
+test_unchanged_refusal_survives_a_new_generation_and_an_unrelated_commit() {
+  local dir state wt refusal='error: slot provisioning refused: scope_mismatch: docs/out.txt changed outside the recorded scope'
+  dir=$(make_lane refusal-effective-inputs)
+  state="$dir/state"
+  wt="$dir/wt-lane"
+  git init -q -b main "$wt"
+  mkdir -p "$wt/src" "$wt/docs"
+  printf 'a\n' > "$wt/src/a.txt"
+  printf 'd\n' > "$wt/docs/d.txt"
+  git -C "$wt" add -A
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm base
+  git -C "$wt" update-ref refs/remotes/origin/main HEAD
+  printf 'slot_owned_path=src\nbranch=main\n' >> "$state/lane.meta"
+  printf 'out\n' > "$wt/docs/out.txt"
+  git -C "$wt" add -A
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'own change outside the scope'
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the first scan failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail 'the first scan did not attempt once'
+  # only the busy generation advances: no attempt, no wake
+  new_generation "$dir"
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after a new generation failed"
+  [ ! -s "$dir/control.log" ] || fail "a new busy generation retried an unchanged refusal: $(cat "$dir/control.log")"
+  [ -z "$FM_SESSION_END_WAKE" ] || fail "a new busy generation woke again: $FM_SESSION_END_WAKE"
+  # only an unrelated commit wholly inside the recorded scope: the same obstruction, so no attempt
+  printf 'b\n' > "$wt/src/b.txt"
+  git -C "$wt" add -A
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'in-scope work'
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after an in-scope commit failed"
+  [ ! -s "$dir/control.log" ] || fail "an unrelated in-scope commit retried an unchanged refusal: $(cat "$dir/control.log")"
+  # the obstruction really changes (a different out-of-scope path set): exactly one attempt
+  git -C "$wt" rm -q docs/out.txt
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'revert the out-of-scope change'
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after the obstruction changed failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail "a cleared obstruction did not permit one attempt: $(cat "$dir/control.log")"
+  pass "an unchanged slot refusal is not retried after a new generation or an unrelated commit; a real change to the obstruction permits one attempt"
+}
+
+# F6: a long drift report keeps its stable durable reference through the wake's 4096-character fallback cap.
+test_long_drift_report_keeps_its_durable_reference_at_the_fallback() {
+  local dir report i capped
+  # shellcheck source=bin/fm-push-transition-lib.sh
+  . "$ROOT/bin/fm-push-transition-lib.sh"
+  dir=$(make_lane long-drift)
+  report='relaunch drift report for lane: 100 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged'
+  for i in $(seq 1 100); do report=$report$'\n'"  drift: proven docs/generated/very/long/directory/name/for/path-number-$i.txt"; done
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  [ "${#FM_SESSION_END_WAKE}" -gt 4096 ] || fail 'the fixture reason is not over the fallback cap'
+  capped=$(watch_delivery_clean_reason "$FM_SESSION_END_WAKE")
+  [ "${#capped}" = 4096 ] || fail "the fallback did not cap the reason: ${#capped}"
+  case "$capped" in *"$dir/state/lane.relaunch-drift"*) ;; *) fail 'the durable report path was lost at the fallback cap' ;; esac
+  [ "$(grep -c 'drift: proven' "$dir/state/lane.relaunch-drift")" = 100 ] || fail 'the durable report is not complete'
+  grep -F 'path-number-100.txt' "$dir/state/lane.relaunch-drift" >/dev/null || fail 'the last path is missing from the durable report'
+  # a short report stays whole in the reason
+  dir=$(make_lane short-drift)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT=$'relaunch drift report for lane: 1 out-of-scope path(s) changed by this task\'s own work\n  drift: proven docs/b.txt' scan_lane_fresh "$dir" || fail "the short scan failed"
+  case "$FM_SESSION_END_WAKE" in *'docs/b.txt'*"$dir/state/lane.relaunch-drift"*|*"$dir/state/lane.relaunch-drift"*'docs/b.txt'*) ;; *) fail "the short report is not whole in the reason: $FM_SESSION_END_WAKE" ;; esac
+  pass "a long drift report keeps its durable reference through the fallback cap; a short one stays whole"
+}
+
 test_session_end_relaunches_a_dead_lane_once
 test_unchanged_refusal_is_reported_once_and_not_retried
+test_unchanged_refusal_survives_a_new_generation_and_an_unrelated_commit
+test_long_drift_report_keeps_its_durable_reference_at_the_fallback
 test_a_non_refusal_failure_keeps_its_retry
 test_drift_report_reaches_the_observer
 test_relaunch_hands_control_the_watcher_home

@@ -14,18 +14,60 @@
 # shellcheck source=tests/fm-control-relaunch-slot-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-control-relaunch-slot-helpers.sh"
 
+# manifest_inventory <manifest>: identity of the manifest directory and of every entry in it, the way the contract
+# reads "nothing was written": inode, type, mode, size, sha256, and modification and change times in nanoseconds. A
+# write, even of identical bytes, moves an entry's change time; a create-and-delete moves the directory's.
+manifest_inventory() {
+  python3 - "$(dirname "$1")" <<'PY'
+import hashlib, os, sys
+root = sys.argv[1]
+def row(path):
+    info = os.lstat(path)
+    digest = "-"
+    if os.path.isfile(path) and not os.path.islink(path):
+        digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
+    return "%s ino=%d mode=%o size=%d sha=%s mtime=%d ctime=%d" % (path, info.st_ino, info.st_mode, info.st_size, digest, info.st_mtime_ns, info.st_ctime_ns)
+print(row(root))
+for dirpath, dirnames, filenames in os.walk(root):
+    for name in sorted(dirnames + filenames):
+        print(row(os.path.join(dirpath, name)))
+PY
+}
+
+# The oracle must reject both required mutants and accept a read-only adoption.
+test_manifest_inventory_oracle_rejects_both_mutants() {
+  local dir=$TMP_ROOT/oracle-$RANDOM before
+  mkdir -p "$dir"
+  printf '{"a":1}' > "$dir/m.json"
+  before=$(manifest_inventory "$dir/m.json")
+  [ "$before" = "$(manifest_inventory "$dir/m.json")" ] || fail 'the oracle rejected an untouched manifest directory'
+  sleep 0.05
+  printf '{"a":1}' > "$dir/m.json"
+  [ "$before" != "$(manifest_inventory "$dir/m.json")" ] || fail 'the oracle missed a same-byte rewrite of the manifest'
+  before=$(manifest_inventory "$dir/m.json")
+  sleep 0.05
+  : > "$dir/receipt" && rm -f "$dir/receipt"
+  [ "$before" != "$(manifest_inventory "$dir/m.json")" ] || fail 'the oracle missed a created-then-deleted receipt'
+  pass "manifest inventory oracle: a same-byte rewrite and a created-then-deleted receipt both change it; an untouched directory does not"
+}
+
 test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch() {
-  local id=adopt1 out rc sum
+  local id=adopt1 out rc sum inv
   make_adopt_case adopt-basic "$id" src
   sum=$(shasum -a 256 "$ADOPT_MANIFEST")
+  inv=$(manifest_inventory "$ADOPT_MANIFEST")
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
   expect_code 0 "$rc" "an own-manifest relaunch must be admitted"$'\n'"$out"
   [ "$(shasum -a 256 "$ADOPT_MANIFEST")" = "$sum" ] || fail 'the relaunch changed the manifest'
+  [ "$inv" = "$(manifest_inventory "$ADOPT_MANIFEST")" ] || fail 'the relaunch changed the manifest directory or an entry in it (inode, mode, size, bytes or times)'
   [ ! -s "$ADOPT_SENTINEL" ] || fail "the relaunch ran the provisioner: $(cat "$ADOPT_SENTINEL")"
   [ "$(meta_field "$ADOPT_DIR" "$id" slot_manifest)" = "$ADOPT_MANIFEST" ] || fail 'the record lost its manifest pointer'
   [ "$(meta_field "$ADOPT_DIR" "$id" slot_base_sha)" = "$(git -C "$ADOPT_DIR/wt" rev-parse HEAD)" ] || fail 'the record changed its base'
+  # supplementary: with the manifest and its directory made non-writable, an adoption that tried any write would fail
+  chmod a-w "$ADOPT_MANIFEST" "$(dirname "$ADOPT_MANIFEST")"
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
-  expect_code 0 "$rc" "a second relaunch must be admitted too"$'\n'"$out"
+  chmod u+w "$(dirname "$ADOPT_MANIFEST")" "$ADOPT_MANIFEST"
+  expect_code 0 "$rc" "a second relaunch must be admitted too, with the manifest and its directory read-only"$'\n'"$out"
   [ "$(shasum -a 256 "$ADOPT_MANIFEST")" = "$sum" ] || fail 'the second relaunch changed the manifest'
   [ ! -s "$ADOPT_SENTINEL" ] || fail 'the second relaunch ran the provisioner'
   pass "fm-control relaunch: a governed relaunch adopts its own manifest, twice, without the provisioner"
@@ -33,7 +75,7 @@ test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch() {
 
 # set_manifest_field <case-dir> <field> <json-value>: rewrite one field of the fixture manifest.
 set_manifest_field() {
-  python3 - "$1/manifest.json" "$2" "$3" <<'PY'
+  python3 - "$1/manifests/manifest.json" "$2" "$3" <<'PY'
 import json, sys
 path, field, value = sys.argv[1:4]
 record = json.load(open(path, encoding="utf-8"))
@@ -177,14 +219,25 @@ test_adopt_route_is_only_for_the_own_slot() {
   printf 'recovery=slot-provision-refused\n' >> "$ADOPT_META"
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
   expect_code 1 "$rc" "a refused-first-provisioning record keeps the provisioning route: $out"
-  [ -s "$ADOPT_SENTINEL" ] || fail 'the provisioning route did not run the provisioner'
-  assert_contains "$out" manifest_exists 'the fixture owner did not refuse the existing manifest on the provisioning route'
+  case "$out" in *'slot adoption refused'*) fail "the recovery record took the adopt route: $out" ;; esac
+  assert_contains "$out" 'slot provisioning refused: manifest_exists' 'the provisioning route did not name the collision before the stop'
+  assert_contains "$out" 'the running agent was not stopped' 'the foreseeable refusal stopped the agent'
   pass "fm-control relaunch: only a relaunch into the task's own recorded slot takes the adopt route"
 }
 
-# D1: a launch artifact the worker edited is kept byte for byte beside the fresh wiring; an unchanged one is simply regenerated.
+# kept_files <dir>: the kept copies of an edited launch artifact in <dir>, one per line.
+kept_files() {
+  local f
+  for f in "$1"/settings.local.json.fm-kept.*; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    printf '%s\n' "$f"
+  done
+}
+
+# D1: a launch artifact the worker edited (its bytes, or only its mode) is kept byte for byte beside the fresh wiring, its
+# parseable protections stay effective in the active file, and an unchanged artifact is simply regenerated.
 test_adopt_keeps_a_worker_edited_launch_artifact() {
-  local id=adoptart out rc settings kept
+  local id=adoptart out rc settings kept n mode
   make_adopt_case adopt-artifact "$id" src
   settings="$ADOPT_DIR/wt/.claude/settings.local.json"
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
@@ -192,20 +245,53 @@ test_adopt_keeps_a_worker_edited_launch_artifact() {
   [ -f "$settings" ] || fail 'the launch wrote no settings file to compare against'
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
   expect_code 0 "$rc" "a relaunch over an unchanged artifact must be admitted"$'\n'"$out"
-  [ -z "$(ls "$ADOPT_DIR/wt/.claude" | grep 'fm-kept' || true)" ] || fail 'an unchanged generated artifact got a kept copy'
-  printf '{"permissions":{"allow":["Bash(make test)"]}}\n' > "$settings"
+  [ -z "$(kept_files "$ADOPT_DIR/wt/.claude")" ] || fail 'an unchanged generated artifact got a kept copy'
+  # a content edit that adds a task-specific protection: kept byte for byte AND still effective beside the fresh hooks
+  printf '{"permissions":{"allow":["Bash(make test)"]},"hooks":{"PreToolUse":[{"matcher":"Task","hooks":[{"type":"command","command":"deny-task-tool"}]}]}}\n' > "$settings"
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
   expect_code 0 "$rc" "a relaunch over an edited artifact must be admitted"$'\n'"$out"
-  kept=$(ls "$ADOPT_DIR/wt/.claude" | grep 'settings.local.json.fm-kept' | head -n 1)
+  kept=$(kept_files "$ADOPT_DIR/wt/.claude" | head -n 1)
   [ -n "$kept" ] || fail 'the worker-edited settings file was not kept'
-  [ "$(cat "$ADOPT_DIR/wt/.claude/$kept")" = '{"permissions":{"allow":["Bash(make test)"]}}' ] || fail 'the kept copy is not byte-identical to the edit'
-  assert_contains "$out" "kept the worker's edited launch artifact .claude/settings.local.json byte for byte at .claude/$kept" 'the launch did not say where the edit was kept'
-  assert_grep PreToolUse "$settings" 'the fresh wiring was not written beside the kept edit'
+  [ "$(cat "$kept")" = '{"permissions":{"allow":["Bash(make test)"]},"hooks":{"PreToolUse":[{"matcher":"Task","hooks":[{"type":"command","command":"deny-task-tool"}]}]}}' ] || fail 'the kept copy is not byte-identical to the edit'
+  assert_contains "$out" "kept the worker's edited launch artifact .claude/settings.local.json byte for byte at .claude/${kept##*/}" 'the launch did not say where the edit was kept'
+  python3 - "$settings" <<'PY' || fail 'the worker protection is not effective beside the fresh wiring'
+import json, sys
+active = json.load(open(sys.argv[1]))
+pre = active["hooks"]["PreToolUse"]
+commands = [h["command"] for entry in pre for h in entry["hooks"]]
+assert any(c == "deny-task-tool" for c in commands), commands
+assert any("fm-jev-guard-hook" in c for c in commands), commands
+assert any(e.get("matcher") == "Task" for e in pre), pre
+assert active["permissions"]["allow"] == ["Bash(make test)"], active
+assert "UserPromptSubmit" in active["hooks"], active
+PY
   git -C "$ADOPT_DIR/wt" status --porcelain --untracked-files=all | grep -q 'fm-kept' && fail 'the kept copy dirtied the copy'
-  pass "fm-control relaunch: an edited launch artifact is kept byte for byte and an unchanged one is regenerated"
+  # a further relaunch with no edit keeps the worker's protection effective and makes no new kept copy
+  n=$(kept_files "$ADOPT_DIR/wt/.claude" | wc -l | tr -d ' ')
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over the merged settings must be admitted"$'\n'"$out"
+  [ "$(kept_files "$ADOPT_DIR/wt/.claude" | wc -l | tr -d ' ')" = "$n" ] || fail 'an unchanged merged settings file got another kept copy'
+  assert_grep deny-task-tool "$settings" 'the worker protection did not survive a later relaunch'
+  # a mode-only edit is an edit: its mode stays effective and the original stays recoverable
+  n=$(kept_files "$ADOPT_DIR/wt/.claude" | wc -l | tr -d ' ')
+  chmod 755 "$settings"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over a mode-only edit must be admitted"$'\n'"$out"
+  [ "$(kept_files "$ADOPT_DIR/wt/.claude" | wc -l | tr -d ' ')" -gt "$n" ] || fail 'a mode-only edit of the launch artifact was not kept'
+  mode=$(python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$settings")
+  [ "$mode" = 0o755 ] || fail "the worker's mode was lost: $mode"
+  # an incomplete file (cut off mid-write) is kept byte for byte and the launch still has fresh wiring
+  printf '{"hooks":{"PreToolUse":[{"matcher":"Task",' > "$settings"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over an incomplete settings file must be admitted"$'\n'"$out"
+  assert_contains "$out" 'do not parse' 'the report did not say the kept file does not parse'
+  assert_grep 'fm-jev-guard-hook' "$settings" 'the incomplete-file launch has no fresh wiring'
+  [ "$(for f in $(kept_files "$ADOPT_DIR/wt/.claude" | tr '\n' ' '); do cat "$f"; done | grep -c '"matcher":"Task",$' || true)" -ge 1 ] || fail 'the incomplete bytes were not kept'
+  pass "fm-control relaunch: an edited launch artifact (bytes, mode, or cut off) is kept byte for byte, parseable protections stay effective, an unchanged one is regenerated"
 }
 
 control_relaunch_test_cases=(
+test_manifest_inventory_oracle_rejects_both_mutants
 test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch
 test_adopt_refuses_a_manifest_that_is_not_this_tasks_own_by_name
 test_adopt_refuses_a_copy_another_task_records
