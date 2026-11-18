@@ -559,10 +559,10 @@ FM_TASK_COPY_SLOT_NAME=
 FM_TASK_COPY_SLOT_HOLDER=
 FM_TASK_COPY_SLOT_STATE=
 FM_TASK_COPY_SLOT_REASON=
-# How many state rows record <slot>'s directory (by any spelling of its path) and how many carry its name; a caller that
-# needs one consistent record reads both, since FM_TASK_COPY_SLOT_HOLDER is only the last leased row's holder.
-FM_TASK_COPY_SLOT_MATCHED=0
-FM_TASK_COPY_SLOT_NAME_ROWS=0
+# How many state rows are <slot>: rows that carry its name, or whose path is the same directory by identity (a differently
+# spelled path, a symlink, whatever the row's name and holder). A caller that needs one consistent record requires 1, since
+# FM_TASK_COPY_SLOT_HOLDER is only the last leased row's holder. Counted for every row, leased or not.
+FM_TASK_COPY_SLOT_ROWS=0
 FM_TASK_COPY_POOL_STATE_FILE=
 FM_TASK_COPY_POOL_STATE_ENTRIES=
 fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
@@ -575,8 +575,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   FM_TASK_COPY_SLOT_HOLDER=
   FM_TASK_COPY_SLOT_STATE=unknown
   FM_TASK_COPY_SLOT_REASON=
-  FM_TASK_COPY_SLOT_MATCHED=0
-  FM_TASK_COPY_SLOT_NAME_ROWS=0
+  FM_TASK_COPY_SLOT_ROWS=0
   if ! command -v jq >/dev/null 2>&1; then
     FM_TASK_COPY_SLOT_STATE=missing-jq
     FM_TASK_COPY_SLOT_REASON="cannot be proved leased: reading Treehouse state $state needs jq, which is not installed"
@@ -637,10 +636,12 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
       has_recovered=1
     fi
   done <<< "$entries"
-  FM_TASK_COPY_SLOT_MATCHED=$matched
-  if [ -n "$FM_TASK_COPY_SLOT_NAME" ]; then
-    while IFS=$'\t' read -r _ _ name _; do
-      [ "${name#N}" != "$FM_TASK_COPY_SLOT_NAME" ] || FM_TASK_COPY_SLOT_NAME_ROWS=$((FM_TASK_COPY_SLOT_NAME_ROWS + 1))
+  if [ "$matched" -gt 0 ]; then
+    while IFS=$'\t' read -r _ _ name path; do
+      path=${path#P}
+      if [ "${name#N}" = "$FM_TASK_COPY_SLOT_NAME" ] || { [ -n "$path" ] && [ "$path" -ef "$slot" ]; }; then
+        FM_TASK_COPY_SLOT_ROWS=$((FM_TASK_COPY_SLOT_ROWS + 1))
+      fi
     done <<< "$entries"
   fi
   if [ "$has_unleased" = 1 ]; then

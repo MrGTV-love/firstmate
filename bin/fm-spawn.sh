@@ -563,8 +563,9 @@
 #   names, which bin/fm-teardown.sh never returns, and listed as passed over. A recovered lease is freed by Treehouse itself
 #   once the copy is idle, clean and landed. Each passed-over copy is a distinct copy the acquisition never accepts again,
 #   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
-#   An unreadable state, a conflicting or duplicated row, a lease that is this task's own, or a path that cannot be
-#   resolved is not that state and is handled as any other copy.
+#   A pool state that cannot be read as exactly one consistent row for the copy (unreadable, a duplicate row by name or by
+#   physical path, a conflicting entry, a lease that is this task's own) refuses the whole spawn at that point, before any
+#   claim; only a copy whose one row is positively unleased goes on to the claim and the idle proof.
 #   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
 #   One absolute thirty-minute bound covers every get and is read before each get, after the custody scan.
@@ -6403,11 +6404,26 @@ spawn_acquire_pool_slot() {
 
   validate_spawn_worktree "treehouse get" "$T"
 
-  # A copy that already carries another holder's lease is passed over before any claim is written to it.
-  if [ "$RELAUNCH" -eq 0 ] && spawn_copy_carries_other_lease "$WT"; then
-    spawn_pass_over_copy
-    spawn_acquire_pool_slot
-    return
+  # The pool state decides before any claim is written: a copy that already carries another holder's lease is passed over; a
+  # copy whose state cannot be read as one consistent record is refused (the copy may hold work, so its endpoint stays open on
+  # it, untouched, exactly as for a lease that cannot be taken); only a positively unleased copy goes on to the claim.
+  if [ "$RELAUNCH" -eq 0 ]; then
+    spawn_classify_copy "$WT"
+    case "$SPAWN_COPY_LEASE_STATE" in
+      other)
+        spawn_pass_over_copy
+        spawn_acquire_pool_slot
+        return
+        ;;
+      unknown)
+        SPAWN_TREEHOUSE_ABORT_TARGET=
+        HERDR_PROJECTION_ABORT_CLEANUP=0
+        ORCA_ABORT_CLEANUP=0
+        spawn_report_leased_copies >&2
+        echo "error: the pool state does not show copy $WT as one consistent record (${FM_TASK_COPY_SLOT_REASON:-state ${FM_TASK_COPY_SLOT_STATE:-unknown}}, ${FM_TASK_COPY_SLOT_ROWS:-0} row(s) for it); nothing was written to it and no claim was made, its endpoint $T stays open on it because closing that endpoint would let Treehouse reset it; no worker admitted" >&2
+        exit 1
+        ;;
+    esac
   fi
 
   # Claim the pool slot for this task. The interactive `treehouse get` sent to
@@ -6430,26 +6446,40 @@ spawn_acquire_pool_slot() {
     SPAWN_SLOT_CLAIMED=1
   fi
 }
-# Whether Treehouse's own pool state, read now and read-only, shows pool copy <path> carrying another holder's lease: exactly
-# one consistent leased row for it, held either by a holder other than this task's own firstmate-skipped:<id> or by Treehouse's
-# recovered lease (fm_task_copy_pool_slot_held, bin/fm-task-copy-lib.sh). Sets SPAWN_OTHER_LEASE_HOLDER on success.
-# The copy must be a slot of this project's own pool. An unreadable state, no jq, a path that cannot be resolved, a copy the
-# state does not record or records more than once (any duplicate row for its path or name, whatever the holders and their
-# order), an unleased or conflicting entry, or a lease that is this task's own is not identified and returns 1, so the copy
-# is handled as any other copy. Nothing is written. No command's message is ever the proof.
-spawn_copy_carries_other_lease() { # <path>
+# What Treehouse's own pool state, read now and read-only and before anything is written, says about pool copy <path>.
+# Sets SPAWN_COPY_LEASE_STATE to one of
+#   ordinary  the copy is not a slot of this project's pool (no pool state to read): handled as before;
+#   unleased  exactly one row is the copy and it is not leased: a normal candidate;
+#   other     exactly one row is the copy and it is leased by a holder other than this task's own firstmate-skipped:<id>
+#             (an ordinary lease or Treehouse's recovered lease), and SPAWN_OTHER_LEASE_HOLDER holds that holder;
+#   unknown   anything else: an unreadable state, no jq, an escaped or relative path, no row for the copy, a row that is also
+#             another row by name or by physical identity (a differently spelled path or a symlink, whatever the names and
+#             holders, in either order), a conflicting entry, or a lease that is this task's own.
+# Every physical alias and every duplicate name counts (fm_task_copy_pool_slot_held counts them), so one row is never read
+# out of several. No command's message is ever the proof, and treehouse is not asked: its status command can rewrite state.
+spawn_classify_copy() { # <path>
   local real
+  SPAWN_COPY_LEASE_STATE=unknown
   SPAWN_OTHER_LEASE_HOLDER=
-  real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) && [ -n "$real" ] || return 1
-  fm_treehouse_pool_slot "$PROJ_ABS" "$real" || return 1
+  real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) && [ -n "$real" ] || return 0
+  if ! fm_treehouse_pool_slot "$PROJ_ABS" "$real"; then
+    SPAWN_COPY_LEASE_STATE=ordinary
+    return 0
+  fi
   # The state is read again now: a scan earlier in this spawn may have cached an older reading.
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
-  fm_task_copy_pool_slot_held "$real" || [ "$FM_TASK_COPY_SLOT_STATE" = recovered ] || return 1
-  case "$FM_TASK_COPY_SLOT_STATE" in held|recovered) ;; *) return 1 ;; esac
-  [ "$FM_TASK_COPY_SLOT_MATCHED" = 1 ] && [ "$FM_TASK_COPY_SLOT_NAME_ROWS" = 1 ] || return 1
-  [ -n "$FM_TASK_COPY_SLOT_HOLDER" ] && [ "$FM_TASK_COPY_SLOT_HOLDER" != "firstmate-skipped:$ID" ] || return 1
-  SPAWN_OTHER_LEASE_HOLDER=$FM_TASK_COPY_SLOT_HOLDER
+  fm_task_copy_pool_slot_held "$real" || :
+  [ "$FM_TASK_COPY_SLOT_ROWS" = 1 ] || return 0
+  case "$FM_TASK_COPY_SLOT_STATE" in
+    unleased) SPAWN_COPY_LEASE_STATE=unleased ;;
+    held | recovered)
+      [ -n "$FM_TASK_COPY_SLOT_HOLDER" ] && [ "$FM_TASK_COPY_SLOT_HOLDER" != "firstmate-skipped:$ID" ] || return 0
+      SPAWN_OTHER_LEASE_HOLDER=$FM_TASK_COPY_SLOT_HOLDER
+      SPAWN_COPY_LEASE_STATE=other
+      ;;
+  esac
+  return 0
 }
 # A copy the pool handed this spawn that already carries another holder's lease is passed over before anything is written to
 # it: no claim (the claim marker beside the copy is never created, replaced or removed), no lease command, no idle proof.
