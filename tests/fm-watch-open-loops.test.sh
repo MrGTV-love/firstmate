@@ -912,8 +912,8 @@ test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery() {
 
 # Real collector projections are prepared outside the watched state so raw
 # status delivery cannot rescue this dedicated ledger notification test.
-prepare_canonical_ledgers() {  # <fixture-dir> <regular|degraded>
-  python3 - "$ROOT" "$1" "$2" <<'PY'
+prepare_canonical_ledgers() {  # <fixture-dir> <regular|degraded> [timed|availability]
+  python3 - "$ROOT" "$1" "$2" "${3:-recurrence}" <<'PY'
 import datetime as dt
 import json
 import os
@@ -924,6 +924,7 @@ import sys
 import time
 root, fixture = map(Path, sys.argv[1:3])
 degraded = sys.argv[3] == 'degraded'
+scenario = sys.argv[4]
 code, home, ledgers = fixture/'collector-code', fixture/'collector-home', fixture/'ledgers'
 shutil.copytree(root/'bin', code/'bin', ignore=lambda _p, _n: {'fm-fleet-snapshot.sh'})
 for part in ('state','data','config','projects','user','tmp'):
@@ -985,6 +986,8 @@ for name in ('first','reopened','new-question'):
     report=json.loads((ledgers/(name+'.json')).read_text())
     for row in report['rows']:row.pop('current_identity',None)
     (ledgers/('legacy-'+name+'.json')).write_text(json.dumps(report))
+if scenario == 'recurrence':
+    sys.exit(0)
 # The same producer also owns a due-result transition with no new question opening.
 call('--present-overdue')
 (inbox/'002.msg').write_text('schema=fm-task-inbox.v1\nat='+at+'\n--\napply the current decision\n')
@@ -1010,7 +1013,7 @@ with status.open('a') as f:f.write('working: unrelated progress after the second
 heartbeat('steer-renewed-unrelated')
 with status.open('a') as f:f.write(f'needs-decision [at={stamp}] [key=after-result]: distinct later question\n')
 heartbeat('steer-next-question')
-if not degraded:
+if scenario == 'availability':
     # Bind an actual shared snapshot observation, with missing-worker age still below its deadline.
     task=dict(id='worker',kind='ship',spawn_gen='synthetic-recurrence',project='',branch='',backend='fixture',
               current_state=dict(state='blocked',source='fixture'),endpoint=dict(exists=True,agent_alive='alive'),
@@ -1165,15 +1168,17 @@ test_legacy_projection_migrates_once_then_current_identity_settles() {
 }
 
 test_result_followup_notifies_once_then_settles() {
-  local kind dir first cycle settled state out pid marker periodic
+  local kind dir first cycle settled state out pid marker periodic coverage
   for kind in regular degraded; do
+    # Degraded provenance also contributes the producer's separate coverage obligation.
+    coverage=0; [ "$kind" != degraded ] || coverage=1
     dir=$(make_case "result-followup-$kind")
-    prepare_canonical_ledgers "$dir" "$kind" || fail "$kind result ledger preparation failed"
+    prepare_canonical_ledgers "$dir" "$kind" timed || fail "$kind result ledger preparation failed"
     first=$(make_case "failed-delivery-$kind")
     publish_recorded_ledger "$dir/ledgers/failed-delivery.json" "$first/state"
     watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
     wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind failed delivery lost the original actionable notification"; }
-    assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger 1
+    assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger "$((1 + coverage))"
     first=$(make_case "result-first-$kind")
     publish_recorded_ledger "$dir/ledgers/steer-current.json" "$first/state"
     watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
@@ -1188,7 +1193,7 @@ test_result_followup_notifies_once_then_settles() {
       || { reap "$pid"; fail "$kind result wait did not stay quiet before its deadline"; }
     publish_recorded_ledger "$dir/ledgers/steer-due.json" "$state"
     wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind due result follow-up did not notify"; }
-    assert_ledger_queue_reason "$state" "$out" open-loop-ledger 2
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger "$((2 + coverage))"
     [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
       || fail "$kind result follow-up relied on periodic rescue"
     settled=$(make_case "result-settled-$kind");state="$settled/state";out="$settled/watch.out"
@@ -1210,7 +1215,7 @@ test_result_followup_notifies_once_then_settles() {
       || { reap "$pid"; fail "$kind current renewal did not stay quiet"; }
     publish_recorded_ledger "$dir/ledgers/steer-renewed-due.json" "$state"
     wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind second result deadline did not notify"; }
-    assert_ledger_queue_reason "$state" "$out" open-loop-ledger 2
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger "$((2 + coverage))"
     cycle="$state"
     settled=$(make_case "result-second-settled-$kind");state="$settled/state";out="$settled/watch.out"
     copy_delivered_cooldowns "$cycle" "$state"
@@ -1229,7 +1234,7 @@ test_result_followup_notifies_once_then_settles() {
 test_unavailable_result_notifies_again_after_recovery() {
   local dir first cycle state out pid previous marker periodic stage current due
   dir=$(make_case consumer-result-followup)
-  prepare_canonical_ledgers "$dir" regular || fail "consumer result ledger preparation failed"
+  prepare_canonical_ledgers "$dir" regular availability || fail "consumer result ledger preparation failed"
   first=$(make_case consumer-result-baseline)
   publish_recorded_ledger "$dir/ledgers/available-current.json" "$first/state"
   watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home";pid=$!
