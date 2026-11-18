@@ -152,28 +152,33 @@ test_leading_help_prints_usage_without_a_home() {
       assert_contains "$out" "Usage: fm-send.sh <target>" "$flag with FM_HOME $label should print the usage"
       [ ! -s "$err" ] || fail "$flag with FM_HOME $label should print nothing on stderr"$'\n'"$(cat "$err")"
       [ ! -s "$log" ] || fail "$flag with FM_HOME $label touched the terminal"$'\n'"$(cat "$log")"
-      [ ! -s "$events" ] || fail "$flag with FM_HOME $label should record no guard event"$'\n'"$(cat "$events")"
+      [ "$(grep -c '"guard":"send-home-fail-closed"' "$events")" -eq 0 ] \
+        || fail "$flag with FM_HOME $label should record no FM_HOME refusal"$'\n'"$(cat "$events")"
     done
   done
   pass "fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME"
 }
 
-test_help_is_a_read_for_a_gate_agent_but_a_send_is_still_refused() {
-  local dir fb err out log rc
+test_help_is_refused_for_a_gate_agent_like_a_send() {
+  local dir fb err out log rc flag
   dir="$TMP_ROOT/help-gate"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); err="$dir/send.err"; log="$dir/tmux.log"; : > "$log"
 
-  out=$(env -u FM_HOME -u FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE=1 PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" \
-    "$SEND" --help 2>"$err"); rc=$?
-  expect_code 0 "$rc" "help should print for a gate agent, it changes nothing"
-  assert_contains "$out" "Usage: fm-send.sh <target>" "a gate agent should read the usage"
+  for flag in --help -h; do
+    out=$(env -u FM_HOME -u FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE=1 PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" \
+      "$SEND" "$flag" 2>"$err"); rc=$?
+    expect_code 3 "$rc" "$flag from a gate agent should keep the gate refusal"
+    assert_contains "$(cat "$err")" "no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)" \
+      "$flag from a gate agent should keep the gate refusal message"
+    [ -z "$out" ] || fail "$flag from a gate agent must print no usage"
+  done
 
   env -u FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE=1 FM_HOME="$dir" PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" \
     "$SEND" sess:win "hello" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "a send from a gate agent must stay refused"
   assert_contains "$(cat "$err")" "no-mistakes gate agent must not drive the fleet" "the gate refusal should be unchanged"
   [ ! -s "$log" ] || fail "a refused gate send still touched the terminal"
-  pass "fm-send help: help does not open a gate agent's send path"
+  pass "fm-send help: a gate agent's --help and -h stay refused as on base"
 }
 
 test_help_word_after_a_target_is_text_and_keeps_the_home_check() {
@@ -362,7 +367,7 @@ test_exact_lane_id_send_still_works
 test_key_send_exit_status_follows_delivery
 test_unset_fm_home_fails
 test_leading_help_prints_usage_without_a_home
-test_help_is_a_read_for_a_gate_agent_but_a_send_is_still_refused
+test_help_is_refused_for_a_gate_agent_like_a_send
 test_help_word_after_a_target_is_text_and_keeps_the_home_check
 test_unresolvable_target_does_not_tmux_fallback
 test_home_guard_allow_is_recorded_for_an_unresolvable_target
