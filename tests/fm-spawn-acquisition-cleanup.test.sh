@@ -3,6 +3,7 @@
 # The herdr argument uses a generated, guarded lab session; the default uses private tmux.
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
 # The late, laterexit, earlyexit, clock and gone cases read the pane's foreground process and run on tmux only.
+# FM_TEST_ACQUISITION_CASES=cleanup-writer leaves a detached child writing during this script's own cleanup.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -24,9 +25,21 @@ B_SPAWN_PID=
 A_POLL_READY=
 B_ALLOW=
 SESSION_LOCK=
+# fm-spawn.sh detaches a refresh, and panes leave programs behind. Any tmux client
+# they start recreates tmux-<uid> in the socket directory, so stop what this test
+# owns first. A process can fork after a sweep reads the process list, so only a
+# sweep that finds nothing proves that nothing is left to write.
+stop_owned_children() {
+  local swept
+  for _ in $(seq 1 50); do
+    swept=$("$ROOT/bin/fm-test-reap-orphans.sh" --owner-pid "$$" --root "$TMP_ROOT") || return 1
+    [ -n "$swept" ] || return 0
+  done
+  return 1
+}
 cleanup_acquisition() {
   local rc=$?
-  local pid alive gate
+  local pid alive gate lab_server
   [ -z "$SESSION_LOCK" ] || fm_lock_release "$SESSION_LOCK" || rc=1
   for gate in "$A_POLL_READY" "$B_ALLOW"; do
     [ -z "$gate" ] || touch "$gate"
@@ -50,7 +63,16 @@ cleanup_acquisition() {
     done
   fi
   if [ -n "$LAB_TMUX_DIR" ]; then
+    lab_server=$(TMUX_TMPDIR="$LAB_TMUX_DIR" "$REAL_TMUX" display-message -p '#{pid}' 2>/dev/null) || lab_server=
     TMUX_TMPDIR="$LAB_TMUX_DIR" "$REAL_TMUX" kill-server 2>/dev/null || true
+    # The sweep reaches a pane's program only once the server is gone. A server
+    # that outlives this wait makes teardown refuse, so it cannot pass unseen.
+    for _ in $(seq 1 500); do
+      [ -n "$lab_server" ] || break
+      kill -0 "$lab_server" 2>/dev/null || break
+      /bin/sleep 0.02
+    done
+    stop_owned_children || rc=1
     "$LAB_HOME_HELPER" teardown "$FM_HOME" || rc=1
   fi
   if [ -n "$HERDR_LAB_SESSION" ]; then
@@ -107,10 +129,24 @@ fi
 cd "\$DEST" || exit 1
 touch "\$ARRIVED"
 if [ "\$MODE" = busy ]; then
-  # Hold the pane in a foreground program that never reads a typed line.
-  while [ ! -e "\$ALLOW" ]; do /bin/sleep 0.02; done
+  # Hold the pane in a foreground program that never reads a typed line. It is one long-lived process: a short-lived
+  # child in the copy can exit while the idle proof reads it, and a process the proof cannot read is never excused.
+  python3 -c 'import os, sys, time
+while not os.path.exists(sys.argv[1]): time.sleep(0.02)' "\$ALLOW"
 fi
 HISTFILE='$TMP_ROOT/get-history' /bin/bash --noprofile --norc -i
+SH
+chmod +x "$FAKEBIN/treehouse"
+# The real `treehouse` is a native program, so the kernel names its process `treehouse` and the slot rules can tell a
+# launcher this spawn opened from any other process in a copy. A bare shell script would be named `bash`, so the fake
+# runs its script body under a renamed copy of bash and shows `treehouse get` as its own command line.
+mv "$FAKEBIN/treehouse" "$FAKEBIN/treehouse.body"
+mkdir -p "$FAKEBIN/real"
+cp /bin/bash "$FAKEBIN/real/treehouse"
+[ "$(uname)" != Darwin ] || codesign -f -s - "$FAKEBIN/real/treehouse" >/dev/null 2>&1 || true
+cat > "$FAKEBIN/treehouse" <<SH
+#!/usr/bin/env bash
+exec -a treehouse '$FAKEBIN/real/treehouse' -c "\$(cat '$FAKEBIN/treehouse.body')" treehouse "\$@"
 SH
 chmod +x "$FAKEBIN/treehouse"
 fm_test_fake_no_mistakes "$FAKEBIN"
@@ -204,6 +240,20 @@ load_acquisition_herdr() {
   # shellcheck source=/dev/null
   . "$ROOT/bin/backends/herdr.sh"
 }
+
+# Leave a detached child writing into the socket directory, then exit into the
+# real cleanup trap. Its parent is gone and only its working directory names this
+# fixture, the same shape as the refresh that fm-spawn.sh detaches.
+if [ "${FM_TEST_ACQUISITION_CASES:-all}" = cleanup-writer ]; then
+  [ "$BACKEND" = tmux ] || fail 'cleanup-writer runs on tmux only'
+  printf '%s\n' "$LAB_TMUX_DIR" > "$FM_TEST_CLEANUP_WRITER_CASE/socket-dir" || fail 'cannot record the socket directory'
+  (nohup bash "$FM_TEST_CLEANUP_WRITER_CASE/child-write.sh" "$LAB_TMUX_DIR" "$FM_TEST_CLEANUP_WRITER_CASE" >/dev/null 2>&1 </dev/null &)
+  for _ in $(seq 1 500); do
+    [ ! -s "$FM_TEST_CLEANUP_WRITER_CASE/writer.proc" ] || [ ! -e "$LAB_TMUX_DIR/child-write.0" ] || exit 0
+    /bin/sleep 0.02
+  done
+  fail 'the writing child never started'
+fi
 
 if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   load_acquisition_herdr "$@"
@@ -502,12 +552,12 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   parent_pane=$(printf '%s' "$parent_out" | jq -er '.result.root_pane.pane_id') || fail 'missing refusal parent pane'
   socket=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_presentation_session_socket_path "$HERDR_LAB_SESSION") || fail 'missing exact lab socket'
   printf 'MODE=%q\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\n' \
-    slow "$A_LEASE" "$A_PIDFILE" "$A_ALLOW" "$A_ARRIVED" "$DIRTY" > "$TMP_ROOT/get-config"
+    slow "$A_LEASE" "$A_PIDFILE" "$A_ALLOW" "$A_ARRIVED" "$FOREIGN" > "$TMP_ROOT/get-config"
   fm_test_spawn_brief "$FM_HOME" "$A_ID" 'Projected refusal must retain its endpoint when session custody is unavailable.'
   FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$A_CASE/claude" PATH="$FAKEBIN:$PATH" \
     HERDR_PANE_ID="$parent_pane" HERDR_SOCKET_PATH="$socket" \
     FM_TEST_POLL_READY="$A_POLL_READY" FM_TEST_REAL_CLEANUP_SLEEP=1 \
-    bash "$ROOT/bin/fm-spawn.sh" "$A_ID" "$PROJECT" --backend herdr --harness codex --allow-api-key --mode no-mistakes --yolo off \
+    bash "$ROOT/bin/fm-spawn.sh" "$A_ID" "$PROJECT" --backend herdr --harness claude --allow-api-key --mode no-mistakes --yolo off \
     > "$A_OUT" 2>&1 &
   A_SPAWN_PID=$!
   for _ in $(seq 1 1000); do
@@ -538,7 +588,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   a_rc=$?
   A_SPAWN_PID=
   [ "$a_rc" -ne 0 ] || fail "projected refused caller launched: $(cat "$A_OUT")"
-  assert_contains "$(cat "$A_OUT")" 'not clean' 'projected caller missed acquired-copy dirty refusal'
+  assert_contains "$(cat "$A_OUT")" 'could not pre-register Claude workspace trust' 'projected caller missed the acquired-copy refusal'
   [ "$(cat "$SESSION_LOCK/pid")" = "$$" ] || fail 'projected refusal changed fixture custody'
   assert_projected_retained() {
     cmp -s "$A_JOURNAL" "$A_CASE/journal-before" || fail 'projected refusal changed its exact journal or projection identity'
@@ -556,7 +606,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
     if [ ! -e "$protected_lease" ] || ! kill -0 "$protected_pid" 2>/dev/null; then
       fail 'projected refusal ended sibling get lease'
     fi
-    [ -e "$A_ARRIVED" ] || fail 'projected get never reached the dirty acquired copy'
+    [ -e "$A_ARRIVED" ] || fail 'projected get never reached the acquired copy'
   }
   assert_projected_retained
   fm_lock_release "$SESSION_LOCK" || fail 'cannot release projected fixture custody'
@@ -578,6 +628,33 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
 fi
 
 if [ "$BACKEND" = tmux ]; then
+  # An owned child still writing must not make cleanup fail or leave the socket
+  # directory behind. The child recreates the directory if it goes first, so a
+  # cleanup that removes it too early fails either way the race lands.
+  WRITER_CASE="$TMP_ROOT/case-cleanup-writer"
+  mkdir -p "$WRITER_CASE"
+  cat > "$WRITER_CASE/child-write.sh" <<'SH'
+fm_test_record_process "$2/writer.proc"
+i=0
+while [ "$SECONDS" -lt "$FM_TEST_STUB_MAX_BLOCK_SECONDS" ]; do
+  { : > "$1/child-write.$((i % 64))"; } 2>/dev/null || mkdir -p "$1"
+  i=$((i + 1))
+done
+SH
+  fm_test_track_process "$WRITER_CASE/writer.proc" child-write
+  out=$(FM_TEST_ACQUISITION_CASES=cleanup-writer FM_TEST_CLEANUP_WRITER_CASE="$WRITER_CASE" bash "$ROOT/tests/fm-spawn-acquisition-cleanup.test.sh" tmux 2>&1)
+  rc=$?
+  writer_dir=$(cat "$WRITER_CASE/socket-dir") || fail "cleanup-writer case recorded no socket directory: $out"
+  writer_dir_left=no
+  if [ -e "$writer_dir" ]; then
+    writer_dir_left=yes
+    rm -rf "$writer_dir"
+  fi
+  ! fm_test_process_alive "$WRITER_CASE/writer.proc" child-write || fail 'cleanup left its writing child alive'
+  expect_code 0 "$rc" "cleanup did not stop its writing child before removing the socket directory: $out"
+  [ "$writer_dir_left" = no ] || fail "the writing child kept the socket directory after cleanup: $out"
+  pass 'tmux cleanup stops its writing child before removing the socket directory'
+
   # A provisioner models the actual ownership requirement with real process
   # ancestry: the acquired get process must be an ancestor of its invocation.
   # Supervisor-side execution fails even though the pane is a valid isolated copy.
@@ -602,7 +679,14 @@ p.add_argument('--owned-path', action='append', required=True)
 a = p.parse_args()
 holder = int(pathlib.Path(os.environ['FM_TEST_SLOT_HOLDER']).read_text())
 parents = {}
-for row in subprocess.check_output(['ps', '-A', '-o', 'pid=,ppid='], text=True).splitlines():
+try:
+    table = subprocess.check_output(['ps', '-A', '-o', 'pid=,ppid='], text=True)
+except PermissionError:
+    table = subprocess.check_output([sys.executable, os.environ['FM_TEST_PROC_INFO'],
+                                     'table', 'pid,ppid'], text=True)
+if not table.strip():
+    raise RuntimeError('fixture process ancestry is unavailable')
+for row in table.splitlines():
     fields = row.split()
     if len(fields) == 2:
         parents[int(fields[0])] = int(fields[1])
@@ -626,6 +710,7 @@ PY
   printf 'MODE=success\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
     "$SLOT_CASE/lease" "$SLOT_CASE/get-pid" "$SLOT_CASE/allow" "$SLOT_CASE/arrived" "$SLOT_COPY" "$SLOT_CASE/ticks" > "$TMP_ROOT/get-config"
   : > "$SLOT_CASE/ticks"
+  "$REAL_TMUX" set-environment -g FM_TEST_PROC_INFO "$FM_TEST_PROC_INFO"
   "$REAL_TMUX" set-environment -g FM_TEST_SLOT_HOLDER "$SLOT_CASE/get-pid"
   "$REAL_TMUX" set-environment -g FM_TEST_SLOT_RECORD "$SLOT_CASE/manifest.json"
   fm_test_spawn_brief "$FM_HOME" "$SLOT_ID" 'Provision from the actual acquired pane before admission.'
@@ -646,7 +731,7 @@ PY
   # Each case owns its project, copy, endpoint and task id; its clock moves only
   # once the owned gate opens, so a busy host cannot spend a budget early.
   run_slot_wait_case() { # <busy|stalled>
-    local shape=$1 wid="get-slot-wait-$1-$$" wcase="$TMP_ROOT/case-slot-wait-$1" wproject wcopy before gate get_mode lock out rc pid
+    local shape=$1 wid="get-slot-wait-$1-$$" wcase="$TMP_ROOT/case-slot-wait-$1" wproject wcopy before tip gate get_mode lock out rc pid
     wproject="$wcase/project" wcopy="$wcase/copy"
     mkdir -p "$wcase"
     fm_git_worktree "$wproject" "$wcopy" "slot-wait-$shape-before"
@@ -668,6 +753,8 @@ PY
     git -C "$wproject" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture stalled provisioner'
     git -C "$wproject" push -q origin main
     before=$(git -C "$wcopy" rev-parse HEAD)
+    # The copy sits behind origin's new tip, so the spawn moves it forward before it provisions.
+    tip=$(git -C "$wproject" rev-parse HEAD)
     get_mode=success
     gate="$wcase/provisioner.pid"
     if [ "$shape" = busy ]; then
@@ -696,8 +783,9 @@ PY
     fi
     assert_contains "$out" 'its helper is stopped and no worker admitted' "$shape refusal did not confirm its helper stopped"
     assert_grep 'recovery=slot-provision-refused' "$FM_HOME/state/$wid.meta" "$shape refusal lost recovery metadata"
-    [ "$(git -C "$wcopy" rev-parse HEAD)" = "$before" ] || fail "$shape refusal did not restore the assigned checkout"
-    [ "$(git -C "$wcopy" branch --show-current)" = "slot-wait-$shape-before" ] || fail "$shape refusal changed the prior branch"
+    [ "$(git -C "$wcopy" rev-parse HEAD)" = "$tip" ] || fail "$shape refusal moved the assigned checkout off the tip it was moved to"
+    # Main 1886 CUT: nothing is switched back. The preparation detached the copy before the move; the prior branch is where it was.
+    [ "$(git -C "$wcopy" rev-parse "refs/heads/slot-wait-$shape-before")" = "$before" ] || fail "$shape refusal moved the prior branch"
     [ -e "$wcase/lease" ] || fail "$shape refusal released its assigned copy lease"
     "$REAL_TMUX" list-windows -t firstmate -F '#{window_name}' | grep -qx "fm-$wid" || fail "$shape refusal closed its retained endpoint"
     "$REAL_TMUX" list-windows -t firstmate -F '#{window_id}' | grep -qx "$SENTINEL_WINDOW" || fail "$shape refusal closed the unrelated sentinel"
@@ -741,34 +829,38 @@ exec '$SLOT_CASE/native/codex' "\$@"
 SH
   chmod +x "$FAKEBIN/codex"
   "$REAL_TMUX" kill-window -t "firstmate:fm-$SLOT_ID"
-  slot_base=$(git -C "$SLOT_COPY" rev-parse HEAD)
   git -C "$SLOT_COPY" checkout -qb retained-ahead
   printf 'prior work must survive recovery\n' >> "$SLOT_COPY/README.md"
   git -C "$SLOT_COPY" add README.md
   git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture retained ahead work'
   prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  # A copy whose HEAD neither origin's default branch nor the selected base holds is skipped untouched, so the earlier
+  # work is first landed on origin and on the project's main; it is the baseline every preparation below starts from.
+  git -C "$SLOT_COPY" push -q origin "HEAD:refs/heads/main"
+  git -C "$SLOT_PROJECT" pull -q --ff-only origin main
+  slot_base=$prior_head
   cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
   cp "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before"
   touch "$SLOT_CASE/refuse"
   "$REAL_TMUX" set-environment -g FM_TEST_SLOT_REFUSE "$SLOT_CASE/refuse"
   RETRY_ID="get-slot-recovery-$$"
   fm_test_spawn_brief "$FM_HOME" "$RETRY_ID" 'Recover the same retained copy and exact declared scope.'
-  printf 'uncommitted prior work must survive\n' >> "$SLOT_COPY/README.md"
+  # A copy that is dirty at the proof is skipped, so the dirt appears after the proof, at the preparation's own read.
+  fm_test_late_dirt_shim "$FAKEBIN" "$SLOT_COPY" "$SLOT_COPY/README.md" 'uncommitted prior work must survive'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
     bash "$ROOT/bin/fm-spawn.sh" "$RETRY_ID" "$SLOT_PROJECT" --backend tmux --harness codex --allow-api-key \
       --mode local-only --yolo off --owned-path scripts --owned-path README.md 2>&1)
   rc=$?
+  rm -f "$FAKEBIN/git" "$FAKEBIN/late-dirt.done"
   [ "$rc" -ne 0 ] || fail 'dirty pre-preparation refusal admitted the task'
   assert_contains "$out" dirty_worktree 'initial refusal did not stop before preparation'
   assert_absent "$SLOT_CASE/admitted" 'refused task entered the harness'
   cmp -s "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before" || fail 'refusal overwrote the prior declaration'
-  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'dirty refusal moved the prior ahead checkout'
-  # Preserve the dirty work by committing it on its original branch, then let
-  # the public retry finish first-admission preparation but refuse provision.
-  git -C "$SLOT_COPY" add README.md
-  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture preserve initially dirty prior work'
-  prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
-  cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'dirty refusal moved the prior checkout'
+  # Preserve the dirty work outside the copy and restore the tracked file (a commit would put HEAD ahead of the recorded
+  # base, which the move refuses), then let the public retry finish first-admission preparation but refuse provision.
+  cp "$SLOT_COPY/README.md" "$SLOT_CASE/preserved-dirt"
+  git -C "$SLOT_COPY" checkout -q -- README.md
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
     bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'Prior dirty work is committed; finish the original preparation without replacing its owner.' 2>&1)
   rc=$?
@@ -835,5 +927,5 @@ PY
   expect_code 0 "$rc" 'relaunch changed the retained scope, copy or task identity'
   [ -e "$SLOT_CASE/lease" ] || fail 'relaunch released its assigned copy lease'
   assert_absent "$SLOT_COPY/.claude/worktrees" 'relaunch created nested isolation'
-  pass 'tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work'
+  pass 'tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior work'
 fi

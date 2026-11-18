@@ -764,7 +764,7 @@ test_live_herdr_lifecycle_accepts_managed_launches() {
         if [ "$action" = relaunch ]; then
           [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "owned relaunch did not complete"
           [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "owned relaunch kept the old incarnation"
-          [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "owned relaunch moved the pane"
+          [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] || fail "owned relaunch moved the pane"
           [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "owned relaunch moved the local copy"
           [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail "owned relaunch changed model"
           [ "$(meta_field "$dir" "$id" effort)" = high ] || fail "owned relaunch changed effort"
@@ -1131,7 +1131,7 @@ test_bootstrap_inspects_the_derived_home_when_fm_home_is_unset() {
   assert_absent "$dir/fake/launched-command" "bootstrap must not replace unmanaged native launch"
   assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "bootstrap must send no lifecycle input"
   [ "$(meta_field "$dir" "$id" spawn_gen)" = old ] || fail "bootstrap changed the unmanaged incarnation"
-  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "bootstrap recovery moved its pane"
+  [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] || fail "bootstrap recovery moved its pane"
   [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "bootstrap recovery moved its local copy"
   [ "$(meta_field "$dir" "$id" harness)" = omp ] || fail "bootstrap recovery changed its recorded harness"
   [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail "bootstrap recovery changed its recorded model"
@@ -1156,7 +1156,7 @@ test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
   [ "$(meta_field "$dir" "$id" harness)" = omp ] || fail 'recovery picked up a different configured harness'
   [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail 'recovery lost the recorded secondmate model'
   [ "$(meta_field "$dir" "$id" effort)" = high ] || fail 'recovery lost the recorded secondmate effort'
-  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail 'recovery moved the secondmate pane'
+  [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] || fail 'recovery moved the secondmate pane'
   [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")" ] \
     || fail 'recovery changed secondmate child work or its charter'
   assert_contains "$out" "recovery-skipped $id launch=unmanaged; no lifecycle action taken" \
@@ -1533,7 +1533,7 @@ test_omp_adoption_foreign_workspace() {
 test_omp_adoption_duplicate_pane() {
   prepare_omp_adoption duplicate
   local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
-  printf 'window=fmlab:%%7\nworktree=%s\nremote_host=\n' "$dir" > "$dir/home/state/duplicate.meta"
+  printf 'window=%s:%%7\nworktree=%s\nremote_host=\n' "$HERDR_CASE_SESSION" "$dir" > "$dir/home/state/duplicate.meta"
   assert_adoption_refused "$dir" "$id" 'unique-claim proof'
   pass "omp adoption: two metas claiming one pane refused"
 }

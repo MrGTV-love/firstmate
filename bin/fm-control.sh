@@ -52,13 +52,20 @@
 # explicitly clear recovery after ordinary automatic-backlog admission.
 # It neither launches an agent nor delivers instructions; then use fm-send for
 # a new continuation instruction, or ordinary relaunch for an exited owner.
+# That send states its choice when the task has open keyed decisions,
+# --resolve-key <key> or --answers-none (rule: bin/fm-send.sh header,
+# "Decision closure").
 # reassociate is metadata-only too: the lock-owning main Firstmate re-points a
 # local ship or scout's record at the replacement copy its work moved to
 # (worktree=, a ship's branch=, a Treehouse pool slot claim, and the brief's
 # Ship branch line), anchoring the copy it leaves, recording that copy as
 # prior_worktree= (or, when it is in a pool slot the task leaves entirely,
 # releasing the task's claim and recording it as released_worktree=), and
-# writing the note in the brief. A ship whose recorded copy is gone refuses,
+# writing the note in the brief. A proven rolled-back relaunch journal is
+# archived beside itself under a unique UTC-dated name before reassociation
+# writes; the active journal is kept until publication succeeds and restored
+# on failure. Completed journals are untouched (closure rules: docs below).
+# A ship whose recorded copy is gone refuses,
 # because relocation through relaunch --worktree is that copy's only recovery
 # route. It stops, starts,
 # deletes, resets, and returns nothing: the old copy's bytes, the endpoint, and
@@ -707,6 +714,9 @@ RA_BRIEF_PUBLISHED=()
 RA_META_TMPS=()
 RA_META_BACKUPS=()
 RA_META_PUBLISHED=()
+RA_JOURNALS=()
+RA_JOURNAL_ARCHIVES=()
+RA_JOURNAL_MOVED=()
 REASSOCIATE_OWNER_PATHS=()
 REASSOCIATE_OWNER_BACKUPS=()
 REASSOCIATE_CLAIMED=0
@@ -719,6 +729,13 @@ reassociate_rollback() {
   for ((i=${#RA_IDS[@]} - 1; i >= 0; i--)); do
     [ -z "${RA_META_TMPS[i]:-}" ] || rm -f -- "${RA_META_TMPS[i]}"
     [ -z "${RA_BRIEF_TMPS[i]:-}" ] || rm -f -- "${RA_BRIEF_TMPS[i]}"
+    # Archives are permanent evidence, even if this attempt fails. Until the
+    # final rename the original never moved; a joint call may have moved an
+    # earlier task's journal before a later rename failed, so restore its name.
+    if [ "${RA_JOURNAL_MOVED[i]:-0}" = 1 ]; then
+      cp -p -- "${RA_JOURNAL_ARCHIVES[i]}" "${RA_JOURNALS[i]}" \
+        || echo "error: task ${RA_IDS[i]}'s relaunch journal could not be restored; its archive is at ${RA_JOURNAL_ARCHIVES[i]}" >&2
+    fi
     if [ "${RA_META_PUBLISHED[i]:-0}" = 1 ]; then
       if fm_backlog_atomic_transition publish "${RA_META_BACKUPS[i]}" "${RA_METAS[i]}" "task record" "$STATE"; then
         RA_META_BACKUPS[i]=
@@ -918,13 +935,39 @@ reassociate_check() {  # <record-index>
   pr=$(fm_meta_get "$META" pr)
   [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
     || die "task $ID has a pending authoritative backlog close from an interrupted cleanup; finish or repair it before reassociating"
-  # A finished relaunch keeps its journal as that transaction's durable record,
-  # so only a journal that is this task's and reads phase=complete is finished.
-  if [ -e "$STATE/$ID.control-relaunch" ] || [ -L "$STATE/$ID.control-relaunch" ]; then
-    [ -f "$STATE/$ID.control-relaunch" ] && [ ! -L "$STATE/$ID.control-relaunch" ] \
-      && [ "$(fm_meta_get "$STATE/$ID.control-relaunch" task)" = "$ID" ] \
-      && [ "$(fm_meta_get "$STATE/$ID.control-relaunch" phase)" = complete ] \
-      || die "task $ID has an unfinished relaunch transaction at $STATE/$ID.control-relaunch; reconcile it before reassociating"
+  # A failed attempt is closed only if its prior incarnation remained the
+  # authoritative record. Those rollbacks need no liveness proof, as with no
+  # journal, except the two that left the old agent alive or unproven stopped:
+  # those still need the backend to prove it stopped or its endpoint missing.
+  local journal="$STATE/$ID.control-relaunch" phase rollback closed=0
+  if [ -e "$journal" ] || [ -L "$journal" ]; then
+    if [ -f "$journal" ] && [ ! -L "$journal" ] && [ -r "$journal" ] \
+       && cat -- "$journal" >/dev/null 2>&1 \
+       && [ "$(fm_backend_meta_exact_value "$journal" task)" = "$ID" ]; then
+      phase=$(fm_backend_meta_exact_value "$journal" phase) || phase=
+      case "$phase" in
+        complete) closed=1 ;;
+        failed:?*)
+          rollback=$(fm_backend_meta_exact_value "$journal" rollback) || rollback=
+          case "$rollback" in
+            instructions-restored-agent-state-*)
+              case "${rollback#instructions-restored-agent-state-}" in
+                ''|*[!A-Za-z0-9._-]*) rollback= ;;
+              esac ;;
+          esac
+          case "$rollback" in
+            prior-record-kept|prior-record-kept-agent-dead|instructions-restored)
+              closed=1; RA_JOURNALS[m]=$journal ;;
+            instructions-restored-agent-alive|instructions-restored-agent-state-?*)
+              case "$(fm_backend_agent_state "$FM_BACKEND_VALIDATED_BACKEND" "$FM_BACKEND_VALIDATED_TARGET")" in
+                dead|missing) closed=1; RA_JOURNALS[m]=$journal ;;
+                *) die "task $ID's agent is not proven stopped; reconcile it before archiving its rolled-back relaunch journal and reassociating" ;;
+              esac ;;
+          esac ;;
+      esac
+    fi
+    [ "$closed" = 1 ] \
+      || die "task $ID has an unfinished relaunch transaction at $journal; reconcile it before reassociating"
   fi
 
   RA_BRIEFS[m]=$brief
@@ -1240,7 +1283,7 @@ reassociate_stage() {  # <record-index> <timestamp>
 }
 
 do_reassociate() {
-  local m x slot stamp copy backup guard_keep
+  local m slot stamp copy backup guard_keep archive_stamp archive_counter
   local -a left_slots=()
 
   [ "$RELOCATE_SET" = 1 ] \
@@ -1311,15 +1354,40 @@ do_reassociate() {
     reassociate_group_check
   fi
 
-  # Every copy of every record is checked before any anchor is written.
-  for x in 0 1; do
-    for ((m=0; m<${#RA_IDS[@]}; m++)); do
-      reassociate_prove "$m" "$x"
+  # Every copy of every record is checked before writing anything. Preserve
+  # closed failed journals first, but keep the active names through publication
+  # so any failed staging/write still leaves ordinary recovery its evidence.
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_prove "$m" 0
+  done
+  REASSOCIATE_ACTIVE=1
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    [ -n "${RA_JOURNALS[m]:-}" ] || continue
+    reassociate_select "$m"
+    archive_stamp=$(date -u +%Y-%m-%dT%H%M%SZ) \
+      || die "could not date task $ID's relaunch journal archive"
+    archive_counter=0
+    while :; do
+      RA_JOURNAL_ARCHIVES[m]="${RA_JOURNALS[m]}.archived-$archive_stamp.$archive_counter"
+      # Reserve exclusively: existing files, directories and symlinks are
+      # collisions, never destinations to overwrite or follow.
+      if [ ! -e "${RA_JOURNAL_ARCHIVES[m]}" ] && [ ! -L "${RA_JOURNAL_ARCHIVES[m]}" ] \
+         && (set -C; : > "${RA_JOURNAL_ARCHIVES[m]}") 2>/dev/null; then
+        break
+      fi
+      if [ ! -e "${RA_JOURNAL_ARCHIVES[m]}" ] && [ ! -L "${RA_JOURNAL_ARCHIVES[m]}" ]; then
+        die "could not reserve task $ID's dated relaunch journal archive"
+      fi
+      archive_counter=$((archive_counter + 1))
     done
+    cp -p -- "${RA_JOURNALS[m]}" "${RA_JOURNAL_ARCHIVES[m]}" \
+      || die "could not archive task $ID's relaunch journal; its active journal is unchanged"
+  done
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_prove "$m" 1
   done
 
   # Stage every write before publishing any of them.
-  REASSOCIATE_ACTIVE=1
   stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   for ((m=0; m<${#RA_IDS[@]}; m++)); do
     reassociate_stage "$m" "$stamp"
@@ -1371,6 +1439,16 @@ do_reassociate() {
       || die "$FM_BACKLOG_TRANSITION_ERROR"
     RA_META_TMPS[m]=
     RA_META_PUBLISHED[m]=1
+  done
+  # Only now retire the active journal names, by rename rather than deletion.
+  # Each destination is this attempt's exclusively reserved, byte-exact copy.
+  # A failed later rename in a joint call restores the earlier active names
+  # from these permanent archives alongside the ordinary record rollback.
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    [ -n "${RA_JOURNALS[m]:-}" ] || continue
+    mv -f -- "${RA_JOURNALS[m]}" "${RA_JOURNAL_ARCHIVES[m]}" \
+      || die "could not finalize task ${RA_IDS[m]}'s relaunch journal archive"
+    RA_JOURNAL_MOVED[m]=1
   done
   # Committed: nothing below may roll a record back. A published record's
   # backup is spent, and its rollback flag is cleared so a late failure cannot

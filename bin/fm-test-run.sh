@@ -139,23 +139,38 @@
 # An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so participating test bursts across worktrees take turns.
+# An unnested --check-coverage takes one pass for its whole scan.
 # A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
 # and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
-# The marker must be a nonnegative decimal integer or execution exits 125;
-# 0 denotes degraded work with no CPU-pass concurrency limit.
+# When the holder's reservation has tokens (FM_CPU_PASS_TOKENS, bin/fm-cpu-pass.py), each
+# script leases its share of them (the count divided by --jobs, rounded down; the whole
+# count for a script it runs alone) in the same acquisition as its slot (gate --passes N),
+# waiting holding neither while sibling runners hold them, so runners that are siblings of
+# this one draw on the same reservation and workers alive together never exceed the passes
+# held. The script's own tree then has exactly the leased count. A holder that only exports the marker has no tokens: each script
+# runs with its share of the count as its marker instead and the marker is trusted.
+# The marker must be a nonnegative decimal integer (001 means 1) or every execution mode,
+# --check-coverage included, exits 125; 0 denotes degraded work with no CPU-pass
+# concurrency limit and is passed on unchanged.
 # Without python3 or the pool tool beside it, scripts run without a CPU pass.
 #
 # Each executed script also takes one slot of its test.<script> key from the
-# host-wide per-key gate (python3 bin/fm-duration.py gate), outside the CPU pass
-# and the per-script bound, so the same heavy suite started in several worktrees
-# runs at most FM_TEST_KEY_SLOTS (default 2) copies at a time. A waiter prints
-# which key it waits on and who holds the slots on the CPU-pass log descriptor,
-# gives up after FM_TEST_SLOT_WAIT_SECONDS and then runs without a slot; a nested
-# run of a key already held (FM_TEST_SLOT_HELD) takes none. The time a script
-# queued for its slot is left out of its recorded duration, its FM_TEST_END
-# duration_ms and its test.<script> sample, and that sample records no start load
-# (the load was read before the queue); the run's own wall time (--max-wall-ms,
-# FM_TEST_SUMMARY) still counts it. bin/fm-duration.py's header owns the protocol.
+# host-wide per-key gate (python3 bin/fm-duration.py gate), outside the per-script
+# bound, so the same heavy suite started in several worktrees runs at most
+# FM_TEST_KEY_SLOTS (default 2) copies at a time. An unnested runner has the gate take
+# its CPU pass in the same acquisition (gate --cpu-pass), so a waiter holds neither and
+# no slot holder waits for a pass. A waiter prints which key it waits on and who holds
+# the slots on the CPU-pass log descriptor and waits until a holder ends, never admitted
+# by elapsed time; a nested run of a key already held by its own ancestry
+# (FM_TEST_SLOT_HELD) takes none, every other key counts all of its holders at any depth,
+# FM_CPU_PASS_HELD never skips a slot, and only a wait cycle proven from the gates' own registrations admits a waiter
+# early (bin/fm-duration.py's header owns the rule). The time a script queued for its
+# slot is left out of its recorded duration and its FM_TEST_END duration_ms; the time it
+# queued for a pass or a token lease stays in its FM_TEST_END duration_ms (as it did before
+# the gate took the pass) but is left out of its test.<script> sample, which measures the
+# script's own execution and records no start load (the load was read before the queue);
+# the run's own wall time (--max-wall-ms, FM_TEST_SUMMARY) counts both.
+# bin/fm-duration.py's header owns the protocol.
 # FM_TEST_KEY_SLOTS=0, no python3 or helper beside this script, or a native
 # Windows bash (uname MINGW, MSYS or CYGWIN) runs scripts without a slot.
 #
@@ -240,6 +255,7 @@ if [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
   RUN_STARTED_LOAD=$(fm_duration_load)
 fi
 
+ORIGINAL_ARGS=("$@")
 MODE=
 LIST_ONLY=0
 LIST_SCHEDULED=0
@@ -456,7 +472,7 @@ family_for_basename() {
     fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|\
     fm-watch-triage-waits-declared.test.sh|fm-watch-triage-waits-pauses.test.sh|\
     fm-watch-triage-waits-away.test.sh|\
-    fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-watch-github-accounting.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh|\
     fm-status-runaway-guard.test.sh)
       printf '%s\n' watcher-wake-lock
@@ -560,7 +576,7 @@ family_for_basename() {
     fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
     fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
     fm-review-diff.test.sh|fm-review-record.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
-    fm-teardown-cleanup.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
+    fm-teardown-cleanup.test.sh|fm-teardown-real-treehouse.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -906,6 +922,8 @@ tests/fm-calm-claude-mod-plugin.test.sh 784
 tests/fm-calm-claude-mod.test.sh 5079
 tests/fm-calm-pi-extension.test.sh 56965
 tests/fm-calm-pi-queue-retention-live-e2e.test.sh 2181
+tests/fm-captain-hold-boundary.test.sh 43963
+tests/fm-captain-hold-delay.test.sh 32194
 tests/fm-check-unregister.test.sh 1442
 tests/fm-ci-workflow.test.sh 23170
 tests/fm-classify-corr-token.test.sh 19063
@@ -1177,6 +1195,7 @@ tests/fm-tmux-agent-liveness.test.sh 4922
 tests/fm-tool-update-check.test.sh 20060
 tests/fm-trace-context-lib.test.sh 1147
 tests/fm-trace-context-spawn.test.sh 124851
+tests/fm-turnend-ask.test.sh 6581
 tests/fm-turnend-foreign-owner-arm-fix.test.sh 6851
 tests/fm-turnend-guard.test.sh 61599
 tests/fm-typesafe-health.test.sh 6669
@@ -2012,6 +2031,10 @@ families_for_changed_path() {
     bin/fm-procevent-quota.sh)
       printf '%s\n' "__script__:fm-procevent-quota.test.sh"
       ;;
+    bin/fm-github-accounting.py|tests/fm-github-accounting.behavior.test.py)
+      printf '%s\n' "__script__:fm-github-accounting.test.sh"
+      printf '%s\n' "__script__:fm-watch-github-accounting.test.sh"
+      ;;
     bin/fm-proc-guard.*|bin/fm-procevent-proc.sh|tests/fm-proc-guard.behavior.test.py)
       printf '%s\n' "__script__:fm-proc-guard.test.sh"
       printf '%s\n' "__script__:fm-procevent-proc.test.sh"
@@ -2736,7 +2759,23 @@ if [ "$LIST_LANES" -eq 1 ]; then
   exit 0
 fi
 
+# Every execution mode, including the coverage scan, refuses a malformed inherited marker.
+if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  case "$FM_CPU_PASS_HELD" in
+    ''|*[!0-9]*)
+      log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
+      exit 125 ;;
+  esac
+fi
+
 if [ "$CHECK_COVERAGE" -eq 1 ]; then
+  # The guard is one long sequential scan of the test inventory (measured 20 CPU seconds
+  # over 37 s), so an unnested run takes one pass of the host-wide pool like a script does.
+  if [ -z "${FM_CPU_PASS_HELD+x}" ] && [ -x "$ROOT/bin/fm-cpu-pass.sh" ] \
+    && [ -r "$ROOT/bin/fm-cpu-pass.py" ] && command -v python3 >/dev/null 2>&1; then
+    exec "$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run --check-coverage" -- \
+      "$ROOT/bin/fm-test-run.sh" ${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}
+  fi
   run_coverage_guard
   exit $?
 fi
@@ -2927,13 +2966,13 @@ fi
 CPU_PASS_ACTIVE=1
 CPU_PASS_LOG_FD=8
 exec 8>&2
+# The scripts of a runner inside passes get their share of the inherited count; see run_script_bounded.
+RUN_PASS_SHARE=
+CONCURRENT_PASS_SHARE=
+NESTED_LEASE=0
 if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  # Validated above, before any execution mode ran; only a positive count is normalized here.
   inherited_passes=$FM_CPU_PASS_HELD
-  case "$inherited_passes" in
-    ''|*[!0-9]*)
-      log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
-      exit 125 ;;
-  esac
   while [ "${inherited_passes#0}" != "$inherited_passes" ]; do
     inherited_passes=${inherited_passes#0}
   done
@@ -2942,6 +2981,19 @@ if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
     printf 'fm-test-run: reducing --jobs %s to inherited FM_CPU_PASS_HELD=%s\n' \
       "$JOBS" "$inherited_passes" >&"$CPU_PASS_LOG_FD"
     JOBS=$inherited_passes
+  fi
+  if [ -n "$inherited_passes" ]; then
+    RUN_PASS_SHARE=$inherited_passes
+    CONCURRENT_PASS_SHARE=$inherited_passes
+    if [ "${#inherited_passes}" -le 6 ] && [ "${#JOBS}" -le 6 ]; then
+      CONCURRENT_PASS_SHARE=$((inherited_passes / JOBS))
+      # The holder's reservation has tokens (bin/fm-cpu-pass.py): each script leases its share of them, so runners
+      # that are siblings of this one draw on the same reservation and the passes held stay one worker each.
+      if [ -n "${FM_CPU_PASS_TOKENS:-}" ] && [ -d "$FM_CPU_PASS_TOKENS" ] \
+        && [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ] && command -v python3 >/dev/null 2>&1; then
+        NESTED_LEASE=1
+      fi
+    fi
   fi
   CPU_PASS_ACTIVE=0
 elif [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
@@ -3079,7 +3131,7 @@ family_bump() {
 
 record_script_result() {
   local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
-  local base family expected gate_skip gate_reason fail_delta token timed_out=0 cpu_ms=
+  local base family expected gate_skip gate_reason fail_delta token sample timed_out=0 cpu_ms=
   # CPU comes from the slot gate's single process-tree sample, so it is present
   # when that wrapper ran and empty otherwise. See docs "Timing artifacts":
   # this is measurement evidence, not a verdict on why a suite took as long as
@@ -3130,10 +3182,16 @@ record_script_result() {
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
     fi
-    if [ "$(slot_wait_ms "$out")" -gt 0 ]; then
+    # The sample measures the script's own execution: the time it waited for a pass or a lease is left out
+    # of it as the slot wait already is (the FM_TEST_END duration above keeps the pass wait).
+    sample=$((duration - $(pass_wait_ms "$out")))
+    if [ "$sample" -lt 0 ]; then
+      sample=0
+    fi
+    if [ "$(slot_wait_ms "$out")" -gt 0 ] || [ "$(pass_wait_ms "$out")" -gt 0 ]; then
       load_start=
     fi
-    fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start" "$timed_out"
+    fm_duration_record "test.$script" "$sample" "$rc" '' 1 "$load_start" "$timed_out"
   fi
   family_bump "$family" "$duration" "$fail_delta"
   TOTAL=$((TOTAL + 1))
@@ -3158,6 +3216,19 @@ slot_wait_ms() {  # <out>
   local waited=0
   if [ -r "$1.slotwait" ]; then
     read -r waited <"$1.slotwait" || true
+  fi
+  case "$waited" in
+    ''|*[!0-9]*) waited=0 ;;
+  esac
+  printf '%s\n' "$waited"
+}
+
+# Milliseconds the script that wrote <out> waited for a CPU pass or a token lease, 0 when it did not (the
+# gate's --pass-wait-file).
+pass_wait_ms() {  # <out>
+  local waited=0
+  if [ -r "$1.passwait" ]; then
+    read -r waited <"$1.passwait" || true
   fi
   case "$waited" in
     ''|*[!0-9]*) waited=0 ;;
@@ -3199,10 +3270,23 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc script_seconds=$PER_SCRIPT_TIMEOUT_SECS
+  local lease=
+  if [ -n "${RUN_PASS_SHARE:-}" ]; then
+    if [ "$NESTED_LEASE" -eq 1 ]; then
+      # The script leases its share of the holder's tokens below and its tree gets exactly that reservation.
+      lease=$RUN_PASS_SHARE
+    else
+      # No tokens (a holder that only exports the marker): lets this script's own nested runners use only its
+      # share of the count, so scripts running together never each spend the whole inherited count. Declared
+      # local so the runner's own marker is left as the caller had it.
+      local FM_CPU_PASS_HELD
+      export FM_CPU_PASS_HELD=$RUN_PASS_SHARE
+    fi
+  fi
   if [ "$script_seconds" -gt 0 ] && declare -F fm_duration_limit >/dev/null 2>&1; then
     script_seconds=$(fm_duration_limit "test.$script" "$script_seconds" 99) || return $?
   fi
-  local -a cmd
+  local -a cmd pass_option
   : "$id"
   if [ "$PROGRESS_GUARD" -eq 1 ]; then
     # Expansion is intentionally deferred to the child bash passed to -c.
@@ -3237,14 +3321,30 @@ run_script_bounded() {  # <script> <out> <stream> <id>
     : >"$out.guarded"
     cmd=(python3 "$ROOT/bin/fm-duration.py" run "test.$script" -- "${cmd[@]}")
   fi
-  if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
-    cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
-      --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
-  fi
   if [ "$TEST_SLOT_ACTIVE" -eq 1 ]; then
-    # Outermost: a waiter holds neither a CPU pass nor any part of the bound.
+    # Outermost: a waiter holds neither a CPU pass nor any part of the bound. The gate
+    # takes the slot and the pass as one acquisition, so no process waits for a pass
+    # while it holds a slot (bin/fm-duration.py's header owns the protocol).
+    pass_option=()
+    if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
+      pass_option=(--cpu-pass "fm-test-run $script")
+    elif [ -n "$lease" ]; then
+      # Inside a holder with tokens: the gate leases the script's share together with its slot.
+      pass_option=(--cpu-pass "fm-test-run $script" --passes "$lease")
+      lease=
+    fi
     cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
-      --wait-file "$out.slotwait" --cpu-file "$out.cpu" "test.$script" -- "${cmd[@]}")
+      --wait-file "$out.slotwait" --pass-wait-file "$out.passwait" --cpu-file "$out.cpu" ${pass_option[@]+"${pass_option[@]}"} \
+      "test.$script" -- "${cmd[@]}")
+  elif [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
+    # The wait file keeps the pass wait out of the script's sample on this route too (FM_TEST_KEY_SLOTS=0 has no gate).
+    cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
+      --log-fd "$CPU_PASS_LOG_FD" --wait-file "$out.passwait" -- "${cmd[@]}")
+  fi
+  if [ -n "$lease" ]; then
+    # No per-key gate to lease through (slots off or no helper): lease the share around the script itself.
+    cmd=("$ROOT/bin/fm-cpu-pass.sh" run --passes "$lease" --label "fm-test-run $script" \
+      --log-fd "$CPU_PASS_LOG_FD" --wait-file "$out.passwait" -- "${cmd[@]}")
   fi
   set +e
   if [ "$stream" -eq 1 ]; then
@@ -3415,6 +3515,7 @@ else
       fi
       begin_ms=$(now_ms)
       set +e
+      RUN_PASS_SHARE=$CONCURRENT_PASS_SHARE
       TMPDIR="$work/tmp" TMP="$work/tmp" run_script_bounded "$script" "$work/output" 0 "w$worker_n"
       rc=$?
       set -e

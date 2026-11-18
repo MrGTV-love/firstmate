@@ -49,10 +49,13 @@
 # provisioner owns repeat/reuse compatibility; dirty scratch, branch/scope changes,
 # foreign active manifests, and create-only refusals stop promotion without a
 # manifest-force path. Governed scouts keep their already-provisioned task branch.
-# A refused promotion deletes a task branch only it created, so a retry is not
-# blocked once the scout advances; it warns and keeps the branch when the
-# project report may declare it or the branch moved, is checked out or the copy
-# is not restored (fm_slot_drop_created_branch in bin/fm-slot-provision-lib.sh).
+# A refused promotion does nothing to the copy: it runs no checkout, switches no
+# HEAD and deletes no branch. The copy stays where the refusal found it, which
+# can be the task branch the provisioning step set, and the refusal says where
+# that is (bin/fm-slot-provision-lib.sh fm_slot_provision). When the copy is
+# left on the task branch, the task record names that branch (branch=), and the
+# refusal names the branch and the next step. A retry then finds the task
+# branch already checked out.
 # Usage: fm-promote.sh <task-id> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--owned-path <tracked-path>]... [--upstream-consent <host>/<owner>/<repo>]
 # --upstream-consent records the captain's one-off approval for this task to
 # publish to firstmate's own upstream repository; promotion applies the same
@@ -321,7 +324,21 @@ if fm_slot_required "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" || grep -q '^slot_man
   PROMOTE_SLOT_REPORT="$DATA/$ID/slot-provision-promote.${BASHPID:-$$}.json"
   fm_slot_provision fm_slot_run_local "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" "$ID" "$BRANCH" \
     "$PROMOTE_SLOT_REPORT" '' '' "${SLOT_OWNED_PATHS[@]}" || {
-    fm_slot_drop_created_branch "$PROMOTE_WORKTREE" "$BRANCH" "$PROMOTE_SLOT_REPORT" || true
+    # The refusal leaves the copy where it is, which can be the task branch the provisioning step set. The task record then
+    # names that branch, so later scout commits land on the branch the record names.
+    PROMOTE_ON=$(git -C "$PROMOTE_WORKTREE" branch --show-current 2>/dev/null) || PROMOTE_ON=
+    if [ "$PROMOTE_ON" = "$BRANCH" ] && [ "$(sed -n 's/^branch=//p' "$META" | tail -n 1)" != "$BRANCH" ]; then
+      TMP="$STATE/.$ID.meta.promote-refused.${BASHPID:-$$}"
+      if grep -v '^branch=' "$META" > "$TMP" && echo "branch=$BRANCH" >> "$TMP" &&
+        fm_backlog_atomic_transition publish "$TMP" "$META" "task record" "$STATE"; then
+        TMP=
+      else
+        echo "error: the task record of $ID could not be updated to name branch $BRANCH, the branch the copy is on (${FM_BACKLOG_TRANSITION_ERROR:-write failed})" >&2
+      fi
+    fi
+    PROMOTE_WHERE='a detached HEAD'
+    [ -z "$PROMOTE_ON" ] || PROMOTE_WHERE="branch $PROMOTE_ON"
+    echo "error: promotion of $ID was not admitted; the copy $PROMOTE_WORKTREE is on $PROMOTE_WHERE; next: keep scout work on it, resolve the provisioner's refusal above, then rerun bin/fm-promote.sh $ID" >&2
     exit 1
   }
 fi
@@ -455,6 +472,7 @@ INSTRUCTIONS_Q=$(printf '%q' "$INSTRUCTIONS")
 echo "promoted $ID to ship mode=$MODE yolo=$YOLO$PROMOTE_FORGE_WORDS (teardown protection restored)"
 echo "wrote ship instructions for mode=$MODE$PROMOTE_FORGE_WORDS: $INSTRUCTIONS"
 echo "next: FM_HOME=$HOME_Q bin/fm-send.sh fm-$ID \"\$(cat $INSTRUCTIONS_Q)\""
+echo "choice: when fm-$ID has open keyed decisions, fm-send stops that send and lists them; add --resolve-key <key> after the target (one key per flag) when it answers one, or --answers-none when it answers none (rule: bin/fm-send.sh header, \"Decision closure\")"
 
 promote_print_rechain_hint() {
   local consent_home=$1 work_home=$2 task_id=$3 id prefix

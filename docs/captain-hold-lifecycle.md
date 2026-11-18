@@ -54,13 +54,19 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 The `hold` subcommand is the mandatory captain-hold creation path.
 It works in this order:
 
-1. It uses an existing task, or creates one when nothing exists to hold.
-2. It records the task's UTC hold-set timestamp as the leading line of the task body.
+1. It validates the new-hold boundary and if-no action before changing an existing task or creating one when nothing exists to hold; unresolved re-holds retain their recorded fields without requiring new ones.
+2. It records the task's UTC hold-set timestamp as the leading line of the task body, with the supplied boundary and JSON-string-valued if-no action in the header.
 3. When `--origin` is supplied, it records the origin on the task, replacing any previous association.
 4. It invokes the underlying tasks-axi hold operation.
 5. It verifies the hold and timestamp.
 
 Publishing the stamp first ensures a snapshot cannot observe a newly captain-held task without the timestamp that defines its age.
+The exact recommendation is a separate JSON-string-valued header field, not a guess from the four-part card's human-readable recommendation and reasons.
+The tool accepts a hold without `--recommendation`, but every filer whose card carries a `Recommendation:` is expected to supply it.
+Its value is the exact answer value that choosing the recommended option sends: the typed words for a typed answer, or for a keyed or Slack answer the option's answer value, never its number and never its display label.
+On a Slack card the answer value is the text in parentheses after the label, so `1. Approve the charge (approve)` gives `approve`: a tap or a typed `1` is converted to `approve` before intake.
+An answer equal to that value after trimming surrounding whitespace records the wait as one delay row.
+The script's `--help` owns the filing fields and delay-log contract.
 
 Repeat and edge cases:
 
@@ -89,6 +95,7 @@ It then works in this order:
 2. It retains the leading hold-set stamp until the selected `tasks-axi done` or `tasks-axi unhold` transition succeeds.
 3. It then restores the successful record's resolution-first body ordering.
    The previous body remains preserved below the block and archived through tasks-axi `--archive-body`.
+4. It appends any delay record planned in that resolution header to the owning home's error log before publishing resolution; an exact answer replay can finish an interrupted append without creating a second record.
 
 If the close is interrupted, the still-held task therefore keeps its original age basis.
 A matching retry also completes any resolution-first normalization left unfinished after the close itself succeeded.
@@ -105,8 +112,22 @@ An expired deferral therefore remains answerable.
 
 ### Recording a reviewed inventory (`complete`)
 
-While originating task metadata is live, the `complete` subcommand unions the reviewed captain-held task ids, called the reviewed inventory, into `decision_keys=` and appends `decisions_reviewed=1`.
+While originating task metadata is live, the `complete` subcommand unions the reviewed captain-held task ids, called the reviewed inventory, into `decision_keys=` and records `decisions_reviewed=1` without disturbing an existing managed PR poll's identity footer.
 A post-teardown visual review can complete against the surviving report and durable tasks without recreating volatile task metadata.
+
+The authorized supervising firstmate owns this metadata attestation in the originating home's authoritative `FM_HOME`.
+A confined scout or worker inventories its complete report and visual surface, records each genuine unresolved captain choice and its options (or explicitly none), and sends the report path and inventory through the existing status/inbox handoff.
+For a scout report with no open choice or blocker keys, `done:` is report-ready for owner review, not task-completion certification.
+A ship retains its selected delivery contract rather than adopting the scout's report-ready definition.
+While any key remains open, a ship or scout sends its ready-work/report pointer and inventory through that keyed `needs-decision` or `blocked` status and stops without `done:` or `failed:`: the existing ship/scout terminal-status fold retires open keys, so a terminal notification would lose that handoff.
+Only the actual owner resolution or verified durable hold/transfer permits the gated phase to proceed; the selected delivery and normal completion gates are unchanged.
+The persistent secondmate channel is different: a later `done:` or `failed:` there may describe other work and never retires an escalation key, so the ship/scout rule against terminal status does not apply.
+Only an exact-key `resolved` line or a verified captain-held transfer closes its escalation.
+The worker does not run captain-hold mutation commands or obtain permission to write protected metadata.
+The supervising firstmate reads the full surface, registers genuine calls through `hold`, reconciles operational keys through their existing owner, then runs the normal `complete <origin> <task-id>...` or `complete <origin> --none` command.
+An executor/permission failure is not a captain choice: retain its evidence and resolve that operational key through the existing owner path before retrying the gate; never fabricate a captain answer or bypass the inventory check.
+A secondmate acting as supervisor in its own authoritative home uses the same normal gate there.
+No metadata permission, completion guard or native-helper admission changes for this handoff.
 
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.

@@ -144,14 +144,48 @@ fm_backlog_drop_words_file_valid() {  # <path>
   perl -0777 -e 'my $s = <>; exit(defined($s) && length($s) <= 8192 && $s =~ /\S/ && index($s, "\0") == -1 ? 0 : 1)' < "$1"
 }
 
-fm_backlog_drop_record() {  # <data> <id> <words-file>
-  local dir="$1/$2" target="$1/$2/captain-drop.md" tmp
+# Whether fm_backlog_drop_record below would succeed now, decided without
+# writing anything: the words are valid, the record's directory is absent with a
+# writable parent or is a writable directory that is not a link, and the record
+# is absent or a regular file that is not a link and can be replaced.
+fm_backlog_drop_record_writable() {  # <data> <id> <words-file>
+  local dir="$1/$2" target="$1/$2/captain-drop.md"
+  case "$2" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  fm_backlog_drop_words_file_valid "$3" || return 1
+  [ ! -L "$dir" ] && [ ! -L "$target" ] && { [ ! -e "$target" ] || [ -f "$target" ]; } || return 1
+  if [ -e "$dir" ]; then
+    [ -d "$dir" ] && [ -w "$dir" ] && [ -x "$dir" ] || return 1
+  else
+    [ -d "$1" ] && [ -w "$1" ] && [ -x "$1" ] || return 1
+  fi
+  fm_backlog_path_deletable "$target"
+}
+
+# Is <file> a regular file of exactly mode 0600? Read with find, so no stat
+# format differs between hosts.
+fm_backlog_file_mode_is_0600() {  # <file>
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -n "$(find "$1" -prune -type f -perm 600 2>/dev/null)" ]
+}
+
+# A caller that passes a private directory of its own (on the data
+# directory's filesystem) has the words staged there first instead of in a new
+# temporary file beside the record.
+fm_backlog_drop_record() {  # <data> <id> <words-file> [private-dir]
+  local dir="$1/$2" target="$1/$2/captain-drop.md" private=${4:-} tmp
   case "$2" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
   fm_backlog_drop_words_file_valid "$3" || return 1
   [ ! -L "$dir" ] && [ ! -L "$target" ] && { [ ! -e "$target" ] || [ -f "$target" ]; } || return 1
   (umask 077; mkdir -p "$dir") || return 1
-  tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
-  cp -- "$3" "$tmp" && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
+  if [ -n "$private" ]; then
+    # Made 0600 before the copy, as mktemp makes it, so cp keeps that mode
+    # whatever the words file's own mode is.
+    tmp="$private/captain-drop"
+    (umask 077; set -C; : > "$tmp") 2>/dev/null || return 1
+  else
+    tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
+  fi
+  cp -- "$3" "$tmp" && fm_backlog_file_mode_is_0600 "$tmp" \
+    && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
     || { rm -f -- "$tmp"; return 1; }
 }
 
@@ -726,9 +760,11 @@ fm_backlog_done() {  # <data-dir> <id> [flag...]
   return 0
 }
 
-# A finished item stops blocking the items that waited on it. Every route that moves
-# an item to Done calls this once the move succeeded: fm_backlog_done above (teardown
-# and every other transition) and bin/fm-tasks-axi.sh done/close. tasks-axi keeps a
+# A finished item stops blocking the items that waited on it. Every Firstmate route that
+# moves an item to Done calls this once the move succeeded: fm_backlog_done above
+# (teardown and every other transition), bin/fm-tasks-axi.sh done/close and its typed
+# public-followup completions, and bin/fm-captain-hold.sh answer, withdraw and reconcile
+# close. A raw tasks-axi done does not. tasks-axi keeps a
 # blocked-by edge after its blocker is done, so the edge is read from each item's
 # stored `deps` field (the `blocked_by` view already hides a done blocker) and cleared
 # with tasks-axi's own `unblock <dependent> --by <id>`. An edge naming another,
@@ -754,6 +790,7 @@ fm_backlog_unblock_dependents() {  # <data-dir> <id>
     case "$line" in '  '[!\ ]*) ;; *) continue ;; esac
     line=${line#  }
     dep=${line%%,*}
+    case "$dep" in '"'*'"') dep=${dep#\"}; dep=${dep%\"} ;; esac
     case "$line" in
       *'"') rest=${line%\"}; deps=${rest##*,\"} ;;
       *) deps=${line##*,} ;;
@@ -1015,6 +1052,78 @@ fm_backlog_record_remove() {
     return 1
   fi
   return 0
+}
+
+# Whether the operating system would let this process delete the directory
+# entry at <path> itself (a link is judged as the link, not its target),
+# decided without writing or removing anything: on macOS, faccessat(2) with
+# _DELETE_OK and AT_SYMLINK_NOFOLLOW, which applies the directory permissions,
+# sticky-bit ownership, file and directory flags and access-control entries
+# that rm -f meets; elsewhere, the directory's write and search permission, the
+# sticky-bit ownership rule, and the Linux immutable and append-only attributes
+# of the entry and its directory. An absent path passes.
+# It refuses on doubt: a host without python3, a check that cannot complete, or
+# on Linux an entry or directory that cannot be opened or whose attributes
+# cannot be read fails, so the caller refuses before its first mutation. Two
+# answers are not doubt: a symbolic link carries no such attributes of its own
+# (only its directory's are read), and a filesystem that keeps no attributes
+# (ENOTTY, EOPNOTSUPP, ENOSYS) cannot hold either one. A cause the checks do not
+# cover passes, and the removal itself still refuses it.
+fm_backlog_path_deletable() {  # <path>
+  local rc=0
+  { [ -e "$1" ] || [ -L "$1" ]; } || return 0
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 -I -c '
+import ctypes, ctypes.util, os, stat, sys
+path = sys.argv[1]
+parent = os.path.dirname(path) or "."
+if sys.platform == "darwin":
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    sys.exit(0 if libc.faccessat(-2, os.fsencode(path), 1 << 12, 0x20) == 0 else 3)
+if not os.access(parent, os.W_OK | os.X_OK):
+    sys.exit(3)
+info, pinfo, euid = os.lstat(path), os.stat(parent), os.geteuid()
+if pinfo.st_mode & stat.S_ISVTX and euid not in (0, info.st_uid, pinfo.st_uid):
+    sys.exit(3)
+if sys.platform.startswith("linux"):
+    import errno, fcntl
+    unsupported = {errno.ENOTTY, errno.EOPNOTSUPP, errno.ENOTSUP, errno.ENOSYS}
+    targets = [(parent, 0)]
+    if not stat.S_ISLNK(info.st_mode):
+        targets.insert(0, (path, getattr(os, "O_NOFOLLOW", 0)))
+    for target, nofollow in targets:
+        try:
+            fd = os.open(target, os.O_RDONLY | os.O_NONBLOCK | nofollow)
+        except OSError:
+            sys.exit(3)
+        flags = ctypes.c_long(0)
+        try:
+            fcntl.ioctl(fd, 0x80086601, flags)
+        except OSError as err:
+            if err.errno not in unsupported:
+                sys.exit(3)
+            flags.value = 0
+        finally:
+            os.close(fd)
+        if flags.value & (0x10 | 0x20):
+            sys.exit(3)
+sys.exit(0)
+' "$1" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 0 ]
+}
+
+# Whether fm_backlog_record_remove would remove <path> now, decided without
+# writing or removing anything, so a caller can refuse before its first
+# mutation: absent, or an authorized regular file that fm_backlog_path_deletable
+# says the operating system lets this process delete.
+fm_backlog_record_removable() {  # <path> <label> <root>
+  local path=$1 label=$2 root=$3
+  fm_backlog_record_parent_authorized "$path" "$label" "$root" || return 1
+  { [ -e "$path" ] || [ -L "$path" ]; } || return 0
+  fm_backlog_record_present "$path" "$label" "$root" || return 1
+  fm_backlog_path_deletable "$path" && return 0
+  FM_BACKLOG_TRANSITION_ERROR="$label could not be removed at $path"
+  return 1
 }
 
 fm_backlog_record_publish() {
