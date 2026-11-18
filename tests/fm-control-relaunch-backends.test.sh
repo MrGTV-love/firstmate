@@ -2184,8 +2184,8 @@ test_omp_bun_adoption_keeps_every_other_proof() {
 }
 
 test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
-  local shape dir id record out before pid_a
-  for shape in protocol-writer interactive-writer unreadable-writer; do
+  local shape dir id record out before pid_a old oldbun oldscript
+  for shape in protocol-writer interactive-writer unreadable-writer old-tree-edited table-unreadable; do
     prepare_bun_adoption "writer-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
     pid_a=
@@ -2199,6 +2199,27 @@ test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
         bun_spawn "a-$shape" tty "$dir/a/bun" "$dir/a/bun" "$dir/a/cli.ts"
         pid_a=$BUN_PID
         rm -f "$dir/a/bun" ;;
+      old-tree-edited)
+        # A previously complete omp tree whose files change only after A started: what a running Bun
+        # loaded is not proved or disproved by the files that sit there now.
+        old="$dir/old-tree"
+        cp -R "$BUN_TREE" "$old"
+        oldbun="$old/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
+        oldscript="$old/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
+        bun_spawn "a-$shape" tty "$oldbun" "$oldbun" "$oldscript" --config "$dir/other.yml" --no-title
+        pid_a=$BUN_PID
+        rm "$old/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli-commands.ts" ;;
+      table-unreadable)
+        # A live Bun omp whose process-table entry cannot be read while the kernel still knows the pid.
+        bun_launch "a-$shape" --config "$dir/other.yml" --no-title 'another agent'
+        pid_a=$BUN_PID
+        mv "$dir/fakebin/ps" "$dir/fakebin/ps.orig"
+        cat > "$dir/fakebin/ps" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -p ] && [ "\${2:-}" = "$pid_a" ]; then exit 1; fi
+exec "$dir/fakebin/ps.orig" "\$@"
+SH
+        chmod +x "$dir/fakebin/ps" ;;
     esac
     # The extension of A rewrites this record; B is the otherwise fully proven foreground target.
     BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" bun_launch "b-$shape" --config "$dir/session.yml" --auto-approve --cwd "$dir/wt/subdirectory" --no-title 'Read the brief'
@@ -2221,7 +2242,7 @@ test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own() {
     assert_contains "$out" "adopted: $id" "repair over a $shape record reports its exact task"
     bun_stop_all
   done
-  pass "omp bun adoption: a live Bun writer of any role or unreadable identity keeps its record; a dead or unrelated pid does not"
+  pass "omp bun adoption: a live Bun writer of any role, unreadable identity, edited old tree or unreadable table entry keeps its record; a dead or unrelated pid does not"
 }
 
 test_omp_adoption_native_omp_first_on_path_keeps_a_live_bun_writer() {
@@ -2300,7 +2321,8 @@ test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install() {
   claims=("$dir"/home/state/.*omp-session.claim.*)
   [ -f "${claims[0]}" ] || fail "the claimed record must exist between the claim and the install"
   a_record=$(jq -c '.pid=2000000002 | .current_session_file=.task_session_file' "${claims[0]}")
-  printf '%s\n' "$a_record" > "$dir/home/state/.late-writer.tmp"
+  printf '%s\n' "$a_record" > "$dir/writer-record.expected"
+  cp "$dir/writer-record.expected" "$dir/home/state/.late-writer.tmp"
   /bin/mv -f "$dir/home/state/.late-writer.tmp" "$record"
   printf 'go\n' > "$dir/fake/barrier-resume"
   read -r -t 120 line <&6 || fail "adoption never finished after the writer published"
@@ -2310,10 +2332,62 @@ test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install() {
   out=$(cat "$dir/adopt.out")
   [ "$rc" -ne 0 ] || fail "adoption overwrote a record published between its claim and its install: $out"
   assert_contains "$out" 'that record was not overwritten' "the refusal says the writer's record was kept"
-  assert_equals "$a_record" "$(cat "$record")" "the record a writer published between the claim and the install stays byte-identical"
+  cmp -s "$dir/writer-record.expected" "$record" || fail "the record a writer published between the claim and the install must stay byte-identical (saved bytes versus the file, newlines included)"
   assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a refused adoption leaves no staged or claimed record"
   bun_stop_all
   pass "omp bun adoption: a record published between the claim and the install is never overwritten"
+}
+
+# ln shim: while <mode> is set, a link whose destination is the session record fails.
+#   always - every such link fails (the install and the restoration);  first - only the first (the install).
+arm_record_link_failure() { # <case-dir> <id> <always|first>
+  local dir=$1 id=$2
+  printf '%s' "$3" > "$dir/fake/ln-mode"
+  cat > "$dir/fakebin/ln" <<SH
+#!/usr/bin/env bash
+D=\$FM_FAKE_DIR
+last=\${!#}
+if [ "\${last##*/}" = "$id.omp-session.json" ]; then
+  case "\$(cat "\$D/ln-mode" 2>/dev/null)" in
+    always) echo "ln: simulated I/O failure" >&2; exit 1 ;;
+    first) if [ ! -f "\$D/ln-failed-once" ]; then : > "\$D/ln-failed-once"; echo "ln: simulated I/O failure" >&2; exit 1; fi ;;
+  esac
+fi
+exec /bin/ln "\$@"
+SH
+  chmod +x "$dir/fakebin/ln"
+}
+
+test_omp_bun_adoption_never_deletes_the_last_copy_of_the_old_record() {
+  local mode dir id record out rc claims
+  for mode in first always; do
+    prepare_bun_adoption "install-failure-$mode"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    cp "$record" "$dir/record.original"
+    arm_record_link_failure "$dir" "$id" "$mode"
+    rc=0
+    out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+    [ "$rc" -ne 0 ] || fail "an install that fails must not report adoption ($mode): $out"
+    assert_contains "$out" 'an I/O failure' "an install failure with no competing writer is reported as an I/O failure ($mode)"
+    assert_not_contains "$out" 'another writer published' "a failed link is not blamed on another writer when none published ($mode)"
+    claims=("$dir"/home/state/.*omp-session.claim.*)
+    case "$mode" in
+      first)
+        # The install failed, the restoration worked: the original record is back, byte for byte, and nothing is left behind.
+        cmp -s "$dir/record.original" "$record" || fail "the failed install must restore the original record byte for byte"
+        [ ! -e "${claims[0]}" ] || fail "a restored record leaves no claim behind"
+        assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a restored record leaves no staged or claimed file" ;;
+      always)
+        # Both the install and the restoration failed: the claim is the last copy and must survive, named.
+        [ ! -e "$record" ] || fail "no record can exist when every link to the record path failed"
+        [ -f "${claims[0]}" ] || fail "the last surviving copy of the old record was deleted"
+        [ "${#claims[@]}" -eq 1 ] || fail "exactly one claim must survive, got ${#claims[@]}"
+        cmp -s "$dir/record.original" "${claims[0]}" || fail "the surviving claim must hold the original record byte for byte"
+        assert_contains "$out" "${claims[0]}" "the operator is told where the surviving copy is" ;;
+    esac
+    bun_stop_all
+  done
+  pass "omp bun adoption: a failed install restores the old record, and a failed restoration keeps and names the last copy instead of deleting it"
 }
 
 test_omp_bun_adoption_binds_the_adopted_incarnation() {
@@ -2403,18 +2477,22 @@ test_omp_bun_relaunch_follows_the_adoption_proof() {
   out=$(run_continuation_control "$dir" "$id" adopt) || fail "the installed Bun runtime must adopt: $out"
   rc=0
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" relaunch --note "resume the restored worker") || rc=$?
-  assert_not_contains "$out" 'cannot positively attribute' "after adoption the relaunch is attributed and goes on"
-  assert_contains "$(cat "$dir/fake/herdr-log")" 'send-' "after adoption the relaunch proceeds to stop the proven agent"
+  expect_code 0 "$rc" "the relaunch of an adopted Bun worker must complete: $out"
+  assert_contains "$out" "relaunched $id" "the relaunch reports the replacement"
+  assert_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the relaunch stops the proven agent first"
+  [ -s "$dir/fake/launched-command" ] || fail "the replacement agent was never launched on the worktree (the fake pane recorded no launch command)"
   bun_stop_all
-  pass "omp bun adoption: the supported relaunch refuses an unadopted Bun worker and proceeds to stop the proven agent once adopted"
+  pass "omp bun adoption: the supported relaunch refuses an unadopted Bun worker and, once adopted, stops the proven agent and launches its replacement"
 }
 
 # P4(b2) and P4(b3): the shell is back in the foreground and the Bun agent is only its descendant.
 test_omp_bun_descendant_keeps_the_pane_occupied_for_relaunch() {
   local shape dir id out rc
+  local -a relaunch_args
   for shape in descendant-live descendant-unreadable agent-free; do
     prepare_bun_adoption "shell-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    relaunch_args=()
     : > "$dir/fake/recovery-shell-foreground"
     : > "$dir/fake/recovery-registration-missing"
     case "$shape" in
@@ -2427,14 +2505,19 @@ test_omp_bun_descendant_keeps_the_pane_occupied_for_relaunch() {
         printf 2000000000 > "$dir/fake/descendant-pid"; printf /x/bun > "$dir/fake/descendant-comm"
         printf 2000000000 > "$dir/fake/holder-pid"; printf /x/bun > "$dir/fake/holder-comm"; printf '/x/bun /x/cli.ts' > "$dir/fake/holder-args" ;;
       agent-free)
+        # No agent anywhere: the pane holds only its shell. The replacement is the generic fake pane's
+        # (a claude), so this control names that harness; the point is that the gate lets a launch through.
         bun_stop_all
-        rm -f "$dir/fake/herdr-agent-live" ;;
+        rm -f "$dir/fake/herdr-agent-live" "$dir/fake/recovery-case-id" "$dir/fake/recovery-shell-foreground"
+        relaunch_args=(--harness claude) ;;
     esac
     rc=0
-    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" relaunch --note "resume the restored worker") || rc=$?
+    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" relaunch ${relaunch_args[@]+"${relaunch_args[@]}"} --note "resume the restored worker") || rc=$?
     case "$shape" in
       agent-free)
-        assert_not_contains "$out" 'cannot positively attribute' "a genuinely agent-free shell lets the relaunch go on" ;;
+        expect_code 0 "$rc" "a genuinely agent-free shell must let the relaunch complete: $out"
+        assert_contains "$out" "relaunched $id" "the agent-free relaunch reports the replacement"
+        [ -s "$dir/fake/launched-command" ] || fail "the agent-free relaunch never launched a replacement on the worktree" ;;
       *)
         [ "$rc" -ne 0 ] || fail "relaunch over a live Bun descendant of the shell must refuse ($shape): $out"
         assert_contains "$out" 'cannot positively attribute its live Herdr agent to this task' "a Bun descendant keeps the pane occupied ($shape)"
@@ -2457,6 +2540,7 @@ test_omp_adoption_bun_runtime() {
   test_omp_adoption_native_omp_first_on_path_keeps_a_live_bun_writer
   test_omp_bun_adoption_does_not_overwrite_a_late_writer
   test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install
+  test_omp_bun_adoption_never_deletes_the_last_copy_of_the_old_record
   test_omp_bun_adoption_binds_the_adopted_incarnation
   test_omp_bun_adoption_needs_positive_live_session_evidence
   test_omp_bun_relaunch_follows_the_adoption_proof

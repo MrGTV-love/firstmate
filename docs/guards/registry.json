@@ -774,7 +774,7 @@
         },
         {
           "file": "bin/fm-control.sh",
-          "match": "|| die \"adopt refused: another writer published the session record while adoption claimed it; that record was not overwritten\""
+          "match": "die \"adopt refused: another writer published the session record while adoption claimed it; that record was not overwritten\""
         },
         {
           "file": "bin/fm-omp-identity.py",

@@ -228,7 +228,7 @@ assert_tree() { # <expected-interactive-exit> <expected-writer-exit> <pid> <mess
   [ "$rc" -eq "$2" ] || fail "$4: expected writer exit $2, got $rc"
 }
 test_identity_comes_from_the_process_tree() {
-  local t="$TMP/trees" name script_pkg runtime_pkg
+  local t="$TMP/trees" name script_pkg runtime_pkg old_pid
   mkdir -p "$t"
   runtime_pkg=runtime/node_modules/@oven/bun-darwin-aarch64
   script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent
@@ -249,33 +249,53 @@ test_identity_comes_from_the_process_tree() {
   tree_launch "$TREE" --no-title
   FM_OMP_INSTALLED_ROOT="$t/no-such-root" assert_tree 2 0 "$SPAWNED" "no installed tree: unresolved, never interactive"
   FM_OMP_INSTALLED_ROOT=relative/root assert_tree 2 0 "$SPAWNED" "a relative installed root is no identity"
+  # a trusted root that is itself a link must not re-anchor the identity on whatever it points at
+  build_tree "$t/real-root"
+  ln -s "$t/real-root" "$t/root-link"
+  tree_launch "$t/real-root" --no-title
+  FM_OMP_INSTALLED_ROOT="$t/root-link" assert_tree 2 0 "$SPAWNED" "a redirected installed root is no identity, whatever complete tree it points at"
+  FM_OMP_INSTALLED_ROOT="$t/real-root" assert_tree 0 0 "$SPAWNED" "the same tree named directly is the installed identity (the legitimate pair)"
   build_tree "$t/linked"; build_tree "$t/away"
   rm "$t/linked/$script_pkg/src/cli.ts"
   ln -s "$t/away/$script_pkg/src/cli.ts" "$t/linked/$script_pkg/src/cli.ts"
   tree_launch "$t/linked" --no-title
   FM_OMP_INSTALLED_ROOT="$t/linked" assert_tree 2 0 "$SPAWNED" "an installed script that links out of its root is no identity"
 
+  # What the files around a process say NOW refuses adoption but is never proof the process is not an omp
+  # session writer: a running Bun keeps what it loaded after those files change.
   build_tree "$t/wrong-script-package"
   printf '{"name":"some-other-package"}\n' > "$t/wrong-script-package/$script_pkg/package.json"
   tree_launch "$t/wrong-script-package" --no-title
-  assert_tree 1 1 "$SPAWNED" "a wrong script package name is another program"
+  assert_tree 1 0 "$SPAWNED" "a wrong script package name refuses adoption and may still own a record"
 
   build_tree "$t/wrong-runtime-package"
   printf '{"name":"not-bun"}\n' > "$t/wrong-runtime-package/$runtime_pkg/package.json"
   tree_launch "$t/wrong-runtime-package" --no-title
-  assert_tree 1 1 "$SPAWNED" "a wrong runtime package name is another program"
+  assert_tree 1 0 "$SPAWNED" "a wrong runtime package name refuses adoption and may still own a record"
 
   for name in cli-commands.ts main.ts; do
     build_tree "$t/missing-$name"
     rm "$t/missing-$name/$script_pkg/src/$name"
     tree_launch "$t/missing-$name" --no-title
-    assert_tree 1 1 "$SPAWNED" "a missing $name marker is another program"
+    assert_tree 1 0 "$SPAWNED" "a missing $name marker refuses adoption and may still own a record"
   done
 
   build_tree "$t/no-package"
   rm "$t/no-package/$script_pkg/package.json"
   tree_launch "$t/no-package" --no-title
-  assert_tree 1 1 "$SPAWNED" "a cli.ts outside any omp package is another program"
+  assert_tree 1 0 "$SPAWNED" "a cli.ts outside any omp package refuses adoption and may still own a record"
+
+  # D1: a live writer from a previously complete tree, whose files change only after it started
+  build_tree "$t/old"
+  tree_launch "$t/old" --no-title; old_pid=$SPAWNED
+  FM_OMP_INSTALLED_ROOT="$t/old" assert_tree 0 0 "$old_pid" "the control: the old tree's process, while its tree is complete, is the installed agent"
+  assert_tree 1 0 "$old_pid" "the control: the old tree's process is not the installed identity, and may own a record"
+  rm "$t/old/$script_pkg/src/cli-commands.ts"
+  assert_tree 1 0 "$old_pid" "a live writer whose tree lost cli-commands.ts after it started may still own a record"
+  printf '{"name":"rewritten"}\n' > "$t/old/$script_pkg/package.json"
+  assert_tree 1 0 "$old_pid" "a live writer whose package.json was rewritten after it started may still own a record"
+  rm "$t/old/$runtime_pkg/package.json"
+  assert_tree 1 0 "$old_pid" "a live writer whose runtime package.json was removed after it started may still own a record"
 
   build_tree "$t/malformed"
   printf 'not json' > "$t/malformed/$script_pkg/package.json"
@@ -302,7 +322,7 @@ test_identity_comes_from_the_process_tree() {
 
   mkdir -p "$t/loose/bin"; cp "$BUN" "$t/loose/bin/bun"
   spawn tty "$t/loose/bin/bun" "$t/loose/bin/bun" "$t/good/$script_pkg/src/cli.ts" --no-title
-  assert_tree 1 1 "$SPAWNED" "the genuine script on a bun outside a runtime package is another program"
+  assert_tree 1 0 "$SPAWNED" "the genuine script on a bun outside a runtime package refuses adoption and may still own a record"
   pass "identity: the process's own tree decides; a wrong package or a missing marker is foreign, and unreadable evidence is unresolved"
 }
 
@@ -463,7 +483,7 @@ test_fail_closed_runs_recover_when_the_evidence_returns() {
 
 # --- 6. record ownership and the library predicates -----------------------------
 test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
-  local pid
+  local pid dead
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
   ps() { # a fake process table over scratch pids only, answering through the kernel reader
@@ -484,6 +504,14 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed() {
   ps() { case "$*" in '-p 2000000000 -o comm=') echo /x/bun ;; '-p 2000000000 -o args=') echo '/x/bun /x/cli.ts' ;; *) return 1 ;; esac; }
   fm_launch_proof_pid_is_omp 2000000000 && fail "unreadable identity evidence is not an adoption target"
   fm_launch_proof_pid_may_own_record 2000000000 || fail "unreadable identity evidence is not proof that no writer owns the record"
+  # D2: a live writer whose process-table entry cannot be read is not an absent writer
+  launch tty --config /x.yml --no-title 'brief'; pid=$SPAWNED
+  ps() { return 1; }
+  fm_launch_proof_pid_may_own_record "$pid" || fail "a live Bun omp whose table entry cannot be read may still own the record"
+  (exit 0) & dead=$!
+  wait "$dead"
+  fm_launch_proof_pid_may_own_record "$dead" && fail "a proven-dead pid is no writer even when the table cannot be read"
+  fm_launch_proof_pid_may_own_record 2000000001 && fail "a pid the kernel reports gone is no writer"
   # genuinely unrelated programs and dead pids may be replaced
   spawn tty /bin/sh /bin/sh -c 'sleep 600'
   ps() { case "$*" in '-p '*' -o comm=') python3 -I "$PROCINFO" comm "$2" ;; '-p '*' -o args=') python3 -I "$PROCINFO" args "$2" ;; esac; }
@@ -564,7 +592,7 @@ PY
 
 # --- 7. the Herdr descendant walk ---------------------------------------------------
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free() {
-  local dir="$TMP/walk" bunpid foreignpid out
+  local dir="$TMP/walk" bunpid foreignpid out oldbun oldscript oldpid
   mkdir -p "$dir"
   # shellcheck source=bin/backends/herdr.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/backends/herdr.sh"
@@ -592,48 +620,106 @@ SH
   out=$(native_first walk "$bunpid" "$BUN" "$BUN $SCRIPT --no-title"); [ "$out" = other ] || fail "a live Bun omp descendant keeps the pane occupied with a native omp first on PATH, got $out"
   out=$(native_first walk "$foreignpid" "$dir/fb/bun" "$dir/fb/bun /elsewhere/cli.ts"); [ "$out" = shell ] || fail "an unrelated Bun job keeps today's outcome with a native omp first on PATH, got $out"
   out=$(native_first walk '' bun ''); [ "$out" = shell ] || fail "a pane with no descendants stays agent-free with a native omp first on PATH, got $out"
+  # D1: a live Bun omp from a previously complete tree, whose files change only after it started
+  build_tree "$dir/old"
+  oldbun="$dir/old/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
+  oldscript="$dir/old/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
+  spawn tty "$oldbun" "$oldbun" "$oldscript" --no-title; oldpid=$SPAWNED
+  out=$(walk "$oldpid" "$oldbun" "$oldbun $oldscript --no-title"); [ "$out" = other ] || fail "the old tree's live omp keeps the pane occupied while its tree is complete, got $out"
+  rm "$dir/old/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli-commands.ts"
+  out=$(walk "$oldpid" "$oldbun" "$oldbun $oldscript --no-title"); [ "$out" = other ] || fail "a live omp whose tree lost cli-commands.ts after it started must still keep the pane occupied, got $out"
   pass "walk: a live or unreadable Bun descendant keeps the pane occupied; an unrelated Bun job and an empty shell keep today's outcome"
 }
 
+write_dispatch_tables() { # <tree>: source files shaped like the installed CLI's, generated from the role port's own tables
+  local src=$1/src/node_modules/@oh-my-pi/pi-coding-agent/src
+  mkdir -p "$src/cli"
+  python3 -I - "$IDENT" "$src" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("oi", sys.argv[1])
+oi = importlib.util.module_from_spec(spec); spec.loader.exec_module(oi)
+src = sys.argv[2]
+open(src + "/cli-commands.ts", "w").write("".join('\t\tname: "%s",\n' % n for n in sorted(oi.SUBCOMMANDS)))
+strings = "".join('\t"%s": setter,\n' % n for n in sorted(oi.STRING_VALUE_FLAGS))
+valueless = "".join('\t"%s",\n' % n for n in sorted(oi.VALUELESS_FLAGS))
+open(src + "/cli/flag-tables.ts", "w").write("export const STRING_SETTERS = {\n" + strings + "};\nexport const OPTIONAL_FLAGS = new Set([]);\nexport const VALUELESS_FLAGS = new Set([\n" + valueless + "]);\n")
+PY
+}
+make_guard_copy() { # <dest>: the live guard with its override refusal block cut, beside the real helpers
+  mkdir -p "$1/tests"
+  cp -R "$ROOT/bin" "$1/bin"
+  cp "$ROOT/tests/lib.sh" "$1/tests/"
+  sed '/^# BEGIN override-refusal$/,/^# END override-refusal$/d' "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" > "$1/tests/fm-omp-identity-live-e2e.test.sh"
+  grep -q 'Unset it' "$1/tests/fm-omp-identity-live-e2e.test.sh" && fail "the scratch guard copy must have its override refusal cut"
+  return 0
+}
 test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable() {
-  local base out mutant
+  local base out mutant copy notables
   base=$(fm_test_base_path_sans "$PATH" omp)
-  guard() { # <PATH>
-    env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 FM_OMP_IDENTITY_LIVE_STANDIN=1 PATH="$1" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
+  write_dispatch_tables "$TREE"
+  # The real guard: no ambient variable lets it certify a stand-in.
+  guard() { # <PATH> <env assignments...>
+    local path=$1
+    shift
+    env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 "$@" PATH="$path" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
   }
-  out=$(guard "$NATIVE_BIN:$TREE:$base") || fail "a native omp first must not stop the guard from starting the later Bun launcher: $out"
-  assert_contains "$out" "$TREE/omp" "the live guard names the Bun launcher that is not first"
-  assert_contains "$out" "checked " "the guard exercised the Bun rule on the later launcher"
-  out=$(guard "$TREE:$NATIVE_BIN:$base") || fail "the Bun launcher first must run the live guard to its end: $out"
-  assert_contains "$out" "checked " "the guard exercised the Bun rule on the first launcher"
-  out=$(FM_OMP_IDENTITY_LIVE_LAUNCHER="$TREE/omp" guard "$NATIVE_BIN:$base") || fail "the named launcher must run the live guard to its end: $out"
-  assert_contains "$out" "checked " "the guard exercised the Bun rule on the named launcher"
-  if out=$(guard "$NATIVE_BIN:$base"); then
+  if out=$(guard "$TREE:$NATIVE_BIN:$base"); then
+    fail "the live guard must refuse to run under an installed-root override: $out"
+  fi
+  assert_contains "$out" "FM_OMP_INSTALLED_ROOT" "the refusal names the override"
+  assert_not_contains "$out" "checked " "a refused run claims no check"
+  if out=$(guard "$TREE:$NATIVE_BIN:$base" FM_OMP_IDENTITY_LIVE_STANDIN=1); then
+    fail "an ambient stand-in marker must not lift the live guard's override refusal: $out"
+  fi
+  assert_contains "$out" "FM_OMP_INSTALLED_ROOT" "the refusal still names the override with a stand-in marker set"
+  assert_not_contains "$out" "checked " "a run under a stand-in marker claims no check"
+  out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=0 PATH="$TREE:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1) || fail "an explicit opt-out must end cleanly: $out"
+  assert_contains "$out" "skip: live: disabled by FM_OMP_IDENTITY_LIVE=0" "an opt-out is reported as an opt-out"
+  assert_not_contains "$out" "checked " "an opt-out claims no check"
+  assert_not_contains "$out" "ok - " "an opt-out is never a pass"
+  if out=$(env -u FM_LIVE -u FM_OMP_INSTALLED_ROOT FM_OMP_IDENTITY_LIVE=1 PATH="$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
     fail "a native omp alone cannot exercise the Bun rule and must fail, never skip or pass: $out"
   fi
   assert_contains "$out" "FM_OMP_IDENTITY_LIVE_LAUNCHER" "the failure names the variable that supplies the Bun launcher"
   assert_not_contains "$out" "checked " "a native omp alone checks nothing and claims nothing"
-  # An installed-root override without the stand-in marker makes the guard compare a stand-in with itself.
-  if out=$(env -u FM_LIVE -u FM_OMP_IDENTITY_LIVE_STANDIN FM_OMP_IDENTITY_LIVE=1 PATH="$TREE:$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
-    fail "the live guard must refuse to run under an installed-root override: $out"
-  fi
-  assert_contains "$out" "FM_OMP_INSTALLED_ROOT" "the failure names the override"
+
+  # The guard's own logic, on a stand-in tree, through a scratch copy that cannot be mistaken for the real guard.
+  copy="$TMP/guard-copy"
+  make_guard_copy "$copy"
+  copy_guard() { # <PATH> <env assignments...>
+    local path=$1
+    shift
+    env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 "$@" PATH="$path" bash "$copy/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
+  }
+  out=$(copy_guard "$NATIVE_BIN:$TREE:$base") || fail "a native omp first must not stop the guard from starting the later Bun launcher: $out"
+  assert_contains "$out" "$TREE/omp" "the live guard names the Bun launcher that is not first"
+  assert_contains "$out" "checked " "the guard exercised the Bun rule on the later launcher"
+  out=$(copy_guard "$TREE:$NATIVE_BIN:$base") || fail "the Bun launcher first must run the live guard to its end: $out"
+  assert_contains "$out" "checked " "the guard exercised the Bun rule on the first launcher"
+  out=$(copy_guard "$NATIVE_BIN:$base" FM_OMP_IDENTITY_LIVE_LAUNCHER="$TREE/omp") || fail "the named launcher must run the live guard to its end: $out"
+  assert_contains "$out" "checked " "the guard exercised the Bun rule on the named launcher"
   # The stand-in on a different installed identity must not be recognized, or the binding is vacuous.
-  if out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 FM_OMP_IDENTITY_LIVE_STANDIN=1 FM_OMP_INSTALLED_ROOT="$TMP/no-such-install" PATH="$TREE:$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+  if out=$(copy_guard "$TREE:$NATIVE_BIN:$base" FM_OMP_INSTALLED_ROOT="$TMP/no-such-install"); then
     fail "a stand-in that is not the installed identity must fail the live guard: $out"
   fi
   assert_contains "$out" "OMP IDENTITY DRIFT" "the guard reports the unrecognized process by name"
+  # Dispatch tables that cannot be read leave the role port unchecked: that fails, it does not pass with fewer checks.
+  notables="$TMP/no-tables-tree"
+  build_tree "$notables"
+  if out=$(copy_guard "$notables:$NATIVE_BIN:$base" FM_OMP_INSTALLED_ROOT="$notables"); then
+    fail "a missing dispatch source must fail the live guard, not pass with fewer checks: $out"
+  fi
+  assert_contains "$out" "dispatch tables cannot be read" "the failure names the missing dispatch evidence"
+  assert_not_contains "$out" "checked " "an unchecked role port claims no completed check"
   # A guard that cannot fail proves nothing: a rule that rejects the installed shape must fail it.
   mutant="$TMP/mutant-root"
-  mkdir -p "$mutant/tests" "$mutant/bin"
-  cp "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" "$ROOT/tests/lib.sh" "$mutant/tests/"
-  cp "$PROCINFO" "$mutant/bin/"
+  make_guard_copy "$mutant"
   sed 's/^SCRIPT_PACKAGE = .*/SCRIPT_PACKAGE = "not-the-omp-package"/' "$ROOT/bin/fm-omp-identity.py" > "$mutant/bin/fm-omp-identity.py"
-  if out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 FM_OMP_IDENTITY_LIVE_STANDIN=1 PATH="$TREE:$NATIVE_BIN:$base" bash "$mutant/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+  if out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 PATH="$TREE:$NATIVE_BIN:$base" bash "$mutant/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
     fail "a rule that rejects the installed shape must fail the live guard: $out"
   fi
   assert_contains "$out" "OMP IDENTITY DRIFT" "the guard reports the drift by name"
-  pass "live guard: it starts a Bun launcher wherever PATH or the named file holds one, fails when the rule rejects it, refuses an override, and fails naming the launcher variable with a native omp alone"
+  pass "live guard: no ambient variable certifies a stand-in, an opt-out is an opt-out, a missing launcher or dispatch source fails, and its logic holds on a scratch copy"
 }
 
 test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {

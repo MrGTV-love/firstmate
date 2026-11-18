@@ -29,12 +29,15 @@
 # FM_OMP_IDENTITY_LIVE_LAUNCHER, which only chooses what to start and never decides
 # identity, or a text launcher from later on PATH, and it names any Bun launcher that is
 # not first. With no text launcher it FAILS, naming FM_OMP_IDENTITY_LIVE_LAUNCHER (and
-# FM_OMP_IDENTITY_LIVE=0 for an explicit opt-out), because a guard that could pass
-# having checked nothing proves nothing. It also fails when FM_OMP_INSTALLED_ROOT is set,
-# because an override makes it compare a stand-in with itself and it could never see
-# drift in the real install; tests/fm-omp-identity.test.sh alone sets
-# FM_OMP_IDENTITY_LIVE_STANDIN=1 to run this script on a stand-in tree. An absent omp is
-# reported explicitly (fm_live_gate), and a run that checked nothing fails.
+# FM_OMP_IDENTITY_LIVE=0 for an explicit opt-out, which is reported as an opt-out and
+# never as a pass), because a guard that could pass having checked nothing proves nothing.
+# It also fails when FM_OMP_INSTALLED_ROOT is set, because an override makes it compare a
+# stand-in with itself and it could never see drift in the real install, and no ambient
+# variable lifts that refusal: tests/fm-omp-identity.test.sh exercises this script's logic
+# on a stand-in tree only through a scratch COPY from which the marked refusal block is
+# cut. It fails when the installed CLI's dispatch tables cannot be read next to the entry
+# script, because the role port is then not verified. An absent omp is reported explicitly
+# (fm_live_gate), and a run that checked nothing fails.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -63,9 +66,11 @@ if [ "$(uname -s)" != Darwin ]; then
   fail "the omp identity rule reads libproc facts and runs on macOS; this host is $(uname -s), so nothing was checked"
 fi
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
-if [ -n "${FM_OMP_INSTALLED_ROOT:-}" ] && [ "${FM_OMP_IDENTITY_LIVE_STANDIN:-}" != 1 ]; then
+# BEGIN override-refusal
+if [ -n "${FM_OMP_INSTALLED_ROOT:-}" ]; then
   fail "FM_OMP_INSTALLED_ROOT is set; this guard checks the real installed identity and cannot detect drift against an override. Unset it"
 fi
+# END override-refusal
 OMP=$(command -v omp)
 is_text_launcher() { [ -f "$1" ] && [ "$(head -c 2 "$1" 2>/dev/null)" = '#!' ]; }
 START=
@@ -186,7 +191,7 @@ PY
   CHECKED=$((CHECKED + 1))
   pass "the installed CLI's subcommand and flag tables match the role rule's copy"
 else
-  note "the installed omp ships no readable CLI source next to its entry script; the dispatch-table comparison was not run"
+  drift "the installed CLI's dispatch tables cannot be read next to its entry script ($SOURCE_DIR/cli-commands.ts and $SOURCE_DIR/cli/flag-tables.ts), so the role port is not verified and this guard cannot vouch for it"
 fi
 # The liveness route: with a shell in the foreground and the agent a descendant, the pane is never agent-free.
 # shellcheck source=bin/fm-backend.sh

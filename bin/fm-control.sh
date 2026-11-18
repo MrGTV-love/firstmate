@@ -82,8 +82,11 @@
 # not own the home lock is refused, as for authorize-continuation and
 # reassociate. It refuses, naming the missing proof, unless all of these hold:
 #   (1) window and herdr_pane_id agree, and the worktree and pane exist;
-#   (2) the launch-proof owner resolves one foreground PID whose process name
-#       or argv[0] is omp;
+#   (2) the launch-proof owner resolves one foreground PID that is omp by its
+#       process name or argv[0], or is the installed omp's Bun runtime run as
+#       its interactive agent (bin/fm-omp-identity.py: actual executable and
+#       entry script equal to the one installed identity, interactive role,
+#       terminal input, and the task session file held open for writing);
 #   (3) that PID's kernel cwd is inside this task's recorded worktree and is
 #       not inside another task's worktree that is as deep or deeper;
 #   (4) no other local task claims the pane;
@@ -100,8 +103,11 @@
 # to maintain and is refused unchanged too. A recorded PID
 # that is gone, or that a process other than omp has since reused, does not
 # block repair. The repair writes version=1, the unchanged spawn_gen, the
-# live pid, task_session_file, and current_session_file, publishing by rename
-# only while the record still holds the bytes the proofs were gathered from.
+# live pid, task_session_file, and current_session_file. Publication claims the
+# record by an atomic rename, confirms the claimed bytes are the compared ones,
+# and links the new record in only where nothing exists, so a writer that
+# published in the gap keeps its record. A failed install restores the claim, and
+# a claim that cannot be restored is kept and named, never deleted.
 # It never unlocks a session, touches project files, starts or stops an agent,
 # or sends lifecycle input.
 # This widens lifecycle authorization: a repaired record can authorize a
@@ -403,9 +409,14 @@ control_cleanup() {
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
   if [ -n "$CONTROL_RECORD_CLAIM" ]; then
-    # An interrupted adopt gives the claimed record back unless a writer already replaced it.
-    [ -e "$CONTROL_RECORD_PATH" ] || ln -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" 2>/dev/null || true
-    rm -f -- "$CONTROL_RECORD_CLAIM"
+    # An interrupted or failed adopt gives the claimed record back unless a writer already
+    # replaced it. The claim is the last copy of the old record, so it is removed only once
+    # a record exists at the record path; when the restore itself fails it is kept.
+    if [ -e "$CONTROL_RECORD_PATH" ] || ln -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" 2>/dev/null; then
+      rm -f -- "$CONTROL_RECORD_CLAIM"
+    else
+      echo "adopt could not restore the original session record at $CONTROL_RECORD_PATH; its only surviving copy is kept at $CONTROL_RECORD_CLAIM - restore it with: ln -- '$CONTROL_RECORD_CLAIM' '$CONTROL_RECORD_PATH'" >&2
+    fi
   fi
   [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
   if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
@@ -1501,8 +1512,12 @@ if [ "$VERB" = adopt ]; then
   if [ "$adoption_prior" != "$(cat "$CONTROL_RECORD_CLAIM" 2>/dev/null)" ]; then
     die "adopt needs stable foreground, session, and generation proof; retry after they settle"
   fi
-  ln -- "$CONTROL_META_TMP" "$CONTROL_RECORD_PATH" 2>/dev/null \
-    || die "adopt refused: another writer published the session record while adoption claimed it; that record was not overwritten"
+  if ! ln -- "$CONTROL_META_TMP" "$CONTROL_RECORD_PATH" 2>/dev/null; then
+    if [ -e "$CONTROL_RECORD_PATH" ]; then
+      die "adopt refused: another writer published the session record while adoption claimed it; that record was not overwritten"
+    fi
+    die "adopt could not install the new session record although no other writer published one (an I/O failure); the original record is being restored, and if that also fails its only copy is kept at $CONTROL_RECORD_CLAIM"
+  fi
   rm -f -- "$CONTROL_RECORD_CLAIM" "$CONTROL_META_TMP"
   CONTROL_RECORD_CLAIM=
   CONTROL_META_TMP=

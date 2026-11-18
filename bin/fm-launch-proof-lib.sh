@@ -85,16 +85,38 @@ fm_launch_proof_pid_is_omp() { # <pid>
   [ -n "$FM_LAUNCH_PROOF_OMP_START" ]
 }
 
+# Prints gone when the kernel says no process has this PID, present when one exists
+# (including one this user may not signal), unknown when that cannot be told.
+fm_launch_proof_pid_presence() { # <pid>
+  local rc=0
+  python3 -I -c 'import os,sys
+try:
+    os.kill(int(sys.argv[1]), 0)
+except ProcessLookupError:
+    sys.exit(3)
+except PermissionError:
+    sys.exit(0)
+except Exception:
+    sys.exit(4)' "$1" >/dev/null 2>&1 || rc=$?
+  case "$rc" in 0) printf present ;; 3) printf gone ;; *) printf unknown ;; esac
+}
+
 # Succeeds when a recorded session-record PID may still be a writer of that
 # record: a live omp by name, or a live bun-shaped process that is the installed
-# omp in ANY role or whose identity cannot be settled. Uncertainty is not proof that
-# no writer owns the record, so this fails open toward "may own", the opposite
-# direction of fm_launch_proof_pid_is_omp. A dead or positively unrelated process
-# fails it. Prints nothing.
+# omp in ANY role or whose identity cannot be settled, or any process that exists but
+# whose process-table entry cannot be read. Uncertainty is not proof that no writer
+# owns the record, so this fails open toward "may own", the opposite direction of
+# fm_launch_proof_pid_is_omp. Only a PID the kernel reports gone or a positively
+# unrelated process fails it. Prints nothing.
 fm_launch_proof_pid_may_own_record() { # <pid>
   local pid=$1 comm args name
-  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
-    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || return 1
+  if ! comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
+    || ! args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null); then
+    # An unreadable table entry is not an absent process: only a PID the kernel
+    # reports gone proves no writer, and an existing or unclassifiable one may own.
+    [ "$(fm_launch_proof_pid_presence "$pid")" != gone ]
+    return
+  fi
   for name in "$comm" "${args%% *}"; do
     [ "${name##*/}" != omp ] || return 0
   done

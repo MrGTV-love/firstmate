@@ -29,8 +29,12 @@ directory named src whose parent holds a regular package.json named
 @oh-my-pi/pi-coding-agent and the regular files src/cli-commands.ts and src/main.ts);
 its role is the interactive agent; and its standard input is a terminal. A complete
 omp-shaped tree at any other path is refused for `interactive` but is never "positively
-another program" for `writer`: it may own a session record. A readable tree that fails a
-structural check is positively another program. Anything that cannot be read, or an
+another program" for `writer`: it may own a session record. Only the process's own
+executable path (not a bun in a bin directory) and the script path in its argument vector
+(no script, or not a cli.ts in a src directory) can prove it positively another program;
+what the package files around them say now can only refuse adoption, because an
+already-running Bun keeps what it loaded after those files change. Anything that cannot be
+read, or an
 executable or script path that no longer exists, or an installed identity that cannot
 be derived (or that resolves outside its own root), is unresolved, never interactive.
 `facts` stores what it read, including the installed pair it compared with, in the
@@ -416,9 +420,11 @@ def installed_identity():
 
     The root is the override FM_OMP_INSTALLED_ROOT when set, else the installed omp's root
     under the account's home directory (the passwd entry, never $HOME, so the environment
-    holds no second override). None when it cannot be derived: no home, a missing root or
-    file, or a runtime or script whose real path leaves the real root (a link out of the
-    tree is not the installed omp).
+    holds no second override). The root is anchored by resolving its PARENT and keeping its
+    own final name: a root that is itself a link is not the trusted root, because following
+    it would let the link redefine what "inside the root" means. None when it cannot be
+    derived: no home, a missing or linked root, a missing runtime or script, or a runtime or
+    script whose real path leaves the anchored root.
     """
     root = os.environ.get(INSTALLED_ROOT_VARIABLE)
     if not root:
@@ -429,12 +435,21 @@ def installed_identity():
         root = os.path.join(home, INSTALLED_ROOT)
     if not os.path.isabs(root):
         return None
-    root_real = _existing_real(root)
-    runtime = _existing_real(os.path.join(root, INSTALLED_RUNTIME))
-    script = _existing_real(os.path.join(root, INSTALLED_SCRIPT))
-    if not (root_real and runtime and script):
+    root = os.path.normpath(root)
+    parent = _existing_real(os.path.dirname(root))
+    if not parent or not os.path.basename(root):
         return None
-    if any(os.path.commonpath([root_real, path]) != root_real for path in (runtime, script)):
+    anchored = os.path.join(parent, os.path.basename(root))
+    try:
+        if not stat.S_ISDIR(os.lstat(anchored).st_mode):
+            return None
+    except OSError:
+        return None
+    runtime = _existing_real(os.path.join(anchored, INSTALLED_RUNTIME))
+    script = _existing_real(os.path.join(anchored, INSTALLED_SCRIPT))
+    if not (runtime and script):
+        return None
+    if any(os.path.commonpath([anchored, path]) != anchored for path in (runtime, script)):
         return None
     return {"runtime": runtime, "script": script}
 
@@ -491,7 +506,15 @@ def _settled(value, what):
 
 
 def decide(facts):
-    """Raise Refused or Unresolved unless facts are the installed omp's interactive agent."""
+    """Raise Refused or Unresolved unless facts are the installed omp's interactive agent.
+
+    Foreign (positively another program) is raised only from facts that a running process
+    cannot have changed: its own executable path and the script path in its argument vector.
+    What the files around them say NOW (package names, marker files, whether the script file
+    is still regular) is mutable: an already-running Bun keeps what it loaded after those
+    files change, so a failure there refuses adoption (Refused) but never proves the process
+    is not an omp session writer.
+    """
     exe, argv, evidence = facts.get("exe"), facts.get("argv"), facts.get("evidence")
     if not facts.get("start"):
         raise Unresolved("the process start identity cannot be read")
@@ -504,10 +527,6 @@ def decide(facts):
     exe_real = _settled(evidence.get("exe_real"), "the actual executable path")
     if os.path.basename(exe_real) != "bun" or os.path.basename(os.path.dirname(exe_real)) != "bin":
         raise Foreign("the executable is not a bun in a bin directory")
-    if not _settled(evidence.get("exe_regular_executable"), "the executable file"):
-        raise Foreign("the executable is not a regular executable file")
-    if not _settled(evidence.get("runtime_package"), "the runtime package").startswith(RUNTIME_PACKAGE_PREFIX):
-        raise Foreign("the executable is not in a Bun runtime package")
     if len(argv) < 2:
         raise Foreign("the runtime runs no script")
     if not os.path.isabs(argv[1]):
@@ -515,12 +534,16 @@ def decide(facts):
     script_real = _settled(evidence.get("script_real"), "the script path")
     if os.path.basename(script_real) != "cli.ts" or os.path.basename(os.path.dirname(script_real)) != "src":
         raise Foreign("the script is not a cli.ts in a src directory")
+    if not _settled(evidence.get("exe_regular_executable"), "the executable file"):
+        raise Refused("the executable is not a regular executable file now")
+    if not _settled(evidence.get("runtime_package"), "the runtime package").startswith(RUNTIME_PACKAGE_PREFIX):
+        raise Refused("the executable is not in a Bun runtime package now")
     if not _settled(evidence.get("script_regular"), "the script file"):
-        raise Foreign("the script is not a regular file")
+        raise Refused("the script is not a regular file now")
     if _settled(evidence.get("script_package"), "the script package") != SCRIPT_PACKAGE:
-        raise Foreign("the script is not in the omp package")
+        raise Refused("the script is not in the omp package now")
     if not _settled(evidence.get("script_markers"), "the omp package files"):
-        raise Foreign("the omp package lacks its command and main files")
+        raise Refused("the omp package lacks its command and main files now")
     installed = facts.get("installed")
     if not isinstance(installed, dict):
         raise Unresolved("the installed identity cannot be read")
