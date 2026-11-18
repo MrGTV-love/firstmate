@@ -1197,6 +1197,64 @@ test_successor_promotion_refuses_a_branch_another_task_records() {
   pass "successor: promoting a scout onto another task's recorded successor refuses and changes nothing, and other promotions write what a promotion with no record writes"
 }
 
+# A scout task in the case's project with no branch= line, whose endpoint the fake
+# backend serves agent-free, in a project that has since become slot-governed.
+make_relaunch_scout() {  # <case-dir> <scout-id>
+  local dir=$1 sid=$2
+  git -C "$dir/proj" worktree add -q -b "scout-$sid" "$dir/wt-scout"
+  printf 'window=fmses:fm-%s\nendpoint_task_id=%s\nworktree=%s\nproject=%s\nharness=claude\nkind=scout\ntasktmp=/tmp/fm-%s\nmodel=default\neffort=default\n' \
+    "$sid" "$sid" "$dir/wt-scout" "$dir/proj" "$sid" > "$dir/home/state/$sid.meta"
+  mkdir -p "$dir/home/data/$sid"
+  printf '# Task\n## Captain'"'"'s intent\nScout the project.\n\n## Firstmate spec\nReport what was found.\n' > "$dir/home/data/$sid/brief.md"
+  printf '%s\n' "fm-$sid" > "$dir/fake/windows"
+  printf '%s' "$dir/wt-scout" > "$dir/fake/cwd"
+  printf 'zsh' > "$dir/fake/command"
+  mkdir -p "$dir/proj/scripts/git-stability"
+  printf 'import json, sys\nprint(json.dumps({"state": "BLOCKED", "reason": "manifest_exists"}))\nsys.exit(2)\n' \
+    > "$dir/proj/scripts/git-stability/provision_existing_slot.py"
+}
+
+# R9-1: a scout spawned before its project was slot-governed records no branch. Once
+# the project is governed, its relaunch with --owned-path would take fm/<id>. While
+# another task records that ref as its successor, the relaunch refuses before the
+# branch reaches a slot preparation, the record or a write profile, and changes no
+# record, copy or ref. With no record naming the ref, the same relaunch goes on as it
+# always did.
+test_successor_relaunch_refuses_a_scout_branch_another_task_records() {
+  local id=suc-relaunch dir out rc refs_before base base_meta other other_meta
+  dir=$(new_successor_case relaunch-claimed "$id")
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --tip "$(tip_of "$dir" "fm/$id")" --note "successor before the scout relaunch") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  make_relaunch_scout "$dir" "$id-v2"
+  cp -p "$dir/home/state/$id-v2.meta" "$dir/scout.before"
+  fp "$dir/wt-scout" > "$dir/scout-copy.before"
+  refs_before=$(git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)')
+  : > "$FM_GUARD_EVENT_LOG"
+  rc=0; out=$(run_spawn "$dir" "$id-v2" --relaunch --harness claude --owned-path scripts) || rc=$?
+  expect_code 1 "$rc" "a scout relaunch onto another task's recorded successor must refuse"$'\n'"$out"
+  assert_contains "$out" "task $id records refs/heads/fm/$id-v2 as its successor branch" "the refusal must name the recording task and the ref"
+  cmp -s "$dir/scout.before" "$dir/home/state/$id-v2.meta" || fail "the refused relaunch changed the scout record"
+  fp "$dir/wt-scout" | cmp -s - "$dir/scout-copy.before" || fail "the refused relaunch changed the scout's copy"
+  [ "$(git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)')" = "$refs_before" ] || fail "the refused relaunch changed a branch or ref"
+  [ -n "$(jq -c --arg b "fm/$id-v2" 'select(.guard == "successor-branch-admission" and .rule == "spawn" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
+    || fail "the refused relaunch wrote no successor-branch-admission deny event"
+  dir=$(new_successor_case relaunch-none "$id")
+  make_relaunch_scout "$dir" "$id-v3"
+  rc=0; base=$(run_spawn "$dir" "$id-v3" --relaunch --harness claude --owned-path scripts) || rc=$?
+  base="rc=$rc"$'\n'$(printf '%s\n' "$base" | sed "s#$dir#CASE#g")
+  base_meta=$(sed "s#$dir#CASE#g" "$dir/home/state/$id-v3.meta")
+  dir=$(new_successor_case relaunch-other "$id")
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --tip "$(tip_of "$dir" "fm/$id")" --note "a successor no scout takes") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  make_relaunch_scout "$dir" "$id-v3"
+  rc=0; other=$(run_spawn "$dir" "$id-v3" --relaunch --harness claude --owned-path scripts) || rc=$?
+  other="rc=$rc"$'\n'$(printf '%s\n' "$other" | sed "s#$dir#CASE#g")
+  other_meta=$(sed "s#$dir#CASE#g" "$dir/home/state/$id-v3.meta")
+  assert_equals "$base" "$other" "a recorded successor the scout does not take must not change what its relaunch prints or returns"
+  assert_equals "$base_meta" "$other_meta" "a recorded successor the scout does not take must not change the record its relaunch leaves"
+  pass "successor: a governed scout relaunch onto another task's recorded successor refuses and changes nothing, and otherwise relaunches as before"
+}
+
 # F6 (d): the receipt says what the launch will do for a launch that no profile governs.
 test_successor_receipt_matches_what_the_launch_will_do() {
   local id=suc-receipt2 dir out rc
@@ -1235,6 +1293,7 @@ test_successor_refusals_write_no_file_under_the_default_event_log
 test_successor_event_log_failure_changes_neither_a_refusal_nor_a_record
 test_successor_fresh_spawn_refuses_a_branch_another_task_records
 test_successor_promotion_refuses_a_branch_another_task_records
+test_successor_relaunch_refuses_a_scout_branch_another_task_records
 test_successor_reads_the_note_file_only_after_admission
 test_successor_keeps_the_composer_dialog_file
 test_successor_note_cannot_add_a_ship_branch_line
