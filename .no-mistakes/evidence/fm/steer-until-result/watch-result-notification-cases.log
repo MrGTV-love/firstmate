@@ -1,0 +1,4 @@
+watcher fixture: owned child 66299 wait returned status 143
+watcher fixture output: $TMPDIR/fm-watch-open-loops-tests.nFIoBN/consumer-result-settled/watch.out
+watcher fixture output: $TMPDIR/fm-watch-open-loops-tests.nFIoBN/consumer-result-settled/watch.out.err
+ok - same-generation unavailability notifies before its separate age deadline and can notify again after recovery

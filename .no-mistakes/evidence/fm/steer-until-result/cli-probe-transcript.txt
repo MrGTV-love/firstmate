@@ -1,0 +1,44 @@
+=== S1 steer + ack-only; hidden before limit, back at limit
+row d5b7cc8a3fe003d1addbab16 limit 1800
+$ action steered --evidence 001.msg
+  exit=0
+  action: "d5b7cc8a3fe003d1addbab16"
+  kind: steered
+t+1799 row presented: False
+t+1800 row presented: True
+$ --present-overdue
+  exit=0
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "d5b7cc8a3fe003d1addbab16","firstmate","worker:question","answer or close this question, or record why it no longer applies",9000,"needs-decision: apply the original decision; steered, result not observed",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+$ re-steer same proof at deadline
+  exit=1
+  error: "steered delivery needs result follow-up: its row limit has elapsed or its consumer is unavailable; reconcile the outcome or use an applicable explicit wait"
+=== S2 genuine resolution clears the row
+row still present after resolved: False
+=== S3 future and missing delivery refused
+$ steer missing 999.msg
+  exit=1
+  error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox, or for a remote secondmate the delivered pending-reply correlation id"
+$ steer future-dated 001.msg
+  exit=1
+  error: "steered delivery needs result follow-up: its row limit has elapsed or its consumer is unavailable; reconcile the outcome or use an applicable explicit wait"
+=== S4 unavailable consumer reopens immediately
+presented after steer: False
+presented at t+5 after worker gone: True
+$ --present-overdue
+  exit=0
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "0bbcf8d7f9e1a510f7506352","firstmate","worker:question","answer or close this question, or record why it no longer applies",7205,"needs-decision: apply the original decision; steered, result not observed",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+=== S5 zero-limit second deferral remedy text
+$ limit=0 second deferred
+  exit=1
+  error: "second deferral refused; row is captain-visible; wait on a task through a delivery naming the row or escalate it"
+$ limit=17 second deferred
+  exit=1
+  error: "second deferral refused; row is captain-visible; steer, wait on a task through a delivery naming the row or escalate it"
+forbidden external calls: none
+exit=0

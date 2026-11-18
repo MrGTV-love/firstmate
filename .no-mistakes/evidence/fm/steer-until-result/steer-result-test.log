@@ -1,0 +1,20 @@
+PASS: default result deadline, no-refresh checking, acknowledgement, retry origin and actual resolution
+PASS: stalled work returns at its own limit unless existing progress evidence shows it resumed
+PASS: formal silence steers ignore transport-only activity but keep genuine reports and resolved replies
+PASS: live-only steered obligations remain actionable on endpoint loss, but are not resurrected after completion
+PASS: batch steering shares the row deadline and cannot renew expired evidence
+PASS: failed and unconfirmed delivery cannot cover the original actionable row
+PASS: authoritative unavailability reopens the original obligation before the missing-worker deadline; recovery cannot revive old proof
+PASS: already-known unavailability refuses steering cover without needing a healthy-to-dead transition
+PASS: a foreign-generation negative cannot invalidate a current delivery, whose own deadline still applies
+PASS: unrelated metadata updates do not conceal same-spawn consumer unavailability
+PASS: a verified current successor launch becoming unavailable cannot hide behind its predecessor delivery
+PASS: legacy and unknown availability retain a bounded wait, never indefinite standing cover
+PASS: a stale negative is not a current consumer verdict and cannot extend the delivery deadline
+PASS: a zero-limit second deferral names only remedies that can stand, not an expiring steer
+PASS: configured and zero result limits use the row policy while recording preserves four-hour delivery freshness
+PASS: an extended row policy cannot widen the reviewed-PR current-turn freshness guard
+PASS: legacy, source-less and delivered remote receipts cannot hide unresolved work indefinitely
+ok - result-follow-through retains the original owner and requires actual reconciliation
+bash tests/fm-open-loops-steer-result.test.sh  23.05s user 15.29s system 23% cpu 2:44.88 total
+exit=0

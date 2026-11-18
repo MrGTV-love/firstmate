@@ -1,0 +1,50 @@
+ok - combined-reader stream replacement rejects predecessor receipt using actual input identity
+ok - before-reader stream replacement rejects predecessor receipt using actual input identity
+ok - whole-reader stream replacement rejects predecessor receipt using actual input identity
+ok - actual opened whole-file cap is enforced without claiming a clipped prefix complete
+ok - unchanged-reader control preserves the confirmed opening
+ok - after-reader control preserves the confirmed opening
+ok - raw malformed resolution cannot erase a confirmed question or replay its unchanged receipt
+ok - degraded steered preserves unchanged work, rejects recurrence and survives source recovery
+ok - degraded escalated preserves unchanged work, rejects recurrence and survives source recovery
+ok - degraded deferred preserves unchanged work, rejects recurrence and survives source recovery
+ok - degraded bound preserves unchanged work, rejects recurrence and survives source recovery
+ok - metadata-only recovery does not replay an unchanged degraded question
+ok - new stamped/unstamped question rejects predecessor steered
+ok - new unstamped/unstamped question rejects predecessor steered
+ok - new stamped/stamped question rejects predecessor steered
+ok - new stamped/malformed question rejects predecessor steered
+ok - new stamped/unstamped question rejects predecessor escalated
+ok - new unstamped/unstamped question rejects predecessor escalated
+ok - new stamped/stamped question rejects predecessor escalated
+ok - new stamped/malformed question rejects predecessor escalated
+ok - new stamped/unstamped question rejects predecessor deferred
+ok - new unstamped/unstamped question rejects predecessor deferred
+ok - new stamped/stamped question rejects predecessor deferred
+ok - new stamped/malformed question rejects predecessor deferred
+ok - new stamped/unstamped question rejects predecessor bound
+ok - new unstamped/unstamped question rejects predecessor bound
+ok - new stamped/stamped question rejects predecessor bound
+ok - new stamped/malformed question rejects predecessor bound
+ok - new stamped/unstamped question rejects predecessor waiting
+ok - new unstamped/unstamped question rejects predecessor waiting
+ok - new stamped/stamped question rejects predecessor waiting
+ok - new stamped/malformed question rejects predecessor waiting
+ok - new stamped/unstamped question rejects predecessor task-wait
+ok - new unstamped/unstamped question rejects predecessor task-wait
+ok - new stamped/stamped question rejects predecessor task-wait
+ok - new stamped/malformed question rejects predecessor task-wait
+ok - current unstamped steered survives restart, no-op and unrelated progress
+ok - current unstamped escalated survives restart, no-op and unrelated progress
+ok - current unstamped deferred survives restart, no-op and unrelated progress
+ok - current unstamped bound survives restart, no-op and unrelated progress
+ok - current unstamped waiting survives restart, no-op and unrelated progress
+ok - current unstamped task-wait survives restart, no-op and unrelated progress
+ok - expired steering requires result follow-up; delivery input-age and explicit wait/deferral controls remain intact
+ok - resolved prerequisite reopens follow-up before recollection
+ok - failed prerequisite reopens follow-up before recollection
+ok - ended authority hold restores the existing reconciliation path
+ok - a legacy status receipt needs one safe refresh without losing its question
+ok - unchanged captain_hold survives provenance addition without releasing the hold
+ok - a merge receipt cannot be fabricated for a status question
+exit=0
