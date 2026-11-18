@@ -543,7 +543,7 @@ The separate slot-provisioning 600-second start allowance and thirty-minute abso
 A live `treehouse get` does not expire at a short wall-clock window, but liveness alone does not reset the no-progress clock.
 The same rule applies when the foreground cannot be read, as on zellij and cmux.
 A waiting line every minute names the foreground evidence, elapsed time, idle time and last rejected path.
-A refusal names the no-progress limit, the poll count, the last path seen, why it was rejected, and the spawning project.
+A refusal names the no-progress limit or the explicit ceiling it reached, the poll count, the last path seen, why it was rejected, and the spawning project.
 Existing acquisition cleanup remains responsible for ending only the refused attempt and its process lease.
 The [measurement record](verification/runtime-backends.md#treehouse-get-entry-wait) retains the earlier acquisition timings and their limitations; those timings did not justify the former short hard cutoff.
 The shared project-lock wait follows observed holder progress rather than total hold age; [`bin/fm-project-lock-lib.sh`](../bin/fm-project-lock-lib.sh) owns its sampling and idle allowance.

@@ -563,7 +563,8 @@
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
 #   Each get retains the measured stall allowance (default 1605 s,
 #   SPAWN_ACQUIRE_STALL overrides) with no new pane path, newly finished candidate
-#   or Git start; elapsed total time does not prevent another get.
+#   or Git start; elapsed total time prevents another get only when an explicit
+#   positive SPAWN_ACQUIRE_CEILING is reached.
 #   After the move a second snapshot is compared with the first. The copy's own refs (HEAD, the
 #   branch it had at the first snapshot, the branch the move advances, and the one anchor ref
 #   this task's own preparation creates) must show only the expected move: any other difference
@@ -6277,7 +6278,8 @@ spawn_acquire_pool_slot() {
   fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
   if [ "$SPAWN_ACQUIRE_CEILING" -gt 0 ] && [ -n "$SPAWN_ACQUIRE_T0" ] &&
     [ $((SECONDS - SPAWN_ACQUIRE_T0)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
-    echo "error: absolute extreme ${SPAWN_ACQUIRE_CEILING}s reached across every treehouse get of this spawn" >&2
+    echo "error: absolute extreme ${SPAWN_ACQUIRE_CEILING}s reached across every treehouse get of this spawn; no further copy is requested (spawning project '$PROJ_ABS'; copies skipped by this spawn: ${SPAWN_SKIPPED_SLOTS[*]:-none})" >&2
+    spawn_report_leased_copies >&2
     exit 1
   fi
   if [ -z "$SPAWN_ACQUIRE_TRACE_DIR" ]; then

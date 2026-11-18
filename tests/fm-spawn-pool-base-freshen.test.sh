@@ -2280,6 +2280,25 @@ test_a_get_is_typed_after_slow_skip_recording() {
   pass 'a second get finishes after 2400 seconds spent recording the first skip'
 }
 
+test_an_explicit_ceiling_between_gets_reports_leased_copies() {
+  local id out status
+  id='pool-ceiling-between-gets'
+  make_skip_case skip-ceiling-between "$id" 3
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(SPAWN_ACQUIRE_CEILING=1800 FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_FIRST_GET_WALK=1 FM_TEST_WALK_READS=3 FM_TEST_TICK_SECONDS=300 FM_TEST_MKDIR_JUMP=2400 FM_TEST_MKDIR_JUMP_PATH="$HOME_DIR/data/$id" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 1 "$status" "the explicit ceiling did not refuse the second get: $out"
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was typed after the explicit ceiling: $out"
+  assert_contains "$out" 'absolute extreme 1800s reached across every treehouse get of this spawn' 'the cross-get ceiling was not named'
+  assert_contains "$out" "spawning project '" 'the spawning project was not named'
+  assert_contains "$out" "copies skipped by this spawn: $(cd "${SKIP_SLOTS[0]}" && pwd -P)" 'the skipped copy was not named'
+  assert_contains "$out" "skipped-copies.tsv" 'the skipped-copy record was not named'
+  assert_contains "$out" "held by firstmate-skipped:$id" 'the leased copy was not reported'
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" 'the skipped copy lost its lease'
+  pass 'an explicit ceiling between gets refuses with the leased copies reported'
+}
+
 # Custody remains checked before each get, regardless of the scan duration.
 test_a_get_is_sent_when_the_scan_ends_at_1799() {
   local id out
@@ -2705,6 +2724,7 @@ test_a_governed_attached_copy_keeps_its_branch_when_skipped
 test_a_dirty_governed_copy_is_skipped_and_another_is_taken
 test_multiple_skips_end_only_when_the_get_stalls
   test_a_get_is_typed_after_slow_skip_recording
+test_an_explicit_ceiling_between_gets_reports_leased_copies
 test_skipped_copies_are_recorded_and_listed
 test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_new_foreign_ref
