@@ -1,0 +1,28 @@
+ ▐▛███▛█   Claude Code v2.1.327
+▝▜██████▀  Opus 5.5 with low effort · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-askclone.rZqw48/fm
+❯ This is a test of a Stop hook. Do not run any tools. Reply with exactly these two lines and nothing else:
+  Release notes are drafted.
+  needs input: should I publish the release notes now? Recommendation: yes
+⏺ Release notes are drafted.
+  needs input: should I publish the release notes now? Recommendation: yes
+⏺ Ran 4 stop hooks
+  ⎿  Stop hook reported a problem
+     [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude]: ASK FORM BLOCK - the text was already published; this corrective
+     continuation does not prevent publication.
+     Each needs input: or needs-input line requires one distinct boundary (credential, spend, destructive, irreversible, tool-denial, owner-rule-change) before if no:, followed by an action containing
+     a letter or digit. Main owns whether the question belongs to the captain; decide routine calls yourself.
+     needs input: should I publish the release notes now? Recommendation: yes
+⏺ Captain, publishing release notes is public and cannot be undone. So I need your word first.
+  needs input: irreversible - should I publish the release notes now? Recommendation: yes. if no: keep the release notes as an unpublished draft.
+✻ Worked for 35s · done 3:01 AM
+❯ Second Stop hook test. Do not run any tools. Reply with exactly these two lines and nothing else:  Line A: The build finished.  Line B: needs input: may I spend 40 USD on a larger CI runner? if no:
+  keep the current free runner
+⏺ The build finished.
+  needs input: may I spend 40 USD on a larger CI runner? if no: keep the current free runner
+✻ Cogitated for 5s · done 3:02 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 5% 52k/1.0M fm:e1d63f97
+  ⏵⏵ auto mode on (shift+tab to cycle)

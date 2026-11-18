@@ -1,0 +1,6 @@
+["Release notes are drafted.\nneeds input: should I publish the release notes now? Recommendation: yes"]
+["Captain, publishing release notes is public and cannot be undone. So I need your word first.\n\nneeds input: irreversible - should I publish the release notes now? Recommendation: yes. if no: keep the release notes as an unpublished draft."]
+["The build finished.\nneeds input: may I spend 40 USD on a larger CI runner? if no: keep the current free runner"]
+["needs input: spend and credential rotation for the deploy key? if no: skip it\nneeds input: tool-denial on the cleanup script? if no: ..."]
+["noted"]
+["Here is a bad example.\n\n```\nneeds input: should I proceed?\n```"]

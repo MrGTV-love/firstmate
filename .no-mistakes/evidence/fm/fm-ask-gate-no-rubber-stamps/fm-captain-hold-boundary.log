@@ -7,3 +7,4 @@ ok - whitespace refuses both paths without changing the backlog
 ok - all six boundaries round trip on both filing paths and survive deferral
 ok - portable legacy records remain readable, listable, deferrable, answerable, completable, reconcilable and withdrawable
 ok - a released legacy hold is not an exemption for a new captain call
+bash tests/$t.test.sh  123.91s user 77.57s system 50% cpu 6:42.07 total

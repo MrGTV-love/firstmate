@@ -24,3 +24,4 @@ ok - the first of two failing physical lines is reported
 ok - fence indentation, marker, length and quoted-content boundaries are honored
 ok - the reason preserves the first 200 of 300 ASCII bytes verbatim
 ok - default, --cursor and foreign compatibility deliveries remain outside this check
+bash tests/$t.test.sh  9.90s user 17.71s system 26% cpu 1:43.90 total

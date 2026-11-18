@@ -6,3 +6,4 @@ ok - the answer is truncated at 200 Unicode characters, not bytes
 ok - deferral keeps the recommendation, but a released task starts without it
 ok - an exact replay finishes an interrupted delay append without duplicating the record
 ok - blank, malformed and non-object log rows are kept and skipped, and the delay row is appended once
+bash tests/$t.test.sh  83.82s user 56.14s system 37% cpu 6:17.86 total
