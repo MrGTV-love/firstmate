@@ -111,13 +111,14 @@ def procs(folder, count=100, limit=10666, error=False):
 SWAP_USED = int(1565.88 * 2 ** 20)  # the swap the facts() fixture reads
 
 
-def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None, last_swap=None):
+def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None, last_swap=SWAP_USED):
     """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
 
     live names runs (repo_id NULL) whose young, low peak the probe has folded in already;
     extra maps more runs (repo_id NULL) to their recorded peak in bytes;
-    last_swap adds the probe's step record (200 steps 300 s apart) and a previous probe reading
-    a minute old that held that much swap used, so the backstop can judge swap growth.
+    The probe's step record (200 steps 300 s apart, available drops of k MiB so the reserve is 198 MiB)
+    and a previous probe reading a minute old that held last_swap of swap used and the compressor the
+    fixture reads are always written, so the guard's harm test can judge the trend and the fit.
     """
     state = folder / 'fmhome' / 'state'
     state.mkdir(parents=True, exist_ok=True)
@@ -133,11 +134,10 @@ def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=No
                                                 first_seen='x', last_seen='x', max_gap_seconds=0)
     record = dict(schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs,
                   pressured=None)
-    if last_swap is not None:
-        stamp = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=60)
-        record['trail'] = dict(
-            last=dict(at=stamp.isoformat(), available_bytes=40 * GIB, compressor_bytes=32768 * 16384, swap_used_bytes=last_swap),
-            steps=[[300, k * 2 ** 20, k * 2 ** 20, 0] for k in range(1, 201)])
+    stamp = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=60)
+    record['trail'] = dict(
+        last=dict(at=stamp.isoformat(), available_bytes=40 * GIB, compressor_bytes=32768 * 16384, swap_used_bytes=last_swap),
+        steps=[[300, k * 2 ** 20, k * 2 ** 20, 0] for k in range(1, 201)])
     write_json(state / '.memory-calibration.json', record)
 
 
@@ -207,9 +207,21 @@ def assert_no_spacing(folder, names):
     return gaps
 
 
+def waiters(folder):
+    return set((folder / 'pool').glob('pipeline-waiter-*.lock'))
+
+
 def pending(folder, count):
-    wait_for(lambda: len(list((folder / 'pool').glob('pipeline-waiter-*.lock'))) == count,
-             str(count) + ' registered waiters')
+    wait_for(lambda: len(waiters(folder)) == count, str(count) + ' registered waiters')
+
+
+def registered(folder, before):
+    """Wait for a waiter record that was not there before this launch, so the registration seen is this start's own.
+
+    A waiter killed by SIGTERM leaves its record until the next scan removes it, so counting records alone can
+    be satisfied by the dead one while the start just launched is still starting up and has no handler yet.
+    """
+    wait_for(lambda: bool(waiters(folder) - before), 'this start registered its own waiter')
 
 
 def held(env):
@@ -341,6 +353,23 @@ try:
     swap(folder, growing=False)
     finish(child)
     assert marker.exists() and 'admitted: counted=0 need=%d budget=%d' % (11 * GIB, 10 * GIB) in (folder / 'floor.stderr').read_text()
+
+    # Every fresh start also meets the guard's harm test as a no-mistakes run: the recorded projection
+    # (p95 of the 13 peaks is the largest, 8 GiB) plus the 198 MiB reserve must fit in available memory,
+    # at normal and at elevated pressure, and the one-start minimum never overrides it.
+    for pressure in (1, 2):
+        folder, db, env = case('nonfit-%d' % pressure, measured=True, available=5 * GIB)
+        facts(folder, available=5 * GIB, pressure=pressure)
+        marker, log = folder / 'nonfit.marker', folder / 'nonfit.stderr'
+        child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'nonfit')
+        pending(folder, 1)
+        wait_for(lambda: 'waiting: overload: memory: projected no-mistakes run of 8.00 GiB (p95 of 13 recorded) does not fit in 5.00 GiB available' in log.read_text(),
+                 'the start that does not fit waits with the numbers (pressure %d)' % pressure)
+        time.sleep(0.6)
+        assert not marker.exists() and child.poll() is None
+        facts(folder, available=9 * GIB, pressure=pressure)
+        finish(child)
+        assert marker.exists() and 'admitted: counted=0 need=%d budget=%d' % (11 * GIB, 9 * GIB) in log.read_text(), log.read_text()
 
     # Measured mode. R = 3 GiB (75th percentile of the 13 recorded peaks) and S = 8 GiB
     # (the largest); the task:crewmate record is not a no-mistakes run and is ignored.
@@ -635,12 +664,14 @@ try:
     assert not marker.exists()
     # Waiters cancelled by SIGINT remove their own records while another queued
     # start scans them; that scan must never refuse the surviving start.
+    known = waiters(folder)
     survivor = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'survivor')], env, folder / 'survivor')
-    pending(folder, 1)
+    registered(folder, known)
     for i in range(20):
+        known = waiters(folder)
         cancelled = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', 'touch', str(folder / 'cancelled')],
                            env, folder / ('cancelled-' + str(i)))
-        pending(folder, 2)
+        registered(folder, known)
         os.killpg(cancelled.pid, signal.SIGINT)
         finish(cancelled, 130)
         assert survivor.poll() is None, (folder / 'survivor.stderr').read_text()

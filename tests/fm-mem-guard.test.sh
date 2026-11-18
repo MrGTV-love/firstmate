@@ -368,9 +368,10 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     assert record["runs"]["task:a"]["first_seen"] < record["runs"]["task:a"]["last_seen"]
     assert record["runs"]["task:a"]["max_gap_seconds"] > 0 and record["pressured"]["highest_level"] == 2
     facts(rss=run_rows(gib), available=gib)
-    report = call("admit",environ=calib_env)
-    assert report["reasons"] == [] and report["headroom"]["headroom_bytes"] == 6*gib, report
-    print("ok - probes record each run's resident-tree peak, samples, span, gaps and omissions; the derived peak and margin are shown but never refuse normal-pressure work")
+    report = call("admit",code=75,environ=calib_env)
+    assert report["headroom"]["headroom_bytes"] == 6*gib, report
+    assert len(report["reasons"]) == 1 and report["reasons"][0].startswith("the harm cannot be judged: "), report["reasons"]
+    print("ok - probes record each run's resident-tree peak, samples, span, gaps and omissions; the derived peak and margin are shown and never decide: the only deferral is the harm test's own unjudged record")
 
     # Studio fixture from JetsamEvent-2026-10-27-113941.ips (sha256
     # 907ef8e738586a5434f9884c3f928dcadc8c075711de979db5bc75614684d8f7),
@@ -406,23 +407,22 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     studio_facts()
     ran = home / "studio-run"
     launch = ("--",sys.executable,"-c","from pathlib import Path; import sys; Path(sys.argv[1]).touch()",str(ran))
-    report = call("admit",environ=studio_env)
+    report = call("admit",code=75,environ=studio_env)
     assert report["headroom"]["run_peak_bytes"] == run_bytes and report["headroom"]["headroom_bytes"] == available
-    assert report["reasons"] == [], report
-    call("run",*launch,environ=studio_env)
-    assert ran.exists()
-    ran.unlink()
+    assert report["reasons"][0].startswith("the harm cannot be judged: "), report
+    call("run",*launch,code=75,environ=studio_env)
+    assert not ran.exists()
     studio_facts(pressure=2)
-    call("run",*launch,environ=studio_env)
-    assert ran.exists()
-    print("ok - estimated 113941 Studio shape: the margin is recorded and shown, and a 13th start is admitted at pressure 1 or 2 because the record is too short to judge a fit")
+    call("run",*launch,code=75,environ=studio_env)
+    assert not ran.exists()
+    print("ok - estimated 113941 Studio shape with 12 runs running: the margin is recorded and shown, and a 13th start is deferred at pressure 1 or 2 because the record is too short to judge the harm")
 
     # The harm itself decides. A record is written by hand with exact derived
     # values: 200 steps 300 s apart whose available drops are k x 10 MiB (p99
-    # 1980 MiB) and compressor rises k x 5 MiB (p95 950 MiB), and 25 task peaks
-    # of i x 100 MiB (p95 2400 MiB) and 25 no-mistakes peaks of i x 200 MiB (p95
-    # 4800 MiB). The previous probe reading holds the swap and compressor the
-    # fixture reads unless a case moves them.
+    # 1980 MiB), and 25 task peaks of i x 100 MiB (p95 2400 MiB) and 25
+    # no-mistakes peaks of i x 200 MiB (p95 4800 MiB). The previous probe
+    # reading holds the swap and compressor the fixture reads unless a case
+    # moves them. The fixture host runs no fleet run unless a case adds one.
     import datetime as _dt, socket as _socket
     mib = 1024 ** 2
     harm = home / "harm"
@@ -431,22 +431,33 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     swap_now = int(1565.88 * mib)
     compressor_now = gib // 2
     record_path = harm / "state/.memory-calibration.json"
+    busy_rows = [dict(daemon), {"pid":601, "ppid":1, "comm":"omp", "started":"s601", "rss_bytes":gib,
+                                "fleet":True, "run":"task:busy"}]
 
-    def record(last_swap=swap_now, last_compressor=compressor_now, age=120, steps=200, host=None):
+    def record(last_swap=swap_now, last_compressor=compressor_now, age=120, steps=200, host=None,
+               kinds=("task", "no-mistakes")):
         stamp = _dt.datetime.now(_dt.timezone.utc)
         peaks = lambda kind, size: {f"{kind}:r{i}": {"peak_bytes": (i + 1) * size, "samples": 2, "incomplete_samples": 0,
                                                     "first_seen": stamp.isoformat(), "last_seen": stamp.isoformat(),
                                                     "max_gap_seconds": 0} for i in range(25)}
+        runs = {}
+        for kind, size in (("task", 100 * mib), ("no-mistakes", 200 * mib)):
+            if kind in kinds:
+                runs.update(peaks(kind, size))
         record_path.write_text(json.dumps({
             "schema": "fm-memory-calibration.v1", "host": host or _socket.gethostname(), "total_bytes": 32 * gib,
-            "runs": {**peaks("task", 100 * mib), **peaks("no-mistakes", 200 * mib)}, "pressured": None,
+            "runs": runs, "pressured": None,
             "trail": {"last": {"at": (stamp - _dt.timedelta(seconds=age)).isoformat(), "available_bytes": 20 * gib,
                                "compressor_bytes": last_compressor, "swap_used_bytes": last_swap},
                       "steps": [[300, k * 10 * mib, k * 5 * mib, 0] for k in range(1, steps + 1)]}}))
 
-    def decide(kind="task", code=0, mode="admit", pressure=1, available=20*gib, compressor=compressor_now, **moves):
-        facts(pressure=pressure, available=available, compressor=compressor)
-        record(**moves)
+    def decide(kind="task", code=0, mode="admit", pressure=1, available=20*gib, compressor=compressor_now,
+               busy=False, recorded=True, **moves):
+        facts(pressure=pressure, available=available, compressor=compressor, rss=busy_rows if busy else None)
+        if recorded:
+            record(**moves)
+        else:
+            record_path.unlink(missing_ok=True)
         return call(mode, *(("--kind", kind) if kind else ()), code=code, environ=harm_env)
 
     # fit: the projection is the run kind's p95 peak and the reserve the p99 drop
@@ -454,8 +465,8 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     detail = report["harm"]
     assert report["admission"] == "admit" and report["pressure_level"] == 4 and report["reasons"] == [], report
     assert detail["projected_bytes"] == 2400 * mib and detail["reserve_bytes"] == 1980 * mib, detail
-    assert detail["compressor_rise_bytes"] == 950 * mib and detail["window_seconds"] == 300, detail
-    assert detail["projection_runs"] == 25 and detail["not_judged"] == [], detail
+    assert detail["window_seconds"] == 300 and "compressor_rise_bytes" not in detail, detail
+    assert detail["projection_runs"] == 25 and detail["not_judged"] == [] and "bootstrap" not in detail, detail
     report = decide(pressure=1, available=4000*mib, code=75)
     assert report["reasons"][0].startswith("projected task run of 2.34 GiB (p95 of 25 recorded) does not fit in "
                                            "3.91 GiB available minus a 1.93 GiB reserve"), report["reasons"]
@@ -486,6 +497,17 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
         assert result.returncode == 2, (bad, result)
     print("ok - fit: a run is deferred when its kind's p95 peak does not fit in available minus the p99 reserve and admitted when it does, at any pressure level, with the numbers in the reason")
 
+    # an unspecified kind needs both kinds' projections; one kind absent leaves it unjudged
+    report = decide(None, kinds=("task",), busy=True, code=75)
+    assert report["reasons"][0].startswith("the harm cannot be judged: fit: 0 recorded no-mistakes runs"), report["reasons"]
+    report = decide(None, kinds=("no-mistakes",), busy=True, code=75)
+    assert "0 recorded task runs" in report["reasons"][0], report["reasons"]
+    decide("task", kinds=("task",), busy=True)
+    decide("no-mistakes", kinds=("task",), busy=True, code=75)
+    report = decide(None, kinds=("task", "no-mistakes"), busy=True)
+    assert report["harm"]["projected_kind"] == "no-mistakes" and report["reasons"] == [], report
+    print("ok - an unspecified kind is judged only when both kinds' projections exist: one kind absent defers, both present judge the larger")
+
     # swap growth defers even with abundant memory; a shrink or no change does not
     report = decide(available=30*gib, last_swap=swap_now - 100*mib, code=75)
     assert report["reasons"][0].startswith("swap used grew by 0.098 GiB in the 12"), report["reasons"]
@@ -494,27 +516,35 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     decide(available=30*gib)
     print("ok - swap growth since the last probe reading defers with 75 even when 30 GiB is available; a shrink or no change admits")
 
-    # a compressor rise above the p95 of recorded rises defers; one at or below it does not
-    report = decide(available=30*gib, compressor=compressor_now + gib, code=75)
-    assert "compressor grew by 1.00 GiB" in report["reasons"][0], report["reasons"]
-    assert "above the 0.93 GiB p95 of recorded rises" in report["reasons"][0], report["reasons"]
-    decide(available=30*gib, compressor=compressor_now + 950*mib)
-    decide(available=30*gib, compressor=compressor_now + 950*mib + 16384, code=75)
+    # any compressor increase defers, however small; no change or a fall admits
+    report = decide(available=30*gib, compressor=compressor_now + 16384, code=75)
+    assert report["reasons"][0].startswith("compressor grew by 0.000 GiB in the 12"), report["reasons"]
+    assert report["harm"]["compressor_delta_bytes"] == 16384, report["harm"]
+    decide(available=30*gib, compressor=compressor_now + 950*mib, code=75)
+    decide(available=30*gib, compressor=compressor_now + gib, code=75)
+    decide(available=30*gib)
     decide(available=30*gib, last_compressor=compressor_now + gib)
-    print("ok - a compressor rise above the p95 of recorded rises defers; one at or below it, or a fall, admits")
+    print("ok - a compressor increase of one page, 950 MiB or 1 GiB defers; no change or a fall admits")
 
-    # what cannot be judged is said, never guessed
-    report = decide(available=30*gib, last_swap=swap_now - 100*mib, age=2000)
-    assert any("outside the 300 s window" in text for text in report["harm"]["not_judged"]), report["harm"]
-    report = decide(available=1*gib, steps=50)
-    assert any("50 recorded probe steps; 100 are needed" in text for text in report["harm"]["not_judged"]), report["harm"]
-    report = decide(available=1*gib, host="another-host")
-    assert any("not host" in text for text in report["harm"]["not_judged"]), report["harm"]
-    record_path.unlink()
-    facts(available=1*gib)
-    report = call("admit","--kind","task",environ=harm_env)
-    assert report["admission"] == "admit" and "no calibration" in report["harm"]["not_judged"][0], report["harm"]
-    print("ok - a stale previous reading, a short record, another host's record or no record leaves that part not judged and says why")
+    # what cannot be judged defers with its reason and the recovery, except on an idle host
+    for name, moves in (("no calibration record", dict(recorded=False)),
+                        ("a previous probe reading 2000 s old outside the 300 s window", dict(last_swap=swap_now - 100*mib, age=2000)),
+                        ("a record of 50 steps", dict(steps=50)),
+                        ("another host's record", dict(host="another-host"))):
+        report = decide(available=30*gib, busy=True, code=75, **moves)
+        reason = report["reasons"][0]
+        assert reason.startswith("the harm cannot be judged: ") and "bin/fm-mem-guard.sh probe" in reason, (name, reason)
+        assert report["harm"]["not_judged"] and "bootstrap" not in report["harm"], (name, report["harm"])
+        idle = decide(available=30*gib, busy=False, **moves)
+        assert idle["reasons"] == [] and "no fleet run is running" in idle["harm"]["bootstrap"], (name, idle["harm"])
+    report = decide(available=30*gib, busy=True, age=2000, code=75, last_swap=swap_now - 100*mib)
+    assert "outside the 300 s window" in report["reasons"][0] and "2000 s old" in report["reasons"][0], report["reasons"]
+    report = decide(available=30*gib, busy=True, steps=50, code=75)
+    assert "50 recorded probe steps; 100 are needed for a window" in report["reasons"][0], report["reasons"]
+    # a judged harm still defers an idle host with an incomplete record
+    report = decide(None, available=30*gib, busy=False, kinds=("task",), last_swap=swap_now - 100*mib, code=75)
+    assert report["reasons"][0].startswith("swap used grew") and "bootstrap" not in report["harm"], report
+    print("ok - an unjudged fit or trend defers a busy host with its reason and how the record is filled, and admits one start on an idle host so the record can begin")
 
     # a failed or inconsistent read keeps its fail-closed 75 whatever the record says
     facts(available=30*gib); record()
@@ -530,7 +560,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     # a probe decides from the record before it folds in, then folds one step in
     facts(available=30*gib, compressor=compressor_now + gib); record()
     report = call("probe",environ=harm_env)
-    assert report["admission"] == "defer" and "compressor grew by 1.00 GiB" in report["reasons"][0], report
+    assert report["admission"] == "defer" and "compressor grew by 1.000 GiB" in report["reasons"][0], report
     folded = json.loads(record_path.read_text())
     assert len(folded["trail"]["steps"]) == 201 and folded["trail"]["steps"][-1][2] == gib, folded["trail"]["steps"][-1]
     assert folded["trail"]["last"]["compressor_bytes"] == compressor_now + gib

@@ -2443,10 +2443,13 @@ On macOS, project capacity is also subject to the [memory guard's admission cont
 Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
 Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 when a required reading is unavailable or the harm itself is measured.
 The harm is starting work that exhausts host memory and makes the host thrash or crash.
-It is measured in two ways: the projected resident size of a run of that kind does not fit in available memory minus a reserve, or swap used or the compressor is growing since the last probe reading.
+It is measured in two ways: the projected resident size of a run of that kind does not fit in available memory minus a reserve, or swap used or the compressor grew at all since the last probe reading.
 The native memory-pressure level is recorded in each reading and never judged, because it does not track available bytes: in the recorded readings it deferred work at 10.9 to 39.0 GiB available while readings that were admitted ran down to 18.2 GiB.
-The projection, reserve, compressor-rise limit and comparison window are quantiles of this host's own records, derived at each decision, so the [engine header](../bin/fm-mem-guard.py) owns them and a record too short for a quantile leaves that part not judged, named in the reading's `harm` object.
+The projection, reserve and comparison window are quantiles of this host's own records, derived at each decision, so the [engine header](../bin/fm-mem-guard.py) owns them.
+A part that cannot be judged defers the start too, with its reason and how the record is filled (a new or short record, a kind with too few recorded runs, or a previous probe reading older than the window), and the reading's `harm` object names it.
+The one exception is a host with no fleet run running, which admits one start so that the record can begin.
 A deferred spawn prints the reasons with their numbers.
+Every fresh pipeline start through the CPU pass pool meets the same test as a no-mistakes run before its own reservation formula, and its one-start minimum never overrides it.
 The generated worker brief names two routes for a new no-mistakes run.
 A start through `bin/fm-mem-guard.sh run -- no-mistakes axi run` takes the same reading as a no-mistakes run (`--kind`) and can defer with the same exit 75, and the worker then writes the `paused:` status described below; this route skips the CPU pass pool.
 A start through `bin/fm-duration.py run --pipeline-priority <class>` goes through the [CPU pass pool](cpu-pass-pool.md#fresh-pipeline-starts) (`pipeline-start`), which owns start admission on that route.

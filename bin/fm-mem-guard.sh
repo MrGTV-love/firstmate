@@ -7,15 +7,18 @@
 # Legacy flags retain the fail-open diagnostic contract in the engine header.
 # sample records facts only; admit returns 75 if the harm itself is measured
 # (the run's projected resident size does not fit in available memory minus the
-# reserve, or swap used or the compressor is growing) or required facts are
-# unreadable. The kernel pressure level is recorded, never judged. No new work
+# reserve, or swap used or the compressor grew since the last probe reading),
+# if that cannot be judged (the reading says why and how the record is filled;
+# a host with no fleet run running admits one start so the record can begin),
+# or if required facts are unreadable. The kernel pressure level is recorded,
+# never judged. No new work
 # runs after that return, and no existing work is stopped. Neither the recorded
 # one-run peak and headroom margin shown in each reading nor the non-fleet RSS
 # alarm baseline affects that result. baseline derives the alarm envelope from
 # recorded healthy root probe readings; the engine header owns every record's
 # contents, the harm test and every derivation. --kind names the run being
-# admitted; run defaults it to no-mistakes, and admit without it judges fit
-# against the larger kind's projection.
+# admitted; run defaults it to no-mistakes, and admit without it needs both
+# kinds' projections and judges fit against the larger.
 # run checks once and execs a NEW run only; reattach/respond directly so a
 # measured overload cannot prevent supervising existing work. admit, run and
 # sample only record a reading in the invoking home's state.
