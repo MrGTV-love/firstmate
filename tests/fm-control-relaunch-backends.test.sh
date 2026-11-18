@@ -2439,15 +2439,12 @@ test_omp_bun_adoption_binds_the_adopted_incarnation() {
 test_omp_bun_adoption_needs_positive_live_session_evidence() {
   local shape dir id record out rc pid_p pid_q start_q msg
   msg='session proof needs the live Bun process to hold the registered task session file open for writing and no other session file'
-  for shape in holds-nothing holds-another-session holds-task-and-another-session; do
+  for shape in holds-nothing holds-another-session; do
     prepare_omp_adoption "bun-session-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
     write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
     case "$shape" in
       holds-nothing) bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
-      holds-task-and-another-session)
-        # A process that holds the task session and another one cannot show which is current (a retained old descriptor).
-        BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" BUN_HOLD_FILE_2="$dir/wt/personal-session.jsonl" bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
       holds-another-session)
         BUN_HOLD_FILE="$dir/wt/personal-session.jsonl" bun_launch "$shape" --config "$dir/session.yml" --no-title 'Read the brief' ;;
     esac
@@ -2542,6 +2539,21 @@ test_omp_bun_descendant_keeps_the_pane_occupied_for_relaunch() {
   pass "omp bun relaunch: a live or unreadable Bun descendant of the shell refuses the relaunch and starts no second agent; an agent-free shell does not"
 }
 
+# N3: a process that holds the task session and another session cannot show which is current (a retained
+# old descriptor after a switch); whether the installed omp does that is unverified and owned by E3.
+test_omp_bun_adoption_refuses_a_process_holding_two_sessions() {
+  local dir id
+  prepare_omp_adoption bun-two-sessions
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
+  BUN_HOLD_FILE="$dir/wt/recorded-session.jsonl" BUN_HOLD_FILE_2="$dir/wt/personal-session.jsonl" \
+    bun_launch two-sessions --config "$dir/session.yml" --no-title 'Read the brief'
+  bun_present "$dir" "$BUN_PID"
+  assert_adoption_refused "$dir" "$id" 'session proof needs the live Bun process to hold the registered task session file open for writing and no other session file'
+  bun_stop_all
+  pass "omp bun adoption: a process holding the task session and another session is refused, because which one is current cannot be proved"
+}
+
 test_omp_adoption_bun_runtime() {
   if [ "$(uname -s)" != Darwin ] || ! command -v cc >/dev/null 2>&1; then
     printf '# skipped: omp bun adoption needs macOS libproc and a C compiler; nothing was checked here\n'
@@ -2556,6 +2568,7 @@ test_omp_adoption_bun_runtime() {
   test_omp_bun_adoption_never_deletes_the_last_copy_of_the_old_record
   test_omp_bun_adoption_binds_the_adopted_incarnation
   test_omp_bun_adoption_needs_positive_live_session_evidence
+  test_omp_bun_adoption_refuses_a_process_holding_two_sessions
   test_omp_bun_relaunch_follows_the_adoption_proof
   test_omp_bun_descendant_keeps_the_pane_occupied_for_relaunch
 }
