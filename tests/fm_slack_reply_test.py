@@ -2056,6 +2056,55 @@ class SecondPersonFollowUpTest(unittest.TestCase):
             self.assertNotIn('state unknown', woken[0][1])
             self.assertEqual(set().union(*reads), set(threads))
 
+    def test_sc2_one_combined_attempt_trace_lists_every_post_attempt_of_both_people_with_its_destination_and_outcome(self):
+        # SC2 with SC8: the owner and the second person each have a request, a reply from Main, a follow-up and a reply to it. The attempt trace holds every
+        # chat.postMessage attempt of every run, the failed one included, not only the posts that worked: the whole list is asserted, run by run, with its
+        # order, its DM, its thread and its outcome. Slack answers their first acknowledgement with HTTP 400: a Slack answer leaves their post unknown (A7),
+        # so no later run posts it again and the next poll wakes it once named unknown. A repeat of each reply attempts nothing.
+        with self.scott() as home:
+            state, path = home.replay_state()
+            mine = home.say('an owner request')
+            theirs = self.their_message(home, 'a request of theirs')
+            state, path = home.replay_state()
+            state['failures']['chat.postMessage:%s' % theirs] = {'status': 400, 'times': 1}
+            path.write_text(json.dumps(state))
+            key = theirs + '@' + SCOTT
+            runs = []
+
+            outs = {}
+
+            def run(name, step):
+                Traced.TRACE.clear()
+                rc, outs[name], _ = step()
+                runs.append((name, rc, [(row['channel'], row['thread'], row['outcome']) for row in home.calls('chat.postMessage')]))
+            run('poll 1', home.poll)
+            run('poll 2', home.poll)
+            run('reply to the owner request', lambda: home.reply(mine, mine, 'the answer to the owner'))
+            run('reply to their request', lambda: home.reply(key, key, 'the answer to them'))
+            owner_followup = home.reply_in(mine, 'an owner follow-up')
+            their_followup = self.their_message(home, 'a follow-up of theirs', thread=theirs)
+            run('poll 3', home.poll)
+            run('reply to the owner follow-up', lambda: home.reply(mine, owner_followup, 'the second answer to the owner'))
+            run('reply to their follow-up', lambda: home.reply(key, their_followup, 'the second answer to them'))
+            run('repeat of the owner reply', lambda: home.reply(mine, owner_followup, 'the second answer to the owner'))
+            run('repeat of their reply', lambda: home.reply(key, their_followup, 'the second answer to them'))
+        self.assertEqual(runs, [
+            ('poll 1', 0, [(OWNER_DM, mine, 'ok'), (SCOTT_DM, theirs, 'failed:api_error')]),
+            ('poll 2', 0, []),
+            ('reply to the owner request', 0, [(OWNER_DM, mine, 'ok')]),
+            ('reply to their request', 0, [(SCOTT_DM, theirs, 'ok')]),
+            ('poll 3', 0, []),
+            ('reply to the owner follow-up', 0, [(OWNER_DM, mine, 'ok')]),
+            ('reply to their follow-up', 0, [(SCOTT_DM, theirs, 'ok')]),
+            ('repeat of the owner reply', 0, []),
+            ('repeat of their reply', 0, []),
+        ])
+        wakes = {name: [line.split(':')[0] + ':' + line.split(':')[1] for line in out.splitlines() if line.startswith('check: slack')] for name, out in outs.items()}
+        self.assertEqual(wakes['poll 1'], ['check: slack request %s from %s' % (mine, OWNER)])
+        self.assertEqual(wakes['poll 2'], ['check: slack request %s from %s (acknowledgement state unknown)' % (theirs, SCOTT)])
+        self.assertEqual(wakes['poll 3'], ['check: slack follow-up %s to request %s from %s' % (owner_followup, mine, OWNER),
+                                           'check: slack follow-up %s to request %s from %s' % (their_followup, key, SCOTT)])
+
     def test_sc8_6_split_checks_read_their_picked_threads_only_with_the_proven_hand_over_of_the_same_sweep(self):
         for second_token, expected in (('sweep.1', True), ('sweep.other', False)):
             with self.scott() as home:
