@@ -2103,7 +2103,8 @@ spawn_abort_cleanup() {
           SPAWN_FRESH_COMMIT_PENDING=0
         fi
         mkdir -p "$STATE" 2>/dev/null || true
-        if [ -d "$STATE" ]; then
+        if [ -d "$STATE" ] &&
+          { [ "$RELAUNCH" -eq 1 ] || spawn_take_task_set_lock; }; then
           SPAWN_META_TMP="$STATE/.$ID.meta.orca-recovery.${BASHPID:-$$}"
           {
             echo "window=$W"
@@ -2448,12 +2449,16 @@ spawn_require_relocated_queued_work
 #
 # A secondmate spawn takes it before this task's own locks, matching the
 # acquisition order documented there. A worker spawn takes it only around
-# publishing its fresh task record, after the shared project lock, treehouse
-# get, and launch preparation. It is the one lock every task of this home
+# publishing its fresh task record, normally after the shared project lock,
+# treehouse get, and launch preparation. It is the one lock every task of this home
 # shares: neither a project-queue wait nor a slow get may retain it and refuse
-# every other project's fresh spawn. A publish refusal uses the existing
+# every other project's fresh spawn. Normal publish refusal uses the existing
 # post-acquisition EXIT cleanup to close this attempt's endpoint and release
 # its process lease and locks. The task-set acquisition never waits.
+# Recovery records are publications too: a slot refusal first preserves its
+# uncertified copy and lease, then takes custody before publishing its record.
+# Orca removal-failure recovery takes custody before writing a record.
+# A refused recovery publication must let the remaining EXIT cleanup finish.
 #
 # A relaunch is exempt: it republishes a task that already exists, so it is
 # already covered by that task's control lock, which the teardown preflight
@@ -2462,32 +2467,36 @@ spawn_require_relocated_queued_work
 # Refusing rather than waiting is the fail-closed direction: the home may be
 # moments from removal, so there is nothing worth waiting for.
 spawn_take_task_set_lock() {
-  SPAWN_TASK_SET_LOCK=$(fm_task_set_lock_path "$STATE") || {
-    echo "error: could not resolve the task-set lock for $STATE" >&2
-    exit 1
-  }
-  if ! fm_lock_try_acquire "$SPAWN_TASK_SET_LOCK"; then
-    case "$(fm_lock_role "$SPAWN_TASK_SET_LOCK" 2>/dev/null || true)" in
-      task-spawn)
-        echo "error: this home's task set is locked by another spawn; refusing to create task $ID rather than racing it" >&2
-        ;;
-      forced-teardown)
-        echo "error: this home's task set is locked by a forced teardown; refusing to create task $ID rather than racing it" >&2
-        ;;
-      *)
-        echo "error: this home's task set is locked by another operation; refusing to create task $ID rather than racing it" >&2
-        ;;
-    esac
-    exit 1
+  if [ "$SPAWN_TASK_SET_LOCK_HELD" != 1 ]; then
+    SPAWN_TASK_SET_LOCK=$(fm_task_set_lock_path "$STATE") || {
+      echo "error: could not resolve the task-set lock for $STATE" >&2
+      return 1
+    }
+    if ! fm_lock_try_acquire "$SPAWN_TASK_SET_LOCK"; then
+      case "$(fm_lock_role "$SPAWN_TASK_SET_LOCK" 2>/dev/null || true)" in
+        task-spawn)
+          echo "error: this home's task set is locked by another spawn; refusing to create task $ID rather than racing it" >&2
+          ;;
+        forced-teardown)
+          echo "error: this home's task set is locked by a forced teardown; refusing to create task $ID rather than racing it" >&2
+          ;;
+        *)
+          echo "error: this home's task set is locked by another operation; refusing to create task $ID rather than racing it" >&2
+          ;;
+      esac
+      return 1
+    fi
+    if ! fm_lock_set_role "$SPAWN_TASK_SET_LOCK" task-spawn; then
+      fm_lock_release "$SPAWN_TASK_SET_LOCK" || true
+      echo "error: could not record task-set lock holder for spawn of $ID" >&2
+      return 1
+    fi
+    SPAWN_TASK_SET_LOCK_HELD=1
   fi
-  if ! fm_lock_set_role "$SPAWN_TASK_SET_LOCK" task-spawn; then
-    fm_lock_release "$SPAWN_TASK_SET_LOCK" || true
-    echo "error: could not record task-set lock holder for spawn of $ID" >&2
-    exit 1
-  fi
-  SPAWN_TASK_SET_LOCK_HELD=1
-  spawn_refuse_if_away_spend_cap
-  spawn_require_relocated_queued_work
+  # Custody alone is not admission: recovery may follow a rejected recheck.
+  # Admission guards exit on refusal. Isolate that exit so an EXIT-cleanup
+  # caller can skip publication and still release all of its other custody.
+  (spawn_refuse_if_away_spend_cap; spawn_require_relocated_queued_work)
 }
 if [ "$RELAUNCH" -eq 1 ]; then
   SPAWN_CONTROL_LOCK="$STATE/.control-$ID.lock"
@@ -2516,7 +2525,7 @@ if [ "$RELAUNCH" -eq 0 ]; then
     echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
     exit 1
   }
-  [ "$KIND" != secondmate ] || spawn_take_task_set_lock
+  [ "$KIND" != secondmate ] || spawn_take_task_set_lock || exit "$?"
   SPAWN_CONTROL_LOCK="$STATE/.control-$ID.lock"
   if ! fm_lock_try_acquire "$SPAWN_CONTROL_LOCK"; then
     echo "error: another lifecycle action is already running for task $ID" >&2
@@ -6621,6 +6630,13 @@ spawn_slot_refused() {
     fi
   fi
   if [ "$update_recovery" = 1 ]; then
+    if [ "$RELAUNCH" -eq 0 ]; then
+      spawn_take_task_set_lock || {
+        rm -f -- "$recovery"
+        echo "error: assigned copy $WT and endpoint $T retained; task record publication refused" >&2
+        exit 1
+      }
+    fi
     fm_backlog_atomic_transition publish "$recovery" "$STATE/$ID.meta" "task record" "$STATE" || {
       echo "error: could not record retained copy $WT: $FM_BACKLOG_TRANSITION_ERROR" >&2
       rm -f -- "$recovery"
@@ -7901,7 +7917,7 @@ fi
   exit 1
 }
 if [ "$RELAUNCH" -eq 0 ]; then
-  [ "$KIND" = secondmate ] || spawn_take_task_set_lock
+  [ "$KIND" = secondmate ] || spawn_take_task_set_lock || exit "$?"
   if ! fm_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE"; then
     echo "error: task record for $ID could not be published ($FM_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1

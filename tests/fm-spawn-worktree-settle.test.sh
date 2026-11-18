@@ -1137,6 +1137,16 @@ make_lock_case() {
     if [ "${SPAWN_TASK_SET_LOCK_HELD:-0}" = 1 ] && [ -n "${FM_LOCK_TAKE_OBSERVED:-}" ]; then
       : > "$FM_LOCK_TAKE_OBSERVED"
     fi
+    if [ -n "${FM_LOCK_PUBLISH_OBSERVED:-}" ] &&
+      [ ! -e "$FM_LOCK_PUBLISH_OBSERVED" ] &&
+      [ -f "${STATE:-}/${ID:-}.meta" ]; then
+      if [ "${SPAWN_TASK_SET_LOCK_HELD:-0}" != 1 ] ||
+        [ ! -d "${SPAWN_TASK_SET_LOCK:-}" ]; then
+        echo 'TL2: task record appeared without task-set custody' >&2
+        exit 97
+      fi
+      : > "$FM_LOCK_PUBLISH_OBSERVED"
+    fi
     if [ -n "${FM_LOCK_PRE_GATE:-}" ] && [ "${SPAWN_META_LOCK_HELD:-0}" = 1 ] &&
       [ -n "${SPAWN_META_TMP:-}" ] && [ -s "$SPAWN_META_TMP" ] &&
       [ "${lock_pre_seen:-0}" = 0 ]; then
@@ -1144,8 +1154,11 @@ make_lock_case() {
       : > "$FM_LOCK_PRE_GATE.ready"
       IFS= read -r _ < "$FM_LOCK_PRE_GATE"
     fi
-    if [ -n "${FM_LOCK_POST_GATE:-}" ] && [ "${SPAWN_TASK_SET_LOCK_HELD:-0}" = 1 ] &&
-      [ -n "${WT:-}" ] && [ "${lock_post_seen:-0}" = 0 ]; then
+    # Observe first appearance inside publish, but pause only in the parent
+    # after publish returns and clears its temporary path, never a subshell.
+    if [ -n "${FM_LOCK_POST_GATE:-}" ] && [ -e "$FM_LOCK_PUBLISH_OBSERVED" ] &&
+      [ "${BASH_SUBSHELL:-0}" = 0 ] && [ "${SPAWN_TASK_SET_LOCK_HELD:-0}" = 1 ] &&
+      [ -z "${SPAWN_META_TMP:-}" ] && [ "${lock_post_seen:-0}" = 0 ]; then
       lock_post_seen=1
       : > "$FM_LOCK_POST_GATE.ready"
       IFS= read -r _ < "$FM_LOCK_POST_GATE"
@@ -1165,6 +1178,7 @@ lock_spawn() { # <id> <project> <copy> [<get-gate> <pre-gate> <post-gate>]
   FM_LOCK_SYNC="$LOCK_DIR/sync.sh" FM_LOCK_GET_GATE=${4:-} FM_LOCK_PRE_GATE=${5:-} FM_LOCK_POST_GATE=${6:-} \
     FM_LOCK_PANE_LOG="$LOCK_DIR/$id.panes" FM_LOCK_LAUNCH_LOG="$LOCK_DIR/$id.launch" \
     FM_LOCK_TAKE_OBSERVED="$LOCK_DIR/$id.took-task-set" \
+    FM_LOCK_PUBLISH_OBSERVED="$LOCK_DIR/$id.published-under-lock" \
     run_settle_spawn "$id"
 }
 
@@ -1276,6 +1290,7 @@ test_task_set_publish_serializes_publishers() {
   [ ! -f "$LOCK_HOME/state/lock-b.meta" ] || fail 'TL2: two publishers entered together'
   printf 'go\n' > "$LOCK_DIR/post"
   lock_finish "$a" lock-a 0
+  [ -e "$LOCK_DIR/lock-a.published-under-lock" ] || fail 'TL2: publication custody was not observed'
   lock_probe || fail 'TL2: published spawn retained lock'
   pass 'TL2: publication excludes a competing publisher and releases custody'
 }
