@@ -807,8 +807,8 @@ It uses the shared harness-process classifier in `bin/fm-agent-process-lib.sh`, 
 | What the process view shows | Registered agent | `agent_not_found` |
 | --- | --- | --- |
 | A harness in the foreground process group, or still a descendant of the pane shell | `live` | `live` |
-| A foreground that is nothing but shells, with no harness descendant | `stale-agent`: agent-free, with that explicit reason | `no-agent`: a proven agent-free shell |
-| A foreground holding anything else after the bounded settle window | `live`: registration retains authority | `unknown`: registration absence does not identify the process |
+| A foreground that is nothing but shells, with no harness descendant and no Bun descendant that may be omp | `stale-agent`: agent-free, with that explicit reason | `no-agent`: a proven agent-free shell |
+| A foreground holding anything else after the bounded settle window, or a shells-only foreground with a Bun descendant that may be the installed omp ([identity rule](agent-control.md)) | `live`: registration retains authority | `unknown`: registration absence does not identify the process |
 | An unreadable, malformed, or mismatched process view | `unknown` | `unknown` |
 
 The settle window exists because an idle shell transiently hosts prompt helpers such as starship in its foreground group.
