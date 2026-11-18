@@ -101,9 +101,7 @@
 #                                   classification (default "heartbeat"); empty
 #                                   disables. Use sparingly: it overrides the
 #                                   captain-relevant escalation for matching
-#                                   kinds. A captain inbox note wake is the one
-#                                   exception: it is always forwarded and its
-#                                   note acked (forward_inbox_note).
+#                                   kinds.
 #          FM_STALE_ESCALATE_SECS   idle seconds before a stale pane escalates
 #                                   as a possible wedge (default 240)
 #          FM_PAUSE_RESURFACE_SECS  seconds a declared wait stays declared,
@@ -1757,24 +1755,28 @@ EOF
 }
 
 # A "check: captain inbox note <id>" row is never retired by the wake drain while
-# its note is unacked (bin/fm-wake-drain.sh header), and this daemon cannot read
-# the note, so it forwards the note line into the escalation buffer first and
-# acks the note itself only once that write succeeded. A failed forward or ack
-# leaves both the note and its wake row for the next cycle. This runs for every
-# such row, including one FM_INJECT_SKIP would otherwise leave unhandled.
-forward_inbox_note() {  # <payload> <state> <note-id>
-  local payload=$1 state=$2 id=$3
-  log "escalate: $payload"
-  escalate_add "$state" "$payload" || return 1
-  if [ "${FM_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" -le 0 ]; then
-    escalate_flush "$state" || true
-  fi
-  FM_STATE_OVERRIDE="$state" "$FM_DAEMON_DIR/fm-inbox.sh" drain --ack "$id" >/dev/null
+# its note is unacked (bin/fm-wake-drain.sh header), and this daemon cannot read a
+# note on the captain's behalf, so it never acks one. It handles such a row exactly
+# as any other check wake, FM_INJECT_SKIP included, then asks the drain to keep it
+# (--keep-unacked-notes): the row and the note stay until the reader that opens the
+# whole note acks it, while every other row retires. The drain presents a kept row
+# again on every later drain, so the daemon handles each note once, recorded by a
+# marker that lives only while the note's row is still queued.
+inbox_note_wake_id() { # <payload> -> the note id of a captain inbox note wake
+  local id
+  case "$1" in
+    "check: captain inbox note "*) ;;
+    *) return 1 ;;
+  esac
+  id=${1#"check: captain inbox note "}
+  id=${id%%[!A-Za-z0-9._-]*}
+  [ -n "$id" ] || return 1
+  printf '%s\n' "$id"
 }
 
 handle_durable_wakes() {  # <watcher-reason> <state>
   local fallback_reason=$1 state=$2 out err tab epoch sequence kind key payload rest
-  local handled=0 failed=0 ack_through ack_generation note_id
+  local handled=0 failed=0 ack_through ack_generation note_id note_ids='' note_dir marker
   out=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || return 1
   err=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || { rm -f "$out"; return 1; }
   if ! "$FM_DAEMON_DIR/fm-wake-drain.sh" > "$out" 2> "$err"; then
@@ -1783,27 +1785,35 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     return 1
   fi
 
+  note_dir="$state/.subsuper-note-wakes"
   tab=$(printf '\t')
   while IFS="$tab" read -r epoch sequence kind key payload rest; do
     case "$epoch" in ''|*[!0-9]*) continue ;; esac
     case "$sequence" in ''|*[!0-9]*) continue ;; esac
     case "$kind" in signal|stale|check|heartbeat) ;; *) continue ;; esac
     note_id=
-    if [ "$kind" = check ]; then
-      case "$payload" in
-        "check: captain inbox note "*)
-          note_id=${payload#"check: captain inbox note "}
-          note_id=${note_id%%[!A-Za-z0-9._-]*}
-          ;;
-      esac
-    fi
+    [ "$kind" != check ] || note_id=$(inbox_note_wake_id "$payload") || note_id=
     if [ -n "$note_id" ]; then
-      forward_inbox_note "$payload" "$state" "$note_id" || failed=1
+      note_ids="$note_ids $note_id "
+      if [ -e "$note_dir/$note_id" ]; then
+        handled=$((handled + 1))
+        continue
+      fi
+    fi
+    if handle_wake "$payload" "$state"; then
+      if [ -n "$note_id" ]; then
+        mkdir -p "$note_dir" && : > "$note_dir/$note_id" || failed=1
+      fi
     else
-      handle_wake "$payload" "$state" || failed=1
+      failed=1
     fi
     handled=$((handled + 1))
   done < "$out"
+  # A marker outlives its row by one drain at most: drop those of rows no longer queued.
+  for marker in "$note_dir"/*; do
+    [ -e "$marker" ] || continue
+    case "$note_ids" in *" ${marker##*/} "*) ;; *) rm -f -- "$marker" ;; esac
+  done
   if [ "$handled" -eq 0 ]; then handle_wake "$fallback_reason" "$state" || failed=1; fi
   forward_overdue_rows "$state" "$out" || failed=1
 
@@ -1820,7 +1830,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     return 1
   fi
   FM_WAKE_ACK_AWAY_DAEMON=1 "$FM_DAEMON_DIR/fm-wake-drain.sh" --ack-through "$ack_through" \
-    --recovery-generation "$ack_generation"
+    --recovery-generation "$ack_generation" --keep-unacked-notes
 }
 
 # --- log --------------------------------------------------------------------

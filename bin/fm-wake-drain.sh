@@ -11,11 +11,15 @@
 # list. Acknowledgement refuses while a row this actor presented still needs an action;
 # docs/configuration.md "Open-work ledger" owns that gate, receipt standing, and invalidation.
 # Acknowledgement also refuses, exit 1 naming each id, while a "check: captain inbox note <id>"
-# row this actor would consume at or below the cutoff has a note still unacked; bin/fm-inbox.sh
-# pending owns that record (an inbox whose state cannot be read refuses too), and
-# bin/fm-inbox.sh drain --ack <id> clears it. No actor is exempt: the away supervise daemon
-# acks each note itself once it has buffered it for escalation. The rows checked are the rows
-# consumed: both come from one snapshot of the actor's claim taken under the first queue lock.
+# row this actor would consume at or below the cutoff has a note not demonstrably acked;
+# bin/fm-inbox.sh pending owns that record (an absent or unreadable inbox, an unreadable queue
+# and an id with no record all refuse too), and bin/fm-inbox.sh drain --ack <id> clears it.
+# No actor is exempt. A caller that cannot read notes, such as the away supervise daemon, adds
+# --keep-unacked-notes: it retires every other row but leaves each such row queued, and
+# never acks a note, so the reader that opens the whole note acks it and retires the row.
+# The rows checked are the rows consumed: both come from one snapshot of the actor's claim
+# taken under the first queue lock. That snapshot, .wake-ack-rows.<pid>.*, is held across
+# the unlocked receipt window, and its pid keeps every other drain's scratch rotation off it.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
@@ -32,9 +36,11 @@
 # stale, check, or heartbeat. Extra query arguments and any actor but main exit 2.
 # Every scratch file this script mints (.main-eligible-rows.tmp.*,
 # .wake-rows.consume.*, .wake-queue.retire.*, .wake-queue.ack.*,
-# .wake-queue.actor-view.*, .wake-ack-rows.*) is created and removed under the queue lock, so one
-# found while taking that lock was left by a drain that died mid-write; each
-# non-deferred presentation or acknowledgement rotates such leftovers away.
+# .wake-queue.actor-view.*, .wake-ack-rows.<pid>.*) is created and removed under the queue lock,
+# so one found while taking that lock was left by a drain that died mid-write; each
+# non-deferred presentation or acknowledgement rotates such leftovers away. The
+# one exception is .wake-ack-rows.<pid>.*, which a live acknowledgement keeps across its
+# unlocked receipt window; rotation removes it only once that pid is gone.
 # FM_STATUS_PRESENTATION_LOCK_TIMEOUT sets the positive whole-second wait for
 # presentation-path locks (default 10); queue mutation locks remain blocking.
 set -u
@@ -58,6 +64,7 @@ SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd
 DRAIN_TMP=
 DRAIN_VIEW_TMP=
 ACK_ROWS_TMP=
+KEEP_UNACKED_NOTES=false
 DRAIN_LOCK_HELD=false
 RAW_ROWS=
 RECOVERY_MARKER="$STATE/.watcher-down"
@@ -106,11 +113,23 @@ rows_file_valid() { fm_wake_grant_rows_valid "$1"; }
 
 # rotate_scratch_locked: remove scratch a dead drain left behind (header).
 rotate_scratch_locked() {
-  local scratch
+  local scratch owner
   for scratch in "$STATE"/.main-eligible-rows.tmp.* "$STATE"/.wake-rows.consume.* \
     "$STATE"/.wake-queue.retire.* "$STATE"/.wake-queue.ack.* "$STATE"/.wake-queue.actor-view.* \
     "$STATE"/.wake-ack-rows.*; do
     [ -e "$scratch" ] || [ -L "$scratch" ] || continue
+    case "$scratch" in
+      "$STATE"/.wake-ack-rows.*)
+        # A live acknowledgement holds its row set across the window where it
+        # released this lock; only a set whose pid is gone was left by a dead drain.
+        owner=${scratch##*/.wake-ack-rows.}
+        owner=${owner%%.*}
+        case "$owner" in
+          ''|*[!0-9]*) ;;
+          *) if kill -0 "$owner" 2>/dev/null; then continue; fi ;;
+        esac
+        ;;
+    esac
     rm -f -- "$scratch"
   done
 }
@@ -221,29 +240,70 @@ consume_actor_rows_locked() { # <rows-file> <cutoff> <consumed-file>
 }
 
 # Refuse an acknowledgement that would retire the only reminder of a captain
-# inbox note still unacked (header). Rows are read from this actor's own claimed
-# set at or below the cutoff, so a row above it or reserved for another actor
-# never blocks. Exit shape matches the overdue-row refusal.
-refuse_unacked_inbox_notes_locked() { # <rows-file> <cutoff>
-  local rows=$1 cutoff=$2 ids unacked id
+# inbox note not demonstrably acked (header). Rows are read from this actor's own
+# claimed set at or below the cutoff, so a row above it or reserved for another
+# actor never blocks. Every failure to establish a note's state - an unreadable
+# queue, a missing row set, an inbox that cannot be read, an id with no record, a
+# reply that does not answer for every id - refuses. Exit shape matches the
+# overdue-row refusal. With --keep-unacked-notes the same rows are dropped from
+# <rows-file> instead, so they are neither consumed nor claimed away.
+gate_unacked_inbox_notes_locked() { # <rows-file> <cutoff>
+  local rows=$1 cutoff=$2 pairs ids states want got held_ids held_seqs seq id tmp state
   [ -s "$FM_WAKE_QUEUE" ] || return 0
-  ids=$(awk -F '\t' -v cutoff="$cutoff" -v seqs="$rows" '
-    BEGIN { while ((getline line < seqs) > 0) mine[line]=1 }
+  if [ ! -e "$rows" ]; then
+    echo "wake drain: the acknowledged row set is missing; acknowledgement refused" >&2
+    return 1
+  fi
+  if ! pairs=$(awk -F '\t' -v cutoff="$cutoff" '
+    FILENAME == ARGV[1] { mine[$1] = 1; next }
     NF >= 5 && $2 ~ /^[0-9]+$/ && $2 + 0 <= cutoff + 0 && ($2 in mine) && $3 == "check" \
-      && match($5, /^check: captain inbox note [A-Za-z0-9._-]+/) { print substr($5, 27, RLENGTH - 26) }
-  ' "$FM_WAKE_QUEUE" | LC_ALL=C sort -u) || return 1
-  [ -n "$ids" ] || return 0
+      && match($5, /^check: captain inbox note [A-Za-z0-9._-]+/) { print $2 "\t" substr($5, 27, RLENGTH - 26) }
+  ' "$rows" "$FM_WAKE_QUEUE"); then
+    echo "wake drain: queue rows could not be read to check captain inbox notes; acknowledgement refused" >&2
+    return 1
+  fi
+  [ -n "$pairs" ] || return 0
+  ids=$(printf '%s\n' "$pairs" | awk -F '\t' '!seen[$2]++ { print $2 }') || return 1
+  want=$(printf '%s\n' "$ids" | awk 'END { print NR + 0 }')
   # shellcheck disable=SC2086
-  if ! unacked=$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-inbox.sh" pending $ids); then
+  states=$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-inbox.sh" pending $ids 2>/dev/null) || true
+  got=$(printf '%s\n' "$states" | awk '$1 == "pending" || $1 == "unknown" || $1 == "handled" { n++ } END { print n + 0 }')
+  if [ "$got" != "$want" ]; then
     echo "wake drain: captain inbox note state could not be read; acknowledgement refused" >&2
     return 1
   fi
-  [ -n "$unacked" ] || return 0
+  held_ids=$(printf '%s\n' "$states" | awk '$1 == "pending" || $1 == "unknown" { print $2 }') || return 1
+  [ -n "$held_ids" ] || return 0
+  if [ "$KEEP_UNACKED_NOTES" = true ]; then
+    held_seqs=
+    while IFS=$'\t' read -r seq id; do
+      case $'\n'"$held_ids"$'\n' in
+        *$'\n'"$id"$'\n'*) held_seqs="$held_seqs $seq" ;;
+      esac
+    done <<EOF
+$pairs
+EOF
+    tmp="$rows.keep"
+    awk -v held="$held_seqs" '
+      BEGIN { n = split(held, a, " "); for (i = 1; i <= n; i++) skip[a[i]] = 1 }
+      $1 ~ /^[0-9]+$/ && !($1 in skip) { print $1 }
+    ' "$rows" > "$tmp" && mv -f "$tmp" "$rows" || return 1
+    printf 'wake drain: kept queued row(s)%s: their captain inbox note is not acked, so the reader that opens the note must ack it\n' "$held_seqs" >&2
+    return 0
+  fi
   echo "error: captain inbox notes presented in this range are not acked; acknowledgement refused"
-  while IFS= read -r id; do
-    printf '  %s - read it, then run bin/fm-inbox.sh drain --ack %s\n' "$id" "$id"
+  while IFS= read -r state; do
+    id=${state#* }
+    case "$state" in
+      unknown\ *)
+        printf '  %s - its note state cannot be established; make the inbox readable, or run bin/fm-inbox.sh drain --ack %s\n' "$id" "$id"
+        ;;
+      *)
+        printf '  %s - read it, then run bin/fm-inbox.sh drain --ack %s\n' "$id" "$id"
+        ;;
+    esac
   done <<EOF
-$unacked
+$(printf '%s\n' "$states" | awk '$1 == "pending" || $1 == "unknown"')
 EOF
   return 1
 }
@@ -293,9 +353,13 @@ case "${1:-}" in
       || { echo "wake drain: acknowledgement requires its recovery generation" >&2; exit 2; }
     ACK_GENERATION=${4:-}
     case "$ACK_GENERATION" in ''|*[!A-Za-z0-9._-]*) echo "wake drain: invalid recovery generation" >&2; exit 2 ;; esac
-    [ "$#" -eq 4 ] || { echo "wake drain: unexpected acknowledgement arguments" >&2; exit 2; }
+    case "$#:${5:-}" in
+      4:) ;;
+      5:--keep-unacked-notes) KEEP_UNACKED_NOTES=true ;;
+      *) echo "wake drain: unexpected acknowledgement arguments" >&2; exit 2 ;;
+    esac
     ;;
-  *) echo "usage: fm-wake-drain.sh [--reemit | --queued | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
+  *) echo "usage: fm-wake-drain.sh [--reemit | --queued | --ack-through SEQUENCE --recovery-generation GENERATION [--keep-unacked-notes]]" >&2; exit 2 ;;
 esac
 
 [ "$ACTOR" != branch ] || require_branch_eligible_rows || exit 1
@@ -968,7 +1032,7 @@ if [ -n "$ACK_THROUGH" ]; then
   # Fix the set this acknowledgement consumes now, under this lock: the inbox
   # note check, the receipts below and the consumption all use this one set, so
   # a row claimed while the lock is released is never consumed unchecked.
-  ACK_ROWS_TMP=$(mktemp "$STATE/.wake-ack-rows.XXXXXX") || exit 1
+  ACK_ROWS_TMP=$(mktemp "$STATE/.wake-ack-rows.$$.XXXXXX") || exit 1
   chmod 0600 "$ACK_ROWS_TMP" || exit 1
   if [ "$ACTOR" = branch ]; then
     ack_rows_source=$ELIGIBLE_ROWS_FILE
@@ -978,7 +1042,7 @@ if [ -n "$ACK_THROUGH" ]; then
   if [ -e "$ack_rows_source" ] || [ -L "$ack_rows_source" ]; then
     awk -v cutoff="$ACK_THROUGH" '$1 ~ /^[0-9]+$/ && $1 + 0 <= cutoff + 0 { print $1 }' "$ack_rows_source" > "$ACK_ROWS_TMP" || exit 1
   fi
-  refuse_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || exit 1
+  gate_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || exit 1
   if [ "$ACTOR" = branch ]; then
     # An away-posture grant can name check-kind rows - the attended
     # partition's check/decision exclusions lift under the away record
@@ -1007,6 +1071,12 @@ if [ -n "$ACK_THROUGH" ]; then
   fi
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
   DRAIN_LOCK_HELD=true
+  # The row set fixed above must still be there: a missing one would read as an
+  # empty set and let this ack report success with its checked rows left queued.
+  if [ ! -e "$ACK_ROWS_TMP" ]; then
+    echo "wake drain: the acknowledged row set vanished while the queue lock was released; acknowledgement refused" >&2
+    exit 1
+  fi
   DRAIN_TMP=$(mktemp "$STATE/.wake-queue.ack.XXXXXX") || exit 1
   chmod 0600 "$DRAIN_TMP" || exit 1
   if [ "$ACTOR" = branch ]; then

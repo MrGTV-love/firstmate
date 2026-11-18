@@ -63,11 +63,15 @@
 # Each reply is stamped with a durable per-home sequence, so the receipts cursor
 # is a strict total order and two replies recorded in the same second are both
 # readable. One reply per note: a second one is refused.
-# `pending` is the read-only query of this ack record: it prints each given id
-# whose note is not yet acked (still in the inbox, not in handled/), one per line,
-# and nothing for an acked or unknown id. An inbox it cannot read exits 1 instead,
-# because unreadable is not acked. bin/fm-wake-drain.sh --ack-through asks it which
-# presented notes are still unacked rather than reading the inbox itself.
+# `pending` is the read-only query of this ack record. It prints one line per given
+# id: `pending <id>` (still in the inbox), `handled <id>` (acked: in handled/, or
+# recorded by `drain --ack`), or `unknown <id>` (no record can be read: the inbox is
+# absent or unreadable, or the id is in neither place). It exits 1 when any id is
+# unknown, because unknown is not acked. `drain --ack <id>` is the way to clear an
+# id: it moves a pending note, and for an id with no record in a readable inbox it
+# records the ack in handled/<id>.acked; it refuses while the inbox cannot be read.
+# bin/fm-wake-drain.sh --ack-through asks `pending` which presented notes are not
+# yet acked rather than reading the inbox itself.
 # `ready` is the read-only primary-readiness projection (lock, wake-consumer
 # health, away posture, observation time). It never acquires the session lock
 # and never infers liveness from a lock file, a session, or a pane.
@@ -1123,14 +1127,25 @@ cmd_drain() {
   if [ "${1:-}" = "--ack" ]; then
     shift
     [ "$#" -gt 0 ] || die "usage: fm-inbox.sh drain --ack <id>..."
-    mkdir -p "$INBOX/handled"
     local id
     for id in "$@"; do
+      valid_note_id "$id" || die "invalid note id: $id"
+    done
+    for id in "$@"; do
       if [ -f "$INBOX/$id.note" ]; then
-        mv "$INBOX/$id.note" "$INBOX/handled/$id.note"
+        mkdir -p "$INBOX/handled" || die "could not create $INBOX/handled"
+        mv "$INBOX/$id.note" "$INBOX/handled/$id.note" || die "could not move note $id to handled"
         printf 'acked %s\n' "$id"
-      else
+      elif [ -f "$INBOX/handled/$id.note" ] || [ -f "$INBOX/handled/$id.acked" ]; then
         printf 'already-acked %s\n' "$id"
+      elif [ -d "$INBOX" ] && [ -r "$INBOX" ] && [ -x "$INBOX" ]; then
+        # A readable inbox with no record of the id holds no unread note to lose;
+        # the ack is written down so a wake row naming it can still be cleared.
+        mkdir -p "$INBOX/handled" || die "could not create $INBOX/handled"
+        : > "$INBOX/handled/$id.acked" || die "could not record the ack of $id"
+        printf 'already-acked %s (no such note; ack recorded)\n' "$id"
+      else
+        die "inbox is not readable, so note $id cannot be acked: $INBOX"
       fi
     done
     return 0
@@ -1140,19 +1155,25 @@ cmd_drain() {
 }
 
 cmd_pending() {
-  local id
-  # An unreadable inbox cannot show a note, and "not found" there is not "acked":
-  # refuse rather than report nothing pending. An inbox that does not exist holds
-  # no unread note at all.
-  if [ -e "$INBOX" ] && { [ ! -d "$INBOX" ] || [ ! -r "$INBOX" ] || [ ! -x "$INBOX" ]; }; then
-    die "inbox is not readable, so note state is unknown: $INBOX"
+  local id bad=0 usable=1
+  # Only a note found pending or handled is established. An inbox that cannot be
+  # read, or an id with no record, is unknown: "not found" is never "acked".
+  if [ ! -d "$INBOX" ] || [ ! -r "$INBOX" ] || [ ! -x "$INBOX" ]; then
+    usable=0
+    echo "fm-inbox: inbox is not readable, so note state is unknown: $INBOX" >&2
   fi
   for id in "$@"; do
     valid_note_id "$id" || die "invalid note id: $id"
-    if [ -f "$INBOX/$id.note" ]; then
-      printf '%s\n' "$id"
+    if [ "$usable" -eq 1 ] && [ -f "$INBOX/$id.note" ]; then
+      printf 'pending %s\n' "$id"
+    elif [ "$usable" -eq 1 ] && { [ -f "$INBOX/handled/$id.note" ] || [ -f "$INBOX/handled/$id.acked" ]; }; then
+      printf 'handled %s\n' "$id"
+    else
+      printf 'unknown %s\n' "$id"
+      bad=1
     fi
   done
+  [ "$bad" -eq 0 ]
 }
 
 # ---------------------------------------------------------------- dispatch
