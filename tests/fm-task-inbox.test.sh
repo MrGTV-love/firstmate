@@ -451,6 +451,161 @@ test_idempotent_write_follows_concurrent_ack() {
   pass "inbox: idempotent enqueue follows a record concurrently moved to handled"
 }
 
+# Seed <n> acknowledged records straight into handled/ with one builtin write
+# each. The record format is the library's own (see its header), and seeding by
+# hand keeps a 1600-record fixture from costing more than the case under test.
+seed_handled_records() {  # <state> <task> <n> [body-prefix]
+  local state=$1 task=$2 n=$3 prefix=${4:-handled record} dir i f
+  dir="$state/$task.inbox/handled"; mkdir -p "$dir"
+  i=0
+  while [ "$i" -lt "$n" ]; do
+    i=$((i + 1))
+    printf -v f '%s/%04d.msg' "$dir" "$i"
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\n%s %s\nsecond line\n' "$prefix" "$i" > "$f"
+  done
+}
+
+# PATH shims that log each launch of awk, cat, cmp and grep before running the
+# real tool, so a case can count the processes a library call starts.
+make_launch_counter() {  # <dir> -> echoes the shim dir; launches log to <dir>/launches
+  local dir=$1 tool real
+  mkdir -p "$dir/shims"; : > "$dir/launches"
+  for tool in awk cat cmp grep; do
+    real=$(command -v "$tool") || fail "no real $tool to shim"
+    printf '#!/bin/sh\nprintf "%%s\\n" "%s" >> "%s"\nexec "%s" "$@"\n' "$tool" "$dir/launches" "$real" > "$dir/shims/$tool"
+    chmod +x "$dir/shims/$tool"
+  done
+  printf '%s' "$dir/shims"
+}
+
+count_idempotent_launches() {  # <dir> <state> <text> -> launches of awk/cat/cmp/grep
+  local dir=$1 state=$2 text=$3 shims
+  shims=$(make_launch_counter "$dir")
+  PATH="$shims:$PATH" FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_task_inbox_write_idempotent "$2" t1 "$3" >/dev/null
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$text" || fail "idempotent write failed while counting launches"
+  wc -l < "$dir/launches" | tr -d ' '
+}
+
+test_idempotent_scan_launches_do_not_grow_with_handled_records() {
+  local dir small large rec
+  dir="$TMP_ROOT/idem-scale"; mkdir -p "$dir/s50" "$dir/s1600"
+  seed_handled_records "$dir/s50/state" t1 50
+  seed_handled_records "$dir/s1600/state" t1 1600
+  small=$(count_idempotent_launches "$dir/s50" "$dir/s50/state" "brand new steer text")
+  large=$(count_idempotent_launches "$dir/s1600" "$dir/s1600/state" "brand new steer text")
+  # The dedup decides "already enqueued" with a fixed number of processes; the
+  # per-record fork loop is what pushed a large handled/ folder past the remote
+  # steer budget. A small fixed difference is allowed, a per-record one is not.
+  [ "$((large - small))" -le 4 ] \
+    || fail "dedup launches grew with the handled records: $small at 50 records, $large at 1600"
+  rec=$(ls "$dir/s1600/state/t1.inbox"/*.msg) || fail "the new steer was not written"
+  grep -qxF "brand new steer text" "$rec" || fail "the new record does not hold the steer text: $rec"
+  pass "inbox: the idempotent enqueue launches the same processes at 50 and 1600 handled records ($small vs $large)"
+}
+
+# The dedup looks only at records that share the text's first non-empty line.
+# Each outcome below is what a full compare of every record gives.
+test_idempotent_prefilter_keeps_every_dedup_outcome() {
+  local state inbox long nl=$'\n' out r1 r2 text
+  state="$TMP_ROOT/idem-prefilter/state"; inbox="$state/t1.inbox"; mkdir -p "$state"
+  long=$(printf 'L%.0s' $(seq 1 6000))
+  idem() { inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 "$@" || fail "idempotent write failed for: $1"; }
+  # 001-004: first lines that a careless search would mishandle; 005: leading
+  # blank lines; 006: an ordinary record; 007: acknowledged; 008: fire-and-forget.
+  for text in 'a.*b[c]\(d\)^$ +?|{}' '-n -e --' 'host: path: value' "$long${nl}tail" $'\n\nlead\nblank' 'same text' 'handled text'; do
+    inbox_lib "$state" fm_task_inbox_write "$state" t1 "$text" >/dev/null || fail "seed write failed"
+  done
+  mv "$inbox/007.msg" "$inbox/handled/" || fail "could not acknowledge the handled seed"
+  inbox_lib "$state" fm_task_inbox_write "$state" t1 'same text' fire-and-forget >/dev/null || fail "seed faf failed"
+  [ "$(idem 'a.*b[c]\(d\)^$ +?|{}')" = "$inbox/001.msg" ] || fail "regex-character first line did not dedup"
+  [ "$(idem '-n -e --')" = "$inbox/002.msg" ] || fail "leading-dash first line did not dedup"
+  [ "$(idem 'host: path: value')" = "$inbox/003.msg" ] || fail "colon first line did not dedup"
+  [ "$(idem "$long${nl}tail")" = "$inbox/004.msg" ] || fail "6000-character first line did not dedup"
+  [ "$(idem $'\n\nlead\nblank')" = "$inbox/005.msg" ] || fail "leading blank lines did not dedup"
+  [ "$(idem 'same text')" = "$inbox/006.msg" ] || fail "ordinary text did not dedup onto the ordinary record"
+  [ "$(idem 'handled text')" = "$inbox/handled/007.msg" ] || fail "acknowledged text did not dedup onto its handled record"
+  [ "$(idem 'same text' fire-and-forget)" = "$inbox/008.msg" ] || fail "fire-and-forget text did not dedup onto the fire-and-forget record"
+  # Same first line, different tail: a NEW record, never the near miss.
+  out=$(idem "$long${nl}other"); [ "$out" = "$inbox/009.msg" ] || fail "near miss (long first line) was not written as 009: $out"
+  out=$(idem $'-n -e --\nmore'); [ "$out" = "$inbox/010.msg" ] || fail "near miss (leading dash) was not written as 010: $out"
+  # A text that equals a record header line is not an enqueued text.
+  out=$(idem 'schema=fm-task-inbox.v1'); [ "$out" = "$inbox/011.msg" ] || fail "header-line text was not written as 011: $out"
+  # The empty text has no first line to search for: it still dedups onto itself.
+  r1=$(idem ''); r2=$(idem '')
+  [ "$r1" = "$inbox/012.msg" ] && [ "$r2" = "$r1" ] || fail "the empty text did not dedup onto its own record: $r1 vs $r2"
+  [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 11 ] || fail "dedup outcomes left the wrong number of unhandled records"
+  pass "inbox: the first-line prefilter keeps every dedup outcome of the full compare"
+}
+
+# A TERM or INT while the lock is held (the remote budget's kill) leaves no
+# temp file behind, frees the lock, and the next steer lands.
+test_idempotent_write_signal_cleans_up() {
+  local sig state inbox started pid rc=0 sleeper leftovers next
+  for sig in TERM INT; do
+    state="$TMP_ROOT/idem-signal-$sig/state"; inbox="$state/t1.inbox"; mkdir -p "$state"
+    inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "seed failed"
+    started="$TMP_ROOT/idem-signal-$sig/started"; sleeper="$TMP_ROOT/idem-signal-$sig/sleeper"
+    # Block inside the compare. A background job (or a suite run from one) starts
+    # with INT ignored, so perl first restores the default disposition.
+    FM_STATE_OVERRIDE="$state" STARTED="$started" SLEEPER="$sleeper" perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' bash -c '
+      . "$1"
+      fm_task_inbox_body() { sleep 60 & echo $! > "$SLEEPER"; echo started > "$STARTED"; wait $!; }
+      fm_task_inbox_write_idempotent "$2" t1 "steer one"
+    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" >/dev/null 2>&1 &
+    pid=$!
+    for _ in $(seq 1 100); do [ -s "$started" ] && break; sleep 0.1; done
+    [ -s "$started" ] || { kill "$pid" 2>/dev/null; fail "$sig case never reached the compare"; }
+    kill -s "$sig" "$pid" || fail "could not signal the blocked writer"
+    rc=0; wait "$pid" || rc=$?
+    kill "$(cat "$sleeper")" 2>/dev/null || true # the stub's own sleeper, by recorded pid
+    [ "$rc" -ge 128 ] || fail "a $sig'd writer should die by the signal, exit $rc"
+    leftovers=$(find "$inbox" -maxdepth 1 -name '.dedup.*' | wc -l | tr -d ' ')
+    [ "$leftovers" = 0 ] || fail "a $sig'd writer left $leftovers .dedup temp file(s)"
+    [ ! -e "$inbox/.seq.lock" ] && [ ! -L "$inbox/.seq.lock" ] || fail "a $sig'd writer left the inbox lock held"
+    [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 1 ] || fail "a $sig'd writer changed the record set"
+    next=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 'steer two') || fail "the steer after a $sig'd writer failed"
+    [ "$next" = "$inbox/002.msg" ] || fail "the steer after a $sig'd writer did not land as 002: $next"
+  done
+  pass "inbox: a TERM or INT inside the idempotent write leaves no temp file, frees the lock, and the next steer lands"
+}
+
+# The caller's own TERM and INT traps survive a normal call unchanged.
+test_idempotent_write_keeps_caller_traps() {
+  local state out
+  state="$TMP_ROOT/idem-traps/state"; mkdir -p "$state"
+  out=$(FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    trap "echo caller-term" TERM
+    before=$(trap -p TERM INT)
+    fm_task_inbox_write_idempotent "$2" t1 "trap check" >/dev/null || exit 1
+    fm_task_inbox_write_idempotent "$2" t1 "trap check" >/dev/null || exit 1
+    [ "$(trap -p TERM INT)" = "$before" ] && echo kept
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state") || fail "trap probe failed"
+  [ "$out" = kept ] || fail "the idempotent write changed the caller's TERM or INT traps"
+  pass "inbox: the idempotent write restores the caller's TERM and INT traps"
+}
+
+# The sequence scan reads the same names as before, whatever else sits in the
+# inbox: gaps, handled records, leading zeros, non-record names.
+test_next_seq_ignores_gaps_and_non_record_names() {
+  local state inbox seq
+  state="$TMP_ROOT/next-seq/state"; inbox="$state/t1.inbox"; mkdir -p "$inbox/handled"
+  next_seq() { inbox_lib "$state" fm_task_inbox_next_seq "$inbox"; }
+  [ "$(next_seq)" = 001 ] || fail "an empty inbox did not start at 001"
+  : > "$inbox/001.msg"; : > "$inbox/005.msg"
+  [ "$(next_seq)" = 006 ] || fail "a gap changed the next sequence"
+  : > "$inbox/handled/0007.msg"
+  [ "$(next_seq)" = 008 ] || fail "a handled record with leading zeros was not counted"
+  : > "$inbox/abc.msg"; : > "$inbox/12x.msg"; : > "$inbox/.msg"; : > "$inbox/-3.msg"; : > "$inbox/009.txt"; : > "$inbox/handled/99.note"
+  [ "$(next_seq)" = 008 ] || fail "a non-record name was counted"
+  : > "$inbox/handled/1000.msg"
+  seq=$(next_seq)
+  [ "$seq" = 1001 ] || fail "a four-digit handled sequence was not followed: $seq"
+  pass "inbox: the sequence scan counts record names only, across the inbox and handled/"
+}
+
 test_handled_mv_dedups_by_sequence() {
   local state r1 r2 oldest r3
   state="$TMP_ROOT/dedup/state"; mkdir -p "$state"
@@ -1309,6 +1464,11 @@ test_ring_skips_dead_agent
 test_ring_submits_its_own_stuck_doorbell
 test_idempotent_write_dedups_exact_body
 test_idempotent_write_follows_concurrent_ack
+test_idempotent_scan_launches_do_not_grow_with_handled_records
+test_idempotent_prefilter_keeps_every_dedup_outcome
+test_idempotent_write_signal_cleans_up
+test_idempotent_write_keeps_caller_traps
+test_next_seq_ignores_gaps_and_non_record_names
 test_handled_mv_dedups_by_sequence
 test_survivor_doorbells_stay_bounded_until_acknowledged
 test_concurrent_writers_never_clobber

@@ -871,6 +871,47 @@ test_remote_transport_loss_preserves_expectation() {
   pass "fm-send remote: ssh 255 fails with resend-safe guidance and preserves the expectation"
 }
 
+# A remote inbox that already holds a large acknowledged history must not slow
+# the idempotent enqueue past the remote budget: the steer lands within the
+# default FM_SEND_REMOTE_BUDGET (deliberately not set here) and a same-id resend
+# still dedups onto that record.
+test_remote_steer_lands_behind_a_large_handled_folder() {
+  local dir fb ssh_log home rhome inbox rc err i f delivery count
+  dir="$TMP_ROOT/remote-large-handled"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-large-handled)
+  home=$(setup_remote_parent_home remote-large-handled "$rhome")
+  inbox="$rhome/state/parent-route/rsm.inbox"; mkdir -p "$inbox/handled"
+  i=0
+  while [ "$i" -lt 1600 ]; do
+    i=$((i + 1))
+    printf -v f '%s/handled/%04d.msg' "$inbox" "$i"
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\nacknowledged steer %s\nsecond line\n' "$i" > "$f"
+  done
+  delivery=ddddeeeeffff0000
+
+  # Delivered means the leg finished inside the default budget, which kills a
+  # slower leg before it writes.
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
+  err=$(cat "$dir/err")
+  [ "$rc" -eq 0 ] || fail "a steer behind 1600 handled records did not deliver (rc $rc): $err"
+  count=$(remote_inbox_records "$rhome" | grep -c . || true)
+  [ "$count" = 1 ] || fail "the steer behind 1600 handled records left $count unhandled records, not 1"
+  [ -z "$(find "$inbox" -maxdepth 1 -name '.dedup.*')" ] || fail "the remote leg left a .dedup temp file"
+
+  # The same delivery id resent dedups onto the one record already written.
+  for _ in 1 2; do
+    send_env "$fb" "$home" "$ssh_log" \
+      "$SEND" rsm --fire-and-forget "$delivery" "reconcile your own books" \
+      >"$dir/faf.out" 2>"$dir/faf.err" || fail "the fire-and-forget steer behind 1600 handled records failed: $(cat "$dir/faf.err")"
+  done
+  count=$(remote_inbox_records "$rhome" | grep -c . || true)
+  [ "$count" = 2 ] || fail "a same-id resend behind 1600 handled records did not dedup, found $count records"
+  [ -z "$(find "$inbox" -maxdepth 1 -name '.dedup.*')" ] || fail "the resend left a .dedup temp file"
+  pass "fm-send remote: a steer lands within the default budget behind 1600 handled records and a same-id resend dedups"
+}
+
 test_remote_send_budget_bounds_busy_lane() {
   local dir fb ssh_log home rhome rc err began elapsed count pend delivery corr ssh_before
   dir="$TMP_ROOT/remote-budget"; mkdir -p "$dir"
@@ -1144,6 +1185,7 @@ test_remote_slash_rides_inbox
 test_remote_real_failure_still_fails
 test_remote_exit3_no_longer_delivered
 test_remote_transport_loss_preserves_expectation
+test_remote_steer_lands_behind_a_large_handled_folder
 test_remote_send_budget_bounds_busy_lane
 test_local_typed_resend_with_correlation_meets_the_choice_rule
 test_local_pending_reports_delivered_unconfirmed

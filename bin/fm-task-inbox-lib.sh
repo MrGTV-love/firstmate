@@ -176,12 +176,17 @@ fm_task_inbox_seq_of() {  # <basename>
 
 # Next unused sequence, scanning the inbox root AND handled/ so an
 # acknowledged sequence is never reissued. Caller must hold .seq.lock.
+# The name test is fm_task_inbox_seq_of's, written inline: a command
+# substitution per record forks once per record while the lock is held.
 fm_task_inbox_next_seq() {  # <inbox-dir>
   local dir=$1 max=0 d f n
   for d in "$dir" "$dir/handled"; do
     for f in "$d"/*.msg; do
       [ -e "$f" ] || continue
-      n=$(fm_task_inbox_seq_of "${f##*/}") || continue
+      n=${f##*/}
+      n=${n%.msg}
+      case "$n" in ''|*[!0-9]*) continue ;; esac
+      n=$((10#$n))
       [ "$n" -le "$max" ] || max=$n
     done
   done
@@ -250,15 +255,67 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # secondmate request embeds a per-request correlation token in its body. The
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
+# The check costs a fixed number of processes however long handled/ grows, and
+# a TERM or INT during it leaves neither a temp file nor the lock behind.
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
-  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have f rec='' status=0
+  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want='' have='' f rec='' status=0
+  local first='' line names='' scan_all=0 prev_term prev_int aborted='' rc
   dir=$(fm_task_inbox_dir "$state" "$task")
   mkdir -p "$dir/handled" || return 1
   lock="$dir/.seq.lock"
-  fm_task_inbox_lock_acquire "$lock" || return 1
-  if want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX"); then
+  # A TERM or INT while the lock is held (the remote budget kills the leg this
+  # way) removes the temp files and releases the lock before the signal takes
+  # effect. The trap goes in before the acquire: the release is owner-checked,
+  # so it is harmless if the lock was never ours. A signal the caller ignores
+  # stays ignored, and the caller's own traps come back on every exit.
+  prev_term=$(trap -p TERM) prev_int=$(trap -p INT)
+  case "$prev_term" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_dedup_abort TERM' TERM ;; esac
+  case "$prev_int" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_dedup_abort INT' INT ;; esac
+  if ! fm_task_inbox_lock_acquire "$lock"; then
+    _fm_task_inbox_dedup_restore_traps
+    return 1
+  fi
+  # The candidate search stays inside the lock on purpose: two writers of the
+  # same text must see each other's new record, or both would write one. It is
+  # a single grep over the inbox and handled/ for the text's first non-empty
+  # line, so the hold no longer grows with the number of records; only the
+  # records that share that line reach the exact compare below. Without such a
+  # line (an empty text) or when grep cannot finish (a record moved to handled/
+  # mid-search), every record is compared, exactly as before.
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    first=$line
+    break
+  done <<TEXT
+$text
+TEXT
+  if [ -n "$first" ]; then
+    rc=0
+    f=$(LC_ALL=C grep -rlFx --include='*.msg' -e "$first" -- "$dir" 2>/dev/null) || rc=$?
+    if [ "$rc" -le 1 ]; then
+      names=$'\n'
+      while IFS= read -r f; do
+        [ -z "$f" ] || names="$names${f##*/}"$'\n'
+      done <<FOUND
+$f
+FOUND
+    else
+      scan_all=1
+    fi
+  else
+    scan_all=1
+  fi
+  if [ "$scan_all" -eq 0 ] && [ "$names" = $'\n' ]; then
+    : # no record shares the first line, so none can equal the text
+  elif want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX"); then
     if printf '%s' "$text" > "$want"; then
       for f in "$dir"/*.msg "$dir/handled"/*.msg; do
+        if [ "$scan_all" -eq 0 ]; then
+          case "$names" in
+            *$'\n'"${f##*/}"$'\n'*) ;;
+            *) continue ;;
+          esac
+        fi
         if [ ! -e "$f" ]; then
           case "$f" in
             "$dir"/*.msg)
@@ -295,12 +352,35 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
     rm -f "${want:-}" 2>/dev/null || true
     status=1
   fi
-  if [ "$status" -eq 0 ] && [ -z "$rec" ]; then
+  if [ -n "$aborted" ]; then
+    status=1
+  elif [ "$status" -eq 0 ] && [ -z "$rec" ]; then
     rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
   fi
   fm_lock_release "$lock"
+  _fm_task_inbox_dedup_restore_traps
   [ "$status" -eq 0 ] || return 1
   printf '%s' "$rec"
+}
+
+# Put back the TERM and INT traps fm_task_inbox_write_idempotent found. Reads
+# that function's locals (bash scoping), so only it and its abort call this.
+_fm_task_inbox_dedup_restore_traps() {
+  eval "${prev_term:-trap - TERM}"
+  eval "${prev_int:-trap - INT}"
+}
+
+# TERM or INT inside fm_task_inbox_write_idempotent: drop the temp files, free
+# the lock, hand the signal back to whoever owned it before, then deliver it.
+# A caller trap that survives the signal finds the function refusing to write.
+_fm_task_inbox_dedup_abort() {  # <TERM|INT>
+  local sig=$1 pid
+  rm -f "$want" "$have" 2>/dev/null || true
+  fm_lock_release "$lock"
+  aborted=$sig
+  _fm_task_inbox_dedup_restore_traps
+  fm_current_pid pid && kill -s "$sig" "$pid"
+  return 0
 }
 
 # The exact enqueued text back out of a record.
