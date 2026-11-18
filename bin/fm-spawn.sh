@@ -555,6 +555,12 @@
 #   it is leased durably in place to this home (`treehouse lease --path`, holder firstmate-skipped:<task>,
 #   because Treehouse resets a slot when its shell exits), recorded in $DATA/<task>/skipped-copies.tsv with the
 #   row read back, listed in the spawn output, and a second `treehouse get` in the same pane takes another copy.
+#   A skipped copy that Treehouse's own pool state, read again after `treehouse lease --path` refused it, shows already
+#   carrying another holder's lease (an ordinary lease or Treehouse's recovered lease) is passed over the same way with no lease
+#   of this home: nothing is written to it, the pane's exit never returns or resets a leased copy, and the row records the refusal
+#   text with the holder column not-leased-by-this-home, so bin/fm-teardown.sh never returns it. Every copy skipped this way is a
+#   distinct copy the acquisition never accepts again, so the loop ends by the one absolute bound below or by the copies
+#   the pool has; the refusal then names each copy and its reason. A lease failure that state cannot confirm refuses as below.
 #   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
 #   One absolute thirty-minute bound covers every get and is read before each get, after the custody scan.
@@ -6212,6 +6218,8 @@ spawn_path_is_prior_copy() { # <path>
 # copy (spawn_skip_copy); the pane then still sits in the skipped copy until the new get moves it.
 SPAWN_SKIPPED_SLOTS=()
 SPAWN_SKIPPED_INFO=()
+# The copies among SPAWN_SKIPPED_SLOTS that already carried another holder's lease: skipped without a lease of this home.
+SPAWN_REFUSED_INFO=()
 SPAWN_PROVEN_COPY=
 SPAWN_APPLY_FAILED=0
 SPAWN_ACQUIRE_T0=
@@ -6236,11 +6244,18 @@ spawn_pane_pid() {
 # firstmate-skipped:<task>) and recorded in $DATA/<task>/skipped-copies.tsv. Nothing here releases a lease.
 spawn_report_leased_copies() {
   local entry
-  [ "${#SPAWN_SKIPPED_INFO[@]}" -gt 0 ] || return 0
-  echo "leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: $DATA/$ID/skipped-copies.tsv):"
-  for entry in "${SPAWN_SKIPPED_INFO[@]}"; do
-    echo "  ${entry%%|*} (${entry#*|}) held by firstmate-skipped:$ID"
-  done
+  if [ "${#SPAWN_SKIPPED_INFO[@]}" -gt 0 ]; then
+    echo "leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: $DATA/$ID/skipped-copies.tsv):"
+    for entry in "${SPAWN_SKIPPED_INFO[@]}"; do
+      echo "  ${entry%%|*} (${entry#*|}) held by firstmate-skipped:$ID"
+    done
+  fi
+  if [ "${#SPAWN_REFUSED_INFO[@]}" -gt 0 ]; then
+    echo "copies left untouched (each already carries another holder's lease, so this home holds no lease on it and wrote nothing to it; record: $DATA/$ID/skipped-copies.tsv):"
+    for entry in "${SPAWN_REFUSED_INFO[@]}"; do
+      echo "  ${entry%%|*} (${entry#*|})"
+    done
+  fi
 }
 spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
   local skipped real
@@ -6404,6 +6419,24 @@ spawn_acquire_pool_slot() {
     SPAWN_SLOT_CLAIMED=1
   fi
 }
+# Whether Treehouse's own pool state, read now and read-only, shows pool copy <path> carrying another holder's lease: an
+# ordinary lease of another holder or Treehouse's recovered lease (fm_task_copy_pool_slot_held states held and recovered).
+# Used only after `treehouse lease --path` refused the copy, only while the spawn skips and continues, and only for a
+# copy of this project's own pool. An unreadable state, a path that cannot be resolved, a copy the state does not record,
+# an unleased or conflicting entry, or a lease that is this task's own is not identified and returns 1, so the whole
+# spawn is refused as before. Sets FM_TASK_COPY_SLOT_HOLDER on success. The message of the failed lease is never the proof.
+spawn_copy_carries_other_lease() { # <path>
+  local real
+  [ "${SPAWN_SKIP_AND_CONTINUE:-1}" = 1 ] || return 1
+  real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) && [ -n "$real" ] || return 1
+  fm_treehouse_pool_slot "$PROJ_ABS" "$real" || return 1
+  # The state is read again now: a scan earlier in this spawn may have cached an older reading.
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$real" || [ "$FM_TASK_COPY_SLOT_STATE" = recovered ] || return 1
+  case "$FM_TASK_COPY_SLOT_STATE" in held|recovered) ;; *) return 1 ;; esac
+  [ -n "$FM_TASK_COPY_SLOT_HOLDER" ] && [ "$FM_TASK_COPY_SLOT_HOLDER" != "firstmate-skipped:$ID" ] || return 1
+}
 # A copy that is not plainly clean, idle and behind the target is never used and never touched
 # (bin/fm-slot-provision-lib.sh owns the rules). Treehouse resets a slot when its shell exits,
 # so the skipped copy is first leased durably, in place and without touching it: treehouse
@@ -6411,7 +6444,7 @@ spawn_acquire_pool_slot() {
 # the claim this spawn just wrote is released. Then a second `treehouse get` in the same pane
 # hands another slot. A relaunch keeps the copy its task's work lives in, so it never skips.
 spawn_skip_copy() {
-  local skipped=$WT lease_out
+  local skipped=$WT lease_out lease_refused=0 lease_holder='' reason holder_col
   if [ "$SPAWN_SLOT_CLAIMED" = 1 ]; then
     fm_treehouse_slot_owner_release "$skipped" "$ID" || {
       echo "error: could not release this spawn's claim on skipped copy $skipped; refusing to take another copy" >&2
@@ -6420,13 +6453,22 @@ spawn_skip_copy() {
     SPAWN_SLOT_CLAIMED=0
   fi
   if ! lease_out=$(treehouse lease --path "$skipped" --lease-holder "firstmate-skipped:$ID" 2>&1 >/dev/null); then
-    # Closing the pane would let Treehouse return, and so reset, a copy that holds work. Keep the
-    # endpoint open on that copy, as a refused governed slot does, and say where it is.
-    SPAWN_TREEHOUSE_ABORT_TARGET=
-    HERDR_PROJECTION_ABORT_CLEANUP=0
-    ORCA_ABORT_CLEANUP=0
-    echo "error: could not lease skipped copy $skipped durably ($lease_out); its endpoint $T stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted" >&2
-    return 1
+    # The harm the lease prevents is Treehouse returning and resetting the copy when the pane's shell exits. A copy whose
+    # pool state already shows another holder's lease (a recovered lease included) is not returned by that exit and is
+    # never handed out again, so there is nothing for this home to add: leave it untouched and take another copy.
+    # Only that positively read state qualifies; any other lease failure keeps the refusal below.
+    if spawn_copy_carries_other_lease "$skipped"; then
+      lease_refused=1
+      lease_holder=$FM_TASK_COPY_SLOT_HOLDER
+    else
+      # Closing the pane would let Treehouse return, and so reset, a copy that holds work. Keep the
+      # endpoint open on that copy, as a refused governed slot does, and say where it is.
+      SPAWN_TREEHOUSE_ABORT_TARGET=
+      HERDR_PROJECTION_ABORT_CLEANUP=0
+      ORCA_ABORT_CLEANUP=0
+      echo "error: could not lease skipped copy $skipped durably ($lease_out); its endpoint $T stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted" >&2
+      return 1
+    fi
   fi
   # Rule Q (Main 1886): a copy is skipped, and another taken, only when its record is written AND read back. A path that
   # cannot be canonicalized, or a record that cannot be written or read back, refuses the whole spawn; the copy stays leased.
@@ -6435,15 +6477,29 @@ spawn_skip_copy() {
     echo "error: skipped copy '$skipped' cannot be resolved to a real path, so its record cannot be trusted; it stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
     exit 1
   fi
-  row=$(printf '%s\t%s\tfirstmate-skipped:%s\t%s' "$real" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)")
+  reason=${FM_SLOT_SKIP_REASON:-unknown}
+  holder_col="firstmate-skipped:$ID"
+  if [ "$lease_refused" = 1 ]; then
+    # The record says what happened: this home holds no lease on the copy, so teardown never returns it (it only
+    # returns a copy whose pool row names the holder recorded here), and the refusal text is kept with the reason.
+    reason="$reason; the copy already carries another holder's lease (holder: ${lease_holder:-unknown}); treehouse lease said: $lease_out"
+    reason=$(printf '%s' "$reason" | tr '\t\r\n' '   ')
+    holder_col=not-leased-by-this-home
+  fi
+  row=$(printf '%s\t%s\t%s\t%s' "$real" "$reason" "$holder_col" "$(date +%s)")
   if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/skipped-copies.tsv" && grep -Fxq -- "$row" "$DATA/$ID/skipped-copies.tsv"; } 2>/dev/null; then
     echo "error: could not write and read back the record of skipped copy $real in $DATA/$ID/skipped-copies.tsv; the copy stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
     exit 1
   fi
   SPAWN_SKIPPED_SLOTS+=("$real")
-  SPAWN_SKIPPED_INFO+=("$real|${FM_SLOT_SKIP_REASON:-unknown}")
-  if [ "${SPAWN_SKIP_AND_CONTINUE:-1}" = 1 ]; then
-    echo "skipped: copy $real (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner; this spawn wrote nothing to it; taking another copy" >&2
+  if [ "$lease_refused" = 1 ]; then
+    SPAWN_REFUSED_INFO+=("$real|$reason")
+    echo "skipped: copy $real (${FM_SLOT_SKIP_REASON:-unknown}) already carries another holder's lease (holder: ${lease_holder:-unknown}); this spawn holds no lease on it and wrote nothing to it; taking another copy" >&2
+  else
+    SPAWN_SKIPPED_INFO+=("$real|${FM_SLOT_SKIP_REASON:-unknown}")
+    if [ "${SPAWN_SKIP_AND_CONTINUE:-1}" = 1 ]; then
+      echo "skipped: copy $real (${FM_SLOT_SKIP_REASON:-unknown}) is leased in place for its owner; this spawn wrote nothing to it; taking another copy" >&2
+    fi
   fi
   FM_SLOT_PREPARED=0
   FM_SLOT_PREPARE_DETACHED=0
