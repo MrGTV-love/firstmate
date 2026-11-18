@@ -922,6 +922,8 @@ tests/fm-calm-claude-mod-plugin.test.sh 784
 tests/fm-calm-claude-mod.test.sh 5079
 tests/fm-calm-pi-extension.test.sh 56965
 tests/fm-calm-pi-queue-retention-live-e2e.test.sh 2181
+tests/fm-captain-hold-boundary.test.sh 43963
+tests/fm-captain-hold-delay.test.sh 32194
 tests/fm-check-unregister.test.sh 1442
 tests/fm-ci-workflow.test.sh 23170
 tests/fm-classify-corr-token.test.sh 19063
@@ -1191,6 +1193,7 @@ tests/fm-tmux-agent-liveness.test.sh 4922
 tests/fm-tool-update-check.test.sh 20060
 tests/fm-trace-context-lib.test.sh 1147
 tests/fm-trace-context-spawn.test.sh 124851
+tests/fm-turnend-ask.test.sh 6581
 tests/fm-turnend-foreign-owner-arm-fix.test.sh 6851
 tests/fm-turnend-guard.test.sh 61599
 tests/fm-typesafe-health.test.sh 6669

@@ -5131,6 +5131,9 @@ hold_key() {
 run_hold() {  # <dir> <args...>
   local dir=$1
   shift
+  if [ "${1:-}" = hold ]; then
+    set -- "$@" --boundary owner-rule-change --if-no 'Keep the existing merge rule'
+  fi
   FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
     FM_CONFIG_OVERRIDE="$dir/config" "$ROOT/bin/fm-captain-hold.sh" "$@" >/dev/null 2>&1
 }
