@@ -546,16 +546,42 @@ EOF
 # outside the open set. Only surviving openings have their dates parsed;
 # historical transitions neither fork nor reread every retained summary.
 # A summary never ends in a tab: the tab is this output's field separator.
+# With --with-opening as the third argument, insert the surviving opening's
+# zero-based transition ordinal before the summary. Together with the status
+# stream identity it distinguishes equal-clock or unstamped reopenings without
+# changing on a no-op read or a later unrelated append. --with-identity also
+# inserts the actual read handle's device:inode after that ordinal, before the summary.
 # Regression coverage: tests/fm-classify-decision-key.test.sh.
-status_open_decisions_dated() {  # <status-file> [<kind>]
-  local f=$1 open='' key verb summary line kind resolve held index=0 epoch tab=$'\t' text rc
+status_open_decisions_dated() {  # <status-file> [<kind>] [--with-opening|--with-identity]
+  local f=$1 open='' key verb summary line kind resolve held index=0 epoch tab=$'\t' text rc opening=${3:-}
+  local stream='' device inode
   local -a opened summaries
-  [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
+  case "$opening" in
+    ''|--with-opening|--with-identity) ;;
+    *) printf 'fm-status: unknown dated-decision option: %s\n' "$opening" >&2; return 2 ;;
+  esac
+  [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || { [ "$opening" != --with-identity ] || return 1; return 0; }
   _fm_status_kind "$f" "${2:-}" kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  text=$(fm_status_cat "$f" | _fm_status_lines_with needs-decision blocked 'done' failed "$resolve" "$held"; exit "${PIPESTATUS[0]}") \
-    || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
+  if [ "$opening" = --with-identity ]; then
+    # Filter raw body bytes before Bash capture, exactly as in the default mode;
+    # otherwise Bash removing NULs could manufacture a decision transition.
+    text=$(fm_status_cat "$f" --with-identity | {
+      IFS= read -r stream || exit 1
+      printf '%s\n' "$stream"
+      _fm_status_lines_with needs-decision blocked 'done' failed "$resolve" "$held"
+    }; exit "${PIPESTATUS[0]}") || return $?
+    stream=${text%%$'\n'*}
+    device=${stream%%:*}; inode=${stream#*:}
+    case "$device" in ''|*[!0-9]*) return 1 ;; esac
+    case "$inode" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$stream" = "$device:$inode" ] || return 1
+    if [ "$text" = "$stream" ]; then text=''; else text=${text#*$'\n'}; fi
+  else
+    text=$(fm_status_cat "$f" | _fm_status_lines_with needs-decision blocked 'done' failed "$resolve" "$held"; exit "${PIPESTATUS[0]}") \
+      || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
+  fi
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" verb
     case "$verb" in
@@ -574,7 +600,13 @@ EOF
     _fm_status_at_epoch "${opened[index]}" epoch || epoch=
     summary=${summaries[index]}
     summary=${summary%"${summary##*[!"$tab"]}"}
-    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$summary"
+    if [ "$opening" = --with-identity ]; then
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$index" "$stream" "$summary"
+    elif [ "$opening" = --with-opening ]; then
+      printf '%s\t%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$index" "$summary"
+    else
+      printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$summary"
+    fi
   done <<EOF
 $open
 EOF
