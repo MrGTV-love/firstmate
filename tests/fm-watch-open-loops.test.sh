@@ -155,7 +155,7 @@ reap() {
   kill "$1" 2>/dev/null || true
   wait_watch_exit "$1"
   rc=$?
-  [ "$rc" -ne 124 ] || fail "watcher pid $1 did not exit within 10s of TERM"
+  [ "$rc" -ne 124 ] || fail "watcher pid $1 did not exit within the fixture wait budget after TERM"
 }
 
 ack_stopped_cycle() {  # <state>

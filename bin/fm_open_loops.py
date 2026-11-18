@@ -1275,9 +1275,10 @@ class Collector:
                 spawn_gen=task["spawn_gen"], available=available)
         return observations
 
-    def result(self):
+    def result(self, consumers=None):
         rows = sorted(self.rows.values(), key=lambda r: (r["category"], r["subject"]))
-        consumers = self.consumer_observations()
+        if consumers is None:
+            consumers = self.consumer_observations()
         for row in rows:
             source = row.get("source")
             task = source.get("task") if isinstance(source, dict) else self.consumer_tasks.get(row["id"])
@@ -1310,7 +1311,8 @@ class Collector:
         target = self.state / "open-loops.json"
         if target.is_symlink():
             raise ValueError("open-loop ledger must not be a symbolic link")
-        report = self.result()
+        consumers = self.consumer_observations()
+        report = self.result(consumers)
         try:
             previous = read_ledger(self.state)
         except (OSError, ValueError):  # an unreadable ledger has no handling to keep; this publication replaces it
@@ -1320,15 +1322,23 @@ class Collector:
             current = {row["id"] for row in report["rows"]}
             unfinished = {task["id"] for task in self.tasks
                           if task["current_state"].get("state") not in STOP_STATES | {"failed"}}
-            losses = {row["source"]["task"]: row for row in report["rows"]
+            losses = {row["source"]["task"]: row["consumer"] for row in report["rows"]
                       if row["category"] == "missing_worker" and consumer_unavailable(row)
                       and row["source"]["task"] in unfinished}
+            # Secondmate silence uses the same producer, but secondmates do not
+            # enter worker_rows. Use only their already verified local endpoint.
+            for task in self.direct_reports:
+                observed = consumers.get(task["id"])
+                if task["kind"] == "secondmate" and not task.get("remote") and observed \
+                        and observed["available"] is False \
+                        and task["current_state"].get("state") not in STOP_STATES | {"failed"}:
+                    losses[task["id"]] = observed
             for row in previous["rows"]:
                 # These producers require a live worker and stop emitting on endpoint loss.
                 # That loss is not a report or resumed work. Reopen the outstanding steer
                 # until handling catches up; don't resurrect questions or completed work.
                 if row["id"] in current or not row.get("overdue") or row.get("stale") \
-                        or row["category"] not in ("silent_report", "stalled_worker"):
+                        or row.get("category") not in ("silent_report", "stalled_worker"):
                     continue
                 action = handling["actions"].get(row["id"], {})
                 source = row.get("source")
@@ -1339,7 +1349,7 @@ class Collector:
                 if not loss or not all(source.get(key) == loss["source"][key]
                                        for key in ("home", "state", "data", "config", "task")):
                     continue
-                retained = dict(row, source=loss["source"], consumer=loss["consumer"])
+                retained = dict(row, source=loss["source"], consumer=loss)
                 if type(retained.get("age_seconds")) is int:
                     retained["age_seconds"] += max(0, self.now - previous["generated_epoch"])
                 report["rows"].append(retained)
@@ -2341,7 +2351,8 @@ def record_action(args, state, now, report, waits, waits_error):
     shown = captain_visible(actions[ident], by_id[ident], now)
     for row in report["rows"]:
         if row["id"] == ident:
-            row["current_identity"] = notification_identity(row, actions[ident], now)
+            # Only the collector publishes notification identities. A receipt
+            # write must not migrate a legacy row or create a new wake by itself.
             if shown:
                 row["captain_visible"] = True
             else:

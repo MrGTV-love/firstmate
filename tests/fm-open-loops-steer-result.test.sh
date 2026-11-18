@@ -20,10 +20,18 @@ shutil.copytree(root / 'bin', code / 'bin')
 fake.mkdir()
 for name in ('ssh', 'gh', 'gh-axi', 'claude', 'codex', 'dsh', 'omp', 'ps'):
     tool = fake / name
-    tool.write_text('#!/bin/sh\nprintf "%s\\n" "$0" >> "$FORBIDDEN_CALLS"\nexit 97\n')
+    # Existing command-progress telemetry samples slow local children on macOS.
+    # Stub only that exact sample; an endpoint or worker process probe still fails.
+    telemetry = ('if [ "$#" -eq 3 ] && [ "$1" = -S ] && [ "$2" = -axo ] && '
+                 '[ "$3" = "pid=,ppid=,time=,stat=,lstart=" ]; then exit 0; fi\n') if name == 'ps' else ''
+    tool.write_text('#!/bin/sh\n' + telemetry + 'printf "%s\\n" "$0 $*" >> "$FORBIDDEN_CALLS"\nexit 97\n')
     tool.chmod(0o755)
 snapshot = code / 'bin/fm-fleet-snapshot.sh'
-snapshot.write_text('#!/usr/bin/env python3\nimport os\nfrom pathlib import Path\nprint((Path(os.environ["FM_HOME"])/"snapshot.json").read_text())\n')
+snapshot.write_text('#!/usr/bin/env python3\nimport os, sys\nfrom pathlib import Path\n'
+                    'if sys.argv[1:] == ["--contribution-input"]:\n'
+                    '    print(\'{"backlog":{"present":true,"records":[{"state":"in_flight"}]}}\')\n'
+                    'else:\n'
+                    '    print((Path(os.environ["FM_HOME"])/"snapshot.json").read_text())\n')
 snapshot.chmod(0o755)
 peek = code / 'bin/fm-peek.sh'
 peek.write_text('#!/bin/sh\nprintf "waiting for validation\\n"\n')
@@ -32,7 +40,7 @@ base = int(time.time())
 iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).isoformat()
 
 class Case:
-    def __init__(self, name, limit=None, category='unanswered_question'):
+    def __init__(self, name, limit=None, category='unanswered_question', kind='ship'):
         self.home = (world / name).resolve()
         for part in ('state', 'data', 'config', 'projects', 'user', 'tmp'):
             (self.home / part).mkdir(parents=True)
@@ -43,17 +51,20 @@ class Case:
                 if category == 'unanswered_question' else f'working [at={opened}]: continue validation\n')
         self.status.write_text(line)
         meta = self.home / 'state/worker.meta'
-        meta.write_text('kind=ship\nspawn_gen=result-generation\n')
+        meta.write_text(f'kind={kind}\nspawn_gen=result-generation\n')
         for path in (self.status, meta):
             stamp = opened if category == 'stalled_worker' and path == self.status else base
             os.utime(path, (stamp, stamp))
         if limit is not None:
             (self.home / 'config/open-loops.json').write_text(json.dumps(dict(age_limits_seconds={category: limit})))
-        self.task = dict(id='worker', kind='ship', project='', branch='', backend='fixture',
+        self.task = dict(id='worker', kind=kind, project='', branch='', backend='fixture',
                          spawn_gen='result-generation', current_state=dict(
                              state='blocked' if category == 'unanswered_question' else 'working', source='fixture'),
                          endpoint=dict(exists=True, agent_alive='alive', target='fixture'),
                          pr=dict(url=None), paths=dict(worktree=dict(path=None)), hints={})
+        if kind == 'secondmate':
+            self.task['paths']['home'] = dict(path=str(self.home / 'secondmate'))
+            (self.home / 'secondmate').mkdir()
         self.save_snapshot()
         self.env = dict(os.environ, HOME=str(self.home / 'user'), TMPDIR=str(self.home / 'tmp'),
                         FM_HOME=str(self.home), NM_HOME=str(self.home / 'nm'), FM_DURATION_FILE='off',
@@ -178,8 +189,8 @@ assert c.ident not in c.cli('--present-overdue').stdout
 print('PASS: stalled work returns at its own limit unless existing progress evidence shows it resumed', flush=True)
 
 # Loss of a source that requires a live worker is not evidence that the steer succeeded.
-for category in ('stalled_worker', 'silent_report'):
-    c = Case('worker-loss-' + category, category=category)
+for category, kind in (('stalled_worker', 'ship'), ('silent_report', 'ship'), ('silent_report', 'secondmate')):
+    c = Case('worker-loss-' + category + '-' + kind, category=category, kind=kind)
     c.delivery(); c.steer()
     c.now += 1
     os.utime(c.status, (c.now, c.now))  # missing-worker age alone will not wake the owner yet
@@ -187,7 +198,7 @@ for category in ('stalled_worker', 'silent_report'):
     for _ in range(2):
         row = c.actionable(True)
         assert (row['id'], row['owner'], row['next_action']) == (c.ident, c.row['owner'], c.row['next_action'])
-        assert not next(row for row in c.report['rows'] if row['category'] == 'missing_worker')['overdue']
+        assert not any(row['overdue'] for row in c.report['rows'] if row['category'] == 'missing_worker')
         c.now += 1
     c.task['current_state'] = dict(state='done', source='fixture')
     c.save_snapshot()
