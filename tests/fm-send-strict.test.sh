@@ -133,8 +133,11 @@ test_unset_fm_home_fails() {
 # The FM_HOME refusal exists to stop a send that resolves a target against the
 # wrong home; a leading --help or -h resolves nothing. Only that leading word is
 # help: the same word after a target is message text and meets every refusal.
+# The caller here is a normal one, with no test bypass, run from a scratch
+# directory, so the gate-agent allow event every fm-send call writes is visible;
+# the only guard event help may add is that one.
 test_leading_help_prints_usage_without_a_home() {
-  local dir fb err out log events rc flag label
+  local dir fb err out log events rc flag label rows
   dir="$TMP_ROOT/help-nohome"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); err="$dir/send.err"; log="$dir/tmux.log"; events="$dir/guard-events.jsonl"
 
@@ -142,21 +145,24 @@ test_leading_help_prints_usage_without_a_home() {
     for label in unset empty; do
       : > "$log"; : > "$events"
       if [ "$label" = unset ]; then
-        out=$(env -u FM_HOME PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" \
-          "$SEND" "$flag" 2>"$err"); rc=$?
+        out=$(cd "$dir" && env -u FM_HOME -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" \
+          FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
       else
-        out=$(PATH="$fb:$PATH" FM_HOME='' FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" \
-          "$SEND" "$flag" 2>"$err"); rc=$?
+        out=$(cd "$dir" && env -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" FM_HOME='' FM_ROOT_OVERRIDE="$dir" \
+          FM_TMUX_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
       fi
       expect_code 0 "$rc" "$flag with FM_HOME $label should exit 0"
       assert_contains "$out" "Usage: fm-send.sh <target>" "$flag with FM_HOME $label should print the usage"
       [ ! -s "$err" ] || fail "$flag with FM_HOME $label should print nothing on stderr"$'\n'"$(cat "$err")"
       [ ! -s "$log" ] || fail "$flag with FM_HOME $label touched the terminal"$'\n'"$(cat "$log")"
-      [ "$(grep -c '"guard":"send-home-fail-closed"' "$events")" -eq 0 ] \
-        || fail "$flag with FM_HOME $label should record no FM_HOME refusal"$'\n'"$(cat "$events")"
+      # Every event row help adds must be the gate-agent allow every call writes, and nothing else.
+      rows=$(grep -c . "$events")
+      [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"allow"' "$events")" -eq "$rows" ] \
+        || fail "$flag with FM_HOME $label wrote a guard event other than the gate-agent allow"$'\n'"$(cat "$events")"
+      [ "$rows" -le 1 ] || fail "$flag with FM_HOME $label wrote more than one guard event"$'\n'"$(cat "$events")"
     done
   done
-  pass "fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME"
+  pass "fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME, adding no guard event but the gate-agent allow"
 }
 
 test_help_is_refused_for_a_gate_agent_like_a_send() {

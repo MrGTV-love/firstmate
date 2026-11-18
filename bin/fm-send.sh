@@ -18,8 +18,8 @@
 # Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
 # Orca currently supports Enter and C-c only, and rejects Escape.
 # Help: fm-send.sh --help (or -h) as the first word prints this paragraph and exits 0
-# without FM_HOME; a gate agent is still refused, and every other call still needs an
-# explicit FM_HOME.
+# without FM_HOME, resolving no target and sending nothing; a gate agent is still
+# refused, and every other call still needs an explicit FM_HOME.
 #
 # Two data planes:
 #
@@ -276,10 +276,11 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
 
-# Help is a read: it prints this header's first paragraph, touches no state, and
-# sends nothing, so it needs no home; a gate agent is still refused above. Only a
-# leading --help or -h counts; the same word after a target is message text and
-# meets every check below.
+# Help is a read: it prints this header's first paragraph, resolves no target, and
+# sends nothing, so it needs no home; a gate agent is still refused above, and the
+# gate-agent allow event that check writes for every call is unchanged. Help writes
+# no other guard event. Only a leading --help or -h counts; the same word after a
+# target is message text and meets every check below.
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
   sed -n '2,/^#$/{/^#$/d;s/^# \{0,1\}//;p;}' "${BASH_SOURCE[0]}"
   exit 0
