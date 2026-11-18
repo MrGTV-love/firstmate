@@ -542,6 +542,9 @@
 #   never a reset: it is `git merge --ff-only` (bin/fm-slot-provision-lib.sh,
 #   fm_slot_apply_move), which git itself refuses unless the copy's HEAD is an ancestor of
 #   the tip, so no commit is dropped and no tracked or untracked change is overwritten.
+#   A home whose treehouse base_branch is fm-pool-base also has that branch moved to the fetched origin default,
+#   under the project lock and before any copy is acquired; a case that cannot fast-forward refuses with no copy
+#   taken (bin/fm-pool-base-lib.sh).
 #   It is preceded by a read-only proof (fm_slot_prove_idle) that writes nothing to the
 #   copy, no ref and no file: one snapshot must show the tree clean, no process with its
 #   working directory in the copy (no age exemption; only the spawn's own pane or `treehouse`
@@ -1097,6 +1100,8 @@ fi
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # shellcheck source=bin/fm-slot-provision-lib.sh
 . "$SCRIPT_DIR/fm-slot-provision-lib.sh"
+# shellcheck source=bin/fm-pool-base-lib.sh
+. "$SCRIPT_DIR/fm-pool-base-lib.sh"
 fm_backlog_directory_present "$STATE" "state directory" || {
   echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
@@ -4618,6 +4623,13 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
     exit 1
   fi
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
+  # A home whose treehouse base_branch is fm-pool-base has that branch moved to the origin default fetched above, under
+  # this lock and before any copy is acquired, so the pool cuts the copy at the origin default; a refusal leaves every
+  # ref unchanged and acquires no copy (bin/fm-pool-base-lib.sh). A spawn that names a base branch fetched that branch,
+  # not the origin default, so it moves nothing.
+  if [ "$BACKEND" != orca ] && [ -z "$BASE_BRANCH" ]; then
+    fm_pool_base_advance "$PROJ_ABS" "$SPAWN_BASE_SHA" "$SPAWN_BASE_ERROR" || exit 1
+  fi
   spawn_validate_local_base || exit 1
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
