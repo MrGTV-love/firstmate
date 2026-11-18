@@ -12,8 +12,10 @@
 # docs/configuration.md "Open-work ledger" owns that gate, receipt standing, and invalidation.
 # Acknowledgement also refuses, exit 1 naming each id, while a "check: captain inbox note <id>"
 # row this actor would consume at or below the cutoff has a note still unacked; bin/fm-inbox.sh
-# pending owns that record, and bin/fm-inbox.sh drain --ack <id> clears it. The away supervise
-# daemon is exempt as it is from the overdue gate: it forwards the note and cannot ack it.
+# pending owns that record (an inbox whose state cannot be read refuses too), and
+# bin/fm-inbox.sh drain --ack <id> clears it. No actor is exempt: the away supervise daemon
+# acks each note itself once it has buffered it for escalation. The rows checked are the rows
+# consumed: both come from one snapshot of the actor's claim taken under the first queue lock.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
@@ -30,7 +32,7 @@
 # stale, check, or heartbeat. Extra query arguments and any actor but main exit 2.
 # Every scratch file this script mints (.main-eligible-rows.tmp.*,
 # .wake-rows.consume.*, .wake-queue.retire.*, .wake-queue.ack.*,
-# .wake-queue.actor-view.*) is created and removed under the queue lock, so one
+# .wake-queue.actor-view.*, .wake-ack-rows.*) is created and removed under the queue lock, so one
 # found while taking that lock was left by a drain that died mid-write; each
 # non-deferred presentation or acknowledgement rotates such leftovers away.
 # FM_STATUS_PRESENTATION_LOCK_TIMEOUT sets the positive whole-second wait for
@@ -55,6 +57,7 @@ SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd
 
 DRAIN_TMP=
 DRAIN_VIEW_TMP=
+ACK_ROWS_TMP=
 DRAIN_LOCK_HELD=false
 RAW_ROWS=
 RECOVERY_MARKER="$STATE/.watcher-down"
@@ -105,7 +108,8 @@ rows_file_valid() { fm_wake_grant_rows_valid "$1"; }
 rotate_scratch_locked() {
   local scratch
   for scratch in "$STATE"/.main-eligible-rows.tmp.* "$STATE"/.wake-rows.consume.* \
-    "$STATE"/.wake-queue.retire.* "$STATE"/.wake-queue.ack.* "$STATE"/.wake-queue.actor-view.*; do
+    "$STATE"/.wake-queue.retire.* "$STATE"/.wake-queue.ack.* "$STATE"/.wake-queue.actor-view.* \
+    "$STATE"/.wake-ack-rows.*; do
     [ -e "$scratch" ] || [ -L "$scratch" ] || continue
     rm -f -- "$scratch"
   done
@@ -200,13 +204,18 @@ claim_main_rows_locked() {
   DRAIN_TMP=
 }
 
-consume_actor_rows_locked() { # <rows-file> <cutoff>
-  local rows=$1 cutoff=$2
+# Only the rows of <consumed-file> leave the claim: a row claimed after the
+# acknowledged set was fixed was never consumed, so it stays claimed.
+consume_actor_rows_locked() { # <rows-file> <cutoff> <consumed-file>
+  local rows=$1 cutoff=$2 consumed=$3
   if [ ! -e "$rows" ] && [ ! -L "$rows" ]; then
     return 0
   fi
   DRAIN_TMP=$(mktemp "$STATE/.wake-rows.consume.XXXXXX") || return 1
-  awk -v cutoff="$cutoff" '$1 ~ /^[0-9]+$/ && $1 > cutoff { print $1 }' "$rows" > "$DRAIN_TMP" || return 1
+  awk -v cutoff="$cutoff" -v consumed="$consumed" '
+    BEGIN { while ((getline line < consumed) > 0) gone[line]=1 }
+    $1 ~ /^[0-9]+$/ && ($1 > cutoff || !($1 in gone)) { print $1 }
+  ' "$rows" > "$DRAIN_TMP" || return 1
   write_rows_file_locked "$rows" "$DRAIN_TMP" || return 1
   DRAIN_TMP=
 }
@@ -867,6 +876,7 @@ cleanup() {
   fm_lock_release "$STATE/.claude-autoarm.lock"
   [ -z "$DRAIN_TMP" ] || rm -f -- "$DRAIN_TMP" 2>/dev/null || true
   [ -z "$DRAIN_VIEW_TMP" ] || rm -f -- "$DRAIN_VIEW_TMP" 2>/dev/null || true
+  [ -z "$ACK_ROWS_TMP" ] || rm -f -- "$ACK_ROWS_TMP" 2>/dev/null || true
   if [ "$DRAIN_LOCK_HELD" = true ]; then
     fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   fi
@@ -955,13 +965,20 @@ if [ -n "$ACK_THROUGH" ]; then
     # grant remains excluded by claim_main_rows_locked.
     claim_main_rows_locked "$ACK_THROUGH" || exit 1
   fi
-  if [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" != 1 ] || [ ! -e "$STATE/.afk" ]; then
-    if [ "$ACTOR" = branch ]; then
-      refuse_unacked_inbox_notes_locked "$ELIGIBLE_ROWS_FILE" "$ACK_THROUGH" || exit 1
-    else
-      refuse_unacked_inbox_notes_locked "$MAIN_ROWS_FILE" "$ACK_THROUGH" || exit 1
-    fi
+  # Fix the set this acknowledgement consumes now, under this lock: the inbox
+  # note check, the receipts below and the consumption all use this one set, so
+  # a row claimed while the lock is released is never consumed unchecked.
+  ACK_ROWS_TMP=$(mktemp "$STATE/.wake-ack-rows.XXXXXX") || exit 1
+  chmod 0600 "$ACK_ROWS_TMP" || exit 1
+  if [ "$ACTOR" = branch ]; then
+    ack_rows_source=$ELIGIBLE_ROWS_FILE
+  else
+    ack_rows_source=$MAIN_ROWS_FILE
   fi
+  if [ -e "$ack_rows_source" ] || [ -L "$ack_rows_source" ]; then
+    awk -v cutoff="$ACK_THROUGH" '$1 ~ /^[0-9]+$/ && $1 + 0 <= cutoff + 0 { print $1 }' "$ack_rows_source" > "$ACK_ROWS_TMP" || exit 1
+  fi
+  refuse_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || exit 1
   if [ "$ACTOR" = branch ]; then
     # An away-posture grant can name check-kind rows - the attended
     # partition's check/decision exclusions lift under the away record
@@ -970,16 +987,16 @@ if [ -n "$ACK_THROUGH" ]; then
     # sequences it consumes. Otherwise the receipt stays pending and every
     # later reconcile scan re-queues the same fingerprint. Attended, a grant
     # names no check row and both scans find nothing.
-    ACK_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-outcome:' "$ELIGIBLE_ROWS_FILE") || exit 1
-    ACK_NOTICE_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-reconcile:' "$ELIGIBLE_ROWS_FILE") || exit 1
+    ACK_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-outcome:' "$ACK_ROWS_TMP") || exit 1
+    ACK_NOTICE_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-reconcile:' "$ACK_ROWS_TMP") || exit 1
   else
     if { [ -e "$MAIN_ROWS_FILE" ] || [ -L "$MAIN_ROWS_FILE" ]; } \
       && ! rows_file_valid "$MAIN_ROWS_FILE"; then
       echo "wake drain: main acknowledgement has an invalid presented-row claim" >&2
       exit 1
     fi
-    ACK_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-outcome:' "$MAIN_ROWS_FILE") || exit 1
-    ACK_NOTICE_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-reconcile:' "$MAIN_ROWS_FILE") || exit 1
+    ACK_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-outcome:' "$ACK_ROWS_TMP") || exit 1
+    ACK_NOTICE_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-reconcile:' "$ACK_ROWS_TMP") || exit 1
   fi
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   DRAIN_LOCK_HELD=false
@@ -997,20 +1014,20 @@ if [ -n "$ACK_THROUGH" ]; then
     # Delete a row only when its sequence is <= cutoff AND it is named in the
     # extension's eligible snapshot; every other row - including one whose
     # sequence is below cutoff but not in the snapshot - is kept untouched.
-    awk -F '\t' -v cutoff="$ACK_THROUGH" -v seqs="$ELIGIBLE_ROWS_FILE" '
+    awk -F '\t' -v cutoff="$ACK_THROUGH" -v seqs="$ACK_ROWS_TMP" '
       BEGIN { while ((getline line < seqs) > 0) if (line ~ /^[0-9]+$/) keep[line] = 1 }
       NF < 5 || $2 !~ /^[0-9]+$/ || $2 > cutoff || !($2 in keep) { print }
     ' "$FM_WAKE_QUEUE" > "$DRAIN_TMP" || exit 1
-    fm_wake_commit_secondmate_stall_receipts_through "$ACK_THROUGH" "$ELIGIBLE_ROWS_FILE" || {
+    fm_wake_commit_secondmate_stall_receipts_through "$ACK_THROUGH" "$ACK_ROWS_TMP" || {
       echo "wake drain: secondmate stall receipt could not be recorded safely" >&2
       exit 1
     }
   else
-    awk -F '\t' -v cutoff="$ACK_THROUGH" -v seqs="$MAIN_ROWS_FILE" '
+    awk -F '\t' -v cutoff="$ACK_THROUGH" -v seqs="$ACK_ROWS_TMP" '
       BEGIN { while ((getline line < seqs) > 0) owned[line]=1 }
       NF < 5 || $2 !~ /^[0-9]+$/ || $2 > cutoff || !($2 in owned) { print }
     ' "$FM_WAKE_QUEUE" > "$DRAIN_TMP" || exit 1
-    fm_wake_commit_secondmate_stall_receipts_through "$ACK_THROUGH" "$MAIN_ROWS_FILE" || {
+    fm_wake_commit_secondmate_stall_receipts_through "$ACK_THROUGH" "$ACK_ROWS_TMP" || {
       echo "wake drain: secondmate stall receipt could not be recorded safely" >&2
       exit 1
     }
@@ -1040,9 +1057,9 @@ if [ -n "$ACK_THROUGH" ]; then
   fi
   DRAIN_TMP=
   if [ "$ACTOR" = branch ]; then
-    consume_actor_rows_locked "$ELIGIBLE_ROWS_FILE" "$ACK_THROUGH" || exit 1
+    consume_actor_rows_locked "$ELIGIBLE_ROWS_FILE" "$ACK_THROUGH" "$ACK_ROWS_TMP" || exit 1
   else
-    consume_actor_rows_locked "$MAIN_ROWS_FILE" "$ACK_THROUGH" || exit 1
+    consume_actor_rows_locked "$MAIN_ROWS_FILE" "$ACK_THROUGH" "$ACK_ROWS_TMP" || exit 1
   fi
   # A partial acknowledgement is still the same handling turn. Keep its receipts
   # until every presented row is consumed, before another drain can take the lock.

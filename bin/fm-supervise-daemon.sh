@@ -101,7 +101,9 @@
 #                                   classification (default "heartbeat"); empty
 #                                   disables. Use sparingly: it overrides the
 #                                   captain-relevant escalation for matching
-#                                   kinds.
+#                                   kinds. A captain inbox note wake is the one
+#                                   exception: it is always forwarded and its
+#                                   note acked (forward_inbox_note).
 #          FM_STALE_ESCALATE_SECS   idle seconds before a stale pane escalates
 #                                   as a possible wedge (default 240)
 #          FM_PAUSE_RESURFACE_SECS  seconds a declared wait stays declared,
@@ -1754,9 +1756,25 @@ $(awk '/^WAITING OPEN WORK/ { on = 1; next } on && /^  "/ { print; next } on && 
 EOF
 }
 
+# A "check: captain inbox note <id>" row is never retired by the wake drain while
+# its note is unacked (bin/fm-wake-drain.sh header), and this daemon cannot read
+# the note, so it forwards the note line into the escalation buffer first and
+# acks the note itself only once that write succeeded. A failed forward or ack
+# leaves both the note and its wake row for the next cycle. This runs for every
+# such row, including one FM_INJECT_SKIP would otherwise leave unhandled.
+forward_inbox_note() {  # <payload> <state> <note-id>
+  local payload=$1 state=$2 id=$3
+  log "escalate: $payload"
+  escalate_add "$state" "$payload" || return 1
+  if [ "${FM_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" -le 0 ]; then
+    escalate_flush "$state" || true
+  fi
+  FM_STATE_OVERRIDE="$state" "$FM_DAEMON_DIR/fm-inbox.sh" drain --ack "$id" >/dev/null
+}
+
 handle_durable_wakes() {  # <watcher-reason> <state>
   local fallback_reason=$1 state=$2 out err tab epoch sequence kind key payload rest
-  local handled=0 failed=0 ack_through ack_generation
+  local handled=0 failed=0 ack_through ack_generation note_id
   out=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || return 1
   err=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || { rm -f "$out"; return 1; }
   if ! "$FM_DAEMON_DIR/fm-wake-drain.sh" > "$out" 2> "$err"; then
@@ -1770,7 +1788,20 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     case "$epoch" in ''|*[!0-9]*) continue ;; esac
     case "$sequence" in ''|*[!0-9]*) continue ;; esac
     case "$kind" in signal|stale|check|heartbeat) ;; *) continue ;; esac
-    handle_wake "$payload" "$state" || failed=1
+    note_id=
+    if [ "$kind" = check ]; then
+      case "$payload" in
+        "check: captain inbox note "*)
+          note_id=${payload#"check: captain inbox note "}
+          note_id=${note_id%%[!A-Za-z0-9._-]*}
+          ;;
+      esac
+    fi
+    if [ -n "$note_id" ]; then
+      forward_inbox_note "$payload" "$state" "$note_id" || failed=1
+    else
+      handle_wake "$payload" "$state" || failed=1
+    fi
     handled=$((handled + 1))
   done < "$out"
   if [ "$handled" -eq 0 ]; then handle_wake "$fallback_reason" "$state" || failed=1; fi

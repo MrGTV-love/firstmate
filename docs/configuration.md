@@ -5058,7 +5058,7 @@ FM_PENDING_REPLY_GRACE_SECS=120   # seconds after the request turn completes wit
 # sub-supervisor (bin/fm-supervise-daemon.sh); presence-gated via /afk
 FM_SUPERVISOR_BACKEND=             # optional supervisor pane backend override; tmux/herdr only, otherwise detects $TMUX_PANE then HERDR_ENV or FM_HERDR_RUNTIME with HERDR_PANE_ID before tmux fallback
 FM_SUPERVISOR_TARGET=              # optional supervisor pane target override; tmux target or herdr <session>:<pane-id>, otherwise auto-detected
-FM_INJECT_SKIP=heartbeat           # |-prefixes force-self-handled bypassing classification; empty disables
+FM_INJECT_SKIP=heartbeat           # |-prefixes force-self-handled bypassing classification; empty disables; a captain inbox note wake is always forwarded and its note acked by the daemon
 FM_ESCALATE_BATCH_SECS=90          # buffer window for batched escalation digests; 0 = flush immediately
 FM_MAX_DEFER_SECS=300              # max buffered escalation age before retry plus wedge alarm; 0 disables
 FM_WEDGE_ALARM_CHANNEL=            # override config/wedge-alarm with one active-alert directive for the wedge alarm; off|auto|osascript|herdr|command:<cmd>; absent = auto (macOS -> an OS notification)

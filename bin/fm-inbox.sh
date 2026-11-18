@@ -65,8 +65,9 @@
 # readable. One reply per note: a second one is refused.
 # `pending` is the read-only query of this ack record: it prints each given id
 # whose note is not yet acked (still in the inbox, not in handled/), one per line,
-# and nothing for an acked or unknown id. bin/fm-wake-drain.sh --ack-through asks
-# it which presented notes are still unacked rather than reading the inbox itself.
+# and nothing for an acked or unknown id. An inbox it cannot read exits 1 instead,
+# because unreadable is not acked. bin/fm-wake-drain.sh --ack-through asks it which
+# presented notes are still unacked rather than reading the inbox itself.
 # `ready` is the read-only primary-readiness projection (lock, wake-consumer
 # health, away posture, observation time). It never acquires the session lock
 # and never infers liveness from a lock file, a session, or a pane.
@@ -1140,6 +1141,12 @@ cmd_drain() {
 
 cmd_pending() {
   local id
+  # An unreadable inbox cannot show a note, and "not found" there is not "acked":
+  # refuse rather than report nothing pending. An inbox that does not exist holds
+  # no unread note at all.
+  if [ -e "$INBOX" ] && { [ ! -d "$INBOX" ] || [ ! -r "$INBOX" ] || [ ! -x "$INBOX" ]; }; then
+    die "inbox is not readable, so note state is unknown: $INBOX"
+  fi
   for id in "$@"; do
     valid_note_id "$id" || die "invalid note id: $id"
     if [ -f "$INBOX/$id.note" ]; then

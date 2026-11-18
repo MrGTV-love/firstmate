@@ -324,6 +324,65 @@ test_catchall_advances_routine_then_surfaces_append() {
   pass "catch-all routine scans advance before later actionable appends"
 }
 
+# The wake drain refuses to acknowledge a captain inbox note row while its note
+# is unacked, so the daemon must buffer the note and ack it itself. These drive
+# the real fm-wake-drain.sh and fm-inbox.sh over a scratch state, with no daemon.
+inbox_note_daemon_case() {  # <dir-name> -> sets dir state note_id
+  dir=$(make_supercase "$1"); state="$dir/state"
+  mkdir -p "$dir/config" "$dir/data"
+  : > "$dir/config/supervision-host-off"
+  : > "$state/.afk"
+  note_id=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_CONFIG_OVERRIDE="$dir/config" "$ROOT/bin/fm-inbox.sh" note "advisor note for away" | sed -n '1s/^queued //p')
+  [ -n "$note_id" ] || fail "the scratch inbox note was not queued"
+}
+
+run_daemon_note_wakes() {  # <dir> <state> [extra env assignments...]
+  local dir=$1 state=$2
+  shift 2
+  env "$@" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_CONFIG_OVERRIDE="$dir/config" FM_ESCALATE_BATCH_SECS=999999 \
+    bash -c '. "$1"; FM_DAEMON_DIR="$2" handle_durable_wakes fallback "$3"' _ "$DAEMON" "$ROOT/bin" "$state"
+}
+
+test_away_daemon_buffers_then_acks_inbox_note_default_and_skip() {
+  local dir state note_id skip
+  for skip in default "check:"; do
+    inbox_note_daemon_case "inbox-note-$skip"
+    if [ "$skip" = default ]; then
+      run_daemon_note_wakes "$dir" "$state" FM_DAEMON_QUIET=1 >/dev/null 2>&1 \
+        || fail "$skip: the daemon did not handle the inbox note wake"
+    else
+      run_daemon_note_wakes "$dir" "$state" "FM_INJECT_SKIP=$skip" >/dev/null 2>&1 \
+        || fail "$skip: the daemon did not handle the inbox note wake"
+    fi
+    grep -qF "check: captain inbox note $note_id" "$state/.subsuper-escalations" \
+      || fail "$skip: the note was not buffered for escalation"
+    assert_present "$state/inbox/handled/$note_id.note" "$skip: the daemon did not ack the note it buffered"
+    assert_absent "$state/inbox/$note_id.note" "$skip: the note stayed pending after the daemon forwarded it"
+    [ ! -s "$state/.wake-queue" ] || fail "$skip: the wake row stayed queued after the note was acked: $(cat "$state/.wake-queue")"
+  done
+  pass "the away daemon buffers a captain inbox note, acks it, and then the wake ack passes (default and FM_INJECT_SKIP=check:)"
+}
+
+test_away_daemon_keeps_note_and_wake_when_forward_fails() {
+  local dir state note_id skip
+  for skip in default "check:"; do
+    inbox_note_daemon_case "inbox-note-fail-$skip"
+    mkdir -p "$state/.subsuper-escalations"
+    if [ "$skip" = default ]; then
+      ! run_daemon_note_wakes "$dir" "$state" FM_DAEMON_QUIET=1 >/dev/null 2>&1 \
+        || fail "$skip: an unwritable escalation buffer was reported as handled"
+    else
+      ! run_daemon_note_wakes "$dir" "$state" "FM_INJECT_SKIP=$skip" >/dev/null 2>&1 \
+        || fail "$skip: an unwritable escalation buffer was reported as handled"
+    fi
+    assert_present "$state/inbox/$note_id.note" "$skip: a failed forward must leave the note unacked"
+    grep -qF "inbox:$note_id" "$state/.wake-queue" || fail "$skip: a failed forward must leave the wake row queued"
+  done
+  pass "a failed forward leaves the captain inbox note unacked and its wake queued (default and FM_INJECT_SKIP=check:)"
+}
+
 test_escalation_buffer_failure_retains_wake_and_position() {
   local dir state fakebin buffer out
   dir=$(make_supercase escalation-write-failure); state="$dir/state"; fakebin="$dir/daemon-bin"
@@ -3568,3 +3627,5 @@ test_inject_msg_herdr_pane_gone_defers
 test_inject_msg_herdr_submits_through_backend_dispatch
 test_inject_msg_defers_on_dead_shell_unknown
 test_inject_msg_defers_on_unrecognized_composer_state
+test_away_daemon_buffers_then_acks_inbox_note_default_and_skip
+test_away_daemon_keeps_note_and_wake_when_forward_fails
