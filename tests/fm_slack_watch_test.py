@@ -4918,6 +4918,32 @@ class SecondPersonTest(unittest.TestCase):
                 with self.assertRaises(SlackError):
                     plane.parse_command(['check', bad], positional=True)
 
+    def test_sc4_resolve_of_their_key_refuses_another_id_and_a_request_of_theirs_not_yet_failed_with_no_change_and_no_slack_call(self):
+        # The resolve guard (slack-request-resolve-failed-only) for <ts>@<member id>: a key closes only the failed row of the id it names. The same ts with
+        # another valid id is a mismatched pair (no_pending_request); their row whose acknowledgement has failed only once is not failed yet
+        # (request_not_failed); each refusal leaves both journals as they were and makes no Slack call; once failed, the full key closes it.
+        with self.second() as (watch, replay), refused_before_attempt('200.000100'):
+            self.says(replay, '200.000100')
+            self.again(watch)
+            key = '200.000100@' + self.SECOND
+            self.assertEqual([row['author'] for row in self.theirs(watch)['pending'] if row.get('person') == 'second'], [self.SECOND])
+            self.assertEqual(watch.failed_requests(), [])
+            calls, theirs, own = len(replay.state['log']), self.theirs(watch), watch.load_state()
+            for wrong, error in (('200.000100@U0SYNTHSEC2', 'no_pending_request'), (key, 'request_not_failed')):
+                with self.subTest(key=wrong), self.assertRaisesRegex(SlackError, '^%s$' % error):
+                    watch.close_request(wrong)
+                self.assertEqual(self.theirs(watch), theirs)
+                self.assertEqual(watch.load_state(), own)
+            for _ in range(2):
+                self.again(watch)
+            self.assertEqual(watch.failed_requests(), [key])
+            calls = len(replay.state['log'])
+            with self.assertRaisesRegex(SlackError, '^no_pending_request$'):
+                watch.close_request('200.000100@U0SYNTHSEC2')
+            watch.close_request(key)
+            self.assertEqual(watch.failed_requests(), [])
+            self.assertEqual(len(replay.state['log']), calls)
+
     def requests_woken(self, watch):
         return [plane.REQUEST_SEGMENT.match(line).group(1, 2) for line in self.wakes(watch)]
 
