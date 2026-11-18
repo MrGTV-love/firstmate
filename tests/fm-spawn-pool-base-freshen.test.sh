@@ -2174,9 +2174,13 @@ slot_neighbourhood() {
 # own_digest <slot>: slot_digest without refs/remotes/*, the one allowed difference: remote-tracking refs live in the shared
 # Git directory and are refreshed for the copy the spawn takes, exactly as a spawn with no skipped slot refreshes them.
 own_digest() {
-  local all
+  local all gitdir
   all=$(slot_digest "$1") || return 1
   printf '%s\n' "$all" | grep -v '^refs/remotes/' || [ "$?" = 1 ]
+  # The raw index file as well (its bytes, not only what git reads from it): a version or ordering change is a change.
+  gitdir=$(git -C "$1" rev-parse --absolute-git-dir) || return 1
+  [ -f "$gitdir/index" ] || return 1
+  printf 'RAWINDEX %s\n' "$(shasum -a 256 < "$gitdir/index")" || return 1
 }
 
 # assert_entry_unchanged <slot> <entry-file> <label>: the slot's raw state entry still equals the bytes kept in <entry-file>.
@@ -2246,10 +2250,11 @@ test_a_copy_leased_by_another_holder_is_left_alone_and_a_clean_copy_is_taken() {
   pass "a copy leased by another holder is passed over untouched too"
 }
 
-# F1 and R2-5: a claim marker another task left beside the passed-over copy is never created, replaced or removed.
-# The slot folder is read-only and the marker itself is read-only, so neither a new file, a rename, an in-place overwrite nor a
-# removal can happen there; and `rm` and `mv` run through logging stand-ins, so an attempt that fails and is ignored (as
-# `rm -f` ignores a refusal) still leaves a line, which the test reads.
+# F1, R2-5 and R3-4: a claim marker another task left beside the passed-over copy is never created, replaced or removed, and
+# the spawn never even asks for it. The operations are observed, not only the end bytes: every call of the claim and release
+# functions is traced (tests/claim-trace.sh) with its arguments, and none may name the passed-over copy while the next clean
+# copy IS claimed (the positive control, so an empty trace cannot pass); `rm` and `mv` run through a log. The marker and its
+# folder are read-only, and immutable where the host supports it (chflags uchg), so a transient write or chmod fails loudly.
 install_mutation_log() { # <log>: rm and mv stand-ins in the case's fakebin that log their arguments, then run the real tool
   local tool real
   for tool in rm mv; do
@@ -2268,8 +2273,24 @@ assert_no_mutation_logged() {
   ! grep -Fq -- "$2" "$1" || fail "$3: an attempt to change the slot folder was logged: $(grep -F -- "$2" "$1" | head -3)"
 }
 
+# assert_claim_trace_clear <trace> <slot> <label>: no traced claim or release names <slot>.
+assert_claim_trace_clear() {
+  ! grep -Fq -- "$2" "$1" || fail "$3: a claim or release naming the passed-over copy was traced: $(grep -F -- "$2" "$1" | head -3)"
+}
+
+# immutable_on <path>...: make each path immutable where the host can (chflags uchg). Prints the reason and returns 1 when it cannot.
+immutable_on() {
+  command -v chflags >/dev/null 2>&1 || { echo "no chflags on this host"; return 1; }
+  local probe="$CASE_DIR/immutable-probe"
+  : > "$probe"
+  chflags uchg "$probe" 2>/dev/null || { rm -f "$probe" 2>/dev/null; echo "chflags uchg is refused on this filesystem"; return 1; }
+  chflags nouchg "$probe" 2>/dev/null
+  rm -f "$probe"
+  chflags uchg "$@" 2>/dev/null || { echo "chflags uchg failed on the marker or its folder"; return 1; }
+}
+
 test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched() {
-  local id out status digest entry beside marker before_bytes folder log
+  local id out status digest entry beside marker before_bytes folder log trace why immutable=0
   real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
   [ "$(id -u)" != 0 ] || { echo "skip - root writes into a read-only folder"; return 0; }
   id='pool-skip-foreign-marker'
@@ -2279,6 +2300,7 @@ test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched() {
   marker="$folder/.fm-slot-owner"
   printf 'task=other-task\nhome=/somewhere/else\n' > "$marker"
   log="$CASE_DIR/mutation.log"; : > "$log"
+  trace="$CASE_DIR/claim.trace"; : > "$trace"
   install_mutation_log "$log"
   before_bytes=$(shasum -a 256 < "$marker")
   digest=$(own_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read before the spawn"
@@ -2286,21 +2308,26 @@ test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched() {
   beside=$(slot_neighbourhood "${REAL_SLOTS[0]}")
   chmod 444 "$marker"
   chmod 555 "$folder"
+  if why=$(immutable_on "$marker" "$folder"); then immutable=1; else echo "note: no immutable flag on the marker and its folder ($why); the read-only modes, the claim trace and the rm and mv log carry this case"; fi
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(FM_TEST_CLAIM_TRACE="$trace" BASH_ENV="$ROOT/tests/claim-trace.sh" run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
+  if [ "$immutable" = 1 ]; then chflags nouchg "$marker" "$folder"; fi
   chmod 755 "$folder"
   chmod 644 "$marker"
   expect_code 0 "$status" "the spawn could not pass over the copy beside a read-only marker"$'\n'"$out"
   [ "$(shasum -a 256 < "$marker")" = "$before_bytes" ] || fail "the foreign claim marker's bytes changed: $(cat "$marker" 2>&1)"
   assert_no_mutation_logged "$log" "$folder" "the passed-over copy with a foreign marker"
+  assert_claim_trace_clear "$trace" "${REAL_SLOTS[0]}" "the passed-over copy with a foreign marker"
+  assert_claim_trace_clear "$trace" "$folder" "the passed-over copy with a foreign marker"
+  grep -Fq "fm_treehouse_slot_owner_claim"$'\t'"${REAL_SLOTS[1]}"$'\t' "$trace" || fail "the trace does not hold the claim of the next clean copy (the positive control): $(cat "$trace")"
   assert_untouched "${REAL_SLOTS[0]}" "$digest" "$entry" "$beside" "the passed-over copy with a foreign marker"
   assert_grep "worktree=${REAL_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the next clean copy"
-  pass "a populated, read-only foreign claim marker beside a passed-over copy keeps its bytes and no rm or mv named its folder"
+  pass "a foreign marker beside a passed-over copy keeps its bytes; the claim trace and the rm and mv log never name it, and the next clean copy is claimed"
 }
 
-# The instrumentation above must see what it claims to see: a deliberate `rm -f` of the marker in a read-only folder fails
-# without a word (rm -f ignores a refusal), and the log must still hold it, so assert_no_mutation_logged must reject it.
+# The instrumentation above must see what it claims to see.
+# (1) A deliberate `rm -f` and `mv` of the marker in a read-only folder fail without a word, and the log must still hold them.
 test_the_mutation_log_sees_an_attempted_removal_that_fails_quietly() {
   local id folder marker log rc=0
   [ "$(id -u)" != 0 ] || { echo "skip - root writes into a read-only folder"; return 0; }
@@ -2322,6 +2349,43 @@ test_the_mutation_log_sees_an_attempted_removal_that_fails_quietly() {
   [ "$rc" != 0 ] || fail "a logged rm and mv of the marker were not reported"
   [ "$(grep -c "$folder" "$log")" = 2 ] || fail "the log did not hold both attempts: $(cat "$log")"
   pass "the mutation log holds an attempted removal and rename that fail quietly, and the assertion rejects them"
+}
+
+# (2) The overwrite-and-restore mutant: a claim that overwrites the marker in place and puts the old bytes back leaves the
+# final bytes unchanged, so an end-state check passes it; the claim trace holds the call and the assertion rejects it.
+test_the_claim_trace_catches_an_overwrite_and_restore_of_the_marker() {
+  local id folder marker trace before after script rc=0 immutable_why
+  id='pool-claim-trace-selftest'
+  make_skip_case claim-trace-selftest "$id" 1
+  folder="$CASE_DIR/slots-selftest"
+  mkdir -p "$folder"
+  marker="$folder/.fm-slot-owner"
+  printf 'task=other-task\nhome=/somewhere/else\n' > "$marker"
+  trace="$CASE_DIR/claim.trace"; : > "$trace"
+  before=$(shasum -a 256 < "$marker")
+  script="$CASE_DIR/mutant-claim.sh"
+  cat > "$script" <<SH
+fm_treehouse_slot_owner_claim() {  # the mutant: overwrite the marker in place, then restore it
+  local saved
+  saved=\$(cat '$marker')
+  printf 'overwritten\n' > '$marker'
+  printf '%s\n' "\$saved" > '$marker'
+}
+fm_treehouse_slot_owner_claim '$folder/project' "$id" /home
+SH
+  FM_TEST_CLAIM_TRACE="$trace" BASH_ENV="$ROOT/tests/claim-trace.sh" bash "$script" || fail "the mutant script failed"
+  after=$(shasum -a 256 < "$marker")
+  [ "$before" = "$after" ] || fail "the mutant did not restore the marker, so it does not model overwrite-and-restore"
+  (assert_claim_trace_clear "$trace" "$folder" "self-test") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the claim trace did not reject an overwrite-and-restore of the marker: $(cat "$trace")"
+  # Immutable marker, where the host supports it: the same overwrite now fails loudly instead of being restored.
+  if immutable_why=$(immutable_on "$marker"); then
+    (printf 'overwritten\n' > "$marker") 2>/dev/null && { chflags nouchg "$marker"; fail "an immutable marker was overwritten"; }
+    chflags nouchg "$marker"
+  else
+    echo "note: no immutable flag here ($immutable_why); the trace alone closes the overwrite-and-restore mutant"
+  fi
+  pass "an overwrite-and-restore of the marker leaves its bytes equal and is rejected by the claim trace"
 }
 
 test_a_known_doubt_copy_with_no_lease_is_still_leased_to_this_task() {
@@ -2402,30 +2466,47 @@ test_conflicting_pool_records_for_a_copy_refuse_the_whole_spawn() {
 # R2-2: the same refusal for a CLEAN copy (an unreadable or conflicting state used to fall through to the claim and admit the
 # task), with the controls: a clean copy whose state is positively unleased goes on, and a dirty one is skipped as before.
 test_an_unreadable_or_conflicting_pool_state_on_a_clean_copy_refuses_before_any_claim() {
-  local id out status variant
+  local id out status variant state hook
   real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
   [ "$(id -u)" != 0 ] || { echo "skip - root reads a state file with no permissions"; return 0; }
-  for variant in unreadable unreadable-dirty duplicate-name own-and-other alias; do
+  for variant in unreadable unreadable-dirty state-missing state-symlink leased-string leased-number leased-null duplicate-name own-and-other alias; do
     id="pool-clean-${variant}"
     ID_FOR_STATE=$id
     make_real_pool_case "clean-$variant" "$id" 3
+    state=$(pool_state_file "${REAL_SLOTS[0]}")
+    hook=
     case "$variant" in
       unreadable-dirty) make_recovered_lease "${REAL_SLOTS[0]}" ;;
       duplicate-name) make_conflicting_state_clean other-then-own "$id" ;;
       own-and-other) make_conflicting_state_clean own-then-other "$id" ;;
       alias) make_conflicting_state_clean alias-own-last "$id" ;;
+      leased-string) make_leased_value_state '"true"' ;;
+      leased-number) make_leased_value_state '1' ;;
+      leased-null) make_leased_value_state 'null' ;;
     esac
-    if [ "$variant" = unreadable ] || [ "$variant" = unreadable-dirty ]; then
-      out=$(FM_TEST_AT_GET="chmod 000 '$(pool_state_file "${REAL_SLOTS[0]}")'" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
-      status=$?
-      chmod 600 "$(pool_state_file "${REAL_SLOTS[0]}")"
-    else
-      out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
-      status=$?
-    fi
+    # The state turns bad as the first get is typed (the copy is already in the pool and the spawn reads the state right after).
+    case "$variant" in
+      unreadable | unreadable-dirty) hook="chmod 000 '$state'" ;;
+      state-missing) hook="mv '$state' '$state.moved'" ;;
+      state-symlink) hook="mv '$state' '$state.moved' && ln -s '$state.moved' '$state'" ;;
+    esac
+    out=$(FM_TEST_AT_GET="$hook" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+    status=$?
+    # Put the state back for the cleanup.
+    chmod 600 "$state" 2>/dev/null || true
+    [ ! -L "$state" ] || rm -f "$state"
+    [ ! -e "$state.moved" ] || mv -f "$state.moved" "$state"
     assert_refused_before_any_claim "$out" "$status" "clean copy, $variant state" "${REAL_SLOTS[0]}"
   done
   pass "an unreadable state (clean or dirty copy), two rows by name, an own-and-other pair and a symlink alias each refuse before any claim"
+}
+
+# make_leased_value_state <json-value>: the copy's one row gets that value for its leased key (a string, a number, null).
+make_leased_value_state() {
+  local state
+  state=$(pool_state_file "${REAL_SLOTS[0]}")
+  jq --argjson v "$1" '.worktrees[0].leased = $v' "$state" > "$state.new" || fail "the leased value $1 could not be set"
+  mv "$state.new" "$state" || fail "the leased value $1 could not be put in place"
 }
 
 # make_conflicting_state_clean <variant> <id>: the conflicting state on a copy that is clean and unleased (no recovered lease).
@@ -2452,6 +2533,21 @@ test_a_clean_unleased_copy_goes_on_to_the_claim_and_is_used() {
   [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a second copy was requested for a clean unleased copy"
   assert_not_contains "$out" "copies left untouched" "a clean unleased copy was reported as passed over"
   pass "a clean copy whose one pool row is positively unleased is claimed and used, as before"
+}
+
+# Control for the leased value: a row whose leased key is the JSON false is unleased too, and the copy is used.
+test_a_row_with_leased_false_is_unleased_and_the_copy_is_used() {
+  local id out status
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  id='pool-clean-leased-false'
+  make_real_pool_case clean-leased-false "$id" 2
+  make_leased_value_state false
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a copy whose leased value is false should be used"$'\n'"$out"
+  assert_grep "worktree=${REAL_SLOTS[0]}" "$HOME_DIR/state/$id.meta" "the copy was not used"
+  pass "a row whose leased value is the JSON false is unleased and its copy is claimed and used"
 }
 
 # R2-3: the acceptance assertion itself rejects a change that only swaps LF for CRLF inside the state entry (valid JSON, every
@@ -2500,6 +2596,27 @@ test_the_acceptance_assertion_rejects_a_failed_git_read_with_changed_work() {
   [ "$rc" != 0 ] || fail "assert_untouched passed although git could not be read and the copy had changed work"
   (assert_untouched "${REAL_SLOTS[0]}" "$digest" "$entry" "$beside" "changed work") >/dev/null 2>&1 && fail "changed work in the copy was accepted"
   pass "own_digest and assert_untouched fail when git cannot be read, and when the copy's work changed"
+}
+
+# R3-3: a change of the raw index file that git still reads the same (index version 4) fails the acceptance assertion.
+test_the_acceptance_assertion_rejects_a_raw_index_change() {
+  local id digest entry beside rc=0
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  id='pool-mutant-index'
+  make_real_pool_case mutant-index "$id" 1
+  make_recovered_lease "${REAL_SLOTS[0]}"
+  digest=$(own_digest "${REAL_SLOTS[0]}") || fail "the slot could not be read"
+  entry="$CASE_DIR/entry.before"; save_entry "${REAL_SLOTS[0]}" "$entry"
+  beside=$(slot_neighbourhood "${REAL_SLOTS[0]}")
+  (assert_untouched "${REAL_SLOTS[0]}" "$digest" "$entry" "$beside" "control") >/dev/null 2>&1 || fail "the untouched copy was rejected"
+  git -C "${REAL_SLOTS[0]}" update-index --index-version 4 || fail "the index version could not be changed"
+  (assert_untouched "${REAL_SLOTS[0]}" "$digest" "$entry" "$beside" "index mutant") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "a change of the raw index bytes was accepted"
+  rc=0
+  mv "$(git -C "${REAL_SLOTS[0]}" rev-parse --absolute-git-dir)/index" "$CASE_DIR/index.moved"
+  (own_digest "${REAL_SLOTS[0]}") >/dev/null 2>&1 && rc=1
+  [ "$rc" = 0 ] || fail "own_digest passed with an unreadable index"
+  pass "the acceptance assertion rejects a raw index change that git reads the same, and an index that cannot be read"
 }
 
 test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn() {
@@ -2885,11 +3002,14 @@ test_a_copy_leased_by_another_holder_is_left_alone_and_a_clean_copy_is_taken
 test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched
 test_a_known_doubt_copy_with_no_lease_is_still_leased_to_this_task
 test_the_mutation_log_sees_an_attempted_removal_that_fails_quietly
+test_the_claim_trace_catches_an_overwrite_and_restore_of_the_marker
 test_conflicting_pool_records_for_a_copy_refuse_the_whole_spawn
 test_an_unreadable_or_conflicting_pool_state_on_a_clean_copy_refuses_before_any_claim
 test_a_clean_unleased_copy_goes_on_to_the_claim_and_is_used
+test_a_row_with_leased_false_is_unleased_and_the_copy_is_used
 test_the_acceptance_assertion_rejects_a_crlf_only_change_of_the_state_entry
 test_the_acceptance_assertion_rejects_a_failed_git_read_with_changed_work
+test_the_acceptance_assertion_rejects_a_raw_index_change
 test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn
 test_a_pool_of_only_refused_copies_refuses_once_and_names_each
 test_a_refused_copy_handed_out_twice_does_not_loop

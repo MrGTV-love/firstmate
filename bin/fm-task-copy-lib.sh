@@ -548,7 +548,7 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
 # treehouse status and treehouse lease use), or empty when no entry records
 # <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, conflicting, recovered,
-# escaped, relative, missing-jq, or unknown; FM_TASK_COPY_SLOT_HOLDER to the lease
+# escaped, relative, invalid (a matching row whose leased value is neither JSON true nor false nor absent), missing-jq, or unknown; FM_TASK_COPY_SLOT_HOLDER to the lease
 # holder of the last leased entry that records <slot>, or empty; and on failure
 # FM_TASK_COPY_SLOT_REASON to a clause following the slot's path.
 # Returns 0 when held, 1 otherwise.
@@ -587,7 +587,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   if [ "$state" = "$FM_TASK_COPY_POOL_STATE_FILE" ]; then
     entries=$FM_TASK_COPY_POOL_STATE_ENTRIES
   else
-    entries=$(jq -r '.worktrees[]? | [("L" + (if .leased == true then "leased" else "unleased" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring))] | @tsv' "$state" 2>/dev/null) || {
+    entries=$(jq -r '.worktrees[]? | [("L" + (if has("leased") == false or .leased == false then "unleased" elif .leased == true then "leased" else "invalid" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring))] | @tsv' "$state" 2>/dev/null) || {
       FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state cannot be read"
       return 1
     }
@@ -629,6 +629,13 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     fi
     matched=$((matched + 1))
     FM_TASK_COPY_SLOT_NAME=${name#N}
+    # Only JSON true is leased and only JSON false (or no leased key, which is how Treehouse writes an unleased slot) is
+    # unleased; any other value (a string, a number, null) cannot be read as either.
+    if [ "${leased#L}" = invalid ]; then
+      FM_TASK_COPY_SLOT_STATE=invalid
+      FM_TASK_COPY_SLOT_REASON="cannot be proved leased or unleased: Treehouse state $state holds a leased value for entry '${name#N}' that is neither true nor false"
+      return 1
+    fi
     [ "${leased#L}" != leased ] || FM_TASK_COPY_SLOT_HOLDER=${holder#H}
     if [ "${leased#L}" != leased ]; then
       has_unleased=1
