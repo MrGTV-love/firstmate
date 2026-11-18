@@ -1,0 +1,21 @@
+# NOTE: setup error, not a product result: the base export had no git history, so spawn refused before acquisition. Rerun after git init is live-base-mutant-stall30-walk.
+# scenario base-mutant-stall30-walk  fm-spawn tree: /tmp/fmbase.jsm0n3 (scratch-export)
+# treehouse v3.1.7-fm.8759019  load:  9:11  up 20:43, 1 user, load averages: 111.82 103.13 110.29
+# STALL=<unset> CEILING=<unset> HANG_AFTER=<none> TH_MODE=<real get only> TH_COUNT= TH_EVERY=
+# pool before:   35 available    2 leased 
+warning: task live-base-mutant-stall30-walk: /tmp/fmlive.zuFmPx/home/data/live-base-mutant-stall30-walk/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.zuFmPx/home/data/live-base-mutant-stall30-walk/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-base-mutant-stall30-walk
+warning: /tmp/fmlive.zuFmPx/home/data/live-base-mutant-stall30-walk/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: spawn refused for live-base-mutant-stall30-walk: cannot determine whether /tmp/fmth.WjGPoE/p shares firstmate's history (the code root /tmp/fmbase.jsm0n3 has no readable history, or a shallow clone shares no root commit); fetch full history (git fetch --unshallow) before dispatching publishing work
+# exit=1 wall=64s
+# acquisition trace dir after spawn: <removed>
+# pool after:   35 available    2 leased 
+# treehouse wrapper calls seen in pane capture: 0
+# git shim present: no; treehouse wrapper present: no
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+/Users/charlesabrooker/.no-mistakes/evidence/01M7Q9WZ1DHT96XKFJN5R98RE3/live-spawn.sh: line 104: /tmp/fmlive.zuFmPx/pane.log: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M7Q9WZ1DHT96XKFJN5R98RE3/live-spawn.sh: line 105: /tmp/fmlive.zuFmPx/pane.log: No such file or directory
+# mirrored 'treehouse: checked' lines: 0
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

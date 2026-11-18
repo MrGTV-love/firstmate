@@ -1,0 +1,37 @@
+# scenario head-stall30-walk  fm-spawn tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3 (700a7d818a0ba1b48d21cf99b743841f863b1d91)
+# treehouse v3.1.7-fm.8759019  load:  7:35  up 19:07, 1 user, load averages: 66.77 79.55 93.91
+# STALL=30 CEILING=<unset> HANG_AFTER=<none>
+# pool before:   30 available    2 leased 
+warning: task live-head-stall30-walk: /tmp/fmlive.TnoUb5/home/data/live-head-stall30-walk/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.TnoUb5/home/data/live-head-stall30-walk/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-head-stall30-walk
+warning: /tmp/fmlive.TnoUb5/home/data/live-head-stall30-walk/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 62s; no path/output progress for 1s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+skill selection for live-head-stall30-walk: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3/bin/fm-home-summary-refresh.sh: child setpgid (24212 to 24212): Operation not permitted
+spawned live-head-stall30-walk harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-live-head-stall30-walk worktree=/private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/20/p
+# exit=0 wall=138s
+# acquisition trace dir after spawn: <removed>
+# GIT_TRACE2_EVENT in acquired pane shell: unset
+# meta: worktree=/private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/20/p
+# pool after:    1 (90763)   29 available    1 in-use    2 leased 
+# --- pane capture of spawn window (last 25 lines) ---
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ printf '\n%s%s\n' '__firstmate_acquire_' '19150_1__'
+__firstmate_acquire_19150_1__
+bash-3.2$ GIT_TRACE2_EVENT='/tmp/fmlive.TnoUb5/home/data/live-head-stall30-walk/.acquire-trace.mxXqJT/get.LRYTXM' treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/20/p. Type 'exit' to return.
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:p charlesabrooker$ unset GIT_TRACE2_EVENT
+Mac-Studio:p charlesabrooker$ cd -- '/private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/20/p'
+Mac-Studio:p charlesabrooker$ export GOTMPDIR=/tmp/fm-live-head-stall30-walk/gotmp
+Mac-Studio:p charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:p charlesabrooker$ export FM_TASK_ID=live-head-stall30-walk
+Mac-Studio:p charlesabrooker$ . '/tmp/fm-live-head-stall30-walk+cbb24698ec933c127852675240b05b5266b7d0b5bc0297c04419e74f983e1a34/launch.s1795009156.19150.18165.sh'
+Mac-Studio:p charlesabrooker$ printf '%s\n' "${GIT_TRACE2_EVENT-unset}" > '/tmp/fmlive.TnoUb5/trace-env'
+Mac-Studio:p charlesabrooker$ 

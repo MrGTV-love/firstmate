@@ -1,0 +1,20 @@
+# scenario base-mutant-stall30-walk  fm-spawn tree: /tmp/fmbase.jsm0n3 (7bde683debcf55ebaef3b0e83ec87e63c7a9bbde)
+# treehouse v3.1.7-fm.8759019  load:  9:45  up 21:17, 1 user, load averages: 118.42 121.52 122.95
+# STALL=<unset> CEILING=<unset> HANG_AFTER=<none> TH_MODE=<real get only> TH_COUNT= TH_EVERY=
+# pool before:   35 available    2 leased 
+warning: task live-base-mutant-stall30-walk: /tmp/fmlive.q2PNbL/home/data/live-base-mutant-stall30-walk/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.q2PNbL/home/data/live-base-mutant-stall30-walk/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-base-mutant-stall30-walk
+warning: /tmp/fmlive.q2PNbL/home/data/live-base-mutant-stall30-walk/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree after 19 polls (no path or output progress for 30s) (last seen '/private/tmp/fmth.WjGPoE/p': it is the project checkout itself; spawning project '/tmp/fmth.WjGPoE/p'; copies skipped by this spawn: none); aborting acquisition
+# exit=1 wall=64s
+# acquisition trace dir after spawn: <removed>
+# pool after:   35 available    2 leased 
+# treehouse wrapper calls seen in pane capture: 0
+# git shim present: no; treehouse wrapper present: no
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+treehouse get
+bash-3.2$ treehouse get
+# mirrored 'treehouse: checked' lines: 0
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

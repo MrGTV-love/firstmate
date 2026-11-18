@@ -1,0 +1,17 @@
+# scenario r2-head-invalid-stall-override  fm-spawn tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3 (700a7d818a0ba1b48d21cf99b743841f863b1d91)
+# treehouse v3.1.7-fm.8759019  load: 11:16  up 22:48, 1 user, load averages: 76.88 88.13 94.36
+# STALL=abc CEILING=<unset> HANG_AFTER=<none> TH_MODE=<real get only> TH_COUNT= TH_EVERY=
+# pool before:    1 No 
+error: SPAWN_ACQUIRE_STALL must be positive decimal seconds; SPAWN_ACQUIRE_CEILING must be nonnegative decimal seconds
+# exit=1 wall=9s
+# acquisition trace dir after spawn: <removed>
+# pool after:    1 No 
+# treehouse wrapper calls seen in pane capture: 0
+# git shim present: no; treehouse wrapper present: no
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+/Users/charlesabrooker/.no-mistakes/evidence/01M7Q9WZ1DHT96XKFJN5R98RE3/live-spawn.sh: line 104: /tmp/fmlive.cAEH8R/pane.log: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M7Q9WZ1DHT96XKFJN5R98RE3/live-spawn.sh: line 105: /tmp/fmlive.cAEH8R/pane.log: No such file or directory
+# mirrored 'treehouse: checked' lines: 0
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

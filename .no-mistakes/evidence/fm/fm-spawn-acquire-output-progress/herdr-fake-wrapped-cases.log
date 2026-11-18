@@ -1,0 +1,2 @@
+== test_wrapped_non_tmux_acquisition_boundary
+ok - a 12-column non-tmux boundary permits get and isolated-copy acceptance

@@ -1,0 +1,31 @@
+# scenario r2-head-stall30-stuck-loop  fm-spawn tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3 (700a7d818a0ba1b48d21cf99b743841f863b1d91)
+# treehouse v3.1.7-fm.8759019  load: 11:16  up 22:48, 1 user, load averages: 76.88 88.13 94.36
+# STALL=30 CEILING=<unset> HANG_AFTER=<none> TH_MODE=stuck TH_COUNT= TH_EVERY=3
+# pool before:    1 No 
+warning: task live-r2-head-stall30-stuck-loop: /tmp/fmlive.GSchkD/home/data/live-r2-head-stall30-stuck-loop/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.GSchkD/home/data/live-r2-head-stall30-stuck-loop/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-r2-head-stall30-stuck-loop
+warning: /tmp/fmlive.GSchkD/home/data/live-r2-head-stall30-stuck-loop/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree after 14 polls (no path or output progress for 30s) (last seen '/private/tmp/fmths.WKK2we/p': it is the project checkout itself; spawning project '/tmp/fmths.WKK2we/p'; copies skipped by this spawn: none); aborting acquisition
+# exit=1 wall=87s
+# acquisition trace dir after spawn: <removed>
+# pool after:    1 No 
+# treehouse wrapper calls seen in pane capture: 0
+# git shim present: no; treehouse wrapper present: yes
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+bash-3.2$ printf '\n%s%s\n' '__firstmate_acquire_' '19609_1__'
+__firstmate_acquire_19609_1__
+bash-3.2$ GIT_TRACE2_EVENT='/tmp/fmlive.GSchkD/home/data/live-r2-head-stall30-st uck-loop/.acquire-trace.rP1hV3/get.kO7ABn' treehouse get
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 1)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 2)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 3)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 4)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 5)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 6)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 7)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 8)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 9)
+treehouse: checked /tmp/fmths.WKK2we/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 10)
+# mirrored 'treehouse: checked' lines: 10
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

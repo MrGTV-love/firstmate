@@ -1,0 +1,42 @@
+# scenario base-mutant-stall30-ceiling300-stuck-loop  fm-spawn tree: /tmp/fmbase.jsm0n3 (7bde683debcf55ebaef3b0e83ec87e63c7a9bbde)
+# treehouse v3.1.7-fm.8759019  load:  9:54  up 21:26, 1 user, load averages: 100.71 102.41 111.86
+# STALL=<unset> CEILING=<unset> HANG_AFTER=<none> TH_MODE=stuck TH_COUNT= TH_EVERY=3
+# pool before:   35 available    2 leased 
+warning: task live-base-mutant-stall30-ceiling300-stuck-loop: /tmp/fmlive.HTfi1O/home/data/live-base-mutant-stall30-ceiling300-stuck-loop/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.HTfi1O/home/data/live-base-mutant-stall30-ceiling300-stuck-loop/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-base-mutant-stall30-ceiling300-stuck-loop
+warning: /tmp/fmlive.HTfi1O/home/data/live-base-mutant-stall30-ceiling300-stuck-loop/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 62s; no path/output progress for 1s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 124s; no path/output progress for 3s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 186s; no path/output progress for 1s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 249s; no path/output progress for 4s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+error: treehouse get did not enter an isolated worktree after 146 polls (absolute extreme 300s reached) (last seen '/private/tmp/fmth.WjGPoE/p': it is the project checkout itself; spawning project '/tmp/fmth.WjGPoE/p'; copies skipped by this spawn: none); aborting acquisition
+# exit=1 wall=346s
+# acquisition trace dir after spawn: <removed>
+# pool after:   35 available    2 leased 
+# treehouse wrapper calls seen in pane capture: 0
+# git shim present: no; treehouse wrapper present: yes
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 74)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 75)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 76)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 77)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 78)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 79)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 80)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 81)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 82)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 83)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 84)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 85)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 86)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 87)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 88)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 89)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 90)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 91)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 92)
+treehouse: checked /tmp/fmth.WjGPoE/pool/.treehouse/stuck-loop/1/p: refused: unlanded work (pass 93)
+# mirrored 'treehouse: checked' lines: 93
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

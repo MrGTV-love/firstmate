@@ -1,0 +1,27 @@
+# scenario r2-head-explicit-ceiling45-new-candidates  fm-spawn tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3 (700a7d818a0ba1b48d21cf99b743841f863b1d91)
+# treehouse v3.1.7-fm.8759019  load: 11:16  up 22:48, 1 user, load averages: 76.88 88.13 94.36
+# STALL=30 CEILING=45 HANG_AFTER=<none> TH_MODE=newcands TH_COUNT=100 TH_EVERY=8
+# pool before:    1 No 
+warning: task live-r2-head-explicit-ceiling45-new-candidates: /tmp/fmlive.6JowID/home/data/live-r2-head-explicit-ceiling45-new-candidates/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.6JowID/home/data/live-r2-head-explicit-ceiling45-new-candidates/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-r2-head-explicit-ceiling45-new-candidates
+warning: /tmp/fmlive.6JowID/home/data/live-r2-head-explicit-ceiling45-new-candidates/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree after 19 polls (absolute extreme 45s reached (explicit SPAWN_ACQUIRE_CEILING override)) (last seen '/private/tmp/fmths.vrCmRp/p': it is the project checkout itself; spawning project '/tmp/fmths.vrCmRp/p'; copies skipped by this spawn: none); aborting acquisition
+# exit=1 wall=97s
+# acquisition trace dir after spawn: <removed>
+# pool after:    1 No 
+# treehouse wrapper calls seen in pane capture: 0
+# git shim present: no; treehouse wrapper present: yes
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+bash-3.2$ printf '\n%s%s\n' '__firstmate_acquire_' '19234_1__'
+__firstmate_acquire_19234_1__
+bash-3.2$ GIT_TRACE2_EVENT='/tmp/fmlive.6JowID/home/data/live-r2-head-explicit-c eiling45-new-candidates/.acquire-trace.Fel2yB/get.Dh0k5L' treehouse get
+treehouse: checked /tmp/fmths.vrCmRp/pool/.treehouse/walk/1/p: refused: unlanded work
+treehouse: checked /tmp/fmths.vrCmRp/pool/.treehouse/walk/2/p: refused: unlanded work
+treehouse: checked /tmp/fmths.vrCmRp/pool/.treehouse/walk/3/p: refused: unlanded work
+treehouse: checked /tmp/fmths.vrCmRp/pool/.treehouse/walk/4/p: refused: unlanded work
+treehouse: checked /tmp/fmths.vrCmRp/pool/.treehouse/walk/5/p: refused: unlanded work
+treehouse: checked /tmp/fmths.vrCmRp/pool/.treehouse/walk/6/p: refused: unlanded work
+# mirrored 'treehouse: checked' lines: 6
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

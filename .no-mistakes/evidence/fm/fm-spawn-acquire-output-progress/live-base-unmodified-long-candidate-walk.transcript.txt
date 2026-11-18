@@ -1,0 +1,67 @@
+# scenario base-unmodified-long-candidate-walk  fm-spawn tree: /tmp/fmbase.k5aQQK (f7980d08661d15d347aee1389d247a6d6af760ea)
+# treehouse v3.1.7-fm.8759019  load: 11:15  up 22:47, 1 user, load averages: 80.58 89.74 95.09
+# STALL=<unset> CEILING=<unset> HANG_AFTER=<none> TH_MODE=newcands TH_COUNT=200 TH_EVERY=10
+# pool before:    1 No 
+warning: task live-base-unmodified-long-candidate-walk: /tmp/fmlive.EQ1mTG/home/data/live-base-unmodified-long-candidate-walk/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.EQ1mTG/home/data/live-base-unmodified-long-candidate-walk/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-base-unmodified-long-candidate-walk
+warning: /tmp/fmlive.EQ1mTG/home/data/live-base-unmodified-long-candidate-walk/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 63s; no path/output progress for 1s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 125s; no path/output progress for 12s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 186s; no path/output progress for 1s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 248s; no path/output progress for 12s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 312s; no path/output progress for 5s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 373s; no path/output progress for 5s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 434s; no path/output progress for 2s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 496s; no path/output progress for 3s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 557s; no path/output progress for 5s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 621s; no path/output progress for 9s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 682s; no path/output progress for 5s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 742s; no path/output progress for 4s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 802s; no path/output progress for 3s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 863s; no path/output progress for 4s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 924s; no path/output progress for 6s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 984s; no path/output progress for 4s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1048s; no path/output progress for 8s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1110s; no path/output progress for 9s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1172s; no path/output progress for 8s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1233s; no path/output progress for 8s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1294s; no path/output progress for 9s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1357s; no path/output progress for 2s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1419s; no path/output progress for 3s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1484s; no path/output progress for 3s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1547s; no path/output progress for 7s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1608s; no path/output progress for 6s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1669s; no path/output progress for 4s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1730s; no path/output progress for 4s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 1791s; no path/output progress for 4s; last path '/private/tmp/fmthb.3rkWN2/p' (it is the project checkout itself)
+error: treehouse get did not enter an isolated worktree after 798 polls (absolute extreme 1800s reached) (last seen '/private/tmp/fmthb.3rkWN2/p': it is the project checkout itself; spawning project '/tmp/fmthb.3rkWN2/p'; copies skipped by this spawn: none); aborting acquisition
+# exit=1 wall=1847s
+# acquisition trace dir after spawn: <removed>
+# pool after:    1 No 
+# treehouse wrapper calls seen in pane capture: 0
+# git shim present: no; treehouse wrapper present: yes
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/158/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/159/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/160/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/161/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/162/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/163/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/164/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/165/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/166/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/167/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/168/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/169/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/170/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/171/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/172/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/173/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/174/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/175/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/176/p: refused: unlanded work
+treehouse: checked /tmp/fmthb.3rkWN2/pool/.treehouse/walk/177/p: refused: unlanded work
+# mirrored 'treehouse: checked' lines: 177
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

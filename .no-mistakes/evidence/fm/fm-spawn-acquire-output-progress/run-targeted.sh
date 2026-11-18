@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Targeted acquisition cases, one per process.
+cd "$1" || exit 1
+out=$2; : > "$out"
+for c in test_single_stale_first_read_is_not_accepted test_already_settled_pane_costs_one_confirm_read test_transient_primary_checkout_is_not_accepted test_primary_checkout_that_never_settles_fails_at_the_deadline test_slow_progressing_get_survives_old_window test_new_candidates_finish_after_5400_seconds test_git_starts_keep_a_silent_walk_alive test_git_activity_stops_then_stalls test_nonstart_trace_growth_is_not_progress test_explicit_acquisition_ceiling_is_honored test_stall_override_selects_the_idle_allowance test_production_defaults_bound_idle_not_walk_time test_invalid_acquisition_override_refuses_before_launch test_unchanged_capture_stops_at_600 test_new_content_observed_at_595_resets_stall test_new_content_emitted_at_599_is_observed_at_600 test_repeated_candidate_with_changing_reason_stalls test_alternating_seen_captures_stall test_fixed_pool_candidates_end_after_one_walk test_cycling_seen_pane_paths_does_not_renew test_new_pane_path_renews_once test_stale_pane_path_does_not_suppress_genuine_completion test_waiting_messages_do_not_renew_progress test_nonmatching_output_does_not_renew_progress test_candidate_paths_are_compared_exactly test_scrolled_out_lines_are_not_new test_reordered_lines_are_not_new; do
+  echo "== settle $c" >> "$out"
+  FM_TEST_ONLY=$c bash tests/fm-spawn-worktree-settle.test.sh >> "$out" 2>&1; echo "rc=$?" >> "$out"
+done
+for c in test_an_explicit_ceiling_between_gets_reports_leased_copies test_multiple_skips_end_only_when_the_get_stalls test_each_get_starts_with_empty_candidate_history test_a_long_walk_then_skip_requests_and_accepts_another_copy test_wrapped_candidates_finish_in_a_narrow_pane test_wrapped_repeated_candidate_stalls test_inherited_history_alone_does_not_renew_the_get test_mixed_first_sample_keeps_current_get_completion test_current_get_repeat_does_not_renew_again test_other_tmux_capture_consumers_keep_physical_lines test_actual_tg8_producer_in_narrow_pane; do
+  echo "== pool $c" >> "$out"
+  FM_TEST_TREEHOUSE_PRODUCER=$(command -v treehouse) bash tests/fm-spawn-pool-base-freshen.test.sh $c >> "$out" 2>&1; echo "rc=$?" >> "$out"
+done
+echo DONE >> "$out"

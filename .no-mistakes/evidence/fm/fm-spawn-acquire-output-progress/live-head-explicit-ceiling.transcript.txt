@@ -1,0 +1,14 @@
+# scenario head-explicit-ceiling  fm-spawn tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3 (700a7d818a0ba1b48d21cf99b743841f863b1d91)
+# treehouse v3.1.7-fm.8759019  load:  7:52  up 19:24, 1 user, load averages: 60.02 62.98 73.71
+# STALL=30 CEILING=45 HANG_AFTER=<none> TH_MODE=<real get only> TH_COUNT= TH_EVERY=
+# pool before:   32 available    2 leased 
+warning: task live-head-explicit-ceiling: /tmp/fmlive.OHQRXg/home/data/live-head-explicit-ceiling/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.OHQRXg/home/data/live-head-explicit-ceiling/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-head-explicit-ceiling
+warning: /tmp/fmlive.OHQRXg/home/data/live-head-explicit-ceiling/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree after 29 polls (absolute extreme 45s reached (explicit SPAWN_ACQUIRE_CEILING override)) (last seen '/private/tmp/fmth.WjGPoE/p': it is the project checkout itself; spawning project '/tmp/fmth.WjGPoE/p'; copies skipped by this spawn: none); aborting acquisition
+# exit=1 wall=49s
+# acquisition trace dir after spawn: <removed>
+# pool after:   32 available    2 leased 
+# --- pane capture of spawn window (last 25 lines) ---
+# lab torn down
+# lab dir removed

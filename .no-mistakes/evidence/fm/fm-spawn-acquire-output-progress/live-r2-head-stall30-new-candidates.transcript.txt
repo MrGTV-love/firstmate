@@ -1,0 +1,64 @@
+# scenario r2-head-stall30-new-candidates  fm-spawn tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3 (700a7d818a0ba1b48d21cf99b743841f863b1d91)
+# treehouse v3.1.7-fm.8759019  load: 11:16  up 22:48, 1 user, load averages: 77.85 88.15 94.33
+# STALL=30 CEILING=<unset> HANG_AFTER=<none> TH_MODE=newcands TH_COUNT=10 TH_EVERY=12
+# pool before:    1 No 
+warning: task live-r2-head-stall30-new-candidates: /tmp/fmlive.dFrqgL/home/data/live-r2-head-stall30-new-candidates/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.dFrqgL/home/data/live-r2-head-stall30-new-candidates/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-r2-head-stall30-new-candidates
+warning: /tmp/fmlive.dFrqgL/home/data/live-r2-head-stall30-new-candidates/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 66s; no path/output progress for 3s; last path '/private/tmp/fmths.e5zTHP/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 126s; no path/output progress for 1s; last path '/private/tmp/fmths.e5zTHP/p' (it is the project checkout itself)
+skill selection for live-r2-head-stall30-new-candidates: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned live-r2-head-stall30-new-candidates harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-live-r2-head-stall30-new-candidates worktree=/private/tmp/fmths.e5zTHP/pool/.treehouse/p-318747/1/p
+# exit=0 wall=248s
+# acquisition trace dir after spawn: <removed>
+# GIT_TRACE2_EVENT in acquired pane shell: unset
+# meta: worktree=/private/tmp/fmths.e5zTHP/pool/.treehouse/p-318747/1/p
+# pool after:    1 (97679)    1 in-use 
+# treehouse wrapper calls seen in pane capture: 10
+# git shim present: no; treehouse wrapper present: yes
+# --- mirrored pane output (pipe-pane), lines matching treehouse/acquire, last 20 ---
+bash-3.2$ printf '\n%s%s\n' '__firstmate_acquire_' '29325_1__'
+__firstmate_acquire_29325_1__
+bash-3.2$ GIT_TRACE2_EVENT='/tmp/fmlive.dFrqgL/home/data/live-r2-head-stall30-ne w-candidates/.acquire-trace.qG5mxN/get.THf6p8' treehouse get
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/1/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/2/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/3/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/4/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/5/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/6/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/7/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/8/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/9/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/10/p: refused: unlanded work
+🌳 Entered worktree at /private/tmp/fmths.e5zTHP/pool/.treehouse/p-318747/1/p. Type 'exit' to return.
+Mac-Studio:p charlesabrooker$ cd -- '/private/tmp/fmths.e5zTHP/pool/.treehouse/p -318747/1/p'
+# mirrored 'treehouse: checked' lines: 10
+# --- pane capture of spawn window (last 25 lines) ---
+__firstmate_acquire_29325_1__
+bash-3.2$ GIT_TRACE2_EVENT='/tmp/fmlive.dFrqgL/home/data/live-r2-head-stall30-new-candidates/.acquire-trace.qG5mxN/get.THf6p8' treehouse get
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/1/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/2/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/3/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/4/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/5/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/6/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/7/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/8/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/9/p: refused: unlanded work
+treehouse: checked /tmp/fmths.e5zTHP/pool/.treehouse/walk/10/p: refused: unlanded work
+🌳 Setting up worktree...
+🌳 Entered worktree at /private/tmp/fmths.e5zTHP/pool/.treehouse/p-318747/1/p. Type 'exit' to return.
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:p charlesabrooker$ unset GIT_TRACE2_EVENT
+Mac-Studio:p charlesabrooker$ cd -- '/private/tmp/fmths.e5zTHP/pool/.treehouse/p-318747/1/p'
+Mac-Studio:p charlesabrooker$ export GOTMPDIR=/tmp/fm-live-r2-head-stall30-new-candidates/gotmp
+Mac-Studio:p charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:p charlesabrooker$ export FM_TASK_ID=live-r2-head-stall30-new-candidates
+Mac-Studio:p charlesabrooker$ . '/tmp/fm-live-r2-head-stall30-new-candidates+5e6daac99d066a4afd97085fcd8d344a63d4449f132ea8f22dc5ca2703eec181/launch.s1795022400.29325.5788.sh'
+Mac-Studio:p charlesabrooker$ printf '%s\n' "${GIT_TRACE2_EVENT-unset}" > '/tmp/fmlive.dFrqgL/trace-env'
+Mac-Studio:p charlesabrooker$ 
+# lab torn down
+# lab dir removed

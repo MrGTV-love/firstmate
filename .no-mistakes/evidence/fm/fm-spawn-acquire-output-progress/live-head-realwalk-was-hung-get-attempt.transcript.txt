@@ -1,0 +1,45 @@
+# NOTE: the git shim was NOT on the pane PATH in this run (driver PATH bug, fixed later). This is only a further real Git-walk acceptance run under STALL=30.
+# scenario head-hung-get  fm-spawn tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7Q9WZ1DHT96XKFJN5R98RE3 (700a7d818a0ba1b48d21cf99b743841f863b1d91)
+# treehouse v3.1.7-fm.8759019  load:  8:03  up 19:35, 1 user, load averages: 100.77 101.75 90.52
+# STALL=30 CEILING=<unset> HANG_AFTER=40 TH_MODE=<real get only> TH_COUNT= TH_EVERY=
+# pool before:   33 available    2 leased 
+warning: task live-head-hung-get: /tmp/fmlive.KuxrfD/home/data/live-head-hung-get/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /tmp/fmlive.KuxrfD/home/data/live-head-hung-get/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-head-hung-get
+warning: /tmp/fmlive.KuxrfD/home/data/live-head-hung-get/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 61s; no path/output progress for 2s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 122s; no path/output progress for 5s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 187s; no path/output progress for 1s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 252s; no path/output progress for 4s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 313s; no path/output progress for 5s; last path '/private/tmp/fmth.WjGPoE/p' (it is the project checkout itself)
+skill selection for live-head-hung-get: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned live-head-hung-get harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-live-head-hung-get worktree=/private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/36/p
+# exit=0 wall=391s
+# acquisition trace dir after spawn: <removed>
+# git shim calls: 
+# GIT_TRACE2_EVENT in acquired pane shell: unset
+# meta: worktree=/private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/36/p
+# pool after:    1 (8716)   33 available    1 in-use    2 leased 
+# git shim present: yes; treehouse wrapper present: no
+# --- pane capture of spawn window (last 25 lines) ---
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ printf '\n%s%s\n' '__firstmate_acquire_' '10779_1__'
+__firstmate_acquire_10779_1__
+bash-3.2$ GIT_TRACE2_EVENT='/tmp/fmlive.KuxrfD/home/data/live-head-hung-get/.acquire-trace.BAsw5U/get.c4WiZh' treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/36/p. Type 'exit' to return.
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:p charlesabrooker$ unset GIT_TRACE2_EVENT
+Mac-Studio:p charlesabrooker$ cd -- '/private/tmp/fmth.WjGPoE/pool/.treehouse/p-d0a4e1/36/p'
+Mac-Studio:p charlesabrooker$ export GOTMPDIR=/tmp/fm-live-head-hung-get/gotmp
+Mac-Studio:p charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:p charlesabrooker$ export FM_TASK_ID=live-head-hung-get
+Mac-Studio:p charlesabrooker$ . '/tmp/fm-live-head-hung-get+13292ee8314996300c6c2257ad41c33d53098f80b9b6ad798800110c3d005159/launch.s1795011128.10779.26173.sh'
+Mac-Studio:p charlesabrooker$ printf '%s\n' "${GIT_TRACE2_EVENT-unset}" > '/tmp/fmlive.KuxrfD/trace-env'
+Mac-Studio:p charlesabrooker$ 
+# lab torn down
+# lab dir removed
