@@ -3,8 +3,8 @@
 # Run scripts/git-stability/provision_existing_slot.py from the registered project
 # clone passed as project, never from the task copy; refuse if the clone lacks it.
 # Governed projects must attest the assigned isolated copy before admission.
-# --owned-path is an explicit,
-# repeatable task scope, never inferred from prose or expanded to the whole repo.
+# --owned-path is an explicit, repeatable task scope, never inferred from prose
+# or expanded to the whole repo.
 # The provisioner owns schema, default origin/main merge-base validation, explicit
 # local-default qualification, same-owner adoption and lease/liveness-gated replacement.
 # A selected local-default ref/SHA is passed explicitly by spawn; no local choice
