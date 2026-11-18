@@ -1036,7 +1036,9 @@ For a steered `stalled_worker` or `silent_report` row whose live-only source sto
 This includes a local secondmate's `silent_report`, even though secondmates do not emit ordinary `missing_worker` rows.
 A recorded stop or completed or failed state is not such a loss; existing outcome and wait handling still applies.
 For a recorded `silent_report` steer, an inbox acknowledgement or an unresolved check-in reply is not the requested report and does not extend the delivery deadline.
-A plain `working` status line is not the requested report either, so only a typed status (a wait, a decision, a blocker, done or idle) or a resolved reply settles the steer. A working line never settles it, whatever second the line carries relative to the delivery. A resolved reply settles it only when the reply names this delivery or resolves in a later second than the delivery, so a reply resolved in the delivery's own second does not settle it.
+A plain `working` status line is not the requested report either, so only a typed status (a wait, a decision, a blocker, done or idle) or a resolved reply settles the steer.
+A working line never settles it, whatever second the line carries relative to the delivery.
+A resolved reply settles it only when the reply names this delivery or resolves in a later second than the delivery, so a reply resolved in the delivery's own second does not settle it.
 The regular silence clock and repeat-send suppression are unchanged when no formal steer is recorded.
 A publication marks a delivery requiring follow-up with the existing `requires_followup` flag, so subsequent consumer recovery cannot silently revive it and the same old delivery cannot renew it.
 The existing opaque notification token changes once when result follow-up becomes due and settles on unchanged observations.
