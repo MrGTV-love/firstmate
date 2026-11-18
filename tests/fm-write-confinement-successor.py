@@ -25,6 +25,10 @@ import sys
 
 # What the confinement's refusal looks like in git's output; any other failure is not a refusal.
 CONFINEMENT_REFUSAL = re.compile(r"(Operation not permitted|Permission denied)")
+# git 2.50 names no error when it cannot create a new ref's leading folder (for example
+# refs/heads/fm/pre-fm/ for fm/pre-fm/<name>); it prints only this. Such a refusal is
+# judged by asking the kernel directly whether the same profile refuses that folder.
+DIRECTORY_REFUSAL = re.compile(r"unable to create directory for '?(/[^'\n]+?)'?\s*$", re.MULTILINE)
 GIT_ENV = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "Fixture",
            "GIT_AUTHOR_EMAIL": "fixture@example.invalid", "GIT_COMMITTER_NAME": "Fixture",
            "GIT_COMMITTER_EMAIL": "fixture@example.invalid"}
@@ -364,7 +368,9 @@ def kernel(repo, base):
         The same command is first run unconfined, so a command that is wrong in itself
         (a name that collides with an existing ref, a bad object) cannot pass as a
         refusal; then, confined, it must exit nonzero with the kernel's
-        operation-not-permitted error and leave the ref where it was.
+        operation-not-permitted error and leave the ref where it was. Where git
+        reports only that it could not create the ref's new leading folder, the same
+        profile must refuse creating that folder with the kernel's error.
         """
         before = ref(name)
         control = unconfined(name, target, how)
@@ -377,8 +383,28 @@ def kernel(repo, base):
         restore(name, before)
         assert after == before, f"{label}: the confined write changed the ref"
         assert result.returncode != 0, f"{label}: the confined git command must exit nonzero"
-        assert CONFINEMENT_REFUSAL.search(result.stderr or ""), \
-            f"{label}: git failed for a reason other than the confinement refusing it: {(result.stderr or '').strip()}"
+        stderr = result.stderr or ""
+        if CONFINEMENT_REFUSAL.search(stderr):
+            return
+        folder_refusal = DIRECTORY_REFUSAL.search(stderr)
+        assert folder_refusal, f"{label}: git failed for a reason other than the confinement refusing it: {stderr.strip()}"
+        # git could not make the ref's leading folder and did not say why. The unconfined
+        # control above made it, so the folder is creatable; the refusal is the
+        # confinement's only when the same profile refuses that folder with the kernel's
+        # operation-not-permitted error.
+        folder = Path(folder_refusal.group(1)).parent
+        refs_root = Path(git("-C", str(project), "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()) / "refs/heads"
+        assert refs_root in folder.parents, f"{label}: git named a folder outside the refs/heads store: {folder}"
+        first_missing = folder
+        while not first_missing.parent.exists():
+            first_missing = first_missing.parent
+        assert not first_missing.exists(), f"{label}: the ref's leading folder {folder} already exists, so git's folder error is not the confinement's"
+        probe = confined(profile, None, "/bin/mkdir", "-p", str(folder))
+        made = first_missing.exists()
+        if made:
+            subprocess.run(["/bin/rm", "-rf", str(first_missing)], check=True)
+        assert probe.returncode != 0 and not made and CONFINEMENT_REFUSAL.search(probe.stderr or ""), \
+            f"{label}: git could not create {folder}, but the profile does not refuse that folder ({probe.stderr.strip() or 'mkdir succeeded'}), so git failed for a reason other than the confinement: {stderr.strip()}"
 
     # With the new profile the successor is allowed: moved, created after deletion, deleted.
     allowed(new_profile, succ, s_tip, "move", "new profile: moving the successor ref")
