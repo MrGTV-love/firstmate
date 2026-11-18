@@ -25,8 +25,10 @@ so `writer` exit 1, "unrelated" and "agent-free") rests only on the first kind: 
 whose basename is not bun, no script argument, or a raw argv[1] that is lexically not a
 cli.ts in a src directory. A script path resolved after launch can never prove it:
 a link retargeted after the process loaded its script changes what the path resolves to,
-not what the process loaded. A differently named link to the entry that the process
-loaded is the named residual (it reads as may-own, never as unrelated).
+not what the process loaded. The named residual is the opposite case: a process that
+loaded the entry through a link with another name (raw argv[1] `/x/foo.ts`) reads as
+unrelated, because the raw arguments are all the kernel holds; it is never admitted
+either way, and the installed launcher always passes the canonical entry path.
 Admission (`interactive`) needs every filesystem input tied to launch time, and
 otherwise fails closed. One trusted installed identity is held in one place
 (INSTALLED_RUNTIME and INSTALLED_SCRIPT below, resolved by installed_identity(); the
