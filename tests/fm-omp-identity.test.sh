@@ -780,18 +780,19 @@ test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
 
 
 # --- N1: a script path resolved after launch is not evidence of what the process loaded ---
-test_a_script_path_retargeted_after_launch_proves_nothing() {
-  local t="$TMP/n1" script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent a b c d rc
+# One case per direction, so each is red or green on its own.
+n1_script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent
+test_a_writer_whose_script_link_is_retargeted_after_launch_stays_a_writer() {
+  local t="$TMP/n1a" a rc
   mkdir -p "$t"
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
   ps() { case "$*" in '-p '*' -o comm=') python3 -I "$PROCINFO" comm "$2" ;; '-p '*' -o args=') python3 -I "$PROCINFO" args "$2" ;; *) return 1 ;; esac; }
-  # A: a live writer whose script link is retargeted to a foreign file after it started
   build_tree "$t/a"
   tree_launch "$t/a" --no-title; a=$SPAWNED
   FM_OMP_INSTALLED_ROOT="$t/a" assert_tree 0 0 "$a" "control: before the retarget the process is the installed agent"
-  mv "$t/a/$script_pkg/src/cli.ts" "$t/a/$script_pkg/src/cli.ts.orig"
-  ln -s main.ts "$t/a/$script_pkg/src/cli.ts"
+  mv "$t/a/$n1_script_pkg/src/cli.ts" "$t/a/$n1_script_pkg/src/cli.ts.orig"
+  ln -s main.ts "$t/a/$n1_script_pkg/src/cli.ts"
   assert_tree 1 0 "$a" "a script link retargeted after launch is never proof the process is another program"
   FM_OMP_INSTALLED_ROOT="$t/a" assert_tree 1 0 "$a" "a script link retargeted after launch is not admitted even where its tree is the installed one"
   fm_launch_proof_pid_may_own_record "$a" || fail "a live writer whose script link was retargeted after launch may still own its record"
@@ -801,39 +802,50 @@ test_a_script_path_retargeted_after_launch_proves_nothing() {
   assert_tree 1 1 "$SPAWNED" "a bun on a script that is lexically not the entry is unrelated"
   rc=0; fm_launch_proof_pid_may_own_record "$SPAWNED" || rc=$?
   [ "$rc" -ne 0 ] || fail "a bun on a script that is lexically not the entry may be replaced as an unrelated reused pid"
-  # B: a foreign process whose script link is retargeted to the installed entry after launch stays refused
-  mkdir -p "$t/b/foreign" "$t/b/lnk/src"
-  : > "$t/b/foreign/cli.ts"
-  ln -s "$t/b/foreign/cli.ts" "$t/b/lnk/src/cli.ts"
-  spawn tty "$BUN" "$BUN" "$t/b/lnk/src/cli.ts" --no-title; b=$SPAWNED
+  pass "N1 A: a writer whose script link was retargeted after launch stays a possible writer; a bun on a script that is lexically not the entry is unrelated"
+}
+test_a_foreign_process_whose_link_is_retargeted_to_the_installed_entry_stays_refused() {
+  local t="$TMP/n1b" b
+  mkdir -p "$t/foreign" "$t/lnk/src"
+  : > "$t/foreign/cli.ts"
+  ln -s "$t/foreign/cli.ts" "$t/lnk/src/cli.ts"
+  spawn tty "$BUN" "$BUN" "$t/lnk/src/cli.ts" --no-title; b=$SPAWNED
   assert_tree 1 0 "$b" "control: a process started on a link to a foreign script is refused"
-  ln -sfn "$SCRIPT" "$t/b/lnk/src/cli.ts"
+  ln -sfn "$SCRIPT" "$t/lnk/src/cli.ts"
   assert_tree 1 0 "$b" "a link retargeted to the installed entry after launch must not admit the process"
-  # C: a directory of the installed path swapped for another after launch
+  pass "N1 B: a foreign process whose link is retargeted to the installed entry after launch stays refused"
+}
+test_a_directory_swapped_into_the_installed_path_after_launch_is_not_admitted() {
+  local t="$TMP/n1c" c
+  mkdir -p "$t"
   build_tree "$t/c"
-  mv "$t/c/$script_pkg/src" "$t/c/real-src"
+  mv "$t/c/$n1_script_pkg/src" "$t/c/real-src"
   mkdir -p "$t/c/foreign-src"; : > "$t/c/foreign-src/cli.ts"
-  ln -s "$t/c/foreign-src" "$t/c/$script_pkg/src"
+  ln -s "$t/c/foreign-src" "$t/c/$n1_script_pkg/src"
   tree_launch "$t/c" --no-title; c=$SPAWNED
-  rm "$t/c/$script_pkg/src"
-  mv "$t/c/real-src" "$t/c/$script_pkg/src"
+  rm "$t/c/$n1_script_pkg/src"
+  mv "$t/c/real-src" "$t/c/$n1_script_pkg/src"
   FM_OMP_INSTALLED_ROOT="$t/c" assert_tree 2 0 "$c" "a directory swapped into the installed path after launch leaves the process unresolved, never admitted"
-  # D: the fail-closed policy for an unrelated write into a directory of the installed path
+  pass "N1 C: a directory swapped into the installed path after launch is not admitted"
+}
+test_a_write_into_the_installed_path_after_launch_fails_closed() {
+  local t="$TMP/n1d" d
+  mkdir -p "$t"
   build_tree "$t/d"
   tree_launch "$t/d" --no-title; d=$SPAWNED
   FM_OMP_INSTALLED_ROOT="$t/d" assert_tree 0 0 "$d" "control: an untouched installed tree admits"
-  : > "$t/d/$script_pkg/src/extra.txt"
+  : > "$t/d/$n1_script_pkg/src/extra.txt"
   FM_OMP_INSTALLED_ROOT="$t/d" assert_tree 2 0 "$d" "a write into a directory of the installed path after launch fails closed (named policy)"
-  pass "N1: a script path or link changed after launch is never proof of another program or of the installed one; only the raw arguments prove unrelated"
+  pass "N1 D: an unrelated write into a directory of the installed path after launch fails closed (named policy)"
 }
 
 # --- N3: which session a process currently writes cannot be read from one descriptor ---
 test_a_process_that_switched_sessions_is_not_tied_to_the_old_one() {
-  local t="$TMP/switch" mode pid rc i
+  local t="$TMP/switch" mode pid rc
   mkdir -p "$t/task"; : > "$t/task.jsonl"; : > "$t/personal.jsonl"; : > "$t/task/__advisor.jsonl"
   holds_rc() { rc=0; python3 -I "$IDENT" holds "$1" "$2" >/dev/null 2>&1 || rc=$?; }
   wait_for_switch() { # <pid> <file>: the same process now holds <file>
-    for i in $(seq 1 100); do
+    for _ in $(seq 1 100); do
       holds_rc "$1" "$2"
       [ "$rc" -ne 1 ] && return 0
       sleep 0.05
@@ -843,7 +855,7 @@ test_a_process_that_switched_sessions_is_not_tied_to_the_old_one() {
   # the real shape (three of the eleven captures): the task session and its own advisor file
   HOLD_FILE="$t/task.jsonl" SWITCH_TO="$t/task/__advisor.jsonl" launch tty --no-title; pid=$SPAWNED
   kill -USR1 "$pid"
-  for i in $(seq 1 100); do
+  for _ in $(seq 1 100); do
     [ "$(python3 -I "$PROCINFO" writable "$pid" | python3 -I -c 'import json,sys;print(sum(1 for e in json.load(sys.stdin) if e["path"].endswith("__advisor.jsonl")))')" = 1 ] && break
     sleep 0.05
   done
@@ -886,5 +898,8 @@ test_verdict_does_not_depend_on_the_omp_on_path
 test_a_helper_failure_is_never_proof_of_no_writer
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free
 test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable
-test_a_script_path_retargeted_after_launch_proves_nothing
+test_a_writer_whose_script_link_is_retargeted_after_launch_stays_a_writer
+test_a_foreign_process_whose_link_is_retargeted_to_the_installed_entry_stays_refused
+test_a_directory_swapped_into_the_installed_path_after_launch_is_not_admitted
+test_a_write_into_the_installed_path_after_launch_fails_closed
 test_a_process_that_switched_sessions_is_not_tied_to_the_old_one
