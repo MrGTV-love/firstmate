@@ -151,13 +151,18 @@ add_copy() {  # <case-dir> <path> <branch>
 }
 
 # add_pool_slot <case-dir> <slot-name> <branch> -> slot path: a linked worktree
-# in the fixed Treehouse <pool>/<slot>/<repo> layout, next to a pool state file.
+# in the fixed Treehouse <pool>/<slot>/<repo> layout, next to a pool state file
+# that, as the real Treehouse writes it, holds a row for the slot (name, path and
+# created_at; not leased).
 add_pool_slot() {  # <case-dir> <slot-name> <branch>
-  local pool="$1/pool"
+  local pool="$1/pool" slot
   mkdir -p "$pool/$2"
   [ -f "$pool/treehouse-state.json" ] || printf '{"worktrees":[]}\n' > "$pool/treehouse-state.json"
   add_copy "$1" "$pool/$2/repo" "$3"
-  (cd "$pool/$2/repo" && pwd -P)
+  slot=$(cd "$pool/$2/repo" && pwd -P) || return 1
+  jq --arg name "$2" --arg path "$slot" '.worktrees += [{name: $name, path: $path, created_at: "2026-01-01T00:00:00Z"}]' \
+    "$pool/treehouse-state.json" > "$pool/treehouse-state.json.next" && mv "$pool/treehouse-state.json.next" "$pool/treehouse-state.json" || return 1
+  printf '%s\n' "$slot"
 }
 
 run_control() {  # <case-dir> <args...>

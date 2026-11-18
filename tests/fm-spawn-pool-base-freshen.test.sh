@@ -2808,7 +2808,7 @@ STRICT_DOC_CASES=(
   'top|version|-1@refused' 'top|version|"4"@refused' 'top|version|null@refused' 'top|version|1.5@refused'
   'top|worktrees|null@refused' 'top|worktrees|{}@refused' 'top|worktrees|"x"@refused'
   'top|Worktrees|[{"name": 5}]@refused' 'top|Version|"x"@refused' 'top|extra|5@valid'
-  'rowdel|0|leased@valid' 'rowdel|0|created_at@refused' 'rowdel|1|path@refused'
+  'rowdel|0|leased@valid' 'rowdel|0|created_at@refused' 'rowdel|1|path@refused' 'rowdel|0|name@refused'
   'dupbefore|0|lease_holder|123@refused' 'dupafter|0|lease_holder|123@refused' 'dupafter|0|lease_holder|"y"@refused'
   'dupbefore|0|created_at|123@refused' 'dupbefore|1|created_at|1.0@refused'
   'raw|bom@refused' 'raw|trailing@refused' 'raw|twodocs@refused' 'raw|empty@refused' 'raw|array@refused' 'raw|nan@refused'
@@ -2970,6 +2970,35 @@ test_a_copy_outside_the_named_pool_goes_on_and_an_unnamed_pool_refuses() {
     fi
   done
   pass "a plain copy goes on as an ordinary copy when the named pool directory excludes it, and is refused before any claim when pool-dir fails or prints nothing"
+}
+
+# The pool directory is asked only for a copy that is not a readable pool slot. A pool slot with a state that passes the
+# strict proof is classified from that state even when `treehouse pool-dir` fails: another holder's copy is passed over and
+# the next clean copy is claimed, and a clean unleased copy is claimed.
+test_a_pool_slot_with_a_readable_state_is_classified_from_it_when_pool_dir_fails() {
+  local id out status variant
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  for variant in other-holder unleased; do
+    id="pool-pooldir-fails-$variant"
+    ID_FOR_STATE=$id
+    make_real_pool_case "pooldir-fails-$variant" "$id" 2
+    if FM_TEST_POOLDIR=fail "$FAKEBIN_DIR/treehouse" pool-dir >/dev/null 2>&1; then fail "$variant: pool-dir did not fail in this world"; fi
+    if [ "$variant" = other-holder ]; then
+      printf 'work in progress\n' >> "${REAL_SLOTS[0]}/README.md"
+      real_th lease --path "${REAL_SLOTS[0]}" --lease-holder other-task >/dev/null 2>&1 || fail "the other holder's lease could not be made"
+    fi
+    out=$(FM_TEST_POOLDIR=fail FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+    status=$?
+    expect_code 0 "$status" "$variant: a pool slot with a readable state should be classified from it when pool-dir fails"$'\n'"$out"
+    if [ "$variant" = other-holder ]; then
+      assert_contains "$out" "holder: other-task" "$variant: the report did not name the other holder"
+      assert_grep "worktree=${REAL_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "$variant: the task was not recorded on the next clean copy"
+      [ "$(jq -r '.worktrees[0].lease_holder' "$(pool_state_file "${REAL_SLOTS[0]}")")" = other-task ] || fail "$variant: the other holder's lease did not survive"
+    else
+      assert_grep "worktree=${REAL_SLOTS[0]}" "$HOME_DIR/state/$id.meta" "$variant: the clean unleased copy was not used"
+    fi
+  done
+  pass "a pool slot whose state passes the strict proof is classified from it when treehouse pool-dir fails: another holder's copy is passed over, a clean unleased copy is claimed"
 }
 
 # R2-3: the acceptance assertion itself rejects a change that only swaps LF for CRLF inside the state entry (valid JSON, every
@@ -3533,6 +3562,7 @@ test_a_state_with_a_wrong_field_type_is_never_read_as_another_holders_lease
 test_a_clean_unleased_copy_in_a_state_that_fails_the_proof_is_never_claimed
 test_a_copy_with_no_readable_state_is_refused_unless_the_named_pool_excludes_it
 test_a_copy_outside_the_named_pool_goes_on_and_an_unnamed_pool_refuses
+test_a_pool_slot_with_a_readable_state_is_classified_from_it_when_pool_dir_fails
 test_the_acceptance_assertion_rejects_a_crlf_only_change_of_the_state_entry
 test_the_acceptance_assertion_rejects_a_failed_git_read_with_changed_work
 test_the_acceptance_assertion_rejects_a_raw_index_change

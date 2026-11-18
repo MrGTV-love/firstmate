@@ -116,6 +116,19 @@ if [ "${1:-}" = lease ] && [ "${2:-}" = --help ]; then
 fi
 printf 'treehouse %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
 case "${1:-}" in
+  pool-dir)
+    # The installed CLI always names the repository's pool folder: here the
+    # folder of the pool state beside its registered slots, or, in a case with
+    # no pool, an empty pool folder of the case that holds no copy.
+    while IFS= read -r line; do
+      case "$line" in "worktree "*) wt=${line#worktree } ;; *) continue ;; esac
+      [ -f "${wt%/*/*}/treehouse-state.json" ] || continue
+      printf '%s\n' "${wt%/*/*}"
+      exit 0
+    done < <(git worktree list --porcelain 2>/dev/null)
+    mkdir -p "${FM_FAKE_CALL_LOG%/*}/treehouse-pool" || exit 1
+    printf '%s\n' "${FM_FAKE_CALL_LOG%/*}/treehouse-pool"
+    ;;
   status)
     # The pool the repository's registered worktrees live in, as the installed
     # CLI lists it: a name and a path per slot.
