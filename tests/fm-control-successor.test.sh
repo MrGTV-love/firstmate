@@ -726,8 +726,8 @@ test_successor_archive_route_admits_a_branch_past_the_archive_tip() {
   pass "successor: the archive-tip route admits a branch past the task's archive tip with that tip as the proved tip, and refuses a branch whose history lacks it"
 }
 
-# The first admission is anchored to the --tip Main reads itself, never to a ref the
-# worker can write. The worker points its own archive name at an unmerged in-family
+# The first admission is anchored to the --tip Main reads itself, never to an archive
+# name the worker can create. The worker points its own archive name at an unmerged in-family
 # commit T and a branch holds T: without --tip, or with another sha, the admission
 # refuses, changes nothing and prints the command to rerun; with --tip T it records
 # T as the proved tip, and a repeat call needs no --tip.

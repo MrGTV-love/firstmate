@@ -104,11 +104,13 @@
 # fm_successor_proof proves it: the ref exists in the project's ref store, it is
 # not checked out in any worktree but the task's own recorded copy (read from the
 # project's worktree list, never from a copy), and it is proved to be this task's
-# by one of two routes, each anchored to the --tip <sha> Main passes, which Main
-# reads itself (the task's submitted or pipeline head from its no-mistakes run
-# record, or the recorded branch's tip) and never takes from a ref the worker can
-# write: it is checked out in the task's recorded copy and contains the recorded
-# branch's tip, which is the --tip (route=checked-out), or its history contains
+# by one of two routes, each anchored to the --tip <sha> Main passes and reads
+# itself: for route=archive-tip, the task's submitted or pipeline head from its
+# no-mistakes run record, which the worker cannot write; for route=checked-out,
+# the recorded branch's tip Main observed, which the worker can move, so that
+# route proves only that Main observed that tip and rests on Main choosing the
+# branch. The routes: it is checked out in the task's recorded copy and contains
+# the recorded branch's tip, which is the --tip (route=checked-out), or its history contains
 # the --tip, which is the tip of one of the task's own custody archive branches
 # archive/<id>-(submitted|pipeline)-<8 hex> (route=archive-tip); a first
 # admission without --tip, or with one no route matches, refuses and prints the
@@ -913,7 +915,7 @@ do_successor() {
       || successor_refuse name "successor branch '$SUCC_BRANCH' is not admissible: $reason; nothing was changed"
     rerun=$(printf 'FM_HOME=%q bash %q %q successor --branch %q --tip %q --note %q' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$SUCC_BRANCH" '<sha>' '<why>')
     proof=$(fm_successor_proof "$project" "$ID" "$old_branch" "$SUCC_BRANCH" "$wt" "$base_branch" anchor "$SUCC_TIP") \
-      || successor_refuse proof "$proof; nothing was changed. Rerun with the tip you read yourself, never from a ref the worker can write: $rerun, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip (git -C $project rev-parse refs/heads/$old_branch)"
+      || successor_refuse proof "$proof; nothing was changed. Rerun with a tip you read yourself: $rerun, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C $project rev-parse refs/heads/$old_branch), a ref the worker can move, so that route proves only that you observed that tip"
   fi
   su_route=$(printf '%s\n' "$proof" | sed -n 's/^route=//p')
   su_archive=$(printf '%s\n' "$proof" | sed -n 's/^archive=//p')
