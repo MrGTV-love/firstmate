@@ -132,9 +132,14 @@ esac
 exec env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"
 WRAPPER
 chmod +x "$TEST_DIR/fakebin/herdr"
+mkdir "$TEST_DIR/treehouse-pool"
 cat > "$TEST_DIR/fakebin/treehouse" <<'WRAPPER'
 #!/usr/bin/env bash
 set -euo pipefail
+# The real `treehouse pool-dir` always names the project's pool folder; the
+# generated copies are plain folders, so the folder named here (empty) holds
+# none of them and a fresh spawn may use one as an ordinary copy.
+[ "$*" != pool-dir ] || { printf '%s\n' "$TEST_DIR/treehouse-pool"; exit 0; }
 # Accept only an exact generated-copy return from its generated project. Any
 # other form refuses; nothing here reaches the shared allocator.
 [ "$#" = 3 ] && [ "$1" = return ] && [ "$2" = --force ] || exit 1
