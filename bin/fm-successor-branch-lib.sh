@@ -66,8 +66,10 @@
 #       worktree on the branch is checked, not the first one listed);
 #     - <tip>, when given, is a full 40 or 64 lowercase hex commit in that store;
 #     - and, in mode anchor (a first admission; <tip> is the --tip Main read
-#       itself, never a ref the worker can write), one of two routes holds, each
-#       with <tip> as the proved tip:
+#       itself: for archive-tip a run-record head the worker cannot write, for
+#       checked-out the recorded branch's tip Main observed, which the worker can
+#       move, so that route proves only that Main observed it), one of two routes
+#       holds, each with <tip> as the proved tip:
 #         checked-out: it is the branch checked out in the recorded copy, the
 #           recorded branch's tip is <tip>, is an ancestor of, or equal to, its
 #           tip, and is the task's own (fm_successor_tip_is_own);
