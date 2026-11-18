@@ -11,7 +11,7 @@ Each family ships as a pair plus its tests.
 `bin/fm-<name>-guard.py` is the engine: it measures, classifies, and prints.
 `tests/fm-<name>-guard.test.sh` drives the engine through its public CLI and asserts observable output, never engine source text.
 
-The memory family is `fm-mem-guard`; its engine header owns Linux/macOS diagnostic sources and budgets, macOS admission measurements, the run-peak and pressure calibration record, the separate alarm baseline derivation, and the distinction between diagnostic fail-open and admission fail-closed behavior.
+The memory family is `fm-mem-guard`; its engine header owns Linux/macOS diagnostic sources and budgets, macOS admission measurements and the harm test that defers new work (fit against a projected run size, swap growth, compressor rise), the run-peak and step calibration record, the separate alarm baseline derivation, and the distinction between diagnostic fail-open and admission fail-closed behavior.
 It makes no Jev, model, or network call.
 The backend-neutral spawn owner and generated worker new-run instructions call the same admission wrapper; the root home's watcher observes through its existing check cadence and surfaces each already-queued memory payload once without duplicating rows.
 The process census reuses `fm-proc-info.py` for sandbox-safe kernel facts, supplements other-user RSS through `ps` when permitted, and records unreadable resident sizes explicitly rather than substituting zero.

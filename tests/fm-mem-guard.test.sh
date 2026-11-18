@@ -187,13 +187,13 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     child = {"pid":202, "ppid":201, "comm":"python3", "started":"start-202",
              "rss_bytes":5*gib, "fleet":False, "run":None}
 
-    def facts(pressure=1, rss=None, total=32*gib, available=8*gib):
+    def facts(pressure=1, rss=None, total=32*gib, available=8*gib, compressor=gib//2):
         (fixture / "sysctl").write_text(f"{total}\n{pressure}\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n")
         (fixture / "vm_stat").write_text(
             "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
             "Pages free: 1000.\nPages speculative: 100.\n"
             f"Anonymous pages: 1048576.\nFile-backed pages: {available//16384 - 1100}.\n"
-            "Pages purgeable: 100.\nPages occupied by compressor: 32768.\n")
+            f"Pages purgeable: 100.\nPages occupied by compressor: {compressor//16384}.\n")
         rows = [dict(daemon), dict(fleet), dict(child)] if rss is None else rss
         (fixture / "processes.json").write_text(json.dumps(rows))
 
@@ -253,16 +253,19 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
         call("run",*launch)
         assert ran.exists()
         ran.unlink()
-        facts(pressure=2)
-        call("run",*launch,code=75)
-        assert not ran.exists() and worker.poll() is None
-        facts(pressure=4)
-        call("admit",code=75)
+        # The kernel pressure level is telemetry: it is recorded and never decides.
+        for level in (2, 4):
+            facts(pressure=level)
+            call("run",*launch)
+            assert ran.exists()
+            ran.unlink()
+            report = call("admit")
+            assert report["pressure_level"] == level and report["admission"] == "admit" and report["reasons"] == [], report
         facts(pressure=0)
         report = call("admit",code=75)
         assert any("unexpected native pressure level 0" in e for e in report["errors"]), report
         assert worker.poll() is None
-        print("ok - real run-start exec admits healthy work, refuses pressure 2/4 and an unreadable level with 75 and preserves existing work")
+        print("ok - real run-start exec admits healthy work and records but ignores pressure 2/4; an unreadable level still refuses with 75 and existing work is preserved")
     finally:
         worker.terminate()
         worker.wait()
@@ -410,7 +413,128 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     assert ran.exists()
     ran.unlink()
     studio_facts(pressure=2)
-    call("run",*launch,code=75,environ=studio_env)
+    call("run",*launch,environ=studio_env)
+    assert ran.exists()
+    print("ok - estimated 113941 Studio shape: the margin is recorded and shown, and a 13th start is admitted at pressure 1 or 2 because the record is too short to judge a fit")
+
+    # The harm itself decides. A record is written by hand with exact derived
+    # values: 200 steps 300 s apart whose available drops are k x 10 MiB (p99
+    # 1980 MiB) and compressor rises k x 5 MiB (p95 950 MiB), and 25 task peaks
+    # of i x 100 MiB (p95 2400 MiB) and 25 no-mistakes peaks of i x 200 MiB (p95
+    # 4800 MiB). The previous probe reading holds the swap and compressor the
+    # fixture reads unless a case moves them.
+    import datetime as _dt, socket as _socket
+    mib = 1024 ** 2
+    harm = home / "harm"
+    (harm / "state").mkdir(parents=True)
+    harm_env = {**env, "FM_HOME":str(harm)}
+    swap_now = int(1565.88 * mib)
+    compressor_now = gib // 2
+    record_path = harm / "state/.memory-calibration.json"
+
+    def record(last_swap=swap_now, last_compressor=compressor_now, age=120, steps=200, host=None):
+        stamp = _dt.datetime.now(_dt.timezone.utc)
+        peaks = lambda kind, size: {f"{kind}:r{i}": {"peak_bytes": (i + 1) * size, "samples": 2, "incomplete_samples": 0,
+                                                    "first_seen": stamp.isoformat(), "last_seen": stamp.isoformat(),
+                                                    "max_gap_seconds": 0} for i in range(25)}
+        record_path.write_text(json.dumps({
+            "schema": "fm-memory-calibration.v1", "host": host or _socket.gethostname(), "total_bytes": 32 * gib,
+            "runs": {**peaks("task", 100 * mib), **peaks("no-mistakes", 200 * mib)}, "pressured": None,
+            "trail": {"last": {"at": (stamp - _dt.timedelta(seconds=age)).isoformat(), "available_bytes": 20 * gib,
+                               "compressor_bytes": last_compressor, "swap_used_bytes": last_swap},
+                      "steps": [[300, k * 10 * mib, k * 5 * mib, 0] for k in range(1, steps + 1)]}}))
+
+    def decide(kind="task", code=0, mode="admit", pressure=1, available=20*gib, compressor=compressor_now, **moves):
+        facts(pressure=pressure, available=available, compressor=compressor)
+        record(**moves)
+        return call(mode, *(("--kind", kind) if kind else ()), code=code, environ=harm_env)
+
+    # fit: the projection is the run kind's p95 peak and the reserve the p99 drop
+    report = decide(pressure=4, available=10*gib)
+    detail = report["harm"]
+    assert report["admission"] == "admit" and report["pressure_level"] == 4 and report["reasons"] == [], report
+    assert detail["projected_bytes"] == 2400 * mib and detail["reserve_bytes"] == 1980 * mib, detail
+    assert detail["compressor_rise_bytes"] == 950 * mib and detail["window_seconds"] == 300, detail
+    assert detail["projection_runs"] == 25 and detail["not_judged"] == [], detail
+    report = decide(pressure=1, available=4000*mib, code=75)
+    assert report["reasons"][0].startswith("projected task run of 2.34 GiB (p95 of 25 recorded) does not fit in "
+                                           "3.91 GiB available minus a 1.93 GiB reserve"), report["reasons"]
+    decide(available=4380*mib)
+    decide(available=4379*mib, code=75)
+    report = decide("no-mistakes", available=6*gib, code=75)
+    assert report["harm"]["projected_bytes"] == 4800 * mib, report["harm"]
+    decide("task", available=6*gib)
+    report = decide(None, available=6*gib, code=75)
+    assert report["harm"]["projected_kind"] == "no-mistakes", report["harm"]
+    decide("no-mistakes", available=6780*mib)
+    # run defaults to the no-mistakes kind; admit --kind task is the spawn kind
+    ran = home / "harm-run"
+    launch = ("--",sys.executable,"-c","from pathlib import Path; import sys; Path(sys.argv[1]).touch()",str(ran))
+    facts(available=6*gib); record()
+    call("run",*launch,code=75,environ=harm_env)
     assert not ran.exists()
-    print("ok - estimated 113941 Studio shape: the margin is recorded and shown but a normal-pressure 13th start is admitted; pressure 2 still refuses")
+    facts(available=8*gib); record()
+    call("run",*launch,environ=harm_env)
+    assert ran.exists()
+    ran.unlink()
+    facts(available=6*gib); record()
+    call("run","--kind","task",*launch,environ=harm_env)
+    assert ran.exists()
+    ran.unlink()
+    for bad in (("admit","--kind","bogus"),("probe","--kind","task"),("admit","--kind")):
+        result = subprocess.run(["bash",wrapper,*bad],capture_output=True,text=True,env=harm_env)
+        assert result.returncode == 2, (bad, result)
+    print("ok - fit: a run is deferred when its kind's p95 peak does not fit in available minus the p99 reserve and admitted when it does, at any pressure level, with the numbers in the reason")
+
+    # swap growth defers even with abundant memory; a shrink or no change does not
+    report = decide(available=30*gib, last_swap=swap_now - 100*mib, code=75)
+    assert report["reasons"][0].startswith("swap used grew by 0.098 GiB in the 12"), report["reasons"]
+    assert report["harm"]["swap_delta_bytes"] == 100 * mib, report["harm"]
+    decide(available=30*gib, last_swap=swap_now + 100*mib)
+    decide(available=30*gib)
+    print("ok - swap growth since the last probe reading defers with 75 even when 30 GiB is available; a shrink or no change admits")
+
+    # a compressor rise above the p95 of recorded rises defers; one at or below it does not
+    report = decide(available=30*gib, compressor=compressor_now + gib, code=75)
+    assert "compressor grew by 1.00 GiB" in report["reasons"][0], report["reasons"]
+    assert "above the 0.93 GiB p95 of recorded rises" in report["reasons"][0], report["reasons"]
+    decide(available=30*gib, compressor=compressor_now + 950*mib)
+    decide(available=30*gib, compressor=compressor_now + 950*mib + 16384, code=75)
+    decide(available=30*gib, last_compressor=compressor_now + gib)
+    print("ok - a compressor rise above the p95 of recorded rises defers; one at or below it, or a fall, admits")
+
+    # what cannot be judged is said, never guessed
+    report = decide(available=30*gib, last_swap=swap_now - 100*mib, age=2000)
+    assert any("outside the 300 s window" in text for text in report["harm"]["not_judged"]), report["harm"]
+    report = decide(available=1*gib, steps=50)
+    assert any("50 recorded probe steps; 100 are needed" in text for text in report["harm"]["not_judged"]), report["harm"]
+    report = decide(available=1*gib, host="another-host")
+    assert any("not host" in text for text in report["harm"]["not_judged"]), report["harm"]
+    record_path.unlink()
+    facts(available=1*gib)
+    report = call("admit","--kind","task",environ=harm_env)
+    assert report["admission"] == "admit" and "no calibration" in report["harm"]["not_judged"][0], report["harm"]
+    print("ok - a stale previous reading, a short record, another host's record or no record leaves that part not judged and says why")
+
+    # a failed or inconsistent read keeps its fail-closed 75 whatever the record says
+    facts(available=30*gib); record()
+    (fixture / "vm_stat").unlink()
+    report = call("admit","--kind","task",code=75,environ=harm_env)
+    assert report["errors"] and report["harm"] is None, report
+    facts(available=30*gib); record()
+    (fixture / "sysctl").write_text(f"{32*gib}\nnot-a-number\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n")
+    report = call("admit","--kind","task",code=75,environ=harm_env)
+    assert report["errors"] and report["harm"] is None, report
+    print("ok - an unreadable memory fact still defers with 75 and judges no harm")
+
+    # a probe decides from the record before it folds in, then folds one step in
+    facts(available=30*gib, compressor=compressor_now + gib); record()
+    report = call("probe",environ=harm_env)
+    assert report["admission"] == "defer" and "compressor grew by 1.00 GiB" in report["reasons"][0], report
+    folded = json.loads(record_path.read_text())
+    assert len(folded["trail"]["steps"]) == 201 and folded["trail"]["steps"][-1][2] == gib, folded["trail"]["steps"][-1]
+    assert folded["trail"]["last"]["compressor_bytes"] == compressor_now + gib
+    report = call("probe",environ=harm_env)
+    assert report["admission"] == "admit" and report["harm"]["compressor_delta_bytes"] == 0, report
+    print("ok - a probe judges the previous probe reading, then records one step (gap, available drop, compressor and swap change) and the new last reading")
 PY

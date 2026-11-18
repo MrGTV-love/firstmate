@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # fm-mem-guard.sh - local memory diagnostic and measured macOS work admission.
 # Usage: fm-mem-guard.sh [legacy diagnostic flags]
-#        fm-mem-guard.sh sample|baseline|admit|probe
-#        fm-mem-guard.sh run -- <new-run command...>
+#        fm-mem-guard.sh sample|baseline|probe
+#        fm-mem-guard.sh admit [--kind task|no-mistakes]
+#        fm-mem-guard.sh run [--kind task|no-mistakes] -- <new-run command...>
 # Legacy flags retain the fail-open diagnostic contract in the engine header.
-# sample records facts only; admit returns 75 if native pressure is 2 or higher
-# or required facts are unreadable. No new work runs after that return, and no
-# existing work is stopped. Neither the recorded one-run peak and headroom
-# margin shown in each reading nor the non-fleet RSS alarm baseline affects
-# that result. baseline derives the alarm envelope from recorded healthy root
-# probe readings; the engine header owns every record's contents and derivation.
-# run checks once and execs a NEW run only; reattach/respond directly so pressure
-# cannot prevent supervising existing work. admit, run and sample only record a
-# reading in the invoking home's state.
+# sample records facts only; admit returns 75 if the harm itself is measured
+# (the run's projected resident size does not fit in available memory minus the
+# reserve, or swap used or the compressor is growing) or required facts are
+# unreadable. The kernel pressure level is recorded, never judged. No new work
+# runs after that return, and no existing work is stopped. Neither the recorded
+# one-run peak and headroom margin shown in each reading nor the non-fleet RSS
+# alarm baseline affects that result. baseline derives the alarm envelope from
+# recorded healthy root probe readings; the engine header owns every record's
+# contents, the harm test and every derivation. --kind names the run being
+# admitted; run defaults it to no-mistakes, and admit without it judges fit
+# against the larger kind's projection.
+# run checks once and execs a NEW run only; reattach/respond directly so a
+# measured overload cannot prevent supervising existing work. admit, run and
+# sample only record a reading in the invoking home's state.
 # probe is the root local home's periodic host observation; elsewhere it does
 # nothing. It records the host's run and pressure calibration and queues
 # identifying check wakes through fm-wake-lib.sh in the root home's own queue.
@@ -35,9 +41,19 @@ case "${1:-}" in
   sample|baseline|admit|probe|run) mode=$1; shift ;;
   *) exec python3 "$SCRIPT_DIR/fm-mem-guard.py" "$@" ;;
 esac
+kind=
+if [ "$mode" = admit ] || [ "$mode" = run ]; then
+  if [ "${1:-}" = --kind ]; then
+    case "${2:-}" in
+      task|no-mistakes) kind=$2; shift 2 ;;
+      *) echo 'usage: --kind task|no-mistakes' >&2; exit 2 ;;
+    esac
+  fi
+fi
 if [ "$mode" = run ]; then
-  [ "${1:-}" = -- ] && [ "$#" -gt 1 ] || { echo 'usage: fm-mem-guard.sh run -- <new-run command...>' >&2; exit 2; }
+  [ "${1:-}" = -- ] && [ "$#" -gt 1 ] || { echo 'usage: fm-mem-guard.sh run [--kind task|no-mistakes] -- <new-run command...>' >&2; exit 2; }
   shift
+  [ -n "$kind" ] || kind=no-mistakes
 else
   [ "$#" -eq 0 ] || { echo 'unexpected memory guard arguments' >&2; exit 2; }
 fi
@@ -57,9 +73,11 @@ fi
 engine_mode=$mode
 [ "$mode" != run ] || engine_mode=admit
 rc=0
+kind_args=()
+[ -z "$kind" ] || kind_args=(--kind "$kind")
 reading=$(FM_MEMORY_FLEET_ROOT="$root" python3 "$SCRIPT_DIR/fm-mem-guard.py" "$engine_mode" \
   --state "$STATE" --baseline "$host_state/.memory-baseline.json" \
-  --calibration "$host_state/.memory-calibration.json") || rc=$?
+  --calibration "$host_state/.memory-calibration.json" ${kind_args[@]+"${kind_args[@]}"}) || rc=$?
 [ -n "$reading" ] || exit 75
 # Use the existing queue owner, not a second notification transport. Queue before
 # recording suppression; a crash may duplicate a notification but never loses it.

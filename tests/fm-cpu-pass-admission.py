@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Executable fixtures for fm-cpu-pass.test.sh; never use fleet state, load or the live host."""
+import datetime
 import hashlib
 import json
 import os
@@ -107,11 +108,16 @@ def procs(folder, count=100, limit=10666, error=False):
     write_json(folder / 'procs.json', dict(count=count, limit=limit, error=error))
 
 
-def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None):
+SWAP_USED = int(1565.88 * 2 ** 20)  # the swap the facts() fixture reads
+
+
+def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None, last_swap=None):
     """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
 
     live names runs (repo_id NULL) whose young, low peak the probe has folded in already;
-    extra maps more runs (repo_id NULL) to their recorded peak in bytes.
+    extra maps more runs (repo_id NULL) to their recorded peak in bytes;
+    last_swap adds the probe's step record (200 steps 300 s apart) and a previous probe reading
+    a minute old that held that much swap used, so the backstop can judge swap growth.
     """
     state = folder / 'fmhome' / 'state'
     state.mkdir(parents=True, exist_ok=True)
@@ -125,8 +131,19 @@ def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=No
     for run, peak in (extra or {}).items():
         runs['no-mistakes:None/' + run] = dict(peak_bytes=peak, samples=2, incomplete_samples=0,
                                                 first_seen='x', last_seen='x', max_gap_seconds=0)
-    write_json(state / '.memory-calibration.json', dict(
-        schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs, pressured=None))
+    record = dict(schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs,
+                  pressured=None)
+    if last_swap is not None:
+        stamp = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=60)
+        record['trail'] = dict(
+            last=dict(at=stamp.isoformat(), available_bytes=40 * GIB, compressor_bytes=32768 * 16384, swap_used_bytes=last_swap),
+            steps=[[300, k * 2 ** 20, k * 2 ** 20, 0] for k in range(1, 201)])
+    write_json(state / '.memory-calibration.json', record)
+
+
+def swap(folder, growing, peaks=PEAKS):
+    """The previous probe reading held less swap than the fixture reads now (growing), or the same."""
+    calibrate(folder, peaks=peaks, last_swap=SWAP_USED - 100 * 2 ** 20 if growing else SWAP_USED)
 
 
 def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
@@ -314,14 +331,14 @@ try:
     # One-start minimum: with nothing counted, one start is admitted although R + S = 11 GiB
     # exceeds the 10 GiB budget, unless the backstop reports an overload.
     folder, db, env = case('floor', measured=True, available=10 * GIB)
-    facts(folder, available=10 * GIB, pressure=2)
+    swap(folder, growing=True)
     marker = folder / 'floor.marker'
     child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'floor')
     pending(folder, 1)
-    wait_for(lambda: 'waiting: overload: memory: native memory pressure level 2' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
+    wait_for(lambda: 'waiting: overload: memory: swap used grew by 0.098 GiB' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
     time.sleep(0.6)
     assert not marker.exists() and child.poll() is None
-    facts(folder, available=10 * GIB)
+    swap(folder, growing=False)
     finish(child)
     assert marker.exists() and 'admitted: counted=0 need=%d budget=%d' % (11 * GIB, 10 * GIB) in (folder / 'floor.stderr').read_text()
 
@@ -424,8 +441,7 @@ try:
     wait_for(lambda: (folder / 'already-running.started').exists(), 'a run already started')
     before_hash = hashlib.sha256(db.read_bytes()).hexdigest()
     for label, bad, good, expected in (
-            ('pressure', lambda: facts(folder, available=100 * GIB, pressure=2, runs=[(None, 'already-running', GIB)]),
-             lambda: facts(folder, available=100 * GIB, runs=[(None, 'already-running', GIB)]), 'memory: native memory pressure level 2'),
+            ('swap', lambda: swap(folder, growing=True), lambda: swap(folder, growing=False), 'memory: swap used grew by 0.098 GiB'),
             ('pileup', lambda: procs(folder, count=6400), lambda: procs(folder, count=6399), 'process pile-up: 6400 of 10666'),
             ('memory-unreadable', lambda: facts(folder, broken=True), lambda: facts(folder, available=100 * GIB), 'memory: '),
             ('procs-unreadable', lambda: procs(folder, error=True), lambda: procs(folder), 'process count unreadable'),
@@ -444,12 +460,18 @@ try:
     (folder / 'already-running.release').touch()
     finish(running)
 
+    # The kernel pressure level is telemetry, never an input: level 4 with no measured harm admits.
+    folder, db, env = case('pressure-flag', measured=True, available=100 * GIB)
+    facts(folder, available=100 * GIB, pressure=4)
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'flag.marker')], env, folder / 'flag'))
+    assert (folder / 'flag.marker').exists()
+
     # A reading that was healthy a moment ago cannot admit a start after the signal turns bad:
     # the grant takes a new reading. Each case first lets a waiter see healthy inputs (it waits
     # at the full counted limit), then changes the signal and frees the slot together, so the old
     # cached reading is the only thing that could grant. It must keep waiting, then start once clear.
     for label, bad, good in (
-            ('pressure', lambda f: facts(f, pressure=2), lambda f: facts(f)),
+            ('swap', lambda f: swap(f, growing=True, peaks=[]), lambda f: swap(f, growing=False, peaks=[])),
             ('pileup', lambda f: procs(f, count=6400), lambda f: procs(f, count=100)),
             ('memory-unreadable', lambda f: facts(f, broken=True), lambda f: facts(f)),
             ('procs-unreadable', lambda f: procs(f, error=True), lambda f: procs(f))):

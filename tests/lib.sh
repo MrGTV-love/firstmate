@@ -75,6 +75,26 @@ FM_MEMORY_GUARD_BIN=$(command -v true)
 export FM_MEMORY_GUARD_BIN
 unset FM_MEMORY_FIXTURE_DIR
 
+# fm_test_memory_record <state-dir> <growing|steady> [total-bytes]: writes the
+# root home's memory calibration record for a native-fixture case whose swap used
+# is the 1565.88M the case's sysctl fixture reads. The probe's step record is
+# 200 steps 300 s apart, and its previous reading is a minute old and held
+# either 100 MiB less swap (growing, so admission defers) or the same (steady).
+fm_test_memory_record() {
+  python3 - "$1/.memory-calibration.json" "$2" "${3:-34359738368}" <<'PY'
+import datetime, json, socket, sys
+path, growing, total = sys.argv[1], sys.argv[2] == "growing", int(sys.argv[3])
+swap = int(1565.88 * 2 ** 20)
+at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=60)
+json.dump({"schema": "fm-memory-calibration.v1", "host": socket.gethostname(), "total_bytes": total, "runs": {},
+           "pressured": None,
+           "trail": {"last": {"at": at.isoformat(), "available_bytes": 8 * 2 ** 30, "compressor_bytes": 32768 * 16384,
+                              "swap_used_bytes": swap - 100 * 2 ** 20 if growing else swap},
+                     "steps": [[300, k * 2 ** 20, k * 2 ** 20, 0] for k in range(1, 201)]}},
+          open(path, "w"))
+PY
+}
+
 # Stubbed commands are not production timing evidence. Never inherit an
 # operational home's ledger into fixtures; timing-specific cases explicitly
 # select an isolated file after sourcing this helper.

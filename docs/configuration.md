@@ -2441,15 +2441,21 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 
 On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
 Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
-Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
+Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 when a required reading is unavailable or the harm itself is measured.
+The harm is starting work that exhausts host memory and makes the host thrash or crash.
+It is measured in two ways: the projected resident size of a run of that kind does not fit in available memory minus a reserve, or swap used or the compressor is growing since the last probe reading.
+The native memory-pressure level is recorded in each reading and never judged, because it does not track available bytes: in the recorded readings it deferred work at 10.9 to 39.0 GiB available while readings that were admitted ran down to 18.2 GiB.
+The projection, reserve, compressor-rise limit and comparison window are quantiles of this host's own records, derived at each decision, so the [engine header](../bin/fm-mem-guard.py) owns them and a record too short for a quantile leaves that part not judged, named in the reading's `harm` object.
+A deferred spawn prints the reasons with their numbers.
 The generated worker brief names two routes for a new no-mistakes run.
-A start through `bin/fm-mem-guard.sh run -- no-mistakes axi run` takes the same reading and can defer with the same exit 75, and the worker then writes the `paused:` status described below; this route skips the CPU pass pool.
+A start through `bin/fm-mem-guard.sh run -- no-mistakes axi run` takes the same reading as a no-mistakes run (`--kind`) and can defer with the same exit 75, and the worker then writes the `paused:` status described below; this route skips the CPU pass pool.
 A start through `bin/fm-duration.py run --pipeline-priority <class>` goes through the [CPU pass pool](cpu-pass-pool.md#fresh-pipeline-starts) (`pipeline-start`), which owns start admission on that route.
 A relaunch, or a respawn of a secondmate whose task record the home still holds, is recovery of existing work and is never refused.
 An unexpected native pressure level below 1 is an unreadable measurement, not a healthy one.
 
 Each reading also records available memory (free, file-backed and purgeable pages, never compressed or swapped memory) and shows this host's measured one-run peak and headroom margin; `admit` refuses no work on either.
 They come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
+It also keeps the last 5,000 steps between consecutive probe readings (seconds apart, available-memory drop, compressor change and swap change) and the last reading itself, which the harm test reads.
 The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure; until both exist the reading names the missing inputs, and Firstmate never seeds or guesses either number or ships a universal cap.
 For `admit` these are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
 A fresh no-mistakes run start through `bin/fm-duration.py run` uses recorded run peaks through the [CPU pass pool's start admission](cpu-pass-pool.md#fresh-pipeline-starts).

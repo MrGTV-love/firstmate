@@ -136,7 +136,7 @@ That is the previous count limit, kept only until the host has measured runs; a 
 
 While either signal reports an actual overload, or cannot be read, no new start is admitted and a notice names the reason:
 
-- the memory reading is unreadable or would make `bin/fm-mem-guard.sh admit` exit 75 (native pressure level 2 or higher, or a required fact unavailable; `admission_evaluate` returns the same list);
+- the memory reading is unreadable, or swap used or the compressor grew since the last probe reading (the harm test of `bin/fm-mem-guard.py` `admission_evaluate`, which returns the same list; the pool's own reservation formula owns the fit, so the backstop does not test it again);
 - `bin/fm-proc-guard.py` reports a pile-up (user process count above its fixed 60 % warning line of the host's per-user cap, a proc-guard constant) or cannot read the count or, on macOS, the per-user cap.
 
 Nothing running is stopped, paused or reprioritised.

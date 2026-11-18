@@ -97,8 +97,8 @@ Pipeline starts:
     start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
     record never refuses a start and never reads as an empty host.
   - Pause-only backstop: while that reading is unreadable or reports a reason to
-    defer (the same list that makes fm-mem-guard.sh admit exit 75, such as native
-    pressure level 2 or higher) or fm-proc-guard.py reports a pile-up (user
+    defer (the swap-growth and compressor-rise part of the list that makes
+    fm-mem-guard.sh admit exit 75; this pool owns the fit) or fm-proc-guard.py reports a pile-up (user
     process count above its warning line) or cannot be read, no start is
     admitted. Nothing running is stopped, and waiting here only delays the start.
   - Admission is before COMMAND (including any measured execution wrapper).
@@ -752,7 +752,14 @@ def host_observation(fresh: bool = False) -> dict:
         try:
             guard = sibling("fm_mem_guard", "fm-mem-guard.py")
             report = guard.admission_sample()
-            deferred, _, _ = guard.admission_evaluate(report, None)
+            # The pool owns the fit (its own measured reservations below); the backstop
+            # judges the swap and compressor trend against the same root-home record.
+            try:
+                calibration = guard.host_record(root_home() / "state" / ".memory-calibration.json", report,
+                                                "calibration", "fm-memory-calibration.v1", ())
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                calibration = (None, "no root-home calibration: %s" % exc)
+            deferred, _, _ = guard.admission_evaluate(report, None, calibration=calibration, fit=False)
             reasons += ["memory: " + text for text in deferred]
             if not report["errors"]:
                 memory = report

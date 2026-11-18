@@ -12,12 +12,46 @@ macOS swap occupancy is telemetry only and never classifies pressure, because
 the OS can grow that pool. Linux swap utilization still classifies the verdict.
 
 Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run):
-  - macOS native pressure level 2 or higher defers. A level below 1 is an
-    unreadable measurement, and any missing required memory or process
-    reading also defers with 75, while the legacy diagnostic remains
-    fail-open. Raw free + speculative pages (PhysMem unused), available pages,
-    occupied compressor pages, swap, each run's resident tree, each reading's
-    largest non-fleet RSS and the largest residents are recorded.
+  - Admission tests the harm itself: starting work that exhausts host memory
+    and makes the host thrash or crash (the 2026-10-09 crash). The kernel
+    memory-pressure level is recorded as telemetry and is never an input:
+    in the recorded readings it flagged 331 of 3,753 readings at 10.9 to
+    39.0 GiB available while readings that were admitted ran down to
+    18.2 GiB, so it does not track the bytes. Admit defers with 75 when:
+      1. any required memory or process reading is missing or inconsistent
+         (a level below 1 is also an unreadable measurement; the legacy
+         diagnostic below stays fail-open);
+      2. fit: the projected resident size of the run does not fit in
+         available memory minus the reserve, where the projection is the
+         PROJECTION_QUANTILE (nearest rank) of this host's recorded per-run
+         peaks for the run's kind (task or no-mistakes; no kind uses the
+         larger of the two), and the reserve is the RESERVE_QUANTILE of the
+         recorded drops in available memory between consecutive probe
+         readings no further apart than the window;
+      3. swap used grew since the last probe reading, or the compressor grew
+         by more than the RISE_QUANTILE of its recorded rises.
+    Window is the WINDOW_QUANTILE of the recorded gaps between probe readings,
+    so a comparison reading older than it is not evidence of a trend. Swap
+    growth has no floor: any increase counts, since in the recorded probes
+    the positive swap changes split into 3 of at most 14.9 MiB and 9 of at
+    least 185.6 MiB with nothing between, and refusing on the 3 costs 0.14%
+    of probe steps. Each quantile is a named policy over measured values:
+    every byte value and time is derived from this host's own record at the
+    moment of the decision, and a missing, short (fewer than 1 / (1 -
+    quantile) values, the fewest for which the quantile differs from the
+    largest) or other-host record leaves that part not judged and says why in
+    the reading's "harm" object; it is never seeded or guessed. The
+    measurement of the record held on 2026-11-18 (3,753 readings, 2,213
+    probes, 556 runs, one 10-hour swap-growth episode), its script and its
+    replay are saved with the change that introduced them (PR body); it
+    produced a projection of 8.27 GiB (task) and 10.37 GiB (no-mistakes), a
+    reserve of 13.20 GiB, a compressor-rise limit of 6.19 GiB and a window of
+    2,325 s, and replayed against the recorded decisions it admitted 160 of
+    331 recorded defers and deferred 85 of 3,183 recorded admits (2.67%).
+    Peaks are snapshots of a run's resident tree and so are lower bounds.
+    Raw free + speculative pages (PhysMem unused), available pages, occupied
+    compressor pages, swap, each run's resident tree, each reading's largest
+    non-fleet RSS and the largest residents are recorded.
   - Available memory is free plus reclaimable pages: Pages free, File-backed
     pages (the page cache, speculative pages included) and Pages purgeable,
     never compressed or swapped memory.
@@ -82,6 +116,7 @@ Invariants:
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -91,6 +126,26 @@ import sys
 from datetime import datetime, timezone
 from time import monotonic
 from typing import Any, Dict, List, Optional
+
+# Named policy quantiles over this host's recorded values; the engine header
+# owns what each one derives and why. Nearest rank, as bin/fm-cpu-pass.py ranks.
+PROJECTION_QUANTILE = 0.95
+RESERVE_QUANTILE = 0.99
+RISE_QUANTILE = 0.95
+WINDOW_QUANTILE = 0.99
+TRAIL_STEPS = 5000  # consecutive probe-to-probe steps kept in the calibration record
+RUN_KINDS = ("task", "no-mistakes")
+
+
+def rank_quantile(values, quantile):
+    """Nearest-rank quantile of a nonempty list."""
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(quantile * len(ordered)) - 1)]
+
+
+def enough_for(quantile):
+    """The fewest values for which the quantile can differ from the largest."""
+    return math.ceil(1 / (1 - quantile))
 
 
 def read_meminfo() -> Dict[str, int]:
@@ -470,6 +525,7 @@ def calibration_record(path, report):
                              samples=pressured["samples"] + 1, last_seen=now,
                              highest_level=max(pressured["highest_level"], report["pressure_level"]))
             calibration["pressured"] = pressured
+        fold_trail(calibration, report)
         return calibration
 
     fresh = {"schema": "fm-memory-calibration.v1", "host": report["host"],
@@ -482,6 +538,138 @@ def calibration_record(path, report):
     temp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
     temp.write_text(json.dumps(calibration))
     os.replace(temp, path)
+
+
+def fold_trail(calibration, report):
+    """Append one probe-to-probe step (seconds apart, available drop, compressor change, swap change)."""
+    trail = calibration.get("trail")
+    if not (isinstance(trail, dict) and isinstance(trail.get("steps"), list)):
+        trail = {"last": None, "steps": []}
+    last = trail.get("last")
+    now = {"at": report["checked_at"], "available_bytes": report["available_bytes"],
+           "compressor_bytes": report["compressor_bytes"], "swap_used_bytes": report["swap_used_bytes"]}
+    if isinstance(last, dict):
+        try:
+            gap = (datetime.fromisoformat(now["at"]) - datetime.fromisoformat(last["at"])).total_seconds()
+            if gap > 0:
+                trail["steps"].append([int(gap), last["available_bytes"] - now["available_bytes"],
+                                       now["compressor_bytes"] - last["compressor_bytes"],
+                                       now["swap_used_bytes"] - last["swap_used_bytes"]])
+        except (KeyError, TypeError, ValueError):
+            pass
+    trail["steps"] = trail["steps"][-TRAIL_STEPS:]
+    trail["last"] = now
+    calibration["trail"] = trail
+
+
+def projected_rss(calibration, kind):
+    """(bytes, qualifying runs, kind) of the PROJECTION_QUANTILE of recorded run peaks, or (None, 0, why)."""
+    kinds = (kind,) if kind else RUN_KINDS
+    best = None
+    notes = []
+    for name in kinds:
+        peaks = [run["peak_bytes"] for run_name, run in calibration["runs"].items()
+                 if run_name.split(":", 1)[0] == name and type(run.get("samples")) is int and run["samples"] >= 2
+                 and type(run.get("peak_bytes")) is int and run["peak_bytes"] > 0]
+        if len(peaks) < enough_for(PROJECTION_QUANTILE):
+            notes.append(f"{len(peaks)} recorded {name} runs seen in at least two readings; "
+                         f"{enough_for(PROJECTION_QUANTILE)} are needed")
+            continue
+        value = rank_quantile(peaks, PROJECTION_QUANTILE)
+        if best is None or value > best[0]:
+            best = (value, len(peaks), name)
+    if best is None:
+        return None, 0, "; ".join(notes)
+    return best
+
+
+def trail_limits(calibration):
+    """The reserve, compressor-rise limit and window from the recorded steps, or (None, why)."""
+    trail = calibration.get("trail")
+    if trail is None:
+        return None, "no probe step record yet; the root home's probe has not folded one"
+    try:
+        steps = [list(step) for step in trail["steps"]]
+        if any(len(step) != 4 or any(type(n) is not int for n in step) for step in steps):
+            raise ValueError("a step is not four integers")
+    except (KeyError, TypeError, ValueError) as exc:
+        return None, f"no usable step record in the calibration ({exc})"
+    if len(steps) < enough_for(WINDOW_QUANTILE):
+        return None, f"{len(steps)} recorded probe steps; {enough_for(WINDOW_QUANTILE)} are needed"
+    window = rank_quantile([step[0] for step in steps], WINDOW_QUANTILE)
+    inside = [step for step in steps if step[0] <= window]
+    drops = [step[1] for step in inside if step[1] > 0]
+    rises = [step[2] for step in inside if step[2] > 0]
+    limits = {"window_seconds": window, "steps": len(inside)}
+    notes = []
+    if len(drops) < enough_for(RESERVE_QUANTILE):
+        notes.append(f"{len(drops)} recorded drops in available memory; {enough_for(RESERVE_QUANTILE)} are needed")
+    else:
+        limits.update(reserve_bytes=rank_quantile(drops, RESERVE_QUANTILE), drops=len(drops))
+    if len(rises) < enough_for(RISE_QUANTILE):
+        notes.append(f"{len(rises)} recorded compressor rises; {enough_for(RISE_QUANTILE)} are needed")
+    else:
+        limits.update(compressor_rise_bytes=rank_quantile(rises, RISE_QUANTILE), rises=len(rises))
+    return limits, "; ".join(notes) or None
+
+
+def harm_evaluate(report, calibration, fit, kind):
+    """Reasons to defer from the harm itself, and the numbers and unjudged parts behind them."""
+    record, missing = calibration
+    gib = 1024 ** 3
+    detail = {"kind": kind, "not_judged": []}
+    reasons = []
+    if record is None:
+        detail["not_judged"].append(f"fit, swap and compressor: {missing}")
+        return reasons, detail
+    limits, why = trail_limits(record)
+    if limits is None:
+        detail["not_judged"].append(f"reserve, swap and compressor: {why}")
+        limits = {}
+    elif why:
+        detail["not_judged"].append(why)
+    detail.update({key: limits[key] for key in ("window_seconds", "reserve_bytes", "compressor_rise_bytes")
+                   if key in limits})
+    if fit:
+        projected, runs, name = projected_rss(record, kind)
+        if projected is None:
+            detail["not_judged"].append(f"fit: {name}")
+        elif "reserve_bytes" not in limits:
+            detail["not_judged"].append("fit: no reserve")
+        else:
+            detail.update(projected_bytes=projected, projection_runs=runs, projected_kind=name)
+            room = report["available_bytes"] - limits["reserve_bytes"]
+            if projected > room:
+                reasons.append(
+                    f"projected {name} run of {projected / gib:.2f} GiB (p{PROJECTION_QUANTILE * 100:g} of {runs} "
+                    f"recorded) does not fit in {report['available_bytes'] / gib:.2f} GiB available minus a "
+                    f"{limits['reserve_bytes'] / gib:.2f} GiB reserve (p{RESERVE_QUANTILE * 100:g} of recorded drops)")
+    last = (record.get("trail") or {}).get("last") if isinstance(record.get("trail"), dict) else None
+    try:
+        gap = (datetime.fromisoformat(report["checked_at"]) - datetime.fromisoformat(last["at"])).total_seconds()
+        swap_delta = report["swap_used_bytes"] - last["swap_used_bytes"]
+        compressor_delta = report["compressor_bytes"] - last["compressor_bytes"]
+        if type(swap_delta) is not int or type(compressor_delta) is not int:
+            raise TypeError("sizes are not integers")
+    except (KeyError, TypeError, ValueError):
+        detail["not_judged"].append("swap and compressor trend: no usable previous probe reading")
+        return reasons, detail
+    if "window_seconds" not in limits:
+        return reasons, detail
+    if not 0 <= gap <= limits["window_seconds"]:
+        detail["not_judged"].append(
+            f"swap and compressor trend: the previous probe reading is {gap:.0f} s old, outside the "
+            f"{limits['window_seconds']} s window")
+        return reasons, detail
+    detail.update(compared_at=last["at"], swap_delta_bytes=swap_delta, compressor_delta_bytes=compressor_delta)
+    if swap_delta > 0:
+        reasons.append(f"swap used grew by {swap_delta / gib:.3f} GiB in the {gap:.0f} s since the last probe reading")
+    rise = limits.get("compressor_rise_bytes")
+    if rise is not None and compressor_delta > rise:
+        reasons.append(
+            f"compressor grew by {compressor_delta / gib:.2f} GiB in the {gap:.0f} s since the last probe reading, "
+            f"above the {rise / gib:.2f} GiB p{RISE_QUANTILE * 100:g} of recorded rises")
+    return reasons, detail
 
 
 def headroom_derive(path, report):
@@ -507,11 +695,16 @@ def headroom_derive(path, report):
         return None, f"calibration {path} unusable: {exc}"
 
 
-def admission_evaluate(report, baseline):
-    """Pressure or unreadable facts defer new work; the recorded margin and RSS alarm never do."""
+def admission_evaluate(report, baseline, calibration=None, fit=True, kind=None):
+    """Unreadable facts and the harm itself defer new work; the pressure level, recorded margin and RSS alarm never do.
+
+    calibration is (record, why-missing) as host_record returns it; without it the harm is not judged,
+    and fit=False judges the swap and compressor trend only, for a caller that owns its own fit.
+    """
     reasons = list(report["errors"])
-    if (report.get("pressure_level") or 0) >= 2:
-        reasons.append(f"native memory pressure level {report['pressure_level']} (2 or higher defers)")
+    if calibration is not None and not reasons:
+        harm_reasons, report["harm"] = harm_evaluate(report, calibration, fit, kind)
+        reasons += harm_reasons
     alarms, hold = [], []
     if baseline is not None:
         for p in report["processes"]:
@@ -563,6 +756,8 @@ def admission_main(argv):
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--calibration", type=Path, required=True)
+    parser.add_argument("--kind", choices=RUN_KINDS,
+                        help="the kind of run being admitted; omitted, fit uses the larger kind's projection")
     args = parser.parse_args(argv)
     report = admission_sample()
     report["source"] = args.mode
@@ -570,6 +765,9 @@ def admission_main(argv):
     report["non_fleet_max_bytes"] = max(candidates) if candidates else None
     state = args.state
     state.mkdir(parents=True, exist_ok=True)
+    # The decision reads the record as it stood before this probe folds into it,
+    # so the previous probe reading is what the trend compares against.
+    recorded = host_record(args.calibration, report, "calibration", "fm-memory-calibration.v1", ())
     if args.mode == "probe" and not report["errors"]:
         calibration_record(args.calibration, report)
     baseline, calibration = host_record(args.baseline, report, "baseline", "fm-memory-baseline.v1",
@@ -577,7 +775,7 @@ def admission_main(argv):
     if baseline is not None and baseline["smallest_reading_max_bytes"] >= baseline["non_fleet_max_bytes"]:
         baseline, calibration = None, f"baseline {args.baseline} unusable: its readings show no spread"
     headroom, headroom_calibration = headroom_derive(args.calibration, report)
-    reasons, alarms, hold = admission_evaluate(report, baseline)
+    reasons, alarms, hold = admission_evaluate(report, baseline, calibration=recorded, kind=args.kind)
     # Only an explicit baseline operation writes the envelope; a matching one is
     # never silently re-learned, so a growing process cannot hide in it.
     if args.mode == "baseline" and not reasons:
@@ -596,6 +794,7 @@ def admission_main(argv):
     report["calibration"] = calibration
     report["headroom"] = headroom
     report["headroom_calibration"] = headroom_calibration
+    report.setdefault("harm", None)
     report["admission"] = "defer" if reasons else "admit"
     report["reasons"] = reasons
     report["alarms"] = alarms
