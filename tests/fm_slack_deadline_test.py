@@ -22,11 +22,45 @@ NO_PROGRESS_SECONDS = 6
 SECOND, SECOND_DM, OWNER_DM = 'U0SYNTHSEC1', 'D0SECONDDM1', 'D0123456789'
 
 
+def no_network_guard():
+    """Any real network step of a Slack entry process (a name lookup or a connect over IP) is refused and recorded in FM_TEST_SLACK_NETWORK; every case
+    asserts that file stays empty (network_attempts), so a call that slips past the fake transport fails the test instead of leaving this host."""
+    log = os.environ['FM_TEST_SLACK_NETWORK']
+
+    def refuse(what, target):
+        with open(log, 'a') as out:
+            out.write(json.dumps({'what': what, 'target': repr(target)}) + '\n')
+        raise OSError('network attempt refused by the deadline test: ' + what)
+    real_connect, real_connect_ex = socket.socket.connect, socket.socket.connect_ex
+
+    def connect(sock, address):
+        if sock.family in (socket.AF_INET, socket.AF_INET6):
+            refuse('connect', address)
+        return real_connect(sock, address)
+
+    def connect_ex(sock, address):
+        if sock.family in (socket.AF_INET, socket.AF_INET6):
+            refuse('connect_ex', address)
+        return real_connect_ex(sock, address)
+    socket.socket.connect, socket.socket.connect_ex = connect, connect_ex
+    socket.create_connection = lambda address, *args, **kwargs: refuse('create_connection', address)
+    socket.getaddrinfo = lambda host, *args, **kwargs: refuse('getaddrinfo', host)
+
+
+def network_attempts(path):
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+
 def install():
-    """Installed only in the Slack entry process, never its local intake children."""
+    """Installed only in the Slack entry process, never its local intake children. The fake answers both transports of bin/fm_slack.py: the plain
+    exchange (urllib.request.urlopen) and the bounded exchange of a caller with a total deadline (the second person's pass), which runs through a
+    dedicated opener's .open (Slack._bounded, Slack._exchange). For the bounded one it models the fence as the real handlers do: nothing begins once the
+    fence is closed or its time is spent, a begun exchange counts as connected (so a cut-off may have sent it), and closing the fence ends a held reply
+    at once, as shutting down its socket does."""
     if Path(sys.argv[0]).name != 'fm_slack_watch.py':
         return
     sys.path.insert(0, str(ROOT / 'bin'))
+    no_network_guard()
     from fm_slack_replay import Replay
     import urllib.request
     replay = Replay(Path(os.environ.get('FM_TEST_SLACK_TRANSCRIPT') or ROOT / 'tests/fixtures/slack/mirror/transcript.json'),
@@ -44,14 +78,41 @@ def install():
             if scenario == 'slow' and requests == 1:
                 time.sleep(21)
 
-    def urlopen(request, timeout):
+    def held(seconds, timeout, fence):
+        """A reply Slack holds for `seconds`: a CPU-idle wait on a silent local socket (no listener, no external address). The socket timeout ends a
+        wait as long as it (socket.timeout, as the real one). For a bounded exchange the socket is registered in the fence as the real handler registers
+        its own, so closing the fence shuts it down and the wait ends at once."""
+        with contextlib.ExitStack() as stack:
+            reader, peer = socket.socketpair()
+            stack.enter_context(reader)
+            stack.enter_context(peer)
+            reader.settimeout(min(seconds, timeout))
+            if fence is not None:
+                with fence.lock:
+                    if fence.closed:
+                        raise OSError('the exchange socket was shut down')
+                    fence.duplicates.append(reader.dup())
+            try:
+                if reader.recv(1) == b'':
+                    raise OSError('the exchange socket was shut down')
+            except socket.timeout:
+                if seconds >= timeout:
+                    raise
+
+    def urlopen(request, timeout, fence=None):
         nonlocal requests
+        if fence is not None:
+            fence.check()                                     # closed, or no time left: never begun (DeadlineSpent, nothing sent)
+            fence.connected = True                            # from here on the request may have reached Slack
         requests += 1
         method = request.full_url.rsplit('/', 1)[-1]
         fields = dict(urllib.parse.parse_qsl(request.data.decode()))
         for key, value in fields.items():
-            with contextlib.suppress(ValueError):
-                fields[key] = json.loads(value)
+            # The transport (wire_body) sends an object, a list or a bool as JSON and every other value as its own string: a whole number goes back to an
+            # int, and a Slack ts such as 2000.000100 stays the string it is.
+            if value[:1] in ('{', '[') or value in ('true', 'false') or value.isdigit():
+                with contextlib.suppress(ValueError):
+                    fields[key] = json.loads(value)
         started = time.monotonic()
         second = fields.get('channel') == SECOND_DM or fields.get('users') == SECOND
         try:
@@ -70,7 +131,7 @@ def install():
                 time.sleep(LATENCY_SECONDS)
             if scenario == 'second-stall' and second:
                 # A call of the second person's that Slack holds: idle, inside the request, for the stall the case sets.
-                time.sleep(float(os.environ['FM_TEST_SLACK_STALL']))
+                held(float(os.environ['FM_TEST_SLACK_STALL']), timeout, fence)
             body = replay.call(method, **fields)
             return Response(json.dumps(body).encode())
         finally:
@@ -78,7 +139,12 @@ def install():
                 out.write(json.dumps({'method': method, 'timeout': timeout, 'second': second,
                                       'seconds': time.monotonic() - started}) + '\n')
 
+    def opener_open(opener, request, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+        fence = next((handler.fence for handler in opener.handlers if hasattr(handler, 'fence')), None)
+        return urlopen(request, timeout, fence)
+
     urllib.request.urlopen = urlopen
+    urllib.request.OpenerDirector.open = opener_open
 
 
 def main():
@@ -88,7 +154,9 @@ def main():
                    FM_DATA_OVERRIDE=str(home / 'data'), FM_CONFIG_OVERRIDE=str(home / 'config'),
                    SLACK_BOT_TOKEN='fixture-token-not-a-secret', FM_SLACK_DM_USER='U0TESTOWNER',
                    FM_SLACK_ALLOWED_AUTHORS='U0TESTOWNER', FM_SLACK_POLL_MAX_ANSWERS='20',
-                   PYTHONDONTWRITEBYTECODE='1')
+                   PYTHONDONTWRITEBYTECODE='1', FM_TEST_SLACK_NETWORK=str(home / 'network.jsonl'))
+        # The children use the real transport class over the fake above; the guard, not FM_SLACK_NO_NETWORK, keeps them off the network.
+        env.pop('FM_SLACK_NO_NETWORK', None)
         subprocess.run(['bash', str(ROOT / 'tests/fixtures/slack/make-home.sh'), 'mirror', tmp],
                        check=True, env=env, capture_output=True, text=True)
         subprocess.run(['bash', str(ROOT / 'bin/fm-captain-hold.sh'), 'bind', 'slack-dm'],
@@ -145,10 +213,11 @@ def main():
                 trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
                 watcher_beat force
                 CHECK_TIMEOUT=$3
+                FM_CHECK_SWEEP=$4; export FM_CHECK_SWEEP              # the watcher's token of this sweep (bin/fm-watch.sh)
                 run_check_capture slack "$2" || exit 21
                 printf 'status=%s stopped=%s notice=%s result=%s\\n' \
                   "$FM_CHECK_STATUS" "$FM_CHECK_STOPPED" "$FM_CHECK_STOP_NOTICE" "$FM_CHECK_RESULT"
-             ''', '_', str(ROOT / 'bin/fm-watch.sh'), str(home / 'state/slack.check.sh'), str(NO_PROGRESS_SECONDS)],
+             ''', '_', str(ROOT / 'bin/fm-watch.sh'), str(home / 'state/slack.check.sh'), str(NO_PROGRESS_SECONDS), 'latency.1'],
             env=dict(env, FM_TEST_SLACK_SCENARIO='latency'), capture_output=True, text=True)
         rows = [json.loads(line) for line in timings.read_text().splitlines()]
         assert watched.returncode == 0, watched
@@ -179,6 +248,7 @@ def main():
         print('ok - longest silent read ends after %.3fs, before owner no-progress bound 30s; one report per episode'
               % max(row['seconds'] for row in rows))
         print('hanging request timings: ' + json.dumps(rows))
+        assert network_attempts(home / 'network.jsonl') == [], network_attempts(home / 'network.jsonl')
 
 
 WATCH = '''
@@ -187,6 +257,9 @@ WATCH = '''
     trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
     watcher_beat force
     [ -z "$3" ] || CHECK_TIMEOUT=$3
+    # The watcher's token of this sweep, the same for the owner's check and the second person's check of one sweep and new for the next (bin/fm-watch.sh).
+    FM_CHECK_SWEEP=$6
+    export FM_CHECK_SWEEP
     run_check_capture "$5" "$2" || exit 21
     printf '%s' "$FM_CHECK_RESULT" > "$4"
     printf 'status=%s stopped=%s notice=%s\\n' "$FM_CHECK_STATUS" "$FM_CHECK_STOPPED" "$FM_CHECK_STOP_NOTICE"
@@ -208,7 +281,8 @@ def second_person_watcher():
                    FM_CONFIG_OVERRIDE=str(home / 'config'), SLACK_BOT_TOKEN='fixture-token-not-a-secret', FM_SLACK_DM_USER='U0TESTOWNER',
                    FM_SLACK_ALLOWED_AUTHORS='U0TESTOWNER', FM_SLACK_POLL_MAX_ANSWERS='20', PYTHONDONTWRITEBYTECODE='1',
                    FM_TEST_SLACK_TRANSCRIPT=str(ROOT / 'tests/fixtures/slack/second-person/transcript.json'),
-                   FM_TEST_SLACK_TIMINGS=str(home / 'timings.jsonl'), FM_TEST_SLACK_STALL='0')
+                   FM_TEST_SLACK_TIMINGS=str(home / 'timings.jsonl'), FM_TEST_SLACK_STALL='0', FM_TEST_SLACK_NETWORK=str(home / 'network.jsonl'))
+        env.pop('FM_SLACK_NO_NETWORK', None)                 # the real transport class over the fake; the guard keeps it off the network
         env['FM_SLACK_SECOND_USER'] = SECOND if second else ''
         subprocess.run(['bash', str(ROOT / 'tests/fixtures/slack/make-home.sh'), 'intake', tmp], check=True, env=env, capture_output=True, text=True)
         hook = home / 'hook'
@@ -229,16 +303,19 @@ def second_person_watcher():
         data['messages'].append(message)
         state[0].write_text(json.dumps(data))
 
-    def watch(home, env, scenario, stall=0, timeout='', check='slack'):
+    def watch(home, env, scenario, sweep, stall=0, timeout='', check='slack'):
+        # One watcher sweep runs the owner's check (slack) and then the second person's (slacksecond) with one token; a new sweep has a new token.
         (home / 'timings.jsonl').write_text('')
         result = home / 'result.txt'
+        result.unlink(missing_ok=True)
         started = time.monotonic()
-        run = subprocess.run(['bash', '-c', WATCH, '_', str(ROOT / 'bin/fm-watch.sh'), str(home / ('state/%s.check.sh' % check)), str(timeout), str(result), check],
+        run = subprocess.run(['bash', '-c', WATCH, '_', str(ROOT / 'bin/fm-watch.sh'), str(home / ('state/%s.check.sh' % check)), str(timeout), str(result), check, sweep],
                              env=dict(env, FM_TEST_SLACK_SCENARIO=scenario, FM_TEST_SLACK_STALL=str(stall)), capture_output=True, text=True)
         elapsed = time.monotonic() - started
         assert run.returncode == 0, run
         line = run.stdout.strip().splitlines()[-1]
         rows = [json.loads(l) for l in (home / 'timings.jsonl').read_text().splitlines()]
+        assert network_attempts(home / 'network.jsonl') == [], network_attempts(home / 'network.jsonl')
         return line, result.read_text() if result.exists() else '', rows, elapsed
 
     def wakes(text, ts, user):
@@ -256,20 +333,21 @@ def second_person_watcher():
         home, env = home_for(tmp, True)
         say(home, '2000.000100', 'U0TESTOWNER', 'an owner request')
         say(home, '2000.000200', SECOND, 'a second person request', SECOND_DM)
-        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60, timeout=NO_PROGRESS_SECONDS)
+        line, result, rows, elapsed = watch(home, env, 'second-stall', 'a.1', stall=60, timeout=NO_PROGRESS_SECONDS)
         assert line == 'status=0 stopped= notice=', line                 # the owner's check ends without any call of theirs
         assert len(wakes(result, '2000.000100', 'U0TESTOWNER')) == 1, result
         assert not any(r['second'] for r in rows), rows
-        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60, timeout=NO_PROGRESS_SECONDS, check='slacksecond')
+        line, result, rows, elapsed = watch(home, env, 'second-stall', 'a.1', stall=60, timeout=NO_PROGRESS_SECONDS, check='slacksecond')
         assert line.startswith('status=124 stopped=no progress notice=check slacksecond stopped after '), line
         assert result == '', result                                   # the watcher discards a stopped check's output
         assert elapsed < 40, elapsed
-        line, result, rows, elapsed = watch(home, env, '')
+        line, result, rows, elapsed = watch(home, env, '', 'a.2')
         assert wakes(result, '2000.000100', 'U0TESTOWNER') == [], result  # delivered once, never again
-        line, result, rows, elapsed = watch(home, env, '', check='slacksecond')
+        line, result, rows, elapsed = watch(home, env, '', 'a.2', check='slacksecond')
         assert line == 'status=0 stopped= notice=', line
         assert len(wakes(result, '2000.000200', SECOND)) == 1, result
         assert len(acks(home, OWNER_DM, '2000.000100')) == 1
+        assert len(acks(home, SECOND_DM, '2000.000200')) == 1
     print('ok - the owner check delivers its wake before any call of theirs, and a stopped second-person check is recovered by the next pass', flush=True)
 
     # B: under the default bound their held calls get no check stopped: the owner's check delivers its wake, and their check's calls begin only inside their
@@ -278,17 +356,20 @@ def second_person_watcher():
         home, env = home_for(tmp, True)
         say(home, '2000.000100', 'U0TESTOWNER', 'an owner request')
         say(home, '2000.000200', SECOND, 'a second person request', SECOND_DM)
-        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=9)
+        line, result, rows, elapsed = watch(home, env, 'second-stall', 'b.1', stall=9)
         assert line == 'status=0 stopped= notice=', line
         assert len(wakes(result, '2000.000100', 'U0TESTOWNER')) == 1, result
-        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=9, check='slacksecond')
+        line, result, rows, elapsed = watch(home, env, 'second-stall', 'b.1', stall=9, check='slacksecond')
         assert line == 'status=0 stopped= notice=', line
         theirs = [r for r in rows if r['second']]
         # A call of theirs begins only inside the 12 s budget of their pass: two held 9 s calls fit (the third would begin at about 18 s).
         assert 1 <= len(theirs) <= 2, rows
-        line, result, rows, elapsed = watch(home, env, '', check='slacksecond')
+        line, result, rows, elapsed = watch(home, env, '', 'b.2')
+        assert wakes(result, '2000.000100', 'U0TESTOWNER') == [], result  # delivered once, never again
+        line, result, rows, elapsed = watch(home, env, '', 'b.2', check='slacksecond')
         assert len(wakes(result, '2000.000200', SECOND)) == 1, result
         assert len(acks(home, OWNER_DM, '2000.000100')) == 1
+        assert len(acks(home, SECOND_DM, '2000.000200')) == 1
     print('ok - under the default bound the real watcher is never made to stop a check by held calls of the second person', flush=True)
 
     # C: control, the second person off: the owner's check wakes the owner and their check makes no call of theirs.
@@ -296,10 +377,10 @@ def second_person_watcher():
         home, env = home_for(tmp, False)
         say(home, '2000.000100', 'U0TESTOWNER', 'an owner request')
         say(home, '2000.000200', SECOND, 'a second person request', SECOND_DM)
-        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60)
+        line, result, rows, elapsed = watch(home, env, 'second-stall', 'c.1', stall=60)
         assert line == 'status=0 stopped= notice=', line
         assert len(wakes(result, '2000.000100', 'U0TESTOWNER')) == 1, result
-        line, result, rows, elapsed = watch(home, env, 'second-stall', stall=60, check='slacksecond')
+        line, result, rows, elapsed = watch(home, env, 'second-stall', 'c.1', stall=60, check='slacksecond')
         assert wakes(result, '2000.000200', SECOND) == [] and not any(r['second'] for r in rows), (result, rows)
     print('ok - with the second person off the owner check wakes the owner and no call of theirs is made', flush=True)
 

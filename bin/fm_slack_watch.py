@@ -2468,19 +2468,30 @@ class Watch:
         entries = self.state.setdefault('followups', {})
         # A thread with a turn goes by its turn; a thread new to their order has none yet and goes to the back, oldest first.
         order = sorted(threads, key=lambda t: (t not in entries, entries.get(t, {}).get('turn', 0), ts_key(t)))
-        read, deferred, done = [], None, []
+        read, deferred, done, starved = [], None, [], False
         for thread in order[:count]:
             if not self.second_time_for(1 + keep):
+                starved = not done
                 break
             try:
                 read.append((thread, self.new_replies(thread, self.followup_cursor(thread), channel)))
             except SecondBudgetSpent:
+                starved = not done
                 break
             except SlackError as error:
                 if str(error) not in THREAD_ERRORS:
                     raise
                 deferred = deferred or error
             done.append(thread)
+        # A pass whose time left no thread read at all marks that their threads go first in their next pass (take_in_second); a pass that read one clears
+        # the mark. So when their budget holds only one call after the DM proof, their history read and their thread reads take turns, and neither waits for
+        # ever (SC8 (6) LIVENESS, A6).
+        if starved != bool(self.state.get('threads_first')) and (starved or done):
+            if starved:
+                self.state['threads_first'] = True
+            else:
+                self.state.pop('threads_first', None)
+            self.commit()
         if len(done) < len(threads):
             # The threads read go to the back; the others keep their order (every thread of theirs gets a turn, numbered from 1 in the new order).
             for turn, thread in enumerate([t for t in order if t not in done] + done, start=1):
@@ -3952,9 +3963,19 @@ class Watch:
         lets them take in now (read_their_followups): their thread reads never take the time of the base's useful steps. Returns the first per-thread read
         error, to be reported after their other work."""
         reads = self.second_reads
-        plan = self.read_requests(max(remaining, 1), True)
-        ready = self.ready_requests(plan)
-        read, deferred = self.read_their_followups(getattr(self, 'followup_reads', 0) or 0, keep=min(ready, max(remaining, 0)))
+        count = getattr(self, 'followup_reads', 0) or 0
+        if self.state.get('threads_first') and count > 0:
+            # The last pass's time left no thread read: their thread reads go first, and a history read that no longer fits waits for the next pass.
+            read, deferred = self.read_their_followups(count)
+            try:
+                plan = self.read_requests(max(remaining, 1), True)
+            except SecondBudgetSpent:
+                plan = None
+            ready = self.ready_requests(plan)
+        else:
+            plan = self.read_requests(max(remaining, 1), True)
+            ready = self.ready_requests(plan)
+            read, deferred = self.read_their_followups(count, keep=min(ready, max(remaining, 0)))
         waiting = self.ready_followups(read)
         if self.second_reads > reads:
             self.state['backlog'] = plan is None or ready + waiting > max(remaining, 0)

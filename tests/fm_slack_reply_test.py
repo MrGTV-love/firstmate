@@ -2056,6 +2056,47 @@ class SecondPersonFollowUpTest(unittest.TestCase):
             self.assertNotIn('state unknown', woken[0][1])
             self.assertEqual(set().union(*reads), set(threads))
 
+    def test_sc8_a_plane_value_that_is_part_of_their_follow_up_label_stops_the_read_of_their_follow_up_and_no_value_means_it_reads(self):
+        # The collision guard (slack-request-secret-collides-with-marker) for the follow-up label: `read --thread <ts>@<id> --message <reply ts>` while a plane
+        # value is part of their follow-up label refuses before anything is read, prints neither the follow-up text nor the value; with no such value the
+        # same read prints the follow-up.
+        with self.scott() as home:
+            request = self.take_in_theirs(home, 'a request whose follow-up is read under a colliding value')
+            followup = self.their_message(home, 'a follow-up read under a colliding value', thread=request)
+            self.assertEqual(home.poll()[0], 0)
+            key, value = request + '@' + SCOTT, 'follow-up from Slack member ' + SCOTT
+            before = home.calls('conversations.replies')
+            rc, out, err = home.read(key, followup, env={'SLACK_SIGNING_SECRET': value})
+            self.assertNotEqual(rc, 0, (out, err))
+            self.assertNotIn('a follow-up read under a colliding value', out)
+            self.assertNotIn(value, out + err)
+            self.assertEqual(home.calls('conversations.replies'), before)
+            rc, out, err = home.read(key, followup)
+            self.assertEqual((rc, err), (0, ''))
+            self.assertIn('a follow-up read under a colliding value', out)
+
+    def test_sc8_6_when_their_dm_proof_and_history_read_take_9_9_s_each_their_waiting_follow_up_is_still_read_and_woken(self):
+        # SC8 (6) LIVENESS and A6 at cap 2, with no new request of theirs: every call of theirs (the DM proof included) takes 9.9 s on their budget's clock,
+        # just under the 10 s call bound, and their budget is the plane's real 21 s. A poll then holds the proof and one more call. Their one thread has a
+        # follow-up waiting: it is read and woken within three polls, never deferred for ever behind their history read.
+        with self.scott(cap='2') as home:
+            _, threads = self.build(home, 0, 1)
+            followup = self.their_message(home, 'a follow-up waiting behind slow calls', thread=threads[0])
+            clock, real = [0.0], Traced.call
+
+            def slow(replay, method, **fields):
+                if fields.get('channel') == SCOTT_DM or (method == 'conversations.open' and fields.get('users') == SCOTT):
+                    clock[0] += 9.9
+                return real(replay, method, **fields)
+            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN
+            woken = []
+            with patch.object(Traced, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+                for poll in range(3):
+                    rc, out, _ = home.poll()
+                    self.assertEqual(rc, 0)
+                    woken += [(poll, line) for line in out.splitlines() if line.startswith('check: slack follow-up %s to request %s@%s' % (followup, threads[0], SCOTT))]
+            self.assertEqual(len(woken), 1, woken)
+
     def test_sc2_one_combined_attempt_trace_lists_every_post_attempt_of_both_people_with_its_destination_and_outcome(self):
         # SC2 with SC8: the owner and the second person each have a request, a reply from Main, a follow-up and a reply to it. The attempt trace holds every
         # chat.postMessage attempt of every run, the failed one included, not only the posts that worked: the whole list is asserted, run by run, with its

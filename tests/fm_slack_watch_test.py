@@ -30,6 +30,7 @@ Usage:
   fm_slack_watch_test.py set-state <state.json> <field> <value>
   fm_slack_watch_test.py set-scopes <transcript.json> <comma-separated-scopes>
   fm_slack_watch_test.py journal-line <state.json> <line>
+  fm_slack_watch_test.py poll-refused-before-attempt <their request ts> <poll args...>
   fm_slack_watch_test.py fail-call <replay-state.json> <method[:ts]> <status> [times]
   fm_slack_watch_test.py clear-fail <replay-state.json> <method[:ts]>
   fm_slack_watch_test.py move-transcript <transcript.json> <out.json> <channel>
@@ -5815,6 +5816,89 @@ class Invariant2Identity(InvariantScenario):
             self.assertEqual(home.cli('check', '200.000100', action='resolve').rc, 0)
             self.assertIn('slack follow-up', home.cli('poll').out)                          # resolving makes it a request thread, and its follow-up is woken
 
+    def test_inv2_their_follow_up_in_a_failed_root_thread_keeps_the_owners_base_rule_it_is_woken_once_after_resolve_and_readable_before(self):
+        # SC8 equal behavior for the owner's base rule just above: a request of theirs whose acknowledgement failed three times is woken as not acknowledged and
+        # waits for resolve; its event is not in seen, so its thread is not one of their request threads yet, exactly as the owner's failed request is not.
+        # A human follow-up of theirs in that thread is not polled before resolve (as the owner's is not), it can be read by its key before resolve (the
+        # admitted root, as test_inv2_a_failed_ack_request_... reads the request), and resolve makes the thread theirs: the follow-up is woken once.
+        key = '200.000100@' + INV_SECOND
+        with self.home() as home, refused_before_attempt('200.000100') as refused:
+            home.cli('poll')
+            home.say('200.000100', 'a request whose acknowledgement is refused')
+            woken = []
+            for _ in range(3):
+                woken += self.requests_woken(home.cli('poll'))
+            self.assertTrue(any('not acknowledged after 3 tries' in line for line in woken), woken)
+            refused.clear()
+            home.say('200.000200', 'a follow-up in its thread', thread_ts='200.000100')
+            before = home.cli('poll')
+            self.assertNotIn('slack follow-up', before.out)
+            read = home.cli('read', '--thread', key, '--message', '200.000200')
+            self.assertEqual((read.rc, 'a follow-up in its thread' in read.out), (0, True), (read.out, read.err))
+            self.assertEqual(home.cli('check', key, action='resolve').rc, 0)
+            after = home.cli('poll')
+            self.assertEqual([line for line in after.out.splitlines() if 'slack follow-up' in line and '200.000200' in line and key in line].__len__(), 1, after.out)
+            self.assertNotIn('slack follow-up', home.cli('poll').out)
+
+    def test_inv2_accepted_limit_a_repeated_answer_after_an_accepted_post_whose_response_was_lost_and_an_empty_lookup_posts_again_for_both_people_as_at_base(self):
+        # An accepted limit, documented (owner ruling on U3): only acknowledgement rows carry the no-repost rule (A7); answer posts follow the base rule.
+        # Model: Main's first answer post is accepted by Slack, its response is lost (the transport says slack_outcome_unknown) and the accepted answer is not
+        # yet visible to the marker lookup; Main repeats the identical reply (same thread, to and part). The repeat posts a second answer, in the right DM and
+        # thread, for the second person and for the owner alike: the same behavior as the base owner path.
+        for second in (True, False):
+            with self.subTest(person='second' if second else 'owner'), self.home(**({} if second else {'scott': None})) as home:
+                home.cli('poll')
+                if second:
+                    home.say('200.000100', 'a request')
+                    key, dm = '200.000100@' + INV_SECOND, INV_SECOND_DM
+                else:
+                    home.say('200.000100', 'a request', user=INV_OWNER, dm=INV_OWNER_DM)
+                    key, dm = '200.000100', INV_OWNER_DM
+                for _ in range(2):
+                    home.cli('poll')
+                real, hidden, cut = Replay.call, set(), [True]
+
+                def lost(replay, method, **fields):
+                    result = real(replay, method, **fields)
+                    if method == 'chat.postMessage' and fields.get('channel') == dm and 'the answer' in (fields.get('text') or '') and cut[0]:
+                        cut[0] = False
+                        hidden.add(result['ts'])
+                        raise SlackError('slack_outcome_unknown')
+                    if method == 'conversations.replies' and hidden:
+                        result = dict(result, messages=[m for m in result.get('messages', []) if m.get('ts') not in hidden])
+                    return result
+                with patch.object(Replay, 'call', lost):
+                    first = home.cli('reply', '--thread', key, '--to', key, stdin='the answer')
+                    again = home.cli('reply', '--thread', key, '--to', key, stdin='the answer')
+                self.assertEqual((first.rc, first.err.strip()), (1, 'slack: refused: slack_outcome_unknown'))
+                self.assertEqual(again.rc, 0, (again.out, again.err))
+                answers = [(c, th) for c, th, t in home.texts() if 'the answer' in (t or '')]
+                self.assertEqual(answers, [(dm, '200.000100'), (dm, '200.000100')])
+
+    def test_inv2_a_refused_public_resolve_changes_only_the_identity_record_and_no_request_closure_state_and_makes_no_slack_call(self):
+        # The resolve guard through the public command (plane.main, which bin/fm-slack-check.sh resolve runs): a plane armed while the setting was off, then
+        # a resolve with the setting naming a valid id not yet recorded, for a key that names no row. The refusal (no_pending_request) first records the id
+        # (identity retention: second-ids and second.json, before close_request), and nothing else: no pending row, no seen event, the owner's journal and
+        # the replay (so no Slack call) unchanged. A refused bare ts changes nothing at all.
+        def snap(root):
+            return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file()}
+        with self.home(scott=None) as home:
+            setting = {'FM_SLACK_SECOND_USER': INV_SECOND}
+            owner_before = (home.state_dir / 'state.json').read_bytes()
+            before = snap(home.dir)
+            refused = home.cli('check', '200.000100@' + INV_SECOND, action='resolve', extra=setting)
+            self.assertEqual((refused.rc, refused.err.strip()), (1, 'slack: refused: no_pending_request'))
+            after = snap(home.dir)
+            self.assertEqual(sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k)),
+                             ['slack-watch/' + plane.SECOND_ID_FILE, 'slack-watch/' + plane.SECOND_FILE])
+            theirs = json.loads((home.state_dir / plane.SECOND_FILE).read_text())
+            self.assertEqual((theirs.get('pending'), theirs.get('seen')), ([], {}))
+            self.assertEqual((home.state_dir / 'state.json').read_bytes(), owner_before)
+            again = snap(home.dir)
+            bare = home.cli('check', '200.000999', action='resolve', extra=setting)
+            self.assertEqual((bare.rc, bare.err.strip()), (1, 'slack: refused: no_pending_request'))
+            self.assertEqual(snap(home.dir), again)
+
     def test_inv2_resolve_names_one_author_when_a_failed_owner_row_and_a_failed_second_person_row_share_a_timestamp(self):
         with self.home(failures={'chat.postMessage:200.000100': {'status': 400}}) as home, refused_before_attempt('200.000100'):
             home.cli('poll')
@@ -10169,6 +10253,11 @@ def main(argv):
         edit(argv[1], lambda data: data.__setitem__(argv[2], argv[3]))
     elif command == 'set-scopes':
         edit(argv[1], lambda data: data.__setitem__('scopes', argv[2].split(',')))
+    elif command == 'poll-refused-before-attempt':
+        # One real poll (plane.main) in which the acknowledgement of their request <ts> is refused before its attempt mark, as refused_before_attempt does:
+        # the only refusal A7 counts as a failed try of theirs. The shell suite runs it through fm-slack-lib.sh, as bin/fm-slack-poll.sh runs the plane.
+        with refused_before_attempt(argv[1]):
+            sys.exit(plane.main(['poll'] + argv[2:]))
     elif command == 'fail-call':
         rule = {'status': int(argv[3])}
         if len(argv) > 4:

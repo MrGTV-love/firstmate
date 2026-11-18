@@ -2908,17 +2908,33 @@ done
 }
 printf 'ok - SECOND-2\n'
 
-# SECOND-3 (SC2 key): a failed request of theirs is named `<ts>@<member id>`: the bare ts closes nothing, the full key closes it.
+# SECOND-3 (SC2 key, A7): a failed request of theirs is named `<ts>@<member id>`: the bare ts closes nothing, the full key closes it. Under A7 a post of
+# theirs is a failed try only when it is refused before its attempt mark (their DM cannot be used at the moment of the post): the failed row is made so,
+# by three real polls through fm-slack-lib.sh (poll-refused-before-attempt). The control: a Slack answer (HTTP 400) leaves the post unknown, so it is woken
+# once named unknown, never listed as failed and never resolvable.
+refused_spoll() {  # <their request ts>: one poll whose acknowledgement of that request is refused before its attempt mark
+  env FM_SLACK_SECOND_USER="$SECOND_ID" bash -c '. "$1/bin/fm-slack-lib.sh"; exec python3 "$2" poll-refused-before-attempt "$3" --replay "$4"' _ "$ROOT" "$HELPER" "$1" "$SECOND_TS"
+}
 second_home
 say_second 2000.000300 'a request whose acknowledgement is refused'
-python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000300 400
-for _ in 1 2 3; do out=$(spoll); done
+for _ in 1 2 3; do out=$(refused_spoll 2000.000300); done
 assert_contains "$(spoll)" "^slack: request 2000.000300@$SECOND_ID not acknowledged (failed, owner Main)" "SECOND-3 the failed listing"
 set +e; "$ROOT/bin/fm-slack-check.sh" resolve 2000.000300 >/dev/null 2>"$TMP/second3.err"; rc=$?; set -e
 [ "$rc" -ne 0 ] || fail "SECOND-3 the bare ts closed their request"
 assert_contains "$(cat "$TMP/second3.err")" 'no_pending_request' "SECOND-3 the bare ts refusal"
 assert_contains "$("$ROOT/bin/fm-slack-check.sh" resolve "2000.000300@$SECOND_ID")" "^resolved: slack request 2000.000300@$SECOND_ID" "SECOND-3 the full key"
 assert_eq "$(spoll)" "" "SECOND-3 a later poll listed the closed request"
+second_home
+say_second 2000.000400 'a request whose acknowledgement Slack answers with HTTP 400'
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000400 400
+control=''
+for _ in 1 2 3; do control="$control$(spoll)"$'\n'; done
+assert_eq "$(printf '%s' "$control" | grep -c "^check: slack request 2000.000400 from $SECOND_ID (acknowledgement state unknown): " || true)" 1 "SECOND-3 [A7 control] woken once named unknown"
+assert_not_contains "$control$(spoll)" 'not acknowledged (failed' "SECOND-3 [A7 control] a Slack answer was listed as failed"
+set +e; "$ROOT/bin/fm-slack-check.sh" resolve "2000.000400@$SECOND_ID" >/dev/null 2>"$TMP/second3c.err"; rc=$?; set -e
+[ "$rc" -ne 0 ] || fail "SECOND-3 [A7 control] an unknown request was resolvable"
+assert_contains "$(cat "$TMP/second3c.err")" 'no_pending_request' "SECOND-3 [A7 control] the resolve refusal"
+assert_eq "$(attempted chat.postMessage)" 1 "SECOND-3 [A7 control] the unknown post was made again"
 printf 'ok - SECOND-3\n'
 
 # SECOND-4 (SC4): with them configured or not, the owner's own wake is the same bytes.
