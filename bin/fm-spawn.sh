@@ -600,8 +600,19 @@
 #   and a shell that starts late finds the attempt already claimed and runs nothing.
 #   It uses the assigned copy, never another worktree. Governed
 #   scouts start on fm/<id> so default promotion can adopt the same declaration.
-#   Relaunch reuses recorded scope and must pass the actual clean-slot contract;
-#   dirty relaunches refuse rather than bypassing attestation. --owned-path on a
+#   A relaunch is not a new scope declaration. When the record names its slot
+#   manifest and the relaunch is neither a relocation nor the recovery of a refused
+#   first provisioning, it adopts that recorded manifest (bin/fm-slot-provision-lib.sh
+#   fm_slot_adopt_check) and never runs the provisioner: the manifest must belong to
+#   this task's own copy, branch, base and scope and the copy-custody owners must
+#   agree, else it refuses by name with nothing changed. The task's own commits and
+#   uncommitted edits outside its recorded scope never block it and never change
+#   the scope; they are printed as a drift report. A relaunch does not check other
+#   tasks' claims (the existing admissions never did), and Vernant's push-time
+#   owned_paths gate stays the control. A relaunch with no recorded manifest keeps
+#   the provisioning route and must pass the clean-slot contract (a copy that
+#   predates the provisioner runs the primary clone's current main, verified byte for
+#   byte against the default branch tip). --owned-path on a
 #   relaunch never overrides recorded scope: it is accepted only to scope a task
 #   with none recorded (for example, admitted before its project was governed),
 #   which then runs the same governed preparation; elsewhere it refuses. If that
@@ -1170,6 +1181,7 @@ BRANCH_PREFIX_SET=0
 BASE_BRANCH=
 BASE_BRANCH_SET=0
 SLOT_OWNED_PATHS=()
+SLOT_ADOPT=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
 CAPTAIN_MODEL_PIN=
@@ -4788,7 +4800,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
         awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
         printf '\n# Dispatch egress capabilities\nRecorded destination classes: %s.\nNative semantic find is available only with semantic-search authorization and existing project/helper eligibility; otherwise it is absent.\nNever write or enlarge the task grant from a worker.\n' "$TASK_EGRESS" &&
-        { if [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
+        { if [ "$FM_SLOT_ADOPTED" = 1 ]; then fm_slot_contract_adopted "$BRANCH"; elif [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
           fm_brief_intent_overlay "$CAPTAIN_INTENT" "$SOURCE_BRIEF"
@@ -6622,7 +6634,11 @@ spawn_slot_refused() {
       rm -f -- "$recovery"
     }
   fi
-  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  if [ "$SLOT_ADOPT" = 1 ]; then
+    printf '%s\n' "$(status_stamp_line "blocked: slot adoption refused before admission; assigned copy and endpoint retained: $WT; see the spawn output for the refusal by name")" >>"$STATE/$ID.status"
+  else
+    printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  fi
   echo "error: assigned copy $WT and endpoint $T retained; no worker admitted" >&2
   exit 1
 }
@@ -6645,6 +6661,7 @@ while :; do
 spawn_validate_local_base "$WT" || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
+SLOT_ADOPT=0
 if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
   if fm_slot_required "$PROJ_ABS" "$WT"; then
     fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1 || {
@@ -6685,6 +6702,10 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
     fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+  elif fm_slot_adopt_route "$RELAUNCH_META" "$RELAUNCH_RELOCATING"; then
+    # The task's own recorded manifest is adopted, never re-provisioned (Main 115, rule S): nothing is
+    # prepared, moved or declared here, and the decision is taken once below.
+    SLOT_ADOPT=1
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
     if [ -n "$prepared_head" ]; then
@@ -6829,7 +6850,12 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
   [ "$rc" -le 255 ] || { echo 'error: assigned-copy provisioner completion status is out of range' >&2; return 1; }
   return "$rc"
 }
-if [ "$SLOT_GOVERNED" = 1 ]; then
+[ "$RELAUNCH" -eq 0 ] || FM_SLOT_PRIMARY_PROVISIONER=1
+if [ "$SLOT_GOVERNED" = 1 ] && [ "$SLOT_ADOPT" = 1 ]; then
+  fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+  fm_slot_drift_report "$WT" "$ID" "$BRANCH" "$FM_SLOT_BASE_SHA" "${SLOT_OWNED_PATHS[@]}"
+  render_launch_brief || exit 1
+elif [ "$SLOT_GOVERNED" = 1 ]; then
   fm_slot_provision spawn_slot_run_in_pane "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "$SLOT_SOURCE_REF" "$SLOT_SOURCE_SHA" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
   render_launch_brief || exit 1
@@ -6985,6 +7011,51 @@ exclude_path() {
   mkdir -p "$(dirname "$EXCL")"
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >>"$EXCL"
 }
+# The identity of a launch artifact for the edit check: a regular file by its bytes, a symlink by its target text.
+spawn_wiring_sha() { # <path>
+  if [ -L "$1" ]; then
+    printf 'link:%s' "$(readlink "$1")" | shasum -a 256 | awk '{print $1}'
+  else
+    shasum -a 256 <"$1" | awk '{print $1}'
+  fi
+}
+# state/<id>.wiring-sha records each worktree launch artifact as it was written. A relaunch into the same copy that
+# finds one differing from its record, or with no record, keeps the original beside it under a collision-safe name,
+# excluded from Git, and says where; an artifact still equal to its record is regenerated without a kept copy.
+spawn_keep_edited_wiring() { # <prior-harness>
+  local harness path rel want got kept n
+  harness=$(fm_control_harness_family "$1") || return 0
+  while IFS= read -r path; do
+    case "$path" in "$WT"/*) ;; *) continue ;; esac
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    rel=${path#"$WT"/}
+    got=$(spawn_wiring_sha "$path") || return 1
+    want=$(awk -v r="$rel" '$2 == r { v = $1 } END { print v }' "$STATE_REAL/$ID.wiring-sha" 2>/dev/null || true)
+    [ -z "$want" ] || [ "$want" != "$got" ] || continue
+    n=0
+    kept="$path.fm-kept.$(date +%s).$n"
+    while [ -e "$kept" ] || [ -L "$kept" ]; do n=$((n + 1)); kept="$path.fm-kept.$(date +%s).$n"; done
+    cp -pP -- "$path" "$kept" || return 1
+    [ "$(spawn_wiring_sha "$kept")" = "$got" ] || return 1
+    exclude_path "${kept#"$WT"/}"
+    echo "kept the worker's edited launch artifact $rel byte for byte at ${kept#"$WT"/}; the fresh wiring is written beside it" >&2
+  done <<EOF
+$(fm_control_harness_wiring_paths "$harness" "$WT" "$STATE_REAL" "$ID" "$KIND")
+EOF
+}
+spawn_record_wiring() {
+  local path rel
+  : >"$STATE_REAL/$ID.wiring-sha.tmp" || return 0
+  while IFS= read -r path; do
+    case "$path" in "$WT"/*) ;; *) continue ;; esac
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    rel=${path#"$WT"/}
+    printf '%s %s\n' "$(spawn_wiring_sha "$path")" "$rel" >>"$STATE_REAL/$ID.wiring-sha.tmp"
+  done <<EOF
+$(fm_control_harness_wiring_paths "$(fm_control_harness_family "$HARNESS" 2>/dev/null || true)" "$WT" "$STATE_REAL" "$ID" "$KIND")
+EOF
+  mv -f -- "$STATE_REAL/$ID.wiring-sha.tmp" "$STATE_REAL/$ID.wiring-sha" 2>/dev/null || rm -f -- "$STATE_REAL/$ID.wiring-sha.tmp"
+}
 if [ "$RELAUNCH" -eq 1 ]; then
   # The fresh copy of a relocation is not firstmate's yet: this is the one place
   # that overwrites and deletes harness files in it, so the check that none of
@@ -6998,6 +7069,14 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # files and turn-end token registry entries behind, and even a same-harness
   # relaunch would orphan the retired busy generation's token
   # (bin/fm-control-lib.sh owns where those artifacts live).
+  # An adopted relaunch resumes the worker's own copy, so a launch artifact the worker edited since the last launch
+  # (its settings, its plugin) is kept byte for byte beside the fresh wiring instead of being deleted with it.
+  if [ "$SLOT_ADOPT" = 1 ]; then
+    spawn_keep_edited_wiring "$RELAUNCH_PRIOR_HARNESS" || {
+      echo "error: could not keep the worker's edited launch artifacts for task $ID; refusing to replace them" >&2
+      exit 1
+    }
+  fi
   clear_relaunch_harness_wiring "$RELAUNCH_PRIOR_HARNESS" "$WT" "$STATE_REAL" "$ID" "$KIND" || {
     echo "error: could not retire $RELAUNCH_PRIOR_HARNESS wiring for task $ID; refusing to arm the replacement" >&2
     exit 1
@@ -7703,6 +7782,7 @@ EOF
     fi
     ;;
   esac
+[ "$KIND" = secondmate ] || spawn_record_wiring
 
 # Per-task git hooksPath for local credential checks and AI trailer stripping.
 # Installed for every kind, including secondmate; keeping trailers disables
@@ -8546,6 +8626,11 @@ if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   exit 1
 fi
 sleep 0.3
+# The copy that was checked is the copy the worker starts in: the adopted slot is judged once more after everything
+# slow (brief, skill selection, wiring) and immediately before the launch is delivered.
+if [ "$SLOT_ADOPT" = 1 ]; then
+  fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+fi
 spawn_send_or_abort "launch command" spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then

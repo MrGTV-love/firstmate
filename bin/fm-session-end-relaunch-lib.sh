@@ -24,6 +24,14 @@
 #   - state/<id>.control-exit does not name this busy generation
 #   - no control lock is held, and no in-progress control-relaunch journal
 #
+# A refusal whose cause is deterministic until a recorded input changes (a slot refusal by name, or a
+# refusal-shaped outcome the scan cannot classify) is reported once and not retried by the scan: the cause
+# fingerprint it recorded (state/.session-end-refusal-<id>, durable across scanner processes) must change
+# before one new attempt is allowed, and the operator's own `bin/fm-control.sh <task> relaunch` is the way to try
+# again. Any other failed outcome keeps the caps and wakes below. A relaunch that starts with, or refuses
+# because of, the task's own out-of-scope work carries the complete drift report in its wake line and in
+# state/<id>.relaunch-drift, so the observer sees every path (bin/fm-slot-provision-lib.sh owns the report).
+#
 # A completed fm-control exit retires the busy record, so its session-end
 # is never seen here. The control-exit marker covers the exit whose command
 # was delivered but whose agent did not stop within the exit wait: that
@@ -169,6 +177,67 @@ fm_session_end_first_line() {  # <text>
   printf '%s' "${line:0:180}"
 }
 
+fm_session_end_refusal_path() {  # <state-dir> <id>
+  printf '%s/.session-end-refusal-%s' "$1" "$2"
+}
+
+# The reason name of a refusal-shaped relaunch outcome, or nothing for an outcome that is not a refusal.
+# A refusal whose reason cannot be named is "unclassified": it is still treated as unchanged.
+fm_session_end_refusal_reason() {  # <control-output>
+  local text=$1 reason
+  reason=$(printf '%s\n' "$text" | sed -n -e 's/.*slot adoption refused: \([a-z_]*\).*/\1/p' \
+    -e 's/.*slot provisioning refused: \([a-z_]*\).*/\1/p' -e 's/.*"reason": "\([a-z_]*\)".*/\1/p' | head -n 1)
+  if [ -z "$reason" ]; then
+    case "$text" in
+      *'slot provisioner refused'*|*'slot adoption refused'*|*'slot provisioning refused'*|*'refused relaunch of governed task'*|*'slot provisioner is missing'*|*'slot provisioner source is not'*)
+        reason=unclassified ;;
+    esac
+  fi
+  printf '%s' "$reason"
+}
+
+# A digest of the recorded inputs the named refusal depends on. The reason alone does not classify a cause: a
+# commit wholly inside the recorded scope changes HEAD without changing a manifest_exists cause, while the same
+# commit can clear a scope refusal, so only the inputs that can clear that reason are folded in.
+fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason>
+  local state=$1 id=$2 reason=$3 meta wt manifest
+  meta="$state/$id.meta"
+  wt=$(fm_meta_get "$meta" worktree 2>/dev/null || true)
+  manifest=$(fm_meta_get "$meta" slot_manifest 2>/dev/null || true)
+  {
+    printf 'reason=%s\n' "$reason"
+    grep -e '^worktree=' -e '^branch=' -e '^project=' -e '^slot_' "$meta" 2>/dev/null || true
+    if [ -n "$manifest" ] && [ -f "$manifest" ]; then shasum -a 256 < "$manifest"; else printf 'no-manifest-file\n'; fi
+    case "$reason" in
+      manifest_exists|repository_mismatch|manifest_*|worktree_path_mismatch|lifecycle_state_mismatch|custody_*) ;;
+      dirty_worktree|operation_in_progress)
+        git -C "$wt" rev-parse --verify HEAD 2>/dev/null || true
+        git -C "$wt" status --porcelain=v1 -z --untracked-files=all 2>/dev/null | shasum -a 256
+        for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply sequencer; do
+          [ -e "$(git -C "$wt" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null)" ] && printf 'op=%s\n' "$marker"
+        done ;;
+      *)
+        git -C "$wt" rev-parse --verify HEAD 2>/dev/null || true
+        git -C "$wt" rev-parse --verify --quiet 'origin/main^{commit}' 2>/dev/null || true
+        git -C "$wt" status --porcelain=v1 -z --untracked-files=all 2>/dev/null | shasum -a 256 ;;
+    esac
+  } | shasum -a 256 | awk '{print $1}'
+}
+
+# The complete drift report inside a control output, on one line: "header | entry | entry ...". Empty when the
+# output carries no report or the report found nothing out of scope.
+fm_session_end_drift_summary() {  # <control-output>
+  local text=$1 header entries limits
+  header=$(printf '%s\n' "$text" | sed -n 's/^relaunch drift report for \(.*\)$/\1/p' | head -n 1)
+  case "$header" in ''|*'no out-of-scope path'*|*'could not be produced'*) ;; *)
+    entries=$(printf '%s\n' "$text" | sed -n 's/^  drift: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
+    limits=$(printf '%s\n' "$text" | sed -n 's/^  limitation: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
+    printf '%s' "drift report: ${header#*: }: $entries${limits:+ | limitation: $limits}"
+    return 0 ;;
+  esac
+  case "$header" in *'could not be produced'*) printf '%s' "drift report: ${header#*: }" ;; esac
+}
+
 fm_session_end_queue_wake() {  # <key> <reason>
   local queued
   [ -n "${FM_WAKE_QUEUE:-}" ] || FM_WAKE_QUEUE="$STATE/.wake-queue"
@@ -189,6 +258,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
   local bin out rc=0 reason key which quota_event busy_record
+  local refusal_file r_gen r_seq r_reason r_fp cause drift
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
   case "$id" in
@@ -218,6 +288,18 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   if [ -f "$marker" ] && [ ! -L "$marker" ]; then
     marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
     [ "$marker_gen" != "$gen" ] || return 0
+  fi
+  # A refusal this episode already reported is not retried while its cause is unchanged (Main 115): no attempt, no
+  # ledger row, no blocked line and no wake. The record outlives this process, so a successor scanner sees it.
+  refusal_file=$(fm_session_end_refusal_path "$state" "$id")
+  if [ -f "$refusal_file" ] && [ ! -L "$refusal_file" ]; then
+    r_gen='' r_seq='' r_reason='' r_fp=''
+    IFS=$'\t' read -r r_gen r_seq r_reason r_fp < "$refusal_file" || true
+    if [ "$r_gen" = "$gen" ] && [ -n "$r_reason" ] && [ -n "$r_fp" ]; then
+      cause=$(fm_session_end_cause_fingerprint "$state" "$id" "$r_reason") || cause=
+      [ -n "$cause" ] && [ "$cause" != "$r_fp" ] || return 0
+    fi
+    rm -f "$refusal_file"
   fi
   recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
   day=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_DAY_SECS") || return 1
@@ -316,6 +398,11 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
       reason="check: $id auto-relaunched after session-end"
     fi
     key="session-end-relaunch-$id-$gen-$seq"
+    drift=$(fm_session_end_drift_summary "$out")
+    if [ -n "$drift" ]; then
+      printf '%s\n' "$out" | sed -n -e '/^relaunch drift report for /,$p' > "$state/$id.relaunch-drift" 2>/dev/null || true
+      reason="$reason; $drift (state/$id.relaunch-drift)"
+    fi
     fm_session_end_queue_wake "$key" "$reason" || return 1
     printf '%s\t%s\trelaunched\n' "$gen" "$seq" > "$handled" || return 1
     FM_SESSION_END_ACTION=relaunch
@@ -324,6 +411,19 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   fi
   fm_session_end_ledger_add "$state" "$id" failed || return 1
   reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi): $(fm_session_end_first_line "$out")"
+  cause=$(fm_session_end_refusal_reason "$out")
+  if [ -n "$cause" ]; then
+    r_fp=$(fm_session_end_cause_fingerprint "$state" "$id" "$cause") || r_fp=
+    if [ -n "$r_fp" ]; then
+      printf '%s\t%s\t%s\t%s\n' "$gen" "$seq" "$cause" "$r_fp" > "$refusal_file" || return 1
+      reason="$reason [refused: $cause: $(fm_session_end_first_line "$(printf '%s\n' "$out" | grep -m 1 -e 'refused')"); not retried by the scan until its cause changes; bin/fm-control.sh $id relaunch tries again]"
+    fi
+  fi
+  drift=$(fm_session_end_drift_summary "$out")
+  if [ -n "$drift" ]; then
+    printf '%s\n' "$out" | sed -n -e '/^relaunch drift report for /,$p' > "$state/$id.relaunch-drift" 2>/dev/null || true
+    reason="$reason; $drift (state/$id.relaunch-drift)"
+  fi
   key="session-end-relaunch-failed-$id-$gen-$seq"
   fm_session_end_queue_wake "$key" "$reason" || return 1
   printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$handled" || return 1

@@ -70,6 +70,7 @@ if [ -n "${FM_SESSION_END_BEACON_REF:-}" ]; then
   fi
 fi
 [ -z "${FM_SESSION_END_CONTROL_SLEEP:-}" ] || sleep "$FM_SESSION_END_CONTROL_SLEEP"
+[ -z "${FM_SESSION_END_CONTROL_OUT:-}" ] || printf '%s\n' "$FM_SESSION_END_CONTROL_OUT"
 exit "${FM_SESSION_END_CONTROL_RC:-0}"
 SH
   chmod +x "$bin/fm-control.sh"
@@ -433,7 +434,98 @@ SH
   pass "claude debug is off by default, on for a claude relaunch, and refused for another harness or a fresh spawn"
 }
 
+# A scan in a freshly started process, as the real watcher exits after a wake and a successor runs the next scan:
+# state kept only in the first process cannot make these cases pass.
+scan_lane_fresh() {  # <dir>
+  local dir=$1 fakebin recorder
+  fakebin=$(make_tmux "$dir")
+  recorder=$(make_recorder "$dir")
+  : > "$dir/control.log"
+  # shellcheck disable=SC2016 # The single-quoted program expands in the freshly started shell.
+  env FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_WAKE_QUEUE="$dir/state/.wake-queue" \
+    FM_TEST_SEAM=1 FM_SESSION_END_CONTROL="$recorder" FM_SESSION_END_CONTROL_LOG="$dir/control.log" \
+    FM_SESSION_END_CONTROL_RC="${FM_SESSION_END_CONTROL_RC:-0}" FM_SESSION_END_CONTROL_OUT="${FM_SESSION_END_CONTROL_OUT:-}" \
+    FM_FAKE_TMUX_LOG="$dir/tmux.log" \
+    bash -c 'export PATH="$3:$PATH"; . "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$2/state"; printf "%s" "$FM_SESSION_END_WAKE" > "$2/wake"' _ "$ROOT" "$dir" "$fakebin"
+  FM_SESSION_END_WAKE=$(cat "$dir/wake")
+}
+
+# Age every ledger row past the 30-minute cap, as if the next scan came much later.
+age_ledger() {  # <dir>
+  local dir=$1 ledger
+  ledger="$dir/state/.session-end-relaunch-lane"
+  awk -F '\t' -v OFS='\t' '{ $1 = $1 - 4000; print }' "$ledger" > "$ledger.aged" && mv "$ledger.aged" "$ledger"
+}
+
+# Main 115: an unchanged refusal is reported once and not retried every 30 minutes; a changed cause permits one attempt.
+test_unchanged_refusal_is_reported_once_and_not_retried() {
+  local dir state refusal='error: slot adoption refused: manifest_exists: the manifest is not adoptable'
+  dir=$(make_lane refusal-memory)
+  state="$dir/state"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the first scan failed"
+  case "$FM_SESSION_END_WAKE" in
+    *'auto-relaunch failed after session-end'*'refused: manifest_exists'*'not retried by the scan'*) ;;
+    *) fail "the first refusal was not reported by name once: ${FM_SESSION_END_WAKE:-<empty>}" ;;
+  esac
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail 'the first scan did not attempt exactly once'
+  [ -f "$state/.session-end-refusal-lane" ] || fail 'the refusal left no durable record for a successor scanner'
+  local rows
+  rows=$(wc -l < "$state/.wake-queue" | tr -d ' ')
+  for _ in 1 2 3; do
+    age_ledger "$dir"
+    FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "a later scan failed"
+    [ ! -s "$dir/control.log" ] || fail "an unchanged refusal was retried: $(cat "$dir/control.log")"
+    [ -z "$FM_SESSION_END_WAKE" ] || fail "an unchanged refusal woke again: $FM_SESSION_END_WAKE"
+    [ "$(wc -l < "$state/.wake-queue" | tr -d ' ')" = "$rows" ] || fail 'an unchanged refusal wrote another wake row'
+  done
+  # the cause changes: the recorded manifest pointer changes, so one new attempt is permitted
+  printf 'slot_manifest=/elsewhere/manifest.json\n' >> "$state/lane.meta"
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after a changed cause failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail "a changed cause did not permit exactly one attempt: $(cat "$dir/control.log")"
+  pass "an unchanged slot refusal is reported once and not retried by successor scanners; a changed cause permits one attempt"
+}
+
+# An outcome that is not a refusal keeps today's caps and retries.
+test_a_non_refusal_failure_keeps_its_retry() {
+  local dir
+  dir=$(make_lane non-refusal)
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT='error: the replacement agent could not be launched on claude' scan_lane_fresh "$dir" \
+    || fail "the first scan failed"
+  [ ! -e "$dir/state/.session-end-refusal-lane" ] || fail 'a launch failure was remembered as a refusal'
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT='error: the replacement agent could not be launched on claude' scan_lane_fresh "$dir" \
+    || fail "the later scan failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail 'a launch failure was not retried after the cap window'
+  pass "a failure that is not a refusal keeps today's retry"
+}
+
+# D9: a successful automatic relaunch that starts with out-of-scope work, and a refusal that names it, deliver the complete report.
+test_drift_report_reaches_the_observer() {
+  local dir report
+  report=$(printf '%s\n' 'relaunch drift report for lane: 2 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache dir' '  a relaunch is not a new scope declaration')
+  dir=$(make_lane drift-success)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  case "$FM_SESSION_END_WAKE" in
+    *'auto-relaunched after session-end'*'docs/b.txt'*'uncertain,ignored cache dir'*) ;;
+    *) fail "the wake did not carry the complete drift report: ${FM_SESSION_END_WAKE:-<empty>}" ;;
+  esac
+  grep -F 'drift: proven docs/b.txt' "$dir/state/lane.relaunch-drift" >/dev/null || fail 'the durable report is missing'
+  dir=$(make_lane drift-refusal)
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$(printf '%s\n' "$report" 'error: slot provisioning refused: dirty_worktree; preserve and reconcile')" \
+    scan_lane_fresh "$dir" || fail "the refusal scan failed"
+  case "$FM_SESSION_END_WAKE" in
+    *'dirty_worktree'*'docs/b.txt'*) ;;
+    *) fail "the dirty refusal did not carry the complete drift report: ${FM_SESSION_END_WAKE:-<empty>}" ;;
+  esac
+  pass "the complete drift report reaches the observer on a relaunch and on a dirty refusal"
+}
+
 test_session_end_relaunches_a_dead_lane_once
+test_unchanged_refusal_is_reported_once_and_not_retried
+test_a_non_refusal_failure_keeps_its_retry
+test_drift_report_reaches_the_observer
 test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
 test_relaunch_bound_stays_inside_the_watcher_grace
