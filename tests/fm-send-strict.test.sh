@@ -133,12 +133,14 @@ test_unset_fm_home_fails() {
 # The FM_HOME refusal exists to stop a send that resolves a target against the
 # wrong home; a leading --help or -h resolves nothing. Only that leading word is
 # help: the same word after a target is message text and meets every refusal.
-# The caller here is a normal one, with no test bypass, run from a scratch root.
-# Help must make no transport call at all (every tmux, herdr or ssh invocation is
-# logged by a tripwire and the log must stay empty), change nothing under the
-# scratch root and HOME (path list and content hashes before and after), and add
-# no guard event except the best-effort gate-agent allow an ordinary caller
-# already emits on base.
+# The caller here is a normal one, with no test bypass. Each case gets its own
+# fixture directory holding the root the call runs in, its HOME, its TMPDIR, the
+# tripwire stubs and the captures. Help must make no transport call at all (every
+# tmux, herdr or ssh invocation is logged by a tripwire and the log must stay
+# empty), must change nothing anywhere in that fixture directory (every path and
+# content hash, recursive, before and after, excluding exactly the guard event
+# log), and may add no guard event except the best-effort gate-agent allow an
+# ordinary caller already emits on base.
 help_tripwire_stubs() {  # <dir> -> echoes a bin dir whose tmux, herdr and ssh log every call
   local fb="$1/tripwire" tool
   mkdir -p "$fb"
@@ -152,34 +154,35 @@ SH
   printf '%s' "$fb"
 }
 
-help_root_snapshot() {  # <root> -> one line per path, with a content hash for each file
-  (cd "$1" && find . | LC_ALL=C sort | while IFS= read -r path; do
+help_fixture_snapshot() {  # <fixture dir> <excluded file> -> one line per path, with a content hash for each file
+  (cd "$1" && find . ! -path "$2" | LC_ALL=C sort | while IFS= read -r path; do
     if [ -f "$path" ]; then printf '%s %s\n' "$path" "$(shasum -a 256 < "$path")"; else printf '%s\n' "$path"; fi
   done)
 }
 
 test_leading_help_prints_usage_without_a_home() {
-  local dir fb err out log events root before after rc flag label rows
-  dir="$TMP_ROOT/help-nohome"; mkdir -p "$dir/root/home"; root="$dir/root"
-  fb=$(help_tripwire_stubs "$dir"); err="$dir/send.err"; log="$dir/tmux.log"; events="$dir/guard-events.jsonl"
-
+  local fixture fb err out log events root before after rc flag label rows n=0
   for flag in --help -h; do
     for label in unset empty; do
-      : > "$log"; : > "$events"
-      before=$(help_root_snapshot "$root")
+      n=$((n + 1))
+      fixture="$TMP_ROOT/help-nohome-$n"; root="$fixture/root"
+      mkdir -p "$root" "$fixture/home" "$fixture/tmp"
+      fb=$(help_tripwire_stubs "$fixture"); err="$fixture/send.err"; log="$fixture/tmux.log"; events="$fixture/guard-events.jsonl"
+      : > "$log"; : > "$events"; : > "$err"
+      before=$(help_fixture_snapshot "$fixture" "./guard-events.jsonl")
       if [ "$label" = unset ]; then
-        out=$(cd "$root" && env -u FM_HOME -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" HOME="$root/home" \
+        out=$(cd "$root" && env -u FM_HOME -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" HOME="$fixture/home" TMPDIR="$fixture/tmp" \
           FM_ROOT_OVERRIDE="$root" FM_TMUX_LOG="$log" FM_HERDR_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
       else
-        out=$(cd "$root" && env -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" HOME="$root/home" FM_HOME='' \
+        out=$(cd "$root" && env -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" HOME="$fixture/home" TMPDIR="$fixture/tmp" FM_HOME='' \
           FM_ROOT_OVERRIDE="$root" FM_TMUX_LOG="$log" FM_HERDR_LOG="$log" FM_GUARD_EVENT_LOG="$events" "$SEND" "$flag" 2>"$err"); rc=$?
       fi
-      after=$(help_root_snapshot "$root")
+      after=$(help_fixture_snapshot "$fixture" "./guard-events.jsonl")
       expect_code 0 "$rc" "$flag with FM_HOME $label should exit 0"
       assert_contains "$out" "Usage: fm-send.sh <target>" "$flag with FM_HOME $label should print the usage"
       [ ! -s "$err" ] || fail "$flag with FM_HOME $label should print nothing on stderr"$'\n'"$(cat "$err")"
       [ ! -s "$log" ] || fail "$flag with FM_HOME $label made a transport call"$'\n'"$(cat "$log")"
-      [ "$before" = "$after" ] || fail "$flag with FM_HOME $label changed the scratch root"$'\n'"$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+      [ "$before" = "$after" ] || fail "$flag with FM_HOME $label changed its fixture directory"$'\n'"$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
       # Every event row help adds must be the gate-agent allow an ordinary caller already writes on base, and nothing else.
       rows=$(grep -c . "$events")
       [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"allow"' "$events")" -eq "$rows" ] \
@@ -187,7 +190,7 @@ test_leading_help_prints_usage_without_a_home() {
       [ "$rows" -le 1 ] || fail "$flag with FM_HOME $label wrote more than one guard event"$'\n'"$(cat "$events")"
     done
   done
-  pass "fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME, with no transport call, no scratch change and no guard event but the gate-agent allow"
+  pass "fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME, with no transport call, no change anywhere in its fixture directory and no guard event but the gate-agent allow"
 }
 
 test_help_is_refused_for_a_gate_agent_like_a_send() {
