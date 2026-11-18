@@ -707,7 +707,8 @@ lay_out_as_pool_slot() {
   local slot_root="$CASE_DIR/slots"
   mkdir -p "$slot_root/1"
   git -C "$PROJECT_DIR" worktree move "$POOL_DIR" "$slot_root/1/project"
-  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot_root/1/project" \
+  # A row as the real CLI writes it: name, path and created_at are always present.
+  printf '{"worktrees":[{"name":"1","path":"%s","created_at":"2026-01-01T00:00:00Z"}]}\n' "$slot_root/1/project" \
     > "$slot_root/treehouse-state.json"
   POOL_DIR="$slot_root/1/project"
   SLOT_CLAIM="$slot_root/1/.fm-slot-owner"
@@ -1636,10 +1637,15 @@ esac
 exec '$real_tmux' "\$@"
 SH
   chmod +x "$FAKEBIN_DIR/tmux"
+  # Like the real one, the stub names a pool folder for `treehouse pool-dir`: an empty one no slot of this world lies under.
+  mkdir -p "$CASE_DIR/treehouse-pool"
   cat > "$FAKEBIN_DIR/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> '$SKIP_LOG'
-case "\${1:-}" in lease) eval "\${FM_TEST_LEASE_PROBE:-:}" >>'$SKIP_LOG' 2>&1; exit "\${FM_TEST_LEASE_RC:-0}" ;; esac
+case "\${1:-}" in
+  lease) eval "\${FM_TEST_LEASE_PROBE:-:}" >>'$SKIP_LOG' 2>&1; exit "\${FM_TEST_LEASE_RC:-0}" ;;
+  pool-dir) printf '%s\n' '$(CDPATH='' cd -- "$CASE_DIR/treehouse-pool" && pwd -P)'; exit 0 ;;
+esac
 exit 0
 SH
   chmod +x "$FAKEBIN_DIR/treehouse"
