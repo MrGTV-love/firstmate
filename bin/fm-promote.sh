@@ -92,6 +92,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # shellcheck source=bin/fm-slot-provision-lib.sh
 . "$SCRIPT_DIR/fm-slot-provision-lib.sh"
+# shellcheck source=bin/fm-successor-branch-lib.sh
+. "$SCRIPT_DIR/fm-successor-branch-lib.sh"
 
 MODE=
 YOLO=
@@ -234,6 +236,13 @@ if ! fm_backlog_record_present "$META" "task record" "$STATE"; then
   exit 1
 fi
 grep -qx 'kind=scout' "$META" || { echo "error: task $ID is not a scout task (kind=scout not in meta)" >&2; exit 1; }
+fm_local_firstmate_state_dirs "$STATE" tolerant
+if promote_successor_claimant=$(fm_successor_claimant "$BRANCH" "$META" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule promote --task "$ID" \
+    --source-ok true --successor "$BRANCH" 2>/dev/null || true
+  echo "error: promotion refused: task $promote_successor_claimant records refs/heads/$BRANCH as its successor branch, so task $ID may not take that branch; nothing was changed. Promote this scout under another id or --branch-prefix, or ask Main to resolve task $promote_successor_claimant's successor record" >&2
+  exit 1
+fi
 
 # Unlike the mode and yolo above, the forge is not a per-task decision: it is the
 # captain's project binding, so promotion takes it from the registry rather than

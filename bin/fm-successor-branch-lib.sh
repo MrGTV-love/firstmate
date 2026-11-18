@@ -17,9 +17,10 @@
 # the project's default or base branch contains (see fm_successor_tip_is_own), so
 # an archive branch the worker points at shared history proves nothing.
 #
-# A fresh spawn and a reassociation of another task ask fm_successor_claimant
-# whether some task's record already names their branch as its successor_branch=,
-# and refuse when one does, so no later task takes over a recorded successor ref.
+# A fresh spawn (bin/fm-spawn.sh), a reassociation (bin/fm-control.sh) and a
+# promotion (bin/fm-promote.sh) of another task ask fm_successor_claimant whether
+# some task's record already names their branch as its successor_branch=, and
+# refuse when one does, so no later task takes over a recorded successor ref.
 #
 # fm_successor_name_refusal <name> <recorded-branch> <base-branch> <own-meta> <project> <state-dir>...
 #   Prints the reason and returns 1 when <name> may not be the successor of the task whose record is <own-meta>;

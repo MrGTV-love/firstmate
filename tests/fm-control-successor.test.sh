@@ -1136,6 +1136,67 @@ test_successor_fresh_spawn_refuses_a_branch_another_task_records() {
   pass "successor: a fresh spawn onto another task's recorded successor refuses and changes nothing, and with no record it goes on as before"
 }
 
+# A scout record and its instructions, as a scout spawn leaves them, for promotion.
+make_scout() {  # <case-dir> <scout-id>
+  local dir=$1 sid=$2
+  printf 'window=fmses:fm-%s\nkind=scout\nworktree=/tmp/fm-successor-test-no-copy-%s\n' "$sid" "$sid" > "$dir/home/state/$sid.meta"
+  mkdir -p "$dir/home/data/$sid"
+  printf 'You are a crewmate.\n\n# Task\n## Captain'"'"'s intent\nExercise promotion.\n\n## Firstmate spec\nVerify the promoted record.\n\n# Definition of done\n' > "$dir/home/data/$sid/brief.md"
+}
+
+run_promote() {  # <case-dir> <scout-id>
+  FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/home/state" "$ROOT/bin/fm-promote.sh" "$2" --mode no-mistakes --yolo off 2>&1
+}
+
+# The files of a promoted scout with its id replaced, so two promotions compare.
+promoted_files() {  # <case-dir> <scout-id>
+  local dir=$1 sid=$2 file
+  printf '== record\n'
+  sed "s/$sid/SCOUT/g" "$dir/home/state/$sid.meta"
+  for file in $(cd "$dir/home/data/$sid" && find . -type f | LC_ALL=C sort); do
+    printf '== %s\n' "$file"
+    sed "s/$sid/SCOUT/g" "$dir/home/data/$sid/$file"
+  done
+}
+
+# R7-1: promotion gives a scout the ship branch <prefix><id>. Once task <id> records
+# fm/<id>-v2 as its successor, promoting scout <id>-v2 refuses before it writes
+# anything, names the task and the ref, and writes a deny event. A promotion with no
+# successor record anywhere, and one while another task records a different
+# successor, promote alike.
+test_successor_promotion_refuses_a_branch_another_task_records() {
+  local id=suc-promote dir out rc base other
+  dir=$(new_successor_case promote "$id")
+  : > "$FM_GUARD_EVENT_LOG"
+  make_scout "$dir" "$id-v8"
+  rc=0; base=$(run_promote "$dir" "$id-v8") || rc=$?
+  expect_code 0 "$rc" "a promotion with no successor record anywhere must promote"$'\n'"$base"
+  [ -z "$(jq -c 'select(.guard == "successor-branch-admission")' "$FM_GUARD_EVENT_LOG")" ] || fail "a promotion with no successor record wrote a successor-branch-admission event"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --tip "$(tip_of "$dir" "fm/$id")" --note "successor before the promotion") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  make_scout "$dir" "$id-v2"
+  make_scout "$dir" "$id-v9"
+  cp -p "$dir/home/state/$id-v2.meta" "$dir/scout.before"
+  snap "$dir" before-promote
+  rc=0; out=$(run_promote "$dir" "$id-v2") || rc=$?
+  expect_code 1 "$rc" "promoting a scout onto another task's recorded successor must refuse"$'\n'"$out"
+  assert_contains "$out" "task $id records refs/heads/fm/$id-v2 as its successor branch" "the refusal must name the recording task and the ref"
+  assert_contains "$out" "nothing was changed" "the refusal must say nothing was changed"
+  snap "$dir" after-promote
+  cmp -s "$dir/scout.before" "$dir/home/state/$id-v2.meta" || fail "the refused promotion changed the scout record"
+  same "$dir" before-promote after-promote "the refused promotion" data wt wt-other proj-git nm fake sentinel
+  [ -n "$(jq -c --arg b "fm/$id-v2" 'select(.guard == "successor-branch-admission" and .rule == "promote" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
+    || fail "the refused promotion wrote no successor-branch-admission deny event naming the ref"
+  rc=0; other=$(run_promote "$dir" "$id-v9") || rc=$?
+  expect_code 0 "$rc" "a promotion while another task records a different successor must promote"$'\n'"$other"
+  # The home's watcher banner (bin/fm-guard.sh) prints in full once per stale episode and
+  # briefly after that, so only promotion's own lines are compared.
+  assert_equals "$(printf '%s\n' "$base" | grep -v -e '^●' -e '^WARNING: watcher' | sed "s/$id-v8/SCOUT/g")" \
+    "$(printf '%s\n' "$other" | grep -v -e '^●' -e '^WARNING: watcher' | sed "s/$id-v9/SCOUT/g")" "the promotion must print what a promotion with no successor record prints"
+  assert_equals "$(promoted_files "$dir" "$id-v8")" "$(promoted_files "$dir" "$id-v9")" "the promotion must write the record and instructions a promotion with no successor record writes"
+  pass "successor: promoting a scout onto another task's recorded successor refuses and changes nothing, and other promotions write what a promotion with no record writes"
+}
+
 # F6 (d): the receipt says what the launch will do for a launch that no profile governs.
 test_successor_receipt_matches_what_the_launch_will_do() {
   local id=suc-receipt2 dir out rc
@@ -1173,6 +1234,7 @@ test_successor_post_rename_publication_failure_restores_everything
 test_successor_refusals_write_no_file_under_the_default_event_log
 test_successor_event_log_failure_changes_neither_a_refusal_nor_a_record
 test_successor_fresh_spawn_refuses_a_branch_another_task_records
+test_successor_promotion_refuses_a_branch_another_task_records
 test_successor_reads_the_note_file_only_after_admission
 test_successor_keeps_the_composer_dialog_file
 test_successor_note_cannot_add_a_ship_branch_line
