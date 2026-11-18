@@ -1,0 +1,6 @@
+=== base test_project_provisioner_spawn
+AssertionError: ('copy guard B ran instead of clone guard A', {'identity': 'B', 'realpath': '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.pGZVvg/source-different-fresh-2693/copy with space/scripts/git-stability/provision_existing_slot.py', 'argv': ['/
+not ok - fresh violated clone execution or argv contract: warning: task source-different-fresh-2693: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.pGZVvg/source-different-fresh-2693/home/data/source-different-fresh-2693/brief.md has no ## Definition Of
+=== mutant test_project_provisioner_spawn
+AssertionError: ('copy guard B ran instead of clone guard A', {'identity': 'B', 'realpath': '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.I6RJmP/source-different-fresh-71471/copy with space/scripts/git-stability/provision_existing_slot.py', 'argv': ['
+not ok - fresh violated clone execution or argv contract: warning: task source-different-fresh-71471: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.I6RJmP/source-different-fresh-71471/home/data/source-different-fresh-71471/brief.md has no ## Definition

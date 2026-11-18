@@ -1,0 +1,5 @@
+error: the stubbed spawn tree could not be built; no spawn was run
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.9Ar7A2/source-different-fresh-48465/executed.jsonl'
+not ok - fresh violated clone execution or argv contract: 

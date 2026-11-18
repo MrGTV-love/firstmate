@@ -1,0 +1,22 @@
+=== test_project_provisioner_spawn
+not ok - fresh violated clone execution or argv contract: 
+rc=
+=== test_project_provisioner_promotion
+AssertionError: ('copy guard B ran instead of clone guard A', {'identity': 'B', 'realpath': '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.2skXza/source-different-promotion-57678/copy with space/scripts/git-stability/provision_existing_slot.py', 'argv'
+not ok - promotion violated clone execution or argv contract: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+rc=
+=== test_project_provisioner_relaunch
+AssertionError: ('copy guard B ran instead of clone guard A', {'identity': 'B', 'realpath': '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.MrvLha/source-stale-relaunch-70651/copy with space/scripts/git-stability/provision_existing_slot.py', 'argv': ['/
+not ok - relaunch violated clone execution or argv contract: {"state": "BLOCKED", "reason": "stale_copy_guard"}
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.MrvLha/source-stale-relaunch-70651/copy with space and endpoint firstmate:fm-source-stale-relaunch-70651 retained; no worker admitted
+rc=
+=== test_project_provisioner_copy_missing
+not ok - spawn violated clone execution or argv contract: 
+rc=
+=== test_project_provisioner_missing_spawn
+not ok - missing clone refusal must name the clone (missing: 'slot provisioner is missing from project clone /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hu3ikn/source-missing-fresh-66586/project')
+rc=
+=== test_project_provisioner_missing_preserves_copy
+direct-missing-clone-runtime-record {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.dFRouq/source-missing-direct-79308/copy with space/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/
+not ok - missing clone changed HEAD, symbolic HEAD or refs before refusing
+rc=

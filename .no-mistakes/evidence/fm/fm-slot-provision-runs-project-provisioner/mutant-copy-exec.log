@@ -1,0 +1,11 @@
+=== test_project_provisioner_spawn
+not ok - fresh violated clone execution or argv contract: 
+rc=
+=== test_project_provisioner_promotion
+AssertionError: ('copy guard B ran instead of clone guard A', {'identity': 'B', 'realpath': '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.knBAlV/source-different-promotion-61616/copy with space/scripts/git-stability/provision_existing_slot.py', 'argv'
+not ok - promotion violated clone execution or argv contract: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+rc=
+=== test_project_provisioner_relaunch
+AssertionError: ('copy guard B ran instead of clone guard A', {'identity': 'B', 'realpath': '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.qBfuGU/source-stale-relaunch-71522/copy with space/scripts/git-stability/provision_existing_slot.py', 'argv': ['/
+not ok - relaunch violated clone execution or argv contract: {"state": "BLOCKED", "reason": "stale_copy_guard"}
+rc=

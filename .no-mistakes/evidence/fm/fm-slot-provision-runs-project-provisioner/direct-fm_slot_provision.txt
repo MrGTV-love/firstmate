@@ -1,0 +1,25 @@
+===== head
+--- case 1: clone A passes, copy B stale (exit 3)
+{"state": "PASS", "manifest_path": "/tmp/fm-pp-scratch.xCQV/direct-head/man.json", "worktree_path": "/private/tmp/fm-pp-scratch.xCQV/direct-head/the copy", "owner_id": "t1", "branch": "fm/t1", "base_sha": "f18747711ccef989b9619259058f339cfa3780d8", "owned_paths": ["README.md"], "lifecycle_state": "worktree_active"}
+rc=0
+{"id": "CLONE_A", "file": "/private/tmp/fm-pp-scratch.xCQV/direct-head/project/scripts/git-stability/provision_existing_slot.py", "argv": ["/tmp/fm-pp-scratch.xCQV/direct-head/project/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/tmp/fm-pp-scratch.xCQV/direct-head/project", "--worktree-path", "/tmp/fm-pp-scratch.xCQV/direct-head/the copy", "--owner-id", "t1", "--branch", "fm/t1", "--base-sha", "f18747711ccef989b9619259058f339cfa3780d8", "--owned-path", "README.md"]}
+--- case 2: clone file removed, copy still has B
+error: slot provisioner is missing from project clone /tmp/fm-pp-scratch.xCQV/direct-head/project
+rc=1
+copy refs unchanged
+no provisioner ran
+no manifest
+===== base
+--- case 1: clone A passes, copy B stale (exit 3)
+{"state":"BLOCKED"}
+error: slot provisioner refused task t1 (exit 3); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/t1 at 13e948af968ea66ef1473c63ba4f7829a7e6e773); report: /tmp/fm-pp-scratch.xCQV/direct-base/report
+rc=3
+{"id": "COPY_B_STALE", "file": "/private/tmp/fm-pp-scratch.xCQV/direct-base/the copy/scripts/git-stability/provision_existing_slot.py", "argv": ["/tmp/fm-pp-scratch.xCQV/direct-base/the copy/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/tmp/fm-pp-scratch.xCQV/direct-base/project", "--worktree-path", "/tmp/fm-pp-scratch.xCQV/direct-base/the copy", "--owner-id", "t1", "--branch", "fm/t1", "--base-sha", "271580bda8f1c2044b0e8d8c4099c8144ea7d0fc", "--owned-path", "README.md"]}
+--- case 2: clone file removed, copy still has B
+{"state":"BLOCKED"}
+error: slot provisioner refused task t1 (exit 3); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/t1b at 13e948af968ea66ef1473c63ba4f7829a7e6e773); report: /tmp/fm-pp-scratch.xCQV/direct-base/report
+rc=3
+COPY REFS CHANGED
+provisioner ran:
+{"id": "COPY_B_STALE", "file": "/private/tmp/fm-pp-scratch.xCQV/direct-base/the copy/scripts/git-stability/provision_existing_slot.py", "argv": ["/tmp/fm-pp-scratch.xCQV/direct-base/the copy/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/tmp/fm-pp-scratch.xCQV/direct-base/project", "--worktree-path", "/tmp/fm-pp-scratch.xCQV/direct-base/the copy", "--owner-id", "t1", "--branch", "fm/t1b", "--base-sha", "271580bda8f1c2044b0e8d8c4099c8144ea7d0fc", "--owned-path", "README.md"]}
+no manifest

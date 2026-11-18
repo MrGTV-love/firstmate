@@ -1,0 +1,7 @@
+=== base test_project_provisioner_copy_missing
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.kuleIm/source-copy-missing-spawn-70193/executed.jsonl'
+not ok - spawn violated clone execution or argv contract: error: slot provisioner is missing from assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.kuleIm/source-copy-missing-spawn-70193/copy with space
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.kuleIm/source-copy-missing-spawn-70193/copy with space and endpoint firstmate:fm-source-copy-missing-spawn-70193 retained; no worker admitted
+=== base test_project_provisioner_missing_spawn
+missing-clone-runtime-record [{"argv": ["/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.cZ4qB1/source-missing-fresh-61095/copy with space/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fm-spawn-pool-base-fr
+not ok - missing clone executed copy guard B instead of refusing
