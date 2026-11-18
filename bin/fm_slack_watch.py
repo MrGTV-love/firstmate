@@ -1713,7 +1713,9 @@ class Watch:
             # would otherwise cut the same third call for ever.
             begun = monotonic()
             if begun >= deadline or begun + self.slowest_call > deadline:
-                raise SecondBudgetSpent()
+                # A call not begun never reached Slack (sent=False): a post stopped here, after its attempt mark was written, is surely absent and is posted by
+                # the next run, never woken as unknown (SC2, SC8 (6) LIVENESS).
+                raise SecondBudgetSpent(sent=False)
             # Each call is ended at its own whole-call bound or at the budget's end, whichever comes first (Main 1650).
             ends = min(deadline, begun + SECOND_CALL_BOUND)
             api.time_left = lambda: ends - monotonic()

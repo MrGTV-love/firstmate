@@ -2019,6 +2019,43 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                     reads.append(set(self.thread_reads(home, set(threads))))
             self.assertEqual(set().union(*reads), set(threads))
 
+    def test_sc8_6_when_their_bookkeeping_is_slow_too_an_acknowledgement_the_budget_stops_before_it_begins_is_posted_next_poll(self):
+        # SC8 (6) LIVENESS ("none is dropped or permanently deferred") with SC2's acknowledgement: each call into their DM takes 2.5 s and each write of
+        # their journal 0.3 s on their budget's clock, the plane's real 21 s budget, ten threads of theirs and one request waiting. After their thread reads
+        # the acknowledgement's attempt mark is written, and its own write leaves too little time, so the budget stops the post before it begins. Nothing
+        # reached Slack, so the post is not an unknown one: the next poll posts it, once, and wakes the request as acknowledged, never as "state unknown".
+        with self.scott() as home:
+            _, threads = self.build(home, 0, 10)
+            clock, real, real_commit, posts = [0.0], Traced.call, plane.Watch.commit, []
+
+            def slow(replay, method, **fields):
+                if fields.get('channel') == SCOTT_DM:
+                    clock[0] += 2.5
+                    if method == 'chat.postMessage':
+                        posts.append(fields.get('thread_ts'))
+                return real(replay, method, **fields)
+
+            def slow_commit(watch):
+                if watch.is_second:
+                    clock[0] += 0.3
+                return real_commit(watch)
+            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN
+            with patch.object(Traced, 'call', slow), patch.object(plane.Watch, 'commit', slow_commit), \
+                    patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+                request = self.their_message(home, 'a request behind slow bookkeeping')
+                woken, reads = [], []
+                for poll in range(6):
+                    Traced.TRACE.clear()
+                    rc, out, _ = home.poll()
+                    self.assertEqual(rc, 0)
+                    woken += [(poll, line) for line in out.splitlines() if line.startswith('check: slack request %s from %s' % (request, SCOTT))]
+                    reads.append(set(self.thread_reads(home, set(threads))))
+            self.assertEqual(posts, [request])
+            self.assertEqual(len(woken), 1, woken)
+            self.assertLessEqual(woken[0][0], 1)
+            self.assertNotIn('state unknown', woken[0][1])
+            self.assertEqual(set().union(*reads), set(threads))
+
     def test_sc8_6_split_checks_read_their_picked_threads_only_with_the_proven_hand_over_of_the_same_sweep(self):
         for second_token, expected in (('sweep.1', True), ('sweep.other', False)):
             with self.scott() as home:
