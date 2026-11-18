@@ -31,6 +31,7 @@
 #   fm-inbox.sh ask  <question>...
 #   fm-inbox.sh list
 #   fm-inbox.sh drain [--ack <id>...]
+#   fm-inbox.sh pending <id>...
 #
 # `note --request-id` is the idempotent capture path: a repeat of the same
 # request id returns the original note instead of creating a second one, and
@@ -62,6 +63,10 @@
 # Each reply is stamped with a durable per-home sequence, so the receipts cursor
 # is a strict total order and two replies recorded in the same second are both
 # readable. One reply per note: a second one is refused.
+# `pending` is the read-only query of this ack record: it prints each given id
+# whose note is not yet acked (still in the inbox, not in handled/), one per line,
+# and nothing for an acked or unknown id. bin/fm-wake-drain.sh --ack-through asks
+# it which presented notes are still unacked rather than reading the inbox itself.
 # `ready` is the read-only primary-readiness projection (lock, wake-consumer
 # health, away posture, observation time). It never acquires the session lock
 # and never infers liveness from a lock file, a session, or a pane.
@@ -81,7 +86,7 @@
 # An absent profile means the call uses whatever credentials are already in the
 # environment, which is also what FM_INBOX_PROFILE= (empty) forces.
 #
-# `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list` and `drain`
+# `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list`, `drain` and `pending`
 # need NO configuration at all, because they make no model call. The voice
 # handover depends on `note`, so it keeps working in a home that has configured
 # nothing. `--json` / `receipts` / `ready` require python3, which a firstmate
@@ -91,7 +96,7 @@
 #   FM_HOME              operational home whose state/ and data/ are used.
 #
 # PRIVACY: `say` sends your audio and `ask` sends your question to Bedrock.
-# `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list` and `drain`
+# `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list`, `drain` and `pending`
 # make no network call at all.
 #
 # `note` is also the queueing half of the spoken interface: when the voice agent
@@ -1133,6 +1138,16 @@ cmd_drain() {
   printf '\nAck with: fm-inbox.sh drain --ack <id>...\n'
 }
 
+cmd_pending() {
+  local id
+  for id in "$@"; do
+    valid_note_id "$id" || die "invalid note id: $id"
+    if [ -f "$INBOX/$id.note" ]; then
+      printf '%s\n' "$id"
+    fi
+  done
+}
+
 # ---------------------------------------------------------------- dispatch
 
 case "${1:-}" in
@@ -1146,6 +1161,7 @@ case "${1:-}" in
   ask)      shift; cmd_ask "$@" ;;
   list)     shift; cmd_list ;;
   drain)    shift; cmd_drain "$@" ;;
+  pending)  shift; cmd_pending "$@" ;;
   ''|-h|--help|help)
     # The whole header block, found rather than counted: everything after the
     # shebang up to the first line that is not a comment. A fixed line range

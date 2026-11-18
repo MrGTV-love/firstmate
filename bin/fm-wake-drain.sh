@@ -10,6 +10,10 @@
 # open-loop-ledger-resurface drain adds covered rows (STANDING) and the WAITING OPEN WORK
 # list. Acknowledgement refuses while a row this actor presented still needs an action;
 # docs/configuration.md "Open-work ledger" owns that gate, receipt standing, and invalidation.
+# Acknowledgement also refuses, exit 1 naming each id, while a "check: captain inbox note <id>"
+# row this actor would consume at or below the cutoff has a note still unacked; bin/fm-inbox.sh
+# pending owns that record, and bin/fm-inbox.sh drain --ack <id> clears it. The away supervise
+# daemon is exempt as it is from the overdue gate: it forwards the note and cannot ack it.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
@@ -205,6 +209,34 @@ consume_actor_rows_locked() { # <rows-file> <cutoff>
   awk -v cutoff="$cutoff" '$1 ~ /^[0-9]+$/ && $1 > cutoff { print $1 }' "$rows" > "$DRAIN_TMP" || return 1
   write_rows_file_locked "$rows" "$DRAIN_TMP" || return 1
   DRAIN_TMP=
+}
+
+# Refuse an acknowledgement that would retire the only reminder of a captain
+# inbox note still unacked (header). Rows are read from this actor's own claimed
+# set at or below the cutoff, so a row above it or reserved for another actor
+# never blocks. Exit shape matches the overdue-row refusal.
+refuse_unacked_inbox_notes_locked() { # <rows-file> <cutoff>
+  local rows=$1 cutoff=$2 ids unacked id
+  [ -s "$FM_WAKE_QUEUE" ] || return 0
+  ids=$(awk -F '\t' -v cutoff="$cutoff" -v seqs="$rows" '
+    BEGIN { while ((getline line < seqs) > 0) mine[line]=1 }
+    NF >= 5 && $2 ~ /^[0-9]+$/ && $2 + 0 <= cutoff + 0 && ($2 in mine) && $3 == "check" \
+      && match($5, /^check: captain inbox note [A-Za-z0-9._-]+/) { print substr($5, 27, RLENGTH - 26) }
+  ' "$FM_WAKE_QUEUE" | LC_ALL=C sort -u) || return 1
+  [ -n "$ids" ] || return 0
+  # shellcheck disable=SC2086
+  if ! unacked=$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-inbox.sh" pending $ids); then
+    echo "wake drain: captain inbox note state could not be read; acknowledgement refused" >&2
+    return 1
+  fi
+  [ -n "$unacked" ] || return 0
+  echo "error: captain inbox notes presented in this range are not acked; acknowledgement refused"
+  while IFS= read -r id; do
+    printf '  %s - read it, then run bin/fm-inbox.sh drain --ack %s\n' "$id" "$id"
+  done <<EOF
+$unacked
+EOF
+  return 1
 }
 
 # A branch-actor drain or ack requires a snapshot to already exist and name at
@@ -922,6 +954,13 @@ if [ -n "$ACK_THROUGH" ]; then
     # would hand every later away-session wake back to main. A live branch
     # grant remains excluded by claim_main_rows_locked.
     claim_main_rows_locked "$ACK_THROUGH" || exit 1
+  fi
+  if [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" != 1 ] || [ ! -e "$STATE/.afk" ]; then
+    if [ "$ACTOR" = branch ]; then
+      refuse_unacked_inbox_notes_locked "$ELIGIBLE_ROWS_FILE" "$ACK_THROUGH" || exit 1
+    else
+      refuse_unacked_inbox_notes_locked "$MAIN_ROWS_FILE" "$ACK_THROUGH" || exit 1
+    fi
   fi
   if [ "$ACTOR" = branch ]; then
     # An away-posture grant can name check-kind rows - the attended

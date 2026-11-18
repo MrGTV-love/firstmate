@@ -388,6 +388,123 @@ assert_equals "2" "$(printf '%s' "$binary" | json_len pending)" \
   "the undecodable note and the readable note are both listed"
 pass "a non-UTF-8 note does not break the receipts view"
 
+# --- the wake drain refuses to acknowledge an unacked presented note ----------
+# A drain presents "check: captain inbox note <id>" rows; acknowledging them
+# while the note itself is unread would retire the only reminder. These cases
+# run the real fm-wake-drain.sh and fm-inbox.sh in a scratch home only.
+
+DRAIN_BIN="$ROOT/bin/fm-wake-drain.sh"
+DRAIN_ROOT=$(fm_test_tmproot fm-inbox-drain-root)
+
+make_drain_home() {
+  local home
+  home=$(make_home "$1")
+  : > "$home/config/supervision-host-off"
+  printf '%s\n' "$home"
+}
+
+run_drain() {  # <home> <drain arguments...>
+  local home=$1
+  shift
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_ROOT_OVERRIDE="$DRAIN_ROOT" \
+    "$DRAIN_BIN" "$@"
+}
+
+# present <home>: drain once and print the exact arguments of its WAKE_ACK_REQUIRED command.
+present() {
+  local home=$1 err
+  err=$(run_drain "$home" 2>&1 >/dev/null) || fail "presentation drain failed: $err"
+  printf '%s\n' "$err" | sed -n 's|^WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh ||p'
+}
+
+queue_note() {  # <home> <text> -> note id
+  local out
+  out=$(run_inbox "$1" note "$2") || fail "note failed"
+  out=${out#queued }
+  printf '%s\n' "${out%%$'\n'*}"
+}
+
+queue_rows() {  # <home>
+  awk 'END { print NR + 0 }' "$1/state/.wake-queue" 2>/dev/null || printf '0\n'
+}
+
+# Unacked note in range: refused, id named, queue untouched; acked: passes.
+home=$(make_drain_home ack-gate-one)
+note_id=$(queue_note "$home" "advisor note")
+ack_args=$(present "$home")
+[ -n "$ack_args" ] || fail "the presentation drain printed no WAKE_ACK_REQUIRED command"
+rows_before=$(queue_rows "$home")
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "ack of an unacked presented note is refused"
+assert_contains "$refusal" "$note_id" "the refusal names the unacked note id"
+assert_equals "$rows_before" "$(queue_rows "$home")" "a refused ack consumes no wake row"
+assert_present "$home/state/inbox/$note_id.note" "a refused ack leaves the note pending"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "ack after the note was acked should pass"
+assert_equals "0" "$(queue_rows "$home")" "the passing ack consumes the wake row"
+# A repeat of the already processed acknowledgement keeps its earlier outcome.
+set +e
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1
+repeat_rc=$?
+set -e
+assert_equals "0" "$repeat_rc" "a repeated ack of an already processed sequence still succeeds"
+pass "the drain refuses to ack an unacked presented note and passes once it is acked"
+
+# Two unacked notes: both ids named; acking only one still refuses and names the other.
+home=$(make_drain_home ack-gate-two)
+note_a=$(queue_note "$home" "first advisor note")
+note_b=$(queue_note "$home" "second advisor note")
+ack_args=$(present "$home")
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "ack with two unacked notes is refused"
+assert_contains "$refusal" "$note_a" "the refusal names the first unacked note"
+assert_contains "$refusal" "$note_b" "the refusal names the second unacked note"
+run_inbox "$home" drain --ack "$note_a" >/dev/null || fail "drain --ack failed"
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "ack with one note still unacked is refused"
+assert_contains "$refusal" "$note_b" "the refusal names the note still unacked"
+assert_not_contains "$refusal" "$note_a" "the refusal does not name the acked note"
+pass "every unacked note in the range is named, and an acked note is not"
+
+# An unacked note whose wake row is above the cutoff does not block.
+home=$(make_drain_home ack-gate-outside)
+note_a=$(queue_note "$home" "presented note")
+ack_args=$(present "$home")
+run_inbox "$home" drain --ack "$note_a" >/dev/null || fail "drain --ack failed"
+note_late=$(queue_note "$home" "note that arrived after presentation")
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "an unacked note above the cutoff must not block the ack"
+assert_present "$home/state/inbox/$note_late.note" "the later note stays pending"
+assert_equals "1" "$(queue_rows "$home")" "only the later note's wake row remains"
+pass "an unacked note outside the acknowledged range does not block"
+
+# A range with no inbox note rows acks as before, even with an unacked note elsewhere.
+home=$(make_drain_home ack-gate-none)
+append_signal_row() {
+  FM_STATE_OVERRIDE="$1/state" bash -c '. "$1"; fm_wake_append signal task1 "signal: task1 done"' _ "$ROOT/bin/fm-wake-lib.sh"
+}
+append_signal_row "$home"
+ack_args=$(present "$home")
+queue_note "$home" "unrelated pending note" >/dev/null
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "a range with no inbox note rows must ack"
+pass "a range with no inbox note rows acks exactly as before"
+
 # --- readiness projection, including unknown -------------------------------
 
 home=$(make_home ready-free)
@@ -544,3 +661,4 @@ run_inbox "$home" drain --ack "$did" >/dev/null || fail "drain --ack failed"
 assert_absent "$home/state/inbox/$did.note" "acked note leaves pending"
 assert_present "$home/state/inbox/handled/$did.note" "acked note is in handled"
 pass "drain --ack still moves the note to handled"
+
