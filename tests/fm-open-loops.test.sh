@@ -4363,13 +4363,17 @@ _, boundary = drain()
 reply_record(home, '0123456789abcdef', delivered='')
 undelivered = act('steered', '0123456789abcdef')
 assert undelivered.returncode == 1 and 'task inbox' in undelivered.stdout, undelivered
-reply_record(home, 'fedcba9876543210', task='other', delivered=str(now + 5))
+reply_record(home, 'fedcba9876543210', task='other', delivered=str(now))
 foreign = act('steered', 'fedcba9876543210')
-assert foreign.returncode == 1, foreign
+assert foreign.returncode == 1 and 'task inbox' in foreign.stdout, foreign
 reply_record(home, '0011223344556677', delivered=str(now - 3700))
 early = act('steered', '0011223344556677')
 assert early.returncode == 1 and 'new delivery' in early.stdout, early
-reply_record(home, 'aabbccddeeff0011', delivered=str(now + 5))
+reply_record(home, '0123012301230123', delivered=str(now + 5))
+future = act('steered', '0123012301230123')
+assert future.returncode == 1 and 'result follow-up' in future.stdout, future
+assert ack(boundary).returncode == 1, 'an unconfirmed or future delivery must leave the row actionable'
+reply_record(home, 'aabbccddeeff0011', delivered=str(now))
 accepted = act('steered', 'aabbccddeeff0011')
 assert accepted.returncode == 0, ('a delivered pending-reply id is a remote secondmate delivery record', accepted.stdout)
 assert stored()['handling']['actions'][row['id']]['evidence'] == 'aabbccddeeff0011'
@@ -4380,11 +4384,11 @@ home2, ledger2, row2, call2, ok2, wake2, drain2, ack2, act2, stored2 = case(
     'remote-link', category='silent_report', subject='mini', owner='firstmate',
     next_action='check in: progress, blockers, cross-workstream dependencies', evidence='last heard')
 _, boundary2 = drain2()
-reply_record(home2, 'aabbccddeeff0011', delivered=str(now + 5))
+reply_record(home2, 'aabbccddeeff0011', delivered=str(now))
 (home2 / 'state/pending-replies/2211221122112211').symlink_to(home2 / 'state/pending-replies/aabbccddeeff0011')
 linked = act2('steered', '2211221122112211')
-assert linked.returncode == 1, linked
-print('PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused', flush=True)
+assert linked.returncode == 1 and 'task inbox' in linked.stdout, linked
+print('PASS: a confirmed remote delivery is accepted; undelivered, foreign, early, future and linked records are refused', flush=True)
 
 # 3. One owner decides captain visibility: the printed row and the deferral check agree.
 def printed_visibility(result, ident):
