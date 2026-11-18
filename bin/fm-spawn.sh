@@ -82,8 +82,9 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
-#   A fresh spawn's `treehouse get` wait is progress-based: it ends after ten
-#   minutes with no newly observed pane path or newly finished candidate.
+#   A fresh spawn's `treehouse get` wait ends after the measured stall allowance
+#   (default 1605 s, SPAWN_ACQUIRE_STALL overrides) with no new pane path,
+#   newly finished candidate or Git start.
 #   Separate per-get path sets reject repeats without letting a stale pane path
 #   suppress a later completion; a per-get output boundary excludes older records.
 #   Repeated candidates are not progress; there is no absolute acquisition ceiling.
@@ -560,7 +561,9 @@
 #   row read back, listed in the spawn output, and a second `treehouse get` in the same pane takes another copy.
 #   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
-#   Each get retains the ten-minute no-progress stop; elapsed total time does not prevent another get.
+#   Each get retains the measured stall allowance (default 1605 s,
+#   SPAWN_ACQUIRE_STALL overrides) with no new pane path, newly finished candidate
+#   or Git start; elapsed total time does not prevent another get.
 #   After the move a second snapshot is compared with the first. The copy's own refs (HEAD, the
 #   branch it had at the first snapshot, the branch the move advances, and the one anchor ref
 #   this task's own preparation creates) must show only the expected move: any other difference

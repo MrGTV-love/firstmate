@@ -449,6 +449,54 @@ test_stall_override_selects_the_idle_allowance() {
   assert_equals 900 "$(cat "$HOME_DIR/acquisition-clock")" 'stall override ended at the wrong time'
   pass 'positive stall override controls idle refusal'
 }
+# Exercise the shipped defaults, not the historical override exported above.
+# Both an idle refusal and legitimate completion must keep working with no
+# operator configuration; an unintended default ceiling rejects the latter.
+test_production_defaults_bound_idle_not_walk_time() {
+  local rec id out status
+  id=settle-default-idle
+  rec=$(make_primary_case default-idle "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(
+    unset SPAWN_ACQUIRE_STALL SPAWN_ACQUIRE_CEILING
+    FM_SETTLE_MODE=unchanged FM_SETTLE_TICK=15 run_settle_spawn "$id"
+  )
+  status=$?
+  expect_code 1 "$status" "idle acquisition did not refuse with production defaults: $out"
+  assert_contains "$out" 'no path or output progress for 1605s' 'wrong production-default stall allowance'
+  assert_equals 1605 "$(cat "$HOME_DIR/acquisition-clock")" 'production-default idle stop occurred at the wrong time'
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'default idle refusal published task metadata'
+
+  id=settle-default-walk
+  rec=$(make_primary_case default-walk "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(
+    unset SPAWN_ACQUIRE_STALL SPAWN_ACQUIRE_CEILING
+    FM_SETTLE_MODE=novel FM_SETTLE_TICK=300 run_settle_spawn "$id"
+  )
+  status=$?
+  expect_code 0 "$status" "production defaults ended a progressing walk: $out"
+  assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$id.meta" 'production-default walk did not publish its copy'
+  assert_equals 5405 "$(cat "$HOME_DIR/acquisition-clock")" 'production-default walk did not settle after 5400'
+  pass 'unset acquisition overrides refuse idle at1605 and accept a5405-second walk'
+}
+
+test_invalid_acquisition_override_refuses_before_launch() {
+  local rec id out status
+  id=settle-invalid-override
+  rec=$(make_primary_case invalid-override "$id" 100000)
+  read_settle_record "$rec"
+  out=$(SPAWN_ACQUIRE_STALL=not-a-duration run_settle_spawn "$id")
+  status=$?
+  expect_code 1 "$status" "invalid acquisition override was accepted: $out"
+  assert_contains "$out" 'error: SPAWN_ACQUIRE_STALL must be positive decimal seconds; SPAWN_ACQUIRE_CEILING must be nonnegative decimal seconds' 'invalid override did not explain the permitted values'
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'invalid override published task metadata'
+  assert_absent "$COUNTFILE.tracepath" 'invalid override sent a get'
+  pass 'an invalid acquisition override exits1 before sending get'
+}
+
 test_unchanged_capture_stops_at_600() { run_content_stall_case unchanged 600; }
 test_new_content_observed_at_595_resets_stall() { run_content_stall_case boundary595 1195; }
 test_new_content_emitted_at_599_is_observed_at_600() { run_content_stall_case boundary599 1200; }
@@ -1271,6 +1319,8 @@ test_git_activity_stops_then_stalls
 test_nonstart_trace_growth_is_not_progress
 test_explicit_acquisition_ceiling_is_honored
 test_stall_override_selects_the_idle_allowance
+test_production_defaults_bound_idle_not_walk_time
+test_invalid_acquisition_override_refuses_before_launch
 test_unchanged_capture_stops_at_600
 test_new_content_observed_at_595_resets_stall
 test_new_content_emitted_at_599_is_observed_at_600
