@@ -264,6 +264,33 @@ check '[ "$(calls)" -eq 0 ]' "no Jev request is made"
 printf '%s\n' '{"verdict":"TRUSTED"}' > "$DATA/verdict.json"
 finish
 
+begin "a snapshot under promotion is refused by every reader, even with a TRUSTED verdict"
+settings '{"work_type":"feature","worker":"candidate_1","validator":"candidate_1"}'
+# Hold the promotion lock exclusively, as bin/fm_model_picker/daily.py promote does; the verdict stays TRUSTED.
+python3 -I - "$DATA" "$TMP_ROOT/promotion.held" "$TMP_ROOT/promotion.release" <<'PY' &
+import fcntl, os, sys, time
+fd = os.open(sys.argv[1], os.O_RDONLY)
+fcntl.flock(fd, fcntl.LOCK_EX)
+open(sys.argv[2], "w").close()
+while not os.path.exists(sys.argv[3]):
+    time.sleep(0.05)
+PY
+PROMOTER=$!
+fm_test_wait_until --while-alive "$PROMOTER" -- test -e "$TMP_ROOT/promotion.held" || fail "the promotion stand-in never took the lock"
+run_observe clear
+check '[ "$CODE" -eq 0 ]' "observe exits 0"
+check '[ "$(row ".picker_status")" = no-trusted-snapshot ]' "observe refuses the snapshot"
+check 'grep -q "a promotion is replacing the benchmark snapshot" "$TMP_ROOT/row.json"' "the row names the promotion"
+check '[ "$(calls)" -eq 0 ]' "no Jev request is made"
+OUT=$("$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" 2>&1); RC=$?
+check '[ "$RC" -eq 2 ]' "the route check refuses with exit 2"
+check 'grep -q "a promotion is replacing the benchmark snapshot" <<<"$OUT"' "the route check names the promotion"
+: > "$TMP_ROOT/promotion.release"
+wait "$PROMOTER"
+OUT=$("$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" 2>&1); RC=$?
+check '[ "$RC" -eq 0 ]' "the route check reads the snapshot again once the promotion is over"
+finish
+
 begin "a pick that fails the post-pick effort re-check is rejected, never replaced"
 python3 -I - "$ROOT/bin/fm_model_picker/routes.json" "$TMP_ROOT/table-codex.json" <<'PY'
 import json, sys

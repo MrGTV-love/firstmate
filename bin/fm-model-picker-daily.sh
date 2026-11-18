@@ -8,13 +8,14 @@
 #
 # run:
 #   1. Takes state/.model-picker-daily.lock. A run already under way ends this one (exit 75).
-#   2. Copies the live data root to a sibling staging directory it owns. The collector rewrites
+#   2. Settles a promotion an earlier runner left unfinished (bin/fm_model_picker/daily.py recover),
+#      then copies the live data root to a sibling staging directory it owns. The collector rewrites
 #      aa.sqlite, verdict.json and projection/ in place and sets the verdict to UNTRUSTED first,
 #      so it never runs against the live root.
 #   3. Runs `bin/fm-model-picker.sh --sweep --stale-after-hours 24 --chartdiff --db` against the
 #      staged copy through bin/fm-proc-budget.sh, with FM_MODEL_PICKER_DATA pointing at it.
 #      Its output is kept in state/.model-picker-daily.last.stdout and .last.stderr.
-#   4. Exit 0: the staged outputs become the live ones (bin/fm_model_picker/daily.py promote).
+#   4. Exit 0: the staged outputs become the live ones (daily.py promote, whose docstring owns the order).
 #      Any other exit, including a budget stop (98, 99, 125): nothing under the live root changes,
 #      so the last good aa.sqlite, verdict.json and projection/ stay byte-identical. The staged
 #      verdict.json and reconcile.md are kept as state/.model-picker-daily.last.verdict.json and
@@ -22,7 +23,15 @@
 #      (never written into the live aa.sqlite), and one `check:` wake names the exit code, the
 #      first stderr line (the chart-diff line when stderr is empty, as for an UNTRUSTED verdict)
 #      and that newest observed_at.
-# The runner exits with the collector's status, 1 when promotion failed, 75 when locked.
+# The runner exits with the collector's status, 1 when promotion failed or an earlier one could not
+# be settled, 75 when locked. A promotion has one commit point (the database commit), so its outcome
+# is one of two whole generations: `completed` (exit 0, also when recovery had to finish it),
+# `restored` (exit 1, the previous aa.sqlite, verdict.json and projection/ are back byte for byte),
+# `cleanup-incomplete` (exit 0, one wake naming the leftover; the next run settles it before it stages
+# or collects, and if that still fails raises one wake and collects nothing), or one of the two cases
+# that need a disk fault to occur, each named in its wake: `restore-incomplete`
+# (exit 1, the live verdict stays UNTRUSTED) and `completion-incomplete` (exit 0, the committed new
+# snapshot's verdict stays UNTRUSTED, one wake, and the next run finishes it).
 #
 # check: reads the newest observed_at in aa.sqlite, read only, and takes no run lock, so it also
 # works while a collection hangs. At 36 hours or less nothing is raised. Older raises one `check:`
@@ -38,15 +47,13 @@
 # failure or staleness raises one more. A key is recorded only after its wake is queued.
 #
 # The data root is the collector's own (FM_MODEL_PICKER_DATA, else <data dir>/model-picker).
-# A failed run leaves it as it was. Promotion (bin/fm_model_picker/daily.py promote, whose
-# docstring owns the order) writes an UNTRUSTED verdict first, installs the staged files and
-# commits the matrix, and only then replaces the verdict, so a reader never trusts a mixture.
-# A failure before the commit undoes every step and restores the previous verdict only when every
-# undo succeeded; a failure or kill after it leaves the complete new generation under an UNTRUSTED
-# verdict. The wake names the outcome first (the stderr line is cut at 300 characters) and the
-# verdict a reader actually sees, read back from the file, never an assumed one. A signal that
-# ends the whole runner during that window leaves the verdict UNTRUSTED with no wake until the
-# next daily run repairs it.
+# A failed run leaves it as it was. A promotion that stops for any reason, a killed promote
+# step included, is settled from its journal: before the commit the old generation returns, after
+# it the new one is completed, and the live verdict returns only when every step worked. The wake
+# names the outcome first, the whole first stderr line (the wake queue sets no length limit) and
+# the verdict a reader actually sees, read back from the file, never an assumed one. A signal that
+# ends the whole runner during a promotion leaves the verdict UNTRUSTED with no wake until the
+# next daily run settles it at its start.
 #
 # Staging is a sibling <root>.daily.<pid> holding an owner record. A run removes only its own
 # stage, and removes a stale one only when the record names a pid that is gone; it never touches
@@ -113,13 +120,14 @@ raise_once() {
   return "$status"
 }
 
-one_line() { LC_ALL=C tr -c '[:print:]' ' ' | cut -c1-300 | sed 's/ *$//'; }
+one_line() { LC_ALL=C tr '\000-\037\177' ' ' | LC_ALL=C sed 's/ *$//'; }
+outcome() { sed -n 's/^outcome=//p' | tail -n 1; }
 
 first_stderr_line() {
   local line
-  line=$(grep -m1 -v '^[[:space:]]*$' "$LAST_ERR" 2>/dev/null | one_line)
+  line=$(LC_ALL=C grep -m1 -v '^[[:space:]]*$' "$LAST_ERR" 2>/dev/null | one_line)
   if [ -z "$line" ]; then
-    line=$(grep -m1 '^chart-diff:' "$LAST_OUT" 2>/dev/null | one_line)
+    line=$(LC_ALL=C grep -m1 '^chart-diff:' "$LAST_OUT" 2>/dev/null | one_line)
     [ -z "$line" ] || line="no stderr line; stdout said: $line"
   fi
   printf '%s\n' "${line:-no stderr line}"
@@ -166,6 +174,15 @@ trap 'exit 143' HUP INT TERM
 daily reap "$ROOT" || true
 
 DAY=$(daily freshness "$ROOT" --now "$NOW" | sed -n 's/^day=//p')
+WORD=$(daily recover "$ROOT" 2> "$LAST_ERR" | outcome)
+case "${WORD:-none}" in
+  unchanged|completed|restored) ;;
+  *)
+    : > "$LAST_OUT"
+    raise_once "model-picker-daily-run:$DAY:recover" \
+      "check: model-picker-daily: an earlier promotion into $ROOT could not be settled (${WORD:-no result}), so this run collected nothing (the runner exits 1; the live verdict now reads $(daily verdict "$ROOT" 2>/dev/null || echo UNKNOWN)): $(first_stderr_line)"
+    exit 1 ;;
+esac
 CODE=0
 if ! daily stage "$ROOT" "$STAGE" "$$"; then
   printf 'error: could not stage %s\n' "$ROOT" > "$LAST_ERR"
@@ -178,11 +195,28 @@ fi
 
 STATUS=$CODE
 if [ "$CODE" -eq 0 ]; then
-  if ! daily promote "$ROOT" "$STAGE" 2> "$LAST_ERR"; then
-    STATUS=1
-    raise_once "model-picker-daily-run:$DAY:promote" \
-      "check: model-picker-daily: the collector run exited 0 but installing its output into $ROOT failed (the runner exits 1; the live verdict now reads $(daily verdict "$ROOT" 2>/dev/null || echo UNKNOWN)): $(first_stderr_line)" || STATUS=1
+  WORD=$(daily promote "$ROOT" "$STAGE" 2> "$LAST_ERR.promote" | outcome)
+  if [ -z "$WORD" ]; then
+    WORD=$(daily recover "$ROOT" 2> "$LAST_ERR.recover" | outcome)
+    WORD=${WORD:-none}
+    { printf 'the promote step ended without a result, so recovery settled it: %s\n' "$WORD"; cat "$LAST_ERR.promote" "$LAST_ERR.recover" 2>/dev/null; } > "$LAST_ERR"
+  else
+    cat "$LAST_ERR.promote" > "$LAST_ERR"
   fi
+  rm -f "$LAST_ERR.promote" "$LAST_ERR.recover"
+  case "$WORD" in
+    completed) ;;
+    cleanup-incomplete)
+      raise_once "model-picker-daily-run:$DAY:cleanup" \
+        "check: model-picker-daily: the collector run exited 0 and its snapshot is committed, published and trusted under $ROOT, but cleanup left files behind (the runner exits 0; the next run removes them before it collects): $(first_stderr_line)" || STATUS=1 ;;
+    completion-incomplete)
+      raise_once "model-picker-daily-run:$DAY:complete" \
+        "check: model-picker-daily: the collector run exited 0 and its snapshot is committed under $ROOT, but its verdict could not be published (the runner exits 0; the live verdict now reads $(daily verdict "$ROOT" 2>/dev/null || echo UNKNOWN); the next run finishes it): $(first_stderr_line)" || STATUS=1 ;;
+    *)
+      STATUS=1
+      raise_once "model-picker-daily-run:$DAY:promote" \
+        "check: model-picker-daily: the collector run exited 0 but installing its output into $ROOT failed (outcome $WORD; the runner exits 1; the live verdict now reads $(daily verdict "$ROOT" 2>/dev/null || echo UNKNOWN)): $(first_stderr_line)" || STATUS=1 ;;
+  esac
 else
   NEWEST=$(daily freshness "$STAGE" --now "$NOW" | sed -n 's/^observed_at=//p')
   printf '%s\n' "${NEWEST:-unknown}" > "$STATE/.model-picker-daily.last.observed_at"

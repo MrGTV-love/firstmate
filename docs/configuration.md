@@ -1293,20 +1293,25 @@ Its header owns the run order, the staging and promotion rules, the wake keys, a
 The collector rewrites `aa.sqlite`, `verdict.json`, and `projection/` in place, so `run` works in a staged copy and promotes it only when the collector exits 0.
 A run that exits 1, 2, 3, or 4, or that a budget stop ends, changes nothing under the data root: the last good `aa.sqlite`, `verdict.json`, and `projection/` stay byte-identical.
 `dispatch_log` and `outcomes` are never replaced, including rows the shadow picker writes while a run is under way.
-Promotion writes an `UNTRUSTED` verdict first, installs the staged files, commits the matrix in one database transaction, and only then replaces the verdict; `bin/fm_model_picker/daily.py` `promote` owns the order.
-A failure before the commit undoes every step and returns the previous verdict only when every undo succeeded, so a failed promotion leaves the last good snapshot byte-identical; if an undo fails too, the verdict stays `UNTRUSTED`.
-A failure or kill after the commit leaves the complete new generation under an `UNTRUSTED` verdict.
-A trusted verdict therefore never sits over a mixed generation, and the next good run repairs any `UNTRUSTED` leftover.
-The wake names the outcome first and the verdict a reader actually sees, read back from the file.
-A signal that ends the whole runner during that short window leaves the verdict `UNTRUSTED` with no wake until the next daily run repairs it.
-A run removes only its own staging directory, and a stale one only when its owner record names a process that is gone; it never touches another directory beside the data root.
+A promotion has one commit point, the database commit that replaces the matrix; `bin/fm_model_picker/daily.py` `promote` owns the order, and a journal in the data root names everything it touches.
+Whatever stops a promotion, a settle step reads that journal and leaves one of two whole generations: before the commit the previous `aa.sqlite`, `verdict.json`, and `projection/` return byte-identical, and after it the new generation is completed.
+The runner settles at the end of a failed promotion and again at the start of every run.
+The previous verdict returns only when every undo step worked, so a trusted verdict never sits over a mixed generation; a step that fails twice leaves the verdict `UNTRUSTED` and the wake says so.
+A reader holds a shared lock on the data root for its whole read of the verdict and projections (`generation_hold` in `bin/fm_model_picker/shadow.py`, used by `--observe` and `--check-routes`) and a promotion holds it exclusively, so no read spans a promotion and a reader that starts during one is refused.
+The wake names the outcome first, then the whole first stderr line (the wake queue sets no length limit; UTF-8 text is kept and each control character becomes a space), and the verdict a reader actually sees, read back from the file.
+A signal that ends the whole runner during a promotion leaves the verdict `UNTRUSTED` with no wake until the next run settles it at its start.
+A run removes only its own staging directory, a stale one only when its owner record names a process that is gone, and from the data root only the names its own journal lists plus its collector-prefixed scratch file `.fm-model-picker-daily.tmp`; it never touches another file, and a promotion that finds another of its own prefixed names with no journal changes nothing and says so.
 
-Two kinds of `check:` wake come from it.
-Both are queued with `fm_wake_append` and kind `check` from `bin/fm-wake-lib.sh`, the call `bin/fm-mem-guard.sh` and `bin/fm-merge-prune.sh` already make from outside a session, and both read `check: model-picker-daily: ...`.
+These `check:` wakes come from it.
+All are queued with `fm_wake_append` and kind `check` from `bin/fm-wake-lib.sh`, the call `bin/fm-mem-guard.sh` and `bin/fm-merge-prune.sh` already make from outside a session, and all read `check: model-picker-daily: ...`.
 
 | Wake | When | Names |
 | --- | --- | --- |
 | Failed run | The collector exits with anything but 0 | The exit code, the first stderr line (the chart-diff line when stderr is empty, as for an `UNTRUSTED` verdict), and the failed run's newest `observed_at` |
+| Install failed | The collector exited 0 but its output could not be installed (the runner exits 1) | The outcome (`restored`, `refused`, or `restore-incomplete`), the verdict read back from the file, and the first stderr line |
+| Cleanup left files | The new snapshot is committed, published and trusted, but removing a leftover failed (the runner exits 0; the next run removes it before it stages or collects) | The leftover and the first stderr line |
+| Verdict unpublished | The new snapshot is committed but its verdict rename failed twice (the runner exits 0; the next run finishes it) | The verdict read back from the file and the first stderr line |
+| Earlier promotion unsettled | At the start of a run, a promotion an earlier runner left cannot be settled (the runner collects nothing and exits 1) | The outcome, the verdict read back from the file, and the first stderr line |
 | Stale snapshot | The newest `observed_at` in `aa.sqlite` is older than 36 hours, or the snapshot is missing, empty, or unreadable | The age in hours, or why the snapshot is missing |
 
 A wake key names its UTC day, so a repeat in one day raises nothing and the next day's failure or staleness raises one more.

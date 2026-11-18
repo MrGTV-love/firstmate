@@ -19,7 +19,9 @@ TMP_ROOT=$(fm_test_tmproot fm-model-picker-daily)
 RUNNER="$ROOT/bin/fm-model-picker-daily.sh"
 INSTALL="$ROOT/bin/fm-model-picker-daily-install.sh"
 DRAIN="$ROOT/bin/fm-wake-drain.sh"
+SHADOW="$ROOT/bin/fm-model-picker-shadow.sh"
 unset FM_HOME FM_ROOT_OVERRIDE FM_DATA_OVERRIDE FM_MODEL_PICKER_DATA FM_STATE_OVERRIDE
+printf '%s\n' '{"rules":[{"when":"Any task in the fixture.","use":[{"harness":"claude","model":"opus","effort":"high"}]}],"default":[{"harness":"claude","model":"opus","effort":"high"}]}' > "$TMP_ROOT/rules.json"
 
 NOW=1800000000
 HOUR=3600
@@ -45,6 +47,35 @@ print("true" if shadow.verdict_state(sys.argv[2])[0] else "false")
 PY
 }
 
+artifacts() {  # <data-root>: the three last-good artifacts, hashed
+  { shasum -a 256 "$1/aa.sqlite" "$1/verdict.json"; tree_hash "$1/projection"; }
+}
+
+leftovers() {  # <data-root>: anything a promotion made and did not remove
+  find "$1" -maxdepth 1 -name '*fm-model-picker-daily*' 
+}
+
+# shadow_view <data-root>: what the consumer's own code reads: its verdict guard, then a mapped
+# projection of the old generation (fixture-model) and of the new one (rebuilt-model).
+shadow_view() {
+  python3 -I - "$ROOT/bin" "$1" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from fm_model_picker import shadow
+root = sys.argv[2]
+table = {"families": {"fam": {"creator": "Fixture Co"}}}
+def read(slug, name):
+    projection, _ = shadow.asserted_projection(table, {"family": "fam"}, {"slug": slug, "name": name}, root)
+    return "ok" if projection is not None else "refused"
+print("%s old=%s new=%s" % ("trusted" if shadow.verdict_state(root)[0] else "refused", read("fixture-model", "Fixture"), read("rebuilt-model", "Rebuilt")))
+PY
+}
+
+# add_route_projection <data-root>: the real projection the route check maps the one fixture route to.
+add_route_projection() {
+  cp "$ROOT/tests/fixtures/model-picker-shadow/projection/claude-opus-5-5-high.json" "$1/projection/"
+}
+
 # make_fixture <data-root> <observed-epoch>: a live root whose newest observation has that time.
 make_fixture() {
   local root=$1 observed=$2
@@ -65,7 +96,7 @@ aadb.log_dispatch(conn, mode="shadow", task_type="fixture-original")
 conn.close()
 PY
   printf '{"verdict": "TRUSTED", "ran_at": "%s"}\n' "$(stamp "$observed")" > "$root/verdict.json"
-  printf '{"slug": "fixture-model", "as_of": "%s"}\n' "$(stamp "$observed")" > "$root/projection/fixture-model.json"
+  printf '{"slug": "fixture-model", "name": "Fixture", "creator": "Fixture Co", "metrics": {}, "as_of": "%s"}\n' "$(stamp "$observed")" > "$root/projection/fixture-model.json"
   printf '{"collected_at": "%s"}\n' "$(stamp "$observed")" > "$root/snapshot.json"
   printf 'coverage\n' > "$root/coverage.md"
   printf 'reconcile\n' > "$root/reconcile.md"
@@ -109,7 +140,7 @@ for old in (data / "projection").iterdir():
         shutil.rmtree(old)
     else:
         old.unlink()
-(data / "projection" / "rebuilt-model.json").write_text('{"slug": "rebuilt-model"}\n')
+(data / "projection" / "rebuilt-model.json").write_text('{"slug": "rebuilt-model", "name": "Rebuilt", "creator": "Fixture Co", "metrics": {}}\n')
 (data / "snapshot.json").write_text('{"collected_at": "' + now + '"}\n')
 if live:
     other = sqlite3.connect(live)
@@ -117,6 +148,7 @@ if live:
     other.commit()
     other.close()
 PY
+[ -z "${FAKE_DONE:-}" ] || : > "$FAKE_DONE"
 [ -z "${FAKE_STDOUT:-}" ] || printf '%s\n' "$FAKE_STDOUT"
 [ -z "${FAKE_STDERR:-}" ] || printf '%b' "$FAKE_STDERR" >&2
 code=${FAKE_EXIT:-0}
@@ -175,7 +207,7 @@ written-during-the-run" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT task_type FROM disp
   assert_equals "page" "$(cat "$DATA_DIR/raw/page.html")" "the raw cache is kept"
   before_state=$(ls -A "$(dirname "$DATA_DIR")")
   assert_equals "model-picker" "$before_state" "no staging directory is left beside the data root"
-  assert_equals "" "$(find "$DATA_DIR" -maxdepth 1 \( -name '*aside*' -o -name '*prev*' -o -name '*tmp*' \))" "promotion leaves nothing set aside inside the data root"
+  assert_equals "" "$(leftovers "$DATA_DIR")" "promotion leaves nothing set aside inside the data root"
   pass "daily runner: budget chain, staged copy, promotion keeps dispatch_log"
 }
 
@@ -365,9 +397,8 @@ test_failed_promotion_restores_the_previous_snapshot() {
   assert_equals "model-picker" "$(ls -A "$(dirname "$DATA_DIR")")" "nothing is left beside the data root"
   rows=$(queued_wakes)
   assert_equals 1 "$(printf '%s\n' "$rows" | grep -c .)" "one wake"
-  assert_contains "$rows" "installing its output into $DATA_DIR failed (the runner exits 1; the live verdict now reads TRUSTED): previous snapshot restored; promotion failed:" "the wake states the true result, read back from the verdict file"
-  assert_equals true "$(shadow_trusts "$DATA_DIR")" "the consumer's guard trusts the restored snapshot"
-  assert_not_contains "$rows" "exited 0 but promoting" "the old wording is gone"
+  assert_contains "$rows" "installing its output into $DATA_DIR failed (outcome restored; the runner exits 1; the live verdict now reads TRUSTED): previous snapshot restored; promotion failed:" "the wake states the true result, read back from the verdict file"
+  assert_equals "trusted old=ok new=refused" "$(shadow_view "$DATA_DIR")" "the consumer's guards read the restored snapshot"
   pass "daily runner: a failed promotion restores the previous snapshot"
 }
 
@@ -412,85 +443,243 @@ PY
   pass "daily runner: the live verdict reads UNTRUSTED for the whole install window"
 }
 
+test_failure_inside_the_database_step_leaves_every_byte() {
+  new_home dbfail
+  local before
+  before=$(tree_hash "$DATA_DIR")
+  run_runner run FM_MODEL_PICKER_DAILY_FAULT=fail:before-commit
+  expect_code 1 "$CODE" "a failure inside the matrix transaction"
+  assert_equals "$before" "$(tree_hash "$DATA_DIR")" "aa.sqlite, verdict.json, projection/ and every other file are byte-identical"
+  assert_equals "trusted old=ok new=refused" "$(shadow_view "$DATA_DIR")" "the consumer's guards read the old generation"
+  assert_equals "" "$(leftovers "$DATA_DIR")" "no journal, aside or kept file is left"
+  assert_contains "$(queued_wakes)" "(outcome restored; the runner exits 1; the live verdict now reads TRUSTED): previous snapshot restored; promotion failed:" "the wake says restored"
+  pass "daily runner: a failure inside the database step leaves every byte of the last good snapshot"
+}
+
+test_promotion_killed_before_the_commit_is_rolled_back() {
+  new_home killbefore
+  local before
+  before=$(artifacts "$DATA_DIR")
+  run_runner run FM_MODEL_PICKER_DAILY_FAULT=kill:before-commit
+  expect_code 1 "$CODE" "a promotion killed inside the matrix transaction"
+  assert_equals "$before" "$(artifacts "$DATA_DIR")" "aa.sqlite, verdict.json and projection/ are byte-identical"
+  assert_equals "trusted old=ok new=refused" "$(shadow_view "$DATA_DIR")" "the consumer's guards read the old generation"
+  assert_equals "1.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "the database holds the old generation"
+  assert_equals "ok" "$(sql "$DATA_DIR/aa.sqlite" 'PRAGMA integrity_check')" "the database is intact after the kill"
+  assert_equals "" "$(leftovers "$DATA_DIR")" "no journal, aside or kept file is left"
+  assert_contains "$(queued_wakes)" "the promote step ended without a result, so recovery settled it: restored" "the wake says what recovery did"
+  assert_contains "$(queued_wakes)" "(outcome restored; the runner exits 1; the live verdict now reads TRUSTED)" "the wake names the verdict read back from the file"
+  assert_equals 1 "$(wake_count)" "one wake"
+  pass "daily runner: a promotion killed before the commit is rolled back byte for byte"
+}
+
+test_promotion_that_stops_after_the_commit_is_completed() {
+  local how
+  for how in kill fail; do
+    new_home "after-$how"
+    run_runner run FM_MODEL_PICKER_DAILY_FAULT="$how:after-commit"
+    expect_code 0 "$CODE" "a promotion that stops after the commit by $how"
+    assert_equals "trusted old=refused new=ok" "$(shadow_view "$DATA_DIR")" "the consumer's guards read the complete new generation"
+    assert_equals "2.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "the database holds the new generation"
+    assert_equals "rebuilt-model.json" "$(ls -A "$DATA_DIR/projection")" "the projection is the new generation"
+    assert_equals "fixture-original" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT task_type FROM dispatch_log ORDER BY id')" "dispatch_log survived"
+    assert_equals "" "$(leftovers "$DATA_DIR")" "no journal, aside or kept file is left"
+    assert_equals 0 "$(wake_count)" "a completed run raises no wake"
+  done
+  pass "daily runner: a promotion that stops after the commit is completed, never reported as a failure"
+}
+
 test_incomplete_rollback_never_restores_a_trusted_verdict() {
   new_home incomplete
-  local before_db before_proj
+  local before_db fault
+  fault='rename:\.daily\.[0-9]+/projection$>>/projection$;rename:projection\.fm-model-picker-daily-aside$>>/projection$'
   before_db=$(sha256sum_of "$DATA_DIR/aa.sqlite")
-  run_runner run FM_MODEL_PICKER_DAILY_FAULT='rename:\.daily\.[0-9]+/snapshot\.json$>>/snapshot\.json$;rename:/projection$>>\.daily\.[0-9]+/projection$'
-  expect_code 1 "$CODE" "a forward failure and a failed undo"
-  assert_contains "$(cat "$DATA_DIR/verdict.json")" UNTRUSTED "the verdict file says UNTRUSTED"
-  assert_equals false "$(shadow_trusts "$DATA_DIR")" "the consumer's guard refuses the half-restored snapshot"
+  run_runner run FM_MODEL_PICKER_DAILY_FAULT="$fault"
+  expect_code 1 "$CODE" "an install that fails and an undo that fails"
+  assert_equals UNTRUSTED "$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["verdict"])' "$DATA_DIR/verdict.json")" "the verdict file says UNTRUSTED"
+  assert_equals "refused old=refused new=refused" "$(shadow_view "$DATA_DIR")" "both consumer guards refuse the half-restored snapshot"
   assert_equals "$before_db" "$(sha256sum_of "$DATA_DIR/aa.sqlite")" "the database was never changed"
-  before_proj=$(queued_wakes)
-  assert_contains "$before_proj" "(the runner exits 1; the live verdict now reads UNTRUSTED): RESTORE INCOMPLETE, live verdict left UNTRUSTED;" "the wake tells the truth about the verdict, ahead of any path"
+  assert_contains "$(queued_wakes)" "(outcome restore-incomplete; the runner exits 1; the live verdict now reads UNTRUSTED): RESTORE INCOMPLETE, live verdict left UNTRUSTED;" "the wake tells the truth about the verdict, ahead of any path"
+  assert_not_contains "$(queued_wakes)" "previous snapshot restored" "the wake never says the snapshot was restored"
   assert_equals 1 "$(wake_count)" "one wake"
-  run_runner run
-  expect_code 0 "$CODE" "the next good run repairs it"
-  assert_equals true "$(shadow_trusts "$DATA_DIR")" "the consumer's guard trusts the repaired snapshot"
+  : > "$FAKE_LOG"
+  NOW_AT=$((NOW + 86400)) run_runner run FM_MODEL_PICKER_DAILY_FAULT="$fault"
+  expect_code 1 "$CODE" "the next run with the same fault cannot settle it"
+  assert_equals "" "$(grep -c '^argv=' "$FAKE_LOG" | grep -v '^0$')" "and collects nothing"
+  assert_contains "$(queued_wakes)" "an earlier promotion into $DATA_DIR could not be settled" "one wake names it"
+  assert_equals "refused old=refused new=refused" "$(shadow_view "$DATA_DIR")" "the guards still refuse"
+  NOW_AT=$((NOW + 2 * 86400)) run_runner run
+  expect_code 0 "$CODE" "the next run without the fault settles it and collects"
+  assert_equals "trusted old=refused new=ok" "$(shadow_view "$DATA_DIR")" "the consumer's guards read the new generation"
   assert_equals "rebuilt-model.json" "$(ls -A "$DATA_DIR/projection")" "the projection is the new generation"
-  assert_equals "" "$(find "$DATA_DIR" -maxdepth 1 \( -name '*aside*' -o -name '*prev*' -o -name '*tmp*' \))" "the killed promotion's leftovers are cleaned"
-  pass "daily runner: an incomplete rollback never restores a trusted verdict over a mixed generation"
+  assert_equals "" "$(leftovers "$DATA_DIR")" "no journal, aside or kept file is left"
+  pass "daily runner: an incomplete rollback never restores a trusted verdict, and the next run settles it"
 }
 
-test_promotion_killed_at_the_commit_boundary_is_refused_and_repaired() {
-  local point old_db
-  for point in before-commit after-commit; do
-    new_home "kill-$point"
-    run_runner run FM_MODEL_PICKER_DAILY_FAULT="kill:$point"
-    expect_code 1 "$CODE" "a promotion killed $point"
-    assert_equals UNTRUSTED "$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["verdict"])' "$DATA_DIR/verdict.json")" "the verdict reads UNTRUSTED after a kill $point"
-    assert_equals false "$(shadow_trusts "$DATA_DIR")" "the consumer's guard refuses the snapshot after a kill $point"
-    old_db=$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')
-    if [ "$point" = before-commit ]; then assert_equals "1.0" "$old_db" "the database is the old generation"; else assert_equals "2.0" "$old_db" "the database is the new generation"; fi
-    assert_contains "$(queued_wakes)" "the live verdict now reads UNTRUSTED" "the wake names the verdict a reader sees"
-    run_runner run
-    expect_code 0 "$CODE" "the next good run after a kill $point"
-    assert_equals true "$(shadow_trusts "$DATA_DIR")" "the consumer's guard trusts the repaired snapshot"
-    assert_equals "2.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "the new generation is live"
-    assert_equals "fixture-original" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT task_type FROM dispatch_log ORDER BY id')" "dispatch_log survived"
-    assert_equals "" "$(find "$DATA_DIR" -maxdepth 1 \( -name '*aside*' -o -name '*prev*' -o -name '*tmp*' \))" "the leftovers of the killed promotion are cleaned"
-  done
-  pass "daily runner: a promotion killed at the commit boundary is refused by the guard and repaired by the next run"
+test_failed_final_rename_leaves_a_committed_snapshot_under_untrusted() {
+  new_home publish
+  run_runner run FM_MODEL_PICKER_DAILY_FAULT='rename:\.fm-model-picker-daily\.next-verdict$>>/verdict\.json$'
+  expect_code 0 "$CODE" "a run whose committed snapshot could not publish its verdict"
+  assert_equals "refused old=refused new=ok" "$(shadow_view "$DATA_DIR")" "the verdict guard refuses until the verdict is published, over a complete new projection"
+  assert_equals "2.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "the database holds the committed new generation"
+  assert_equals 1 "$(wake_count)" "one wake"
+  assert_contains "$(queued_wakes)" "its snapshot is committed under $DATA_DIR, but its verdict could not be published (the runner exits 0; the live verdict now reads UNTRUSTED; the next run finishes it)" "the wake names the state"
+  NOW_AT=$((NOW + 86400)) run_runner run
+  expect_code 0 "$CODE" "the next run"
+  assert_equals "trusted old=refused new=ok" "$(shadow_view "$DATA_DIR")" "the next run publishes the verdict"
+  assert_equals "" "$(leftovers "$DATA_DIR")" "no journal, aside or kept file is left"
+  assert_equals 1 "$(wake_count)" "the next run raises nothing more"
+  pass "daily runner: a verdict that cannot publish after the commit raises one wake and the next run finishes it"
 }
 
-test_independent_reader_at_the_commit_boundary() {
-  local point announce release runner
+test_cleanup_removes_only_what_the_journal_names() {
+  new_home sentinels
+  local dead before
+  /bin/sleep 0 &
+  dead=$!
+  wait "$dead" 2>/dev/null
+  mkdir -p "$DATA_DIR/saved.aside.$dead"
+  printf 'keep\n' > "$DATA_DIR/saved.aside.$dead/data"
+  printf 'notes\n' > "$DATA_DIR/notes.prev.$dead"
+  printf 'scratch\n' > "$DATA_DIR/aa.sqlite.tmp.$dead"
+  printf 'old\n' > "$DATA_DIR/.verdict.json.prev.$dead"
+  run_runner run
+  expect_code 0 "$CODE" "a run beside unrelated files named like leftovers of a dead pid"
+  assert_present "$DATA_DIR/saved.aside.$dead/data" "a directory named like an aside is kept"
+  assert_present "$DATA_DIR/notes.prev.$dead" "a file named like a kept copy is kept"
+  assert_present "$DATA_DIR/aa.sqlite.tmp.$dead" "a file named like a scratch file is kept"
+  assert_present "$DATA_DIR/.verdict.json.prev.$dead" "an old-style kept verdict is kept"
+  mkdir -p "$DATA_DIR/projection.fm-model-picker-daily-aside"
+  printf 'precious\n' > "$DATA_DIR/projection.fm-model-picker-daily-aside/data"
+  before=$(tree_hash "$DATA_DIR")
+  run_runner run
+  expect_code 1 "$CODE" "a run that finds a name of its own with no journal"
+  assert_equals "$before" "$(tree_hash "$DATA_DIR")" "nothing under the data root changed"
+  assert_present "$DATA_DIR/projection.fm-model-picker-daily-aside/data" "the file it cannot prove it made is kept"
+  assert_contains "$(queued_wakes)" "(outcome refused;" "the wake says the promotion refused"
+  assert_contains "$(queued_wakes)" "projection.fm-model-picker-daily-aside" "the wake names the file in the way"
+  pass "daily runner: cleanup removes only what its journal names, and never a file it cannot prove it made"
+}
+
+test_wake_carries_the_whole_first_stderr_line() {
+  local line long
+  new_home longline
+  line="$(printf 'e%.0s' $(seq 1 364))-REQUIRED-TAIL"
+  run_runner run FAKE_EXIT=2 FAKE_STDERR="$line\nsecond line\n"
+  expect_code 2 "$CODE" "a run whose first stderr line is 364 characters"
+  assert_contains "$(queued_wakes)" "exited 2: $line;" "the wake carries the whole line"
+  new_home longer
+  long="$(printf 'f%.0s' $(seq 1 6000))-REQUIRED-TAIL"
+  run_runner run FAKE_EXIT=2 FAKE_STDERR="$long\nsecond line\n"
+  assert_contains "$(queued_wakes)" "exited 2: $long;" "the wake carries a line of 6000 characters whole"
+  pass "daily runner: the wake carries the whole first stderr line"
+}
+
+test_wake_carries_a_non_ascii_first_stderr_line() {
+  local line
+  new_home unicode
+  line="fetch failed: café 東京 - REQUIRED-TAIL"
+  run_runner run FAKE_EXIT=2 FAKE_STDERR="$line\nsecond line\n"
+  expect_code 2 "$CODE" "a run whose first stderr line holds UTF-8 text"
+  assert_contains "$(queued_wakes)" "exited 2: $line;" "the wake carries the line exactly, UTF-8 included"
+  new_home control
+  run_runner run FAKE_EXIT=2 FAKE_STDERR="tab\there\r - REQUIRED-TAIL\n"
+  assert_contains "$(queued_wakes)" "exited 2: tab here  - REQUIRED-TAIL;" "each control character becomes one space and the line stays one row"
+  assert_equals 1 "$(wake_count)" "one wake row"
+  pass "daily runner: the wake carries a non-ASCII first stderr line whole"
+}
+
+test_cleanup_fault_after_the_commit_is_named_and_settled_before_the_next_collection() {
+  new_home cleanup
+  local fault collector_calls
+  fault='remove:raw\.fm-model-picker-daily-aside$'
+  run_runner run FM_MODEL_PICKER_DAILY_FAULT="$fault"
+  expect_code 0 "$CODE" "a run whose cleanup after the commit fails"
+  assert_equals "trusted old=refused new=ok" "$(shadow_view "$DATA_DIR")" "the new snapshot is live and trusted"
+  assert_equals "2.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "the database holds the new generation"
+  assert_equals 1 "$(wake_count)" "one wake"
+  assert_contains "$(queued_wakes)" "cleanup left files behind (the runner exits 0; the next run removes them before it collects): new snapshot is live and trusted; cleanup left files behind that the next run removes before it collects: remove the old raw:" "the wake names the leftover"
+  assert_present "$DATA_DIR/raw.fm-model-picker-daily-aside" "the leftover is still there"
+  collector_calls=$(grep -c '^argv=' "$FAKE_LOG")
+  NOW_AT=$((NOW + 86400)) run_runner run FM_MODEL_PICKER_DAILY_FAULT="$fault"
+  expect_code 1 "$CODE" "the next run with the fault still on cannot settle it"
+  assert_equals "$collector_calls" "$(grep -c '^argv=' "$FAKE_LOG")" "and does not collect"
+  assert_equals 2 "$(wake_count)" "it raises one more wake"
+  assert_contains "$(queued_wakes)" "an earlier promotion into $DATA_DIR could not be settled (cleanup-incomplete)" "the wake says it could not settle"
+  NOW_AT=$((NOW + 2 * 86400)) run_runner run
+  expect_code 0 "$CODE" "the next run after the fault clears"
+  assert_equals "$((collector_calls + 1))" "$(grep -c '^argv=' "$FAKE_LOG")" "it settles first, then collects"
+  assert_equals "" "$(leftovers "$DATA_DIR")" "no journal, aside or kept file is left"
+  assert_absent "$DATA_DIR/raw.fm-model-picker-daily-aside" "the leftover is gone"
+  assert_equals 2 "$(wake_count)" "no further wake"
+  pass "daily runner: a cleanup fault after the commit is named, and settled before the next collection"
+}
+
+test_a_reader_spanning_a_promotion_sees_one_generation() {
+  new_home span
+  add_route_projection "$DATA_DIR"
+  local held="$TMP_ROOT/span/held" release="$TMP_ROOT/span/release" reader runner
+  env FM_TEST_SEAM=1 FM_MODEL_PICKER_READER_HOLD="$held:$release" "$SHADOW" --check-routes --rules "$TMP_ROOT/rules.json" --data-root "$DATA_DIR" \
+    > "$TMP_ROOT/span/reader.out" 2>&1 &
+  reader=$!
+  fm_test_wait_until --while-alive "$reader" -- test -e "$held" || fail "the reader never took its hold"
+  assert_equals "trusted old=ok new=refused" "$(shadow_view "$DATA_DIR")" "a reader that began before the promotion holds a trusted old generation"
+  env FM_HOME="$HOME_DIR" FM_TEST_SEAM=1 FM_MODEL_PICKER_DAILY_NOW="$NOW" FM_MODEL_PICKER_DAILY_COLLECTOR="$TMP_ROOT/fake-collector.sh" \
+    FM_MODEL_PICKER_DAILY_BUDGET="$TMP_ROOT/fake-budget.sh" FAKE_LOG="$FAKE_LOG" FAKE_DONE="$TMP_ROOT/span/collected" "$RUNNER" run >/dev/null 2>&1 &
+  runner=$!
+  # The collector writes the marker when its staged generation is complete; the promotion starts next.
+  fm_test_wait_until --while-alive "$runner" -- test -e "$TMP_ROOT/span/collected" || { : > "$release"; fail "the run never finished collecting"; }
+  /bin/sleep 3
+  assert_equals "1.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "the promotion has not begun while the reader holds the generation"
+  assert_contains "$(cat "$DATA_DIR/verdict.json")" TRUSTED "the verdict is still the old trusted one"
+  : > "$release"
+  wait "$reader"
+  expect_code 0 "$?" "the reader"
+  grep -Eq 'claude-opus-5-5-high +yes' "$TMP_ROOT/span/reader.out"
+  expect_code 0 "$?" "the reader read the old generation, whole"
+  wait "$runner"
+  expect_code 0 "$?" "the promotion after the reader ended"
+  assert_equals "trusted old=refused new=ok" "$(shadow_view "$DATA_DIR")" "the new generation is live"
+  pass "daily runner: a reader that began before a promotion finishes on the old generation"
+}
+
+test_a_reader_during_a_promotion_is_refused() {
+  local point announce release runner out code
   for point in before-commit after-commit; do
-    new_home "hold-$point"
-    announce="$TMP_ROOT/hold-$point/announce"
-    release="$TMP_ROOT/hold-$point/release"
+    new_home "fresh-$point"
+    add_route_projection "$DATA_DIR"
+    announce="$TMP_ROOT/fresh-$point/announce"
+    release="$TMP_ROOT/fresh-$point/release"
     env FM_HOME="$HOME_DIR" FM_TEST_SEAM=1 FM_MODEL_PICKER_DAILY_NOW="$NOW" FM_MODEL_PICKER_DAILY_COLLECTOR="$TMP_ROOT/fake-collector.sh" \
       FM_MODEL_PICKER_DAILY_BUDGET="$TMP_ROOT/fake-budget.sh" FAKE_LOG="$FAKE_LOG" \
       FM_MODEL_PICKER_DAILY_FAULT="hold:$point:$announce:$release" "$RUNNER" run >/dev/null 2>&1 &
     runner=$!
     fm_test_wait_until --while-alive "$runner" -- test -e "$announce" || { : > "$release"; fail "the promotion never reached $point"; }
-    assert_equals false "$(shadow_trusts "$DATA_DIR")" "a reader at $point is refused by the guard"
-    assert_contains "$(cat "$DATA_DIR/verdict.json")" UNTRUSTED "a reader at $point sees UNTRUSTED"
-    if [ "$point" = before-commit ]; then
-      assert_equals "1.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "a reader at before-commit sees the old database"
-    else
-      assert_equals "2.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "a reader at after-commit sees the new database"
-    fi
+    code=0
+    out=$("$SHADOW" --check-routes --rules "$TMP_ROOT/rules.json" --data-root "$DATA_DIR" 2>&1) || code=$?
+    expect_code 2 "$code" "a reader that starts at $point"
+    assert_contains "$out" "a promotion is replacing the benchmark snapshot" "the reader says why"
+    assert_not_contains "$out" "yes" "the reader reads nothing"
+    assert_equals "refused" "$(shadow_view "$DATA_DIR" | cut -d' ' -f1)" "the verdict guard refuses at $point"
     : > "$release"
     wait "$runner"
     expect_code 0 "$?" "the promotion released at $point"
-    assert_equals true "$(shadow_trusts "$DATA_DIR")" "the guard trusts the finished promotion"
+    assert_equals "trusted old=refused new=ok" "$(shadow_view "$DATA_DIR")" "the guards trust the finished promotion"
   done
-  pass "daily runner: an independent reader at the commit boundary is never trusted with a mixture"
+  pass "daily runner: a reader that starts during a promotion is refused"
 }
 
 test_wake_keeps_the_outcome_with_a_long_path() {
-  local long outcome
+  local long
   long=$(printf 'd%.0s' $(seq 1 120))
   new_home "$long/$long"
   run_runner run FM_MODEL_PICKER_DAILY_FAULT='rename:\.daily\.[0-9]+/snapshot\.json$>>/snapshot\.json$'
   expect_code 1 "$CODE" "a restored promotion failure under a long path"
-  outcome=$(queued_wakes)
-  assert_contains "$outcome" "the live verdict now reads TRUSTED): previous snapshot restored; promotion failed:" "the restored outcome survives the long path"
+  assert_contains "$(queued_wakes)" "(outcome restored; the runner exits 1; the live verdict now reads TRUSTED): previous snapshot restored; promotion failed:" "the restored outcome survives the long path"
   new_home "$long/incomplete"
-  run_runner run FM_MODEL_PICKER_DAILY_FAULT='rename:\.daily\.[0-9]+/snapshot\.json$>>/snapshot\.json$;rename:/projection$>>\.daily\.[0-9]+/projection$'
+  run_runner run FM_MODEL_PICKER_DAILY_FAULT='rename:\.daily\.[0-9]+/projection$>>/projection$;rename:projection\.fm-model-picker-daily-aside$>>/projection$'
   expect_code 1 "$CODE" "an incomplete rollback under a long path"
-  assert_contains "$(queued_wakes)" "the live verdict now reads UNTRUSTED): RESTORE INCOMPLETE, live verdict left UNTRUSTED;" "the incomplete outcome survives the long path"
+  assert_contains "$(queued_wakes)" "(outcome restore-incomplete; the runner exits 1; the live verdict now reads UNTRUSTED): RESTORE INCOMPLETE, live verdict left UNTRUSTED;" "the incomplete outcome survives the long path"
   pass "daily runner: the wake names the real outcome ahead of long paths"
 }
 
@@ -608,9 +797,17 @@ test_staging_cleanup_touches_only_owned_stages
 test_failed_promotion_restores_the_previous_snapshot
 test_promotion_installs_a_whole_generation
 test_verdict_reads_untrusted_while_a_promotion_waits
+test_failure_inside_the_database_step_leaves_every_byte
+test_promotion_killed_before_the_commit_is_rolled_back
+test_promotion_that_stops_after_the_commit_is_completed
 test_incomplete_rollback_never_restores_a_trusted_verdict
-test_promotion_killed_at_the_commit_boundary_is_refused_and_repaired
-test_independent_reader_at_the_commit_boundary
+test_failed_final_rename_leaves_a_committed_snapshot_under_untrusted
+test_cleanup_removes_only_what_the_journal_names
+test_wake_carries_the_whole_first_stderr_line
+test_wake_carries_a_non_ascii_first_stderr_line
+test_cleanup_fault_after_the_commit_is_named_and_settled_before_the_next_collection
+test_a_reader_spanning_a_promotion_sees_one_generation
+test_a_reader_during_a_promotion_is_refused
 test_wake_keeps_the_outcome_with_a_long_path
 test_installer_print_names_runner_daily_interval_and_login
 test_installer_install_replace_status_uninstall
