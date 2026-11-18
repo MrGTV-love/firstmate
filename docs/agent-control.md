@@ -515,6 +515,10 @@ Pane-path changes have a separate per-get seen set: returning to a pane path alr
 Both sets start empty for each get.
 Tmux acquisition capture joins soft wraps; the acquisition parser also reconstructs checked-candidate records split across physical lines by other backends, including wraps within the record prefix, path and decision delimiter.
 Other capture consumers retain their existing physical-line output.
+Tmux's joined logical records are parsed separately and never borrow a following record as an empty reason.
+A non-tmux text capture cannot distinguish a wrapped non-empty reason from a malformed empty-reason record followed by unrelated output.
+Acquisition interprets that ambiguous alignment as the valid wrapped record, rather than stopping a legitimate progressing walk.
+An empty reason violates the producer format; this interpretation does not let a candidate path already seen in the get renew again.
 Acquisition requires a readable capture: the pane must acknowledge a compact per-get output boundary across physical line wraps before `treehouse get` is sent, so even a burst larger than the bounded capture cannot hide the boundary before it is established.
 If that boundary cannot be read, no get is sent and the same 600-second no-progress stop refuses the acquisition.
 That boundary excludes inherited records without clearing pane history, including when the first get sample also contains a current completion.

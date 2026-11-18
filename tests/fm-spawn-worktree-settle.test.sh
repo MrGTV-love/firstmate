@@ -121,6 +121,7 @@ case "${1:-}" in
         printf 'treehouse: checked relative-%s: refused: reason\n' "$now"
         printf 'treehouse: checked /fixture/bad-%s: pending: reason\n' "$now"
         printf 'treehouse: checked /fixture/empty-%s: accepted: \n' "$now"
+        printf 'waiting: tick %s\n' "$now"
         exit 0 ;;
       exact)
         if [ "$now" -lt 300 ]; then

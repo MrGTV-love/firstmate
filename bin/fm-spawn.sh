@@ -6397,23 +6397,29 @@ spawn_acquire_pool_slot() {
         acquire_record=''
         acquire_record_prefix='treehouse: checked /'
         while IFS= read -r output_line; do
-          if [ -z "$output_line" ]; then
-            acquire_record=''
-            continue
-          fi
-          case "$output_line" in
-            'treehouse: checked /'*) acquire_record=$output_line ;;
-            *) acquire_record+=$output_line ;;
-          esac
-          case "$acquire_record" in
-            "$acquire_record_prefix"*) ;;
-            *)
-              # A short prefix can itself wrap. Anything else is noise.
-              case "$acquire_record_prefix" in "$acquire_record"*) continue ;; esac
+          if [ "$BACKEND" = tmux ]; then
+            # -J already preserves logical records. Never borrow the next
+            # record as the reason of a malformed empty-reason line.
+            acquire_record=$output_line
+          else
+            if [ -z "$output_line" ]; then
               acquire_record=''
               continue
-              ;;
-          esac
+            fi
+            case "$output_line" in
+              'treehouse: checked /'*) acquire_record=$output_line ;;
+              *) acquire_record+=$output_line ;;
+            esac
+            case "$acquire_record" in
+              "$acquire_record_prefix"*) ;;
+              *)
+                # A short prefix can itself wrap. Anything else is noise.
+                case "$acquire_record_prefix" in "$acquire_record"*) continue ;; esac
+                acquire_record=''
+                continue
+                ;;
+            esac
+          fi
           [[ "$acquire_record" =~ $acquire_progress_pattern ]] || continue
           # Take the first decision delimiter, not a later one inside the reason.
           acquire_candidate=${acquire_record#'treehouse: checked '}

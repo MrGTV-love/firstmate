@@ -94,6 +94,15 @@ case "${1:-} ${2:-}" in
         [ ! -f "$D/acquisition-marker" ] || cat "$D/acquisition-marker"
         if [ "$FM_FAKE_PROGRESS_MODE" = noise ]; then
           printf 'waiting: treehouse get sample %s\n' "$k"
+        elif [ "$FM_FAKE_PROGRESS_MODE" = ambiguous ]; then
+          # A valid record whose non-empty reason starts on the next physical
+          # line is indistinguishable from an empty reason followed by noise.
+          prefix="treehouse: checked /fixture/candidate-$k-"
+          delimiter=': accepted: '
+          printf -v padding '%0*d' "$((FM_FAKE_PROGRESS_WIDTH - ${#prefix} - ${#delimiter}))" 0
+          printf '%s%s%swaiting: tick 1\n' "$prefix" "$padding" "$delimiter"
+        elif [ "$FM_FAKE_PROGRESS_MODE" = empty-reason-repeat ]; then
+          printf 'treehouse: checked /fixture/same: accepted: \nwaiting: tick\n'
         else
           candidate=$k
           [ "$FM_FAKE_PROGRESS_MODE" != repeat ] || candidate=0
@@ -370,7 +379,40 @@ test_wrapped_non_tmux_repeats_and_noise_stall() {
   done
 }
 
+test_non_tmux_reason_starts_after_wrapped_decision_delimiter() {
+  local out status=0
+  make_case reason-at-wrap-boundary ship
+  out=$(FM_FAKE_DIR="$CASE_DIR" FM_FAKE_PROJECT="$PROJ_DIR" \
+    FM_FAKE_PROGRESS_MODE=ambiguous FM_FAKE_PROGRESS_WIDTH=64 \
+    FM_TEST_TICK_SECONDS=100 BASH_ENV="$ROOT/tests/skip-clock.sh" \
+    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$ID" "$PROJ_DIR" \
+      --mode local-only --yolo off --backend herdr --harness codex 2>&1) || status=$?
+  expect_code 0 "$status" "a valid reason at the exact wrap boundary must permit completion: $out"
+  assert_grep '^treehouse: checked /fixture/candidate-[0-9]+-0+: accepted: $' \
+    "$CASE_DIR/progress-capture" 'the decision delimiter did not end at the physical boundary'
+  assert_grep '^waiting: tick 1$' "$CASE_DIR/progress-capture" 'the reason did not start on the next physical line'
+  assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$ID.meta" 'the valid wrapped reason prevented isolated-copy acceptance'
+  pass 'non-tmux exact decision-delimiter alignment is accepted as a valid wrapped reason'
+}
+
+test_empty_reason_with_repeated_identical_noise_renews_once() {
+  local out status=0
+  make_case repeated-ambiguous-reason ship
+  out=$(FM_FAKE_DIR="$CASE_DIR" FM_FAKE_PROJECT="$PROJ_DIR" \
+    FM_FAKE_PROGRESS_MODE=empty-reason-repeat FM_FAKE_PROGRESS_WIDTH=64 \
+    FM_TEST_TICK_SECONDS=100 BASH_ENV="$ROOT/tests/skip-clock.sh" \
+    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$ID" "$PROJ_DIR" \
+      --mode local-only --yolo off --backend herdr --harness codex 2>&1) || status=$?
+  expect_code 1 "$status" "a repeated ambiguous candidate must not renew twice: $out"
+  assert_contains "$out" 'no path or output progress for 600s' 'repeated ambiguous output lost the stall refusal'
+  [ ! -e "$HOME_DIR/state/$ID.meta" ] || fail 'repeated ambiguous output published an acquired copy'
+  [ "$(cat "$CASE_DIR/path-reads")" -lt 14 ] || fail 'identical ambiguous output extended the acquisition'
+  pass 'an empty reason plus repeated identical noise cannot renew a candidate twice'
+}
+
 fm_test_only
+test_non_tmux_reason_starts_after_wrapped_decision_delimiter
+test_empty_reason_with_repeated_identical_noise_renews_once
 test_wrapped_non_tmux_candidate_progress
 test_wrapped_non_tmux_repeats_and_noise_stall
 test_claude_staged_native_hook_suppression
