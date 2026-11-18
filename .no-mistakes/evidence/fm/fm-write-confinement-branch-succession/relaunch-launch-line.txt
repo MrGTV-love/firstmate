@@ -1,0 +1,1 @@
+sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.tka0bb/state/fm-lab-succ-task.write-confinement.sb'

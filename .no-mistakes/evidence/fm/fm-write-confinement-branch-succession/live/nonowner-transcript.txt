@@ -1,0 +1,9 @@
+ancestry of this caller:
+42779 bash
+42770 tmux
+$ fm-control fm-lab-scott-task successor --branch fm/fm-lab-scott-task-foo --tip <S> --note x   (unset CLAUDE_PID CLAUDE_CODE_SESSION_ID)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch recording requires the actual lock-owning main Firstmate
+[exit 1]
+CHECK non-owner: record and brief byte-identical
+note: the echo label above says --branch ...-foo --tip <S>; the call actually run is the line under it: --branch fm/fm-lab-scott-task-v2 --tip <old-branch tip>; it is refused at the lock check before any record read

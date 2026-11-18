@@ -1,0 +1,19 @@
+===== ADVERSARIAL (R3-1 at relaunch): hand-edited record names successor_branch=fm/fm-lab-scott-task-foo successor_proved_tip=<root a2e45ca0cf7881cf24a599790e82a935d1a627b9>; archive/fm-lab-scott-task-pipeline-a2e45ca0 points at root =====
+successor_branch=fm/fm-lab-scott-task-foo
+successor_proved_tip=a2e45ca0cf7881cf24a599790e82a935d1a627b9
+refs/heads/archive/fm-lab-scott-task-pipeline-6db21b5e 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/archive/fm-lab-scott-task-pipeline-a2e45ca0 a2e45ca0cf7881cf24a599790e82a935d1a627b9
+refs/heads/archive/fm-lab-scott-task-submitted-8435a6f2 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/fm/fm-lab-scott-task 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/fm/fm-lab-scott-task-foo a2e45ca0cf7881cf24a599790e82a935d1a627b9
+refs/heads/fm/fm-lab-scott-task-v2 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/main a2e45ca0cf7881cf24a599790e82a935d1a627b9
+$ fm-control fm-lab-scott-task relaunch --note planted
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: task fm-lab-scott-task records successor branch 'fm/fm-lab-scott-task-foo', which is no longer proved to be this task's: the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 recorded as proved at the successor's admission is not a commit of task fm-lab-scott-task's own: it is neither the tip of one of its archive/fm-lab-scott-task-(submitted|pipeline)-<8 hex> branches nor a commit of the recorded branch 'fm/fm-lab-scott-task', in either case one the project's default or base branch does not contain; refused before stopping the running agent; repair: preserve task fm-lab-scott-task's worktree and record, then make the successor branch contain its recorded successor_proved_tip= again, or remove its successor_branch= and successor_proved_tip= lines from the record, and run fm-control fm-lab-scott-task relaunch again
+[exit 1]
+CHECK record unchanged
+fm-lab-scott-task.inbox
+fm-lab-scott-task.meta
+fm-lab-scott-task.status
+guard-events.jsonl

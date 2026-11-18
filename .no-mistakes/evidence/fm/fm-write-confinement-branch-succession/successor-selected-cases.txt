@@ -1,0 +1,8 @@
+ok - successor: the receipt names owner, action and a next command that relaunch accepts
+ok - successor: a publication that fails after the rename restores the record, the instructions and the profile, with no backup or lock left
+ok - successor: a failure injected at each write step leaves the record and the brief exactly as before and no lock behind
+ok - successor: the profile the next relaunch generates gains exactly the successor's literal allow lines
+DIGEST no-successor-relaunch-profile=4e7edb649908a43e0477be81b3e5ee6e0b51ab2aaf3deb665972af39d6ef8acf
+ok - successor: a relaunch of a task with no successor generates the profile it always did
+ok - successor: --branch stays refused, with the same message, on every other verb, and successor takes no --check
+exit=0

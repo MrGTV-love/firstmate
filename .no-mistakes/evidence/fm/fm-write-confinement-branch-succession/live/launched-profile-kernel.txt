@@ -1,0 +1,11 @@
+--- the launch script names sandbox-exec with the regenerated profile
+sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.write-confinement.sb'
+--- does the live worker process run confined? (kernel probe: try to write the task meta from a child of the live claude is not possible; instead the pane's own shell is unconfined, so the profile is checked by applying the exact launched file)
+exit=0 : git update-ref refs/heads/fm/fm-lab-scott-task-v2 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7 :  
+exit=128 : git branch fm/fm-lab-scott-task-v2x 6db21b5eb716310ad6356746ee9786e40eb9b4d6 : fatal: cannot lock ref 'refs/heads/fm/fm-lab-scott-task-v2x': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/ref
+exit=128 : git branch fm/unrelated 6db21b5eb716310ad6356746ee9786e40eb9b4d6 : fatal: cannot lock ref 'refs/heads/fm/unrelated': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/u
+exit=128 : git update-ref refs/heads/main 6db21b5eb716310ad6356746ee9786e40eb9b4d6 : fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create '/Users/charlesabrooker/tmp/fm-lab.4
+exit=1 : sh -c echo x >> /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.meta : sh: /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.meta: Operation not permitted 
++ fm/fm-lab-scott-task
+  fm/fm-lab-scott-task-foo
+  fm/fm-lab-scott-task-v2

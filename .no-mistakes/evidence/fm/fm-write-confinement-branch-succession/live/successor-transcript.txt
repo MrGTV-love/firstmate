@@ -1,0 +1,162 @@
+
+===== build the Scott-shaped fixture under the lab home (task id renamed to fm-lab-scott-task) =====
+fixture ready under /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx
+  project:  /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project   copy: /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/slots/22/project   gate: /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/gate.git
+  state:    /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/home/state/fm-lab-scott-task.meta   run binding: /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/run-binding.txt
+S(old branch tip)=8435a6f28f95b9cc3db51ec5b63009556fb4a4b7 P(pipeline head = successor tip)=6db21b5eb716310ad6356746ee9786e40eb9b4d6 M(root/main)=a2e45ca0cf7881cf24a599790e82a935d1a627b9
+--- task record before
+window=fixture:w1:p1
+endpoint_task_id=fm-lab-scott-task
+worktree=/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/slots/22/project
+project=/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project
+harness=claude
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/fm-lab-scott-task
+tasktmp=/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/tmp/fm-fm-lab-scott-task
+write_confinement=seatbelt-v1
+claude_session_id=00000000-0000-4000-8000-000000000000
+model=claude-sonnet-5-5[1m]
+effort=high
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+egress=[]
+skill_selection=picked
+skill_selection_picked=firstmate-coding-guidelines
+busy_gen=g0.0.0
+spawn_gen=s0.0.0
+launch_proof=env-v1
+backend=herdr
+dispatch_rule=rule_6
+herdr_session=fixture
+herdr_workspace_id=w1
+herdr_tab_id=w1:t1
+herdr_pane_id=w1:p1
+--- brief before
+Fixture brief for fm-lab-scott-task
+Ship branch: fm/fm-lab-scott-task
+
+===== take the lab home lock as this real Claude session (bin/fm-lock.sh) =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-lock.sh
+lock acquired: harness pid 41286
+[exit 0]
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-lock.sh status
+lock: held by live harness pid 41286
+[exit 0]
+
+===== ADVERSARIAL: a worker session (FM_TASK_ID set) calls the verb =====
+$ env FM_TASK_ID=fm-lab-scott-task bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note worker try
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: workers cannot record a successor branch
+[exit 1]
+CHECK same(before,after-worker): worker call changed nothing -> DIFFERENT
+diff -r /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/before/state-list /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/after-worker/state-list
+3a4
+> guard-events.jsonl
+
+===== ADVERSARIAL: first admission with no --tip =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --note no tip
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'fm/fm-lab-scott-task-v2' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/fm-lab-scott-task-(submitted|pipeline)-<8 hex> branches) fails because no --tip was given; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.45nNXS bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project rev-parse refs/heads/fm/fm-lab-scott-task), a ref the worker can move, so that route proves only that you observed that tip
+[exit 1]
+CHECK same(before,after-notip): missing --tip changed nothing -> DIFFERENT
+diff -r /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/before/state-list /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/after-notip/state-list
+3a4
+> guard-events.jsonl
+
+===== ADVERSARIAL: first admission with a wrong --tip (the root commit M every branch shares) =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 --note root tip
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'fm/fm-lab-scott-task-v2' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/fm-lab-scott-task-(submitted|pipeline)-<8 hex> branches) fails because no archive/fm-lab-scott-task-(submitted|pipeline)-<8 hex> branch of the task has the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 outside the project's default and base branches; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.45nNXS bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project rev-parse refs/heads/fm/fm-lab-scott-task), a ref the worker can move, so that route proves only that you observed that tip
+[exit 1]
+CHECK same(before,after-roottip): wrong --tip changed nothing -> DIFFERENT
+diff -r /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/before/state-list /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/after-roottip/state-list
+3a4
+> guard-events.jsonl
+
+===== ADVERSARIAL: names outside the task's name family or otherwise inadmissible =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch develop --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note bad name
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'develop' is not admissible: it is outside the task's own name family: the recorded branch name 'fm/fm-lab-scott-task', then '-', then one or more of letters, digits, '.', '_' and '-'; that bound keeps a branch of another lineage such as develop or release/* out of the task's write profile; nothing was changed
+[exit 1]
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-taskv2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note bad name
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'fm/fm-lab-scott-taskv2' is not admissible: it is outside the task's own name family: the recorded branch name 'fm/fm-lab-scott-task', then '-', then one or more of letters, digits, '.', '_' and '-'; that bound keeps a branch of another lineage such as develop or release/* out of the task's write profile; nothing was changed
+[exit 1]
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note bad name
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'fm/fm-lab-scott-task' is not admissible: it equals the task's recorded branch; nothing was changed
+[exit 1]
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch main --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note bad name
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'main' is not admissible: it is the project's default branch; nothing was changed
+[exit 1]
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-* --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note bad name
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'fm/fm-lab-scott-task-*' is not admissible: it may use only letters, digits, '.', '_', '-' and '/', starting with a letter or digit (no wildcard, space or other character); nothing was changed
+[exit 1]
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch archive/fm-lab-scott-task-pipeline-6db21b5e --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note bad name
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'archive/fm-lab-scott-task-pipeline-6db21b5e' is not admissible: it is under archive/, which only a task's own recovery branches use; nothing was changed
+[exit 1]
+CHECK same(before,after-names-clean): bad-name calls changed nothing (after removing the two scratch branches this driver made) -> DIFFERENT
+diff -r /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/before/state-list /Users/charlesabrooker/tmp/fm-lab.45nNXS/snap/after-names-clean/state-list
+3a4
+> guard-events.jsonl
+
+===== ADVERSARIAL (R3-1): the worker plants archive/fm-lab-scott-task-pipeline-<root 8 hex> at the root commit, then Main is asked to admit fm/fm-lab-scott-task-foo by --tip <root> =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-foo --tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 --note planted archive
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: successor branch 'fm/fm-lab-scott-task-foo' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/fm-lab-scott-task-(submitted|pipeline)-<8 hex> branches) fails because no archive/fm-lab-scott-task-(submitted|pipeline)-<8 hex> branch of the task has the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 outside the project's default and base branches; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.45nNXS bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-foo --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project rev-parse refs/heads/fm/fm-lab-scott-task), a ref the worker can move, so that route proves only that you observed that tip
+[exit 1]
+CHECK planted-archive admission: record unchanged
+
+===== HAPPY: Main admits fm/fm-lab-scott-task-v2 with --tip = pipeline head P read from the run record =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note Scott v2 custody: the pipeline head lives on the successor branch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+successor-recorded fm-lab-scott-task branch=fm/fm-lab-scott-task successor_branch=fm/fm-lab-scott-task-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.45nNXS
+action: task=fm-lab-scott-task prior_branch=fm/fm-lab-scott-task successor_branch=fm/fm-lab-scott-task-v2; recorded; wrote /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.meta and /Users/charlesabrooker/tmp/fm-lab.45nNXS/data/fm-lab-scott-task/brief.md; proof: route=archive-tip archive=archive/fm-lab-scott-task-pipeline-6db21b5e: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 of the task's own archive branch archive/fm-lab-scott-task-pipeline-6db21b5e; no work tree, ref, index, process, run record or profile file was touched
+route: route=archive-tip archive=archive/fm-lab-scott-task-pipeline-6db21b5e successor=fm/fm-lab-scott-task-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.45nNXS bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task relaunch --note apply\ recorded\ successor\ branch\ fm/fm-lab-scott-task-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-lab-scott-task and successor fm/fm-lab-scott-task-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit 0]
+--- record diff before -> after
+9a10,11
+> successor_branch=fm/fm-lab-scott-task-v2
+> successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+--- brief diff before -> after
+2a3,11
+> 
+> ## Successor branch (2026-11-18T01:57:30Z)
+> 
+> This task now records a successor branch in the same copy.
+> Prior branch: fm/fm-lab-scott-task (still recorded; the Ship branch line above is unchanged).
+> Successor branch: fm/fm-lab-scott-task-v2
+> The write profile of this task's next launch allows writes to exactly its prior branch, the successor branch (each with its lock and reflog) and its archive recovery branches, and nothing more.
+> 
+> Scott v2 custody: the pipeline head lives on the successor branch
+CHECK refs unchanged by admission: DIFFERENT
+CHECK gate-refs unchanged by admission: IDENTICAL
+CHECK copy unchanged by admission: IDENTICAL
+
+===== IDEMPOTENT: the same call again =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note Scott v2 custody: the pipeline head lives on the successor branch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+successor-already-recorded fm-lab-scott-task branch=fm/fm-lab-scott-task successor_branch=fm/fm-lab-scott-task-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.45nNXS
+action: task=fm-lab-scott-task prior_branch=fm/fm-lab-scott-task successor_branch=fm/fm-lab-scott-task-v2; none: task fm-lab-scott-task already records successor_branch=fm/fm-lab-scott-task-v2; wrote nothing; proof: route=proved-tip: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 still contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved at its admission; no work tree, ref, index, process, run record or profile file was touched
+route: route=proved-tip successor=fm/fm-lab-scott-task-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: none needed: re-admitted from the record's successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.45nNXS bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task relaunch --note apply\ recorded\ successor\ branch\ fm/fm-lab-scott-task-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-lab-scott-task and successor fm/fm-lab-scott-task-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit 0]
+CHECK same(after-admit,after-repeat): repeat call changed nothing -> IDENTICAL
+
+===== ADVERSARIAL: a different second successor while one is recorded =====
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v3 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note second
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: task fm-lab-scott-task already records successor branch fm/fm-lab-scott-task-v2; one successor per task, so nothing was changed
+[exit 1]
+CHECK same(after-admit,after-second): second successor refused, nothing changed -> IDENTICAL

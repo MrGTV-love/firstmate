@@ -1,0 +1,92 @@
+== lab home: /Users/charlesabrooker/tmp/fm-lab.Glaxjf  TMUX_TMPDIR=/tmp/fml.f5eBfl
+== tmux (private) sessions:
+fmlab: 2 windows (created Tue Nov 17 21:11:51 2026)
+lock acquired: harness pid 90752
+lock: held by live harness pid 90752
+
+######## record the successor
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Glaxjf
+successor-recorded fm-lab-succ-task branch=fm/fm-lab-succ-task successor_branch=fm/fm-lab-succ-task-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.Glaxjf
+action: task=fm-lab-succ-task prior_branch=fm/fm-lab-succ-task successor_branch=fm/fm-lab-succ-task-v2; recorded; wrote /Users/charlesabrooker/tmp/fm-lab.Glaxjf/state/fm-lab-succ-task.meta and /Users/charlesabrooker/tmp/fm-lab.Glaxjf/data/fm-lab-succ-task/brief.md; proof: route=archive-tip archive=archive/fm-lab-succ-task-pipeline-6db21b5e: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 of the task's own archive branch archive/fm-lab-succ-task-pipeline-6db21b5e; no work tree, ref, index, process, run record or profile file was touched
+route: route=archive-tip archive=archive/fm-lab-succ-task-pipeline-6db21b5e successor=fm/fm-lab-succ-task-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Glaxjf bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-succ-task relaunch --note apply\ recorded\ successor\ branch\ fm/fm-lab-succ-task-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-lab-succ-task and successor fm/fm-lab-succ-task-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit=0]
+
+######## refs + copy before relaunch
+
+######## run the receipt's relaunch command
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Glaxjf
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Glaxjf
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: /Users/charlesabrooker/tmp/fm-lab.Glaxjf/data/fm-lab-succ-task/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for fm-lab-succ-task: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+error: the replacement agent for fm-lab-succ-task did not come up within 90s (endpoint reads 'dead')
+error: fm-lab-succ-task was relaunched on claude but no running agent could be confirmed; its work is preserved at /Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/slots/22/project
+
+real	4m26.874s
+user	0m22.336s
+sys	0m35.340s
+[relaunch exit=1]
+
+######## generated profile: refs/heads lines
+-rw-r--r--@ 1 charlesabrooker  staff  19471 Nov 17 21:12 /Users/charlesabrooker/tmp/fm-lab.Glaxjf/state/fm-lab-succ-task.write-confinement.sb
+48:(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/refs/heads"))
+49:(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/logs/refs/heads"))
+74:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/refs/heads/fm/fm-lab-succ-task"))
+75:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/refs/heads/fm/fm-lab-succ-task.lock"))
+76:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/logs/refs/heads/fm/fm-lab-succ-task"))
+77:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/logs/refs/heads/fm/fm-lab-succ-task.lock"))
+78:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/refs/heads/fm/fm-lab-succ-task-v2"))
+79:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/refs/heads/fm/fm-lab-succ-task-v2.lock"))
+80:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/logs/refs/heads/fm/fm-lab-succ-task-v2"))
+81:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/logs/refs/heads/fm/fm-lab-succ-task-v2.lock"))
+82:(allow file-write* (regex #"^/Users/charlesabrooker/tmp/fm\-scott\-relaunch\.BV5hxI/fx/project/\.git/refs/heads/archive/fm\-lab\-succ\-task-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+83:(allow file-write* (regex #"^/Users/charlesabrooker/tmp/fm\-scott\-relaunch\.BV5hxI/fx/project/\.git/logs/refs/heads/archive/fm\-lab\-succ\-task-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+94:(allow file-write-create (require-all (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/refs/heads/archive") (vnode-type DIRECTORY)))
+95:(allow file-write-create (require-all (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/logs/refs/heads/archive") (vnode-type DIRECTORY)))
+141:(deny file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/refs/heads"))
+143:(deny file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI/fx/project/.git/logs/refs/heads"))
+
+######## worker process under sandbox-exec
+fmlab:zsh pid=77435 cmd=sleep
+fmlab:fm-fm-lab-succ-task pid=77442 cmd=bash
+77435 sleep 3600
+77442 /bin/bash --noprofile --norc
+
+######## kill the private tmux server (stops the worker)
+
+######## refs/copy/gate after relaunch
+project refs unchanged
+gate refs unchanged
+0a1
+> !! .claude/
+(copy status diff above; worker wiring files expected)
+
+######## kernel: apply the GENERATED profile to git in the copy
+update-ref refs/heads/fm/fm-lab-succ-task-v2 -> rc=0 
+update-ref refs/heads/fm/fm-lab-succ-task-v3 -> rc=128 fatal: update_ref failed for ref 'refs/heads/fm/fm-lab-succ-task-v3': cannot lock ref 'refs/heads/fm/fm-lab-succ-task-v3': Unable to create '/Users/charlesabroo
+update-ref refs/heads/fm/fm-lab-succ-task-v2x -> rc=128 fatal: update_ref failed for ref 'refs/heads/fm/fm-lab-succ-task-v2x': cannot lock ref 'refs/heads/fm/fm-lab-succ-task-v2x': Unable to create '/Users/charlesabr
+update-ref refs/heads/x-fm/fm-lab-succ-task-v2 -> rc=128 fatal: update_ref failed for ref 'refs/heads/x-fm/fm-lab-succ-task-v2': cannot lock ref 'refs/heads/x-fm/fm-lab-succ-task-v2': unable to create directory for /U
+update-ref refs/heads/fm/other-task -> rc=128 fatal: update_ref failed for ref 'refs/heads/fm/other-task': cannot lock ref 'refs/heads/fm/other-task': Unable to create '/Users/charlesabrooker/tmp/fm-scott-r
+update-ref refs/heads/fm/fm-lab-succ-task -> rc=0 
+refs/heads/archive/fm-lab-succ-task-pipeline-6db21b5e 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/archive/fm-lab-succ-task-submitted-8435a6f2 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/fm/fm-lab-succ-task 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/fm/fm-lab-succ-task-v2 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/main a2e45ca0cf7881cf24a599790e82a935d1a627b9
+
+######## guard events
+{"decision":"allow","rule":"record","route":"archive-tip","successor":"fm/fm-lab-succ-task-v2"}
+{"decision":"allow","rule":"launch","route":"proved-tip","successor":"fm/fm-lab-succ-task-v2"}
+LAB=/Users/charlesabrooker/tmp/fm-lab.Glaxjf FIX=/Users/charlesabrooker/tmp/fm-scott-relaunch.BV5hxI

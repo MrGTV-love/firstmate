@@ -1,0 +1,27 @@
+DIGEST no-successor-generator-profile=80ca47bc5fea55953ceb1ed42d70d996147c46c0811f36140536b9193250e6dd
+ok - no-successor-allows-exactly-the-branch
+ok - successor-adds-exactly-four-literals
+ok - successor-only-in-literal-lines
+ok - generator-refuses-inadmissible-successors
+ok - generator-holds-the-name-family-bound
+ok - alias-check-covers-the-successor-and-spares-the-own-branch
+ok - PROFILE-COVERS (profile text): the generated profile gains exactly the successor's literal allow lines and nothing else, holds the name family, and checks the successor's paths for links
+DIGEST no-successor-generator-profile=612ef3c55c4b98ac26b2cfd949d1323f22ca6a1001f608087f202f893b9f3f22
+ok - no-successor-allows-exactly-the-branch
+ok - successor-adds-exactly-four-literals
+ok - successor-only-in-literal-lines
+ok - generator-refuses-inadmissible-successors
+ok - the profile validator passes on the unchanged generator
+DIGEST no-successor-generator-profile=612ef3c55c4b98ac26b2cfd949d1323f22ca6a1001f608087f202f893b9f3f22
+ok - the profile validator fails when the successor build loses a protected-ref deny line: the successor profile dropped lines: ['(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-write-confinement-succe
+ok - kernel proof: the new profile allows the successor and refuses an unrelated name, another task's branch and prefix- or suffix-sharing names; the old profile refuses the successor
+ok - the kernel validator passes an ideal confinement and judges every refusal on a valid command
+ok - the kernel validator fails when a refusal is an unrelated git failure
+ok - the kernel validator fails when nothing is confined
+ok - kernel proof: the new profile allows the successor and refuses an unrelated name, another task's branch and prefix- or suffix-sharing names; the old profile refuses the successor
+ok - the kernel validator passes a refusal git reports only as a folder it could not create, when the profile refuses that folder
+ok - the kernel validator fails when git's folder error is not the confinement's (the folder can be made)
+ok - PROFILE-COVERS (validators): the profile comparison sees a removed deny line, and the kernel judgment tells a confinement refusal from an unrelated git failure
+ok - kernel proof: the new profile allows the successor and refuses an unrelated name, another task's branch and prefix- or suffix-sharing names; the old profile refuses the successor
+ok - PROFILE-COVERS (kernel): with the new profile the successor is allowed and an unrelated name, another task's branch and prefix- or suffix-sharing names are refused; with the old profile the successor is refused
+exit=0

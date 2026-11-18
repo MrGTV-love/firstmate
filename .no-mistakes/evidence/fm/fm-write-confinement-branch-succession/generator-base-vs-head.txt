@@ -1,0 +1,30 @@
+== base generator (df896569) vs head generator (7ecedbdb), same inputs, no successor
+base rc=0
+head rc=0
+IDENTICAL: no-successor profile is byte-identical to base (85a54c2f317fb3ed)
+
+== head with --successor-branch fm/fm-lab-succ-task-v2 vs head without: diff
+head+succ rc=0
+77a78,81
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.2p4wl7/fx/project/.git/refs/heads/fm/fm-lab-succ-task-v2"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.2p4wl7/fx/project/.git/refs/heads/fm/fm-lab-succ-task-v2.lock"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.2p4wl7/fx/project/.git/logs/refs/heads/fm/fm-lab-succ-task-v2"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-scott-relaunch.2p4wl7/fx/project/.git/logs/refs/heads/fm/fm-lab-succ-task-v2.lock"))
+
+== generator refuses non-literal or out-of-family successors
+[fm/fm-lab-succ-task-*] error: cannot prepare worker write confinement: successor branch 'fm/fm-lab-succ-task-*' cannot be granted as one exact literal ref
+  rc=
+[fm/fm-lab-succ-task-v2/x] error: cannot prepare worker write confinement: successor branch 'fm/fm-lab-succ-task-v2/x' is outside the task's own name family ('fm/fm-lab-succ-task', then '-', then letters, digits, '.', '_' or '-')
+  rc=
+[develop] error: cannot prepare worker write confinement: successor branch 'develop' is outside the task's own name family ('fm/fm-lab-succ-task', then '-', then letters, digits, '.', '_' or '-')
+  rc=
+[archive/fm-lab-succ-task-pipeline-6db21b5e] error: cannot prepare worker write confinement: successor branch 'archive/fm-lab-succ-task-pipeline-6db21b5e' cannot be granted as one exact literal ref
+  rc=
+[fm/fm-lab-succ-task] error: cannot prepare worker write confinement: successor branch 'fm/fm-lab-succ-task' cannot be granted as one exact literal ref
+  rc=
+[FM/fm-lab-succ-task] error: cannot prepare worker write confinement: successor branch 'FM/fm-lab-succ-task' cannot be granted as one exact literal ref
+  rc=
+
+== base generator does not know --successor-branch (so no grant exists on base)
+fm-write-confinement.py: error: unrecognized arguments: --successor-branch fm/fm-lab-succ-task-v2
+rc=

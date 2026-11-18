@@ -1,0 +1,10 @@
+===== custody before vs after the real relaunch =====
+refs: IDENTICAL
+gate-refs: IDENTICAL
+gate-files: IDENTICAL
+binding: IDENTICAL
+copy: DIFFERENT
+0a1
+> e52d977cd12581e34c19d8e974dbf30e450d7bb9f1e6d4e94c24cfddc4c59b0f  ./.claude/settings.local.json
+copy HEAD: refs/heads/fm/fm-lab-scott-task 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+lab tmux: no server running on /private/tmp/fml.1mBe0E/tmux-501/default

@@ -1,0 +1,24 @@
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.45nNXS bash bin/fm-control.sh fm-lab-scott-task relaunch --note 'apply recorded successor branch fm/fm-lab-scott-task-v2'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: exit-delivered fm-lab-scott-task interrupt=not-needed exit-command=delivered agent-state=missing exit=unconfirmed; the agent did not stop within 30s
+error: relaunch of fm-lab-scott-task failed while stopping the old agent and its state is 'missing', so it was not proven stopped; its original instructions were restored and the durable record was retained for recovery
+bash bin/fm-control.sh $T relaunch --note   2.78s user 3.91s system 10% cpu 1:02.49 total
+[exit 1]
+
+===== second attempt: worker pane is a shell running claude (as a spawned worker's pane is); the failed:stopping journal from attempt 1 is still present =====
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.45nNXS bash bin/fm-control.sh fm-lab-scott-task relaunch --note 'apply recorded successor branch fm/fm-lab-scott-task-v2'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: /Users/charlesabrooker/tmp/fm-lab.45nNXS/data/fm-lab-scott-task/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for fm-lab-scott-task: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+relaunched fm-lab-scott-task harness=claude from=claude model=claude-sonnet-5-5[1m] effort=high backend=tmux endpoint=fmlab:fm-fm-lab-scott-task worktree=/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/slots/22/project
+[exit 0]

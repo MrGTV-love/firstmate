@@ -1,0 +1,65 @@
+===== after relaunch =====
+pane %0 pid=46141 cmd=bash
+--- processes under the pane (pid ppid command, cut)
+92594 46141 /bin/bash -c export TMPDIR='/tmp/fm-fm-lab-scott-task' TMP='/tmp/fm-fm-lab-scott-task' TEMP='/tmp/fm-fm-lab-scott-task'; ( fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}; set -
+92639 92594 /bin/bash -c fm_launch_git_hooks() {\012  fm_hooks=$1 fm_count=${GIT_CONFIG_COUNT-0}\012  fm_i=0 fm_out=0 fm_key= fm_value=\012  case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac\012  while [ "$fm_i" -lt "$fm_count" ]; do\012    eval "fm_key=\${GIT
+92656 92639 claude --session-id 796d1084-cac7-45df-9085-2518aea9f83b --dangerously-skip-permissions --add-dir /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/operational-inbox --add-dir /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.inbox --ad
+--- pane (last lines)
+bash-3.2$ export FM_TASK_ID=fm-lab-scott-task
+bash-3.2$ . '/tmp/fm-fm-lab-scott-task+ea75c6834d81ae9e260f283e2b58f05a7e940bb11bb3f0fa2e7abb58b7265bb5/launch.s1794968059.68557.28667.sh'
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Adding a new directory:
+ /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/operational-inbox
+ This session hasn't worked here before. Is this a directory you created or one you trust?
+ Claude Code'll be able to read, edit, and execute files here. Its skills, commands, and agents load and can run commands, and so can the git settings of its repository. Your answer holds for this
+ session. Starting Claude Code in this directory and trusting it there lasts, and covers its whole repository or everything below it.
+ Security guide
+ ❯ No, exit
+   Yes, add it
+ Enter to confirm · Esc to cancel
+--- profile file
+-rw-r--r--@ 1 charlesabrooker  staff  18838 Nov 17 20:14 /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.write-confinement.sb
+48:(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads"))
+49:(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads"))
+74:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task"))
+75:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task.lock"))
+76:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads/fm/fm-lab-scott-task"))
+77:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads/fm/fm-lab-scott-task.lock"))
+78:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-v2"))
+79:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-v2.lock"))
+80:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads/fm/fm-lab-scott-task-v2"))
+81:(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads/fm/fm-lab-scott-task-v2.lock"))
+82:(allow file-write* (regex #"^/Users/charlesabrooker/tmp/fm\-lab\.45nNXS/fx/project/\.git/refs/heads/archive/fm\-lab\-scott\-task-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+83:(allow file-write* (regex #"^/Users/charlesabrooker/tmp/fm\-lab\.45nNXS/fx/project/\.git/logs/refs/heads/archive/fm\-lab\-scott\-task-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+94:(allow file-write-create (require-all (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/archive") (vnode-type DIRECTORY)))
+95:(allow file-write-create (require-all (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads/archive") (vnode-type DIRECTORY)))
+140:(deny file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads"))
+142:(deny file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads"))
+--- journal
+v1
+task=fm-lab-scott-task
+phase=complete
+ts=2026-11-18T02:15:18Z
+backend=tmux
+endpoint=fmlab:fm-fm-lab-scott-task
+worktree=/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/slots/22/project
+kind=ship
+from_harness=claude
+from_model=claude-sonnet-5-5[1m]
+from_effort=high
+to_harness=claude
+to_model=claude-sonnet-5-5[1m]
+to_effort=high
+worktree_head=8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+worktree_dirty=no
+note_file=/Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.control-relaunch.note
+exit_result=stopped
+--- record successor lines
+branch=fm/fm-lab-scott-task
+successor_branch=fm/fm-lab-scott-task-v2
+successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+--- launch guard events
+{"guard":"successor-branch-admission","decision":"deny","rule":"one-successor","route":null,"successor":"fm/fm-lab-scott-task-v3"}
+{"guard":"successor-branch-admission","decision":"deny","rule":"relaunch","route":null,"successor":"fm/fm-lab-scott-task-foo"}
+{"guard":"spawn-write-confinement","decision":"allow","rule":"spawn-write-confinement","route":null,"successor":null}
+{"guard":"successor-branch-admission","decision":"allow","rule":"launch","route":"proved-tip","successor":"fm/fm-lab-scott-task-v2"}

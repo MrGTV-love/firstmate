@@ -1,0 +1,6 @@
+base generator: df896569 bin/fm-write-confinement.py ; head generator: 7b15aa0f bin/fm-write-confinement.py
+built base
+built head
+dfce71e7c0ddfe29a48743d0bb07b3a784aa0d09a7a49102d27c05d9e5b48392  kernel/base-nosucc.sb
+dfce71e7c0ddfe29a48743d0bb07b3a784aa0d09a7a49102d27c05d9e5b48392  kernel/head-nosucc.sb
+CHECK no-successor profile: base and head BYTE-IDENTICAL

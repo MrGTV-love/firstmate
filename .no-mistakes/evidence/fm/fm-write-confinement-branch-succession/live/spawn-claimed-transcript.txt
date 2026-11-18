@@ -1,0 +1,33 @@
+$ fm-spawn.sh fm-lab-scott-task-v2 /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project --mode no-mistakes --yolo off   (its branch fm/fm-lab-scott-task-v2 is task fm-lab-scott-task's recorded successor)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: spawn refused: task fm-lab-scott-task records refs/heads/fm/fm-lab-scott-task-v2 as its successor branch, so task fm-lab-scott-task-v2 may not take that branch; nothing was changed. Spawn this task under another id or --branch-prefix, or let Main end task fm-lab-scott-task's succession first
+[exit 1]
+CHECK state folder CHANGED
+total 184
+drwxr-xr-x@ 21 charlesabrooker  staff    672 Nov 17 20:16 .
+drwx------@ 12 charlesabrooker  staff    384 Nov 17 20:16 ..
+-rw-------@  1 charlesabrooker  staff     16 Nov 17 19:56 .fm-lab-tmux-dir
+-rw-r--r--@  1 charlesabrooker  staff     13 Nov 17 20:13 .guard-watcher-stale-banner
+-rw-r--r--@  1 charlesabrooker  staff      6 Nov 17 19:56 .lock
+-rw-------@  1 charlesabrooker  staff     37 Nov 17 19:56 .lock-session
+-rw-------@  1 charlesabrooker  staff     23 Nov 17 20:14 fm-lab-scott-task.busy-gen
+-rw-------@  1 charlesabrooker  staff     98 Nov 17 20:16 fm-lab-scott-task.busy-state
+-rw-r--r--@  1 charlesabrooker  staff    518 Nov 17 20:15 fm-lab-scott-task.control-relaunch
+-rw-------@  1 charlesabrooker  staff    797 Nov 17 20:09 fm-lab-scott-task.control-relaunch.brief-prior
+-rw-------@  1 charlesabrooker  staff    761 Nov 17 20:12 fm-lab-scott-task.control-relaunch.meta-prior
+-rw-r--r--@  1 charlesabrooker  staff     56 Nov 17 20:13 fm-lab-scott-task.control-relaunch.note
+dr-x------@ 17 charlesabrooker  staff    544 Nov 17 20:14 fm-lab-scott-task.git-hooks
+drwxr-xr-x@  3 charlesabrooker  staff     96 Nov 17 19:56 fm-lab-scott-task.inbox
+-rw-r--r--@  1 charlesabrooker  staff    106 Nov 17 20:14 fm-lab-scott-task.launch-models
+-rw-r--r--@  1 charlesabrooker  staff    785 Nov 17 20:14 fm-lab-scott-task.meta
+-rw-r--r--@  1 charlesabrooker  staff    350 Nov 17 19:56 fm-lab-scott-task.status
+-rw-r--r--@  1 charlesabrooker  staff  18838 Nov 17 20:14 fm-lab-scott-task.write-confinement.sb
+-rw-r--r--@  1 charlesabrooker  staff  13682 Nov 17 20:17 guard-events.jsonl
+-rw-------@  1 charlesabrooker  staff   1368 Nov 17 20:14 home-summary.json
+drwxr-xr-x@  3 charlesabrooker  staff     96 Nov 17 20:14 operational-inbox
+CHECK worktree list unchanged
+CHECK refs unchanged
+lab tmux: no server running on /private/tmp/fml.1mBe0E/tmux-501/default
+note: the coarse ls -la digest changed only by mtimes: guard-events.jsonl (the deny event, 20:17) and the stopped lab worker's busy-state (20:16, written when the lab tmux server was killed). No fm-lab-scott-task-v2.* record or file exists:
+0

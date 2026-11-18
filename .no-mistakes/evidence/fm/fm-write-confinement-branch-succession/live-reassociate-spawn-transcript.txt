@@ -1,0 +1,37 @@
+lock acquired: harness pid 90752
+######## record successor fm/fm-lab-reassoc-task-v2 for fm-lab-reassoc-task
+successor-recorded fm-lab-reassoc-task branch=fm/fm-lab-reassoc-task successor_branch=fm/fm-lab-reassoc-task-v2
+
+######## 1. reassociate fm-lab-reassoc-task onto a copy on a branch other than its recorded successor -> refuse
+error: task fm-lab-reassoc-task records successor branch fm/fm-lab-reassoc-task-v2, and replacement copy /Users/charlesabrooker/tmp/fm-scott-reassoc.2wkMlq/copyA is on 'fm/fm-lab-reassoc-task-other'; while a successor is recorded a ship may be reassociated only onto a copy on that successor branch, which drops the successor record; nothing was changed
+[exit=1]
+record of fm-lab-reassoc-task unchanged
+
+######## 2. reassociate other task fm-lab-other-task onto a copy on fm-lab-reassoc-task's claimed successor -> refuse
+error: replacement copy /Users/charlesabrooker/tmp/fm-scott-reassoc.2wkMlq/copyB is on refs/heads/fm/fm-lab-reassoc-task-v2, which task fm-lab-reassoc-task records as its successor branch, so task fm-lab-other-task may not take it; nothing was changed
+[exit=1]
+record of fm-lab-other-task unchanged
+
+######## 3. fresh spawn of a ship whose branch is fm-lab-reassoc-task's claimed successor -> refuse before creating anything
+error: spawn refused: task fm-lab-reassoc-task records refs/heads/fm/fm-lab-reassoc-task-v2 as its successor branch, so task fm-lab-reassoc-task-v2 may not take that branch; nothing was changed. Spawn this task under another id or --branch-prefix, or let Main end task fm-lab-reassoc-task's succession first
+[exit=1]
+no new state files
+
+######## 4. reassociate fm-lab-reassoc-task onto its successor copy -> moves and drops successor lines
+reassociated fm-lab-reassoc-task worktree=/Users/charlesabrooker/tmp/fm-scott-reassoc.2wkMlq/copyB branch=fm/fm-lab-reassoc-task-v2 dropped_successor_branch=fm/fm-lab-reassoc-task-v2 prior=/Users/charlesabrooker/tmp/fm-scott-reassoc.2wkMlq/fx/slots/22/project slot=none
+[exit=0]
+-- record after:
+worktree=/Users/charlesabrooker/tmp/fm-scott-reassoc.2wkMlq/copyB
+branch=fm/fm-lab-reassoc-task-v2
+prior_worktree=/Users/charlesabrooker/tmp/fm-scott-reassoc.2wkMlq/fx/slots/22/project
+-- brief Ship branch lines:
+Ship branch: fm/fm-lab-reassoc-task-v2
+
+######## guard events
+{"decision":"allow","rule":"record","route":"archive-tip","task":"fm-lab-reassoc-task","successor":"fm/fm-lab-reassoc-task-v2"}
+{"decision":"deny","rule":"reassociate","route":null,"task":"fm-lab-other-task","successor":"fm/fm-lab-reassoc-task-v2"}
+{"decision":"deny","rule":"spawn","route":null,"task":"fm-lab-reassoc-task-v2","successor":"fm/fm-lab-reassoc-task-v2"}
+
+== teardown
+ls: /Users/charlesabrooker/tmp/fm-lab.3A9Cl2: No such file or directory
+ls: /Users/charlesabrooker/tmp/fm-scott-reassoc.2wkMlq: No such file or directory

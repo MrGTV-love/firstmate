@@ -1,0 +1,5 @@
+$ fm-control fm-lab-scott-task successor --branch fm/fm-lab-scott-task-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x   (journal phase=failed:stopping present)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.45nNXS
+error: task fm-lab-scott-task has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.45nNXS/state/fm-lab-scott-task.control-relaunch; reconcile it before recording a successor branch
+[exit 1]
+CHECK record and brief byte-identical

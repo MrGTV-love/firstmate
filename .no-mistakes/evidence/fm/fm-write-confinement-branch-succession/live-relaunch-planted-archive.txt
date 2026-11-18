@@ -1,0 +1,38 @@
+TMUX_TMPDIR=/tmp/fml.Urg0Kd
+lock: held by live harness pid 90752
+== plant archive/fm-lab-succ-task-pipeline-a2e45ca0 at root a2e45ca0cf7881cf24a599790e82a935d1a627b9; hand-edit successor_proved_tip=<root>
+branch=fm/fm-lab-succ-task
+successor_branch=fm/fm-lab-succ-task-v2
+successor_proved_tip=a2e45ca0cf7881cf24a599790e82a935d1a627b9
+
+######## (a) fm-control relaunch with the hand-edited record
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tka0bb
+error: task fm-lab-succ-task records successor branch 'fm/fm-lab-succ-task-v2', which is no longer proved to be this task's: the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 recorded as proved at the successor's admission is not a commit of task fm-lab-succ-task's own: it is neither the tip of one of its archive/fm-lab-succ-task-(submitted|pipeline)-<8 hex> branches nor a commit of the recorded branch 'fm/fm-lab-succ-task', in either case one the project's default or base branch does not contain; refused before stopping the running agent; repair: preserve task fm-lab-succ-task's worktree and record, then make the successor branch contain its recorded successor_proved_tip= again, or remove its successor_branch= and successor_proved_tip= lines from the record, and run fm-control fm-lab-succ-task relaunch again
+[exit=1]
+
+######## (b) fm-spawn --relaunch directly (the launch-time check)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tka0bb
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/tmp/fm-lab.tka0bb/data/fm-lab-succ-task/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for fm-lab-succ-task: unavailable - no TypeSafe or OpenRouter key
+error: task fm-lab-succ-task records successor branch 'fm/fm-lab-succ-task-v2', which is no longer proved to be this task's: the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 recorded as proved at the successor's admission is not a commit of task fm-lab-succ-task's own: it is neither the tip of one of its archive/fm-lab-succ-task-(submitted|pipeline)-<8 hex> branches nor a commit of the recorded branch 'fm/fm-lab-succ-task', in either case one the project's default or base branch does not contain
+repair: preserve this task's worktree and record; make the successor branch contain its recorded successor_proved_tip= again, or remove its successor_branch= and successor_proved_tip= lines from the task record, then run bash bin/fm-control.sh fm-lab-succ-task relaunch --note <why>
+[exit=1]
+
+== pane unchanged: before='92847 bash' after='92847 bash'
+cmp: /Users/charlesabrooker/tmp/fm-lab.tka0bb/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+
+######## (c) restore the record's real proved tip: relaunch re-admits (route=proved-tip)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tka0bb
+
+== guard events
+{"decision":"allow","rule":"record","route":"archive-tip","successor":"fm/fm-lab-succ-task-v2"}
+{"decision":"allow","rule":"launch","route":"proved-tip","successor":"fm/fm-lab-succ-task-v2"}
+{"decision":"deny","rule":"relaunch","route":null,"successor":"fm/fm-lab-succ-task-v2"}
+{"decision":"deny","rule":"launch","route":null,"successor":"fm/fm-lab-succ-task-v2"}
+
+######## (c) rerun: restored proved tip, planted root archive still present
+successor-already-recorded fm-lab-succ-task branch=fm/fm-lab-succ-task successor_branch=fm/fm-lab-succ-task-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.tka0bb
+action: task=fm-lab-succ-task prior_branch=fm/fm-lab-succ-task successor_branch=fm/fm-lab-succ-task-v2; none: task fm-lab-succ-task already records successor_branch=fm/fm-lab-succ-task-v2; wrote nothing; proof: route=proved-tip: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 still contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved at its admission; no work tree, ref, index, process, run record or profile file was touched
+route: route=proved-tip successor=fm/fm-lab-succ-task-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6

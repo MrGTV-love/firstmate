@@ -1,0 +1,10 @@
+lock acquired: harness pid 90752
+round 1: A exit=0: successor-recorded fm-lab-conc-task branch=fm/fm-lab-conc-task successor_branch=fm/fm-lab-
+round 1: B exit=0: successor-already-recorded fm-lab-conc-task branch=fm/fm-lab-conc-task successor_branch=fm
+round 1: successor lines in record=1 proved_tip lines=1 brief sections=1 leftover temp/lock files=0
+round 2: A exit=0: successor-already-recorded fm-lab-conc-task branch=fm/fm-lab-conc-task successor_branch=fm
+round 2: B exit=0: successor-recorded fm-lab-conc-task branch=fm/fm-lab-conc-task successor_branch=fm/fm-lab-
+round 2: successor lines in record=1 proved_tip lines=1 brief sections=1 leftover temp/lock files=0
+round 3: A exit=0: successor-already-recorded fm-lab-conc-task branch=fm/fm-lab-conc-task successor_branch=fm
+round 3: B exit=0: successor-recorded fm-lab-conc-task branch=fm/fm-lab-conc-task successor_branch=fm/fm-lab-
+round 3: successor lines in record=1 proved_tip lines=1 brief sections=1 leftover temp/lock files=0

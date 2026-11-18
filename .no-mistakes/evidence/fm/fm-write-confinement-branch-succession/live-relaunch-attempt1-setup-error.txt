@@ -1,0 +1,60 @@
+== lab home: /Users/charlesabrooker/tmp/fm-lab.LAv14v  TMUX_TMPDIR=/tmp/fml.qM0wf9
+== tmux (private) sessions:
+fmlab: 1 windows (created Tue Nov 17 21:09:44 2026)
+lock acquired: harness pid 90752
+lock: held by live harness pid 90752
+
+######## record the successor
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LAv14v
+successor-recorded fm-lab-succ-task branch=fm/fm-lab-succ-task successor_branch=fm/fm-lab-succ-task-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.LAv14v
+action: task=fm-lab-succ-task prior_branch=fm/fm-lab-succ-task successor_branch=fm/fm-lab-succ-task-v2; recorded; wrote /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.meta and /Users/charlesabrooker/tmp/fm-lab.LAv14v/data/fm-lab-succ-task/brief.md; proof: route=archive-tip archive=archive/fm-lab-succ-task-pipeline-6db21b5e: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 of the task's own archive branch archive/fm-lab-succ-task-pipeline-6db21b5e; no work tree, ref, index, process, run record or profile file was touched
+route: route=archive-tip archive=archive/fm-lab-succ-task-pipeline-6db21b5e successor=fm/fm-lab-succ-task-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.LAv14v bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-lab-succ-task relaunch --note apply\ recorded\ successor\ branch\ fm/fm-lab-succ-task-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-lab-succ-task and successor fm/fm-lab-succ-task-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit=0]
+
+######## refs + copy before relaunch
+
+######## run the receipt's relaunch command
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LAv14v
+error: task fm-lab-succ-task's endpoint fmlab:fm-fm-lab-succ-task reads 'missing', but the processes holding the recorded worktree could not be read; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+error: relaunch of fm-lab-succ-task failed while stopping the old agent and its state is 'missing', so it was not proven stopped; its original instructions were restored and the durable record was retained for recovery
+
+real	0m7.435s
+user	0m1.293s
+sys	0m1.747s
+[relaunch exit=1]
+
+######## generated profile: refs/heads lines
+ls: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+grep: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+
+######## worker process under sandbox-exec
+fmlab:zsh pid=29349 cmd=sleep
+29349 sleep 3600
+
+######## kill the private tmux server (stops the worker)
+
+######## refs/copy/gate after relaunch
+project refs unchanged
+gate refs unchanged
+(copy status diff above; worker wiring files expected)
+
+######## kernel: apply the GENERATED profile to git in the copy
+update-ref refs/heads/fm/fm-lab-succ-task-v2 -> rc=65 sandbox-exec: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+update-ref refs/heads/fm/fm-lab-succ-task-v3 -> rc=65 sandbox-exec: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+update-ref refs/heads/fm/fm-lab-succ-task-v2x -> rc=65 sandbox-exec: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+update-ref refs/heads/x-fm/fm-lab-succ-task-v2 -> rc=65 sandbox-exec: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+update-ref refs/heads/fm/other-task -> rc=65 sandbox-exec: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+update-ref refs/heads/fm/fm-lab-succ-task -> rc=65 sandbox-exec: /Users/charlesabrooker/tmp/fm-lab.LAv14v/state/fm-lab-succ-task.write-confinement.sb: No such file or directory
+refs/heads/archive/fm-lab-succ-task-pipeline-6db21b5e 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/archive/fm-lab-succ-task-submitted-8435a6f2 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/fm/fm-lab-succ-task 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/fm/fm-lab-succ-task-v2 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/main a2e45ca0cf7881cf24a599790e82a935d1a627b9
+
+######## guard events
+{"decision":"allow","rule":"record","route":"archive-tip","successor":"fm/fm-lab-succ-task-v2"}
+LAB=/Users/charlesabrooker/tmp/fm-lab.LAv14v FIX=/Users/charlesabrooker/tmp/fm-scott-relaunch.reiE2X

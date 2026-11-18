@@ -1,0 +1,36 @@
+recorded successor: fm/fm-lab-scott-task-v2
+built old.sb (no successor)
+built new.sb (--successor-branch fm/fm-lab-scott-task-v2)
+--- diff old.sb new.sb (every changed line)
+80a81,84
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-v2"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-v2.lock"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads/fm/fm-lab-scott-task-v2"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/logs/refs/heads/fm/fm-lab-scott-task-v2.lock"))
+--- generator refuses an out-of-family or wildcard successor
+error: cannot prepare worker write confinement: successor branch 'develop' is outside the task's own name family ('fm/fm-lab-scott-task', then '-', then letters, digits, '.', '_' or '-')
+[exit 1]
+error: cannot prepare worker write confinement: successor branch 'fm/fm-lab-scott-task-*' cannot be granted as one exact literal ref
+[exit 1]
+--- kernel runs (cwd = the task copy)
+new  move successor (update-ref)                      exit=0   refs 48205c723617->7fdaaaa3670d | 
+new  git branch <successor> <P> (create)              exit=0   refs 497f976fc362->48205c723617 | 
+new  delete successor                                 exit=0   refs 48205c723617->497f976fc362 | Deleted branch fm/fm-lab-scott-task-v2 (was 6db21b5).
+old  move successor (update-ref)                      exit=128 refs 48205c723617->48205c723617 | fatal: update_ref failed for ref 'refs/heads/fm/fm-lab-scott-task-v2': cannot lock ref 'refs/heads/fm/fm-lab-scott-task-v2': Unable to create '/Users/charlesabrooker/tmp/
+old  git branch <successor> <P> (create)              exit=128 refs 497f976fc362->497f976fc362 | fatal: cannot lock ref 'refs/heads/fm/fm-lab-scott-task-v2': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-v2
+new  own branch move (update-ref)                     exit=0   refs 48205c723617->e132b05038bc | 
+new  create fm/unrelated                              exit=128 refs 48205c723617->48205c723617 | fatal: cannot lock ref 'refs/heads/fm/unrelated': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/unrelated.lock': Operation not 
+new  create successor-as-prefix fm/fm-lab-scott-task-v2-x exit=128 refs 48205c723617->48205c723617 | fatal: cannot lock ref 'refs/heads/fm/fm-lab-scott-task-v2-x': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-
+new  create successor-as-suffix fm/pre-fm/fm-lab-scott-task-v2 exit=128 refs 48205c723617->48205c723617 | fatal: cannot lock ref 'refs/heads/fm/pre-fm/fm-lab-scott-task-v2': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/
+new  mkdir refs/heads/fm/pre-fm (same dir)            exit=1   refs 48205c723617->48205c723617 | mkdir: /Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/pre-fm: Operation not permitted
+new  create old-as-prefix fm/fm-lab-scott-task-x      exit=128 refs 48205c723617->48205c723617 | fatal: cannot lock ref 'refs/heads/fm/fm-lab-scott-task-x': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-x.l
+new  move another task's branch fm/other-task         exit=128 refs 48205c723617->48205c723617 | fatal: update_ref failed for ref 'refs/heads/fm/other-task': cannot lock ref 'refs/heads/fm/other-task': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/pro
+new  delete another task's branch fm/other-task       exit=1   refs 48205c723617->48205c723617 | error: could not delete reference refs/heads/fm/other-task: cannot lock ref 'refs/heads/fm/other-task': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/proj
+new  create planted-family fm/fm-lab-scott-task-foo2  exit=128 refs 48205c723617->48205c723617 | fatal: cannot lock ref 'refs/heads/fm/fm-lab-scott-task-foo2': Unable to create '/Users/charlesabrooker/tmp/fm-lab.45nNXS/fx/project/.git/refs/heads/fm/fm-lab-scott-task-
+--- unconfined controls (prove the refused commands are valid on their own)
+unconfined create fm/unrelated: ok
+unconfined create fm/fm-lab-scott-task-v2-x: ok
+unconfined create fm/pre-fm/fm-lab-scott-task-v2: ok
+unconfined create fm/fm-lab-scott-task-x: ok
+unconfined create fm/fm-lab-scott-task-foo2: ok
+fm/other-task now: 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7 (S=8435a6f28f95b9cc3db51ec5b63009556fb4a4b7)

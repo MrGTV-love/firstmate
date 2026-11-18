@@ -1,0 +1,174 @@
+== lab home: /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+== fixture: /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI
+== S=8435a6f28f95b9cc3db51ec5b63009556fb4a4b7 P=6db21b5eb716310ad6356746ee9786e40eb9b4d6 ROOT=a2e45ca0cf7881cf24a599790e82a935d1a627b9
+
+== take the lab home lock as this real Claude session
+lock acquired: harness pid 90752
+[exit=0]
+lock: held by live harness pid 90752
+
+== record before
+branch=fm/fm-slack-second-person-scott
+Ship branch: fm/fm-slack-second-person-scott
+
+######## A. worker call refused
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note worker try
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: workers cannot record a successor branch
+[exit=1]
+
+######## B. first admission without --tip refused
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --note Scott v2 custody
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'fm/fm-slack-second-person-scott-v2' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/fm-slack-second-person-scott-(submitted|pipeline)-<8 hex> branches) fails because no --tip was given; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0l2FKm bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/project rev-parse refs/heads/fm/fm-slack-second-person-scott), a ref the worker can move, so that route proves only that you observed that tip
+[exit=1]
+
+######## C. --tip that is the shared base (root) refused
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 --note Scott v2 custody
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'fm/fm-slack-second-person-scott-v2' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/fm-slack-second-person-scott-(submitted|pipeline)-<8 hex> branches) fails because no archive/fm-slack-second-person-scott-(submitted|pipeline)-<8 hex> branch of the task has the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 outside the project's default and base branches; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0l2FKm bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/project rev-parse refs/heads/fm/fm-slack-second-person-scott), a ref the worker can move, so that route proves only that you observed that tip
+[exit=1]
+
+######## D. name refusals
+
+$ fm-control fm-slack-second-person-scott successor --branch develop --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note n
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'develop' is not admissible: it is outside the task's own name family: the recorded branch name 'fm/fm-slack-second-person-scott', then '-', then one or more of letters, digits, '.', '_' and '-'; that bound keeps a branch of another lineage such as develop or release/* out of the task's write profile; nothing was changed
+[exit=1]
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2* --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note n
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'fm/fm-slack-second-person-scott-v2*' is not admissible: it may use only letters, digits, '.', '_', '-' and '/', starting with a letter or digit (no wildcard, space or other character); nothing was changed
+[exit=1]
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note n
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'fm/fm-slack-second-person-scott' is not admissible: it equals the task's recorded branch; nothing was changed
+[exit=1]
+
+$ fm-control fm-slack-second-person-scott successor --branch archive/fm-slack-second-person-scott-pipeline-6db21b5e --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note n
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'archive/fm-slack-second-person-scott-pipeline-6db21b5e' is not admissible: it is under archive/, which only a task's own recovery branches use; nothing was changed
+[exit=1]
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v3 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note n
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'fm/fm-slack-second-person-scott-v3' does not exist in the project's ref store (/Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/project); create it first; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0l2FKm bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v3 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/project rev-parse refs/heads/fm/fm-slack-second-person-scott), a ref the worker can move, so that route proves only that you observed that tip
+[exit=1]
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip 6db21b5eb716 --note n
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: --tip 6db21b5eb716 is not a full 40 or 64 lowercase hex commit in the project's ref store; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0l2FKm bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/project rev-parse refs/heads/fm/fm-slack-second-person-scott), a ref the worker can move, so that route proves only that you observed that tip
+[exit=1]
+
+######## E. planted archive at the root commit (worker-writable name) + --tip=root refused
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 --note planted
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch 'fm/fm-slack-second-person-scott-v2' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/fm-slack-second-person-scott-(submitted|pipeline)-<8 hex> branches) fails because no archive/fm-slack-second-person-scott-(submitted|pipeline)-<8 hex> branch of the task has the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 outside the project's default and base branches; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0l2FKm bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI/project rev-parse refs/heads/fm/fm-slack-second-person-scott), a ref the worker can move, so that route proves only that you observed that tip
+[exit=1]
+
+== refusals changed record/brief/refs/worktrees? (expect only the planted archive ref line)
+3a4
+> refs/heads/archive/fm-slack-second-person-scott-pipeline-a2e45ca0 a2e45ca0cf7881cf24a599790e82a935d1a627b9
+
+######## F. legitimate first admission: archive-tip route with --tip = pipeline head P
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note Scott v2 custody: the run owns fm/fm-slack-second-person-scott-v2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+successor-recorded fm-slack-second-person-scott branch=fm/fm-slack-second-person-scott successor_branch=fm/fm-slack-second-person-scott-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+action: task=fm-slack-second-person-scott prior_branch=fm/fm-slack-second-person-scott successor_branch=fm/fm-slack-second-person-scott-v2; recorded; wrote /Users/charlesabrooker/tmp/fm-lab.0l2FKm/state/fm-slack-second-person-scott.meta and /Users/charlesabrooker/tmp/fm-lab.0l2FKm/data/fm-slack-second-person-scott/brief.md; proof: route=archive-tip archive=archive/fm-slack-second-person-scott-pipeline-6db21b5e: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 of the task's own archive branch archive/fm-slack-second-person-scott-pipeline-6db21b5e; no work tree, ref, index, process, run record or profile file was touched
+route: route=archive-tip archive=archive/fm-slack-second-person-scott-pipeline-6db21b5e successor=fm/fm-slack-second-person-scott-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0l2FKm bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-slack-second-person-scott relaunch --note apply\ recorded\ successor\ branch\ fm/fm-slack-second-person-scott-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-slack-second-person-scott and successor fm/fm-slack-second-person-scott-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit=0]
+
+== record after
+9:branch=fm/fm-slack-second-person-scott
+10:successor_branch=fm/fm-slack-second-person-scott-v2
+11:successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+== brief after
+2:Ship branch: fm/fm-slack-second-person-scott
+
+## Successor branch (2026-11-18T03:05:56Z)
+
+This task now records a successor branch in the same copy.
+Prior branch: fm/fm-slack-second-person-scott (still recorded; the Ship branch line above is unchanged).
+Successor branch: fm/fm-slack-second-person-scott-v2
+The write profile of this task's next launch allows writes to exactly its prior branch, the successor branch (each with its lock and reflog) and its archive recovery branches, and nothing more.
+
+Scott v2 custody: the run owns fm/fm-slack-second-person-scott-v2
+
+== diff of refs/worktrees/record hashes (expect only record + brief hash lines)
+1,2c1,2
+< 1ad9fcf2817a492de639faf1130ee336dd8906a9a4ca42c014893edf5abbac41  /Users/charlesabrooker/tmp/fm-lab.0l2FKm/state/fm-slack-second-person-scott.meta
+< 1e9138db8d68fdc69b255477533fd8f16873149d331413541c8defa9b41eeb3a  /Users/charlesabrooker/tmp/fm-lab.0l2FKm/data/fm-slack-second-person-scott/brief.md
+---
+> 3f63f687fae680a3970be40b1c557fa89d902c76e0ec8ee5db799d4d193b15d8  /Users/charlesabrooker/tmp/fm-lab.0l2FKm/state/fm-slack-second-person-scott.meta
+> cf17ebc2f09a8d2f61868fa1dc5b42225163a16d2af42e90a4905755edcf0b5f  /Users/charlesabrooker/tmp/fm-lab.0l2FKm/data/fm-slack-second-person-scott/brief.md
+
+######## G. repeat call is a no-op (no --tip needed)
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --note again
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+successor-already-recorded fm-slack-second-person-scott branch=fm/fm-slack-second-person-scott successor_branch=fm/fm-slack-second-person-scott-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+action: task=fm-slack-second-person-scott prior_branch=fm/fm-slack-second-person-scott successor_branch=fm/fm-slack-second-person-scott-v2; none: task fm-slack-second-person-scott already records successor_branch=fm/fm-slack-second-person-scott-v2; wrote nothing; proof: route=proved-tip: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 still contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved at its admission; no work tree, ref, index, process, run record or profile file was touched
+route: route=proved-tip successor=fm/fm-slack-second-person-scott-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: none needed: re-admitted from the record's successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0l2FKm bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/bin/fm-control.sh fm-slack-second-person-scott relaunch --note apply\ recorded\ successor\ branch\ fm/fm-slack-second-person-scott-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-slack-second-person-scott and successor fm/fm-slack-second-person-scott-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit=0]
+record+brief byte-identical after repeat
+
+######## H. a second, different successor refused
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v3 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note n
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: task fm-slack-second-person-scott already records successor branch fm/fm-slack-second-person-scott-v2; one successor per task, so nothing was changed
+[exit=1]
+record byte-identical after H
+
+######## I. hand-edited record: successor_proved_tip=<root> refused at re-admission
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --note again
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: task fm-slack-second-person-scott records successor branch 'fm/fm-slack-second-person-scott-v2', which is no longer proved to be this task's: the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 recorded as proved at the successor's admission is not a commit of task fm-slack-second-person-scott's own: it is neither the tip of one of its archive/fm-slack-second-person-scott-(submitted|pipeline)-<8 hex> branches nor a commit of the recorded branch 'fm/fm-slack-second-person-scott', in either case one the project's default or base branch does not contain; its next launch refuses it; nothing was changed
+[exit=1]
+
+######## J. successor reset off its proved tip refused at re-admission
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --note again
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: task fm-slack-second-person-scott records successor branch 'fm/fm-slack-second-person-scott-v2', which is no longer proved to be this task's: successor branch 'fm/fm-slack-second-person-scott-v2' at a2e45ca0cf7881cf24a599790e82a935d1a627b9 no longer contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved at its admission; its next launch refuses it; nothing was changed
+[exit=1]
+
+######## K. non-owner: lock names a dead pid
+
+$ fm-control fm-slack-second-person-scott successor --branch fm/fm-slack-second-person-scott-v2 --note again
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0l2FKm
+error: successor branch recording requires the actual lock-owning main Firstmate
+[exit=1]
+
+######## L. guard events written
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/fm-slack-second-person-scott-v2"}
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/fm-slack-second-person-scott-v2"}
+{"decision":"deny","rule":"name","route":null,"successor":"develop"}
+{"decision":"deny","rule":"name","route":null,"successor":"fm/fm-slack-second-person-scott-v2*"}
+{"decision":"deny","rule":"name","route":null,"successor":"fm/fm-slack-second-person-scott"}
+{"decision":"deny","rule":"name","route":null,"successor":"archive/fm-slack-second-person-scott-pipeline-6db21b5e"}
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/fm-slack-second-person-scott-v3"}
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/fm-slack-second-person-scott-v2"}
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/fm-slack-second-person-scott-v2"}
+{"decision":"allow","rule":"record","route":"archive-tip","successor":"fm/fm-slack-second-person-scott-v2"}
+{"decision":"deny","rule":"one-successor","route":null,"successor":"fm/fm-slack-second-person-scott-v3"}
+{"decision":"deny","rule":"recorded","route":null,"successor":"fm/fm-slack-second-person-scott-v2"}
+{"decision":"deny","rule":"recorded","route":null,"successor":"fm/fm-slack-second-person-scott-v2"}
+
+== teardown
+FIXTURE_KEPT_FOR_PROFILE_STEP=/Users/charlesabrooker/tmp/fm-scott-fixture.S5clGI
