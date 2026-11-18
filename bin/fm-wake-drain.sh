@@ -14,9 +14,12 @@
 # row this actor would consume at or below the cutoff has a note not demonstrably acked;
 # bin/fm-inbox.sh pending owns that record (an absent or unreadable inbox, an unreadable queue
 # and an id with no record all refuse too), and bin/fm-inbox.sh drain --ack <id> clears it.
-# No actor is exempt. A caller that cannot read notes, such as the away supervise daemon, adds
-# --keep-unacked-notes: it retires every other row but leaves each such row queued, and
-# never acks a note, so the reader that opens the whole note acks it and retires the row.
+# No actor is exempt. Only the away supervise daemon (FM_WAKE_ACK_AWAY_DAEMON=1 while state/.afk
+# exists), which cannot read notes, may add --keep-unacked-notes: it retires every other row but
+# leaves each such row queued, and never acks a note, so the reader that opens the whole note acks
+# it and retires the row. Any other actor passing it gets the ordinary refusal naming the ids.
+# The note check runs again under the lock that consumes the rows, after the receipts, so a note
+# published while that lock was released is never consumed unread.
 # The rows checked are the rows consumed: both come from one snapshot of the actor's claim
 # taken under the first queue lock. That snapshot, .wake-ack-rows.<pid>.*, is held across
 # the unlocked receipt window, and its pid keeps every other drain's scratch rotation off it.
@@ -248,7 +251,10 @@ consume_actor_rows_locked() { # <rows-file> <cutoff> <consumed-file>
 # overdue-row refusal. With --keep-unacked-notes the same rows are dropped from
 # <rows-file> instead, so they are neither consumed nor claimed away.
 gate_unacked_inbox_notes_locked() { # <rows-file> <cutoff>
-  local rows=$1 cutoff=$2 pairs ids states want got held_ids held_seqs seq id tmp state
+  local rows=$1 cutoff=$2 pairs ids states want got held_ids held_seqs seq id tmp state keep=false
+  if [ "$KEEP_UNACKED_NOTES" = true ] && [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" = 1 ] && [ -e "$STATE/.afk" ]; then
+    keep=true
+  fi
   [ -s "$FM_WAKE_QUEUE" ] || return 0
   if [ ! -e "$rows" ]; then
     echo "wake drain: the acknowledged row set is missing; acknowledgement refused" >&2
@@ -274,7 +280,7 @@ gate_unacked_inbox_notes_locked() { # <rows-file> <cutoff>
   fi
   held_ids=$(printf '%s\n' "$states" | awk '$1 == "pending" || $1 == "unknown" { print $2 }') || return 1
   [ -n "$held_ids" ] || return 0
-  if [ "$KEEP_UNACKED_NOTES" = true ]; then
+  if [ "$keep" = true ]; then
     held_seqs=
     while IFS=$'\t' read -r seq id; do
       case $'\n'"$held_ids"$'\n' in
@@ -1077,6 +1083,9 @@ if [ -n "$ACK_THROUGH" ]; then
     echo "wake drain: the acknowledged row set vanished while the queue lock was released; acknowledgement refused" >&2
     exit 1
   fi
+  # Decide to consume only now, inside the lock hold that consumes: a note that became
+  # pending while the lock was released (a replayed write, a restored inbox) refuses here.
+  gate_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || exit 1
   DRAIN_TMP=$(mktemp "$STATE/.wake-queue.ack.XXXXXX") || exit 1
   chmod 0600 "$DRAIN_TMP" || exit 1
   if [ "$ACTOR" = branch ]; then

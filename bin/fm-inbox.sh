@@ -424,12 +424,22 @@ publish_from_reservation() {  # <request-id> <source> <body> <extra>
   id=$(tr -d '\r' <"$reserved")
   id=${id%%$'\n'*}
   valid_note_id "$id" || return 1
-  if [ ! -f "$INBOX/$id.note" ] && [ ! -f "$INBOX/handled/$id.note" ]; then
+  # An acknowledged identity is terminal: a replay never publishes it as a new
+  # pending note, so the wake drain's final pending check cannot be undone by one.
+  if [ ! -f "$INBOX/$id.note" ] && [ ! -f "$INBOX/handled/$id.note" ] \
+    && [ ! -f "$INBOX/handled/$id.acked" ]; then
     tmp=$(mktemp "$INBOX/.staging-XXXXXX")
     write_note_file "$tmp" "$id" "$source" "$body" "$extra" "$request_id"
     mv "$tmp" "$INBOX/$id.note"
   fi
   printf '%s\n' "$id"
+}
+
+# The summary of the note a replay names; empty when only an ack record remains.
+replay_summary() {  # <id>
+  local path
+  path=$(note_path "$1") || return 0
+  note_summary_from_body "$(read_note_body "$path")"
 }
 
 queue_note() {
@@ -448,7 +458,7 @@ queue_note() {
     if [ -f "$reserved" ]; then
       id=$(publish_from_reservation "$request_id" "$source" "$body" "$extra") \
         || die "request id $request_id is reserved but unreadable; retry the same request id"
-      summary=$(note_summary_from_body "$(read_note_body "$(note_path "$id")")")
+      summary=$(replay_summary "$id")
       finish_note_result replay "$id" "$request_id" "$json" "$strict" "$summary"
       return $?
     fi
@@ -460,7 +470,7 @@ queue_note() {
       rm -f "$tmp"
       id=$(publish_from_reservation "$request_id" "$source" "$body" "$extra") \
         || die "request id $request_id is reserved but unreadable; retry the same request id"
-      summary=$(note_summary_from_body "$(read_note_body "$(note_path "$id")")")
+      summary=$(replay_summary "$id")
       finish_note_result replay "$id" "$request_id" "$json" "$strict" "$summary"
       return $?
     fi
