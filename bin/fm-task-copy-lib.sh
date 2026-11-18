@@ -689,6 +689,146 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   return 1
 }
 
+# fm_task_copy_pool_state_strict <state-file>: the strict allow-list proof that the WHOLE Treehouse state file is one the
+# installed Treehouse CLI reads as intact, read exactly as written: every number by its own text, every key once. A caller
+# must have this proof before it reads any row of the file as a positive classification (bin/fm-spawn.sh
+# spawn_classify_copy, before a copy is passed over OR claimed); a lenient read that coerces (a number read as text, a
+# string read as a boolean, 1.0 read as 1, the last of two equal keys) is never a proof, because the real CLI calls such a
+# file corrupt and rebuilds it. The row reader fm_task_copy_pool_slot_held stays lenient for its other callers. Returns 0
+# only when ALL of these hold, in EVERY row, not only the row the caller wants:
+#   - the file is a regular, readable, non-symlink file of UTF-8 text with no byte-order mark, holding exactly one JSON
+#     document with no key repeated in any object and no NaN or Infinity;
+#   - the document is an object whose `worktrees` is an array of objects, and whose `version`, when present, is an integer
+#     literal from 0 to 4 (the versions the installed CLI reads; it refuses any other);
+#   - each row has a string `name`, a non-empty string `path` and a `created_at` that is an RFC 3339 time;
+#   - when present: `leased`, `destroying` and `seed_inventory_known` are booleans; `lease_id`, `lease_holder`,
+#     `seed_inventory_digest`, `seed_auth_identity`, `seed_backend` and `base_branch` are strings; `leased_at` is an RFC
+#     3339 time; `owner_pid` is an integer literal within 32 bits and `owner_started_at` one within 64 bits (no fraction and
+#     no exponent: the CLI calls 1.0 and 1e3 corrupt there); `seeded_paths` is an array of strings; a JSON null is not
+#     accepted for any of them (the CLI writes none);
+#   - no key, in a row or at the top, has a non-ASCII letter or spells one of these names in another case (the CLI's decoder
+#     matches names without regard to case).
+# These are the fields and forms the installed Treehouse (v3.1.7-fm.8759019) decodes, found by feeding the real CLI each
+# JSON type and literal form in each field (the table is recorded with the evidence of the task that added this function).
+# Where the CLI is more lenient (a null, a non-ASCII key, a repeated key with equal types, year 0000) the proof refuses.
+# A field that CLI does not decode is ignored, as the CLI ignores it. Sets FM_TASK_COPY_STRICT_REASON on failure. Needs
+# python3.
+FM_TASK_COPY_STRICT_REASON=
+fm_task_copy_pool_state_strict() {  # <state-file>
+  local state=$1 why
+  FM_TASK_COPY_STRICT_REASON=
+  command -v python3 >/dev/null 2>&1 || { FM_TASK_COPY_STRICT_REASON="python3 is not installed"; return 1; }
+  if why=$(python3 -I - "$state" <<'PY'
+import datetime, json, os, re, stat, sys
+
+path = sys.argv[1]
+
+def not_intact(why):
+    print(why)
+    sys.exit(1)
+
+try:
+    if not stat.S_ISREG(os.lstat(path).st_mode):
+        not_intact("is not a regular file (a symlink, a folder or a device)")
+    with open(path, "rb") as fh:
+        raw = fh.read()
+except OSError as err:
+    not_intact("cannot be read (%s)" % err.strerror)
+try:
+    text = raw.decode("utf-8")
+except UnicodeDecodeError:
+    not_intact("is not UTF-8 text")
+if text.startswith("﻿"):
+    not_intact("starts with a byte-order mark")
+
+class Fraction:
+    """A number written with a fraction or an exponent, kept as its text, so it is never an integer."""
+    def __init__(self, text):
+        self.text = text
+
+def once(pairs):
+    seen = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError("the key %r appears twice in one object" % key)
+        seen[key] = value
+    return seen
+
+def no_constant(name):
+    raise ValueError("%s is not a JSON number" % name)
+
+try:
+    doc = json.loads(text, object_pairs_hook=once, parse_float=Fraction, parse_int=int, parse_constant=no_constant)
+except ValueError as err:
+    not_intact("is not one JSON document read exactly (%s)" % err)
+
+TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?(Z|[+-]([0-9]{2}):([0-9]{2}))")
+
+def is_time(v):
+    if type(v) is not str:
+        return False
+    m = TIME.fullmatch(v)
+    if not m:
+        return False
+    try:
+        datetime.datetime(*(int(g) for g in m.groups()[:6]))
+    except ValueError:
+        return False
+    return m.group(8) == "Z" or (int(m.group(9)) <= 23 and int(m.group(10)) <= 59)
+
+def is_str(v):
+    return type(v) is str
+
+def is_bool(v):
+    return type(v) is bool
+
+def int_within(bits):
+    return lambda v: type(v) is int and -(1 << (bits - 1)) <= v < (1 << (bits - 1))
+
+ROW = {
+    "name": is_str, "path": lambda v: is_str(v) and v != "", "created_at": is_time,
+    "leased": is_bool, "destroying": is_bool, "seed_inventory_known": is_bool,
+    "lease_id": is_str, "lease_holder": is_str, "seed_inventory_digest": is_str, "seed_auth_identity": is_str,
+    "seed_backend": is_str, "base_branch": is_str, "leased_at": is_time,
+    "owner_pid": int_within(32), "owner_started_at": int_within(64),
+    "seeded_paths": lambda v: type(v) is list and all(type(x) is str for x in v),
+}
+REQUIRED = ("name", "path", "created_at")
+TOP = ("version", "worktrees")
+
+def keys_exact(obj, known, where):
+    for key in obj:
+        if any(ord(c) > 127 for c in key):
+            not_intact("%s has a key with a non-ASCII letter (%r)" % (where, key))
+        if key.lower() in known and key != key.lower():
+            not_intact("%s has the key %r, which the CLI reads as %r" % (where, key, key.lower()))
+
+if type(doc) is not dict:
+    not_intact("is not a JSON object")
+keys_exact(doc, TOP, "the document")
+if "version" in doc and not (type(doc["version"]) is int and 0 <= doc["version"] <= 4):
+    not_intact("has a version that is not an integer from 0 to 4")
+rows = doc.get("worktrees")
+if type(rows) is not list:
+    not_intact("has no worktrees array")
+for n, row in enumerate(rows):
+    if type(row) is not dict:
+        not_intact("has row %d that is not an object" % n)
+    keys_exact(row, ROW, "row %d" % n)
+    for key in REQUIRED:
+        if key not in row:
+            not_intact("has row %d with no %s" % (n, key))
+    for key, ok in ROW.items():
+        if key in row and not ok(row[key]):
+            not_intact("has row %d whose %s is not of the type or form the CLI reads" % (n, key))
+PY
+  ); then
+    return 0
+  fi
+  FM_TASK_COPY_STRICT_REASON="Treehouse state $state ${why:-cannot be checked}"
+  return 1
+}
+
 # The pool folder treehouse get would allocate from when run in <project>, as
 # treehouse pool-dir reports it: one absolute directory line, read without a
 # slot scan or the state lock. Firstmate never predicts where Treehouse puts a

@@ -978,14 +978,28 @@ fm_test_bash_only_dir() {
   printf '%s\n' "$dir"
 }
 
+# fm_fake_exit0 <fakebin> <tool>...: each tool does nothing and exits 0. A no-op `treehouse` still names a pool folder for
+# `treehouse pool-dir`, as the real one always does: an empty folder inside <fakebin>, under which no copy of a fake world
+# lies. bin/fm-spawn.sh spawn_classify_copy treats a copy that is not a readable pool slot as an ordinary copy only when
+# the named pool folder excludes it, so a fake that named none would refuse every fake-world spawn.
 fm_fake_exit0() {
-  local fakebin=$1 tool
+  local fakebin=$1 tool pool
   shift
   for tool in "$@"; do
-    cat > "$fakebin/$tool" <<'SH'
+    if [ "$tool" = treehouse ]; then
+      mkdir -p "$fakebin/.treehouse-pool"
+      pool=$(CDPATH='' cd -- "$fakebin/.treehouse-pool" && pwd -P) || return 1
+      cat > "$fakebin/$tool" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" != pool-dir ] || printf '%s\\n' '$pool'
+exit 0
+SH
+    else
+      cat > "$fakebin/$tool" <<'SH'
 #!/usr/bin/env bash
 exit 0
 SH
+    fi
     chmod +x "$fakebin/$tool"
   done
 }

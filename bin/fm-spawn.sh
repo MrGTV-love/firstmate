@@ -6448,29 +6448,54 @@ spawn_acquire_pool_slot() {
 }
 # What Treehouse's own pool state, read now and read-only and before anything is written, says about pool copy <path>.
 # Sets SPAWN_COPY_LEASE_STATE to one of
-#   ordinary  the copy is not in this project's pool (outside the pool directory Treehouse names for it): handled as before;
-#   unleased  exactly one row is the copy and it is not leased: a normal candidate;
-#   other     exactly one row is the copy and it is leased by a holder other than this task's own firstmate-skipped:<id>
-#             (an ordinary lease or Treehouse's recovered lease), and SPAWN_OTHER_LEASE_HOLDER holds that holder;
-#   unknown   anything else: a copy in this project's pool whose state is missing, a symlink or unreadable, no jq, an escaped
-#             or relative path, a leased value that is neither true nor false, no row for the copy, a row that is also
-#             another row by name or by physical identity (a differently spelled path or a symlink, whatever the names and
-#             holders, in either order), a conflicting entry, or a lease that is this task's own.
-# Every physical alias and every duplicate name counts (fm_task_copy_pool_slot_held counts them), so one row is never read
-# out of several. No command's message is ever the proof, and treehouse is not asked: its status command can rewrite state.
+#   ordinary  the copy is positively NOT in this project's pool: Treehouse named the pool directory and the copy is not under
+#             it. Handled as before. No other proof is accepted: a lookup that fails is not a proof;
+#   unleased  the whole state file passed the strict proof, exactly one row is the copy and it is not leased: a normal
+#             candidate;
+#   other     the whole state file passed the strict proof, exactly one row is the copy, and it is leased by a holder other
+#             than this task's own firstmate-skipped:<id> (an ordinary lease or Treehouse's recovered lease);
+#             SPAWN_OTHER_LEASE_HOLDER holds that holder. Only this state passes a copy over;
+#   unknown   anything else: a copy that lies in the pool, or that cannot be shown to lie outside it, whose state is missing,
+#             a symlink or unreadable; a state that fails the strict proof in ANY row (fm_task_copy_pool_state_strict: one
+#             JSON document read exactly, every row's field types, nothing coerced); an escaped or relative path; no row for
+#             the copy; a row that is also another row by name or by physical identity (a differently spelled path or a
+#             symlink, whatever the names and holders, in either order); a conflicting entry; or a lease that is this task's
+#             own.
+# This is called for a copy the pool just handed this spawn, so it is a pool copy by construction; a pool-slot test that
+# fails therefore leaves it unknown unless the pool directory resolves and excludes it. The strict proof comes before any
+# row is read, so no lenient read of a row is ever what classifies a copy. Every physical alias and every duplicate name
+# counts (fm_task_copy_pool_slot_held counts them), so one row is never read out of several. No command's message is ever
+# the proof, and treehouse is not asked: its status command can rewrite state. The state is read under the Treehouse
+# project lock this spawn holds, so the strict proof and the row read see one file.
 spawn_classify_copy() { # <path>
   local real pool_dir
   SPAWN_COPY_LEASE_STATE=unknown
   SPAWN_OTHER_LEASE_HOLDER=
+  FM_TASK_COPY_SLOT_STATE=unknown
+  FM_TASK_COPY_SLOT_ROWS=0
+  FM_TASK_COPY_SLOT_REASON="the copy path cannot be resolved"
   real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) && [ -n "$real" ] || return 0
   if ! fm_treehouse_pool_slot "$PROJ_ABS" "$real"; then
-    # Not a readable pool slot. A copy that lies under this project's own pool directory is a pool slot whose state is
-    # missing, a symlink or unparseable: that is unknown, never ordinary. Only a copy outside the pool is handled as before
-    # (and so is any copy when Treehouse cannot name the pool directory, which leaves no pool to be wrong about).
-    if pool_dir=$(fm_task_copy_treehouse_pool_dir "$PROJ_ABS") && pool_dir=$(CDPATH='' cd -- "$pool_dir" 2>/dev/null && pwd -P); then
-      case "$real" in "$pool_dir"/*) FM_TASK_COPY_SLOT_STATE=missing-state; FM_TASK_COPY_SLOT_REASON="lies in this project's pool $pool_dir whose state file cannot be used (missing, a symlink or not a Git-matching pool)"; FM_TASK_COPY_SLOT_ROWS=0; return 0 ;; esac
+    # Not a readable pool slot. That alone proves nothing: a pool copy whose state is missing, a symlink or unparseable looks
+    # the same. It is ordinary ONLY when Treehouse names this project's pool directory and the copy is not under it.
+    if pool_dir=$(fm_task_copy_treehouse_pool_dir "$PROJ_ABS") && pool_dir=$(CDPATH='' cd -- "$pool_dir" 2>/dev/null && pwd -P) && [ -n "$pool_dir" ]; then
+      case "$real" in
+        "$pool_dir"/*)
+          FM_TASK_COPY_SLOT_STATE=missing-state
+          FM_TASK_COPY_SLOT_REASON="lies in this project's pool $pool_dir whose state file cannot be used (missing, a symlink or not a Git-matching pool)"
+          ;;
+        *) SPAWN_COPY_LEASE_STATE=ordinary ;;
+      esac
+    else
+      FM_TASK_COPY_SLOT_STATE=missing-state
+      FM_TASK_COPY_SLOT_REASON="is not a readable pool slot and Treehouse did not name this project's pool directory, so it is not shown to lie outside the pool"
     fi
-    SPAWN_COPY_LEASE_STATE=ordinary
+    return 0
+  fi
+  # The whole state file first, exactly as written; no row of a file that fails it is read as a classification.
+  if ! fm_task_copy_pool_state_strict "${real%/*/*}/treehouse-state.json"; then
+    FM_TASK_COPY_SLOT_STATE=invalid
+    FM_TASK_COPY_SLOT_REASON="cannot be classified: $FM_TASK_COPY_STRICT_REASON"
     return 0
   fi
   # The state is read again now: a scan earlier in this spawn may have cached an older reading.
