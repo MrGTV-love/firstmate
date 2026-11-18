@@ -1880,6 +1880,30 @@ SH
   : > "$dir/fake/barrier-armed"
 }
 
+# Wrap ln and mv: the first call whose DESTINATION (last argument) is the session
+# record is the install step, whichever command performs it. It announces itself
+# on the events FIFO, then waits for the test to release it. The claim, which
+# names the record only as its source, passes through.
+arm_install_barrier() { # <case-dir> <id>
+  local dir=$1 id=$2 command
+  mkfifo "$dir/fake/barrier-events" "$dir/fake/barrier-resume"
+  for command in ln mv; do
+    cat > "$dir/fakebin/$command" <<SH
+#!/usr/bin/env bash
+D=\$FM_FAKE_DIR
+last=\${!#}
+if [ -f "\$D/barrier-armed" ] && [ "\${last##*/}" = "$id.omp-session.json" ]; then
+  rm -f "\$D/barrier-armed"
+  printf 'reached install\n' > "\$D/barrier-events"
+  read -r _ < "\$D/barrier-resume"
+fi
+exec /bin/$command "\$@"
+SH
+    chmod +x "$dir/fakebin/$command"
+  done
+  : > "$dir/fake/barrier-armed"
+}
+
 test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
   local shape=$1 dir id record line rc=0 out reached=0 before adopt_job
   prepare_omp_adoption "personal-anchor-$shape"
@@ -1969,6 +1993,8 @@ BUN_PIDS=()
 bun_tree() { # one scratch installation per run
   [ -z "$BUN_TREE" ] || return 0
   BUN_TREE="$TMP_ROOT/bun-tree"
+  # The one trusted installed identity (bin/fm-omp-identity.py installed_identity) is this scratch tree.
+  export FM_OMP_INSTALLED_ROOT="$BUN_TREE"
   local bin="$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin"
   mkdir -p "$bin" "$BUN_TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src"
   printf '#include <unistd.h>\nint main(void){alarm(900);for(;;)pause();}\n' > "$BUN_TREE/stub.c"
@@ -2255,6 +2281,41 @@ test_omp_bun_adoption_does_not_overwrite_a_late_writer() {
   pass "omp bun adoption: a record published after the last comparison is never overwritten"
 }
 
+test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install() {
+  local dir id record line rc=0 out adopt_job a_record claims
+  prepare_bun_adoption claim-install-writer
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  arm_install_barrier "$dir" "$id"
+  exec 6<> "$dir/fake/barrier-events"
+  (
+    rc=0
+    run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
+    printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
+  ) &
+  adopt_job=$!
+  read -r -t 120 line <&6 || fail "adoption never reached the install step"
+  [ "$line" = 'reached install' ] || fail "adoption never reached the install step: $line"
+  # The record is claimed and the path is absent; a different live writer publishes into that gap.
+  [ ! -e "$record" ] || fail "the record path must be absent between the claim and the install, or the case is vacuous"
+  claims=("$dir"/home/state/.*omp-session.claim.*)
+  [ -f "${claims[0]}" ] || fail "the claimed record must exist between the claim and the install"
+  a_record=$(jq -c '.pid=2000000002 | .current_session_file=.task_session_file' "${claims[0]}")
+  printf '%s\n' "$a_record" > "$dir/home/state/.late-writer.tmp"
+  /bin/mv -f "$dir/home/state/.late-writer.tmp" "$record"
+  printf 'go\n' > "$dir/fake/barrier-resume"
+  read -r -t 120 line <&6 || fail "adoption never finished after the writer published"
+  case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
+  wait "$adopt_job"
+  exec 6>&-
+  out=$(cat "$dir/adopt.out")
+  [ "$rc" -ne 0 ] || fail "adoption overwrote a record published between its claim and its install: $out"
+  assert_contains "$out" 'that record was not overwritten' "the refusal says the writer's record was kept"
+  assert_equals "$a_record" "$(cat "$record")" "the record a writer published between the claim and the install stays byte-identical"
+  assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a refused adoption leaves no staged or claimed record"
+  bun_stop_all
+  pass "omp bun adoption: a record published between the claim and the install is never overwritten"
+}
+
 test_omp_bun_adoption_binds_the_adopted_incarnation() {
   local dir id record out rc pid_a pid_b same=0 try
   for try in 1 2 3 4 5 6 7 8; do
@@ -2330,6 +2391,61 @@ test_omp_bun_adoption_needs_positive_live_session_evidence() {
   pass "omp bun adoption: a registration is not proof of the live session; the process must hold the task session open, at adoption and at the recheck"
 }
 
+# P2(b): the supported relaunch is the lifecycle verb that needs the attribution adoption restores.
+test_omp_bun_relaunch_follows_the_adoption_proof() {
+  local dir id out rc=0
+  prepare_bun_adoption relaunch-admit
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" relaunch --note "resume the restored worker") || rc=$?
+  [ "$rc" -ne 0 ] || fail "relaunch of an unadopted Bun worker must refuse: $out"
+  assert_contains "$out" 'cannot positively attribute its live Herdr agent to this task' "the unadopted Bun worker keeps the attribution refusal"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a refused relaunch stops nothing"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "the installed Bun runtime must adopt: $out"
+  rc=0
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" relaunch --note "resume the restored worker") || rc=$?
+  assert_not_contains "$out" 'cannot positively attribute' "after adoption the relaunch is attributed and goes on"
+  assert_contains "$(cat "$dir/fake/herdr-log")" 'send-' "after adoption the relaunch proceeds to stop the proven agent"
+  bun_stop_all
+  pass "omp bun adoption: the supported relaunch refuses an unadopted Bun worker and proceeds to stop the proven agent once adopted"
+}
+
+# P4(b2) and P4(b3): the shell is back in the foreground and the Bun agent is only its descendant.
+test_omp_bun_descendant_keeps_the_pane_occupied_for_relaunch() {
+  local shape dir id out rc
+  for shape in descendant-live descendant-unreadable agent-free; do
+    prepare_bun_adoption "shell-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    : > "$dir/fake/recovery-shell-foreground"
+    : > "$dir/fake/recovery-registration-missing"
+    case "$shape" in
+      descendant-live)
+        printf '%s' "$BUN_PID" > "$dir/fake/descendant-pid"
+        python3 -I "$ROOT/bin/fm-proc-info.py" exe "$BUN_PID" > "$dir/fake/descendant-comm" ;;
+      descendant-unreadable)
+        # The process table and command line read, but the executable path and argument boundaries do not.
+        bun_stop_all
+        printf 2000000000 > "$dir/fake/descendant-pid"; printf /x/bun > "$dir/fake/descendant-comm"
+        printf 2000000000 > "$dir/fake/holder-pid"; printf /x/bun > "$dir/fake/holder-comm"; printf '/x/bun /x/cli.ts' > "$dir/fake/holder-args" ;;
+      agent-free)
+        bun_stop_all
+        rm -f "$dir/fake/herdr-agent-live" ;;
+    esac
+    rc=0
+    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" relaunch --note "resume the restored worker") || rc=$?
+    case "$shape" in
+      agent-free)
+        assert_not_contains "$out" 'cannot positively attribute' "a genuinely agent-free shell lets the relaunch go on" ;;
+      *)
+        [ "$rc" -ne 0 ] || fail "relaunch over a live Bun descendant of the shell must refuse ($shape): $out"
+        assert_contains "$out" 'cannot positively attribute its live Herdr agent to this task' "a Bun descendant keeps the pane occupied ($shape)"
+        assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a refused relaunch stops nothing ($shape)"
+        assert_equals '' "$(cat "$dir/fake/launched-command" 2>/dev/null)" "no second agent starts on the worktree ($shape)" ;;
+    esac
+    bun_stop_all
+  done
+  pass "omp bun relaunch: a live or unreadable Bun descendant of the shell refuses the relaunch and starts no second agent; an agent-free shell does not"
+}
+
 test_omp_adoption_bun_runtime() {
   if [ "$(uname -s)" != Darwin ] || ! command -v cc >/dev/null 2>&1; then
     printf '# skipped: omp bun adoption needs macOS libproc and a C compiler; nothing was checked here\n'
@@ -2340,8 +2456,11 @@ test_omp_adoption_bun_runtime() {
   test_omp_bun_adoption_never_overwrites_a_record_a_writer_may_own
   test_omp_adoption_native_omp_first_on_path_keeps_a_live_bun_writer
   test_omp_bun_adoption_does_not_overwrite_a_late_writer
+  test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install
   test_omp_bun_adoption_binds_the_adopted_incarnation
   test_omp_bun_adoption_needs_positive_live_session_evidence
+  test_omp_bun_relaunch_follows_the_adoption_proof
+  test_omp_bun_descendant_keeps_the_pane_occupied_for_relaunch
 }
 
 test_omp_adoption() {

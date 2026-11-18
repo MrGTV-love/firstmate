@@ -22,13 +22,19 @@
 # view is the same JSON shape the adapter parses (docs/herdr-backend.md).
 # Refresh docs/verification/runtime-backends.md "omp identity" with this command:
 #   bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh
-# The identity rule reads the live process and needs no launcher, but this guard
-# must start a real Bun-shaped omp. It starts the first omp on PATH; when that is a
-# native binary it starts the file named by FM_OMP_IDENTITY_LIVE_LAUNCHER, which only
-# chooses what to start and never decides identity, or a text launcher from later on
-# PATH, and it names any Bun launcher that is not first. With no text launcher it
-# ends with a named skip line. An absent omp is reported explicitly (fm_live_gate),
-# and a run that checked nothing fails instead of passing.
+# The identity rule compares the live process with the one trusted installed identity
+# held in bin/fm-omp-identity.py (installed_identity(), FM_OMP_INSTALLED_ROOT for tests)
+# and needs no launcher, but this guard must start a real Bun-shaped omp. It starts the
+# first omp on PATH; when that is a native binary it starts the file named by
+# FM_OMP_IDENTITY_LIVE_LAUNCHER, which only chooses what to start and never decides
+# identity, or a text launcher from later on PATH, and it names any Bun launcher that is
+# not first. With no text launcher it FAILS, naming FM_OMP_IDENTITY_LIVE_LAUNCHER (and
+# FM_OMP_IDENTITY_LIVE=0 for an explicit opt-out), because a guard that could pass
+# having checked nothing proves nothing. It also fails when FM_OMP_INSTALLED_ROOT is set,
+# because an override makes it compare a stand-in with itself and it could never see
+# drift in the real install; tests/fm-omp-identity.test.sh alone sets
+# FM_OMP_IDENTITY_LIVE_STANDIN=1 to run this script on a stand-in tree. An absent omp is
+# reported explicitly (fm_live_gate), and a run that checked nothing fails.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -57,6 +63,9 @@ if [ "$(uname -s)" != Darwin ]; then
   fail "the omp identity rule reads libproc facts and runs on macOS; this host is $(uname -s), so nothing was checked"
 fi
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
+if [ -n "${FM_OMP_INSTALLED_ROOT:-}" ] && [ "${FM_OMP_IDENTITY_LIVE_STANDIN:-}" != 1 ]; then
+  fail "FM_OMP_INSTALLED_ROOT is set; this guard checks the real installed identity and cannot detect drift against an override. Unset it"
+fi
 OMP=$(command -v omp)
 is_text_launcher() { [ -f "$1" ] && [ "$(head -c 2 "$1" 2>/dev/null)" = '#!' ]; }
 START=
@@ -71,8 +80,7 @@ while IFS= read -r CANDIDATE; do
   fi
 done < <(printf '%s\n' "$OMP" "${FM_OMP_IDENTITY_LIVE_LAUNCHER:-}"; type -ap omp)
 if [ -z "$START" ]; then
-  printf 'skip: live: only a native omp is installed; the Bun identity rule was not exercised\n'
-  exit 0
+  fail "no Bun launcher to start: the first omp on PATH is native and no text launcher was found, so the Bun identity rule was not exercised. Name the installed launcher with FM_OMP_IDENTITY_LIVE_LAUNCHER=<path>, or set FM_OMP_IDENTITY_LIVE=0 to opt out of this guard"
 fi
 [ "$START" -ef "$OMP" ] || note "the Bun launcher $START is not first on PATH ($OMP is); this run starts $START"
 # Even `--version` runs under the scratch environment, so no operator agent directory or .env is read.
@@ -125,6 +133,17 @@ json.dump(facts, open(sys.argv[2], "w"))
 PY
 if python3 -I "$IDENT" interactive --facts "$SCRATCH/foreign.json" >/dev/null 2>&1; then
   drift "a foreign runtime package still recognized the live process: the identity check is vacuous"
+fi
+CHECKED=$((CHECKED + 1))
+# The same process against another installed identity must not be recognized, or the identity binding is vacuous.
+python3 -I - "$SCRATCH/facts.json" "$SCRATCH/other-install.json" <<'PY'
+import json, sys
+facts = json.load(open(sys.argv[1]))
+facts["installed"] = {"runtime": facts["installed"]["runtime"] + ".other", "script": facts["installed"]["script"]}
+json.dump(facts, open(sys.argv[2], "w"))
+PY
+if python3 -I "$IDENT" interactive --facts "$SCRATCH/other-install.json" >/dev/null 2>&1; then
+  drift "the live process was recognized against an installed identity it does not match: the identity binding is vacuous"
 fi
 CHECKED=$((CHECKED + 1))
 # A worker-role argument vector of the same runtime is never the interactive agent.

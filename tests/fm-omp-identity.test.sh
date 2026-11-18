@@ -2,6 +2,9 @@
 # Portable regression for the omp identity rule (bin/fm-omp-identity.py): the
 # installed omp can run as its Bun runtime on an entry script, so its process is
 # named bun and only its executable path, script and role identify it.
+# The one trusted installed identity is held in bin/fm-omp-identity.py
+# (installed_identity(); FM_OMP_INSTALLED_ROOT is the test override), and this suite
+# points it at the scratch tree $TREE.
 # Real processes only: a compiled stand-in "bun" under a scratch runtime root, a
 # launcher that execs it as the host's does, and pseudo-terminal or pipe standard
 # input. No harness runs and no model is called. macOS only (libproc facts).
@@ -44,6 +47,7 @@ EOF
   chmod +x "$root/omp"
 }
 TREE="$TMP/tree"; build_tree "$TREE"
+export FM_OMP_INSTALLED_ROOT="$TREE"
 BUN="$TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
 SCRIPT="$TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
 REAL_BUN=$(python3 -I -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$BUN")
@@ -226,11 +230,30 @@ assert_tree() { # <expected-interactive-exit> <expected-writer-exit> <pid> <mess
 test_identity_comes_from_the_process_tree() {
   local t="$TMP/trees" name script_pkg runtime_pkg
   mkdir -p "$t"
-  build_tree "$t/good"
-  tree_launch "$t/good" --no-title
-  assert_tree 0 0 "$SPAWNED" "a process of a complete omp tree is the interactive agent"
   runtime_pkg=runtime/node_modules/@oven/bun-darwin-aarch64
   script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent
+  # the installed tree itself, and a complete omp-shaped tree at another path
+  tree_launch "$TREE" --no-title
+  assert_tree 0 0 "$SPAWNED" "the process of the one installed tree is the interactive agent"
+  build_tree "$t/good"
+  tree_launch "$t/good" --no-title
+  assert_tree 1 0 "$SPAWNED" "a complete omp-shaped tree at another path is refused as the interactive agent but may still own a record"
+  # the same foreign tree is recognized when it is the installed identity: the identity is the only difference
+  FM_OMP_INSTALLED_ROOT="$t/good" assert_tree 0 0 "$SPAWNED" "the same tree is the interactive agent once it is the installed identity"
+  # a Bun on another script of the installed tree, and on another script of a foreign tree
+  spawn tty "$BUN" "$BUN" "$TREE/$script_pkg/src/main.ts" --no-title
+  assert_tree 1 1 "$SPAWNED" "a bun on src/main.ts of the installed tree is another program"
+  spawn tty "$t/good/$runtime_pkg/bin/bun" "$t/good/$runtime_pkg/bin/bun" "$t/good/$script_pkg/src/main.ts" --no-title
+  assert_tree 1 1 "$SPAWNED" "a bun on src/main.ts of a complete foreign tree is another program"
+  # the installed identity cannot be derived: nothing is admitted and a live process may still own a record
+  tree_launch "$TREE" --no-title
+  FM_OMP_INSTALLED_ROOT="$t/no-such-root" assert_tree 2 0 "$SPAWNED" "no installed tree: unresolved, never interactive"
+  FM_OMP_INSTALLED_ROOT=relative/root assert_tree 2 0 "$SPAWNED" "a relative installed root is no identity"
+  build_tree "$t/linked"; build_tree "$t/away"
+  rm "$t/linked/$script_pkg/src/cli.ts"
+  ln -s "$t/away/$script_pkg/src/cli.ts" "$t/linked/$script_pkg/src/cli.ts"
+  tree_launch "$t/linked" --no-title
+  FM_OMP_INSTALLED_ROOT="$t/linked" assert_tree 2 0 "$SPAWNED" "an installed script that links out of its root is no identity"
 
   build_tree "$t/wrong-script-package"
   printf '{"name":"some-other-package"}\n' > "$t/wrong-script-package/$script_pkg/package.json"
@@ -287,6 +310,7 @@ test_captured_facts_replay_without_the_tree() {
   local t="$TMP/replay" rc
   mkdir -p "$t"
   build_tree "$t/tree"
+  export FM_OMP_INSTALLED_ROOT="$t/tree"
   tree_launch "$t/tree" --no-title
   python3 -I "$IDENT" facts "$SPAWNED" > "$t/good.json" || fail "facts must be capturable"
   tree_launch "$t/tree" __omp_worker_daemon_broker
@@ -295,9 +319,12 @@ test_captured_facts_replay_without_the_tree() {
   spawn tty "$t/foreign-runtime" "$t/tree/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun" \
     "$t/tree/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts" --no-title
   python3 -I "$IDENT" facts "$SPAWNED" > "$t/foreign.json" || fail "facts must be capturable"
+  python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f["installed"]["runtime"]+=".other";json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/other-install.json"
+  python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f.pop("installed");json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/no-installed.json"
   python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f.pop("exe");json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/no-exe.json"
   python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f.pop("evidence");json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/no-evidence.json"
   rm -rf "$t/tree"
+  export FM_OMP_INSTALLED_ROOT="$TREE"
   replay() { # <file> <interactive-exit> <writer-exit> <message>
     rc=0; python3 -I "$IDENT" interactive --facts "$t/$1" >/dev/null 2>&1 || rc=$?
     [ "$rc" -eq "$2" ] || fail "replay: $4: expected interactive exit $2, got $rc"
@@ -310,6 +337,8 @@ test_captured_facts_replay_without_the_tree() {
   replay no-exe.json 2 0 "a capture without the executable path is unresolved"
   replay no-evidence.json 2 0 "a capture without the tree evidence is unresolved"
   replay missing.json 2 0 "a capture that cannot be read is unresolved"
+  replay other-install.json 1 0 "a capture whose recorded installed identity is another runtime is refused, and may still own a record"
+  replay no-installed.json 2 0 "a capture without its installed identity is unresolved"
   pass "replay: a capture is judged from its stored evidence alone, with the tree gone"
 }
 
@@ -411,6 +440,7 @@ test_fail_closed_runs_recover_when_the_evidence_returns() {
   local t="$TMP/fail" pid helper foreign rc=0 script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent
   mkdir -p "$t"
   build_tree "$t/tree"
+  export FM_OMP_INSTALLED_ROOT="$t/tree"
   spawn tty /bin/sh /bin/sh "$t/tree/omp" --no-title; pid=$SPAWNED
   spawn tty /bin/sh /bin/sh "$t/tree/omp" __omp_worker_daemon_broker; helper=$SPAWNED
   cp "$BUN" "$t/foreign-runtime"
@@ -427,6 +457,7 @@ test_fail_closed_runs_recover_when_the_evidence_returns() {
   assert_verdict 0 "$pid" "the same process is admitted again once the evidence returns"
   assert_verdict 1 "$helper" "a helper stays refused once the evidence returns"
   assert_verdict 1 "$foreign" "a foreign process stays refused once the evidence returns"
+  export FM_OMP_INSTALLED_ROOT="$TREE"
   pass "fail closed: unreadable evidence admits nothing and the compliant process is admitted again once it returns"
 }
 
@@ -564,11 +595,11 @@ SH
   pass "walk: a live or unreadable Bun descendant keeps the pane occupied; an unrelated Bun job and an empty shell keep today's outcome"
 }
 
-test_live_guard_starts_a_bun_omp_or_ends_with_a_named_skip() {
+test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable() {
   local base out mutant
   base=$(fm_test_base_path_sans "$PATH" omp)
   guard() { # <PATH>
-    env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 PATH="$1" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
+    env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 FM_OMP_IDENTITY_LIVE_STANDIN=1 PATH="$1" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
   }
   out=$(guard "$NATIVE_BIN:$TREE:$base") || fail "a native omp first must not stop the guard from starting the later Bun launcher: $out"
   assert_contains "$out" "$TREE/omp" "the live guard names the Bun launcher that is not first"
@@ -577,23 +608,36 @@ test_live_guard_starts_a_bun_omp_or_ends_with_a_named_skip() {
   assert_contains "$out" "checked " "the guard exercised the Bun rule on the first launcher"
   out=$(FM_OMP_IDENTITY_LIVE_LAUNCHER="$TREE/omp" guard "$NATIVE_BIN:$base") || fail "the named launcher must run the live guard to its end: $out"
   assert_contains "$out" "checked " "the guard exercised the Bun rule on the named launcher"
-  out=$(guard "$NATIVE_BIN:$base") || fail "a native omp alone must skip, not fail: $out"
-  case "$out" in skip:*) ;; *) fail "a native omp alone must end with a skip line, not a pass: $out" ;; esac
+  if out=$(guard "$NATIVE_BIN:$base"); then
+    fail "a native omp alone cannot exercise the Bun rule and must fail, never skip or pass: $out"
+  fi
+  assert_contains "$out" "FM_OMP_IDENTITY_LIVE_LAUNCHER" "the failure names the variable that supplies the Bun launcher"
   assert_not_contains "$out" "checked " "a native omp alone checks nothing and claims nothing"
+  # An installed-root override without the stand-in marker makes the guard compare a stand-in with itself.
+  if out=$(env -u FM_LIVE -u FM_OMP_IDENTITY_LIVE_STANDIN FM_OMP_IDENTITY_LIVE=1 PATH="$TREE:$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+    fail "the live guard must refuse to run under an installed-root override: $out"
+  fi
+  assert_contains "$out" "FM_OMP_INSTALLED_ROOT" "the failure names the override"
+  # The stand-in on a different installed identity must not be recognized, or the binding is vacuous.
+  if out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 FM_OMP_IDENTITY_LIVE_STANDIN=1 FM_OMP_INSTALLED_ROOT="$TMP/no-such-install" PATH="$TREE:$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+    fail "a stand-in that is not the installed identity must fail the live guard: $out"
+  fi
+  assert_contains "$out" "OMP IDENTITY DRIFT" "the guard reports the unrecognized process by name"
   # A guard that cannot fail proves nothing: a rule that rejects the installed shape must fail it.
   mutant="$TMP/mutant-root"
   mkdir -p "$mutant/tests" "$mutant/bin"
   cp "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" "$ROOT/tests/lib.sh" "$mutant/tests/"
   cp "$PROCINFO" "$mutant/bin/"
   sed 's/^SCRIPT_PACKAGE = .*/SCRIPT_PACKAGE = "not-the-omp-package"/' "$ROOT/bin/fm-omp-identity.py" > "$mutant/bin/fm-omp-identity.py"
-  if out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 PATH="$TREE:$NATIVE_BIN:$base" bash "$mutant/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+  if out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 FM_OMP_IDENTITY_LIVE_STANDIN=1 PATH="$TREE:$NATIVE_BIN:$base" bash "$mutant/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
     fail "a rule that rejects the installed shape must fail the live guard: $out"
   fi
   assert_contains "$out" "OMP IDENTITY DRIFT" "the guard reports the drift by name"
-  pass "live guard: it starts a Bun launcher wherever PATH or the named file holds one, fails when the rule rejects it, and skips by name with a native omp alone"
+  pass "live guard: it starts a Bun launcher wherever PATH or the named file holds one, fails when the rule rejects it, refuses an override, and fails naming the launcher variable with a native omp alone"
 }
 
 test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
+  local rc
   # shellcheck source=bin/fm-agent-process-lib.sh
   . "$ROOT/bin/fm-agent-process-lib.sh"
   [ "$(fm_agent_process_classify_name omp)" = agent ] || fail "omp is an agent"
@@ -605,8 +649,11 @@ test_classifier_keeps_its_names_and_the_bun_shape_stays_other() {
   [ "$(fm_agent_process_classify bun "$BUN" "$BUN $SCRIPT __omp_worker_daemon_broker")" = other ] || fail "a worker-role invocation stays other"
   [ "$(fm_agent_process_classify zsh -zsh -zsh)" = shell ] || fail "a login shell stays a shell"
   [ "$(fm_agent_process_classify claude claude 'claude --resume x')" = agent ] || fail "another harness keeps its name"
-  fm_agent_process_bun_may_be_omp zsh zsh 1 && fail "only bun-named processes reach the identity rule"
-  fm_agent_process_bun_may_be_omp ompd ompd 1 && fail "ompd never reaches the identity rule"
+  declare -F fm_agent_process_bun_may_be_omp >/dev/null || fail "fm_agent_process_bun_may_be_omp must exist"
+  rc=0; fm_agent_process_bun_may_be_omp zsh zsh 1 || rc=$?
+  [ "$rc" -eq 1 ] || fail "only bun-named processes reach the identity rule (exit $rc)"
+  rc=0; fm_agent_process_bun_may_be_omp ompd ompd 1 || rc=$?
+  [ "$rc" -eq 1 ] || fail "ompd never reaches the identity rule (exit $rc)"
   pass "classifier: every recognized name keeps its verdict and the installed Bun shape stays other, owned by the identity rule"
 }
 
@@ -624,4 +671,4 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed
 test_verdict_does_not_depend_on_the_omp_on_path
 test_a_helper_failure_is_never_proof_of_no_writer
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free
-test_live_guard_starts_a_bun_omp_or_ends_with_a_named_skip
+test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable

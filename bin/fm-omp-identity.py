@@ -14,20 +14,28 @@ the single owner of that identity rule. bin/fm-launch-proof-lib.sh calls
 `interactive` and `holds`; bin/fm-agent-process-lib.sh calls `writer` for the
 record-owner check and the Herdr descendant walk.
 
-Identity. The installed omp is read from the live process, never from a launcher
-or from PATH, so an `omp update` that replaces a launcher cannot change the verdict
-on a process that is already running. No version is pinned. A process is the
-installed omp's interactive agent only when ALL of these hold: its kernel executable
-path (fm-proc-info.py exe, never an argument word) resolves to a regular executable
-file named bun, in a directory named bin whose parent holds a package.json with a name
-starting @oven/bun-; argv[1] is an absolute path that resolves to a file named cli.ts
-in a directory named src, whose parent holds a regular package.json named
-@oh-my-pi/pi-coding-agent and the regular files src/cli-commands.ts and src/main.ts;
-its role is the interactive agent; and its standard input is a terminal. A readable
-tree that fails a check is positively another program. Anything that cannot be read,
-or an executable or script path that no longer exists, is unresolved, never
-interactive. `facts` stores what it read in the record's `evidence`, and every verdict
-is judged from that record alone, so a capture replays without the tree.
+Identity. One trusted installed identity, held in one place (INSTALLED_RUNTIME and
+INSTALLED_SCRIPT below, resolved by installed_identity(); the test override is the
+single variable FM_OMP_INSTALLED_ROOT, which names a replacement root with the same
+layout). It never consults a launcher or PATH, so an `omp update` that replaces a
+launcher cannot change the verdict on a process that is already running, and no
+version is pinned. A process is the installed omp's interactive agent only when ALL of
+these hold: its kernel executable path (fm-proc-info.py exe, never an argument word)
+resolves to the installed runtime's realpath; argv[1] is an absolute path that resolves
+to the installed script's realpath; those two real paths also pass the structural
+checks, kept as extra proof (a regular executable named bun in a directory named bin
+whose parent holds a package.json named @oven/bun-*; a regular file named cli.ts in a
+directory named src whose parent holds a regular package.json named
+@oh-my-pi/pi-coding-agent and the regular files src/cli-commands.ts and src/main.ts);
+its role is the interactive agent; and its standard input is a terminal. A complete
+omp-shaped tree at any other path is refused for `interactive` but is never "positively
+another program" for `writer`: it may own a session record. A readable tree that fails a
+structural check is positively another program. Anything that cannot be read, or an
+executable or script path that no longer exists, or an installed identity that cannot
+be derived (or that resolves outside its own root), is unresolved, never interactive.
+`facts` stores what it read, including the installed pair it compared with, in the
+record, and every verdict on a `--facts` record is judged from that record alone, so a
+capture replays without the tree; a live PID never takes its identity from input.
 
 Role. The role is decided by a port of the installed CLI's own dispatch, over
 the argument ARRAY so boundaries survive: profile-flag extraction
@@ -57,13 +65,16 @@ Exit status. interactive: 0 the process is the installed omp's interactive
 agent (stdout is JSON carrying the incarnation `start`), 1 refused (a foreign
 executable or script, or another role), 2 unresolved (evidence unavailable).
 writer: 0 the process may own an omp session record (the installed omp in any
-role, anything whose identity cannot be read, or any unexpected failure of this
-helper), 1 it is positively another program. Reasons go to stderr. Nothing here
+role, a complete omp-shaped tree that is not the installed one, anything whose
+identity cannot be read, or any unexpected failure of this helper), 1 it is
+positively another program. Reasons go to stderr. Nothing here
 reads a process environment, sends a signal, or reads any file but the package
-files beside the process's own executable and script.
+files beside the process's own executable and script (the installed identity is
+resolved by path only, and nothing in it is opened).
 """
 import json
 import os
+import pwd
 import stat
 import subprocess
 import sys
@@ -71,6 +82,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROC_INFO = os.path.join(HERE, "fm-proc-info.py")
 
+INSTALLED_ROOT_VARIABLE = "FM_OMP_INSTALLED_ROOT"
+INSTALLED_ROOT = os.path.join(".local", "share", "omp-promax-fix")  # relative to the user's home
+INSTALLED_RUNTIME = os.path.join("runtime", "node_modules", "@oven", "bun-darwin-aarch64", "bin", "bun")
+INSTALLED_SCRIPT = os.path.join("src", "node_modules", "@oh-my-pi", "pi-coding-agent", "src", "cli.ts")
 RUNTIME_PACKAGE_PREFIX = "@oven/bun-"
 SCRIPT_PACKAGE = "@oh-my-pi/pi-coding-agent"
 SCRIPT_MARKERS = (os.path.join("src", "cli-commands.ts"), os.path.join("src", "main.ts"))
@@ -396,6 +411,34 @@ def _package_name(directory):
     return name if isinstance(name, str) else ""
 
 
+def installed_identity():
+    """The one trusted installed identity: {"runtime": realpath, "script": realpath}, or None.
+
+    The root is the override FM_OMP_INSTALLED_ROOT when set, else the installed omp's root
+    under the account's home directory (the passwd entry, never $HOME, so the environment
+    holds no second override). None when it cannot be derived: no home, a missing root or
+    file, or a runtime or script whose real path leaves the real root (a link out of the
+    tree is not the installed omp).
+    """
+    root = os.environ.get(INSTALLED_ROOT_VARIABLE)
+    if not root:
+        try:
+            home = pwd.getpwuid(os.getuid()).pw_dir
+        except (KeyError, OSError):
+            return None
+        root = os.path.join(home, INSTALLED_ROOT)
+    if not os.path.isabs(root):
+        return None
+    root_real = _existing_real(root)
+    runtime = _existing_real(os.path.join(root, INSTALLED_RUNTIME))
+    script = _existing_real(os.path.join(root, INSTALLED_SCRIPT))
+    if not (root_real and runtime and script):
+        return None
+    if any(os.path.commonpath([root_real, path]) != root_real for path in (runtime, script)):
+        return None
+    return {"runtime": runtime, "script": script}
+
+
 def read_evidence(exe, argv):
     """What the tree around the process's own executable and script shows."""
     evidence = {}
@@ -425,6 +468,7 @@ def live_facts(pid):
     except ValueError:
         facts["argv"] = None
     facts["evidence"] = read_evidence(facts["exe"], facts["argv"])
+    facts["installed"] = installed_identity()
     return facts
 
 
@@ -477,6 +521,14 @@ def decide(facts):
         raise Foreign("the script is not in the omp package")
     if not _settled(evidence.get("script_markers"), "the omp package files"):
         raise Foreign("the omp package lacks its command and main files")
+    installed = facts.get("installed")
+    if not isinstance(installed, dict):
+        raise Unresolved("the installed identity cannot be read")
+    runtime, script = installed.get("runtime"), installed.get("script")
+    if not (isinstance(runtime, str) and isinstance(script, str) and runtime and script):
+        raise Unresolved("the installed identity cannot be read")
+    if exe_real != runtime or script_real != script:
+        raise Refused("an omp-shaped program that is not the installed omp's runtime on its entry script")
     decide_role(argv[2:], facts.get("stdin"))
 
 
