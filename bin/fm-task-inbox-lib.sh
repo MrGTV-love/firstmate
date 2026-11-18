@@ -255,101 +255,68 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # secondmate request embeds a per-request correlation token in its body. The
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
-# The check costs a fixed number of processes however long handled/ grows, and
-# a TERM or INT during it leaves neither a temp file nor the lock behind.
+# The check launches a fixed number of processes however many records exist or
+# share the text's first line, and a TERM or INT during it leaves neither a
+# temp file nor the lock behind.
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
-  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want='' have='' f rec='' status=0
-  local first='' line names='' scan_all=0 prev_term prev_int aborted='' rc
+  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock have='' f rec='' got status=0
+  local prev_term prev_int aborted=''
   dir=$(fm_task_inbox_dir "$state" "$task")
   mkdir -p "$dir/handled" || return 1
   lock="$dir/.seq.lock"
   # A TERM or INT while the lock is held (the remote budget kills the leg this
-  # way) removes the temp files and releases the lock before the signal takes
+  # way) removes the temp file and releases the lock before the signal takes
   # effect. The trap goes in before the acquire: the release is owner-checked,
   # so it is harmless if the lock was never ours. A signal the caller ignores
   # stays ignored, and the caller's own traps come back on every exit.
   prev_term=$(trap -p TERM) prev_int=$(trap -p INT)
-  case "$prev_term" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_dedup_abort TERM' TERM ;; esac
-  case "$prev_int" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_dedup_abort INT' INT ;; esac
+  case "$prev_term" in *"''"*) ;; *) trap '_fm_task_inbox_dedup_abort TERM' TERM ;; esac
+  case "$prev_int" in *"''"*) ;; *) trap '_fm_task_inbox_dedup_abort INT' INT ;; esac
   if ! fm_task_inbox_lock_acquire "$lock"; then
     _fm_task_inbox_dedup_restore_traps
     return 1
   fi
-  # The candidate search stays inside the lock on purpose: two writers of the
-  # same text must see each other's new record, or both would write one. It is
-  # a single grep over the inbox and handled/ for the text's first non-empty
-  # line, so the hold no longer grows with the number of records; only the
-  # records that share that line reach the exact compare below. Without such a
-  # line (an empty text) or when grep cannot finish (a record moved to handled/
-  # mid-search), every record is compared, exactly as before.
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    first=$line
-    break
-  done <<TEXT
-$text
-TEXT
-  if [ -n "$first" ]; then
-    rc=0
-    f=$(LC_ALL=C grep -rlFx --include='*.msg' -e "$first" -- "$dir" 2>/dev/null) || rc=$?
-    if [ "$rc" -le 1 ]; then
-      names=$'\n'
-      while IFS= read -r f; do
-        [ -z "$f" ] || names="$names${f##*/}"$'\n'
-      done <<FOUND
-$f
-FOUND
-    else
-      scan_all=1
-    fi
+  # Every record is compared, exactly as before, but with builtins only: the
+  # mode check and the body read launch no process, so the hold on the lock
+  # does not grow with the number of records, whatever they hold. Records are
+  # reached through the same globs as before, so a linked handled/ directory or
+  # record file is read like any other.
+  if have=$(mktemp "$dir/.dedup.XXXXXX"); then
+    for f in "$dir"/*.msg "$dir/handled"/*.msg; do
+      if [ ! -e "$f" ]; then
+        case "$f" in
+          "$dir"/*.msg)
+            f="$dir/handled/${f##*/}"
+            [ -e "$f" ] || continue
+            ;;
+          *) continue ;;
+        esac
+      fi
+      if [ "$delivery_mode" = fire-and-forget ]; then
+        fm_task_inbox_is_fire_and_forget "$f" || continue
+      elif fm_task_inbox_is_fire_and_forget "$f"; then
+        continue
+      fi
+      if ! fm_task_inbox_body "$f" > "$have" 2>/dev/null; then
+        case "$f" in
+          "$dir"/*.msg)
+            f="$dir/handled/${f##*/}"
+            fm_task_inbox_body "$f" > "$have" 2>/dev/null || continue
+            ;;
+          *) continue ;;
+        esac
+      fi
+      # The body equals the text byte for byte. A NUL byte ends the read, and
+      # the text (a shell argument) holds none, so such a body never matches.
+      ! IFS= read -r -d '' got < "$have" || continue
+      [ "$got" = "$text" ] || continue
+      [ ! -e "$dir/handled/${f##*/}" ] || f="$dir/handled/${f##*/}"
+      rec=$f
+      break
+    done
+    rm -f "$have"
   else
-    scan_all=1
-  fi
-  if [ "$scan_all" -eq 0 ] && [ "$names" = $'\n' ]; then
-    : # no record shares the first line, so none can equal the text
-  elif want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX"); then
-    if printf '%s' "$text" > "$want"; then
-      for f in "$dir"/*.msg "$dir/handled"/*.msg; do
-        if [ "$scan_all" -eq 0 ]; then
-          case "$names" in
-            *$'\n'"${f##*/}"$'\n'*) ;;
-            *) continue ;;
-          esac
-        fi
-        if [ ! -e "$f" ]; then
-          case "$f" in
-            "$dir"/*.msg)
-              f="$dir/handled/${f##*/}"
-              [ -e "$f" ] || continue
-              ;;
-            *) continue ;;
-          esac
-        fi
-        if [ "$delivery_mode" = fire-and-forget ]; then
-          fm_task_inbox_is_fire_and_forget "$f" || continue
-        elif fm_task_inbox_is_fire_and_forget "$f"; then
-          continue
-        fi
-        if ! fm_task_inbox_body "$f" > "$have" 2>/dev/null; then
-          case "$f" in
-            "$dir"/*.msg)
-              f="$dir/handled/${f##*/}"
-              fm_task_inbox_body "$f" > "$have" 2>/dev/null || continue
-              ;;
-            *) continue ;;
-          esac
-        fi
-        cmp -s "$want" "$have" || continue
-        [ ! -e "$dir/handled/${f##*/}" ] || f="$dir/handled/${f##*/}"
-        rec=$f
-        break
-      done
-    else
-      status=1
-    fi
-    rm -f "$want" "$have"
-  else
-    rm -f "${want:-}" 2>/dev/null || true
+    rm -f "${have:-}" 2>/dev/null || true
     status=1
   fi
   if [ -n "$aborted" ]; then
@@ -370,12 +337,12 @@ _fm_task_inbox_dedup_restore_traps() {
   eval "${prev_int:-trap - INT}"
 }
 
-# TERM or INT inside fm_task_inbox_write_idempotent: drop the temp files, free
+# TERM or INT inside fm_task_inbox_write_idempotent: drop the temp file, free
 # the lock, hand the signal back to whoever owned it before, then deliver it.
 # A caller trap that survives the signal finds the function refusing to write.
 _fm_task_inbox_dedup_abort() {  # <TERM|INT>
   local sig=$1 pid
-  rm -f "$want" "$have" 2>/dev/null || true
+  rm -f "$have" 2>/dev/null || true
   fm_lock_release "$lock"
   aborted=$sig
   _fm_task_inbox_dedup_restore_traps
@@ -383,10 +350,32 @@ _fm_task_inbox_dedup_abort() {  # <TERM|INT>
   return 0
 }
 
-# The exact enqueued text back out of a record.
+# The exact enqueued text back out of a record, read with builtins only: the
+# idempotent enqueue calls this once per record while it holds the inbox lock,
+# so a process launch here would grow with the number of records. A body that
+# holds a NUL byte (a variable cannot) is read by cat instead.
 fm_task_inbox_body() {  # <record-path>
+  local rec=$1 line body nul=0
+  [ -f "$rec" ] || return 1
+  {
+    while IFS= read -r line; do
+      if [ "$line" = -- ]; then
+        if IFS= read -r -d '' body; then
+          nul=1
+        else
+          printf '%s' "$body"
+          return 0
+        fi
+        break
+      fi
+    done
+  } < "$rec"
+  [ "$nul" -eq 1 ] || return 1
+  _fm_task_inbox_body_with_nul "$rec"
+}
+
+_fm_task_inbox_body_with_nul() {  # <record-path>
   local line
-  [ -f "$1" ] || return 1
   while IFS= read -r line; do
     if [ "$line" = -- ]; then
       cat
@@ -497,16 +486,19 @@ fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
 }
 
 fm_task_inbox_is_fire_and_forget() {  # <record-path>
-  local rec=$1
+  local rec=$1 line found=1
   if [ ! -f "$rec" ]; then
     rec="${rec%/*}/handled/${rec##*/}"
     [ -f "$rec" ] || return 1
   fi
-  awk '
-    $0 == "--" { exit }
-    $0 == "delivery=fire-and-forget" { found=1 }
-    END { exit(found ? 0 : 1) }
-  ' "$rec"
+  # Header lines up to the first "--", builtins only (the idempotent enqueue
+  # asks this once per record under the inbox lock). A last line without its
+  # newline still counts as a line.
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ "$line" != -- ] || break
+    [ "$line" != delivery=fire-and-forget ] || found=0
+  done < "$rec"
+  return "$found"
 }
 
 # Oldest escalation-tracked unhandled record, or fail when none is due.

@@ -454,14 +454,19 @@ test_idempotent_write_follows_concurrent_ack() {
 # Seed <n> acknowledged records straight into handled/ with one builtin write
 # each. The record format is the library's own (see its header), and seeding by
 # hand keeps a 1600-record fixture from costing more than the case under test.
-seed_handled_records() {  # <state> <task> <n> [body-prefix]
-  local state=$1 task=$2 n=$3 prefix=${4:-handled record} dir i f
+seed_handled_records() {  # <state> <task> <n> [body-prefix] [shared-first-line]
+  local state=$1 task=$2 n=$3 prefix=${4:-handled record} shared=${5:-} dir i f
   dir="$state/$task.inbox/handled"; mkdir -p "$dir"
   i=0
   while [ "$i" -lt "$n" ]; do
     i=$((i + 1))
     printf -v f '%s/%04d.msg' "$dir" "$i"
-    printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\n%s %s\nsecond line\n' "$prefix" "$i" > "$f"
+    if [ -n "$shared" ]; then
+      # every record opens with the same line and differs only further down
+      printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\n%s\n%s %s\n' "$shared" "$prefix" "$i" > "$f"
+    else
+      printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\n%s %s\nsecond line\n' "$prefix" "$i" > "$f"
+    fi
   done
 }
 
@@ -505,9 +510,37 @@ test_idempotent_scan_launches_do_not_grow_with_handled_records() {
   pass "inbox: the idempotent enqueue launches the same processes at 50 and 1600 handled records ($small vs $large)"
 }
 
-# The dedup looks only at records that share the text's first non-empty line.
+# Records that all share the new text's first line, and the empty text, are the
+# cases a first-line search cannot narrow: the launches still stay fixed.
+test_idempotent_scan_launches_do_not_grow_when_records_share_the_first_line() {
+  local dir small large rec
+  dir="$TMP_ROOT/idem-scale-collide"; mkdir -p "$dir/s50" "$dir/s1600"
+  seed_handled_records "$dir/s50/state" t1 50 "old tail" "shared first line"
+  seed_handled_records "$dir/s1600/state" t1 1600 "old tail" "shared first line"
+  small=$(count_idempotent_launches "$dir/s50" "$dir/s50/state" $'shared first line\nnew tail')
+  large=$(count_idempotent_launches "$dir/s1600" "$dir/s1600/state" $'shared first line\nnew tail')
+  [ "$((large - small))" -le 4 ] \
+    || fail "dedup launches grew with records sharing the first line: $small at 50 records, $large at 1600"
+  rec=$(ls "$dir/s1600/state/t1.inbox"/*.msg) || fail "the new steer was not written"
+  grep -qxF "new tail" "$rec" || fail "the new record does not hold the steer text: $rec"
+  pass "inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that share its first line ($small vs $large)"
+}
+
+test_idempotent_scan_launches_do_not_grow_for_the_empty_text() {
+  local dir small large
+  dir="$TMP_ROOT/idem-scale-empty"; mkdir -p "$dir/s50" "$dir/s1600"
+  seed_handled_records "$dir/s50/state" t1 50
+  seed_handled_records "$dir/s1600/state" t1 1600
+  small=$(count_idempotent_launches "$dir/s50" "$dir/s50/state" "")
+  large=$(count_idempotent_launches "$dir/s1600" "$dir/s1600/state" "")
+  [ "$((large - small))" -le 4 ] \
+    || fail "dedup launches grew with the records for the empty text: $small at 50 records, $large at 1600"
+  [ -f "$dir/s1600/state/t1.inbox/1601.msg" ] || fail "the empty steer was not written behind the 1600 handled records"
+  pass "inbox: the idempotent enqueue launches the same processes at 50 and 1600 records for the empty text ($small vs $large)"
+}
+
 # Each outcome below is what a full compare of every record gives.
-test_idempotent_prefilter_keeps_every_dedup_outcome() {
+test_idempotent_dedup_keeps_every_outcome_of_the_full_compare() {
   local state inbox long nl=$'\n' out r1 r2 text
   state="$TMP_ROOT/idem-prefilter/state"; inbox="$state/t1.inbox"; mkdir -p "$state"
   long=$(printf 'L%.0s' $(seq 1 6000))
@@ -536,7 +569,61 @@ test_idempotent_prefilter_keeps_every_dedup_outcome() {
   r1=$(idem ''); r2=$(idem '')
   [ "$r1" = "$inbox/012.msg" ] && [ "$r2" = "$r1" ] || fail "the empty text did not dedup onto its own record: $r1 vs $r2"
   [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 11 ] || fail "dedup outcomes left the wrong number of unhandled records"
-  pass "inbox: the first-line prefilter keeps every dedup outcome of the full compare"
+  pass "inbox: the dedup keeps every outcome of the full compare"
+}
+
+# One hand-made record per case, compared against a text the way cmp compared
+# the written text with the body: byte for byte, whatever the bytes are.
+idem_odd_case() {  # <name> <printf-format of the whole record> <text> <mode> <same|new>
+  local name=$1 fmt=$2 text=$3 mode=$4 want=$5 state inbox out expect
+  state="$TMP_ROOT/idem-odd-$name/state"; inbox="$state/t1.inbox"; mkdir -p "$inbox"
+  # shellcheck disable=SC2059 # the format carries the record bytes on purpose
+  printf "$fmt" > "$inbox/001.msg"
+  out=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 "$text" "$mode") || fail "$name: the write failed"
+  if [ "$want" = same ]; then expect="$inbox/001.msg"; else expect="$inbox/002.msg"; fi
+  [ "$out" = "$expect" ] || fail "$name: expected $expect, got $out"
+}
+
+test_idempotent_dedup_reads_odd_records_like_the_full_compare() {
+  local head='schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n' faf='delivery=fire-and-forget\n'
+  idem_odd_case nul-prefix "$head--\nabc\0def" abc '' new
+  idem_odd_case nul-whole "$head--\n\0" '' '' new
+  idem_odd_case invalid-utf8 "$head--\n\377\376 ok" $'\377\376 ok' '' same
+  idem_odd_case cr-same "$head--\nx\r" $'x\r' '' same
+  idem_odd_case cr-differs "$head--\nx\r" x '' new
+  idem_odd_case trailing-newline-differs "$head--\na\n" a '' new
+  idem_odd_case trailing-newline-same "$head--\na\n" $'a\n' '' same
+  idem_odd_case empty-body "$head--\n" '' '' same
+  idem_odd_case no-newline-after-separator "$head--" '' '' new
+  idem_odd_case second-separator-in-body "$head--\n--\nq" $'--\nq' '' same
+  idem_odd_case second-separator-not-the-body "$head--\n--\nq" q '' new
+  idem_odd_case body-line-is-not-a-mode "$head--\ndelivery=fire-and-forget" delivery=fire-and-forget '' same
+  idem_odd_case body-line-is-not-a-mode-faf "$head--\ndelivery=fire-and-forget" delivery=fire-and-forget fire-and-forget new
+  idem_odd_case mode-header-faf "$head$faf--\nz" z fire-and-forget same
+  idem_odd_case mode-header-ordinary-asks-faf "$head--\nz" z fire-and-forget new
+  idem_odd_case mode-header-faf-asks-ordinary "$head$faf--\nz" z '' new
+  idem_odd_case no-separator "$head" '' '' new
+  pass "inbox: the dedup compares odd records byte for byte (NUL, invalid UTF-8, CR, newlines, separators, modes)"
+}
+
+# A handled/ directory or a record file that is a link is read like any other:
+# an already acknowledged instruction is still found, so a resend never lands
+# twice.
+test_idempotent_dedup_finds_records_behind_links() {
+  local state inbox archive out
+  state="$TMP_ROOT/idem-links/state"; inbox="$state/t1.inbox"; archive="$TMP_ROOT/idem-links/archive"
+  mkdir -p "$inbox" "$archive"
+  printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\nexisting delivery' > "$archive/001.msg"
+  ln -s "$archive" "$inbox/handled" || fail "could not link handled/"
+  out=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 "existing delivery") || fail "the write failed behind a linked handled/"
+  [ "$out" = "$inbox/handled/001.msg" ] || fail "a record in a linked handled/ was not found: $out"
+  [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 0 ] \
+    || fail "a resend of an acknowledged instruction behind a linked handled/ was written again"
+  printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\nlinked record' > "$TMP_ROOT/idem-links/elsewhere.msg"
+  ln -s "$TMP_ROOT/idem-links/elsewhere.msg" "$inbox/005.msg" || fail "could not link a record"
+  out=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 "linked record") || fail "the write failed behind a linked record"
+  [ "$out" = "$inbox/005.msg" ] || fail "a linked record file was not found: $out"
+  pass "inbox: the dedup finds a record behind a linked handled/ directory or a linked record file"
 }
 
 # A TERM or INT while the lock is held (the remote budget's kill) leaves no
@@ -1465,7 +1552,11 @@ test_ring_submits_its_own_stuck_doorbell
 test_idempotent_write_dedups_exact_body
 test_idempotent_write_follows_concurrent_ack
 test_idempotent_scan_launches_do_not_grow_with_handled_records
-test_idempotent_prefilter_keeps_every_dedup_outcome
+test_idempotent_scan_launches_do_not_grow_when_records_share_the_first_line
+test_idempotent_scan_launches_do_not_grow_for_the_empty_text
+test_idempotent_dedup_keeps_every_outcome_of_the_full_compare
+test_idempotent_dedup_reads_odd_records_like_the_full_compare
+test_idempotent_dedup_finds_records_behind_links
 test_idempotent_write_signal_cleans_up
 test_idempotent_write_keeps_caller_traps
 test_next_seq_ignores_gaps_and_non_record_names

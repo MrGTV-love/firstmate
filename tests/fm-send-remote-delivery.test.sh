@@ -912,6 +912,49 @@ test_remote_steer_lands_behind_a_large_handled_folder() {
   pass "fm-send remote: a steer lands within the default budget behind 1600 handled records and a same-id resend dedups"
 }
 
+# The marked secondmate request puts the same from-firstmate marker and
+# correlation token at the head of its first line, so a history can hold many
+# records that share the new steer's first line and differ only further down.
+# Those records must not slow the enqueue either: the steer lands within the
+# default budget and a same-id resend still dedups onto it.
+test_remote_steer_lands_behind_handled_records_sharing_its_first_line() {
+  local dir fb ssh_log home rhome inbox i f delivery first count probe_home probe_rec rc=0
+  dir="$TMP_ROOT/remote-same-first-line"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-same-first-line)
+  home=$(setup_remote_parent_home remote-same-first-line "$rhome")
+  inbox="$rhome/state/parent-route/rsm.inbox"; mkdir -p "$inbox/handled"
+  delivery=ddddeeeeffff0000
+  # The wire first line is whatever fm-send really writes for this steer, so a
+  # probe send into a scratch remote home supplies it.
+  probe_home=$(setup_remote_secondmate_home remote-same-first-line-probe)
+  send_env "$fb" "$(setup_remote_parent_home remote-same-first-line-probe "$probe_home")" "$ssh_log" \
+    "$SEND" rsm --fire-and-forget "$delivery" $'shared first line\nnew tail' >"$dir/probe.out" 2>"$dir/probe.err" \
+    || fail "the probe steer failed: $(cat "$dir/probe.err")"
+  probe_rec=$(remote_inbox_records "$probe_home")
+  [ -n "$probe_rec" ] || fail "the probe steer wrote no remote record"
+  first=$(fm_task_inbox_body "$probe_rec" | head -1)
+  case "$first" in *"shared first line") ;; *) fail "the probe record's first line is not the steer's: $first" ;; esac
+  i=0
+  while [ "$i" -lt 1600 ]; do
+    i=$((i + 1))
+    printf -v f '%s/handled/%04d.msg' "$inbox" "$i"
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\ndelivery=fire-and-forget\n--\n%s\nold tail %s\n' "$first" "$i" > "$f"
+  done
+
+  for _ in 1 2; do
+    rc=0
+    send_env "$fb" "$home" "$ssh_log" \
+      "$SEND" rsm --fire-and-forget "$delivery" $'shared first line\nnew tail' \
+      >"$dir/out" 2>"$dir/err" || rc=$?
+    [ "$rc" -eq 0 ] || fail "a steer behind 1600 handled records sharing its first line did not deliver (rc $rc): $(cat "$dir/err")"
+  done
+  count=$(remote_inbox_records "$rhome" | grep -c . || true)
+  [ "$count" = 1 ] || fail "the steer and its same-id resend left $count unhandled records, not 1"
+  [ -z "$(find "$inbox" -maxdepth 1 -name '.dedup.*')" ] || fail "the remote leg left a .dedup temp file"
+  pass "fm-send remote: a steer lands within the default budget behind 1600 handled records that share its first line"
+}
+
 test_remote_send_budget_bounds_busy_lane() {
   local dir fb ssh_log home rhome rc err began elapsed count pend delivery corr ssh_before
   dir="$TMP_ROOT/remote-budget"; mkdir -p "$dir"
@@ -1186,6 +1229,7 @@ test_remote_real_failure_still_fails
 test_remote_exit3_no_longer_delivered
 test_remote_transport_loss_preserves_expectation
 test_remote_steer_lands_behind_a_large_handled_folder
+test_remote_steer_lands_behind_handled_records_sharing_its_first_line
 test_remote_send_budget_bounds_busy_lane
 test_local_typed_resend_with_correlation_meets_the_choice_rule
 test_local_pending_reports_delivered_unconfirmed
