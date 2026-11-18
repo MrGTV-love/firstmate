@@ -11,7 +11,11 @@ the confinement stubbed, so the judgment itself is tested anywhere:
     would collide with still exists;
   - a confinement whose refusals are really unrelated git failures (the command is
     wrong, the ref is unchanged) must fail the validator;
-  - no confinement at all must fail it.
+  - no confinement at all must fail it;
+  - a refusal that git reports only as "unable to create directory for <ref>" (git
+    2.50 names no error for a ref's new leading folder) must pass when the same
+    profile refuses that folder with the kernel's error, and must fail when the
+    folder can be made, because then git failed for some other reason.
 No kernel and no sandbox are used.
 """
 import importlib.util
@@ -46,6 +50,12 @@ def run_kernel(label, style):
     calls = []
 
     def fake_confined(profile, manifest, *argv):
+        if argv[0] == "/bin/mkdir":
+            # The folder probe of a directory-only refusal.
+            calls.append((Path(profile).name, "mkdir " + argv[-1], False))
+            if style == "dir-ideal":
+                return subprocess.CompletedProcess(argv, 1, "", f"mkdir: {argv[-1]}: Operation not permitted\n")
+            return subprocess.run(list(argv), capture_output=True, text=True)
         name = ref_name(argv)
         copy = argv[2]
         exists = subprocess.run(["git", "-C", copy, "rev-parse", "--verify", "-q", "refs/heads/" + name.rsplit("/child", 1)[0]],
@@ -54,7 +64,13 @@ def run_kernel(label, style):
         permitted = style == "none" or (Path(profile).name == "new.sb" and name == SUCCESSOR)
         if permitted:
             return subprocess.run(list(argv), capture_output=True, text=True, env=dict(os.environ, **module.GIT_ENV))
-        if style == "ideal":
+        if style in ("dir-ideal", "dir-unrelated") and argv[3] == "branch" and argv[4] != "-D":
+            common = subprocess.run(["git", "-C", copy, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                                    capture_output=True, text=True).stdout.strip()
+            path = Path(common) / "refs/heads" / name
+            if not path.parent.exists():
+                return subprocess.CompletedProcess(argv, 128, "", f"fatal: cannot lock ref 'refs/heads/{name}': unable to create directory for {path}\n")
+        if style in ("ideal", "dir-ideal", "dir-unrelated"):
             return subprocess.CompletedProcess(argv, 1, "", f"error: unable to create 'refs/heads/{name}': Operation not permitted\n")
         return subprocess.CompletedProcess(argv, 128, "", "fatal: bad object 0000000000000000000000000000000000000000\n")
 
@@ -82,3 +98,13 @@ print("ok - the kernel validator fails when a refusal is an unrelated git failur
 outcome, detail, _ = run_kernel("none", "none")
 assert outcome == "failed", "the kernel validator passed a run with no confinement at all"
 print("ok - the kernel validator fails when nothing is confined")
+
+outcome, detail, calls = run_kernel("dir-ideal", "dir-ideal")
+assert outcome == "passed", f"a folder refusal the profile also gives for the folder must pass the kernel validator: {detail}"
+assert any(name.startswith("mkdir ") for _, name, _ in calls), "the directory-only refusal was never staged, so its judgment went untested"
+print("ok - the kernel validator passes a refusal git reports only as a folder it could not create, when the profile refuses that folder")
+
+outcome, detail, _ = run_kernel("dir-unrelated", "dir-unrelated")
+assert outcome == "failed" and "does not refuse that folder" in detail, \
+    f"the kernel validator passed a folder error whose folder the profile allows: {outcome} {detail}"
+print("ok - the kernel validator fails when git's folder error is not the confinement's (the folder can be made)")
