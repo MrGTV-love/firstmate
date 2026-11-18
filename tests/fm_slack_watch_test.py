@@ -4364,9 +4364,30 @@ class SecondPersonTest(unittest.TestCase):
     assert_only_base_calls = IntakeTest.assert_only_base_calls
     UNSET = object()
 
+    # The stated cost of one Slack call on the clock of their time budget in this class (one of the costs of the production-limit table, A6).
+    CALL_COST = 0.05
+
+    @staticmethod
     @contextmanager
-    def second(self, cap='20', value=None, authors=None, env=None, dms=None, started=True, history=True, clock=None):
-        """A plane with the second person configured and their window started (the first poll records its newest message and takes nothing in)."""
+    def call_clock(cost):
+        """The clock of the second person's time budget (plane.monotonic) for the tests of this class, none of which is about time: it moves by `cost` on
+        every Slack call through the replay and by nothing else, so the 21 s budget is spent by the calls a poll makes and never by this host's CPU time
+        between them. On the host clock a loaded host spent it on the plane's own work (20.9 s of a 21.9 s pass with 1.0 s in calls), and a pass stopped
+        an acknowledgement that the test counts on (Main 2813 (b), (c)). No test of this class holds a lock, so no lock wait is left on a clock that only
+        calls move."""
+        now = [1000.0]
+        real = Replay.call
+
+        def call(self, method, **fields):
+            now[0] += cost
+            return real(self, method, **fields)
+        with patch.object(plane, 'monotonic', lambda: now[0]), patch.object(Replay, 'call', call):
+            yield
+
+    @contextmanager
+    def second(self, cap='20', value=None, authors=None, env=None, dms=None, started=True, history=True, clock=None, call_cost=None):
+        """A plane with the second person configured and their window started (the first poll records its newest message and takes nothing in). Their
+        time budget runs on call_clock (CALL_COST per Slack call, or call_cost)."""
         value = self.SECOND if value is None else value
         environment = dict(env or {})
         if value is not self.UNSET:
@@ -4382,7 +4403,7 @@ class SecondPersonTest(unittest.TestCase):
                 os.environ.pop('FM_SLACK_SECOND_USER', None)
             # A completed run with no Slack Date is dated by this host's clock: here a time just after the fixture's history, so that the synthetic timestamps of
             # these replays order against it as real ones would.
-            with patch.object(plane, 'host_now', lambda: 100.0005, create=True), \
+            with patch.object(plane, 'host_now', lambda: 100.0005, create=True), self.call_clock(self.CALL_COST if call_cost is None else call_cost), \
                     self.fixture(cap=cap, authors=authors, env=environment, transcript_extra=extra) as (watch, replay):
                 if started:
                     watch.poll()
@@ -4873,6 +4894,62 @@ class SecondPersonTest(unittest.TestCase):
                 self.again(watch)
                 self.assertGreater(len(self.posts(replay)) + len(self.theirs(watch).get('second', {}).get('intake_bounds', [])), before)
             self.assertEqual(len([p for p in self.posts(replay) if p[0] == self.SECOND_DM]), 450)
+
+    def test_sc4_a_pass_their_21_s_budget_stops_mid_window_delays_messages_and_never_loses_or_repeats_one_or_opens_an_approval(self):
+        # Main 2829: a pass that stops at its 21 s budget (as CPU starvation makes it on the host clock) is accepted only if it delays and never loses or
+        # repeats. At the production constants, none patched, a stated clock of 2.5 s per Slack call fits 8 calls in their pass (the DM proof, the
+        # history read and 6 acknowledgements), so their pass stops in the middle of their window of 10 requests while owner requests are pending too.
+        self.assertEqual((plane.SECOND_BUDGET, plane.SECOND_CALL_BOUND, plane.SECOND_IO_WAIT), (21.0, 10.0, 2.0))
+        theirs = ['request %d' % n for n in range(7)] + ['approve', '1', 'merge it']
+        their_ts = ['1000.%06d' % (2 * n + 2) for n in range(len(theirs))]
+        owner_ts = ['1000.%06d' % (2 * n + 1) for n in range(3)]
+        later_owner_ts = ['1000.%06d' % (100 + n) for n in range(2)]
+        stops = []
+        real_spent = plane.SecondBudgetSpent.__init__
+
+        def spent(error, *args, **kwargs):
+            stops.append(len(polls))
+            real_spent(error, *args, **kwargs)
+        with self.second(call_cost=2.5) as (watch, replay):
+            calls, fake = self.recorder()
+            polls = []
+            with patch.object(plane, 'run', fake), patch.object(watch, 'probe', return_value=(0, 'live')), \
+                    patch.object(plane.SecondBudgetSpent, '__init__', spent):
+                card = self.card(watch, replay)
+                for ts in owner_ts:
+                    self.owner_says(replay, ts, 'owner request ' + ts)
+                for ts, text in zip(their_ts, theirs):
+                    self.says(replay, ts, text)
+                # Their `approve` on the owner's held decision card (posted at ts 901 by the replay; every message here is later): refused and logged,
+                # whatever the budget does.
+                replay.state['messages'].append({'ts': '1000.000900', 'thread_ts': card, 'user': self.SECOND, 'text': 'approve'})
+                for n in range(8):
+                    if n == 1:
+                        for ts in later_owner_ts:                       # owner requests that arrive while their window is still being taken in
+                            self.owner_says(replay, ts, 'owner request ' + ts)
+                    self.again(watch)
+                    polls.append([(plane.REQUEST_SEGMENT.match(line).group(1, 2), self.literal(line)) for line in self.wakes(watch)])
+            their_polls = [[ts for (ts, user), _ in poll if user == self.SECOND] for poll in polls]
+            # Read inside the fixture: its state folder (the refusal log) is removed when it closes.
+            # The budget stopped a pass of theirs in the middle of their window: the first poll took some of their requests in, not all.
+            self.assertTrue(stops, polls)
+            self.assertTrue(0 < len(their_polls[0]) < len(theirs), their_polls)
+            # Every message delivered exactly once and in order, for each person; the owner's requests in the poll they arrived in.
+            woken = [key for poll in polls for key, _ in poll]
+            self.assertEqual([ts for ts, user in woken if user == self.OWNER], owner_ts + later_owner_ts)
+            self.assertEqual([ts for ts, user in woken if user == self.SECOND], their_ts)
+            self.assertEqual([ts for (ts, user), _ in polls[1] if user == self.OWNER], later_owner_ts)
+            self.assertEqual([text for poll in polls for (ts, user), text in poll if user == self.SECOND], theirs)
+            self.assertEqual(polls[-1], [])                                    # and nothing after
+            acks = [post for post in self.posts(replay) if post[1] is not None and post[1] != card]
+            self.assertEqual(len(acks), len(set(acks)), acks)
+            self.assertEqual(sorted(acks), sorted([(self.OWNER_DM, ts) for ts in owner_ts + later_owner_ts] + [(self.SECOND_DM, ts) for ts in their_ts]))
+            # No approval path: no answer reached the intake, their card reply is refused and logged once, and their DM text is request data only.
+            self.assertEqual([c for c in calls if c[1][:1] == ('answers',)], [])
+            self.assertEqual([(r['reason'], r.get('author'), r.get('item')) for r in self.refusals(watch) if r['reason'].startswith('decision_held')],
+                             [('decision_held_for_captain_reply', self.SECOND, '1000.000900')])
+            self.assertEqual({channel for channel, thread in self.posts(replay)}, {self.OWNER_DM, self.SECOND_DM})
+            self.assertNotIn(self.SECOND_DM, {channel for channel, thread in self.posts(replay) if thread in (None, card)})
 
     def test_sc4_they_share_the_cap_and_never_take_the_turn_of_an_owner_request(self):
         # One shared cap (SC4; Main 1547 withdrew the separate cap of order 1307). At cap 1 the slot alternates by poll when both have work (Main 1597, which
@@ -6127,13 +6204,18 @@ if os.environ.get('INV4_FAIL_SAVE'):
             raise OSError('synthetic storage failure')
         return real_save(path, value)
     plane.save = failing_save
+import time as _wall
+_main_began = _wall.monotonic()
 code = plane.main(sys.argv[1:])
+_main_seconds = _wall.monotonic() - _main_began
 import threading
 with open(os.environ['INV4_LOG'] + '.threads', 'a') as log:
     # Every thread still running when the check ends, whatever its name: a reader left behind past the deadline is one of them.
     log.write('bounded-alive %d\n' % len([t for t in threading.enumerate() if t is not threading.main_thread() and t.is_alive()]))
     log.write('lookup-alive %d\n' % len([t for t in threading.enumerate() if t.name == 'fm-slack-lookup' and t.is_alive()]))
     log.write('clock %.6f\n' % clock[0])
+    # The plane's own run in this process (plane.main, start to end) on the host clock; interpreter start-up, imports and exit are not in it.
+    log.write('main-seconds %.6f\n' % _main_seconds)
 sys.exit(code)
 """
 
@@ -6152,6 +6234,16 @@ sys.exit(code)
                                   env=env, text=True, timeout=120)
         calls = log.read_text().split() if log.exists() else []
         return done.returncode, captured.read_text(), calls
+
+    @staticmethod
+    def main_seconds(home, name):
+        """The plane's own run of the check process `name` (plane.main, start to end, measured inside the process by DRIVER). The bound the code keeps for
+        their check is SECOND_BUDGET plus CUTOFF_JOIN on this span; the process's start-up, imports and exit are host work that no code bounds, and on a
+        loaded host they alone took longer than the 2 s that OWNER_WAKE_WAIT_BOUND allows for them (Main 2813 (a))."""
+        lines = [line for line in (home.dir / (name + '.calls.threads')).read_text().splitlines() if line.startswith('main-seconds ')]
+        if not lines:
+            raise AssertionError('the check process %s recorded no main-seconds line' % name)
+        return float(lines[-1].split()[1])
 
     def owner_and_second_waiting(self, home):
         home.cli('poll')                                   # starts their window
@@ -7359,8 +7451,10 @@ class Round6TotalBound(InvariantScenario):
             sweep_end = time.monotonic()                     # the watcher raises the sweep's one wake when this, its last check, has exited
             self.assertEqual(rc, 0)
             self.assertTrue(calls, 'their check made a call of theirs on the real transport')
-            self.assertLessEqual(sweep_end - owner_done, plane.OWNER_WAKE_WAIT_BOUND,
-                                 'the owner wake waited %.1f s for their check' % (sweep_end - owner_done))
+            # The owner wake waits for their check's process; the code's part of that wait, their plane run, ends by their budget and one cut-off join.
+            ran = Invariant4OwnerFirst.main_seconds(home, 'second-check')
+            self.assertLessEqual(ran, plane.SECOND_BUDGET + plane.CUTOFF_JOIN,
+                                 'their plane run took %.1f s; the owner wake waited %.1f s for their check' % (ran, sweep_end - owner_done))
             self.assertEqual(self.wakes_of(second_run, INV_SECOND), [])
             server.mode = 'fast'
             later = []
@@ -8642,9 +8736,10 @@ class Round9Findings(InvariantScenario):
             with patch.dict(os.environ, {'INV4_BLOCK_RESOLVER': '1'}):
                 rc, out, calls = self.run_check(home, 'trickle', 'blocked', command='check-second', server='https://127.0.0.1:%d/' % port)
             exited = time.monotonic() - started                                 # the whole CLI process, started and ended
+            ran = Invariant4OwnerFirst.main_seconds(home, 'blocked')            # its plane run, inside the process
             time.sleep(1.0)
             self.assertEqual(rc, 0, out)
-            self.assertLessEqual(exited, plane.OWNER_WAKE_WAIT_BOUND, exited)
+            self.assertLessEqual(ran, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, (ran, exited))
             self.assertEqual(accepted, [], 'a connection reached the server')   # nothing sent, before or after the process ended
 
     # ---- F10: an interrupted span report appends its row once ----
@@ -9144,9 +9239,10 @@ class Round10Findings(InvariantScenario):
                 exited = time.monotonic() - started
                 entered = (home.dir / (name + '.calls.resolver')).read_text().split() if (home.dir / (name + '.calls.resolver')).exists() else []
                 threads = (home.dir / (name + '.calls.threads')).read_text()
+                ran = Invariant4OwnerFirst.main_seconds(home, name)
                 self.assertEqual(rc, 0, out)
                 self.assertGreaterEqual(len(entered), 1, 'the blocked resolver was never reached')
-                self.assertLessEqual(exited, plane.OWNER_WAKE_WAIT_BOUND, exited)   # this process's own bound
+                self.assertLessEqual(ran, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, (ran, exited))   # this process's own bound, on its plane run
                 self.assertIn('lookup-alive 1', threads)                         # at most one lookup thread in this process, the stuck one
             time.sleep(1.0)
             self.assertEqual(accepted, [], 'a connection reached the server')

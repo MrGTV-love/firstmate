@@ -67,6 +67,53 @@ def install():
                     Path(os.environ['FM_STATE_OVERRIDE']) / 'slack-watch')
     scenario = os.environ.get('FM_TEST_SLACK_SCENARIO', '')
     requests = 0
+    import _thread
+    calls_open, guard = [0, 0.0, 0.0], _thread.allocate_lock()   # [calls of theirs open now, time they were open before, when the open span began]
+    held_log = os.environ.get('FM_TEST_SLACK_TIMINGS', '') + '.held'
+    if os.environ.get('FM_TEST_SLACK_CALL_CLOCK'):
+        # Case A only (the watcher's no-progress stop of their check during a held call; Main 2813 (e)). Two things on a loaded host kept that stop from
+        # ever coming, and neither is what the case is about:
+        # - The clock of their time budget ran during the work before the held call (the entry shell, start-up, the binding checks, each 3 s on a loaded
+        #   host): the held call got 3.9 s and 7.5 s of its budget, or none (119 s, no call begun). Here that clock (fm_slack_watch.monotonic, the plane's
+        #   own name for it) moves only while a call of theirs is open, at the host clock's rate, and stands still between calls; every other reader of
+        #   time.monotonic gets the host clock.
+        # - Their call bound (10 s) ends a held call before the watcher can see it: the watcher marks progress at the sample that saw it, so it needs
+        #   about 6 s plus two sampling intervals of silence, and one sample took 5.5 to 7.2 s on that host. Here, at the plane's first read of this
+        #   clock, their call bound and their budget are set to the stall of the case (FM_TEST_SLACK_STALL, 60 s), and the transport's own 10 s wait on
+        #   a silent socket (Slack._bounded) is the call's time left, so the held call is silent for the whole stall: the 6 s stop then comes for any
+        #   sampling interval under 27 s.
+        host_monotonic, origin = time.monotonic, []
+        import fm_slack
+        bounded_exchange = fm_slack.Slack._exchange
+
+        def exchange(slack, request, timeout, opener=None):
+            return bounded_exchange(slack, request, max(timeout, slack.time_left()) if opener is not None else timeout, opener)
+        fm_slack.Slack._exchange = exchange
+
+        def budget_clock():
+            now = host_monotonic()
+            caller = sys._getframe(1)
+            if caller.f_code.co_name != 'monotonic' or caller.f_globals.get('__name__') != '__main__':
+                return now
+            with guard:
+                if not origin:
+                    origin.append(now)
+                    caller.f_globals['SECOND_CALL_BOUND'] = caller.f_globals['SECOND_BUDGET'] = float(os.environ['FM_TEST_SLACK_STALL'])
+                return origin[0] + calls_open[1] + (now - calls_open[2] if calls_open[0] else 0.0)
+        time.monotonic = budget_clock
+
+    def their_call(opening):
+        # Counts the open calls of theirs for the budget clock above (and nothing else).
+        now = time.monotonic()
+        with guard:
+            if opening:
+                calls_open[0] += 1
+                if calls_open[0] == 1:
+                    calls_open[2] = now
+            else:
+                calls_open[0] -= 1
+                if calls_open[0] == 0:
+                    calls_open[1] += now - calls_open[2]
 
     class Response(io.BytesIO):
         headers = {'x-oauth-scopes': ','.join(replay.scopes)}
@@ -92,10 +139,17 @@ def install():
                     if fence.closed:
                         raise OSError('the exchange socket was shut down')
                     fence.duplicates.append(reader.dup())
+            # Each held reply notes when it began and how it ended (ran its length, or cut by its fence); a stopped process notes no end.
+            with open(held_log, 'a') as out:
+                out.write('begun\n')
             try:
                 if reader.recv(1) == b'':
+                    with open(held_log, 'a') as out:
+                        out.write('cut\n')
                     raise OSError('the exchange socket was shut down')
             except socket.timeout:
+                with open(held_log, 'a') as out:
+                    out.write('ran\n')
                 if seconds >= timeout:
                     raise
 
@@ -115,6 +169,8 @@ def install():
                     fields[key] = json.loads(value)
         started = time.monotonic()
         second = fields.get('channel') == SECOND_DM or fields.get('users') == SECOND
+        if second:
+            their_call(True)
         try:
             if scenario == 'hang':
                 # No listener or external address: leave the peer silent and
@@ -135,6 +191,8 @@ def install():
             body = replay.call(method, **fields)
             return Response(json.dumps(body).encode())
         finally:
+            if second:
+                their_call(False)
             with open(os.environ['FM_TEST_SLACK_TIMINGS'], 'a') as out:
                 out.write(json.dumps({'method': method, 'timeout': timeout, 'second': second,
                                       'seconds': time.monotonic() - started}) + '\n')
@@ -303,14 +361,16 @@ def second_person_watcher():
         data['messages'].append(message)
         state[0].write_text(json.dumps(data))
 
-    def watch(home, env, scenario, sweep, stall=0, timeout='', check='slack'):
+    def watch(home, env, scenario, sweep, stall=0, timeout='', check='slack', call_clock=False):
         # One watcher sweep runs the owner's check (slack) and then the second person's (slacksecond) with one token; a new sweep has a new token.
         (home / 'timings.jsonl').write_text('')
+        (home / 'timings.jsonl.held').write_text('')
         result = home / 'result.txt'
         result.unlink(missing_ok=True)
         started = time.monotonic()
         run = subprocess.run(['bash', '-c', WATCH, '_', str(ROOT / 'bin/fm-watch.sh'), str(home / ('state/%s.check.sh' % check)), str(timeout), str(result), check, sweep],
-                             env=dict(env, FM_TEST_SLACK_SCENARIO=scenario, FM_TEST_SLACK_STALL=str(stall)), capture_output=True, text=True)
+                             env=dict(env, FM_TEST_SLACK_SCENARIO=scenario, FM_TEST_SLACK_STALL=str(stall), FM_TEST_SLACK_CALL_CLOCK='1' if call_clock else ''),
+                             capture_output=True, text=True)
         elapsed = time.monotonic() - started
         assert run.returncode == 0, run
         line = run.stdout.strip().splitlines()[-1]
@@ -337,10 +397,13 @@ def second_person_watcher():
         assert line == 'status=0 stopped= notice=', line                 # the owner's check ends without any call of theirs
         assert len(wakes(result, '2000.000100', 'U0TESTOWNER')) == 1, result
         assert not any(r['second'] for r in rows), rows
-        line, result, rows, elapsed = watch(home, env, 'second-stall', 'a.1', stall=60, timeout=NO_PROGRESS_SECONDS, check='slacksecond')
+        # Their budget runs on the call clock (install): the held call begins with its whole call bound left, however long the work before it took.
+        line, result, rows, elapsed = watch(home, env, 'second-stall', 'a.1', stall=60, timeout=NO_PROGRESS_SECONDS, check='slacksecond', call_clock=True)
         assert line.startswith('status=124 stopped=no progress notice=check slacksecond stopped after '), line
         assert result == '', result                                   # the watcher discards a stopped check's output
-        assert elapsed < 40, elapsed
+        # Stopped during their held call: a held reply of theirs began, and none ran its length or was cut by its fence before the stop.
+        held = (home / 'timings.jsonl.held').read_text().split()
+        assert held[:1] == ['begun'] and 'ran' not in held and 'cut' not in held, held
         line, result, rows, elapsed = watch(home, env, '', 'a.2')
         assert wakes(result, '2000.000100', 'U0TESTOWNER') == [], result  # delivered once, never again
         line, result, rows, elapsed = watch(home, env, '', 'a.2', check='slacksecond')

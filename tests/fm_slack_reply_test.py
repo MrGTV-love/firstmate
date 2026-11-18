@@ -82,6 +82,43 @@ class LiveScrub(Traced):
         return json.loads(json.dumps(data, ensure_ascii=False).replace(os.environ['SLACK_BOT_TOKEN'], self.scrub_with))
 
 
+class Priced:
+    """A fake clock for the plane (its monotonic) on which every Slack call costs `cost` seconds, the owner's and the second person's alike, their DM proof
+    included, and nothing else costs time. Each call is recorded with its method and whose it is (second: a call into their DM or the proof of their DM).
+    The clock reads (calls so far) x (cost - 1 ns) plus the time before this cost was set: a product, never a running float sum, and 1 ns under the
+    stated cost, so that floating-point rounding never decides whether a call that ends exactly at the budget's end (70 x 0.3 s = 21 s) begins; the
+    plane's own rule (second_budget) begins it."""
+    SLACK = 1e-9
+
+    def __init__(self, second_user, second_dm):
+        self._cost, self.base, self.count, self.calls, self.who = 0.0, 0.0, 0, [], (second_user, second_dm)
+
+    @property
+    def cost(self):
+        return self._cost
+
+    @cost.setter
+    def cost(self, value):
+        self.base, self.count, self._cost = self.now, 0, value
+
+    @property
+    def now(self):
+        return self.base + self.count * max(0.0, self._cost - self.SLACK)
+
+    @contextlib.contextmanager
+    def on(self):
+        real = Traced.call
+        priced = self
+
+        def call(replay, method, **fields):
+            priced.count += 1
+            theirs = fields.get('channel') == priced.who[1] or (method == 'conversations.open' and fields.get('users') == priced.who[0])
+            priced.calls.append((method, 'second' if theirs else 'owner'))
+            return real(replay, method, **fields)
+        with patch.object(Traced, 'call', call), patch.object(plane, 'monotonic', lambda: priced.now):
+            yield self
+
+
 class Children:
     """The stand-in for subprocess.run: every child start is recorded with its arguments and its effective environment (names only)."""
 
@@ -2096,6 +2133,270 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                     self.assertEqual(rc, 0)
                     woken += [(poll, line) for line in out.splitlines() if line.startswith('check: slack follow-up %s to request %s@%s' % (followup, threads[0], SCOTT))]
             self.assertEqual(len(woken), 1, woken)
+
+    # ---- SC8 (6) and A6 on the real bounded reader: the plane's own SECOND_IO_WAIT (2 s) and SECOND_BUDGET (21 s), never the long ones of scott() ----
+    # The tests above that use scott() grade the split arithmetic with both made 600 s; these grade the same bounds at the plane's own limits, with a fake
+    # clock on which every Slack call costs one stated amount (Priced). A case whose calls the budget cannot hold is reported, not asserted as met.
+    PRODUCTION_COSTS = (0.05, 0.3, 1.0, 2.5)
+
+    @contextlib.contextmanager
+    def production(self):
+        """One home with the second person configured at the plane's own limits (no patch of SECOND_IO_WAIT or SECOND_BUDGET), on a priced clock whose
+        calls cost nothing until the caller sets its cost."""
+        self.assertEqual((plane.SECOND_IO_WAIT, plane.SECOND_BUDGET, plane.SECOND_CALL_BOUND), (2.0, 21.0, 10.0))
+        priced = Priced(SCOTT, SCOTT_DM)
+        with case(cap='20', extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT}) as home, priced.on():
+            self.assertEqual(home.poll()[0], 0)
+            yield home, priced
+
+    @staticmethod
+    def calls_that_fit(cost):
+        """How many calls of theirs begin in one pass when each costs cost: a call begins only when it ends inside SECOND_BUDGET (second_budget)."""
+        return int((plane.SECOND_BUDGET + 1e-9) // cost)
+
+    @classmethod
+    def thread_bounds(cls, cap, cost, owners, theirs):
+        """The bounds of SC8 (6) for one flood case, and K. owner: the adopted owner bound (2 To at C = 1, ceil(To / ceil(C / 2)) at C >= 2), whatever the
+        cost (the owner's reads have no time budget). dod: the adopted bound for their threads (2 Ts at C = 1, ceil(Ts / floor(C / 2)) at C >= 2). K: the
+        bound at the plane's own limits, from r = floor(SECOND_BUDGET / cost) - 2, the thread reads their pass can begin after the DM proof and the history
+        read: K = 2 Ts at C = 1 and K = ceil(Ts / min(floor(C / 2), r)) at C >= 2, while r >= 1. With r = 0 (the budget holds the proof and one call) their
+        history read and their thread reads take turns (threads_first), one pass in two reads one thread: K = 2 Ts at C >= 2 (not stated at C = 1). K
+        equals dod exactly when the budget holds the proof, the history read and their share (met)."""
+        r = cls.calls_that_fit(cost) - 2
+        if cap == 1:
+            owner, dod = 2 * owners, 2 * theirs
+            k = dod if r >= 1 else None
+        else:
+            owner, share = -(-owners // -(-cap // 2)), cap // 2
+            dod = -(-theirs // share)
+            k = -(-theirs // min(share, r)) if r >= 1 else (2 * theirs if r == 0 else None)
+        return {'owner': owner, 'dod': dod, 'k': k, 'r': r, 'met': k == dod}
+
+    @classmethod
+    def liveness_bounds(cls, cap, cost):
+        """The LIVENESS case of SC8 (6) (3C new requests and 3C request threads of theirs, no owner load) at the plane's own limits, by the rule of their
+        pass (resume_second, take_in_second, read_their_followups, take_in_requests). A pass begins F = floor(SECOND_BUDGET / cost) calls:
+        1. the DM proof;
+        2. the acknowledgement the last pass's budget stopped before it began (it was taken in), first, charged to the cap;
+        3. normally the history read, then thread reads while each leaves time for keep = min(cap left, requests waiting) acknowledgements, so
+           min(C, F - calls - keep) reads; a pass that reads no thread marks their threads first for the next pass; then the requests are taken in and
+           acknowledged while the time lasts: the first acknowledgement that cannot begin leaves its request taken in for the next pass, and the rest wait;
+        4. a pass so marked reads min(C, F - calls) threads first, then the history read and the acknowledgements only while they still fit.
+        A request is woken when its acknowledgement is posted. Returns the poll by which every request is woken and every one of the 3C threads read
+        (K_requests, K_threads), r = F - 2, and met: both within the adopted 3 polls."""
+        fit = cls.calls_that_fit(cost)
+        waiting, pending, unread, first = 3 * cap, 0, 3 * cap, False
+        poll, k_requests, k_threads, woken = 0, None, None, 0
+        while (k_requests is None or k_threads is None) and fit >= 2 and poll < 1000:
+            poll += 1
+            calls = 1
+            resumed = min(pending, fit - calls)
+            calls, pending, woken, left = calls + resumed, pending - resumed, woken + resumed, cap - resumed
+            reads, history = 0, False
+            if first:
+                reads = min(cap, fit - calls)
+                calls += reads
+                history = calls + 1 <= fit
+                calls += history
+            else:
+                calls += 1
+                history = True
+                reads = min(cap, max(0, fit - calls - min(left, waiting)))
+                calls += reads
+            if history:
+                taken = min(left, waiting)
+                acks = min(taken, fit - calls)
+                woken += acks
+                if acks < taken:
+                    pending += 1
+                    waiting -= acks + 1
+                else:
+                    waiting -= taken
+            first = reads == 0
+            unread = max(0, unread - reads)
+            if woken == 3 * cap and k_requests is None:
+                k_requests = poll
+            if unread == 0 and k_threads is None:
+                k_threads = poll
+        return {'k_requests': k_requests, 'k_threads': k_threads, 'r': fit - 2,
+                'met': k_requests is not None and k_threads is not None and max(k_requests, k_threads) <= 3}
+
+    @staticmethod
+    def each_cost(home, costs):
+        """The home as built now, once for each cost: the whole disposable home (its journals, its replay conversation) is saved after the build and put
+        back before each cost after the first, so every cost starts from the same state. Yields each cost."""
+        with tempfile.TemporaryDirectory(prefix='fm-slack-reply-saved-') as saved:
+            copy = Path(saved) / 'home'
+            shutil.copytree(home.dir, copy)
+            for index, cost in enumerate(costs):
+                if index:
+                    shutil.rmtree(home.dir)
+                    shutil.copytree(copy, home.dir)
+                yield cost
+
+    def production_flood(self, cap, costs, owners, theirs, polls):
+        """The flood of SC8 (6) at the plane's own limits: owners and theirs request threads, each with one follow-up waiting, polled at cap until every
+        follow-up was woken (at most polls(cost) polls), from the same built state at each cost. Returns {cost: record}: the poll at which each thread was
+        first read (a thread read that worked) and each follow-up first woken, and for each poll the request-thread reads made, the calls of theirs begun,
+        and the threads of each person first read."""
+        found = {}
+        with self.production() as (home, priced):
+            mine, others = self.build(home, owners, theirs, followups=True)
+            everything = set(mine) | set(others)
+            for cost in self.each_cost(home, costs):
+                priced.cost = cost
+                read, woken, per_poll = {}, {}, []
+                for poll in range(1, polls(cost) + 1):
+                    Traced.TRACE.clear()
+                    del priced.calls[:]
+                    rc, out, err = home.poll(env={'FM_SLACK_POLL_MAX_ANSWERS': str(cap)})
+                    self.assertEqual(rc, 0, err)
+                    rows = [row for row in home.calls('conversations.replies') if row['thread'] in everything]
+                    fresh = [row['thread'] for row in rows if row['outcome'] == 'ok' and row['thread'] not in read]
+                    for thread in fresh:
+                        read[thread] = poll
+                    per_poll.append({'reads': len(rows), 'their_calls': sum(1 for _, who in priced.calls if who == 'second'),
+                                     'their_new': sum(1 for t in fresh if t in others), 'owner_new': sum(1 for t in fresh if t in mine)})
+                    for thread in everything:
+                        if ('follow-up in %s"' % thread) in out:
+                            woken.setdefault(thread, poll)
+                    if len(woken) == len(everything):
+                        break
+                found[cost] = {'mine': mine, 'others': others, 'read': read, 'woken': woken, 'per_poll': per_poll}
+        return found
+
+    def production_liveness(self, cap, costs, polls):
+        """The LIVENESS case of SC8 (6) at the plane's own limits: 3C request threads of theirs and 3C new requests of theirs, no owner load, polled at cap
+        until every request was woken and every thread read (at most polls polls), from the same built state at each cost. Returns {cost: record}: the
+        poll at which each request was woken and each thread first read, and the calls of theirs begun in each poll."""
+        found = {}
+        with self.production() as (home, priced):
+            _, threads = self.build(home, 0, 3 * cap)
+            requests = [self.their_message(home, 'a new request %d' % index) for index in range(3 * cap)]
+            for cost in self.each_cost(home, costs):
+                priced.cost = cost
+                woken, read, per_poll = {}, {}, []
+                for poll in range(1, polls + 1):
+                    Traced.TRACE.clear()
+                    del priced.calls[:]
+                    rc, out, err = home.poll(env={'FM_SLACK_POLL_MAX_ANSWERS': str(cap)})
+                    self.assertEqual(rc, 0, err)
+                    per_poll.append({'their_calls': sum(1 for _, who in priced.calls if who == 'second'),
+                                     'woken': sum(1 for ts in requests if 'check: slack request %s from %s' % (ts, SCOTT) in out)})
+                    for ts in requests:
+                        if 'check: slack request %s from %s' % (ts, SCOTT) in out:
+                            woken.setdefault(ts, poll)
+                    for row in home.calls('conversations.replies'):
+                        if row['thread'] in threads and row['outcome'] == 'ok':
+                            read.setdefault(row['thread'], poll)
+                    if len(woken) == len(requests) and len(read) == len(threads):
+                        break
+                found[cost] = {'requests': requests, 'threads': threads, 'woken': woken, 'read': read, 'per_poll': per_poll}
+        return found
+
+    def check_flood_at_production_limits(self, cap, scenarios, costs=None):
+        """Every flood case at cap and each priced cost, at the plane's own limits: the owner bound holds whatever the cost and whatever their volume; every
+        thread of theirs is read within K polls (thread_bounds), which is the adopted bound exactly when the budget holds the DM proof, the history read and
+        their share; every poll reads part of their share until all of it was read; request-thread reads never exceed C in a poll; no pass of theirs
+        begins more calls than its budget holds; and every follow-up of both people is woken. Returns {(cost, owners, theirs): the record}."""
+        found, costs = {}, costs or self.PRODUCTION_COSTS
+        for owners, theirs in scenarios:
+            bounds = {cost: self.thread_bounds(cap, cost, owners, theirs) for cost in costs}
+            for cost, b in bounds.items():
+                self.assertIsNotNone(b['k'], (cap, cost, owners, theirs))
+            runs = self.production_flood(cap, costs, owners, theirs, lambda cost: max(bounds[cost]['owner'], bounds[cost]['k'], bounds[cost]['dod']) + 6)
+            for cost in costs:
+                label, b, r = (cap, cost, owners, theirs), bounds[cost], runs[cost]
+                self.assertEqual(set(r['woken']), set(r['mine']) | set(r['others']), label)
+                self.assertEqual(set(r['read']), set(r['mine']) | set(r['others']), label)
+                self.assertLessEqual(max(r['read'][t] for t in r['mine']), b['owner'], label)
+                self.assertLessEqual(max(r['read'][t] for t in r['others']), b['k'], label)
+                if b['met']:
+                    self.assertLessEqual(max(r['read'][t] for t in r['others']), b['dod'], label)
+                left = theirs
+                for index, poll in enumerate(r['per_poll'], start=1):
+                    self.assertLessEqual(poll['reads'], cap, (label, index))
+                    self.assertLessEqual(poll['their_calls'], self.calls_that_fit(cost), (label, index))
+                    if cap > 1 and left:
+                        # Progress on their share in every poll: at least min(floor(C / 2), r) of their threads not read yet (all, when fewer are left).
+                        self.assertGreaterEqual(poll['their_new'], min(cap // 2, b['r'], left), (label, index))
+                    left -= poll['their_new']
+                if cap == 1:
+                    # At C = 1 the one read alternates: in every two polls one more thread of theirs is read until all are.
+                    news = [poll['their_new'] for poll in r['per_poll']]
+                    for index in range(len(news) - 1):
+                        if sum(news[:index]) < theirs:
+                            self.assertGreaterEqual(news[index] + news[index + 1], 1, (label, index + 1))
+                found[(cost, owners, theirs)] = r
+        return found
+
+    def test_sc8_6_at_the_planes_own_limits_cap_1_keeps_the_owner_bound_2_to_and_reads_each_thread_of_theirs_within_2_ts_at_every_priced_cost(self):
+        # SC8 (6) and A6 on the real bounded reader at C = 1: the FLOOD TEST AT C = 1 (To = 3, Ts = 3 x the default cap), Ts = 1, and a balanced case.
+        # Every priced cost (0.05, 0.3, 1.0 and 2.5 s per call) holds the proof, the history read and one thread read (r >= 1), so K = 2 Ts is met at each.
+        found = self.check_flood_at_production_limits(1, ((3, 1), (3, 60), (5, 5)))
+        for cost in self.PRODUCTION_COSTS:
+            self.assertTrue(self.thread_bounds(1, cost, 3, 60)['met'], cost)
+            # The owner bound is the same with Ts = 1 as with Ts = 3 x the default.
+            self.assertEqual(max(found[(cost, 3, 1)]['read'][t] for t in found[(cost, 3, 1)]['mine']),
+                             max(found[(cost, 3, 60)]['read'][t] for t in found[(cost, 3, 60)]['mine']), cost)
+
+    def test_sc8_6_at_the_planes_own_limits_cap_2_and_3_keep_each_persons_bound_at_every_priced_cost(self):
+        # C = 2 and C = 3: their share floor(C / 2) = 1 thread read fits the budget at every priced cost, so the adopted bounds are met at each (A6, Main 2787).
+        for cap in (2, 3):
+            self.check_flood_at_production_limits(cap, ((3, 60), (cap + 2, 1), (cap - 1, max(3, cap)), (5, 5)))
+            for cost in self.PRODUCTION_COSTS:
+                self.assertTrue(self.thread_bounds(cap, cost, 3, 60)['met'], (cap, cost))
+
+    def test_sc8_6_at_the_planes_own_limits_the_default_cap_meets_the_bound_up_to_1_s_per_call_and_reads_within_k_polls_at_2_5_s(self):
+        # The default C = 20: their share is 10 thread reads. At 0.05, 0.3 and 1.0 s per call the budget holds the proof, the history read and the share
+        # (2 + 10 calls), so every thread of theirs is read within ceil(Ts / 10) polls (A6, Main 2787, condition 1). At 2.5 s it holds 8 calls, so r = 6
+        # thread reads a poll: K = ceil(Ts / 6) is asserted, and is reached exactly when Ts = 60 (the owner's spare share flows to them, the budget stops it).
+        found = self.check_flood_at_production_limits(20, ((3, 60), (22, 1), (19, 20), (5, 5)))
+        for cost in (0.05, 0.3, 1.0):
+            self.assertTrue(self.thread_bounds(20, cost, 3, 60)['met'], cost)
+        slow = self.thread_bounds(20, 2.5, 3, 60)
+        self.assertEqual((slow['r'], slow['dod'], slow['k'], slow['met']), (6, 6, 10, False))
+        self.assertEqual(max(found[(2.5, 3, 60)]['read'][t] for t in found[(2.5, 3, 60)]['others']), 10)
+        self.assertEqual([poll['their_new'] for poll in found[(2.5, 3, 60)]['per_poll']][:10], [6] * 10)
+
+    def test_sc8_6_at_the_planes_own_limits_a_larger_cap_40_reads_within_k_polls(self):
+        # C = 40: their share is 20 thread reads. At 0.05 and 0.3 s the budget holds 2 + 20 calls (met); at 1.0 s it holds 21 calls (r = 19) and at 2.5 s
+        # 8 (r = 6), so K = ceil(Ts / 19) and ceil(Ts / 6) are asserted there. The owner bound holds at every cost.
+        self.check_flood_at_production_limits(40, ((3, 60), (42, 1), (39, 40), (5, 5)))
+        self.assertEqual([self.thread_bounds(40, cost, 3, 60)['met'] for cost in self.PRODUCTION_COSTS], [True, True, False, False])
+
+    def test_sc8_6_liveness_at_the_planes_own_limits_3c_requests_and_threads_of_theirs_are_taken_in_and_read_within_k_polls(self):
+        # SC8 (6) LIVENESS on the real bounded reader: 3C new requests and 3C request threads of theirs, no owner load, at C = 1, 2, 3, the default 20 and 40,
+        # at every priced cost. Within the adopted 3 polls wherever the budget holds the proof, the history read, C acknowledgements and C thread reads in
+        # each poll (2C + 2 calls); at every cost by K (liveness_bounds, the rule of their pass), which is asserted. No pass begins more calls than its
+        # budget holds, and in every two polls more of their requests are woken or more of their threads read until all are.
+        for cap in (1, 2, 3, 20, 40):
+            runs = self.production_liveness(cap, self.PRODUCTION_COSTS, 40)
+            for cost in self.PRODUCTION_COSTS:
+                label, b, r = (cap, cost), self.liveness_bounds(cap, cost), runs[cost]
+                if cap <= 3:
+                    self.assertTrue(b['met'], label)
+                self.assertEqual(set(r['woken']), set(r['requests']), label)
+                self.assertEqual(set(r['read']), set(r['threads']), label)
+                self.assertLessEqual(max(r['woken'].values()), b['k_requests'], label)
+                self.assertLessEqual(max(r['read'].values()), b['k_threads'], label)
+                if b['met']:
+                    self.assertLessEqual(max(list(r['woken'].values()) + list(r['read'].values())), 3, label)
+                done = [sum(1 for v in r['woken'].values() if v <= poll) + sum(1 for v in r['read'].values() if v <= poll)
+                        for poll in range(len(r['per_poll']) + 1)]
+                for index, poll in enumerate(r['per_poll'], start=1):
+                    self.assertLessEqual(poll['their_calls'], self.calls_that_fit(cost), (label, index))
+                    if index >= 2 and done[index - 2] < 6 * cap:
+                        self.assertGreater(done[index], done[index - 2], (label, index))
+
+    def test_sc8_6_u1_at_9_9_s_per_call_their_one_thread_at_cap_2_is_read_within_k_2_polls_by_turn_taking(self):
+        # The U1 input (C = 2, one thread of theirs, every call 9.9 s): the budget holds the proof and one call (r = 0), so the adopted bound of 1 poll cannot
+        # be met; their history read and thread reads take turns, and the thread is read at the second poll (K = 2), never later.
+        b = self.thread_bounds(2, 9.9, 0, 1)
+        self.assertEqual((b['r'], b['dod'], b['k'], b['met']), (0, 1, 2, False))
+        r = self.production_flood(2, (9.9,), 0, 1, lambda cost: 4)[9.9]
+        self.assertEqual(r['read'].get(r['others'][0]), 2, r['per_poll'])
+        self.assertEqual([poll['their_new'] for poll in r['per_poll']][:2], [0, 1])
 
     def test_sc2_one_combined_attempt_trace_lists_every_post_attempt_of_both_people_with_its_destination_and_outcome(self):
         # SC2 with SC8: the owner and the second person each have a request, a reply from Main, a follow-up and a reply to it. The attempt trace holds every
