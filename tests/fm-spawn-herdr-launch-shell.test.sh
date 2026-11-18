@@ -388,9 +388,10 @@ test_non_tmux_reason_starts_after_wrapped_decision_delimiter() {
     fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$ID" "$PROJ_DIR" \
       --mode local-only --yolo off --backend herdr --harness codex 2>&1) || status=$?
   expect_code 0 "$status" "a valid reason at the exact wrap boundary must permit completion: $out"
-  assert_grep '^treehouse: checked /fixture/candidate-[0-9]+-0+: accepted: $' \
-    "$CASE_DIR/progress-capture" 'the decision delimiter did not end at the physical boundary'
-  assert_grep '^waiting: tick 1$' "$CASE_DIR/progress-capture" 'the reason did not start on the next physical line'
+  grep -Eq '^treehouse: checked /fixture/candidate-[0-9]+-0+: accepted: $' \
+    "$CASE_DIR/progress-capture" || fail 'the decision delimiter did not end at the physical boundary'
+  grep -Fxq 'waiting: tick 1' "$CASE_DIR/progress-capture" \
+    || fail 'the reason did not start on the next physical line'
   assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$ID.meta" 'the valid wrapped reason prevented isolated-copy acceptance'
   pass 'non-tmux exact decision-delimiter alignment is accepted as a valid wrapped reason'
 }
