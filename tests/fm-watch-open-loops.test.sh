@@ -67,7 +67,9 @@ watch_wait_diagnostics() {
 
 wait_watch_exit() {
   local status
-  wait_for_exit "$@"
+  # Wait for the owned watcher to exit, not just to print its wake. Under parallel
+  # validation it can publish the right wake after the old ten-second test guard.
+  wait_for_exit "$1" 400
   status=$?
   if [ "$status" -ne 0 ]; then
     printf 'watcher fixture: owned child %s wait returned status %s\n' "$1" "$status" >&2
@@ -151,7 +153,7 @@ set_mtime() {  # <epoch> <file>
 reap() {
   local rc
   kill "$1" 2>/dev/null || true
-  wait_watch_exit "$1" 100
+  wait_watch_exit "$1"
   rc=$?
   [ "$rc" -ne 124 ] || fail "watcher pid $1 did not exit within 10s of TERM"
 }
@@ -231,7 +233,7 @@ test_overdue_row_wakes_with_a_durable_row() {
   publish_ledger "$state" lost-launcher
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "watcher did not exit for an overdue ledger row"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "watcher did not exit for an overdue ledger row"; }
   grep -q 'check: open-loop-ledger (1 overdue' "$out" || fail "wake reason missing the overdue count: $(cat "$out")"
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger
   [ -s "$state/.open-loops-surfaced" ] || fail "surfacing marker was not recorded"
@@ -244,7 +246,7 @@ test_unchanged_overdue_set_stays_quiet_then_new_row_wakes() {
   publish_ledger "$state" lost-launcher
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "first overdue ledger did not wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "first overdue ledger did not wake"; }
   ack_stopped_cycle "$state" || fail "could not acknowledge the first wake"
   # The same set, republished, is already known: absorbed without an exit or a queue row.
   publish_ledger "$state" lost-launcher
@@ -254,14 +256,14 @@ test_unchanged_overdue_set_stays_quiet_then_new_row_wakes() {
   [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "an unchanged overdue set was queued again"; }
   # A newly overdue row changes the set, so it wakes at once.
   publish_ledger "$state" lost-launcher forgotten-guard
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a newly overdue row did not wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "a newly overdue row did not wake"; }
   grep -q '2 overdue' "$state/.wake-queue" || fail "new overdue row was not queued: $(cat "$state/.wake-queue")"
   ack_stopped_cycle "$state" || fail "could not acknowledge the new row wake"
   jq '.rows[0].evidence = "worker resumed with a new status"' "$state/open-loops.json" > "$state/changed-ledger"
   mv "$state/changed-ledger" "$state/open-loops.json"
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "changed evidence with the same row ids did not wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "changed evidence with the same row ids did not wake"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger
   pass "unchanged evidence stays quiet; new rows and changed evidence wake immediately"
 }
@@ -273,7 +275,7 @@ test_resurface_wake_is_periodic_and_separate_from_changes() {
   publish_ledger "$state" lost-launcher
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "first overdue ledger did not wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "first overdue ledger did not wake"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger
   [ -e "$resurfaced" ] || fail "the first surfaced row did not start the resurface period"
   ack_stopped_cycle "$state" || fail "could not acknowledge the first wake"
@@ -282,7 +284,7 @@ test_resurface_wake_is_periodic_and_separate_from_changes() {
   publish_ledger "$state" lost-launcher forgotten-guard
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a new row did not wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "a new row did not wake"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger
   ! grep -q 'open-loop-ledger-resurface' "$state/.wake-queue" || fail "a single new row queued the periodic list"
   [ "$(file_mtime "$resurfaced")" = "$before" ] || fail "a change wake restamped the resurface cooldown"
@@ -290,7 +292,7 @@ test_resurface_wake_is_periodic_and_separate_from_changes() {
   set_mtime "$(( $(date +%s) - 3700 ))" "$resurfaced"
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "the resurface interval passed without the periodic wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "the resurface interval passed without the periodic wake"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger-resurface
   ack_stopped_cycle "$state" || fail "could not acknowledge the resurface wake"
   # Changes in the due cycle must not starve the periodic list.
@@ -298,7 +300,7 @@ test_resurface_wake_is_periodic_and_separate_from_changes() {
   publish_ledger "$state" lost-launcher forgotten-guard resumed-worker
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "changed rows suppressed a due periodic wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "changed rows suppressed a due periodic wake"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger-resurface
   grep -q "$(printf '\tcheck\topen-loop-ledger\t')" "$state/.wake-queue" \
     || fail "a due periodic wake suppressed the changed-row wake"
@@ -329,7 +331,7 @@ test_detached_helper_runs_and_a_blind_ledger_wakes() {
   install_helper "$fakebin"
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=1 FM_OPEN_LOOPS_BIN="$fakebin/fake-open-loops"
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a degraded ledger published by the helper did not wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "a degraded ledger published by the helper did not wake"; }
   [ -e "$state/.helper-ran" ] || fail "the watcher never ran the detached reconciler"
   grep -q 'open-loop-ledger' "$state/.wake-queue" || fail "degraded ledger wake was not durably queued"
   pass "the watcher runs the reconciler detached and a partly blind ledger still wakes"
@@ -342,7 +344,7 @@ test_missing_ledger_collects_with_large_interval_and_then_throttles() {
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=1209600 \
     FM_OPEN_LOOPS_BIN="$fakebin/fake-open-loops"
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a missing ledger was not collected with a large interval"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "a missing ledger was not collected with a large interval"; }
   [ -e "$state/.helper-ran" ] || fail "the initial collector did not run"
   [ -e "$state/.open-loops-started" ] || fail "initial collection did not record its start"
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger
@@ -368,7 +370,7 @@ test_unpublished_ledger_is_its_own_wake() {
   chmod +x "$fakebin/failing-open-loops"
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=10 FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
   pid=$!
-  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a ledger nobody refreshes did not wake"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "a ledger nobody refreshes did not wake"; }
   grep -q 'check: open-loop-ledger-stale' "$out" || fail "stale wake reason missing: $(cat "$out")"
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger-stale
   pass "a ledger the reconciler stopped publishing is its own wake"
@@ -409,7 +411,7 @@ test_failed_publication_retries_the_same_ledger() {
         fi
       fi
       rm -f "$state/.test-poll-hold"
-      wait_watch_exit "$pid" 100
+      wait_watch_exit "$pid"
       rc=$?
       [ "$rc" -ne 124 ] || { reap "$pid"; fail "$kind/$failure did not refuse the failed publication"; }
       [ "$rc" -ne 0 ] || fail "$kind/$failure reported success without publishing"
@@ -421,7 +423,7 @@ test_failed_publication_retries_the_same_ledger() {
       watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=60 \
         FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
       pid=$!
-      wait_watch_exit "$pid" 100 \
+      wait_watch_exit "$pid" \
         || { reap "$pid"; fail "$kind/$failure retry lost the identical ledger notification"; }
       count=$(awk -F '\t' -v key="$key" '$3 == "check" && $4 == key { n++ } END { print n+0 }' "$state/.wake-queue")
       [ "$count" -eq 1 ] || fail "$kind/$failure retry published $count ledger notifications"
@@ -477,7 +479,7 @@ test_blocked_publication_does_not_commit_cooldown() {
     [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "$kind bypassed the queue lock"; }
     rm -f "$state/.wake-queue.lock/pid"
     rmdir "$state/.wake-queue.lock"
-    wait_watch_exit "$pid" 100 \
+    wait_watch_exit "$pid" \
       || { reap "$pid"; fail "$kind notification was lost after its queue lock was repaired"; }
     assert_ledger_queue_reason "$state" "$out" "$key"
     [ -e "$marker" ] || fail "$kind lock repair did not commit cooldown after publication"
@@ -511,7 +513,7 @@ SH
     FM_PROJECTS_OVERRIDE="$dir/projects" FM_OPEN_LOOPS_INTERVAL=60 \
     FM_OPEN_LOOPS_BIN="$dir/collector-bin/fm-open-loops.sh"
   pid=$!
-  wait_watch_exit "$pid" 100 \
+  wait_watch_exit "$pid" \
     || { : > "$dir/.collector-release"; reap "$pid"; fail "the first watcher did not wake during its detached scan"; }
   wait_for_file "$dir/.collector-started" \
     || { : > "$dir/.collector-release"; fail "the detached real collector never reached its source"; }
@@ -542,7 +544,7 @@ SH
     fi
     sleep 0.1
   done
-  wait_watch_exit "$pid" 100 \
+  wait_watch_exit "$pid" \
     || { reap "$pid"; fail "the retained scan did not publish and wake the restarted watcher"; }
   [ "$retained" -eq 1 ] || fail "the original scan did not survive its watcher's actionable exit"
   [ "$scans" -eq 1 ] || fail "watcher restart overlapped $scans collectors before publication"
@@ -613,7 +615,7 @@ test_decimal_interval_and_zero_defaults() (
     pid=$!
     case "$value" in
       08|09)
-        wait_watch_exit "$pid" 100 || { reap "$pid"; fail "decimal interval $value did not surface stale publication"; }
+        wait_watch_exit "$pid" || { reap "$pid"; fail "decimal interval $value did not surface stale publication"; }
         grep -q 'open-loop-ledger-stale' "$state/.wake-queue" || fail "interval $value did not queue a durable stale wake"
         ;;
       *)
@@ -657,7 +659,7 @@ test_decimal_resurface_and_zero_defaults() (
         FM_HOME_SUMMARY_INTERVAL=99999999 BASH_ENV="$fakebin/clock-env.sh" \
         FM_TEST_PREVIOUS_BASH_ENV="${BASH_ENV:-}"
       pid=$!
-      wait_watch_exit "$pid" 100 || { reap "$pid"; fail "$kind initial wake failed for resurface $value"; }
+      wait_watch_exit "$pid" || { reap "$pid"; fail "$kind initial wake failed for resurface $value"; }
       ack_stopped_cycle "$state" || fail "could not acknowledge $kind resurface fixture"
       age=100
       [ "$value" != 0100 ] || age=85
@@ -672,7 +674,7 @@ test_decimal_resurface_and_zero_defaults() (
       [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "$kind resurface $value queued prematurely"; }
       if [ "$value" = 0100 ]; then
         set_mtime "$((now - 120))" "$marker"
-        wait_watch_exit "$pid" 100 || { reap "$pid"; fail "$kind decimal resurface did not expire after 100 seconds"; }
+        wait_watch_exit "$pid" || { reap "$pid"; fail "$kind decimal resurface did not expire after 100 seconds"; }
         grep -q 'open-loop-ledger' "$state/.wake-queue" || fail "$kind decimal resurface expiry was not durable"
       else
         reap "$pid"
@@ -702,7 +704,7 @@ SH
       || fail "real collector could not publish initial recovery fixture"
     watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
     pid=$!
-    wait_watch_exit "$pid" 100 || { reap "$pid"; fail "initial real overdue publication did not wake"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "initial real overdue publication did not wake"; }
     ack_stopped_cycle "$state" || fail "could not acknowledge initial overdue recovery fixture"
     digest=$(cat "$state/.open-loops-surfaced")
     surfaced=$(file_mtime "$state/.open-loops-surfaced")
@@ -710,7 +712,7 @@ SH
     watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=10 \
       FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
     pid=$!
-    wait_watch_exit "$pid" 100 || { reap "$pid"; fail "first stale incident did not wake"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "first stale incident did not wake"; }
     [ -e "$state/.open-loops-stale-surfaced" ] || fail "first incident did not commit stale cooldown"
     ack_stopped_cycle "$state" || fail "could not acknowledge first stale incident"
     FM_HOME="$dir" NM_HOME="$dir/nm" FM_STATE_OVERRIDE="$state" \
@@ -738,7 +740,7 @@ SH
     watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=10 \
       FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
     pid=$!
-    wait_watch_exit "$pid" 100 || { reap "$pid"; fail "$second second stale incident was suppressed by the first cooldown"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$second second stale incident was suppressed by the first cooldown"; }
     grep -q 'check: open-loop-ledger-stale' "$out" || fail "$second second incident was not an actionable stale exit"
     grep -q 'open-loop-ledger-stale' "$state/.wake-queue" || fail "$second second stale incident was not durable"
     [ -e "$state/.open-loops-stale-surfaced" ] || fail "$second second incident did not commit its own cooldown"
@@ -767,7 +769,7 @@ SH
     watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 \
       FM_OPEN_LOOPS_RESURFACE=21600
     pid=$!
-    wait_watch_exit "$pid" 100 \
+    wait_watch_exit "$pid" \
       || { reap "$pid"; fail "$kind initial overdue publication did not wake"; }
     ack_stopped_cycle "$state" || fail "$kind initial overdue wake could not be acknowledged"
     digest=$(cat "$state/.open-loops-surfaced")
@@ -805,7 +807,7 @@ SH
       || { reap "$pid"; fail "$kind recovery publication retained stale suppression"; }
     rm -f "$state/.wake-queue.lock/pid"
     rmdir "$state/.wake-queue.lock"
-    wait_watch_exit "$pid" 100 \
+    wait_watch_exit "$pid" \
       || { reap "$pid"; fail "$kind historical stale wake was lost after queue release"; }
     count=$(awk -F '\t' '$3 == "check" && $4 == "open-loop-ledger-stale" { n++ } END { print n+0 }' "$state/.wake-queue")
     [ "$count" -eq 1 ] || fail "$kind historical stale notification was not queued exactly once"
@@ -835,7 +837,7 @@ SH
       : > "$state/.open-loops-started"
       set_mtime "$(( $(date +%s) - 600 ))" "$state/.open-loops-started"
     fi
-    wait_watch_exit "$pid" 100 \
+    wait_watch_exit "$pid" \
       || { reap "$pid"; fail "$kind distinct outage was suppressed after fresh observation"; }
     count=$(awk -F '\t' '$3 == "check" && $4 == "open-loop-ledger-stale" { n++ } END { print n+0 }' "$state/.wake-queue")
     [ "$count" -eq 1 ] || fail "$kind distinct outage did not queue exactly one stale notification"
@@ -864,7 +866,7 @@ test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery() {
     cp "$state/open-loops.json" "$dir/valid-ledger.json"
     watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
     pid=$!
-    wait_watch_exit "$pid" 100 \
+    wait_watch_exit "$pid" \
       || { reap "$pid"; fail "$filter initial overdue ledger did not wake"; }
     ack_stopped_cycle "$state" || fail "$filter initial overdue wake could not be acknowledged"
     digest=$(cat "$state/.open-loops-surfaced")
@@ -1070,7 +1072,7 @@ test_canonical_reopening_notifies_without_an_absence_observation() {
     first=$(make_case "canonical-first-$kind")
     publish_recorded_ledger "$dir/ledgers/first.json" "$first/state"
     watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind predecessor did not notify"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind predecessor did not notify"; }
     assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger
     cycle=$(make_case "canonical-cycle-$kind");state="$cycle/state";out="$cycle/watch.out";fakebin="$dir/fakebin"
     copy_delivered_cooldowns "$first/state" "$state"
@@ -1086,7 +1088,7 @@ test_canonical_reopening_notifies_without_an_absence_observation() {
       || { reap "$pid"; fail "$kind unrelated append changed notification identity"; }
     # Resolution and identical reopening both precede this one publication.
     publish_recorded_ledger "$dir/ledgers/reopened.json" "$state"
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind new opening inherited predecessor notification"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind new opening inherited predecessor notification"; }
     assert_ledger_queue_reason "$state" "$out" open-loop-ledger
     [ "$(cat "$state/.open-loops-surfaced")" != "$marker" ] || fail "$kind recurrence did not advance its dedicated marker"
     [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] || fail "$kind recurrence used periodic rescue"
@@ -1111,7 +1113,7 @@ test_canonical_reopening_notifies_without_an_absence_observation() {
       && [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
       || { reap "$pid"; fail "$kind unrelated append replayed the modern notification"; }
     publish_recorded_ledger "$dir/ledgers/new-question.json" "$state"
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind settled consumer lost genuine new-question eligibility"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind settled consumer lost genuine new-question eligibility"; }
     assert_ledger_queue_reason "$state" "$out" open-loop-ledger
     [ ! -s "$dir/forbidden-calls" ] || fail "$kind fixture called an external backend"
     python3 - "$dir/ledgers" <<'PY' || fail "$kind publication did not identify the current row independently of old handling history"
@@ -1136,7 +1138,7 @@ test_legacy_projection_migrates_once_then_current_identity_settles() {
   first=$(make_case canonical-legacy-first)
   publish_recorded_ledger "$dir/ledgers/legacy-first.json" "$first/state"
   watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home";pid=$!
-  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "legacy initial projection did not notify"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "legacy initial projection did not notify"; }
   assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger
   cycle=$(make_case canonical-legacy-cycle);state="$cycle/state";out="$cycle/watch.out"
   copy_delivered_cooldowns "$first/state" "$state"
@@ -1148,7 +1150,7 @@ test_legacy_projection_migrates_once_then_current_identity_settles() {
   [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
     || { reap "$pid"; fail "absent-token fallback changed its exact six-field identity"; }
   publish_recorded_ledger "$dir/ledgers/reopened.json" "$state"
-  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "upgrading the legacy marker did not notify"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "upgrading the legacy marker did not notify"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger
   [ "$(cat "$state/.open-loops-surfaced")" != "$marker" ] || fail "migration did not advance its marker"
   [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] || fail "migration used a periodic rescue"
@@ -1161,7 +1163,7 @@ test_legacy_projection_migrates_once_then_current_identity_settles() {
   [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
     || { reap "$pid"; fail "migration caused repeated unchanged notifications"; }
   publish_recorded_ledger "$dir/ledgers/new-question.json" "$state"
-  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "quiet upgraded consumer lost new-question eligibility"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "quiet upgraded consumer lost new-question eligibility"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger
   [ ! -s "$dir/forbidden-calls" ] || fail "legacy fixture called an external backend"
   pass "absent identity preserves exact legacy projection; one migration wake settles before a genuine new question"
@@ -1177,12 +1179,12 @@ test_result_followup_notifies_once_then_settles() {
     first=$(make_case "failed-delivery-$kind")
     publish_recorded_ledger "$dir/ledgers/failed-delivery.json" "$first/state"
     watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind failed delivery lost the original actionable notification"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind failed delivery lost the original actionable notification"; }
     assert_ledger_queue_reason "$first/state" "$first/watch.out" open-loop-ledger "$((1 + coverage))"
     first=$(make_case "result-first-$kind")
     publish_recorded_ledger "$dir/ledgers/steer-current.json" "$first/state"
     watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home"; pid=$!
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind initial result fixture did not notify"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind initial result fixture did not notify"; }
     cycle=$(make_case "result-cycle-$kind");state="$cycle/state";out="$cycle/watch.out"
     copy_delivered_cooldowns "$first/state" "$state"
     marker=$(cat "$state/.open-loops-surfaced");periodic=$(file_mtime "$state/.open-loops-resurfaced")
@@ -1192,7 +1194,7 @@ test_result_followup_notifies_once_then_settles() {
     [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
       || { reap "$pid"; fail "$kind result wait did not stay quiet before its deadline"; }
     publish_recorded_ledger "$dir/ledgers/steer-due.json" "$state"
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind due result follow-up did not notify"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind due result follow-up did not notify"; }
     assert_ledger_queue_reason "$state" "$out" open-loop-ledger "$((2 + coverage))"
     [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
       || fail "$kind result follow-up relied on periodic rescue"
@@ -1214,7 +1216,7 @@ test_result_followup_notifies_once_then_settles() {
     [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
       || { reap "$pid"; fail "$kind current renewal did not stay quiet"; }
     publish_recorded_ledger "$dir/ledgers/steer-renewed-due.json" "$state"
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind second result deadline did not notify"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind second result deadline did not notify"; }
     assert_ledger_queue_reason "$state" "$out" open-loop-ledger "$((2 + coverage))"
     cycle="$state"
     settled=$(make_case "result-second-settled-$kind");state="$settled/state";out="$settled/watch.out"
@@ -1224,7 +1226,7 @@ test_result_followup_notifies_once_then_settles() {
     wait_poll_cycle "$state" "$pid" 100 || { reap "$pid"; fail "$kind second due result did not settle"; }
     [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "$kind second result replayed"; }
     publish_recorded_ledger "$dir/ledgers/steer-next-question.json" "$state"
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$kind settled result lost distinct-question notification"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$kind settled result lost distinct-question notification"; }
     assert_ledger_queue_reason "$state" "$out" open-loop-ledger
     [ ! -s "$dir/forbidden-calls" ] || fail "$kind result fixture called an external backend"
   done
@@ -1238,7 +1240,7 @@ test_unavailable_result_notifies_again_after_recovery() {
   first=$(make_case consumer-result-baseline)
   publish_recorded_ledger "$dir/ledgers/available-current.json" "$first/state"
   watch_canonical_ledger "$first/state" "$dir/fakebin" "$first/watch.out" "$dir/collector-home";pid=$!
-  wait_watch_exit "$pid" 400 || { reap "$pid"; fail "consumer result initial notification failed"; }
+  wait_watch_exit "$pid" || { reap "$pid"; fail "consumer result initial notification failed"; }
   previous="$first/state"
   for stage in first second; do
     if [ "$stage" = first ]; then current=available-current;due=unavailable-due
@@ -1252,7 +1254,7 @@ test_unavailable_result_notifies_again_after_recovery() {
     [ ! -s "$state/.wake-queue" ] && [ "$(cat "$state/.open-loops-surfaced")" = "$marker" ] \
       || { reap "$pid"; fail "$stage recovery/new delivery itself replayed the result wake"; }
     publish_recorded_ledger "$dir/ledgers/$due.json" "$state"
-    wait_watch_exit "$pid" 400 || { reap "$pid"; fail "$stage authoritative unavailability did not notify"; }
+    wait_watch_exit "$pid" || { reap "$pid"; fail "$stage authoritative unavailability did not notify"; }
     assert_ledger_queue_reason "$state" "$out" open-loop-ledger 3
     [ "$(file_mtime "$state/.open-loops-resurfaced")" = "$periodic" ] \
       || fail "$stage consumer result depended on periodic rescue"
