@@ -897,6 +897,118 @@ assert_absent "$home/state/.wake-ack-rows.$dead_pid.AAAAAA" "a row set whose pid
 assert_present "$home/state/.wake-ack-rows.$live_pid.BBBBBB" "a row set whose pid is live is kept"
 pass "scratch rotation keeps a live ack's row set and removes a dead one's"
 
+# One lock serializes the ack decision and the replay publication. A writer is
+# paused with a PATH shim at a boundary of publish_from_reservation while the
+# missing-record ack and the wake ack run; in every valid order the final state
+# keeps the invariant: a pending note always has its wake row, and a note that
+# was acked is never published afterward.
+#   inside: paused at the staging rename, which is inside the lock
+#   before: paused before the lock, so both acks finish first
+paused_writer_case() {  # <name> <inside|before>
+  local name=$1 where=$2 home shim fifo reached real_mv real_tr writer_pid ack_pid wake_pid note_id ack_args rows
+  local waited=0 writer_out writer_rc=0 wake_rc=0 pending_present=no
+  home=$(make_drain_home "$name")
+  shim="$home/shim"; fifo="$home/writer.fifo"; reached="$home/writer.reached"
+  mkdir -p "$shim"
+  real_mv=$(command -v mv); real_tr=$(command -v tr)
+  writer_out=$(run_inbox "$home" note --request-id "$name" "UNREAD CONCURRENT BODY") || fail "$name: the first note failed"
+  note_id=$(printf '%s\n' "$writer_out" | sed -n '1s/^queued //p')
+  "$real_mv" "$home/state/inbox/$note_id.note" "$home/note.aside"
+  ack_args=$(present "$home")
+  cat > "$shim/mv" <<SHIM
+#!/bin/sh
+case "\$1" in
+  */.staging-*)
+    if [ "$where" = inside ] && [ ! -e "$reached" ]; then : > "$reached"; read -r _ < "$fifo"; fi ;;
+esac
+exec "$real_mv" "\$@"
+SHIM
+  cat > "$shim/tr" <<SHIM
+#!/bin/sh
+if [ "$where" = before ] && [ "\$1" = -d ] && [ ! -e "$reached" ]; then : > "$reached"; read -r _ < "$fifo"; fi
+exec "$real_tr" "\$@"
+SHIM
+  chmod +x "$shim/mv" "$shim/tr"
+  mkfifo "$fifo"
+  PATH="$shim:$PATH" run_inbox "$home" note --request-id "$name" "UNREAD CONCURRENT BODY" > "$home/writer.out" 2>&1 &
+  writer_pid=$!
+  while [ ! -e "$reached" ] && [ "$waited" -lt 200 ]; do sleep 0.1; waited=$((waited + 1)); done
+  assert_present "$reached" "$name: the writer never reached its pause point"
+  run_inbox "$home" drain --ack "$note_id" > "$home/ack.out" 2>&1 &
+  ack_pid=$!
+  # shellcheck disable=SC2086
+  run_drain "$home" $ack_args > "$home/wake.out" 2>&1 &
+  wake_pid=$!
+  if [ "$where" = before ]; then
+    wait "$ack_pid" || fail "$name: the missing-record ack failed"
+    wait "$wake_pid" || fail "$name: the wake ack failed while the writer was paused before the lock"
+    assert_equals "0" "$(queue_rows "$home")" "$name: both acks completed before the writer was released"
+  else
+    waited=0
+    while [ "$waited" -lt 20 ]; do sleep 0.1; waited=$((waited + 1)); done
+    assert_absent "$home/state/inbox/handled/$note_id.acked" "$name: the ack decided while the writer was inside the lock"
+  fi
+  printf 'go\n' > "$fifo"
+  wait "$writer_pid" || writer_rc=$?
+  if [ "$where" = inside ]; then
+    wait "$ack_pid" || true
+    wait "$wake_pid" || wake_rc=$?
+  fi
+  rows=$(queue_rows "$home")
+  [ ! -f "$home/state/inbox/$note_id.note" ] || pending_present=yes
+  assert_equals "0" "$writer_rc" "$name: the writer ended cleanly"
+  if [ "$pending_present" = yes ] && [ "$rows" -eq 0 ]; then
+    fail "$name: a pending note was left with no wake row (wake ack rc=$wake_rc, marker: $(find "$home/state/inbox/handled" -type f 2>/dev/null | tr '\n' ' '))"
+  fi
+  if [ "$pending_present" = yes ] && [ -e "$home/state/inbox/handled/$note_id.acked" ]; then
+    fail "$name: a note was published after its identity was acked"
+  fi
+  # Whatever the order, one more ack of the wake passes once the note is handled, and no unread note remains.
+  run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "$name: the final note ack failed"
+  # shellcheck disable=SC2086
+  run_drain "$home" $ack_args >/dev/null 2>&1 || fail "$name: the final wake ack did not pass: $(run_drain "$home" $ack_args 2>&1)"
+  assert_equals "0" "$(queue_rows "$home")" "$name: no wake row is left behind"
+  assert_absent "$home/state/inbox/$note_id.note" "$name: no unread note is left behind"
+}
+paused_writer_case ack-writer-paused-inside inside
+pass "a replay paused inside the lock keeps the invariant in whichever order the acks follow it"
+paused_writer_case ack-writer-paused-before before
+pass "a replay paused before the lock cannot publish an identity acked meanwhile"
+
+# A replay of an identity that has only an ack record reports acknowledgement, in
+# human and JSON form, saves nothing and wakes nothing. Control: a note that was
+# handled the ordinary way reports acknowledgement with its handled path.
+home=$(make_drain_home ack-replay-report)
+first=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the reported note failed"
+note_id=$(printf '%s\n' "$first" | sed -n '1s/^queued //p')
+mv "$home/state/inbox/$note_id.note" "$home/note.aside"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+ack_args=$(present "$home")
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "the wake ack must pass"
+human=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the human replay failed"
+json=$(run_inbox "$home" note --request-id reported --json "REPORTED BODY") || fail "the json replay failed"
+assert_contains "$human" "replay $note_id" "the replay names the identity"
+assert_contains "$human" "already acknowledged" "the replay says the note was acknowledged"
+assert_not_contains "$human" "pick this up" "the replay promises no pickup"
+assert_equals "False" "$(printf '%s' "$json" | json_get saved)" "the replay claims nothing was saved"
+assert_equals "True" "$(printf '%s' "$json" | json_get acknowledged)" "the json replay reports acknowledgement"
+assert_equals "None" "$(printf '%s' "$json" | json_get path)" "the json replay names no path"
+assert_equals "0" "$(queue_rows "$home")" "the replay queued no wake"
+assert_absent "$home/state/inbox/$note_id.note" "the replay published no note"
+home=$(make_drain_home ack-replay-report-control)
+first=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the control note failed"
+note_id=$(printf '%s\n' "$first" | sed -n '1s/^queued //p')
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+human=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the control human replay failed"
+json=$(run_inbox "$home" note --request-id reported --json "REPORTED BODY") || fail "the control json replay failed"
+assert_contains "$human" "already acknowledged" "the control replay says the note was acknowledged"
+assert_not_contains "$human" "pick this up" "the control replay promises no pickup"
+assert_equals "True" "$(printf '%s' "$json" | json_get saved)" "the control record still exists"
+assert_equals "True" "$(printf '%s' "$json" | json_get acknowledged)" "the control json replay reports acknowledgement"
+assert_equals "$home/state/inbox/handled/$note_id.note" "$(printf '%s' "$json" | json_get path)" "the control replay names the handled path"
+pass "a replay of an acknowledged identity reports acknowledgement, and a path only when a record exists"
+
 # --- readiness projection, including unknown -------------------------------
 
 home=$(make_home ready-free)

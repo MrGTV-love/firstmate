@@ -40,8 +40,18 @@
 # crash between save and wake still replays the original note. Without
 # --request-id the historical one-note-per-call behaviour is unchanged.
 # `announce` repairs the wake for an already-saved note without creating another.
-# A note already acknowledged (in handled/) gets no wake from `announce` or a
-# request-id replay; both report it as acknowledged and exit 0.
+# A note already acknowledged (in handled/, or recorded by `drain --ack` with no note
+# record) gets no wake from `announce` or a request-id replay; both report it as
+# acknowledged and exit 0. A replay reports a saved note and its path only when the
+# note record exists, and never says firstmate will pick it up.
+# One lock, the wake-queue lock, serializes every decision that makes a note pending
+# or acknowledged against the wake drain's final consumption: `drain --ack` holds it
+# for its whole loop, a replay holds it from its acknowledged-identity check to the
+# rename that publishes the note, and bin/fm-wake-drain.sh holds it for its note
+# re-check and row consumption. Lock order: this script takes only that lock, never
+# while waiting on another, and never calls the drain; the drain calls only the
+# read-only `pending` while it holds the lock. No order of the three can leave a
+# pending note without its wake, or a note published after its identity was acked.
 # It refuses a note whose announcement state is UNKNOWN: a note written before
 # this home tracked announcement markers already appended its own wake at
 # creation, and there is no record to prove it, so announcing it again would be
@@ -222,6 +232,24 @@ load_wake_lib() {
   FM_INBOX_WAKE_LIB=1
 }
 
+# The wake-queue lock lives in the wake library. A home without that library has
+# no wake drain to race with, so its note decisions run without the lock; a lock
+# that exists but cannot be taken is a failure.
+WAKE_LOCK_TAKEN=false
+take_wake_lock() {
+  WAKE_LOCK_TAKEN=false
+  load_wake_lib || return 0
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  WAKE_LOCK_TAKEN=true
+}
+
+drop_wake_lock() {
+  if [ "$WAKE_LOCK_TAKEN" = true ]; then
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    WAKE_LOCK_TAKEN=false
+  fi
+}
+
 need_python() {
   command -v python3 >/dev/null 2>&1 || die "python3 is required for machine-readable inbox output"
 }
@@ -255,6 +283,13 @@ note_path() {  # <id>
   else
     return 1
   fi
+}
+
+# true when the note is no longer pending and was acknowledged: moved to handled/,
+# or acked with no record (handled/<id>.acked).
+note_acknowledged() {  # <id>
+  [ ! -f "$INBOX/$1.note" ] \
+    && { [ -f "$INBOX/handled/$1.note" ] || [ -f "$INBOX/handled/$1.acked" ]; }
 }
 
 note_announced() {  # <id>
@@ -325,7 +360,7 @@ json.dump({
     "saved": saved == "1",
     "announced": True if announced == "1" else False if announced == "0" else None,
     "acknowledged": acknowledged == "1",
-    "path": path,
+    "path": path or None,
 }, sys.stdout, separators=(",", ":"))
 sys.stdout.write("\n")
 PY
@@ -345,6 +380,9 @@ PY
 # already acknowledged it, so a wake would only spend a turn on an empty inbox.
 announce_note() {  # <id> <summary>
   local id=$1 summary=$2 lib="$FM_ROOT/bin/fm-wake-lib.sh" status=0
+  if note_acknowledged "$id"; then
+    return 2
+  fi
   if note_announced "$id"; then
     return 0
   fi
@@ -374,22 +412,27 @@ announce_note() {  # <id> <summary>
 
 finish_note_result() {  # <outcome> <id> <request-id> <json> <strict-exit> <summary>
   local outcome=$1 id=$2 request_id=$3 json=$4 strict=$5 summary=$6
-  local announced=0 acknowledged=0 path="$INBOX/$id.note" rc=0
+  local announced=0 acknowledged=0 saved=1 path="$INBOX/$id.note" rc=0
   announce_note "$id" "$summary" || rc=$?
   case "$rc" in
     0) announced=1 ;;
     2) acknowledged=1 ;;
   esac
   [ -f "$INBOX/handled/$id.note" ] && path="$INBOX/handled/$id.note"
+  # An identity acked with no note record has nothing saved and no path to name.
+  if [ ! -f "$path" ]; then
+    saved=0
+    path=
+  fi
   if [ "$json" -eq 1 ]; then
-    emit_note_json "$outcome" "$id" "$request_id" 1 "$announced" "$path" "$acknowledged"
+    emit_note_json "$outcome" "$id" "$request_id" "$saved" "$announced" "$path" "$acknowledged"
   else
     if [ "$outcome" = replay ]; then
       printf 'replay %s\n' "$id"
     else
       printf 'queued %s\n' "$id"
     fi
-    printf '  %s\n' "$summary"
+    [ -z "$summary" ] || printf '  %s\n' "$summary"
     if [ "$announced" -eq 1 ]; then
       printf '  firstmate will pick this up at its next check.\n'
     elif [ "$acknowledged" -eq 1 ]; then
@@ -399,6 +442,7 @@ finish_note_result() {  # <outcome> <id> <request-id> <json> <strict-exit> <summ
   if [ "$announced" -eq 1 ] || [ "$acknowledged" -eq 1 ]; then
     return 0
   fi
+  [ -n "$path" ] || path="$INBOX/$id.note"
   if [ "$strict" -eq 1 ]; then
     printf 'fm-inbox: note %s is saved at %s but firstmate was NOT woken\n' \
       "$id" "$path" >&2
@@ -419,19 +463,27 @@ claim_request_id() {  # <request-id> <note-id>  -> 0 claimed, 1 already exists
 
 publish_from_reservation() {  # <request-id> <source> <body> <extra>
   local request_id=$1 source=$2 body=$3 extra=$4
-  local reserved="$REQUESTS/$request_id" id tmp
+  local reserved="$REQUESTS/$request_id" id tmp rc=0
   [ -f "$reserved" ] || return 1
   id=$(tr -d '\r' <"$reserved")
   id=${id%%$'\n'*}
   valid_note_id "$id" || return 1
-  # An acknowledged identity is terminal: a replay never publishes it as a new
-  # pending note, so the wake drain's final pending check cannot be undone by one.
+  # The acknowledged-identity check and the rename that publishes the note are one
+  # step under the wake-queue lock that `drain --ack` and the wake drain's final
+  # consumption also hold (header): an identity acked before this step cannot be
+  # published, and one published before it is seen pending by the ack and the drain.
+  take_wake_lock || return 1
   if [ ! -f "$INBOX/$id.note" ] && [ ! -f "$INBOX/handled/$id.note" ] \
     && [ ! -f "$INBOX/handled/$id.acked" ]; then
-    tmp=$(mktemp "$INBOX/.staging-XXXXXX")
-    write_note_file "$tmp" "$id" "$source" "$body" "$extra" "$request_id"
-    mv "$tmp" "$INBOX/$id.note"
+    if tmp=$(mktemp "$INBOX/.staging-XXXXXX"); then
+      write_note_file "$tmp" "$id" "$source" "$body" "$extra" "$request_id" \
+        && mv "$tmp" "$INBOX/$id.note" || rc=1
+    else
+      rc=1
+    fi
   fi
+  drop_wake_lock
+  [ "$rc" -eq 0 ] || return "$rc"
   printf '%s\n' "$id"
 }
 
@@ -1133,31 +1185,45 @@ cmd_list() {
   [ "$any" -eq 1 ] || printf '(inbox empty)\n'
 }
 
+# One id of `drain --ack`, run under the wake-queue lock (header).
+ack_one_locked() {  # <id>
+  local id=$1
+  if [ -f "$INBOX/$id.note" ]; then
+    if ! mkdir -p "$INBOX/handled" || ! mv "$INBOX/$id.note" "$INBOX/handled/$id.note"; then
+      printf 'fm-inbox: could not move note %s to handled\n' "$id" >&2
+      return 1
+    fi
+    printf 'acked %s\n' "$id"
+  elif [ -f "$INBOX/handled/$id.note" ] || [ -f "$INBOX/handled/$id.acked" ]; then
+    printf 'already-acked %s\n' "$id"
+  elif [ -d "$INBOX" ] && [ -r "$INBOX" ] && [ -x "$INBOX" ]; then
+    # A readable inbox with no record of the id holds no unread note to lose;
+    # the ack is written down so a wake row naming it can still be cleared.
+    if ! mkdir -p "$INBOX/handled" || ! : > "$INBOX/handled/$id.acked"; then
+      printf 'fm-inbox: could not record the ack of %s\n' "$id" >&2
+      return 1
+    fi
+    printf 'already-acked %s (no such note; ack recorded)\n' "$id"
+  else
+    printf 'fm-inbox: inbox is not readable, so note %s cannot be acked: %s\n' "$id" "$INBOX" >&2
+    return 1
+  fi
+}
+
 cmd_drain() {
   if [ "${1:-}" = "--ack" ]; then
     shift
     [ "$#" -gt 0 ] || die "usage: fm-inbox.sh drain --ack <id>..."
-    local id
+    local id rc=0
     for id in "$@"; do
       valid_note_id "$id" || die "invalid note id: $id"
     done
+    take_wake_lock || die "could not take the wake-queue lock to ack"
     for id in "$@"; do
-      if [ -f "$INBOX/$id.note" ]; then
-        mkdir -p "$INBOX/handled" || die "could not create $INBOX/handled"
-        mv "$INBOX/$id.note" "$INBOX/handled/$id.note" || die "could not move note $id to handled"
-        printf 'acked %s\n' "$id"
-      elif [ -f "$INBOX/handled/$id.note" ] || [ -f "$INBOX/handled/$id.acked" ]; then
-        printf 'already-acked %s\n' "$id"
-      elif [ -d "$INBOX" ] && [ -r "$INBOX" ] && [ -x "$INBOX" ]; then
-        # A readable inbox with no record of the id holds no unread note to lose;
-        # the ack is written down so a wake row naming it can still be cleared.
-        mkdir -p "$INBOX/handled" || die "could not create $INBOX/handled"
-        : > "$INBOX/handled/$id.acked" || die "could not record the ack of $id"
-        printf 'already-acked %s (no such note; ack recorded)\n' "$id"
-      else
-        die "inbox is not readable, so note $id cannot be acked: $INBOX"
-      fi
+      ack_one_locked "$id" || { rc=1; break; }
     done
+    drop_wake_lock
+    [ "$rc" -eq 0 ] || exit 1
     return 0
   fi
   cmd_list
