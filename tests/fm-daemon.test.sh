@@ -340,6 +340,7 @@ inbox_note_daemon_case() {  # <dir-name> -> sets dir state note_id
 run_daemon_note_wakes() {  # <dir> <state> [extra env assignments...]
   local dir=$1 state=$2
   shift 2
+  # shellcheck disable=SC2016
   env "$@" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$dir/data" \
     FM_CONFIG_OVERRIDE="$dir/config" FM_ESCALATE_BATCH_SECS=999999 \
     bash -c '. "$1"; FM_DAEMON_DIR="$2" handle_durable_wakes fallback "$3"' _ "$DAEMON" "$ROOT/bin" "$state"
