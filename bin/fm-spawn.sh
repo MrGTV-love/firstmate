@@ -2360,19 +2360,24 @@ fm_task_id_creation_valid "$ID" || {
   echo "error: invalid task id" >&2
   exit 2
 }
+# A fresh spawn never takes a branch another task records as its successor: every
+# point where a fresh ship or slot-governed scout fixes its branch asks here first.
+spawn_refuse_claimed_branch() {  # <branch>
+  local branch=$1 claimant
+  fm_local_firstmate_state_dirs "$STATE" tolerant
+  claimant=$(fm_successor_claimant "$branch" "$STATE/$ID.meta" "${FM_LOCAL_FIRSTMATE_STATES[@]}") || return 0
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule spawn --task "$ID" \
+    --source-ok true --successor "$branch" 2>/dev/null || true
+  echo "error: spawn refused: task $claimant records refs/heads/$branch as its successor branch, so task $ID may not take that branch; nothing was changed. Spawn this task under another id or --branch-prefix, or let Main end task $claimant's succession first" >&2
+  exit 1
+}
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
   BRANCH="$BRANCH_PREFIX$ID"
   if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
     echo "error: --branch-prefix and task id must form a valid git branch (got '$BRANCH')" >&2
     exit 1
   fi
-  fm_local_firstmate_state_dirs "$STATE" tolerant
-  if spawn_successor_claimant=$(fm_successor_claimant "$BRANCH" "$STATE/$ID.meta" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
-    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule spawn --task "$ID" \
-      --source-ok true --successor "$BRANCH" 2>/dev/null || true
-    echo "error: spawn refused: task $spawn_successor_claimant records refs/heads/$BRANCH as its successor branch, so task $ID may not take that branch; nothing was changed. Spawn this task under another id or --branch-prefix, or let Main end task $spawn_successor_claimant's succession first" >&2
-    exit 1
-  fi
+  spawn_refuse_claimed_branch "$BRANCH"
 fi
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   fm_backlog_directory_present "$STATE" "state directory" || {
@@ -4457,6 +4462,9 @@ else
   PROJ_ABS="$(cd "$(resolve_project_dir_arg "$PROJ")" && pwd)"
   WT=""
   BRIEF="$DATA/$ID/brief.md"
+  if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = scout ] && fm_slot_required "$PROJ_ABS" ""; then
+    spawn_refuse_claimed_branch "fm/$ID"
+  fi
 fi
 # Resolve consent before provisioning, never from a live worker's first refusal.
 # The TypeScript policy owner also validates the runtime backstop's grant.
@@ -6668,6 +6676,7 @@ SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
 if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
   if fm_slot_required "$PROJ_ABS" "$WT"; then
+    spawn_refuse_claimed_branch "${BRANCH:-fm/$ID}"
     fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1 || {
       SLOT_GOVERNED=1
       BRANCH=${BRANCH:-fm/$ID}
@@ -6752,6 +6761,7 @@ done
 # Keep early governance sticky (including when freshness removes its owner),
 # but require the same explicit scope and preparation for a newly governed copy.
 if [ "$KIND" != secondmate ] && [ "$SLOT_GOVERNED" = 0 ] && fm_slot_required "$PROJ_ABS" "$WT"; then
+  [ "$RELAUNCH" -eq 1 ] || spawn_refuse_claimed_branch "${BRANCH:-fm/$ID}"
   SLOT_GOVERNED=1
   fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
   BRANCH=${BRANCH:-fm/$ID}

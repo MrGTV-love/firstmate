@@ -2775,6 +2775,75 @@ PY
   pass 'governed spawn refuses before admission and preserves prior branches, copy and foreign data'
 }
 
+# A slot-governed project as test_governed_slot_refuses_before_admission_and_preserves_work
+# builds it, with a provisioner that refuses (exit 2) or succeeds (exit 0).
+governed_scout_case() {  # <case-name> <provisioner-exit>
+  local rec
+  rec=$(make_spawn_case "$1" codex scout-succ-v2)
+  read_case_record "$rec"
+  mkdir -p "$PROJ_DIR/scripts/git-stability"
+  if [ "$2" = 0 ]; then
+    printf 'import json\nprint(json.dumps({"state": "READY"}))\n' > "$PROJ_DIR/scripts/git-stability/provision_existing_slot.py"
+  else
+    printf 'import json, sys\nprint(json.dumps({"state": "BLOCKED", "reason": "manifest_exists", "blocked_reasons": ["manifest_exists"]}))\nsys.exit(2)\n' \
+      > "$PROJ_DIR/scripts/git-stability/provision_existing_slot.py"
+  fi
+  git -C "$PROJ_DIR" add scripts
+  git -C "$PROJ_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
+  git -C "$PROJ_DIR" push -q origin "HEAD:refs/heads/main"
+}
+
+# The record of another task, built by hand: this suite has no ship fixture for the
+# real fm-control successor verb, and a spawn reads only the successor_branch= line of
+# other records (tests/fm-control-successor.test.sh records one with the real verb).
+record_other_successor() {  # <home> <successor-branch>
+  printf 'kind=ship\nbranch=fm/scout-succ\nsuccessor_branch=%s\n' "$2" > "$1/state/scout-succ.meta"
+}
+
+# A spawn's output or record with this case's directory, its commit ids and the
+# process id in report names replaced, so two cases built alike compare.
+scout_case_normalized() {
+  sed -E -e "s#$CASE_DIR#CASE#g" -e 's/[0-9a-f]{40}/SHA/g' -e 's/\.[0-9]+\.json/.PID.json/g'
+}
+
+# R8-1: a scout spawned fresh in a slot-governed project takes the branch fm/<id>. While
+# another task records that ref as its successor, the spawn refuses before it records,
+# prepares, moves or launches anything, whether the provisioner would refuse or succeed.
+# With no record, or with another task recording a different successor, the same spawn
+# goes on exactly as it always did.
+test_governed_scout_spawn_refuses_another_tasks_recorded_successor() {
+  local id=scout-succ-v2 exit_code out status refs_before head_before base_out base_meta other_out other_meta
+  for exit_code in 2 0; do
+    governed_scout_case "scout-claimed-$exit_code" "$exit_code"
+    record_other_successor "$HOME_DIR" "fm/$id"
+    refs_before=$(git -C "$PROJ_DIR" for-each-ref --format='%(refname) %(objectname)')
+    head_before=$(git -C "$WT_DIR" rev-parse HEAD; git -C "$WT_DIR" symbolic-ref -q HEAD)
+    : > "$FM_GUARD_EVENT_LOG"
+    out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout --owned-path scripts 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "a governed scout spawn onto another task's recorded successor was admitted (provisioner exit $exit_code)"
+    assert_contains "$out" "task scout-succ records refs/heads/fm/$id as its successor branch" "the refusal must name the recording task and the ref"
+    assert_absent "$HOME_DIR/state/$id.meta" "the refused spawn wrote a scout record"
+    [ ! -s "$LAUNCH_LOG" ] || fail "the refused spawn sent a harness launch"
+    [ "$(git -C "$PROJ_DIR" for-each-ref --format='%(refname) %(objectname)')" = "$refs_before" ] || fail "the refused spawn changed a branch or ref"
+    [ "$(git -C "$WT_DIR" rev-parse HEAD; git -C "$WT_DIR" symbolic-ref -q HEAD)" = "$head_before" ] || fail "the refused spawn moved the assigned copy"
+    [ -n "$(jq -c --arg b "fm/$id" 'select(.guard == "successor-branch-admission" and .rule == "spawn" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
+      || fail "the refused spawn wrote no successor-branch-admission deny event"
+  done
+  governed_scout_case scout-unclaimed-none 2
+  base_out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout --owned-path scripts 2>&1 | scout_case_normalized)
+  assert_contains "$base_out" 'manifest_exists' 'with no successor record the governed scout spawn must reach its provisioner'
+  assert_grep "branch=fm/$id" "$HOME_DIR/state/$id.meta" 'with no successor record the governed scout keeps fm/<id>'
+  base_meta=$(scout_case_normalized < "$HOME_DIR/state/$id.meta")
+  governed_scout_case scout-unclaimed-other 2
+  record_other_successor "$HOME_DIR" "fm/$id-v9"
+  other_out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout --owned-path scripts 2>&1 | scout_case_normalized)
+  other_meta=$(scout_case_normalized < "$HOME_DIR/state/$id.meta")
+  assert_equals "$base_out" "$other_out" 'a different recorded successor must not change what the spawn prints'
+  assert_equals "$base_meta" "$other_meta" 'a different recorded successor must not change the record the spawn writes'
+  pass 'a governed scout spawn refuses another task'"'"'s recorded successor ref before anything is written, and otherwise spawns as before'
+}
+
 test_governed_slot_requires_explicit_scope_before_refresh() {
   local rec id=slot-needs-scope out status before
   rec=$(make_spawn_case slot-needs-scope codex "$id")
@@ -2882,6 +2951,7 @@ test_teamclaude_launcher_proxies_a_raw_claude_launch
 test_teamclaude_launcher_is_inherited_by_secondmates
 test_default_secondmate_launch_survives_unsafe_routing_sources
 test_governed_slot_refuses_before_admission_and_preserves_work
+test_governed_scout_spawn_refuses_another_tasks_recorded_successor
 test_governed_slot_requires_explicit_scope_before_refresh
 
 echo "# all fm-spawn-dispatch-profile tests passed"
