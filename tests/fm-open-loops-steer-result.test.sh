@@ -212,7 +212,7 @@ for mode in ('ack-only', 'actual-report', 'pending-reply'):
         os.utime(handled, (c.now, c.now))
         if mode == 'actual-report':
             with c.status.open('a') as stream:
-                stream.write(f'working [at={c.now}]: reported the validation outcome and remaining blocker\n')
+                stream.write(f'blocked [at={c.now}]: reported the validation outcome; waiting on the original decision\n')
     c.now = base + 899
     c.actionable(False)
     c.now = base + 900
@@ -224,6 +224,48 @@ for mode in ('ack-only', 'actual-report', 'pending-reply'):
         reply.write_text(delivery + f'phase=resolved\nresolved_epoch={c.now}\n')
         c.actionable(False)
 print('PASS: formal silence steers ignore transport-only activity but keep genuine reports and resolved replies', flush=True)
+
+# A plain working line is not a result: only a typed status or a resolved reply settles a silence steer,
+# whatever second the line carries relative to the delivery.
+for mode in ('ack-and-working-same-second', 'working-after-ack', 'working-before-steer-same-second'):
+    c = Case('plain-working-' + mode, category='silent_report')
+    assert c.row['limit_seconds'] == 900
+    if mode == 'working-before-steer-same-second':
+        with c.status.open('a') as stream:
+            stream.write(f'working [at={base}]: status written in the second the steer is delivered\n')
+    message = c.delivery(); c.steer()
+    c.now = base + 800
+    handled = c.home / 'state/worker.inbox/handled'
+    handled.mkdir()
+    message.rename(handled / '001.msg')
+    os.utime(handled, (c.now, c.now))
+    if mode != 'working-before-steer-same-second':
+        later = c.now + (1 if mode == 'working-after-ack' else 0)
+        with c.status.open('a') as stream:
+            stream.write(f'working [at={later}]: acknowledged the inbox; no report yet\n')
+    c.now = base + 899
+    c.actionable(False)
+    c.now = base + 900
+    c.actionable(True, refresh=False)
+    c.actionable(True)
+print('PASS: an acknowledgement-only or pre-steer plain working status never settles a silence steer', flush=True)
+
+# Control: a typed report that follows the acknowledgement and a plain working line still settles the steer.
+c = Case('plain-working-then-typed-report', category='silent_report')
+message = c.delivery(); c.steer()
+c.now = base + 800
+handled = c.home / 'state/worker.inbox/handled'
+handled.mkdir()
+message.rename(handled / '001.msg')
+os.utime(handled, (c.now, c.now))
+with c.status.open('a') as stream:
+    stream.write(f'working [at={c.now}]: acknowledged the inbox; no report yet\n')
+c.now = base + 850
+with c.status.open('a') as stream:
+    stream.write(f'blocked [at={c.now}]: reported the validation outcome; waiting on the original decision\n')
+c.now = base + 900
+c.actionable(False)
+print('PASS: a typed report after an acknowledgement and a plain working line still settles a silence steer', flush=True)
 
 # Loss of a source that requires a live worker is not evidence that the steer succeeded.
 for category, kind in (('stalled_worker', 'ship'), ('silent_report', 'ship'), ('silent_report', 'secondmate')):

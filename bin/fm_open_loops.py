@@ -447,11 +447,11 @@ class Collector:
             evidence += "; no report yet: clock starts at dispatch"
         row = self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
                        since, evidence=evidence, informational=informational, consumer_task=ident)
-        if not excluded and (pending or (ack_at is not None and since == ack_at)):
-            # Transport activity may reset the ordinary check-in cadence, but
-            # only a report or resolved reply can settle a recorded steer.
-            self.silence_transport[row["id"]] = max(
-                (stamp for stamp in (status_at, reply_at) if stamp is not None and stamp <= self.now), default=-1)
+        if not excluded:
+            # A status or acknowledgement may reset the ordinary check-in cadence, but a plain status line is
+            # never a result and a second-resolution stamp cannot order it against the delivery. Only a resolved
+            # reply or a typed status (excluded above) settles a recorded steer.
+            self.silence_transport[row["id"]] = reply_at if reply_at is not None else -1
         if long_wait:
             row["limit_seconds"] = pause_limit
             row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit)
