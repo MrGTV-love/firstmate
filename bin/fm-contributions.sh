@@ -33,7 +33,6 @@
 # can grant merge authority. Captain-actor prose requires an existing live hold;
 # an eligible merge remains a captain call, never an automatic forge action.
 # Any PR merge goes through the guarded merge path (bin/fm-pr-merge.sh).
-# AGENTS.md section 7 owns who may merge without asking.
 #
 # retire ends one task's observation of a contribution whose forge object can
 # never be read again, such as a PR in a deleted repository. It records retired
