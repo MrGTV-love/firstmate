@@ -177,7 +177,8 @@ jq -r '.guards
   | map(select(length > 1))
   | .[]
   | (map(.id) | sort) as $ids
-  | [$ids[0], ($ids[1:] | join(","))] | @tsv' "$REGISTRY" 2>/dev/null \
+  | range($ids | length) as $i
+  | [$ids[$i], ($ids | del(.[$i]) | join(","))] | @tsv' "$REGISTRY" 2>/dev/null \
   | while IFS=$'\t' read -r first rest; do
       [ -n "$first" ] || continue
       violation R1 "$first" "invariant shared with: $rest"
@@ -391,7 +392,6 @@ case "$MODE" in
     trap 'rm -f "$VIOLATIONS" "$SITES_JSON" "$ALLOWED_FILE" "$SC" "$base_json" "$base_allow"' EXIT
     if git -C "$ROOT" rev-parse --verify "$BASE_REF" >/dev/null 2>&1 \
       && git -C "$ROOT" show "$BASE_REF:docs/guards/registry.json" >"$base_json" 2>/dev/null; then
-      touched_started=$SECONDS
       touched_status=0
       touched=$(jq -r --slurpfile base "$base_json" '
         (.guards | map({key: .id, value: .}) | from_entries) as $now
@@ -426,8 +426,12 @@ TOUCHED_GUARDS
           touch_decision=deny
         fi
         "$SCRIPT_DIR/fm-guard-event.sh" guard-lint-touched-registry "$touch_decision" \
-          --source-ok "$touch_source_ok" --base "$BASE_REF" --elapsed-ms "$(((SECONDS - touched_started) * 1000))" \
+          --source-ok "$touch_source_ok" --base "$BASE_REF" \
           >/dev/null 2>&1 || true
+      fi
+      if [ "$touched_status" -ne 0 ]; then
+        echo "error: touched-registry comparison against '$BASE_REF' failed (status $touched_status); no touched guard is cleared" >&2
+        out=1
       fi
       # The allowlist holds every legacy refusal-site violation, so one it does not
       # hold is new, whichever guard or site it names.

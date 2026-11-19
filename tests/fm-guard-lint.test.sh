@@ -18,6 +18,7 @@
 #   - report mode exits 0 while still printing the violation
 #   - new-or-touched mode ignores an untouched offending guard, even for numeric-looking ids
 #   - a touched offending id still fails until the offending field is corrected
+#   - a touched guard that shares an invariant fails by its own id, and an unreadable base fails closed
 #   - a retired guard that is still registered fails
 #   - --counts excludes active guards named in beyond_audit_active and beyond_audit_retired points
 #   - every refusal-site signature (marker, message, helper call, hook deny, guard event) is found
@@ -266,6 +267,44 @@ mutate "$NAT" '(.guards[] | select(.id == "gnew") | .remedy) = "a pointer with n
 out=$("$LINT" --root "$NAT" --mode new-or-touched --base HEAD 2>&1) && fail "new-or-touched must fail for a touched guard"
 printf '%s\n' "$out" | grep -q 'VIOLATION R2 gnew' || fail "expected the touched guard to fail, got: $out"
 pass "new-or-touched fails for a touched guard"
+
+SHARED=$(fixture shared_newortouched)
+git -C "$SHARED" init -q
+git -C "$SHARED" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$SHARED" -c user.email=t@example.invalid -c user.name=t commit -qm base
+mutate "$SHARED" '.guards += [(.guards[0] | .id = "gshared" | .invariant = "a second invariant" | .owner = "bin/gguard2.sh" | .test = "tests/gguard2.test.sh")]'
+: >"$SHARED/bin/gguard2.sh"; : >"$SHARED/tests/gguard2.test.sh"
+"$LINT" --root "$SHARED" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a touched guard with a distinct invariant must pass"
+pass "new-or-touched passes a touched guard with a distinct invariant"
+
+mutate "$SHARED" '(.guards[] | select(.id == "gshared") | .invariant) = "a fixture invariant"'
+out=$("$LINT" --root "$SHARED" --mode new-or-touched --base HEAD 2>&1) && fail "a touched guard sharing an invariant must fail"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 gshared: invariant shared with: gguard$' \
+  || fail "expected the shared invariant attributed to the touched id gshared, got: $out"
+pass "new-or-touched refuses a touched guard that shares an invariant by its own id"
+
+mutate "$SHARED" '(.guards[] | select(.id == "gshared") | .invariant) = "a second invariant"'
+"$LINT" --root "$SHARED" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "correcting only the shared invariant must clear the same edit"
+pass "new-or-touched passes the same edit after correcting the shared invariant"
+
+UNREADABLE=$(fixture unreadable_base)
+cp "$UNREADABLE/docs/guards/registry.json" "$TMP/unreadable-current.json"
+printf '{"schema_version":1,"system":"firstmate","audited":1,"excluded":[],"guards":["unreadable"]}\n' >"$UNREADABLE/docs/guards/registry.json"
+git -C "$UNREADABLE" init -q
+git -C "$UNREADABLE" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$UNREADABLE" -c user.email=t@example.invalid -c user.name=t commit -qm base
+cp "$TMP/unreadable-current.json" "$UNREADABLE/docs/guards/registry.json"
+rc=0
+out=$(FM_GUARD_EVENT_LOG="$UNREADABLE/events.jsonl" "$LINT" --root "$UNREADABLE" --mode new-or-touched --base HEAD 2>&1) || rc=$?
+[ "$rc" -eq 1 ] || fail "an unreadable base registry must fail new-or-touched closed, got exit $rc: $out"
+printf '%s\n' "$out" | grep -q "^error: touched-registry comparison against 'HEAD' failed" \
+  || fail "expected the touched-registry comparison diagnostic, got: $out"
+jq -es 'map(select(.guard == "guard-lint-touched-registry"))
+  | (map(.decision) == ["error"]) and (.[0].source_ok == false)' "$UNREADABLE/events.jsonl" >/dev/null \
+  || fail "expected one error touched-registry event with source_ok false"
+pass "new-or-touched fails closed when the base registry cannot be compared"
 
 LITERAL_NAT=$(fixture literal_newortouched)
 mutate "$LITERAL_NAT" '.guards[0] |= (.id = "01" | .fail_direction = "unspecified")
