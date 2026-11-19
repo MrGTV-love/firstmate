@@ -557,7 +557,8 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
         assert idle["reasons"] == [] and "no fleet run is running" in idle["harm"]["bootstrap"], (name, idle["harm"])
         assert idle["harm"]["largest_peak_bytes"] == 5000 * mib, (name, idle["harm"])
     report = decide(available=30*gib, busy=True, age=2000, code=75, last_swap=swap_now - 100*mib)
-    assert "outside the 300 s window" in report["reasons"][0] and "2000 s old" in report["reasons"][0], report["reasons"]
+    # the reading is stamped 2000 s before the decision, which runs a moment later: the age reads 2000 s plus the run time
+    assert "outside the 300 s window" in report["reasons"][0] and any(f"{age} s old" in report["reasons"][0] for age in range(2000, 2010)), report["reasons"]
     report = decide(available=30*gib, busy=True, steps=50, code=75)
     assert "50 recorded probe steps; 100 are needed for a window" in report["reasons"][0], report["reasons"]
     # the task-only record's largest peak is 2500 MiB: an idle host above it admits, below it defers
