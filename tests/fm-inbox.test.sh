@@ -710,6 +710,48 @@ run_drain "$home" --ack-through 5 --recovery-generation "$generation" >/dev/null
 assert_equals "0" "$(queue_rows "$home")" "the passing ack consumes rows 4 and 5 with the rest of the range"
 pass "a refused ack does not change main's claim; after the note is acked the same ack consumes the whole range"
 
+# A note acked at the first check and pending again at the second check refuses the
+# ack inside its receipt window. A shim inside a copied bin/ makes the note pending
+# on the second fm-inbox.sh pending call, which is the second check. The row claimed
+# during that ack must not stay main-owned.
+home=$(make_drain_home ack-window-refusal)
+append_keyed_signal "$home" taska
+note_id=$(queue_note "$home" "note acked before the first check")
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+ack_args=$(present "$home")
+generation=$(printf '%s' "$ack_args" | sed 's/.*--recovery-generation //')
+append_keyed_signal "$home" taskc
+claim_before=$(cat "$home/state/.main-eligible-rows")
+cp -R "$ROOT/bin" "$home/bin"
+cat > "$home/bin/fm-inbox.sh" <<SHIM
+#!/usr/bin/env bash
+if [ "\${1:-}" = pending ]; then
+  n=\$(cat "$home/pending-calls" 2>/dev/null || echo 0)
+  n=\$((n + 1))
+  printf '%s\n' "\$n" > "$home/pending-calls"
+  if [ "\$n" -eq 2 ]; then
+    mv "$home/state/inbox/handled/$note_id.note" "$home/state/inbox/$note_id.note"
+  fi
+fi
+exec "$ROOT/bin/fm-inbox.sh" "\$@"
+SHIM
+chmod +x "$home/bin/fm-inbox.sh"
+set +e
+refusal=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+  FM_CONFIG_OVERRIDE="$home/config" FM_ROOT_OVERRIDE="$DRAIN_ROOT" \
+  "$home/bin/fm-wake-drain.sh" --ack-through 3 --recovery-generation "$generation" 2>&1)
+refusal_rc=$?
+set -e
+assert_equals "2" "$(cat "$home/pending-calls")" "the refusal came from the second note check, inside the receipt window"
+assert_not_equals "0" "$refusal_rc" "the ack is refused when the note is pending again at the second check"
+assert_contains "$refusal" "$note_id" "the refusal names the note"
+assert_equals "$claim_before" "$(cat "$home/state/.main-eligible-rows")" "a refused ack leaves main's claim as it was, so row 3 stays unowned"
+assert_equals "3" "$(queue_rows "$home")" "a refused ack consumes no wake row"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+run_drain "$home" --ack-through 3 --recovery-generation "$generation" >/dev/null 2>&1 || fail "the ack must pass once the note is acked again"
+assert_equals "0" "$(queue_rows "$home")" "the second ack consumes the rows the refused ack left unclaimed"
+pass "a note pending again at the second check refuses the ack without changing main's claim"
+
 # A request-id replay of an identity that was acked with no note record must not
 # publish a new pending note, even inside the ack's unlocked receipt window, and
 # the ack's final decision is made under the lock that consumes. The barrier holds

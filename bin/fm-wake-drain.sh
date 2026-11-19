@@ -70,6 +70,7 @@ SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd
 DRAIN_TMP=
 DRAIN_VIEW_TMP=
 ACK_ROWS_TMP=
+CLAIM_ADDED=
 KEEP_UNACKED_NOTES=false
 DRAIN_LOCK_HELD=false
 RAW_ROWS=
@@ -235,11 +236,32 @@ main_claim_commit_locked() {
   DRAIN_TMP=
 }
 
-# claim_main_rows_locked [<cutoff>]: claim every unreserved queued row for main,
-# or with a cutoff only the unreserved rows at or below it. Rows main already
-# owns stay owned either way.
+main_claim_added_locked() {
+  local src=$MAIN_ROWS_FILE
+  [ -e "$src" ] || src=/dev/null
+  CLAIM_ADDED=$(awk -F '\t' '
+    FILENAME == ARGV[1] { owned[$0]; next }
+    !($0 in owned) { printf "%s ", $0 }
+  ' "$src" "$DRAIN_TMP") || return 1
+}
+
+rollback_main_claim_locked() {
+  local src=$MAIN_ROWS_FILE
+  [ -n "$CLAIM_ADDED" ] || return 0
+  [ -e "$src" ] || src=/dev/null
+  DRAIN_TMP=$(mktemp "$STATE/.main-eligible-rows.tmp.XXXXXX") || return 1
+  awk -F '\t' -v added="$CLAIM_ADDED" '
+    BEGIN { n = split(added, a, " "); for (i = 1; i <= n; i++) drop[a[i]] = 1 }
+    !($0 in drop)
+  ' "$src" > "$DRAIN_TMP" || return 1
+  write_rows_file_locked "$MAIN_ROWS_FILE" "$DRAIN_TMP" || return 1
+  DRAIN_TMP=
+}
+
+# claim_main_rows_locked: claim every unreserved queued row for main. Rows main
+# already owns stay owned.
 claim_main_rows_locked() {
-  main_claim_candidate_locked "$@" && main_claim_commit_locked
+  main_claim_candidate_locked && main_claim_commit_locked
 }
 
 # Only the rows of <consumed-file> leave the claim: a row claimed after the
@@ -265,7 +287,7 @@ consume_actor_rows_locked() { # <rows-file> <cutoff> <consumed-file>
 # queue, a missing row set, an inbox that cannot be read, an id with no record, a
 # reply that does not answer for every id - refuses. Exit shape matches the
 # overdue-row refusal. With --keep-unacked-notes the same rows are dropped from
-# <rows-file> instead, so they are neither consumed nor claimed away.
+# <rows-file> instead, so they are not consumed; main still claims them, because the reader of a captain note is main.
 gate_unacked_inbox_notes_locked() { # <rows-file> <cutoff>
   local rows=$1 cutoff=$2 pairs ids states want got held_ids held_seqs seq id tmp state keep=false
   if [ "$KEEP_UNACKED_NOTES" = true ] && [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" = 1 ] && [ -e "$STATE/.afk" ]; then
@@ -1066,6 +1088,7 @@ if [ -n "$ACK_THROUGH" ]; then
   fi
   gate_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || exit 1
   if [ "$ACTOR" = main ]; then
+    main_claim_added_locked || exit 1
     main_claim_commit_locked || exit 1
   fi
   if [ "$ACTOR" = branch ]; then
@@ -1100,11 +1123,15 @@ if [ -n "$ACK_THROUGH" ]; then
   # empty set and let this ack report success with its checked rows left queued.
   if [ ! -e "$ACK_ROWS_TMP" ]; then
     echo "wake drain: the acknowledged row set vanished while the queue lock was released; acknowledgement refused" >&2
+    rollback_main_claim_locked
     exit 1
   fi
   # Decide to consume only now, inside the lock hold that consumes: a note that became
   # pending while the lock was released (a replayed write, a restored inbox) refuses here.
-  gate_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || exit 1
+  gate_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || {
+    rollback_main_claim_locked
+    exit 1
+  }
   DRAIN_TMP=$(mktemp "$STATE/.wake-queue.ack.XXXXXX") || exit 1
   chmod 0600 "$DRAIN_TMP" || exit 1
   if [ "$ACTOR" = branch ]; then
