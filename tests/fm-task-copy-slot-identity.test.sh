@@ -100,7 +100,7 @@ test_lease_holders_compare_raw_never_tsv_escaped() (
 
 # A path is a pool slot only by positive proof (Main 1864 R-C). A real git layout: a project,
 # a linked worktree as the slot, a linked copy nested in it, and the guard called directly.
-r6_slot_case() {  # <name> <layout: custom|home> <pool-dir: fails|self|other>; prints the guard's exit
+r6_slot_case() {  # <name> <layout: custom|home|underdot|superseded> <pool-dir: fails|self|other>; prints the guard's exit
   local name=$1 layout=$2 pooldir=$3 dir project slot copy statedir home
   dir="$TMP_ROOT/r6-slot-$name"
   rm -rf "$dir"
@@ -121,7 +121,14 @@ r6_slot_case() {  # <name> <layout: custom|home> <pool-dir: fails|self|other>; p
     copy="$project/nested"
   else
     slot="$dir/custom-pool/1/project"
-    mkdir -p "$dir/custom-pool/1"
+    # underdot: a pool of its own that merely sits below a `.treehouse` folder higher up
+    # the path (a checkout that itself lives in a pool); superseded: a pool folder directly
+    # under a `.treehouse` folder, a pool the provider no longer names
+    case "$layout" in
+      underdot) slot="$dir/.treehouse/outer/custom-pool/1/project" ;;
+      superseded) slot="$dir/.treehouse/old-pool/1/project" ;;
+    esac
+    mkdir -p "${slot%/*}"
     git -C "$project" worktree add -q -b slot-branch "$slot"
     copy="$slot/nested"
   fi
@@ -177,6 +184,13 @@ test_slot_identity_needs_positive_proof() {
   [ "$rc" = 0 ] || fail "a project clone inside a Treehouse-backed Firstmate home was refused as a slot (pool-dir failing)"
   rc=$(r6_slot_case home-other home other)
   [ "$rc" = 0 ] || fail "a project clone inside a Treehouse-backed Firstmate home was refused as a slot (pool-dir naming another pool)"
+  # a `.treehouse` folder higher up the path is no evidence: a linked worktree whose pool
+  # folder is not directly under it, with pool-dir naming another pool, is proved not a slot
+  rc=$(r6_slot_case under-dot-ancestor underdot other)
+  [ "$rc" = 0 ] || fail "a linked worktree below an unrelated .treehouse ancestor, outside the pool pool-dir names, was refused as a slot: $(cat "$TMP_ROOT/r6-slot-under-dot-ancestor/err" 2>&1)"
+  # control: a pool folder directly under a .treehouse folder is a superseded pool and refuses
+  rc=$(r6_slot_case superseded-pool superseded other)
+  [ "$rc" != 0 ] || fail "a worktree in a superseded pool folder directly under .treehouse was admitted with its state file missing"
   pass 'a missing-state path is a slot only by positive proof: an unprovable linked worktree (custom root, no pool-dir) refuses without suggesting a status, a worktree pool-dir proves outside the pool admits, and a project clone inside a Treehouse-backed home is never taken for a slot'
 }
 

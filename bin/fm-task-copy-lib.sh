@@ -518,8 +518,9 @@ fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-m
 # add; the project's own clone, or a project clone inside a Treehouse-backed Firstmate
 # home, has a .git directory of its own and is never a slot), and then
 #   - `treehouse pool-dir` names a pool folder: the path is a slot when that folder
-#     holds it, or when a `.treehouse` component marks it as a pool folder (a superseded
-#     one); a path outside both is proved not a slot, so it is no slot;
+#     holds it, or when the pool folder sits directly under a `.treehouse` folder (a
+#     superseded one; a `.treehouse` folder higher up the path is no evidence); a path
+#     outside both is proved not a slot, so it is no slot;
 #   - `treehouse pool-dir` cannot say (an old provider, a failing run, a custom root it
 #     cannot name): the linked worktree's slot status cannot be proved, so it is
 #     treated as a slot and its copy's unreadable hold refuses the allocation.
@@ -545,7 +546,10 @@ fm_task_copy_pool_slot_without_state() {  # <project> <dir>
   [ "$slot_gitdir" != "$slot_common" ] || return 1
   if pool_dir=$(fm_task_copy_treehouse_pool_dir "$project"); then
     [ "$pool" -ef "$pool_dir" ] && return 0
-    case "/$pool/" in */.treehouse/*) return 0 ;; esac
+    # A superseded pool is a pool folder directly under a `.treehouse` folder
+    # (.treehouse/<pool>/<n>/<project>); a `.treehouse` folder higher up the path
+    # (a checkout that itself lives in a pool) is no evidence for this slot.
+    [ "$(basename "$(dirname "$pool")")" != .treehouse ] || return 0
     return 1
   fi
   return 0
@@ -968,10 +972,12 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name> [proof]
     FM_TASK_COPY_POOL_CURRENCY=superseded
     return 1
   fi
-  # With "proof" (the allocation guard) the status listing below, a state-lock command
-  # that an older treehouse answers with its own recovery, is never the fallback unless
-  # the capability is proven; without it the currency stays unknown.
-  if [ "${4:-}" = proof ] && ! fm_task_copy_treehouse_persists_recovered_leases; then
+  # With "proof" (the allocation guard) the status listing below is never the fallback,
+  # proven capability or not: treehouse status is a state-lock command that an older
+  # treehouse answers with its own recovery and that a proven one uses to adopt old
+  # recovered holders, and the guard never changes a lease or a holder. The currency
+  # then stays unknown, and the guard refuses a slot it cannot place.
+  if [ "${4:-}" = proof ]; then
     return 1
   fi
   fm_task_copy_current_pool_listing "$project" || return 1
@@ -1005,7 +1011,7 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name> [proof]
 # still on the old recovered holder (a Firstmate home slot included; there is no home
 # exemption here), and an entry that cannot be read are all refused. The probe runs
 # only for such an entry, never for an ordinary one. An entry still on the old holder
-# becomes `recovered`, so a proven treehouse adopts it; any other refusal becomes
+# becomes `recovered`, which refuses until the provider's cutover adoption; any other refusal becomes
 # `unproved` with a reason that names whether the capability is proven.
 # Does nothing unless FM_TASK_COPY_SLOT_STATE is held; sets FM_TASK_COPY_SLOT_STATE
 # and FM_TASK_COPY_SLOT_REASON when it refuses.
@@ -1052,10 +1058,9 @@ fm_task_copy_guard_admit_held() {  # <slot>
 # slot a task merely left is not a record's current copy, so none of them
 # stops the allocation. A slot still on the old recovered holder is not durable
 # even on a proven treehouse, because an old session's exit sweeps exactly that
-# holder: on a proven treehouse one treehouse status, run once per process
-# (fm_task_copy_current_pool_listing), adopts it under the protected holder at
-# its first state lock, lease kept and nothing moved, and the state is read
-# again; a slot still on the old holder refuses. A leased entry that is not
+# holder: it refuses, and moving it to the protected holder is the provider's
+# cutover adoption, never a step of this guard (no consumer path changes a lease
+# or a holder; the guard runs no treehouse status). A leased entry that is not
 # an ordinary lease (fm_task_copy_guard_admit_held) is probed before it is
 # admitted, and admitted only on the published protected holder. Recovered leases are never
 # converted to firm leases here. A uniquely recorded unleased slot names the treehouse
@@ -1086,13 +1091,6 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy" strict) || continue
       fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
       fm_task_copy_guard_admit_held "$slot"
-      if [ "$FM_TASK_COPY_SLOT_STATE" = recovered ] && fm_task_copy_treehouse_persists_recovered_leases; then
-        fm_task_copy_current_pool_listing "$project" || true
-        FM_TASK_COPY_POOL_STATE_FILE=
-        FM_TASK_COPY_POOL_STATE_ENTRIES=
-        fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
-        fm_task_copy_guard_admit_held "$slot"
-      fi
       id=$(basename "$meta" .meta)
       case "$FM_TASK_COPY_SLOT_STATE" in
         held) continue ;;
@@ -1116,8 +1114,8 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
           ;;
         recovered)
           if fm_task_copy_treehouse_persists_recovered_leases; then
-            FM_TASK_COPY_SLOT_REASON="$FM_TASK_COPY_SLOT_REASON, and treehouse status did not rewrite it to the protected holder '$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER', so the exit of an older Treehouse session could still free the slot and move the copy"
-            remedy="Report this entry for repair: run (cd '$project' && treehouse status) with the installed treehouse and confirm the entry's holder before retrying; treehouse lease refuses a slot that is already leased."
+            FM_TASK_COPY_SLOT_REASON="$FM_TASK_COPY_SLOT_REASON, and it is not on the protected holder '$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER', so the exit of an older Treehouse session could still free the slot and move the copy"
+            remedy="Run the provider's cutover adoption first, then retry: it moves the entry to the protected holder (one adopting treehouse status of the proven build, a cutover step owned by the provider side). This guard and teardown never change a lease or a holder themselves; treehouse lease refuses a slot that is already leased."
           else
             FM_TASK_COPY_SLOT_REASON="$FM_TASK_COPY_SLOT_REASON, and the installed treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON, so its own recovery could free the slot and move the copy"
             remedy="Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy."
