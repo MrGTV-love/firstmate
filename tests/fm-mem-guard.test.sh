@@ -594,17 +594,23 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
         result = subprocess.run(["bash", wrapper, "calibrate", "--kind", kind, *command], capture_output=True, text=True, env=harm_env)
         assert result.returncode == code, (kind, result.returncode, result.stdout, result.stderr)
         return result
+    # A calibration run is measured with the native macOS census (fm-proc-info.py memory). Off macOS it reads no
+    # residents and records nothing, so the measured assertions run only there; the refusals run everywhere.
+    macos_census = sys.platform == "darwin"
     # nothing recorded and a fleet run running: refused; nothing recorded and idle: measured and recorded
     facts(available=30*gib, rss=busy_rows); record_path.unlink(missing_ok=True)
     refused = calibrate("task", code=75)
     assert "no run peak has ever been recorded" in refused.stderr and not record_path.exists(), refused.stderr
     facts(available=30*gib); record_path.unlink(missing_ok=True)
-    done = calibrate("task")
-    runs = json.loads(record_path.read_text())["runs"]
-    assert list(runs) and all(name.startswith("task:calibration/") for name in runs), runs
-    measured = next(iter(runs.values()))
-    assert measured["peak_bytes"] >= 100 * mib and measured["samples"] >= 2, measured
-    assert "calibration recorded: task:calibration/" in done.stderr, done.stderr
+    if macos_census:
+        done = calibrate("task")
+        runs = json.loads(record_path.read_text())["runs"]
+        assert list(runs) and all(name.startswith("task:calibration/") for name in runs), runs
+        measured = next(iter(runs.values()))
+        assert measured["peak_bytes"] >= 100 * mib and measured["samples"] >= 2, measured
+        assert "calibration recorded: task:calibration/" in done.stderr, done.stderr
+    else:
+        print("skip - a measured calibration run needs the native macOS census; the calibration refusals still run")
     # the deadlock case: a task is running, only task peaks exist, a no-mistakes start defers and names the route
     facts(available=30*gib, rss=busy_rows); record(kinds=("task",))
     refused = subprocess.run(["bash", wrapper, "run", "--kind", "no-mistakes", "--", sys.executable, "-c", "pass"],
@@ -612,13 +618,14 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     report = json.loads(refused.stderr)
     assert refused.returncode == 75 and "0 recorded no-mistakes runs" in report["reasons"][0], refused.stderr
     assert "calibrate --kind no-mistakes -- <command>" in report["reasons"][0], report
-    calibrate("no-mistakes")
-    report = call("admit", "--kind", "no-mistakes", code=75, environ=harm_env)
-    assert "1 recorded no-mistakes runs" in report["reasons"][0], report["reasons"]
-    calibrate("no-mistakes")
-    facts(available=30*gib, rss=busy_rows)
-    report = call("admit", "--kind", "no-mistakes", environ=harm_env)
-    assert report["admission"] == "admit" and report["harm"]["projection_runs"] == 2 and report["harm"]["not_judged"] == [], report
+    if macos_census:
+        calibrate("no-mistakes")
+        report = call("admit", "--kind", "no-mistakes", code=75, environ=harm_env)
+        assert "1 recorded no-mistakes runs" in report["reasons"][0], report["reasons"]
+        calibrate("no-mistakes")
+        facts(available=30*gib, rss=busy_rows)
+        report = call("admit", "--kind", "no-mistakes", environ=harm_env)
+        assert report["admission"] == "admit" and report["harm"]["projection_runs"] == 2 and report["harm"]["not_judged"] == [], report
     # the run is refused while swap grows, and a command too short to read twice records nothing
     facts(available=30*gib, rss=busy_rows); record(last_swap=swap_now - 100*mib)
     refused = calibrate("task", code=75)
@@ -627,7 +634,8 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     before = json.loads(record_path.read_text())["runs"]
     short = calibrate("task", code=1, command=("--", "true"))
     assert json.loads(record_path.read_text())["runs"] == before and "not recorded" in short.stderr, short.stderr
-    print("ok - calibrate records a measured run of its kind (refused on a busy unmeasured host, while swap grows, or when too short to read twice), and two calibration runs resolve the task-running, no-mistakes-unmeasured deadlock")
+    if macos_census:
+        print("ok - calibrate records a measured run of its kind (refused on a busy unmeasured host, while swap grows, or when too short to read twice), and two calibration runs resolve the task-running, no-mistakes-unmeasured deadlock")
 
     # a failed or inconsistent read keeps its fail-closed 75 whatever the record says
     facts(available=30*gib); record()
@@ -680,9 +688,10 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
         facts(available=20*gib); setup()
         report = call("admit", "--kind", "no-mistakes", environ=harm_env)
         assert report["reasons"] == [] and "no fleet run is running" in report["harm"]["bootstrap"], (name, report["harm"])
-        facts(available=20*gib); setup()
-        done = calibrate("no-mistakes")
-        assert "calibration recorded: no-mistakes:calibration/" in done.stderr, (name, done.stderr)
+        if macos_census:
+            facts(available=20*gib); setup()
+            done = calibrate("no-mistakes")
+            assert "calibration recorded: no-mistakes:calibration/" in done.stderr, (name, done.stderr)
     # one step names no window, so no previous reading counts as fresh: the one start admits on the bootstrap alone
     facts(available=20*gib); record(steps=1, last_compressor=compressor_now - rise)
     report = call("admit", "--kind", "no-mistakes", environ=harm_env)
