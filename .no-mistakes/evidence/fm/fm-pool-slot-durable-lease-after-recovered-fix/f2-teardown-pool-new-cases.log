@@ -1,0 +1,3 @@
+skip - R3/R6 real-provider release: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse.b36d1a5 publishes no recovered_quarantine_holder; the real-provider pass did NOT run
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched
+skip - R4 real-provider interruptions: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse.b36d1a5 publishes no recovered_quarantine_holder; the real-provider pass did NOT run

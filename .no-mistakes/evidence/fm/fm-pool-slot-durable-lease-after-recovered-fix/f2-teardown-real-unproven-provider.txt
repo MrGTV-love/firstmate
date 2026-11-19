@@ -1,0 +1,54 @@
+### teardown task-x1 (no --force), provider /Users/charlesabrooker/.local/bin/treehouse (v3.1.7-fm.8759019), slot A lease kind: recovered-old
+slot A: /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/real-root/.treehouse/project-dbd5e5/1/project
+sibling B (recovered, unlanded nested copy): /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/real-root/.treehouse/project-dbd5e5/2/project
+teardown exit: 0
+--- output:
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 45s ago).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/project: already current
+    teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/real-root/.treehouse/project-dbd5e5/1/project/.claude/worktrees/x left in place, since it is not a pool slot)
+    notice: task-x1's prior copy /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/real-root/.treehouse/project-dbd5e5/1/project (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+    Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.IV2jdd/live-treehouse-recovered-old-real/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- treehouse argv:
+    capabilities --json
+no treehouse return issued
+pool state: byte-equal
+sibling B nested copy (unlanded HEAD, bytes): unchanged
+task-x1 nested copy in slot A: left in place
+return-pending marker: none (inert route)
+recovered backup: none
+task record: retired (today's completion outside the route)
+RESULT: PASS
+
+### teardown task-x1 (no --force), provider /Users/charlesabrooker/.local/bin/treehouse (v3.1.7-fm.8759019), slot A lease kind: ordinary-old
+slot A: /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/real-root/.treehouse/project-a3687e/1/project
+sibling B (recovered, unlanded nested copy): /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/real-root/.treehouse/project-a3687e/2/project
+teardown exit: 0
+--- output:
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 67s ago).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/project: already current
+    teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/real-root/.treehouse/project-a3687e/1/project/.claude/worktrees/x left in place, since it is not a pool slot)
+    notice: task-x1's prior copy /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/real-root/.treehouse/project-a3687e/1/project (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+    Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.lTZRoZ/live-treehouse-ordinary-old-real/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- treehouse argv:
+    capabilities --json
+no treehouse return issued
+pool state: byte-equal
+sibling B nested copy (unlanded HEAD, bytes): unchanged
+task-x1 nested copy in slot A: left in place
+return-pending marker: none (inert route)
+recovered backup: none
+task record: retired (today's completion outside the route)
+RESULT: PASS
+

@@ -1,0 +1,72 @@
+### case live-treehouse-recovered-first
+provider: /Users/charlesabrooker/.local/bin/treehouse (v3.1.7-fm.8759019)
+recovered slot A: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-recovered-first/real-root/.treehouse/project-8d82fb/1/project (holder: recovered: state file was corrupt or truncated; verify before reuse)
+free slot B: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-recovered-first/real-root/.treehouse/project-8d82fb/2/project
+spawn exit: 1
+--- spawn output:
+    warning: task new-live-treehouse-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-recovered-first/home/data/new-live-treehouse-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+    error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-recovered-first/real-root/.treehouse/project-8d82fb/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-recovered-first/real-root/.treehouse/project-8d82fb/1/project/.claude/worktrees/nested-live-treehouse-recovered-first and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-recovered-first/real-root/.treehouse/project-8d82fb/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+    Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+--- treehouse argv during spawn:
+    capabilities --json
+recovered slot + nested copy fingerprint: unchanged
+pool state file: byte-equal
+holder record: byte-equal
+new task record: not published
+recovered backup: none
+RESULT: PASS
+
+### case live-treehouse-free-first
+provider: /Users/charlesabrooker/.local/bin/treehouse (v3.1.7-fm.8759019)
+recovered slot A: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-free-first/real-root/.treehouse/project-41af46/1/project (holder: recovered: state file was corrupt or truncated; verify before reuse)
+free slot B: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-free-first/real-root/.treehouse/project-41af46/2/project
+spawn exit: 1
+--- spawn output:
+    warning: task new-live-treehouse-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-free-first/home/data/new-live-treehouse-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+    error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-free-first/real-root/.treehouse/project-41af46/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-free-first/real-root/.treehouse/project-41af46/1/project/.claude/worktrees/nested-live-treehouse-free-first and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse-free-first/real-root/.treehouse/project-41af46/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+    Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+--- treehouse argv during spawn:
+    capabilities --json
+recovered slot + nested copy fingerprint: unchanged
+pool state file: byte-equal
+holder record: byte-equal
+new task record: not published
+recovered backup: none
+RESULT: PASS
+
+### case live-treehouse.b36d1a5-recovered-first
+provider: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse.b36d1a5 (v3.1.7-fm.b36d1a5)
+recovered slot A: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-recovered-first/real-root/.treehouse/project-00573c/1/project (holder: recovered: state file was corrupt or truncated; verify before reuse)
+free slot B: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-recovered-first/real-root/.treehouse/project-00573c/2/project
+spawn exit: 1
+--- spawn output:
+    warning: task new-live-treehouse.b36d1a5-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-recovered-first/home/data/new-live-treehouse.b36d1a5-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+    error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-recovered-first/real-root/.treehouse/project-00573c/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-recovered-first/real-root/.treehouse/project-00573c/1/project/.claude/worktrees/nested-live-treehouse.b36d1a5-recovered-first and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-recovered-first/real-root/.treehouse/project-00573c/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+    Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+--- treehouse argv during spawn:
+    capabilities --json
+recovered slot + nested copy fingerprint: unchanged
+pool state file: byte-equal
+holder record: byte-equal
+new task record: not published
+recovered backup: none
+RESULT: PASS
+
+### case live-treehouse.b36d1a5-free-first
+provider: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse.b36d1a5 (v3.1.7-fm.b36d1a5)
+recovered slot A: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-free-first/real-root/.treehouse/project-2f475d/1/project (holder: recovered: state file was corrupt or truncated; verify before reuse)
+free slot B: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-free-first/real-root/.treehouse/project-2f475d/2/project
+spawn exit: 1
+--- spawn output:
+    warning: task new-live-treehouse.b36d1a5-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-free-first/home/data/new-live-treehouse.b36d1a5-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+    error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-free-first/real-root/.treehouse/project-2f475d/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-free-first/real-root/.treehouse/project-2f475d/1/project/.claude/worktrees/nested-live-treehouse.b36d1a5-free-first and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.aT3auI/live-treehouse.b36d1a5-free-first/real-root/.treehouse/project-2f475d/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+    Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+--- treehouse argv during spawn:
+    capabilities --json
+recovered slot + nested copy fingerprint: unchanged
+pool state file: byte-equal
+holder record: byte-equal
+new task record: not published
+recovered backup: none
+RESULT: PASS
+

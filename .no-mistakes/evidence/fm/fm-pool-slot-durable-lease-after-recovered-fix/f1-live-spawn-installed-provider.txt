@@ -1,0 +1,12 @@
+=== pool state BEFORE (fixture pool, recovered slot 1 + free slot 2):
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-retained-copy.iqpDng/live-installed-provider/pool/1/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-retained-copy.iqpDng/live-installed-provider/pool/2/project","leased":null,"lease_holder":null}
+=== bin/fm-spawn.sh exit code: 1
+=== bin/fm-spawn.sh output:
+warning: task new-live-installed-provider: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.iqpDng/live-installed-provider/home/data/new-live-installed-provider/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.iqpDng/live-installed-provider/pool/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.iqpDng/live-installed-provider/pool/1/project/.claude/worktrees/nested-live-installed-provider and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.iqpDng/live-installed-provider/pool/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+=== every treehouse argv run (real installed binary v3.1.7-fm.8759019):
+capabilities --json
+=== holder record: byte-equal
+=== pool state: byte-equal

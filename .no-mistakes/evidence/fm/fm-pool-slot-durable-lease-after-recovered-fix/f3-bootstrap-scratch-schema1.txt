@@ -1,0 +1,7 @@
+### bootstrap with real scratch-schema1 provider (v3.1.7-fm.b5d2805)
+exit=0
+--- treehouse-related lines:
+BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
+--- every treehouse argv bootstrap ran:
+get --help
+capabilities --json

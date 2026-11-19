@@ -1,0 +1,7 @@
+=== real provider: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse.b36d1a5 (v3.1.7-fm.b36d1a5); capabilities: {"schema_version":1,"version":"v3.1.7-fm.b36d1a5","persistent_recovered_leases":true}
+=== bin/fm-spawn.sh exit code: 1
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.KYkwm9/live-schema1-provider/pool/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.KYkwm9/live-schema1-provider/pool/1/project/.claude/worktrees/nested-live-schema1-provider and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.KYkwm9/live-schema1-provider/pool/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+=== every treehouse argv the spawn ran:
+capabilities --json
+=== pool state: byte-equal

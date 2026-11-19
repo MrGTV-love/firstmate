@@ -1,0 +1,14 @@
+ok - a lease scan that fails anywhere (a relative or escaped path before or after the target entry) ends unreadable with every value cleared and a failing status, and valid leased and unleased scans are unchanged
+ok - lease holders compare as raw values: one backslash and two backslashes never match through their @tsv text, equal backslash and tab holders match, and the holder read back is the stored value
+ok - a missing-state path is a slot only by positive proof: an unprovable linked worktree (custom root, no pool-dir) refuses without suggesting a status, a worktree pool-dir proves outside the pool admits, and a project clone inside a Treehouse-backed home is never taken for a slot
+# all fm-task-copy-slot-identity tests passed
+bin/fm-proc-budget.sh -- bash tests/fm-task-copy-slot-identity.test.sh  1.43s user 3.10s system 12% cpu 35.610 total
+EXIT=0
+ok - bootstrap distinguishes installed off-PATH tools without executing them or weakening compatibility
+ok - bootstrap preserves missing-tool advice for absent and unusable user-local candidates
+ok - crew dispatch reports an off-PATH jq without executing it until PATH lookup succeeds
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+bootstrap approval present: no OMP_API_BILLING lines
+ok - bootstrap reports API-billed omp roles and fallback keys/targets locally and honors only recorded fallback approvals without writes
