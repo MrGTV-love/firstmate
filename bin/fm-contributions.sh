@@ -31,9 +31,9 @@
 # prose verdict only after its source identifies that head; otherwise leave it unbound and
 # triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
 # can grant merge authority. Captain-actor prose requires an existing live hold.
-# This script never merges: a merge is never an automatic forge action and goes
-# through the guarded merge path (bin/fm-pr-merge.sh); AGENTS.md section 7 owns
-# who may merge without asking.
+# This script never merges and takes no forge merge action. Any merge goes
+# through the guarded merge path (bin/fm-pr-merge.sh), and AGENTS.md section 7
+# owns who may merge without asking.
 #
 # retire ends one task's observation of a contribution whose forge object can
 # never be read again, such as a PR in a deleted repository. It records retired
