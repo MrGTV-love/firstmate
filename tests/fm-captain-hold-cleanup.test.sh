@@ -275,7 +275,8 @@ SH
   PATH="$fb:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    "$ROOT/bin/fm-captain-hold.sh" hold "$id" --reason "captain must decide" >/dev/null \
+    "$ROOT/bin/fm-captain-hold.sh" hold "$id" --reason "captain must decide" \
+    --boundary owner-rule-change --if-no 'Keep the existing owner rule' >/dev/null \
     || fail "holding on a beads-configured home failed without a markdown backlog"
   assert_grep "hold $id" "$log" \
     "the captain-hold mutation never reached the configured backend"
@@ -1236,12 +1237,12 @@ EOF
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/fm-captain-hold.sh" hold "$id" \
-    --reason "captain must choose after relocated interrupted cleanup" >/dev/null \
+    --boundary owner-rule-change --if-no 'Keep the existing owner rule' --reason "captain must choose after relocated interrupted cleanup" >/dev/null \
     || fail "could not hold the relocated answer-before-replay fixture"
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/fm-captain-hold.sh" hold "$id-call" --title "Sibling captain call" \
-    --reason "captain must decide the sibling call" --repo sample --origin "$id" >/dev/null \
+    --boundary owner-rule-change --if-no 'Keep the existing owner rule' --reason "captain must decide the sibling call" --repo sample --origin "$id" >/dev/null \
     || fail "could not hold the sibling captain call"
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
@@ -1342,12 +1343,12 @@ EOF
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/fm-captain-hold.sh" hold "$id" \
-    --reason "captain must choose the relocated sample outcome" >/dev/null \
+    --boundary owner-rule-change --if-no 'Keep the existing owner rule' --reason "captain must choose the relocated sample outcome" >/dev/null \
     || fail "could not hold the relocated work item"
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/fm-captain-hold.sh" hold "$id-call" --title "Sibling captain call" \
-    --reason "captain must decide the sibling call" --repo sample --origin "$id" >/dev/null \
+    --boundary owner-rule-change --if-no 'Keep the existing owner rule' --reason "captain must decide the sibling call" --repo sample --origin "$id" >/dev/null \
     || fail "could not hold the sibling captain call"
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
