@@ -148,7 +148,6 @@ if live:
     other.commit()
     other.close()
 PY
-[ -z "${FAKE_DONE:-}" ] || : > "$FAKE_DONE"
 [ -z "${FAKE_STDOUT:-}" ] || printf '%s\n' "$FAKE_STDOUT"
 [ -z "${FAKE_STDERR:-}" ] || printf '%b' "$FAKE_STDERR" >&2
 code=${FAKE_EXIT:-0}
@@ -589,6 +588,23 @@ test_wake_carries_a_non_ascii_first_stderr_line() {
   pass "daily runner: the wake carries a non-ASCII first stderr line whole"
 }
 
+test_wake_carries_the_literal_first_stderr_line() {
+  new_home spaces
+  run_runner run FAKE_EXIT=2 FAKE_STDERR="fetch failed: REQUIRED-TAIL   \nsecond line\n"
+  expect_code 2 "$CODE" "a run whose first stderr line ends in spaces"
+  assert_contains "$(queued_wakes)" "exited 2: fetch failed: REQUIRED-TAIL   ;" "the wake keeps the trailing spaces of the line"
+  new_home blank
+  run_runner run FAKE_EXIT=2 FAKE_STDERR="\nREQUIRED-SECOND-LINE\n"
+  expect_code 2 "$CODE" "a run whose first stderr line is empty"
+  assert_contains "$(queued_wakes)" "exited 2: (the first stderr line is empty);" "the wake says the first line is empty"
+  assert_not_contains "$(queued_wakes)" "REQUIRED-SECOND-LINE" "the wake does not pass off a later line as the first"
+  new_home blanks
+  run_runner run FAKE_EXIT=2 FAKE_STDERR="  \nREQUIRED-SECOND-LINE\n"
+  assert_contains "$(queued_wakes)" "exited 2:   ;" "a first line of spaces is carried as it is"
+  assert_equals 1 "$(wake_count)" "one wake row"
+  pass "daily runner: the wake carries the literal first stderr line, trailing spaces included"
+}
+
 test_cleanup_fault_after_the_commit_is_named_and_settled_before_the_next_collection() {
   new_home cleanup
   local fault collector_calls
@@ -618,18 +634,17 @@ test_cleanup_fault_after_the_commit_is_named_and_settled_before_the_next_collect
 test_a_reader_spanning_a_promotion_sees_one_generation() {
   new_home span
   add_route_projection "$DATA_DIR"
-  local held="$TMP_ROOT/span/held" release="$TMP_ROOT/span/release" reader runner
+  local held="$TMP_ROOT/span/held" release="$TMP_ROOT/span/release" blocked="$TMP_ROOT/span/blocked" reader runner
   env FM_TEST_SEAM=1 FM_MODEL_PICKER_READER_HOLD="$held:$release" "$SHADOW" --check-routes --rules "$TMP_ROOT/rules.json" --data-root "$DATA_DIR" \
     > "$TMP_ROOT/span/reader.out" 2>&1 &
   reader=$!
   fm_test_wait_until --while-alive "$reader" -- test -e "$held" || fail "the reader never took its hold"
   assert_equals "trusted old=ok new=refused" "$(shadow_view "$DATA_DIR")" "a reader that began before the promotion holds a trusted old generation"
   env FM_HOME="$HOME_DIR" FM_TEST_SEAM=1 FM_MODEL_PICKER_DAILY_NOW="$NOW" FM_MODEL_PICKER_DAILY_COLLECTOR="$TMP_ROOT/fake-collector.sh" \
-    FM_MODEL_PICKER_DAILY_BUDGET="$TMP_ROOT/fake-budget.sh" FAKE_LOG="$FAKE_LOG" FAKE_DONE="$TMP_ROOT/span/collected" "$RUNNER" run >/dev/null 2>&1 &
+    FM_MODEL_PICKER_DAILY_BUDGET="$TMP_ROOT/fake-budget.sh" FAKE_LOG="$FAKE_LOG" FM_MODEL_PICKER_DAILY_FAULT="mark:lock-blocked:$blocked" "$RUNNER" run >/dev/null 2>&1 &
   runner=$!
-  # The collector writes the marker when its staged generation is complete; the promotion starts next.
-  fm_test_wait_until --while-alive "$runner" -- test -e "$TMP_ROOT/span/collected" || { : > "$release"; fail "the run never finished collecting"; }
-  /bin/sleep 3
+  # The promotion writes the marker when its real exclusive lock attempt was refused by the reader's shared hold, so waiting for it is waiting for the blocked promotion itself.
+  fm_test_wait_until --while-alive "$runner" -- test -e "$blocked" || { : > "$release"; fail "the promotion never reached the lock and was never blocked by the reader"; }
   assert_equals "1.0" "$(sql "$DATA_DIR/aa.sqlite" 'SELECT value FROM observations')" "the promotion has not begun while the reader holds the generation"
   assert_contains "$(cat "$DATA_DIR/verdict.json")" TRUSTED "the verdict is still the old trusted one"
   : > "$release"
@@ -805,6 +820,7 @@ test_failed_final_rename_leaves_a_committed_snapshot_under_untrusted
 test_cleanup_removes_only_what_the_journal_names
 test_wake_carries_the_whole_first_stderr_line
 test_wake_carries_a_non_ascii_first_stderr_line
+test_wake_carries_the_literal_first_stderr_line
 test_cleanup_fault_after_the_commit_is_named_and_settled_before_the_next_collection
 test_a_reader_spanning_a_promotion_sees_one_generation
 test_a_reader_during_a_promotion_is_refused

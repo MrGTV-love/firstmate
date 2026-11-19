@@ -139,11 +139,15 @@ def _exclusive(root):
     fd = os.open(str(root), os.O_RDONLY)
     try:
         deadline = time.monotonic() + LOCK_WAIT_SECONDS
+        blocked = False
         while True:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except BlockingIOError:
+                if not blocked:
+                    blocked = True
+                    _point("lock-blocked")
                 if time.monotonic() >= deadline:
                     raise _Refused(f"a reader held the lock on {root} for {LOCK_WAIT_SECONDS} seconds; nothing was changed") from None
                 time.sleep(0.02)
@@ -170,7 +174,9 @@ def _faults():
     holds ';'-separated entries: rename:SRC_REGEX>>DST_REGEX fails a matching rename,
     remove:PATH_REGEX fails the removal of a matching path with an I/O error,
     kill:POINT SIGKILLs this process and fail:POINT raises there (POINT is before-commit or
-    after-commit), hold:POINT:ANNOUNCE:RELEASE creates ANNOUNCE and waits there until RELEASE exists."""
+    after-commit), hold:POINT:ANNOUNCE:RELEASE creates ANNOUNCE and waits there until RELEASE exists,
+    mark:POINT:FILE creates FILE there and goes on (lock-blocked is reached when a reader's shared
+    lock refused the promotion's first exclusive attempt)."""
     if os.environ.get("FM_TEST_SEAM") != "1":
         return []
     return [e for e in os.environ.get("FM_MODEL_PICKER_DAILY_FAULT", "").split(";") if e]
@@ -183,6 +189,8 @@ def _point(name):
             os.kill(os.getpid(), signal.SIGKILL)
         if kind == "fail" and rest == name:
             raise OSError(errno.EIO, f"injected failure at {name}")
+        if kind == "mark" and rest.startswith(name + ":"):
+            Path(rest.split(":", 1)[1]).write_text("")
         if kind == "hold" and rest.startswith(name + ":"):
             _, announce, release = rest.split(":", 2)
             Path(announce).write_text("")

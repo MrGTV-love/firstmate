@@ -1298,7 +1298,7 @@ Whatever stops a promotion, a settle step reads that journal and leaves one of t
 The runner settles at the end of a failed promotion and again at the start of every run.
 The previous verdict returns only when every undo step worked, so a trusted verdict never sits over a mixed generation; a step that fails twice leaves the verdict `UNTRUSTED` and the wake says so.
 A reader holds a shared lock on the data root for its whole read of the verdict and projections (`generation_hold` in `bin/fm_model_picker/shadow.py`, used by `--observe` and `--check-routes`) and a promotion holds it exclusively, so no read spans a promotion and a reader that starts during one is refused.
-The wake names the outcome first, then the whole first stderr line (the wake queue sets no length limit; UTF-8 text is kept and each control character becomes a space), and the verdict a reader actually sees, read back from the file.
+The wake names the outcome first, then the whole first stderr line, the literal first line with its trailing spaces (the wake queue sets no length limit; UTF-8 text is kept and each control character becomes a space; an empty first line is named as empty), and the verdict a reader actually sees, read back from the file.
 A signal that ends the whole runner during a promotion leaves the verdict `UNTRUSTED` with no wake until the next run settles it at its start.
 A run removes only its own staging directory, a stale one only when its owner record names a process that is gone, and from the data root only the names its own journal lists plus its collector-prefixed scratch file `.fm-model-picker-daily.tmp`; it never touches another file, and a promotion that finds another of its own prefixed names with no journal changes nothing and says so.
 

@@ -120,16 +120,20 @@ raise_once() {
   return "$status"
 }
 
-one_line() { LC_ALL=C tr '\000-\037\177' ' ' | LC_ALL=C sed 's/ *$//'; }
+# one_line: keep every byte of one line except its newline and the control characters the one-row wake queue cannot carry; each of those becomes one space.
+one_line() { LC_ALL=C tr -d '\n' | LC_ALL=C tr '\000-\037\177' ' '; }
 outcome() { sed -n 's/^outcome=//p' | tail -n 1; }
 
+# first_stderr_line: the literal first line of the failed run's stderr, trailing spaces included.
 first_stderr_line() {
   local line
-  line=$(LC_ALL=C grep -m1 -v '^[[:space:]]*$' "$LAST_ERR" 2>/dev/null | one_line)
-  if [ -z "$line" ]; then
-    line=$(LC_ALL=C grep -m1 '^chart-diff:' "$LAST_OUT" 2>/dev/null | one_line)
-    [ -z "$line" ] || line="no stderr line; stdout said: $line"
+  if [ -s "$LAST_ERR" ]; then
+    line=$(LC_ALL=C head -n 1 "$LAST_ERR" | one_line)
+    printf '%s\n' "${line:-(the first stderr line is empty)}"
+    return 0
   fi
+  line=$(LC_ALL=C grep -m1 '^chart-diff:' "$LAST_OUT" 2>/dev/null | one_line)
+  [ -z "$line" ] || line="no stderr line; stdout said: $line"
   printf '%s\n' "${line:-no stderr line}"
 }
 
