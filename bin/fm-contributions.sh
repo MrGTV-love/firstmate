@@ -30,7 +30,7 @@
 # Neither kind can grant merge authority.
 # Captain-actor prose requires an existing live hold.
 # This script never merges and takes no forge merge action.
-# Any merge goes through the guarded merge path (bin/fm-pr-merge.sh).
+# Any PR merge goes through the guarded merge path (bin/fm-pr-merge.sh).
 # AGENTS.md section 7 owns who may merge without asking.
 #
 # retire ends one task's observation of a contribution whose forge object can
