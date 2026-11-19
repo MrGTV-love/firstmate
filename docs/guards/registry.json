@@ -2110,7 +2110,7 @@
       "invariant": "Fresh task publication never races a task-set mutation; presentation changes respect the presentation-lock owner.",
       "layer": "runtime-block",
       "source": "the home task-set lock holder role and the named Herdr presentation/recovery lock; existing decision points: site:bin/fm-spawn.sh:ee41751d06",
-      "trigger": "publishing a fresh task while another spawn, forced teardown or other op holds the task-set lock, or changing a Herdr presentation while another operation owns its presentation lock (the presentation-lock warning that skips abort cleanup is also a mapped site)",
+      "trigger": "publishing a fresh task record into a home whose task set another spawn, a forced teardown or other op owns, or into a home a forced teardown has already removed (the task-set lock is taken only at publication, after the treehouse get wait, so a fresh spawn may begin during a teardown and must be refused at publication), or changing a Herdr presentation while another operation owns its presentation lock (the presentation-lock warning that skips abort cleanup is also a mapped site)",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",

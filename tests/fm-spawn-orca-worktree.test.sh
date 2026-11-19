@@ -305,7 +305,7 @@ test_orca_abort_recovery_obeys_task_set_custody() {
   pass 'Orca abort recovery publishes only with task-set custody and finishes cleanup after refusal'
 }
 
-test_orca_late_admission_refusal_cannot_publish_recovery() {
+test_orca_late_admission_refusal_still_records_retained_copy() {
   local reason case_dir home id fb out status lock actor cap late_meta late_backlog
   . "$ROOT/bin/fm-wake-lib.sh"
   for reason in cap queued; do
@@ -341,20 +341,22 @@ test_orca_late_admission_refusal_cannot_publish_recovery() {
     else
       assert_contains "$out" 'may dispatch only queued unblocked work' 'relocated work did not reject late admission'
     fi
-    [ ! -e "$home/state/$id.meta" ] || fail 'rejected late admission published an Orca recovery record under held custody'
+    assert_grep 'cleanup_recovery=orca' "$home/state/$id.meta" 'rejected late admission lost the Orca recovery record'
+    assert_grep "orca_worktree_id=wt-fm-$id" "$home/state/$id.meta" 'Orca recovery record does not name the retained worktree'
+    assert_grep "endpoint_task_id=$id" "$home/state/$id.meta" 'Orca recovery record does not name the endpoint task'
     [ ! -e "$home/state/.control-$id.lock" ] || fail 'late Orca refusal retained control custody'
     [ ! -e "$home/state/.spawn-$id.lock" ] || fail 'late Orca refusal retained spawn custody'
     lock=$(fm_task_set_lock_path "$home/state") || fail 'cannot resolve fixture task set'
     fm_lock_try_acquire "$lock" || fail 'late Orca refusal retained task-set custody'
     fm_lock_release "$lock"
   done
-  pass 'late spend-cap and relocated-work refusals cannot become Orca recovery publication permission'
+  pass 'late spend-cap and relocated-work refusals still record the retained Orca copy without admitting a worker'
 }
 
 fm_test_only
 
 test_orca_abort_recovery_obeys_task_set_custody
-test_orca_late_admission_refusal_cannot_publish_recovery
+test_orca_late_admission_refusal_still_records_retained_copy
 
 test_orca_fresh_spawn_enters_the_worktree_it_created
 test_orca_relaunch_is_refused_before_the_worktree_carveout_could_run
