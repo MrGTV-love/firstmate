@@ -1,0 +1,11 @@
+# load before:  3:22  up 1 day, 14:54, 1 user, load averages: 65.30 59.52 55.92
+ok - fm-send remote: a text steer lands as a durable remote inbox record and exits 0 at enqueue
+ok - fm-send remote: the printed correlation-reusing resend deduplicates onto the same record
+not ok - the printed correlation resend must be accepted: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: steer to remote secondmate rsm is unconfirmed (the remote transport did not complete within its 30s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/Users/charlesabrooker/tmp/fm-send-remote-delivery.C5uCk1/remote-escalated-resend-1883 FM_PENDING_REPLY_EXISTING_CORR=d48d18d7fea6e0f3 /tmp/fm-val-r3/head/bin/fm-send.sh rsm --answers-none -- please\ rename\ the\ metric: expected exit 0, got 1
+real 230.37
+user 4.52
+sys 10.90
+# exit=1
+# load after:  3:26  up 1 day, 14:58, 1 user, load averages: 95.42 73.81 62.60

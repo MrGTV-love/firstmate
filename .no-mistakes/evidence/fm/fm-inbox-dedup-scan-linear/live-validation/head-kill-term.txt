@@ -1,0 +1,9 @@
+pre-signal: lock_held=yes work_dirs=1 alive=yes
+signal=TERM writer_exit=143
+post-signal entries: 
+lock_left=no unhandled_after_signal=0
+second_call rc=0 seconds=45.014 printed=STATE/t1.inbox/1601.msg err=
+second_call_entries:  unhandled=1
+inbox_listing_unhandled: STATE/t1.inbox/1601.msg 
+record_body: AFTER-KILL-STEER corr=K2
+stderr_of_killed_writer: 

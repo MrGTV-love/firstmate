@@ -1,0 +1,6 @@
+== deep path (~900-byte record paths, under PATH_MAX 1024), 1600 records: total argv > ARG_MAX 1048576 ==
+N=1600 path-bytes-avg=904 total-arg-bytes~1446400 tree=/tmp/fm-val-head
+resend-of-handled: rc=0 seconds=2.4 printed='t1.inbox/handled/0900.msg' stderr=''
+  unhandled=0 handled=1600
+new-text: rc=0 seconds=6.5 printed='t1.inbox/1601.msg' stderr=''
+  unhandled=1 handled=1600

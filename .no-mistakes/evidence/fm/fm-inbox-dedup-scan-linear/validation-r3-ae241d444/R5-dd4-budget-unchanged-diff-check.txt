@@ -1,0 +1,9 @@
+# git diff base..head: FM_SEND_REMOTE_BUDGET lines
+503:+# default FM_SEND_REMOTE_BUDGET (deliberately not set here) and a same-id resend
+# files changed in diff
+ 3 files changed, 962 insertions(+), 68 deletions(-)
+# bin/fm-send.sh changed lines in diff:
+       0
+# default in head fm-send.sh:
+989:    FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
+1014:    FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}

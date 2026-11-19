@@ -1,0 +1,36 @@
+Live validation: fm-inbox-dedup-scan-linear (head 9cb1583fe, base 7f3a198b3)
+Host load during runs: 1-min load average 58 to 115 on an 18-core Mac (not idle).
+Scratch trees: git archive of base and head, plus git clones at each commit, all under /tmp.
+
+Timing, real fm_task_inbox_write_idempotent, one steer, 1600 handled records:
+- head, new text:                 26.3 s, rc 0, printed 1601.msg               (head-1600-new.txt)
+- head, resend of handled text:   76.4 s, rc 0, printed handled/0900.msg, no new record (head-1600-resend.txt)
+- head, text equal to unhandled:   7.3 s, rc 0, printed 1601.msg, no new record  (head-1600-unhandled.txt)
+- head, 200 records, new text:    13.3 s                                        (run in shell, not saved)
+- base, 200 records, new text:    no result in 110 s                            (run in shell, not saved)
+- base, 1600 records: not completed (stopped after more than 5 min)
+
+Kill mid-scan (lock held, scan running), head, 1600 records:
+- SIGTERM: writer exit 143, no .dedup/.work/.staging left, lock freed, next call rc 0 writes 1601.msg (head-kill-term.txt)
+- SIGINT:  writer exit 130, no temp left, lock freed, next call rc 0 writes 1601.msg (head-kill-int-py.txt)
+  (first INT attempt was a harness artifact: a non-interactive background job ignores INT; not used)
+- SIGKILL: writer exit 137, one .work.<pid>.<rand> dir and the lock left behind, as the header says;
+  next call rc 0 after 127 s (stale lock recovered), writes 1601.msg (head-kill-kill.txt)
+
+Remote steer through real bin/fm-send.sh with the repo fake ssh (tests/fm-send-remote-delivery.test.sh):
+- full file, head, run 1: first case FAILED: "steer ... unconfirmed (30s budget)"   (test-remote.txt is base; see below)
+- full file, head, rerun: 15 cases pass; case 16 (1600 handled records) FAILED on the
+  same-id fire-and-forget resend: "unconfirmed (delivery-id=ddddeeeeffff0000)" (test-remote-2.txt)
+- full file, base: first case FAILED with the same 30 s budget message (test-remote-base.txt)
+- single case 16 on a clean head clone: PASSED (test-remote-1600-clone.txt)
+- single case 16 on a scratch archive (no .git): invalid run (refused: "not tracked by this Firstmate checkout"), discarded
+
+Existing inbox test file, head: 30 cases pass, including the launch-count cases at 50 vs 1600 records (16 vs 16),
+  the signal matrix, and the dedup-outcome cases (test-inbox.txt). Case 31 (watcher re-ring) failed with its watcher killed
+  under load; a cleaner single-case re-run was not completed (see unresolved note).
+
+Budget: git diff 7f3a198b3..HEAD touches no FM_SEND_REMOTE_BUDGET line; bin/fm-send.sh is unchanged.
+
+Watcher case under load (messy single-file runs, both trees): head and base both FAIL with
+  "the watcher never escalated the deferred draft-risk attempt" (inbox-watch-head.txt, inbox-watch-base.txt).
+  Same failure on base, so it is not caused by this change; a clean single-case re-run was not finished.

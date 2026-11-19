@@ -1,0 +1,17 @@
+fm_run_timed budget=2s writer=subst rc=124 blocked_pids=[51099 ] blocked_alive_after=no
+  leftovers(after 1.5s): .seq.lock .seq.lock.owner.8AzFno .work.50098.1236625653 
+  work-dir-contents: . .. .dedup.cands .staging.record 
+  top-level .dedup* files: 0  any-temp-file-holding-text: t1.inbox/.work.50098.1236625653/.staging.record 
+fm_run_timed budget=2s writer=subst rc=124 blocked_pids=[78494 ] blocked_alive_after=no
+  leftovers(after 1.5s): .seq.lock .seq.lock.owner.bJWEiR .work.77324.629728047 
+  work-dir-contents: . .. .dedup.cands .staging.record 
+  top-level .dedup* files: 0  any-temp-file-holding-text: t1.inbox/.work.77324.629728047/.staging.record 
+== base, scan kill under the same budget wrapper ==
+fm_run_timed budget=2s writer=subst rc=124 blocked_pids=[] blocked_alive_after=no
+  leftovers(after 1.5s): .dedup.Mog0b0 .dedup.eBpisX .seq.lock .seq.lock.owner.eT2sSx 
+  work-dir-contents: 
+  top-level .dedup* files: 2  any-temp-file-holding-text: t1.inbox/.dedup.Mog0b0 
+fm_run_timed budget=2s writer=subst rc=124 blocked_pids=[] blocked_alive_after=no
+  leftovers(after 1.5s): .dedup.4Pgs0u .dedup.vQM7PQ .seq.lock .seq.lock.owner.Hn4mNN 
+  work-dir-contents: 
+  top-level .dedup* files: 2  any-temp-file-holding-text: t1.inbox/.dedup.vQM7PQ 

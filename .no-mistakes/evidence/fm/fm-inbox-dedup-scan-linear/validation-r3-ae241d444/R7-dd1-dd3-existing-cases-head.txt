@@ -1,0 +1,19 @@
+# load before:  4:00  up 1 day, 15:32, 1 user, load averages: 94.76 93.24 83.58
+ok - inbox: a steer is written durably and round-trips byte-exact with a self-describing doorbell
+ok - inbox: a hostile-name doorbell executes as a no-op in bare shells
+ok - inbox: terminal-control inbox names are rejected without typing
+ok - inbox: the ring skips dead or missing endpoints and still rings live or unclassifiable endpoints
+ok - inbox: the ring submits its own stuck doorbell, skips other pending text, and retries a lost Enter once on both paths
+ok - inbox: the idempotent enqueue dedups an exact re-run onto the same record, handled or not
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 handled records (17 vs 17)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that share its first line (17 vs 17)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records for the empty text (17 vs 17)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that hold NUL bytes
+ok - inbox: the dedup keeps every outcome of the full compare
+ok - inbox: the dedup compares odd records byte for byte (NUL, invalid UTF-8, CR, newlines, separators, modes)
+ok - inbox: a TERM or INT inside the idempotent write leaves no temp file, frees the lock, and the next steer lands
+ok - inbox: TERM and INT to the writer, its process group or the writer alone leave no temp file, work directory or lock in any window (112 cells)
+ok - inbox: the idempotent write restores the caller's TERM and INT traps
+dd single cases done
+# exit=0
+# load after:  4:32  up 1 day, 16:04, 1 user, load averages: 95.36 103.05 91.54

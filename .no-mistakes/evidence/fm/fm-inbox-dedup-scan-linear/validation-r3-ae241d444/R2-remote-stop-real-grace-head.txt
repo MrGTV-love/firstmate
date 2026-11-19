@@ -1,0 +1,17 @@
+# host load:  3:23  up 1 day, 14:55, 1 user, load averages: 67.36 61.44 56.96
+# tree: head ae241d444
+worker pid=1243 blocking-grep pid=2549 blocked-in-scan=yes
+pre-stop entries: .seq.lock .seq.lock.owner.Hh8CbK .work.1243.1718711411 
+/tmp/fm-val-r3/head/bin/fm-remote-job-lib.sh: line 1090:  1243 Terminated: 15          PATH="$D/shim:$PATH" FM_STATE_OVERRIDE="$STATE" bash "$D/fm-remote-job-worker.sh" "$LIB" "$STATE" "$TEXT" > "$D/out" 2> "$D/err"
+fm_remote_job_stop_worker_tree rc=0 seconds=.414074000
+worker exit status=143 (143 = TERM reached the writer)
+worker stdout: 
+after stop: blocking-grep alive=no
+after stop: entries: .seq.lock .seq.lock.owner.Hh8CbK .work.1243.1718711411 
+after stop: work-dir contents: . .. .dedup.cands 
+after stop: any temp holding the killed text: 
+after stop: unhandled .msg: 0
+second call rc=0 seconds=2 printed=t1.inbox/1601.msg
+after second call: unhandled .msg: 1601.msg 
+after second call: entries: .work.1243.1718711411 
+# host load after:  3:23  up 1 day, 14:55, 1 user, load averages: 66.31 61.45 57.03

@@ -1,0 +1,13 @@
+tree=/tmp/fm-s4-clone signal=KILL N=1600 state-dir=/tmp/fm-val-kill.daclaj1a
+pre-signal: scan-blocked=True writer-alive=True blocking-grep-alive=True lock-held=True work-or-temp=['.seq.lock', '.seq.lock.owner.dQjjAj', '.work.19392.956221123']
+writer returncode=-9 (negative means killed by that signal)
+writer stderr=b''
+after signal: blocking-grep-alive=True
+after signal: entries=['.seq.lock', '.seq.lock.owner.dQjjAj', '.work.19392.956221123']
+after signal: lock-present=True
+after signal: unhandled .msg=[]
+after SIGKILL: stale lock recovery is timed by the second call (expect a wait).
+second call rc=0 seconds=1.1 printed='STATE/t1.inbox/1601.msg' stderr=''
+after second call: entries=['.work.19392.956221123']
+after second call: unhandled .msg=['1601.msg']
+1601.msg body tail='AFTER-KILL-STEER corr=K2\nsecond line'

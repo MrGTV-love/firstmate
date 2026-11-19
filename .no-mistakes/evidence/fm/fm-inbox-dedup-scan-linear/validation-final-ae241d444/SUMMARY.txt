@@ -1,0 +1,20 @@
+Final live validation, head ae241d444 (base 7f3a198b3). Scratch clone: /tmp/fm-s4-clone (git clone of the worktree at ae241d444). Host load 33-95 during runs.
+
+DD1 launch counts: `tests/fm-task-inbox.test.sh` cases test_idempotent_scan_launches_do_not_grow_* PASS on head (17 vs 17 launches at 50 vs 1600 records). Saved in dd-dedup-launch-signal-cases-head.txt. Base was red earlier (167 vs 4817) per validation-r3-ae241d444/R8.
+Wall time, real write, 1600 records, head: 0.31-0.63 s (6 runs, load ~48-51); one outlier 26.3 s and one 2.7 s at load ~50-55.
+Wall time, base 200 records: 17.7 s (validation-ae241d444/s10).
+
+DD2 dedup parity: validation-r3-ae241d444/R4 (all cases identical:true). Head dedup cases also PASS in dd-dedup-launch-signal-cases-head.txt.
+
+DD3 kill mid-scan, real writer, 1600 records (kill-drive.py, head):
+  TERM: writer -15, no temp, lock freed, next call writes 1601.msg -> dd3-kill-TERM-head-1600.txt
+  INT:  writer -2, same result -> dd3-kill-INT-head-1600.txt
+  KILL: writer -9, work dir and lock left (expected, SIGKILL cannot be trapped), next call recovers stale lock and writes 1601.msg -> dd3-kill-KILL-head-1600.txt
+
+DD4 remote steer behind 1600 handled records (real fm-send.sh, test fake ssh):
+  test_remote_steer_lands_behind_a_large_handled_folder: one full pass at load ~45-60 (ordinary steer, same-id resend, fire-and-forget, same-id resend dedup).
+  Interleaved timing, 6 pairs, load ~40-60: empty inbox 3.7-17.3 s (median ~8.4); 1600 handled 3.0-17.0 s (median ~9.0). Folder adds no visible cost.
+  Earlier round-3 runs at load 31-95 timed out at the 30 s budget (R6, R9), including the fire-and-forget steer. Empty-inbox legs were not run at that load.
+  Budget: no FM_SEND_REMOTE_BUDGET line changed in the diff (grep count 0).
+
+Concurrent writers (test_concurrent_writers_never_clobber, isolated): head 8/8 + 5/5 pass in one batch; 3 intermittent failures "Killed: 9" (writer SIGKILLed, source not isolated) in 13 head runs total; base 11/11 pass. Full inbox file once on head stopped at this case.

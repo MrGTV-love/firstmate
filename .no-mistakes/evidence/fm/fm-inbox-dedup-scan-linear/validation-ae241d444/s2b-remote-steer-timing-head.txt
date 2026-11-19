@@ -1,0 +1,20 @@
+STEER-EMPTY-INBOX rc=0 seconds=3.54 uptime=[load averages: 33.69 44.29 51.64]
+STEER-BEHIND-1600 rc=0 seconds=21.33 uptime=[load averages: 40.58 45.15 51.78] err=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESEND-SAME-ID-BEHIND-1600 rc=0 seconds=5.02 unhandled=1 files_new=1601.msg 
+PROBE-DONE
+STEER-EMPTY-INBOX rc=0 seconds=3.10 uptime=[load averages: 42.14 45.34 51.77]
+STEER-BEHIND-1600 rc=0 seconds=2.90 uptime=[load averages: 42.05 45.27 51.70] err=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESEND-SAME-ID-BEHIND-1600 rc=0 seconds=2.34 unhandled=1 files_new=1601.msg 
+PROBE-DONE
+STEER-EMPTY-INBOX rc=0 seconds=9.11 uptime=[load averages: 47.65 46.24 51.86]
+STEER-BEHIND-1600 rc=0 seconds=4.55 uptime=[load averages: 48.56 46.46 51.90] err=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESEND-SAME-ID-BEHIND-1600 rc=0 seconds=4.01 unhandled=1 files_new=1601.msg 
+STEER-EMPTY-INBOX rc=0 seconds=3.39 uptime=[load averages: 51.22 47.15 52.06]
+STEER-BEHIND-1600 rc=0 seconds=2.25 uptime=[load averages: 51.22 47.15 52.06] err=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESEND-SAME-ID-BEHIND-1600 rc=0 seconds=2.22 unhandled=1 files_new=1601.msg 
+STEER-EMPTY-INBOX rc=0 seconds=7.59 uptime=[load averages: 50.09 47.03 51.92]
+STEER-BEHIND-1600 rc=0 seconds=5.54 uptime=[load averages: 53.37 47.76 52.15] err=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESEND-SAME-ID-BEHIND-1600 rc=0 seconds=2.95 unhandled=1 files_new=1601.msg 
+STEER-EMPTY-INBOX rc=0 seconds=2.26 uptime=[load averages: 51.99 47.65 52.06]
+STEER-BEHIND-1600 rc=0 seconds=1.99 uptime=[load averages: 51.99 47.65 52.06] err=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESEND-SAME-ID-BEHIND-1600 rc=0 seconds=1.72 unhandled=1 files_new=1601.msg 

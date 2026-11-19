@@ -1,0 +1,14 @@
+ATTEMPT1 rc=3 scan-blocked-pids=[974] stderr=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-val-head/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: fire-and-forget steer to remote secondmate rsm is unconfirmed (delivery-id=ddddeeeeffff0000); retry only with the same delivery id
+AFTER-ATTEMPT1 temps=[/Users/charlesabrooker/tmp/fm-send-remote-delivery.Dgbd8J/budget-kill-rhome/state/parent-route/rsm.inbox/.work.98738.319928324 ] lock=present unhandled_records=0 ssh_calls=       1
+RESEND-AFTER-KILL rc=0 unhandled_records=1 stderr=WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+notice: doorbell did not reach fm-remote:p1; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-send-remote-delivery.Dgbd8J/budget-kill-rhome/state/parent-route/rsm.inbox/1601.msg
+SECOND-RESEND rc=0 unhandled_records=1 files=1601.msg handled 
+PROBE-DONE
+bash tests/probe-budget-kill.test.sh  1.98s user 5.08s system 44% cpu 15.851 total

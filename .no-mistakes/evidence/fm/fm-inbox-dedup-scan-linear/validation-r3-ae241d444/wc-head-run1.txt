@@ -1,0 +1,28 @@
+Note: switching to 'ae241d44444c8f05b279a618e0271f6d182e993f'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+run 1: job=job-c5ausu worker=28485 blocked-grep=93361 writer-shell=84293 in-scan=yes
+  cancel rc=0; lane exited rc=0 after 1795082248.48 s from cancel
+  lane stdout: 
+  blocking grep alive after: no
+  entries after lane: 
+  work-dir contents: 
+  temp files holding the killed text: 
+  unhandled .msg after lane: 0
+  second call rc=0 seconds=4 printed=t1.inbox/1601.msg
+  entries after second call: 
+

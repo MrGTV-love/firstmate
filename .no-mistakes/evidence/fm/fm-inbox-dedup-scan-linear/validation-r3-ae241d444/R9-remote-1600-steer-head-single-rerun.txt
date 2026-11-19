@@ -1,0 +1,8 @@
+# load before:  4:09  up 1 day, 15:41, 1 user, load averages: 31.65 68.13 77.71
+not ok - the fire-and-forget steer behind 1600 handled records failed: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: fire-and-forget steer to remote secondmate rsm is unconfirmed (delivery-id=ddddeeeeffff0000); retry only with the same delivery id
+real 142.63
+user 2.10
+sys 5.26
+# exit=1
+# load after:  4:12  up 1 day, 15:44, 1 user, load averages: 22.20 50.23 68.98

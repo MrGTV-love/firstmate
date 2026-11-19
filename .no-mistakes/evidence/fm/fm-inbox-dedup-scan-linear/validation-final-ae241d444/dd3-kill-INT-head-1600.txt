@@ -1,0 +1,12 @@
+tree=/tmp/fm-s4-clone signal=INT N=1600 state-dir=/tmp/fm-val-kill.z8gui3n_
+pre-signal: scan-blocked=True writer-alive=True blocking-grep-alive=True lock-held=True work-or-temp=['.seq.lock', '.seq.lock.owner.gFmC8H', '.work.14787.1327025511']
+writer returncode=-2 (negative means killed by that signal)
+writer stderr=b''
+after signal: blocking-grep-alive=False
+after signal: entries=[]
+after signal: lock-present=False
+after signal: unhandled .msg=[]
+second call rc=0 seconds=0.4 printed='STATE/t1.inbox/1601.msg' stderr=''
+after second call: entries=[]
+after second call: unhandled .msg=['1601.msg']
+1601.msg body tail='AFTER-KILL-STEER corr=K2\nsecond line'

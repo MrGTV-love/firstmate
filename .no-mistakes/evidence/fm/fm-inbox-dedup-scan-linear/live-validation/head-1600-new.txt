@@ -1,0 +1,2 @@
+tree=head N=1600 mode=new seconds=26.276 rc=0 printed=STATE/t1.inbox/1601.msg handled_after=1600 unhandled_after=1 temps=0
+exit=0

@@ -1,0 +1,15 @@
+# load before:  3:59  up 1 day, 15:31, 1 user, load averages: 79.27 91.09 82.13
+not ok - a steer behind 1600 handled records did not deliver (rc 1): ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-val-r3/head/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: steer to remote secondmate rsm is unconfirmed (the remote transport did not complete within its 30s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/Users/charlesabrooker/tmp/fm-send-remote-delivery.omUcBr/remote-large-handled-10588 FM_PENDING_REPLY_EXISTING_CORR=3f0485475bef75e4 /tmp/fm-val-r3/head/bin/fm-send.sh rsm --answers-none -- please\ rename\ the\ metric
+real 205.87
+user 1.20
+sys 3.53
+# exit=1
+# load after:  4:02  up 1 day, 15:34, 1 user, load averages: 86.66 91.83 84.61

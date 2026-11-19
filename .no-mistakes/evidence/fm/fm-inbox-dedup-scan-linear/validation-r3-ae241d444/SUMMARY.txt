@@ -1,0 +1,30 @@
+Round 3 live validation, head ae241d444 (base 7f3a198b3). Scratch clones under /tmp/fm-val-r3 (head, base). Symlinks /tmp/fm-val-head and /tmp/fm-val-base point at them.
+Host load (1-min, 18 cores) during runs: 30 to 123. The load is machine-wide (about 1500 processes under the same uid, not from this run).
+
+NOTE on R2-remote-stop-real-grace-head.txt and scripts/remote-stop-kill.sh: that harness called fm_remote_job_stop_worker_tree (fleet repair path, 5 s grace). It is NOT the caller-cancel path. Superseded by the worker-cancel runs below. Its residue (2 dirty of 9 valid runs) is not evidence about the cancel path.
+
+Scenario evidence (this round):
+
+R1 remote-delivery test file, full (tests/fm-send-remote-delivery.test.sh, head, load 65-95): FAILED at an early case ("printed correlation resend must be accepted: ... unconfirmed (30s budget)"). The file stops at the first failure. Load-driven; see R6.
+
+R6 single 1600-record remote steer case (test_remote_steer_lands_behind_a_large_handled_folder, head, load 79-95): FAILED. "steer ... unconfirmed (the remote transport did not complete within its 30s budget)". Real fm-send.sh with the fake-ssh transport from the test file.
+R9 same case rerun at lower load: see R9 file (if present) and the result line below.
+
+R3 direct kill, real writer, 1600 handled, blocked dedup grep (scripts/kill-drive.py, head):
+  TERM: writer rc -15, no .work/.dedup/.staging left, lock freed, next call rc 0 writes 1601.msg.
+  INT: writer rc -2, same result.
+  (SIGKILL not run this round.)
+
+R4 DD2 base-vs-head parity (scripts/dd2-diff.py, 24 cases): ALL-IDENTICAL (rc, printed path, record set).
+
+R5 DD4 budget unchanged (git diff base..head): no change to bin/fm-send.sh; FM_SEND_REMOTE_BUDGET default stays 30 in fm-send.sh; the only diff hit is a test comment.
+
+R7 existing inbox cases on head (zz-dd.test.sh, single-file run of named tests): pass for dedup exact re-run (handled or not), launch counts 50 vs 1600 (17 vs 17), launch counts with shared first line (17 vs 17). Remaining cases in the file: see R7 file.
+R8 same cases on base: NOT FINISHED in this round (pending). Earlier round (validation-ae241d444/s7) recorded base red: 167 vs 4817 launches. Not re-proven this round.
+
+R-cancel: real remote job path, worker-cancel-kill.sh (real fm_remote_job_stage, real bin/fm-remote-job-worker.sh --lane, real fm_remote_job_cancel; job = fm-writer-job.sh running the real fm_task_inbox_write_idempotent inside $(...), blocking grep shim so the cancel lands in the scan):
+  wc-run1 (scratch file /tmp/fm-val-r3/wc-run1.txt, copied to wc-head-run1.txt): cancel rc 0, lane exit 0, blocking grep dead, entries after lane NONE, work dir NONE, temp holding killed text NONE, next call rc 0 writes 1601.msg.
+  wc-head-6runs.txt runs 1 and 2: same clean result (entries NONE, next call rc 0 writes 1601.msg).
+  Runs 3 to 6: still running at the time of this summary (see wc-head-6runs.txt if completed).
+
+Not run this round: base cancel contrast; SIGKILL live rerun; DD1 timing record (E/DD1/timing.md) for 200/800/1600 on base and head; watcher re-ring case (out of scope).

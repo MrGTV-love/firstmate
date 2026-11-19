@@ -1,0 +1,1 @@
+tree=head N=1600 mode=resend seconds=76.446 rc=0 printed=STATE/t1.inbox/handled/0900.msg handled_after=1600 unhandled_after=0 temps=0

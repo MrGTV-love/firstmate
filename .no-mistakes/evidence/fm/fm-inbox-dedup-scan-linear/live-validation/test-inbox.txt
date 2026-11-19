@@ -1,0 +1,34 @@
+ok - inbox: a steer is written durably and round-trips byte-exact with a self-describing doorbell
+ok - inbox: a hostile-name doorbell executes as a no-op in bare shells
+ok - inbox: terminal-control inbox names are rejected without typing
+ok - inbox: the ring skips dead or missing endpoints and still rings live or unclassifiable endpoints
+ok - inbox: the ring submits its own stuck doorbell, skips other pending text, and retries a lost Enter once on both paths
+ok - inbox: the idempotent enqueue dedups an exact re-run onto the same record, handled or not
+ok - inbox: idempotent enqueue follows a record concurrently moved to handled
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 handled records (16 vs 16)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that share its first line (16 vs 16)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records for the empty text (16 vs 16)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that hold NUL bytes
+ok - inbox: the dedup keeps every outcome of the full compare
+ok - inbox: the dedup compares odd records byte for byte (NUL, invalid UTF-8, CR, newlines, separators, modes)
+ok - inbox: the dedup finds a record behind a linked handled/ directory or a linked record file
+ok - inbox: a TERM or INT inside the idempotent write leaves no temp file, frees the lock, and the next steer lands
+ok - inbox: TERM and INT to the writer, its process group or the writer alone leave no temp file, work directory or lock in any window (112 cells)
+ok - inbox: the caller's EXIT trap is untouched by a normal call, and an exit inside a write cleans up and runs it exactly once (8 cells)
+ok - inbox: a written record is owner-only (mode 600)
+ok - inbox: a work directory is never read as a record
+ok - inbox: the idempotent write restores the caller's TERM and INT traps
+ok - inbox: the sequence scan counts record names only, across the inbox and handled/
+ok - inbox: the handled mv is the idempotent ack and sequences are never reissued
+ok - inbox: survivor replay announces each bounded carrier until its record is acknowledged
+ok - inbox: concurrent writers serialize on the sequence lock and lose nothing
+ok - inbox: a writer retries when a competing lock vanishes after its failed claim
+ok - inbox: ladder bookkeeping ignores a concurrently removed inbox
+ok - inbox: fire-and-forget records stay durable and outside the ladder
+ok - inbox: a fire-and-forget record whose ring did not land is owed exactly one retry
+ok - inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet
+ok - inbox: the re-ring ladder paces by grace, escalates once, and resets on ack
+not ok - the watcher never re-rang the doorbell:
+
+tests/lib.sh: line 526: 10983 Killed: 9               PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_FAKE_CREW_STATE='state: working · source: run-step · validating (running)' FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_TASK_INBOX_GRACE_SECS=1 env "$@" "$WATCH" > "$out" 2> /dev/null
+EXIT=1

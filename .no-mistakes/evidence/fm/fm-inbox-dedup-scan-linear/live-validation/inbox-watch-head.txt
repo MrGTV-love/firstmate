@@ -1,0 +1,3 @@
+not ok - the watcher never escalated the deferred draft-risk attempt
+tests/lib.sh: line 526: 31675 Killed: 9               PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_FAKE_CREW_STATE='state: working · source: run-step · validating (running)' FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_TASK_INBOX_GRACE_SECS=1 env "$@" "$WATCH" > "$out" 2> /dev/null
+EXIT=1

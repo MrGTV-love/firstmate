@@ -1,0 +1,46 @@
+Live validation of head ae241d444 (base 7f3a198b3). Fresh runs this round; the older live-validation/ folder is for 9cb1583fe and is not cited here.
+Host load during runs: 1-min load 30 to 55 on an 18-core Mac (round 1 ran at 75 to 110).
+Scratch trees: git clones of head and base under /tmp/fm-val-head and /tmp/fm-val-base (removed after the run).
+
+S1 remote steer lands behind 1600 handled records, same-id resend dedups (real bin/fm-send.sh, repo fake ssh executing the real remote leg)
+  s1-remote-1600-head.txt: tests/fm-send-remote-delivery.test.sh full file on head: "all fm-send-remote-delivery tests passed",
+  including test_remote_steer_lands_behind_a_large_handled_folder and test_remote_steer_lands_behind_handled_records_sharing_its_first_line.
+  s2b-remote-steer-timing-head.txt: 5 pairs. Steer into empty remote inbox 2.3 to 9.1 s; steer behind 1600 records 2.0 to 21.3 s
+  (the 21.3 s outlier was the first pair; empty-inbox steers ran as long in the same window); same-id resend behind 1600: 1.7 to 5.0 s, dedups to 1601.msg, one record.
+
+S2 direct function, 1600 handled records (real fm_task_inbox_write_idempotent, real files)
+  s2-head-direct-1600.txt: resend of acknowledged text -> handled/0900.msg, rc 0, no new record (3.0 s, first run).
+  s3-head-repeat-and-shared-first-line-1600.txt: resend x3 0.3 to 5.2 s; new text x2 3.6 and 10.6 s; shared-first-line new/resend 1.5 to 2.5 s.
+  Load noise is large; the 10.6 s run is not explained by the scan (0.2 to 0.3 s in s10 at the same load).
+
+S3 DD1 timing (new text, one call each, head)
+  s10-dd1-timing-head-and-base.txt: head 200 records 0.19 s, 800 records 0.20 s, 1600 records 0.31 s; base 200 records 17.7 s.
+  Base 800 and 1600 were not run (base at 200 records already took 17.7 s; prior summary saw base 1600 run more than 5 min).
+
+S4 DD3 kill, direct TERM and INT during the scan (kill-drive.py, blocking dedup grep shim, real writer)
+  s4-kill-head-term-int-1600.txt: writer killed inside scan (pre-signal alive=yes, blocking grep alive=yes, lock held).
+  TERM: no .work/.dedup/.staging left, lock freed, next call rc 0 writes 1601.msg. INT: same.
+
+S5 DD3 kill through the real budget wrapper (fm_run_timed from bin/fm-timeout-lib.sh, the wrapper fm-send uses for FM_SEND_REMOTE_BUDGET)
+  s6-budget-kill-head-base-fm_run_timed.txt:
+    head, scan window (2 runs): leftover .seq.lock, .seq.lock.owner.*, .work.<pid>.<rand>/ containing .dedup.cands (record paths, not text). Top-level .dedup.* files: 0.
+    head, staging window forced by a blocking chmod shim (2 runs): leftover .work.<pid>.<rand>/.staging.record holding the KILLED-STEER text.
+    base, scan window (2 runs): leftover top-level .dedup.* files (2), one holds the KILLED-STEER text.
+  s5-remote-budget-kill-head.txt: real bin/fm-send.sh with FM_SEND_REMOTE_BUDGET=2 and the scan blocked on the remote leg:
+    attempt 1 rc=3 "unconfirmed (delivery-id=ddddeeeeffff0000)"; leftover .work dir and lock; no unhandled record.
+    resend with the same delivery id: rc 0, one record 1601.msg. Second resend: rc 0, still one record.
+
+S6 DD2 outcome parity, base against head (dd2-diff.py): s8-dd2-base-vs-head-differential.txt
+  24 cases: printed path, rc, and record set identical on base and head (write-time at= line masked).
+
+S7 DD1 launch counts (existing tests run on head; head test file copied to base)
+  s7-inbox-cases-head.txt: 4 launch-count cases pass on head (17 vs 17 launches at 50 vs 1600 records), plus dedup, signal and caller-trap cases, all ok.
+  s7-inbox-cases-base-with-head-tests.txt: base fails "dedup launches grew with the handled records: 167 at 50 records, 4817 at 1600" (red on base).
+
+S8 argument length (argmax.py)
+  s9-arg-max-head.txt: 5000 normal-path records, resend 5.5 s, new 6.9 s, both correct.
+  s9b-arg-max-deep-head.txt: 1600 records with ~900-byte paths (argv ~1.45 MB > ARG_MAX 1048576): resend dedups to 0900.msg, new text 1601.msg, both correct.
+
+S9 budget not raised: git diff 7f3a198b3..ae241d444 has no change to any FM_SEND_REMOTE_BUDGET default; the only hit is a comment in the new test file. bin/fm-send.sh is unchanged.
+
+Not run this round: watcher re-ring case (fails on base too under load, out of scope); SIGKILL live rerun (round 1 evidence was for an older head).

@@ -1,0 +1,8 @@
+pre-signal: lock_held=yes work_dirs=1 alive=yes
+signal=INT writer_exit=130
+post-signal entries: 
+lock_left=no unhandled_after_signal=0
+writer_stderr: 
+second_call rc=0 seconds=41.978 printed=STATE/t1.inbox/1601.msg err=
+second_call_entries:  unhandled=1
+FIN

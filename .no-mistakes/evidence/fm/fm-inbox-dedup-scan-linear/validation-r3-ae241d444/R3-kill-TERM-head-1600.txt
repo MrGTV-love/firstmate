@@ -1,0 +1,14 @@
+# load:  3:41  up 1 day, 15:13, 1 user, load averages: 44.50 57.21 64.21
+tree=/tmp/fm-val-r3/head signal=TERM N=1600 state-dir=/tmp/fm-val-kill.hrs5yl7e
+pre-signal: scan-blocked=True writer-alive=True blocking-grep-alive=True lock-held=True work-or-temp=['.seq.lock', '.seq.lock.owner.X3cp34', '.work.60530.1606215755']
+writer returncode=-15 (negative means killed by that signal)
+writer stderr=b''
+after signal: blocking-grep-alive=False
+after signal: entries=[]
+after signal: lock-present=False
+after signal: unhandled .msg=[]
+second call rc=0 seconds=0.6 printed='STATE/t1.inbox/1601.msg' stderr=''
+after second call: entries=[]
+after second call: unhandled .msg=['1601.msg']
+1601.msg body tail='AFTER-KILL-STEER corr=K2\nsecond line'
+# load after:  3:41  up 1 day, 15:13, 1 user, load averages: 44.50 57.21 64.21

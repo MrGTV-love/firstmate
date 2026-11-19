@@ -1,0 +1,17 @@
+== normal path, 5000 records ==
+N=5000 path-bytes-avg=50 total-arg-bytes~250000 tree=/tmp/fm-val-head
+resend-of-handled: rc=0 seconds=5.5 printed='t1.inbox/handled/0900.msg' stderr=''
+  unhandled=0 handled=5000
+new-text: rc=0 seconds=6.9 printed='t1.inbox/5001.msg' stderr=''
+  unhandled=1 handled=5000
+== deep path (~1 KB per record path), 1600 records ==
+Traceback (most recent call last):
+  File "/tmp/fm-val-scripts/argmax.py", line 12, in <module>
+    os.makedirs(st, exist_ok=True)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 218, in makedirs
+  File "<frozen os>", line 218, in makedirs
+  File "<frozen os>", line 218, in makedirs
+  File "<frozen os>", line 228, in makedirs
+OSError: [Errno 63] File name too long: '/tmp/fm-val-arg.o0cd5yst/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+== deep path, 1600 records, base for comparison is not run (base too slow at 1600) ==

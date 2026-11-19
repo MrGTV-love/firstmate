@@ -1,0 +1,15 @@
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 handled records (17 vs 17)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that share its first line (17 vs 17)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records for the empty text (17 vs 17)
+ok - inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that hold NUL bytes
+ok - inbox: the dedup keeps every outcome of the full compare
+ok - inbox: the dedup compares odd records byte for byte (NUL, invalid UTF-8, CR, newlines, separators, modes)
+ok - inbox: the dedup finds a record behind a linked handled/ directory or a linked record file
+ok - inbox: the idempotent enqueue dedups an exact re-run onto the same record, handled or not
+ok - inbox: idempotent enqueue follows a record concurrently moved to handled
+ok - inbox: a TERM or INT inside the idempotent write leaves no temp file, frees the lock, and the next steer lands
+ok - inbox: TERM and INT to the writer, its process group or the writer alone leave no temp file, work directory or lock in any window (112 cells)
+ok - inbox: the caller's EXIT trap is untouched by a normal call, and an exit inside a write cleans up and runs it exactly once (8 cells)
+ok - inbox: the idempotent write restores the caller's TERM and INT traps
+PROBE-INBOX-DONE
+head exit=0

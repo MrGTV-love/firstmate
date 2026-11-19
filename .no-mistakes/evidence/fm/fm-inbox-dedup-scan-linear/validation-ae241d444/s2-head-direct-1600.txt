@@ -1,0 +1,6 @@
+tree=/tmp/fm-val-head N=1600 mode=resend-handled seconds=3.022 rc=0 printed=t1.inbox/handled/0900.msg new_records=none-changed unhandled_count=0 err= uptime=[load averages: 30.56 46.11 62.73]
+
+tree=/tmp/fm-val-head N=1600 mode=new seconds=0.478 rc=0 printed=t1.inbox/1601.msg new_records=changed unhandled_count=1 err= uptime=[load averages: 39.11 47.31 62.87]
+
+tree=/tmp/fm-val-head N=1600 mode=resend-unhandled seconds=1.612 rc=0 printed=t1.inbox/handled/0900.msg new_records=none-changed unhandled_count=1 err= uptime=[load averages: 41.88 47.50 62.67]
+

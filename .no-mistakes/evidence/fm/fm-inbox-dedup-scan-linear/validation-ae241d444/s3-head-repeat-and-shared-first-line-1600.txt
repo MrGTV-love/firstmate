@@ -1,0 +1,18 @@
+tree=/tmp/fm-val-head N=1600 mode=resend-handled seconds=0.334 rc=0 printed=t1.inbox/handled/0900.msg new_records=none-changed unhandled_count=0 err= uptime=[load averages: 51.84 49.70 62.71]
+
+tree=/tmp/fm-val-head N=1600 mode=resend-handled seconds=0.411 rc=0 printed=t1.inbox/handled/0900.msg new_records=none-changed unhandled_count=0 err= uptime=[load averages: 48.54 49.05 62.33]
+
+tree=/tmp/fm-val-head N=1600 mode=resend-handled seconds=5.242 rc=0 printed=t1.inbox/handled/0900.msg new_records=none-changed unhandled_count=0 err= uptime=[load averages: 48.90 49.02 61.85]
+
+tree=/tmp/fm-val-head N=1600 mode=new seconds=3.595 rc=0 printed=t1.inbox/1601.msg new_records=changed unhandled_count=1 err= uptime=[load averages: 46.65 48.44 61.27]
+
+tree=/tmp/fm-val-head N=1600 mode=new seconds=10.550 rc=0 printed=t1.inbox/1601.msg new_records=changed unhandled_count=1 err= uptime=[load averages: 48.61 48.74 61.00]
+
+tree=/tmp/fm-val-head N=1600 mode=shared-new seconds=2.461 rc=0 printed=t1.inbox/1601.msg new_records=changed unhandled_count=1 err= uptime=[load averages: 55.57 50.79 61.20]
+
+tree=/tmp/fm-val-head N=1600 mode=shared-resend seconds=1.480 rc=0 printed=t1.inbox/handled/0900.msg new_records=none-changed unhandled_count=0 err= uptime=[load averages: 54.23 50.82 60.98]
+
+tree=/tmp/fm-val-head N=1600 mode=shared-new seconds=1.888 rc=0 printed=t1.inbox/1601.msg new_records=changed unhandled_count=1 err= uptime=[load averages: 52.95 50.68 60.81]
+
+tree=/tmp/fm-val-head N=1600 mode=shared-resend seconds=1.588 rc=0 printed=t1.inbox/handled/0900.msg new_records=none-changed unhandled_count=0 err= uptime=[load averages: 49.90 50.09 60.48]
+
