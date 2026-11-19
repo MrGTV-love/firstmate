@@ -199,7 +199,7 @@
           "count": 14
         }
       ],
-      "layer_note": "Added with the fm-pool-base upkeep: the guard only denies a spawn that would otherwise cut pool copies at a stale or unreadable base, and it moves nothing on a refusal. It loosens no other guard and widens nothing: a home whose treehouse config is readable and does not name fm-pool-base is never refused by it, and one whose config cannot be read is refused, because it is unknown whether its pool uses fm-pool-base. Harm judged: a pool of copies cut ahead of the origin default fills to its limit with copies the spawn precheck skips as head_not_target, and a forced or overwritten fm-pool-base would hide unlanded commits."
+      "layer_note": "The guard only denies a spawn that would otherwise cut pool copies at a stale or unreadable base, and it moves nothing on a refusal. It loosens no other guard and widens nothing: a home whose treehouse config is readable and does not name fm-pool-base is never refused by it, and one whose config cannot be read is refused, because it is unknown whether its pool uses fm-pool-base. Harm judged: a pool of copies cut ahead of the origin default fills to its limit with copies the spawn precheck skips as head_not_target, and a forced or overwritten fm-pool-base would hide unlanded commits."
     },
     {
       "id": "turnend-ask-gate",
