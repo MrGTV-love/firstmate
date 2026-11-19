@@ -32,7 +32,7 @@
 #   <task>.inbox/handled/      the worker's `mv` here IS the acknowledgement
 #   <task>.inbox/.seq.lock     serializes sequence allocation across writers
 #                              (the session and the away daemon)
-#   <task>.inbox/.work.<pid>.<n>/  one write's temp files; removed when the write
+#   <task>.inbox/.work.<pid>.<random>/  one write's temp files; removed when the write
 #                              ends or is signalled, never read as a record
 #   <task>.inbox/.ring-state   watcher re-ring ladder: "<msg>\t<count>\t<epoch>"
 #   <task>.inbox/.busy-state   consecutive busy deferrals: "<msg>\t<count>"
