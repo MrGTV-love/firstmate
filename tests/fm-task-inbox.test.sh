@@ -749,7 +749,9 @@ signal_matrix_case() {  # <idempotent|plain> <work|probe|compare|stage> <TERM|IN
   local name dir state inbox shims stub pgid writer sleeper rc=0 leftovers next runs script launcher want
   name="$fn-$window-$sig-$target-$trap_kind-$form"
   dir="$TMP_ROOT/sigmx-$name"; state="$dir/state"; inbox="$state/t1.inbox"; rm -rf "$dir"; mkdir -p "$state" "$dir/shims"
-  inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "$name: seed failed"
+  # The seed shares the steer's first line: the dedup compares only the records
+  # that do, so only such a record reaches the compare window.
+  inbox_lib "$state" fm_task_inbox_write "$state" t1 $'new steer\nold tail' >/dev/null || fail "$name: seed failed"
   shims="$dir/shims"; stub=''
   mkfifo "$dir/fifo"
   case "$window" in
@@ -855,7 +857,8 @@ exit_matrix_case() {  # <idempotent|plain> <none|existing> <direct|cmdsub>
   local fn=$1 trap_kind=$2 form=$3 name dir state inbox rc=0 runs want next script
   name="exit-$fn-$trap_kind-$form"
   dir="$TMP_ROOT/exitmx-$name"; state="$dir/state"; inbox="$state/t1.inbox"; rm -rf "$dir"; mkdir -p "$state"
-  inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "$name: seed failed"
+  # Shares the steer's first line, so the idempotent compare reaches its body read.
+  inbox_lib "$state" fm_task_inbox_write "$state" t1 $'new steer\nold tail' >/dev/null || fail "$name: seed failed"
   # shellcheck disable=SC2016 # the script is text the writer's shell evaluates
   script='
     . "$1"

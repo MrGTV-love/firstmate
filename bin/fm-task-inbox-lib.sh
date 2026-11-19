@@ -397,9 +397,10 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
 # The check launches a fixed number of external processes however many records
-# exist, share the text's first line, or hold NUL bytes (the scan itself, and
-# the lock hold, still grow with the history), and a TERM or INT during it
-# leaves neither a temp file nor the lock behind.
+# exist: one grep names the records that hold the text's first non-empty line,
+# and only those get the exact compare. The grep reads the history under the
+# lock, so the lock hold still grows with it, but not the launches. A TERM or
+# INT during the check leaves neither a temp file nor the lock behind.
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock have f rec='' got rc status=0
   local _fm_task_inbox_skip_nul=1
@@ -410,17 +411,23 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
     _fm_task_inbox_scope_leave
     return 1
   fi
-  # Every record is compared, with builtins only: the mode check and the body
-  # read launch no process, so the number of external launches does not grow
-  # with the number of records, whatever they hold. The scan itself, and so the
-  # time the lock is held, still grows with the amount of history: only the cost
-  # of one record fell, not the number of records read. The lock stays held for
-  # the scan because the compare and the write must see one history, and a
-  # record landing between them would be a duplicate. A body with a NUL byte
-  # cannot equal the text (a shell argument holds none), so it is skipped as
-  # the byte compare would. Records are reached through the same globs as
-  # before, so a linked handled/ directory or record file is read like any other.
+  # A record can equal the text only if it holds the text's first non-empty
+  # line, so one grep, run as a waited child of this scope, names those records
+  # and only they get the exact compare, with builtins. The records come from the
+  # same globs as before (a dangling record name maps to its handled/ twin as
+  # before), and grep prints them in that order, so the first match is the one
+  # the full scan gave. A grep that fails (exit 2 or more) falls back to every
+  # record, so an error never reads as "no match" and writes a duplicate. The
+  # grep reads the history under the lock, so the lock hold still grows with it,
+  # but at grep speed and with no launch per record. A body with a NUL byte
+  # cannot equal the text (a shell argument holds none), so it is skipped as the
+  # byte compare would.
   have="$_fm_task_inbox_work/.dedup.body"
+  cands="$_fm_task_inbox_work/.dedup.cands"
+  first=$text
+  while [ -n "$first" ] && [ -z "${first%%$'\n'*}" ]; do first=${first#*$'\n'}; done
+  first=${first%%$'\n'*}
+  files=()
   for f in "$dir"/*.msg "$dir/handled"/*.msg; do
     if [ ! -e "$f" ]; then
       case "$f" in
@@ -431,6 +438,17 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
         *) continue ;;
       esac
     fi
+    files+=("$f")
+  done
+  : > "$cands"
+  if [ "${#files[@]}" -gt 0 ]; then
+    rc=0
+    _fm_task_inbox_run env LC_ALL=C grep -F -l -a --null -e "$first" -- "${files[@]}" > "$cands" 2>/dev/null || rc=$?
+    if [ "$rc" -ge 2 ]; then
+      printf '%s\0' "${files[@]}" > "$cands"
+    fi
+  fi
+  while IFS= read -r -d '' f; do
     if [ "$delivery_mode" = fire-and-forget ]; then
       fm_task_inbox_is_fire_and_forget "$f" || continue
     elif fm_task_inbox_is_fire_and_forget "$f"; then
@@ -456,7 +474,7 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
     [ ! -e "$dir/handled/${f##*/}" ] || f="$dir/handled/${f##*/}"
     rec=$f
     break
-  done
+  done < "$cands"
   if [ -n "$_fm_task_inbox_aborted" ]; then
     status=1
   elif [ -z "$rec" ]; then
@@ -469,7 +487,7 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
 }
 
 # The exact enqueued text back out of a record, read with builtins only: the
-# idempotent enqueue calls this once per record while it holds the inbox lock,
+# idempotent enqueue calls this once per candidate record while it holds the inbox lock,
 # so a process launch here would grow with the number of records. A body that
 # holds a NUL byte (a variable cannot) is read by cat instead.
 fm_task_inbox_body() {  # <record-path>
@@ -613,7 +631,7 @@ fm_task_inbox_is_fire_and_forget() {  # <record-path>
     [ -f "$rec" ] || return 1
   fi
   # Header lines up to the first "--", builtins only (the idempotent enqueue
-  # asks this once per record under the inbox lock). A last line without its
+  # asks this once per candidate record under the inbox lock). A last line without its
   # newline still counts as a line.
   while IFS= read -r line || [ -n "$line" ]; do
     [ "$line" != -- ] || break
