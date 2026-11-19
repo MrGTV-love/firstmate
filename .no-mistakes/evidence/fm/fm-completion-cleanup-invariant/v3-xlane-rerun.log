@@ -1,0 +1,13 @@
+unregistered before housekeeping: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+unregistered after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+poll-never-published before housekeeping: record=open pr=https://github.com/acme/widget/pull/7 poll=none prune-record=none copy=present ledger=[]
+poll-never-published after supervision: record=gone pr=none poll=none prune-record=none copy=gone ledger=[task.status task.status task.pr_ready task.merged task.cleaned_up ]
+branch-pruned after supervision: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+ok - a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up; with the PR branch pruned the copy-only head is not registered, and the task keeps one owned cleanup row naming plain teardown
+OPEN PR after supervision: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+OPEN PR: O ledger rows for t1: unlanded_commit | firstmate | false | land this work through its PR, or obtain the captain's drop
+CLOSED PR after supervision: record=open pr=none poll=none prune-record=none copy=present ledger=[]
+CLOSED PR: O ledger rows for t1: unlanded_commit | firstmate | false | land this work through its PR, or obtain the captain's drop
+ok - a PR that is open, or closed unmerged, leaves the record, the copy and the ledger as they were
+XL_BOUND=900 bash tests/fm-merge-prune.test.sh    35.74s user 70.97s system 7% cpu 25:23.78 total
+rc=0

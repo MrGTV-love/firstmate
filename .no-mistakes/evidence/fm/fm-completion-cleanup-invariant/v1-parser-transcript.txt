@@ -1,0 +1,10 @@
+note=[PR https://github.com/o/r/pull/9 head abc]                -> rc=0 url=https://github.com/o/r/pull/9
+note=[https://github.com/o/r/pull/9 merged]                     -> rc=0 url=https://github.com/o/r/pull/9
+note=[https://github.com/o/r/pull/9]                            -> rc=0 url=https://github.com/o/r/pull/9
+note=[https://gitlab.com/g/p/-/merge_requests/5 merged]         -> rc=0 url=https://gitlab.com/g/p/-/merge_requests/5
+note=[https://github.com/o/r/issues/9]                          -> rc=1 url=
+note=[see https://github.com/o/r/pull/9]                        -> rc=1 url=
+note=[]                                                         -> rc=1 url=
+note=[https://github.com/o/r/pull/9, merged]                    -> rc=1 url=
+note=[https://example.com/x then https://github.com/o/r/pull/9] -> rc=1 url=
+note=[PR https://github.com/o/r/issues/9]                       -> rc=1 url=

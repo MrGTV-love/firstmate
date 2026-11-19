@@ -1,0 +1,9 @@
+15:32  up 1 day,  3:04, 1 user, load averages: 61.55 76.40 84.05
+== head
+ledger_call 0 rc 0 seconds 91.4
+ledger_call 1 rc 0 seconds 125.7
+15:36  up 1 day,  3:09, 1 user, load averages: 69.86 66.90 77.40
+== base
+ledger_call 0 rc 0 seconds 37.7
+ledger_call 1 rc 0 seconds 74.8
+15:39  up 1 day,  3:11, 1 user, load averages: 69.97 67.53 76.05

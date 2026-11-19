@@ -44,4 +44,4 @@ ok - worker role renders the shared rubric and refuses without it
 ok - a done note names its PR as 'PR <url>' or as its first word, and nothing else
 ok - a refused no-mistakes read names a down daemon, a missing run and an unreadable run apart
 all fm-dod-lib tests passed
-bash tests/fm-dod-lib.test.sh  22.43s user 16.89s system 70% cpu 55.555 total
+rc=0

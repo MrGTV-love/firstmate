@@ -4,3 +4,4 @@ ok - an unreadable refusal record makes the last refusal unknown and degrades co
 ok - a merged task whose cleanup is refused (dirty copy) is an owned pending_cleanup row carrying the refusal; a clean copy and a declared wait are controls
 ok - the ledger's landing check compares blobs: a merge driver cannot land a differing line; a squash is landed
 ok - kind (d): a scout with a delivered report and a done report whose pane reads working gets an owned pending_cleanup row with the scout action
+rc=0

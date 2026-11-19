@@ -1,193 +1,22 @@
-PASS: ordinary categories, PR proof, ages and configuration
-PASS: completed reviews and committed candidates retain their owner action; failed reports do not imply acceptance
-PASS: record-owned live-head review, discovery hint, typed absence versus degraded, interval boundary, required checks, merge completion
-PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
-PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
-PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
-PASS: interrupted teardown records bound to the current task record
-PASS: correction coverage and landed/drop exclusions
-PASS: recorded task-only PR classification, fork landing, and correction coverage
-PASS: patch-equivalent delivery
-PASS: approved local landing and qualified defaults
-PASS: independent failed delivery and worker liveness axes
-PASS: unknown current state degrades independently of live verdict
-PASS: future pipeline stamps do not mask older valid progress
-PASS: future status commit and reflog cannot hide unknown-age stalls
-PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
-PASS: collection leaves Git index and object inventory unchanged
-PASS: last-error JSON and human representations
-PASS: local-path origins are disclosed without degrading the ledger
-PASS: exact GitHub host admission and PR projection
-PASS: unreadable shared state inventory cannot publish complete empty coverage
-PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
-PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
-PASS: generation-invalidated snapshots retain coverage failures despite live stop events
-PASS: only dispatched ready work is overdue
-PASS: ordinary recovery adapters and source degradation
-PASS: publication suppression reset success/failure/skip
-PASS: held-gate singleflight and child cleanup
-PASS: unset and empty address overrides share shell defaults before collection
-PASS: no-progress source failure owns resistant descendant cleanup
-PASS: live process-group EPERM still refuses and leaves the process running
-PASS: an all-zombie or vanished process group swallows the Darwin EPERM race
-PASS: no-progress expiry reports the configured interval and keeps captured output
-PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
-PASS: owned-work categories, owners, ages, degraded row, and atomic publication
-PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
-V4 ledger rows (category, subject, owner, overdue, next action):
-   completed_task fin-scout firstmate overdue | consume the report, complete the owner handoff and tear the task down; once it is accepted, run plain bin/fm-t
-   completed_task fin-scout-refused firstmate overdue | consume the report, complete the owner handoff and tear the task down; once it is accepted, run plain bin/fm-t
-   completed_task pend-scout firstmate overdue | consume the report, complete the owner handoff and tear the task down
-   completed_task pend-ship firstmate overdue | advance the committed candidate through its selected delivery path
-   completed_task src-report firstmate overdue | advance the committed candidate through its selected delivery path
-   completed_task src-state firstmate overdue | advance the committed candidate through its selected delivery path
-   interrupted_teardown fin-return firstmate overdue | re-run bin/fm-teardown.sh fin-return to finish returning its pool slot; its processes and endpoint may already
-   pending_acceptance gate-nm-norun firstmate overdue | resolve the ship-done gate's refusal of the done claim of gate-nm-norun: no no-mistakes run exists for this co
-   pending_acceptance gate-nm-norun-merged firstmate overdue | resolve the ship-done gate's refusal of the done claim of gate-nm-norun-merged: no no-mistakes run exists for 
-   pending_acceptance gate-nm-unreadable firstmate overdue | resolve the ship-done gate's refusal of the done claim of gate-nm-unreadable: the no-mistakes run for this cop
-   pending_acceptance gate-refused firstmate overdue | resolve the ship-done gate's refusal of the done claim of gate-refused: named head 0123abc is unreachable outs
-   pending_acceptance pend-clean home:firstmate overdue | review and accept the delivered work of pend-clean; its worker is still live
-   pending_acceptance src-backlog home:firstmate overdue | review and accept the delivered work of src-backlog; its worker is still live
-   pending_acceptance src-both home:firstmate overdue | review and accept the delivered work of src-both; its worker is still live
-   pending_acceptance src-unproven home:firstmate overdue | review and accept the delivered work of src-unproven; its worker is still live
-   pending_cleanup fin-content home:firstmate overdue | run plain bin/fm-teardown.sh fin-content; the record stays open until it succeeds
-   pending_cleanup fin-dirty home:firstmate overdue | the last recorded cleanup refusal (recorded by bin/fm-merge-prune.sh): REFUSED: worktree /Users/charlesabrooke
-   pending_cleanup fin-merged home:firstmate overdue | run plain bin/fm-teardown.sh fin-merged; the record stays open until it succeeds
-   pending_cleanup fin-moot firstmate overdue | Main runs bin/fm-teardown.sh fin-moot --force --drop-file /Users/charlesabrooker/tmp/fm-open-loops.SRp0Wa/v4-h
-   pending_cleanup fin-moot-clean home:firstmate overdue | run plain bin/fm-teardown.sh fin-moot-clean; the record stays open until it succeeds
-   pending_cleanup fin-noupdate home:firstmate overdue | run plain bin/fm-teardown.sh fin-noupdate; the record stays open until it succeeds
-   pending_cleanup fin-order home:firstmate overdue | the last recorded cleanup refusal (a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh): REFUSED: th
-   pending_cleanup fin-pending home:firstmate overdue | the last recorded cleanup refusal (recorded by bin/fm-merge-prune.sh): REFUSED: fin-pending copy is busy: a pr
-   pending_cleanup fin-publish home:firstmate overdue | the last recorded cleanup refusal (a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh): REFUSED: th
-   pending_cleanup fin-refused home:firstmate overdue | the last recorded cleanup refusal (recorded by bin/fm-merge-prune.sh): REFUSED: worktree /pool/9 has uncommitt
-   pending_cleanup fin-scout-working home:firstmate overdue | accept the delivered report, then run plain bin/fm-teardown.sh fin-scout-working; the record stays open until 
-   pending_cleanup fin-working home:firstmate overdue | run plain bin/fm-teardown.sh fin-working; the record stays open until it succeeds
-   pending_cleanup merge-clean home:firstmate overdue | run plain bin/fm-teardown.sh merge-clean; the record stays open until it succeeds
-   pending_cleanup pipe-input home:firstmate overdue | run plain bin/fm-teardown.sh pipe-input; the record stays open until it succeeds
-   pending_cleanup src-merged home:firstmate overdue | run plain bin/fm-teardown.sh src-merged; the record stays open until it succeeds
-   pending_cleanup unl-refused home:firstmate overdue | the last recorded cleanup refusal (a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh): REFUSED: t1
-   pending_cleanup work-synced-done home:firstmate overdue | run plain bin/fm-teardown.sh work-synced-done; the record stays open until it succeeds
-   silent_report fin-content firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-dirty firstmate - | check in: progress, blockers, cross-workstream dependencies; the last recorded cleanup refusal (recorded by bi
-   silent_report fin-merged firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-moot firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-moot-clean firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-noupdate firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-order firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-pending firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-publish firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-refused firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-return firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-scout firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-scout-refused firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-scout-working firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report fin-working firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report gate-covered firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report gate-nm-down firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report gate-nm-norun firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report gate-nm-norun-merged firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report gate-nm-unreadable firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report gate-refused firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report merge-clean firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report merge-extra firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report merge-open firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report merged-more firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report merged-wait firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report pend-clean firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report pend-run firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report pend-scout firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report pend-ship firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report pipe-input firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report src-backlog firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report src-both firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report src-merged firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report src-report firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report src-state firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report src-unproven firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report unfin-dirty firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report unl-refused firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report v4-mate firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report wait-held firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report wait-paused firstmate - | check in: progress, blockers, cross-workstream dependencies
-   silent_report work-empty firstmate overdue | check in: progress, blockers, cross-workstream dependencies
-   silent_report work-landed firstmate overdue | check in: progress, blockers, cross-workstream dependencies; its copy's content is on the default branch: if i
-   silent_report work-synced firstmate overdue | check in: progress, blockers, cross-workstream dependencies; its copy's content is on the default branch: if i
-   silent_report work-synced-done firstmate - | check in: progress, blockers, cross-workstream dependencies
-   stalled_worker fin-noupdate worker:fin-noupdate overdue | follow up on the recorded wait and recover the worker
-   stalled_worker fin-scout-working worker:fin-scout-working overdue | follow up on the recorded wait and recover the worker
-   stalled_worker fin-working worker:fin-working overdue | follow up on the recorded wait and recover the worker
-   stalled_worker merge-open worker:merge-open overdue | follow up on the recorded wait and recover the worker
-   stalled_worker merged-more worker:merged-more overdue | follow up on the recorded wait and recover the worker
-   stalled_worker pend-run worker:pend-run overdue | follow up on the recorded wait and recover the worker
-   stalled_worker work-empty worker:work-empty overdue | follow up on the recorded wait and recover the worker
-   stalled_worker work-landed worker:work-landed overdue | follow up on the recorded wait and recover the worker
-   stalled_worker work-synced worker:work-synced overdue | follow up on the recorded wait and recover the worker
-   stalled_worker work-synced-done worker:work-synced-done overdue | follow up on the recorded wait and recover the worker
-   unlanded_commit gate-covered firstmate overdue | land this work through its PR, or obtain the captain's drop; resolve the ship-done gate's refusal of the done 
-   unlanded_commit merge-extra firstmate overdue | land this work through its PR, or obtain the captain's drop
-   unlanded_commit merged-more firstmate overdue | land this work through its PR, or obtain the captain's drop
-   unlanded_commit unfin-dirty firstmate overdue | land this work through its PR, or obtain the captain's drop
-   unlanded_commit unl-refused firstmate overdue | land this work through its PR, or obtain the captain's drop; the last recorded cleanup refusal (a plain bin/fm
-F4 merged-while-working ok 
-F4 never-committed ok 
-F4 interrupted-return ok 
-F4 refused-claim-covered ok 
-F4 newest-recorded-refusal ok 
-F4 merged-without-done-update ok 
-F4 merged-with-more-work-no-cleanup ok 
-F4 merged-with-declared-wait-no-cleanup ok 
-F4 latest-written-refusal ok 
-F4 prune-reason-labeled ok 
-F4 content-landed-working-no-pr-keeps-check-in ok 
-F4 synced-working-no-cleanup ok 
-F4 plain-check-in-unchanged ok 
-F4 synced-after-done-report-cleanup ok 
-F4 working-with-no-commits-no-cleanup ok 
-F4 merge-with-extra-change-not-landed ok 
-F4 clean-local-merge-landed ok 
-F4 merge-under-open-pr-head-covered ok 
-F4 published-last-refusal ok 
-PASS: a content-landed working ship is asked to report done; other check-ins are unchanged
-PASS: finished and unaccepted work with an open record keeps an owned ledger row; waits, unfinished work and an idle secondmate do not
-PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
-PASS: live and aged captain holds share unresolved-question coverage with status decisions
-PASS: unreadable tmux degrades coverage without fabricating missing worker
-PASS: current-state timeout retains independent observation failure
-PASS: real snapshot unreadable metadata/status inventory stays degraded
-PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory
-PASS: new/changed gate, unchanged acknowledgement, no unproved captain-delivery label, and gate/digest coverage
-PASS: a stamped escalation is never captain waiting; unchanged work stays listed and changed work gates
-PASS: each actor gates only the rows its own drain presented
-PASS: PR provenance steers use own inbox or handled records, reject foreign and old evidence, and permit acknowledgement
-PASS: a steer on a row with a non-object source falls back to its owner inbox
-PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
-PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers
-PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup
-PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain, also on a quota-stale ledger; a changed row or an answered, released, blocked, re-held or unreadable bound hold needs a new action while a hold deferred to a date keeps covering; evidence text, other owners, reviewed PRs and other categories cannot bind holds, so their escalations are never captain waiting; the deferral limit remains enforced; one presentation reads the backlog once; an unverifiable escalation answers only the turn it followed
-PASS: a paused worker status append changes its collected row and gates acknowledgement again
-PASS: batch validates per row, preserves valid actions and uses one real snapshot
-PASS: drain and refused acknowledgement preserve unchanged recorded work
-PASS: stdin batch recovery and partial acknowledgements preserve completed actions
-PASS: every obligation identity change requires new evidence
-PASS: firstmate escalations and steers need no new action on unchanged work, only on changed work
-PASS: a free-text escalation stays listed without proof it reached the captain, not re-gated by time
-PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do
-PASS: a pane timer in any unit changes no obligation; a different task still does
-PASS: an unreadable config file never blocks the receipt gate
-PASS: second deferral requires new follow-up even after a standing escalation
-PASS: reviewed PRs keep their next-turn action requirement
-PASS: a refused batch line leaks no state into its siblings
-PASS: a hold ending or becoming unreadable restores the same-turn action requirement
-PASS: a home without a ledger acknowledges without the receipt command
-PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated
-PASS: a steer delivered after the overdue episode began counts on every re-presentation of the unchanged row
-PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused
-PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say
-PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused
-PASS: captain_visible is one derived value for the printed row, the stored action and the deferral check
-PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, loses its session or record, is replaced, lands done with no PR or comes due; a prerequisite that is not live is refused
-PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; one older than the episode is refused; a row no longer overdue closes its episode
-PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows are refused that form and still wait through a delivery naming them
-ok - open-work reconciliation reports owned obligations from live records
-bash tests/fm-open-loops.test.sh  705.50s user 1001.91s system 70% cpu 40:08.13 total
-o=0
+Traceback (most recent call last):
+  File "<stdin>", line 176, in <module>
+  File "<stdin>", line 33, in ledger
+  File "<stdin>", line 24, in out
+  File "<stdin>", line 22, in run
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 671, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 1395, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 2424, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        skip_check_and_raise=True)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 1434, in _check_timeout
+    raise TimeoutExpired(
+    ...<2 lines>...
+            stderr=b''.join(stderr_seq) if stderr_seq else None)
+subprocess.TimeoutExpired: Command '['/Users/charlesabrooker/tmp/fm-open-loops.zcxHkD/code/bin/fm-open-loops.sh', '--json']' timed out after 120 seconds
+rc=1

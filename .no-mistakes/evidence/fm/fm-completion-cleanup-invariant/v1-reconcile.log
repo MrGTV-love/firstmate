@@ -23,18 +23,4 @@ ok - hung forge call is killed at the pass limit and the next watcher tick regis
 ok - a done note leading with the PR URL registers like the PR form; a URL later in the note, an issue URL and no URL do not
 ok - a lost poll is re-armed once with one pr_ready event; a valid published poll, or one a live registrar is publishing, is never registered again
 ok - a teardown's set-aside merge marker stops a re-arm whatever it holds, unreadable, malformed or a directory
-tests/fm-pr-ready-reconcile.test.sh: line 716: 79548 Killed: 9               FM_TEST_KILL_AT=$2 FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-check.sh" "$1" "$URL" > "$CASE/crash.out" 2>&1
-tests/fm-pr-ready-reconcile.test.sh: line 716: 83651 Killed: 9               FM_TEST_KILL_AT=$2 FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-check.sh" "$1" "$URL" > "$CASE/crash.out" 2>&1
-ok - a registrar that dies after any final rename short of its check is re-armed on the next pass; one that published its check is left alone
-ok - a poll whose only fault is a moved device number is left for the watcher to re-record
-ok - a registered custom check is never overwritten by a merge-poll re-arm; the conflict is named
-ok - a first registration from either done-note form never replaces a registered custom check and names the conflict; an old template poll is replaced
-ok - a re-arm whose recorded PR changes between its commit and its publication publishes nothing
-ok - a first registration from an empty pr= snapshot never replaces a PR another registration recorded meanwhile
-ok - a pass that runs while a first registration is between pr= and its poll leaves the poll to it
-ok - a pass that runs right after a first registration makes pr= readable leaves the poll to it
-ok - a merge-notified marker stops the re-arm only for the PR it names
-ok - a re-arm whose recorded PR changed during the pass leaves the newer PR recorded
-ok - a registered ship gets one review-step forge read per pass, a local-only task none, and a ship still to register is registered in the same pass
-ok - a hung review-step read is stopped at the pass limit and cannot starve a later ship
-bash tests/fm-pr-ready-reconcile.test.sh  34.87s user 61.91s system 53% cpu 3:01.65 total
+tests/fm-pr-ready-reconcile.test.sh: line 716: 71592 Killed: 9               FM_TEST_KILL_AT=$2 FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-check.sh" "$1" "$URL" > "$CASE/crash.out" 2>&1
