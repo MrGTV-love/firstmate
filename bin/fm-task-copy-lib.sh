@@ -710,7 +710,9 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 #     accepted for any of them (the CLI writes none);
 #   - no key, in a row or at the top, has a non-ASCII letter or spells one of these names in another case (the CLI's decoder
 #     matches names without regard to case);
-#   - no string anywhere holds a \u escape of a lone UTF-16 surrogate (jq cannot read such a file at all).
+#   - no string anywhere holds a \u escape of a lone UTF-16 surrogate. jq refuses a whole file with a lone HIGH surrogate
+#     and reads a lone LOW one as U+FFFD; this proof refuses both, so for the low form it refuses a state that the jq reading
+#     alone classified (as the spawn did at 1f2d57dc): a state entry that cannot be read as written is not classified.
 # On success it puts the rows of the document it proved, in fm_task_copy_pool_slot_held's own form, in that reader's cache
 # (FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES), so the next fm_task_copy_pool_slot_held for a slot of
 # this file classifies from the very bytes that were proved and reads no file; on failure it empties that cache. The file is
@@ -775,7 +777,8 @@ try:
 except ValueError as err:
     not_intact("is not one JSON document read exactly (%s)" % err)
 
-# A \u escape of a lone surrogate decodes to a string that is not text; jq refuses the whole file for it.
+# A \u escape of a lone surrogate decodes to a string that is not text; jq refuses the whole file for a high one and reads a
+# low one as U+FFFD, and this proof refuses both.
 todo = [doc]
 while todo:
     item = todo.pop()

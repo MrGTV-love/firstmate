@@ -6469,8 +6469,10 @@ spawn_acquire_pool_slot() {
 # proof, and treehouse is not asked: its status command can rewrite state. Treehouse writes its state under its own lock,
 # which this spawn does not hold (the Firstmate project lock does not stop a treehouse command run elsewhere), so the file
 # is proved and classified a second time, and the copy is classified only when both readings pass the proof and agree for
-# it; a state that changed for the copy, or became one the proof refuses, between the two readings is unknown. A change that
-# is made and undone entirely before one reading and after the other is seen by no read-only check.
+# it; a state that changed for the copy, or became one the proof refuses, between the two readings is unknown. This is a
+# sampling limit: "no corrupt state reaches a worker" holds for a corruption that a reading sees. A change made and undone
+# between two readings, or made after the second, is seen by no reading and can be seen by no read-only classifier; the copy
+# is then classified from a state that passed the proof twice, and a worker may be launched.
 spawn_classify_copy() { # <path>
   local real pool_dir state reading first_rows='' first_state='' first_holder='' first_name=''
   SPAWN_COPY_LEASE_STATE=unknown
