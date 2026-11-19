@@ -401,12 +401,6 @@ case "$MODE" in
       while IFS= read -r gid; do
         [ -n "$gid" ] || continue
         # A nonnumeric prefix forces text comparison; ENVIRON preserves the literal ID.
-        FM_GUARD_LINT_ID="id:$gid" awk -F'\t' '("id:" $2) == ENVIRON["FM_GUARD_LINT_ID"] {print}' "$SC" | while IFS=$'\t' read -r r i m; do
-          [ -n "$r" ] || continue
-          printf 'VIOLATION %s %s: %s\n' "$r" "$i" "$m"
-        done
-        print_status=${PIPESTATUS[0]}
-        [ "$print_status" -eq 0 ] || touched_status=$print_status
         if FM_GUARD_LINT_ID="id:$gid" awk -F'\t' '("id:" $2) == ENVIRON["FM_GUARD_LINT_ID"] {found = 1} END {exit !found}' "$SC"; then
           out=1
         else

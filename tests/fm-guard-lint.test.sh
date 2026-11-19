@@ -319,14 +319,12 @@ literal_base=$(
 
 mutate "$LITERAL_NAT" '(.guards[] | select(.id == "01") | .source) += " with updated wording"'
 literal_rc=0
-out=$(FM_GUARD_EVENT_LOG="$literal_log" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) || literal_rc=$?
+out=$(FM_GUARD_EVENT_LOG="$literal_log" "$LINT" --root "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json 2>/dev/null) || literal_rc=$?
 literal_message="fail_direction 'unspecified' is not closed or open"
-literal_diagnostic="VIOLATION R4 01: $literal_message"
-literal_summary=${out%$'\n'"$literal_diagnostic"}
-if [ "$literal_rc" -ne 1 ] || [ "$literal_summary" = "$out" ] ||
+if [ "$literal_rc" -ne 1 ] ||
   ! jq -es --arg message "$literal_message" 'length == 1 and .[0].findings == [{rule:"R4", id:"01", message:$message}]' \
-    <<< "$literal_summary" >/dev/null; then
-  fail "editing offending id 01 must exit 1 with its sole R4 finding, got exit $literal_rc: $out"
+    <<< "$out" >/dev/null; then
+  fail "editing offending id 01 must exit 1 with its sole R4 finding in one JSON document, got exit $literal_rc: $out"
 fi
 pass "new-or-touched fails when offending literal id 01 itself is edited"
 
