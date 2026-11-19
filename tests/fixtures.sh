@@ -198,6 +198,50 @@ case "${1:-}" in
           rm -f "$pane_file"
           : > "$pane_file.alive"
           (
+            if [ "${FM_FAKE_TMUX_GET_LIVE:-}" = pty ]; then
+              # The real provider's get is interactive: it runs $SHELL in the chosen slot and
+              # returns the slot when that shell exits, and with no terminal the shell exits at
+              # once, so nothing is printed and nothing stays allocated. Drive the real get under
+              # a pseudo-terminal whose shell publishes the directory it was started in (the
+              # slot the provider chose) and stays until the .alive marker goes. No worker
+              # starts, and the real provider process stays the shell's parent, as in a pane.
+              shell=$pane_file.shell
+              tick=$pane_file.tick
+              rm -f "$tick"
+              mkfifo "$tick" || exit 1
+              cat > "$shell" <<'PTYSH'
+#!/bin/bash
+pwd -P > "$FM_PTY_PANE_FILE.tmp" && mv "$FM_PTY_PANE_FILE.tmp" "$FM_PTY_PANE_FILE"
+exec 3<>"$FM_PTY_TICK"
+n=0
+while [ -e "$FM_PTY_ALIVE" ] && [ "$n" -lt 120 ]; do
+  n=$((n + 1))
+  read -r -t 1 -u 3 _ || :
+done
+PTYSH
+              chmod +x "$shell" || exit 1
+              # The provider process is named `treehouse`, as the installed one is (a copy: the
+              # kernel names a process after the file, not a link): the spawn's live-holder
+              # rule knows its own get by that launcher name.
+              launcher=$pane_file.launcher/treehouse
+              mkdir -p "${launcher%/*}" && cp "${FM_FAKE_TMUX_GET_BIN:?FM_FAKE_TMUX_GET_BIN is required with FM_FAKE_TMUX_GET_LIVE=pty}" "$launcher" || exit 1
+              [ "$(uname)" != Darwin ] || codesign -f -s - "$launcher" >/dev/null 2>&1 || true
+              exec env SHELL="$shell" FM_PTY_LAUNCHER="$launcher" FM_PTY_PANE_FILE="$pane_file" FM_PTY_ALIVE="$pane_file.alive" FM_PTY_TICK="$tick" \
+                python3 -I -c 'import os, pty, sys, time
+alive = os.environ["FM_PTY_ALIVE"]
+pid, fd = pty.fork()
+if pid == 0:
+    os.chdir(sys.argv[1])
+    os.execv(os.environ["FM_PTY_LAUNCHER"], ["treehouse", "get", "--root", sys.argv[2]])
+deadline = time.time() + 120
+while os.path.exists(alive) and time.time() < deadline:
+    try:
+        os.read(fd, 4096)
+    except OSError:
+        break
+os.close(fd)
+os.waitpid(pid, 0)' "$FM_FAKE_TMUX_GET_DIR" "$FM_FAKE_TMUX_GET_ROOT"
+            fi
             if [ "${FM_FAKE_TMUX_GET_LIVE:-}" = beat ]; then
               # Like a real pane, the get itself stays alive: its interactive subshell owns the
               # allocation. It runs in the background, prints its path, then keeps beating
