@@ -329,7 +329,8 @@ test_backlog_hold_is_skipped() {
     || { pass "backlog hold skip skipped (could not add a backlog row)"; return 0; }
   FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
     FM_CONFIG_OVERRIDE="$dir/config" \
-    "$ROOT/bin/fm-captain-hold.sh" hold lane --reason 'awaiting the captain' >/dev/null 2>&1 \
+    "$ROOT/bin/fm-captain-hold.sh" hold lane --reason 'awaiting the captain' \
+      --boundary owner-rule-change --if-no 'Keep the existing owner rule' >/dev/null 2>&1 \
     || { pass "backlog hold skip skipped (hold could not be recorded)"; return 0; }
   printf 'working: still open\n' > "$dir/state/lane.status"
   scan_lane "$dir" || fail "held-metadata scan failed"

@@ -3565,6 +3565,8 @@ open_loops_surface() {
       || open_loops_stale_wake "$ledger"
     return 0
   fi
+  # Keep the legacy display-field identity and append the producer's opaque
+  # current-row token; never infer an opening from mutable source or handling history.
   ids=$(jq -rs '
     if length == 1 then .[0] else error("expected one open-loop ledger") end
     | if type == "object" and .schema == "fm-open-loops.v1"
@@ -3572,8 +3574,11 @@ open_loops_surface() {
         and (.home | type) == "string" and (.home | length) > 0
         and (.complete | type) == "boolean" and (.rows | type) == "array"
         and all(.rows[]; type == "object" and (.id | type) == "string"
-          and (.id | length) > 0 and (.overdue | type) == "boolean")
-      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]]
+          and (.id | length) > 0 and (.overdue | type) == "boolean"
+          and (if has("current_identity") then
+            (.current_identity | type == "string" and test("^[0-9a-f]{24}$")) else true end))
+      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]
+        + (if has("current_identity") then [.current_identity] else [] end)]
         | sort | .[] | @json
       else error("invalid open-loop ledger") end
   ' "$ledger" 2>/dev/null) || return 0
