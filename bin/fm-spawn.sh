@@ -6655,7 +6655,7 @@ spawn_slot_refused() {
       fi
     fi
   fi
-  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy $WT and endpoint $T retained; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy $WT and endpoint $T retained; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status" 2>/dev/null || true
   if [ "$update_recovery" = 1 ]; then
     if [ "$RELAUNCH" -eq 0 ]; then
       spawn_take_task_set_custody wait && spawn_state_unchanged || {

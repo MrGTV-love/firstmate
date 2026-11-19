@@ -2456,6 +2456,36 @@ SH
   pass 'a slot refused at the spend cap still records its retained copy and endpoint without launching'
 }
 
+test_slot_refusal_still_names_retained_copy_when_state_dir_vanishes() {
+  local id rec rc=0
+  id="slot-state-gone-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  printf 'manual\n' > "$HOME_DIR/config/backlog-backend"
+  write_refusing_slot_owner "$POOL_DIR"
+  git -C "$POOL_DIR" add scripts
+  git -C "$POOL_DIR" -c user.name=T -c user.email=t@example.invalid commit -qm 'governed refusal fixture'
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.original"
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = new-window ]; then
+  rm -rf '$HOME_DIR/state'
+fi
+exec '$FAKEBIN_DIR/tmux.original' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+  FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provision.called" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$id" "$PROJECT_DIR" --backend tmux --mode no-mistakes --yolo off > "$CASE_DIR/spawn.out" 2>&1 || rc=$?
+  cat "$CASE_DIR/spawn.out"
+  expect_code 1 "$rc" "a slot refusal whose state directory vanished must exit nonzero: $(cat "$CASE_DIR/spawn.out")"
+  assert_contains "$(cat "$CASE_DIR/spawn.out")" "error: assigned copy $POOL_DIR and endpoint" 'the retained copy was not named when the state directory vanished'
+  assert_contains "$(cat "$CASE_DIR/spawn.out")" 'retained; task record publication refused' 'the retained-copy refusal did not print when the state directory vanished'
+  [ -d "$POOL_DIR" ] || fail 'the retained copy was removed when the state directory vanished'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'a slot refusal with a vanished state directory launched a worker'
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'a slot refusal with a vanished state directory published a task record'
+  pass 'a slot refusal whose state directory vanishes still names the retained copy and endpoint, publishes nothing and launches nothing'
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
@@ -2551,5 +2581,6 @@ test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was
 test_slot_recovery_waits_out_a_task_spawn_holder_that_releases
 test_slot_recovery_refuses_when_a_task_spawn_holder_outlasts_the_bound
 test_slot_late_cap_refusal_still_records_retained_copy
+test_slot_refusal_still_names_retained_copy_when_state_dir_vanishes
 
 echo "# all fm-spawn-pool-base-freshen tests passed"
