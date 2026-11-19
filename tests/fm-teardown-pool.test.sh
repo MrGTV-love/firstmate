@@ -6065,13 +6065,17 @@ test_unplanned_unclaimed_copy_refuses_before_any_helper() {
   for mode in unproven other-holder; do
     UNC_HISTORY=none unc_pool_case "unplanned-run-$mode" ordinary fake || fail "$mode: cannot build the pool"
     case_dir=$UNC_CASE
-    sed 's/^kind=ship$/kind=scout/' "$case_dir/state/task-x1.meta" > "$case_dir/meta.tmp" \
-      && mv "$case_dir/meta.tmp" "$case_dir/state/task-x1.meta" || fail "$mode: cannot make the record a scout"
+    if ! sed 's/^kind=ship$/kind=scout/' "$case_dir/state/task-x1.meta" > "$case_dir/meta.tmp" \
+      || ! mv "$case_dir/meta.tmp" "$case_dir/state/task-x1.meta"; then
+      fail "$mode: cannot make the record a scout"
+    fi
     if [ "$mode" = unproven ]; then
       : > "$case_dir/capability-old"
     else
-      jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= (.lease_holder = "other-task")' "$UNC_STATE" > "$UNC_STATE.tmp" \
-        && mv "$UNC_STATE.tmp" "$UNC_STATE" || fail "$mode: cannot give slot A to another holder"
+      if ! jq --arg p "$UNC_A" '(.worktrees[] | select(.path == $p)) |= (.lease_holder = "other-task")' "$UNC_STATE" > "$UNC_STATE.tmp" \
+        || ! mv "$UNC_STATE.tmp" "$UNC_STATE"; then
+        fail "$mode: cannot give slot A to another holder"
+      fi
     fi
     unc_copy_snapshot "$UNC_NESTED" "$case_dir/own-copy.before"
     unc_a_entry > "$case_dir/a-entry.before"
