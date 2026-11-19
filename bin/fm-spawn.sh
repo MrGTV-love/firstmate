@@ -2102,7 +2102,9 @@ spawn_abort_cleanup() {
           fi
           SPAWN_FRESH_COMMIT_PENDING=0
         fi
-        mkdir -p "$STATE" 2>/dev/null || true
+        if [ -d "$STATE" ]; then
+          printf '%s\n' "$(status_stamp_line "blocked: Orca worktree $ORCA_WORKTREE_ID could not be removed after a failed spawn; retained worktree: ${WT:-}")" >>"$STATE/$ID.status" 2>/dev/null || true
+        fi
         if [ -d "$STATE" ] &&
           { [ "$RELAUNCH" -eq 1 ] || spawn_take_task_set_lock; }; then
           SPAWN_META_TMP="$STATE/.$ID.meta.orca-recovery.${BASHPID:-$$}"
@@ -2126,6 +2128,8 @@ spawn_abort_cleanup() {
           } >"$SPAWN_META_TMP" 2>/dev/null &&
             fm_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE" ||
             true
+        else
+          echo "error: retained Orca worktree $ORCA_WORKTREE_ID at ${WT:-} has no cleanup_recovery task record" >&2
         fi
       fi
     fi
@@ -6629,6 +6633,7 @@ spawn_slot_refused() {
       fi
     fi
   fi
+  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy $WT and endpoint $T retained; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
   if [ "$update_recovery" = 1 ]; then
     if [ "$RELAUNCH" -eq 0 ]; then
       spawn_take_task_set_lock || {
@@ -6642,7 +6647,6 @@ spawn_slot_refused() {
       rm -f -- "$recovery"
     }
   fi
-  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
   echo "error: assigned copy $WT and endpoint $T retained; no worker admitted" >&2
   exit 1
 }
@@ -6988,7 +6992,10 @@ mkdir -p "$TASK_TMP/gotmp"
 # state/<id>.turn-ended when the agent finishes a turn. Worktree-resident hooks
 # and token pointers stay out of git's view so they never block teardown's dirty
 # check or leak into a commit.
-mkdir -p "$STATE"
+fm_backlog_directory_present "$STATE" "state directory" || {
+  echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  exit 1
+}
 STATE_REAL=$(cd "$STATE" && pwd -P)
 TURNEND="$STATE_REAL/$ID.turn-ended"
 exclude_path() {

@@ -290,6 +290,7 @@ test_orca_abort_recovery_obeys_task_set_custody() {
     if [ "$held" = 1 ]; then
       assert_contains "$out" 'task set is locked by a forced teardown' 'Orca recovery bypassed task-set contention'
       [ ! -e "$home/state/$id.meta" ] || fail 'Orca recovery published inside forced teardown custody'
+      assert_grep "wt-fm-$id" "$home/state/$id.status" 'Orca retained worktree is not named by a durable record'
       [ "$(cat "$lock/role")" = forced-teardown ] || fail 'Orca recovery removed teardown custody'
       fm_lock_release "$lock"
     else

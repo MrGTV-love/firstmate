@@ -173,7 +173,7 @@ run_settle_spawn() {
     FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
     FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
     FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" BASH_ENV="$TMP_ROOT/clock.sh" \
-    FM_GUARD_EVENT_LOG="$HOME_DIR/state/guard-events.jsonl" \
+    FM_GUARD_EVENT_LOG="${FM_LOCK_GUARD_EVENT_LOG:-$HOME_DIR/state/guard-events.jsonl}" \
     CLAUDE_CONFIG_DIR=${SETTLE_CLAUDE_CONFIG_DIR:-} PI_CODING_AGENT_DIR='' OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp \
     FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_PANE_STALE="$STALE_DIR" \
     FM_FAKE_PANE_STALE_READS="$STALE_READS" FM_FAKE_PANE_COUNTFILE="$COUNTFILE" \
@@ -1416,6 +1416,41 @@ test_task_set_abort_shows_only_output_tail() {
   pass 'TL4: abort prints the exact 30/5/0-line capture tails without filtering'
 }
 
+test_task_set_publish_after_forced_teardown_does_not_recreate_home() {
+  local a rc=0 teardown_rc=0 parent
+  make_lock_case lock-torn-down
+  parent="$LOCK_DIR/torn-parent"
+  mkdir -p "$parent/state" "$parent/data"
+  printf '%s\n' domain > "$LOCK_HOME/.fm-secondmate-home"
+  cat > "$parent/state/domain.meta" <<EOF
+window=firstmate:fm-domain
+worktree=$LOCK_HOME
+project=$LOCK_HOME
+harness=echo
+kind=secondmate
+mode=secondmate
+yolo=off
+home=$LOCK_HOME
+projects=alpha
+EOF
+  printf '%s\n' "- domain - design domain (home: $LOCK_HOME; scope: design domain; projects: alpha; added 2026-06-22)" > "$parent/data/secondmates.md"
+  mkfifo "$LOCK_DIR/get"
+  FM_LOCK_GUARD_EVENT_LOG="$LOCK_DIR/guard-events.jsonl" lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" "$LOCK_DIR/get"
+  a=$LOCK_PID
+  lock_ready "$a" "$LOCK_DIR/get"
+  FM_HOME=$parent PATH="$LOCK_FAKE:$PATH" "$ROOT/bin/fm-teardown.sh" domain --force \
+    --drop-file "$(fm_test_drop_file)" >"$LOCK_DIR/teardown.out" 2>&1 || teardown_rc=$?
+  expect_code 0 "$teardown_rc" "forced teardown of the secondmate home failed: $(cat "$LOCK_DIR/teardown.out")"
+  [ ! -e "$LOCK_HOME" ] || fail 'forced teardown did not remove the secondmate home'
+  kill -0 "$a" 2>/dev/null || fail "spawn ended before its get returned: $(cat "$LOCK_DIR/lock-a.out")"
+  printf 'go\n' > "$LOCK_DIR/get"
+  wait "$a" || rc=$?
+  lock_forget "$a"
+  [ "$rc" -ne 0 ] || fail "a spawn published into a home its forced teardown had removed: $(cat "$LOCK_DIR/lock-a.out")"
+  [ ! -e "$LOCK_HOME" ] || fail "a refused spawn recreated the home its forced teardown removed: $(cat "$LOCK_DIR/lock-a.out")"
+  pass 'a spawn whose forced teardown finished during its get is refused and recreates nothing'
+}
+
 fm_test_only
 
 test_task_set_get_does_not_block_another_project
@@ -1426,6 +1461,7 @@ test_task_set_relocated_work_is_rechecked_at_publication
 test_task_set_early_refusal_never_acquires
 test_task_set_teardown_refusal_cleans_acquired_copy
 test_task_set_abort_shows_only_output_tail
+test_task_set_publish_after_forced_teardown_does_not_recreate_home
 test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined

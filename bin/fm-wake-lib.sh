@@ -48,7 +48,7 @@ FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
 _FM_UNAME=$(uname 2>/dev/null || echo unknown)
-mkdir -p "$STATE"
+mkdir "$STATE" 2>/dev/null || true
 
 _fm_wake_require_status() {
   command -v status_observed_signature >/dev/null 2>&1 && return 0

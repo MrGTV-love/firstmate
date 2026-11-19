@@ -2365,6 +2365,8 @@ test_governed_refusal_retains_prepared_copy_when_publication_is_locked() {
   assert_contains "$GOV_OUT" 'task set is locked by a forced teardown' 'governed recovery bypassed custody'
   assert_contains "$GOV_OUT" 'retained; task record publication refused' 'refusal did not name retained recovery resources'
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'governed recovery published inside teardown custody'
+  assert_grep "${SKIP_SLOTS[0]}" "$HOME_DIR/state/$id.status" 'retained copy is not named by a durable record'
+  assert_grep ":fm-$id" "$HOME_DIR/state/$id.status" 'retained endpoint is not named by a durable record'
   assert_no_launch "$CASE_DIR/launch.log"
   [ -e "$CASE_DIR/pane.live" ] && [ -e "$CASE_DIR/lease.live" ] || fail 'governed refusal closed the retained acquisition lease'
   [ "$(cat "${SKIP_SLOTS[0]}/late-work.txt")" = 'preserve late assigned work' ] || fail 'governed refusal lost late assigned work'
