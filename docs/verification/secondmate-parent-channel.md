@@ -20,6 +20,8 @@ The mate's only actions are the scripts a firstmate runs when it registers a PR 
 
 ## Transcript
 
+The transcript preserves the commands actually run, not current filing syntax; new holds must use the boundary and if-no fields owned by [`bin/fm-captain-hold.sh --help`](../../bin/fm-captain-hold.sh).
+
 ```text
 $ # Setup: mate home $M is a secondmate of parent home $P (local route); child task 'child' lives in a real tmux pane; both watchers are live
 

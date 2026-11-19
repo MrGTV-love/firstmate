@@ -312,7 +312,11 @@ test_every_failure_kind_is_reported_and_the_valid_item_still_closes() {
   cx "$case_dir" "done" done-already --note finished >/dev/null
   cx_add "$case_dir" a-scout scout
   # Every hold and release goes through the real owner-call route, bin/fm-captain-hold.sh.
-  captain_hold() { FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+  captain_hold() {
+    if [ "${1:-}" = hold ]; then
+      set -- "$@" --boundary owner-rule-change --if-no 'Keep the existing owner rule'
+    fi
+    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
     FM_CONFIG_OVERRIDE="$case_dir/home/config" "$ROOT/bin/fm-captain-hold.sh" "$@" >/dev/null 2>"$case_dir/hold.err" \
     || { cat "$case_dir/hold.err" >&2; fail "c3: fm-captain-hold.sh $* failed"; }; }
   printf '%s\n' 'Released: go ahead.' > "$case_dir/release.md"
@@ -1074,7 +1078,12 @@ test_a_withdrawn_captain_call_clears_the_edge() {
   local case_dir home
   case_dir=$(make_case c4-withdraw)
   home=$case_dir/home
-  hold_env() { FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-captain-hold.sh" "$@"; }
+  hold_env() {
+    if [ "${1:-}" = hold ]; then
+      set -- "$@" --boundary owner-rule-change --if-no 'Keep the existing owner rule'
+    fi
+    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-captain-hold.sh" "$@"
+  }
   cx_add "$case_dir" call-w captain
   cx_add "$case_dir" ruling-r captain
   hold_env hold call-w --reason "owner decides" >/dev/null 2>&1 || fail "c4-withdraw: could not hold call-w"

@@ -339,7 +339,7 @@ test_recovered_alias_beside_leased_entry_is_not_held() (
 )
 
 test_slot_holding_live_nested_current_copy_refuses() {
-  local spelling name nested out
+  local spelling name nested out rc
   for spelling in direct alias; do
     name="nested-live-$spelling"
     make_retained_case "$name"
@@ -363,10 +363,21 @@ test_slot_holding_live_nested_current_copy_refuses() {
     rm "$HOME_DIR/state/holder.meta"
     : > "$CASE_DIR/pane-log"
     : > "$CASE_DIR/launch-log"
-    out=$(run_retained_spawn "$name") || true
+    # Slot 1 still holds the preserved nested copy, so it is not clean and
+    # spawn rightly passes it over; offer a clean second slot to land in.
+    add_free_second_slot ',"owner_pid":99999999,"owner_started_at":1'
+    retained_fingerprint > "$CASE_DIR/before-copy"
+    rc=0
+    out=$(run_retained_spawn "$name") || rc=$?
+    expect_code 0 "$rc" "$spelling: a retired record still stopped the spawn"$'\n'"$out"
     assert_not_contains "$out" "contains task holder's current copy" "a retired record still blocked allocation"
+    assert_contains "$out" "spawned new-$name" "$spelling: spawn did not launch"
     grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" \
       || fail "a slot whose nested copy no record names did not reach treehouse get: $out"
+    assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "$spelling: spawn did not claim the clean slot"
+    [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "$spelling: spawn claimed the slot holding the nested copy"
+    retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$spelling: spawn changed the slot holding the nested copy"
+    assert_grep 'nested unlanded commit' "$nested/nested-owned.txt" "$spelling: spawn lost the nested work"
   done
   pass "a pool slot holding a live record's nested current copy refuses allocation until that record is retired"
 }

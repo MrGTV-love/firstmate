@@ -6,6 +6,7 @@ The tool reference establishes either that identity's empirical path or its unsu
 ## Turn end
 
 `../../../docs/turnend-guard.md` owns the "no turn ends blind" contract, hook installation, per-surface blocking behavior, and tradeoffs when a hook cannot block.
+Its [Claude final-message ask check](../../../docs/turnend-guard.md#claude-final-message-ask-check) names the sole covered adapter and every excluded harness; do not infer chat coverage from supervision support.
 `../../../docs/supervision-protocols/` and `../../../bin/fm-supervision-instructions.sh` own harness-specific wake protocols.
 Never substitute another harness's wait shape.
 `../../../bin/fm-busy-lib.sh` remains the semantic busy owner; a tool reference names only its source and evidence.
