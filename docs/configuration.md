@@ -946,6 +946,7 @@ The watcher offers the run at most every `FM_SCRATCH_REAPER_TICK` seconds (defau
 The script owns the 30-minute window, a lock, and its failure log, so a failed, busy, or hung run never reaches the supervision cycle.
 A secondmate home never runs it.
 It raises one `check: scratch-reaper low-disk` wake only when free space on the roots' volume is below 20 GiB and the run removed nothing, repeats it after six hours at most, and stays quiet once space recovers or a run frees bytes.
+On a 100 percent full volume the reaper's own writes (its temp folder, its `lsof` snapshot and its log) can fail, so it frees little there; it runs at most once every 30 minutes and raises the low-disk wake under 20 GiB.
 A suite that sets `FM_TEST_SEAM` never starts the real script from the watcher.
 `tests/scratch-reaper-helpers.sh` refuses any test run, for a dry run, `--apply`, and `--scheduled`, whose config root is missing, is a symlink, or resolves physically outside its private world, or whose config or archive folder is outside it, and then starts no script.
 Regression coverage is `tests/fm-scratch-reaper.test.sh` and `tests/fm-watch-scratch-reaper.test.sh`.

@@ -343,6 +343,7 @@ cleanup_work() {
 
 # --- decision log -------------------------------------------------------------
 KEPT=0 REMOVED=0 BYTES=0 LSOF_FAILED=0
+KEPT_REASONS=()
 decide() {  # <verb> <path> <detail>
   local line
   line="$(iso_utc "$NOW") $1 $2${3:+ $3}"
@@ -351,7 +352,7 @@ decide() {  # <verb> <path> <detail>
     printf '%s\n' "$line" >> "$LOG_FILE" || echo "fm-scratch-reaper: cannot append $LOG_FILE" >&2
   fi
 }
-keep() { KEPT=$((KEPT + 1)); decide kept "$1" "reason=$2"; }  # <path> <reason>
+keep() { KEPT=$((KEPT + 1)); KEPT_REASONS+=("$2"); decide kept "$1" "reason=$2"; }  # <path> <reason>
 
 # --- open-handle snapshot -----------------------------------------------------
 SNAPSHOT_STATE=untaken   # untaken | ok | failed
@@ -524,14 +525,30 @@ log_event() {  # <text>: a scheduled-run event line
   printf '%s %s\n' "$(iso_utc "$NOW")" "$1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
+aged_kept_tally() {  # prints "<reason>: <n>" for each kept reason an aged candidate can carry; empty when none
+  local r n k out=''
+  for r in 'lsof failed' 'open handle' 'archive failed' 'remove failed' task-record git; do
+    n=0
+    for k in ${KEPT_REASONS[@]+"${KEPT_REASONS[@]}"}; do [ "$k" = "$r" ] && n=$((n + 1)); done
+    [ "$n" -eq 0 ] || out="$out${out:+, }$r: $n"
+  done
+  printf '%s' "$out"
+}
+
 raise_low_disk_alarm() {  # <free KiB>
-  local marker="$STATE_DIR/.scratch-reaper-alarmed" last='' payload
+  local marker="$STATE_DIR/.scratch-reaper-alarmed" last='' payload kept='' cause
   if [ -f "$marker" ] && [ ! -L "$marker" ]; then IFS= read -r last < "$marker" || last=''; fi
   case "$last" in ''|*[!0-9]*) last='' ;; esac
   if [ -n "$last" ] && [ $((NOW - last)) -lt "$ALARM_RESURFACE_SECS" ]; then return 0; fi
   # shellcheck source=bin/fm-wake-lib.sh disable=SC1091
   . "$SCRIPT_DIR/fm-wake-lib.sh"
-  payload="check: scratch-reaper low-disk: only $(( $1 / 1048576 )) GiB free on the data volume and the scheduled reaper removed nothing. Aged scratch is not the cause, so find what else fills the disk (docs/configuration.md \"Scratch reaper\"). Tell the captain in one short note."
+  kept=$(aged_kept_tally)
+  if [ -n "$kept" ]; then
+    cause="kept aged scratch ($kept), so this run does not show the cause; the reasons are in state/scratch-reaper.log"
+  else
+    cause="kept no aged scratch, so aged scratch is not the cause; find what else fills the disk"
+  fi
+  payload="check: scratch-reaper low-disk: only $(( $1 / 1048576 )) GiB free on the data volume; the scheduled reaper removed $REMOVED directories and freed $BYTES bytes, and it $cause (docs/configuration.md \"Scratch reaper\"). Tell the captain in one short note."
   if fm_wake_append check scratch-reaper-low-disk "$payload"; then
     printf '%s\n' "$NOW" > "$marker"
   else

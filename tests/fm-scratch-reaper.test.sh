@@ -418,6 +418,31 @@ case_missing_default_root_is_skipped() {
   case "$out" in *home/tmp*) fail "the missing default root ~/tmp was not skipped silently: $out" ;; esac
 }
 
+case_low_disk_wake_names_kept_scratch() {
+  local world t=1800000000 root rc
+  new_world; world=$SR_WORLD; root=$world/root
+  install_df "$world" 10485760
+  make_aged "$root/fm-a" a.log || fail 'fixture'
+  printf '#!/bin/sh\nexit 1\n' > "$world/fakebin/lsof"; chmod +x "$world/fakebin/lsof"
+  sched "$world" "$t" >/dev/null && rc=0 || rc=$?
+  [ "$rc" -eq 3 ] && [ -d "$root/fm-a" ] || fail "a failing lsof must keep the aged directory and exit 3, got $rc"
+  [ "$(wake_rows "$world")" = 1 ] || fail 'low space with nothing freed must raise one low-disk wake'
+  grep -q 'lsof failed: 1' "$world/fm/state/.wake-queue" || fail 'the low-disk wake does not name the aged directory kept for lsof failed'
+  if grep -q 'aged scratch is not the cause' "$world/fm/state/.wake-queue"; then
+    fail 'the low-disk wake says aged scratch is not the cause while an aged directory was kept'
+  fi
+}
+
+case_low_disk_wake_no_kept_scratch() {
+  local world t=1800000000
+  new_world; world=$SR_WORLD
+  install_df "$world" 10485760
+  sched "$world" "$t" >/dev/null || fail 'run failed'
+  [ "$(wake_rows "$world")" = 1 ] || fail 'low space with nothing freed must raise one low-disk wake'
+  grep -q 'kept no aged scratch, so aged scratch is not the cause' "$world/fm/state/.wake-queue" \
+    || fail 'the low-disk wake does not say aged scratch is not the cause when none was kept'
+}
+
 # --- the schedule (SR3) --------------------------------------------------------
 
 install_df() {  # <world> <available-KiB>
@@ -612,6 +637,8 @@ test_control_character_name_is_kept() { case_control_character_name_kept; pass '
 test_task_record_is_kept_until_the_record_goes() { case_task_record_kept; pass 'a directory a recorded task owns (this home, or a secondmate home through a symlink) is kept as task-record and removed once its record is gone'; }
 test_missing_configured_root_refuses() { case_missing_configured_root_refuses; pass 'a configured root that is missing stops the run with exit 2, names the config file and the root, and removes nothing'; }
 test_missing_default_root_is_skipped() { case_missing_default_root_is_skipped; pass 'a missing built-in default root is skipped silently and the present default root is still reaped'; }
+test_low_disk_wake_names_kept_scratch() { case_low_disk_wake_names_kept_scratch; pass 'the low-disk wake names the aged scratch the run kept and its reason, and does not say aged scratch is not the cause'; }
+test_low_disk_wake_no_kept_scratch() { case_low_disk_wake_no_kept_scratch; pass 'the low-disk wake says aged scratch is not the cause only when the run kept none'; }
 test_unreadable_log_keeps_the_directory() { case_archive_read_failure_keeps_directory; pass 'a small log that cannot be read keeps the directory as archive failed'; }
 test_archive_finishes_before_removal() { case_archive_before_remove_ordering; pass 'a copy that fails on the second file, or differs from its source, keeps the whole directory untouched'; }
 test_one_snapshot_per_run() { case_one_snapshot_per_run; pass 'one lsof snapshot serves every candidate of a run'; }
@@ -675,6 +702,8 @@ test_control_character_name_is_kept
 test_task_record_is_kept_until_the_record_goes
 test_missing_configured_root_refuses
 test_missing_default_root_is_skipped
+test_low_disk_wake_names_kept_scratch
+test_low_disk_wake_no_kept_scratch
 test_unreadable_log_keeps_the_directory
 test_archive_finishes_before_removal
 test_one_snapshot_per_run
