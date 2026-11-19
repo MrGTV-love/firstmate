@@ -13,6 +13,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [status log size bounds](#status-log-size-bounds-fm_status_cap_bytes), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
+| New work refused on a nearly full disk | [Disk free floor](#disk-free-floor-configdisk-free-floor) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Automatic exact-head review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
@@ -2467,6 +2468,45 @@ The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
+
+## Disk free floor (config/disk-free-floor)
+
+A new heavy step starts only while the volume it writes to holds at least 20 GiB free.
+A nearly full disk makes every new worker, pipeline run and stack worse, so the check refuses the start instead of making it worse.
+[`bin/fm-disk-floor-lib.sh`](../bin/fm-disk-floor-lib.sh) owns the measurement, the floor, the message and the exit statuses.
+
+The optional local, gitignored `config/disk-free-floor` holds one line with a positive whole number of GiB, at most six digits and no leading zero, to replace the default of 20.
+An absent file means 20.
+A malformed file refuses the start with exit 2 and an `error:` line naming the file, and never defers, because retrying cannot repair it.
+Secondmate homes inherit the file from the primary like other inheritable config.
+
+The meter is `df -Pk` on the nearest existing ancestor of the path the step writes to, so a copy that does not exist yet is measured on the volume it will be created on.
+The available kilobytes are divided by 1048576 in integer arithmetic, which is the 1,024-based whole-GiB figure `df -g` prints on macOS, rounded down.
+Exactly the floor admits, and one kilobyte below it refuses.
+
+The check runs where new work starts:
+
+- A fresh `bin/fm-spawn.sh` ship, scout or new secondmate spawn, beside the memory admission and before any copy, record or brief exists; it measures the project clone, or the secondmate's home.
+- A fresh no-mistakes run start through `bin/fm-mem-guard.sh run`, and through `bin/fm-cpu-pass.sh pipeline-start`, which `bin/fm-duration.py run --pipeline-priority <class>` uses for a fresh run or an authorized rerun; both measure the starting directory.
+- `bin/fm-disk-floor-lib.sh admit stack <path>` for a task's Docker, Compose or Supabase stack.
+  Firstmate owns no stack-start script, because workers start their own stacks, so nothing calls this yet; the stack half of this guard is not wired to a start path.
+
+Below the floor, the start exits 75, which means deferred and never failed, and prints one line naming the free GiB, the floor, the path measured and `config/disk-free-floor`.
+A deferred spawn leaves no record, brief, copy or terminal call behind, and its backlog item stays queued, so Firstmate dispatches it again once space is freed.
+A deferred run start never queues in the CPU pass pool and never runs its command.
+
+Recovery is never refused.
+A relaunch of an existing worker, through `bin/fm-control.sh relaunch` or `bin/fm-spawn.sh --relaunch`, reuses its copy and allocates nothing.
+A respawn of a secondmate whose record the home still holds is the same recovery.
+Every teardown and cleanup path never asks the floor, because freeing space is what a full disk needs.
+Reattaching to an existing no-mistakes run starts nothing new and is never refused.
+The floor refuses new starts only; it never kills or slows running work.
+
+When `df` fails or prints nothing usable, the step is admitted with one `warning:` line, so an unreadable meter cannot stop recovery.
+Each decision is recorded as the `disk-free-floor` guard in `state/guard-events.jsonl`: `deny` below the floor, `warn` for an unreadable meter, and `allow` otherwise.
+`bin/fm-disk-floor-lib.sh free <path>` prints the whole GiB the guard reads for a path.
+
+`tests/fm-disk-floor.test.sh`, `tests/fm-disk-floor-relaunch.test.sh` and the disk-floor cases of `tests/fm-cpu-pass-admission.py` cover these behaviors with a fake `df` first on `PATH`.
 
 ## Host memory admission
 

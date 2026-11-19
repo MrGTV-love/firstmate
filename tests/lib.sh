@@ -167,6 +167,14 @@ TOML
 # test files, not by this library, so it reads as "unused" here.
 # shellcheck disable=SC2034
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# The free-disk floor (bin/fm-disk-floor-lib.sh) defers new spawns, pipeline runs
+# and stacks below 20 GiB free, so fixtures must not depend on how full the
+# developer's or the runner's disk is. A PATH-first fake df reports a large free
+# volume; tests/fm-disk-floor.test.sh drives it with chosen numbers.
+PATH="$ROOT/tests/assets/fake-bin:$PATH"
+export PATH
+unset FM_FAKE_DF_AVAIL_KB FM_FAKE_DF_MODE FM_FAKE_DF_LOG
 export FM_GUARD_AUDIT_READER="$ROOT/bin/fm-jev-audit-read.mjs"
 
 # --- reporters --------------------------------------------------------------

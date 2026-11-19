@@ -7,6 +7,9 @@
 #   Every fresh spawn reads host memory once through fm-mem-guard.sh; its
 #   measured refusal returns 75 before task resources or backlog dispatch.
 #   Relaunches and secondmate respawns are recovery and are never refused.
+#   A fresh spawn also reads the free disk once through fm-disk-floor-lib.sh and
+#   defers with the same 75 below the floor (default 20 GiB, config/disk-free-floor)
+#   before any copy is allocated; a relaunch never reads it.
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
 #   per task at intake (AGENTS.md section 7); data/projects.md holds the captain's
@@ -1132,6 +1135,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
 # shellcheck source=bin/fm-project-capacity-lib.sh
 . "$SCRIPT_DIR/fm-project-capacity-lib.sh"
+# shellcheck source=bin/fm-disk-floor-lib.sh
+. "$SCRIPT_DIR/fm-disk-floor-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
@@ -4646,6 +4651,17 @@ if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" != secondmate ] || [ ! -e "$STATE/$ID.me
     echo "deferred: host memory admission refused new task $ID (exit $memory_rc); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl" >&2
     exit 75
   fi
+fi
+# The free-disk floor sits beside the memory admission and has the same recovery
+# exemption: a relaunch, or a secondmate respawn whose record this home still
+# holds, allocates nothing new and is never refused. bin/fm-disk-floor-lib.sh owns
+# the measurement, the floor and the deferral message.
+if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" != secondmate ] || [ ! -e "$STATE/$ID.meta" ]; }; then
+  disk_floor_path=$PROJ_ABS
+  [ "$KIND" != secondmate ] || disk_floor_path=${FIRSTMATE_HOME:-$PROJ_ABS}
+  disk_floor_rc=0
+  fm_disk_floor_admit "spawn of task $ID" "$disk_floor_path" "$CONFIG" "$ID" || disk_floor_rc=$?
+  [ "$disk_floor_rc" -eq 0 ] || exit "$disk_floor_rc"
 fi
 if [ "$RELAUNCH_RELOCATING" = 1 ]; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {

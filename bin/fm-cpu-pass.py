@@ -115,8 +115,13 @@ Pipeline starts:
     guessing headroom. If a read fails after launch, retain the start lock until
     COMMAND returns; never stop running work because the observer lost its source.
 
+  - Before it queues, `pipeline-start` asks bin/fm-disk-floor-lib.sh whether the volume holding
+    the current directory still has the free-disk floor. Below it, nothing is queued and the
+    status is 75 (deferred, never a failure) with the library's one `deferred:` line; a malformed
+    config/disk-free-floor returns 2; an unreadable meter admits with a warning.
+
 Exit status of `run` and `pipeline-start`: COMMAND's own status; 126 when COMMAND cannot be
-executed, 127 when it is not found, 125 for a usage error.
+executed, 127 when it is not found, 125 for a usage error, 75 when the disk floor defers a start.
 """
 
 import argparse
@@ -820,6 +825,17 @@ def first_pipeline_waiter(directory: str) -> str:
     return min(entries)[2] if entries else ""
 
 
+def disk_floor_status(step: str) -> int:
+    """Run the free-disk floor for a NEW start: 0 admits, anything else is the status to return."""
+    library = Path(__file__).resolve().parent / "fm-disk-floor-lib.sh"
+    try:
+        return subprocess.run(["bash", str(library), "admit", step, os.getcwd()], check=False).returncode
+    except OSError as exc:
+        # An unreadable meter must not stop a start (the library's own rule).
+        log(2, "warning: disk free floor not enforced for %s: %s; admitted" % (step, exc))
+        return 0
+
+
 def cmd_pipeline_start(args: argparse.Namespace) -> int:
     command = list(args.command)
     if command[:1] == ["--"]:
@@ -827,6 +843,9 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
     if not command:
         log(2, "pipeline-start needs a command after --")
         return 125
+    refused = disk_floor_status("no-mistakes run start")
+    if refused:
+        return refused
     waiter_fd = admission_fd = None
     waiter_path = None
     try:

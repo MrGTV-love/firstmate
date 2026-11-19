@@ -569,6 +569,7 @@ family_for_basename() {
     fm-spawn-compact-adviser-disable-remote.test.sh|\
     fm-spawn-herdr-launch-shell.test.sh|\
     fm-project-capacity.test.sh|\
+    fm-disk-floor.test.sh|fm-disk-floor-relaunch.test.sh|\
     fm-teardown-endpoint-safety.test.sh)
       printf '%s\n' backend-dispatch
       ;;
