@@ -1,0 +1,184 @@
+
+== C1 absent binding, relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=0
+  stdout: 
+  stderr: 
+  [c1] binding: inode= sha256=
+  [c1] state tree:
+      .
+      ./task.dsh
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c1] decoy-log: untouched
+  [c2-before] binding: inode=1926175444 sha256=ab3848ff2f8bc585
+  [c2-before] state tree:
+      .
+      ./task.dsh
+      ./task.dsh-session
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c2-before] decoy-log: untouched
+
+== C2 unreadable binding (chmod 000), relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=1
+  stdout: 
+  stderr: error: REFUSED: saved DSH binding read failed: [Errno 13] Permission denied: '<LAB>/c2/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it|
+  [c2-after-refusal] binding: inode=1926175444 sha256=
+  [c2-after-refusal] state tree:
+      .
+      ./guard-events.jsonl
+      ./task.dsh
+      ./task.dsh-session
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c2-after-refusal] guard-events.jsonl:
+      {"ts":"2026-11-19T05:50:25Z","guard":"dsh-resume-binding-read","rule":"dsh-resume-binding-read","task":"task","version":"1","system":"firstmate","session":"task","decision":"deny","source_ok":false,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+  [c2-after-refusal] decoy-log: untouched
+
+== C2b same binding after access restored, relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=0
+  stdout: <LAB>/c2/state/task.dsh/g1|
+  stderr: 
+  [c2b-after-restore] binding: inode=1926175444 sha256=ab3848ff2f8bc585
+  [c2b-after-restore] state tree:
+      .
+      ./guard-events.jsonl
+      ./task.dsh
+      ./task.dsh-session
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c2b-after-restore] guard-events.jsonl:
+      {"ts":"2026-11-19T05:50:25Z","guard":"dsh-resume-binding-read","rule":"dsh-resume-binding-read","task":"task","version":"1","system":"firstmate","session":"task","decision":"deny","source_ok":false,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+      {"ts":"2026-11-19T05:50:38Z","guard":"dsh-resume-binding-read","rule":"dsh-resume-binding-read","task":"task","version":"1","system":"firstmate","session":"task","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+  [c2b-after-restore] decoy-log: untouched
+  [c2b] launch.yml sessionId: 11111111-1111-4111-8111-111111111111  (original UUID 11111111-1111-4111-8111-111111111111)
+
+== C3 unreadable binding, standalone (no flag)
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD>
+  rc=1
+  stdout: 
+  stderr: error: REFUSED: saved DSH binding read failed: [Errno 13] Permission denied: '<LAB>/c3/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it|
+  [c3] binding: inode=1926197580 sha256=
+  [c3] state tree:
+      .
+      ./task.dsh
+      ./task.dsh-session
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c3] decoy-log: untouched
+
+== C4 BASE 7f3a198b, unreadable binding (chmod 000)
+  rc=0 stdout=[] stderr=[]
+
+== C5 malformed legacy binding, relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=0
+  stdout: 
+  stderr: 
+  [c5] binding: inode=1926210389 sha256=1e9ac65c2af99c8b
+  [c5] state tree:
+      .
+      ./guard-events.jsonl
+      ./task.dsh
+      ./task.dsh-session
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c5] guard-events.jsonl:
+      {"ts":"2026-11-19T05:50:56Z","guard":"dsh-resume-binding-read","rule":"dsh-resume-binding-read","task":"task","version":"1","system":"firstmate","session":"task","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+  [c5] decoy-log: untouched
+
+== C6 model mismatch (readable), relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/other high <CWD> --record-binding-decision
+  rc=0
+  stdout: 
+  stderr: 
+  [c6] binding: inode=1926221435 sha256=3410e11e62f7b7bb
+  [c6] state tree:
+      .
+      ./guard-events.jsonl
+      ./task.dsh
+      ./task.dsh-session
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c6] guard-events.jsonl:
+      {"ts":"2026-11-19T05:51:10Z","guard":"dsh-resume-binding-read","rule":"dsh-resume-binding-read","task":"task","version":"1","system":"firstmate","session":"task","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+  [c6] decoy-log: untouched
+
+== C7 binding path is a directory, relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=1
+  stdout: 
+  stderr: error: REFUSED: saved DSH binding read failed: [Errno 21] Is a directory: '<LAB>/c7/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it|
+
+== C8 dangling symlink binding, relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=0
+  stdout: 
+  stderr: 
+
+== C9 state dir unsearchable, relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=1
+  stdout: 
+  stderr: error: REFUSED: saved DSH binding read failed: [Errno 13] Permission denied: '<LAB>/c9/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it|
+
+== C10 unsafe guard log symlink planted, unreadable binding, relaunch flag
+  command: python3 -IBS bin/fm-dsh.py resume <STATE> task deepseek/v4 high <CWD> --record-binding-decision
+  rc=1
+  stdout: 
+  stderr: error: REFUSED: saved DSH binding read failed: [Errno 13] Permission denied: '<LAB>/c10/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it|
+  [c10] binding: inode=1926246553 sha256=
+  [c10] state tree:
+      .
+      ./guard-events.jsonl
+      ./task.dsh
+      ./task.dsh-session
+      ./task.dsh/g1
+      ./task.dsh/g1/dsh
+      ./task.dsh/g1/dsh/sessions
+      ./task.dsh/g1/dsh/sessions/workspace
+      ./task.dsh/g1/dsh/sessions/workspace/session
+      ./task.dsh/g1/dsh/sessions/workspace/session/session.v4.jsonl
+      ./task.dsh/g1/launch.yml
+  [c10] guard-events.jsonl:
+  [c10] decoy-log: untouched
+
+Teardown: chmod -R u+rwx and rm the disposable /tmp roots.
