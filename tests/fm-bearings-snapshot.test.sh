@@ -243,6 +243,9 @@ run_prepared() {
 run_captain() {  # <home> <fakebin> <command args...>
   local home=$1 fakebin=$2
   shift 2
+  if [ "${1:-}" = hold ]; then
+    set -- "$@" --boundary owner-rule-change --if-no 'Keep the existing owner rule'
+  fi
   PATH="$fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_ROOT_OVERRIDE="$ROOT" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-captain-hold.sh" "$@"

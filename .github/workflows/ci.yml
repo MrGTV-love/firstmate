@@ -114,12 +114,35 @@ jobs:
       - name: Prove guard wiring and retirement references
         run: bin/fm-guard-refcheck.sh
       - name: Enforce the guard registry contract and its ratchet
-        run: bin/fm-guard-lint.sh --mode enforce --counts
+        run: bin/fm-cpu-pass.sh run --label ci-guard-lint-enforce -- bin/fm-guard-lint.sh --mode enforce --counts
       # New work cannot add debt: a refusal site on a changed line must map to a
       # guard, and the burn-down allowlist may not grow against the PR base.
       - name: Enforce the guard ratchet against the pull request base
         if: github.event_name == 'pull_request'
-        run: bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+        run: bin/fm-cpu-pass.sh run --label ci-guard-lint-new-or-touched -- bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+
+  # The CPU pass pool's concurrency proofs (tests/fm-cpu-pass-concurrency.py), including the CI-only kill and
+  # fault cases. They run up to three CPU-bound processes at once (FM_CONC_N=2 pooled workers plus
+  # FM_CONC_BURNERS=1 pass-less burner in the soak, or three ungated copies in the off-switch check), so they
+  # take three passes of the runner's pool (docs/cpu-pass-pool.md rule 5) instead of running inside the one
+  # pass of tests/fm-cpu-pass.test.sh; the fixture refuses a smaller held reservation.
+  cpu-pass-concurrency:
+    name: CPU pass concurrency proofs
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history: the lint cases run bin/fm-lint.sh, whose limit-literal check compares against origin/main.
+          fetch-depth: 0
+      - name: Run the concurrency proofs under their own passes
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/fm-conc"
+          FM_CONC_N=2 FM_CONC_LANES=4 FM_CONC_ROUNDS=5 FM_CONC_WORK=0.15 FM_CONC_BURNERS=1 \
+            bin/fm-cpu-pass.sh run --passes 3 --label ci-cpu-pass-concurrency -- \
+            bin/fm-proc-budget.sh -- python3 tests/fm-cpu-pass-concurrency.py "$PWD" "$RUNNER_TEMP/fm-conc" "$(command -v python3)"
 
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
@@ -484,9 +507,13 @@ jobs:
           shell_inventory="$RUNNER_TEMP/fm-shell-inventory"
           bin/fm-lint.sh --list-files > "$shell_inventory"
           parse_fail=0
-          while IFS= read -r f; do
-            /bin/bash -n "$f" || { echo "::error::stock macOS Bash 3.2 failed to parse $f"; parse_fail=1; }
-          done < "$shell_inventory"
+          # One CPU-bound sweep (measured 2.8 CPU seconds over 4.5), so it takes a pass and is named in the holder list.
+          bin/fm-cpu-pass.sh run --label ci-stock-bash-parse-sweep -- /bin/bash -c '
+            fail=0
+            while IFS= read -r f; do
+              /bin/bash -n "$f" || { echo "::error::stock macOS Bash 3.2 failed to parse $f"; fail=1; }
+            done < "$1"
+            exit "$fail"' _ "$shell_inventory" || parse_fail=1
           [ "$parse_fail" -eq 0 ] || { echo "::error::stock macOS Bash 3.2 parse sweep failed"; exit 1; }
 
           command -v npm >/dev/null || { echo "::error::npm is required to install tasks-axi"; exit 1; }
@@ -495,10 +522,12 @@ jobs:
           export PATH
           command -v tasks-axi >/dev/null || { echo "::error::tasks-axi is required for the stock Bash regressions"; exit 1; }
 
-          snapshot_output=$(/bin/bash tests/fm-fleet-snapshot-view.test.sh)
+          # The two long single-worker scripts take a pass of the runner's CPU pass pool like any heavy test burst
+          # (docs/cpu-pass-pool.md); the pass tool is stock-bash safe, and without python3 it runs the command unpooled.
+          snapshot_output=$(bin/fm-cpu-pass.sh run --label ci-stock-bash-fleet-snapshot-view -- /bin/bash tests/fm-fleet-snapshot-view.test.sh)
           printf '%s\n' "$snapshot_output"
 
-          bearings_output=$(/bin/bash tests/fm-bearings-snapshot.test.sh)
+          bearings_output=$(bin/fm-cpu-pass.sh run --label ci-stock-bash-bearings-snapshot -- /bin/bash tests/fm-bearings-snapshot.test.sh)
           printf '%s\n' "$bearings_output"
 
           # The full public-followup suite is not a stock-bash snapshot; run only

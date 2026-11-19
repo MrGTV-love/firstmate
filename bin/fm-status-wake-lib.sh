@@ -159,22 +159,22 @@ status_observed_signature_to() {  # <out-var> <file> [size] [ident]
   fi
   if [ -z "$ident" ]; then
     if [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
-      ident=$(_fm_open_decisions_file_ident "$f") || ident=identity-error
+      ident=$(_fm_open_decisions_file_ident "$f") || ident='identity-error'
     elif [ -n "${f_ident-}" ]; then
       # Same rule as _fm_open_decisions_file_ident: a birth time is part of the
       # identity only when the file system records one.
       birth=''
       [ "$f_epoch" = 0 ] || birth=$f_birth
       case "$f_ident$birth" in
-        *$'\t'*|*$'\n'*) ident=identity-error ;;
+        *$'\t'*|*$'\n'*) ident='identity-error' ;;
         *)
           if [ -n "$birth" ]; then ident="strong:$f_ident:$birth"; else ident="weak:$f_ident"; fi
           ;;
       esac
     else
-      ident=identity-error
+      ident='identity-error'
     fi
-    [ -n "$ident" ] || ident=identity-error
+    [ -n "$ident" ] || ident='identity-error'
   fi
   if [ -r "$f" ]; then access=readable; else access=unreadable; fi
   _status_hex_fields_to hex "$size" "$ident" "$path_state" "$link_target" "$access" "$kind" || return 1
