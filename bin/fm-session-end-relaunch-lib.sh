@@ -196,6 +196,11 @@ fm_session_end_refusal_reason() {  # <control-output>
   printf '%s' "$reason"
 }
 
+# The collision file a refusal names in the provisioner's own "manifest_path" form, empty when it names none.
+fm_session_end_refusal_obstruction() {  # <control-output>
+  printf '%s\n' "$1" | sed -n 's/.*"manifest_path": "\([^"]*\)".*/\1/p' | head -n 1
+}
+
 # A digest of the effective inputs the named refusal depends on. Neither the busy generation nor the raw HEAD is an
 # input: an unrelated commit or a new generation leaves the same obstruction in place, while a real change to the
 # obstruction (the uncovered paths, the tracked state of a scope path, a collision file, the manifest, the copy's dirt)
@@ -445,7 +450,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   reason="$reason: $(fm_session_end_first_line "$out")"
   cause=$(fm_session_end_refusal_reason "$out")
   if [ -n "$cause" ]; then
-    r_obstruction=$(printf '%s\n' "$out" | sed -n 's/.*"manifest_path": "\([^"]*\)".*/\1/p' | head -n 1)
+    r_obstruction=$(fm_session_end_refusal_obstruction "$out")
     r_fp=$(fm_session_end_cause_fingerprint "$state" "$id" "$cause" "$r_obstruction") || r_fp=
     if [ -n "$r_fp" ]; then
       printf '%s\t%s\t%s\t%s\t%s\n' "$gen" "$seq" "$cause" "$r_fp" "$r_obstruction" > "$refusal_file" || return 1

@@ -24,7 +24,7 @@ manifest = Path(os.environ["FM_TEST_SLOT_RECORD"])
 if a.check_manifest_only:
     # read-only like the real provisioner's pool preselection check: never writes, never counts as a run
     refused = manifest.exists()
-    print(json.dumps({"state": "BLOCKED", "reason": "manifest_exists"} if refused else {"state": "PASS"}))
+    print(json.dumps({"state": "BLOCKED", "reason": "manifest_exists", "manifest_path": str(manifest)} if refused else {"state": "PASS"}))
     raise SystemExit(2 if refused else 0)
 with open(os.environ["FM_TEST_PROVISION_CALLED"], "a", encoding="utf-8") as sentinel:
     sentinel.write(json.dumps(sys.argv[1:]) + "\n")

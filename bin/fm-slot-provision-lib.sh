@@ -402,7 +402,7 @@ fm_slot_export_drop() {
 # write that the record does not adopt (asked of the provisioner's own read-only --check-manifest-only when it has
 # one). A refusal that cannot be foreseen leaves the existing rollback to the prior record.
 fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned-path>...
-  local project=$1 copy=$2 id=$3 branch=$4 meta=$5 base path out reason script scope inside
+  local project=$1 copy=$2 id=$3 branch=$4 meta=$5 base path out reason script scope inside outside mpath
   local -a args=()
   shift 5
   if ! out=$(fm_slot_check_copy "$project" "$copy" 2>&1); then
@@ -425,17 +425,22 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
     }
   done
   out=$(git -C "$copy" diff --name-only --no-renames -z "$base" HEAD 2>/dev/null | tr '\0' '\n') || out=
+  outside=
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     inside=0
     for scope in "$@"; do
       case "$path" in "${scope%/}"|"${scope%/}"/*) inside=1 ;; esac
     done
-    [ "$inside" = 1 ] || {
-      echo "error: slot provisioning refused: scope_mismatch: $path changed outside the recorded scope" >&2
-      return 1
-    }
+    [ "$inside" = 1 ] || outside=${outside:+$outside, }$path
   done <<<"$out"
+  if [ -n "$outside" ]; then
+    # Every own out-of-scope path is named, and the drift report prints the same paths with their provenance, so the
+    # refusal leaves the operator exactly what the dirty_worktree refusal does.
+    echo "error: slot provisioning refused: scope_mismatch: $outside changed outside the recorded scope" >&2
+    fm_slot_drift_report "$copy" "$id" "$branch" "$base" "$@"
+    return 1
+  fi
   # The provisioner that would really run: the copy's own, or for a copy that predates it the verified primary
   # clone export (D7). Its read-only manifest check, when it has one, names a manifest collision before the stop.
   script=$copy/scripts/git-stability/provision_existing_slot.py
@@ -459,9 +464,18 @@ try:
     print(r["reason"] if r.get("state") == "BLOCKED" else "")
 except Exception:
     print("")' 2>/dev/null) || reason=
+  mpath=$(printf '%s' "$out" | python3 -c 'import json, sys
+try:
+    r = json.load(sys.stdin)
+    value = r.get("manifest_path")
+    print(value if isinstance(value, str) and "\"" not in value and "\n" not in value else "")
+except Exception:
+    print("")' 2>/dev/null) || mpath=
   case "$reason" in
     manifest_exists)
-      echo "error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it" >&2
+      # The collision file is named in the provisioner's own "manifest_path" form, so the session-end refusal memory can
+      # hash it and a cleared collision permits one new attempt.
+      echo "error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it${mpath:+; \"manifest_path\": \"$mpath\"}" >&2
       return 1 ;;
   esac
 }

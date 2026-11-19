@@ -94,10 +94,55 @@ test_foreseen_refusals_come_before_the_stop() {
   pass "fm-control relaunch: foreseeable provisioning refusals are named before the agent is stopped"
 }
 
+# F-r2-1 (amendment F7): a no-manifest task whose branch holds its own committed out-of-scope changes is refused before the
+# stop with every such path named and the drift report printed, exactly like the dirty_worktree refusal.
+test_committed_out_of_scope_refusal_names_every_path_and_the_report() {
+  local id=foresee-committed out rc before
+  make_noman_case foresee-committed "$id" 1 src
+  printf 'one\n' > "$ADOPT_DIR/wt/out1.txt"
+  printf 'two\n' > "$ADOPT_DIR/wt/out2.txt"
+  git -C "$ADOPT_DIR/wt" add out1.txt out2.txt
+  git -C "$ADOPT_DIR/wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'own work outside the scope'
+  before=$(cat "$ADOPT_META")
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  assert_refused_before_stop "$ADOPT_DIR" "$id" scope_mismatch 'committed own out-of-scope work on the provisioning route' "$out" "$rc" "$before"
+  assert_contains "$out" 'out1.txt' 'the refusal did not name the first out-of-scope path'
+  assert_contains "$out" 'out2.txt' 'the refusal did not name the second out-of-scope path'
+  assert_contains "$out" 'relaunch drift report for' 'the refusal did not print the drift report'
+  assert_contains "$out" 'drift: proven out1.txt' 'the drift report did not list the first path'
+  assert_contains "$out" 'drift: proven out2.txt' 'the drift report did not list the second path'
+  [ "$(cat "$ADOPT_DIR/wt/out2.txt")" = two ] || fail 'the refusal touched the own work'
+  pass "fm-control relaunch: a committed own out-of-scope change is refused before the stop with every path and the drift report"
+}
+
+# F-r2-2: the manifest_exists refusal names the collision file, so the session-end refusal memory hashes it and a cleared
+# collision changes the memory (one new attempt), while an unchanged one does not.
+test_manifest_exists_refusal_names_the_collision_the_memory_hashes() {
+  local id=foresee-collision out rc before obstruction fp1 fp2 fp3
+  make_noman_case foresee-collision "$id" 1 src
+  printf '{}' > "$ADOPT_MANIFEST"
+  before=$(cat "$ADOPT_META")
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  assert_refused_before_stop "$ADOPT_DIR" "$id" manifest_exists 'a collision manifest' "$out" "$rc" "$before"
+  assert_contains "$out" "\"manifest_path\": \"$ADOPT_MANIFEST\"" 'the refusal did not name the collision file'
+  fp_of() { FM_HOME="$ADOPT_DIR/home" bash -c '. "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_cause_fingerprint "$2" "$3" manifest_exists "$4"' _ "$ROOT" "$ADOPT_DIR/home/state" "$id" "$1"; }
+  obstruction=$(FM_HOME="$ADOPT_DIR/home" bash -c '. "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_refusal_obstruction "$2"' _ "$ROOT" "$out")
+  [ "$obstruction" = "$ADOPT_MANIFEST" ] || fail "the scan would not learn the collision file from the real refusal: '$obstruction'"
+  fp1=$(fp_of "$obstruction")
+  fp2=$(fp_of "$obstruction")
+  [ "$fp1" = "$fp2" ] || fail 'an unchanged collision changed the refusal memory'
+  rm -f "$ADOPT_MANIFEST"
+  fp3=$(fp_of "$obstruction")
+  [ "$fp1" != "$fp3" ] || fail 'a cleared collision did not change the refusal memory'
+  pass "fm-control relaunch: the manifest_exists refusal names the collision file and a cleared collision changes the refusal memory"
+}
+
 control_relaunch_test_cases=(
 test_old_copy_is_provisioned_by_the_primary_clone_then_adopted
 test_primary_provisioner_must_match_the_default_tip
 test_foreseen_refusals_come_before_the_stop
+test_committed_out_of_scope_refusal_names_every_path_and_the_report
+test_manifest_exists_refusal_names_the_collision_the_memory_hashes
 )
 
 control_relaunch_run "$@"

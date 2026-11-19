@@ -149,6 +149,7 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
    The task's own out-of-scope commits and uncommitted edits never block it, never change the recorded scope, and are printed as a labelled drift report by both `fm-control relaunch` and `fm-spawn --relaunch`.
    The residual: a relaunch does not check other tasks' claims, as the existing admissions never did, and Vernant's push-time `owned_paths` gate stays the control for what the task may push.
    A relaunch with no recorded manifest, a relocation to a replacement copy, and the recovery of a first provisioning that was refused keep the provisioning route, where `fm_slot_foresee_refusals` names a foreseeable refusal before the stop.
+   A committed own out-of-scope change is refused as `scope_mismatch` naming every such path with the drift report, and a `manifest_exists` refusal names the collision file, so a cleared collision permits one new automatic attempt.
    `bin/fm-session-end-relaunch-lib.sh` owns why the automatic session-end relaunch does not retry a refusal whose cause is unchanged.
 6. **Preserve runtime-bound status authority where supported.**
    The endpoint's runtime may bind pane status to one session identity; the launch owner preserves it only when that runtime records a reference the replacement adapter can consume, and otherwise launches the ordinary fresh session.
