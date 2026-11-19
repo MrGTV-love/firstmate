@@ -93,7 +93,11 @@ call_count() { wc -l < "$1/calls.log" | tr -d ' '; }
 run_spawn() { # <case-dir> <avail-kb|mode:NAME> <pane-path> <args...>
   local case_dir=$1 avail=$2 pane=$3 home="$1/home" mode=plenty kbs=
   shift 3
-  case "$avail" in mode:*) mode=${avail#mode:} ;; *) kbs=$avail ;; esac
+  case "$avail" in
+    mode:*:*) mode=${avail#mode:}; kbs=${mode#*:}; mode=${mode%%:*} ;;
+    mode:*) mode=${avail#mode:} ;;
+    *) kbs=$avail ;;
+  esac
   FM_ROOT_OVERRIDE='' FM_HOME="$home" \
     FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
     FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" FM_BACKEND=tmux \
@@ -338,6 +342,26 @@ test_the_stack_start_refuses_below_and_admits_above() {
   pass "the stack start defers at 19.999 GiB, runs at 20 GiB passing its exit status through, and admits an unreadable meter with a warning"
 }
 
+# A df that prints a parseable table and then exits nonzero is an unreadable
+# meter, not a measurement: the exit status is df's own, never the last pipe stage's.
+test_a_failing_df_with_parseable_output_admits_with_a_warning() {
+  local case_dir out rc kb_value n=0 id
+  for kb_value in "$(kb 1)" "$(kb 500)"; do
+    n=$((n + 1))
+    id="task-p$n"
+    case_dir=$(make_case "partial-$n" "$id")
+    rc=0
+    out=$(spawn_ship "$case_dir" "mode:failafter:$kb_value" "$id") || rc=$?
+    expect_code 0 "$rc" "a df that failed after printing $kb_value KiB free stopped the spawn: $out"
+    assert_contains "$out" "warning: disk free floor not enforced for spawn of task $id: cannot read the free space of $case_dir/project; admitted" \
+      "a failing df with $kb_value KiB free printed no warning"
+    assert_not_contains "$out" "deferred:" "a failing df with $kb_value KiB free was read as a measurement"
+    [ -n "$(guard_events "$case_dir" warn)" ] || fail "a failing df with $kb_value KiB free wrote no warn guard event"
+    [ -z "$(guard_events "$case_dir" deny)" ] || fail "a failing df with $kb_value KiB free wrote a deny guard event"
+  done
+  pass "a df that prints a valid line then exits 1 admits the spawn with one warning and a warn event, at low and plentiful values"
+}
+
 disk_floor_test_cases=(
 test_new_spawn_below_the_floor_defers_and_leaves_nothing
 test_the_floor_is_inclusive_and_rounds_down
@@ -348,6 +372,7 @@ test_a_missing_path_is_measured_on_its_nearest_existing_ancestor
 test_the_mem_guard_run_start_refuses_below_and_admits_above
 test_the_admit_command_defers_and_admits
 test_the_stack_start_refuses_below_and_admits_above
+test_a_failing_df_with_parseable_output_admits_with_a_warning
 )
 
 fm_test_run_cases "${disk_floor_test_cases[@]}" -- "$@"

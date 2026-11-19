@@ -71,7 +71,10 @@ fm_disk_floor_free_gib() { # <path>
       *) probe=. ;;
     esac
   done
-  line=$(df -Pk "$probe" 2>/dev/null | tail -n 1) || return 1
+  # df's own status decides: a pipe would report the last stage's status, so a df
+  # that printed a table and then failed would be read as a measurement.
+  line=$(df -Pk "$probe" 2>/dev/null) || return 1
+  line=${line##*$'\n'}
   # shellcheck disable=SC2086 # split the df columns on purpose.
   set -- $line
   [ "$#" -ge 4 ] || return 1
