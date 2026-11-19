@@ -6,10 +6,10 @@
 # This is firstmate's merge gate-action (the captain's merge authority applied
 # locally instead of via a GitHub PR). It is the one sanctioned exception to hard
 # rule #1 "never run state-changing git in projects/", and it is narrow: it only
-# runs for mode=local-only tasks, only after the captain's explicit word approves
-# (yolo does not approve it), and only as a clean fast-forward - it refuses a diverged branch
-# and tells you to have the crewmate rebase. See AGENTS.md prime directives,
-# project management, and task lifecycle.
+# runs for mode=local-only tasks, and only with the captain's recorded approval.
+# It does only a clean fast-forward, and it refuses a diverged branch.
+# In that case it tells you to have the crewmate rebase.
+# See AGENTS.md section 7 for merge authority, prime directives, project management, and task lifecycle.
 # The task's existing per-task control lock serializes the captain-hold check
 # through that fast-forward. A still-held or unreadable row refuses before the
 # merge, so a captain approval must be recorded as an `answer --release` before

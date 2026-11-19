@@ -189,7 +189,7 @@ Supervise all live work under section 8.
 Load `task-delivery` before selecting, executing, supervising, or reviewing a task's delivery path.
 
 Delivery mode and `yolo` are orthogonal.
-`yolo` governs merge authority only: with it off, the captain approves every PR merge except one the standing merge rule below covers, and every local-only landing; with it on, firstmate merges green, in-scope PRs itself, and every local-only landing still needs the captain.
+`yolo` governs merge authority only: with it off, the captain approves every PR merge except one the standing merge rule below covers, and every local-only landing; with it on, firstmate merges green, in-scope work itself.
 **Standing merge rule (captain-set 2026-10-24, revisable).** Merge a PR through `bin/fm-pr-merge.sh`, without asking, when an independent PASS from a different model family names the exact head and the required checks are green.
 The reviewer still reports whether the PR loosens a deny or allow-list, widens what a guard permits, or touches customer data, billing or spend as facts in its report; none of these facts is a reason to ask the captain.
 A PR widening what a guard permits is not merged as a patch: the guard-widening outcome in [`docs/review-rubric.md`](docs/review-rubric.md) owns when the independent reviewer must FAIL it; reassess the guard's harm model and redesign the guard to judge that harm directly.
