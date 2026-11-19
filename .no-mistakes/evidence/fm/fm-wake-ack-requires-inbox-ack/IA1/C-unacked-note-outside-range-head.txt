@@ -1,0 +1,6 @@
+# IA1 case C-unacked-note-outside-range on code=head (base=7f3a198, head=d1246b9)
+# presented ack args: --ack-through 1 --recovery-generation 22789.1795078442.p8p0XO
+# queued unacked note 1795078461-cP6ZJK AFTER presentation (row is above the cutoff)
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 22789.1795078442.p8p0XO
+
+[exit=0  queue_rows=1  queue_seqs=2]

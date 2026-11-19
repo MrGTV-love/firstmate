@@ -1,0 +1,8 @@
+# IA1 case F-repeated-ack on code=base (base=7f3a198, head=d1246b9)
+# presented ack args: --ack-through 1 --recovery-generation 97296.1795078392.a14vvt
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 97296.1795078392.a14vvt
+
+[exit=0  queue_rows=0  queue_seqs=]
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 97296.1795078392.a14vvt
+
+[exit=0  queue_rows=0  queue_seqs=]

@@ -1,0 +1,17 @@
+# IA1 case B-two-unacked-notes on code=head (base=7f3a198, head=d1246b9)
+# queued notes 1795078426-kNuzq4 and 1795078427-H6rhDh
+# presented ack args: --ack-through 2 --recovery-generation 87412.1795078427.kOBkUq
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 87412.1795078427.kOBkUq
+error: captain inbox notes presented in this range are not acked; acknowledgement refused
+  1795078426-kNuzq4 - read it, then run bin/fm-inbox.sh drain --ack 1795078426-kNuzq4
+  1795078427-H6rhDh - read it, then run bin/fm-inbox.sh drain --ack 1795078427-H6rhDh
+[exit=1  queue_rows=2  queue_seqs=1 2]
+# ran: drain --ack 1795078426-kNuzq4
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 87412.1795078427.kOBkUq
+error: captain inbox notes presented in this range are not acked; acknowledgement refused
+  1795078427-H6rhDh - read it, then run bin/fm-inbox.sh drain --ack 1795078427-H6rhDh
+[exit=1  queue_rows=2  queue_seqs=1 2]
+# ran: drain --ack 1795078427-H6rhDh
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 87412.1795078427.kOBkUq
+
+[exit=0  queue_rows=0  queue_seqs=]

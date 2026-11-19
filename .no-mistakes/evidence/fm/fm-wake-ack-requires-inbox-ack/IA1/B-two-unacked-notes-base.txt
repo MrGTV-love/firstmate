@@ -1,0 +1,14 @@
+# IA1 case B-two-unacked-notes on code=base (base=7f3a198, head=d1246b9)
+# queued notes 1795078317-WJcO7o and 1795078317-4aPnLv
+# presented ack args: --ack-through 2 --recovery-generation 98729.1795078317.rhTEmu
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 98729.1795078317.rhTEmu
+
+[exit=0  queue_rows=0  queue_seqs=]
+# ran: drain --ack 1795078317-WJcO7o
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 98729.1795078317.rhTEmu
+
+[exit=0  queue_rows=0  queue_seqs=]
+# ran: drain --ack 1795078317-4aPnLv
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 98729.1795078317.rhTEmu
+
+[exit=0  queue_rows=0  queue_seqs=]

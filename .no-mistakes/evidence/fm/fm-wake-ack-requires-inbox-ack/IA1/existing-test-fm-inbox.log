@@ -1,0 +1,35 @@
+ok - plain note, list, and wake stay on the historical human path
+ok - plain note keeps exit 1 for a saved-but-unannounced failure
+ok - the same request id returns the original note as a distinguishable replay
+ok - a crash between recording the request id and publishing the note reuses the original id
+ok - saved-but-unannounced notes are repairable without creating a second note
+ok - repair and replay do not wake firstmate for an already-acknowledged note
+ok - receipts JSON is bounded by fixed bounds and discloses what it omitted
+ok - notes that predate the announcement marker are unknown, not re-announced
+ok - the reply channel is durable and its cursor is a strict order
+ok - the reply cursor never goes backwards when the sequence counter is lost
+ok - a reply without a valid sequence is reported as malformed
+ok - a non-UTF-8 note does not break the receipts view
+ok - the drain refuses to ack an unacked presented note and passes once it is acked
+ok - every unacked note in the range is named, and an acked note is not
+ok - an unacked note outside the acknowledged range does not block
+ok - a range with no inbox note rows acks exactly as before
+ok - an absent inbox fails closed, then an acked note lets the ack pass
+ok - a wake naming an unknown note refuses until its ack is recorded; a handled note does not
+ok - an unreadable inbox fails closed and the wake rows stay
+ok - a failed queue scan refuses the ack and keeps the rows; an empty range still acks
+ok - keep mode is the away daemon's alone: it keeps note rows and retires the rest, and an ordinary actor refuses with the ids
+ok - a refused ack does not change main's claim; after the note is acked the same ack consumes the whole range
+ok - a note pending again at the second check refuses the ack without changing main's claim
+ok - an acknowledged identity is terminal for replay, and the final pending check runs under the consuming lock
+ok - a row claimed while the lock is released is not consumed unchecked: checked row removed, note kept, receipt consistent
+ok - a row set that vanishes while the lock is released is an explicit failure
+ok - scratch rotation keeps a live ack's row set and removes a dead one's
+ok - a replay paused inside the lock keeps the invariant in whichever order the acks follow it
+ok - a replay paused before the lock cannot publish an identity acked meanwhile
+ok - a replay of an acknowledged identity reports acknowledgement, and a path only when a record exists
+ok - readiness says unknown (or not-receivable) instead of inferring liveness from a lock
+ok - empty bodies and unsafe request ids are refused
+ok - a note body that opens with a double dash is queued as text
+ok - drain --ack still moves the note to handled
+exit=0

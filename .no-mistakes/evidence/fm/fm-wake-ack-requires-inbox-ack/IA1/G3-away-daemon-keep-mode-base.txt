@@ -1,0 +1,5 @@
+# IA1 case G3-away-daemon-keep-mode on code=base (base=7f3a198, head=d1246b9)
+# queued note 1795078404-efUVCD; presented ack args: --ack-through 1 --recovery-generation 30288.1795078404.xp3Bop; created state/.afk
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 30288.1795078404.xp3Bop --keep-unacked-notes
+wake drain: unexpected acknowledgement arguments
+[exit=2  queue_rows=1  queue_seqs=1]

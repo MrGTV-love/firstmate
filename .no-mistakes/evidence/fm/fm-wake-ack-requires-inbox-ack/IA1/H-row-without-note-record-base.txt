@@ -1,0 +1,10 @@
+# IA1 case H-row-without-note-record on code=base (base=7f3a198, head=d1246b9)
+# queued note 1795078406-73ygsF, then deleted its note file (no record left)
+# presented ack args: --ack-through 1 --recovery-generation 36684.1795078406.kaNsZ1
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36684.1795078406.kaNsZ1
+
+[exit=0  queue_rows=0  queue_seqs=]
+# ran: drain --ack 1795078406-73ygsF (exit=0)
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36684.1795078406.kaNsZ1
+
+[exit=0  queue_rows=0  queue_seqs=]

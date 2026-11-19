@@ -1,0 +1,6 @@
+# IA1 case E-already-acked-note on code=head (base=7f3a198, head=d1246b9)
+# acked 1795078513-jSZS7j before presentation
+# presented ack args: --ack-through 1 --recovery-generation 37950.1795078519.mr7vnp
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 37950.1795078519.mr7vnp
+
+[exit=0  queue_rows=0  queue_seqs=]

@@ -1,0 +1,11 @@
+# IA1 case H-row-without-note-record on code=head (base=7f3a198, head=d1246b9)
+# queued note 1795078574-ch9sJX, then deleted its note file (no record left)
+# presented ack args: --ack-through 1 --recovery-generation 37512.1795078575.347PWL
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 37512.1795078575.347PWL
+error: captain inbox notes presented in this range are not acked; acknowledgement refused
+  1795078574-ch9sJX - its note state cannot be established; make the inbox readable, or run bin/fm-inbox.sh drain --ack 1795078574-ch9sJX
+[exit=1  queue_rows=1  queue_seqs=1]
+# ran: drain --ack 1795078574-ch9sJX (exit=0)
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 37512.1795078575.347PWL
+
+[exit=0  queue_rows=0  queue_seqs=]

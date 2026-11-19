@@ -1,0 +1,5 @@
+# IA1 case G3-away-daemon-keep-mode on code=head (base=7f3a198, head=d1246b9)
+# queued note 1795078568-6RxdCO; presented ack args: --ack-through 1 --recovery-generation 18179.1795078569.IFQptm; created state/.afk
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 18179.1795078569.IFQptm --keep-unacked-notes
+wake drain: kept queued row(s) 1: their captain inbox note is not acked, so the reader that opens the note must ack it
+[exit=0  queue_rows=1  queue_seqs=1]

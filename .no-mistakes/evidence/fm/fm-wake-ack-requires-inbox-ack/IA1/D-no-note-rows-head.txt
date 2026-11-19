@@ -1,0 +1,5 @@
+# IA1 case D-no-note-rows on code=head (base=7f3a198, head=d1246b9)
+# presented ack args: --ack-through 1 --recovery-generation 87341.1795078468.HOpgaL (signal row only)
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 87341.1795078468.HOpgaL
+
+[exit=0  queue_rows=0  queue_seqs=]

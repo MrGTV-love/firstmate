@@ -1,0 +1,6 @@
+# IA1 case G1-keep-flag-ordinary-actor on code=head (base=7f3a198, head=d1246b9)
+# queued note 1795078555-QUmT9f; presented ack args: --ack-through 1 --recovery-generation 79345.1795078556.sTDmmd
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 79345.1795078556.sTDmmd --keep-unacked-notes
+error: captain inbox notes presented in this range are not acked; acknowledgement refused
+  1795078555-QUmT9f - read it, then run bin/fm-inbox.sh drain --ack 1795078555-QUmT9f
+[exit=1  queue_rows=1  queue_seqs=1]

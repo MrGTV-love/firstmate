@@ -1,0 +1,10 @@
+# IA1 case A-one-unacked-note on code=base (base=7f3a198, head=d1246b9)
+# queued captain inbox note 1795078310-twYTz9
+# presented ack args: --ack-through 1 --recovery-generation 82736.1795078311.u9GpDD
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 82736.1795078311.u9GpDD
+
+[exit=0  queue_rows=0  queue_seqs=]
+# ran: bin/fm-inbox.sh drain --ack 1795078310-twYTz9 (exit=0)
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 82736.1795078311.u9GpDD
+
+[exit=0  queue_rows=0  queue_seqs=]
