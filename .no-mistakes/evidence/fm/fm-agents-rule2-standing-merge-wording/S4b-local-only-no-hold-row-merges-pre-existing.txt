@@ -1,0 +1,4 @@
+# S4b real output: yolo on, NO captain hold row, local-only task t-free (code path unchanged by this diff)
+$ bin/fm-merge-local.sh t-free
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+merged fm/t-free into local main (f99eece -> 6227e97) in /Users/charlesabrooker/tmp/fm-lab.di0GN0/projects/fixture-proj

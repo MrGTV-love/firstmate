@@ -1,0 +1,4 @@
+# S5: bin/fm-contributions.sh --help (header text shows the new guarded-merge line)
+$ bin/fm-contributions.sh --help
+34:Any PR merge goes through the guarded merge path (bin/fm-pr-merge.sh).
+help-exit=0

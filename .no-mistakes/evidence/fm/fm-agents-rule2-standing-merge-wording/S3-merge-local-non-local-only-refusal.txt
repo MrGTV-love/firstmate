@@ -1,0 +1,5 @@
+# S3 real output: bin/fm-merge-local.sh on a mode=no-mistakes task in lab home
+$ bin/fm-merge-local.sh t-pr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task t-pr is mode=no-mistakes, not local-only; merge PR tasks with bin/fm-pr-merge.sh <id> <PR url> (AGENTS.md section 7 owns who may merge without asking)
+exit=1

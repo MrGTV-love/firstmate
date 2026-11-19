@@ -1,0 +1,6 @@
+# S4a real output: yolo on (fixture-proj +yolo), captain hold OPEN on local-only task t-local
+$ bin/fm-captain-hold.sh open t-local --distinguish-absent   -> exit 0 (held)
+$ bin/fm-merge-local.sh t-local
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task t-local is still held for the captain; release it before merging
+# main stayed at f99eece before and after this refusal (checked in the run; the ship branch was not merged)
