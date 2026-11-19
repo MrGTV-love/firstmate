@@ -684,6 +684,32 @@ mv "$home/state/inbox.away" "$home/state/inbox"
 assert_equals "1" "$(queue_rows "$home")" "an absent inbox keeps the note's row in keep mode"
 pass "keep mode is the away daemon's alone: it keeps note rows and retires the rest, and an ordinary actor refuses with the ids"
 
+# A refused ack must not change main's claim. Rows 1-3 are presented and claimed;
+# row 4 is a pending captain inbox note and row 5 arrives unclaimed. The refused
+# ack of 1-5 leaves the claim file byte-identical, so rows 4 and 5 are not main-owned;
+# once the note is acked the same ack consumes all five rows.
+home=$(make_drain_home ack-refusal-keeps-claim)
+append_keyed_signal "$home" taska
+append_keyed_signal "$home" taskb
+append_keyed_signal "$home" taskc
+ack_args=$(present "$home")
+generation=$(printf '%s' "$ack_args" | sed 's/.*--recovery-generation //')
+note_id=$(queue_note "$home" "note in a range main is refusing")
+append_keyed_signal "$home" taskd
+assert_equals "1 2 3 4 5" "$(awk -F '\t' 'NF >= 5 { printf "%s%s", (n++ ? " " : ""), $2 }' "$home/state/.wake-queue")" "the range holds rows 1-5"
+claim_before=$(cat "$home/state/.main-eligible-rows")
+set +e
+refusal=$(run_drain "$home" --ack-through 5 --recovery-generation "$generation" 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "the ack of a range holding a pending note is refused"
+assert_contains "$refusal" "$note_id" "the refusal names the pending note"
+assert_equals "$claim_before" "$(cat "$home/state/.main-eligible-rows")" "a refused ack leaves main's claim unchanged, so rows 4 and 5 stay unowned"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+run_drain "$home" --ack-through 5 --recovery-generation "$generation" >/dev/null 2>&1 || fail "the ack must pass once the note is acked"
+assert_equals "0" "$(queue_rows "$home")" "the passing ack consumes rows 4 and 5 with the rest of the range"
+pass "a refused ack does not change main's claim; after the note is acked the same ack consumes the whole range"
+
 # A request-id replay of an identity that was acked with no note record must not
 # publish a new pending note, even inside the ack's unlocked receipt window, and
 # the ack's final decision is made under the lock that consumes. The barrier holds

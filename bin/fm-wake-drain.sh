@@ -14,10 +14,13 @@
 # row this actor would consume at or below the cutoff has a note not demonstrably acked;
 # bin/fm-inbox.sh pending owns that record (an absent or unreadable inbox, an unreadable queue
 # and an id with no record all refuse too), and bin/fm-inbox.sh drain --ack <id> clears it.
-# No actor is exempt. Only the away supervise daemon (FM_WAKE_ACK_AWAY_DAEMON=1 while state/.afk
-# exists), which cannot read notes, may add --keep-unacked-notes: it retires every other row but
-# leaves each such row queued, and never acks a note, so the reader that opens the whole note acks
-# it and retires the row. Any other actor passing it gets the ordinary refusal naming the ids.
+# One bounded exemption, recorded as the wake-ack-unacked-inbox-note guard reassessment in
+# docs/guards/registry.json: only the away supervise daemon (FM_WAKE_ACK_AWAY_DAEMON=1 while
+# state/.afk exists), which cannot read notes, may add --keep-unacked-notes.
+# That mode keeps each held note row queued and retires every other row.
+# It never acks a note, so the reader that opens the whole note acks it and retires the row.
+# Its harm model: no captain inbox note wake is ever consumed, so no note is lost or retired unread.
+# Any other actor passing it gets the ordinary refusal naming the ids.
 # The note check runs again under the lock that consumes the rows, after the receipts, so a note
 # published while that lock was released is never consumed unread.
 # The rows checked are the rows consumed: both come from one snapshot of the actor's claim
@@ -206,10 +209,11 @@ write_rows_file_locked() { # <target> <source>
   _fm_atomic_replace "$source" "$target"
 }
 
-# claim_main_rows_locked [<cutoff>]: claim every unreserved queued row for main,
-# or with a cutoff only the unreserved rows at or below it. Rows main already
-# owns stay owned either way.
-claim_main_rows_locked() {
+# main_claim_candidate_locked [<cutoff>]: build in DRAIN_TMP the rows main would
+# claim: every unreserved queued row, or with a cutoff only the unreserved rows at
+# or below it, plus the rows main already owns. Writes nothing; the claim is
+# committed by main_claim_commit_locked.
+main_claim_candidate_locked() {
   DRAIN_TMP=$(mktemp "$STATE/.main-eligible-rows.tmp.XXXXXX") || return 1
   awk -F '\t' -v branch="$ELIGIBLE_ROWS_FILE" -v main="$MAIN_ROWS_FILE" -v cutoff="${1:-}" '
     BEGIN {
@@ -222,8 +226,20 @@ claim_main_rows_locked() {
     }
     END { for (seq in owned) if (seq in present) print seq }
   ' "$FM_WAKE_QUEUE" | LC_ALL=C sort -n > "$DRAIN_TMP" || return 1
+}
+
+# main_claim_commit_locked: make the candidate built by main_claim_candidate_locked
+# main's claim.
+main_claim_commit_locked() {
   write_rows_file_locked "$MAIN_ROWS_FILE" "$DRAIN_TMP" || return 1
   DRAIN_TMP=
+}
+
+# claim_main_rows_locked [<cutoff>]: claim every unreserved queued row for main,
+# or with a cutoff only the unreserved rows at or below it. Rows main already
+# owns stay owned either way.
+claim_main_rows_locked() {
+  main_claim_candidate_locked "$@" && main_claim_commit_locked
 }
 
 # Only the rows of <consumed-file> leave the claim: a row claimed after the
@@ -1033,7 +1049,7 @@ if [ -n "$ACK_THROUGH" ]; then
     # stays unowned for whichever actor presents it next; claiming it here
     # would hand every later away-session wake back to main. A live branch
     # grant remains excluded by claim_main_rows_locked.
-    claim_main_rows_locked "$ACK_THROUGH" || exit 1
+    main_claim_candidate_locked "$ACK_THROUGH" || exit 1
   fi
   # Fix the set this acknowledgement consumes now, under this lock: the inbox
   # note check, the receipts below and the consumption all use this one set, so
@@ -1043,12 +1059,15 @@ if [ -n "$ACK_THROUGH" ]; then
   if [ "$ACTOR" = branch ]; then
     ack_rows_source=$ELIGIBLE_ROWS_FILE
   else
-    ack_rows_source=$MAIN_ROWS_FILE
+    ack_rows_source=$DRAIN_TMP
   fi
   if [ -e "$ack_rows_source" ] || [ -L "$ack_rows_source" ]; then
     awk -v cutoff="$ACK_THROUGH" '$1 ~ /^[0-9]+$/ && $1 + 0 <= cutoff + 0 { print $1 }' "$ack_rows_source" > "$ACK_ROWS_TMP" || exit 1
   fi
   gate_unacked_inbox_notes_locked "$ACK_ROWS_TMP" "$ACK_THROUGH" || exit 1
+  if [ "$ACTOR" = main ]; then
+    main_claim_commit_locked || exit 1
+  fi
   if [ "$ACTOR" = branch ]; then
     # An away-posture grant can name check-kind rows - the attended
     # partition's check/decision exclusions lift under the away record
