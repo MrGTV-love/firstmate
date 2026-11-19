@@ -80,8 +80,11 @@ and no removed guard is silently resurrected.
 
 ## Guard procedure
 
-At scoping, declare each new, changed, or retired guard by decision point and exact stable ID, marking missing registrations, and update the declaration with the diff.
+At scoping, Main, which fills the task brief before dispatch, declares each new, changed, or retired guard by decision point and exact stable ID in that brief.
+A decision point is a code line that decides a guard's outcome; the registry's `site:` entries name the registered ones, and a decision point with no registration is a missing registration that the [review checklist](review-rubric.md#guard-changes) reports.
+The worker updates that declaration with the final diff.
 This covers behavior changes even with no registry edit or matching entry, as well as active ID additions or removals and material changes to a guard's contract or test evidence.
+Here the contract is the guard's [Fields](#fields) entry, and a material change is any change other than the bookkeeping below.
 Bookkeeping alone, such as recording a `retirement_decision`, retains its existing obligations without triggering this procedure.
 
 1. Name the harm and the closest legitimate action the guard could mistake for it.
@@ -92,9 +95,9 @@ Bookkeeping alone, such as recording a `retirement_decision`, retains its existi
    For a warning-only guard, prove the warning's intended effect instead of claiming a deny.
    Use an isolated control or equally discriminating downstream evidence to attribute those effects to the named guard rather than an unrelated check; a diagnostic or event alone is not proof.
    After a representative refusal, run the documented remedy and show the same work resumes or reaches a safe disposition, or explain why recovery cannot apply.
-4. Record the exact final comparison base and head commit IDs, the tree actually tested, check inputs and validator revision, and the observed results and limits in the delivery evidence.
+4. The worker records the exact final comparison base and head commit IDs, the tree actually tested, check inputs and validator revision, and the observed results and limits in the delivery evidence.
    If the tested tree differs from the final head tree, show how it was derived and why the checked inputs and behavior still cover the change.
-   Include passing results from the existing [registry and reference checks](#registry), counts and the base-specific [ratchet](#ratchet), reusing matching trusted CI results or trusted equivalent checks in authorized isolation.
+   Include passing results from the existing [registry and reference checks](#registry), counts and the base-specific [ratchet](#ratchet), either by running them or by reusing proven matching CI results of them, which supply these structural checks only.
    Independently qualify a changed validator before relying on its result.
    These structural checks do not prove the behavioral cases ran or replace the [independent landing review](review-rubric.md#guard-changes).
 

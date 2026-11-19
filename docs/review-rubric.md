@@ -1,7 +1,8 @@
 # Shared review rubric
 
 This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
-It does not change the selected delivery path, review authority, or merge policy.
+It does not change the selected delivery path, review authority, or merge policy, except that the scoped Firstmate guard-change prerequisite under [Guard changes](#guard-changes) applies.
+That prerequisite adds no tooling, and it leaves merge approver and author-family policy, delivery machinery, and programmatically enforced checks unchanged.
 
 - Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
 - Grade every DoD mandatory item by its id as pass, fail, or unresolved, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
@@ -30,12 +31,12 @@ It does not change the selected delivery path, review authority, or merge policy
 Check for changes within the [guard procedure](guard-spec.md#guard-procedure) even if the declaration or registry diff is absent.
 For those changes, a nonauthor meeting the existing review lane's independence rules reads the complete, unfiltered final base-to-head diff and reconciles the decision points and exact IDs against the base and final registry and retirement ledger.
 Report an unmatched decision point as missing registration; deleting the row for a still-live guard is not a retirement.
-Assess the executed outcomes against the guard procedure and retain the reviewer identity, trusted policy revision, exact base and head, full diff or its digest and scope, evidence references, and verdict.
-Reuse an existing read only when its retained inputs and report establish this coverage, including which trusted configuration and reviewer build produced a pipeline read.
-A read can precede Test or CI, but complete the verdict against matching executed evidence before landing and refresh the read if the comparison base or head changes.
+Assess the executed outcomes against the guard procedure and retain the reviewer identity, trusted policy revision, exact base and head, scope, checked tree, full diff or its digest, evidence references, and verdict.
+A complete diff read from earlier may be reused only for the identical final base, head and scope, and only with independently established provenance from its retained inputs and report, including the trusted configuration and reviewer build that produced it.
+Landing needs a matching recorded final PASS that assesses the executed behavior and the checked tree for that exact base and head; a pre-check read, a green check, or a verdict for a wrong base or head is insufficient.
 
 Apply this checklist prospectively from the trusted default branch.
-Independently read the full, exact first-adoption diff under the existing trusted rubric and separately approved adoption criteria, not the proposed procedure.
+Independently read the full, exact first-adoption diff under the captured trusted rubric and task plan, not the submitted procedure.
 
 ## Review outcomes
 
