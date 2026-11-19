@@ -1021,23 +1021,95 @@ test_survivor_doorbells_stay_bounded_until_acknowledged() {
   pass "inbox: survivor replay announces each bounded carrier until its record is acknowledged"
 }
 
+# The plain write that concurrent writers use also starts a fixed number of
+# processes however many records the inbox holds: no per-record launch, so a
+# long history cannot lengthen the time a writer holds the lock for the others.
+test_plain_write_launches_do_not_grow_with_handled_records() {
+  local dir small large
+  dir="$TMP_ROOT/plain-scale"; mkdir -p "$dir/s50" "$dir/s1600"
+  seed_handled_records "$dir/s50/state" t1 50
+  seed_handled_records "$dir/s1600/state" t1 1600
+  for size in 50 1600; do
+    local shims
+    shims=$(make_launch_counter "$dir/s$size")
+    PATH="$shims:$PATH" FM_STATE_OVERRIDE="$dir/s$size/state" bash -c '
+      . "$1"
+      fm_task_inbox_write "$2" t1 "brand new steer text" >/dev/null
+    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$dir/s$size/state" || fail "plain write failed while counting launches at $size records"
+  done
+  small=$(wc -l < "$dir/s50/launches" | tr -d ' ')
+  large=$(wc -l < "$dir/s1600/launches" | tr -d ' ')
+  [ "$((large - small))" -le 4 ] \
+    || fail "plain write launches grew with the handled records: $small at 50 records, $large at 1600"
+  pass "inbox: the plain write launches the same processes at 50 and 1600 handled records ($small vs $large)"
+}
+
+# Six writers contend for the lock. Their lock wait is set far beyond any host
+# load (600 s), so a slow host cannot make one of them give up: what is under
+# test is that the sequence lock serializes them, every writer succeeds, the six
+# records take the numbers 001 to 006 exactly once, none is clobbered or lost,
+# and no lock is left. The production 5 s wait and what happens when it runs
+# out are pinned by test_lock_wait_expiry_is_bounded_and_loses_nothing below.
 test_concurrent_writers_never_clobber() {
-  local state i pids=() count
-  state="$TMP_ROOT/race/state"; mkdir -p "$state"
+  local state i pids=() count inbox
+  state="$TMP_ROOT/race/state"; inbox="$state/t1.inbox"; mkdir -p "$state"
   for i in 1 2 3 4 5 6; do
-    inbox_lib "$state" fm_task_inbox_write "$state" t1 "steer number $i" >/dev/null &
+    FM_TASK_INBOX_LOCK_WAIT_SECS=600 inbox_lib "$state" fm_task_inbox_write "$state" t1 "steer number $i" >/dev/null &
     pids+=($!)
   done
   for i in "${pids[@]}"; do
-    wait "$i" || fail "a concurrent inbox write failed"
+    wait "$i" || fail "a concurrent inbox write failed even with a 600 s lock wait"
   done
-  count=$(find "$state/t1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
-  [ "$count" = 6 ] || fail "6 concurrent writes should yield 6 records, got $count:"$'\n'"$(ls "$state/t1.inbox")"
+  count=$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
+  [ "$count" = 6 ] || fail "6 concurrent writes should yield 6 records, got $count:"$'\n'"$(ls "$inbox")"
   for i in 1 2 3 4 5 6; do
-    grep -rqF "steer number $i" "$state/t1.inbox" \
+    [ -f "$inbox/00$i.msg" ] || fail "sequence 00$i was not used exactly once: $(ls -A "$inbox")"
+    grep -rqF "steer number $i" "$inbox" \
       || fail "steer number $i was lost in the concurrent write race"
   done
+  [ ! -e "$inbox/.seq.lock" ] && [ ! -L "$inbox/.seq.lock" ] || fail "the race left the inbox lock held"
   pass "inbox: concurrent writers serialize on the sequence lock and lose nothing"
+}
+
+# The production lock wait (5 s, no override) run out on purpose: a helper process
+# holds the sequence lock, a writer waits for it, and when the wait is up the
+# writer exits 1, writes nothing, leaves no temp file or work directory, does
+# not take the lock from its live owner, and leaves the existing record
+# untouched. Once the holder is gone the next write lands as the next sequence.
+# The outcome does not depend on host load: the holder is alive for the whole
+# wait, and only a lower bound on the elapsed time is asserted.
+test_lock_wait_expiry_is_bounded_and_loses_nothing() {
+  local fn state inbox holder started t0 elapsed rc before next
+  for fn in fm_task_inbox_write fm_task_inbox_write_idempotent; do
+    state="$TMP_ROOT/expiry-$fn/state"; inbox="$state/t1.inbox"; mkdir -p "$state"
+    inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "$fn: seed failed"
+    before=$(cat "$inbox/001.msg")
+    started="$TMP_ROOT/expiry-$fn/held"
+    FM_STATE_OVERRIDE="$state" HELD="$started" bash -c '
+      . "$1"
+      fm_task_inbox_lock_acquire "$2/t1.inbox/.seq.lock" || exit 1
+      echo held > "$HELD"
+      sleep 600
+    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" >/dev/null 2>&1 &
+    holder=$!
+    for _ in $(seq 1 150); do [ -s "$started" ] && break; sleep 0.1; done
+    [ -s "$started" ] || { kill "$holder" 2>/dev/null; fail "$fn: the helper never took the lock"; }
+    t0=$(date +%s); rc=0
+    inbox_lib "$state" "$fn" "$state" t1 'steer two' >/dev/null 2>&1 || rc=$?
+    elapsed=$(( $(date +%s) - t0 ))
+    kill -0 "$holder" 2>/dev/null || fail "$fn: the lock holder died during the wait"
+    [ -L "$inbox/.seq.lock" ] || [ -d "$inbox/.seq.lock" ] || { kill "$holder" 2>/dev/null; fail "$fn: the live holder's lock was taken or removed"; }
+    kill "$holder" 2>/dev/null || true; wait "$holder" 2>/dev/null || true
+    [ "$rc" = 1 ] || fail "$fn: a write that waited out the lock should exit 1, got $rc"
+    [ "$elapsed" -ge 4 ] || fail "$fn: the write gave up after $elapsed s, before the 5 s production wait"
+    [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 1 ] || fail "$fn: a record was written without the lock: $(ls -A "$inbox")"
+    [ "$(cat "$inbox/001.msg")" = "$before" ] || fail "$fn: the existing record was changed"
+    [ -z "$(find "$inbox" -mindepth 1 \( -name '.work.*' -o -name '.staging.*' -o -name '.dedup.*' -o -name '.lock-probe*' \))" ] \
+      || fail "$fn: the expired write left a temp file or work directory: $(ls -A "$inbox")"
+    next=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 'steer three') || fail "$fn: the write after the holder is gone failed"
+    [ "$next" = "$inbox/002.msg" ] || fail "$fn: the write after the holder is gone did not land as 002: $next"
+  done
+  pass "inbox: a write that waits out the 5 s lock exits 1, writes and changes nothing, and the next write lands"
 }
 
 test_writer_retries_after_a_vanished_lock_collision() {
@@ -1850,6 +1922,8 @@ test_next_seq_ignores_gaps_and_non_record_names
 test_handled_mv_dedups_by_sequence
 test_survivor_doorbells_stay_bounded_until_acknowledged
 test_concurrent_writers_never_clobber
+test_lock_wait_expiry_is_bounded_and_loses_nothing
+test_plain_write_launches_do_not_grow_with_handled_records
 test_writer_retries_after_a_vanished_lock_collision
 test_ladder_writes_ignore_vanished_inbox
 test_fire_and_forget_records_never_enter_the_ladder
