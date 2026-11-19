@@ -2130,15 +2130,29 @@ SH
 }
 
 # make_recovered_lease <slot>...: leave tracked work in each slot, then truncate the pool's state file and let the real
-# treehouse rebuild it. A slot that is idle, clean and landed is freed by that rebuild, so only a slot with tracked work
-# keeps the recovered lease; each is checked in the state before the spawn runs.
+# treehouse rebuild it, which gives every slot of the pool the recovered lease. Only the named slots keep it: an older
+# Treehouse build frees an idle, clean and landed slot in that rebuild on its own; a build with persistent recovered leases
+# (`treehouse capabilities`: "persistent_recovered_leases":true, v3.1.7-fm.611a088 for one) keeps it on every slot until the
+# slot is returned by name, so each OTHER slot of the case (REAL_SLOTS) that still carries it is returned by name here, with
+# `treehouse return`, Treehouse's own remedy, in this private pool. The named slots are checked in the state before the spawn
+# runs, and each other slot is checked to be free.
 make_recovered_lease() {
-  local state slot holder
+  local state slot holder other named
   state=$(pool_state_file "$1")
   for slot in "$@"; do printf 'work in progress\n' >> "$slot/README.md"; done
   head -c 150 "$state" > "$state.cut" || fail "the pool state could not be truncated"
   mv "$state.cut" "$state" || fail "the truncated pool state could not be put in place"
   real_th status >/dev/null 2>&1
+  for other in "${REAL_SLOTS[@]}"; do
+    named=0
+    for slot in "$@"; do [ "$slot" != "$other" ] || named=1; done
+    [ "$named" = 0 ] || continue
+    holder=$(state_entry "$other" | jq -r '.lease_holder // empty')
+    case "$holder" in
+      recovered:*) real_th return "$other" >/dev/null 2>&1 || fail "the real treehouse did not return $other by name" ;;
+    esac
+    [ "$(state_entry "$other" | jq -r '.leased // false')" = false ] || fail "slot $other is still leased after the rebuild"
+  done
   for slot in "$@"; do
     holder=$(state_entry "$slot" | jq -r '.lease_holder // empty')
     case "$holder" in recovered:*) ;; *) fail "slot $slot has no recovered lease in the pool state (holder: '${holder:-none}')" ;; esac
