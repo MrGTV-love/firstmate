@@ -270,7 +270,7 @@ test_verification_plan_preserves_crlf_criteria_and_refuses_nul() {
   assert_contains "$out" 'Out of scope: Keep billing.' 'CRLF legacy exclusions were lost'
   assert_contains "$out" '- Keep layout.' 'CRLF subsection exclusions were lost'
   assert_not_contains "$out" 'Not a criterion.' 'CRLF grading boundary was lost'
-  assert_not_contains "$out" 'absent' 'CRLF criteria were misreported as absent'
+  assert_not_contains "$out" 'Task Definition Of Done: absent' 'CRLF criteria were misreported as absent'
   printf '%s\r\n' "$second" > "$criteria"
   printf '## Definition Of Done (task)\r\nDoD file: %s\r\n{DOD_MANDATORY_ITEMS}\r\n## How You'\''re Graded\r\n' "$criteria" > "$brief"
   out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF criteria directive failed'
@@ -290,7 +290,7 @@ test_verification_plan_preserves_crlf_criteria_and_refuses_nul() {
   out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); rc=$?
   [ "$rc" -ne 0 ] || fail 'NUL brief silently emitted a plan'
   assert_contains "$out" "malformed input $brief: NUL bytes" 'brief refusal did not name malformed input'
-  assert_not_contains "$out" 'absent' 'NUL brief misreported criteria as absent'
+  assert_not_contains "$out" 'Task Definition Of Done: absent' 'NUL brief misreported criteria as absent'
   pass 'CRLF criteria and exclusions survive; NUL briefs and external criteria refuse explicitly'
 }
 
