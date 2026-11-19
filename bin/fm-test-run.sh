@@ -2084,6 +2084,7 @@ families_for_changed_path() {
     .dsh/fm-primary.mjs|bin/fm-dsh-primary.sh|bin/fm-dsh.py|bin/fm-dsh-lib.sh)
       printf '%s\n' __script__:fm-dsh-primary.test.sh
       printf '%s\n' __script__:fm-dsh-harness.test.sh
+      printf '%s\n' __script__:fm-dsh-resume-binding.test.sh
       printf '%s\n' __script__:fm-dsh-spawn.test.sh
       printf '%s\n' __script__:fm-dsh-primary-live-e2e.test.sh
       printf '%s\n' __script__:fm-dsh-live-e2e.test.sh

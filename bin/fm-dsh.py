@@ -58,6 +58,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
+import subprocess
 import sys
 
 CHUNK = 1024 * 1024
@@ -351,12 +353,43 @@ def position(state, task):
     return [str(path), fold(path)[1]]
 
 
-def resume(args, primary_root=None):
+def record_binding_read(state, task, decision):
+    # Only the relaunch caller opts in, with its physical, existing state directory.
+    directory = Path(state)
+    log = directory / "guard-events.jsonl"
+    try:
+        if directory != directory.resolve(strict=True) or not directory.is_dir():
+            return
+        try:
+            info = log.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                return
+        subprocess.run([os.path.join(os.path.dirname(__file__), "fm-guard-event.sh"), "dsh-resume-binding-read", decision,
+                        "--task", task, "--source-ok", "true" if decision == "allow" else "false", "--log", str(log)],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    except (OSError, RuntimeError):
+        pass  # Receipts are best-effort and cannot alter the resume verdict.
+
+
+def resume(args, primary_root=None, record_binding_decision=False):
     state, task, model, effort, cwd = args
     try:
-        binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
-    except (OSError, ValueError):
-        # No recorded session: the caller prepares a fresh launch.
+        text = (Path(state) / f"{task}.dsh-session").read_text()
+    except (FileNotFoundError, ValueError):
+        # Preserve fallback for a missing target or legacy text decoding errors.
+        return
+    except OSError as error:
+        if record_binding_decision:
+            record_binding_read(state, task, "deny")
+        raise ValueError(f"REFUSED: saved DSH binding read failed: {error}; restore read access to the same saved record and retry without removing or replacing it") from error
+    if record_binding_decision:
+        record_binding_read(state, task, "allow")
+    try:
+        binding = json.loads(text)
+    except ValueError:
         return
     model = deepseek_id(model)
     effort = "" if effort in ("", "default") else effort
@@ -427,6 +460,7 @@ def main():
     p = sub.add_parser("resume")
     p.add_argument("values", nargs=5)
     p.add_argument("--primary-root")
+    p.add_argument("--record-binding-decision", action="store_true", help="record the relaunch read decision in STATE")
     p = sub.add_parser("bound")
     p.add_argument("state")
     p.add_argument("task")
@@ -463,7 +497,7 @@ def main():
         elif args.command == "prepare-primary":
             prepare(args.values, args.primary_root)
         elif args.command == "resume":
-            resume(args.values, args.primary_root)
+            resume(args.values, args.primary_root, args.record_binding_decision)
         elif args.command == "bound":
             bound(args.state, args.task)
         elif args.command == "own-model":
