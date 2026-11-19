@@ -143,9 +143,9 @@
 # (fm_treehouse_project_lock_path, called on the slot's registered project: the one the
 # caller names in TEARDOWN_ROUTE_PROJECT, else the one derived from the slot's git common
 # directory; a slot whose own lock key differs from its project's refuses) from its first
-# step to the end of the execute, so
-# no Firstmate or pipeline code path that takes that lock changes the slot's primary
-# checkout meanwhile. The sweep takes it and releases it; teardown borrows its
+# step to the end of each call (the plan call and the execute call are separate), so no
+# Firstmate or pipeline code path that takes that lock changes the slot's primary checkout
+# during a call. No lock is held between the plan and the execute; the execute's pre-entry read refuses a switch then. The sweep takes it and releases it; teardown borrows its
 # caller's hold (TEARDOWN_ROUTE_LOCK_HELD, proved by the lock's pid file naming this
 # process), never takes it a second time and never releases it. A claim the pid file
 # does not prove, a claim at a path other than the computed lock (there is no fall-through
