@@ -1,0 +1,20 @@
+ok - an aged unused directory is removed and its small logs are archived with matching sha256
+ok - a dry run changes nothing and writes no log or archive
+ok - a failing or empty lsof keeps everything and exits 3
+ok - an archive failure keeps the directory
+ok - oversize logs are skipped, the line says so, and a safe directory is still removed
+ok - small logs whose names hold a newline, a leading dash or a space are archived byte for byte before removal
+ok - a leading-dash directory is archived and removed, and kept while a process holds it
+ok - a small log that cannot be read keeps the directory as archive failed
+ok - one lsof snapshot serves every candidate of a run
+ok - a lsof failure, a busy lock and a secondmate home are logged or silent and never fail the cycle
+ok - the test helper starts no script for /private/tmp, /tmp, a foreign root, a symlink or ".." alias of one, or no config, in all three modes
+ok - mutant 'drop the archive step' fails case_aged_removed_and_archived
+ok - mutant 'archive with newline-delimited paths' fails case_newline_file_names_archived
+ok - mutant 'treat an unreadable log as skippable' fails case_archive_read_failure_keeps_directory
+ok - mutant 'remove after a failed archive' fails case_archive_before_remove_ordering
+ok - mutant 'drop the byte comparison of the copy' fails case_archive_before_remove_ordering
+ok - mutant 'drop the helper refusal of a symlink root' fails case_helper_refuses_real_roots
+ok - mutant 'drop the helper refusal of a root outside the world' fails case_helper_refuses_real_roots
+ok - mutant 'resolve only the parent of a helper root (the old helper)' fails case_helper_refuses_real_roots
+ok - mutant 'drop every helper refusal of a root' fails case_helper_refuses_real_roots

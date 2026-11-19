@@ -1,0 +1,173 @@
+=== SR1/SR2 main world ===
+
+--- SR1 dry run (no --apply) ---
+2026-11-19T13:33:48Z would-remove /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-bigfile bytes=2101248
+2026-11-19T13:33:48Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-busy reason=open handle
+2026-11-19T13:33:48Z would-remove /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-clean bytes=16384
+2026-11-19T13:33:48Z would-remove /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-escape bytes=0
+2026-11-19T13:33:48Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-gitwt reason=git
+2026-11-19T13:33:48Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-linkchild reason=symlink
+2026-11-19T13:33:48Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-nl?x reason=control-character-name
+2026-11-19T13:33:48Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-young reason=young
+summary: mode=dry-run removed=0 freed_bytes=0 kept=5
+PASS - SR1 dry run exits 0
+PASS - SR1 dry run changes nothing on disk
+PASS - SR1 dry run writes no decision log
+PASS - SR1 dry run says would-remove fm-clean
+PASS - SR1 dry run says would-remove fm-bigfile
+PASS - SR1 dry run says would-remove fm-escape
+PASS - SR1 kept young directory with reason young
+PASS - SR1 kept directory with open cwd with reason open handle
+PASS - SR1 kept git worktree with reason git
+PASS - SR1 kept symlink child with reason symlink
+PASS - SR1 kept newline-named directory with reason control-character-name
+PASS - SR1 names no directory outside the glob
+PASS - SR1 never treats a plain file as a candidate
+
+--- SR1/SR2 apply (--apply) ---
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-bigfile bytes=2101248 archived=1 skipped_logs=1
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-busy reason=open handle
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-clean bytes=16384 archived=3 skipped_logs=0
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-escape bytes=0 archived=0 skipped_logs=0
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-gitwt reason=git
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-linkchild reason=symlink
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-nl?x reason=control-character-name
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-young reason=young
+summary: mode=apply removed=3 freed_bytes=2117632 kept=5
+PASS - SR1 apply exits 0
+PASS - SR1 removed fm-clean
+PASS - SR1 removed fm-bigfile (with an oversize log)
+PASS - SR1 removed fm-escape (its symlink was not followed)
+PASS - SR1 kept fm-young on disk
+PASS - SR1 kept fm-busy on disk
+PASS - SR1 kept fm-gitwt on disk
+PASS - SR1 kept fm-linkchild symlink on disk
+PASS - SR1 kept the newline-named directory on disk
+PASS - SR1 kept other-old, outside the glob
+PASS - SR1 kept plain file fm-plain.txt
+PASS - SR4 symlink target outside the root is untouched
+PASS - SR2 archived run.log matches original sha256
+PASS - SR2 archived nested err.out keeps its relative path and sha256
+PASS - SR2 archived result.json matches original sha256
+PASS - SR2 did not archive data.bin (not a log extension)
+PASS - SR2 did not archive oversize big.log
+PASS - SR2 archived small.log of fm-bigfile matches original sha256
+PASS - SR2 log line: fm-clean archived=3 skipped_logs=0
+PASS - SR2 log line: fm-bigfile says one log skipped
+PASS - SR1 log holds a kept line for fm-busy
+PASS - SR1 log holds a kept line for fm-young
+PASS - SR1 fm-busy process is still alive
+
+--- SR1 decision log (state/scratch-reaper.log) ---
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-bigfile bytes=2101248 archived=1 skipped_logs=1
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-busy reason=open handle
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-clean bytes=16384 archived=3 skipped_logs=0
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-escape bytes=0 archived=0 skipped_logs=0
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-gitwt reason=git
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-linkchild reason=symlink
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-nl?x reason=control-character-name
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-young reason=young
+summary: mode=apply removed=3 freed_bytes=2117632 kept=5
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-bigfile bytes=2101248 archived=1 skipped_logs=1
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-busy reason=open handle
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-clean bytes=16384 archived=3 skipped_logs=0
+2026-11-19T13:33:55Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-escape bytes=0 archived=0 skipped_logs=0
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-gitwt reason=git
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-linkchild reason=symlink
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-nl?x reason=control-character-name
+2026-11-19T13:33:55Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/main/root/fm-young reason=young
+
+
+=== SR2 archive failure ===
+
+--- SR2 apply with a blocked archive folder ---
+mkdir: /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/archfail/fm/data/scratch-reaper-archive: Not a directory
+2026-11-19T13:33:58Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/archfail/root/fm-arch reason=archive failed
+summary: mode=apply removed=0 freed_bytes=0 kept=1
+PASS - SR2 archive failure exits 0
+PASS - SR2 kept the directory with reason archive failed
+PASS - SR2 the directory and its log are untouched
+
+=== SR1 lsof failure ===
+
+--- SR1 apply with a failing lsof stand-in ---
+2026-11-19T13:34:01Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/lsoffail/root/fm-lsof reason=lsof failed
+summary: mode=apply removed=0 freed_bytes=0 kept=1
+PASS - SR1 lsof failure exits 3
+PASS - SR1 lsof failure keeps the candidate with reason lsof failed
+PASS - SR1 lsof failure removes nothing
+
+--- SR3 scheduled run with a failing lsof stand-in ---
+2026-11-19T13:34:01Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/lsoffail/root/fm-lsof reason=lsof failed
+2026-11-19T13:34:01Z kept /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/lsoffail/root/fm-lsof2 reason=lsof failed
+summary: mode=apply removed=0 freed_bytes=0 kept=2
+PASS - SR3 failed scheduled run keeps its candidate (lsof failed)
+PASS - SR3 failed scheduled run returns to its caller with rc 3 (the watcher ignores it)
+PASS - SR3 failed scheduled run is logged as error rc=3
+
+=== SR3 scheduled window ===
+
+--- SR3 scheduled run at t0 ---
+2026-11-19T13:34:02Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/sched/root/fm-s1 bytes=4096 archived=1 skipped_logs=0
+summary: mode=apply removed=1 freed_bytes=4096 kept=0
+PASS - SR3 first scheduled run exits 0
+PASS - SR3 first scheduled run removed fm-s1
+PASS - SR3 next-run marker is t0 plus 1800 s
+PASS - SR3 run inside the window exits 0
+PASS - SR3 run inside the window prints nothing
+PASS - SR3 run inside the window adds no decision-log line
+PASS - SR3 run inside the window leaves fm-s2 alone
+
+--- SR3 scheduled run at t0 plus 1800 s ---
+2026-11-19T14:04:02Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/sched/root/fm-s2 bytes=4096 archived=1 skipped_logs=0
+summary: mode=apply removed=1 freed_bytes=4096 kept=0
+PASS - SR3 run at the window edge removes fm-s2
+
+=== SR3 low-disk alarm ===
+
+--- SR3 low disk, nothing removed, first run ---
+summary: mode=apply removed=0 freed_bytes=0 kept=0
+PASS - SR3 low disk first run exits 0
+PASS - SR3 low disk raises one wake
+PASS - SR3 low disk records the alarm marker
+PASS - SR3 low disk within 6 hours raises no second wake
+PASS - SR3 low disk after 6 hours raises the wake again
+PASS - SR3 recovered space clears the alarm marker
+PASS - SR3 recovered space raises no wake
+
+--- SR3 low disk but the run frees bytes ---
+2026-11-19T21:04:25Z removed /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/lowdisk/root/fm-l1 bytes=4096 archived=1 skipped_logs=0
+summary: mode=apply removed=1 freed_bytes=4096 kept=0
+PASS - SR3 low disk with bytes freed removes fm-l1
+PASS - SR3 low disk with bytes freed raises no wake
+
+=== SR4 root refusals ===
+
+--- SR4 configured root that is missing ---
+fm-scratch-reaper: root /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/cfgmissing/nope from /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/cfgmissing/fm/config/scratch-reaper is missing, a symlink or not a directory
+PASS - SR4 missing configured root exits 2
+PASS - SR4 missing configured root names the config file and the root
+PASS - SR4 missing configured root removes nothing
+
+--- SR4 root that contains the home ---
+fm-scratch-reaper: root /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/cfgprotected/fm (/Users/charlesabrooker/tmp/fm-live-sr.7FhIla/cfgprotected/fm) is, contains or lies under a protected path
+PASS - SR4 root holding the home exits 2
+PASS - SR4 root holding the home says protected
+
+--- SR4 symlink root ---
+fm-scratch-reaper: root /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/cfgsymlink/rootlink from /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/cfgsymlink/fm/config/scratch-reaper is missing, a symlink or not a directory
+PASS - SR4 symlink root exits 2
+PASS - SR4 symlink root removes nothing behind it
+
+--- SR4 relative root ---
+fm-scratch-reaper: /Users/charlesabrooker/tmp/fm-live-sr.7FhIla/cfgrelative/fm/config/scratch-reaper:1: root 'relroot' is not absolute or ~/
+PASS - SR4 relative root exits 2
+PASS - SR4 relative root says not absolute
+
+=== cwd name trap (owner-declined review item, observed) ===
+
+--- run from a folder holding fm-trap ---
+summary: mode=apply removed=0 freed_bytes=0 kept=0
+OBSERVED - aged fm-cw was kept when the run's cwd held a fm-* name (glob expanded against cwd)
+
+=== summary: 0 failing check(s) ===

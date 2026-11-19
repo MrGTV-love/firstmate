@@ -1,0 +1,14 @@
+ok - mutant 'drop the open-handle check' fails case_open_handle_kept
+ok - mutant 'drop the age check' fails case_young_kept
+ok - mutant 'drop the git check' fails case_git_kept
+ok - mutant 'drop the archive step' fails case_aged_removed_and_archived
+ok - mutant 'drop the symlink check' fails case_symlink_not_followed
+ok - mutant 'archive with newline-delimited paths' fails case_newline_file_names_archived
+ok - mutant 'treat an unreadable log as skippable' fails case_archive_read_failure_keeps_directory
+ok - mutant 'remove after a failed archive' fails case_archive_before_remove_ordering
+ok - mutant 'drop the byte comparison of the copy' fails case_archive_before_remove_ordering
+ok - mutant 'take one snapshot per candidate' fails case_one_snapshot_per_run
+ok - mutant 'drop the helper refusal of a symlink root' fails case_helper_refuses_real_roots
+ok - mutant 'drop the helper refusal of a root outside the world' fails case_helper_refuses_real_roots
+ok - mutant 'resolve only the parent of a helper root (the old helper)' fails case_helper_refuses_real_roots
+ok - mutant 'drop every helper refusal of a root' fails case_helper_refuses_real_roots

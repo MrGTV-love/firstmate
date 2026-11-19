@@ -1,0 +1,55 @@
+
+--- watcher stdout (tail) ---
+
+--- watcher stderr (tail) ---
+
+--- reaper offers received by the guard (count 2) ---
+--scheduled
+--scheduled
+
+--- decision log ---
+2026-11-19T13:52:15Z removed /Users/charlesabrooker/tmp/fm-live-watch.GNj0pq/w/root/fm-wlive bytes=4096 archived=1 skipped_logs=0
+
+--- next-run marker ---
+1795098135
+
+--- world state folder ---
+total 128
+drwxr-xr-x@ 24 charlesabrooker  staff    768 Nov 19 07:52 .
+drwxr-xr-x@  5 charlesabrooker  staff    160 Nov 19 07:51 ..
+-rw-------@  1 charlesabrooker  staff     25 Nov 19 07:52 .inactive-outcome-reconcile
+-rw-r--r--@  1 charlesabrooker  staff      0 Nov 19 07:52 .last-heartbeat
+-rw-r--r--@  1 charlesabrooker  staff      0 Nov 19 07:52 .last-watcher-beat
+-rw-r--r--@  1 charlesabrooker  staff     11 Nov 19 07:52 .lavish-auto-retire-next
+drwxr-xr-x@  2 charlesabrooker  staff     64 Nov 19 07:51 .lock-monitor
+-rw-------@  1 charlesabrooker  staff    155 Nov 19 07:51 .lock-monitor.hold.N3C9ri
+-rw-r--r--@  1 charlesabrooker  staff     13 Nov 19 07:52 .memory-alarmed
+-rw-r--r--@  1 charlesabrooker  staff  10943 Nov 19 07:52 .memory-calibration.json
+-rw-r--r--@  1 charlesabrooker  staff     11 Nov 19 07:52 .memory-health-next
+-rw-r--r--@  1 charlesabrooker  staff      0 Nov 19 07:52 .open-loops-started
+drwx------@  2 charlesabrooker  staff     64 Nov 19 07:52 .pr-ready-reconcile
+-rw-r--r--@  1 charlesabrooker  staff      2 Nov 19 07:52 .prelude-progress
+-rw-r--r--@  1 charlesabrooker  staff     11 Nov 19 07:52 .scratch-reaper-next
+-rw-r--r--@  1 charlesabrooker  staff    383 Nov 19 07:52 .wake-queue
+-rw-r--r--@  1 charlesabrooker  staff      2 Nov 19 07:52 .wake-queue.seq
+lrwxr-xr-x@  1 charlesabrooker  staff     83 Nov 19 07:51 .watch.lock -> /Users/charlesabrooker/tmp/fm-live-watch.GNj0pq/w/fm/state/.watch.lock.owner.i00CQi
+drwx------@  7 charlesabrooker  staff    224 Nov 19 07:52 .watch.lock.owner.i00CQi
+-rw-------@  1 charlesabrooker  staff     41 Nov 19 07:52 .watcher-down
+drwx------@  6 charlesabrooker  staff    192 Nov 19 07:52 github-accounting
+-rw-------@  1 charlesabrooker  staff   7353 Nov 19 07:52 memory-readings.jsonl
+-rw-r--r--@  1 charlesabrooker  staff    130 Nov 19 07:52 scratch-reaper.log
+drwxr-xr-x@  2 charlesabrooker  staff     64 Nov 19 07:52 terminal-outcomes
+
+--- open-loops.json (head) ---
+
+
+--- watcher still running: yes ---
+PASS - WATCH the real watcher offers the reaper with --scheduled
+PASS - WATCH the first tick's reaper removes the aged fm-wlive directory
+PASS - WATCH the removal is logged as one removed line
+PASS - WATCH the next-run marker is set one window ahead
+OBSERVED - offers received by the guard: 2
+OBSERVED - the first actionable wake from the watcher stdout: 
+OBSERVED - watcher still running at the end of the run: yes
+
+=== watch-live summary: 0 failing check(s) ===

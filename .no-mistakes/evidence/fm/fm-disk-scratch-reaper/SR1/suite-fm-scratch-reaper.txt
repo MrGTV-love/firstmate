@@ -1,0 +1,40 @@
+ok - an aged unused directory is removed and its small logs are archived with matching sha256
+ok - a young directory, and a directory with one new file deep inside, are kept
+ok - a live process cwd or open file keeps its directory and the reason says open handle
+ok - a git worktree, a repo, a nested repo and a pool slot are kept
+ok - a symlink child is kept, an escaping link inside a removed directory leaves its target alone, a symlink root is refused
+ok - directories outside every allow-listed root or glob are never touched
+ok - a dry run changes nothing and writes no log or archive
+ok - a failing or empty lsof keeps everything and exits 3
+ok - an archive failure keeps the directory
+ok - oversize logs are skipped, the line says so, and a safe directory is still removed
+ok - small logs whose names hold a newline, a leading dash or a space are archived byte for byte before removal
+ok - a leading-dash directory is archived and removed, and kept while a process holds it
+ok - a directory whose name holds a control character is kept as control-character-name on one line
+ok - a directory a recorded task owns (this home, or a secondmate home through a symlink) is kept as task-record and removed once its record is gone
+ok - a configured root that is missing stops the run with exit 2, names the config file and the root, and removes nothing
+ok - a missing built-in default root is skipped silently and the present default root is still reaped
+ok - the low-disk wake names the aged scratch the run kept and its reason, and does not say aged scratch is not the cause
+ok - the low-disk wake says aged scratch is not the cause only when the run kept none
+ok - a small log that cannot be read keeps the directory as archive failed
+ok - a copy that fails on the second file, or differs from its source, keeps the whole directory untouched
+ok - one lsof snapshot serves every candidate of a run
+ok - the scheduled run works once per window and not inside it
+ok - the low-disk alarm rises only with under 20 GiB free and nothing freed, and repeats only after 6 hours
+ok - a lsof failure, a busy lock and a secondmate home are logged or silent and never fail the cycle
+ok - the test helper starts no script for /private/tmp, /tmp, a foreign root, a symlink or ".." alias of one, or no config, in all three modes
+ok - mutant 'drop the open-handle check' fails case_open_handle_kept
+ok - mutant 'drop the age check' fails case_young_kept
+ok - mutant 'drop the git check' fails case_git_kept
+ok - mutant 'drop the archive step' fails case_aged_removed_and_archived
+ok - mutant 'drop the symlink check' fails case_symlink_not_followed
+ok - mutant 'archive with newline-delimited paths' fails case_newline_file_names_archived
+ok - mutant 'treat an unreadable log as skippable' fails case_archive_read_failure_keeps_directory
+ok - mutant 'remove after a failed archive' fails case_archive_before_remove_ordering
+ok - mutant 'drop the byte comparison of the copy' fails case_archive_before_remove_ordering
+ok - mutant 'take one snapshot per candidate' fails case_one_snapshot_per_run
+ok - mutant 'drop the helper refusal of a symlink root' fails case_helper_refuses_real_roots
+ok - mutant 'drop the helper refusal of a root outside the world' fails case_helper_refuses_real_roots
+ok - mutant 'resolve only the parent of a helper root (the old helper)' fails case_helper_refuses_real_roots
+ok - mutant 'drop every helper refusal of a root' fails case_helper_refuses_real_roots
+bash tests/fm-scratch-reaper.test.sh  10.47s user 22.65s system 8% cpu 6:30.53 total

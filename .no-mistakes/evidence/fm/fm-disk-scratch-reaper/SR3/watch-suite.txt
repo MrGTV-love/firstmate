@@ -1,0 +1,7 @@
+ok - the poll loop starts the reaper detached with --scheduled, on its tick, for this home, without a wake
+ok - FM_SCRATCH_REAPER_TICK=0 turns the offer off
+ok - a failing run is offered again quietly and never stops the poll
+ok - a run still going is never started twice, and the poll keeps running
+ok - under FM_TEST_SEAM the watcher never starts the real reaper
+bash tests/fm-watch-scratch-reaper.test.sh  4.74s user 8.35s system 11% cpu 1:54.40 total
+exit=0
