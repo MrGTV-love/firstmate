@@ -133,18 +133,38 @@ fm_status_read_allowed() {  # <status-file> <bytes>
 # supported route, nothing is printed, and the status is 2. A span is never clipped, so
 # a caller that turns the bytes into a position measures it against the span it asked
 # for. Any other failure (a file that cannot be opened or is shorter than asked) is
-# status 1 with no message.
-fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lines>]
-  local f=$1 start=$2 length=$3 lines rc=0
-  fm_status_read_allowed "$f" "$length" || return 2
+# status 1 with no message. With --with-identity as the fifth argument, prefix
+# successful bytes with a device:inode line from the same opened regular handle;
+# this mode buffers the bounded span so failures publish neither identity nor bytes.
+# --whole-with-identity also takes the whole-file endpoint and checks the byte cap
+# from that handle, ignoring the requested span; ordinary exact spans are unchanged.
+fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lines>] [--with-identity|--whole-with-identity]
+  local f=$1 start=$2 length=$3 lines rc=0 identity=${5:-} read_limit=0
+  case "$identity" in ''|--with-identity|--whole-with-identity) ;; *) return 1 ;; esac
+  if [ "$identity" = --whole-with-identity ]; then
+    fm_status_read_limit_bytes read_limit
+  else
+    fm_status_read_allowed "$f" "$length" || return 2
+  fi
   case "${4-}" in
     0) lines=0 ;;
     ''|*[!0-9]*) fm_status_read_limit_lines lines ;;
     *) lines=$4 ;;
   esac
   perl -MFcntl=:DEFAULT -e '
-    my ($path, $start, $length, $max_lines) = @ARGV;
+    my ($path, $start, $length, $max_lines, $identity, $read_limit) = @ARGV;
     sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;
+    -f $file or exit 1;
+    my @opened = stat($file);
+    @opened or exit 1;
+    if ($identity eq "--whole-with-identity") {
+      ($start, $length) = (0, $opened[7]);
+      if ($length > $read_limit) {
+        (my $name = $path) =~ s{.*/}{};
+        print STDERR "fm-status: refused to read $name: a span of $length bytes is past the read limit of $read_limit bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log\n";
+        exit 2;
+      }
+    }
     sysseek($file, $start, 0) == $start or exit 1;
     my $held = "";
     while ($length > 0) {
@@ -152,13 +172,12 @@ fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lin
       my $read = sysread($file, my $chunk, $want);
       defined($read) && $read > 0 or exit 1;
       $length -= $read;
-      if ($max_lines > 0) { $held .= $chunk; } else { print $chunk or exit 1; }
+      if ($max_lines > 0 || $identity) { $held .= $chunk; } else { print $chunk or exit 1; }
     }
-    if ($max_lines > 0) {
-      exit 3 if ($held =~ tr/\n//) > $max_lines;
-      print $held or exit 1;
-    }
-  ' "$f" "$start" "$length" "$lines" || rc=$?
+    exit 3 if $max_lines > 0 && ($held =~ tr/\n//) > $max_lines;
+    print "$opened[0]:$opened[1]\n" or exit 1 if $identity;
+    print $held or exit 1 if $max_lines > 0 || $identity;
+  ' "$f" "$start" "$length" "$lines" "$identity" "$read_limit" || rc=$?
   if [ "$rc" -eq 3 ]; then
     echo "fm-status: refused to read ${f##*/}: a span of more than $lines lines is past the line-by-line read limit; nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log" >&2
     return 2
