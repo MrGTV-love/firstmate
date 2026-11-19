@@ -514,9 +514,9 @@ EOF
 # fm_slot_adopt_route says when that applies and fm_slot_adopt_check is the one decision: it reads
 # the manifest, the copy and the custody owners and writes nothing, so the manifest file, its
 # directory, the recorded scope and the recorded base stay exactly as they were. Vernant's push-time
-# owned_paths gate stays the control for the task's own out-of-scope work, and a relaunch does not
-# check other tasks' claims (the existing admissions never scanned peers either); the drift report
-# only makes the out-of-scope paths visible.
+# owned_paths gate stays the control for the task's own out-of-scope work, a pool slot another task claims refuses the
+# relaunch by name unless that task's record places its copy inside the slot, and no other peer claim is checked; the
+# drift report only makes the out-of-scope paths visible.
 FM_SLOT_ADOPTED=0
 
 # 0 when <meta>'s task is relaunched into its own recorded slot: a recorded manifest, no
@@ -861,7 +861,7 @@ fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   printf '%s\n' "$out" | while IFS= read -r line; do
     case "$line" in limitation$'\t'*) printf '  limitation: %s\n' "${line#limitation$'\t'}" >&2 ;; esac
   done
-  echo "  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a relaunch does not check other tasks' claims" >&2
+  echo "  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot" >&2
 }
 
 # The launch contract for a worker started on an adopted slot: continue in place.

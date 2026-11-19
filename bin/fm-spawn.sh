@@ -607,8 +607,8 @@
 #   this task's own copy, branch, base and scope and the copy-custody owners must
 #   agree, else it refuses by name with nothing changed. The task's own commits and
 #   uncommitted edits outside its recorded scope never block it and never change
-#   the scope; they are printed as a drift report. A relaunch does not check other
-#   tasks' claims (the existing admissions never did), and Vernant's push-time
+#   the scope; they are printed as a drift report. A pool slot another task claims refuses
+#   the relaunch by name unless that task's record places its copy inside the slot; no other peer claim is checked, and Vernant's push-time
 #   owned_paths gate stays the control. A relaunch with no recorded manifest keeps
 #   the provisioning route and must pass the clean-slot contract (a copy that
 #   predates the provisioner runs the primary clone's current main, verified byte for
@@ -7060,8 +7060,10 @@ for event, entries in (fresh.get("hooks") or {}).items():
     kept_entries = [e for e in merged_hooks.get(event, []) if foreign(e)] if isinstance(merged_hooks.get(event, []), list) else []
     merged_hooks[event] = kept_entries + entries
 merged["hooks"] = merged_hooks
-if isinstance(old.get("permissions"), dict):
-    merged["permissions"] = old["permissions"]
+rules = old.get("permissions") if isinstance(old.get("permissions"), dict) else {}
+rules = {k: rules[k] for k in ("allow", "deny", "ask") if k in rules}
+if rules:
+    merged["permissions"] = rules
 with open(active, "w", encoding="utf-8") as handle:
     json.dump(merged, handle, separators=(",", ":"))
     handle.write("\n")

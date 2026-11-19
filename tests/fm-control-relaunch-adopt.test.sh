@@ -319,6 +319,28 @@ PY
   pass "fm-control relaunch: a worker's override keys stay in its kept copy, its hook and permission entries are merged into the active file"
 }
 
+# D1(d): of the worker's permissions, only its allow, deny and ask rule lists reach the active file; a mode or any other key does not.
+test_adopt_carries_only_the_worker_rule_lists_into_the_active_file() {
+  local id=adoptperm out rc settings kept body
+  make_adopt_case adopt-perm "$id" src
+  settings="$ADOPT_DIR/wt/.claude/settings.local.json"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "the first relaunch must be admitted"$'\n'"$out"
+  body='{"permissions":{"defaultMode":"bypassPermissions","allow":["Bash(make test)"],"deny":["Bash(rm -rf *)"],"ask":["Bash(git push*)"],"unknownKey":"fake-test-value"},"hooks":{"PreToolUse":[{"matcher":"Task","hooks":[{"type":"command","command":"deny-task-tool"}]}]}}'
+  printf '%s\n' "$body" > "$settings"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over an edited artifact must be admitted"$'\n'"$out"
+  kept=$(kept_files "$ADOPT_DIR/wt/.claude" | head -n 1)
+  [ -n "$kept" ] || fail 'the worker-edited settings file was not kept'
+  printf '%s\n' "$body" | cmp -s - "$kept" || fail 'the kept copy is not byte-identical to the worker edit'
+  python3 - "$settings" <<'PY' || fail "the worker's permissions object was carried whole, or its rule lists did not arrive"
+import json, sys
+active = json.load(open(sys.argv[1]))
+assert active.get("permissions") == {"allow": ["Bash(make test)"], "deny": ["Bash(rm -rf *)"], "ask": ["Bash(git push*)"]}, active
+PY
+  pass "fm-control relaunch: the worker's allow, deny and ask rule lists reach the active file; a mode and other permission keys do not"
+}
+
 control_relaunch_test_cases=(
 test_manifest_inventory_oracle_rejects_both_mutants
 test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch
@@ -329,6 +351,7 @@ test_adopt_admits_a_dirty_copy_and_a_stopped_rebase
 test_adopt_route_is_only_for_the_own_slot
 test_adopt_keeps_a_worker_edited_launch_artifact
 test_adopt_keeps_worker_override_keys_out_of_the_active_file
+test_adopt_carries_only_the_worker_rule_lists_into_the_active_file
 )
 
 control_relaunch_run "$@"

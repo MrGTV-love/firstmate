@@ -147,7 +147,8 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
    A relaunch of a governed task is not a new scope declaration: when the record names its slot manifest, the relaunch adopts that recorded manifest and never runs the project's provisioner (`fm_slot_adopt_check` in `bin/fm-slot-provision-lib.sh` owns the decision).
    The manifest must belong to this task's own copy, branch, base and scope, and the existing copy-custody owners must agree, or the relaunch refuses by name before the agent is stopped, with the manifest, record and copy unchanged.
    The task's own out-of-scope commits and uncommitted edits never block it, never change the recorded scope, and are printed as a labelled drift report by both `fm-control relaunch` and `fm-spawn --relaunch`.
-   The residual: a relaunch does not check other tasks' claims, as the existing admissions never did, and Vernant's push-time `owned_paths` gate stays the control for what the task may push.
+   A pool slot that another task claims refuses the relaunch by name (`custody_slot_claim`), unless that task's own record places its copy strictly inside the slot; a relaunch checks no other peer claims beyond that.
+   The residual: Vernant's push-time `owned_paths` gate stays the control for what the task may push.
    A relaunch with no recorded manifest, a relocation to a replacement copy, and the recovery of a first provisioning that was refused keep the provisioning route, where `fm_slot_foresee_refusals` names a foreseeable refusal before the stop.
    A committed own out-of-scope change is refused as `scope_mismatch` naming every such path with the drift report, and a `manifest_exists` refusal names the collision file, so a cleared collision permits one new automatic attempt.
    `bin/fm-session-end-relaunch-lib.sh` owns why the automatic session-end relaunch does not retry a refusal whose cause is unchanged.
