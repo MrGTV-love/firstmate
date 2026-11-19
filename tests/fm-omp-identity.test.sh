@@ -559,6 +559,7 @@ test_verdict_does_not_depend_on_the_omp_on_path() {
   local pid foreign dead rc
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-launch-proof-lib.sh"
+  # shellcheck disable=SC2329 # Invoked only through native_first, which shellcheck cannot follow; the sourced library calls it.
   ps() { case "$*" in '-p '*' -o comm=') python3 -I "$PROCINFO" comm "$2" ;; '-p '*' -o args=') python3 -I "$PROCINFO" args "$2" ;; *) return 1 ;; esac; }
   [ "$(native_first python3 -I -c 'import shutil;print(shutil.which("omp"))')" = "$NATIVE_BIN/omp" ] \
     || fail "the native stand-in must come first on PATH or the case is vacuous"
