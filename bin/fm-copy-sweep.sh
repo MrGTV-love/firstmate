@@ -1439,7 +1439,7 @@ gib_or_dash() {  # <KiB or ->
 # reason first. It is display text only and never grants or refuses anything.
 driver_reason_prefix() {  # <driver output>
   local reason
-  reason=$(printf '%s' "$1" | jq -s -r 'if length == 1 and (.[0] | type == "object") then (.[0] | (if (.reason | type) == "string" and .reason != "" then .reason elif (.cleanup_recovery_reason | type) == "string" and .cleanup_recovery_reason != "" then .cleanup_recovery_reason else empty end)) else empty end' 2>/dev/null) || return 0
+  reason=$(printf '%s' "$1" | jq -s -r --arg route "${TEARDOWN_CLOSEOUT_ROUTE:-}" 'if length == 1 and (.[0] | type == "object") then (.[0] | (if (.reason | type) == "string" and .reason != "" then .reason elif $route == "pr" and (.cleanup_recovery_reason | type) == "string" and .cleanup_recovery_reason != "" then .cleanup_recovery_reason else empty end)) else empty end' 2>/dev/null) || return 0
   [ -z "$reason" ] || printf '%s: ' "$(fm_refuse_text "${reason:0:600}")"
 }
 

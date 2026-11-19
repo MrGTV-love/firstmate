@@ -1253,6 +1253,20 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_ref
   pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code"
 }
 
+test_a_plain_plan_refusal_with_no_reason_is_shown_as_the_base_shows_it() {
+  make_locked_copy_case plainrecovery dead
+  install_driver "$SLOT" "$W"
+  printf '{"allowed": false, "cleanup_recovery_reason": "cleanup_lease_conflict"}\n' > "$W/plan-output"
+  printf '3\n' > "$W/plan-exit"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "a refused plan failed the run ($RC): $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" '(exit 3): {"allowed": false, "cleanup_recovery_reason": "cleanup_lease_conflict"}' \
+    "a plain plan without a reason is not shown as the base shows it"
+  assert_not_contains "$OUT" "cleanup_lease_conflict: " "a plain plan's recovery reason was put in front as the driver's reason"
+  pass "a plain plan refusal with no reason and a recovery reason is shown with the same text as the base"
+}
+
 # Prints every preserved copy of unique.dat under this world's sweep data, one
 # per line, so a test can count the preserves a run left.
 preserved_unique() {
@@ -6315,6 +6329,7 @@ test_driver_verdict_types_and_exit_status_are_not_permission
 test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_nothing
 test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal
+test_a_plain_plan_refusal_with_no_reason_is_shown_as_the_base_shows_it
 test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
 test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
 test_ignored_content_changed_after_the_last_proof_is_not_released
