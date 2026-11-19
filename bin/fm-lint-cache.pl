@@ -1221,7 +1221,9 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # peak is written to FM_LINT_INTERNAL_SLOT_PEAK_FILE when the gate names one, so
 # the gate's admission charges it.
 # Any miss while the root runs that is followed by a later tick makes the root exit
-# 96 (fm_watch_unmeasured); only a miss on its very last tick is exempt. Three misses
+# 96 (fm_watch_unmeasured); only a miss on its very last tick is exempt. Each tick
+# first reaps an exited root (keeping its exit status), so slow ticks that follow
+# each other cannot hold an exited root unreaped and sample its exit as misses. Three misses
 # in a row also write FM_LINT_INTERNAL_ABORT_FILE so the run's gates admit no
 # further root. 96 comes before 98, so no unmeasured root is retried or recorded as
 # a success.
@@ -1272,7 +1274,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
     my ($reader_failures, $libproc_samples) = (0, 0);
     my %known;    # pid => [start seconds, start microseconds], every member counted
-    my ($child_reaped);
+    my ($child_reaped, $reaped_status);
     # A reader exits when its input closes; only a reader still running 2 s later,
     # the watch's own unreaped child, is ended by a signal (as on the base).
     my $stop_reader = sub {
@@ -1594,6 +1596,13 @@ PYTHON
                 }
             }
         }
+        # Reap an exited root here: the main flow's waitpid cannot run while ticks
+        # follow each other, and the exit would otherwise be sampled as misses.
+        if (!$child_reaped) {
+            my $gone = waitpid($child, POSIX::WNOHANG());
+            if ($gone == $child) { ($child_reaped, $reaped_status) = (1, $?); return; }
+            return if $gone == -1 && $!{ECHILD};
+        }
         my $rss = $tree_rss->($child);
         if (!defined $rss) {
             return if $child_reaped;
@@ -1675,10 +1684,11 @@ PYTHON
     close $go_write;
     $term_root->() if $caught;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 1, 1);
-    my $reaped = waitpid($child, 0);
+    my $reaped = $child_reaped ? $child : waitpid($child, 0);
+    $reaped = $child if $child_reaped;
     $child_reaped = 1 if $reaped == $child;
     $unmeasured = fm_watch_unmeasured(@ticks);
-    my $status = $reaped == $child ? $? : 127 << 8;
+    my $status = $reaped == $child ? ($reaped_status // $?) : 127 << 8;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
     $stop_reader->();
     # After every end, a normal success included: each process the watch counted

@@ -320,7 +320,8 @@
 # recycled pid, or any identity or memory that cannot be read makes the sample
 # unknown, never counted or adopted. Any missed sample while the root runs that is
 # followed by a later tick fails that root (status 96, reason unmeasured; only a miss
-# on its very last tick, its own exit, is exempt), even if it later crosses the
+# on its very last tick, its own exit, is exempt; each tick first reaps an exited
+# root, so its exit is not sampled as misses), even if it later crosses the
 # cap: 96 comes before 98, so no memory retry follows, no success is recorded, and
 # the run fails, naming each root it did not start. Each watched root's measurement
 # record holds the time of its last successful sample; it has none until the first
@@ -797,9 +798,15 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" "$queued_ms" \
       "$(fm_lint_root_time_rss "$rss_file" "$fallback_rss")" "$(fm_lint_root_watch_peak "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
+  # The watch's own record of a root it failed (status 96): its samples and the
+  # reasons it wrote, so the run's stop mark and the end line say what happened.
+  FM_LINT_LAST_WATCH=
+  if [ "$invocation_rc" = 96 ]; then
+    FM_LINT_LAST_WATCH=$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")
+  fi
   if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
-    printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
-      "$path" "$reason" "$invocation_rc" "$duration_ms" "$rss_kib" >&2
+    printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s%s\n' \
+      "$path" "$reason" "$invocation_rc" "$duration_ms" "$rss_kib" "${FM_LINT_LAST_WATCH:+ watch=$FM_LINT_LAST_WATCH}" >&2
   fi
   return "$invocation_rc"
 }
@@ -825,7 +832,7 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
     : > "$output.out"
     for entry in "${root_entries[@]}"; do
       # A gate that refused for an unreadable host process table, or a watch that
-      # lost every reader of its root's memory, marked the run: start no further
+      # failed its root (status 96), marked the run: start no further
       # root in either worker, and fail the shard, because a root not started is
       # not analyzed.
       if [ -e "${FM_LINT_INTERNAL_ABORT_FILE:-}" ]; then
@@ -841,11 +848,12 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
       if [ "$rc" -eq 0 ] && [ "$invocation_rc" -ne 0 ]; then
         rc=$invocation_rc
       fi
-      # A root that ran unmeasured (status 96): mark the run, so neither worker
+      # A root its watch failed (status 96): mark the run, so neither worker
       # starts another root, even if the watch could not write the mark itself;
       # if this mark cannot be written either, this worker starts no further root.
+      # The mark names the root and the watch's recorded samples and reasons.
       if [ "$invocation_rc" -eq 96 ] && [ -n "${FM_LINT_INTERNAL_ABORT_FILE:-}" ] && [ ! -e "$FM_LINT_INTERNAL_ABORT_FILE" ]; then
-        if ! printf 'a root ran unmeasured (its resident-memory watch lost every reader)\n' >> "$FM_LINT_INTERNAL_ABORT_FILE" 2>/dev/null; then
+        if ! printf 'the resident-memory watch failed %s (status 96; watch record: %s)\n' "$path" "${FM_LINT_LAST_WATCH:-none}" >> "$FM_LINT_INTERNAL_ABORT_FILE" 2>/dev/null; then
           printf 'fm-lint: the run could not be marked to stop at %s; this worker starts no further root\n' "$FM_LINT_INTERNAL_ABORT_FILE" >> "$output.out"
           break
         fi

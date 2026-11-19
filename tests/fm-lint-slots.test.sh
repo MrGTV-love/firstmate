@@ -4424,6 +4424,10 @@ if args[:2] == ["-c", "import sys; print(sys.executable)"]:
 if "-c" in args:
     i = args.index("-c")
     program = args[i + 1]
+    if os.environ.get("FM_TEST_CHECK_DELAY"):
+        # A loaded host: every one-shot check starts this many seconds late.
+        import time
+        time.sleep(float(os.environ["FM_TEST_CHECK_DELAY"]))
     if os.environ.get("FM_TEST_IDENTITY") == "fail" and args[i + 3:i + 4] == ["identity"]:
         print("unknown")
         sys.exit(0)
@@ -5596,6 +5600,33 @@ test_a_late_reply_is_retried_once_in_the_same_tick() {
   pass "a reply late on its first read and good on the same-tick retry keeps the root to its own result (0); a tick whose read and retry both miss still ends the root with 96 (unmeasured)"
 }
 
+# (Main 2981, Main 2988) On a loaded host each one-shot check starts late, so a tick
+# that meets the root's own exit (a zombie, refused by the reply check and retried)
+# outlasts the 1 s timer and the next tick ran before the watch could reap the root:
+# a clean root ended 96. Each tick now reaps an exited root first. The root is
+# shaped as bin/fm-lint.sh runs it (/usr/bin/time around the analysis), every check
+# is 0.5 s late, and the root keeps its own exit status, 0 or 3.
+test_a_root_exit_under_slow_checks_keeps_its_own_status() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident watch runs on native macOS only): root exit under slow checks"
+    return
+  fi
+  local tmp real_python rc want
+  tmp=$(fm_test_tmproot fm-lint-slow-exit)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  for want in 0 3; do
+    rc=0
+    FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_CHECK_DELAY=0.5 \
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$want" -- \
+      /usr/bin/time -lp -o "$tmp/rss.$want" perl -e 'sleep 3; exit $ARGV[0]' "$want" > "$tmp/err.$want" 2>&1 || rc=$?
+    [ "$rc" -eq "$want" ] || fail "a root that exited $want under 0.5 s slow checks ended $rc: $(cat "$tmp/err.$want") $(cat "$tmp/rss.$want" 2>/dev/null)"
+    ! grep -q '^rss_unmeasured=1$' "$tmp/rss.$want" || fail "a root's own exit under slow checks was recorded as unmeasured: $(cat "$tmp/rss.$want")"
+    grep -Eq '^rss_samples=libproc:[1-9]' "$tmp/rss.$want" || fail "the watch took no sample of the root: $(cat "$tmp/rss.$want")"
+  done
+  pass "under 0.5 s slow checks a root's own exit is reaped, not sampled as misses: it ends with its own status (0, and 3), measured and not unmeasured"
+}
+
 # (Main 1806 item 5, Main 1862) A compiled launcher that runs delegate A or B (one
 # version, chosen by a file): every run is analysed, so after A passed B's finding is
 # reported, and back on A the run is analysed again.
@@ -5984,6 +6015,7 @@ test_an_empty_or_damaged_lane_record_holds_the_lane
 test_a_stale_measurement_record_admits_no_new_root
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
 test_a_late_reply_is_retried_once_in_the_same_tick
+test_a_root_exit_under_slow_checks_keeps_its_own_status
 test_a_compiled_launcher_switching_delegates_is_analysed_every_run
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
