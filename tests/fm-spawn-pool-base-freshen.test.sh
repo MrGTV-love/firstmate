@@ -2189,17 +2189,24 @@ slot_neighbourhood() {
   done
 }
 
-# tree_stat_digest <slot>: what a write cannot restore. For EVERY file and folder of the copy's own state - the slot folder
-# (the checkout, the claim marker beside it, whatever else is there) and the copy's own Git administration folder (HEAD,
-# index, its logs) - one line with the path, its kind, mode, inode, size, mtime and ctime in NANOSECONDS, and the sha256 of its
-# bytes (a symlink: its target). ctime is set by the kernel on every write, chmod, rename and unlink in or of the entry; no
-# user can set it, so a write that puts the bytes, the mode and the mtime back still changes it, with or without immutable
-# flags on the host. A failed stat, read or checksum FAILS the digest (exit 1), never an empty field. The shared refs are
-# not here: another copy's work legitimately changes them, and own_digest compares them logically.
+# tree_stat_digest <slot>: what a write cannot restore. One line with the path, its kind, mode, inode, size, mtime and ctime in
+# NANOSECONDS, and the sha256 of its bytes (a symlink: its target), for:
+#   - EVERY file and folder of the slot folder (the checkout, the claim marker beside it, whatever else is there) and of the
+#     copy's own Git administration folder (HEAD, index, its logs);
+#   - the pool state file the copy's state entry is read from (pool_state_file);
+#   - every loose ref FILE of the shared Git folder outside refs/remotes/ (refs/heads, refs/tags and any other namespace).
+# ctime is set by the kernel on every write, chmod, rename and unlink in or of the entry; no user can set it, so a write that
+# puts the bytes, the mode and the mtime back still changes it, with or without immutable flags on the host. A failed stat,
+# read or checksum FAILS the digest (exit 1), never an empty field. Left to the logical comparisons only: refs/remotes/*
+# (another copy's work legitimately refreshes them), packed-refs, and the folders of the shared refs (a ref another copy
+# creates or updates there changes them); own_digest compares every ref but refs/remotes/* by value and assert_untouched
+# the copy's raw state entry by bytes.
 tree_stat_digest() {
-  local gitdir
+  local gitdir common
   gitdir=$(git -C "$1" rev-parse --absolute-git-dir) || return 1
-  python3 - "$(dirname "$1")" "$gitdir" <<'PY'
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir) || return 1
+  [ -n "$gitdir" ] && [ -n "$common" ] || return 1
+  python3 - "$(dirname "$1")" "$gitdir" "$(pool_state_file "$1")" "$common/refs" <<'PY'
 import hashlib, os, stat, sys
 
 def line(path):
@@ -2220,12 +2227,19 @@ def line(path):
 def fail(err):
     raise err
 
+slot_dir, gitdir, state, refs = sys.argv[1:]
 out = []
-for root in sys.argv[1:]:
+for root in (slot_dir, gitdir):
     out.append(line(root))
     for cur, dirs, files in os.walk(root, followlinks=False, onerror=fail):
         for name in sorted(dirs) + sorted(files):
             out.append(line(os.path.join(cur, name)))
+out.append(line(state))
+for cur, dirs, files in os.walk(refs, followlinks=False, onerror=fail):
+    if cur == refs:
+        dirs[:] = [d for d in dirs if d != "remotes"]
+    for name in sorted(files):
+        out.append(line(os.path.join(cur, name)))
 print("STATSTART")
 print("\n".join(sorted(set(out))))
 print("STATEND")
@@ -2260,7 +2274,8 @@ assert_entry_unchanged() {
 
 # assert_untouched <slot> <own-digest> <entry-file> <neighbourhood> <label> [<after-digest>]: nothing about the passed-over copy
 # changed - files, HEAD, every ref but refs/remotes/*, the raw state entry (cmp against <entry-file>) and lease, the files beside
-# it, and for every file and folder of its own state its bytes, inode, mtime and ctime in nanoseconds (tree_stat_digest).
+# it, and the bytes, inode, mtime and ctime in nanoseconds of every file and folder of the slot folder and of its own Git
+# folder, of the pool state file and of every loose ref file outside refs/remotes/ (tree_stat_digest).
 assert_untouched() {
   local slot=$1 digest=$2 entry=$3 beside=$4 label=$5 after after_entry after_beside
   # A case that makes the copy read-only or immutable and puts the modes back afterwards (the marker case) takes its own
@@ -3168,6 +3183,78 @@ test_a_failed_raw_index_checksum_fails_the_acceptance_assertion() {
   pass "a failed raw-index checksum fails own_digest and assert_untouched, with or without the index change"
 }
 
+# restore_rewrite <file>: overwrite <file> in place with other bytes, then write its own bytes back and set its mtime back to
+# the nanosecond: the bytes, the inode, the mode and the mtime are as they were, and only the ctime the kernel set differs.
+# Fails when the bytes or the mtime are not back, and when the ctime did not change: then the host shows no write and the
+# case could show nothing, so it must not pass.
+restore_rewrite() {
+  python3 - "$1" <<'PY'
+import os, sys
+p = sys.argv[1]
+before = os.stat(p)
+data = open(p, "rb").read()
+with open(p, "wb") as fh:
+    fh.write(b"temporary bytes\n")
+with open(p, "wb") as fh:
+    fh.write(data)
+os.utime(p, ns=(before.st_atime_ns, before.st_mtime_ns))
+after = os.stat(p)
+if open(p, "rb").read() != data or after.st_mtime_ns != before.st_mtime_ns or after.st_ino != before.st_ino:
+    sys.exit("the bytes, the inode or the mtime of %s did not come back" % p)
+if after.st_ctime_ns == before.st_ctime_ns:
+    sys.exit("inconclusive: the host did not change the ctime of %s on a write" % p)
+PY
+}
+
+# Main 2889 F2: the untouched oracle compares the bytes, inode, mtime and ctime in nanoseconds of the pool state file the
+# copy's entry is read from and of the copy's loose ref files, not only the entry's bytes and the refs' values. Each control
+# is accepted; each rewrite that puts back the bytes and the mtime is rejected, though the entry's bytes and every ref's value
+# read the same.
+test_the_acceptance_assertion_rejects_a_restored_rewrite_of_the_pool_state_file() {
+  local id slot state digest entry beside rc
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  id='pool-mutant-state-file'
+  make_real_pool_case mutant-state-file "$id" 2
+  slot=${REAL_SLOTS[0]}
+  real_th lease --path "$slot" --lease-holder other-task >/dev/null 2>&1 || fail "the real treehouse did not lease $slot"
+  state=$(pool_state_file "$slot")
+  entry="$CASE_DIR/entry.before"; save_entry "$slot" "$entry"
+  beside=$(slot_neighbourhood "$slot") || fail "the slot folder could not be read"
+  digest=$(own_digest "$slot") || fail "the slot could not be read"
+  rc=0
+  (assert_untouched "$slot" "$digest" "$entry" "$beside" "control") >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 0 ] || fail "the untouched copy was rejected"
+  restore_rewrite "$state" || fail "the rewrite of the pool state file is not a restore"
+  (assert_entry_unchanged "$slot" "$entry" "the restored state file") || fail "the restored state file does not give the copy's entry its old bytes, so this does not model a restore"
+  rc=0
+  (assert_untouched "$slot" "$digest" "$entry" "$beside" "state file rewritten and restored") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the assertion accepted a rewrite of the pool state file that restored its bytes and mtime"
+  pass "the acceptance assertion accepts the untouched copy and rejects a rewrite of the pool state file that restores its bytes and mtime"
+}
+
+test_the_acceptance_assertion_rejects_a_restored_rewrite_of_a_loose_ref_file() {
+  local id slot ref digest entry beside rc
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  id='pool-mutant-ref-file'
+  make_real_pool_case mutant-ref-file "$id" 1
+  slot=${REAL_SLOTS[0]}
+  git -C "$slot" update-ref refs/heads/held-by-the-copy HEAD || fail "the ref could not be made"
+  ref="$(git -C "$slot" rev-parse --path-format=absolute --git-common-dir)/refs/heads/held-by-the-copy"
+  [ -f "$ref" ] || fail "the ref is not a loose file"
+  entry="$CASE_DIR/entry.before"; save_entry "$slot" "$entry"
+  beside=$(slot_neighbourhood "$slot") || fail "the slot folder could not be read"
+  digest=$(own_digest "$slot") || fail "the slot could not be read"
+  rc=0
+  (assert_untouched "$slot" "$digest" "$entry" "$beside" "control") >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 0 ] || fail "the untouched copy was rejected"
+  restore_rewrite "$ref" || fail "the rewrite of the loose ref file is not a restore"
+  [ "$(git -C "$slot" rev-parse refs/heads/held-by-the-copy)" = "$(git -C "$slot" rev-parse HEAD)" ] || fail "the ref's value changed, so this does not model a restore"
+  rc=0
+  (assert_untouched "$slot" "$digest" "$entry" "$beside" "loose ref rewritten and restored") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the assertion accepted a rewrite of a loose ref file that restored its bytes and mtime"
+  pass "the acceptance assertion accepts the untouched copy and rejects a rewrite of a loose ref file that restores its bytes and mtime"
+}
+
 # install_state_read_hook <slot>: a python3 on the spawn's PATH that counts in $CASE_DIR/state-reads each python3 run naming
 # <slot>'s pool state file as an argument (one reading of that file), and runs FM_TEST_STATE_READ_BEFORE and
 # FM_TEST_STATE_READ_AFTER as shell text, with that reading's number in $n, just before and just after it. Every other run is
@@ -3696,6 +3783,8 @@ test_the_acceptance_assertion_rejects_a_failed_git_read_with_changed_work
 test_the_acceptance_assertion_rejects_a_raw_index_change
 test_the_acceptance_assertion_rejects_a_write_that_restores_bytes_mode_and_mtime
 test_a_failed_raw_index_checksum_fails_the_acceptance_assertion
+test_the_acceptance_assertion_rejects_a_restored_rewrite_of_the_pool_state_file
+test_the_acceptance_assertion_rejects_a_restored_rewrite_of_a_loose_ref_file
 test_a_state_that_fails_the_proof_after_the_first_reading_refuses_before_any_claim
 test_a_change_that_no_strict_reading_sees_never_classifies_the_copy
 test_a_valid_change_to_another_row_between_the_two_readings_does_not_refuse
