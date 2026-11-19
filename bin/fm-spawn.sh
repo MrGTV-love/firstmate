@@ -559,7 +559,7 @@
 #   Treehouse's recovered lease), shown by one consistent row of Treehouse's pool state read before anything is written, is
 #   passed over before any claim, lease command or idle proof: nothing is written to it, the claim marker beside it is
 #   never created, replaced or removed, and this home takes no lease (the pool state already holds it; Treehouse leaves a
-#   leased copy exactly as it is when the pane's shell exits). It is recorded in skipped-copies.tsv with the holder the pool
+#   stands inside it, so the pane is not closed for the rest of the spawn). It is recorded in skipped-copies.tsv with the holder the pool
 #   names, which bin/fm-teardown.sh never returns, and listed as passed over. A recovered lease is freed by Treehouse itself
 #   once the copy is idle, clean and landed. Each passed-over copy is a distinct copy the acquisition never accepts again,
 #   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
@@ -6533,12 +6533,14 @@ spawn_classify_copy() { # <path>
 }
 # A copy the pool handed this spawn that already carries another holder's lease is passed over before anything is written to
 # it: no claim (the claim marker beside the copy is never created, replaced or removed), no lease command, no idle proof.
-# The pool state already protects it (Treehouse leaves a copy with any lease exactly as it is when the pane's shell exits,
-# and never hands it out), so this home adds no lease of its own. It is recorded in $DATA/<task>/skipped-copies.tsv with the
+# The pool state already holds the copy's lease, so this home adds no lease of its own; the pane is not closed for the rest of
+# this spawn, since its shell stands inside the copy. It is recorded in $DATA/<task>/skipped-copies.tsv with the
 # lease holder the pool state names in the holder column, never a holder this home could own, so bin/fm-teardown.sh never
 # returns it. The record is read back; a record that cannot be written and read back refuses the whole spawn.
 spawn_pass_over_copy() {
   local passed=$WT real row reason
+  # The pane's shell stands inside this passed-over copy. Closing the pane would let Treehouse reset a copy another holder
+  # may lease, so the pane stays open for the rest of this spawn.
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0
   real=$(CDPATH='' cd -- "$passed" 2>/dev/null && pwd -P) && [ -n "$real" ] || {

@@ -3434,7 +3434,7 @@ teardown_return_collisions() { # <copy> <branch>
 # branch a return resets it to tracks a path (teardown_return_collisions, the proof's own comparison), and its
 # lease still held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
-# whose copy is gone, or whose lease another holder has taken, is dropped. This never changes the exit status.
+# whose copy is gone is dropped; a row naming another holder is kept untouched. This never changes the exit status.
 teardown_skipped_copies() {
   local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok reset_branch
   local keep="$record.keep.${BASHPID:-$$}" changed=0
