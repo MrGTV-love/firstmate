@@ -766,9 +766,10 @@ test_unproved_fresh_read_and_blank_version_are_refused() (
 # command substitution stored it stripped, equal to the old holder, so a recorded copy
 # on a slot still on the old holder compared equal to the "protected" holder and was
 # admitted (Main 1817). The shared guard now refuses: the capability is not proven, the
-# stored holder is never the old holder, and a failed adopting status leaves the slot
-# refused. Control: a normal distinct protected holder with the same failed status also
-# refuses (it needs the adoption), and with an adopting status it is admitted.
+# stored holder is never the old holder, and the slot stays refused. Control: a normal
+# distinct protected holder also refuses an old-holder slot, even beside a provider whose
+# status would adopt it: the guard runs no status and changes no holder (Main 2882), so the
+# adoption is the provider's cutover step and the slot stays refused until it has run.
 test_forged_capability_holder_cannot_collapse_to_the_old_literal() (
   # shellcheck source=bin/fm-task-copy-lib.sh
   . "$ROOT/bin/fm-task-copy-lib.sh"
@@ -803,6 +804,7 @@ test_forged_capability_holder_cannot_collapse_to_the_old_literal() (
           valid-new*) command jq -cn '{schema_version:2,version:"fixture",persistent_recovered_leases:true,recovered_quarantine_holder:"quarantined: fixture"}' ;;
         esac ;;
       status)
+        : > "$dir/status-called"
         if [[ $CASE == valid-new-adopts ]]; then
           command jq -cn '{worktrees:[{name:"1",path:"'"$fslot"'",leased:true,lease_holder:"quarantined: fixture"}]}' > "$dir/state.json"
           printf '[]\n'
@@ -821,18 +823,20 @@ test_forged_capability_holder_cannot_collapse_to_the_old_literal() (
     FM_TASK_COPY_POOL_LISTING_PROJECTS=()
     FM_TASK_COPY_POOL_LISTINGS=()
     rc=0
+    rm -f "$dir/status-called"
     fm_task_copy_pool_slots_hold_no_current_copy "$dir/project" "$fslot/state" >/dev/null 2>&1 || rc=$?
+    [ ! -e "$dir/status-called" ] || fail "$case_name: the guard ran treehouse status, which can rewrite a holder"
+    command jq -e --arg h "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" '.worktrees[0].lease_holder == $h' "$dir/state.json" >/dev/null || fail "$case_name: the guard changed the entry's holder"
     case "$case_name" in
       forged-*)
         [ "$rc" != 0 ] || fail "$case_name: a forged capability holder let the old-holder slot through"
         [ "$FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT" = no ] || fail "$case_name: the forged answer was taken as proof ($FM_TASK_COPY_RECOVERED_CAPABILITY_VERDICT)"
         [ "$FM_TASK_COPY_RECOVERED_QUARANTINE_HOLDER" != "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ] || fail "$case_name: the stored holder collapsed to the old holder"
         ;;
-      valid-new) [ "$rc" != 0 ] || fail "$case_name: an old-holder slot was admitted without an adopting status" ;;
-      valid-new-adopts) [ "$rc" = 0 ] || fail "$case_name: a proven provider that adopts the slot was refused" ;;
+      valid-new|valid-new-adopts) [ "$rc" != 0 ] || fail "$case_name: an old-holder slot was admitted although the guard adopts nothing" ;;
     esac
   done
-  pass "a capability answer whose holder is the old holder plus a newline, or only a newline, is not proof and cannot make an old-holder slot pass; a distinct protected holder still needs its adoption"
+  pass "a capability answer whose holder is the old holder plus a newline, or only a newline, is not proof and cannot make an old-holder slot pass; a distinct protected holder still refuses an old-holder slot, and the guard runs no status and changes no holder"
 )
 
 # A fixture treehouse for the two allocation boundaries of Main 1817: <caps> is the
@@ -917,14 +921,16 @@ test_unproven_allocation_runs_no_status_to_place_a_slot() {
   assert_contains "$out" "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true" "$name: the refusal did not name the upgrade"
   ! grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "$name: a refused allocation sent treehouse get"
   cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$name: the refusal changed the pool state"
-  # 1b. control: a proven provider may list, and the listing names the lease remedy
+  # 1b. control: a proven provider is not asked either (Main 2882): treehouse status can adopt
+  # old recovered holders, so no consumer guard runs it; the currency stays unknown, the guard
+  # refuses, and the remedy tells the operator to confirm the slot and run the lease command
   name=boundary-status-proven
   make_retained_case "$name"
   add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
   install_boundary_treehouse proven pool-dir-fails status-lists
   assert_retained_refusal "$name" "is not leased in Treehouse state" "treehouse lease '1'"
-  grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$name: the proven guard did not use the listing"
-  pass "an unproven provider is never asked for status to place an unleased slot (the refusal names the upgrade), while a proven provider may use the listing"
+  ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$name: the proven guard ran treehouse status, which can rewrite a holder: $(cat "$CASE_DIR/treehouse-calls")"
+  pass "neither an unproven nor a proven provider is asked for status to place an unleased slot (the unproven refusal names the upgrade, the proven one the lease remedy)"
 }
 
 test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn() {
@@ -1137,11 +1143,13 @@ assert_quarantine_intact() {  # <label> <new-owner-id or empty>
   assert_grep 'new owner work' "$PANE_DIR/new-owner.txt" "$1: the new owner's copy lost its work"
 }
 
-# N1: an older session's exit sweeps only entries on the exact old holder. A
-# proven provider's status adopts them under the protected holder, so an exit
-# before the allocation or after it leaves the recovered slot's lease and copy
-# and the new owner's lease and copy intact.
-test_old_holder_is_adopted_and_old_session_exit_cannot_sweep() {
+# N1: an older session's exit sweeps only entries on the exact old holder. The guard
+# changes no lease and no holder (Main 2882): an entry still on the old holder is refused
+# with its bytes unchanged and no status run, and moving it to the protected holder is the
+# provider's cutover adoption, modeled here by the test running treehouse status itself.
+# Once adopted, an exit before the allocation or after it leaves the recovered slot's
+# lease and copy and the new owner's lease and copy intact.
+test_old_holder_is_refused_unchanged_then_survives_old_exit_after_cutover_adoption() {
   local timing name out rc
   for timing in before after; do
     name="adopt-$timing"
@@ -1150,51 +1158,59 @@ test_old_holder_is_adopted_and_old_session_exit_cannot_sweep() {
     add_free_second_slot "$(printf ',"leased":true,"lease_holder":"%s"' "$OLD_RECOVERED")"
     install_quarantine_treehouse adopting
     retained_fingerprint > "$CASE_DIR/before-copy"
-    if [ "$timing" = before ]; then
-      (cd "$PROJECT_DIR" && PATH="$FAKEBIN_DIR:$PATH" treehouse status </dev/null >/dev/null)
-      old_session_exit "$CASE_DIR/pool/treehouse-state.json"
-      assert_quarantine_intact "$timing: exit after the adopting status"
+    if [ "$timing" = after ]; then
+      # the guard meets the old holder first: refused, nothing run, nothing changed
+      cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+      assert_retained_refusal "$name" "it is not on the protected holder '$PROTECTED_HOLDER'" "Run the provider's cutover adoption first"
+      ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$timing: the guard ran treehouse status, which can rewrite a holder: $(cat "$CASE_DIR/treehouse-calls")"
+      [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$timing: the guard ran a lease, get or return"
+      cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$timing: the refusing guard changed the pool state (a holder or a lease)"
       : > "$CASE_DIR/treehouse-calls"
     fi
-    rm -f "$CASE_DIR/status-update-check" "$CASE_DIR/status-stdin"
+    # the provider's cutover adoption: one status of the proven build, run by the operator
+    (cd "$PROJECT_DIR" && PATH="$FAKEBIN_DIR:$PATH" treehouse status </dev/null >/dev/null)
+    if [ "$timing" = before ]; then
+      old_session_exit "$CASE_DIR/pool/treehouse-state.json"
+      assert_quarantine_intact "$timing: exit after the cutover adoption"
+    fi
+    : > "$CASE_DIR/treehouse-calls"
     rc=0
-    out=$(unset TREEHOUSE_NO_UPDATE_CHECK; run_retained_spawn "$name") || rc=$?
+    out=$(run_retained_spawn "$name") || rc=$?
     expect_code 0 "$rc" "$timing: the spawn beside an adopted recovered slot failed"$'\n'"$out"
     assert_contains "$out" "spawned new-$name" "$timing: spawn did not launch"
     assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "$timing: spawn did not claim the free slot"
     [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$timing: the guard ran a lease, get or return: $(cat "$CASE_DIR/treehouse-calls")"
-    if [ "$timing" = after ]; then
-      assert_equals 1 "$(grep -c '^status' "$CASE_DIR/treehouse-calls")" "$timing: the guard did not adopt by exactly one status: $(cat "$CASE_DIR/treehouse-calls")"
-      assert_equals 1 "$(cat "$CASE_DIR/status-update-check")" "$timing: the adopting status ran with the update check on"
-      assert_absent "$CASE_DIR/status-stdin" "$timing: the adopting status did not get EOF stdin"
-    else
-      ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$timing: the guard ran status for an entry already on the protected holder"
-    fi
+    ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$timing: the spawn ran treehouse status for an entry already on the protected holder"
     model_new_owner "new-$name"
     old_session_exit "$CASE_DIR/pool/treehouse-state.json"
     assert_quarantine_intact "$timing: exit after the allocation" "new-$name"
   done
-  pass "an old holder adopted under the protected holder survives an old session's exit before and after the allocation, with the new owner's lease and copy intact"
+  pass "the guard refuses an old holder with its bytes unchanged and runs no status; once the provider's cutover has adopted it, the recovered slot survives an old session's exit before and after the allocation, with the new owner's lease and copy intact"
 }
 
-# An entry a proven provider's status did not adopt is refused, never relaxed,
-# with a named cause and before any claim or record is published; adoption runs
-# once per process however many recovered slots the records name.
-test_unadopted_old_holder_refuses_and_adoption_runs_once() {
-  local name third out rc
-  name=unadopted
-  make_retained_case "$name"
-  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
-  add_free_second_slot "$(printf ',"leased":true,"lease_holder":"%s"' "$OLD_RECOVERED")"
-  install_quarantine_treehouse stuck
-  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
-  assert_retained_refusal "$name" "did not rewrite it to the protected holder '$PROTECTED_HOLDER'" \
-    "Report this entry for repair" "treehouse lease '"
-  [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "unadopted: the guard ran a lease, get or return"
-  assert_equals 1 "$(grep -c '^status' "$CASE_DIR/treehouse-calls")" "unadopted: the guard did not try exactly one adopting status"
-  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "unadopted: the refusal changed the pool state"
+# An entry still on the old holder is refused, never relaxed, with a named cause and the
+# cutover remedy, before any claim or record is published, and the consumer is never the
+# caller of a status that rewrites a holder (Main 2882): the provider below would adopt on
+# a status, and the guard runs none, however many recovered slots the records name, so
+# every holder and the whole pool state are byte-identical afterwards. A stuck provider
+# (one whose status leaves the entry) is the same.
+test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status() {
+  local name third out rc mode
+  for mode in stuck adopting; do
+    name="old-holder-$mode"
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    add_free_second_slot "$(printf ',"leased":true,"lease_holder":"%s"' "$OLD_RECOVERED")"
+    install_quarantine_treehouse "$mode"
+    cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+    assert_retained_refusal "$name" "it is not on the protected holder '$PROTECTED_HOLDER'" \
+      "Run the provider's cutover adoption first" "treehouse lease '"
+    [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$mode: the guard ran a lease, get or return"
+    assert_equals 0 "$(grep -c '^status' "$CASE_DIR/treehouse-calls")" "$mode: the guard ran treehouse status, which can rewrite a holder: $(cat "$CASE_DIR/treehouse-calls")"
+    cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$mode: the refusal changed the pool state (a holder or a lease)"
+  done
 
-  name=adopt-once
+  name=old-holder-two-slots
   make_retained_case "$name"
   add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
   add_free_second_slot ''
@@ -1205,12 +1221,13 @@ test_unadopted_old_holder_refuses_and_adoption_runs_once() {
     '{worktrees: [{name: "1", path: $a, leased: true, lease_holder: $old}, {name: "2", path: $b},
       {name: "3", path: $c, leased: true, lease_holder: $old}]}' > "$CASE_DIR/pool/treehouse-state.json"
   install_quarantine_treehouse adopting
+  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
   rc=0
   out=$(run_retained_spawn "$name") || rc=$?
-  expect_code 0 "$rc" "adopt-once: the spawn beside two adopted recovered slots failed"$'\n'"$out"
-  assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "adopt-once: spawn did not claim the free slot"
-  assert_equals 1 "$(grep -c '^status' "$CASE_DIR/treehouse-calls")" "adopt-once: adoption ran other than once: $(cat "$CASE_DIR/treehouse-calls")"
-  pass "an old holder the provider did not adopt refuses before treehouse get with a named cause, and adoption runs once per process"
+  [ "$rc" -ne 0 ] || fail "$name: the spawn was accepted beside two old-holder slots"$'\n'"$out"
+  assert_equals 0 "$(grep -c '^status' "$CASE_DIR/treehouse-calls")" "$name: the guard ran treehouse status: $(cat "$CASE_DIR/treehouse-calls")"
+  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$name: a holder changed although the consumer was the caller"
+  pass "an old holder refuses before treehouse get with a named cause and the cutover remedy, and the guard never runs treehouse status, so no holder or lease changes when the consumer is the caller"
 }
 
 # The home-seed caller's shared guard, run as bin/fm-home-seed.sh runs it before
@@ -1242,10 +1259,13 @@ test_home_seed_guard_follows_the_protected_holder() {
     rc=0
     out=$(run_home_seed_guard) || rc=$?
     case "$shape" in
-      unproven|stuck)
+      unproven|stuck|adopting)
         [ "$rc" -ne 0 ] || fail "$shape: the home-seed guard allowed an allocation beside an old recovered holder"
         assert_contains "$out" "refusing allocation before treehouse get" "$shape: the home-seed guard did not refuse before get"
         [ "$shape" != unproven ] || assert_only_capability_probes "$shape"
+        ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "$shape: the home-seed guard ran treehouse status, which can rewrite a holder"
+        jq -e --arg p "$SLOT_DIR" --arg h "$OLD_RECOVERED" '.worktrees[] | select(.path == $p) | .lease_holder == $h' \
+          "$CASE_DIR/pool/treehouse-state.json" >/dev/null || fail "$shape: the home-seed guard changed the old holder"
         ;;
       *)
         expect_code 0 "$rc" "$shape: the home-seed guard refused beside a protected slot"$'\n'"$out"
@@ -1256,11 +1276,11 @@ test_home_seed_guard_follows_the_protected_holder() {
     [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$shape: the home-seed guard ran a lease, get or return"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$shape: the home-seed guard changed the recovered slot"
   done
-  pass "the shared guard bin/fm-home-seed.sh runs refuses an old recovered holder until the provider adopts it, and passes beside a protected slot"
+  pass "the shared guard bin/fm-home-seed.sh runs refuses an old recovered holder until the provider's cutover adopts it, changes no holder, and passes beside a protected slot"
 }
 
 # The rollout in order: the consumer first, inert on the old provider at both
-# allocation paths; then the provider install and its adopting status; then an
+# allocation paths; then the provider install (still refused) and the cutover adoption; then an
 # old session's exit; then an allocation and another exit. The recovered copy
 # and the new owner's copy stay intact at every step.
 test_combined_rollout_keeps_recovered_and_new_copies() {
@@ -1277,8 +1297,19 @@ test_combined_rollout_keeps_recovered_and_new_copies() {
   assert_only_capability_probes "rollout: old provider"
   retained_fingerprint > "$CASE_DIR/before-copy"
   install_quarantine_treehouse adopting
+  # the new provider is installed but not yet cut over: both guards still refuse, run no
+  # status and change no holder
+  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+  rc=0
+  out=$(run_home_seed_guard) || rc=$?
+  [ "$rc" -ne 0 ] || fail "rollout: the home-seed guard allowed an allocation before the cutover adoption"
+  rc=0
+  out=$(run_retained_spawn "$name") || rc=$?
+  [ "$rc" -ne 0 ] || fail "rollout: the spawn was accepted before the cutover adoption"$'\n'"$out"
+  ! grep -q '^status' "$CASE_DIR/treehouse-calls" || fail "rollout: a guard ran treehouse status before the cutover: $(cat "$CASE_DIR/treehouse-calls")"
+  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "rollout: a guard changed the pool state before the cutover"
   (cd "$PROJECT_DIR" && PATH="$FAKEBIN_DIR:$PATH" treehouse status </dev/null >/dev/null)
-  assert_quarantine_intact "rollout: after the install and its adopting status"
+  assert_quarantine_intact "rollout: after the install and the cutover adoption"
   old_session_exit "$CASE_DIR/pool/treehouse-state.json"
   assert_quarantine_intact "rollout: after an old session's exit"
   rc=0
@@ -1596,6 +1627,69 @@ test_real_provider_recovered_slot_allows_free_slot_allocation() {
   pass "against the real provider a recovered quarantine holding a current copy stays untouched while the spawn and the following get take the free slot, in both state orders"
 }
 
+# F-10: the installed provider answers schema 1 (no recovered_quarantine_holder), which the
+# consumer rejects by design. With that real binary (FM_TEST_TREEHOUSE_SCHEMA1_PROVIDER, a
+# real treehouse that answers capabilities --json with schema_version 1; skipped when unset)
+# a recovered slot holding a current copy, whether still on the old holder or already on the
+# holder a schema-2 provider would publish, refuses before any treehouse get, runs nothing
+# but the capability probe, and damages nothing: the pool state and the copy are
+# byte-identical afterwards.
+test_installed_schema1_provider_refuses_safely_and_damages_nothing() {
+  local schema bin
+  bin=${FM_TEST_TREEHOUSE_SCHEMA1_PROVIDER:-}
+  if [ -z "$bin" ] || [ ! -x "$bin" ]; then
+    printf 'skip - installed schema-1 provider: FM_TEST_TREEHOUSE_SCHEMA1_PROVIDER names no executable treehouse; the case did NOT run\n'
+    return 0
+  fi
+  schema=$(cd / && TREEHOUSE_NO_UPDATE_CHECK=1 "$bin" capabilities --json </dev/null 2>/dev/null | jq -r '.schema_version // empty' 2>/dev/null) || schema=
+  if [ "$schema" != 1 ]; then
+    printf 'skip - installed schema-1 provider: %s answers schema %s, not 1; the case did NOT run\n' "$bin" "${schema:-none}"
+    return 0
+  fi
+  ( real_schema1_provider_cases "$bin" ) || exit 1
+  pass "against a real schema-1 provider a recovered slot holding a current copy, on the old holder or on a schema-2 style holder, refuses before treehouse get with only the capability probe run, and the pool state and the copy are unchanged"
+}
+
+real_schema1_provider_cases() {  # <provider-binary>
+  local bin=$1 name start a b state pool holder
+  for start in old schema2-style; do
+    name="schema1-$start"
+    CASE_DIR="$TMP_ROOT/$name"
+    HOME_DIR="$CASE_DIR/home"
+    PROJECT_DIR="$CASE_DIR/project"
+    FAKEBIN_DIR=$(make_spawn_fakebin "$CASE_DIR/fake")
+    fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+    fm_test_spawn_home "$HOME_DIR" codex
+    fm_test_spawn_brief "$HOME_DIR" "new-$name"
+    mkdir -p "$HOME_DIR/user-home" "$CASE_DIR/real-home" "$CASE_DIR/real-xdg"
+    fm_git_init_commit "$PROJECT_DIR"
+    fm_git_add_origin "$PROJECT_DIR" "$CASE_DIR/origin.git"
+    git -C "$PROJECT_DIR" remote set-head origin main 2>/dev/null || true
+    fm_test_rooted_treehouse "$FAKEBIN_DIR/treehouse" "$bin"
+    export HOME="$CASE_DIR/real-home" XDG_CONFIG_HOME="$CASE_DIR/real-xdg" TREEHOUSE_NO_UPDATE_CHECK=1 \
+      TREEHOUSE_ROOT="$CASE_DIR/real-root" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    a=$(cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder holder </dev/null 2>/dev/null) || fail "$name: cannot lease slot A"
+    b=$(cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder spare </dev/null 2>/dev/null) || fail "$name: cannot lease slot B"
+    a=$(cd "$a" && pwd -P)
+    b=$(cd "$b" && pwd -P)
+    (cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" return "$b" --if-lease-holder spare </dev/null >/dev/null 2>&1) || fail "$name: cannot free slot B"
+    pool=${a%/*/*}
+    state=$pool/treehouse-state.json
+    holder=$OLD_RECOVERED
+    [ "$start" = old ] || holder='recovered: persistent quarantine; verify before reuse'
+    jq --arg r "$holder" --arg a "$a" '.worktrees |= map(if .path == $a then (.lease_holder = $r | del(.lease_id)) else . end)' \
+      "$state" > "$state.tmp" && mv "$state.tmp" "$state" || fail "$name: cannot make slot A recovered"
+    SLOT_DIR=$a
+    PANE_DIR=$PROJECT_DIR
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$a" "nested-$name"
+    : > "$CASE_DIR/pane-log"
+    : > "$CASE_DIR/launch-log"
+    cp "$state" "$CASE_DIR/before-state"
+    assert_retained_refusal "$name" "refusing allocation" "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
+    cmp -s "$CASE_DIR/before-state" "$state" || fail "$name: the refusing guard changed the real pool state"
+  done
+}
+
 # The cases of the test above. It runs them in a subshell, so their exports and
 # fixture globals stay there.
 real_provider_recovered_slot_cases() {
@@ -1645,8 +1739,23 @@ real_provider_recovered_slot_cases() {
     retained_fingerprint > "$CASE_DIR/before-copy"
     cp "$state" "$CASE_DIR/before-state"
     cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+    if [ "$start" = old ]; then
+      # An entry still on the old holder: the spawn refuses with the state byte-identical (the
+      # consumer changes no holder and runs no status); the provider's cutover adoption, one real
+      # status run here as the operator, then moves it, and the spawn proceeds.
+      rc=0
+      out=$(run_spawn_with_own_get "$name") || rc=$?
+      [ "$rc" -ne 0 ] || fail "$start/$order: the spawn was accepted beside an old-holder recovered slot"$'\n'"$out"
+      assert_contains "$out" "Run the provider's cutover adoption first" "$start/$order: the refusal did not name the cutover"
+      cmp -s "$CASE_DIR/before-state" "$state" || fail "$start/$order: the refusing spawn changed the pool state"
+      (cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" status --json </dev/null >/dev/null 2>&1) || fail "$start/$order: the cutover adoption (treehouse status) failed"
+      jq -e --arg a "$a" --arg r "$recovered" '.worktrees[] | select(.path == $a) | .lease_holder == $r' "$state" >/dev/null \
+        || fail "$start/$order: the provider's cutover did not move the entry to the protected holder"
+      cp "$state" "$CASE_DIR/before-state"
+      rm -f "$CASE_DIR/pane-path"
+    fi
     rc=0
-    out=$(run_spawn_with_own_get "$name") || rc=$?
+    out=$(FM_FAKE_TMUX_GET_LIVE=pty FM_FAKE_TMUX_GET_BIN="$FM_TEST_TREEHOUSE_PROVIDER" run_spawn_with_own_get "$name") || rc=$?
     expect_code 0 "$rc" "$order: the spawn beside a real recovered quarantine failed"$'\n'"$out"
     assert_not_contains "$out" "refusing allocation" "$order: the recovered quarantine still blocked allocation"
     assert_contains "$out" "spawned new-$name" "$order: spawn did not launch"
@@ -1658,14 +1767,10 @@ real_provider_recovered_slot_cases() {
     [ ! -e "$a/../.fm-slot-owner" ] || fail "$order: spawn claimed the recovered slot"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$order: spawn changed the recovered slot"
     cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$order: spawn changed the holder's record"
-    # Slot A's entry, field by field: the protected start keeps every field; the old
-    # start changes lease_holder only (the adopting rewrite). The free slot's entry and
-    # the rest of the state file are the provider's own business.
-    if [ "$start" = protected ]; then
-      assert_lease_entry_preserved "$CASE_DIR/before-state" "$state" "$a" "$start/$order: after the spawn"
-    else
-      assert_lease_entry_preserved "$CASE_DIR/before-state" "$state" "$a" "$start/$order: after the spawn" lease_holder
-    fi
+    # Slot A's entry, field by field, holder included: the spawn keeps every field (for the old
+    # start, measured from the state the provider's cutover left). The free slot's entry and the
+    # rest of the state file are the provider's own business.
+    assert_lease_entry_preserved "$CASE_DIR/before-state" "$state" "$a" "$start/$order: after the spawn"
     cp "$state" "$CASE_DIR/after-spawn-state"
     jq -e --arg a "$a" --arg r "$recovered" '[.worktrees[] | select(.path == $a)] | length == 1 and .[0].leased == true and .[0].lease_holder == $r and ((.[0].lease_id // "") == "")' "$state" >/dev/null \
       || fail "$start/$order: the recovered slot is not leased under the protected holder after the spawn"
@@ -1730,7 +1835,8 @@ test_nested_copy_in_leased_slot_allows_allocation() {
 # folder only, so an unleased slot in a superseded pool folder that holds such a
 # copy does not stop a spawn, and the spawn never receives that slot: it lands
 # in the current pool. The guard asks Treehouse at each start, through
-# treehouse pool-dir or, without it, the status listing: once Treehouse names
+# treehouse pool-dir (never the status listing, which can rewrite a holder, so
+# without pool-dir the slot is refused, not placed): once Treehouse names
 # the old folder as current again, the same slot refuses with its lease remedy
 # before treehouse get, so the harm is still caught.
 test_nested_copy_in_superseded_slot_allows_allocation() {
@@ -1765,13 +1871,21 @@ SH
     # proved the capability may be asked (status), and an unproven one is refused with
     # no status call (status-unproven).
     [ "$mode" != status ] || : > "$CASE_DIR/proven"
-    if [ "$mode" = status-unproven ]; then
+    if [ "$mode" = status-unproven ] || [ "$mode" = status ]; then
+      # Without pool-dir the guard never places the slot through a status listing, proven
+      # provider or not (Main 2882: treehouse status can rewrite a holder): the currency
+      # stays unknown and the guard refuses before treehouse get, naming the upgrade for
+      # an unproven provider and the operator's lease remedy for a proven one.
       printf '[{"name":"1","path":"%s"}]\n' "$current" > "$CASE_DIR/status.json"
       PANE_DIR=$SLOT_DIR
       : > "$CASE_DIR/pane-log"
       : > "$CASE_DIR/launch-log"
-      assert_retained_refusal "$name" "contains task holder's current copy" "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
-      [ ! -e "$CASE_DIR/status-calls" ] || fail "$mode: the unproven guard read a status listing"
+      if [ "$mode" = status ]; then
+        assert_retained_refusal "$name" "contains task holder's current copy" "confirm that treehouse status run from"
+      else
+        assert_retained_refusal "$name" "contains task holder's current copy" "Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true"
+      fi
+      [ ! -e "$CASE_DIR/status-calls" ] || fail "$mode: the guard read a status listing, which can rewrite a holder"
       continue
     fi
     if [ "$mode" = status ]; then
@@ -1913,12 +2027,13 @@ fm_test_run_cases \
   test_forged_capability_holder_cannot_collapse_to_the_old_literal \
   test_recovered_slot_allows_allocation_with_proven_capability \
   test_proven_capability_does_not_relax_other_refusals \
-  test_old_holder_is_adopted_and_old_session_exit_cannot_sweep \
-  test_unadopted_old_holder_refuses_and_adoption_runs_once \
+  test_old_holder_is_refused_unchanged_then_survives_old_exit_after_cutover_adoption \
+  test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status \
   test_home_seed_guard_follows_the_protected_holder \
   test_combined_rollout_keeps_recovered_and_new_copies \
   test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose \
   test_real_provider_recovered_slot_allows_free_slot_allocation \
+  test_installed_schema1_provider_refuses_safely_and_damages_nothing \
   test_nested_copy_in_leased_slot_allows_allocation \
   test_nested_copy_in_superseded_slot_allows_allocation \
   test_secondmate_home_slot_with_other_project_copy_allows_allocation \
