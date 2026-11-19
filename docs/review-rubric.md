@@ -31,7 +31,9 @@ That prerequisite adds no tooling, and it leaves merge approver and author-famil
 Check for changes within the [guard procedure](guard-spec.md#guard-procedure) even if the declaration or registry diff is absent.
 For those changes, a nonauthor meeting the existing review lane's independence rules reads the complete, unfiltered final base-to-head diff and reconciles the decision points, as [defined](guard-spec.md#guard-procedure), and exact IDs against the base and final registry and retirement ledger.
 Report an unmatched decision point as missing registration; deleting the row for a still-live guard is not a retirement.
-Assess the executed outcomes against the guard procedure and retain the reviewer identity, trusted policy revision, exact base and head, scope, checked tree, full diff or its digest, evidence references, and verdict.
+Assess the executed outcomes against the guard procedure: the nonauthor verifies each outcome from inspectable execution records attributable to the stated case, decision, and observed downstream effect, and a worker narrative alone is insufficient.
+Reuse retained real execution records when they are independently verifiable, including records the worker collected; independent replay can supply missing proof but is not a mandatory second execution.
+Retain the reviewer identity, trusted policy revision, exact base and head, scope, checked tree, full diff or its digest, evidence references, and verdict.
 A complete diff read from earlier may be reused only for the identical final base, head and scope, and only with independently established provenance from its retained inputs and report, including the trusted configuration and reviewer build that produced it.
 Landing needs a matching recorded final PASS whose linked report carries the exact base and head, scope, checked tree, executed-evidence assessment, and verdict for that comparison.
 The recorded verdict binds only the head, so Main checks that report against the current base, head, and tree before marking ready or landing, and does not rely on the report when any of them moved.
