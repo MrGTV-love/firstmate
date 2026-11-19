@@ -1,0 +1,31 @@
+# G141 near-miss and FM_HOME-set runs, scratch head copy (outside any gate worktree)
+IDENTICAL: scratch head bin/fm-send.sh == worktree bin/fm-send.sh
+
+### near-miss --helpx, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh --helpx
+[exit 1] first line: error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+
+### near-miss -help, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh -help
+[exit 1] first line: error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+
+### near-miss --HELP, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh --HELP
+[exit 1] first line: error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+
+### near-miss -- --help, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh -- --help
+[exit 1] first line: error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+
+### help word first with trailing text, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh --help sess:win hello
+[exit 0] first line: Steer a task by durable record: write the message into the task's steering
+
+### help with FM_HOME set to scratch dir
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-live.5lR61W/home-set /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh --help
+[exit 0] first line: Steer a task by durable record: write the message into the task's steering
+
+### BASE near-miss --helpx, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh --helpx
+[exit 1] first line: error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+

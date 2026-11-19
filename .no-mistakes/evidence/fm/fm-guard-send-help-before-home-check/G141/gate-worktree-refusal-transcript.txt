@@ -1,0 +1,90 @@
+# Runs made INSIDE the no-mistakes gate worktree (cwd git-common-dir under .no-mistakes/repos).
+# Result: the gate-context refusal fires first on BOTH base and head, so the FM_HOME-unset rows below
+# are NOT evidence of the help change. The help branch is never reached from the gate worktree.
+# Labels 'FM_HOME unset' here mean FM_HOME was unset in the environment. The scratch-copy transcript is G141/live-transcript.txt.
+
+
+### HEAD --help, FM_HOME unset
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh --help
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD -h, FM_HOME unset
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh -h
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD --help, FM_HOME empty
+$ env FM_HOME= /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh --help
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### BASE --help, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh --help
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### BASE -h, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh -h
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD send, FM_HOME unset (fail closed)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh sess:win hello
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD --help after target, FM_HOME unset
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh sess:win --help
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD -h after target, FM_HOME unset
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh sess:win -h
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### BASE send, FM_HOME unset (fail closed)
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh sess:win hello
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD gate agent --help (NO_MISTAKES_GATE=1)
+$ env NO_MISTAKES_GATE=1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh --help
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD gate agent -h (NO_MISTAKES_GATE=1)
+$ env NO_MISTAKES_GATE=1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7SNZZ4SF5CKY2D9FDZ42G8W/bin/fm-send.sh -h
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### BASE gate agent --help (NO_MISTAKES_GATE=1)
+$ env NO_MISTAKES_GATE=1 /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh --help
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+

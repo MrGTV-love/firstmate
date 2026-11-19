@@ -1,0 +1,7 @@
+Paired run of tests/fm-send-strict.test.sh (head test file in both runs)
+- HEAD (9418fb9b, bin/fm-send.sh head): 12 cases ok, exit 0. Log: head-fm-send-strict.log
+- BASE (7f3a198b bin/fm-send.sh, head test file copied in): first new case fails, exit 1.
+  Failure: "not ok - --help with FM_HOME unset should exit 0: expected exit 0, got 1"
+  Log: base-fm-send-strict-with-head-test.log (the file stops at the first failure)
+- Other two new cases (gate-agent --help/-h refused; --help after a target keeps FM_HOME refusal)
+  are regression guards. They pass on base too, because base already refuses both. Confirmed live on base in G141/live-transcript.txt.

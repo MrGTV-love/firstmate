@@ -1,0 +1,136 @@
+# G141 live transcript: fm-send.sh run from scratch copies (no .git, outside any gate worktree)
+# base = git archive 7f3a198b (merge base); head = git archive 9418fb9b (target). Same bytes as the gate worktree at those commits.
+# FM_HOME is unset in every run below unless the label says otherwise.
+
+### HEAD --help, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh --help
+Steer a task by durable record: write the message into the task's steering
+inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
+Usage: fm-send.sh <target> [--resolve-key <key> [--resolve-key <key>]... | --answers-none] [--fire-and-forget <delivery-id>] [--] <text...>
+  One key per --resolve-key flag: repeat the flag for each key the send
+  answers. A lone -- ends the options, so a message that starts with -- (even
+  --answers-none or --key) is sent as text.
+  <target> may be an exact task id, a legacy fm-<id> task label resolved
+  through this home's state/<id>.meta, or an explicit well-formed backend
+  target. fm-send refuses unresolved guesses rather than falling back to a
+  tmux window search, because a "successful" send to the wrong endpoint is
+  worse than a loud failure.
+The text must be nonempty: an empty or whitespace-only message is refused
+before anything is marked, recorded, or typed, because an empty marked
+secondmate request delivers only marker and correlation bytes and leaves the
+parent waiting on a reply to nothing.
+Special keys instead of text: fm-send.sh <target> --key Enter
+Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
+Orca currently supports Enter and C-c only, and rejects Escape.
+Help: a leading --help or -h prints usage and exits 0 without FM_HOME, after the existing gate-agent containment check; every other call keeps the existing behavior, including the FM_HOME check.
+[exit 0]
+
+### HEAD -h, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh -h
+Steer a task by durable record: write the message into the task's steering
+inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
+Usage: fm-send.sh <target> [--resolve-key <key> [--resolve-key <key>]... | --answers-none] [--fire-and-forget <delivery-id>] [--] <text...>
+  One key per --resolve-key flag: repeat the flag for each key the send
+  answers. A lone -- ends the options, so a message that starts with -- (even
+  --answers-none or --key) is sent as text.
+  <target> may be an exact task id, a legacy fm-<id> task label resolved
+  through this home's state/<id>.meta, or an explicit well-formed backend
+  target. fm-send refuses unresolved guesses rather than falling back to a
+  tmux window search, because a "successful" send to the wrong endpoint is
+  worse than a loud failure.
+The text must be nonempty: an empty or whitespace-only message is refused
+before anything is marked, recorded, or typed, because an empty marked
+secondmate request delivers only marker and correlation bytes and leaves the
+parent waiting on a reply to nothing.
+Special keys instead of text: fm-send.sh <target> --key Enter
+Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
+Orca currently supports Enter and C-c only, and rejects Escape.
+Help: a leading --help or -h prints usage and exits 0 without FM_HOME, after the existing gate-agent containment check; every other call keeps the existing behavior, including the FM_HOME check.
+[exit 0]
+
+### HEAD --help, FM_HOME empty string
+$ env FM_HOME= /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh --help
+Steer a task by durable record: write the message into the task's steering
+inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
+Usage: fm-send.sh <target> [--resolve-key <key> [--resolve-key <key>]... | --answers-none] [--fire-and-forget <delivery-id>] [--] <text...>
+  One key per --resolve-key flag: repeat the flag for each key the send
+  answers. A lone -- ends the options, so a message that starts with -- (even
+  --answers-none or --key) is sent as text.
+  <target> may be an exact task id, a legacy fm-<id> task label resolved
+  through this home's state/<id>.meta, or an explicit well-formed backend
+  target. fm-send refuses unresolved guesses rather than falling back to a
+  tmux window search, because a "successful" send to the wrong endpoint is
+  worse than a loud failure.
+The text must be nonempty: an empty or whitespace-only message is refused
+before anything is marked, recorded, or typed, because an empty marked
+secondmate request delivers only marker and correlation bytes and leaves the
+parent waiting on a reply to nothing.
+Special keys instead of text: fm-send.sh <target> --key Enter
+Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
+Orca currently supports Enter and C-c only, and rejects Escape.
+Help: a leading --help or -h prints usage and exits 0 without FM_HOME, after the existing gate-agent containment check; every other call keeps the existing behavior, including the FM_HOME check.
+[exit 0]
+
+### BASE --help, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh --help
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+usage: FM_HOME=<home> bin/fm-send.sh <task> <message>
+[exit 1]
+
+### BASE -h, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh -h
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+usage: FM_HOME=<home> bin/fm-send.sh <task> <message>
+[exit 1]
+
+### HEAD send, FM_HOME unset (must fail closed)
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh sess:win hello
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+usage: FM_HOME=<home> bin/fm-send.sh <task> <message>
+[exit 1]
+
+### BASE send, FM_HOME unset (must fail closed)
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh sess:win hello
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+usage: FM_HOME=<home> bin/fm-send.sh <task> <message>
+[exit 1]
+
+### HEAD --help after target, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh sess:win --help
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+usage: FM_HOME=<home> bin/fm-send.sh <task> <message>
+[exit 1]
+
+### HEAD -h after target, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh sess:win -h
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+usage: FM_HOME=<home> bin/fm-send.sh <task> <message>
+[exit 1]
+
+### HEAD --help after task and text, FM_HOME unset
+$ /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh sess:win hello --help
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+usage: FM_HOME=<home> bin/fm-send.sh <task> <message>
+[exit 1]
+
+### HEAD gate agent --help (NO_MISTAKES_GATE=1)
+$ env NO_MISTAKES_GATE=1 /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh --help
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### HEAD gate agent -h (NO_MISTAKES_GATE=1)
+$ env NO_MISTAKES_GATE=1 /Users/charlesabrooker/tmp/fm-live.5lR61W/head/bin/fm-send.sh -h
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+
+### BASE gate agent --help (NO_MISTAKES_GATE=1)
+$ env NO_MISTAKES_GATE=1 /Users/charlesabrooker/tmp/fm-live.5lR61W/base/bin/fm-send.sh --help
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+[exit 3]
+

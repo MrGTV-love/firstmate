@@ -1,0 +1,6 @@
+ok - fm-send strict: exact task/lane ids resolve through home metadata
+ok - fm-send --key: exit status follows delivery, and an undelivered key never reports success
+ok - fm-send strict: unset FM_HOME fails before target resolution
+not ok - --help with FM_HOME unset should exit 0: expected exit 0, got 1
+bash tests/fm-send-strict.test.sh  1.75s user 4.27s system 23% cpu 25.207 total
+base rc=1
