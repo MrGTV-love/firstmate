@@ -1,0 +1,4 @@
+== config names fm-pool-base, branch absent:
+fm-pool-base: created at origin default 8d60c87b6357cb983add26a8f1165122a40f1213
+rc=0
+== fm-pool-base now: 8d60c87b6357cb983add26a8f1165122a40f1213 (origin default 8d60c87b6357cb983add26a8f1165122a40f1213)

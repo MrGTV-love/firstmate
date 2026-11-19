@@ -1,0 +1,5 @@
+ok - a task that names a base branch still has fm-pool-base moved to the origin default, and still starts from that branch
+ok - a spawn whose treehouse config cannot be read is refused before any copy is taken and no ref moves
+ok - a spawn moves only fm-pool-base, and moves nothing when the home does not name it
+ok - a spawn over a diverged fm-pool-base is refused before any copy is taken and no ref moves
+EXIT=0

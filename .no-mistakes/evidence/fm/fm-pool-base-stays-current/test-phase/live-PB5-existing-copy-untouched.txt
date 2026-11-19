@@ -1,0 +1,10 @@
+== existing copy A (leased earlier): /private/tmp/pbdrive/pb5.XI5X46/pool/.treehouse/repo-e722b0/1/repo  HEAD=5e6539da8e072019e65bfd41d03e15cc88c6ebed  status=[]
+== origin default now 5d0053dd753c3aa1c444724f969fe4e61d2bc1db; running the step (as spawn admission does under the lock)
+fm-pool-base: advanced 5e6539da8e072019e65bfd41d03e15cc88c6ebed to origin default 5d0053dd753c3aa1c444724f969fe4e61d2bc1db
+step rc=0
+== fm-pool-base now 5d0053dd753c3aa1c444724f969fe4e61d2bc1db
+== copy A untouched (HEAD, staged, dirty counts): YES  HEAD=5e6539da8e072019e65bfd41d03e15cc88c6ebed  status=[]
+== local main unchanged: YES
+== second real get handed out a different copy: YES (/private/tmp/pbdrive/pb5.XI5X46/pool/.treehouse/repo-e722b0/2/repo)
+== second copy HEAD == origin default 5d0053dd753c3aa1c444724f969fe4e61d2bc1db? YES
+== copy A still at its old commit: 5e6539da8e072019e65bfd41d03e15cc88c6ebed

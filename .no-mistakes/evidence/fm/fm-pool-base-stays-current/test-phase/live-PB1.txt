@@ -1,0 +1,13 @@
+== before: origin/main=76ca216a6e8ac48f2e0445599e9c23f051ef37dd local main=f5329be85736aa5fe0bd5a25b8e724289a1c7a23 fm-pool-base=b57a9cf9ac31027fce2941e3fc0672b3a5b545bc
+== step (what fm-spawn does under the lock, origin default = 76ca216a6e8ac48f2e0445599e9c23f051ef37dd):
+fm-pool-base: advanced b57a9cf9ac31027fce2941e3fc0672b3a5b545bc to origin default 76ca216a6e8ac48f2e0445599e9c23f051ef37dd
+rc=0
+== fm-pool-base after: 76ca216a6e8ac48f2e0445599e9c23f051ef37dd (origin default 76ca216a6e8ac48f2e0445599e9c23f051ef37dd)
+== local main after: f5329be85736aa5fe0bd5a25b8e724289a1c7a23 (unchanged: f5329be85736aa5fe0bd5a25b8e724289a1c7a23)
+treehouse get rc=0
+== real treehouse handed out: /private/tmp/pbdrive/pb1.ErCOC1/pool/.treehouse/repo-2e9276/1/repo
+== copy HEAD: 76ca216a6e8ac48f2e0445599e9c23f051ef37dd
+== copy HEAD == origin default? YES
+== fm-pool-base reflog:
+fm-pool-base@{0} fm-pool-base: fast-forward to the origin default
+fm-pool-base@{1} branch: Created from b57a9cf9ac31027fce2941e3fc0672b3a5b545bc

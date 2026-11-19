@@ -1,0 +1,4 @@
+not ok - an absent fm-pool-base named by the config is created
+_: /Users/charlesabrooker/tmp/fm-base-tree.10VAMp/bin/fm-pool-base-lib.sh: No such file or directory
+_: fm_pool_base_advance: command not found: expected exit 0, got 127
+EXIT=1

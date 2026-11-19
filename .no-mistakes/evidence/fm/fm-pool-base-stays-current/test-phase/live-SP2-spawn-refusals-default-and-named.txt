@@ -1,0 +1,14 @@
+== repo before spawn: origin/main=ae58699d8e7e8477465bbca6abfe7ac55eae871e (the repo has NOT fetched)  fm-pool-base=a9e2955919c4e7b1a98a9bb697c974ed3a3b1a41  local main=f72f0918d42f0d5bb2437e52d2503b28647359b8
+== origin default the spawn must fetch: 2a35fc884198ed7014a7449723b4f97c42e3f57b ; repo holds it before spawn? NO
+################ default spawn (--mode no-mistakes --yolo off)
+error: fm-pool-base refused (diverged): fm-pool-base (a9e2955919c4e7b1a98a9bb697c974ed3a3b1a41) and the origin default (2a35fc884198ed7014a7449723b4f97c42e3f57b) each hold commits the other lacks [fm-pool-base: a9e2955919c4e7b1a98a9bb697c974ed3a3b1a41; origin default: 2a35fc884198ed7014a7449723b4f97c42e3f57b]; every ref is as it was
+== exit 1
+== origin default 2a35fc884198ed7014a7449723b4f97c42e3f57b named in the refusal: YES
+== refs byte-identical: YES
+== pool entries: 0
+################ named spawn (--mode direct-PR --yolo off --base-branch feature/hub)
+error: fm-pool-base refused (diverged): fm-pool-base (a9e2955919c4e7b1a98a9bb697c974ed3a3b1a41) and the origin default (2a35fc884198ed7014a7449723b4f97c42e3f57b) each hold commits the other lacks [fm-pool-base: a9e2955919c4e7b1a98a9bb697c974ed3a3b1a41; origin default: 2a35fc884198ed7014a7449723b4f97c42e3f57b]; every ref is as it was
+== exit 1
+== origin default 2a35fc884198ed7014a7449723b4f97c42e3f57b named in the refusal: YES
+== refs byte-identical: YES
+== pool entries: 0

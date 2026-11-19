@@ -1,0 +1,32 @@
+code root: /Users/charlesabrooker/tmp/fm-base-tree.10VAMp
+real treehouse: /Users/charlesabrooker/.local/bin/treehouse
+treehouse version: v3.1.7-fm.611a088
+scratch root: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ixp6Ff
+
+== before
+origin default (read from the bare origin): 30bad15b3642608e5d7902740ef3de6829942437
+origin/main in scratch clone:               30bad15b3642608e5d7902740ef3de6829942437
+local main:                                 4bad5bbeafb533335d4389f8f6abbabdda3ce6f3
+fm-pool-base:                               3adccb7ac781c975f6de9bb18b8a662ec0cd1a87
+local main commits origin/main lacks:       1
+
+== spawn
+exit code: 0
+warning: task pool-base-live-happy: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ixp6Ff/pbA/home/data/pool-base-live-happy/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ixp6Ff/pbA/home/data/pool-base-live-happy/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-base-live-happy
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ixp6Ff/pbA/home/data/pool-base-live-happy/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for pool-base-live-happy: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned pool-base-live-happy harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-pool-base-live-happy worktree=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ixp6Ff/pbA/pool-root/.treehouse/repo-ec63d6/1/repo
+
+== after
+fm-pool-base:                               3adccb7ac781c975f6de9bb18b8a662ec0cd1a87
+local main (must be unchanged):             4bad5bbeafb533335d4389f8f6abbabdda3ce6f3
+fm-pool-base reflog:
+3adccb7 refs/heads/fm-pool-base@{0}: branch: Created from 3adccb7ac781c975f6de9bb18b8a662ec0cd1a87
+treehouse get record (captured as the get returned):
+slot=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ixp6Ff/pbA/pool-root/.treehouse/repo-ec63d6/1/repo
+head_at_get=3adccb7ac781c975f6de9bb18b8a662ec0cd1a87
+pool_base_at_get=3adccb7ac781c975f6de9bb18b8a662ec0cd1a87
+launched copy HEAD:                         30bad15b3642608e5d7902740ef3de6829942437
+DRIVER_EXIT=0

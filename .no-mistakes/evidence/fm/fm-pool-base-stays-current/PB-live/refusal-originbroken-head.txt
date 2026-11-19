@@ -1,0 +1,16 @@
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7RYMPD0Z8151S3VR02EHTSK
+real treehouse: /Users/charlesabrooker/.local/bin/treehouse
+treehouse version: v3.1.7-fm.611a088
+scratch root: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.XygPn1
+
+== before
+origin url now points at a missing repository
+
+== spawn
+exit code: 1
+error: fm-pool-base refused (origin_unreadable): the origin default of /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.XygPn1/pbD/scn/repo could not be read (could not fetch origin) [fm-pool-base: 3adccb7ac781c975f6de9bb18b8a662ec0cd1a87; origin default: unavailable]; every ref is as it was
+
+== after
+every ref byte-identical to before: yes
+copy acquired: no
+DRIVER_EXIT=0

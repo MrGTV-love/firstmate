@@ -1,0 +1,6 @@
+== before: origin/main=f2110a69373364cae89f675e333291a329f90bb2 main=386bd004ed8bf8fe5c09ac72e39037fba9f10414 fm-pool-base=f99361fc58b648ecbc958946159474a9ecc9419a
+== real fm-spawn.sh output:
+error: fm-pool-base refused (diverged): fm-pool-base (f99361fc58b648ecbc958946159474a9ecc9419a) and the origin default (f2110a69373364cae89f675e333291a329f90bb2) each hold commits the other lacks [fm-pool-base: f99361fc58b648ecbc958946159474a9ecc9419a; origin default: f2110a69373364cae89f675e333291a329f90bb2]; every ref is as it was
+== spawn exit code: 1
+== refs byte-identical after spawn: YES
+== treehouse pool dir entries after refusal: 0

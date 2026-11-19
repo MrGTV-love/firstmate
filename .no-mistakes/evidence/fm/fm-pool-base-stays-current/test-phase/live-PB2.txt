@@ -1,0 +1,11 @@
+== before: fm-pool-base=fa1fd0aa48eb2d8d54b302b2e02b08ad276c2e06 origin default=25bbcb348018594a3a890c6b4e150be0d5c34104
+== run 1:
+fm-pool-base: advanced fa1fd0aa48eb2d8d54b302b2e02b08ad276c2e06 to origin default 25bbcb348018594a3a890c6b4e150be0d5c34104
+rc=0
+== after run 1: fm-pool-base=25bbcb348018594a3a890c6b4e150be0d5c34104
+fm-pool-base@{0} fm-pool-base: fast-forward to the origin default
+fm-pool-base@{1} branch: Created from fa1fd0aa48eb2d8d54b302b2e02b08ad276c2e06
+== run 2 (nothing new on origin):
+rc=0 out=[]
+== refs unchanged by run 2: YES
+commits origin has that fm-pool-base lacks: 0

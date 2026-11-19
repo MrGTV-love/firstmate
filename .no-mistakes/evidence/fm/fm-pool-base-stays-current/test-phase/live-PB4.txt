@@ -1,0 +1,15 @@
+################ config: 'base_branch = "main"'
+rc=0 out=[]
+all refs unchanged: YES
+fm-pool-base created: NO
+################ config: 'max_trees = 4'
+rc=0 out=[]
+all refs unchanged: YES
+fm-pool-base created: NO
+################ config: '<no treehouse.toml content: empty file>'
+rc=0 out=[]
+all refs unchanged: YES
+fm-pool-base created: NO
+################ no treehouse config at all
+rc=0 out=[]
+all refs unchanged: YES

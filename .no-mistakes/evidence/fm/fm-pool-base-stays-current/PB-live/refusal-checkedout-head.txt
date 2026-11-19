@@ -1,0 +1,17 @@
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7RYMPD0Z8151S3VR02EHTSK
+real treehouse: /Users/charlesabrooker/.local/bin/treehouse
+treehouse version: v3.1.7-fm.611a088
+scratch root: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.EMWZL0
+
+== before
+origin default: 30bad15b3642608e5d7902740ef3de6829942437
+fm-pool-base (behind origin, checked out in /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.EMWZL0/pbC/holder): 3adccb7ac781c975f6de9bb18b8a662ec0cd1a87
+
+== spawn
+exit code: 1
+error: fm-pool-base refused (checked_out): fm-pool-base (3adccb7ac781c975f6de9bb18b8a662ec0cd1a87) is checked out in a worktree, so it is not moved to origin default 30bad15b3642608e5d7902740ef3de6829942437 [fm-pool-base: 3adccb7ac781c975f6de9bb18b8a662ec0cd1a87; origin default: 30bad15b3642608e5d7902740ef3de6829942437]; every ref is as it was
+
+== after
+every ref byte-identical to before: yes
+copy acquired: no
+DRIVER_EXIT=0

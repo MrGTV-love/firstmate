@@ -1,0 +1,30 @@
+################ refusal case: diverged  (origin default arg='336e64b47c8ca13ec0d1e464448d96d4ef953fe6')
+error: fm-pool-base refused (diverged): fm-pool-base (cc3071b312144a6dee97d30662f4cb6411e7647e) and the origin default (336e64b47c8ca13ec0d1e464448d96d4ef953fe6) each hold commits the other lacks [fm-pool-base: cc3071b312144a6dee97d30662f4cb6411e7647e; origin default: 336e64b47c8ca13ec0d1e464448d96d4ef953fe6]; every ref is as it was
+exit=1
+refs and worktree HEADs byte-identical after refusal: YES
+
+################ refusal case: ahead  (origin default arg='7791baccb7f806f572f222380fae43f65be82d7a')
+error: fm-pool-base refused (ahead): fm-pool-base (4d25b662c186010f95c51d43b6ec6f7b0f520fa5) holds commits the origin default (7791baccb7f806f572f222380fae43f65be82d7a) lacks [fm-pool-base: 4d25b662c186010f95c51d43b6ec6f7b0f520fa5; origin default: 7791baccb7f806f572f222380fae43f65be82d7a]; every ref is as it was
+exit=1
+refs and worktree HEADs byte-identical after refusal: YES
+
+################ refusal case: origin_missing  (origin default arg='<empty>')
+error: fm-pool-base refused (origin_missing): /tmp/pbdrive/pb3-origin_missing.96beYM/repo has no origin remote, so there is no origin default to follow [fm-pool-base: 39206dd308853cf9dab6b3de852c46a56a9c7969; origin default: unavailable]; every ref is as it was
+exit=1
+refs and worktree HEADs byte-identical after refusal: YES
+
+################ refusal case: origin_unreadable  (origin default arg='0000000000000000000000000000000000000001')
+error: fm-pool-base refused (origin_unreadable): origin default '0000000000000000000000000000000000000001' is not a commit in /tmp/pbdrive/pb3-origin_unreadable.tA97ST/repo [fm-pool-base: e53ca801788d6853bcbb3cbc23503056022e92a3; origin default: unavailable]; every ref is as it was
+exit=1
+refs and worktree HEADs byte-identical after refusal: YES
+
+################ refusal case: config_unreadable  (origin default arg='9265f63fbb506c51c78945b643e32f55a425909d')
+error: fm-pool-base refused (config_unreadable): the treehouse config of /tmp/pbdrive/pb3-config_unreadable.jrnOjq/repo cannot be read or parsed, so it is unknown whether the pool uses fm-pool-base [fm-pool-base: 02a2baf111c4c33fcd35589597e1c5102f51ffad; origin default: unavailable]; every ref is as it was
+exit=1
+refs and worktree HEADs byte-identical after refusal: YES
+
+################ refusal case: checked_out  (origin default arg='d2330a608ac72b83a1be8e8c0f19882c736f680d')
+error: fm-pool-base refused (checked_out): fm-pool-base (d76455feb08b4eaefaf19f3ad56b64664d93d64b) is checked out in a worktree, so it is not moved to origin default d2330a608ac72b83a1be8e8c0f19882c736f680d [fm-pool-base: d76455feb08b4eaefaf19f3ad56b64664d93d64b; origin default: d2330a608ac72b83a1be8e8c0f19882c736f680d]; every ref is as it was
+exit=1
+refs and worktree HEADs byte-identical after refusal: YES
+

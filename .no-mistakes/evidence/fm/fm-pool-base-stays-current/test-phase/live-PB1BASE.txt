@@ -1,0 +1,4 @@
+== no fm-pool-base step. origin default=127b76c1f22d38a2b7fe75d18dd7f140bf74ffdc fm-pool-base=b8a6d58459b67ab1024c717e2fafce5eb7fa4ef5
+treehouse get rc=0
+== copy HEAD: b8a6d58459b67ab1024c717e2fafce5eb7fa4ef5
+== copy HEAD == origin default? NO
