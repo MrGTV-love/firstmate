@@ -30,17 +30,25 @@ Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run)
          consecutive probe readings no further apart than the window;
       3. swap used or the compressor grew at all since the last probe
          reading no older than the window, which is the WINDOW_QUANTILE of
-         the recorded gaps between probe readings;
-      4. fit or the trend cannot be judged (no record, too few recorded
-         steps for a window, a kind with fewer than MIN_VALUES recorded
-         runs, a missing previous probe reading or one older than the
-         window): the start defers with that reason, the recovery text
+         the recorded gaps between probe readings (a record of fewer than
+         100 steps, down to MIN_VALUES, ranks the window from the gaps it
+         has: its largest);
+      4. fit or the trend cannot be judged (no record, fewer than 100
+         recorded steps for a reserve, fewer than MIN_VALUES for a window, a
+         kind with fewer than MIN_VALUES recorded runs, a missing previous
+         probe reading or one older than the window): the start defers with
+         that reason, the recovery text
          (RECOVERY) and the calibration run (calibrate_hint). The one
          bootstrap admit: the host is idle (no fleet run is running, so the
          start is the only run) and available memory exceeds the largest peak
          recorded for ANY kind (largest_peak). A host with no recorded peak
          admits nothing on an unjudged input. No other admit is made with an
-         unjudged input.
+         unjudged input. The bootstrap admit never overrides a judged trend:
+         growth against a previous reading inside the window refuses it,
+         also while the record is short. With fewer than MIN_VALUES steps no
+         window can be named, so no previous reading counts as fresh and the
+         one start admits on the bootstrap alone (a known residue of a short
+         record).
       5. calibrate (the wrapper's calibrate mode) is how a first measurement
          is made: one operator-chosen representative command runs once, its
          process tree's largest resident size is read from the same census the
@@ -49,15 +57,20 @@ Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run)
          sees it. It starts only when the readings are readable, swap and the
          compressor are not growing, more memory is available than the largest
          recorded peak (or, with none recorded, no fleet run is running), and
-         no other calibration is measuring. A command read fewer than
-         MIN_VALUES times is not recorded.
+         no other calibration is measuring; the same trend comparison as admit
+         decides growth, with the same window and residue. A command read
+         fewer than MIN_VALUES times is not recorded.
     Quantile values come from this host's own record at the moment of the
     decision and are never seeded or guessed. Fewer values than
     1 / (1 - quantile) make the nearest-rank quantile the largest recorded
-    value, a bound that can only be too high, so a projection or reserve is
-    ranked from as few as MIN_VALUES values; a window needs 1 / (1 - 0.99)
-    steps because a short record's largest gap would accept an older, less
-    relevant reading. Swap and compressor growth have no floor: in the
+    value, so a projection is ranked from as few as MIN_VALUES values and a
+    window from as few as MIN_VALUES steps; the reserve, and so the fit,
+    needs 1 / (1 - 0.99) steps because a short record's largest drop is not
+    the 99th percentile of the drops. A short record's largest gap can sit
+    below the real cadence tail (the measured record's window is 2,325 s), so
+    a previous reading may count as outside the window and be admitted
+    against: that is the permissive direction of a short record, and it ends
+    once the record holds 100 steps. Swap and compressor growth have no floor: in the
     recorded probes the positive swap changes split into 3 of at most
     14.9 MiB and 9 of at least 185.6 MiB with nothing between, and a
     compressor rise is the early sign of swap growth; refusing on any
@@ -608,7 +621,10 @@ def projected_rss(calibration, kind):
 
 
 def trail_limits(calibration):
-    """The reserve and window from the recorded steps, or (None, why); a second value names what is missing."""
+    """The reserve and window from the recorded steps, or (None, why); a second value names what is missing.
+
+    A record of at least MIN_VALUES steps always yields its window; the reserve needs 100.
+    """
     trail = calibration.get("trail")
     if trail is None:
         return None, "no probe step record yet; the root home's probe has not folded one"
@@ -618,9 +634,14 @@ def trail_limits(calibration):
             raise ValueError("a step is not four integers")
     except (KeyError, TypeError, ValueError) as exc:
         return None, f"no usable step record in the calibration ({exc})"
-    if len(steps) < enough_for(WINDOW_QUANTILE):
-        return None, f"{len(steps)} recorded probe steps; {enough_for(WINDOW_QUANTILE)} are needed for a window"
+    if len(steps) < MIN_VALUES:
+        return None, f"{len(steps)} recorded probe steps; {MIN_VALUES} are needed for a window"
     window = rank_quantile([step[0] for step in steps], WINDOW_QUANTILE)
+    if len(steps) < enough_for(RESERVE_QUANTILE):
+        # A short record ranks its window from the gaps it has (its largest gap) so that growth against a fresh
+        # previous reading still refuses; the reserve, and so the fit, wait for a record long enough to rank it.
+        return {"window_seconds": window, "steps": len(steps)}, (
+            f"{len(steps)} recorded probe steps; {enough_for(RESERVE_QUANTILE)} are needed for a reserve")
     drops = [step[1] for step in steps if step[0] <= window and step[1] > 0]
     limits = {"window_seconds": window, "steps": len(steps)}
     if len(drops) < MIN_VALUES:

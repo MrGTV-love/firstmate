@@ -560,7 +560,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     # the reading is stamped 2000 s before the decision, which runs a moment later: the age reads 2000 s plus the run time
     assert "outside the 300 s window" in report["reasons"][0] and any(f"{age} s old" in report["reasons"][0] for age in range(2000, 2010)), report["reasons"]
     report = decide(available=30*gib, busy=True, steps=50, code=75)
-    assert "50 recorded probe steps; 100 are needed for a window" in report["reasons"][0], report["reasons"]
+    assert "fit: 50 recorded probe steps; 100 are needed for a reserve" in report["reasons"][0], report["reasons"]
     # the task-only record's largest peak is 2500 MiB: an idle host above it admits, below it defers
     report = decide(None, available=3000*mib, busy=False, kinds=("task",), steps=50)
     assert report["harm"]["largest_peak_bytes"] == 2500 * mib and "bootstrap" in report["harm"], report["harm"]
@@ -650,4 +650,42 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     report = call("probe",environ=harm_env)
     assert report["admission"] == "admit" and report["harm"]["compressor_delta_bytes"] == 0, report
     print("ok - a probe judges the previous probe reading, then records one step (gap, available drop, compressor and swap change) and the new last reading")
+
+    # a short record (3 steps of 300 s, so a 300 s window and no reserve) still refuses growth against a fresh previous
+    # reading, on the bootstrap admit and on the calibration run; every control below must keep admitting
+    def short_record(prior="fresh", **moves):
+        record(steps=3, **moves)
+        saved = json.loads(record_path.read_text())
+        if prior == "none":
+            del saved["trail"]["last"]
+        record_path.write_text(json.dumps(saved))
+    rise = 16384
+    for name, moves in (("a one-page compressor rise", dict(last_compressor=compressor_now - rise)),
+                        ("swap growth", dict(last_swap=swap_now - 100*mib))):
+        print(f"case - short record, {name}: admit")
+        facts(available=20*gib); short_record(**moves)
+        report = call("admit", "--kind", "no-mistakes", code=75, environ=harm_env)
+        assert "bootstrap" not in report["harm"] and report["harm"]["window_seconds"] == 300, (name, report["harm"])
+        assert report["reasons"][0].startswith(("compressor grew by 16384 bytes", "swap used grew by")), (name, report["reasons"])
+        assert "reserve_bytes" not in report["harm"], (name, report["harm"])
+        print(f"case - short record, {name}: calibrate")
+        facts(available=20*gib); short_record(**moves)
+        before = json.loads(record_path.read_text())["runs"]
+        refused = calibrate("no-mistakes", code=75)
+        assert "grew by" in refused.stderr and json.loads(record_path.read_text())["runs"] == before, refused.stderr
+    for name, setup in (("flat readings", lambda: short_record()),
+                        ("no previous reading", lambda: short_record(prior="none", last_compressor=compressor_now - rise)),
+                        ("a previous reading 600 s old outside the 300 s window",
+                         lambda: short_record(last_compressor=compressor_now - rise, age=600))):
+        facts(available=20*gib); setup()
+        report = call("admit", "--kind", "no-mistakes", environ=harm_env)
+        assert report["reasons"] == [] and "no fleet run is running" in report["harm"]["bootstrap"], (name, report["harm"])
+        facts(available=20*gib); setup()
+        done = calibrate("no-mistakes")
+        assert "calibration recorded: no-mistakes:calibration/" in done.stderr, (name, done.stderr)
+    # one step names no window, so no previous reading counts as fresh: the one start admits on the bootstrap alone
+    facts(available=20*gib); record(steps=1, last_compressor=compressor_now - rise)
+    report = call("admit", "--kind", "no-mistakes", environ=harm_env)
+    assert "window_seconds" not in report["harm"] and "bootstrap" in report["harm"], report["harm"]
+    print("ok - a short record refuses swap or compressor growth against a fresh previous reading on admit and calibrate, and still admits flat readings, no previous reading and a stale one")
 PY
