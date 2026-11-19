@@ -19,7 +19,9 @@
 #
 # The ShellCheck and actionlint versions are maintained pins, not a freeze.
 # CI and --strict-version refuse a different local ShellCheck; an ordinary local
-# run warns and proceeds so a newer local tool is not a wall. --check-version
+# run warns and proceeds so a newer local tool is not a wall. --strict-version
+# also exits 2 on every host that is not macOS, where the per-root resident cap
+# is not enforced. --check-version
 # compares both pins with the latest upstream releases (exit 0 current, 1
 # behind, 2 unknown) so a bump is routine rather than discovered by a failure.
 #
@@ -152,7 +154,10 @@
 # asks for its turn. That reading is the live process table (resident size
 # only, from ps or libproc) and, where the macOS watch runs, the watch's own
 # peak of resident size and footprint. A held root is charged the worst case
-# when its record names no charge. Admission needs that table: while neither ps
+# when its record names no charge. A root waiting for its turn reads that table
+# at most every 0.5 s and reuses the reading until the next read; the ledger and
+# the slot charges are read fresh on every pass under the host lock. Admission
+# needs that table: while neither ps
 # nor bin/fm-proc-info.py (its table and memory commands) can read it, no root
 # is admitted in any pool. This script reads that table once, before any root
 # starts, and exits 2 naming the host process table, ps and fm-proc-info.py and
@@ -436,7 +441,7 @@
 #   fm-lint.sh --telemetry <path> ...  write a quiet metrics snapshot
 #   fm-lint.sh --required-version      print the ShellCheck pin
 #   fm-lint.sh --check-version         report whether the ShellCheck/actionlint pins are current
-#   fm-lint.sh --strict-version        refuse a local ShellCheck that differs from the pin
+#   fm-lint.sh --strict-version        refuse a local ShellCheck that differs from the pin; exits 2 on every non-macOS host
 #   fm-lint.sh --list-files            print the file set that would be linted
 #   fm-lint.sh --help                  print this usage
 set -u

@@ -75,7 +75,7 @@ Coordinate any workflow rollback with its required-check names so a retired chec
   `docs/fm-test-portable-shards.md` owns partition verification and performance evidence.
   Its header and `--help` output own the exact local lint modes, dependency selection, and analysis flags.
   A malformed `.github/workflows/*.yml`, including a self-broken `ci.yml`, fails that local lint path before merge because a broken workflow cannot report its own breakage.
-  It pins one shellcheck version and one actionlint version for CI parity; CI and `--strict-version` refuse a different version, while an ordinary local run warns and proceeds so a newer local tool is not a wall.
+  It pins one shellcheck version and one actionlint version for CI parity; CI and `--strict-version` refuse a different version, while an ordinary local run warns and proceeds so a newer local tool is not a wall. `--strict-version` also exits 2 on every non-macOS host, where the per-root resident cap is not enforced.
   Print the shellcheck pin with `bin/fm-lint.sh --required-version` and the actionlint pin with `bin/fm-lint-workflows.sh --required-version`.
   Use `bin/fm-install-shellcheck.sh` and `bin/fm-install-actionlint.sh` to install those exact builds locally; each installer's header owns its destination usage and supported platforms.
   `bin/fm-lint.sh --check-version` compares both pins with the latest upstream releases (exit 0 current, 1 behind, 2 unknown) without needing a local linter; `.github/workflows/lint-currency.yml` runs it weekly so a bump is routine rather than discovered by a failure.

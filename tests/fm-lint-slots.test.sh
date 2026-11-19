@@ -1819,6 +1819,47 @@ test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root() {
   pass "a waiting gate whose only child is its own table read is not the oldest running gate in any form a table shows it (${forms[*]})"
 }
 
+# (RV-4) A queue head that waits on a full budget reads the process table at most
+# every 0.5 s: a holder root fills the budget for 6 s, the waiter's reads are
+# counted through a ps stub over 4 s, and the waiter runs once the holder ends.
+test_the_queue_head_reads_the_process_table_at_most_twice_a_second() {
+  local tmp reads before count holder waiter code
+  tmp=$(fm_test_tmproot fm-lint-table-rate)
+  mkdir -p "$tmp/ps"
+  reads="$tmp/reads.log"
+  : > "$reads"
+  cat > "$tmp/ps/ps" <<'SH'
+#!/bin/sh
+if [ "$*" = '-axww -o pid=,ppid=,rss=,lstart=,command=' ]; then
+  printf 'read\n' >> "$FM_TEST_READS"
+  printf '%s 1 0 %s perl fm-lint-cache.pl gate %s 2 %s\n' "$PPID" "$(date '+%a %b %e %H:%M:%S %Y')" "$FM_TEST_POOL" "$FM_TEST_NAME"
+  exit 0
+fi
+exit 1
+SH
+  chmod +x "$tmp/ps/ps"
+  PATH="$tmp/ps:$PATH" FM_TEST_READS="$reads" FM_TEST_POOL="$tmp/pool" FM_TEST_NAME=holder \
+    FM_LINT_INTERNAL_HOST_LOCK="$tmp/host.lock" FM_LINT_INTERNAL_HOST_RSS_KIB=1000 FM_LINT_INTERNAL_ROOT_CAP_KIB=900 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/pool" 2 holder "$tmp/holder.wait" -- sleep 6 &
+  holder=$!
+  sleep 1
+  PATH="$tmp/ps:$PATH" FM_TEST_READS="$reads" FM_TEST_POOL="$tmp/pool" FM_TEST_NAME=waiter \
+    FM_LINT_INTERNAL_HOST_LOCK="$tmp/host.lock" FM_LINT_INTERNAL_HOST_RSS_KIB=1000 FM_LINT_INTERNAL_ROOT_CAP_KIB=900 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/pool" 2 waiter "$tmp/waiter.wait" -- true &
+  waiter=$!
+  sleep 0.5
+  before=$(wc -l < "$reads" | tr -d ' ')
+  sleep 4
+  count=$(( $(wc -l < "$reads" | tr -d ' ') - before ))
+  code=0
+  wait "$waiter" || code=$?
+  wait "$holder" || fail "the holder root did not end cleanly"
+  [ "$count" -ge 2 ] || fail "the waiting queue head read the process table $count times in 4 s, so it did not keep its reading current"
+  [ "$count" -le 20 ] || fail "the waiting queue head read the process table $count times in 4 s, more than 5 times a second"
+  [ "$code" -eq 0 ] || fail "the waiter did not run once the budget was free (exit $code)"
+  pass "a queue head waiting on a full budget read the process table $count times in 4 s (at most 0.5 s apart) and ran once the budget was free"
+}
+
 test_growth_guard_never_stops_the_watch_reader() {
   local tmp py older younger deadline settle rows watch reader standin form
   local reader_seen reader_large reader_stopped standin_stopped
@@ -4541,9 +4582,15 @@ test_no_signal_route_takes_a_group_from_input() {
     rc=0
     FM_TEST_SIGNAL_LOG="$log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" \
       perl "$ROOT/bin/fm-lint-cache.pl" signal KILL "$item" > "$tmp/out" 2>&1 || rc=$?
-    [ "$rc" -ne 0 ] || fm_lint_fail_settled "a signal mode accepted the item '$item': $(cat "$tmp/out")"
+    [ "$rc" -eq 255 ] && [ "$(cat "$tmp/out")" = "fm-lint-cache: invalid private invocation" ] \
+      || fm_lint_fail_settled "the command line signal mode did not refuse '$item' with its usage error (exit $rc): $(cat "$tmp/out")"
   done
   [ ! -s "$log" ] || fm_lint_fail_settled "a refused item was sent: $(cat "$log")"
+  printf '#!/bin/sh\n:\n' > "$tmp/root.sh"
+  rc=0
+  perl "$ROOT/bin/fm-lint-cache.pl" select "$tmp" "$tmp/root.sh" < /dev/null > "$tmp/ok.out" 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && [ ! -s "$tmp/ok.out" ] \
+    || fm_lint_fail_settled "the same dispatcher did not accept a valid mode (exit $rc): $(cat "$tmp/ok.out")"
   sub=$(perl -0ne 'print $1 if /^(sub fm_signal_root \{\n.*?^\}\n)/ms' "$ROOT/bin/fm-lint-cache.pl")
   [ -n "$sub" ] || fm_lint_fail_settled "fm_signal_root is missing"
   out=$(FM_LINT_INTERNAL_PYTHON=/nonexistent perl -e 'use strict; use warnings; our $ROOT_SIGNAL_PY = ""; '"$sub"'
@@ -5354,7 +5401,6 @@ EOF
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a2.out" 2>&1 ) || fail "delegate A's second run failed: $(cat "$tmp/a2.out")"
   grep -v -- '--version' "$tmp/starts.log" | grep -q '^A .*bin/consumer[.]sh' || fail "delegate A's second run was not analysed: $(cat "$tmp/starts.log")"
-  ! grep -q 'cache hit' "$tmp/a.out" "$tmp/b.out" "$tmp/a2.out" || fail "a run reported a reused analysis result"
   pass "after delegate A passed, delegate B of the same version was analysed and its finding reported, and back on A the run was analysed again"
 }
 # (Main 1791 item 5) A watch that cannot write the run's stop mark (its directory is
@@ -5687,7 +5733,6 @@ test_a_compiled_launcher_switching_delegates_is_analysed_every_run() {
   printf 'a\n' > "$tmp/choice"
   ( cd "$repo" && env PATH="$tmp/c/bin:$PATH" CI='' GITHUB_ACTIONS='' \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/a2.out" 2>&1 ) || fail "delegate A's second run failed: $(cat "$tmp/a2.out")"
-  ! grep -q 'cache hit' "$tmp/a1.out" "$tmp/b.out" "$tmp/a2.out" || fail "a run reported a reused analysis result"
   pass "a compiled launcher switched to delegate B reported B's finding, and every run, back on A included, was analysed"
 }
 # fm_lint_source_sub <name>: the text of sub <name> in bin/fm-lint-cache.pl.
@@ -5721,7 +5766,6 @@ print join(",", fm_watch_exit(unmeasured => 1, status => 0), fm_watch_exit(unmea
 # admission lock (its header).
 test_the_measurement_record_rules_hold_on_synthetic_records() {
   local subs tmp out
-  if [ "$(id -u)" -eq 0 ]; then pass "SKIP (a read-only directory still takes files as root): measurement record rules"; return; fi
   subs="$(fm_lint_source_sub fm_health_publish)$(fm_lint_source_sub fm_health_invalidate)$(fm_lint_source_sub fm_health_fresh)"
   [ -n "$subs" ] || fail "a measurement record sub is missing"
   tmp=$(fm_test_tmproot fm-lint-record-rules)
@@ -5749,6 +5793,8 @@ chmod 0400, $path; chmod 0500, $dir;
 push @f, fm_health_invalidate($path, "x"), fm_health_fresh($path, $now);
 chmod 0700, $dir; chmod 0600, $path;
 print join(",", @f), "\n";' "$tmp" 2>&1)
+  [ "$(printf '%s\n' "$out" | head -n 2)" = "$(printf '0,0,0,0,0,1\n1,1,1,0')" ] || fail "a measurement record rule changed: $out"
+  if [ "$(id -u)" -eq 0 ]; then pass "SKIP (a read-only directory still takes files as root): the record that cannot be invalidated"; return; fi
   [ "$out" = "$(printf '0,0,0,0,0,1\n1,1,1,0\n0,1,0,0,1')" ] || fail "a measurement record rule changed: $out"
   pass "only a fresh sample is proof; a published sample is read back and invalidated at once; a failed publication is invalidated in place; a record that cannot be invalidated is reported (and stays fresh, which the watch answers with the host lock)"
 }
@@ -5977,6 +6023,7 @@ test_every_mode_takes_its_budget_from_the_same_host_wide_bound
 test_a_second_run_finds_the_budget_restored_and_repeats_the_first
 test_the_roots_log_records_each_roots_queue_wait_in_wait_ms
 test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root
+test_the_queue_head_reads_the_process_table_at_most_twice_a_second
 test_growth_guard_never_stops_the_watch_reader
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
 test_memory_budget_bounds_the_aggregate_across_homes

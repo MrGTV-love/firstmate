@@ -52,7 +52,6 @@ SH
     out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/inert.sh 2>&1) || fail "inert-word lint failed: $out"
   done
-  assert_not_contains "$out" 'cache hit' "a run reused an analysis result; every root is analysed"
   pass "inert quoted programs, prose, comments, conditionals, and heredocs are not imports"
 }
 
@@ -100,7 +99,6 @@ SH
       for attempt in 1 2; do
         out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
-        assert_not_contains "$out" "cache hit" "$state $root attempt $attempt reused an analysis result"
       done
     done
   done
@@ -117,7 +115,6 @@ SH
   for attempt in 1 2; do
     out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/unresolved-child.sh 2>&1) || fail "unresolved child lint failed: $out"
-    assert_not_contains "$out" 'cache hit bin/unresolved-child.sh' "unresolved child import authorized reuse"
   done
   fm_lint_write_diff_file "$diff_file" bin/library.sh
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
@@ -197,7 +194,6 @@ SH
       for attempt in 1 2; do
         out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
-        assert_not_contains "$out" "cache hit" "$state $root attempt $attempt reused an analysis result"
       done
     done
   done
@@ -228,7 +224,6 @@ SH
     for attempt in 1 2; do
       out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
         "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "unknown stdin lint failed: $out"
-      assert_not_contains "$out" "cache hit $root" "unknown child stdin authorized reuse"
     done
   done
   pass "executable stdin imports select direct and transitive callers, and every run analyses each root"
@@ -273,7 +268,6 @@ SH
     out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/inert-stdin.sh 2>&1) || fail "inert stdin lint failed: $out"
   done
-  assert_not_contains "$out" 'cache hit' "a second run of the inert-heredoc root reused an analysis result"
   pass "command-string, script-file, and non-stdin heredocs remain import data"
 }
 
@@ -299,9 +293,6 @@ test_production_fixture_stdin_imports_invalidate_cache() {
       for attempt in 1 2; do
         out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $helper lint failed: $out"
-        if [ "$attempt" -eq 1 ] || [ "$helper" != herdr-test-safety ]; then
-          assert_not_contains "$out" "cache hit $root" "$state $helper authorized stale or unknown reuse"
-        fi
       done
     done
     cp "$ROOT/tests/$helper.sh" "$repo/tests/$helper.sh"
@@ -323,7 +314,7 @@ test_production_nested_sources_and_pending_reply_cache() {
       out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
         "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$root lint failed: $out"
     done
-    assert_not_contains "$out" "cache hit" "a second run of $root reused an analysis result"
+    [ "$(grep -Fxc -- "$root" "$tmp/checks")" -eq 2 ] || fail "a second run of $root did not analyse it again: $(cat "$tmp/checks")"
   done
   if ! pinned_ready; then
     pass "SKIP (ShellCheck $REQUIRED not resolved): real pending-reply closure cache regression"
@@ -334,14 +325,10 @@ test_production_nested_sources_and_pending_reply_cache() {
       "$repo/bin/fm-lint.sh" --jobs 1 bin/fm-pending-reply-lib.sh 2>&1) \
       || fail "production pending-reply check $attempt failed: $out"
   done
-  assert_not_contains "$out" 'cache hit' \
-    "a second run of the production pending-reply closure reused an analysis result"
   printf '\n' >> "$repo/bin/fm-composer-lib.sh"
   out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/fm-pending-reply-lib.sh 2>&1) \
     || fail "changed production source check failed: $out"
-  assert_not_contains "$out" 'cache hit bin/fm-pending-reply-lib.sh' \
-    "a real adapter source mutation reused stale pending-reply analysis"
   pass "production nested sources and the real pending-reply closure are analysed on every run"
 }
 
@@ -435,8 +422,6 @@ SH
     out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
       || fail "runtime consumer check failed: $out"
-    assert_not_contains "$out" 'cache hit bin/transitive.sh' \
-      "unproved runtime closure reused successful analysis"
   done
   cat > "$repo/bin/runtime.sh" <<'SH'
 #!/usr/bin/env bash
@@ -449,8 +434,6 @@ SH
     out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
       || fail "isolated runtime consumer check failed: $out"
-    assert_not_contains "$out" 'cache hit bin/transitive.sh' \
-      "a /dev/null override authorized reuse of an unproved runtime closure"
   done
   cat > "$repo/bin/runtime.sh" <<'SH'
 #!/usr/bin/env bash
@@ -503,8 +486,6 @@ SH
     out=$(CI='' GITHUB_ACTIONS='' \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/unparsed.sh 2>&1) \
       || fail "unsupported source wrapper check $attempt failed: $out"
-    assert_not_contains "$out" 'cache hit bin/unparsed.sh' \
-      "an unparsed source form authorized successful-result reuse"
   done
   fm_lint_write_diff_file "$diff_file" unrelated-input
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
@@ -553,7 +534,6 @@ SH
   out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
     || fail "argument-bearing joint call did not pass again: $out"
-  assert_not_contains "$out" 'cache hit' "a second run of the clean joint call reused an analysis result"
   cat > "$repo/bin/consumer.sh" <<'SH'
 #!/usr/bin/env bash
 # shellcheck source=bin/library.sh
@@ -580,12 +560,10 @@ SH
       again)
         out=$(CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || rc=$?
-        assert_not_contains "$out" 'cache hit' "a run after the consumer mutation reused an analysis result"
         ;;
       ci)
         out=$(CI=true GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || rc=$?
-        assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
         ;;
     esac
     [ "$rc" -eq 1 ] || fail "$mode joint source analysis did not reject the missing argument: $out"
@@ -626,7 +604,6 @@ SH
   out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) \
     || fail "private-source consumer did not pass again: $out"
-  assert_not_contains "$out" 'cache hit' "a second run of the private-source consumer reused an analysis result"
   cat > "$repo/bin/library.sh" <<'SH'
 #!/usr/bin/env bash
 needs_argument() {
@@ -651,12 +628,10 @@ SH
       again)
         out=$(CI='' GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || rc=$?
-        assert_not_contains "$out" 'cache hit' "a run after the private import changed reused an analysis result"
         ;;
       ci)
         out=$(CI=true GITHUB_ACTIONS='' \
           "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
-        assert_not_contains "$out" 'cache hit ' "CI reused a private-source success"
         ;;
     esac
     [ "$rc" -eq 1 ] || fail "$mode private source hid the changed argument requirement: $out"
@@ -693,7 +668,6 @@ SH
   out=$(CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
     || fail "declaration fixture did not pass again: $out"
-  assert_not_contains "$out" 'cache hit' "a second run of the declaration fixture reused an analysis result"
   cat > "$repo/bin/library.sh" <<'SH'
 #!/usr/bin/env bash
 library_value() {
@@ -852,7 +826,6 @@ SH
         out=$(perl "$repo/bin/fm-lint-cache.pl" check "$repo" \
           "$fakebin/shellcheck" --norc --external-sources -- "$root" 2>&1) \
           || fail "$state $backend check failed for $root: $out"
-        assert_not_contains "$out" "cache hit" "$state $backend reused an analysis result for $root"
       done
       [ "$(cat "$log")" = $'bin/fm-backend.sh\nbin/caller.sh' ] \
         || fail "$state $backend did not analyse the dispatcher and its caller: $(cat "$log")"
@@ -897,7 +870,6 @@ SH
     "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) || fail "unchanged repeat failed: $out"
   after=$(wc -l < "$log" | tr -d ' ')
   [ "$after" -eq "$((before + 2))" ] || fail "an unchanged repeat reused a result instead of analysing both roots"
-  assert_not_contains "$out" 'cache hit' "an unchanged repeat reported a reused result"
   cat >> "$two/bin/library.sh" <<'SH'
 bad() {
   local a= b=

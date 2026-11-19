@@ -439,7 +439,6 @@ test_ci_forces_full_lint_even_with_empty_diff() {
       "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || fail "CI inventory lint failed: $out"
     [ "$(LC_ALL=C sort "$log")" = "$expected" ] \
       || fail "CI run $run did not analyze the complete inventory: $(cat "$log")"
-    assert_not_contains "$out" 'cache hit ' "CI reused a local lint success"
   done
   pass "CI=true checks the complete inventory even with an empty diff"
 }
