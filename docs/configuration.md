@@ -888,6 +888,11 @@ A direct child directory of a listed root, whose name matches that root's glob, 
 
 Any doubt keeps the directory, and an `lsof` that fails or prints nothing keeps everything and exits 3.
 Plain files are never removed, whatever their name.
+A name that holds a newline, a space, or a leading dash is handled like any other, because the script keeps paths NUL-delimited from the listing to the copy and prints a newline in a name as `\n` so one decision stays one line.
+
+The one `lsof` snapshot is the only check for open handles, so it has one honest limit.
+A process that starts after the snapshot and opens a file in a candidate, or enters it, before that candidate is removed is not seen.
+The window runs from the snapshot to the removal of that one directory, and the directory has been untouched for the whole age first.
 
 `config/scratch-reaper` lists one `<root> <glob>` per line, with `~/` allowed at the start of a root and `#` starting a comment.
 A line `age_hours <n>` sets the age.
@@ -896,9 +901,17 @@ The defaults are `/private/tmp` with `fm-*`, `omp-*`, `fm-fm-*`, `fm-omp-*`, `fm
 A root that is a symlink, is not a directory, or is, contains, or lies under a protected path stops the run with exit 2 before it touches anything.
 
 Before a directory is removed, each regular file in it named `*.log`, `*.txt`, `*.out`, `*.err`, `*.json`, or `*.md` of at most 1 MiB is copied, with its relative path and verified byte for byte, to `data/scratch-reaper-archive/<UTC date>/<directory name>/`, up to 20 MiB per directory.
-An archive that cannot be written keeps the directory.
+The whole archive finishes before the removal starts.
+A file whose size cannot be read, a copy that fails, and a copy that differs from its source each keep the whole directory, even when an earlier file was already copied.
 A larger log is not copied, the directory is still removed when every other check passes, and the decision line carries `skipped_logs=<n>`.
 Neither the archive nor the log below is pruned.
+
+The script has exactly four production `rm` calls, and only the first removes a scratch directory.
+The first is `rm -rf --` of `<real root>/<name>` for a listed root, run after a re-check that it is a real directory and its own real path.
+The second is `rm -rf --` of the script's own temp folder `<TMPDIR>/.scratch-reaper.XXXXXX`.
+The third is `rm -f --` of the `lsof` snapshot file inside that temp folder.
+The fourth is `rm -f --` of `state/.scratch-reaper-alarmed`.
+The last three touch only the script's own files, never a scratch directory and never a path under a listed root.
 
 Every decision is one line, printed and appended to `state/scratch-reaper.log`: `removed` with the bytes freed, or `kept` with its reason (`young`, `open handle`, `git`, `outside root`, `symlink`, `protected`, `archive failed`, `lsof failed`, `remove failed`).
 A run without `--apply` is a dry run that prints the same lines as `would-remove` or `kept` and writes nothing.
@@ -907,7 +920,8 @@ The watcher offers the run at most every `FM_SCRATCH_REAPER_TICK` seconds (defau
 The script owns the 30-minute window, a lock, and its failure log, so a failed, busy, or hung run never reaches the supervision cycle.
 A secondmate home never runs it.
 It raises one `check: scratch-reaper low-disk` wake only when free space on the roots' volume is below 20 GiB and the run removed nothing, repeats it after six hours at most, and stays quiet once space recovers or a run frees bytes.
-A suite that sets `FM_TEST_SEAM` never starts the real script from the watcher, and `tests/scratch-reaper-helpers.sh` refuses any test run whose root, config, or archive folder is outside its private world.
+A suite that sets `FM_TEST_SEAM` never starts the real script from the watcher.
+`tests/scratch-reaper-helpers.sh` refuses any test run, for a dry run, `--apply`, and `--scheduled`, whose config root is missing, is a symlink, or resolves physically outside its private world, or whose config or archive folder is outside it, and then starts no script.
 Regression coverage is `tests/fm-scratch-reaper.test.sh` and `tests/fm-watch-scratch-reaper.test.sh`.
 
 ## Waiting worker spends no turns (config/wait-no-turns)

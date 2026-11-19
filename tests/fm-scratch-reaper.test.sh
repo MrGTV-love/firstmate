@@ -23,6 +23,8 @@ SLEEPERS=()
 
 new_world() {  # sets SR_WORLD
   CASE_N=$((CASE_N + 1))
+  # A mutant runs its case in a subshell that starts from the same counter, so skip a world already taken.
+  while [ -e "$TMP_ROOT/w$CASE_N" ]; do CASE_N=$((CASE_N + 1)); done
   SR_WORLD=$(sr_world_new "$TMP_ROOT" "w$CASE_N") || fail 'cannot build a test world'
   printf '%s fm-*\n' "$SR_WORLD/root" > "$SR_WORLD/fm/config/scratch-reaper"
 }
@@ -30,7 +32,8 @@ new_world() {  # sets SR_WORLD
 reap() {  # <world> <args...>: stdout and status of one guarded run
   local world=$1
   shift
-  sr_run "$world" --script "$SR_SCRIPT" --fakebin -- "$@"
+  # shellcheck disable=SC2086  # SR_REAP_FLAGS holds whole option words
+  sr_run "$world" --script "$SR_SCRIPT" --fakebin ${SR_REAP_FLAGS:-} -- "$@"
 }
 
 state_log() { printf '%s/fm/state/scratch-reaper.log' "$1"; }
@@ -41,7 +44,7 @@ make_aged() {  # <dir> [file...]: a directory with the files, all old
   shift
   mkdir -p "$d" || return 1
   for f in "$@"; do
-    mkdir -p "$d/$(dirname "$f")" && printf 'content of %s\n' "$f" > "$d/$f" || return 1
+    mkdir -p -- "$d/$(dirname -- "$f")" && printf 'content of %s\n' "$f" > "$d/$f" || return 1
   done
   sr_age_tree "$d"
 }
@@ -49,6 +52,7 @@ make_aged() {  # <dir> [file...]: a directory with the files, all old
 start_sleeper() {  # <cwd> [fd-file]: a live sleep process with its cwd (and a file) in place
   local cwd=$1 file=${2:-} pid n=0 ready
   CASE_N=$((CASE_N + 1))
+  while [ -e "$TMP_ROOT/ready.$CASE_N" ]; do CASE_N=$((CASE_N + 1)); done
   ready="$TMP_ROOT/ready.$CASE_N"
   # The marker is written after the cwd and the file are held and before exec, which keeps both.
   if [ -n "$file" ]; then
@@ -167,7 +171,7 @@ case_symlink_not_followed() {
   ln -s "$root" "$world/rootlink" || fail 'root symlink fixture'
   printf '%s fm-*\n' "$world/rootlink" > "$world/fm/config/scratch-reaper"
   make_aged "$root/fm-after" a.log || fail 'fixture'
-  out=$(reap "$world" --apply 2>&1) && rc=0 || rc=$?
+  out=$(SR_REAP_FLAGS=--inworld-symlink-root reap "$world" --apply 2>&1) && rc=0 || rc=$?
   [ "$rc" -eq 2 ] || fail "a symlinked root must be refused with exit 2, got $rc: $out"
   [ -d "$root/fm-after" ] || fail 'a refused symlinked root still removed a directory'
 }
@@ -247,6 +251,149 @@ case_oversize_logs_not_archived() {
   assert_contains "$out" "removed $root/fm-many " 'fm-many not removed'
   assert_contains "$out" 'archived=20 skipped_logs=2' 'the 20 MiB per-directory cap did not hold'
   [ -d "$root/fm-bigyoung" ] || fail 'a young directory with an oversize log was removed'
+}
+
+# A cp that passes through for the first call and fails (or corrupts) from the second on.
+install_cp_fault() {  # <world> fail|corrupt
+  cat > "$1/fakebin/cp" <<SH
+#!/bin/sh
+here=\$(dirname "\$0")
+n=\$(cat "\$here/cp.count" 2>/dev/null || echo 0)
+n=\$((n + 1))
+echo "\$n" > "\$here/cp.count"
+if [ "\$n" -ge 2 ]; then
+  [ "$2" = fail ] && exit 1
+  /bin/cp "\$@" || exit 1
+  for last in "\$@"; do :; done
+  printf 'x' >> "\$last"
+  exit 0
+fi
+exec /bin/cp "\$@"
+SH
+  chmod +x "$1/fakebin/cp"
+}
+
+log_lines_are_single() {  # <world>: every line of the decision log starts with a UTC time
+  local stray
+  stray=$(grep -vc '^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T' "$(state_log "$1")") || stray=0
+  [ "$stray" -eq 0 ] || fail "a name split the decision log into $stray stray lines"
+}
+
+case_newline_file_names_archived() {
+  local world out root nl=$'\n' d f i=0
+  local -a files sums=()
+  new_world; world=$SR_WORLD; root=$world/root
+  files=("new${nl}line.log" "-dash.txt" "sp ace.md" "sub${nl}dir/in.json" "trail${nl}.err")
+  make_aged "$root/fm-log" "${files[@]}" || fail 'fixture'
+  for f in "${files[@]}"; do sums+=("$(sr_sha "$root/fm-log/$f")"); done
+  out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
+  [ ! -e "$root/fm-log" ] || fail 'the directory with newline and dash file names was not removed'
+  d=$(archive_dirs "$world" fm-log)
+  [ -n "$d" ] || fail 'no archive folder for the directory with hostile file names'
+  for f in "${files[@]}"; do
+    [ -f "$d/$f" ] || fail "the small log '$f' was deleted with no archived copy"
+    [ "$(sr_sha "$d/$f")" = "${sums[$i]}" ] || fail "the archived copy of '$f' differs from its original (sha256)"
+    i=$((i + 1))
+  done
+  assert_contains "$out" 'archived=5 skipped_logs=0' 'every hostile-named log must be archived and none skipped'
+  log_lines_are_single "$world"
+}
+
+case_leading_dash_directory() {
+  local world out root
+  new_world; world=$SR_WORLD; root=$world/root
+  printf '%s fm-*\n%s -*\n' "$root" "$root" > "$world/fm/config/scratch-reaper"
+  make_aged "$root/-lead" a.log -b.txt || fail 'fixture'
+  make_aged "$root/-held" held.log || fail 'fixture'
+  start_sleeper "$root/-held"
+  out=$(reap "$world" --apply 2>&1) || { stop_sleepers; fail "run failed: $out"; }
+  stop_sleepers
+  [ ! -e "$root/-lead" ] || fail 'a leading-dash directory was not removed'
+  assert_contains "$out" "removed $root/-lead bytes=" 'the leading-dash directory removal is not logged'
+  [ -n "$(archive_dirs "$world" -lead)" ] && [ -f "$(archive_dirs "$world" -lead)/-b.txt" ] || fail 'the leading-dash directory logs were not archived'
+  [ -d "$root/-held" ] || fail 'a leading-dash directory holding a process cwd was removed'
+  assert_contains "$out" "kept $root/-held reason=open handle" 'the leading-dash holder is not kept for an open handle'
+}
+
+case_newline_directory_names() {
+  local world out root nl=$'\n'
+  new_world; world=$SR_WORLD; root=$world/root
+  make_aged "$root/fm-nl${nl}dir" a.log || fail 'fixture'
+  make_aged "$root/fm-trail${nl}" a.log || fail 'fixture'
+  make_aged "$root/fm-young${nl}x" a.log || fail 'fixture'
+  printf 'n\n' > "$root/fm-young${nl}x/fresh.txt"
+  out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
+  [ ! -e "$root/fm-nl${nl}dir" ] || fail 'a newline-named directory was not removed'
+  [ ! -e "$root/fm-trail${nl}" ] || fail 'a directory whose name ends in a newline was not removed'
+  assert_contains "$out" "removed $root/"'fm-nl\ndir bytes=' 'a newline in a name must print as \n on one line'
+  [ -d "$root/fm-young${nl}x" ] || fail 'a young newline-named directory was removed'
+  assert_contains "$out" "kept $root/"'fm-young\nx reason=young' 'the young newline-named directory is not kept as young'
+  log_lines_are_single "$world"
+}
+
+case_newline_directory_open_handle_kept() {
+  local world out root nl=$'\n'
+  new_world; world=$SR_WORLD; root=$world/root
+  make_aged "$root/fm-hold${nl}x" held.log || fail 'fixture'
+  make_aged "$root/fm-file${nl}y" held2.log || fail 'fixture'
+  start_sleeper "$root/fm-hold${nl}x"
+  start_sleeper "$world" "$root/fm-file${nl}y/held2.log"
+  out=$(reap "$world" --apply 2>&1) || { stop_sleepers; fail "run failed: $out"; }
+  stop_sleepers
+  [ -d "$root/fm-hold${nl}x" ] || fail 'a newline-named directory holding a process cwd was removed'
+  [ -d "$root/fm-file${nl}y" ] || fail 'a newline-named directory holding an open file was removed'
+  assert_contains "$out" "kept $root/"'fm-hold\nx reason=open handle' 'the newline-named cwd holder is not kept for an open handle'
+  assert_contains "$out" "kept $root/"'fm-file\ny reason=open handle' 'the newline-named open-file holder is not kept for an open handle'
+  log_lines_are_single "$world"
+}
+
+case_archive_read_failure_keeps_directory() {
+  local world out root
+  [ "$(id -u)" -ne 0 ] || { echo 'ok - skipped the unreadable-log case: running as root reads any file'; return 0; }
+  new_world; world=$SR_WORLD; root=$world/root
+  make_aged "$root/fm-unreadable" good.log bad.log || fail 'fixture'
+  chmod 000 "$root/fm-unreadable/bad.log"
+  out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
+  [ -f "$root/fm-unreadable/good.log" ] && [ -e "$root/fm-unreadable/bad.log" ] || fail 'a directory with an unreadable small log was removed'
+  assert_contains "$out" "kept $root/fm-unreadable reason=archive failed" 'an unreadable log must keep the directory as archive failed'
+  [ "$(grep -c "removed $root/fm-unreadable" "$(state_log "$world")")" -eq 0 ] || fail 'the log says removed for a kept directory'
+}
+
+case_archive_before_remove_ordering() {
+  local world out root before after d
+  new_world; world=$SR_WORLD; root=$world/root
+  make_aged "$root/fm-order" a.log b.log c.txt keep.bin || fail 'fixture'
+  before=$(find "$root/fm-order" -type f -exec cksum {} + | sort)
+  install_cp_fault "$world" fail
+  out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
+  [ "$(cat "$world/fakebin/cp.count")" -ge 2 ] || fail 'the fault never reached a second copy, so the ordering is untested'
+  after=$(find "$root/fm-order" -type f -exec cksum {} + | sort)
+  [ -d "$root/fm-order" ] && [ "$before" = "$after" ] || fail 'a directory was removed or changed although its second log failed to archive'
+  assert_contains "$out" "kept $root/fm-order reason=archive failed" 'the failed second copy is not named'
+  case "$out" in *"removed $root/fm-order"*) fail 'the run says removed for a kept directory' ;; esac
+  d=$(archive_dirs "$world" fm-order)
+  [ -n "$d" ] && [ "$(find "$d" -type f | wc -l | tr -d ' ')" -eq 1 ] || fail 'the first copy did not land before the second failed'
+  # A copy that differs from its source is a failure too.
+  rm -f "$world/fakebin/cp.count"
+  rm -rf "$world/fm/data/scratch-reaper-archive"
+  install_cp_fault "$world" corrupt
+  out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
+  [ -d "$root/fm-order" ] || fail 'a directory was removed although its archived copy differs from the original'
+  assert_contains "$out" "kept $root/fm-order reason=archive failed" 'a corrupt copy is not named as archive failed'
+}
+
+case_one_snapshot_per_run() {
+  local world root real out
+  new_world; world=$SR_WORLD; root=$world/root
+  real=$(command -v lsof)
+  make_aged "$root/fm-one" a.log || fail 'fixture'
+  make_aged "$root/fm-two" a.log || fail 'fixture'
+  make_aged "$root/fm-three" a.log || fail 'fixture'
+  printf '#!/bin/sh\necho x >> "%s/fakebin/lsof.calls"\nexec "%s" "$@"\n' "$world" "$real" > "$world/fakebin/lsof"
+  chmod +x "$world/fakebin/lsof"
+  out=$(reap "$world" --apply) || fail "run failed: $out"
+  [ "$(wc -l < "$world/fakebin/lsof.calls" | tr -d ' ')" -eq 1 ] || fail 'the run must take exactly one lsof snapshot for all candidates'
+  [ ! -e "$root/fm-one" ] && [ ! -e "$root/fm-two" ] && [ ! -e "$root/fm-three" ] || fail 'the free candidates were not removed'
 }
 
 # --- the schedule (SR3) --------------------------------------------------------
@@ -352,28 +499,55 @@ case_schedule_failures_never_propagate() {
 # --- the helper's own refusal --------------------------------------------------
 
 case_helper_refuses_real_roots() {
-  local world rc root helper=${SR_HELPER:-$HELPERS}
+  local world rc root helper=${SR_HELPER:-$HELPERS} margs foreign
+  local -a bad
   new_world; world=$SR_WORLD
+  foreign=$TMP_ROOT/not-this-world
+  mkdir -p "$foreign/sub" "$world/elsewhere" || fail 'fixture'
+  # The aliases are plain symlinks: nothing here ever starts the reaper on them.
+  ln -s /private/tmp "$world/alias-real-tmp" && ln -s "$foreign" "$world/alias-foreign" \
+    && ln -s "$world/root" "$world/alias-inworld" && ln -s "$foreign" "$world/linkdir" || fail 'alias fixture'
   printf '#!/bin/sh\n: > "$FM_HOME/stub-ran"\n' > "$world/stub.sh"
-  for root in /private/tmp /tmp "$TMP_ROOT/not-this-world"; do
+  bad=(/private/tmp /tmp "$foreign" "$world/alias-real-tmp" "$world/alias-foreign" "$world/alias-inworld" \
+    "$world/linkdir/sub" "$world/root/../.." "$world/missing-root")
+  # Every refusal holds for a dry run, --apply and --scheduled, and no script starts.
+  for root in "${bad[@]}"; do
+    for margs in '' '--apply' '--scheduled'; do
+      printf '%s fm-*\n' "$root" > "$world/fm/config/scratch-reaper"
+      rm -f "$world/fm/stub-ran"
+      # shellcheck disable=SC2086
+      ( . "$helper"; sr_run "$world" --script "$world/stub.sh" -- $margs ) >/dev/null 2>&1 && rc=0 || rc=$?
+      [ "$rc" -eq 99 ] || fail "the helper must refuse root '$root' for '${margs:-dry run}' with 99, got $rc"
+      [ ! -e "$world/fm/stub-ran" ] || fail "the helper started the script for root '$root' and '${margs:-dry run}'"
+    done
+  done
+  # The in-world symlink flag admits only a link that still ends inside the world.
+  for root in "$world/alias-real-tmp" "$world/alias-foreign" "$world/linkdir/sub"; do
     printf '%s fm-*\n' "$root" > "$world/fm/config/scratch-reaper"
     rm -f "$world/fm/stub-ran"
-    ( . "$helper"; sr_run "$world" --script "$world/stub.sh" -- --apply ) >/dev/null 2>&1 && rc=0 || rc=$?
-    [ "$rc" -eq 99 ] || fail "the helper must refuse root $root with 99, got $rc"
-    [ ! -e "$world/fm/stub-ran" ] || fail "the helper ran the script for root $root"
+    ( . "$helper"; sr_run "$world" --script "$world/stub.sh" --inworld-symlink-root -- --apply ) >/dev/null 2>&1 && rc=0 || rc=$?
+    [ "$rc" -eq 99 ] && [ ! -e "$world/fm/stub-ran" ] || fail "the in-world symlink flag let root '$root' through"
   done
-  rm -f "$world/fm/config/scratch-reaper"
+  printf '%s fm-*\n' "$world/alias-inworld" > "$world/fm/config/scratch-reaper"
+  ( . "$helper"; sr_run "$world" --script "$world/stub.sh" --inworld-symlink-root -- --apply ) >/dev/null 2>&1 || fail 'the in-world symlink flag refused a link that ends inside the world'
+  [ -e "$world/fm/stub-ran" ] || fail 'the helper did not run the script for an in-world symlink root with the flag'
+  rm -f "$world/fm/stub-ran" "$world/fm/config/scratch-reaper"
   ( . "$helper"; sr_run "$world" --script "$world/stub.sh" -- --apply ) >/dev/null 2>&1 && rc=0 || rc=$?
   [ "$rc" -eq 99 ] && [ ! -e "$world/fm/stub-ran" ] || fail 'the helper ran with no private config'
-  printf '%s fm-*\n' "$world/root" > "$world/fm/config/scratch-reaper"
-  ( . "$helper"; sr_run "$world" --script "$world/stub.sh" -- --apply ) >/dev/null 2>&1 || fail 'the helper refused a private world'
-  [ -e "$world/fm/stub-ran" ] || fail 'the helper did not run the script for a private root'
+  for margs in '' '--apply' '--scheduled'; do
+    printf '%s fm-*\n' "$world/root" > "$world/fm/config/scratch-reaper"
+    rm -f "$world/fm/stub-ran"
+    # shellcheck disable=SC2086
+    ( . "$helper"; sr_run "$world" --script "$world/stub.sh" -- $margs ) >/dev/null 2>&1 || fail "the helper refused a private world for '${margs:-dry run}'"
+    [ -e "$world/fm/stub-ran" ] || fail "the helper did not run the script for a private root and '${margs:-dry run}'"
+  done
 }
 
 # --- mutants: each dropped safety check must fail its named case ----------------
 
 mutate() {  # <name> <old> <new> <file>: write a mutant of the script (or helper) and print its path
-  local name=$1 old=$2 new=$3 src=$4 out="$TMP_ROOT/mutants/$1.sh"
+  local name=$1 old=$2 new=$3 src=$4 out
+  out="$TMP_ROOT/mutants/$name.sh"
   mkdir -p "$TMP_ROOT/mutants"
   python3 -I - "$src" "$out" "$old" "$new" "$ROOT" <<'PY' || return 1
 import sys
@@ -410,10 +584,17 @@ test_dry_run_changes_nothing() { case_dry_run_changes_nothing; pass 'a dry run c
 test_lsof_failure_keeps_everything() { case_lsof_failure_keeps_everything; pass 'a failing or empty lsof keeps everything and exits 3'; }
 test_archive_failure_keeps_the_directory() { case_archive_failure_keeps_directory; pass 'an archive failure keeps the directory'; }
 test_oversize_logs_are_not_archived() { case_oversize_logs_not_archived; pass 'oversize logs are skipped, the line says so, and a safe directory is still removed'; }
+test_newline_file_names_are_archived() { case_newline_file_names_archived; pass 'small logs whose names hold a newline, a leading dash or a space are archived byte for byte before removal'; }
+test_leading_dash_directory() { case_leading_dash_directory; pass 'a leading-dash directory is archived and removed, and kept while a process holds it'; }
+test_newline_directory_names() { case_newline_directory_names; pass 'newline-named directories are removed or kept on their merits and logged on one line each'; }
+test_newline_directory_open_handle() { case_newline_directory_open_handle_kept; pass 'a newline-named directory with a process cwd or open file is kept as open handle'; }
+test_unreadable_log_keeps_the_directory() { case_archive_read_failure_keeps_directory; pass 'a small log that cannot be read keeps the directory as archive failed'; }
+test_archive_finishes_before_removal() { case_archive_before_remove_ordering; pass 'a copy that fails on the second file, or differs from its source, keeps the whole directory untouched'; }
+test_one_snapshot_per_run() { case_one_snapshot_per_run; pass 'one lsof snapshot serves every candidate of a run'; }
 test_schedule_runs_once_per_window() { case_schedule_one_run_per_window; pass 'the scheduled run works once per window and not inside it'; }
 test_schedule_alarm_only_when_low_and_nothing_freed() { case_schedule_alarm_only_when_low_and_nothing_freed; pass 'the low-disk alarm rises only with under 20 GiB free and nothing freed, and repeats only after 6 hours'; }
 test_schedule_failures_never_propagate() { case_schedule_failures_never_propagate; pass 'a lsof failure, a busy lock and a secondmate home are logged or silent and never fail the cycle'; }
-test_helper_refuses_real_roots() { case_helper_refuses_real_roots; pass 'the test helper refuses --apply for /private/tmp, /tmp, a foreign root or no config'; }
+test_helper_refuses_real_roots() { case_helper_refuses_real_roots; pass 'the test helper starts no script for /private/tmp, /tmp, a foreign root, a symlink or ".." alias of one, or no config, in all three modes'; }
 
 test_mutants_each_fail_a_named_case() {
   local m
@@ -427,9 +608,29 @@ test_mutants_each_fail_a_named_case() {
   mutant_must_fail 'drop the archive step' case_aged_removed_and_archived "$m"
   m=$(mutate drop-symlink-check 'if [ -L "$path" ]; then keep "$path" symlink; return 0; fi' ':' "$REAPER") || fail 'mutant build failed'
   mutant_must_fail 'drop the symlink check' case_symlink_not_followed "$m"
-  m=$(mutate drop-helper-root-checks 'case "$real" in "$world"/*) ;; *) echo "sr_run: root '"'"'$root'"'"' is outside the test world" >&2; return 1 ;; esac' ':' "$HELPERS") || fail 'mutant build failed'
-  m=$(mutate drop-helper-real-root-list 'case "$root" in /|/tmp|/private/tmp|/var/tmp|/var/folders|"${HOME:-/nonexistent}"|"${HOME:-/nonexistent}/tmp") echo "sr_run: root '"'"'$root'"'"' is a real root" >&2; return 1 ;; esac' ':' "$m") || fail 'mutant build failed'
-  mutant_must_fail 'drop the helper refusal of real roots' case_helper_refuses_real_roots "$m"
+  m=$(mutate newline-delimited-archive '-print0 > "$list"' '-print > "$list"' "$REAPER") || fail 'mutant build failed'
+  m=$(mutate newline-delimited-archive-read "read -r -d '' f; do" 'read -r f; do' "$m") || fail 'mutant build failed'
+  mutant_must_fail 'archive with newline-delimited paths' case_newline_file_names_archived "$m"
+  m=$(mutate size-read-failure-skips 'size=$(wc -c < "$f" 2>/dev/null) || return 1' 'size=$(wc -c < "$f" 2>/dev/null) || size=' "$REAPER") || fail 'mutant build failed'
+  m=$(mutate size-read-failure-skips-case "case \"\$size\" in ''|*[!0-9]*) return 1 ;; esac" "case \"\$size\" in ''|*[!0-9]*) ARCH_SKIPPED=\$((ARCH_SKIPPED + 1)); continue ;; esac" "$m") || fail 'mutant build failed'
+  mutant_must_fail 'treat an unreadable log as skippable' case_archive_read_failure_keeps_directory "$m"
+  m=$(mutate ignore-archive-failure 'if ! archive_logs "$real" "$name"; then keep "$path" "archive failed"; return 0; fi' 'archive_logs "$real" "$name" || true' "$REAPER") || fail 'mutant build failed'
+  mutant_must_fail 'remove after a failed archive' case_archive_before_remove_ordering "$m"
+  m=$(mutate drop-verify-copy 'cmp -s -- "$f" "$dest/$rel" || return 1' ':' "$REAPER") || fail 'mutant build failed'
+  mutant_must_fail 'drop the byte comparison of the copy' case_archive_before_remove_ordering "$m"
+  m=$(mutate snapshot-per-candidate 'if [ "$SNAPSHOT_STATE" = untaken ]; then take_snapshot || true; fi' 'take_snapshot || true' "$REAPER") || fail 'mutant build failed'
+  mutant_must_fail 'take one snapshot per candidate' case_one_snapshot_per_run "$m"
+  m=$(mutate drop-helper-symlink-root-check 'if [ -L "$root" ] && [ "${SR_SYMLINK_ROOT_OK:-0}" != 1 ]; then echo "sr_run: root '"'"'$root'"'"' is a symlink" >&2; return 1; fi' ':' "$HELPERS") || fail 'mutant build failed'
+  mutant_must_fail 'drop the helper refusal of a symlink root' case_helper_refuses_real_roots "$m"
+  m=$(mutate drop-helper-outside-world-check 'case "$real" in "$world"/*) ;;' 'case "$real" in *) ;;' "$HELPERS") || fail 'mutant build failed'
+  mutant_must_fail 'drop the helper refusal of a root outside the world' case_helper_refuses_real_roots "$m"
+  m=$(mutate helper-parent-only-resolve 'real=$(cd -P -- "$root" 2>/dev/null && pwd -P)' 'real=$(cd -P -- "$(dirname -- "$root")" 2>/dev/null && printf '"'%s/%s'"' "$(pwd -P)" "$(basename -- "$root")")' "$HELPERS") || fail 'mutant build failed'
+  m=$(mutate helper-parent-only-no-symlink-check 'if [ -L "$root" ] && [ "${SR_SYMLINK_ROOT_OK:-0}" != 1 ]; then echo "sr_run: root '"'"'$root'"'"' is a symlink" >&2; return 1; fi' ':' "$m") || fail 'mutant build failed'
+  mutant_must_fail 'resolve only the parent of a helper root (the old helper)' case_helper_refuses_real_roots "$m"
+  m=$(mutate drop-helper-real-root-list 'case "$root" in /|/tmp|/private/tmp|/var/tmp|/var/folders|"${HOME:-/nonexistent}"|"${HOME:-/nonexistent}/tmp") echo "sr_run: root '"'"'$root'"'"' is a real root" >&2; return 1 ;; esac' ':' "$HELPERS") || fail 'mutant build failed'
+  m=$(mutate drop-helper-outside-world-2 'case "$real" in "$world"/*) ;;' 'case "$real" in *) ;;' "$m") || fail 'mutant build failed'
+  m=$(mutate drop-helper-symlink-check-2 'if [ -L "$root" ] && [ "${SR_SYMLINK_ROOT_OK:-0}" != 1 ]; then echo "sr_run: root '"'"'$root'"'"' is a symlink" >&2; return 1; fi' ':' "$m") || fail 'mutant build failed'
+  mutant_must_fail 'drop every helper refusal of a root' case_helper_refuses_real_roots "$m"
 }
 
 trap 'stop_sleepers; fm_test_cleanup' EXIT
@@ -444,6 +645,13 @@ test_dry_run_changes_nothing
 test_lsof_failure_keeps_everything
 test_archive_failure_keeps_the_directory
 test_oversize_logs_are_not_archived
+test_newline_file_names_are_archived
+test_leading_dash_directory
+test_newline_directory_names
+test_newline_directory_open_handle
+test_unreadable_log_keeps_the_directory
+test_archive_finishes_before_removal
+test_one_snapshot_per_run
 test_schedule_runs_once_per_window
 test_schedule_alarm_only_when_low_and_nothing_freed
 test_schedule_failures_never_propagate

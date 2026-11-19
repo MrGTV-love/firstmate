@@ -33,7 +33,16 @@
 #      the realpath and its aliases (the root as written, and the /private-stripped
 #      form macOS lsof prints for /tmp and /var). The snapshot is bounded by
 #      FM_SCRATCH_REAPER_LSOF_SECS (default 120). A failed, timed-out or empty
-#      snapshot keeps every candidate that needs it as `lsof failed` and the run exits 3;
+#      snapshot keeps every candidate that needs it as `lsof failed` and the run exits 3.
+#      Honest limit: the snapshot is the only handle check. A process that starts after
+#      it and opens a file or enters a candidate before that candidate is removed is not
+#      seen, because the contract takes one snapshot per run. The window runs from the
+#      snapshot to the removal of that one directory, and the directory has been
+#      untouched for the whole age first, so only a process that reuses a day-old unused
+#      scratch directory inside that window can be hit. A write by such a process is not
+#      re-checked either. A name holding a control character such as a newline is matched
+#      on the text before its first control character, which keeps at least as much as an
+#      exact match would;
 #   7. every small log in it was archived (else `archive failed`).
 #
 # Archive: before removal, each regular file named *.log *.txt *.out *.err *.json *.md of
@@ -41,8 +50,13 @@
 #   <data>/scratch-reaper-archive/<UTC date>/<directory name>/ and compared byte for
 #   byte. A directory is archived up to 20 MiB; a larger log, or one past that total, is
 #   not copied, the directory is still removed when every other check passes, and its
-#   decision line says how many logs were skipped. An archive that cannot be written
-#   and verified keeps the directory. The archive and the log below have no size cap.
+#   decision line says how many logs were skipped. Paths are NUL-delimited from the
+#   directory listing to the copy, so a name holding a newline or a leading dash is
+#   archived like any other. A file whose size cannot be read, a copy that fails, and
+#   a copy that differs from its source are all an archive failure: the directory is
+#   kept, even when an earlier file was already copied. The archive finishes before
+#   the removal starts, and the removal is reached only when it succeeded. The archive
+#   and the log below have no size cap.
 #
 # Decisions: one line each, printed and (with --apply) appended to <state>/scratch-reaper.log:
 #   <UTC time> removed <path> bytes=<n> archived=<n> skipped_logs=<n>
@@ -52,10 +66,18 @@
 #   A failed or partial removal is `kept ... reason=remove failed`, never `removed`.
 #   A dry run prints only: it writes no log line, no archive and no marker.
 #
-# Removal: exactly one `rm -rf --` call site (reap_remove), reached only with a path that
-#   is <realpath root>/<name> for a root in the allow-list, re-checked to be neither a
-#   symlink nor the root itself immediately before the call. The reaper's own temp
-#   folder is removed by one more guarded call (cleanup_work). No other path is removed.
+# Removal: the script has exactly four production rm calls, and only the first removes a
+#   candidate:
+#     1. reap_remove: `rm -rf --` of <realpath root>/<name> for a root in the allow-list,
+#        re-checked to be a real directory, not a symlink, and its own realpath, immediately
+#        before the call;
+#     2. cleanup_work: `rm -rf --` of the reaper's own temp folder, only when its name is
+#        <TMPDIR>/.scratch-reaper.XXXXXX and it is not a symlink;
+#     3. take_snapshot: `rm -f --` of the lsof snapshot file inside that temp folder;
+#     4. scheduled_epilogue: `rm -f --` of <state>/.scratch-reaper-alarmed.
+#   Calls 2 to 4 touch the reaper's own work files, never a scratch candidate and never a
+#   path under an allow-listed root. No other path is removed. Whether a path is under an
+#   allow-listed root is decided on its realpath, never on the name as written.
 #
 # Roots are refused, and the run exits 2 before touching anything, when a root is not an
 #   absolute or ~/ path, is not a directory, or is, contains, or lies under a protected path.
@@ -151,6 +173,16 @@ real_dir() {  # <dir> -> its physical path; fails when it is not a directory
   ( cd -P -- "$1" 2>/dev/null && pwd -P )
 }
 
+# real_dir_exact <dir>: set REAL to the physical path, keeping a trailing newline in a name
+# that $(...) alone would strip; fails when it is not a directory.
+REAL=
+real_dir_exact() {
+  local r
+  r=$( cd -P -- "$1" 2>/dev/null && pwd -P && printf x ) || return 1
+  REAL=${r%x}
+  REAL=${REAL%$'\n'}
+}
+
 # --- protected paths ----------------------------------------------------------
 PROTECTED=()
 add_protected() {
@@ -196,7 +228,7 @@ default_config() {
 }
 
 load_config() {
-  local line key a b extra n=0 had_roots=0
+  local line a b extra n=0 had_roots=0
   CFG_LINES=()
   if [ -e "$CONFIG_FILE" ] || [ -L "$CONFIG_FILE" ]; then
     [ -f "$CONFIG_FILE" ] && [ ! -L "$CONFIG_FILE" ] \
@@ -266,9 +298,16 @@ cleanup_work() {
 
 # --- decision log -------------------------------------------------------------
 KEPT=0 REMOVED=0 BYTES=0 LSOF_FAILED=0
+# printable <text>: a newline or carriage return in a name must not split a decision line.
+printable() {
+  local p=$1
+  p=${p//$'\n'/\\n}
+  p=${p//$'\r'/\\r}
+  printf '%s' "$p"
+}
 decide() {  # <verb> <path> <detail>
   local line
-  line="$(iso_utc "$NOW") $1 $2${3:+ $3}"
+  line="$(iso_utc "$NOW") $1 $(printable "$2")${3:+ $3}"
   printf '%s\n' "$line"
   if [ "$APPLY" -eq 1 ]; then
     printf '%s\n' "$line" >> "$LOG_FILE" || echo "fm-scratch-reaper: cannot append $LOG_FILE" >&2
@@ -317,30 +356,45 @@ take_snapshot() {
 }
 
 has_open_handle() {  # <real dir>: 0 = busy, 1 = free, 2 = unknown
+  local prefix
   if [ "$SNAPSHOT_STATE" = untaken ]; then take_snapshot || true; fi
   [ "$SNAPSHOT_STATE" = ok ] || return 2
+  case "$1" in
+    *[[:cntrl:]]*)
+      # lsof prints a newline in a name as \n (and a raw newline would split the line), so
+      # an exact match cannot work: any busy entry that starts with the text before the
+      # first control character keeps the directory.
+      prefix=${1%%[[:cntrl:]]*}
+      if PFX="$prefix" awk 'index($0, ENVIRON["PFX"]) == 1 { f = 1 } END { exit !f }' "$BUSY_FILE"; then return 0; fi
+      return 1
+      ;;
+  esac
   if grep -qxF -- "$1" "$BUSY_FILE"; then return 0; fi
   return 1
 }
 
 # --- archive ------------------------------------------------------------------
 ARCH_COUNT=0 ARCH_SKIPPED=0
-archive_logs() {  # <real dir> <name>: copy the small logs; 0 on success
-  local dir=$1 name=$2 list="$WORK/loglist" dest f rel total=0 size
+archive_logs() {  # <real dir> <name>: copy the small logs; 0 only when every eligible log is archived and verified
+  local dir=$1 name=$2 list="$WORK/loglist" dest f rel reldir total=0 size
   ARCH_COUNT=0 ARCH_SKIPPED=0
   dest="$ARCHIVE_ROOT/$(date -u -r "$NOW" +%Y-%m-%d 2>/dev/null || date -u -d "@$NOW" +%Y-%m-%d)/$name"
+  # NUL-delimited end to end: a name may hold a newline, a space or a leading dash.
   find "$dir" -type f \( -name '*.log' -o -name '*.txt' -o -name '*.out' -o -name '*.err' -o -name '*.json' -o -name '*.md' \) \
-    -print > "$list" 2>/dev/null || return 1
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    size=$(wc -c < "$f" 2>/dev/null | tr -d ' ') || size=
-    case "$size" in ''|*[!0-9]*) ARCH_SKIPPED=$((ARCH_SKIPPED + 1)); continue ;; esac
+    -print0 > "$list" 2>/dev/null || return 1
+  while IFS= read -r -d '' f; do
+    # A size that cannot be read means the file cannot be judged small or large, so it cannot be
+    # archived or skipped: fail closed and keep the directory.
+    size=$(wc -c < "$f" 2>/dev/null) || return 1
+    size=${size//[[:space:]]/}
+    case "$size" in ''|*[!0-9]*) return 1 ;; esac
     if [ "$size" -gt "$LOG_MAX_BYTES" ] || [ $((total + size)) -gt "$LOG_DIR_MAX_BYTES" ]; then
       ARCH_SKIPPED=$((ARCH_SKIPPED + 1))
       continue
     fi
     rel=${f#"$dir"/}
-    mkdir -p -- "$dest/$(dirname -- "$rel")" || return 1
+    case "$rel" in */*) reldir=${rel%/*} ;; *) reldir= ;; esac
+    mkdir -p -- "$dest${reldir:+/$reldir}" || return 1
     cp -p -- "$f" "$dest/$rel" || return 1
     cmp -s -- "$f" "$dest/$rel" || return 1
     total=$((total + size))
@@ -359,7 +413,7 @@ reap_remove() {
   while [ "$i" -lt "${#ROOT_REAL[@]}" ]; do [ "${ROOT_REAL[$i]}" = "$root" ] && ok=1; i=$((i + 1)); done
   [ "$ok" -eq 1 ] || return 1
   [ -d "$target" ] && [ ! -L "$target" ] || return 1
-  [ "$(real_dir "$target")" = "$target" ] || return 1
+  real_dir_exact "$target" && [ "$REAL" = "$target" ] || return 1
   rm -rf -- "$target"
 }
 
@@ -376,7 +430,8 @@ process_candidate() {  # <real root> <as-written root> <name>
   path="$root/$name"
   if [ -L "$path" ]; then keep "$path" symlink; return 0; fi
   [ -d "$path" ] || { [ -e "$path" ] || decide gone "$path"; return 0; }
-  real=$(real_dir "$path") || { decide gone "$path"; return 0; }
+  real_dir_exact "$path" || { decide gone "$path"; return 0; }
+  real=$REAL
   if [ "$real" != "$root/$name" ]; then keep "$path" "outside root"; return 0; fi
   if protected_path "$real"; then keep "$path" protected; return 0; fi
   if [ -n "$(find "$real" -newer "$REF" -print -quit 2>/dev/null)" ]; then keep "$path" young; return 0; fi
@@ -410,8 +465,8 @@ run_pass() {
   while [ "$i" -lt "${#ROOT_REAL[@]}" ]; do
     root=${ROOT_REAL[$i]} asis=${ROOT_ASIS[$i]} globs=${ROOT_GLOBS[$i]}
     i=$((i + 1))
-    find "$root" -mindepth 1 -maxdepth 1 -print 2>/dev/null | sort > "$tmp" || continue
-    while IFS= read -r entry; do
+    find "$root" -mindepth 1 -maxdepth 1 -print0 2>/dev/null | sort -z > "$tmp" || continue
+    while IFS= read -r -d '' entry; do
       name=${entry##*/}
       match=0
       for g in $globs; do

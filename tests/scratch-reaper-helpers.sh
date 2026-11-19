@@ -47,29 +47,34 @@ sr_guard() {
     root=$a
     case "$root" in /*) ;; *) echo "sr_run: root '$root' is not absolute" >&2; return 1 ;; esac
     case "$root" in /|/tmp|/private/tmp|/var/tmp|/var/folders|"${HOME:-/nonexistent}"|"${HOME:-/nonexistent}/tmp") echo "sr_run: root '$root' is a real root" >&2; return 1 ;; esac
-    # Test the real path of the root's parent plus its name, so a symlink root is judged where it points
-    # and a missing root is judged where it would be.
-    real=$(cd -P -- "$(dirname -- "$root")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename -- "$root")") || { echo "sr_run: cannot resolve root '$root'" >&2; return 1; }
-    case "$real" in "$world"/*) ;; *) echo "sr_run: root '$root' is outside the test world" >&2; return 1 ;; esac
+    # Resolve the WHOLE root physically: a symlink root, or a symlink anywhere in its path, is judged
+    # where it ends up, never by its own name. A missing root is refused too.
+    [ -d "$root" ] || { echo "sr_run: root '$root' is not an existing directory" >&2; return 1; }
+    if [ -L "$root" ] && [ "${SR_SYMLINK_ROOT_OK:-0}" != 1 ]; then echo "sr_run: root '$root' is a symlink" >&2; return 1; fi
+    real=$(cd -P -- "$root" 2>/dev/null && pwd -P) || { echo "sr_run: cannot resolve root '$root'" >&2; return 1; }
+    case "$real" in "$world"/*) ;; *) echo "sr_run: root '$root' resolves to '$real', outside the test world" >&2; return 1 ;; esac
   done < "$cfg"
   return 0
 }
 
-# sr_run <world> [--script <path>] [--fakebin] -- <reaper args>: run the reaper in the private world.
+# sr_run <world> [--script <path>] [--fakebin] [--inworld-symlink-root] -- <reaper args>: run the reaper
+# in the private world. --inworld-symlink-root lets a config root be a symlink, and only when its whole
+# physical path still lies inside the world (a test of the reaper's own symlink-root refusal).
 # Output and status are the reaper's. Extra environment goes in SR_EXTRA_ENV (name=value words).
 sr_run() {
   # shellcheck disable=SC2153  # ROOT is exported by tests/lib.sh
-  local world=$1 script="$ROOT/bin/fm-scratch-reaper.sh" use_fakebin=0 path
+  local world=$1 script="$ROOT/bin/fm-scratch-reaper.sh" use_fakebin=0 link_ok=0 path
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --script) script=$2; shift 2 ;;
       --fakebin) use_fakebin=1; shift ;;
+      --inworld-symlink-root) link_ok=1; shift ;;
       --) shift; break ;;
       *) echo "sr_run: unknown option $1" >&2; return 1 ;;
     esac
   done
-  sr_guard "$world" "$@" || return 99
+  SR_SYMLINK_ROOT_OK=$link_ok sr_guard "$world" "$@" || return 99
   path=$PATH
   [ "$use_fakebin" -eq 0 ] || path="$world/fakebin:$PATH"
   # shellcheck disable=SC2086
