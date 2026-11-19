@@ -14,6 +14,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [status log size bounds](#status-log-size-bounds-fm_status_cap_bytes), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
+| Aged scratch directories filling `/private/tmp` and `~/tmp` | [Scratch reaper](#scratch-reaper-configscratch-reaper) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Automatic exact-head review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
@@ -869,6 +870,45 @@ The wake is recorded as sent only after the wake queue took it, so a failed appe
 Each outcome is one line in `data/<id>/merge-prune.log`; a pruned copy raises no wake, and only a copy that stays raises its one wake, `check: merge-prune kept <copy> for <id>: <reason>`; the prune never writes to the task's status file.
 The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.
 `bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.
+
+## Scratch reaper (config/scratch-reaper)
+
+Killed or keeping test, build, and agent runs leak scratch directories into `/private/tmp` and `~/tmp`, and nothing else removes them.
+`bin/fm-scratch-reaper.sh` removes the aged ones that nothing uses, and the watcher runs it, so no person has to.
+The script's header owns the mechanics; this section states the contract an operator relies on.
+
+A direct child directory of a listed root, whose name matches that root's glob, is removed only when every one of these holds:
+
+- It is not a symlink, and its real path is exactly the real root plus its name.
+- It is not protected: not under `~/.treehouse`, `~/firstmate`, `/Volumes`, this home, or this home's `data/` or `state/` folder.
+- Nothing in its whole tree is newer than the age, which is 24 hours unless `age_hours` says otherwise.
+- No `.git` entry and no `.fm-slot-owner` entry exists anywhere in its tree, so worktrees, pool slots, and nested repositories stay.
+- No process has an open file or a current directory inside it, judged from one `lsof` snapshot per run.
+- Its small logs were archived.
+
+Any doubt keeps the directory, and an `lsof` that fails or prints nothing keeps everything and exits 3.
+Plain files are never removed, whatever their name.
+
+`config/scratch-reaper` lists one `<root> <glob>` per line, with `~/` allowed at the start of a root and `#` starting a comment.
+A line `age_hours <n>` sets the age.
+The file replaces the built-in defaults when it names at least one root, and a file with no root line keeps them.
+The defaults are `/private/tmp` with `fm-*`, `omp-*`, `fm-fm-*`, `fm-omp-*`, `fm-joined-generation.*`, `fm-bash-*`, `fm-pre-generic.*`, `fm-prekey-matcher.*`, and `fm-ttsr-pending.*`, and `~/tmp` with `backpass-*`, `fm-spawn-tree-*`, `dsh-*`, `nm-e2e-bin*`, and `nm-timeout-bin*`.
+A root that is a symlink, is not a directory, or is, contains, or lies under a protected path stops the run with exit 2 before it touches anything.
+
+Before a directory is removed, each regular file in it named `*.log`, `*.txt`, `*.out`, `*.err`, `*.json`, or `*.md` of at most 1 MiB is copied, with its relative path and verified byte for byte, to `data/scratch-reaper-archive/<UTC date>/<directory name>/`, up to 20 MiB per directory.
+An archive that cannot be written keeps the directory.
+A larger log is not copied, the directory is still removed when every other check passes, and the decision line carries `skipped_logs=<n>`.
+Neither the archive nor the log below is pruned.
+
+Every decision is one line, printed and appended to `state/scratch-reaper.log`: `removed` with the bytes freed, or `kept` with its reason (`young`, `open handle`, `git`, `outside root`, `symlink`, `protected`, `archive failed`, `lsof failed`, `remove failed`).
+A run without `--apply` is a dry run that prints the same lines as `would-remove` or `kept` and writes nothing.
+
+The watcher offers the run at most every `FM_SCRATCH_REAPER_TICK` seconds (default 60, `0` turns it off), starting `bin/fm-scratch-reaper.sh --scheduled` detached and single-flight, with no daemon and no LaunchAgent.
+The script owns the 30-minute window, a lock, and its failure log, so a failed, busy, or hung run never reaches the supervision cycle.
+A secondmate home never runs it.
+It raises one `check: scratch-reaper low-disk` wake only when free space on the roots' volume is below 20 GiB and the run removed nothing, repeats it after six hours at most, and stays quiet once space recovers or a run frees bytes.
+A suite that sets `FM_TEST_SEAM` never starts the real script from the watcher, and `tests/scratch-reaper-helpers.sh` refuses any test run whose root, config, or archive folder is outside its private world.
+Regression coverage is `tests/fm-scratch-reaper.test.sh` and `tests/fm-watch-scratch-reaper.test.sh`.
 
 ## Waiting worker spends no turns (config/wait-no-turns)
 

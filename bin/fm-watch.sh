@@ -434,6 +434,15 @@ case "$IDLE_REAP_INTERVAL" in
 esac
 IDLE_REAP_BIN=${FM_IDLE_REAP_BIN:-$SCRIPT_DIR/fm-idle-session-reap.sh}
 IDLE_REAP_NEXT=
+# Scratch reaper (bin/fm-scratch-reaper.sh): the poll loop offers the run at most this often
+# and the script itself owns the 30-minute window; 0 turns the offer off.
+SCRATCH_REAPER_TICK=${FM_SCRATCH_REAPER_TICK:-60}
+case "$SCRATCH_REAPER_TICK" in
+  ''|*[!0-9]*) SCRATCH_REAPER_TICK=60 ;;
+  *) SCRATCH_REAPER_TICK=$((10#$SCRATCH_REAPER_TICK)) ;;
+esac
+SCRATCH_REAPER_BIN=${FM_SCRATCH_REAPER_BIN:-$SCRIPT_DIR/fm-scratch-reaper.sh}
+SCRATCH_REAPER_LAUNCHED=0
 # Pruning a merged task's pool copy (bin/fm-merge-prune.sh); 0 stops the sweep.
 MERGE_PRUNE_BIN=${FM_MERGE_PRUNE_BIN:-$SCRIPT_DIR/fm-merge-prune.sh}
 MERGE_PRUNE_INTERVAL=${FM_MERGE_PRUNE_INTERVAL:-60}
@@ -3357,6 +3366,30 @@ idle_reap_tick() {
   IDLE_REAP_PID=$!
 }
 
+# Scratch reaper, detached and single-flight like the sweep above. The script owns the window,
+# its lock and its failure log (bin/fm-scratch-reaper.sh header), so a failed, busy or hung run
+# never reaches the poll. A suite that sets FM_TEST_SEAM never starts the real script: it
+# deletes directories, so only an explicit FM_SCRATCH_REAPER_BIN stand-in runs under a test.
+SCRATCH_REAPER_PID=
+scratch_reaper_tick() {
+  local now
+  [ "$SCRATCH_REAPER_TICK" -gt 0 ] || return 0
+  if [ "${FM_TEST_SEAM:-}" = 1 ] && [ -z "${FM_SCRATCH_REAPER_BIN:-}" ]; then return 0; fi
+  fm_epoch_seconds_to now
+  [ $((now - SCRATCH_REAPER_LAUNCHED)) -ge "$SCRATCH_REAPER_TICK" ] || return 0
+  if [ -n "$SCRATCH_REAPER_PID" ]; then
+    if kill -0 "$SCRATCH_REAPER_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$SCRATCH_REAPER_PID" 2>/dev/null || true
+    SCRATCH_REAPER_PID=
+  fi
+  SCRATCH_REAPER_LAUNCHED=$now
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$SCRATCH_REAPER_BIN" --scheduled </dev/null >/dev/null 2>&1 &
+  SCRATCH_REAPER_PID=$!
+}
+
 # Merged-task copy pruning, detached and single-flight like the sweep above. A
 # record in state/*.merge-prune is armed by the merge paths; while one exists the
 # sweep is started at most once per FM_MERGE_PRUNE_INTERVAL and decides for
@@ -3897,6 +3930,7 @@ prelude_phase() {
   fi
   watcher_beat
   idle_reap_tick
+  scratch_reaper_tick
   merge_prune_tick
   typesafe_health_tick
   memory_health_tick
