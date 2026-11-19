@@ -29,11 +29,13 @@
 # actor is exactly one of captain, fleet, maintainer or nobody; any other value
 # is refused. A comment's arrival time never supplies its judged head. Record a
 # prose verdict only after its source identifies that head; otherwise leave it unbound and
-# triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
-# can grant merge authority. Captain-actor prose requires an existing live hold.
-# This script never merges and takes no forge merge action. Any merge goes
-# through the guarded merge path (bin/fm-pr-merge.sh), and AGENTS.md section 7
-# owns who may merge without asking.
+# triage its signal.
+# Formal reviews carry GitHub's own commit_id.
+# Neither kind can grant merge authority.
+# Captain-actor prose requires an existing live hold.
+# This script never merges and takes no forge merge action.
+# Any merge goes through the guarded merge path (bin/fm-pr-merge.sh).
+# AGENTS.md section 7 owns who may merge without asking.
 #
 # retire ends one task's observation of a contribution whose forge object can
 # never be read again, such as a PR in a deleted repository. It records retired
