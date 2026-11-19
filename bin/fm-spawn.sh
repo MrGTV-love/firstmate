@@ -1992,6 +1992,7 @@ SPAWN_BRIEF_DELIVERED=0
 SPAWN_BRIEF_FAILURE_REASON=
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_TREEHOUSE_ABORT_TARGET=
+SPAWN_PANE_IN_PASSED_COPY=0
 SPAWN_ROUTING_PAIR=
 
 spawn_fresh_commit_rollback() {
@@ -2052,6 +2053,10 @@ spawn_abort_cleanup() {
         echo "warning: could not retire replacement busy generation after aborted relaunch of $ID" >&2
       fi
     fi
+  fi
+  if [ "$SPAWN_PANE_IN_PASSED_COPY" = 1 ]; then
+    HERDR_PROJECTION_ABORT_CLEANUP=0
+    SPAWN_TREEHOUSE_ABORT_TARGET=
   fi
   if [ "$HERDR_PROJECTION_ABORT_CLEANUP" = 1 ] &&
     [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" != 1 ]; then
@@ -6424,6 +6429,7 @@ spawn_acquire_pool_slot() {
         exit 1
         ;;
     esac
+    SPAWN_PANE_IN_PASSED_COPY=0
   fi
 
   # Claim the pool slot for this task. The interactive `treehouse get` sent to
@@ -6539,6 +6545,7 @@ spawn_classify_copy() { # <path>
 # returns it. The record is read back; a record that cannot be written and read back refuses the whole spawn.
 spawn_pass_over_copy() {
   local passed=$WT real row reason
+  SPAWN_PANE_IN_PASSED_COPY=1
   real=$(CDPATH='' cd -- "$passed" 2>/dev/null && pwd -P) && [ -n "$real" ] || {
     echo "error: copy '$passed' cannot be resolved to a real path, so its record cannot be trusted; nothing was written to it and the spawn is refused (no worker admitted)" >&2
     exit 1

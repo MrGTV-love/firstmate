@@ -3455,6 +3455,92 @@ test_a_refused_copy_handed_out_twice_does_not_loop() {
   pass "a refused copy handed out again is not taken, tried again or looped on, and the spawn ends within its bound"
 }
 
+# install_window_log <log>: the case's tmux answers new-window with a window id and logs each new-window and kill-window
+# call, so a case sees whether the spawn closed the pane it created. Every other call goes to the fixture's tmux stub.
+install_window_log() {
+  local log=$1 inner="$FAKEBIN_DIR/tmux.fixture"
+  mv "$FAKEBIN_DIR/tmux" "$inner" || fail "the tmux stub could not be wrapped"
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  new-window) printf '%s\\n' "\$*" >> '$log'; printf '@41\\n'; exit 0 ;;
+  kill-window) printf '%s\\n' "\$*" >> '$log'; exit 0 ;;
+esac
+exec '$inner' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+}
+
+# An abort never closes the pane while it sits in a copy this spawn passed over: the other holder's copy stays as it is.
+# Both aborts below leave the pane in a passed-over copy: every copy refused, and a refused copy handed out again. The
+# control is an abort before any copy is taken, which must close the pane the spawn created.
+test_a_passed_over_pane_is_not_closed_on_abort() {
+  local id out status log
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+
+  id='pool-pane-kept-all-refused'
+  make_real_pool_case pane-kept-all-refused "$id" 2
+  make_recovered_lease "${REAL_SLOTS[0]}" "${REAL_SLOTS[1]}"
+  log="$CASE_DIR/window.log"; : > "$log"
+  install_window_log "$log"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=60 BASH_ENV="${FM_TEST_PANE_BASH_ENV:-$SKIP_CLOCK}" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a worker was admitted although every copy carried another holder's lease"
+  assert_no_launch "$CASE_DIR/launch.log"
+  assert_contains "$out" "aborting acquisition" "the all-refused spawn did not end with its acquisition refusal"
+  grep -Fq 'new-window' "$log" || fail "the spawn created no pane, so its close could not be observed"
+  ! grep -Fq 'kill-window' "$log" || fail "the all-refused spawn closed the pane in a passed-over copy: $(cat "$log")"
+
+  id='pool-pane-kept-handed-twice'
+  make_real_pool_case pane-kept-handed-twice "$id" 2
+  make_recovered_lease "${REAL_SLOTS[0]}"
+  printf '%s\n' "${REAL_SLOTS[0]}" "${REAL_SLOTS[0]}" "${REAL_SLOTS[1]}" > "$CASE_DIR/slots"
+  log="$CASE_DIR/window.log"; : > "$log"
+  install_window_log "$log"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=60 BASH_ENV="${FM_TEST_PANE_BASH_ENV:-$SKIP_CLOCK}" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "the spawn went on although the only copy in the pane was passed over"
+  assert_no_launch "$CASE_DIR/launch.log"
+  assert_contains "$out" "the pane is still in a copy this spawn skipped" "the repeated copy was not recognised as passed over"
+  grep -Fq 'new-window' "$log" || fail "the spawn created no pane, so its close could not be observed"
+  ! grep -Fq 'kill-window' "$log" || fail "the spawn closed the pane while it sat in a passed-over copy: $(cat "$log")"
+
+  id='pool-pane-closed-control'
+  make_skip_case pane-closed-control "$id" 2
+  git -C "$POOL_DIR" remote set-url origin "file://$CASE_DIR/missing-origin.git"
+  log="$CASE_DIR/window.log"; : > "$log"
+  install_window_log "$log"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "the control spawn went on although origin cannot be fetched"
+  assert_no_launch "$CASE_DIR/launch.log"
+  grep -Fq 'kill-window -t @41' "$log" || fail "the control did not close the pane it created: $(cat "$log")"
+  pass "an abort leaves a pane in a passed-over copy open, and an abort before any copy closes the pane it created"
+}
+
+# The mutant restores the close: before the abort cleanup reads the pass-over flag, it clears the flag. The case above
+# must reject it, so the mutant's kill-window of the passed-over pane is what fails.
+test_the_passed_over_pane_case_rejects_a_restored_close() {
+  local dir rc=0 out
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  dir="$TMP_ROOT/pane-kept-mutant"
+  mkdir -p "$dir"
+  cat > "$dir/mutant.sh" <<SH
+. '$ROOT/tests/skip-clock.sh'
+set -T
+__fm_restore_close() {
+  case "\$BASH_COMMAND" in
+    'local status=\$? skill_meta_tmp') SPAWN_PANE_IN_PASSED_COPY=0 ;;
+  esac
+  return 0
+}
+trap '__fm_restore_close' DEBUG
+SH
+  out=$(FM_TEST_PANE_BASH_ENV="$dir/mutant.sh" test_a_passed_over_pane_is_not_closed_on_abort 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "the passed-over pane case passed with a spawn that restores the close"
+  pass "the passed-over pane case rejects a spawn that restores the close"
+}
+
 # --- finding 10 (validators) -----------------------------------------------------------------
 
 test_slot_digest_sees_another_tasks_branch_move() {
@@ -3805,6 +3891,8 @@ test_a_valid_change_to_another_row_between_the_two_readings_does_not_refuse
 test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn
 test_a_pool_of_only_refused_copies_refuses_once_and_names_each
 test_a_refused_copy_handed_out_twice_does_not_loop
+test_a_passed_over_pane_is_not_closed_on_abort
+test_the_passed_over_pane_case_rejects_a_restored_close
 test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_new_foreign_ref
 test_slot_digest_sees_a_removed_ref
