@@ -385,8 +385,8 @@ case "$MODE" in
   report) exit 0 ;;
   enforce) [ "$stale" -eq 0 ] && [ "$shown" -eq 0 ] && exit 0; exit 1 ;;
   new-or-touched)
-    # Only guards added or edited since the base are in scope. A changed guard is
-    # one whose canonical JSON differs between the base registry and this one.
+    # Only guards added or edited since the base are in scope. An id is changed when
+    # the multiset of its complete rows differs between the base registry and this one.
     base_json=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base.XXXXXX") || exit 2
     base_allow=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base-allow.XXXXXX") || exit 2
     trap 'rm -f "$VIOLATIONS" "$SITES_JSON" "$ALLOWED_FILE" "$SC" "$base_json" "$base_allow"' EXIT
@@ -394,9 +394,9 @@ case "$MODE" in
       && git -C "$ROOT" show "$BASE_REF:docs/guards/registry.json" >"$base_json" 2>/dev/null; then
       touched_status=0
       touched=$(jq -r --slurpfile base "$base_json" '
-        (.guards | map({key: .id, value: .}) | from_entries) as $now
-        | ($base[0].guards | map({key: .id, value: .}) | from_entries) as $was
-        | $now | keys[] | select(($was[.] == null) or ($was[.] != $now[.]))' "$REGISTRY") || touched_status=$?
+        (.guards | group_by(.id) | map(sort)) as $now
+        | ($base[0].guards | group_by(.id) | map(sort)) as $was
+        | ($now - $was)[] | .[0].id' "$REGISTRY") || touched_status=$?
       out=0
       while IFS= read -r gid; do
         [ -n "$gid" ] || continue

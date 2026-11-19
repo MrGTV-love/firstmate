@@ -19,6 +19,7 @@
 #   - new-or-touched mode ignores an untouched offending guard, even for numeric-looking ids
 #   - a touched offending id still fails until the offending field is corrected
 #   - a touched guard that shares an invariant fails by its own id, and an unreadable base fails closed
+#   - a duplicate id added before its original fails by that literal id, and correcting the id clears it
 #   - a retired guard that is still registered fails
 #   - --counts excludes active guards named in beyond_audit_active and beyond_audit_retired points
 #   - every refusal-site signature (marker, message, helper call, hook deny, guard event) is found
@@ -363,6 +364,25 @@ jq -es --arg base "$literal_base" '
       and all($events[]; .source_ok and .opportunity and .base == $base)
   ' "$literal_log" >/dev/null || fail "expected one event per touched-registry verdict with the same base"
 pass "new-or-touched records the touched-registry refusal, recovery and unrelated admission"
+
+DUP_NAT=$(fixture duplicate_newortouched)
+git -C "$DUP_NAT" init -q
+git -C "$DUP_NAT" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$DUP_NAT" -c user.email=t@example.invalid -c user.name=t commit -qm base
+: >"$DUP_NAT/bin/gguard2.sh"; : >"$DUP_NAT/tests/gguard2.test.sh"
+mutate "$DUP_NAT" '.guards = [(.guards[0] | .invariant = "a duplicate invariant" | .owner = "bin/gguard2.sh" | .test = "tests/gguard2.test.sh")] + .guards'
+dup_rc=0
+out=$("$LINT" --root "$DUP_NAT" --mode new-or-touched --base HEAD --json 2>/dev/null) || dup_rc=$?
+if [ "$dup_rc" -ne 1 ] ||
+  ! jq -es 'length == 1 and .[0].findings == [{rule:"R1", id:"gguard", message:"duplicate guard id"}]' <<< "$out" >/dev/null; then
+  fail "adding a duplicate id before the original must exit 1 with its R1 finding in one JSON document, got exit $dup_rc: $out"
+fi
+pass "new-or-touched refuses an added duplicate id before the original"
+
+mutate "$DUP_NAT" '.guards[0].id = "gfixed"'
+"$LINT" --root "$DUP_NAT" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "correcting only the duplicate id must clear the same edit"
+pass "new-or-touched passes the same edit after correcting the duplicate id"
 
 # --- malformed input --------------------------------------------------------
 BROKEN=$(fixture broken)
