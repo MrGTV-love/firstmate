@@ -1,0 +1,56 @@
+Guard outcome-proof procedure: docs-only validation transcript
+Branch: fm/guard-outcome-proof-procedure
+Base:   7f3a198b31ed21a993bbefdfcd0f3535c8455bec
+Head:   2a1382ec8376d1b3116ee209b02f478eddcc474e  (git rev-parse HEAD)
+Scope:  .agents/skills/task-delivery/SKILL.md, docs/guard-spec.md, docs/review-rubric.md
+
+== git show --stat 2a1382ec ==
+2a1382ec no-mistakes(review): Require inspectable execution records for guard outcomes
+ docs/review-rubric.md | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+== git diff --check 7f3a198b..2a1382ec ==
+(no output, exit 0)
+
+== bash bin/fm-doc-audience-check.sh ==
+fm-doc-audience-check: ok surfaces=156 local_links=1824
+exit=0
+
+== bash tests/fm-documentation-audiences.test.sh ==
+ok - documentation inventory classifies every maintained prose surface exactly once
+ok - classification, setup routing, and maintained-prose scope fail safely
+ok - required documentation owner pointers cannot silently disappear
+ok - local links resolve while dates, versions, commands, and incident prose remain semantically reviewed
+ok - nested skill references use their owner while ordinary links, anchors, and path boundaries remain enforced
+exit=0
+
+== bash bin/fm-guard-refcheck.sh --root <worktree> ==
+REFCHECK_SUMMARY registrations=51 paths=106 missing=0 registry_missing=0 retired=16 resurrected=0
+exit=0
+
+== bash tests/fm-guard-refcheck.test.sh ==
+ok - a missing registry spec path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+exit=0
+
+== Anchors resolved by hand (grep of exact headings) ==
+docs/guard-spec.md -> ## Guard procedure            (linked from task-delivery SKILL.md, review-rubric.md)
+docs/guard-spec.md -> ## Fields                     (linked from Guard procedure step 2)
+docs/guard-spec.md -> ## Registry                   (linked from Guard procedure step 4)
+docs/guard-spec.md -> ## Cut procedure              (linked from Guard procedure step 2)
+docs/guard-spec.md -> ## Ratchet                    (linked from Guard procedure step 4)
+docs/review-rubric.md -> ### Guard changes          (linked from guard-spec.md, task-delivery SKILL.md)
+docs/configuration.md -> ## Automatic review and merge (config/review-runner)   (slug automatic-review-and-merge-configreview-runner)
+.agents/skills/ship-landing/SKILL.md -> ## Firstmate train landing order      (linked from task-delivery SKILL.md)
+Relative path ../../../docs/guard-spec.md from .agents/skills/task-delivery/ resolves to the repo file.
+Relative path ../ship-landing/SKILL.md from .agents/skills/task-delivery/ resolves to .agents/skills/ship-landing/SKILL.md.
+
+== Not run ==
+bin/fm-guard-lint.sh (ratchet and counts) was NOT run: linters are out of scope for this phase.
+No runtime, Firstmate lifecycle, or Herdr lab was started: the change is prose only.
+R3 adoption (live required checks, exact independent PASS, Main-owned landing) is pending downstream.
