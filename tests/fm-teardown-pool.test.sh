@@ -4823,18 +4823,14 @@ unc_return_count() {  # <case-dir> counts provider return calls
 }
 
 # Teardown sends the provider nothing but the capability probe, the pool-dir
-# read, the exact conditional return of slot A, and, only when <adopting> is set
-# for an entry still on the old holder, one adopting status: never a lease, get,
-# forced return, or a return of another slot.
-unc_assert_only_route_commands() {  # <case-dir> <label> [adopting]
+# read and the exact conditional return of slot A: never a status (which can
+# rewrite a holder), lease, get, forced return, or a return of another slot.
+unc_assert_only_route_commands() {  # <case-dir> <label>
   local line
   [ -e "$1/treehouse.argv" ] || return 0
   while IFS= read -r line; do
     case "$line" in
       'capabilities --json'|pool-dir) ;;
-      'status --json')
-        [ -n "${3:-}" ] || fail "$2: teardown ran a status with no old holder to adopt"
-        ;;
       "return $UNC_A --if-lease-holder "*)
         case "$line" in *--force*|*" -f"*|*--yes*) fail "$2: a forced or answered return was sent: $line" ;; esac
         ;;
@@ -4847,16 +4843,13 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
   local provider kind case_dir out rc lease_id label
   unc_providers "R3/R6 real-provider release"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for kind in ordinary recovered recovered-old recovered-id; do
+    for kind in ordinary recovered recovered-id; do
       label="$provider $kind"
-      UNC_B_HOLDER_AFTER=
-      [ "$kind" != recovered-old ] || UNC_B_HOLDER_AFTER=adopted
       unc_pool_case "unclaimed-release-$kind" "$kind" "$provider" || fail "$label: cannot build the pool"
       case_dir=$UNC_CASE
       lease_id=$(jq -r --arg p "$UNC_A" '.worktrees[] | select(.path == $p) | .lease_id // ""' "$UNC_STATE")
       unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
-      jq -c --arg p "$UNC_B" --arg h "$UNC_PROTECTED_HOLDER" --arg adopt "$UNC_B_HOLDER_AFTER" \
-        '.worktrees[] | select(.path == $p) | if $adopt == "adopted" then .lease_holder = $h else . end' "$UNC_STATE" > "$case_dir/b-entry.before"
+      jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/b-entry.before"
       rc=0
       out=$(unc_run_teardown "$case_dir") || rc=$?
       expect_code 0 "$rc" "$label: teardown of the unclaimed enclosing slot failed"$'\n'"$out"
@@ -4878,7 +4871,7 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return() {
       fi
       assert_equals 1 "$(unc_return_count "$case_dir")" "$label: the slot was returned other than once: $(cat "$case_dir/treehouse.argv")"
       ! grep -E -- '--force|(^| )-f( |$)|--yes' "$case_dir/treehouse.argv" >/dev/null || fail "$label: a forced or answered return was issued: $(cat "$case_dir/treehouse.argv")"
-      unc_assert_only_route_commands "$case_dir" "$label" "$UNC_B_HOLDER_AFTER"
+      unc_assert_only_route_commands "$case_dir" "$label"
       unc_assert_no_forced_git "$case_dir" "$label" removal-expected
       grep -Fx "teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree $UNC_NESTED removed and its unclaimed pool slot $UNC_A returned by its exact lease)" <<<"$out" >/dev/null \
         || fail "$label: the completion line did not report the returned slot"$'\n'"$out"
@@ -5126,43 +5119,155 @@ test_unclaimed_release_refuses_each_custody_condition() {
   pass 'R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry'
 }
 
-# An unproven treehouse stays inert (no capabilities command, a failing probe, or a
-# schema 1 build that publishes no protected holder, for an ordinary or a recovered
-# lease): teardown completes, leaves the reassociated copy and slot A in place,
-# writes no return-pending marker, and issues no return.
+# An unproven treehouse (no capabilities command, a failing probe, or a schema 1 build
+# that publishes no protected holder) cannot show that a recovered slot is safe to
+# return or to leave. With the task's reassociated copy in a recovered entry, teardown
+# refuses and keeps the record (the retry obligation), the copy, the slot's entry and
+# the pool state, and issues no return. With an ordinary lease it completes as before:
+# the lease holds the slot durably on any treehouse, so the record may retire (inert).
 test_unclaimed_slot_on_unproven_provider_stays_inert() {
-  local provider cond case_dir out rc before kind
+  local provider cond kind case_dir out rc before
   unc_providers "unclaimed-route gate on the real provider"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for cond in capability-old capability-old-recovered capability-failed capability-no-holder capability-no-version; do
-      kind=ordinary-old
-      [ "$cond" != capability-old-recovered ] || kind="recovered-old"
-      unc_pool_case "unclaimed-outside-$cond" "$kind" "$provider" || fail "$provider $cond: cannot build the pool"
-      case_dir=$UNC_CASE
-      case "$cond" in
-        capability-old*) : > "$case_dir/capability-old" ;;
-        capability-failed) : > "$case_dir/capability-fail" ;;
-        capability-no-holder) : > "$case_dir/capability-no-holder" ;;
-        capability-no-version) : > "$case_dir/capability-no-version" ;;
-      esac
-      before=$(cat "$UNC_STATE")
-      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
-      unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.before"
-      rc=0
-      out=$(unc_run_teardown "$case_dir") || rc=$?
-      expect_code 0 "$rc" "$provider $cond: teardown outside the route must complete as before"$'\n'"$out"
-      assert_absent "$case_dir/state/task-x1.meta" "$provider $cond: the task record survived"
-      assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond: a return-pending marker was written outside the route"
-      ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $cond: a return was issued: $(cat "$case_dir/treehouse.argv")"
-      [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $cond: the pool state changed"
-      unc_assert_only_route_commands "$case_dir" "$provider $cond"
-      unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.after"
-      cmp -s "$case_dir/nested.before" "$case_dir/nested.after" || fail "$provider $cond: the reassociated copy was not left in place"
-      unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
-      cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $cond: sibling B's nested copy changed"
+    for cond in capability-old capability-failed capability-no-holder capability-no-version; do
+      for kind in ordinary-old recovered-old; do
+        unc_pool_case "unclaimed-outside-$cond-$kind" "$kind" "$provider" || fail "$provider $cond $kind: cannot build the pool"
+        case_dir=$UNC_CASE
+        case "$cond" in
+          capability-old) : > "$case_dir/capability-old" ;;
+          capability-failed) : > "$case_dir/capability-fail" ;;
+          capability-no-holder) : > "$case_dir/capability-no-holder" ;;
+          capability-no-version) : > "$case_dir/capability-no-version" ;;
+        esac
+        before=$(cat "$UNC_STATE")
+        unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
+        unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.before"
+        rc=0
+        out=$(unc_run_teardown "$case_dir") || rc=$?
+        if [ "$kind" = recovered-old ]; then
+          [ "$rc" -ne 0 ] || fail "$provider $cond $kind: teardown completed and retired the record although the slot's recovered entry could not be proved safe"$'\n'"$out"
+          assert_contains "$out" "REFUSED" "$provider $cond $kind: no refusal"
+          assert_present "$case_dir/state/task-x1.meta" "$provider $cond $kind: the task record was retired, so the retry obligation was lost"
+        else
+          expect_code 0 "$rc" "$provider $cond $kind: teardown outside the route must complete as before"$'\n'"$out"
+          assert_absent "$case_dir/state/task-x1.meta" "$provider $cond $kind: the task record survived"
+        fi
+        assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$provider $cond $kind: a return-pending marker was written outside the route"
+        ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $cond $kind: a return was issued: $(cat "$case_dir/treehouse.argv")"
+        [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $cond $kind: the pool state changed"
+        unc_assert_only_route_commands "$case_dir" "$provider $cond $kind"
+        unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.after"
+        cmp -s "$case_dir/nested.before" "$case_dir/nested.after" || fail "$provider $cond $kind: the reassociated copy was not left in place"
+        unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
+        cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $cond $kind: sibling B's nested copy changed"
+      done
     done
   done
-  pass 'on an unproven treehouse the unclaimed-slot route stays inert: teardown completes, keeps the reassociated copy, and writes no return-pending marker'
+  pass 'on an unproven treehouse a recovered entry holding the reassociated copy refuses and keeps the record, the copy and the pool state, and an ordinary lease keeps the inert completion; no return and no marker either way'
+}
+
+# Ignored files are invisible to git status, so the unclaimed route's custody proofs never
+# saw them. Two fixtures put unique ignored bytes where a normal teardown would lose them.
+# unc_ignore_path marks <relative-path> ignored for every worktree of the fixture project.
+unc_ignore_path() {  # <relative-path>
+  local common
+  common=$(git -C "$UNC_CASE/project" rev-parse --path-format=absolute --git-common-dir) || return 1
+  mkdir -p "$common/info" && printf '%s\n' "$1" >> "$common/info/exclude"
+}
+
+# F-01: slot A's root holds an ignored file at a path the branch a return resets it to
+# tracks. The return would overwrite it, so teardown refuses before the return and keeps
+# the record, the marker, the bytes, the copy and the pool state. Control: an ignored file
+# at a path that branch does not track is kept by the return, which then runs.
+test_unclaimed_return_refuses_to_overwrite_an_ignored_root_file() {
+  local provider variant case_dir out rc before origin
+  unc_providers "unclaimed-route gate on the real provider"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for variant in colliding unrelated; do
+      unc_pool_case "unclaimed-ignored-root-$variant" ordinary "$provider" || fail "$provider $variant: cannot build the pool"
+      case_dir=$UNC_CASE
+      # origin gains a commit that tracks collision.txt, fetched into the project: the root is
+      # behind it. The fixture's origin is a local bare repository; the push goes nowhere else.
+      origin=$(git -C "$case_dir/project" remote get-url origin) || fail "$provider $variant: the fixture project has no origin"
+      git clone -q "$origin" "$case_dir/upstream-work" || fail "$provider $variant: cannot clone the fixture origin"
+      printf 'upstream tracked version\n' > "$case_dir/upstream-work/collision.txt"
+      git -C "$case_dir/upstream-work" add collision.txt
+      git -C "$case_dir/upstream-work" -c user.email=t@t -c user.name=t commit -q -m upstream-tracks-collision
+      git -C "$case_dir/upstream-work" push -q origin HEAD:main || fail "$provider $variant: cannot push to the fixture origin"
+      git -C "$case_dir/project" fetch -q origin || fail "$provider $variant: cannot fetch the fixture origin"
+      git -C "$UNC_A" ls-tree -r --name-only refs/remotes/origin/main | grep -qx collision.txt || fail "$provider $variant: origin/main does not track collision.txt"
+      if [ "$variant" = colliding ]; then
+        unc_ignore_path collision.txt
+        printf 'unique ignored local bytes\n' > "$UNC_A/collision.txt"
+        git -C "$UNC_A" check-ignore -q collision.txt || fail "$provider $variant: the fixture file is not ignored"
+      else
+        unc_ignore_path scratch.dat
+        printf 'unique ignored local bytes\n' > "$UNC_A/scratch.dat"
+        git -C "$UNC_A" check-ignore -q scratch.dat || fail "$provider $variant: the fixture file is not ignored"
+      fi
+      [ -z "$(git -C "$UNC_A" status --porcelain --untracked-files=all | grep -v '^?? .claude')" ] || fail "$provider $variant: git status shows the ignored file, so the fixture does not model the defect"
+      before=$(cat "$UNC_STATE")
+      rc=0
+      out=$(unc_run_teardown "$case_dir") || rc=$?
+      if [ "$variant" = colliding ]; then
+        [ "$rc" -ne 0 ] || fail "$provider $variant: teardown completed although the return would overwrite an ignored root file"$'\n'"$out"
+        assert_contains "$out" "ignored files in its root sit where the branch a return resets it to" "$provider $variant: the refusal did not name its cause"
+        assert_present "$case_dir/state/task-x1.meta" "$provider $variant: the task record was retired"
+        assert_present "$case_dir/state/task-x1.teardown-return-pending" "$provider $variant: the return-pending marker was dropped"
+        ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $variant: a return was issued: $(cat "$case_dir/treehouse.argv")"
+        [ "$(cat "$UNC_STATE")" = "$before" ] || fail "$provider $variant: the pool state changed"
+        assert_present "$UNC_NESTED" "$provider $variant: the task's nested copy was removed by a refused route"
+        [ "$(cat "$UNC_A/collision.txt")" = 'unique ignored local bytes' ] || fail "$provider $variant: the ignored root bytes changed"
+      else
+        expect_code 0 "$rc" "$provider $variant: an ignored file the return keeps must not stop the route"$'\n'"$out"
+        grep -q '^return ' "$case_dir/treehouse.argv" || fail "$provider $variant: the route never returned the slot"
+        [ "$(cat "$UNC_A/scratch.dat")" = 'unique ignored local bytes' ] || fail "$provider $variant: the ignored root bytes changed"
+      fi
+      unc_assert_no_forced_git "$case_dir" "$provider $variant" "$([ "$variant" = colliding ] || echo removal-expected)"
+    done
+  done
+  pass 'an ignored root file where the return target tracks a path refuses the unclaimed return before anything is removed, and an ignored file it keeps does not'
+}
+
+# F-02: an unlocked own nested copy holds a unique ignored file. Plain git worktree remove
+# deletes ignored files without --force, so the file is preserved first in the task's data
+# folder with its bytes, and a preserve that cannot be made refuses with the copy intact.
+test_unclaimed_own_copy_ignored_files_are_preserved_or_refused() {
+  local provider case_dir out rc found variant preserved
+  unc_providers "unclaimed-route gate on the real provider"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for variant in preserved refused; do
+      unc_pool_case "unclaimed-ignored-nested-$variant" ordinary "$provider" || fail "$provider $variant: cannot build the pool"
+      case_dir=$UNC_CASE
+      unc_ignore_path nested-private.dat
+      printf 'unique nested ignored bytes\n' > "$UNC_NESTED/nested-private.dat"
+      git -C "$UNC_NESTED" check-ignore -q nested-private.dat || fail "$provider $variant: the fixture file is not ignored"
+      [ -z "$(git -C "$UNC_NESTED" status --porcelain --untracked-files=all)" ] || fail "$provider $variant: git status shows the ignored file, so the fixture does not model the defect"
+      if [ "$variant" = refused ]; then
+        # the preserve folder cannot be made: its name is taken by a regular file
+        mkdir -p "$case_dir/data/task-x1"
+        : > "$case_dir/data/task-x1/nested-copy-preserved"
+      fi
+      rc=0
+      out=$(unc_run_teardown "$case_dir") || rc=$?
+      preserved=$(find "$case_dir/data" -name nested-private.dat -type f 2>/dev/null | head -1)
+      if [ "$variant" = preserved ]; then
+        expect_code 0 "$rc" "$provider $variant: the route must complete once the ignored file is preserved"$'\n'"$out"
+        [ -n "$preserved" ] || fail "$provider $variant: the nested copy's ignored file was deleted with no preserve"$'\n'"$out"
+        [ "$(cat "$preserved")" = 'unique nested ignored bytes' ] || fail "$provider $variant: the preserved bytes differ"
+        assert_absent "$UNC_NESTED" "$provider $variant: the nested copy was not removed"
+        grep -q '^return ' "$case_dir/treehouse.argv" || fail "$provider $variant: the slot was not returned"
+      else
+        [ "$rc" -ne 0 ] || fail "$provider $variant: teardown completed although the copy's ignored file could not be preserved"$'\n'"$out"
+        assert_present "$UNC_NESTED/nested-private.dat" "$provider $variant: the ignored file is gone"
+        [ "$(cat "$UNC_NESTED/nested-private.dat")" = 'unique nested ignored bytes' ] || fail "$provider $variant: the ignored bytes changed"
+        assert_present "$case_dir/state/task-x1.meta" "$provider $variant: the task record was retired"
+        ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $variant: a return was issued"
+      fi
+      unc_assert_no_forced_git "$case_dir" "$provider $variant" "$([ "$variant" = preserved ] && echo removal-expected)"
+    done
+  done
+  pass 'an unlocked own nested copy with a unique ignored file is preserved before removal, or the route refuses with the copy and the file intact'
 }
 
 # Control for the legacy refusal: an ordinary lease (it carries a lease id) held by
@@ -5209,17 +5314,16 @@ test_unclaimed_ordinary_lease_of_another_holder_stays_outside_the_route() {
 #     route is never planned, so the gate does not apply (outside the route);
 #   - a route only the planning under project custody selected (the early proof did
 #     not): its own tuple is the record, so a successor after it refuses too;
-#   - an entry on the old recovered holder: adopted before any helper, and bound only
-#     when it then shows the protected holder; a failed status or a status that
-#     rewrites nothing refuses before any helper, and an adopted one proceeds.
+#   - an entry on the old recovered holder: refused before any helper, with no status
+#     run (the provider's cutover adopts it; the consumer changes no holder).
 unc_teardown_functions() {  # prints the extracted functions
   python3 - "$ROOT/bin/fm-teardown.sh" <<'PY'
 import re, sys
 text = open(sys.argv[1]).read()
-optional = ('teardown_unclaimed_adopt_old_holder', 'teardown_unclaimed_pass', 'teardown_unclaimed_pass_checks',
+optional = ('teardown_unclaimed_refuse_old_holder', 'teardown_unclaimed_pass', 'teardown_unclaimed_pass_checks',
             'teardown_unclaimed_pass_refusal', 'teardown_unclaimed_foreign_live_pids')
 for name in ('teardown_nested_slot', 'teardown_unclaimed_candidate', 'teardown_unclaimed_early_proof',
-             'teardown_unclaimed_retire_gate', 'teardown_unclaimed_adopt_old_holder', 'teardown_unclaimed_note',
+             'teardown_unclaimed_retire_gate', 'teardown_unclaimed_refuse_old_holder', 'teardown_unclaimed_note',
              'teardown_unclaimed_pass', 'teardown_unclaimed_pass_checks', 'teardown_unclaimed_pass_refusal',
              'teardown_unclaimed_foreign_live_pids', 'teardown_unclaimed_lease_matches'):
     m = re.search(r'^' + re.escape(name) + r'\(\) \{[^\n]*\n.*?^\}', text, re.M | re.S)
@@ -5292,9 +5396,7 @@ test_unclaimed_successor_runs_no_retirement_helper() {
       'other-holder-from-start|other|id-9|other|id-9|other|id-9|none|outside' \
       'planning-only-control|other|id-9|task-x1|id-1|task-x1|id-1|none|helpers' \
       'planning-only-successor|other|id-9|task-x1|id-1|successor|id-2|none|refused' \
-      'old-holder-adopted|recovered: old||recovered: old||recovered: old||adopt|helpers' \
-      'old-holder-status-failed|recovered: old||recovered: old||recovered: old||failed|refused' \
-      'old-holder-status-no-rewrite|recovered: old||recovered: old||recovered: old||noop|refused'; do
+      'old-holder-refused|recovered: old||recovered: old||recovered: old||adopt|refused'; do
     IFS="|" read -r name he ie hp ip hn idn st expect <<<"$scenario"
     (
     rc=0
@@ -5306,7 +5408,7 @@ test_unclaimed_successor_runs_no_retirement_helper() {
         assert_contains "$out" RETIRE_DONE "$name: the retirement did not finish"
         # the return-pending marker is the first step of the route, before any helper
         case "$name" in
-          planning-only-control|control|old-holder-adopted)
+          planning-only-control|control)
             assert_contains "$out" "MARKER /fixture/pool/1/repo" "$name: no return-pending marker was written for the route"
             [ "$(printf '%s\n' "$out" | grep -n -m1 '^MARKER' | cut -d: -f1)" -lt "$(printf '%s\n' "$out" | grep -n -m1 '^HELPER' | cut -d: -f1)" ] \
               || fail "$name: a retirement helper ran before the return-pending marker was written"$'\n'"$out"
@@ -5327,59 +5429,55 @@ test_unclaimed_successor_runs_no_retirement_helper() {
         assert_not_contains "$out" RETIRE_DONE "$name: retirement completed"
         assert_contains "$out" "REFUSED: pool slot /fixture/pool/1/repo" "$name: the gate did not refuse by name"
         assert_contains "$out" "record is kept for a retry" "$name: the refusal did not keep the record"
+        assert_not_contains "$out" "STATUS" "$name: the gate ran treehouse status, which can rewrite a holder"
         ;;
     esac
     ) || bad="$bad ${scenario%%|*}"
   done
   [ -z "$bad" ] || fail "retirement gate scenarios failed:$bad"
-  pass 'the retirement gate refuses before any retirement, launch-agent or process-reaping helper when a successor appears before or after the planning (different holder, or the same holder with a new lease id) or when an old-holder adoption fails or rewrites nothing, and lets an unchanged lease, a protected adoption and an interrupted release retire; another holder from the start stays outside the route'
+  pass 'the retirement gate refuses before any retirement, launch-agent or process-reaping helper when a successor appears before or after the planning (different holder, or the same holder with a new lease id) or when the entry is still on the old holder (refused with no status run), and lets an unchanged lease and an interrupted release retire; another holder from the start stays outside the route'
 }
 
-# An entry on the old recovered holder is bound only when the adopting status then
-# shows the protected holder (Main 1784). A failed status, and a status that rewrites
-# nothing, refuse before the own-copy cleanup and before any retirement: the task's
-# copy and slot A are untouched, nothing is returned, no git removal runs, the old
-# holder is still on slot A, and the record is kept. Control: an adopting status
-# binds the protected holder and the route completes (R3 recovered-old).
-# Retry after a failed status, with the return-pending marker an interrupted attempt
-# leaves when it proved the old-holder lease (the persisted marker format): when another
-# command adopted slot A in between (the protected holder, same lease id and name), the
-# retry converges with the conditional return of the protected holder; when slot A then
-# carries a new lease id or another holder, the retry refuses with the record, marker
-# and lease kept and nothing returned.
-test_unclaimed_old_holder_adoption_failure_refuses_before_cleanup() {
+# An entry still on the old recovered holder is never bound, and teardown never changes a
+# lease or a holder (Main 2882): it refuses before the own-copy cleanup and before any
+# retirement, runs no status (the provider's cutover adoption, not the consumer, moves the
+# entry to the protected holder), and keeps the task's copy, slot A, the old holder on
+# slot A and the record. Retry with the return-pending marker an interrupted attempt leaves
+# when it proved the old-holder lease (the persisted marker format): once the cutover
+# adopted slot A in between (the protected holder, same lease id and name), the retry
+# converges with the conditional return of the protected holder; when slot A then carries
+# a new lease id or another holder, the retry refuses with the record, marker and lease
+# kept and nothing returned.
+test_unclaimed_old_holder_refuses_without_changing_anything_and_converges_after_cutover() {
   local provider mode case_dir out rc retry filter gen proved
-  unc_providers "old-holder adoption failure on the real provider"
+  unc_providers "old-holder refusal on the real provider"
   for provider in "${UNC_PROVIDERS[@]}"; do
-    for mode in status-fail status-noop retry-adopted retry-new-id retry-other-holder; do
+    for mode in old-holder retry-adopted retry-new-id retry-other-holder; do
       unc_pool_case "unclaimed-adopt-$mode" recovered-old "$provider" || fail "$provider $mode: cannot build the pool"
       case_dir=$UNC_CASE
       retry=
-      case "$mode" in retry-*) retry=${mode#retry-}; : > "$case_dir/status-fail" ;; *) : > "$case_dir/$mode" ;; esac
+      case "$mode" in retry-*) retry=${mode#retry-} ;; esac
       unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.before"
       jq -c --arg p "$UNC_A" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/a-entry.before"
       rc=0
       out=$(unc_run_teardown "$case_dir") || rc=$?
-      [ "$rc" -ne 0 ] || fail "$provider $mode: teardown completed although the old holder was never adopted"$'\n'"$out"
+      [ "$rc" -ne 0 ] || fail "$provider $mode: teardown completed although the entry is still on the old holder"$'\n'"$out"
+      ! grep -q '^status' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $mode: teardown ran treehouse status, which can rewrite a holder: $(cat "$case_dir/treehouse.argv")"
       assert_present "$case_dir/state/task-x1.meta" "$provider $mode: the task record was retired"
-      assert_present "$UNC_NESTED" "$provider $mode: the task's own copy was removed before the adoption was proved"
+      assert_present "$UNC_NESTED" "$provider $mode: the task's own copy was removed beside an old-holder entry"
       unc_copy_snapshot "$UNC_NESTED" "$case_dir/nested.after"
       cmp -s "$case_dir/nested.before" "$case_dir/nested.after" || fail "$provider $mode: the task's copy changed"
       jq -c --arg p "$UNC_A" '.worktrees[] | select(.path == $p)' "$UNC_STATE" | cmp -s - "$case_dir/a-entry.before" \
-        || fail "$provider $mode: slot A's entry changed although the old holder was never adopted"
+        || fail "$provider $mode: slot A's entry changed although teardown adopts nothing"
       ! grep -q '^return ' "$case_dir/treehouse.argv" 2>/dev/null || fail "$provider $mode: a return was issued: $(cat "$case_dir/treehouse.argv")"
       ! grep -q ' worktree remove ' "$case_dir/git.argv" 2>/dev/null || fail "$provider $mode: a copy was removed: $(grep ' worktree remove ' "$case_dir/git.argv")"
-      case "$mode" in
-        status-noop) assert_contains "$out" "was not rewritten to the protected holder" "$provider $mode: the refusal did not name the missing rewrite" ;;
-        *) assert_contains "$out" "failed" "$provider $mode: the refusal did not name the failed status" ;;
-      esac
+      assert_contains "$out" "run the provider's cutover adoption first" "$provider $mode: the refusal did not name the cutover"
       assert_contains "$out" "record is kept for a retry" "$provider $mode: the refusal did not keep the record"
       [ -n "$retry" ] || continue
       gen=$(sed -n 's/^spawn_gen=//p' "$case_dir/state/task-x1.meta" | tail -1)
       proved="recovered|$UNC_RECOVERED_HOLDER||$(jq -r --arg p "$UNC_A" '.worktrees[] | select(.path == $p) | .name' "$UNC_STATE")"
       printf 'spawn_gen=%s\nslot=%s\nlease=%s\n' "$gen" "$UNC_A" "$(printf '%s' "$proved" | od -An -v -tx1 | tr -d ' \n')" \
         > "$case_dir/state/task-x1.teardown-return-pending"
-      rm -f "$case_dir/status-fail"
       # The filters are jq programs; $h and $i are jq variables, never shell expansions.
       # shellcheck disable=SC2016
       case "$retry" in
@@ -5418,7 +5516,7 @@ test_unclaimed_old_holder_adoption_failure_refuses_before_cleanup() {
       fi
     done
   done
-  pass 'an old recovered holder that the adopting status does not rewrite (a failed status, or one that rewrites nothing) refuses before the own-copy cleanup and any retirement, with the copy, slot and record untouched; a retry converges when slot A was adopted in between and refuses when it then carries a new lease id or another holder'
+  pass 'an entry still on the old recovered holder refuses before the own-copy cleanup and any retirement with no status run and the copy, slot and record untouched; a retry converges when the cutover adopted slot A in between and refuses when it then carries a new lease id or another holder'
 }
 
 # A nested current copy whose record has no history that names its slot (Main 1817):
@@ -5564,7 +5662,7 @@ test_unclaimed_final_bind_carries_the_gate_lease() {
   script=$(python3 - "$ROOT/bin/fm-teardown.sh" <<'PY'
 import re, sys
 text = open(sys.argv[1]).read()
-for name, required in (('teardown_unclaimed_note', True), ('teardown_unclaimed_adopt_old_holder', True),
+for name, required in (('teardown_unclaimed_note', True), ('teardown_unclaimed_refuse_old_holder', True),
         ('teardown_unclaimed_retire_gate', True), ('teardown_unclaimed_lease_is_the_gated_one', False),
         ('teardown_unclaimed_lease_matches', True),
         ('teardown_unclaimed_read_lease', True), ('teardown_unclaimed_slot_prove', True),
@@ -5750,7 +5848,7 @@ unc6_retire_case() {  # <name> <inject> <successor-kind: id|holder|process> <pid
     . "$ROOT/bin/fm-task-copy-lib.sh"
     eval "$(unc6_functions teardown_nested_slot teardown_unclaimed_retire_gate teardown_unclaimed_lease_matches teardown_unclaimed_pass \
       teardown_unclaimed_pass_checks teardown_unclaimed_pass_refusal teardown_unclaimed_foreign_live_pids \
-      teardown_unclaimed_adopt_old_holder teardown_unclaimed_note)"
+      teardown_unclaimed_refuse_old_holder teardown_unclaimed_note)"
     ID=task-x1 KIND=ship FORCE='' PROJ=$dir/project WT=$dir/pool/1/proj/nested TASK_TMP=$dir/tmp META=$dir/state/meta STATE=$dir/state
     SLOT=$dir/pool/1/proj
     FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: old'
@@ -6128,6 +6226,9 @@ unc6_custody_case() {  # <name> <extra-repo: yes|no> <tmp-pids: none|one|fail>
     require_exclusive_worktree_slot_record() { return 0; }
     teardown_nested_slot() { return 0; }
     teardown_landed() { return 0; }
+    # the root's ignored-file comparison with the return target is its own case (F-01)
+    teardown_return_base_branch() { printf 'main\n'; }
+    teardown_return_collisions() { return 0; }
     teardown_refuse_copy() { echo "REFUSE_COPY $1 $3"; }
     pids_with_cwd_under() {
       case "$1:$tmp" in
@@ -6228,6 +6329,10 @@ unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt> [<proc>]
     teardown_slot_peers_detect() { TEARDOWN_PEER_IDS=(); }
     require_exclusive_worktree_slot_record() { return 0; }
     teardown_landed() { return 0; }
+    # the root's ignored-file comparison with the return target is its own case (F-01):
+    # here the root holds no ignored file that the target tracks
+    teardown_return_base_branch() { printf 'main\n'; }
+    teardown_return_collisions() { return 0; }
     [ "$proc" != none ] || pids_with_cwd_under() { return 0; }
     validate_worktree_teardown_safety() { return 0; }
     teardown_retained_receipt() { printf '%s\n' "$DATA/retained-record"; }
@@ -6769,6 +6874,8 @@ test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return
 test_unclaimed_release_interruptions_converge_and_never_clear_a_successor
 test_unclaimed_release_refuses_each_custody_condition
 test_unclaimed_slot_on_unproven_provider_stays_inert
+test_unclaimed_return_refuses_to_overwrite_an_ignored_root_file
+test_unclaimed_own_copy_ignored_files_are_preserved_or_refused
 test_unclaimed_ordinary_lease_of_another_holder_stays_outside_the_route
 test_early_refusal_assertion_names_the_specific_cause
 test_unclaimed_record_without_slot_history_reaches_only_the_nonforced_route
@@ -6784,7 +6891,7 @@ test_unclaimed_route_closes_held_for_an_own_copy_the_driver_kept
 test_unclaimed_retire_step_leaves_a_kept_own_copy_alone
 test_unclaimed_held_close_leaves_only_the_kept_copy_out_of_the_process_scan
 test_unclaimed_successor_runs_no_retirement_helper
-test_unclaimed_old_holder_adoption_failure_refuses_before_cleanup
+test_unclaimed_old_holder_refuses_without_changing_anything_and_converges_after_cutover
 test_unclaimed_release_concludes_runs_and_agents_on_the_slot
 test_unclaimed_refusal_leaves_runs_and_agents_on_the_slot
 test_vernant_slot_manifest_retirement
