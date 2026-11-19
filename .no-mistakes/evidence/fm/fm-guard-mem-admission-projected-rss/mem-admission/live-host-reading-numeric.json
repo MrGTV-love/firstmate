@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-11-19T07:26:55.465609+00:00",
+  "pressure_level": 1,
+  "total_bytes": 137438953472,
+  "available_bytes": 34600599552,
+  "unused_bytes": 8942649344,
+  "anonymous_bytes": 81772593152,
+  "compressor_bytes": 11301847040,
+  "swap_total_bytes": 0,
+  "swap_used_bytes": 0,
+  "swap_free_bytes": 0,
+  "page_size_bytes": 16384,
+  "errors": [],
+  "admission": "defer",
+  "reasons_first_line": "the harm cannot be judged: fit and trend: no calibration at /Users/charlesabrooker/tmp/fm-lab.gBJ1QM/state/.memory-calibration.json; the root home's probe (bin/"
+}

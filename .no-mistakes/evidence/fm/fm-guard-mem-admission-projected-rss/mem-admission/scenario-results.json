@@ -1,0 +1,421 @@
+[
+  {
+    "scenario": "S1 critical pressure flag, 30 GiB available, fit and trend judged",
+    "head": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 4,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [],
+        "harm": {
+          "kind": "task",
+          "not_judged": [],
+          "window_seconds": 300,
+          "reserve_bytes": 2076180480,
+          "projected_bytes": 2516582400,
+          "projection_runs": 25,
+          "projected_kind": "task",
+          "compared_at": "2026-11-19T07:29:28.780431+00:00",
+          "swap_delta_bytes": 0,
+          "compressor_delta_bytes": 0
+        }
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    },
+    "base": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 4,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [
+          "native memory pressure level 4 (2 or higher defers)"
+        ],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    }
+  },
+  {
+    "scenario": "S2 level-2 pressure flag, 22 GiB available (the audit's defer band)",
+    "head": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 2,
+        "available_GiB": 22.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [],
+        "harm": {
+          "kind": "task",
+          "not_judged": [],
+          "window_seconds": 300,
+          "reserve_bytes": 2076180480,
+          "projected_bytes": 2516582400,
+          "projection_runs": 25,
+          "projected_kind": "task",
+          "compared_at": "2026-11-19T07:29:46.292806+00:00",
+          "swap_delta_bytes": 0,
+          "compressor_delta_bytes": 0
+        }
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    },
+    "base": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 2,
+        "available_GiB": 22.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [
+          "native memory pressure level 2 (2 or higher defers)"
+        ],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    }
+  },
+  {
+    "scenario": "S3 normal pressure flag, 3 GiB available: projection does not fit",
+    "head": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 1,
+        "available_GiB": 3.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [
+          "projected task run of 2.34 GiB (p95 of 25 recorded) does not fit in 3.00 GiB available minus a 1.93 GiB reserve (p99 of recorded drops)"
+        ],
+        "harm": {
+          "kind": "task",
+          "not_judged": [],
+          "window_seconds": 300,
+          "reserve_bytes": 2076180480,
+          "projected_bytes": 2516582400,
+          "projection_runs": 25,
+          "projected_kind": "task",
+          "compared_at": "2026-11-19T07:29:50.017011+00:00",
+          "swap_delta_bytes": 0,
+          "compressor_delta_bytes": 0
+        }
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    },
+    "base": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 1,
+        "available_GiB": 3.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    }
+  },
+  {
+    "scenario": "S4 swap grew 34 MiB since last probe, 30 GiB available, normal pressure",
+    "head": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1600.0,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [
+          "swap used grew by 35777414 bytes (0.033 GiB) in the 61 s since the last probe reading"
+        ],
+        "harm": {
+          "kind": "task",
+          "not_judged": [],
+          "window_seconds": 300,
+          "reserve_bytes": 2076180480,
+          "projected_bytes": 2516582400,
+          "projection_runs": 25,
+          "projected_kind": "task",
+          "compared_at": "2026-11-19T07:29:52.548326+00:00",
+          "swap_delta_bytes": 35777414,
+          "compressor_delta_bytes": 0
+        }
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    },
+    "base": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1600.0,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    }
+  },
+  {
+    "scenario": "S5 compressor grew 256 MiB, swap flat, 30 GiB available, normal pressure",
+    "head": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.75,
+        "errors": [],
+        "reasons": [
+          "compressor grew by 268435456 bytes (0.250 GiB) in the 61 s since the last probe reading"
+        ],
+        "harm": {
+          "kind": "task",
+          "not_judged": [],
+          "window_seconds": 300,
+          "reserve_bytes": 2076180480,
+          "projected_bytes": 2516582400,
+          "projection_runs": 25,
+          "projected_kind": "task",
+          "compared_at": "2026-11-19T07:29:54.681975+00:00",
+          "swap_delta_bytes": 0,
+          "compressor_delta_bytes": 268435456
+        }
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    },
+    "base": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.75,
+        "errors": [],
+        "reasons": [],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    }
+  },
+  {
+    "scenario": "S6 unreadable vm_stat (native read fails): fail closed",
+    "head": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 1,
+        "available_GiB": null,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": null,
+        "errors": [
+          "memory: [Errno 2] No such file or directory: '/tmp/fmv/fixture/vm_stat'"
+        ],
+        "reasons": [
+          "memory: [Errno 2] No such file or directory: '/tmp/fmv/fixture/vm_stat'"
+        ],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    },
+    "base": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 1,
+        "available_GiB": null,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": null,
+        "errors": [
+          "memory: [Errno 2] No such file or directory: '/tmp/fmv/fixture/vm_stat'"
+        ],
+        "reasons": [
+          "memory: [Errno 2] No such file or directory: '/tmp/fmv/fixture/vm_stat'"
+        ],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    }
+  },
+  {
+    "scenario": "S7 no calibration record, busy host, 30 GiB available",
+    "head": {
+      "exit": 75,
+      "got": "defer",
+      "expected": "defer",
+      "ok": true,
+      "summary": {
+        "admission": "defer",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [
+          "the harm cannot be judged: fit and trend: no calibration at /Users/charlesabrooker/tmp/fm-lab.gBJ1QM/state/.memory-calibration.json; no run peak has ever been recorded on this host, so no start is admitted on an unjudged input; to record it now, run one representative command of that kind once on this host as `bin/fm-mem-guard.sh calibrate --kind task -- <command>`; its largest resident size is recorded as calibration and the next admit sees it"
+        ],
+        "harm": {
+          "kind": "task",
+          "not_judged": [
+            "fit and trend: no calibration at /Users/charlesabrooker/tmp/fm-lab.gBJ1QM/state/.memory-calibration.json"
+          ]
+        }
+      },
+      "stderr_tail": "",
+      "run_exit": 75,
+      "run_executed": false
+    },
+    "base": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    }
+  },
+  {
+    "scenario": "S8 idle host (no fleet run), 30 GiB available, judged record: fit admits",
+    "head": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [],
+        "harm": {
+          "kind": "task",
+          "not_judged": [],
+          "window_seconds": 300,
+          "reserve_bytes": 2076180480,
+          "projected_bytes": 2516582400,
+          "projection_runs": 25,
+          "projected_kind": "task",
+          "compared_at": "2026-11-19T07:30:02.666346+00:00",
+          "swap_delta_bytes": 0,
+          "compressor_delta_bytes": 0
+        }
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    },
+    "base": {
+      "exit": 0,
+      "got": "admit",
+      "expected": "admit",
+      "ok": true,
+      "summary": {
+        "admission": "admit",
+        "pressure_level": 1,
+        "available_GiB": 30.0,
+        "swap_used_MiB": 1565.88,
+        "compressor_GiB": 0.5,
+        "errors": [],
+        "reasons": [],
+        "harm": null
+      },
+      "stderr_tail": "",
+      "run_exit": 0,
+      "run_executed": true
+    }
+  }
+]

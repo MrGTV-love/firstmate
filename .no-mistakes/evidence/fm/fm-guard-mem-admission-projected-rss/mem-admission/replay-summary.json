@@ -1,0 +1,65 @@
+{
+  "recorded_defer_head_defer": 119,
+  "recorded_admit_head_defer": {
+    "total": 349,
+    "reasons": {
+      "unjudged": 42,
+      "compressor": 247,
+      "projected": 60
+    }
+  },
+  "recorded_admit_head_admit": 978,
+  "not_judged": 45,
+  "defer_head_admit_examples": [
+    {
+      "at": "2026-11-16T04:51:20.358315+00:00",
+      "available_GiB": 24.55,
+      "pressure_level": 2,
+      "projected_GiB": 10.37,
+      "reserve_GiB": 13.2,
+      "not_judged": [],
+      "bootstrap": null
+    },
+    {
+      "at": "2026-11-16T05:11:58.111176+00:00",
+      "available_GiB": 34.37,
+      "pressure_level": 2,
+      "projected_GiB": 10.37,
+      "reserve_GiB": 13.2,
+      "not_judged": [],
+      "bootstrap": null
+    },
+    {
+      "at": "2026-11-16T05:20:02.598672+00:00",
+      "available_GiB": 36.23,
+      "pressure_level": 2,
+      "projected_GiB": 10.37,
+      "reserve_GiB": 13.2,
+      "not_judged": [],
+      "bootstrap": null
+    },
+    {
+      "at": "2026-11-16T05:21:02.924217+00:00",
+      "available_GiB": 35.43,
+      "pressure_level": 2,
+      "projected_GiB": 10.37,
+      "reserve_GiB": 13.2,
+      "not_judged": [],
+      "bootstrap": null
+    },
+    {
+      "at": "2026-11-16T05:21:22.572457+00:00",
+      "available_GiB": 35.63,
+      "pressure_level": 2,
+      "projected_GiB": 10.37,
+      "reserve_GiB": 13.2,
+      "not_judged": [],
+      "bootstrap": null
+    }
+  ],
+  "rows_seen": {
+    "admit_rows": 1327,
+    "defer_rows": 223
+  },
+  "defer_head_admit_count": 104
+}
