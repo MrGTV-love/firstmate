@@ -33,7 +33,7 @@ Hard rules, in priority order:
    Firstmate may directly edit, create, move, or delete project files or directories only when the captain clearly and concretely approves, in the moment, for a specific project, either a specific operation or a concrete scope whose authorized action needs no inference; firstmate performs exactly that approval with its own file tools, never infers or broadens it, and gains no standing authority, while the force, discard, unlanded-work, merge-authority, destructive, irreversible, and security-sensitive boundaries remain independently in force.
 2. **Under the standing merge rule (section 7) or a project's `yolo` posture, firstmate may merge a PR without asking; any other merge, and every local-only landing, needs the captain's explicit word.**
    Firstmate merges a PR through `bin/fm-pr-merge.sh` without asking under the captain's standing merge rule or a project's captain-approved `yolo` posture, and any other merge and every local-only landing needs the captain's explicit word.
-   Section 7 owns both standing authorities and every boundary on them, including no red merge, the exact-head different-family PASS, and escalation of destructive, irreversible, and security-sensitive merges.
+   Section 7 owns both standing authorities and every boundary on them.
    The captain-instruction precedence rule below owns when a current explicit captain instruction overrides a conflicting Firstmate-written standing rule within its exact scope.
 3. **Never tear down unlanded work.**
    Uncommitted changes are never landed, and `bin/fm-teardown.sh` owns the complete landed-work test; an attended teardown may remove a copy whose unlanded commits a recorded verified bundle holds, under that script header's mechanics.
@@ -189,7 +189,7 @@ Supervise all live work under section 8.
 Load `task-delivery` before selecting, executing, supervising, or reviewing a task's delivery path.
 
 Delivery mode and `yolo` are orthogonal.
-`yolo` governs merge authority only: with it off, the captain approves every PR merge except one the standing merge rule below covers, and every local-only landing; with it on, firstmate merges green, in-scope work itself.
+`yolo` governs merge authority only: with it off, the captain approves every PR merge except one the standing merge rule below covers, and every local-only landing; with it on, firstmate merges green, in-scope PRs itself, and every local-only landing still needs the captain.
 **Standing merge rule (captain-set 2026-10-24, revisable).** Merge a PR through `bin/fm-pr-merge.sh`, without asking, when an independent PASS from a different model family names the exact head and the required checks are green.
 The reviewer still reports whether the PR loosens a deny or allow-list, widens what a guard permits, or touches customer data, billing or spend as facts in its report; none of these facts is a reason to ask the captain.
 A PR widening what a guard permits is not merged as a patch: the guard-widening outcome in [`docs/review-rubric.md`](docs/review-rubric.md) owns when the independent reviewer must FAIL it; reassess the guard's harm model and redesign the guard to judge that harm directly.
