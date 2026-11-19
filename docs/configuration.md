@@ -92,6 +92,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The nested-copy sweep's removal log `data/copy-sweep.log` and preservation, driver-retention receipts and per-copy waiting records under `data/copy-sweep/`, owned by `bin/fm-copy-sweep.sh --apply`; `bin/fm-teardown.sh` also writes a receipt, in its complete form, as soon as Vernant's closeout driver keeps an own nested copy of a task (whether the task then closes or refuses), and [Agent control](agent-control.md)'s kept-own-copy rule owns its fields.
 - A task's own-copy preserves under `data/<task>/nested-copy-preserved/` (never rebuilt, overwritten or removed) and its refusal records under `data/<task>/closeout-refused/`, written by `bin/fm-teardown.sh` when a kept own copy's receipt cannot be written; [Agent control](agent-control.md)'s kept-own-copy rule owns both.
 - The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
+- The [scratch reaper](#scratch-reaper-configscratch-reaper) archive of small logs under `data/scratch-reaper-archive/<UTC date>/`, written before it removes a scratch directory; `bin/fm-scratch-reaper.sh` owns it.
 
 `state/` holds runtime records:
 
@@ -120,6 +121,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The [host memory admission](#host-memory-admission) readings `state/memory-readings.jsonl` and, in the root home only, the alarm episode marker `state/.memory-alarmed`, calibration record `state/.memory-calibration.json` and alarm baseline `state/.memory-baseline.json`, all owned by `bin/fm-mem-guard.sh`; `bin/fm-watch.sh` owns the persistent probe deadline `state/.memory-health-next` and surfaced-row marker `state/.seen-memory-health`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
+- The [scratch reaper](#scratch-reaper-configscratch-reaper) decision log `state/scratch-reaper.log`, window marker `state/.scratch-reaper-next`, single-flight lock `state/.scratch-reaper.lock`, and low-disk marker `state/.scratch-reaper-alarmed`, all written by `bin/fm-scratch-reaper.sh`.
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
@@ -873,7 +875,7 @@ The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune 
 
 ## Scratch reaper (config/scratch-reaper)
 
-Killed or keeping test, build, and agent runs leak scratch directories into `/private/tmp` and `~/tmp`, and nothing else removes them.
+Killed or keeping test, build, and agent runs leak scratch directories into `/private/tmp` and `~/tmp`, and nothing removes them on a schedule.
 `bin/fm-scratch-reaper.sh` removes the aged ones that nothing uses, and the watcher runs it, so no person has to.
 The script's header owns the mechanics; this section states the contract an operator relies on.
 
@@ -942,14 +944,13 @@ The last three touch only the script's own files, never a scratch directory and 
 Every decision is one line, printed and appended to `state/scratch-reaper.log`: `removed` with the bytes freed, or `kept` with its reason (`control-character-name`, `symlink`, `outside root`, `protected`, `task-record`, `young`, `git`, `open handle`, `archive failed`, `lsof failed`, `remove failed`).
 A run without `--apply` is a dry run that prints the same lines as `would-remove` or `kept` and writes nothing.
 
-The watcher offers the run at most every `FM_SCRATCH_REAPER_TICK` seconds (default 60, `0` turns it off), starting `bin/fm-scratch-reaper.sh --scheduled` detached and single-flight, with no daemon and no LaunchAgent.
+The watcher offers the run at most every `FM_SCRATCH_REAPER_TICK` seconds ([environment variables](#environment-variables)), starting `bin/fm-scratch-reaper.sh --scheduled` detached and single-flight, with no daemon and no LaunchAgent.
 The script owns the 30-minute window, a lock, and its failure log, so a failed, busy, or hung run never reaches the supervision cycle.
-A secondmate home never runs it.
+A secondmate home's scheduled run exits at once without work.
 It raises one `check: scratch-reaper low-disk` wake only when free space on the roots' volume is below 20 GiB and the run removed nothing, repeats it after six hours at most, and stays quiet once space recovers or a run frees bytes.
 On a 100 percent full volume the reaper's own writes (its temp folder, its `lsof` snapshot and its log) can fail, so it frees little there; it runs at most once every 30 minutes and raises the low-disk wake under 20 GiB.
 A suite that sets `FM_TEST_SEAM` never starts the real script from the watcher.
-`tests/scratch-reaper-helpers.sh` refuses any test run, for a dry run, `--apply`, and `--scheduled`, whose config root is missing, is a symlink, or resolves physically outside its private world, or whose config or archive folder is outside it, and then starts no script.
-Regression coverage is `tests/fm-scratch-reaper.test.sh` and `tests/fm-watch-scratch-reaper.test.sh`.
+Regression coverage is `tests/fm-scratch-reaper.test.sh` and `tests/fm-watch-scratch-reaper.test.sh`, which run the script only through `tests/scratch-reaper-helpers.sh`; that helper's header owns the test-world guard.
 
 ## Waiting worker spends no turns (config/wait-no-turns)
 
@@ -5038,6 +5039,8 @@ FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by
 FM_TEST_SLOT_WAIT_SECONDS=   # retired and ignored: a waiter waits for a slot until a holder ends (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
 FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
+FM_SCRATCH_REAPER_TICK=60   # seconds between the watcher's offers of the detached scratch-reaper run (bin/fm-scratch-reaper.sh --scheduled); the script owns its 30-minute window; 0 turns the offer off; invalid values use 60
+FM_SCRATCH_REAPER_BIN=   # test seam: the script the watcher launches instead of bin/fm-scratch-reaper.sh; under FM_TEST_SEAM=1 the watcher starts nothing unless this is set
 FM_HOME_SUMMARY_TIMEOUT=900    # no-output/no-CPU seconds for home-summary initialization through atomic publication, never a wall-clock cutoff; independent failure-accounting bounds are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 900
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2

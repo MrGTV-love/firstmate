@@ -7,6 +7,8 @@
 # refuses to start unless a private root, a private config and a private archive folder all
 # exist inside the test world. sr_run never runs a script when any check fails, and the guard
 # is the same for dry runs, --apply and --scheduled, so a typo cannot reach a real root.
+# The one exception is --no-config: it has no config, so no root check runs and the script uses
+# its built-in default roots, which are the real temp folders.
 #
 # Sourced, never executed. The caller sources tests/lib.sh first.
 
