@@ -2488,8 +2488,8 @@ The check runs where new work starts:
 
 - A fresh `bin/fm-spawn.sh` ship, scout or new secondmate spawn, beside the memory admission and before any copy, record or brief exists; it measures the project clone, or the secondmate's home.
 - A fresh no-mistakes run start through `bin/fm-mem-guard.sh run`, and through `bin/fm-cpu-pass.sh pipeline-start`, which `bin/fm-duration.py run --pipeline-priority <class>` uses for a fresh run or an authorized rerun; both measure the starting directory.
-- `bin/fm-disk-floor-lib.sh admit stack <path>` for a task's Docker, Compose or Supabase stack.
-  Firstmate owns no stack-start script, because workers start their own stacks, so nothing calls this yet; the stack half of this guard is not wired to a start path.
+- `bin/fm-stack-start.sh -- <start command...>` for a task's Docker, Compose or Supabase stack; it measures the current directory, or `--path <dir>`, exits 75 below the floor without running the command, and otherwise runs the command unchanged with its own exit status.
+  The generated worker brief (rule 10) names it as the way to start a stack, but this is an entry point the briefs name, not an enforcement point, because a project's own start script can still bypass it.
 
 Below the floor, the start exits 75, which means deferred and never failed, and prints one line naming the free GiB, the floor, the path measured and `config/disk-free-floor`.
 A deferred spawn leaves no record, brief, copy or terminal call behind, and its backlog item stays queued, so Firstmate dispatches it again once space is freed.
@@ -2506,7 +2506,7 @@ When `df` fails or prints nothing usable, the step is admitted with one `warning
 Each decision is recorded as the `disk-free-floor` guard in `state/guard-events.jsonl`: `deny` below the floor, `warn` for an unreadable meter, and `allow` otherwise.
 `bin/fm-disk-floor-lib.sh free <path>` prints the whole GiB the guard reads for a path.
 
-`tests/fm-disk-floor.test.sh`, `tests/fm-disk-floor-relaunch.test.sh` and the disk-floor cases of `tests/fm-cpu-pass-admission.py` cover these behaviors with a fake `df` first on `PATH`.
+`tests/fm-disk-floor.test.sh` (including the stack start), `tests/fm-disk-floor-relaunch.test.sh` and the disk-floor cases of `tests/fm-cpu-pass-admission.py` cover these behaviors with a fake `df` first on `PATH`.
 
 ## Host memory admission
 

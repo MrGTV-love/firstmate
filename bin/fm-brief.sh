@@ -760,6 +760,8 @@ IFS= read -r -d '' DOCKER_MARKER_RULE <<'EOF' || true
    you finish with as you go; teardown only catches what is left, and never touches another task's stacks.
 EOF
 DOCKER_MARKER_RULE=${DOCKER_MARKER_RULE%$'\n'}
+DOCKER_MARKER_RULE+="
+   Start the stack through \`$(shell_quote "$FM_ROOT/bin/fm-stack-start.sh") -- <start command...>\`, which refuses with exit 75 while the disk holds less than the free-disk floor; on 75 free space on the volume and start again, never loop on it."
 
 if [ "$KIND" = scout ]; then
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then

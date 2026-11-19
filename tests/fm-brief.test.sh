@@ -1698,6 +1698,7 @@ test_crewmate_scaffolds_teach_the_docker_task_marker() {
     brief="$home/data/$id/brief.md"
     # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
     assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "$mode ship brief did not teach the Docker task label"
+    assert_grep "bin/fm-stack-start.sh" "$brief" "$mode ship brief did not name the stack-start entry point"
     # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
     assert_grep 'docker compose -p "$FM_TASK_ID"' "$brief" "$mode ship brief did not teach the exact compose project name"
     # shellcheck disable=SC2016
@@ -1724,6 +1725,7 @@ test_crewmate_scaffolds_teach_the_docker_task_marker() {
   brief="$home/data/brief-docker-scout/brief.md"
   # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
   assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "scout brief did not teach the Docker task label"
+  assert_grep "bin/fm-stack-start.sh" "$brief" "scout brief did not name the stack-start entry point"
   # shellcheck disable=SC2016
   assert_grep 'fm.task: ${FM_TASK_ID}' "$brief" "scout brief did not teach Compose object labels"
   # shellcheck disable=SC2016

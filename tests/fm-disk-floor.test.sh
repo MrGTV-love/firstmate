@@ -307,6 +307,37 @@ test_the_admit_command_defers_and_admits() {
   pass "fm-disk-floor-lib.sh admit defers at 3 GiB free with 75 and admits at 20 GiB silently"
 }
 
+# The stack entry point the worker brief names: below the floor the command is
+# never run, at the floor it runs and its exit status passes through, and an
+# unreadable meter admits with the same warning as every other start.
+test_the_stack_start_refuses_below_and_admits_above() {
+  local case_dir out rc=0 marker STACK="$ROOT/bin/fm-stack-start.sh"
+  case_dir=$(make_case stack)
+  marker="$case_dir/stack-started"
+  out=$(cd "$case_dir" && FM_HOME="$case_dir/home" FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
+    FM_FAKE_DF_AVAIL_KB="$(kb 19 1048575)" "$STACK" -- touch "$marker" 2>&1) || rc=$?
+  expect_code "$DEFER_EXIT" "$rc" "the stack start at 19.999 GiB free was not deferred: $out"
+  assert_contains "$out" "deferred: disk free floor refused stack: 19 GiB free on the volume holding $case_dir, below the floor of 20 GiB ($case_dir/home/config/disk-free-floor)" \
+    "the stack deferral did not use the shared message"
+  assert_absent "$marker" "a deferred stack start still ran its command"
+  [ -n "$(guard_events "$case_dir" deny)" ] || fail "the stack refusal wrote no deny guard event"
+  rc=0
+  out=$(cd "$case_dir" && FM_HOME="$case_dir/home" FM_FAKE_DF_AVAIL_KB="$(kb 20)" "$STACK" -- bash -c 'touch "$1"; exit 7' _ "$marker" 2>&1) || rc=$?
+  expect_code 7 "$rc" "the stack command's own exit status was not passed through: $out"
+  assert_present "$marker" "an admitted stack start did not run its command"
+  rm -f "$marker"
+  rc=0
+  out=$(cd "$case_dir" && FM_HOME="$case_dir/home" FM_FAKE_DF_MODE=fail "$STACK" -- touch "$marker" 2>&1) || rc=$?
+  expect_code 0 "$rc" "an unreadable meter stopped the stack start: $out"
+  assert_contains "$out" "warning: disk free floor not enforced for stack: cannot read the free space of $case_dir; admitted" \
+    "the unreadable meter printed no warning"
+  assert_present "$marker" "an unreadable meter still blocked the stack command"
+  rc=0
+  out=$(cd "$case_dir" && FM_HOME="$case_dir/home" "$STACK" 2>&1) || rc=$?
+  expect_code 64 "$rc" "a start with no command was not a usage error: $out"
+  pass "the stack start defers at 19.999 GiB, runs at 20 GiB passing its exit status through, and admits an unreadable meter with a warning"
+}
+
 disk_floor_test_cases=(
 test_new_spawn_below_the_floor_defers_and_leaves_nothing
 test_the_floor_is_inclusive_and_rounds_down
@@ -316,6 +347,7 @@ test_config_overrides_the_floor_and_a_malformed_file_refuses
 test_a_missing_path_is_measured_on_its_nearest_existing_ancestor
 test_the_mem_guard_run_start_refuses_below_and_admits_above
 test_the_admit_command_defers_and_admits
+test_the_stack_start_refuses_below_and_admits_above
 )
 
 fm_test_run_cases "${disk_floor_test_cases[@]}" -- "$@"

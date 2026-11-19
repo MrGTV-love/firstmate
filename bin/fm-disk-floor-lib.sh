@@ -14,7 +14,8 @@
 #   fm-disk-floor-lib.sh floor [<config-dir>]
 #       Prints the floor in GiB. Exits 2 when config/disk-free-floor is malformed.
 #   fm-disk-floor-lib.sh admit <step> <path> [<config-dir>] [<task-id>]
-#       Decides one start. <step> names what starts (spawn, pipeline or stack),
+#       Decides one start. <step> names what starts (spawn, pipeline or stack; bin/fm-stack-start.sh
+#       is the stack caller),
 #       <path> is where its bytes will land, and <config-dir> defaults to
 #       FM_CONFIG_OVERRIDE, else $FM_HOME/config (FM_HOME defaults to the checkout
 #       holding this script). The exit status is 0 when the
@@ -37,7 +38,8 @@
 #
 # Deferral: below the floor `admit` prints one `deferred:` line naming the free
 # GiB, the floor, the path measured and the config file, and returns 75. The
-# caller's task stays queued and is dispatched again; 75 is never a failure.
+# caller's queued task, if any, stays queued and is dispatched again; 75 is never
+# a failure.
 #
 # Unreadable meter: when df fails or prints nothing usable, `admit` admits the
 # step, prints one `warning:` line, and records a warn event. An unreadable
@@ -143,7 +145,7 @@ fm_disk_floor_admit() { # <step> <path> [<config-dir>] [<task-id>]
     return 0
   fi
   if [ "$free" -lt "$FM_DISK_FLOOR_GIB" ]; then
-    printf 'deferred: disk free floor refused %s: %s GiB free on the volume holding %s, below the floor of %s GiB (%s); nothing was started and its backlog item stays queued - free space on that volume, or lower the floor in that file, and start it again\n' \
+    printf 'deferred: disk free floor refused %s: %s GiB free on the volume holding %s, below the floor of %s GiB (%s); nothing was started - free space on that volume, or lower the floor in that file, and start it again\n' \
       "$step" "$free" "$path" "$FM_DISK_FLOOR_GIB" "$FM_DISK_FLOOR_FILE" >&2
     fm_disk_floor_event deny "$task"
     return "$FM_DISK_FLOOR_DEFER_EXIT"
