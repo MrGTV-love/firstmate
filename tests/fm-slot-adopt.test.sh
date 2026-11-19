@@ -236,6 +236,37 @@ PY
   pass "preflight: an old copy is judged by the primary provisioner's read-only check, collision refused, clean admitted"
 }
 
+# A refusal on the second adopt check, after the launch wiring and the record were written, says so; the first check does not.
+test_a_second_adoption_refusal_says_the_wiring_and_record_were_written() {
+  local out rc
+  make_world second-check
+  rm -f "$W_MANIFEST"
+  out=$(FM_SLOT_ADOPT_WIRED=1 adopt); rc=$?
+  [ "$rc" -ne 0 ] || fail "a missing manifest was adopted at the second check: $out"
+  assert_contains "$out" manifest_missing 'the second-check refusal did not name the reason'
+  assert_contains "$out" 'already written' 'the second-check refusal did not say the wiring and record were already written'
+  case "$out" in *'no manifest, scope, record or copy was changed'*) fail "the second-check refusal claims nothing was written: $out" ;; esac
+  out=$(adopt); rc=$?
+  [ "$rc" -ne 0 ] || fail "a missing manifest was adopted at the first check: $out"
+  assert_contains "$out" 'no manifest, scope, record or copy was changed' 'the first-check refusal text changed'
+  pass "adopt check: a refusal after the wiring and record were written says so; the first-check refusal keeps its text"
+}
+
+# A provision refused after the primary clone's verified export was made leaves no export or bytecode directory behind.
+test_a_refused_provision_leaves_no_export_directory() {
+  local out rc tmpd
+  make_primary provision-cleanup
+  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" HEAD
+  git -C "$P_DIR/copy" rm -rq scripts
+  git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
+  tmpd=$P_DIR/tmp
+  mkdir -p "$tmpd"
+  out=$(TMPDIR="$tmpd" FM_SLOT_PRIMARY_PROVISIONER=1 fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t 'bad..branch' "$P_DIR/report.json" '' '' README.md 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a provision with an invalid branch was accepted: $out"
+  [ -z "$(ls -A "$tmpd")" ] || fail "a refused provision left temp directories: $(ls -A "$tmpd")"
+  pass "provision: a refused provision after the verified export leaves no export or bytecode directory"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
@@ -243,6 +274,8 @@ test_a_hidden_symlink_retarget_is_task_drift
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run
+test_a_second_adoption_refusal_says_the_wiring_and_record_were_written
+test_a_refused_provision_leaves_no_export_directory
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

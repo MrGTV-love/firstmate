@@ -7028,10 +7028,12 @@ print("%s:%o:%o" % (hashlib.sha256(body).hexdigest(), stat.S_IFMT(info.st_mode),
 PY
 }
 SPAWN_KEPT_SETTINGS=
-# The worker's kept settings are not lost to the fresh wiring: their parseable protections stay effective beside it.
+# The worker's kept settings are not lost to the fresh wiring: their hook and permission entries stay effective beside it.
 # Firstmate's own previous entries (busy and guard hooks of this task) are dropped from the kept side so they do not
-# pile up; every other key and hook of the worker's file survives, and its mode is restored. A kept file that does not
-# parse stays byte for byte at its kept path, the fresh wiring is written without it, and the report says so.
+# pile up; no other key of the worker's file is carried into the active file, so an override such as disableAllHooks
+# or an env entry is never applied, and the mode is restored. The kept copy itself stays byte for byte at its kept path.
+# A kept file that does not parse stays byte for byte at its kept path, the fresh wiring is written without it, and the
+# report says so.
 spawn_merge_kept_settings() { # <kept-path> <active-path>
   python3 - "$1" "$2" "$ID" <<'PY' || return 1
 import json, os, stat, sys
@@ -7052,17 +7054,19 @@ def foreign(entry):
     if not isinstance(hooks, list):
         return True
     return not all(isinstance(h, dict) and any(m in str(h.get("command", "")) for m in ours) and task in str(h.get("command", "")) for h in hooks)
-merged = dict(old)
+merged = dict(fresh)
 merged_hooks = dict(old.get("hooks") if isinstance(old.get("hooks"), dict) else {})
 for event, entries in (fresh.get("hooks") or {}).items():
     kept_entries = [e for e in merged_hooks.get(event, []) if foreign(e)] if isinstance(merged_hooks.get(event, []), list) else []
     merged_hooks[event] = kept_entries + entries
 merged["hooks"] = merged_hooks
+if isinstance(old.get("permissions"), dict):
+    merged["permissions"] = old["permissions"]
 with open(active, "w", encoding="utf-8") as handle:
     json.dump(merged, handle, separators=(",", ":"))
     handle.write("\n")
 os.chmod(active, stat.S_IMODE(os.stat(kept).st_mode))
-print("merged the worker's kept settings into the fresh wiring at %s; their own hooks, permissions and keys stay effective" % active, file=sys.stderr)
+print("merged the worker's kept hook and permission entries into the fresh wiring at %s; its other keys are not carried over" % active, file=sys.stderr)
 PY
 }
 # state/<id>.wiring-sha records each worktree launch artifact as it was written. A relaunch into the same copy that
@@ -8693,6 +8697,7 @@ sleep 0.3
 # The copy that was checked is the copy the worker starts in: the adopted slot is judged once more after everything
 # slow (brief, skill selection, wiring) and immediately before the launch is delivered.
 if [ "$SLOT_ADOPT" = 1 ]; then
+  FM_SLOT_ADOPT_WIRED=1
   fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
 fi
 spawn_send_or_abort "launch command" spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"

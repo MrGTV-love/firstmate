@@ -201,10 +201,14 @@ fm_session_end_refusal_obstruction() {  # <control-output>
   printf '%s\n' "$1" | sed -n 's/.*"manifest_path": "\([^"]*\)".*/\1/p' | head -n 1
 }
 
-# A digest of the effective inputs the named refusal depends on. Neither the busy generation nor the raw HEAD is an
-# input: an unrelated commit or a new generation leaves the same obstruction in place, while a real change to the
-# obstruction (the uncovered paths, the tracked state of a scope path, a collision file, the manifest, the copy's dirt)
-# or its clearing changes the digest and permits one new attempt.
+# A digest of what the named refusal's arm reads: the task record's worktree, branch, project and slot lines, the
+# manifest's bytes, and the named obstruction file when one is named. A scope refusal adds the uncovered paths and the
+# tracked count of each scope path at the base; dirty_worktree and operation_in_progress add the copy's status and its
+# operation markers; every other reason adds the copy's HEAD, origin/main and status. The branch, repository, custody and
+# manifest refusals read nothing beyond the record, the manifest and the obstruction, so the copy's checked-out branch,
+# the pool-slot claim files and other task records are not inputs. A real change to a digested input changes the digest
+# and permits one new attempt. A refusal that depends on an undigested input is retried only by a manual fm-control
+# relaunch, which the D6(b) fallback accepts.
 fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason> [<obstruction-path>]
   local state=$1 id=$2 reason=$3 obstruction=${4:-} meta wt manifest base path scope marker inside
   local -a scopes=()

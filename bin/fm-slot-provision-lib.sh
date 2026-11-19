@@ -113,6 +113,13 @@ fm_slot_run_local() { # <project> <report> <provisioner> <arg>...
 }
 
 fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <local-default-ref-or-empty> <selected-sha-or-empty> <owned-path>...
+  local rc=0
+  fm_slot_provision_run "$@" || rc=$?
+  fm_slot_export_drop
+  return "$rc"
+}
+
+fm_slot_provision_run() {
   local runner=$1 project=$2 copy=$3 id=$4 branch=$5 report=$6 local_ref=$7 selected=$8
   local base old_branch old_head branch_head provisioner rc=0
   shift 8
@@ -351,9 +358,9 @@ fm_slot_primary_provisioner() { # <project>
   # tip's blobs, never from the working tree), run with an interpreter cache prefix that is a fresh empty directory so no
   # bytecode that existed before the run can load. Its hashes are checked again after the run (fm_slot_export_verify).
   FM_SLOT_EXPORT=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-export.XXXXXX") || return 1
-  FM_SLOT_PYCACHE=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-pycache.XXXXXX") || return 1
+  FM_SLOT_PYCACHE=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-pycache.XXXXXX") || { fm_slot_export_drop; return 1; }
   FM_SLOT_EXPORT_SUMS=$FM_SLOT_EXPORT.sums
-  : >"$FM_SLOT_EXPORT_SUMS" || return 1
+  : >"$FM_SLOT_EXPORT_SUMS" || { fm_slot_export_drop; return 1; }
   while IFS=$'\t' read -r kind rel; do
     if mkdir -p "$FM_SLOT_EXPORT/$(dirname "$rel")" && git -C "$primary" show "$tip:$rel" >"$FM_SLOT_EXPORT/$rel"; then
       printf '%s %s\n' "$(shasum -a 256 <"$FM_SLOT_EXPORT/$rel" | awk '{print $1}')" "$rel" >>"$FM_SLOT_EXPORT_SUMS"
@@ -521,7 +528,11 @@ fm_slot_adopt_route() { # <meta> <relocating 0|1>
 }
 
 fm_slot_adopt_refuse() { # <reason> <detail>
-  echo "error: slot adoption refused: $1${2:+: $2}; no manifest, scope, record or copy was changed" >&2
+  local changed='no manifest, scope, record or copy was changed'
+  if [ "${FM_SLOT_ADOPT_WIRED:-0}" = 1 ]; then
+    changed='the launch wiring in the copy and the task record were already written by this relaunch; the recorded manifest and scope were not changed'
+  fi
+  echo "error: slot adoption refused: $1${2:+: $2}; $changed" >&2
   return 1
 }
 

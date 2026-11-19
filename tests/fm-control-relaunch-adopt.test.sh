@@ -290,6 +290,35 @@ PY
   pass "fm-control relaunch: an edited launch artifact (bytes, mode, or cut off) is kept byte for byte, parseable protections stay effective, an unchanged one is regenerated"
 }
 
+# D1(c): the worker's override keys (disableAllHooks, an env entry) stay in its kept copy and never reach the active file,
+# while its own hook and permission entries still do.
+test_adopt_keeps_worker_override_keys_out_of_the_active_file() {
+  local id=adoptkey out rc settings kept body
+  make_adopt_case adopt-override "$id" src
+  settings="$ADOPT_DIR/wt/.claude/settings.local.json"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "the first relaunch must be admitted"$'\n'"$out"
+  body='{"disableAllHooks":true,"env":{"ANTHROPIC_API_KEY":"fake-test-credential"},"permissions":{"allow":["Bash(make test)"]},"hooks":{"PreToolUse":[{"matcher":"Task","hooks":[{"type":"command","command":"deny-task-tool"}]}]}}'
+  printf '%s\n' "$body" > "$settings"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over an edited artifact must be admitted"$'\n'"$out"
+  kept=$(kept_files "$ADOPT_DIR/wt/.claude" | head -n 1)
+  [ -n "$kept" ] || fail 'the worker-edited settings file was not kept'
+  printf '%s\n' "$body" | cmp -s - "$kept" || fail 'the kept copy is not byte-identical to the worker edit'
+  python3 - "$settings" <<'PY' || fail "a worker override key reached the active file, or its hook and permission entries did not"
+import json, sys
+active = json.load(open(sys.argv[1]))
+assert "disableAllHooks" not in active, active
+assert "env" not in active, active
+assert active.get("permissions") == {"allow": ["Bash(make test)"]}, active
+commands = [h["command"] for entry in active["hooks"]["PreToolUse"] for h in entry["hooks"]]
+assert "deny-task-tool" in commands, commands
+assert any("fm-jev-guard-hook" in c for c in commands), commands
+PY
+  case "$(cat "$settings")" in *fake-test-credential*) fail 'the worker credential reached the active settings file' ;; esac
+  pass "fm-control relaunch: a worker's override keys stay in its kept copy, its hook and permission entries are merged into the active file"
+}
+
 control_relaunch_test_cases=(
 test_manifest_inventory_oracle_rejects_both_mutants
 test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch
@@ -299,6 +328,7 @@ test_adopt_admits_own_out_of_scope_work_and_prints_it
 test_adopt_admits_a_dirty_copy_and_a_stopped_rebase
 test_adopt_route_is_only_for_the_own_slot
 test_adopt_keeps_a_worker_edited_launch_artifact
+test_adopt_keeps_worker_override_keys_out_of_the_active_file
 )
 
 control_relaunch_run "$@"
