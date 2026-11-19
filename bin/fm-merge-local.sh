@@ -9,7 +9,8 @@
 # runs for mode=local-only tasks, and only with the captain's recorded approval.
 # It does only a clean fast-forward, and it refuses a diverged branch.
 # In that case it tells you to have the crewmate rebase.
-# See AGENTS.md section 7 for merge authority, prime directives, project management, and task lifecycle.
+# See AGENTS.md section 7 for merge authority and task lifecycle, section 1 for prime directives,
+# and section 6 for project management.
 # The task's existing per-task control lock serializes the captain-hold check
 # through that fast-forward. A still-held or unreadable row refuses before the
 # merge, so a captain approval must be recorded as an `answer --release` before
