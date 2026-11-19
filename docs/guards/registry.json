@@ -2104,6 +2104,10 @@
         },
         {
           "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: assigned copy $WT and endpoint $T retained; task record publication refused\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
           "match": "echo \"warning: herdr presentation focus lock unavailable; retaining the projection journal and refusing concurrent abort cleanup\" >&2"
         }
       ]
