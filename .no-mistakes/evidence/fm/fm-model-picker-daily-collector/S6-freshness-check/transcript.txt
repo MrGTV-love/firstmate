@@ -1,0 +1,39 @@
+### 35 h old (injected clock) - expect no wake
+check exit=0; wakes after poll 1: 0
+check exit=0; wakes after poll 2 (same day): 0
+snapshot files unchanged by check: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.uvw34Y
+
+### 36 h old (injected clock) - expect no wake (36 hours or less raises nothing)
+check exit=0; wakes after poll 1: 0
+check exit=0; wakes after poll 2 (same day): 0
+snapshot files unchanged by check: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.IA6WXW
+
+### 37 h old (real clock) - expect one wake naming 37 hours
+check exit=0; wakes after poll 1: 1
+1795101350	1	check	model-picker-daily-stale:2026-11-19	check: model-picker-daily: the model-picker snapshot is 37.0 hours old (newest observed_at 2026-11-18T02:15:01Z), past the 36 hour limit, so the daily collector is not producing a trusted run; read /Users/charlesabrooker/tmp/fm-lab.wfdyGm/state/.model-picker-daily.last.stderr, then run bin/fm-model-picker-daily-install.sh status
+check exit=0; wakes after poll 2 (same day): 1
+snapshot files unchanged by check: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.wfdyGm
+
+### 31 days old (real clock) - expect one wake naming 744 hours
+check exit=0; wakes after poll 1: 1
+1795101395	1	check	model-picker-daily-stale:2026-11-19	check: model-picker-daily: the model-picker snapshot is 744.0 hours old (newest observed_at 2026-10-19T15:15:01Z), past the 36 hour limit, so the daily collector is not producing a trusted run; read /Users/charlesabrooker/tmp/fm-lab.BGmcDg/state/.model-picker-daily.last.stderr, then run bin/fm-model-picker-daily-install.sh status
+check exit=0; wakes after poll 2 (same day): 1
+snapshot files unchanged by check: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.BGmcDg
+
+### missing aa.sqlite (real clock) - expect one wake saying missing
+check exit=0; wakes after poll 1: 1
+1795101401	1	check	model-picker-daily-stale:2026-11-19	check: model-picker-daily: the model-picker snapshot is missing: no aa.sqlite at /Users/charlesabrooker/tmp/fm-lab.p5ILV4/data/model-picker/aa.sqlite; run bin/fm-model-picker-daily.sh and read /Users/charlesabrooker/tmp/fm-lab.p5ILV4/state/.model-picker-daily.last.stderr
+check exit=0; wakes after poll 2 (same day): 1
+snapshot files unchanged by check: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.p5ILV4
+
+### 1 h old (real clock) - expect no wake
+check exit=0; wakes after poll 1: 0
+check exit=0; wakes after poll 2 (same day): 0
+snapshot files unchanged by check: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.QismqF
+

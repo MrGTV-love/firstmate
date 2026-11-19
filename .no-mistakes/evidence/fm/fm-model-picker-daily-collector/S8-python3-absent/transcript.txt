@@ -1,0 +1,11 @@
+python3 visible to the runner's PATH: no
+== poll 1: runner run with PATH lacking python3
+exit=1
+stderr: error: Python 3 is not on PATH, so the runner cannot read or collect the snapshot
+wakes: 1
+1795101456	1	check	model-picker-daily-setup:20776:python3	check: model-picker-daily: the runner (run) exited 1 before it could finish: Python 3 is not on PATH, so the runner cannot read or collect the snapshot
+== poll 2: check verb, same PATH, same day
+exit=1
+stderr: error: Python 3 is not on PATH, so the runner cannot read or collect the snapshot
+wakes after poll 2: 1 (expected 1)
+lab: /Users/charlesabrooker/tmp/fm-lab.FGUa1E

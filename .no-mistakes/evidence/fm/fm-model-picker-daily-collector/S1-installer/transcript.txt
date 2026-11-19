@@ -1,0 +1,74 @@
+== real LaunchAgents before (operator home, read-only listing) ==
+(no model-picker agents in the real LaunchAgents dir)
+== 1. status before any install (scratch home) ==
+com.firstmate.model-picker-daily.run.1030323027 plist=absent launchd=not-loaded
+com.firstmate.model-picker-daily.check.1030323027 plist=absent launchd=not-loaded
+exit=0
+== 2. install (both agents) ==
+installed com.firstmate.model-picker-daily.run.1030323027 (every 86400s, and at login) for /Users/charlesabrooker/tmp/fm-lab.A7DyAt
+installed com.firstmate.model-picker-daily.check.1030323027 (every 3600s) for /Users/charlesabrooker/tmp/fm-lab.A7DyAt
+exit=0
+   agent files:
+com.firstmate.model-picker-daily.check.1030323027.plist
+com.firstmate.model-picker-daily.run.1030323027.plist
+ccbd1f9a8bf296e5ba9eed0f8eaf25d5be49856ed225a3ddb9ae4b42e066400b  ./com.firstmate.model-picker-daily.check.1030323027.plist
+6c31586d0f53d9bcec2fbcfcf4465229961db982b6833e43b9e1a0034e17a257  ./com.firstmate.model-picker-daily.run.1030323027.plist
+   launchctl calls:
+launchctl print gui/501/com.firstmate.model-picker-daily.run.1030323027
+launchctl print gui/501/com.firstmate.model-picker-daily.check.1030323027
+launchctl print gui/501/com.firstmate.model-picker-daily.run.1030323027
+launchctl bootstrap gui/501 /tmp/fm-dc-test/s1-home.rUWZ8I/Library/LaunchAgents/com.firstmate.model-picker-daily.run.1030323027.plist
+launchctl print gui/501/com.firstmate.model-picker-daily.check.1030323027
+launchctl bootstrap gui/501 /tmp/fm-dc-test/s1-home.rUWZ8I/Library/LaunchAgents/com.firstmate.model-picker-daily.check.1030323027.plist
+== 3. status after install ==
+com.firstmate.model-picker-daily.run.1030323027 plist=present launchd=loaded
+com.firstmate.model-picker-daily.check.1030323027 plist=present launchd=loaded
+exit=0
+== 4. second install (must replace, never duplicate) ==
+installed com.firstmate.model-picker-daily.run.1030323027 (every 86400s, and at login) for /Users/charlesabrooker/tmp/fm-lab.A7DyAt
+installed com.firstmate.model-picker-daily.check.1030323027 (every 3600s) for /Users/charlesabrooker/tmp/fm-lab.A7DyAt
+exit=0
+   agent files:
+2
+   launchctl calls:
+launchctl print gui/501/com.firstmate.model-picker-daily.run.1030323027
+launchctl bootout gui/501/com.firstmate.model-picker-daily.run.1030323027
+launchctl bootstrap gui/501 /tmp/fm-dc-test/s1-home.rUWZ8I/Library/LaunchAgents/com.firstmate.model-picker-daily.run.1030323027.plist
+launchctl print gui/501/com.firstmate.model-picker-daily.check.1030323027
+launchctl bootout gui/501/com.firstmate.model-picker-daily.check.1030323027
+launchctl bootstrap gui/501 /tmp/fm-dc-test/s1-home.rUWZ8I/Library/LaunchAgents/com.firstmate.model-picker-daily.check.1030323027.plist
+   loaded labels:
+com.firstmate.model-picker-daily.run.1030323027
+com.firstmate.model-picker-daily.check.1030323027
+== 5. install --agent check (must refuse, install nothing) ==
+error: --agent works only with --print; install always installs both agents
+exit=2
+   agent dir unchanged: yes
+   launchctl calls: 0
+== 6. install --print --agent check (prints, changes nothing) ==
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent template for bin/fm-model-picker-daily.sh (docs/configuration.md, "Daily collection").
+  bin/fm-model-picker-daily-install.sh renders it twice, once per verb (run and check), filling the
+  tokens between at signs, and writes the results to ~/Library/LaunchAgents; do not load this file directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.firstmate.model-picker-daily.check.1030323027</string>
+  <key>ProgramArguments</key>
+exit=0
+   agent dir unchanged: yes
+== 7. uninstall ==
+removed com.firstmate.model-picker-daily.run.1030323027
+removed com.firstmate.model-picker-daily.check.1030323027
+exit=0
+   agent files left: 0
+   loaded labels left: 0
+== 8. status after uninstall ==
+com.firstmate.model-picker-daily.run.1030323027 plist=absent launchd=not-loaded
+com.firstmate.model-picker-daily.check.1030323027 plist=absent launchd=not-loaded
+exit=0
+== real LaunchAgents after (must match before) ==
+(no model-picker agents in the real LaunchAgents dir)

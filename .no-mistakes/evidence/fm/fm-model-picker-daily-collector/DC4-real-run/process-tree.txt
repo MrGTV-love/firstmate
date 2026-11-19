@@ -1,0 +1,6 @@
+Thu Nov 19 15:09:26 UTC 2026
+# runner pid 14480 (its $$), its children, and the budget wrapper in the chain:
+  PID  PPID     ELAPSED COMMAND
+ 9489     1       14:27 bash /tmp/fm-dc-test/real-run.sh
+14480  9489       14:25 bash bin/fm-model-picker-daily.sh run
+42669 14480       14:13 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -m fm_model_picker.collect --sweep --stale-after-hours 24 --chartdiff --db

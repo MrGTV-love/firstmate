@@ -1,0 +1,17 @@
+### S9a: empty data root, every fetch fails (real collector)
+2026-11-19T15:16:30Z
+runner exit=2
+runner stderr: 
+collector output (last 3 lines):
+live root contents: 
+wakes: 1
+1795101785	1	check	model-picker-daily-run:2026-11-19:exit2	check: model-picker-daily: the daily collector run exited 2: error: /sitemap.xml: <urlopen error [Errno 61] Connection refused>; the failed run's newest observed_at was unknown; the last good snapshot under /Users/charlesabrooker/tmp/fm-lab.Nh6fvB/data/model-picker is unchanged; the failed run's output and verdict are in /Users/charlesabro
+lab: /Users/charlesabrooker/tmp/fm-lab.Nh6fvB
+
+### S9b: good snapshot in place, every fetch fails (real collector)
+runner exit=2
+runner stderr: 
+last good aa.sqlite, verdict.json, projection/ byte-identical: yes
+wakes: 1
+1795102221	1	check	model-picker-daily-run:2026-11-19:exit2	check: model-picker-daily: the daily collector run exited 2: error: /sitemap.xml: <urlopen error [Errno 61] Connection refused>; the failed run's newest observed_at was 2026-11-19T14:23:30Z; the last good snapshot under /Users/charlesabrooker/tmp/fm-lab.6Kd5C5/data/model-picker is unchanged; the failed run's output and verdict are in /User
+lab: /Users/charlesabrooker/tmp/fm-lab.6Kd5C5

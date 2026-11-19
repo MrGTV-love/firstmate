@@ -1,0 +1,2 @@
+run: program=['/bin/bash', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7STSA1463EBT6TGEKTNMN89/bin/fm-model-picker-daily.sh', 'run'] StartInterval=86400s RunAtLoad=True -> PASS
+check: program=['/bin/bash', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7STSA1463EBT6TGEKTNMN89/bin/fm-model-picker-daily.sh', 'check'] StartInterval=3600s RunAtLoad=False -> PASS

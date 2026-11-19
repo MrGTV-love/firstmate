@@ -1,0 +1,60 @@
+### S3 argv and budget chain (fake exit 0, real wrapper)
+runner exit=0
+-- recorded calls:
+budget argv=-- /tmp/fm-dc-test/s4/stub-collector.sh --sweep --stale-after-hours 24 --chartdiff --db
+argv=--sweep --stale-after-hours 24 --chartdiff --db
+data=/Users/charlesabrooker/tmp/fm-lab.XnevL9/data/model-picker.daily.42755
+via_budget=1
+-- runner stderr (should be empty):
+-- wakes queued: 0
+lab: /Users/charlesabrooker/tmp/fm-lab.XnevL9
+
+### S3-neg: the collector refuses to run without the budget wrapper (stub guard, direct call)
+direct collector exit=97
+error: collector ran without the budget wrapper
+
+### S4 exit 1: failed run keeps last good artifacts and raises one wake
+runner exit=1 (expected 1)
+wakes after day-1 run: 1
+1795101148	1	check	model-picker-daily-run:2026-11-19:exit1	check: model-picker-daily: the daily collector run exited 1: fixture-stderr-line-for-exit-1; the failed run's newest observed_at was 2026-11-19T15:11:41Z; the last good snapshot under /Users/charlesabrooker/tmp/fm-lab.eyZP7f/data/model-picker is unchanged; the failed run's output and verdict are in /Users/charlesabrooker/tmp/fm-lab.eyZP7f/state/.model-picker-daily.last.*
+last good artifacts byte-identical: yes
+same day repeat (+30 min): runner exit=1; wakes now: 1 (expected 1)
+next day (+25 h): runner exit=1; wakes now: 2 (expected 2)
+artifacts still byte-identical after 3 failed runs: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.eyZP7f
+
+### S4 exit 2: failed run keeps last good artifacts and raises one wake
+runner exit=2 (expected 2)
+wakes after day-1 run: 1
+1795101277	1	check	model-picker-daily-run:2026-11-19:exit2	check: model-picker-daily: the daily collector run exited 2: fixture-stderr-line-for-exit-2; the failed run's newest observed_at was 2026-11-19T15:11:41Z; the last good snapshot under /Users/charlesabrooker/tmp/fm-lab.R6eWXa/data/model-picker is unchanged; the failed run's output and verdict are in /Users/charlesabrooker/tmp/fm-lab.R6eWXa/state/.model-picker-daily.last.*
+last good artifacts byte-identical: yes
+same day repeat (+30 min): runner exit=2; wakes now: 1 (expected 1)
+next day (+25 h): runner exit=2; wakes now: 2 (expected 2)
+artifacts still byte-identical after 3 failed runs: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.R6eWXa
+
+### S4 exit 3: failed run keeps last good artifacts and raises one wake
+runner exit=3 (expected 3)
+wakes after day-1 run: 1
+1795101387	1	check	model-picker-daily-run:2026-11-19:exit3	check: model-picker-daily: the daily collector run exited 3: fixture-stderr-line-for-exit-3; the failed run's newest observed_at was 2026-11-19T15:11:41Z; the last good snapshot under /Users/charlesabrooker/tmp/fm-lab.KKems6/data/model-picker is unchanged; the failed run's output and verdict are in /Users/charlesabrooker/tmp/fm-lab.KKems6/state/.model-picker-daily.last.*
+last good artifacts byte-identical: yes
+same day repeat (+30 min): runner exit=3; wakes now: 1 (expected 1)
+next day (+25 h): runner exit=3; wakes now: 2 (expected 2)
+artifacts still byte-identical after 3 failed runs: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.KKems6
+
+### S4 exit 4: failed run keeps last good artifacts and raises one wake
+runner exit=4 (expected 4)
+wakes after day-1 run: 1
+1795101448	1	check	model-picker-daily-run:2026-11-19:exit4	check: model-picker-daily: the daily collector run exited 4: fixture-stderr-line-for-exit-4; the failed run's newest observed_at was 2026-11-19T15:11:41Z; the last good snapshot under /Users/charlesabrooker/tmp/fm-lab.C2Nnit/data/model-picker is unchanged; the failed run's output and verdict are in /Users/charlesabrooker/tmp/fm-lab.C2Nnit/state/.model-picker-daily.last.*
+last good artifacts byte-identical: yes
+same day repeat (+30 min): runner exit=4; wakes now: 1 (expected 1)
+next day (+25 h): runner exit=4; wakes now: 2 (expected 2)
+artifacts still byte-identical after 3 failed runs: yes
+lab: /Users/charlesabrooker/tmp/fm-lab.C2Nnit
+
+### S5 exit 0: clean run promotes and raises no wake
+runner exit=0
+wakes: 0 (expected 0)
+live verdict now: TRUSTED
+lab: /Users/charlesabrooker/tmp/fm-lab.xYwXeC

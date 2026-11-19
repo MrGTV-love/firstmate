@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent template for bin/fm-model-picker-daily.sh (docs/configuration.md, "Daily collection").
+  bin/fm-model-picker-daily-install.sh renders it twice, once per verb (run and check), filling the
+  tokens between at signs, and writes the results to ~/Library/LaunchAgents; do not load this file directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.firstmate.model-picker-daily.check.1030323027</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7STSA1463EBT6TGEKTNMN89/bin/fm-model-picker-daily.sh</string>
+    <string>check</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FM_HOME</key>
+    <string>/Users/charlesabrooker/tmp/fm-lab.A7DyAt</string>
+    <key>PATH</key>
+    <string>/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/Users/charlesabrooker/tmp/fm-lab.A7DyAt</string>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/charlesabrooker/tmp/fm-lab.A7DyAt/state/.model-picker-daily-check.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/charlesabrooker/tmp/fm-lab.A7DyAt/state/.model-picker-daily-check.launchd.log</string>
+</dict>
+</plist>
