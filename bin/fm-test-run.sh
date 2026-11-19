@@ -534,6 +534,7 @@ family_for_basename() {
     fm-pi-watch-loader-live.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|fm-omp-fallback-chain-live-e2e.test.sh|\
+    fm-omp-lsp-overlay-live-e2e.test.sh|\
     fm-omp-stale-wake-live-e2e.test.sh|\
     fm-jev-guard-omp-live-e2e.test.sh|fm-jev-guard-claude-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
