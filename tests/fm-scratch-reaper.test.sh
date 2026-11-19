@@ -394,6 +394,30 @@ case_one_snapshot_per_run() {
   [ ! -e "$root/fm-one" ] && [ ! -e "$root/fm-two" ] && [ ! -e "$root/fm-three" ] || fail 'the free candidates were not removed'
 }
 
+case_missing_configured_root_refuses() {
+  local world out root rc
+  new_world; world=$SR_WORLD; root=$world/root
+  printf '%s fm-*\n%s fm-*\n' "$root" "$world/typo-root" > "$world/fm/config/scratch-reaper"
+  make_aged "$root/fm-aged" a.log || fail 'fixture'
+  out=$(SR_REAP_FLAGS=--missing-root reap "$world" --apply 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 2 ] || fail "a missing configured root must stop the run with exit 2, got $rc: $out"
+  [ -d "$root/fm-aged" ] || fail 'a run that refused a missing configured root removed a directory'
+  assert_contains "$out" "$world/typo-root" 'the refusal does not name the missing root'
+  assert_contains "$out" "$world/fm/config/scratch-reaper" 'the refusal does not name the config file'
+}
+
+case_missing_default_root_is_skipped() {
+  local world out root rc m
+  new_world; world=$SR_WORLD; root=$world/present
+  rm -f "$world/fm/config/scratch-reaper"
+  make_aged "$root/fm-aged" a.log || fail 'fixture'
+  m=$(mutate default-private-tmp-in-world 'CFG_LINES+=("/private/tmp $g")' "CFG_LINES+=(\"$root \$g\")" "$REAPER") || fail 'mutant build failed'
+  out=$(SR_SCRIPT=$m SR_REAP_FLAGS=--no-config reap "$world" --apply 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "a missing built-in default root must be skipped, got $rc: $out"
+  [ ! -e "$root/fm-aged" ] || fail 'the present default root was not reaped'
+  case "$out" in *home/tmp*) fail "the missing default root ~/tmp was not skipped silently: $out" ;; esac
+}
+
 # --- the schedule (SR3) --------------------------------------------------------
 
 install_df() {  # <world> <available-KiB>
@@ -586,6 +610,8 @@ test_newline_file_names_are_archived() { case_newline_file_names_archived; pass 
 test_leading_dash_directory() { case_leading_dash_directory; pass 'a leading-dash directory is archived and removed, and kept while a process holds it'; }
 test_control_character_name_is_kept() { case_control_character_name_kept; pass 'a directory whose name holds a control character is kept as control-character-name on one line'; }
 test_task_record_is_kept_until_the_record_goes() { case_task_record_kept; pass 'a directory a recorded task owns (this home, or a secondmate home through a symlink) is kept as task-record and removed once its record is gone'; }
+test_missing_configured_root_refuses() { case_missing_configured_root_refuses; pass 'a configured root that is missing stops the run with exit 2, names the config file and the root, and removes nothing'; }
+test_missing_default_root_is_skipped() { case_missing_default_root_is_skipped; pass 'a missing built-in default root is skipped silently and the present default root is still reaped'; }
 test_unreadable_log_keeps_the_directory() { case_archive_read_failure_keeps_directory; pass 'a small log that cannot be read keeps the directory as archive failed'; }
 test_archive_finishes_before_removal() { case_archive_before_remove_ordering; pass 'a copy that fails on the second file, or differs from its source, keeps the whole directory untouched'; }
 test_one_snapshot_per_run() { case_one_snapshot_per_run; pass 'one lsof snapshot serves every candidate of a run'; }
@@ -647,6 +673,8 @@ test_newline_file_names_are_archived
 test_leading_dash_directory
 test_control_character_name_is_kept
 test_task_record_is_kept_until_the_record_goes
+test_missing_configured_root_refuses
+test_missing_default_root_is_skipped
 test_unreadable_log_keeps_the_directory
 test_archive_finishes_before_removal
 test_one_snapshot_per_run

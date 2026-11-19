@@ -85,7 +85,9 @@
 #   allow-listed root is decided on its realpath, never on the name as written.
 #
 # Roots are refused, and the run exits 2 before touching anything, when a root is not an
-#   absolute or ~/ path, is not a directory, or is, contains, or lies under a protected path.
+#   absolute or ~/ path, is a symlink or not a directory, or is, contains, or lies under a
+#   protected path. A configured root that is missing is refused the same way, and the message
+#   names the config file and the root. A missing built-in default root is skipped.
 #
 # Scheduled run (--scheduled), owned here so the window has one owner:
 #   - a secondmate home exits 0 silently (the primary home reaps this machine's scratch);
@@ -293,18 +295,20 @@ load_config() {
     done < "$CONFIG_FILE"
   fi
   [ "$had_roots" -eq 1 ] || { CFG_LINES=(); default_config; }
+  CFG_FROM_FILE=$had_roots
   return 0
 }
 
 register_root() {  # <root as written> <glob>
-  local asis=$1 glob=$2 real i
+  local asis=$1 glob=$2 real i src
   # shellcheck disable=SC2088  # a literal ~/ in the config file
   case "$asis" in '~/'*) asis="${HOME:-/nonexistent}/${asis#\~/}" ;; esac
   asis=${asis%/}
   if [ ! -d "$asis" ] || [ -L "$asis" ]; then
     # A missing default root (no ~/tmp, no /private/tmp on Linux) is simply nothing to do.
-    [ ! -e "$asis" ] && [ ! -L "$asis" ] && return 0
-    echo "fm-scratch-reaper: root $asis is a symlink or not a directory" >&2
+    if [ "$CFG_FROM_FILE" -eq 0 ] && [ ! -e "$asis" ] && [ ! -L "$asis" ]; then return 0; fi
+    if [ "$CFG_FROM_FILE" -eq 1 ]; then src=$CONFIG_FILE; else src='the built-in defaults'; fi
+    echo "fm-scratch-reaper: root $asis from $src is missing, a symlink or not a directory" >&2
     return 2
   fi
   real=$(real_dir "$asis") || { echo "fm-scratch-reaper: cannot resolve root $asis" >&2; return 2; }

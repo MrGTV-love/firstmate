@@ -901,6 +901,8 @@ A line `age_hours <n>` sets the age.
 The file replaces the built-in defaults when it names at least one root, and a file with no root line keeps them.
 The defaults are `/private/tmp` with `fm-*`, `omp-*`, `fm-fm-*`, `fm-omp-*`, `fm-joined-generation.*`, `fm-bash-*`, `fm-pre-generic.*`, `fm-prekey-matcher.*`, and `fm-ttsr-pending.*`, and `~/tmp` with `backpass-*`, `fm-spawn-tree-*`, `dsh-*`, `nm-e2e-bin*`, and `nm-timeout-bin*`.
 A root that is a symlink, is not a directory, or is, contains, or lies under a protected path stops the run with exit 2 before it touches anything.
+A configured root that is missing stops the run with exit 2 the same way, and the message names the config file and the root.
+A built-in default root that is missing is skipped.
 
 Why each default glob is there:
 
