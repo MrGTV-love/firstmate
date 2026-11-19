@@ -658,6 +658,55 @@ test_dated_decisions_follow_valid_reopenings() {
   pass "dated decisions retain only the last valid reopening across resolutions and terminal declarations"
 }
 
+test_identified_decisions_keep_the_surviving_opening() {
+  local dir f original identified
+  dir=$(case_dir identified-openings)
+  f="$dir/task.status"
+  printf 'kind=ship\n' > "$dir/task.meta"
+  printf 'needs-decision [key=route]: inner\ttab kept\n' > "$f"
+  original=$(printf 'route\tneeds-decision\t\tinner\ttab kept')
+  identified=$(printf 'route\tneeds-decision\t\t0\tinner\ttab kept')
+  assert_equals "$original" "$(status_open_decisions_dated "$f")" "the default dated API changed"
+  assert_equals "$identified" "$(status_open_decisions_dated "$f" '' --with-opening)" "the first opener lost its identity"
+  printf 'working: unrelated progress\nnote: mentions needs-decision in prose\n' >> "$f"
+  assert_equals "$identified" "$(status_open_decisions_dated "$f" '' --with-opening)" "unrelated appends changed the opener"
+  assert_equals "$identified" "$(status_open_decisions_dated "$f" '' --with-opening)" "a no-op read changed the opener"
+  printf 'resolved [key=route]: answered\nneeds-decision [key=route]: inner\ttab kept\n' >> "$f"
+  assert_equals "$original" "$(status_open_decisions_dated "$f")" "unstamped compatibility changed"
+  assert_equals "$(printf 'route\tneeds-decision\t\t2\tinner\ttab kept')" \
+    "$(status_open_decisions_dated "$f" '' --with-opening)" "byte-identical reopenings shared an identity"
+  printf 'done: first deliverable complete\nneeds-decision [key=route] [at=100]: same second\n' >> "$f"
+  assert_equals "$(printf 'route\tneeds-decision\t100\t4\tsame second')" \
+    "$(status_open_decisions_dated "$f" '' --with-opening)" "a post-terminal opener lost its identity"
+  printf 'resolved [key=route] [at=100]: answered\nneeds-decision [key=route] [at=100]: same second\n' >> "$f"
+  assert_equals "$(printf 'route\tneeds-decision\t100\t6\tsame second')" \
+    "$(status_open_decisions_dated "$f" '' --with-opening)" "equal timestamps hid a new opening"
+  f="$dir/custom.status"
+  printf 'needs-decision [key=route]: first opening\nanswered [key=route]: custom resolution\nneeds-decision [key=route]: another opening\n' > "$f"
+  assert_equals "$(printf 'route\tneeds-decision\t\t2\tanother opening')" \
+    "$(FM_CLASSIFY_RESOLVE_VERB=answered status_open_decisions_dated "$f" '' --with-opening)" \
+    "the identified fold ignored the configured resolution verb"
+  pass "optional opening identity distinguishes unstamped and same-clock recurrence without changing dated compatibility"
+}
+
+test_identified_decisions_keep_the_surviving_opening
+
+test_actual_stream_identity_preserves_raw_fold_semantics() {
+  local dir f stream expected
+  dir=$(case_dir actual-stream-raw-filter);f="$dir/task.status"
+  printf 'needs-decision [key=gate]: unresolved\tinner tab\nresol\000ved [key=gate]: malformed\n' > "$f"
+  stream=$(perl -e 'my @s=stat($ARGV[0]); print "$s[0]:$s[1]"' "$f")
+  expected=$(printf 'gate\tneeds-decision\t\tunresolved\tinner tab')
+  assert_equals "$expected" "$(status_open_decisions_dated "$f")" "malformed raw bytes became a default resolution"
+  assert_equals "$(printf 'gate\tneeds-decision\t\t0\tunresolved\tinner tab')" \
+    "$(status_open_decisions_dated "$f" '' --with-opening)" "ordinal mode changed the canonical raw filter"
+  assert_equals "$(printf 'gate\tneeds-decision\t\t0\t%s\tunresolved\tinner tab' "$stream")" \
+    "$(status_open_decisions_dated "$f" '' --with-identity)" "actual identity mode normalized raw bytes before filtering"
+  pass "actual stream identity preserves default raw filtering, unknown age and inner-tab summaries"
+}
+
+test_actual_stream_identity_preserves_raw_fold_semantics
+
 test_dated_decisions_close_only_the_exact_key_record() {
   local dir f expected
   dir=$(case_dir dated-exact-key)
