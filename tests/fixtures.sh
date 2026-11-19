@@ -354,7 +354,7 @@ fm_test_hold_task_set_as_spawn() {
     : > "$ready"
     while [ ! -e "$release" ]; do sleep 0.01; done
   ) >/dev/null 2>&1 &
-  FM_TEST_TASK_SET_HOLDER=$!
+  export FM_TEST_TASK_SET_HOLDER=$!
 }
 
 # fm_test_release_on_lock_wait <script> <release-file>: writes the FM_LOCK_WAIT_TICK hook that releases the holder

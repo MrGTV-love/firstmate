@@ -6658,11 +6658,11 @@ spawn_slot_refused() {
   printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy $WT and endpoint $T retained; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status" 2>/dev/null || true
   if [ "$update_recovery" = 1 ]; then
     if [ "$RELAUNCH" -eq 0 ]; then
-      spawn_take_task_set_custody wait && spawn_state_unchanged || {
+      if ! spawn_take_task_set_custody wait || ! spawn_state_unchanged; then
         rm -f -- "$recovery"
         echo "error: assigned copy $WT and endpoint $T retained; task record publication refused" >&2
         exit 1
-      }
+      fi
     fi
     fm_backlog_atomic_transition publish "$recovery" "$STATE/$ID.meta" "task record" "$STATE" || {
       echo "error: could not record retained copy $WT: $FM_BACKLOG_TRANSITION_ERROR" >&2
