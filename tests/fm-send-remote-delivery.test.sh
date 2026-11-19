@@ -898,7 +898,7 @@ test_remote_steer_lands_behind_a_large_handled_folder() {
   [ "$rc" -eq 0 ] || fail "a steer behind 1600 handled records did not deliver (rc $rc): $err"
   count=$(remote_inbox_records "$rhome" | grep -c . || true)
   [ "$count" = 1 ] || fail "the steer behind 1600 handled records left $count unhandled records, not 1"
-  [ -z "$(find "$inbox" -maxdepth 1 -name '.dedup.*')" ] || fail "the remote leg left a .dedup temp file"
+  [ -z "$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' \))" ] || fail "the remote leg left a .dedup temp file"
 
   # The same delivery id resent dedups onto the one record already written.
   for _ in 1 2; do
@@ -908,7 +908,7 @@ test_remote_steer_lands_behind_a_large_handled_folder() {
   done
   count=$(remote_inbox_records "$rhome" | grep -c . || true)
   [ "$count" = 2 ] || fail "a same-id resend behind 1600 handled records did not dedup, found $count records"
-  [ -z "$(find "$inbox" -maxdepth 1 -name '.dedup.*')" ] || fail "the resend left a .dedup temp file"
+  [ -z "$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' \))" ] || fail "the resend left a .dedup temp file"
   pass "fm-send remote: a steer lands within the default budget behind 1600 handled records and a same-id resend dedups"
 }
 
@@ -951,7 +951,7 @@ test_remote_steer_lands_behind_handled_records_sharing_its_first_line() {
   done
   count=$(remote_inbox_records "$rhome" | grep -c . || true)
   [ "$count" = 1 ] || fail "the steer and its same-id resend left $count unhandled records, not 1"
-  [ -z "$(find "$inbox" -maxdepth 1 -name '.dedup.*')" ] || fail "the remote leg left a .dedup temp file"
+  [ -z "$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' \))" ] || fail "the remote leg left a .dedup temp file"
   pass "fm-send remote: a steer lands within the default budget behind 1600 handled records that share its first line"
 }
 

@@ -470,12 +470,14 @@ seed_handled_records() {  # <state> <task> <n> [body-prefix] [shared-first-line]
   done
 }
 
-# PATH shims that log each launch of awk, cat, cmp and grep before running the
-# real tool, so a case can count the processes a library call starts.
+# PATH shims that log each launch of the usual per-record tools (text, file and
+# temp-file tools) before running the real tool, so a case can count the
+# processes a library call starts. A command substitution forks without
+# running a tool and is not counted here.
 make_launch_counter() {  # <dir> -> echoes the shim dir; launches log to <dir>/launches
   local dir=$1 tool real
   mkdir -p "$dir/shims"; : > "$dir/launches"
-  for tool in awk cat cmp grep; do
+  for tool in awk cat cmp grep sed tr cut head tail wc rm mv mkdir mktemp chmod date ls find sleep; do
     real=$(command -v "$tool") || fail "no real $tool to shim"
     printf '#!/bin/sh\nprintf "%%s\\n" "%s" >> "%s"\nexec "%s" "$@"\n' "$tool" "$dir/launches" "$real" > "$dir/shims/$tool"
     chmod +x "$dir/shims/$tool"
@@ -483,7 +485,7 @@ make_launch_counter() {  # <dir> -> echoes the shim dir; launches log to <dir>/l
   printf '%s' "$dir/shims"
 }
 
-count_idempotent_launches() {  # <dir> <state> <text> -> launches of awk/cat/cmp/grep
+count_idempotent_launches() {  # <dir> <state> <text> -> launches of the shimmed tools
   local dir=$1 state=$2 text=$3 shims
   shims=$(make_launch_counter "$dir")
   PATH="$shims:$PATH" FM_STATE_OVERRIDE="$state" bash -c '
@@ -537,6 +539,37 @@ test_idempotent_scan_launches_do_not_grow_for_the_empty_text() {
     || fail "dedup launches grew with the records for the empty text: $small at 50 records, $large at 1600"
   [ -f "$dir/s1600/state/t1.inbox/1601.msg" ] || fail "the empty steer was not written behind the 1600 handled records"
   pass "inbox: the idempotent enqueue launches the same processes at 50 and 1600 records for the empty text ($small vs $large)"
+}
+
+# A NUL byte in a record body is an accepted byte shape too (imported or
+# damaged history): the dedup still reads it in-process, as a body that cannot
+# equal the text, and the launches stay fixed.
+seed_handled_nul_records() {  # <state> <task> <n>
+  local state=$1 task=$2 n=$3 dir i f
+  dir="$state/$task.inbox/handled"; mkdir -p "$dir"
+  i=0
+  while [ "$i" -lt "$n" ]; do
+    i=$((i + 1))
+    printf -v f '%s/%04d.msg' "$dir" "$i"
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\nshared first line\nunique\0body %s\n' "$i" > "$f"
+  done
+}
+
+test_idempotent_scan_launches_do_not_grow_for_records_with_nul_bytes() {
+  local dir kind text small large
+  for kind in collision empty; do
+    dir="$TMP_ROOT/idem-scale-nul-$kind"; mkdir -p "$dir/s50" "$dir/s1600"
+    seed_handled_nul_records "$dir/s50/state" t1 50
+    seed_handled_nul_records "$dir/s1600/state" t1 1600
+    if [ "$kind" = collision ]; then text=$'shared first line\nnew body'; else text=''; fi
+    small=$(count_idempotent_launches "$dir/s50" "$dir/s50/state" "$text")
+    large=$(count_idempotent_launches "$dir/s1600" "$dir/s1600/state" "$text")
+    [ "$((large - small))" -le 4 ] \
+      || fail "dedup launches grew with NUL-holding records ($kind): $small at 50 records, $large at 1600"
+    [ "$(find "$dir/s1600/state/t1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 1 ] \
+      || fail "the $kind steer behind NUL-holding records was not written once"
+  done
+  pass "inbox: the idempotent enqueue launches the same processes at 50 and 1600 records that hold NUL bytes"
 }
 
 # Each outcome below is what a full compare of every record gives.
@@ -648,14 +681,159 @@ test_idempotent_write_signal_cleans_up() {
     rc=0; wait "$pid" || rc=$?
     kill "$(cat "$sleeper")" 2>/dev/null || true # the stub's own sleeper, by recorded pid
     [ "$rc" -ge 128 ] || fail "a $sig'd writer should die by the signal, exit $rc"
-    leftovers=$(find "$inbox" -maxdepth 1 -name '.dedup.*' | wc -l | tr -d ' ')
-    [ "$leftovers" = 0 ] || fail "a $sig'd writer left $leftovers .dedup temp file(s)"
+    leftovers=$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' \) | wc -l | tr -d ' ')
+    [ "$leftovers" = 0 ] || fail "a $sig'd writer left $leftovers temp file(s) or work directories"
     [ ! -e "$inbox/.seq.lock" ] && [ ! -L "$inbox/.seq.lock" ] || fail "a $sig'd writer left the inbox lock held"
     [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 1 ] || fail "a $sig'd writer changed the record set"
     next=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 'steer two') || fail "the steer after a $sig'd writer failed"
     [ "$next" = "$inbox/002.msg" ] || fail "the steer after a $sig'd writer did not land as 002: $next"
   done
   pass "inbox: a TERM or INT inside the idempotent write leaves no temp file, frees the lock, and the next steer lands"
+}
+
+# A shim for <tool> that stops when an argument matches <glob>: it runs the real
+# tool first when <run-first> is yes (so the allocation exists), records its own
+# pid and a marker, and then waits to be killed (exec, so the pid it recorded is
+# the sleeper itself and a signal reaches it directly).
+make_blocking_shim() {  # <shim-dir> <tool> <arg-glob> <run-first: yes|no>
+  local dir=$1 tool=$2 glob=$3 first=$4 real
+  real=$(command -v "$tool") || fail "no real $tool to shim"
+  mkdir -p "$dir"
+  cat > "$dir/$tool" <<SH
+#!/bin/bash
+for a in "\$@"; do
+  case "\$a" in $glob)
+    [ "$first" != yes ] || "$real" "\$@" || exit \$?
+    echo \$\$ > "\$SLEEPER"; echo started > "\$STARTED"
+    exec /bin/sleep 3600 ;;
+  esac
+done
+exec "$real" "\$@"
+SH
+  chmod +x "$dir/$tool"
+}
+
+# One kill of a write blocked in <window>: the signal goes to the parent alone or
+# to its whole process group (the timed-command contract signals the group), and
+# afterwards the inbox holds no temp file, work directory or lock, the records
+# are unchanged, and the next enqueue lands.
+write_signal_case() {  # <idempotent|plain> <work|probe|compare|stage> <TERM|INT> <parent|group>
+  local fn=$1 window=$2 sig=$3 kind=$4 name dir state inbox started sleeper shims pid rc=0 leftovers next group=0 stub=''
+  name="$fn-$window-$sig-$kind"
+  dir="$TMP_ROOT/sigcase-$name"; state="$dir/state"; inbox="$state/t1.inbox"; mkdir -p "$state"
+  inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "$name: seed failed"
+  started="$dir/started"; sleeper="$dir/sleeper"; shims="$dir/shims"; mkdir -p "$shims"
+  # shellcheck disable=SC2016 # the compare stub is text the child evaluates, not expanded here
+  case "$window" in
+    work) make_blocking_shim "$shims" mkdir '*/.work.*' yes ;;
+    probe) make_blocking_shim "$shims" mktemp '*/.lock-probe.*' yes ;;
+    stage) make_blocking_shim "$shims" mv '*/.staging.*' no ;;
+    compare) stub='fm_task_inbox_body() { sleep 60 & echo $! > "$SLEEPER"; echo started > "$STARTED"; wait $!; }' ;;
+  esac
+  [ "$kind" != group ] || group=1
+  # The text is new, so the plain and the idempotent write both reach staging.
+  # perl restores the default INT disposition (a background job starts with it
+  # ignored) and, for the group kind, makes the writer its own group leader.
+  FM_STATE_OVERRIDE="$state" STARTED="$started" SLEEPER="$sleeper" GROUP="$group" PATH="$shims:$PATH" \
+    perl -MPOSIX -e 'POSIX::setsid() if $ENV{GROUP}; $SIG{INT} = "DEFAULT"; exec @ARGV' bash -c '
+      . "$1"
+      eval "$3"
+      if [ "$4" = idempotent ]; then fm_task_inbox_write_idempotent "$2" t1 "new steer"; else fm_task_inbox_write "$2" t1 "new steer"; fi
+    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$stub" "$fn" >/dev/null 2>&1 &
+  pid=$!
+  for _ in $(seq 1 150); do [ -s "$started" ] && break; sleep 0.1; done
+  [ -s "$started" ] || { kill "$pid" 2>/dev/null; fail "$name: the writer never reached the $window window"; }
+  if [ "$group" = 1 ]; then kill -s "$sig" -- "-$pid" || fail "$name: could not signal the group"
+  else kill -s "$sig" "$pid" || fail "$name: could not signal the writer"; fi
+  # A parent waiting on a foreground child runs its trap when the child ends.
+  # Bash drops an INT sent to the parent alone unless the child dies of INT
+  # too, so the blocked child gets the same signal (what Ctrl-C does).
+  [ "$group" = 1 ] || { sleep 0.3; kill -s "$sig" "$(cat "$sleeper")" 2>/dev/null || true; }
+  for _ in $(seq 1 150); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+  if kill -0 "$pid" 2>/dev/null; then kill -s KILL "$pid"; kill "$(cat "$sleeper")" 2>/dev/null || true; fail "$name: the writer was still alive 15 s after $sig"; fi
+  wait "$pid" || rc=$?
+  kill "$(cat "$sleeper")" 2>/dev/null || true
+  [ "$rc" -ge 128 ] || fail "$name: the signalled writer should die by the signal, exit $rc"
+  leftovers=$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' -o -name '.lock-probe.*' \) | wc -l | tr -d ' ')
+  [ "$leftovers" = 0 ] || fail "$name: left $leftovers temp file(s) or work directories: $(ls -A "$inbox")"
+  [ ! -e "$inbox/.seq.lock" ] && [ ! -L "$inbox/.seq.lock" ] || fail "$name: left the inbox lock held"
+  [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 1 ] || fail "$name: changed the record set"
+  next=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 'steer two') || fail "$name: the steer after it failed"
+  [ "$next" = "$inbox/002.msg" ] || fail "$name: the steer after it did not land as 002: $next"
+}
+
+test_write_signals_leave_no_temp_and_no_lock_in_any_window() {
+  local fn window sig kind n=0 windows
+  for fn in idempotent plain; do
+    windows='work probe stage'; [ "$fn" != idempotent ] || windows='work probe compare stage'
+    for window in $windows; do
+      for sig in TERM INT; do
+        for kind in parent group; do
+          write_signal_case "$fn" "$window" "$sig" "$kind"
+          n=$((n + 1))
+        done
+      done
+    done
+  done
+  pass "inbox: TERM and INT to the writer or its process group leave no temp file, work directory or lock in any window ($n cases)"
+}
+
+# A caller's own EXIT trap is neither replaced nor run twice, in the shell or
+# in a command substitution; with none, an exit inside the call still cleans up.
+test_write_keeps_caller_exit_trap_and_cleans_up_on_exit() {
+  local state out rc=0
+  state="$TMP_ROOT/exit-trap/state"; mkdir -p "$state"
+  out=$(FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    trap "echo caller-exit" EXIT
+    rec=$(fm_task_inbox_write_idempotent "$2" t1 "exit trap check") || exit 1
+    fm_task_inbox_write "$2" t1 "second" >/dev/null || exit 1
+    [ "$(trap -p EXIT)" = "trap -- '"'"'echo caller-exit'"'"' EXIT" ] || echo changed
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state") || fail "exit-trap probe failed"
+  [ "$out" = caller-exit ] || fail "the caller's EXIT trap was changed or ran more than once: $out"
+  state="$TMP_ROOT/exit-inside/state"; mkdir -p "$state"
+  inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "seed failed"
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_task_inbox_body() { exit 3; }
+    fm_task_inbox_write_idempotent "$2" t1 "steer one"
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || fail "an exit inside the call should keep its status, got $rc"
+  [ -z "$(find "$state/t1.inbox" -maxdepth 1 \( -name '.work.*' -o -name '.dedup.*' -o -name '.staging.*' \))" ] \
+    || fail "an exit inside the call left a work directory: $(ls -A "$state/t1.inbox")"
+  [ ! -e "$state/t1.inbox/.seq.lock" ] || fail "an exit inside the call left the inbox lock held"
+  pass "inbox: the caller's EXIT trap is untouched, and an exit inside a write cleans up"
+}
+
+# A work directory (or one stranded by a SIGKILL) is never read as a record:
+# the sequence, listing, oldest-unhandled and due-action readers all pass it by,
+# even when it holds files named like records.
+test_work_directory_is_never_read_as_a_record() {
+  local state inbox out
+  state="$TMP_ROOT/work-dir-readers/state"; inbox="$state/t1.inbox"; mkdir -p "$inbox/handled/.work.1.2" "$inbox/.work.3.4"
+  printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\nstranded\n' > "$inbox/.work.3.4/001.msg"
+  : > "$inbox/.work.3.4/.staging.record"; : > "$inbox/.work.3.4/.dedup.body"
+  cp "$inbox/.work.3.4/001.msg" "$inbox/handled/.work.1.2/009.msg"
+  out=$(inbox_lib "$state" fm_task_inbox_next_seq "$inbox") || fail "next_seq failed beside a work directory"
+  [ "$out" = 001 ] || fail "a work directory changed the next sequence: $out"
+  out=$(inbox_lib "$state" fm_task_inbox_doorbells "$state" t1) || fail "doorbells failed beside a work directory"
+  [ -z "$out" ] || fail "a work directory was listed as a record: $out"
+  if inbox_lib "$state" fm_task_inbox_oldest_unhandled "$state" t1 >/dev/null; then fail "a work directory counted as an unhandled record"; fi
+  out=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 "stranded") || fail "the dedup failed beside a work directory"
+  [ "$out" = "$inbox/001.msg" ] || fail "a work directory's file was taken for an existing record: $out"
+  pass "inbox: a work directory is never read as a record"
+}
+
+# A record stays owner-only, as the temp file it used to be renamed from.
+test_write_record_stays_owner_only() {
+  local state rec mode fn
+  state="$TMP_ROOT/mode/state"; mkdir -p "$state"
+  for fn in fm_task_inbox_write fm_task_inbox_write_idempotent; do
+    rec=$(inbox_lib "$state" "$fn" "$state" t1 "mode check $fn") || fail "$fn failed"
+    mode=$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$rec")
+    [ "$mode" = 600 ] || fail "$fn wrote a record with mode $mode, not 600"
+  done
+  pass "inbox: a written record is owner-only (mode 600)"
 }
 
 # The caller's own TERM and INT traps survive a normal call unchanged.
@@ -1554,10 +1732,15 @@ test_idempotent_write_follows_concurrent_ack
 test_idempotent_scan_launches_do_not_grow_with_handled_records
 test_idempotent_scan_launches_do_not_grow_when_records_share_the_first_line
 test_idempotent_scan_launches_do_not_grow_for_the_empty_text
+test_idempotent_scan_launches_do_not_grow_for_records_with_nul_bytes
 test_idempotent_dedup_keeps_every_outcome_of_the_full_compare
 test_idempotent_dedup_reads_odd_records_like_the_full_compare
 test_idempotent_dedup_finds_records_behind_links
 test_idempotent_write_signal_cleans_up
+test_write_signals_leave_no_temp_and_no_lock_in_any_window
+test_write_keeps_caller_exit_trap_and_cleans_up_on_exit
+test_write_record_stays_owner_only
+test_work_directory_is_never_read_as_a_record
 test_idempotent_write_keeps_caller_traps
 test_next_seq_ignores_gaps_and_non_record_names
 test_handled_mv_dedups_by_sequence
