@@ -3518,27 +3518,82 @@ test_a_passed_over_pane_is_not_closed_on_abort() {
   pass "an abort leaves a pane in a passed-over copy open, and an abort before any copy closes the pane it created"
 }
 
-# The mutant restores the close: before the abort cleanup reads the pass-over flag, it clears the flag. The case above
-# must reject it, so the mutant's kill-window of the passed-over pane is what fails.
-test_the_passed_over_pane_case_rejects_a_restored_close() {
+# run_after_clean_copy_case <claim|base|hold>: a spawn whose pool hands it a copy with a recovered lease (passed over), then a
+# clean copy that is accepted and reached. The spawn then refuses at one point after that copy was reached: the claim (the
+# claim marker beside the copy is a directory), the base check (under local-only, the copy shows an origin the primary does
+# not) or the hold (the copy's idle proof cannot be read, so it is leased in place). The pane must stay open in each case.
+run_after_clean_copy_case() {
+  local kind=$1 id mode=no-mistakes out status log real_git
+  id="pool-pane-after-clean-$kind"
+  make_real_pool_case "after-clean-$kind" "$id" 2
+  make_recovered_lease "${REAL_SLOTS[0]}"
+  log="$CASE_DIR/window.log"; : > "$log"
+  install_window_log "$log"
+  real_git=$(command -v git)
+  case "$kind" in
+    claim) mkdir "$(dirname "${REAL_SLOTS[1]}")/.fm-slot-owner" || fail "the claim marker could not be made" ;;
+    base)
+      mode=local-only
+      cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *"${REAL_SLOTS[1]}"*' config '*) exit 1 ;; esac
+exec '$real_git' "\$@"
+SH
+      chmod +x "$FAKEBIN_DIR/git"
+      ;;
+    hold)
+      cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+case "\$*" in *"${REAL_SLOTS[1]}"*' status '*) exit 1 ;; esac
+exec '$real_git' "\$@"
+SH
+      chmod +x "$FAKEBIN_DIR/git"
+      ;;
+  esac
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" BASH_ENV="${FM_TEST_PANE_BASH_ENV:-/dev/null}" run_spawn "$id" --mode "$mode" --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "$kind: a worker was admitted"
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "$kind: treehouse get was not typed exactly twice"$'\n'"$out"
+  assert_grep "${REAL_SLOTS[0]}" "$HOME_DIR/data/$id/skipped-copies.tsv" "$kind: the passed-over copy was not recorded"
+  case "$kind" in
+    claim) assert_contains "$out" "could not claim Treehouse pool slot" "$kind: the spawn did not refuse at the claim" ;;
+    base) assert_contains "$out" "qualification disagree" "$kind: the spawn did not refuse at the base check" ;;
+    hold) assert_grep "firstmate-skipped:$id" "$HOME_DIR/data/$id/skipped-copies.tsv" "$kind: the reached copy was not held" ;;
+  esac
+  grep -Fq 'new-window' "$log" || fail "$kind: the spawn created no pane, so its close could not be observed"
+  ! grep -Fq 'kill-window' "$log" || fail "$kind: the spawn closed the pane after a clean copy was reached: $(cat "$log")"
+}
+
+# An abort after a clean copy was reached leaves the pane open too: the pass-over ends the pane's close for this spawn.
+test_an_abort_after_a_clean_copy_is_reached_keeps_the_pane() {
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  run_after_clean_copy_case claim
+  run_after_clean_copy_case base
+  run_after_clean_copy_case hold
+  pass "an abort after a passed-over copy and a clean copy was reached leaves the pane open at the claim, the base check and the hold"
+}
+
+# The mutant restores the close: at the start of the abort cleanup it points the endpoint back at the window the spawn
+# created, as an abort without the pass-over would. The case above must reject it.
+test_the_after_clean_copy_case_rejects_a_restored_close() {
   local dir rc=0 out
   real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
-  dir="$TMP_ROOT/pane-kept-mutant"
+  dir="$TMP_ROOT/after-clean-mutant"
   mkdir -p "$dir"
   cat > "$dir/mutant.sh" <<SH
-. '$ROOT/tests/skip-clock.sh'
 set -T
 __fm_restore_close() {
   case "\$BASH_COMMAND" in
-    'local status=\$? skill_meta_tmp') SPAWN_PANE_IN_PASSED_COPY=0 ;;
+    'local status=\$? skill_meta_tmp') SPAWN_TREEHOUSE_ABORT_TARGET=@41 ;;
   esac
   return 0
 }
 trap '__fm_restore_close' DEBUG
 SH
-  out=$(FM_TEST_PANE_BASH_ENV="$dir/mutant.sh" test_a_passed_over_pane_is_not_closed_on_abort 2>&1) || rc=$?
-  [ "$rc" != 0 ] || fail "the passed-over pane case passed with a spawn that restores the close"
-  pass "the passed-over pane case rejects a spawn that restores the close"
+  out=$(FM_TEST_PANE_BASH_ENV="$dir/mutant.sh" test_an_abort_after_a_clean_copy_is_reached_keeps_the_pane 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "the after-clean-copy case passed with a spawn that restores the close"
+  pass "the after-clean-copy case rejects a spawn that restores the close"
 }
 
 # --- finding 10 (validators) -----------------------------------------------------------------
@@ -3892,7 +3947,8 @@ test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn
 test_a_pool_of_only_refused_copies_refuses_once_and_names_each
 test_a_refused_copy_handed_out_twice_does_not_loop
 test_a_passed_over_pane_is_not_closed_on_abort
-test_the_passed_over_pane_case_rejects_a_restored_close
+test_an_abort_after_a_clean_copy_is_reached_keeps_the_pane
+test_the_after_clean_copy_case_rejects_a_restored_close
 test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_new_foreign_ref
 test_slot_digest_sees_a_removed_ref
