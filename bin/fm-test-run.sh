@@ -576,7 +576,8 @@ family_for_basename() {
     fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
     fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
     fm-review-diff.test.sh|fm-review-record.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
-    fm-teardown-cleanup.test.sh|fm-teardown-real-treehouse.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
+    fm-teardown-cleanup.test.sh|fm-teardown-real-treehouse.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|\
+    fm-open-loops-episodes.test.sh|fm-open-loops-steer-result.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -922,6 +923,8 @@ tests/fm-calm-claude-mod-plugin.test.sh 784
 tests/fm-calm-claude-mod.test.sh 5079
 tests/fm-calm-pi-extension.test.sh 56965
 tests/fm-calm-pi-queue-retention-live-e2e.test.sh 2181
+tests/fm-captain-hold-boundary.test.sh 43963
+tests/fm-captain-hold-delay.test.sh 32194
 tests/fm-check-unregister.test.sh 1442
 tests/fm-ci-workflow.test.sh 23170
 tests/fm-classify-corr-token.test.sh 19063
@@ -1191,6 +1194,7 @@ tests/fm-tmux-agent-liveness.test.sh 4922
 tests/fm-tool-update-check.test.sh 20060
 tests/fm-trace-context-lib.test.sh 1147
 tests/fm-trace-context-spawn.test.sh 124851
+tests/fm-turnend-ask.test.sh 6581
 tests/fm-turnend-foreign-owner-arm-fix.test.sh 6851
 tests/fm-turnend-guard.test.sh 61599
 tests/fm-typesafe-health.test.sh 6669
@@ -1951,6 +1955,8 @@ families_for_changed_path() {
       fi
       ;;
     bin/fm-open-loops.sh|bin/fm_open_loops.py)
+      printf '%s\n' "__script__:fm-open-loops-steer-result.test.sh"
+      printf '%s\n' "__script__:fm-open-loops-episodes.test.sh"
       printf '%s\n' "__script__:fm-open-loops.test.sh"
       printf '%s\n' "__script__:fm-watch-open-loops.test.sh"
       ;;

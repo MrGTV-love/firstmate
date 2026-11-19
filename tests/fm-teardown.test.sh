@@ -2748,6 +2748,9 @@ record_preservation_bundle() {  # <case> <copy> <bundle> [revision...]
 run_captain_hold() {  # <case> <arg>...
   local case_dir=$1
   shift
+  if [ "${1:-}" = hold ]; then
+    set -- "$@" --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'
+  fi
   FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
     FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" "$ROOT/bin/fm-captain-hold.sh" "$@"
 }
