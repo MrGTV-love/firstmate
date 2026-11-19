@@ -734,9 +734,12 @@ pass "raw launch records match delivery capability"
 raw_pointer_fake() {
   mv "$SPAWN_FAKEBIN/tmux" "$SPAWN_FAKEBIN/tmux-base"
   fm_fake_exit0 "$SPAWN_FAKEBIN" rovo kimi
+  fm_test_fake_tmux_acquisition_support "$SPAWN_FAKEBIN" || return
   cat > "$SPAWN_FAKEBIN/tmux" <<'SH'
 #!/usr/bin/env bash
 set -eu
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 state=$(cat "$POINTER_STATE" 2>/dev/null || true)
 screen() {
   if [ "${POINTER_RELAUNCH:-0}" = 1 ] && [ ! -f "$FM_FAKE_LAUNCH_LOG" ]; then

@@ -98,7 +98,9 @@ for arg in "$@"; do
   if [[ "$arg" =~ $treehouse_command ]]; then
     # Recognize only the exact submitted/literal allocation forms. A miss
     # refuses before any real command reaches a pane or the shared allocator.
-    [ "$#" = 4 ] && [ "$1" = pane ] && { [ "$2" = run ] || [ "$2" = send-text ]; } && [ "$4" = 'treehouse get' ] || exit 1
+    [ "$#" = 4 ] && [ "$1" = pane ] && { [ "$2" = run ] || [ "$2" = send-text ]; } || exit 1
+    # The spawn's get carries its private GIT_TRACE2_EVENT prefix; nothing else is accepted.
+    case "$4" in 'treehouse get'|'GIT_TRACE2_EVENT='*' treehouse get') ;; *) exit 1 ;; esac
     cwd=$(PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" pane get "$3" | jq -r '.result.pane.foreground_cwd')
     case "$cwd" in
       "$TEST_DIR"/project-*) lane=${cwd#"$TEST_DIR"/project-} ;;

@@ -44,6 +44,7 @@
     "signal-only-recorded-process",
     "slot-owner-claim",
     "slot-registered-copies-proven",
+    "spawn-acquire-stall",
     "spawn-fresh-base",
     "spawn-lock-no-race",
     "spawn-stale-model",
@@ -5877,6 +5878,36 @@
       "test": "tests/fm-spawn-acquisition-cleanup.test.sh",
       "tier": "C",
       "harm": "irreversible",
+      "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "spawn-acquire-stall",
+      "owner": "bin/fm-spawn.sh",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "acquire_progress_pattern='^treehouse: checked"
+        }
+      ],
+      "invariant": "a treehouse get wait ends only after the stall allowance passes with no new pane path, candidate, or Git start",
+      "layer": "runtime-block",
+      "source": "pane path, checked-candidate records, and Trace2 Git start events of the get",
+      "trigger": "a get shows no new pane path, candidate, or Git start for SPAWN_ACQUIRE_STALL seconds, or repeats the same candidate",
+      "remedy": "bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> (SPAWN_ACQUIRE_STALL=<seconds> sets a longer stall allowance)",
+      "budget": 1,
+      "test": "tests/fm-spawn-worktree-settle.test.sh",
+      "tier": "C",
+      "harm": "reversible",
       "remedy_verified": "fixture"
     },
     {
