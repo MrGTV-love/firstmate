@@ -113,6 +113,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - The [pool-copy prune](#pool-copy-prune-after-a-merge-fm_merge_prune) record `state/<id>.merge-prune` with its locks, and the task's outcome log `data/<id>/merge-prune.log` with any preserved records under `data/<id>/merge-prune-preserved/`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
+- The model-picker daily collection's lock, raised-wake keys, last-run output, and launchd logs `state/.model-picker-daily*`, owned by [Daily collection](#daily-collection).
 - The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
 - The [standing GitHub caller accounting](#standing-github-caller-accounting) owner's private directory `state/github-accounting/` and the watcher's failed-start marker `state/.github-accounting-start-failed`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
@@ -1295,7 +1296,7 @@ At its default location the whole root is private and gitignored with `data/`.
 | --- | --- |
 | `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s with one line per URL; a run does not re-request a remembered 404 unless `--stale-after-hours` has aged it out |
 | `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status (`slug_status`, `sweep_failures`), which is its only home; its stored coverage, if any, is never read |
-| `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, and `reconcile_runs` |
+| `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, and `reconcile_runs`; a daily promotion adds the one-row `daily_promotion` table, its commit marker ([Daily collection](#daily-collection)) |
 | `coverage.md` | Per-series coverage, recomputed from the raw cache on every run (never from `aa.sqlite` or `snapshot.json`) |
 | `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
 | `projection/<slug>.json` | One wire-format projection per catalog model, written last |
@@ -1329,7 +1330,7 @@ Whatever stops a promotion, a settle step reads that journal and leaves one of t
 The runner settles at the end of a failed promotion and again at the start of every run.
 The previous verdict returns only when every undo step worked, so a trusted verdict never sits over a mixed generation; a step that fails twice leaves the verdict `UNTRUSTED` and the wake says so.
 A reader holds a shared lock on the data root for its whole read of the verdict and projections (`generation_hold` in `bin/fm_model_picker/shadow.py`, used by `--observe` and `--check-routes`) and a promotion holds it exclusively, so no read spans a promotion and a reader that starts during one is refused.
-The wake names the outcome first, then the whole first stderr line, the literal first line with its trailing spaces (the wake queue sets no length limit; UTF-8 text is kept and each control character becomes a space; an empty first line is named as empty), and the verdict a reader actually sees, read back from the file.
+A promotion wake names its outcome first when it has one, then the whole first stderr line, the literal first line with its trailing spaces (the wake queue sets no length limit; UTF-8 text is kept and each control character becomes a space; an empty first line is named as empty), and the verdict a reader actually sees when it names one, read back from the file; the failed-run wake names its exit code and newest `observed_at` instead.
 A signal that ends the whole runner during a promotion leaves the verdict `UNTRUSTED` with no wake until the next run settles it at its start.
 A run removes only its own staging directory, a stale one only when its owner record names a process that is gone, and from the data root only the names its own journal lists plus its collector-prefixed scratch file `.fm-model-picker-daily.tmp`; it never touches another file, and a promotion that finds another of its own prefixed names with no journal changes nothing and says so.
 
