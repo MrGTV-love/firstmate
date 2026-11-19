@@ -391,21 +391,44 @@ case "$MODE" in
     trap 'rm -f "$VIOLATIONS" "$SITES_JSON" "$ALLOWED_FILE" "$SC" "$base_json" "$base_allow"' EXIT
     if git -C "$ROOT" rev-parse --verify "$BASE_REF" >/dev/null 2>&1 \
       && git -C "$ROOT" show "$BASE_REF:docs/guards/registry.json" >"$base_json" 2>/dev/null; then
+      touched_started=$SECONDS
+      touched_status=0
       touched=$(jq -r --slurpfile base "$base_json" '
         (.guards | map({key: .id, value: .}) | from_entries) as $now
         | ($base[0].guards | map({key: .id, value: .}) | from_entries) as $was
-        | $now | keys[] | select(($was[.] == null) or ($was[.] != $now[.]))' "$REGISTRY")
+        | $now | keys[] | select(($was[.] == null) or ($was[.] != $now[.]))' "$REGISTRY") || touched_status=$?
       out=0
       while IFS= read -r gid; do
         [ -n "$gid" ] || continue
-        awk -F'\t' -v id="$gid" '$2 == id {print}' "$SC" | while IFS=$'\t' read -r r i m; do
+        # A nonnumeric prefix forces text comparison; ENVIRON preserves the literal ID.
+        FM_GUARD_LINT_ID="id:$gid" awk -F'\t' '("id:" $2) == ENVIRON["FM_GUARD_LINT_ID"] {print}' "$SC" | while IFS=$'\t' read -r r i m; do
           [ -n "$r" ] || continue
           printf 'VIOLATION %s %s: %s\n' "$r" "$i" "$m"
         done
-        awk -F'\t' -v id="$gid" '$2 == id {found = 1} END {exit !found}' "$SC" && out=1
+        print_status=${PIPESTATUS[0]}
+        [ "$print_status" -eq 0 ] || touched_status=$print_status
+        if FM_GUARD_LINT_ID="id:$gid" awk -F'\t' '("id:" $2) == ENVIRON["FM_GUARD_LINT_ID"] {found = 1} END {exit !found}' "$SC"; then
+          out=1
+        else
+          match_status=$?
+          [ "$match_status" -eq 1 ] || touched_status=$match_status
+        fi
       done <<TOUCHED_GUARDS
 $touched
 TOUCHED_GUARDS
+      # Record only this stage, before independent site and allowlist verdicts.
+      # Use an explicit sink so a standalone lint cannot write fleet state.
+      if [ -n "${FM_GUARD_EVENT_LOG:-}" ]; then
+        touch_decision=allow touch_source_ok=true
+        if [ "$touched_status" -ne 0 ]; then
+          touch_decision=error touch_source_ok=false
+        elif [ "$out" -ne 0 ]; then
+          touch_decision=deny
+        fi
+        "$SCRIPT_DIR/fm-guard-event.sh" guard-lint-touched-registry "$touch_decision" \
+          --source-ok "$touch_source_ok" --base "$BASE_REF" --elapsed-ms "$(((SECONDS - touched_started) * 1000))" \
+          >/dev/null 2>&1 || true
+      fi
       # The allowlist holds every legacy refusal-site violation, so one it does not
       # hold is new, whichever guard or site it names.
       awk -F'\t' '$1 ~ /^S[0-9]+$/ {found = 1} END {exit !found}' "$SC" && out=1

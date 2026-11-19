@@ -16,7 +16,8 @@
 #   - an allowlisted violation passes, and removing the violation makes that
 #     same entry stale, so the allowlist can only shrink
 #   - report mode exits 0 while still printing the violation
-#   - new-or-touched mode ignores an untouched offending guard
+#   - new-or-touched mode ignores an untouched offending guard, even for numeric-looking ids
+#   - a touched offending id still fails until the offending field is corrected
 #   - a retired guard that is still registered fails
 #   - --counts excludes active guards named in beyond_audit_active and beyond_audit_retired points
 #   - every refusal-site signature (marker, message, helper call, hook deny, guard event) is found
@@ -265,6 +266,66 @@ mutate "$NAT" '(.guards[] | select(.id == "gnew") | .remedy) = "a pointer with n
 out=$("$LINT" --root "$NAT" --mode new-or-touched --base HEAD 2>&1) && fail "new-or-touched must fail for a touched guard"
 printf '%s\n' "$out" | grep -q 'VIOLATION R2 gnew' || fail "expected the touched guard to fail, got: $out"
 pass "new-or-touched fails for a touched guard"
+
+LITERAL_NAT=$(fixture literal_newortouched)
+mutate "$LITERAL_NAT" '.guards[0] |= (.id = "01" | .fail_direction = "unspecified")
+  | .guards += [(.guards[0] | .id = "1" | .invariant = "a second invariant" | .fail_direction = "closed")]'
+literal_registry=docs/guards/registry.json
+literal_log="$LITERAL_NAT/guard-events.jsonl"
+literal_base=$(
+  builtin cd "$LITERAL_NAT" && git init -q --template= &&
+  git add -- "$literal_registry" && tree=$(git write-tree) &&
+  git -c user.email=t@example.invalid -c user.name=t commit-tree "$tree" -m base
+) || fail "could not create the literal id fixture base"
+
+mutate "$LITERAL_NAT" '(.guards[] | select(.id == "01") | .source) += " with updated wording"'
+literal_rc=0
+out=$(FM_GUARD_EVENT_LOG="$literal_log" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) || literal_rc=$?
+literal_message="fail_direction 'unspecified' is not closed or open"
+literal_diagnostic="VIOLATION R4 01: $literal_message"
+literal_summary=${out%$'\n'"$literal_diagnostic"}
+if [ "$literal_rc" -ne 1 ] || [ "$literal_summary" = "$out" ] ||
+  ! jq -es --arg message "$literal_message" 'length == 1 and .[0].findings == [{rule:"R4", id:"01", message:$message}]' \
+    <<< "$literal_summary" >/dev/null; then
+  fail "editing offending id 01 must exit 1 with its sole R4 finding, got exit $literal_rc: $out"
+fi
+pass "new-or-touched fails when offending literal id 01 itself is edited"
+
+# A regular file cannot host a log beneath it; keep both the result and diagnostic.
+: >"$LITERAL_NAT/not-a-directory"
+unavailable_rc=0
+unavailable_out=$(FM_GUARD_EVENT_LOG="$LITERAL_NAT/not-a-directory/events.jsonl" \
+  run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) || unavailable_rc=$?
+if [ "$unavailable_rc" -ne "$literal_rc" ] || [ "$unavailable_out" != "$out" ]; then
+  fail "an unavailable event log changed the touched refusal, got exit $unavailable_rc: $unavailable_out"
+fi
+pass "an unavailable event log does not change the touched refusal"
+
+# Keep the attempted source edit; change only the offending field in that same row.
+mutate "$LITERAL_NAT" '(.guards[] | select(.id == "01") | .fail_direction) = "closed"'
+out=$(FM_GUARD_EVENT_LOG="$literal_log" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+  || fail "correcting only id 01's fail direction must clear the same edit (exit $?): $out"
+jq -es 'length == 1 and .[0].findings == []' <<< "$out" >/dev/null \
+  || fail "expected no findings or touched diagnostics after correcting the field, got: $out"
+pass "new-or-touched passes the same edit after correcting the offending field"
+
+git -C "$LITERAL_NAT" show "$literal_base:$literal_registry" >"$LITERAL_NAT/$literal_registry" \
+  || fail "could not restore the literal id fixture base"
+mutate "$LITERAL_NAT" '(.guards[] | select(.id == "1") | .source) += " with updated wording"'
+out=$(FM_GUARD_EVENT_LOG="$literal_log" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+  || fail "editing only valid id 1 must not fail for untouched id 01 (exit $?): $out"
+jq -es --arg message "$literal_message" 'length == 1 and .[0].findings == [{rule:"R4", id:"01", message:$message}]' \
+  <<< "$out" >/dev/null \
+  || fail "expected only the existing R4 finding in the summary, not a touched diagnostic, got: $out"
+pass "new-or-touched passes an edit to valid id 1 despite untouched debt on id 01"
+
+[ -f "$literal_log" ] || fail "the touched-registry stage emitted no decision events"
+jq -es --arg base "$literal_base" '
+    map(select(.guard == "guard-lint-touched-registry")) as $events
+    | ($events | map(.decision)) == ["deny", "allow", "allow"]
+      and all($events[]; .source_ok and .opportunity and .base == $base)
+  ' "$literal_log" >/dev/null || fail "expected one event per touched-registry verdict with the same base"
+pass "new-or-touched records the touched-registry refusal, recovery and unrelated admission"
 
 # --- malformed input --------------------------------------------------------
 BROKEN=$(fixture broken)
@@ -784,8 +845,11 @@ git -C "$NEWSITE" init -q
 git -C "$NEWSITE" -c user.email=t@example.invalid -c user.name=t add -A
 git -C "$NEWSITE" -c user.email=t@example.invalid -c user.name=t commit -qm base
 printf 'echo "REFUSED: a brand new refusal" >&2\n' >"$NEWSITE/bin/gnew.sh"
-out=$("$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD 2>&1) && fail "a new unmapped site must fail new-or-touched: $out"
+out=$(FM_GUARD_EVENT_LOG="$NEWSITE/guard-events.jsonl" "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD 2>&1) \
+  && fail "a new unmapped site must fail new-or-touched: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION S1 site:bin/gnew.sh' || fail "expected S1 for the new site, got: $out"
+jq -es 'map(select(.guard == "guard-lint-touched-registry") | .decision) == ["allow"]' \
+  "$NEWSITE/guard-events.jsonl" >/dev/null || fail "an S1 refusal must not be recorded as a touched-registry refusal"
 pass "new-or-touched fails a new refusal site that maps to nothing"
 mutate "$NEWSITE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a brand new refusal"}]'
 "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
