@@ -15,8 +15,8 @@ A separate review or audit is allowed only when the captain explicitly requests 
 If fast-path risk needs more rigor, escalate whether to use no-mistakes instead of inventing a manual gate.
 The one exception is a Firstmate guard change on any path: for that change only, its required independent review overrides the manual-verdict hold and the separate-review limit above, including the "alone owns review" wording, as needed for that review; anti-stacking and every other rule above still apply.
 Its task brief links the [guard procedure](../../../docs/guard-spec.md#guard-procedure) and its [review checklist](../../../docs/review-rubric.md#guard-changes), and the change lands only after the matching independent PASS that the checklist defines.
-If the [automatic PR lane](../../../docs/configuration.md#automatic-review-and-merge-configreview-runner) cannot show that it will wait for that PASS, Main, which owns the [Firstmate landing order](../ship-landing/SKILL.md#firstmate-train-landing-order), keeps the guard PR in draft from first exposure until that PASS is recorded and its report passes Main's check.
-A guard PR with no safe draft route stops before exposure and goes to Main as a report.
+If the [automatic PR lane](../../../docs/configuration.md#automatic-review-and-merge-configreview-runner) cannot show it will wait for the PASS required by the review checklist, Main, which owns the [Firstmate landing order](../ship-landing/SKILL.md#firstmate-train-landing-order), keeps the guard PR in draft from first exposure until that PASS is recorded and its report has been verified.
+If a PR subject to that draft requirement cannot be opened as a draft, stop before opening it and report the limitation to Main.
 Local-only and other non-PR delivery are not newly prohibited; existing authority verifies the required PASS before authorized landing.
 The path's worker, automated gates, and captain approval remain authoritative:
 
