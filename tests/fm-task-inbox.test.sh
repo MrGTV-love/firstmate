@@ -827,25 +827,24 @@ signal_matrix_case() {  # <idempotent|plain> <work|probe|compare|stage> <TERM|IN
 # after it, so "finished" does not exist there; compare has no child, so
 # "writer with child blocked" does not exist there; the plain write has no
 # compare window.
-test_write_signals_leave_no_temp_and_no_lock_in_any_window() {
-  local fn window sig target trap_kind form n=0
-  for sig in TERM INT; do
-    for trap_kind in none existing; do
-      for form in direct cmdsub; do
-        for fn in idempotent plain; do
-          for window in work probe stage; do
-            for target in group writer; do
-              signal_matrix_case "$fn" "$window" "$sig" "$target" "$trap_kind" "$form"; n=$((n + 1))
-            done
-          done
-        done
-        for target in group finished; do
-          signal_matrix_case idempotent compare "$sig" "$target" "$trap_kind" "$form"; n=$((n + 1))
+# One slice of the matrix per call (a signal and a caller EXIT trap kind), so the
+# run prints a result line every 28 cells instead of one line after all 112,
+# which on a loaded host is minutes of silence that a watcher reads as a stall.
+test_write_signals_leave_no_temp_and_no_lock_in_any_window() {  # <TERM|INT> <none|existing>
+  local sig=$1 trap_kind=$2 fn window target form n=0
+  for form in direct cmdsub; do
+    for fn in idempotent plain; do
+      for window in work probe stage; do
+        for target in group writer; do
+          signal_matrix_case "$fn" "$window" "$sig" "$target" "$trap_kind" "$form"; n=$((n + 1))
         done
       done
     done
+    for target in group finished; do
+      signal_matrix_case idempotent compare "$sig" "$target" "$trap_kind" "$form"; n=$((n + 1))
+    done
   done
-  pass "inbox: TERM and INT to the writer, its process group or the writer alone leave no temp file, work directory or lock in any window ($n cells)"
+  pass "inbox: $sig to the writer, its process group or the writer alone leaves no temp file, work directory or lock in any window (caller EXIT trap: $trap_kind, $n cells)"
 }
 
 # One cell of the EXIT matrix: an exit inside the call (the body reader of the
@@ -1913,7 +1912,10 @@ test_idempotent_dedup_keeps_every_outcome_of_the_full_compare
 test_idempotent_dedup_reads_odd_records_like_the_full_compare
 test_idempotent_dedup_finds_records_behind_links
 test_idempotent_write_signal_cleans_up
-test_write_signals_leave_no_temp_and_no_lock_in_any_window
+test_write_signals_leave_no_temp_and_no_lock_in_any_window TERM none
+test_write_signals_leave_no_temp_and_no_lock_in_any_window TERM existing
+test_write_signals_leave_no_temp_and_no_lock_in_any_window INT none
+test_write_signals_leave_no_temp_and_no_lock_in_any_window INT existing
 test_write_keeps_caller_exit_trap_and_cleans_up_on_exit
 test_write_record_stays_owner_only
 test_work_directory_is_never_read_as_a_record
