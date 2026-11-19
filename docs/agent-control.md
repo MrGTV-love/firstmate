@@ -146,10 +146,13 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
    When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in that worktree and republishes the binding, subject to the backend policy in [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
    A relaunch of a governed task is not a new scope declaration: when the record names its slot manifest, the relaunch adopts that recorded manifest and never runs the project's provisioner (`fm_slot_adopt_check` in `bin/fm-slot-provision-lib.sh` owns the decision).
    The manifest must belong to this task's own copy, branch, base and scope, and the existing copy-custody owners must agree, or the relaunch refuses by name before the agent is stopped, with the manifest, record and copy unchanged.
+   `bin/fm-spawn.sh` checks the adoption again after the stop, the wiring rewrite and the record publish, just before it delivers the launch.
+   If that second check refuses, the wiring and the task record were already written by the relaunch, and the recorded manifest and scope are still unchanged.
    The task's own out-of-scope commits and uncommitted edits never block it, never change the recorded scope, and are printed as a labelled drift report by both `fm-control relaunch` and `fm-spawn --relaunch`.
    A pool slot that another task claims refuses the relaunch by name (`custody_slot_claim`), unless that task's own record places its copy strictly inside the slot; a relaunch checks no other peer claims beyond that.
    The residual: Vernant's push-time `owned_paths` gate stays the control for what the task may push.
    An adopted relaunch keeps a launch artifact the worker edited since its last launch (its settings or plugin) byte for byte beside the fresh wiring instead of deleting it.
+   Of the kept settings, only the worker's hook entries (not this task's own Firstmate hooks) and its allow, deny and ask lists reach the active settings file; no other key does, and the kept copy stays byte for byte at its kept path.
    A relaunch with no recorded manifest, a relocation to a replacement copy, and the recovery of a first provisioning that was refused keep the provisioning route, where `fm_slot_foresee_refusals` names a foreseeable refusal before the stop.
    A committed own out-of-scope change is refused as `scope_mismatch` naming every such path with the drift report, and a `manifest_exists` refusal names the collision file, so a cleared collision permits one new automatic attempt.
    `bin/fm-session-end-relaunch-lib.sh` owns why the automatic session-end relaunch does not retry a refusal whose cause is unchanged.
