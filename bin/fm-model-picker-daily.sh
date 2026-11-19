@@ -45,6 +45,9 @@
 # A key names its UTC day (run failures also name the exit), and state/.model-picker-daily.raised
 # remembers the keys already raised, so a repeat in one day raises nothing and the next day's
 # failure or staleness raises one more. A key is recorded only after its wake is queued.
+# A run or check that cannot reach its first step (the clock gives no epoch, Python 3 not on PATH,
+# the data root unresolved, freshness printing no state or day) exits 1 with one wake per condition
+# per UTC day, whichever verb meets it. Its key counts epoch days, or the word clock when the clock gave none.
 #
 # The data root is the collector's own (FM_MODEL_PICKER_DATA, else <data dir>/model-picker).
 # A failed run leaves it as it was. A promotion that stops for any reason, a killed promote
@@ -91,7 +94,6 @@ esac
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 
-command -v python3 >/dev/null 2>&1 || { printf 'error: Python 3 is required\n' >&2; exit 1; }
 daily() { PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 python3 -m fm_model_picker.daily "$@"; }
 
 RUN_LOCK="$STATE/.model-picker-daily.lock"
@@ -119,6 +121,21 @@ raise_once() {
   fm_lock_release "$RAISED.lock"
   return "$status"
 }
+
+NOW=$(now_epoch)
+case "$NOW" in ''|*[!0-9]*) EDAY=clock ;; *) EDAY=$((NOW / 86400)) ;; esac
+
+# early_failure <condition> <reason>: stop with exit 1 and raise one check wake for the condition,
+# once per epoch day and shared by both verbs.
+early_failure() {
+  printf 'error: %s\n' "$2" >&2
+  raise_once "model-picker-daily-setup:$EDAY:$1" \
+    "check: model-picker-daily: the runner ($MODE) exited 1 before it could finish: $2" || true
+  exit 1
+}
+
+case "$NOW" in ''|*[!0-9]*) early_failure clock 'the clock gave no epoch' ;; esac
+command -v python3 >/dev/null 2>&1 || early_failure python3 'Python 3 is not on PATH, so the runner cannot read or collect the snapshot'
 
 # one_line: keep every byte of one line except its newline and the control characters the one-row wake queue cannot carry; each of those becomes one space.
 one_line() { LC_ALL=C tr -d '\n' | LC_ALL=C tr '\000-\037\177' ' '; }
@@ -153,13 +170,11 @@ check_freshness() {  # <root> <now>
     missing)
       raise_once "model-picker-daily-stale:$day" \
         "check: model-picker-daily: the model-picker snapshot is missing: $reason; run bin/fm-model-picker-daily.sh and read $LAST_ERR" ;;
-    *) printf 'error: the freshness check gave no state\n' >&2; return 1 ;;
+    *) early_failure freshness 'the freshness check printed no state or day, so Python 3 could not read the snapshot' ;;
   esac
 }
 
-NOW=$(now_epoch)
-case "$NOW" in ''|*[!0-9]*) printf 'error: the clock gave no epoch\n' >&2; exit 1 ;; esac
-ROOT=$(daily root) || { printf 'error: cannot resolve the model-picker data root\n' >&2; exit 1; }
+ROOT=$(daily root 2>/dev/null) || early_failure root 'Python 3 could not resolve the model-picker data root'
 
 if [ "$MODE" = check ]; then
   check_freshness "$ROOT" "$NOW"
@@ -178,6 +193,7 @@ trap 'exit 143' HUP INT TERM
 daily reap "$ROOT" || true
 
 DAY=$(daily freshness "$ROOT" --now "$NOW" | sed -n 's/^day=//p')
+[ -n "$DAY" ] || early_failure freshness 'the freshness check printed no state or day, so Python 3 could not read the snapshot'
 WORD=$(daily recover "$ROOT" 2> "$LAST_ERR" | outcome)
 case "${WORD:-none}" in
   unchanged|completed|restored) ;;

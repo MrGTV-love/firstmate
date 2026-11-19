@@ -19,6 +19,7 @@
 # are preserved. The labels are com.firstmate.model-picker-daily.{run,check}.<decimal cksum of
 # resolved FM_HOME>. Reinstall boots each loaded agent out and replaces it, so there are only
 # ever two. --print renders one plist (--agent picks it, run by default) and changes nothing.
+# Without --print, --agent is refused with exit 2, because install always installs both agents.
 # FM_MODEL_PICKER_DATA and FM_DATA_OVERRIDE, when set where install runs, are written into both
 # agents' environment, because the collector resolves its data root from them and launchd gives
 # an agent no other environment.
@@ -101,14 +102,18 @@ install_one() {  # <agent>
 }
 
 cmd_install() {
-  local print_only=0 only=run agent
+  local print_only=0 only=run agent agent_given=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --print) print_only=1; shift ;;
-      --agent) [ "$#" -gt 1 ] || die "--agent needs run or check"; only=$2; shift 2 ;;
+      --agent) [ "$#" -gt 1 ] || die "--agent needs run or check"; only=$2; agent_given=1; shift 2 ;;
       *) usage >&2; exit 2 ;;
     esac
   done
+  if [ "$print_only" -eq 0 ] && [ "$agent_given" -eq 1 ]; then
+    printf 'error: --agent works only with --print; install always installs both agents\n' >&2
+    exit 2
+  fi
   case "$only" in run|check) ;; *) die "--agent takes run or check" ;; esac
   if [ "$print_only" -eq 1 ]; then
     render "$only"

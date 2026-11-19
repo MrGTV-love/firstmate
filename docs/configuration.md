@@ -1344,6 +1344,7 @@ All are queued with `fm_wake_append` and kind `check` from `bin/fm-wake-lib.sh`,
 | Verdict unpublished | The new snapshot is committed but its verdict rename failed twice (the runner exits 0; the next run finishes it) | The verdict read back from the file and the first stderr line |
 | Earlier promotion unsettled | At the start of a run, a promotion an earlier runner left cannot be settled (the runner collects nothing and exits 1) | The outcome, the verdict read back from the file, and the first stderr line |
 | Stale snapshot | The newest `observed_at` in `aa.sqlite` is older than 36 hours, or the snapshot is missing, empty, or unreadable | The age in hours, or why the snapshot is missing |
+| Could not start | `run` or `check` cannot reach its first step: the clock gives no epoch, Python 3 is not on `PATH`, the data root cannot be resolved, or the freshness check prints no state or day (the runner exits 1; one wake per condition per UTC day, whichever verb meets it) | The exit and the reason |
 
 A wake key names its UTC day, so a repeat in one day raises nothing and the next day's failure or staleness raises one more.
 The last run's output, and the verdict, reconcile report and newest `observed_at` of a failed run, are in `state/.model-picker-daily.last.*`; none of them is written into the live `aa.sqlite`.

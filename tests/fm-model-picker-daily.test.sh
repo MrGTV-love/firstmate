@@ -184,6 +184,22 @@ run_runner() {
 queued_wakes() { FM_HOME="$HOME_DIR" "$DRAIN" --queued; }
 wake_count() { queued_wakes | grep -c . || true; }
 
+# link_path_without_python <dir>: links every executable on this PATH except python3, so the runner
+# finds every tool it uses and no Python 3 interpreter.
+link_path_without_python() {
+  local dir entry name
+  local IFS=:
+  for dir in $PATH; do
+    [ -d "$dir" ] || continue
+    for entry in "$dir"/*; do
+      [ -f "$entry" ] && [ -x "$entry" ] || continue
+      name=${entry##*/}
+      [ "$name" = python3 ] && continue
+      [ -e "$1/$name" ] || ln -s "$entry" "$1/$name" 2>/dev/null || true
+    done
+  done
+}
+
 test_run_chains_budget_collector_and_promotes() {
   new_home chain
   local before_state
@@ -337,6 +353,54 @@ test_data_root_follows_the_collector_resolution() {
   run_runner check FM_MODEL_PICKER_DATA="$custom"
   assert_contains "$(queued_wakes)" "37.0 hours old" "FM_MODEL_PICKER_DATA selects the checked root"
   pass "daily check: the data root is the collector's own"
+}
+
+test_python3_absent_raises_one_wake_for_run_and_check() {
+  new_home nopython
+  local bin="$TMP_ROOT/nopython/bin" before
+  mkdir -p "$bin"
+  link_path_without_python "$bin"
+  assert_equals "" "$(env PATH="$bin" bash -c 'command -v python3' 2>/dev/null)" "the scratch PATH has no python3"
+  before=$(artifacts "$DATA_DIR")
+  run_runner run PATH="$bin"
+  expect_code 1 "$CODE" "run with python3 absent"
+  assert_contains "$(queued_wakes)" "the runner (run) exited 1 before it could finish: Python 3 is not on PATH" "the wake names the exit and the reason"
+  run_runner check PATH="$bin"
+  expect_code 1 "$CODE" "check with python3 absent"
+  run_runner run PATH="$bin"
+  assert_equals 1 "$(wake_count)" "one wake for the condition on the day, from run and check alike"
+  assert_equals "$before" "$(artifacts "$DATA_DIR")" "the last good snapshot is unchanged"
+  assert_absent "$HOME_DIR/state/.model-picker-daily.last.stderr" "an early exit writes no last-run state"
+  pass "daily runner: python3 absent from PATH raises one check wake a day"
+}
+
+test_unresolved_data_root_raises_one_wake() {
+  new_home noroot
+  local before
+  before=$(artifacts "$DATA_DIR")
+  run_runner run PYTHONHOME="$TMP_ROOT/noroot/no-python-home"
+  expect_code 1 "$CODE" "run with an unresolvable data root"
+  assert_contains "$(queued_wakes)" "the runner (run) exited 1 before it could finish: Python 3 could not resolve the model-picker data root" "the wake names the reason"
+  run_runner check PYTHONHOME="$TMP_ROOT/noroot/no-python-home"
+  expect_code 1 "$CODE" "check with an unresolvable data root"
+  run_runner run PYTHONHOME="$TMP_ROOT/noroot/no-python-home"
+  assert_equals 1 "$(wake_count)" "one wake for the condition on the day"
+  assert_equals "$before" "$(artifacts "$DATA_DIR")" "the last good snapshot is unchanged"
+  assert_absent "$HOME_DIR/state/.model-picker-daily.last.stderr" "an early exit writes no last-run state"
+  pass "daily runner: an unresolvable data root raises one check wake a day"
+}
+
+test_freshness_without_a_state_raises_one_wake() {
+  new_home nostate
+  NOW_AT=99999999999999999 run_runner check
+  expect_code 1 "$CODE" "check when the freshness check prints no state"
+  assert_contains "$(queued_wakes)" "the runner (check) exited 1 before it could finish: the freshness check printed no state or day" "the wake names the reason"
+  NOW_AT=99999999999999999 run_runner run
+  expect_code 1 "$CODE" "run when the freshness check prints no day"
+  NOW_AT=99999999999999999 run_runner check
+  assert_equals 1 "$(wake_count)" "one wake for the condition on the day, from run and check alike"
+  assert_absent "$HOME_DIR/state/.model-picker-daily.last.stderr" "an early exit writes no last-run state"
+  pass "daily runner: a freshness check with no state raises one check wake a day"
 }
 
 test_second_run_is_refused_while_one_is_under_way() {
@@ -796,6 +860,21 @@ test_installer_refuses_a_home_with_no_state() {
   pass "daily installer: a home with no state directory is refused"
 }
 
+test_installer_refuses_agent_without_print() {
+  setup_installer
+  run_install install --agent check
+  expect_code 2 "$CODE" "install --agent check without --print"
+  assert_equals "" "$(ls -A "$TMP_ROOT/inst/agents")" "nothing is written"
+  assert_equals "" "$(cat "$TMP_ROOT/inst/calls")" "launchctl is never called"
+  run_install install --agent run
+  expect_code 2 "$CODE" "install --agent run without --print"
+  assert_equals "" "$(cat "$TMP_ROOT/inst/calls")" "launchctl is still never called"
+  run_install install --print --agent check
+  expect_code 0 "$CODE" "install --print --agent check"
+  assert_contains "$OUT" "<string>check</string>" "print still renders the chosen agent"
+  pass "daily installer: --agent without --print is refused and installs nothing"
+}
+
 install_fakes
 fm_test_only
 test_run_chains_budget_collector_and_promotes
@@ -807,6 +886,9 @@ test_freshness_boundaries
 test_old_snapshot_that_exists_is_stale
 test_missing_snapshot_raises_one_wake
 test_data_root_follows_the_collector_resolution
+test_python3_absent_raises_one_wake_for_run_and_check
+test_unresolved_data_root_raises_one_wake
+test_freshness_without_a_state_raises_one_wake
 test_second_run_is_refused_while_one_is_under_way
 test_staging_cleanup_touches_only_owned_stages
 test_failed_promotion_restores_the_previous_snapshot
@@ -828,3 +910,4 @@ test_wake_keeps_the_outcome_with_a_long_path
 test_installer_print_names_runner_daily_interval_and_login
 test_installer_install_replace_status_uninstall
 test_installer_refuses_a_home_with_no_state
+test_installer_refuses_agent_without_print
