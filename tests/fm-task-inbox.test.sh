@@ -693,8 +693,9 @@ test_idempotent_write_signal_cleans_up() {
 
 # A shim for <tool> that stops when an argument matches <glob>: it runs the real
 # tool first when <run-first> is yes (so the allocation exists), records its own
-# pid and a marker, and then waits to be killed (exec, so the pid it recorded is
-# the sleeper itself and a signal reaches it directly).
+# pid (SLEEPER), the pid of the shell that started it (WRITER) and a marker
+# (STARTED), and then waits to be killed (exec, so the pid it recorded is the
+# sleeper itself and only a signal sent to that pid reaches it).
 make_blocking_shim() {  # <shim-dir> <tool> <arg-glob> <run-first: yes|no>
   local dir=$1 tool=$2 glob=$3 first=$4 real
   real=$(command -v "$tool") || fail "no real $tool to shim"
@@ -704,7 +705,7 @@ make_blocking_shim() {  # <shim-dir> <tool> <arg-glob> <run-first: yes|no>
 for a in "\$@"; do
   case "\$a" in $glob)
     [ "$first" != yes ] || "$real" "\$@" || exit \$?
-    echo \$\$ > "\$SLEEPER"; echo started > "\$STARTED"
+    echo \$\$ > "\$SLEEPER"; echo \$PPID > "\$WRITER"; echo started > "\$STARTED"
     exec /bin/sleep 3600 ;;
   esac
 done
@@ -713,75 +714,179 @@ SH
   chmod +x "$dir/$tool"
 }
 
-# One kill of a write blocked in <window>: the signal goes to the parent alone or
-# to its whole process group (the timed-command contract signals the group), and
-# afterwards the inbox holds no temp file, work directory or lock, the records
-# are unchanged, and the next enqueue lands.
-write_signal_case() {  # <idempotent|plain> <work|probe|compare|stage> <TERM|INT> <parent|group>
-  local fn=$1 window=$2 sig=$3 kind=$4 name dir state inbox started sleeper shims pid rc=0 leftovers next group=0 stub=''
-  name="$fn-$window-$sig-$kind"
-  dir="$TMP_ROOT/sigcase-$name"; state="$dir/state"; inbox="$state/t1.inbox"; mkdir -p "$state"
+# The compare window holds the writer itself in a builtin read, with no child
+# alive: the body reader is replaced by a function that records the writer's pid
+# (the process whose parent is the substitution's sh) and blocks on a FIFO
+# nothing ever opens for writing.
+write_compare_block_stub() {  # <stub-file>
+  cat > "$1" <<'SH'
+fm_task_inbox_body() {
+  printf '%s' "$(exec sh -c 'printf %s "$PPID"')" > "$WRITER"
+  echo started > "$STARTED"
+  IFS= read -r _ < "$FIFO"
+}
+SH
+}
+
+# Stop everything a matrix case started, then fail with the message.
+matrix_fail() {  # <writer-group-pid> <sleeper-file> <message>
+  kill -s KILL -- "-$1" 2>/dev/null || true
+  [ ! -s "$2" ] || kill -s KILL "$(cat "$2")" 2>/dev/null || true
+  fail "$3"
+}
+
+# One cell of the signal matrix: a write blocked in <window> receives <sig> as
+# directed by <target>, with the caller's EXIT trap <none|existing>, called
+# <direct>ly or in a command <cmdsub>. Targets: group (the writer's whole
+# process group), writer (the writer alone while its child stays blocked: the
+# child may end only because the writer reaps it), finished (the writer alone,
+# held in its own builtin with no child alive). Afterwards the inbox holds no
+# temp file, work directory or lock, the records are unchanged, the caller's
+# EXIT trap ran exactly once (or never, with none), the child is gone, and the
+# next enqueue lands at the default lock wait.
+signal_matrix_case() {  # <idempotent|plain> <work|probe|compare|stage> <TERM|INT> <group|writer|finished> <none|existing> <direct|cmdsub>
+  local fn=$1 window=$2 sig=$3 target=$4 trap_kind=$5 form=$6
+  local name dir state inbox shims stub pgid writer sleeper rc=0 leftovers next runs script launcher want
+  name="$fn-$window-$sig-$target-$trap_kind-$form"
+  dir="$TMP_ROOT/sigmx-$name"; state="$dir/state"; inbox="$state/t1.inbox"; rm -rf "$dir"; mkdir -p "$state" "$dir/shims"
   inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "$name: seed failed"
-  started="$dir/started"; sleeper="$dir/sleeper"; shims="$dir/shims"; mkdir -p "$shims"
-  # shellcheck disable=SC2016 # the compare stub is text the child evaluates, not expanded here
+  shims="$dir/shims"; stub=''
+  mkfifo "$dir/fifo"
   case "$window" in
     work) make_blocking_shim "$shims" mkdir '*/.work.*' yes ;;
     probe) make_blocking_shim "$shims" mktemp '*/.lock-probe.*' yes ;;
     stage) make_blocking_shim "$shims" mv '*/.staging.*' no ;;
-    compare) stub='fm_task_inbox_body() { sleep 60 & echo $! > "$SLEEPER"; echo started > "$STARTED"; wait $!; }' ;;
+    compare) stub="$dir/stub.sh"; write_compare_block_stub "$stub" ;;
   esac
-  [ "$kind" != group ] || group=1
-  # The text is new, so the plain and the idempotent write both reach staging.
-  # perl restores the default INT disposition (a background job starts with it
-  # ignored) and, for the group kind, makes the writer its own group leader.
-  FM_STATE_OVERRIDE="$state" STARTED="$started" SLEEPER="$sleeper" GROUP="$group" PATH="$shims:$PATH" \
-    perl -MPOSIX -e 'POSIX::setsid() if $ENV{GROUP}; $SIG{INT} = "DEFAULT"; exec @ARGV' bash -c '
-      . "$1"
-      eval "$3"
-      if [ "$4" = idempotent ]; then fm_task_inbox_write_idempotent "$2" t1 "new steer"; else fm_task_inbox_write "$2" t1 "new steer"; fi
-    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$stub" "$fn" >/dev/null 2>&1 &
-  pid=$!
-  for _ in $(seq 1 150); do [ -s "$started" ] && break; sleep 0.1; done
-  [ -s "$started" ] || { kill "$pid" 2>/dev/null; fail "$name: the writer never reached the $window window"; }
-  if [ "$group" = 1 ]; then kill -s "$sig" -- "-$pid" || fail "$name: could not signal the group"
-  else kill -s "$sig" "$pid" || fail "$name: could not signal the writer"; fi
-  # A parent waiting on a foreground child runs its trap when the child ends.
-  # Bash drops an INT sent to the parent alone unless the child dies of INT
-  # too, so the blocked child gets the same signal (what Ctrl-C does).
-  [ "$group" = 1 ] || { sleep 0.3; kill -s "$sig" "$(cat "$sleeper")" 2>/dev/null || true; }
-  for _ in $(seq 1 150); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
-  if kill -0 "$pid" 2>/dev/null; then kill -s KILL "$pid"; kill "$(cat "$sleeper")" 2>/dev/null || true; fail "$name: the writer was still alive 15 s after $sig"; fi
-  wait "$pid" || rc=$?
-  kill "$(cat "$sleeper")" 2>/dev/null || true
-  [ "$rc" -ge 128 ] || fail "$name: the signalled writer should die by the signal, exit $rc"
-  leftovers=$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' -o -name '.lock-probe.*' \) | wc -l | tr -d ' ')
+  # shellcheck disable=SC2016 # the script is text the writer's shell evaluates
+  script='
+    echo $$ > "$PGIDFILE"
+    . "$1"
+    [ -z "$STUB" ] || . "$STUB"
+    [ "$TRAP" != existing ] || trap '"'"'echo ran >> "$CALLER_LOG"'"'"' EXIT
+    call() { if [ "$FN" = idempotent ]; then fm_task_inbox_write_idempotent "$2" t1 "new steer"; else fm_task_inbox_write "$2" t1 "new steer"; fi; }
+    if [ "$FORM" = direct ]; then call "$@"; else out=$(call "$@"); fi'
+  # The writer is its own session and group leader, so the group kind reaches
+  # exactly it and its children. perl restores the default INT disposition (a
+  # background job starts with it ignored). The writer's own status is recorded
+  # by the shell that started it, because a status read back with wait can come
+  # from another job when the host reuses a process id.
+  (
+    FM_STATE_OVERRIDE="$state" STARTED="$dir/started" SLEEPER="$dir/sleeper" WRITER="$dir/writer" FIFO="$dir/fifo" \
+      STUB="$stub" TRAP="$trap_kind" FN="$fn" FORM="$form" CALLER_LOG="$dir/caller-log" PGIDFILE="$dir/pgid" PATH="$shims:$PATH" \
+      perl -MPOSIX -e 'POSIX::setsid(); $SIG{INT} = "DEFAULT"; exec @ARGV' bash -c "$script" _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" >"$dir/out" 2>"$dir/err"
+    echo $? > "$dir/rc"
+  ) 2>/dev/null &
+  launcher=$!
+  for _ in $(seq 1 150); do [ -s "$dir/started" ] && break; sleep 0.1; done
+  pgid=$(cat "$dir/pgid" 2>/dev/null || echo 0)
+  [ -s "$dir/started" ] || matrix_fail "$pgid" "$dir/sleeper" "$name: the writer never reached the $window window"
+  writer=$(cat "$dir/writer"); sleeper=$dir/sleeper
+  kill -0 "$writer" 2>/dev/null || matrix_fail "$pgid" "$sleeper" "$name: the writer was not alive in the window"
+  if [ "$window" = compare ]; then
+    [ ! -e "$sleeper" ] || matrix_fail "$pgid" "$sleeper" "$name: a child is alive in the compare window"
+  else
+    kill -0 "$(cat "$sleeper")" 2>/dev/null || matrix_fail "$pgid" "$sleeper" "$name: the blocked child is not alive"
+  fi
+  case "$target" in
+    group) kill -s "$sig" -- "-$pgid" || matrix_fail "$pgid" "$sleeper" "$name: could not signal the group" ;;
+    *) kill -s "$sig" "$writer" || matrix_fail "$pgid" "$sleeper" "$name: could not signal the writer" ;;
+  esac
+  for _ in $(seq 1 150); do kill -0 "$writer" 2>/dev/null || break; sleep 0.1; done
+  ! kill -0 "$writer" 2>/dev/null || matrix_fail "$pgid" "$sleeper" "$name: the writer was still alive 15 s after $sig"
+  for _ in $(seq 1 150); do [ -s "$dir/rc" ] && break; sleep 0.1; done
+  [ -s "$dir/rc" ] || matrix_fail "$pgid" "$sleeper" "$name: the writer's shell was still alive 15 s after $sig"
+  wait "$launcher" 2>/dev/null || true
+  rc=$(cat "$dir/rc")
+  # Only a direct call makes the started shell the writer. With a substitution
+  # the shell above it may finish before it sees a group signal, so its own
+  # status says nothing: the writer's death is what the checks above proved.
+  if [ "$form" = direct ]; then
+    [ "$rc" -ge 128 ] || fail "$name: the signalled writer should die by the signal, exit $rc, stdout '$(cat "$dir/out")', stderr '$(cat "$dir/err")'"
+  fi
+  [ ! -s "$sleeper" ] || ! kill -0 "$(cat "$sleeper")" 2>/dev/null || matrix_fail "$pgid" "$sleeper" "$name: the blocked child outlived the writer"
+  leftovers=$(find "$inbox" -mindepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' -o -name '.lock-probe*' \) | wc -l | tr -d ' ')
   [ "$leftovers" = 0 ] || fail "$name: left $leftovers temp file(s) or work directories: $(ls -A "$inbox")"
   [ ! -e "$inbox/.seq.lock" ] && [ ! -L "$inbox/.seq.lock" ] || fail "$name: left the inbox lock held"
   [ "$(find "$inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')" = 1 ] || fail "$name: changed the record set"
+  runs=0; [ ! -s "$dir/caller-log" ] || runs=$(wc -l < "$dir/caller-log" | tr -d ' ')
+  if [ "$trap_kind" = existing ]; then want=1; else want=0; fi
+  [ "$runs" = "$want" ] || fail "$name: the caller's EXIT trap ran $runs time(s), not $want"
   next=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 'steer two') || fail "$name: the steer after it failed"
   [ "$next" = "$inbox/002.msg" ] || fail "$name: the steer after it did not land as 002: $next"
+  [ -z "${MATRIX_LOG:-}" ] || printf 'signal|%s|ok\n' "$name" >> "$MATRIX_LOG"
 }
 
+# The finite matrix. Applicable cells, for both writes: signal {TERM, INT} x
+# caller EXIT trap {none, existing} x call {direct, command substitution} x
+# (work, probe, stage with target group or writer; for the idempotent write
+# also compare with target group or finished). The inapplicable cells, each by
+# construction: work, probe and stage have a child and no holdable writer step
+# after it, so "finished" does not exist there; compare has no child, so
+# "writer with child blocked" does not exist there; the plain write has no
+# compare window.
 test_write_signals_leave_no_temp_and_no_lock_in_any_window() {
-  local fn window sig kind n=0 windows
-  for fn in idempotent plain; do
-    windows='work probe stage'; [ "$fn" != idempotent ] || windows='work probe compare stage'
-    for window in $windows; do
-      for sig in TERM INT; do
-        for kind in parent group; do
-          write_signal_case "$fn" "$window" "$sig" "$kind"
-          n=$((n + 1))
+  local fn window sig target trap_kind form n=0
+  for sig in TERM INT; do
+    for trap_kind in none existing; do
+      for form in direct cmdsub; do
+        for fn in idempotent plain; do
+          for window in work probe stage; do
+            for target in group writer; do
+              signal_matrix_case "$fn" "$window" "$sig" "$target" "$trap_kind" "$form"; n=$((n + 1))
+            done
+          done
+        done
+        for target in group finished; do
+          signal_matrix_case idempotent compare "$sig" "$target" "$trap_kind" "$form"; n=$((n + 1))
         done
       done
     done
   done
-  pass "inbox: TERM and INT to the writer or its process group leave no temp file, work directory or lock in any window ($n cases)"
+  pass "inbox: TERM and INT to the writer, its process group or the writer alone leave no temp file, work directory or lock in any window ($n cells)"
 }
 
-# A caller's own EXIT trap is neither replaced nor run twice, in the shell or
-# in a command substitution; with none, an exit inside the call still cleans up.
+# One cell of the EXIT matrix: an exit inside the call (the body reader of the
+# idempotent write, or the lock acquisition of the plain write, calls exit 3) with the caller's EXIT trap <none|existing>,
+# called <direct>ly or in a command <cmdsub>. The call's status survives, the
+# work directory and lock are gone, the caller's trap ran exactly once (or never),
+# and the next enqueue lands.
+exit_matrix_case() {  # <idempotent|plain> <none|existing> <direct|cmdsub>
+  local fn=$1 trap_kind=$2 form=$3 name dir state inbox rc=0 runs want next script
+  name="exit-$fn-$trap_kind-$form"
+  dir="$TMP_ROOT/exitmx-$name"; state="$dir/state"; inbox="$state/t1.inbox"; rm -rf "$dir"; mkdir -p "$state"
+  inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "$name: seed failed"
+  # shellcheck disable=SC2016 # the script is text the writer's shell evaluates
+  script='
+    . "$1"
+    if [ "$FN" = idempotent ]; then fm_task_inbox_body() { exit 3; }; else fm_task_inbox_lock_acquire() { exit 3; }; fi
+    [ "$TRAP" != existing ] || trap '"'"'echo ran >> "$CALLER_LOG"'"'"' EXIT
+    call() { if [ "$FN" = idempotent ]; then fm_task_inbox_write_idempotent "$2" t1 "new steer"; else fm_task_inbox_write "$2" t1 "new steer"; fi; }
+    if [ "$FORM" = direct ]; then call "$@"; else out=$(call "$@"); echo "inner=$?" > "$RESULT"; fi'
+  FM_STATE_OVERRIDE="$state" TRAP="$trap_kind" FN="$fn" FORM="$form" CALLER_LOG="$dir/caller-log" RESULT="$dir/result" \
+    bash -c "$script" _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" >/dev/null 2>&1 || rc=$?
+  if [ "$form" = direct ]; then
+    [ "$rc" = 3 ] || fail "$name: an exit inside the call should keep its status, got $rc"
+  else
+    [ "$(cat "$dir/result" 2>/dev/null)" = inner=3 ] || fail "$name: the substitution should end with the call's status 3: $(cat "$dir/result" 2>/dev/null)"
+  fi
+  [ -z "$(find "$inbox" -mindepth 1 \( -name '.work.*' -o -name '.dedup.*' -o -name '.staging.*' -o -name '.lock-probe*' \))" ] \
+    || fail "$name: an exit inside the call left a work directory: $(ls -A "$inbox")"
+  [ ! -e "$inbox/.seq.lock" ] && [ ! -L "$inbox/.seq.lock" ] || fail "$name: an exit inside the call left the inbox lock held"
+  runs=0; [ ! -s "$dir/caller-log" ] || runs=$(wc -l < "$dir/caller-log" | tr -d ' ')
+  if [ "$trap_kind" = existing ]; then want=1; else want=0; fi
+  [ "$runs" = "$want" ] || fail "$name: the caller's EXIT trap ran $runs time(s), not $want"
+  next=$(inbox_lib "$state" fm_task_inbox_write_idempotent "$state" t1 'steer two') || fail "$name: the steer after it failed"
+  [ "$next" = "$inbox/002.msg" ] || fail "$name: the steer after it did not land as 002: $next"
+  [ -z "${MATRIX_LOG:-}" ] || printf 'exit|%s|ok\n' "$name" >> "$MATRIX_LOG"
+}
+
+# A caller's own EXIT trap is neither replaced nor run twice by a normal call,
+# in the shell or in a command substitution; an exit inside a call cleans up in
+# each combination of trap and call form (the existing-trap case with an exit
+# inside the call is the one combined fault).
 test_write_keeps_caller_exit_trap_and_cleans_up_on_exit() {
-  local state out rc=0
+  local state out fn trap_kind form n=0
   state="$TMP_ROOT/exit-trap/state"; mkdir -p "$state"
   out=$(FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
@@ -791,18 +896,14 @@ test_write_keeps_caller_exit_trap_and_cleans_up_on_exit() {
     [ "$(trap -p EXIT)" = "trap -- '"'"'echo caller-exit'"'"' EXIT" ] || echo changed
   ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state") || fail "exit-trap probe failed"
   [ "$out" = caller-exit ] || fail "the caller's EXIT trap was changed or ran more than once: $out"
-  state="$TMP_ROOT/exit-inside/state"; mkdir -p "$state"
-  inbox_lib "$state" fm_task_inbox_write "$state" t1 'steer one' >/dev/null || fail "seed failed"
-  FM_STATE_OVERRIDE="$state" bash -c '
-    . "$1"
-    fm_task_inbox_body() { exit 3; }
-    fm_task_inbox_write_idempotent "$2" t1 "steer one"
-  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" >/dev/null 2>&1 || rc=$?
-  [ "$rc" = 3 ] || fail "an exit inside the call should keep its status, got $rc"
-  [ -z "$(find "$state/t1.inbox" -maxdepth 1 \( -name '.work.*' -o -name '.dedup.*' -o -name '.staging.*' \))" ] \
-    || fail "an exit inside the call left a work directory: $(ls -A "$state/t1.inbox")"
-  [ ! -e "$state/t1.inbox/.seq.lock" ] || fail "an exit inside the call left the inbox lock held"
-  pass "inbox: the caller's EXIT trap is untouched, and an exit inside a write cleans up"
+  for fn in idempotent plain; do
+    for trap_kind in none existing; do
+      for form in direct cmdsub; do
+        exit_matrix_case "$fn" "$trap_kind" "$form"; n=$((n + 1))
+      done
+    done
+  done
+  pass "inbox: the caller's EXIT trap is untouched by a normal call, and an exit inside a write cleans up and runs it exactly once ($n cells)"
 }
 
 # A work directory (or one stranded by a SIGKILL) is never read as a record:

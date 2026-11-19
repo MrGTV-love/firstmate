@@ -197,10 +197,13 @@ fm_task_inbox_next_seq() {  # <inbox-dir>
 
 fm_task_inbox_lock_acquire() {  # <lock-path> [probe-dir]
   local lock=$1 wait=${FM_TASK_INBOX_LOCK_WAIT_SECS:-$FM_TASK_INBOX_LOCK_WAIT_DEFAULT}
-  local deadline probe
+  local deadline probe_dir=${2:-${lock%/*}}
   case "$wait" in ''|*[!0-9]*) wait=$FM_TASK_INBOX_LOCK_WAIT_DEFAULT ;; esac
-  probe=$(mktemp "${2:-${lock%/*}}/.lock-probe.XXXXXX") || return 1
-  rm -f "$probe" || return 1
+  # The probe proves the directory takes a new file. It runs as a waited
+  # background child (_fm_task_inbox_run) and is removed by pattern, so no
+  # command substitution holds the shell while a signal waits.
+  _fm_task_inbox_run mktemp "$probe_dir/.lock-probe.XXXXXX" >/dev/null || return 1
+  _fm_task_inbox_run rm -f "$probe_dir"/.lock-probe.?????? || return 1
   if [ ! -e "$lock" ] && [ ! -L "$lock" ]; then
     fm_lock_try_create "$lock" && return 0
   fi
@@ -215,58 +218,134 @@ fm_task_inbox_lock_acquire() {  # <lock-path> [probe-dir]
 # inside the inbox, so a TERM, INT or exit during the write has one thing to
 # clean up. The name is fixed before any process that a signal could kill
 # half-way through creating it runs, and ONE trap (TERM, INT and EXIT) removes
-# the directory and frees the lock. A signal the caller ignores stays ignored,
-# the caller's own TERM and INT traps come back on every exit, and a caller that
-# already has an EXIT trap keeps it untouched (a command substitution reports
-# its parent's EXIT trap without owning it, so putting that one back would run
-# it twice). The state lives in globals, not function locals: bash drops a
+# the directory and frees the lock. Bash runs a trap only after the foreground
+# command it is waiting for ends, so every external command in the write runs
+# through _fm_task_inbox_run as a background child that is waited for: a
+# signal sent to this shell alone then runs the trap at once, and the trap
+# kills and reaps that child before it cleans up. A signal the caller ignores
+# stays ignored and the caller's own TERM and INT traps come back on every
+# exit. The EXIT trap is always ours while the write runs. In the shell that
+# owns the caller's EXIT trap, our trap runs that trap's command exactly once
+# if the shell exits inside the call, and a normal return puts the trap back.
+# A command substitution reports its parent's EXIT trap without owning it, so
+# there our trap runs alone and a normal return clears it: running the parent's
+# trap in the substitution would run it twice (an EXIT trap a substitution set
+# for itself before the call cannot be told from the inherited one and is not
+# kept). The state lives in globals, not function locals: bash drops a
 # function's locals before it runs the EXIT trap of an exit inside the call.
-# One write is in flight per shell at a time.
+# One write is in flight per shell at a time. SIGKILL cannot be trapped; no
+# sweep of a stranded work directory exists or is added.
 _fm_task_inbox_scope_enter() {  # <inbox-dir> <lock-path>
-  _fm_task_inbox_aborted=''
-  _fm_task_inbox_lock=$2
+  local inbox=$1 lock=$2 pid
+  _fm_task_inbox_aborted='' _fm_task_inbox_child='' _fm_task_inbox_launching='' _fm_task_inbox_pending='' _fm_task_inbox_rec=''
+  _fm_task_inbox_lock=$lock _fm_task_inbox_exit_body='' _fm_task_inbox_owns_exit=''
   _fm_task_inbox_prev_term=$(trap -p TERM) _fm_task_inbox_prev_int=$(trap -p INT)
   _fm_task_inbox_prev_exit=$(trap -p EXIT)
-  _fm_task_inbox_work="$1/.work.$$.$RANDOM$RANDOM"
-  case "$_fm_task_inbox_prev_term" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_scope_abort TERM' TERM ;; esac
-  case "$_fm_task_inbox_prev_int" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_scope_abort INT' INT ;; esac
-  [ -n "$_fm_task_inbox_prev_exit" ] || trap '_fm_task_inbox_scope_abort EXIT' EXIT
-  mkdir -m 700 "$_fm_task_inbox_work"
+  _fm_task_inbox_work="$inbox/.work.$$.$RANDOM$RANDOM"
+  if [ -n "$_fm_task_inbox_prev_exit" ]; then
+    fm_current_pid pid || pid=$$
+    if [ "$pid" = "$$" ]; then
+      _fm_task_inbox_owns_exit=1
+      # trap -p prints: trap -- '<command>' EXIT
+      eval "set -- $_fm_task_inbox_prev_exit"
+      _fm_task_inbox_exit_body=$3
+    fi
+  fi
+  case "$_fm_task_inbox_prev_term" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_scope_signal TERM' TERM ;; esac
+  case "$_fm_task_inbox_prev_int" in "trap -- '' "*) ;; *) trap '_fm_task_inbox_scope_signal INT' INT ;; esac
+  trap '_fm_task_inbox_scope_abort EXIT' EXIT
+  _fm_task_inbox_run mkdir -m 700 "$_fm_task_inbox_work"
+}
+
+# Run one external command as a background child and wait for it. A signal
+# that reaches this shell while it waits runs the scope's trap at once, which
+# kills and reaps the child. A signal in the instant between starting the
+# child and recording its pid is held (_fm_task_inbox_pending) and acted on
+# right after, so the child is never left running unknown. Fails when the
+# command fails or the write was aborted. Standard input is not passed on (a
+# background command in a script reads /dev/null), and the commands run here
+# read none.
+_fm_task_inbox_run() {  # <command...>
+  local pid rc=0 sig
+  _fm_task_inbox_launching=1
+  "$@" &
+  pid=$!
+  _fm_task_inbox_child=$pid _fm_task_inbox_launching=''
+  if [ -n "${_fm_task_inbox_pending:-}" ]; then
+    sig=$_fm_task_inbox_pending _fm_task_inbox_pending=''
+    _fm_task_inbox_scope_abort "$sig"
+  fi
+  [ -z "${_fm_task_inbox_aborted:-}" ] || kill -s KILL "$pid" 2>/dev/null
+  { wait "$pid"; } 2>/dev/null || rc=$?
+  _fm_task_inbox_child=''
+  [ -z "${_fm_task_inbox_aborted:-}" ] || return 1
+  return "$rc"
+}
+
+# Kill and reap the child a signal found in flight.
+_fm_task_inbox_scope_reap() {
+  local pid=${_fm_task_inbox_child:-}
+  [ -n "$pid" ] || return 0
+  kill -s KILL "$pid" 2>/dev/null
+  { wait "$pid"; } 2>/dev/null || true
+  _fm_task_inbox_child=''
 }
 
 # Free the lock first (it is the shared resource), then drop the directory.
 _fm_task_inbox_scope_cleanup() {
-  [ -z "$_fm_task_inbox_lock" ] || fm_lock_release "$_fm_task_inbox_lock"
-  case "$_fm_task_inbox_work" in */.work.*) rm -rf "$_fm_task_inbox_work" 2>/dev/null || true ;; esac
+  [ -z "${_fm_task_inbox_lock:-}" ] || fm_lock_release "$_fm_task_inbox_lock"
+  case "${_fm_task_inbox_work:-}" in */.work.*) rm -rf "$_fm_task_inbox_work" 2>/dev/null || true ;; esac
 }
 
 _fm_task_inbox_scope_leave() {
   _fm_task_inbox_scope_cleanup
-  _fm_task_inbox_scope_restore
+  _fm_task_inbox_scope_restore signals exit
   _fm_task_inbox_lock='' _fm_task_inbox_work=''
 }
 
-_fm_task_inbox_scope_restore() {
+# Hand the caller's traps back: always TERM and INT, and the EXIT trap too
+# unless this runs inside that trap.
+_fm_task_inbox_scope_restore() {  # signals [exit]
   eval "${_fm_task_inbox_prev_term:-trap - TERM}"
   eval "${_fm_task_inbox_prev_int:-trap - INT}"
-  [ -n "$_fm_task_inbox_prev_exit" ] || trap - EXIT
+  [ "${2:-}" = exit ] || return 0
+  if [ -n "$_fm_task_inbox_owns_exit" ]; then eval "$_fm_task_inbox_prev_exit"; else trap - EXIT; fi
 }
 
-# The one trap. Clean up, hand the traps back to whoever owned them, then
-# deliver the signal. A caller trap that survives the signal finds the write
-# refusing to publish.
+# The TERM and INT trap. A signal that lands while a child is being started
+# is held for the runner, which acts on it once it knows the child.
+_fm_task_inbox_scope_signal() {  # <TERM|INT>
+  if [ -n "$_fm_task_inbox_launching" ]; then
+    _fm_task_inbox_pending=$1
+    return 0
+  fi
+  _fm_task_inbox_scope_abort "$1"
+}
+
+# The one cleanup. Reap the child in flight, clean up, hand the traps back to
+# whoever owned them, then deliver the signal (a caller trap that survives it
+# finds the write refusing to publish) or, on an exit inside the call, run the
+# caller's EXIT trap command once.
 _fm_task_inbox_scope_abort() {  # <TERM|INT|EXIT>
   local sig=$1 pid
+  _fm_task_inbox_scope_reap
   _fm_task_inbox_scope_cleanup
   _fm_task_inbox_aborted=$sig
-  _fm_task_inbox_scope_restore
-  [ "$sig" = EXIT ] || { fm_current_pid pid && kill -s "$sig" "$pid"; }
+  if [ "$sig" = EXIT ]; then
+    _fm_task_inbox_scope_restore signals
+    [ -z "$_fm_task_inbox_exit_body" ] || eval "$_fm_task_inbox_exit_body"
+  else
+    _fm_task_inbox_scope_restore signals exit
+    fm_current_pid pid && kill -s "$sig" "$pid"
+  fi
   return 0
 }
 
 # Write one record into the next sequence slot: stage it in the call's work
-# directory, then atomic rename (same filesystem). Prints the record path.
-# Caller must hold .seq.lock and be inside _fm_task_inbox_scope_enter.
+# directory, then atomic rename (same filesystem). Sets _fm_task_inbox_rec to
+# the record path; it is called directly, never in a command substitution,
+# because a substitution is a foreground child that would hold a signal until
+# it ends. Caller must hold .seq.lock and be inside _fm_task_inbox_scope_enter.
 _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
   local dir=$1 text=$2 delivery_mode=${3:-} seq tmp rec status=0
   seq=$(fm_task_inbox_next_seq "$dir")
@@ -280,10 +359,10 @@ _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
     printf '%s' "$text"
   } > "$tmp" || status=1
   # a record has always been owner-only
-  if [ "$status" -ne 0 ] || ! chmod 600 "$tmp" || ! mv "$tmp" "$rec"; then
+  if [ "$status" -ne 0 ] || ! _fm_task_inbox_run chmod 600 "$tmp" || ! _fm_task_inbox_run mv "$tmp" "$rec"; then
     return 1
   fi
-  printf '%s' "$rec"
+  _fm_task_inbox_rec=$rec
 }
 
 # Durably enqueue one steer: stage, then atomic rename into the next sequence
@@ -298,7 +377,8 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
     _fm_task_inbox_scope_leave
     return 1
   fi
-  rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
+  _fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode" || status=1
+  rec=$_fm_task_inbox_rec
   [ -z "$_fm_task_inbox_aborted" ] || status=1
   _fm_task_inbox_scope_leave
   [ "$status" -eq 0 ] || return 1
@@ -316,8 +396,9 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # secondmate request embeds a per-request correlation token in its body. The
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
-# The check launches a fixed number of processes however many records exist,
-# share the text's first line, or hold NUL bytes, and a TERM or INT during it
+# The check launches a fixed number of external processes however many records
+# exist, share the text's first line, or hold NUL bytes (the scan itself, and
+# the lock hold, still grow with the history), and a TERM or INT during it
 # leaves neither a temp file nor the lock behind.
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock have f rec='' got rc status=0
@@ -330,11 +411,15 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
     return 1
   fi
   # Every record is compared, with builtins only: the mode check and the body
-  # read launch no process, so the hold on the lock does not grow with the
-  # number of records, whatever they hold. A body with a NUL byte cannot equal
-  # the text (a shell argument holds none), so it is skipped as the byte
-  # compare would. Records are reached through the same globs as before, so a
-  # linked handled/ directory or record file is read like any other.
+  # read launch no process, so the number of external launches does not grow
+  # with the number of records, whatever they hold. The scan itself, and so the
+  # time the lock is held, still grows with the amount of history: only the cost
+  # of one record fell, not the number of records read. The lock stays held for
+  # the scan because the compare and the write must see one history, and a
+  # record landing between them would be a duplicate. A body with a NUL byte
+  # cannot equal the text (a shell argument holds none), so it is skipped as
+  # the byte compare would. Records are reached through the same globs as
+  # before, so a linked handled/ directory or record file is read like any other.
   have="$_fm_task_inbox_work/.dedup.body"
   for f in "$dir"/*.msg "$dir/handled"/*.msg; do
     if [ ! -e "$f" ]; then
@@ -375,7 +460,8 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
   if [ -n "$_fm_task_inbox_aborted" ]; then
     status=1
   elif [ -z "$rec" ]; then
-    rec=$(_fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode") || status=1
+    _fm_task_inbox_write_record_locked "$dir" "$text" "$delivery_mode" || status=1
+    rec=$_fm_task_inbox_rec
   fi
   _fm_task_inbox_scope_leave
   [ "$status" -eq 0 ] || return 1
