@@ -554,7 +554,9 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # Returns 0 when held, 1 otherwise.
 # The last state file read and its entries are kept in
 # FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES, so a scan
-# reads each pool's state once; a scan clears both before it starts.
+# reads each pool's state once; a scan clears both before it starts. A passed
+# fm_task_copy_pool_state_strict leaves there the rows of the document it
+# proved, so the next call for that file reads those rows and not the file.
 FM_TASK_COPY_SLOT_NAME=
 FM_TASK_COPY_SLOT_HOLDER=
 FM_TASK_COPY_SLOT_STATE=
@@ -707,7 +709,12 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 #     no exponent: the CLI calls 1.0 and 1e3 corrupt there); `seeded_paths` is an array of strings; a JSON null is not
 #     accepted for any of them (the CLI writes none);
 #   - no key, in a row or at the top, has a non-ASCII letter or spells one of these names in another case (the CLI's decoder
-#     matches names without regard to case).
+#     matches names without regard to case);
+#   - no string anywhere holds a \u escape of a lone UTF-16 surrogate (jq cannot read such a file at all).
+# On success it puts the rows of the document it proved, in fm_task_copy_pool_slot_held's own form, in that reader's cache
+# (FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES), so the next fm_task_copy_pool_slot_held for a slot of
+# this file classifies from the very bytes that were proved and reads no file; on failure it empties that cache. The file is
+# read once, through a descriptor opened without following a symlink, so the bytes proved are the regular file's.
 # These are the fields and forms the installed Treehouse (v3.1.7-fm.8759019) decodes, found by feeding the real CLI each
 # JSON type and literal form in each field (the table is recorded with the evidence of the task that added this function).
 # Where the CLI is more lenient (a null, a non-ASCII key, a repeated key with equal types, year 0000) the proof refuses.
@@ -715,10 +722,12 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 # python3.
 FM_TASK_COPY_STRICT_REASON=
 fm_task_copy_pool_state_strict() {  # <state-file>
-  local state=$1 why
+  local state=$1 out
   FM_TASK_COPY_STRICT_REASON=
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
   command -v python3 >/dev/null 2>&1 || { FM_TASK_COPY_STRICT_REASON="python3 is not installed"; return 1; }
-  if why=$(python3 -I - "$state" <<'PY'
+  if out=$(python3 -I - "$state" <<'PY'
 import datetime, json, os, re, stat, sys
 
 path = sys.argv[1]
@@ -730,7 +739,11 @@ def not_intact(why):
 try:
     if not stat.S_ISREG(os.lstat(path).st_mode):
         not_intact("is not a regular file (a symlink, a folder or a device)")
-    with open(path, "rb") as fh:
+    # The bytes proved are read through this one descriptor, so a file swapped in after the check above is never what is read.
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as fh:
+        if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+            not_intact("is not a regular file (a symlink, a folder or a device)")
         raw = fh.read()
 except OSError as err:
     not_intact("cannot be read (%s)" % err.strerror)
@@ -761,6 +774,21 @@ try:
     doc = json.loads(text, object_pairs_hook=once, parse_float=Fraction, parse_int=int, parse_constant=no_constant)
 except ValueError as err:
     not_intact("is not one JSON document read exactly (%s)" % err)
+
+# A \u escape of a lone surrogate decodes to a string that is not text; jq refuses the whole file for it.
+todo = [doc]
+while todo:
+    item = todo.pop()
+    if type(item) is dict:
+        todo.extend(item.keys())
+        todo.extend(item.values())
+    elif type(item) is list:
+        todo.extend(item)
+    elif type(item) is str:
+        try:
+            item.encode("utf-8")
+        except UnicodeEncodeError:
+            not_intact("holds a \\u escape of a lone UTF-16 surrogate, which is not text")
 
 TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?(Z|[+-]([0-9]{2}):([0-9]{2}))")
 
@@ -821,11 +849,28 @@ for n, row in enumerate(rows):
     for key, ok in ROW.items():
         if key in row and not ok(row[key]):
             not_intact("has row %d whose %s is not of the type or form the CLI reads" % (n, key))
+
+# The rows of the proved document, exactly as fm_task_copy_pool_slot_held's jq reading writes them (one line per row, each
+# field behind its one-letter prefix, escaped as jq's @tsv escapes: backslash, tab, line feed, carriage return).
+def tsv(text):
+    return text.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r")
+
+lines = []
+for row in rows:
+    lines.append("\t".join((
+        "L" + ("leased" if row.get("leased") is True else "unleased"),
+        "H" + tsv(row.get("lease_holder", "")),
+        "N" + tsv(row["name"]),
+        "P" + tsv(row["path"]),
+    )))
+sys.stdout.buffer.write("\n".join(lines).encode("utf-8"))
 PY
   ); then
+    FM_TASK_COPY_POOL_STATE_FILE=$state
+    FM_TASK_COPY_POOL_STATE_ENTRIES=$out
     return 0
   fi
-  FM_TASK_COPY_STRICT_REASON="Treehouse state $state ${why:-cannot be checked}"
+  FM_TASK_COPY_STRICT_REASON="Treehouse state $state ${out:-cannot be checked}"
   return 1
 }
 

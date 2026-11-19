@@ -3168,6 +3168,134 @@ test_a_failed_raw_index_checksum_fails_the_acceptance_assertion() {
   pass "a failed raw-index checksum fails own_digest and assert_untouched, with or without the index change"
 }
 
+# install_state_read_hook <slot>: a python3 on the spawn's PATH that counts in $CASE_DIR/state-reads each python3 run naming
+# <slot>'s pool state file as an argument (one reading of that file), and runs FM_TEST_STATE_READ_BEFORE and
+# FM_TEST_STATE_READ_AFTER as shell text, with that reading's number in $n, just before and just after it. Every other run is
+# the real python3, unchanged. It lets a case change the pool state between two of the spawn's own readings, as a treehouse
+# command run elsewhere can: Treehouse writes its state under its own lock, which the spawn does not hold.
+install_state_read_hook() {
+  local state real_py
+  state=$(pool_state_file "$1")
+  real_py=$(command -v python3) || fail "python3 is not installed"
+  echo 0 > "$CASE_DIR/state-reads"
+  cat > "$FAKEBIN_DIR/python3" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  [ "\$arg" = '$state' ] || continue
+  n=\$(( \$(cat '$CASE_DIR/state-reads') + 1 ))
+  echo "\$n" > '$CASE_DIR/state-reads'
+  [ -z "\${FM_TEST_STATE_READ_BEFORE:-}" ] || eval "\$FM_TEST_STATE_READ_BEFORE" </dev/null
+  rc=0
+  '$real_py' "\$@" || rc=\$?
+  [ -z "\${FM_TEST_STATE_READ_AFTER:-}" ] || eval "\$FM_TEST_STATE_READ_AFTER" </dev/null
+  exit "\$rc"
+done
+exec '$real_py' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/python3"
+}
+
+# write_state_change <name> <jq-filter>: a script $CASE_DIR/<name> that rewrites the pool state of REAL_SLOTS in place with
+# <jq-filter> ($slot is the first slot's path), as a hook runs it.
+write_state_change() {
+  local state
+  state=$(pool_state_file "${REAL_SLOTS[0]}")
+  cat > "$CASE_DIR/$1" <<SH
+#!/usr/bin/env bash
+jq --arg slot '${REAL_SLOTS[0]}' '$2' '$state' > '$CASE_DIR/$1.next' && cat '$CASE_DIR/$1.next' > '$state'
+SH
+  chmod +x "$CASE_DIR/$1"
+}
+
+# Main 2889 F1 (review r7): a pool state that the strict proof passed and that then fails it before the spawn's second
+# reading is refused before any claim: no pass-over, no second copy, no worker, whether the change stays, is undone at the
+# next get, or is in another copy's row. The spawn reads the state twice, so the change is seen at the second reading.
+test_a_state_that_fails_the_proof_after_the_first_reading_refuses_before_any_claim() {
+  local id out status variant state
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  for variant in number-holder number-holder-undone-at-the-next-get other-row-number-created-at; do
+    id="pool-state-race-$variant"
+    ID_FOR_STATE=$id
+    make_real_pool_case "state-race-$variant" "$id" 3
+    state=$(pool_state_file "${REAL_SLOTS[0]}")
+    if [ "$variant" != other-row-number-created-at ]; then
+      printf 'other holder work\n' >> "${REAL_SLOTS[0]}/README.md"
+      real_th lease --path "${REAL_SLOTS[0]}" --lease-holder other-task >/dev/null 2>&1 || fail "the real treehouse did not lease the first copy"
+    fi
+    cp "$state" "$CASE_DIR/valid-state.json"
+    # shellcheck disable=SC2016 # jq expands $slot, which write_state_change passes with --arg.
+    case "$variant" in
+      other-row-number-created-at) write_state_change change '(.worktrees[] | select(.path != $slot) | .created_at) = 123' ;;
+      *) write_state_change change '(.worktrees[] | select(.path == $slot) | .lease_holder) = 123' ;;
+    esac
+    install_state_read_hook "${REAL_SLOTS[0]}"
+    out=$(FM_TEST_STATE_READ_AFTER="[ \"\$n\" != 1 ] || '$CASE_DIR/change'" \
+      FM_TEST_AT_GET="$([ "$variant" != number-holder-undone-at-the-next-get ] || printf '%s' "[ \"\$n\" != 2 ] || cp '$CASE_DIR/valid-state.json' '$state'")" \
+      FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+    status=$?
+    [ "$(cat "$CASE_DIR/state-reads")" -ge 1 ] || fail "$variant: the spawn never read the pool state, so the change was never made"
+    assert_refused_before_any_claim "$out" "$status" "$variant" "${REAL_SLOTS[0]}"
+    assert_not_contains "$out" "holder: 123" "$variant: a holder the proof refuses was read as a lease"
+  done
+  pass "a state that fails the proof after the first reading - a number holder that stays or is undone at the next get, or a number created_at in another row - is refused before any claim"
+}
+
+# Main 2889 F1: the copy is classified from the rows of the document the proof read, never from another reading of the file.
+# A change made after the first reading and undone before the second is in neither proved document, so the copy is passed
+# over under the holder the proof read, and the changed holder is never recorded or reported.
+test_a_change_that_no_strict_reading_sees_never_classifies_the_copy() {
+  local id out status state
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  id='pool-state-unseen-change'
+  ID_FOR_STATE=$id
+  make_real_pool_case state-unseen-change "$id" 3
+  printf 'other holder work\n' >> "${REAL_SLOTS[0]}/README.md"
+  real_th lease --path "${REAL_SLOTS[0]}" --lease-holder other-task >/dev/null 2>&1 || fail "the real treehouse did not lease the first copy"
+  state=$(pool_state_file "${REAL_SLOTS[0]}")
+  cp "$state" "$CASE_DIR/valid-state.json"
+  # shellcheck disable=SC2016 # jq expands $slot, which write_state_change passes with --arg.
+  write_state_change change '(.worktrees[] | select(.path == $slot) | .lease_holder) = 123'
+  install_state_read_hook "${REAL_SLOTS[0]}"
+  out=$(FM_TEST_STATE_READ_AFTER="[ \"\$n\" != 1 ] || '$CASE_DIR/change'" \
+    FM_TEST_STATE_READ_BEFORE="[ \"\$n\" != 2 ] || cp '$CASE_DIR/valid-state.json' '$state'" \
+    FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$(cat "$CASE_DIR/state-reads")" -ge 2 ] || fail "the spawn read the pool state fewer than two times, so the change was never undone"
+  expect_code 0 "$status" "a copy whose proved state shows another holder's lease should be passed over and the next clean copy used"$'\n'"$out"
+  assert_contains "$out" "skipped: copy ${REAL_SLOTS[0]} already carries another holder's lease in the pool state (holder: other-task)" "the pass-over did not name the holder the proof read"
+  assert_not_contains "$out" "holder: 123" "a holder that no proved reading held was reported"
+  assert_grep "other-task" "$HOME_DIR/data/$id/skipped-copies.tsv" "the record did not name the holder the proof read"
+  ! grep -Fq "123" "$HOME_DIR/data/$id/skipped-copies.tsv" || fail "the record names a holder that no proved reading held: $(cat "$HOME_DIR/data/$id/skipped-copies.tsv")"
+  assert_grep "worktree=${REAL_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the next clean copy"
+  pass "a change made after the first proved reading and undone before the second never classifies the copy: it is passed over under the holder the proof read"
+}
+
+# The control for the second reading: Treehouse leasing ANOTHER copy between the two readings rewrites the file, but the
+# copy's own row, state and holder are the same in both proved documents, so the spawn goes on.
+test_a_valid_change_to_another_row_between_the_two_readings_does_not_refuse() {
+  local id out status state
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  id='pool-state-other-row-lease'
+  make_real_pool_case state-other-row-lease "$id" 3
+  printf 'other holder work\n' >> "${REAL_SLOTS[0]}/README.md"
+  real_th lease --path "${REAL_SLOTS[0]}" --lease-holder other-task >/dev/null 2>&1 || fail "the real treehouse did not lease the first copy"
+  state=$(pool_state_file "${REAL_SLOTS[0]}")
+  cat > "$CASE_DIR/lease-third" <<SH
+#!/usr/bin/env bash
+cd '$PROJECT_DIR' && TREEHOUSE_ROOT='$CASE_DIR/th-root' '$REAL_TREEHOUSE' lease --path '${REAL_SLOTS[2]}' --lease-holder concurrent-cli >/dev/null 2>&1
+SH
+  chmod +x "$CASE_DIR/lease-third"
+  install_state_read_hook "${REAL_SLOTS[0]}"
+  out=$(FM_TEST_STATE_READ_AFTER="[ \"\$n\" != 1 ] || '$CASE_DIR/lease-third'" \
+    FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$(jq -r --arg p "${REAL_SLOTS[2]}" '.worktrees[] | select(.path == $p) | .lease_holder // ""' "$state")" = concurrent-cli ] || fail "the third copy was not leased between the readings, so the control shows nothing"
+  expect_code 0 "$status" "a change to another copy's row between the two readings should not refuse"$'\n'"$out"
+  assert_contains "$out" "(holder: other-task)" "the first copy was not passed over under its holder"
+  assert_grep "worktree=${REAL_SLOTS[1]}" "$HOME_DIR/state/$id.meta" "the task was not recorded on the next clean copy"
+  pass "a valid lease of another copy between the two readings leaves the classification as it was and the spawn goes on"
+}
+
 test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn() {
   local id out status digest entry
   real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
@@ -3568,6 +3696,9 @@ test_the_acceptance_assertion_rejects_a_failed_git_read_with_changed_work
 test_the_acceptance_assertion_rejects_a_raw_index_change
 test_the_acceptance_assertion_rejects_a_write_that_restores_bytes_mode_and_mtime
 test_a_failed_raw_index_checksum_fails_the_acceptance_assertion
+test_a_state_that_fails_the_proof_after_the_first_reading_refuses_before_any_claim
+test_a_change_that_no_strict_reading_sees_never_classifies_the_copy
+test_a_valid_change_to_another_row_between_the_two_readings_does_not_refuse
 test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn
 test_a_pool_of_only_refused_copies_refuses_once_and_names_each
 test_a_refused_copy_handed_out_twice_does_not_loop

@@ -6459,16 +6459,20 @@ spawn_acquire_pool_slot() {
 #             a symlink or unreadable; a state that fails the strict proof in ANY row (fm_task_copy_pool_state_strict: one
 #             JSON document read exactly, every row's field types, nothing coerced); an escaped or relative path; no row for
 #             the copy; a row that is also another row by name or by physical identity (a differently spelled path or a
-#             symlink, whatever the names and holders, in either order); a conflicting entry; or a lease that is this task's
-#             own.
+#             symlink, whatever the names and holders, in either order); a conflicting entry; a lease that is this task's
+#             own; or a state that, read twice, does not give the copy the same row count, state, holder and name.
 # This is called for a copy the pool just handed this spawn, so it is a pool copy by construction; a pool-slot test that
-# fails therefore leaves it unknown unless the pool directory resolves and excludes it. The strict proof comes before any
-# row is read, so no lenient read of a row is ever what classifies a copy. Every physical alias and every duplicate name
-# counts (fm_task_copy_pool_slot_held counts them), so one row is never read out of several. No command's message is ever
-# the proof, and treehouse is not asked: its status command can rewrite state. The state is read under the Treehouse
-# project lock this spawn holds, so the strict proof and the row read see one file.
+# fails therefore leaves it unknown unless the pool directory resolves and excludes it. The copy is classified from the rows
+# of the very document the strict proof read (the proof leaves them in fm_task_copy_pool_slot_held's cache), so the file is
+# never read leniently for a classification. Every physical alias and every duplicate name counts
+# (fm_task_copy_pool_slot_held counts them), so one row is never read out of several. No command's message is ever the
+# proof, and treehouse is not asked: its status command can rewrite state. Treehouse writes its state under its own lock,
+# which this spawn does not hold (the Firstmate project lock does not stop a treehouse command run elsewhere), so the file
+# is proved and classified a second time, and the copy is classified only when both readings pass the proof and agree for
+# it; a state that changed for the copy, or became one the proof refuses, between the two readings is unknown. A change that
+# is made and undone entirely before one reading and after the other is seen by no read-only check.
 spawn_classify_copy() { # <path>
-  local real pool_dir
+  local real pool_dir state reading first_rows='' first_state='' first_holder='' first_name=''
   SPAWN_COPY_LEASE_STATE=unknown
   SPAWN_OTHER_LEASE_HOLDER=
   FM_TASK_COPY_SLOT_STATE=unknown
@@ -6492,16 +6496,28 @@ spawn_classify_copy() { # <path>
     fi
     return 0
   fi
-  # The whole state file first, exactly as written; no row of a file that fails it is read as a classification.
-  if ! fm_task_copy_pool_state_strict "${real%/*/*}/treehouse-state.json"; then
-    FM_TASK_COPY_SLOT_STATE=invalid
-    FM_TASK_COPY_SLOT_REASON="cannot be classified: $FM_TASK_COPY_STRICT_REASON"
-    return 0
-  fi
-  # The state is read again now: a scan earlier in this spawn may have cached an older reading.
-  FM_TASK_COPY_POOL_STATE_FILE=
-  FM_TASK_COPY_POOL_STATE_ENTRIES=
-  fm_task_copy_pool_slot_held "$real" || :
+  # Each reading proves the whole state file exactly as written and classifies the copy from the rows of that proved
+  # document; no row of a file that fails the proof is read as a classification.
+  state="${real%/*/*}/treehouse-state.json"
+  for reading in first second; do
+    if ! fm_task_copy_pool_state_strict "$state"; then
+      FM_TASK_COPY_SLOT_STATE=invalid
+      FM_TASK_COPY_SLOT_REASON="cannot be classified on the $reading reading of the pool state: $FM_TASK_COPY_STRICT_REASON"
+      return 0
+    fi
+    fm_task_copy_pool_slot_held "$real" || :
+    # No later reader in this spawn may take this reading's rows for a newer one.
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    if [ "$reading" = first ]; then
+      first_rows=$FM_TASK_COPY_SLOT_ROWS first_state=$FM_TASK_COPY_SLOT_STATE first_holder=$FM_TASK_COPY_SLOT_HOLDER first_name=$FM_TASK_COPY_SLOT_NAME
+    elif [ "$first_rows" != "$FM_TASK_COPY_SLOT_ROWS" ] || [ "$first_state" != "$FM_TASK_COPY_SLOT_STATE" ] ||
+      [ "$first_holder" != "$FM_TASK_COPY_SLOT_HOLDER" ] || [ "$first_name" != "$FM_TASK_COPY_SLOT_NAME" ]; then
+      FM_TASK_COPY_SLOT_REASON="changed between two readings of the pool state $state (first $first_rows row(s), state ${first_state:-none}, holder '${first_holder}'; then $FM_TASK_COPY_SLOT_ROWS row(s), state ${FM_TASK_COPY_SLOT_STATE:-none}, holder '${FM_TASK_COPY_SLOT_HOLDER}')"
+      FM_TASK_COPY_SLOT_STATE=changed
+      return 0
+    fi
+  done
   [ "$FM_TASK_COPY_SLOT_ROWS" = 1 ] || return 0
   case "$FM_TASK_COPY_SLOT_STATE" in
     unleased) SPAWN_COPY_LEASE_STATE=unleased ;;
