@@ -29,7 +29,15 @@ Do not close a captain-held task merely because the originating investigation co
 Holding the work item the question gates is safe for exactly that reason: cleanup keeps such a row open with the finished work's deliverable recorded and returns it to the queue, so it still reads as the captain's own call.
 Only `answer` with the captain's words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling may resolve it.
 
-A hold is only for a call that needs the captain's own words, and a secondmate home must say so when it files one with `--owner captain`.
+A new hold is only for a real authority boundary that needs the captain's own words, with a concrete action the fleet would take if the answer were no; otherwise Main decides and proceeds without a captain wait.
+`bin/fm-captain-hold.sh --help` owns the required boundary and if-no fields and the allowed boundary names.
+A boundary name is an assertion by the filing agent, not proof that the boundary applies.
+When the card carries a `Recommendation:`, also pass `--recommendation <exact-answer-text>`; the tool accepts a hold without it, but every filer whose card recommends an option is expected to supply it.
+Its value is the exact answer value that choosing the recommended option sends: the typed words for a typed answer, or for a keyed or Slack answer the option's answer value, never its number and never its display label, and never a paraphrase or the card's reasons.
+On a Slack card the answer value is the text in parentheses after the label, so `1. Approve the charge (approve)` gives `approve`: a tap or a typed `1` is converted to `approve` before intake.
+An answer equal to that value after trimming surrounding whitespace records the wait as a delay mistake; a value that does not match what the captain sends records nothing.
+For example: `bin/fm-captain-hold.sh hold T42 --reason $'Decision sought: approve the one-time API charge?\nRecommendation: approve, the batch cannot finish without it' --boundary spend --if-no 'skip the paid step and finish the batch without it' --recommendation approve`; its card option `1. Approve the charge (approve)` sends `approve`, so the value is `approve`, not `1` and not `Approve the charge`.
+A secondmate home must also say whose words it needs with `--owner captain`.
 A call the main firstmate owns is never held: the home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
 A captain-owned hold is released only by the captain's own words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling that names it.
 
@@ -38,6 +46,7 @@ When verified evidence establishes that all answers were already recorded elsewh
 A merge approval uses that existing release path because approval permits the merge to proceed; cleanup closes the work only after it lands and records what shipped.
 Closing a held row at merge approval instead records completion before landing, so the backlog claims completion before the work actually ships.
 When the answer changes what a task must build, follow `worker-steering`'s mid-task ask rule to preserve the captain's words in the brief and steer the worker.
+An unresolved hold, including one filed before boundary fields existed, may be re-held without new boundary fields and retains any fields it already carries.
 When the captain says "later", that is an answer too: re-hold with `bin/fm-captain-hold.sh hold <id> --reason "<reason>" --until <date>` (adding `--owner captain` in a secondmate home) so the item leaves the live Captain's Call and resurfaces on its date, instead of leaving a live-looking card or fabricating a closure.
 "A keyed answer resolves its matching captain-held task" is one capability with one owner, `bin/fm-captain-hold.sh answers`, and every channel that carries a captain answer feeds it the same task id and answer; a channel never maps keys to tasks, records a decision, or resolves anything itself.
 Chat already feeds it through `bin/fm-send.sh --resolve-key`, and a captured-answer source feeds it once bound with `bin/fm-captain-hold.sh bind <source-id>`; bind before arming the source, and key each structured question by the held task's id.
