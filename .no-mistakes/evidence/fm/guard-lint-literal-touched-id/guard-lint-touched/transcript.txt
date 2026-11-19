@@ -1,0 +1,593 @@
+### S1 literal id: edit valid 1 while untouched 01 is bad
+==================================================================
+CASE s1-old-edit-valid-1
+CMD  old/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s1-old.log
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+VIOLATION R4 01: fail_direction 'unspecified' is not closed or open
+--- stderr:
+--- event log lines:
+(no event log file written)
+==================================================================
+CASE s1-new-edit-valid-1
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s1-new.log
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:04:02Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+==================================================================
+CASE s1-new-enforce-baseline-01
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode enforce --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 1
+--- stdout:
+{
+  "mode": "enforce",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+==================================================================
+CASE s2-new-edit-bad-01
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s2-new.log
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:05:04Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+==================================================================
+CASE s2-old-edit-bad-01
+CMD  old/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+VIOLATION R4 01: fail_direction 'unspecified' is not closed or open
+--- stderr:
+### S2 text-mode refusal (same edit, no --json)
+VIOLATION R4 01: fail_direction 'unspecified' is not closed or open
+LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+EXIT 1
+### S3 same-work recovery: keep the edit, correct only fail_direction of 01
+==================================================================
+CASE s3-new-recovered-01
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s3-new.log
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 0,
+  "unallowlisted": 0,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": []
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:06:12Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+### S4 look-alike ids: valid edits must pass; offending edits must refuse their own literal id
+==================================================================
+CASE s4-new-edit-1
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 5,
+  "violations": 3,
+  "unallowlisted": 3,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "1.0",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "010",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+==================================================================
+CASE s4-old-edit-1
+CMD  old/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 5,
+  "violations": 3,
+  "unallowlisted": 3,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "1.0",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "010",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+VIOLATION R4 01: fail_direction 'unspecified' is not closed or open
+VIOLATION R4 1.0: fail_direction 'unspecified' is not closed or open
+--- stderr:
+==================================================================
+CASE s4-new-edit-10
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 5,
+  "violations": 3,
+  "unallowlisted": 3,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "1.0",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "010",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+==================================================================
+CASE s4-new-edit-1.0
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 5,
+  "violations": 3,
+  "unallowlisted": 3,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "1.0",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "010",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+==================================================================
+CASE s4-new-edit-010
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 5,
+  "violations": 3,
+  "unallowlisted": 3,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "1.0",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    },
+    {
+      "rule": "R4",
+      "id": "010",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+### S5 reverse look-alike: bad 1 untouched, valid 01 edited
+==================================================================
+CASE s5-new-edit-01
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "1",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+==================================================================
+CASE s5-new-edit-1
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "1",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+### S6 shared invariant: touched gshared shares gguard's invariant
+==================================================================
+CASE s6-new-distinct
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s6-distinct.log
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 0,
+  "unallowlisted": 0,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": []
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:09:42Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+==================================================================
+CASE s6-new-shared
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s6-shared.log
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 2,
+  "unallowlisted": 2,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R1",
+      "id": "gguard",
+      "message": "invariant shared with: gshared"
+    },
+    {
+      "rule": "R1",
+      "id": "gshared",
+      "message": "invariant shared with: gguard"
+    }
+  ]
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:10:00Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+==================================================================
+CASE s6-old-shared
+CMD  old/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R1",
+      "id": "gguard",
+      "message": "invariant shared with: gshared"
+    }
+  ]
+}
+--- stderr:
+==================================================================
+CASE s6-new-corrected
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s6-corrected.log
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 0,
+  "unallowlisted": 0,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": []
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:10:09Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+### S7a malformed base registry blob (guards is a string array) with a valid current registry
+==================================================================
+CASE s7a-new-malformed-base
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s7a.log
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 1,
+  "violations": 0,
+  "unallowlisted": 0,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": []
+}
+--- stderr:
+jq: error (at /private/tmp/fmv-guard-lint.Y3kyK7/s7-current-valid/docs/guards/registry.json:25): Cannot index string with string "id"
+error: touched-registry comparison against 'HEAD' failed (status 5); no touched guard is cleared
+--- event log lines:
+{"ts":"2026-11-19T05:10:21Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"error","source_ok":false,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+### S7b base ref that does not exist
+==================================================================
+CASE s7b-new-missing-ref
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base no-such-ref --json  FM_GUARD_EVENT_LOG=-
+EXIT 2
+--- stdout:
+--- stderr:
+error: cannot resolve base ref 'no-such-ref'
+error: refusal site discovery failed (base ref 'no-such-ref' in new-or-touched mode)
+### S7c base commit has no registry file at docs/guards/registry.json
+==================================================================
+CASE s7c-new-base-without-registry
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 2
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 1,
+  "violations": 0,
+  "unallowlisted": 0,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": []
+}
+--- stderr:
+error: cannot resolve base ref 'HEAD' for new-or-touched mode
+### S8 telemetry non-interference: same refusal (s2 edit) with three sinks
+==================================================================
+CASE s8-no-sink
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=-
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+==================================================================
+CASE s8-valid-sink
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/s8-valid.log
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:11:03Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"HEAD","actor":"main","opportunity":true}
+==================================================================
+CASE s8-unwritable-sink
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/not-a-dir/events.jsonl
+EXIT 1
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+--- event log lines:
+(no event log file written)
+### S8 also: unwritable sink on a clean edit must still pass
+==================================================================
+CASE s8-unwritable-sink-clean
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base HEAD --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.Y3kyK7/not-a-dir/events2.jsonl
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+--- stderr:
+--- event log lines:
+(no event log file written)
+### S9 real repository at target commit (worktree), base 7f3a198b
+### S9 real repository at target commit (worktree), base 7f3a198b
+==================================================================
+CASE s9-new-real-touched
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode new-or-touched --base 7f3a198b --json  FM_GUARD_EVENT_LOG=/tmp/fmv-guard-lint.t1JWwT/s9-real.log
+EXIT 0
+--- stdout:
+{
+  "mode": "new-or-touched",
+  "guards": 185,
+  "violations": 283,
+  "unallowlisted": 0,
+  "allowlisted": 283,
+  "stale": 0,
+  "findings": []
+}
+--- stderr:
+--- event log lines:
+{"ts":"2026-11-19T05:35:17Z","guard":"guard-lint-touched-registry","rule":"guard-lint-touched-registry","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/.no-mistakes/worktrees/eb631854535e/01M7RX4RBT5G4AHYZJ0787ZN3Q:17af1d50-040b-449f-acbf-b6677aaeeda2","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"7f3a198b","actor":"main","opportunity":true}
+==================================================================
+CASE s9-new-real-enforce
+CMD  01M7RX4RBT5G4AHYZJ0787ZN3Q/bin/fm-guard-lint.sh --root <fixture> --mode enforce --base 7f3a198b --json  FM_GUARD_EVENT_LOG=-
+EXIT 0
+--- stdout:
+{
+  "mode": "enforce",
+  "guards": 185,
+  "violations": 283,
+  "unallowlisted": 0,
+  "allowlisted": 283,
+  "stale": 0,
+  "findings": []
+}
+--- stderr:

@@ -1,0 +1,15 @@
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R1",
+      "id": "gguard",
+      "message": "invariant shared with: gshared"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+error: cannot resolve base ref 'no-such-ref'
+error: refusal site discovery failed (base ref 'no-such-ref' in new-or-touched mode)

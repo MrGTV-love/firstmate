@@ -1,0 +1,16 @@
+{
+  "mode": "new-or-touched",
+  "guards": 2,
+  "violations": 1,
+  "unallowlisted": 1,
+  "allowlisted": 0,
+  "stale": 0,
+  "findings": [
+    {
+      "rule": "R4",
+      "id": "01",
+      "message": "fail_direction 'unspecified' is not closed or open"
+    }
+  ]
+}
+VIOLATION R4 01: fail_direction 'unspecified' is not closed or open

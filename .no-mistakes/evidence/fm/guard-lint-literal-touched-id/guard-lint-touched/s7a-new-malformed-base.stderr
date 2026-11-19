@@ -1,0 +1,2 @@
+jq: error (at /private/tmp/fmv-guard-lint.Y3kyK7/s7-current-valid/docs/guards/registry.json:25): Cannot index string with string "id"
+error: touched-registry comparison against 'HEAD' failed (status 5); no touched guard is cleared

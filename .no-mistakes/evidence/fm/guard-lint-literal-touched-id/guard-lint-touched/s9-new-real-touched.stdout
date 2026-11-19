@@ -1,0 +1,9 @@
+{
+  "mode": "new-or-touched",
+  "guards": 185,
+  "violations": 283,
+  "unallowlisted": 0,
+  "allowlisted": 283,
+  "stale": 0,
+  "findings": []
+}
