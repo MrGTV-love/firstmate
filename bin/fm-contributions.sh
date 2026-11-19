@@ -17,19 +17,15 @@
 # endpoint teardown. Repository-wide PR discovery never establishes ownership.
 # GitHub PRs and issues are supported; other forges remain visibly unmeasured.
 #
-# This script owns fm-contributions.v1: one atomic file per durable task with
-# task and records[]. Each record contains url, kind, checked_at, error,
-# observation, verdict, seen event tokens, pending events, notified tokens, and
-# retired provenance once retired.
-# observation is one coherent forge read (a PR head is rechecked after fetching
-# checks/reviews). Checks are normalized by name, id, started_at, status and
-# conclusion; projection picks the newest attempt per distinct name. The last
-# observation's lane names also disclose a lane absent from the next head.
-# A verdict records the EXACT judged head, source URL, actor and summary. The
-# actor is exactly one of captain, fleet, maintainer or nobody; any other value
-# is refused. A comment's arrival time never supplies its judged head. Record a
-# prose verdict only after its source identifies that head; otherwise leave it unbound and
-# triage its signal.
+# This script owns fm-contributions.v1: one atomic file per durable task with task and records[].
+# Each record contains url, kind, checked_at, error, observation, verdict, seen event tokens, pending events, notified tokens, and retired provenance once retired.
+# observation is one coherent forge read (a PR head is rechecked after fetching checks/reviews).
+# Checks are normalized by name, id, started_at, status and conclusion; projection picks the newest attempt per distinct name.
+# The last observation's lane names also disclose a lane absent from the next head.
+# A verdict records the EXACT judged head, source URL, actor and summary.
+# The actor is exactly one of captain, fleet, maintainer or nobody; any other value is refused.
+# A comment's arrival time never supplies its judged head.
+# Record a prose verdict only after its source identifies that head; otherwise leave it unbound and triage its signal.
 # Formal reviews carry GitHub's own commit_id.
 # Neither kind can grant merge authority.
 # Captain-actor prose requires an existing live hold.
