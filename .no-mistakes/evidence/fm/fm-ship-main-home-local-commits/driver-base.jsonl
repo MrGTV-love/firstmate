@@ -1,0 +1,8 @@
+{"scenario": "S1-ack-plus-working-same-second", "still_overdue_at_deadline": false, "presented": []}
+{"scenario": "S2-working-before-steer-same-second", "still_overdue_at_deadline": false, "presented": []}
+{"scenario": "S3-reply-same-second-as-steer", "still_overdue_at_deadline": false, "presented": []}
+{"scenario": "S4-reply-later-second", "still_overdue_at_deadline": false, "presented": []}
+{"scenario": "S5-typed-blocked-report", "still_overdue_at_deadline": false, "presented": []}
+{"scenario": "S6-named-delivery-reply-same-second", "still_overdue_at_deadline": true, "presented": ["  \"46f095aea8bafd38fc040eb1\",\"firstmate\",\"worker\",\"check in: progress, blockers, cross-workstream dependencies\",900,\"last heard: status=1795036380; inbox acknowledgement=None; resolved reply=1795043580\",false", "help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)"]}
+{"scenario": "S7-other-reply-same-second-as-named-delivery", "still_overdue_at_deadline": false, "presented": []}
+{"scenario": "S8-no-steer-working-line-resets-clock", "still_overdue_at_deadline": false, "presented": []}
