@@ -1029,7 +1029,7 @@
         , "count": 2},
         {
           "file": "bin/fm-task-copy-lib.sh",
-          "match": "remedy=\"Report this entry for repair: run (cd '$project' && treehouse status) with the installed treehouse"
+          "match": "remedy=\"Run the provider's cutover adoption first, then retry: it moves the entry to the protected holder"
         },
         {
           "file": "bin/fm-bootstrap.sh",
