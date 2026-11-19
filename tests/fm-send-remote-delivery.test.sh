@@ -46,6 +46,29 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 TMP_ROOT=$(fm_test_tmproot fm-send-remote-delivery)
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 
+# A remote steer's last step rings the secondmate's doorbell through the herdr
+# adapter (fm_task_inbox_ring in bin/fm-task-inbox-lib.sh asks the recorded pane
+# for its agent and composer state with `status --json`, `pane get` and
+# `agent get`). The fixture has no herdr server, so this file owns a fake client
+# that reports an unreachable server, and it points every herdr lookup at that
+# fake and at scratch values. No call can reach a real herdr client, socket or
+# pane. The fake logs each call so a test can name what the doorbell asked.
+FAKE_HERDR_DIR="$TMP_ROOT/herdr-fake"
+FAKE_HERDR_LOG="$TMP_ROOT/herdr-fake.calls"
+mkdir -p "$FAKE_HERDR_DIR"
+: > "$FAKE_HERDR_LOG"
+cat > "$FAKE_HERDR_DIR/herdr" <<SH
+#!/bin/sh
+printf '%s\n' "\$*" >> "$FAKE_HERDR_LOG"
+echo 'error: herdr server is not running (test fixture)' >&2
+exit 1
+SH
+chmod +x "$FAKE_HERDR_DIR/herdr"
+unset HERDR_ENV HERDR_SESSION HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_CLIENT_SESSION FM_HERDR_RUNTIME SSH_AUTH_SOCK
+export HERDR_SOCKET_PATH="$TMP_ROOT/no-such-herdr.sock" HERDR_PANE_ID="scratch-pane"
+export FM_BACKEND_HERDR_BIN="$FAKE_HERDR_DIR/herdr"
+export PATH="$FAKE_HERDR_DIR:$PATH"
+
 # Stub tmux for the local typed-plane legs: logs literal typed text to
 # FM_SEND_LOG. The default composer reads empty (clean submit);
 # FM_FAKE_TMUX_PENDING=1 keeps a proven pending composer with no busy footer,
@@ -276,8 +299,12 @@ test_remote_steer_lands_in_remote_inbox() {
     *"$FM_FROMFIRST_MARK"*) : ;;
     *) fail "the remote record must carry the from-firstmate marker: $body" ;;
   esac
-  # The doorbell could not reach the fixture pane (no herdr CLI here); that
-  # never fails the send, and the notice still names the durable record.
+  # The doorbell asked the fake herdr (unreachable server) and only read state;
+  # it never typed into a pane. That never fails the send, and the notice still
+  # names the durable record.
+  [ -s "$FAKE_HERDR_LOG" ] || fail "the doorbell should have asked the fixture's herdr client about the pane"
+  ! grep -Evq '^(status --json|pane get|agent get) ' "$FAKE_HERDR_LOG" \
+    || fail "the doorbell may only read state from herdr: $(cat "$FAKE_HERDR_LOG")"
   assert_contains "$err" "durably recorded" \
     "a failed doorbell must be reported as a notice on a durably sent steer"
   assert_not_contains "$err" "error:" "a durably recorded steer must not carry an error report"
