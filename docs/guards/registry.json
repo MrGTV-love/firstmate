@@ -171,8 +171,8 @@
       "owner": "bin/fm-pool-base-lib.sh",
       "invariant": "A spawn takes no pool copy while the pool's fm-pool-base branch cannot be fast-forwarded to the fetched origin default.",
       "layer": "runtime-block",
-      "source": "the base_branch of the repository's treehouse config (treehouse.toml in the main checkout, else the user config), the origin default tip bin/fm-spawn.sh fetched, and refs/heads/fm-pool-base with its worktree inventory",
-      "trigger": "the treehouse config names fm-pool-base and the repository has no origin, its origin default cannot be read, fm-pool-base holds commits the origin default lacks, the two have diverged, fm-pool-base is checked out in a worktree, it or its ancestry cannot be read, or it moved during the compare-and-set update",
+      "source": "the base_branch of the repository's treehouse config (treehouse.toml in the main checkout, else the user config), the origin default tip bin/fm-spawn.sh fetched whatever starting branch the task names, and refs/heads/fm-pool-base with its worktree inventory",
+      "trigger": "the treehouse config names fm-pool-base, or cannot be read or parsed, and the repository has no origin, its origin default cannot be read, fm-pool-base holds commits the origin default lacks, the two have diverged, fm-pool-base is checked out in a worktree or a worktree took it during the update, it or its ancestry cannot be read, or it moved during the compare-and-set update",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Read the named commits, then have the repository's owner correct the branch with git -C <project> log --oneline --left-right fm-pool-base...origin/<default> before retrying bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off>; the guard never forces, resets or deletes the branch.",
@@ -196,10 +196,10 @@
         {
           "file": "bin/fm-pool-base-lib.sh",
           "match": "fm_pool_base_refuse ",
-          "count": 11
+          "count": 14
         }
       ],
-      "layer_note": "Added with the fm-pool-base upkeep: the guard only denies a spawn that would otherwise cut pool copies at a stale or unreadable base, and it moves nothing on a refusal. It loosens no other guard and widens nothing: a home whose treehouse config does not name fm-pool-base is never refused by it. Harm judged: a pool of copies cut ahead of the origin default fills to its limit with copies the spawn precheck skips as head_not_target, and a forced or overwritten fm-pool-base would hide unlanded commits."
+      "layer_note": "Added with the fm-pool-base upkeep: the guard only denies a spawn that would otherwise cut pool copies at a stale or unreadable base, and it moves nothing on a refusal. It loosens no other guard and widens nothing: a home whose treehouse config is readable and does not name fm-pool-base is never refused by it, and one whose config cannot be read is refused, because it is unknown whether its pool uses fm-pool-base. Harm judged: a pool of copies cut ahead of the origin default fills to its limit with copies the spawn precheck skips as head_not_target, and a forced or overwritten fm-pool-base would hide unlanded commits."
     },
     {
       "id": "turnend-ask-gate",
