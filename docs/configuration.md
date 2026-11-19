@@ -879,8 +879,10 @@ The script's header owns the mechanics; this section states the contract an oper
 
 A direct child directory of a listed root, whose name matches that root's glob, is removed only when every one of these holds:
 
+- A name that holds a control character, such as a newline, is kept with reason `control-character-name`, and its printed name shows each control character as `?`.
 - It is not a symlink, and its real path is exactly the real root plus its name.
 - It is not protected: not under `~/.treehouse`, `~/firstmate`, `/Volumes`, this home, or this home's `data/` or `state/` folder.
+- No recorded task owns it: it equals the `tasktmp=` value of a `state/*.meta` file, or it is named `fm-<id>` or starts with `fm-<id>+` for a `state/<id>.meta` file, in this home or in a local secondmate home that `data/secondmates.md` lists.
 - Nothing in its whole tree is newer than the age, which is 24 hours unless `age_hours` says otherwise.
 - No `.git` entry and no `.fm-slot-owner` entry exists anywhere in its tree, so worktrees, pool slots, and nested repositories stay.
 - No process has an open file or a current directory inside it, judged from one `lsof` snapshot per run.
@@ -888,7 +890,7 @@ A direct child directory of a listed root, whose name matches that root's glob, 
 
 Any doubt keeps the directory, and an `lsof` that fails or prints nothing keeps everything and exits 3.
 Plain files are never removed, whatever their name.
-A name that holds a newline, a space, or a leading dash is handled like any other, because the script keeps paths NUL-delimited from the listing to the copy and prints a newline in a name as `\n` so one decision stays one line.
+A file name inside a directory that holds a newline, a space, or a leading dash is archived like any other, because the script keeps paths NUL-delimited from the listing to the copy.
 
 The one `lsof` snapshot is the only check for open handles, so it has one honest limit.
 A process that starts after the snapshot and opens a file in a candidate, or enters it, before that candidate is removed is not seen.
@@ -899,6 +901,28 @@ A line `age_hours <n>` sets the age.
 The file replaces the built-in defaults when it names at least one root, and a file with no root line keeps them.
 The defaults are `/private/tmp` with `fm-*`, `omp-*`, `fm-fm-*`, `fm-omp-*`, `fm-joined-generation.*`, `fm-bash-*`, `fm-pre-generic.*`, `fm-prekey-matcher.*`, and `fm-ttsr-pending.*`, and `~/tmp` with `backpass-*`, `fm-spawn-tree-*`, `dsh-*`, `nm-e2e-bin*`, and `nm-timeout-bin*`.
 A root that is a symlink, is not a directory, or is, contains, or lies under a protected path stops the run with exit 2 before it touches anything.
+
+Why each default glob is there:
+
+- `/private/tmp` `fm-*`: every firstmate scratch name, including the `fm-<task-id>` temp roots that the recorded-task rule keeps while their record exists, and the fixture families `fm-acct-*`, `fm-atomic-*` and `fm-batch-*`.
+- `/private/tmp` `omp-*`: omp scratch; no producer of this bare name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-fm-*`: named by the captain as suite fixture directories.
+- `/private/tmp` `fm-omp-*`: named by the captain as omp scratch.
+- `/private/tmp` `fm-joined-generation.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-bash-*`: the bash timeout command's scratch name in `bin/fm-timeout-lib.sh`.
+- `/private/tmp` `fm-pre-generic.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-prekey-matcher.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-ttsr-pending.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `~/tmp` `backpass-*`: named by the captain as backpass scratch.
+- `~/tmp` `fm-spawn-tree-*`: named by the captain as spawn-tree scratch.
+- `~/tmp` `dsh-*`: the captain named only `dsh-workspace-changes`, and the wider glob has no producer in this repository, so its origin is unresolved here.
+- `~/tmp` `nm-e2e-bin*`: named by the captain as end-to-end test scratch.
+- `~/tmp` `nm-timeout-bin*`: no producer of this name is in this repository, so its origin is unresolved here.
+
+The recorded-task rule reads `state/*.meta` in this home and in each local secondmate home that `data/secondmates.md` lists, read only.
+A remote secondmate record is not read, because its home is on another host.
+A listed home that is not an absolute path, a `data/secondmates.md` that is not a regular file, or a malformed secondmate line stops the run with exit 2 before it touches anything.
+Residual: another home's own task temp roots are not protected, and a listed home whose `state/` cannot be read is not seen.
 
 Before a directory is removed, each regular file in it named `*.log`, `*.txt`, `*.out`, `*.err`, `*.json`, or `*.md` of at most 1 MiB is copied, with its relative path and verified byte for byte, to `data/scratch-reaper-archive/<UTC date>/<directory name>/`, up to 20 MiB per directory.
 The whole archive finishes before the removal starts.
@@ -913,7 +937,7 @@ The third is `rm -f --` of the `lsof` snapshot file inside that temp folder.
 The fourth is `rm -f --` of `state/.scratch-reaper-alarmed`.
 The last three touch only the script's own files, never a scratch directory and never a path under a listed root.
 
-Every decision is one line, printed and appended to `state/scratch-reaper.log`: `removed` with the bytes freed, or `kept` with its reason (`young`, `open handle`, `git`, `outside root`, `symlink`, `protected`, `archive failed`, `lsof failed`, `remove failed`).
+Every decision is one line, printed and appended to `state/scratch-reaper.log`: `removed` with the bytes freed, or `kept` with its reason (`control-character-name`, `symlink`, `outside root`, `protected`, `task-record`, `young`, `git`, `open handle`, `archive failed`, `lsof failed`, `remove failed`).
 A run without `--apply` is a dry run that prints the same lines as `would-remove` or `kept` and writes nothing.
 
 The watcher offers the run at most every `FM_SCRATCH_REAPER_TICK` seconds (default 60, `0` turns it off), starting `bin/fm-scratch-reaper.sh --scheduled` detached and single-flight, with no daemon and no LaunchAgent.

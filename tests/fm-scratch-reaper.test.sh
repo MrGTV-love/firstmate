@@ -315,36 +315,34 @@ case_leading_dash_directory() {
   assert_contains "$out" "kept $root/-held reason=open handle" 'the leading-dash holder is not kept for an open handle'
 }
 
-case_newline_directory_names() {
+case_control_character_name_kept() {
   local world out root nl=$'\n'
   new_world; world=$SR_WORLD; root=$world/root
   make_aged "$root/fm-nl${nl}dir" a.log || fail 'fixture'
-  make_aged "$root/fm-trail${nl}" a.log || fail 'fixture'
-  make_aged "$root/fm-young${nl}x" a.log || fail 'fixture'
-  printf 'n\n' > "$root/fm-young${nl}x/fresh.txt"
   out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
-  [ ! -e "$root/fm-nl${nl}dir" ] || fail 'a newline-named directory was not removed'
-  [ ! -e "$root/fm-trail${nl}" ] || fail 'a directory whose name ends in a newline was not removed'
-  assert_contains "$out" "removed $root/"'fm-nl\ndir bytes=' 'a newline in a name must print as \n on one line'
-  [ -d "$root/fm-young${nl}x" ] || fail 'a young newline-named directory was removed'
-  assert_contains "$out" "kept $root/"'fm-young\nx reason=young' 'the young newline-named directory is not kept as young'
+  [ -d "$root/fm-nl${nl}dir" ] || fail 'a directory whose name holds a control character was removed'
+  assert_contains "$out" "kept $root/fm-nl?dir reason=control-character-name" 'a control-character name is not kept with its reason'
   log_lines_are_single "$world"
 }
 
-case_newline_directory_open_handle_kept() {
-  local world out root nl=$'\n'
+case_task_record_kept() {
+  local world out root sm
   new_world; world=$SR_WORLD; root=$world/root
-  make_aged "$root/fm-hold${nl}x" held.log || fail 'fixture'
-  make_aged "$root/fm-file${nl}y" held2.log || fail 'fixture'
-  start_sleeper "$root/fm-hold${nl}x"
-  start_sleeper "$world" "$root/fm-file${nl}y/held2.log"
-  out=$(reap "$world" --apply 2>&1) || { stop_sleepers; fail "run failed: $out"; }
-  stop_sleepers
-  [ -d "$root/fm-hold${nl}x" ] || fail 'a newline-named directory holding a process cwd was removed'
-  [ -d "$root/fm-file${nl}y" ] || fail 'a newline-named directory holding an open file was removed'
-  assert_contains "$out" "kept $root/"'fm-hold\nx reason=open handle' 'the newline-named cwd holder is not kept for an open handle'
-  assert_contains "$out" "kept $root/"'fm-file\ny reason=open handle' 'the newline-named open-file holder is not kept for an open handle'
-  log_lines_are_single "$world"
+  ln -s "$root" "$world/rootlink" || fail 'link fixture'
+  make_aged "$root/fm-task-x1" a.log || fail 'fixture'
+  make_aged "$root/fm-y" a.log || fail 'fixture'
+  printf 'tasktmp=%s\n' "$root/fm-task-x1" > "$world/fm/state/task-x1.meta"
+  sm=$world/sm
+  mkdir -p "$sm/state" || fail 'secondmate fixture'
+  printf 'tasktmp=%s\n' "$world/rootlink/fm-y" > "$sm/state/task-y.meta"
+  printf -- '- sm1 - a secondmate (home: %s; scope: test; projects: ; added 2026-01-01)\n' "$sm" > "$world/fm/data/secondmates.md"
+  out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
+  [ -d "$root/fm-task-x1" ] && [ -d "$root/fm-y" ] || fail 'a directory a recorded task owns was removed'
+  assert_contains "$out" "kept $root/fm-task-x1 reason=task-record" 'a directory named for a recorded task is not kept'
+  assert_contains "$out" "kept $root/fm-y reason=task-record" 'a tasktmp= of a secondmate home, given through a symlink, is not kept'
+  rm -f "$world/fm/state/task-x1.meta" "$sm/state/task-y.meta"
+  out=$(reap "$world" --apply 2>&1) || fail "run failed: $out"
+  [ ! -e "$root/fm-task-x1" ] && [ ! -e "$root/fm-y" ] || fail 'a directory whose task record is gone was not removed'
 }
 
 case_archive_read_failure_keeps_directory() {
@@ -586,8 +584,8 @@ test_archive_failure_keeps_the_directory() { case_archive_failure_keeps_director
 test_oversize_logs_are_not_archived() { case_oversize_logs_not_archived; pass 'oversize logs are skipped, the line says so, and a safe directory is still removed'; }
 test_newline_file_names_are_archived() { case_newline_file_names_archived; pass 'small logs whose names hold a newline, a leading dash or a space are archived byte for byte before removal'; }
 test_leading_dash_directory() { case_leading_dash_directory; pass 'a leading-dash directory is archived and removed, and kept while a process holds it'; }
-test_newline_directory_names() { case_newline_directory_names; pass 'newline-named directories are removed or kept on their merits and logged on one line each'; }
-test_newline_directory_open_handle() { case_newline_directory_open_handle_kept; pass 'a newline-named directory with a process cwd or open file is kept as open handle'; }
+test_control_character_name_is_kept() { case_control_character_name_kept; pass 'a directory whose name holds a control character is kept as control-character-name on one line'; }
+test_task_record_is_kept_until_the_record_goes() { case_task_record_kept; pass 'a directory a recorded task owns (this home, or a secondmate home through a symlink) is kept as task-record and removed once its record is gone'; }
 test_unreadable_log_keeps_the_directory() { case_archive_read_failure_keeps_directory; pass 'a small log that cannot be read keeps the directory as archive failed'; }
 test_archive_finishes_before_removal() { case_archive_before_remove_ordering; pass 'a copy that fails on the second file, or differs from its source, keeps the whole directory untouched'; }
 test_one_snapshot_per_run() { case_one_snapshot_per_run; pass 'one lsof snapshot serves every candidate of a run'; }
@@ -647,8 +645,8 @@ test_archive_failure_keeps_the_directory
 test_oversize_logs_are_not_archived
 test_newline_file_names_are_archived
 test_leading_dash_directory
-test_newline_directory_names
-test_newline_directory_open_handle
+test_control_character_name_is_kept
+test_task_record_is_kept_until_the_record_goes
 test_unreadable_log_keeps_the_directory
 test_archive_finishes_before_removal
 test_one_snapshot_per_run

@@ -17,17 +17,24 @@
 #   directory of a listed root whose name matches that root's glob is a candidate.
 #   Plain files, whatever their name, are never candidates.
 #
+# Before any check, a directory whose name holds a control character, such as a newline, is
+#   kept as `control-character-name`, with each control character printed as `?`.
 # A candidate is removed only when ALL of these hold, checked in this order:
 #   1. it is not a symlink (a symlink is kept as `symlink` and never followed);
 #   2. its realpath is exactly <realpath of its root>/<its name> (else `outside root`);
 #   3. it is not protected: not under ~/.treehouse, ~/firstmate, /Volumes, this home, or
 #      this home's data or state folder (else `protected`);
-#   4. nothing in its whole tree is newer than the age (default 24 hours): the newest
+#   4. no recorded task owns it (else `task-record`): it equals the `tasktmp=` value of a
+#      state/*.meta in this home or in a local secondmate home that data/secondmates.md lists
+#      (read-only), or it is named fm-<id> or fm-<id>+... for a state/<id>.meta in one of
+#      those homes. A remote secondmate record is not read, because its home is on another
+#      host. Another home's own task temp roots are not protected;
+#   5. nothing in its whole tree is newer than the age (default 24 hours): the newest
 #      mtime of any entry decides, never the folder's own mtime (else `young`);
-#   5. no .git entry and no .fm-slot-owner entry exists anywhere in its tree, so a git
+#   6. no .git entry and no .fm-slot-owner entry exists anywhere in its tree, so a git
 #      worktree, a pool slot, a treehouse worktree and a nested repository are all kept
 #      (else `git`);
-#   6. no process has an open file or a current directory inside it (else `open handle`).
+#   7. no process has an open file or a current directory inside it (else `open handle`).
 #      ONE lsof snapshot (open file names and process cwds) is taken per run, lazily,
 #      when the first candidate reaches this check, then matched by path prefix against
 #      the realpath and its aliases (the root as written, and the /private-stripped
@@ -40,10 +47,8 @@
 #      snapshot to the removal of that one directory, and the directory has been
 #      untouched for the whole age first, so only a process that reuses a day-old unused
 #      scratch directory inside that window can be hit. A write by such a process is not
-#      re-checked either. A name holding a control character such as a newline is matched
-#      on the text before its first control character, which keeps at least as much as an
-#      exact match would;
-#   7. every small log in it was archived (else `archive failed`).
+#      re-checked either;
+#   8. every small log in it was archived (else `archive failed`).
 #
 # Archive: before removal, each regular file named *.log *.txt *.out *.err *.json *.md of
 #   at most 1 MiB is copied, with its relative path, to
@@ -173,16 +178,6 @@ real_dir() {  # <dir> -> its physical path; fails when it is not a directory
   ( cd -P -- "$1" 2>/dev/null && pwd -P )
 }
 
-# real_dir_exact <dir>: set REAL to the physical path, keeping a trailing newline in a name
-# that $(...) alone would strip; fails when it is not a directory.
-REAL=
-real_dir_exact() {
-  local r
-  r=$( cd -P -- "$1" 2>/dev/null && pwd -P && printf x ) || return 1
-  REAL=${r%x}
-  REAL=${REAL%$'\n'}
-}
-
 # --- protected paths ----------------------------------------------------------
 PROTECTED=()
 add_protected() {
@@ -206,6 +201,52 @@ protected_path() {
   for q in "${PROTECTED[@]}"; do
     case "$p/" in "$q"/*) return 0 ;; esac
     case "$q/" in "$p"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+# --- recorded tasks -----------------------------------------------------------
+# A parked worker can sit idle for days with no open handle, so scratch that a recorded task
+# still owns is kept. The records come from this home's state folder and from each local
+# secondmate home that data/secondmates.md lists; they are only read.
+TASK_IDS=()    # <id> of each state/<id>.meta read
+TASK_TMPS=()   # each absolute tasktmp= value read, resolved to its real path
+
+collect_task_records() {  # <state folder>
+  local f id v d
+  for f in "$1"/*.meta; do
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    id=${f##*/}; id=${id%.meta}
+    TASK_IDS+=("$id")
+    v=$(grep '^tasktmp=' "$f" 2>/dev/null | tail -1 | cut -d= -f2-)
+    case "$v" in /*) ;; *) continue ;; esac
+    d=$(real_dir "$(dirname -- "$v")") || continue
+    TASK_TMPS+=("$d/$(basename -- "$v")")
+  done
+}
+
+collect_secondmate_records() {
+  local reg="$DATA_DIR/secondmates.md" line home n=0
+  [ -e "$reg" ] || [ -L "$reg" ] || return 0
+  [ -f "$reg" ] && [ ! -L "$reg" ] || { echo "fm-scratch-reaper: $reg is not a regular file" >&2; exit 2; }
+  # shellcheck source=bin/fm-secondmate-registry-lib.sh disable=SC1091
+  . "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    case "$line" in "- "*) ;; *) continue ;; esac
+    secondmate_registry_parse_line "$line" || { echo "fm-scratch-reaper: $reg:$n: malformed secondmate registry entry" >&2; exit 2; }
+    [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
+    home=$SECONDMATE_REGISTRY_HOME
+    case "$home" in /*) ;; *) echo "fm-scratch-reaper: $reg:$n: secondmate home is not absolute" >&2; exit 2 ;; esac
+    if [ -d "$home/state" ]; then collect_task_records "$home/state"; fi
+  done < "$reg"
+}
+
+task_record_kept() {  # <real dir> <name>: 0 when a recorded task owns the directory
+  local real=$1 name=$2 t id
+  for t in ${TASK_TMPS[@]+"${TASK_TMPS[@]}"}; do [ "$t" = "$real" ] && return 0; done
+  for id in ${TASK_IDS[@]+"${TASK_IDS[@]}"}; do
+    case "$name" in "fm-$id"|"fm-$id+"*) return 0 ;; esac
   done
   return 1
 }
@@ -298,16 +339,9 @@ cleanup_work() {
 
 # --- decision log -------------------------------------------------------------
 KEPT=0 REMOVED=0 BYTES=0 LSOF_FAILED=0
-# printable <text>: a newline or carriage return in a name must not split a decision line.
-printable() {
-  local p=$1
-  p=${p//$'\n'/\\n}
-  p=${p//$'\r'/\\r}
-  printf '%s' "$p"
-}
 decide() {  # <verb> <path> <detail>
   local line
-  line="$(iso_utc "$NOW") $1 $(printable "$2")${3:+ $3}"
+  line="$(iso_utc "$NOW") $1 $2${3:+ $3}"
   printf '%s\n' "$line"
   if [ "$APPLY" -eq 1 ]; then
     printf '%s\n' "$line" >> "$LOG_FILE" || echo "fm-scratch-reaper: cannot append $LOG_FILE" >&2
@@ -356,19 +390,8 @@ take_snapshot() {
 }
 
 has_open_handle() {  # <real dir>: 0 = busy, 1 = free, 2 = unknown
-  local prefix
   if [ "$SNAPSHOT_STATE" = untaken ]; then take_snapshot || true; fi
   [ "$SNAPSHOT_STATE" = ok ] || return 2
-  case "$1" in
-    *[[:cntrl:]]*)
-      # lsof prints a newline in a name as \n (and a raw newline would split the line), so
-      # an exact match cannot work: any busy entry that starts with the text before the
-      # first control character keeps the directory.
-      prefix=${1%%[[:cntrl:]]*}
-      if PFX="$prefix" awk 'index($0, ENVIRON["PFX"]) == 1 { f = 1 } END { exit !f }' "$BUSY_FILE"; then return 0; fi
-      return 1
-      ;;
-  esac
   if grep -qxF -- "$1" "$BUSY_FILE"; then return 0; fi
   return 1
 }
@@ -413,7 +436,7 @@ reap_remove() {
   while [ "$i" -lt "${#ROOT_REAL[@]}" ]; do [ "${ROOT_REAL[$i]}" = "$root" ] && ok=1; i=$((i + 1)); done
   [ "$ok" -eq 1 ] || return 1
   [ -d "$target" ] && [ ! -L "$target" ] || return 1
-  real_dir_exact "$target" && [ "$REAL" = "$target" ] || return 1
+  [ "$(real_dir "$target")" = "$target" ] || return 1
   rm -rf -- "$target"
 }
 
@@ -427,13 +450,14 @@ dir_kib() {  # <dir>
 # --- one candidate ------------------------------------------------------------
 process_candidate() {  # <real root> <as-written root> <name>
   local root=$1 name=$3 path real kib bytes rc
+  case "$name" in *[[:cntrl:]]*) keep "$root/${name//[[:cntrl:]]/?}" control-character-name; return 0 ;; esac
   path="$root/$name"
   if [ -L "$path" ]; then keep "$path" symlink; return 0; fi
   [ -d "$path" ] || { [ -e "$path" ] || decide gone "$path"; return 0; }
-  real_dir_exact "$path" || { decide gone "$path"; return 0; }
-  real=$REAL
+  real=$(real_dir "$path") || { decide gone "$path"; return 0; }
   if [ "$real" != "$root/$name" ]; then keep "$path" "outside root"; return 0; fi
   if protected_path "$real"; then keep "$path" protected; return 0; fi
+  if task_record_kept "$real" "$name"; then keep "$path" task-record; return 0; fi
   if [ -n "$(find "$real" -newer "$REF" -print -quit 2>/dev/null)" ]; then keep "$path" young; return 0; fi
   if [ -n "$(find "$real" \( -name .git -o -name .fm-slot-owner \) -print -quit 2>/dev/null)" ]; then keep "$path" git; return 0; fi
   has_open_handle "$real"; rc=$?
@@ -567,6 +591,9 @@ REF="$WORK/age-ref"
 cutoff=$((NOW - AGE_HOURS * 3600))
 stamp=$(touch_stamp "$cutoff") || { echo "fm-scratch-reaper: cannot format the age cutoff" >&2; exit 1; }
 TZ=UTC touch -t "$stamp" "$REF" || { echo "fm-scratch-reaper: cannot set the age reference" >&2; exit 1; }
+
+collect_task_records "$STATE_DIR"
+collect_secondmate_records
 
 run_pass
 
