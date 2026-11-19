@@ -269,7 +269,9 @@ It refuses without changing the record, instructions, or copies when:
 - the task is a secondmate, a remotely placed task, or an Orca task, whose recorded `orca_worktree_id=` binds the copy Orca created;
 - a recorded GitHub PR has no full recorded `pr_head=` and no readable forge head, either head is missing from Git or not an ancestor of the replacement's HEAD, or a successful forge response is malformed; other forge providers retain the recorded-PR refusal;
   The proof checks both the recorded head and the current forge head when reachable, regardless of whether the PR is open, closed, or merged, and retains the PR identity rather than treating closure as permission to lose its history;
-- a pending backlog close or an unfinished relaunch transaction exists;
+- a pending backlog close or an unfinished relaunch transaction exists: a readable regular journal naming this task is closed when `phase=complete`, when `phase=failed:*` records `rollback=prior-record-kept`, `prior-record-kept-agent-dead`, or `instructions-restored`, or when `phase=failed:*` records `rollback=instructions-restored-agent-alive` or `instructions-restored-agent-state-<state>` with a suffix matching `[A-Za-z0-9._-]+` and the backend now proves the agent stopped or the endpoint missing;
+  The rollback markers prove the prior task record was retained. The first three add no liveness check, so a live worker reassociates as it would with no journal. The last two left an agent observed alive or not proven stopped, so a live, ambiguous, unverified, or unreadable agent state refuses with the journal and records unchanged.
+  Both `none-new-*` markers, missing or unrecognized rollback evidence, unreadable or symlinked journals, another task's journal, and every other unfinished phase still refuse;
 - the task is a ship whose recorded copy no longer exists: reassociation re-points a live copy and is never a vanished-copy recovery, so the refusal names relocation through `relaunch --worktree`, which runs the lease proof in [Relocating a task whose worktree is gone](#relocating-a-task-whose-worktree-is-gone);
 - the task has no regular `brief.md` to carry the note, the record already names the replacement copy, or the record carries more than one `kind=` line, more than one `branch=` line for a ship, or a `project=` that is not a directory;
 - the replacement copy is not an isolated worktree root of the project's own repository, or is the project or primary checkout itself;
@@ -419,6 +421,13 @@ Before publishing the replacement, it anchors the HEAD of the existing current c
 
 Every reassociation holds the shared project lock through both copies' ownership scans and record publication, whether or not either copy is a pool slot.
 Reassociation already holds the task's control lock, so it makes one nonwaiting attempt through [`bin/fm-project-lock-lib.sh`](../bin/fm-project-lock-lib.sh): a concurrent allocation, return, or reassociation, or any operation queued for the lock, makes it refuse rather than race the ownership proof, which runs only under the acquired lock.
+
+For a proven rolled-back journal, after every read-only check and before anchoring or staging any reassociation write, it preserves an identical copy beside the journal at `state/<id>.control-relaunch.archived-<UTC-timestamp>.<counter>`.
+Exclusive creation reserves the timestamp and numeric counter, advancing past existing entries without overwriting an earlier archive.
+The active journal stays in place through staging and publication; after all records publish, it is renamed over that attempt's own archive before committing the reassociation.
+If a later step fails, the original journal remains at its active path, or is restored from its retained archive if a joint call already moved it; a failed restoration reports that archive's recovery path.
+Archives remain durable even after a failed attempt, and no journal is deleted.
+A `phase=complete` journal remains untouched.
 
 It then publishes, in order, so an earlier failure rolls back to the record that was there:
 

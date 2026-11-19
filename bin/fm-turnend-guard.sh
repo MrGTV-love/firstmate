@@ -60,7 +60,7 @@
 # never a wedged, un-endable session - while still nagging again on a later turn
 # if the problem persists.
 #
-# Loop-guard, --claude mode (Stop-owned auto-arm cooperation): Claude Code
+# Supervision loop-guard, --claude mode (Stop-owned auto-arm cooperation): Claude Code
 # marks EVERY stop after ANY stop-hook-driven continuation stop_hook_active=true,
 # including turns started by the asyncRewake auto-arm, so the one-shot allow
 # would re-open the exact blind window this guard exists to close
@@ -206,6 +206,60 @@ fi
 # checkout has the two equal. Child worktrees never carry the gitignored marker,
 # so this exempts them while guarding every real secondmate home.
 fm_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
+
+# The Claude-only form backstop precedes supervision need, health and waiting.
+# It never uses that predicate's event function or changes its block budget.
+# A form-compliant question is not evidence of captain ownership.
+if [ "$CLAUDE_MODE" -eq 1 ]; then
+  ASK_RESULT=$(printf '%s' "$PAYLOAD" | jq -c --argjson stop_hook_active "$STOP_HOOK_ACTIVE" '
+    def ask_line:
+      ascii_downcase | test("^[ \\t]*(?:(?:[-*+]|[0-9]+\\.)[ \\t]*)?[*_]*(?:needs input[*_]*:|needs-input[*_]*:?)");
+    def example_ask:
+      sub("^[ \\t]*(?:>[ \\t]*)+"; "") | ask_line;
+    .last_assistant_message as $text
+    | if $stop_hook_active then
+        {unchecked:true, source_ok:($text | type == "string"), line:null}
+      elif ($text | type) != "string" or ($text | test("[^ \\t\\r\\n]") | not) then
+        {unchecked:true, source_ok:false, line:null}
+      else
+        reduce ($text | split("\n")[]) as $line
+          ({fence:"", width:0, unchecked:false, line:null};
+            ($line | capture("^ {0,3}(?<mark>`{3,}|~{3,})(?<tail>.*)$")? // null) as $mark
+            | if .fence != "" then
+                if $mark != null and $mark.mark[0:1] == .fence
+                   and ($mark.mark | length) >= .width and ($mark.tail | test("^[ \\t\\r]*$"))
+                then .fence = "" | .width = 0
+                else .unchecked = (.unchecked or ($line | example_ask)) end
+              elif ($line | test("^[ \\t]*>")) then
+                .unchecked = (.unchecked or ($line | example_ask))
+              elif $mark != null then
+                .fence = $mark.mark[0:1] | .width = ($mark.mark | length)
+              elif ($line | ask_line) then
+                ($line | ascii_downcase
+                  | capture("^(?<request>.*?)(?<![a-z0-9])if +no *:(?<action>.*)$")? // null) as $ask
+                | if $ask != null and ($ask.action | test("[a-z0-9]"))
+                     and ([$ask.request
+                       | scan("(?<![a-z0-9])(credential|spend|destructive|irreversible|tool[ _-]+denial|owner[ _-]+rule[ _-]+change)(?![a-z0-9])")
+                       | .[0] | gsub("[ _-]+"; "-")] | unique | length) == 1
+                  then . else .line = (.line // $line[0:200]) end
+              else . end)
+        | {unchecked:.unchecked, source_ok:true, line:.line}
+      end
+  ' 2>/dev/null) || ASK_RESULT='{"unchecked":true,"source_ok":false,"line":null}'
+  if printf '%s' "$ASK_RESULT" | jq -e '.line != null' >/dev/null; then
+    printf '%s\n' 'ASK FORM BLOCK - the text was already published; this corrective continuation does not prevent publication.' >&2
+    printf '%s\n' 'Each needs input: or needs-input line requires one distinct boundary (credential, spend, destructive, irreversible, tool-denial, owner-rule-change) before if no:, followed by an action containing a letter or digit. Main owns whether the question belongs to the captain; decide routine calls yourself.' >&2
+    # jq preserves the original line; C-locale cut bounds stderr in bytes.
+    printf '%s' "$ASK_RESULT" | jq -r '.line' | LC_ALL=C cut -b 1-200 >&2
+    "$SCRIPT_DIR/fm-guard-event.sh" turnend-ask-gate deny --rule ask-gate-rubber-stamp \
+      --session "$(printf '%s' "$PAYLOAD" | jq -r '.session_id // "unknown"')" 2>/dev/null || true
+    exit 2
+  elif printf '%s' "$ASK_RESULT" | jq -e .unchecked >/dev/null; then
+    "$SCRIPT_DIR/fm-guard-event.sh" turnend-ask-gate warn --rule ask-gate-unchecked \
+      --source-ok "$(printf '%s' "$ASK_RESULT" | jq -r .source_ok)" \
+      --session "$(printf '%s' "$PAYLOAD" | jq -r '.session_id // "unknown"')" 2>/dev/null || true
+  fi
+fi
 
 # --- the actual predicate ----------------------------------------------------
 # shellcheck source=bin/fm-wake-lib.sh

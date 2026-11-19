@@ -51,7 +51,8 @@ task() {  # <id> <title> [body-file]
 }
 
 hold() {  # <id> [reason]
-  FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold "$1" --reason "${2:-Select the release approach}" >/dev/null
+  FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold "$1" --reason "${2:-Select the release approach}" \
+    --boundary owner-rule-change --if-no 'Keep the existing release rule' >/dev/null
 }
 
 close_call() {  # <id>

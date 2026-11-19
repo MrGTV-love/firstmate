@@ -460,6 +460,15 @@ A home may instead select another tasks-axi adapter such as Beads through its ow
 Captain-hold row creation is owned by [`bin/fm-captain-hold.sh`](../bin/fm-captain-hold.sh) `hold`: when no work item exists, it creates an ordinary backlog row (`--kind captain` metadata; Beads native type `task`) and then applies the captain hold.
 Captain rows have no Beads due semantics, so that create path waives a Beads `due.required` setting rather than passing a synthetic `--due`; `--until` remains the optional hold deferral.
 
+New captain holds require a named authority boundary and a concrete if-no action, stored on the task and visible through `tasks-axi show <id> --full`; [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the flags and allowed names.
+A call without those facts is Main's to decide, not the captain's to hold.
+Existing holds remain readable and resolvable without the new fields, and an unresolved hold may be deferred again without supplying them.
+The answer path also accounts for an avoidable wait when the answer matches the hold's separately recorded exact recommendation; the script header owns that field and the home-local delay-log contract.
+The tool accepts a hold without `--recommendation`, but every filer whose card carries a `Recommendation:` is expected to supply it.
+Its value is the exact answer value that choosing the recommended option sends: the typed words for a typed answer, or for a keyed or Slack answer the option's answer value, never its number and never its display label.
+On a Slack card the answer value is the text in parentheses after the label, so `1. Approve the charge (approve)` gives `approve`: a tap or a typed `1` is converted to `approve` before intake.
+An answer equal to that value after trimming surrounding whitespace records one delay row; any other answer records none.
+
 Do not register a Beads `types.custom` `captain` type for this: captain is a hold kind, and the fleet Beads `due.required` policy for ordinary work stays in the federated beads config.
 
 ### Automatic dispatch and completion
@@ -885,6 +894,7 @@ An existing ledger is left untouched while recording is disabled.
 Ordinary reconciliation never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
+The publisher's opaque `current_identity` identifies the row's current reconciliation evidence and a steered obligation's transition back to required result follow-up; the watcher does not reconstruct that decision from handling history.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
 
 | Category | A row exists when | Default limit |
@@ -977,7 +987,10 @@ For an early maintenance wake, progression is committed only after successful ou
 [`tests/fm-watch-triage.test.sh`](../tests/fm-watch-triage.test.sh) contains the between-cycle and in-cycle signal, late-signal routing and output-failure, and bounded-maintenance-deferral regressions.
 The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
-When the ids or digested evidence of overdue rows change, the watcher queues one durable `check` wake keyed `open-loop-ledger`; unchanged evidence queues no change wake.
+When an overdue row's existing notification fields (`id`, `category`, `subject`, `owner`, `next_action`, `evidence`) or its published `current_identity` change, the watcher queues one durable `check` wake keyed `open-loop-ledger`; unchanged work and unrelated status appends queue no change wake.
+This includes a resolved status question reopened under the same key and text before the next publication, even when its clock is missing or unchanged and full task provenance is unavailable.
+The watcher uses the opaque token without reconstructing identity from mutable source or handling history; a legacy row with no token retains exactly the six-field comparison, while a present token that is not 24 lowercase hexadecimal characters makes that observation invalid and preserves existing cooldowns.
+Upgrading a legacy notification marker can produce one conservative change wake, after which an unchanged identified row settles.
 While overdue rows exist, the watcher independently queues the periodic waiting-list wake keyed `open-loop-ledger-resurface` every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600), counted from the first surfaced overdue row; only that wake restamps its `state/.open-loops-resurfaced` cooldown, so a change wake never resets or replaces the period.
 When a change and the periodic deadline coincide, both wakes queue in that cycle and the watcher exits with the periodic wake reason; otherwise it exits with the reason of the wake it queued.
 A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
@@ -986,7 +999,7 @@ Both interval settings accept positive decimal seconds, including leading zeros;
 Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the periodic waiting-list cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
 Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; only on a periodic resurface drain do rows that need no action follow in a `STANDING` block, and a drain whose only overdue rows need no action prints neither block and opens no handling episode.
-`bin/fm-wake-drain.sh --ack-through` refuses acknowledgement, among overdue rows that this actor's drain presented, for a row with no action or one whose category, subject, owner, next action, or evidence differs from its last action, or whose age clock restarted after the clock start recorded with that action (a new PR head, push, status line, or hold restarts it, even when the row text returns to its old value and even when the restart came between the presented ledger's generation and the record time; an action recorded before this field existed compares against its action time); repeated presentation and increasing age alone do not require another action, except on a `review_pass_not_merged` row, a lapsed deferral, a waiting receipt that no longer stands, or an escalation whose captain hold could not be verified.
+`bin/fm-wake-drain.sh --ack-through` refuses acknowledgement, among overdue rows that this actor's drain presented, for a row with no action or one whose category, subject, owner, next action, or evidence differs from its last action, or whose age clock restarted after the clock start recorded with that action (a new PR head, push, status line, or hold restarts it, even when the row text returns to its old value and even when the restart came between the presented ledger's generation and the record time; an action recorded before this field existed compares against its action time); repeated presentation and increasing age alone do not require another action, except on a `review_pass_not_merged` row, a steer requiring result follow-up, a lapsed deferral, a waiting receipt that no longer stands, or an escalation whose captain hold could not be verified.
 A row first published after the drain is not gated by that acknowledgement: the change wake the watcher queues for it presents it at the next drain, where it is gated as usual.
 A row this actor's drain presented stays gated for this actor's current acknowledgement until an action covers its current evidence, even if the row changes after the drain; a row this actor's drain did not present, including one whose wait lapses or changes after the drain, is gated at its next drain.
 This boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake, whose drain still presents and gates every overdue row.
@@ -1012,7 +1025,24 @@ The episode opens at the moment the row became overdue, read from the ledger's o
 The episode restarts at the presentation of materially changed evidence (its digest), at a recorded deferral, or when the row's age clock restarted on unchanged text (the stored episode keeps the clock it was opened under; a clock that now starts later opens a new episode at the moment the row became overdue under the new clock), and never restarts because the same unchanged row is presented again, so a steer that predates a re-presentation, and a record already cited, still answer that re-presentation, while a delivery sent before the row became overdue or before its evidence changed does not.
 Publication keeps an episode only for a row that is still overdue or that an incomplete pass keeps as stale, so a row that stops being overdue and later goes overdue again opens a new episode, while a row an incomplete pass could not confirm keeps its episode and a delivery sent before a deferral or a changed row still does not count when a complete pass presents it again.
 A ledger written before episodes existed falls back to the acting actor's latest presentation of the row, or the earliest presentation by any actor when it has none.
-Where a steer answers only the turn it followed (on a `review_pass_not_merged` row), its four-hour bound is counted from its delivery, so one message never answers for more than four hours.
+A steer permits standing acknowledgement until its row's configured age limit after the original `sent_epoch`, never from a later acknowledgement, status append, or repeated recording; legacy receipts without that field use their original action time.
+The four-hour input-freshness and new-delivery rules remain recording requirements, not a replacement for the row's result-follow-up deadline.
+A zero-limit row permits the delivery's own instant only, and a future delivery timestamp is refused rather than extending the window.
+The same rule governs standing coverage, current-turn action acceptance, and recording a delivery; expiry requests owner reconciliation, not a blind resend or interruption of useful work.
+The collector reuses its existing worker observations to publish optional `consumer` evidence only when the captured `spawn_gen` still matches the actual metadata and its full source identity matches the row.
+An authoritative unavailable consumer returns the steered obligation for follow-up immediately, even before a separate missing-worker row becomes overdue.
+The observation must match the row's current source roots and verified launch, including a verified successor when the obligation survives relaunch; an absent, unknown, stale or mismatched observation is not evidence of health or an early invalidation.
+This reuses current fleet-snapshot and crew-state evidence; a name-only match is never enough.
+For a steered `stalled_worker` or `silent_report` row whose live-only source stops emitting on unexpected endpoint loss, the publisher keeps the original obligation actionable against the verified endpoint observation instead of treating its disappearance as the result.
+This includes a local secondmate's `silent_report`, even though secondmates do not emit ordinary `missing_worker` rows.
+A recorded stop or completed or failed state is not such a loss; existing outcome and wait handling still applies.
+For a recorded `silent_report` steer, an inbox acknowledgement or an unresolved check-in reply is not the requested report and does not extend the delivery deadline.
+The regular silence clock and repeat-send suppression are unchanged when no formal steer is recorded.
+A publication marks a delivery requiring follow-up with the existing `requires_followup` flag, so subsequent consumer recovery cannot silently revive it and the same old delivery cannot renew it.
+The existing opaque notification token changes once when result follow-up becomes due and settles on unchanged observations.
+A current new action on the same obligation retains that notification token as its seed rather than replaying the handled notification; another unmet delivery deadline or authoritative unavailability derives a new token for the same still-open obligation.
+No new scheduler or process-control path is added.
+A reviewed-green PR still requires an action on each new presentation, even within the delivery's bounded window, and its existing four-hour current-turn answer bound is not widened by a larger configured row limit.
 A merge's evidence is the row's own PR URL, and a merge of that PR must be recorded locally by `bin/fm-pr-merge.sh` or the merge poll (the `fm-pr-poll-merge-notified-v1` marker).
 Escalation evidence is free text: no alarm channel, digest, or firstmate-pane injection has a read receipt, so none of them is proof that an escalation reached the captain.
 An escalation with no captain hold binding carries no proof that it reached the captain, regardless of the row's owner, so it is never counted as covering its row or listed as `escalated, waiting on the captain`; it is still the action on new or changed work, so while the row is unchanged it needs no new action and stays in the periodic waiting list as `escalated, no proof it reached the captain`, and a change to the row gates it again.
@@ -1021,7 +1051,7 @@ The captain's own answer is the only proof that it reached the captain, and that
 A deferral's recheck time must be in the future and at most 24 hours ahead.
 Only one deferral is allowed per unchanged row: deferrals count only while the last action's row digest and recorded clock start match the current row, so a changed row is new work with a fresh allowance.
 `captain_visible` has one owner: a row is captain-visible once its deferral has been used and no longer stands, or once a refusal marked it, in either case only while the row is unchanged, and the printed row and the stored row read that same value.
-A second attempt on an unchanged row refuses, marks the row `captain_visible` and its prior receipt `requires_followup`, and requires steering, merging, a wait, or escalation before acknowledgement, even if that prior receipt otherwise stood, and that mark ends with the first action recorded on changed work; the refusal names a wait only where the row can take one: a wait on a named live task for an `open_pr` or `red_check` row, a wait through a delivery naming the row for an `unanswered_question` or `unlanded_commit` row, and none for any other row.
+A second attempt on an unchanged row refuses, marks the row `captain_visible` and its prior receipt `requires_followup`, and requires steering, merging, a wait, or escalation before acknowledgement, even if that prior receipt otherwise stood, and that mark ends with the first action recorded on changed work; the refusal names a wait only where the row can take one: a wait on a named live task for an `open_pr` or `red_check` row, a wait through a delivery naming the row for an `unanswered_question` or `unlanded_commit` row, and none for any other row; it names a steer only where the row's age limit is nonzero, because a zero-limit steer stands only at its delivery instant.
 Repeated presentation while an action is missing is idempotent; an action covers unchanged evidence across handling turns while it stands or, for an escalation bound to a captain hold, while it waits on the captain; an unproved escalation leaves unchanged evidence in the periodic waiting list instead.
 A first deferral stands until its recheck time unless its row evidence changes, except on a `review_pass_not_merged` row or once a refusal marked it `requires_followup`; a deferral that does not stand leaves the unchanged row captain-visible, so a further deferral is refused and marks it.
 An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` binds one task still held for the captain and covers the row the same way while that hold lasts; when that one hold is answered, released, blocked on an unresolved task, or held again, or cannot be read, the row counts as changed and needs a new firstmate action, so a captain's "merge it" brings an `open_pr` row back for the merge.
@@ -1038,7 +1068,8 @@ When the backlog or the home's ledger cannot be read, an escalation of such a ro
 A bound hold ending or becoming unreadable restores the action requirement immediately, including within the turn the escalation was recorded.
 An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
-Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
+A new canonical status opening changes the question's reconciliation identity even with an absent or identical timestamp; its stream identity and whole-file endpoint come from the same bounded regular input actually read, and unavailable optional task provenance does not erase a confirmed question.
+Legacy status-question receipts without a canonical opening identity require one current reconciliation action after refresh; optional full provenance recovery does not replay an unchanged identified opening, captain-hold provenance additions preserve existing escalation and deferral receipts, and bound waits still verify their full source and dependency.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; a wait on a named task may also bind a `red_check` row, whose worker is parked on purpose until that task lands.
 It is never a task-wide ownership inference or an answer to its prerequisite, and the red checks stay red: the row's evidence still names them, so a changed set of failing checks ends the wait.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
@@ -1245,7 +1276,7 @@ Explicit reopening or successful new-work start or dispatch retires the previous
 The same transitions retire every earlier `Deliverable of the finished work:` line to `Historical deliverable of the finished work:`, keeping its text, so only the current cycle's deliverable stays active.
 A ship whose commits only a recorded verified bundle holds is removed only while its row is held for the captain's land-or-drop call, and teardown keeps that row open and held, as [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header describes.
 A home with a manual backlog, or an Orca cleanup recovery, has no row that can hold that call, so the bundle route refuses there.
-A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project> --owner captain --reason <reason>`.
+A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project> --owner captain --reason <reason> --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'`.
 The captain's answer closes the row with no note, and its captain hold kind keeps it out of Recently Landed.
 A row closed on that bundle instead, by a replay that finds the hold released or by hand, carries the note `preserved in bundle <path>, not landed`; it is never presented as recently landed, and it is not marked as the captain's drop.
 The same transitions retire that line to `Historical preserved in bundle <path>, not landed`, so a row restarted after a bundle close and then closed again is judged on its new close.
@@ -1560,24 +1591,42 @@ A presentation manifest larger than one tail window, and the legacy open-decisio
 ## Test slots per key (FM_TEST_KEY_SLOTS)
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
-The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many scripts run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
-`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
-`--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
+The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many CPU-bound workers run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot and one pool pass, together, before it starts its clock, and `bin/fm-test-run.sh` takes the same slot and a pass around every script it runs through `python3 bin/fm-duration.py gate`, which takes the pass by default.
+The wait for the slot is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots and `--pass-wait-file` the milliseconds it waited for a pass or a token lease, and the runner subtracts the slot wait from the script's duration (its `FM_TEST_END` line and its timing record).
+The wait for the pass (or, inside a pass, for a lease of its tokens) stays in the runner's `FM_TEST_END` duration, as it did before the gate took the pass, but it is left out of the `test.<script>` sample, which measures the script's own execution (with `FM_TEST_KEY_SLOTS=0` too, where the runner reads the pool wrapper's own wait file), and out of the stop clocks and the per-script bound, because those start after the pass is held.
+`--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count both waits.
+The slot and the pass are one acquisition: a waiter holds neither while it queues, so a process that took its slot through `gate` or `run` never waits for a pass while it holds that slot; inside a pass whose holder exported tokens, `gate` and `run` lease tokens in the same acquisition instead, so they never wait for a lease while they hold a slot either.
+A claim in `FM_CPU_PASS_HELD` never skips a slot; only the same key already held by the command's own ancestry (`FM_TEST_SLOT_HELD`) does, and even that request still takes its tokens from the reservation it runs inside, so same-key sibling runners under one pass run one worker at a time.
+Every other nested key counts all holders of that key, so `gate test.K` under another key waits for an unnested `test.K` holder exactly as it does when nothing is nested.
+The one other way out of a wait is a proven wait cycle, and the proof is constructive: gates that each hold one key and reach each other's key through gates alone (a gate whose command is the next gate, directly or through `exec`) cannot end while the nested gate waits, because a gate does nothing but wait for its one command, and each gate registers its command's pid in its own slot record.
+The cycle is closed when every holder of every waiting key is such a gate, whatever `FM_TEST_KEY_SLOTS` is, and a waiter that only waits on the cycle, holding nothing a member waits for, is not part of it; the earliest queued waiter in it, seen on two polls in a row, runs beside the limit and says so (the [`fm-duration.py` header](../bin/fm-duration.py) owns the rule).
+Any other shape gets no exception, because nothing available shows what a user shell, a pass wrapper or a runner between two gates is waiting on: that waiter starts only when a holder ends.
+So a real cycle with a user shell between the gates waits until a holder ends, which in a true cycle nobody does; no timeout, reaper or other mechanism is added for it.
+Amendment A-4 decided this rule: the one constructive exception for a proven wait cycle of gates, and no other exception, timeout or reaper.
 A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
-The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the bounded wait, the nested-run rule and the exit codes.
+The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the wait until a holder ends, the nested-run and wait-cycle rules and the exit codes.
 
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
 | `FM_TEST_KEY_SLOTS` | 2 | 0..16 | Concurrent copies of one `test.*` key allowed host-wide; `0` turns the gate off. Other keys are never gated. |
-| `FM_TEST_SLOT_WAIT_SECONDS` | 7200 | at least 1 | How long a waiter queues before it runs without a slot and says so. |
+| `FM_TEST_SLOT_WAIT_SECONDS` | retired | none | No longer read: a waiter waits until a holder ends and is never admitted by elapsed time, so any value is ignored. |
 | `FM_TEST_SLOT_DIR` | `$HOME/.cache/fm-test-slots` | an absolute path | Where the per-key slot directories live; tests point it at a fixture directory. |
 
-**Why two copies and 7200 seconds**
+**Why two copies, and no wait limit**
 
 A day of the host's own timings (`data/command-durations.jsonl`, 2026-10-17) shows `tests/fm-teardown.test.sh` run 6 times for 13,276 seconds in total, with a median of 2,175 seconds and a longest run of 6,884, and three copies alive at once in three worktrees.
 One slot would queue those six runs behind each other for about 3.7 hours of waiting between them; two slots cap the overlap at two copies while the third waits for the first of the two to finish, typically one median run.
-A waiter gives up after 7,200 seconds, a little longer than the longest run seen, so a queued copy outlasts a holder that is merely slow, and a holder that never finishes can delay a copy by at most that long.
-The gate shapes throughput and is not a safety boundary: a waiter that gives up, a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so.
+The pool, not this cap, bounds the CPU-bound workers; the cap bounds how much of the pool one suite can fill and that suite's process churn.
+Two is the largest per-key count at which the fleet's peak mix of suites, all running at the cap, still fits the CPUs by measured demand.
+The six heavy scripts measured use between 0.15 and 0.67 of a CPU each (0.69 for the duration suite; the one suite that averaged 1.66 runs runners of its own and reserves their passes, so it is not the one-worker copy counted here), the host has 18 logical CPUs (`sysctl -n hw.logicalcpu`), and the most distinct `test.*` keys the host's own ledger shows running together is 12 (a sweep of the intervals `recorded_at` minus `duration_ms` in `data/command-durations.jsonl` since 2026-10-14).
+With the largest of the six measured demands, 12 keys of K copies each need 12 x K x 0.67 CPUs, which fits 18 CPUs only for K up to floor(18 / (12 x 0.67)) = 2 (16.2 CPUs); K = 3 would need 24.3, so three copies of a suite would let the peak mix of suites ask for more CPU than the host has even though the pool would still cap the workers at 18.
+The result holds while the largest per-copy demand stays at or below 0.75 CPU (18 / (12 x 2)); a heavier suite mix derives a smaller number, so re-derive the default from the same three measurements when the host or the suite mix changes.
+On a host with fewer CPUs the pool is smaller but the cap still applies per key: with four passes and two slots a third request for one key waits while two passes are free, because the slot cap and the pass pool are separate limits and a request waits for whichever is full.
+The accepted default stays at 2 on every host; the formula is how it was derived here, not a per-host recomputation.
+A waiter used to give up after 7,200 seconds and run beside the limit, so a day of slow holders let every copy through together, which is the harm the gate exists to prevent.
+Waiting is now by capacity alone: a waiter starts when a holder ends, whatever time has passed, and a holder that never ends is bounded only by the stop rules of its own runner.
+The gate shapes throughput and is not a safety boundary: a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so, and never blocks it.
 A native Windows bash (`uname` MINGW, MSYS or CYGWIN) never calls the gate.
 
 **Release and stale holders**
@@ -4906,7 +4955,7 @@ FM_GITHUB_ACCOUNTING=1   # 0 stops a primary home's watcher from keeping the sta
 FM_GITHUB_ACCOUNTING_BIN=   # test seam: the owner the watcher starts instead of bin/fm-github-accounting.py
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
-FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
+FM_TEST_SLOT_WAIT_SECONDS=   # retired and ignored: a waiter waits for a slot until a holder ends (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
 FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
 FM_HOME_SUMMARY_TIMEOUT=900    # no-output/no-CPU seconds for home-summary initialization through atomic publication, never a wall-clock cutoff; independent failure-accounting bounds are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 900
