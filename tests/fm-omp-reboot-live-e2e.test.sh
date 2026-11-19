@@ -225,7 +225,7 @@ exercise_native_refusals() {
         out=$("$ROOT/bin/fm-control.sh" "$TASK_ID" relaunch --recover-launch 2>&1) \
           || fail "direct native recovery inspection failed: $out"
         case "$out" in
-          *"recovery-skipped $TASK_ID launch=unmanaged; no lifecycle action taken"*) ;;
+          *"recovery-skipped $TASK_ID launch=unmanaged: live omp agent carries"*) ;;
           *) fail "direct recovery did not report the unmanaged no-op: $out" ;;
         esac
         ;;
@@ -233,7 +233,7 @@ exercise_native_refusals() {
         out=$("$ROOT/bin/fm-reboot-recover.sh" recover 2>&1) \
           || fail "native reboot inspection failed: $out"
         case "$out" in
-          *"REBOOT_RECOVERY: $TASK_ID: live launch is unmanaged; no lifecycle action taken"*) ;;
+          *"REBOOT_RECOVERY: $TASK_ID: live omp agent carries"*) ;;
           *) fail "reboot sweep did not alert without lifecycle action: $out" ;;
         esac
         ;;

@@ -149,7 +149,15 @@
 # semantic callers may set FM_SEND_EXPECTED_SPAWN_GEN or
 # FM_SEND_EXPECTED_REMOTE_HOST to require that sampled identity to still match
 # during the final locked remote-route validation; unset or empty guards do not
-# change ordinary sends.
+# change ordinary sends. A caller that compared a route sets
+# FM_SEND_EXPECTED_PLACEMENT (local or remote), and for a local one
+# FM_SEND_EXPECTED_ENDPOINT, so a send that resolves to another placement or
+# endpoint refuses (Main 1807 (4)). A caller that compared a remote route (Main 1714 (b))
+# also sets FM_ON_EXPECTED_HOST, FM_ON_EXPECTED_ROOT and FM_ON_EXPECTED_HOME,
+# which bin/fm-on.sh enforces, and FM_SEND_EXPECTED_REMOTE_TARGET: the send then
+# refuses before any pending-reply record, and again at the locked validation,
+# when its record's remote_host, remote_root or home differ, and passes the
+# target to the host send verb, which refuses another endpoint.
 #
 # Decision closure (answerer-closes): a text send to a task selector whose
 # state/<id>.status holds open keyed decisions (every key status_open_decisions
@@ -630,6 +638,95 @@ fm_send_resolve_target "$RAW_TARGET" || {
   exit 1
 }
 T=$RESOLVED_TARGET
+
+# A compared route (Main 1714 (b), Main 1807 (4)) binds the send for every
+# backend: when any expectation is set, the resolved placement must be the
+# expected one (FM_SEND_EXPECTED_PLACEMENT local or remote); a remote record
+# must name the expected host, root, home and remote target, and a local one
+# must resolve to the expected endpoint (FM_SEND_EXPECTED_ENDPOINT). Checked
+# before anything is recorded; the locked validations below repeat it. It
+# takes the record as one snapshot (Main 1928): FM_SEND_RECORD_BYTES and its
+# private copy FM_SEND_RECORD_COPY from fm_send_record_snapshot, never the
+# record's path, so every field it compares comes from the caller's one read.
+fm_send_route_expected_set() {
+  [ -n "${FM_SEND_EXPECTED_PLACEMENT:-}${FM_SEND_EXPECTED_ENDPOINT:-}${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ]
+}
+fm_send_remote_route_expected() { # <snapshot-bytes> <snapshot-copy>
+  local placement=local bytes=$1 copy=$2
+  fm_send_route_expected_set || return 0
+  [ "$TARGET_BACKEND" != remote ] || placement=remote
+  [ -z "${FM_SEND_EXPECTED_PLACEMENT:-}" ] || [ "$FM_SEND_EXPECTED_PLACEMENT" = "$placement" ] || return 1
+  [ -n "$bytes" ] && [ -n "$copy" ] || return 1
+  if [ "$placement" = remote ]; then
+    [ -z "${FM_SEND_EXPECTED_ENDPOINT:-}" ] || return 1
+    [ "$(fm_launch_proof_bytes_field "$bytes" remote_host)" = "${FM_ON_EXPECTED_HOST:-}" ] \
+      && [ "$(fm_launch_proof_bytes_field "$bytes" remote_root)" = "${FM_ON_EXPECTED_ROOT:-}" ] \
+      && [ "$(fm_launch_proof_bytes_field "$bytes" home)" = "${FM_ON_EXPECTED_HOME:-}" ] || return 1
+    [ -z "${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] \
+      || [ "$(fm_launch_proof_bytes_field "$bytes" remote_target)" = "$FM_SEND_EXPECTED_REMOTE_TARGET" ]
+    return
+  fi
+  [ -z "${FM_ON_EXPECTED_HOST:-}${FM_ON_EXPECTED_ROOT:-}${FM_ON_EXPECTED_HOME:-}${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] || return 1
+  # The endpoint rule (bin/fm-backend.sh owns it) reads the private copy.
+  [ -n "${FM_SEND_EXPECTED_ENDPOINT:-}" ] && [ "$T" = "$FM_SEND_EXPECTED_ENDPOINT" ] \
+    && [ "$(fm_backend_target_of_meta "$copy")" = "$FM_SEND_EXPECTED_ENDPOINT" ]
+}
+# A local compared route also re-checks the agent now at that endpoint, right
+# before delivery (Main 1856 F4): the restart's own attribution decision,
+# re-run on the record, must still proceed and name the compared endpoint.
+fm_send_expected_attribution() { # <meta>
+  [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] || return 0
+  if ! declare -F fm_secondmate_restart_attribution >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-secondmate-restart-lib.sh
+    . "$SCRIPT_DIR/fm-secondmate-restart-lib.sh" || return 1
+  fi
+  fm_secondmate_restart_attribution "$1" || return 1
+  [ "${FM_SECONDMATE_RESTART_ROUTE_PLACEMENT:-}" = local ] \
+    && [ "${FM_SECONDMATE_RESTART_ROUTE_TARGET:-}" = "${FM_SEND_EXPECTED_ENDPOINT:-}" ]
+}
+# The doorbell after the inbox write rings only while the endpoint snapshot the
+# delivery was checked on still holds (Main 1874 (i)): for a local compared
+# route, the attribution decision run again must proceed on the same record
+# bytes. Otherwise the steer stays in the inbox for the next agent that reads
+# it, and the ring is withheld and reported.
+FM_SEND_DECISION_BYTES=''
+# The locked final validation reads the task record once (Main 1874 rule S,
+# Main 1901): FM_SEND_RECORD_BYTES holds the bytes (bin/fm-launch-proof-lib.sh
+# owns the reader: a failed, empty or NUL-bearing read fails) and
+# FM_SEND_RECORD_COPY a private copy that every field reader is given, so no
+# field comes from a second read of the record. The caller removes the copy.
+FM_SEND_RECORD_BYTES='' FM_SEND_RECORD_COPY=''
+fm_send_record_snapshot() { # <meta>
+  local bytes
+  FM_SEND_RECORD_BYTES='' FM_SEND_RECORD_COPY=''
+  [ -n "$1" ] && [ -f "$1" ] || return 1
+  if ! declare -F fm_launch_proof_bytes >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-launch-proof-lib.sh
+    . "$SCRIPT_DIR/fm-launch-proof-lib.sh" || return 1
+  fi
+  bytes=$(fm_launch_proof_bytes "$1") || return 1
+  FM_SEND_RECORD_BYTES=${bytes%x}
+  FM_SEND_RECORD_COPY=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-send-record.XXXXXX") || return 1
+  printf '%s' "$FM_SEND_RECORD_BYTES" > "$FM_SEND_RECORD_COPY" || {
+    rm -f -- "$FM_SEND_RECORD_COPY"; FM_SEND_RECORD_COPY=''; return 1
+  }
+}
+fm_send_ring_snapshot_holds() { # <meta>
+  [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] || return 0
+  [ -n "$FM_SEND_DECISION_BYTES" ] || return 1
+  fm_send_expected_attribution "$1" || return 1
+  [ "${FM_SECONDMATE_RESTART_RECORD_BYTES:-}" = "$FM_SEND_DECISION_BYTES" ]
+}
+route_expected_ok=1
+if fm_send_route_expected_set; then
+  fm_send_record_snapshot "${TARGET_META:-}" || true
+  fm_send_remote_route_expected "$FM_SEND_RECORD_BYTES" "$FM_SEND_RECORD_COPY" || route_expected_ok=0
+  [ -z "$FM_SEND_RECORD_COPY" ] || rm -f -- "$FM_SEND_RECORD_COPY"
+fi
+if [ "$route_expected_ok" = 0 ]; then
+  echo "error: steer not sent to ${TARGET_REMOTE_ID:-$RAW_TARGET}: its resolved route is not the expected route (placement '${FM_SEND_EXPECTED_PLACEMENT:-}', endpoint '${FM_SEND_EXPECTED_ENDPOINT:-${FM_SEND_EXPECTED_REMOTE_TARGET:-}}', host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent" >&2
+  exit 1
+fi
 shift
 
 # Supervision lease guard: a steer is overlap territory between the two Pi
@@ -1124,18 +1221,27 @@ else
     CURRENT_REMOTE_ID=
     CURRENT_REMOTE_HOST=
     CURRENT_REMOTE_SPAWN_GEN=
-    if [ -f "$TARGET_META" ]; then
+    # One read of the parent record decides (Main 1874 rule S, Main 1928): the
+    # id is the record's name, and the host, generation and route fields all
+    # come from the same snapshot.
+    if fm_send_record_snapshot "$TARGET_META"; then
       CURRENT_REMOTE_ID=$(fm_send_id_from_meta "$TARGET_META")
-      CURRENT_REMOTE_HOST=$(fm_meta_get "$TARGET_META" remote_host)
-      CURRENT_REMOTE_SPAWN_GEN=$(fm_meta_get "$TARGET_META" spawn_gen)
+      CURRENT_REMOTE_HOST=$(fm_launch_proof_bytes_field "$FM_SEND_RECORD_BYTES" remote_host)
+      CURRENT_REMOTE_SPAWN_GEN=$(fm_launch_proof_bytes_field "$FM_SEND_RECORD_BYTES" spawn_gen)
     fi
+    remote_valid=1
     if [ "$CURRENT_REMOTE_ID" != "$TARGET_REMOTE_ID" ] ||
       { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
         [ "$CURRENT_REMOTE_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
       { [ -n "${FM_SEND_EXPECTED_REMOTE_HOST:-}" ] &&
         [ "$CURRENT_REMOTE_HOST" != "$FM_SEND_EXPECTED_REMOTE_HOST" ]; } ||
       [ -z "$CURRENT_REMOTE_HOST" ] ||
-      [ "$CURRENT_REMOTE_HOST" != "$TARGET_REMOTE_HOST" ]; then
+      [ "$CURRENT_REMOTE_HOST" != "$TARGET_REMOTE_HOST" ] ||
+      ! fm_send_remote_route_expected "$FM_SEND_RECORD_BYTES" "$FM_SEND_RECORD_COPY"; then
+      remote_valid=0
+    fi
+    [ -z "$FM_SEND_RECORD_COPY" ] || rm -f -- "$FM_SEND_RECORD_COPY"
+    if [ "$remote_valid" = 0 ]; then
       fm_lock_release "$REMOTE_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
@@ -1147,6 +1253,8 @@ else
     remote_completion_unknown=0
     REMOTE_SEND_ARGS=("$TARGET_REMOTE_ID" "$MESSAGE")
     [ -z "$FIRE_AND_FORGET_ID" ] || REMOTE_SEND_ARGS+=(fire-and-forget)
+    [ -z "${FM_SEND_EXPECTED_REMOTE_TARGET:-}" ] \
+      || REMOTE_SEND_ARGS+=("expected-target=$FM_SEND_EXPECTED_REMOTE_TARGET")
     # Each transport attempt is bounded by FM_SEND_REMOTE_BUDGET seconds.
     # fm_run_timed's 124 means the attempt was killed at the bound with remote
     # completion unknown - the enqueue may have landed - so it exits through
@@ -1252,16 +1360,31 @@ else
     CURRENT_INBOX_TARGET=
     CURRENT_INBOX_BACKEND=
     CURRENT_INBOX_SPAWN_GEN=
-    if [ -f "$TARGET_META" ]; then
-      CURRENT_INBOX_TARGET=$(fm_backend_target_of_meta "$TARGET_META")
-      CURRENT_INBOX_BACKEND=$(fm_backend_of_meta "$TARGET_META")
-      CURRENT_INBOX_SPAWN_GEN=$(fm_meta_get "$TARGET_META" spawn_gen)
+    CURRENT_INBOX_REMOTE_HOST=
+    # Every field below comes from one read of the record (its private copy);
+    # a local compared route's attribution decision must have read the same
+    # bytes (Main 1874 rule S, Main 1901).
+    if fm_send_record_snapshot "$TARGET_META"; then
+      CURRENT_INBOX_TARGET=$(fm_backend_target_of_meta "$FM_SEND_RECORD_COPY")
+      CURRENT_INBOX_BACKEND=$(fm_backend_of_meta "$FM_SEND_RECORD_COPY")
+      CURRENT_INBOX_SPAWN_GEN=$(fm_meta_get "$FM_SEND_RECORD_COPY" spawn_gen)
+      CURRENT_INBOX_REMOTE_HOST=$(fm_meta_get "$FM_SEND_RECORD_COPY" remote_host)
     fi
-    if [ "$CURRENT_INBOX_TARGET" != "$T" ] ||
+    final_valid=1
+    if [ -z "$FM_SEND_RECORD_COPY" ] ||
+      [ "$CURRENT_INBOX_TARGET" != "$T" ] ||
       [ "$CURRENT_INBOX_BACKEND" != "$TARGET_BACKEND" ] ||
       { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
         [ "$CURRENT_INBOX_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
-      [ -n "$(fm_meta_get "$TARGET_META" remote_host)" ]; then
+      [ -n "$CURRENT_INBOX_REMOTE_HOST" ] ||
+      ! fm_send_remote_route_expected "$FM_SEND_RECORD_BYTES" "$FM_SEND_RECORD_COPY" ||
+      ! fm_send_expected_attribution "$TARGET_META" ||
+      { [ "${FM_SEND_EXPECTED_PLACEMENT:-}" = local ] &&
+        [ "${FM_SECONDMATE_RESTART_RECORD_BYTES:-}" != "$FM_SEND_RECORD_BYTES" ]; }; then
+      final_valid=0
+    fi
+    [ -z "$FM_SEND_RECORD_COPY" ] || rm -f -- "$FM_SEND_RECORD_COPY"
+    if [ "$final_valid" = 0 ]; then
       fm_lock_release "$INBOX_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
@@ -1269,6 +1392,7 @@ else
       echo "error: steer not sent to $INBOX_TASK_ID: the task retired or changed endpoint during target resolution" >&2
       exit 1
     fi
+    [ "${FM_SEND_EXPECTED_PLACEMENT:-}" != local ] || FM_SEND_DECISION_BYTES=$FM_SEND_RECORD_BYTES
     if [ "${FM_SEND_IDEMPOTENT:-0}" = 1 ]; then
       INBOX_RECORD=$(fm_task_inbox_write_idempotent "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
         "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
@@ -1313,6 +1437,10 @@ else
     if [ -n "$RESOLVE_KEYS" ]; then
       fm_send_close_resolved_keys "$RESOLVE_ANSWER_TEXT" || exit 1
       fm_send_feed_resolved_holds "$RESOLVE_ANSWER_TEXT" || exit 1
+    fi
+    if ! fm_send_ring_snapshot_holds "$TARGET_META"; then
+      echo "fm-send: doorbell withheld: the record or the agent at $T is no longer the one this steer was checked against, so the pane was not rung; the steer stays durably recorded at $INBOX_RECORD for the next agent that reads its inbox" >&2
+      exit 0
     fi
     # Ring the doorbell, best-effort: no ring outcome changes the exit status,
     # because the watcher owns loss detection from here, either through its

@@ -249,7 +249,12 @@ arm_answer() {
 
 run_restart() {  # <case-dir> <args...>
   local dir=$1; shift
+  # A claude relaunch pre-registers workspace trust in the launching user's own
+  # store (bin/fm-claude-trust.sh), so this runs against a throwaway HOME;
+  # without it this suite would write the developer's real ~/.claude.json.
+  mkdir -p "$dir/user-home"
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
     FM_CONFIG_OVERRIDE="$dir/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
     FM_SECONDMATE_PERSIST_WAIT="${FM_TEST_PERSIST_WAIT:-30}" \
@@ -468,18 +473,21 @@ setup_remote_case() {  # <case-dir> <id> <ssh-mode>
   local fb="$dir/fakebin"
   mkdir -p "$dir/$id-home"
   {
+    # The fields bin/fm-spawn.sh writes for a remote secondmate: worktree and
+    # home are the registry home, project and remote_root the registry root.
     echo "window=remote:$id"
     echo "endpoint_task_id=$id"
-    echo "worktree=$dir/$id-home"
-    echo "project=$dir/$id-home"
+    echo "worktree=/srv/$id"
+    echo "project=/srv/fm"
     echo "harness=claude"
     echo "kind=secondmate"
     echo "mode=secondmate"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
-    echo "home=$dir/$id-home"
+    echo "home=/srv/$id"
     echo "remote_host=remote-mac"
+    echo "remote_root=/srv/fm"
     echo "remote_backend=herdr"
     echo "remote_target=fm-remote:2ndmate-$id"
   } > "$dir/home/state/$id.meta"
@@ -502,6 +510,8 @@ decode() { printf '%s' "$1" | base64 --decode 2>/dev/null || printf '%s' "$1" | 
 rargs=()
 while IFS= read -r -d '' a; do rargs+=("$a"); done < <(decode "$argv_b64")
 printf '%s\n' "${rargs[*]}" >> "$FM_FAKE_SSH_LOG"
+# Every call's route (root and home as fm-on resolved them), one line each.
+printf 'root=%s home=%s %s\n' "$(decode "$2")" "$(decode "$3")" "${rargs[0]} ${rargs[1]:-}" >> "$FM_FAKE_SSH_LOG.route"
 if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ] && [ "${rargs[0]}" = fm-remote-inherit.sh ]; then
   remote_root=$(decode "$2")
   remote_home=$(decode "$3")
@@ -511,8 +521,56 @@ fi
 case "${FM_FAKE_SSH_MODE:-ok}" in
   unreachable) exit 255 ;;
 esac
+# The host's own endpoint target: a case moves it by writing fake/host-target.
+host_target=${FM_FAKE_HOST_TARGET:-fm-remote:2ndmate-${rargs[2]:-}}
+[ ! -f "$FM_FAKE_DIR/host-target" ] || host_target=$(cat "$FM_FAKE_DIR/host-target")
 case "${rargs[1]:-}" in
+  attribution)
+    # Main 1807 (7): whether any pending-reply expectation existed at this check.
+    if [ -e "$FM_HOME/state/pending-replies" ]; then state=present; else state=absent; fi
+    printf 'pending-replies=%s\n' "$state" >> "$FM_FAKE_DIR/attribution-checks"
+    # The host refuses a recorded target other than its own endpoint.
+    if [ "${rargs[3]:-}" != "$host_target" ]; then
+      printf 'attribution=refuse: this host endpoint is not the recorded target\n'
+      [ -z "${FM_FAKE_AFTER_ASK:-}" ] || "$FM_FAKE_AFTER_ASK"
+      exit 0
+    fi
+    # The host's read-only verdict; unset models a host that proves the agent.
+    # FM_FAKE_REMOTE_ATTRIBUTION=old-host models a code root without the verb;
+    # nul-proceed prints the proceed line with a NUL byte inside it.
+    case "${FM_FAKE_REMOTE_ATTRIBUTION:-attribution=proceed}" in
+      old-host) printf 'error: unknown command: attribution\n' >&2; exit 1 ;;
+      nul-proceed) printf 'attribution=pro\000ceed\n' ;;
+      *) printf '%s\n' "${FM_FAKE_REMOTE_ATTRIBUTION:-attribution=proceed}" ;;
+    esac
+    # A barrier after the parent's comparison: the registry, the record or the
+    # host endpoint changes before the delivery.
+    [ -z "${FM_FAKE_AFTER_ASK:-}" ] || "$FM_FAKE_AFTER_ASK"
+    ;;
   send)
+    # Main 1856 F4, Main 1860: the host send verb re-reads the agent's
+    # attribution right before the write; a replaced agent refuses. Whether a
+    # pending-reply expectation existed at that refusal is logged.
+    if [ -f "$FM_FAKE_DIR/agent-replaced" ]; then
+      if [ -e "$FM_HOME/state/pending-replies" ]; then state=present; else state=absent; fi
+      printf 'send-refused pending-replies=%s\n' "$state" >> "$FM_FAKE_DIR/attribution-checks"
+      # Main 1874 finding 6: the agent can be attributable again right after the
+      # refusal, and the parent's discard of its expectation can fail.
+      [ ! -f "$FM_FAKE_DIR/restore-after-refusal" ] || rm -f "$FM_FAKE_DIR/agent-replaced"
+      [ ! -f "$FM_FAKE_DIR/discard-fails" ] || chmod 500 "$FM_HOME/state/pending-replies"
+      printf 'error: the agent at this host endpoint is no longer attributed to this task\n' >&2
+      exit 1
+    fi
+    # The host verb refuses an expected target other than its own endpoint.
+    for a in "${rargs[@]:2}"; do
+      case "$a" in
+        expected-target=*)
+          if [ "${a#expected-target=}" != "$host_target" ]; then
+            printf 'error: this host endpoint is not the expected target\n' >&2
+            exit 1
+          fi ;;
+      esac
+    done
     # Model the live remote mate: act on the instruction and report back on the
     # parent channel, carrying the correlation token the request embedded.
     if [ -n "${FM_FAKE_ANSWER_STATUS:-}" ]; then
@@ -525,8 +583,23 @@ case "${rargs[1]:-}" in
       [ -z "$corr" ] || printf 'done [%s]: open records written down\n' "$corr" \
         >> "$FM_FAKE_ANSWER_STATUS"
     fi
+    # Main 1874 (i): the host recorded the steer but withheld its doorbell.
+    [ ! -f "$FM_FAKE_DIR/withhold-doorbell" ] \
+      || printf 'notice: doorbell withheld: the record or the agent at %s is no longer the one this steer was checked against, so the pane was not rung; the steer stays durably recorded at /synthetic/inbox for the next agent that reads its inbox\n' "$host_target" >&2
+    # A barrier after the persistence request, before the relaunch.
+    [ -z "${FM_FAKE_AFTER_SEND:-}" ] || "$FM_FAKE_AFTER_SEND"
     ;;
   relaunch)
+    # Main 1809: the host refuses an expected target other than its endpoint.
+    for a in "${rargs[@]:3}"; do
+      case "$a" in
+        --expected-target=*)
+          if [ "${a#--expected-target=}" != "$host_target" ]; then
+            printf 'error: this host endpoint is not the expected target\n' >&2
+            exit 1
+          fi ;;
+      esac
+    done
     if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ]; then
       remote_root=$(decode "$2")
       remote_home=$(decode "$3")
@@ -590,13 +663,316 @@ test_remote_mate_restarts_over_the_transport_hop() {
     "a remote restart should be reported with its host and the parent's pinned runtime"
   relaunch_line=$(grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
   [ -n "$relaunch_line" ] || fail "no relaunch crossed the transport hop"$'\n'"$(cat "$dir/ssh.log")"
-  [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 codex big-model high" ] \
+  [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 codex big-model high --expected-target=fm-remote:2ndmate-sm2" ] \
     || fail "the host-local relaunch did not carry the parent's resolved profile: $relaunch_line"
   # The persist request crossed the SAME hop before the restart did.
   [ "$(grep -n '^fm-remote-secondmate-control.sh send' "$dir/ssh.log" | head -1 | cut -d: -f1)" \
      -lt "$(grep -n '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
     || fail "the remote mate was restarted before it was asked to persist"$'\n'"$(cat "$dir/ssh.log")"
   pass "T6 a remote mate restarts through the host-local control plane over the fm-on hop"
+}
+
+# --- N4: a remote mate's agent is attributed on its host before any effect ------
+test_remote_unproven_agent_gets_no_request_record_or_nudge() {
+  local dir out rc verdict
+  for verdict in 'attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live agent is an unpinned native restore' \
+    old-host '' 'attribution=proceed extra' 'attributed' $'attribution=proceed\n' nul-proceed; do
+    dir=$(new_case remote-unproven)
+    setup_remote_case "$dir" sm2 ok
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    if [ -n "$verdict" ]; then export FM_FAKE_REMOTE_ATTRIBUTION="$verdict"; else export FM_FAKE_REMOTE_ATTRIBUTION=$'\n'; fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_REMOTE_ATTRIBUTION
+    expect_code 3 "$rc" "remote verdict '$verdict' must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2: its remote agent on remote-mac was not attributed to this task" \
+      "remote verdict '$verdict' must be reported as an unattributed remote agent"
+    grep -q '^fm-remote-secondmate-control.sh attribution sm2 fm-remote:2ndmate-sm2$' "$dir/ssh.log" \
+      || fail "the host verdict was never asked for"$'\n'"$(cat "$dir/ssh.log")"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "remote verdict '$verdict' must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "remote verdict '$verdict' must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "remote verdict '$verdict' created a pending-reply record"
+  done
+  pass "N4 a remote mate whose host does not prove its agent gets no request, record, nudge or relaunch"
+}
+
+# --- F6: every remote placement asks its host, or refuses, before any effect ----
+test_remote_backend_other_than_herdr_refuses_before_any_effect() {
+  local dir out rc backend meta
+  for backend in tmux bogus omitted; do
+    dir=$(new_case remote-backend)
+    setup_remote_case "$dir" sm2 ok
+    meta="$dir/home/state/sm2.meta"
+    grep -v '^remote_backend=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+    [ "$backend" = omitted ] || printf 'remote_backend=%s\n' "$backend" >> "$meta"
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS
+    if [ "$backend" = omitted ]; then
+      # An omitted remote_backend is Herdr: the host is asked and the restart goes on.
+      expect_code 0 "$rc" "an omitted remote_backend must ask the host and restart"$'\n'"$out"
+      grep -q '^fm-remote-secondmate-control.sh attribution sm2 fm-remote:2ndmate-sm2$' "$dir/ssh.log" || fail "the host verdict was not asked for an omitted backend"
+      continue
+    fi
+    expect_code 3 "$rc" "remote_backend=$backend must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2:" "remote_backend=$backend must be reported unreached"
+    assert_contains "$out" "remote_backend" "remote_backend=$backend must name the backend it refused"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "remote_backend=$backend must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "remote_backend=$backend must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "remote_backend=$backend created a pending-reply record"
+  done
+  pass "F6 a remote mate whose backend is not Herdr refuses before any effect; an omitted backend asks its host"
+}
+
+# --- Main 1630: an omitted remote_backend is herdr, and its host decides --------
+test_remote_omitted_backend_is_herdr_and_obeys_its_host() {
+  local dir out rc meta verdict
+  for verdict in proceed refuse; do
+    dir=$(new_case remote-omitted)
+    setup_remote_case "$dir" sm2 ok
+    meta="$dir/home/state/sm2.meta"
+    grep -v '^remote_backend=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+    grep -q '^remote_backend=' "$meta" && fail "the fixture still names a remote_backend"
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    if [ "$verdict" = refuse ]; then
+      export FM_FAKE_REMOTE_ATTRIBUTION='attribution=refuse: its live Herdr agent cannot be positively attributed to this task'
+    fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_REMOTE_ATTRIBUTION
+    grep -q '^fm-remote-secondmate-control.sh attribution sm2 fm-remote:2ndmate-sm2$' "$dir/ssh.log" \
+      || fail "an omitted remote_backend ($verdict) was not asked of its host"$'\n'"$(cat "$dir/ssh.log")"
+    assert_not_contains "$out" "names remote_backend" "an omitted remote_backend ($verdict) must not be refused as another backend"
+    if [ "$verdict" = proceed ]; then
+      expect_code 0 "$rc" "an omitted remote_backend whose host proceeds must restart as herdr"$'\n'"$out"
+      grep -q 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
+        || fail "an omitted remote_backend whose host proceeds was not relaunched on its host"
+      continue
+    fi
+    expect_code 3 "$rc" "an omitted remote_backend whose host refuses must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2: its remote agent on remote-mac was not attributed to this task" \
+      "an omitted remote_backend whose host refuses must report the host's refusal"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "an omitted remote_backend whose host refuses must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "an omitted remote_backend whose host refuses must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "an omitted remote_backend whose host refuses created a pending-reply record"
+  done
+  pass "Main 1630 an omitted remote_backend is herdr: its host is asked, and its answer decides"
+}
+
+# --- Main 1634 D4: the host decision is bound to the parent-recorded route -----
+test_remote_attribution_is_bound_to_the_recorded_route() {
+  local dir out rc case meta
+  for case in other-host other-root other-home no-root no-home no-target unregistered; do
+    dir=$(new_case remote-route)
+    setup_remote_case "$dir" sm2 ok
+    meta="$dir/home/state/sm2.meta"
+    case "$case" in
+      other-host)
+        grep -v '^remote_host=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+        printf 'remote_host=other-mac\n' >> "$meta" ;;
+      other-root)
+        grep -v '^remote_root=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+        printf 'remote_root=/srv/other\n' >> "$meta" ;;
+      other-home)
+        grep -v '^home=' "$meta" > "$meta.new" && mv "$meta.new" "$meta"
+        printf 'home=/srv/other\n' >> "$meta" ;;
+      no-root)
+        grep -v '^remote_root=' "$meta" > "$meta.new" && mv "$meta.new" "$meta" ;;
+      no-home)
+        grep -v '^home=' "$meta" > "$meta.new" && mv "$meta.new" "$meta" ;;
+      no-target)
+        grep -v '^remote_target=' "$meta" > "$meta.new" && mv "$meta.new" "$meta" ;;
+      unregistered)
+        : > "$dir/home/data/secondmates.md" ;;
+    esac
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS
+    expect_code 3 "$rc" "a $case route must leave the mate unreached"$'\n'"$out"
+    assert_contains "$out" "unreached: sm2:" "a $case route must be reported unreached"
+    assert_contains "$out" "route" "a $case route must name the route it could not bind"
+    assert_no_grep 'fm-remote-secondmate-control.sh attribution' "$dir/ssh.log" "a $case route must not ask an unbound host"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "a $case route must send no request or nudge"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "a $case route must not relaunch"
+    [ -z "$(find "$dir/home/state/pending-replies" -type f 2>/dev/null)" ] \
+      || fail "a $case route created a pending-reply record"
+  done
+  pass "D4 a remote mate whose registry host, root or home differs from its record, or that records no target, is asked nothing and sent nothing"
+}
+
+# --- Main 1709 ruling 3, Main 1714 (d): the delivery uses the compared route ----
+# Barriers after the host decision change the registry, the record or the host
+# endpoint; each delivery then refuses, with no request, record or relaunch.
+test_remote_delivery_uses_the_compared_route() {
+  local dir out rc case
+  for case in control registry-after-ask meta-after-ask endpoint-after-ask placement-after-ask agent-replaced-before-send discard-fails-after-send-refusal; do
+    dir=$(new_case remote-compared)
+    setup_remote_case "$dir" sm2 ok
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    case "$case" in
+      registry-after-ask)
+        printf '#!/usr/bin/env bash\nsed -i.bak "s|home: /srv/sm2|home: /srv/moved|" %q\n' "$dir/home/data/secondmates.md" > "$dir/after-ask" ;;
+      meta-after-ask)
+        printf '#!/usr/bin/env bash\nsed -i.bak "s|^remote_root=.*|remote_root=/srv/moved|" %q\n' "$dir/home/state/sm2.meta" > "$dir/after-ask" ;;
+      endpoint-after-ask)
+        # The host's endpoint moves from its recorded target after the first ask.
+        printf '#!/usr/bin/env bash\nprintf fm-remote:2ndmate-other > %q\n' "$dir/fake/host-target" > "$dir/after-ask" ;;
+      agent-replaced-before-send|discard-fails-after-send-refusal)
+        # Main 1860: after the check-only ask (the second host ask) passes, the
+        # agent is replaced at the same endpoint before the send. Main 1874
+        # finding 6: it is attributable again right after the send refuses, so a
+        # later nudge would reach it; the second case also makes the discard fail.
+        : > "$dir/fake/restore-after-refusal"
+        [ "$case" != discard-fails-after-send-refusal ] || : > "$dir/fake/discard-fails"
+        # shellcheck disable=SC2016 # the expressions expand in the written script
+        printf '#!/usr/bin/env bash\nn=$(grep -c . %q 2>/dev/null || true)\n[ "${n:-0}" -lt 2 ] || : > %q\n' \
+          "$dir/fake/attribution-checks" "$dir/fake/agent-replaced" > "$dir/after-ask" ;;
+      placement-after-ask)
+        # Main 1807 (4): the parent record becomes a local task after the decision.
+        printf '#!/usr/bin/env bash\nprintf %%s\\\\n backend=herdr window=lab:w1:p2 harness=claude kind=secondmate herdr_session=lab herdr_workspace_id=w1 herdr_tab_id=w1 herdr_pane_id=w1:p2 > %q\n' "$dir/home/state/sm2.meta" > "$dir/after-ask" ;;
+    esac
+    if [ -f "$dir/after-ask" ]; then chmod +x "$dir/after-ask"; export FM_FAKE_AFTER_ASK="$dir/after-ask"; fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_AFTER_ASK FM_FAKE_HOST_TARGET
+    # Main 1807 (7), Main 1860: every check before the send ran while no
+    # pending-reply expectation existed.
+    [ -s "$dir/fake/attribution-checks" ] || fail "$case: the host was never asked"
+    ! grep -v '^send-refused' "$dir/fake/attribution-checks" | grep -q 'pending-replies=present' \
+      || fail "$case: a pending-reply expectation existed at a check before the send"
+    if [ "$case" = control ]; then
+      [ "$(grep -c . "$dir/fake/attribution-checks")" -ge 2 ] \
+        || fail "the check-only step did not ask the host again before the request"$'\n'"$(cat "$dir/fake/attribution-checks")"
+      expect_code 0 "$rc" "the compared route must restart"$'\n'"$out"
+      grep '^fm-remote-secondmate-control.sh send' "$dir/ssh.log" | grep -q 'expected-target=fm-remote:2ndmate-sm2' \
+        || fail "the persistence request did not carry the compared target"$'\n'"$(cat "$dir/ssh.log")"
+      ! grep -v '^root=/srv/fm home=/srv/sm2 ' "$dir/ssh.log.route" | grep -q . \
+        || fail "a call crossed another route"$'\n'"$(cat "$dir/ssh.log.route")"
+      continue
+    fi
+    [ "$rc" -ne 0 ] || fail "$case: the restart went on after the route changed"$'\n'"$out"
+    assert_not_contains "$out" "restarted: sm2" "$case: the mate was reported restarted"
+    assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "$case: the mate was relaunched"
+    if [ "$case" = agent-replaced-before-send ] || [ "$case" = discard-fails-after-send-refusal ]; then
+      # Main 1860: the send verb's own re-check refuses after the expectation
+      # was created. Main 1874 finding 6: that refusal is the mate's final
+      # outcome: it is reported unreached, the pass sends it nothing more (one
+      # send, the refused one, and no nudge, though its agent is attributable
+      # again), and the expectation is discarded or its failed discard reported.
+      assert_grep 'send-refused pending-replies=present' "$dir/fake/attribution-checks" \
+        "$case: the send-time refusal was not reached after the expectation"
+      [ "$(grep -c '^fm-remote-secondmate-control.sh send' "$dir/ssh.log")" = 1 ] \
+        || fail "$case: the pass sent the mate more after its send-time refusal"$'\n'"$(cat "$dir/ssh.log")"
+      assert_not_contains "$out" "nudged: sm2" "$case: a refused mate was nudged in the same pass"
+      assert_contains "$out" "unreached: sm2: the request to write down its open work was not delivered, so nothing else was sent to it" \
+        "$case: the send-time refusal was not the mate's reported outcome"$'\n'"$out"
+      if [ "$case" = discard-fails-after-send-refusal ]; then
+        assert_contains "$out" "could not be discarded" "$case: a failed discard was suppressed"$'\n'"$out"
+        chmod 700 "$dir/home/state/pending-replies"
+      else
+        assert_not_contains "$out" "could not be discarded" "$case: a clean discard was reported as failed"
+        [ -z "$(find "$dir/home/state/pending-replies" -type f ! -name '.*' 2>/dev/null)" ] \
+          || fail "$case: a pending-reply record remained after the send-time refusal"
+      fi
+      continue
+    fi
+    # Main 1777 (3), Main 1807 (7): the refusal comes from a check that ran
+    # before any expectation, so none is ever created and nothing is sent.
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "$case: a request crossed a changed route"
+    [ ! -e "$dir/home/state/pending-replies" ] \
+      || fail "$case: a pending-reply expectation was created before a check refused"
+    [ ! -e "$dir/fake/literal" ] || [ ! -s "$dir/fake/literal" ] \
+      || fail "$case: input reached a local pane: $(cat "$dir/fake/literal")"
+  done
+  pass "a remote restart delivers only over the route it compared: a registry, record, endpoint or placement change after the decision refuses at a check that runs before any expectation exists"
+}
+
+# --- Main 1874 (i): a withheld doorbell is reported, not dropped ------------
+# The host records the persistence request but withholds its doorbell; the
+# restart says so for that mate, and the pass otherwise goes on as delivered.
+test_remote_withheld_doorbell_is_reported() {
+  local dir out rc
+  dir=$(new_case remote-withheld)
+  setup_remote_case "$dir" sm2 ok
+  : > "$dir/fake/withhold-doorbell"
+  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+  out=$(run_restart "$dir" sm2); rc=$?
+  unset FM_FAKE_ANSWER_STATUS
+  assert_contains "$out" "notice: sm2: the request to write down its open work is recorded, but doorbell withheld:" \
+    "a withheld doorbell must be reported for the mate"$'\n'"$out"
+  expect_code 0 "$rc" "a recorded request whose doorbell was withheld is still delivered"$'\n'"$out"
+  pass "Main 1874 (i) a withheld doorbell on the persistence request is reported"
+}
+
+# --- Main 1807 (6): an early capability refusal keeps its first route --------
+# The record names no kind, so the capability check refuses and the mate falls
+# back to a nudge. Between its first decision and the nudge, the registry row
+# and the record both move to another home, so the fresh decision proceeds on a
+# different route; the nudge must refuse. The control keeps the route.
+test_early_capability_fallback_keeps_the_first_route() {
+  local dir out rc case
+  for case in control route-moved; do
+    dir=$(new_case early-fallback-route)
+    setup_remote_case "$dir" sm2 ok
+    grep -v '^kind=' "$dir/home/state/sm2.meta" > "$dir/sm2.meta.next" && mv "$dir/sm2.meta.next" "$dir/home/state/sm2.meta"
+    if [ "$case" = route-moved ]; then
+      printf '#!/usr/bin/env bash\n[ -e %q ] && exit 0\n: > %q\nsed -i.bak "s|home: /srv/sm2|home: /srv/moved|" %q\nsed -i.bak "s|^home=.*|home=/srv/moved|" %q\n' \
+        "$dir/fake/moved-once" "$dir/fake/moved-once" "$dir/home/data/secondmates.md" "$dir/home/state/sm2.meta" > "$dir/after-ask"
+      chmod +x "$dir/after-ask"
+      export FM_FAKE_AFTER_ASK="$dir/after-ask"
+    fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_AFTER_ASK
+    if [ "$case" = control ]; then
+      assert_contains "$out" "nudged: sm2" "the early-refusal control on its first route must be nudged"$'\n'"$out"
+      continue
+    fi
+    assert_contains "$out" "unreached: sm2:" "a fallback on a changed route must be reported unreached"$'\n'"$out"
+    assert_contains "$out" "no longer the one its first decision compared" "the refusal must name the changed route"
+    assert_not_contains "$out" "nudged: sm2" "a fallback on a changed route was nudged"
+    assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "a nudge crossed a changed route"
+  done
+  pass "an early capability refusal keeps its first compared route, and its fallback refuses a changed one"
+}
+
+# --- Main 1777 (2): the relaunch uses the same compared route ---------------
+# The registry row changes after the persistence request, before the relaunch.
+test_remote_relaunch_uses_the_compared_route() {
+  local dir out rc case
+  for case in control registry-after-request endpoint-after-request; do
+    dir=$(new_case remote-relaunch-route)
+    setup_remote_case "$dir" sm2 ok
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    case "$case" in
+      registry-after-request)
+        printf '#!/usr/bin/env bash\nsed -i.bak "s|home: /srv/sm2|home: /srv/moved|" %q\n' "$dir/home/data/secondmates.md" > "$dir/after-send" ;;
+      endpoint-after-request)
+        # Main 1807 (5): the host endpoint moves from p1 to p2 after the request.
+        printf '#!/usr/bin/env bash\nprintf fm-remote:2ndmate-moved > %q\n' "$dir/fake/host-target" > "$dir/after-send" ;;
+    esac
+    if [ -f "$dir/after-send" ]; then chmod +x "$dir/after-send"; export FM_FAKE_AFTER_SEND="$dir/after-send"; fi
+    out=$(run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS FM_FAKE_AFTER_SEND
+    if [ "$case" = control ]; then
+      expect_code 0 "$rc" "the compared route must relaunch"$'\n'"$out"
+      grep -q '^root=/srv/fm home=/srv/sm2 fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log.route" \
+        || fail "the relaunch did not cross the compared route"$'\n'"$(cat "$dir/ssh.log.route")"
+      grep -q '^fm-remote-secondmate-control.sh relaunch .*--expected-target=fm-remote:2ndmate-sm2$' "$dir/ssh.log" \
+        || fail "the relaunch did not carry the compared target"$'\n'"$(cat "$dir/ssh.log")"
+      continue
+    fi
+    grep -q '^fm-remote-secondmate-control.sh send' "$dir/ssh.log" \
+      || fail "the persistence request did not go out before the barrier"$'\n'"$(cat "$dir/ssh.log")"
+    [ "$rc" -ne 0 ] || fail "the restart reported success after the route changed"$'\n'"$out"
+    assert_not_contains "$out" "restarted: sm2" "a relaunch over a changed route was reported restarted"
+    if [ "$case" = endpoint-after-request ]; then
+      # The relaunch reached the host, which refused before dispatch.
+      assert_contains "$out" "not the expected target" "$case: the host did not refuse the moved endpoint"
+    else
+      assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "the relaunch crossed a changed route"
+    fi
+  done
+  pass "a remote relaunch crosses only the route and endpoint its decision compared"
 }
 
 test_remote_fleet_restart_obeys_initiating_policy() {
@@ -628,6 +1004,9 @@ test_remote_role_restart_resolves_the_pair_selected_after_persist() {
     mkdir -p "$dir/sm2-home/config" "$dir/sm2-home/state" "$dir/codex"
     printf -- '- sm2 - remote domain (host: remote-mac; root: %s; home: %s; scope: things; projects: p; added 2026-09-03)\n' \
       "$ROOT" "$dir/sm2-home" > "$dir/home/data/secondmates.md"
+    # The record names the same route the registry row does (Main 1713 (7)).
+    sed -e "s|^remote_root=.*|remote_root=$ROOT|" -e "s|^home=.*|home=$dir/sm2-home|" \
+      "$dir/home/state/sm2.meta" > "$dir/sm2.meta.next" && mv "$dir/sm2.meta.next" "$dir/home/state/sm2.meta"
     printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"before-model","stand_in":"before-stand-in"}}},"retired":[]}' \
       > "$dir/home/config/model-index.json"
     printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"after-model","stand_in":"after-stand-in"}}},"retired":[]}' \
@@ -656,7 +1035,7 @@ test_remote_role_restart_resolves_the_pair_selected_after_persist() {
     selected=$(FM_HOME="$dir/sm2-home" FM_CONFIG_OVERRIDE="$dir/sm2-home/config" FM_MODEL_CATALOG_DIR='' "$ROOT/bin/fm-model-index.sh" profiles "$dir/sm2-home/config/crew-dispatch.json" | jq -r '.default.model')
     [ "$selected" = "$expected" ] || fail "published dispatch selected $selected instead of $expected"
     relaunch_line=$(grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
-    [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 codex $expected high" ] \
+    [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 codex $expected high --expected-target=fm-remote:2ndmate-sm2" ] \
       || fail "relaunch froze the early $selector model: $relaunch_line"
     grep -Fx "model=$expected" "$dir/home/state/sm2.meta" >/dev/null \
       || fail "parent route did not publish the relaunched model"
@@ -678,7 +1057,10 @@ test_unreachable_host_is_reported_unknown() {
   expect_code 3 "$rc" "an unreachable host must not be reported as a reload"$'\n'"$out"
   assert_not_contains "$out" "restarted: sm3" "an unreachable host must not be claimed as restarted"
   assert_contains "$out" "sm3:" "the unreachable mate must still be named"
-  assert_contains "$out" "could not be delivered" "an unreachable host must be reported as undelivered, not as reloaded"
+  # The host's attribution verdict cannot be read either, so nothing is sent at all.
+  assert_contains "$out" "unreached: sm3:" "an unreachable host must be reported unreached, not as reloaded"
+  assert_contains "$out" "returned no attribution decision" "an unreachable host must be reported as an unread attribution"
+  assert_no_grep 'fm-remote-secondmate-control.sh send' "$dir/ssh.log" "nothing is sent to a host whose verdict was not read"
   pass "T7 an unreachable host is reported honestly instead of claimed as reloaded"
 }
 
@@ -724,7 +1106,7 @@ test_native_ultra_restart_keeps_local_and_remote_profiles() {
   unset FM_FAKE_ANSWER_STATUS
   expect_code 0 "$rc" "native remote restart failed: $out"
   relaunch_line=$(grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
-  [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 pi-signed codex-native/gpt-6-astra ultra" ] \
+  [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 pi-signed codex-native/gpt-6-astra ultra --expected-target=fm-remote:2ndmate-sm2" ] \
     || fail "remote restart dropped native profile: $relaunch_line"
   pass "native Ultra survives local restart and the remote restart transport"
 }
@@ -1012,6 +1394,14 @@ test_refused_restart_falls_back_without_claiming_a_reload
 test_local_restart_uses_the_home_pin_and_reports_what_ran
 test_native_ultra_restart_keeps_local_and_remote_profiles
 test_remote_mate_restarts_over_the_transport_hop
+test_remote_unproven_agent_gets_no_request_record_or_nudge
+test_remote_backend_other_than_herdr_refuses_before_any_effect
+test_remote_omitted_backend_is_herdr_and_obeys_its_host
+test_remote_attribution_is_bound_to_the_recorded_route
+test_remote_delivery_uses_the_compared_route
+test_remote_withheld_doorbell_is_reported
+test_remote_relaunch_uses_the_compared_route
+test_early_capability_fallback_keeps_the_first_route
 test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown

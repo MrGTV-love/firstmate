@@ -22,7 +22,9 @@
 # --recover-launch is Herdr-only inspection under the control lock.
 # Managed and stopped agents are left untouched. Unmanaged live agents are
 # reported without lifecycle input; native restoration does not prove ownership.
-# Unknown proof on a versioned launch refuses. A legacy record (no launch_proof)
+# Unknown proof on a versioned launch refuses; an unpinned claude refuses with
+# its own cause (nothing can authorize it), and a claude pinned to another launch
+# generation refuses with its own cause. A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven launches skip.
 # This mode cannot change a profile or create a relaunch transaction.
@@ -83,41 +85,10 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
-# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
-# under the task's control and metadata locks. The lock-owning main Firstmate
-# alone may run it: a worker, the supervision branch, or a session that does
-# not own the home lock is refused, as for authorize-continuation and
-# reassociate. It refuses, naming the missing proof, unless all of these hold:
-#   (1) window and herdr_pane_id agree, and the worktree and pane exist;
-#   (2) the launch-proof owner resolves one foreground PID whose process name
-#       or argv[0] is omp;
-#   (3) that PID's kernel cwd is inside this task's recorded worktree and is
-#       not inside another task's worktree that is as deep or deeper;
-#   (4) no other local task claims the pane;
-#   (5) the existing record has the same nonempty spawn_gen as the metadata,
-#       and the live PID does not carry a launch pin for another generation.
-# The preserved task_session_file (or the pane's omp session-file reference
-# when the field is absent) must identify the same persisted file as that
-# reference. Publication also needs a positively readable live environment
-# without a usable launch pin; a matching or different pin and unreadable
-# probing refuse before staging. A record that already names the live PID is
-# refused unchanged, including the extension's empty unproven mark and an
-# activation naming another file, even when Herdr still registers the task
-# file. A record naming another live omp process is that process's extension's
-# to maintain and is refused unchanged too. A recorded PID
-# that is gone, or that a process other than omp has since reused, does not
-# block repair. The repair writes version=1, the unchanged spawn_gen, the
-# live pid, task_session_file, and current_session_file, publishing by rename
-# only while the record still holds the bytes the proofs were gathered from.
-# It never unlocks a session, touches project files, starts or stops an agent,
-# or sends lifecycle input.
-# This widens lifecycle authorization: a repaired record can authorize a
-# restored omp without the launch environment pin, only while the launch-proof
-# owner can recheck all adoption proofs and the same live PID and session
-# file. Ordinary empty or invalid session records still refuse, and other
-# harnesses and backends keep their existing proof rules.
-# docs/agent-control.md "Repairing a restored omp session record" owns the
-# operator contract and the residual risk of an unpinned adopted process.
+# adopt refuses for every task and changes nothing: the omp adoption route was
+# removed (Main 1874, Main 1901), as the claude one was (Main 1637). An agent
+# without its launch pin is stopped by hand and relaunched; docs/agent-control.md
+# "Repairing a restored omp session record" says so.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -1485,9 +1456,19 @@ if [ -n "$(fm_meta_get "$META" remote_host)" ]; then
   die "task $ID is a remotely placed secondmate on $(fm_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane"
 fi
 
+# A caller that compared this task's endpoint (bin/fm-secondmate-restart.sh,
+# directly or through the host relaunch verb) sets FM_CONTROL_EXPECTED_ENDPOINT,
+# and the validated endpoint must be exactly that one before any lifecycle step
+# (Main 1856 F3). Unset, nothing changes.
+fm_control_require_expected_endpoint() { # <validated-endpoint>
+  [ -z "${FM_CONTROL_EXPECTED_ENDPOINT:-}" ] || [ "$1" = "$FM_CONTROL_EXPECTED_ENDPOINT" ] \
+    || die "task $ID's endpoint is '$1', not the compared endpoint '$FM_CONTROL_EXPECTED_ENDPOINT'; refusing before any lifecycle step"
+}
+
 fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
 BACKEND=$FM_BACKEND_VALIDATED_BACKEND
 T=$FM_BACKEND_VALIDATED_TARGET
+fm_control_require_expected_endpoint "$T"
 LABEL="fm-$ID"
 RECORDED_HARNESS=$(fm_meta_get "$META" harness)
 KIND=$(fm_meta_get "$META" kind)
@@ -1511,54 +1492,11 @@ if [ "$BACKEND" = herdr ]; then
 fi
 
 if [ "$VERB" = adopt ]; then
-  [ -z "${FM_TASK_ID:-}" ] \
-    || die "workers cannot adopt a session record"
-  fm_lease_forbid_branch "session record adoption (fm-control)"
-  # shellcheck source=bin/fm-session-lock-lib.sh
-  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
-  fm_session_lock_owned_by_self "$STATE" \
-    || die "session record adoption requires the actual lock-owning main Firstmate"
-  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
-    || die "adopt needs a local Herdr omp task; no session record was changed"
-  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
-  fm_lock_acquire_wait "$CONTROL_META_LOCK"
-  CONTROL_META_LOCK_HELD=1
-  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
-  adoption_prior=$(cat "$STATE/$ID.omp-session.json" 2>/dev/null) \
-    || die "adopt needs an existing readable session record with the metadata spawn_gen"
-  adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
-  # The omp extension rewrites the record of the process it runs in, by rename
-  # and without these locks, so a record naming a live omp process is the
-  # extension's evidence to keep. A PID reused by any other process after a
-  # restart, another harness included, names no extension and does not block repair.
-  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
-  adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
-    | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
-  [ "$adoption_recorded_pid" != "$adoption_pid" ] \
-    || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
-  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; then
-    echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
-    exit 1
-  fi
-  # Only a positively readable unpinned process cannot run the extension's
-  # pinned publication path, so its extension never rewrites the record meanwhile.
-  fm_launch_proof_pid_unpinned "$adoption_pid" \
-    || die "adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates"
-  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
-    || die "adopt needs a writable session-record directory"
-  printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
-    || die "adopt could not stage the session record; original record preserved"
-  # Refuse a changing foreground, session registration, generation, or task
-  # record rather than publishing a proof gathered for a different activation.
-  adoption_recheck=$(fm_launch_proof_omp_adoption "$META") || exit 1
-  [ "$adoption_record" = "$adoption_recheck" ] \
-    && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
-    || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
-  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
-    || die "adopt could not publish the session record; original record preserved"
-  CONTROL_META_TMP=
-  printf 'adopted: %s\n' "$ID"
-  exit 0
+  # There is no adoption route for any harness (Main 1637 for claude, Main 1874
+  # and Main 1901 for omp): no session record is repaired and no agent without
+  # its launch pin is authorized. The verb keeps its name so a caller gets this
+  # refusal and its next action, and it changes nothing.
+  die "adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with \"bin/fm-control.sh $ID relaunch\"; nothing was changed"
 fi
 
 # --- shared helpers ---------------------------------------------------------
@@ -1571,8 +1509,17 @@ busy_verdict() {
   fm_busy_classify_meta "$META" "$ID" "$STATE"
 }
 
+# ATTRIBUTION_REFUSAL carries the cause a refusal names: the verdict is read once
+# by fm_launch_proof_herdr_refusal, bound to the endpoint T every delivery uses
+# (Main 1856 F2), and every refusing site appends its text.
+ATTRIBUTION_REFUSAL=''
 require_live_task_attribution() {
   local state=${1:-} absence
+  # One read of the task record decides (Main 1874 rule S, Main 1901): the
+  # endpoint comparison and the launch proof both use these bytes.
+  # shellcheck disable=SC2034 # the launch-proof library reads these in scope
+  local FM_LAUNCH_PROOF_RECORD_PATH='' FM_LAUNCH_PROOF_RECORD_BYTES='' FM_LAUNCH_PROOF_RECORD_OK=''
+  ATTRIBUTION_REFUSAL=''
   [ "$BACKEND" = herdr ] || return 0
   [ -n "$state" ] || state=$(agent_state)
   if [ "$state" = missing ]; then
@@ -1584,7 +1531,22 @@ require_live_task_attribution() {
     alive) ;;
     *) return 1 ;;
   esac
-  fm_launch_proof_herdr_authorizes "$META"
+  # The proof must be of T, the one endpoint every delivery below uses: a
+  # record that names another endpoint now refuses (Main 1856 F2).
+  fm_launch_proof_record_read "$META"
+  if [ "$FM_LAUNCH_PROOF_RECORD_OK" != 1 ]; then
+    ATTRIBUTION_REFUSAL=$FM_LAUNCH_PROOF_RECORD_CAUSE
+    return 1
+  fi
+  if [ "$(fm_launch_proof_field "$META" window)" != "$T" ]; then
+    ATTRIBUTION_REFUSAL="its record no longer names the endpoint $T this action targets"
+    return 1
+  fi
+  if ATTRIBUTION_REFUSAL=$(fm_launch_proof_herdr_refusal "$META" "$T"); then
+    ATTRIBUTION_REFUSAL=''
+    return 0
+  fi
+  return 1
 }
 
 # wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
@@ -1597,7 +1559,7 @@ wait_agent_state() {  # <timeout> <wanted>...
     for want in "$@"; do
       if [ "$state" = "$want" ]; then
         if [ "$want" = alive ] && [ "$BACKEND" = herdr ] \
-          && ! fm_launch_proof_herdr_authorizes "$META"; then
+          && ! fm_launch_proof_herdr_authorizes "$META" "$T"; then
           continue
         fi
         printf '%s' "$state"
@@ -1805,7 +1767,7 @@ confirm_exit_picker() {
   [ "$state" = alive ] \
     || refuse_blocking_prompt "$dialog" "It was left as it was because the endpoint reads '$state' rather than a positively classified live agent."
   require_live_task_attribution alive \
-    || refuse_blocking_prompt "$dialog" "It was left as it was because the live agent cannot be positively attributed to this task."
+    || refuse_blocking_prompt "$dialog" "It was left as it was because the live agent cannot be positively attributed to this task${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}."
   if ! exit_picker_visible; then
     EXIT_PICKER_WHY="the screen changed before the key could be sent"
     refuse_exit_picker "$dialog"
@@ -1969,7 +1931,7 @@ verify_interrupt_running() {
 do_interrupt() {
   local proof cancel
   require_live_task_attribution alive \
-    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
   cancel=$(deliver_interrupt) || return $?
   proof=$(verify_interrupt_running) || return $?
   printf '%s cancel=%s' "$proof" "$cancel"
@@ -2086,7 +2048,7 @@ do_exit() {
     *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint" ;;
   esac
   require_live_task_attribution alive \
-    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
   # A busy agent is interrupted first before the exit command is submitted.
   # The verdict is kept: exit_picker_answerable reads it, and it must be the one
   # taken before anything was sent.
@@ -2717,7 +2679,9 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0
+  local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0 report_harness
+  # shellcheck disable=SC2034 # the launch-proof library reads these in scope
+  local FM_LAUNCH_PROOF_RECORD_PATH='' FM_LAUNCH_PROOF_RECORD_BYTES='' FM_LAUNCH_PROOF_RECORD_OK=''
   local -a spawn_args
   local owned_path
 
@@ -2730,23 +2694,40 @@ do_relaunch() {
       alive) ;;
       *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
     esac
-    state=$(fm_launch_proof_herdr "$META")
+    # One record read decides the legacy branch, the verdict and the harness the
+    # report follows (Main 1807 (2), Main 1937 O3): the judge inherits this
+    # decision's bytes, so the report never mixes the startup read with them.
+    fm_launch_proof_record_read "$META"
+    report_harness=$(fm_launch_proof_field "$META" harness)
+    judged=$(fm_launch_proof_recovery_judge "$META" "$T")
+    legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}; judged=${judged#*$'\t'}
+    state=${judged%%$'\t'*}
+    detail=${judged#*$'\t'}
     case "$state" in
       managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
       unmanaged)
-        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+        if [ "$legacy" = 1 ]; then
           echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
           return 0
         fi
-        echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
+        # A claude lane has no skip: an unpinned native restore keeps the
+        # nonzero exit an unproven versioned launch always had.
+        [ "$report_harness" != claude ] \
+          || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
+        # An unpinned omp names its cause and next action as claude does (Main
+        # 1901 (b), Main 1928 F3); it keeps the skip and zero exit omp always had.
+        echo "recovery-skipped $ID launch=unmanaged: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
         return 0
         ;;
+      pinned-elsewhere|contested)
+        die "launch recovery for $ID found $(fm_launch_proof_refusal_cause "$state" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$state" "$META")"
+        ;;
       unknown)
-        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+        if [ "$legacy" = 1 ]; then
           echo "recovery-skipped $ID launch=legacy-unproven"
           return 0
         fi
-        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken"
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown "$detail"); $(fm_launch_proof_refusal_next unknown "$META"))"
         ;;
       *) die "invalid launch proof for $ID: $state" ;;
     esac
@@ -2809,7 +2790,7 @@ do_relaunch() {
   # unattributable live Herdr agent stop an ordinary relaunch, still before any
   # checkpoint or lifecycle input.
   require_live_task_attribution \
-    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
   safe_checkpoint
   slot_copy=$WT
   [ "$RELOCATING" = 0 ] || slot_copy=$RELOCATE_DEST
@@ -2963,7 +2944,7 @@ case "$VERB" in
       *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a key into an unattributed endpoint" ;;
     esac
     require_live_task_attribution alive \
-      || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
+      || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}"
     dismiss_exit_picker
     echo "stayed $ID harness=$HARNESS backend=$BACKEND endpoint=$T verified=picker-closed agent=alive"
     ;;

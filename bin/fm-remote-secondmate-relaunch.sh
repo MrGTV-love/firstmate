@@ -96,6 +96,10 @@ fi
 
 RELAUNCH_ARGS=("$ID" "$HARNESS" "$MODEL" "$EFFORT")
 [ -z "$CAPTAIN_MODEL_PIN" ] || RELAUNCH_ARGS+=("--captain-model-pin=$CAPTAIN_MODEL_PIN")
+# A caller that compared the route (bin/fm-secondmate-restart.sh) binds the
+# host relaunch to that endpoint (Main 1809); unset, the argv is unchanged.
+[ -z "${FM_REMOTE_RELAUNCH_EXPECTED_TARGET:-}" ] \
+  || RELAUNCH_ARGS+=("--expected-target=$FM_REMOTE_RELAUNCH_EXPECTED_TARGET")
 if [ "$(fm_compact_adviser_force_off)" = 1 ]; then
   fm_compact_adviser_bypass_event "$ID"
   RELAUNCH_ARGS+=(--compact-adviser-disable)

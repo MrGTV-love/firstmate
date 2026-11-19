@@ -33,7 +33,7 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-# shellcheck source=bin/fm-pending-reply-lib.sh
+# shellcheck source=bin/fm-pending-reply-lib.sh disable=SC2153 # tests/lib.sh sets ROOT
 . "$ROOT/bin/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-marker-lib.sh
 . "$ROOT/bin/fm-marker-lib.sh"
@@ -757,6 +757,118 @@ test_remote_expected_host_revalidates_final_route() {
   pass "fm-send remote: expected host is enforced by final route validation"
 }
 
+# Main 1709 ruling 3 and Main 1714 (b), (c): with an expected route set, fm-send
+# refuses before any pending-reply record when its record's remote_root or home
+# differs, fm-on refuses a registry route that differs, and the host send verb
+# refuses an endpoint other than the expected target. Unset is unchanged.
+test_remote_expected_route_binds_delivery() {
+  local dir fb ssh_log home rhome rc err case target root rhome_expected
+  for case in unset match meta-root meta-home registry endpoint; do
+    dir="$TMP_ROOT/remote-expected-route-$case"; mkdir -p "$dir"
+    fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+    # The host's attribution reads the endpoint through herdr. A pinned fake
+    # reports the recorded pane gone, so the result never depends on whether
+    # the test host has a real herdr client installed.
+    cat > "$fb/herdr" <<'SH'
+#!/usr/bin/env bash
+case "$1 ${2:-}" in
+  'pane get') printf '{"error":{"code":"pane_not_found"}}\n' ;;
+  *) exit 1 ;;
+esac
+SH
+    chmod +x "$fb/herdr"
+    rhome=$(setup_remote_secondmate_home "remote-expected-route-$case")
+    home=$(setup_remote_parent_home "remote-expected-route-$case" "$rhome")
+    printf 'home=%s\n' "$rhome" >> "$home/state/rsm.meta"
+    target=fm-remote:p1 root=/remote/root rhome_expected=$rhome
+    case "$case" in
+      meta-root) sed 's|^remote_root=.*|remote_root=/other/root|' "$home/state/rsm.meta" > "$dir/m" && mv "$dir/m" "$home/state/rsm.meta" ;;
+      meta-home) sed "s|^home=.*|home=/other/home|" "$home/state/rsm.meta" > "$dir/m" && mv "$dir/m" "$home/state/rsm.meta" ;;
+      registry)
+        sed "s|^home=.*|home=/other/home|" "$home/state/rsm.meta" > "$dir/m" && mv "$dir/m" "$home/state/rsm.meta"
+        rhome_expected=/other/home ;;
+      endpoint) target=fm-remote:p9 ;;
+    esac
+    rc=0
+    if [ "$case" = unset ]; then
+      send_env "$fb" "$home" "$ssh_log" "$SEND" rsm "route-bound steer" >"$dir/out" 2>"$dir/err" || rc=$?
+    else
+      send_env "$fb" "$home" "$ssh_log" FM_ON_EXPECTED_HOST=remote-mac FM_ON_EXPECTED_ROOT="$root" \
+        FM_ON_EXPECTED_HOME="$rhome_expected" FM_SEND_EXPECTED_REMOTE_TARGET="$target" \
+        "$SEND" rsm "route-bound steer" >"$dir/out" 2>"$dir/err" || rc=$?
+    fi
+    err=$(cat "$dir/err")
+    case "$case" in
+      unset|match)
+        expect_code 0 "$rc" "$case: the steer must be delivered: $err"
+        [ -n "$(remote_inbox_records "$rhome")" ] || fail "$case: no remote inbox record"
+        [ -n "$(pending_record "$home")" ] || fail "$case: the reply expectation was not kept"
+        ;;
+      *)
+        [ "$rc" -ne 0 ] || fail "$case: a route that differs from the expected one was delivered"
+        [ -z "$(remote_inbox_records "$rhome")" ] || fail "$case: a remote inbox record was written"
+        [ -z "$(pending_record "$home")" ] || fail "$case: a pending-reply record remained: $(cat "$(pending_record "$home")")"
+        case "$case" in
+          meta-root|meta-home) [ ! -s "$ssh_log" ] || fail "$case: the transport was used before the record was compared" ;;
+          registry) [ ! -s "$ssh_log" ] || fail "$case: ssh ran for a registry route that differs" ;;
+        esac
+        ;;
+    esac
+  done
+  pass "fm-send remote: an expected route binds the record, the registry route and the host endpoint; unset is unchanged"
+}
+
+# Main 1807 (4): the compared route binds the send for every backend. A local
+# record must not take a remote compared route, a remote record must not take a
+# local one, and a local one must resolve to the compared endpoint. The local
+# matching control is delivered; unset leaves ordinary sends unchanged.
+test_expected_route_binds_every_placement() {
+  local dir fb log home rc case rhome
+  for case in local-match local-other-endpoint local-given-remote remote-given-local; do
+    dir="$TMP_ROOT/route-placement-$case"; mkdir -p "$dir"
+    fb=$(make_stubs "$dir"); log="$dir/send.log"; : > "$log"
+    if [ "$case" = remote-given-local ]; then
+      rhome=$(setup_remote_secondmate_home "route-placement-$case")
+      home=$(setup_remote_parent_home "route-placement-$case" "$rhome")
+      printf 'home=%s\n' "$rhome" >> "$home/state/rsm.meta"
+    else
+      home=$(setup_home "route-placement-$case")
+      fm_write_meta "$home/state/lsm.meta" \
+        "window=sess:fm-lsm" "harness=claude" "kind=secondmate" "mode=secondmate" "home=$home/sm"
+    fi
+    rc=0
+    case "$case" in
+      local-match)
+        env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+          FM_SEND_EXPECTED_PLACEMENT=local FM_SEND_EXPECTED_ENDPOINT=sess:fm-lsm \
+          "$SEND" lsm "route-bound steer" >"$dir/out" 2>"$dir/err" || rc=$? ;;
+      local-other-endpoint)
+        env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+          FM_SEND_EXPECTED_PLACEMENT=local FM_SEND_EXPECTED_ENDPOINT=sess:fm-other \
+          "$SEND" lsm "route-bound steer" >"$dir/out" 2>"$dir/err" || rc=$? ;;
+      local-given-remote)
+        env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+          FM_SEND_EXPECTED_PLACEMENT=remote FM_ON_EXPECTED_HOST=remote-mac FM_ON_EXPECTED_ROOT=/remote/root \
+          FM_ON_EXPECTED_HOME=/remote/home FM_SEND_EXPECTED_REMOTE_TARGET=fm-remote:p1 \
+          "$SEND" lsm "route-bound steer" >"$dir/out" 2>"$dir/err" || rc=$? ;;
+      remote-given-local)
+        send_env "$fb" "$home" "$dir/ssh.log" FM_SEND_EXPECTED_PLACEMENT=local FM_SEND_EXPECTED_ENDPOINT=fm-remote:p1 \
+          "$SEND" rsm "route-bound steer" >"$dir/out" 2>"$dir/err" || rc=$? ;;
+    esac
+    if [ "$case" = local-match ]; then
+      expect_code 0 "$rc" "$case: the compared local endpoint must be delivered: $(cat "$dir/err")"
+      [ -n "$(find "$home/state/lsm.inbox" -name '*.msg' 2>/dev/null)" ] || fail "$case: no inbox record"
+      continue
+    fi
+    [ "$rc" -ne 0 ] || fail "$case: a send off the compared route was delivered"
+    assert_contains "$(cat "$dir/err")" "is not the expected route" "$case: the refusal must name the route"
+    [ -z "$(pending_record "$home")" ] || fail "$case: a pending-reply record was created"
+    [ -z "$(find "$home/state" -path '*.inbox/*.msg' 2>/dev/null)" ] || fail "$case: an inbox record was written"
+    [ ! -s "$dir/ssh.log" ] || fail "$case: the transport was used"
+  done
+  pass "fm-send: a compared route binds local and remote placements alike"
+}
+
 test_remote_resolve_key_closes_at_enqueue() {
   local dir fb ssh_log home rhome rc out
   dir="$TMP_ROOT/remote-key"; mkdir -p "$dir"
@@ -1139,6 +1251,8 @@ test_remote_fire_and_forget_never_arms_reply_recovery
 test_remote_send_revalidates_after_retirement_lock
 test_remote_send_revalidates_parent_route_after_retirement_lock
 test_remote_expected_host_revalidates_final_route
+test_remote_expected_route_binds_delivery
+test_expected_route_binds_every_placement
 test_remote_resolve_key_closes_at_enqueue
 test_remote_slash_rides_inbox
 test_remote_real_failure_still_fails

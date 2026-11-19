@@ -131,6 +131,8 @@ case "$action" in
 esac
 if [ "${FM_FAKE_RELAUNCH_MODE:-}" = host-control ]; then
   [ "$cmd" = fm-remote-secondmate-control.sh ] && [ "$action" = relaunch ] || exit 93
+  # The exact argv that crossed the transport, NUL-separated.
+  printf '%s\0' "${args[@]}" > "$FM_FAKE_SOURCE_HOME/../relaunch-argv"
   FM_HOME="$FM_FAKE_DEST_HOME" \
     exec "$FM_FAKE_SOURCE_HOME/../host-root/bin/fm-remote-secondmate-control.sh" "${args[@]:1}"
 fi
@@ -780,5 +782,90 @@ assert_grep "model=$STALE_PIN" "$HOME_DIR/state/ios.meta" \
 [ "$(cat "$TMP/host-control.skips")" = 'internal|internal' ] \
   || fail "the host-local relaunch did not mark its convergence skips as internal plumbing: $(cat "$TMP/host-control.skips")"
 pass "a captain pin passed to the remote relaunch wrapper reaches the host-side fm-control"
+
+# --- Main 1809: the relaunch is bound to the compared endpoint ----------------
+# Unset, the argv crossing the transport is byte-identical to base; a matching
+# expected target dispatches; a host endpoint that moved from p1 to p2 refuses
+# before the host-local control plane is dispatched.
+relaunch_endpoint() { # <pane>
+  fm_write_meta "$DEST_HOME/state/parent-route/ios.meta" \
+    "window=fm-remote:$1" "endpoint_task_id=ios" \
+    "worktree=$DEST_HOME" "project=$DEST_HOME" "home=$DEST_HOME" \
+    "backend=herdr" "herdr_session=fm-remote" "herdr_workspace_id=w1" \
+    "herdr_tab_id=t1" "herdr_pane_id=$1" \
+    "harness=omp" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "model=$STALE_PIN" "effort=medium"
+}
+for EXPECTED_CASE in unset matching moved; do
+  reset_meta
+  rm -f "$TMP/host-control.args" "$TMP/relaunch-argv"
+  relaunch_endpoint p1
+  [ "$EXPECTED_CASE" != moved ] || relaunch_endpoint p2
+  FM_FAKE_RELAUNCH_MODE='host-control'
+  if [ "$EXPECTED_CASE" = unset ]; then
+    OUT=$(run_relaunch ios omp "$STALE_PIN" -); RC=$?
+  else
+    OUT=$(fixture_env FM_REMOTE_RELAUNCH_EXPECTED_TARGET=fm-remote:p1 "$ROOT/bin/fm-remote-secondmate-relaunch.sh" ios omp "$STALE_PIN" -); RC=$?
+  fi
+  unset FM_FAKE_RELAUNCH_MODE
+  case "$EXPECTED_CASE" in
+    unset)
+      expect_code 0 "$RC" "an unset expected target should relaunch as before"$'\n'"$OUT"
+      [ "$(tr '\0' ' ' < "$TMP/relaunch-argv")" = "fm-remote-secondmate-control.sh relaunch ios omp $STALE_PIN - " ] \
+        || fail "an unset expected target changed the transported argv: $(tr '\0' ' ' < "$TMP/relaunch-argv")" ;;
+    matching)
+      expect_code 0 "$RC" "a matching expected target should relaunch"$'\n'"$OUT"
+      assert_present "$TMP/host-control.args" "a matching expected target did not dispatch the host control plane"
+      [ "$(tr '\0' ' ' < "$TMP/relaunch-argv")" = "fm-remote-secondmate-control.sh relaunch ios omp $STALE_PIN - --expected-target=fm-remote:p1 " ] \
+        || fail "the expected target did not cross the transport: $(tr '\0' ' ' < "$TMP/relaunch-argv")" ;;
+    moved)
+      [ "$RC" -ne 0 ] || fail "a host endpoint moved from p1 to p2 was relaunched"$'\n'"$OUT"
+      assert_contains "$OUT" "not the expected target 'fm-remote:p1'" "the refusal must name the compared target"
+      assert_absent "$TMP/host-control.args" "a moved endpoint dispatched the host control plane"
+      assert_no_grep "model=$STALE_PIN" "$HOME_DIR/state/ios.meta" "a refused relaunch must not republish the parent record" ;;
+  esac
+done
+pass "a remote relaunch is bound to the compared endpoint: unset unchanged, matching dispatches, moved refuses"
+
+# --- the host endpoint load digests its record with shasum or sha256sum -------
+# A Linux host may carry sha256sum without shasum. The route verb runs the real
+# endpoint load from a PATH where only sha256sum exists, then from one where
+# neither exists, which must keep refusing.
+digest_path() { # <dir> <with-sha256sum:0|1>
+  local dir=$1 entry name
+  mkdir -p "$dir"
+  IFS=: read -r -a PATH_DIRS <<< "$PATH"
+  for entry in "${PATH_DIRS[@]}"; do
+    [ -d "$entry" ] || continue
+    for name in "$entry"/*; do
+      case "${name##*/}" in shasum|shasum5*|sha256sum) continue ;; esac
+      [ -x "$name" ] && [ ! -e "$dir/${name##*/}" ] && ln -s "$name" "$dir/${name##*/}"
+    done
+  done
+  if [ "$2" = 1 ]; then
+    REAL_DIGEST=$(command -v shasum || command -v sha256sum) || fail "no digest tool to back the sha256sum shim"
+    case "$REAL_DIGEST" in
+      */shasum) printf '#!/bin/sh\nexec %s -a 256 "$@"\n' "$REAL_DIGEST" > "$dir/sha256sum" ;;
+      *) printf '#!/bin/sh\nexec %s "$@"\n' "$REAL_DIGEST" > "$dir/sha256sum" ;;
+    esac
+    chmod +x "$dir/sha256sum"
+  fi
+}
+digest_path "$TMP/digest-sha256sum" 1
+digest_path "$TMP/digest-none" 0
+relaunch_endpoint p1
+for DIGEST_CASE in sha256sum none; do
+  OUT=$(env -i PATH="$TMP/digest-$DIGEST_CASE" HOME="$TMP/user-home" TMPDIR="$TMP/tmp" \
+    FM_HOME="$DEST_HOME" "$TMP/host-root/bin/fm-remote-secondmate-control.sh" route ios 2>&1); RC=$?
+  case "$DIGEST_CASE" in
+    sha256sum)
+      expect_code 0 "$RC" "the endpoint load should succeed where only sha256sum exists"$'\n'"$OUT"
+      assert_contains "$OUT" 'target=fm-remote:p1' "the route did not print the loaded endpoint" ;;
+    none)
+      [ "$RC" -ne 0 ] || fail "the endpoint load accepted a record it could not digest"$'\n'"$OUT"
+      assert_contains "$OUT" 'endpoint metadata is invalid' "the undigestable record did not refuse as invalid" ;;
+  esac
+done
+pass "the host endpoint load digests with sha256sum when shasum is absent and refuses with neither"
 
 echo "ALL TESTS PASSED"

@@ -8,7 +8,12 @@
 # Remote secondmates and other backends keep their existing recovery owners.
 # Missing/stopped agents remain with their existing liveness recovery paths.
 # Herdr's session-wide auto-resume setting is deliberately not changed.
-# Unknown versioned launch proof is reported. A legacy record (no launch_proof)
+# Unknown versioned launch proof is reported as unreadable. A claude whose
+# readable environment carries no launch pin is reported as an unpinned native
+# restore, which nothing can authorize, and keeps the nonzero status.
+# A claude whose readable environment carries a pin for another launch generation
+# is reported as pinned elsewhere and keeps the nonzero status.
+# A legacy record (no launch_proof)
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven records skip.
 # Failed inspection is surfaced; an unbounded sweep continues inspecting records.
@@ -94,10 +99,19 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
   index=$(( (start + offset) % count ))
   meta=${records[index]}
   [ -f "$meta" ] && [ ! -L "$meta" ] || continue
-  [ "$(fm_meta_get "$meta" backend)" = herdr ] || continue
-  [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
   id=${meta##*/}; id=${id%.meta}
-  case "$(fm_meta_get "$meta" kind)" in ship|scout|secondmate|'') ;; *) continue ;; esac
+  # One read of each record decides its inspection (Main 1874 rule S, Main
+  # 1901): the selection, the endpoint validation (on a private copy), the
+  # inspection and its wording all use these bytes, which the inspection
+  # inherits (FM_LAUNCH_PROOF_RECORD_*).
+  fm_launch_proof_record_read "$meta"
+  # A record that cannot be read as one record names no backend to skip on, so
+  # it is selected and reported, and the --one cursor moves past it.
+  if [ "$FM_LAUNCH_PROOF_RECORD_OK" = 1 ]; then
+    [ "$(fm_launch_proof_field "$meta" backend)" = herdr ] || continue
+    [ -z "$(fm_launch_proof_field "$meta" remote_host)" ] || continue
+    case "$(fm_launch_proof_field "$meta" kind)" in ship|scout|secondmate|'') ;; *) continue ;; esac
+  fi
   selected=1
   if [ "$ONE" = 1 ]; then
     tmp=$(umask 077; mktemp "$STATE/.reboot-recovery-cursor.XXXXXX") || exit 1
@@ -107,7 +121,16 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
       exit 1
     fi
   fi
-  if ! fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null; then
+  if [ "$FM_LAUNCH_PROOF_RECORD_OK" != 1 ]; then
+    notice "$id" "record-unreadable" \
+      "REBOOT_RECOVERY: $id: $FM_LAUNCH_PROOF_RECORD_CAUSE; no lifecycle action taken" && result=1
+    continue
+  fi
+  copy=$(fm_launch_proof_record_copy "$meta") || { result=1; continue; }
+  valid=0
+  fm_backend_validate_task_endpoint "$copy" "$id" >/dev/null || valid=1
+  rm -f -- "$copy"
+  if [ "$valid" != 0 ]; then
     result=1
     continue
   fi
@@ -123,32 +146,48 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
     *) result=1; continue ;;
   esac
   born=''
-  if pid=$(fm_launch_proof_herdr_pid "$meta"); then
-    proof=$(fm_launch_proof_herdr_verdict "$meta" "$pid")
-    born=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null | awk '{$1=$1; print}') || born=''
-  else
-    pid='' proof=unknown
-  fi
+  # The same record read decides the legacy branch, the attributed PID and the
+  # verdict (Main 1807 (2)).
+  judged=$(fm_launch_proof_recovery_judge "$meta" "$target")
+  legacy=${judged%%$'\t'*}; judged=${judged#*$'\t'}
+  pid=${judged%%$'\t'*}; judged=${judged#*$'\t'}
+  proof=${judged%%$'\t'*}
+  detail=${judged#*$'\t'}
+  [ -z "$pid" ] || born=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null | awk '{$1=$1; print}') || born=''
   identity="$target $pid $born"
   case "$proof" in
     managed) forget "$id"; continue ;;
     unknown)
-      if [ -z "$(fm_meta_get "$meta" launch_proof)" ]; then
+      if [ "$legacy" = 1 ]; then
         forget "$id"
         continue
       fi
       notice "$id" "launch-unreadable $identity" \
-        "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" && result=1
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$meta")" && result=1
       continue
       ;;
     unmanaged)
-      if [ -z "$(fm_meta_get "$meta" launch_proof)" ]; then
+      if [ "$legacy" = 1 ]; then
         notice "$id" "legacy $identity" \
           "REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" || true
         continue
       fi
+      if [ "$(fm_launch_proof_field "$meta" harness)" = claude ]; then
+        # An unpinned native restore keeps the nonzero status an unproven
+        # versioned launch always had; only its wording follows the true cause.
+        notice "$id" "unmanaged $identity" \
+          "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta")" && result=1
+        continue
+      fi
+      # An unpinned omp names its cause and next action as claude does (Main
+      # 1901 (b), Main 1928 F3); it keeps the zero status omp always had.
       notice "$id" "unmanaged $identity" \
-        "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" || true
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta")" || true
+      ;;
+    pinned-elsewhere|contested)
+      notice "$id" "$proof $identity" \
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause "$proof" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$proof" "$meta")" && result=1
+      continue
       ;;
     *) result=1 ;;
   esac
