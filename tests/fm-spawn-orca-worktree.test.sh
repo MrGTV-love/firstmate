@@ -353,10 +353,63 @@ test_orca_late_admission_refusal_still_records_retained_copy() {
   pass 'late spend-cap and relocated-work refusals still record the retained Orca copy without admitting a worker'
 }
 
+orca_task_spawn_holder_case() {  # <name> <release-on-wait 0|1>: sets ORCA_HOLDER_OUT ORCA_HOLDER_STATUS ORCA_HOLDER_HOME ORCA_HOLDER_ID
+  local name=$1 release_on_wait=$2 case_dir home id fb ready release tick="" holder
+  id="orca-holder-$name-$$"
+  case_dir="$TMP_ROOT/$id"
+  home="$case_dir/home"
+  fm_test_spawn_home "$home" codex
+  printf 'manual\n' > "$home/config/backlog-backend"
+  fm_test_spawn_brief "$home" "$id"
+  fm_git_init_commit "$case_dir/project"
+  fb=$(make_orca_fakebin "$case_dir")
+  ready="$case_dir/holder.ready"
+  release="$case_dir/holder.release"
+  fm_test_hold_task_set_as_spawn "$home/state" "$ready" "$release"
+  holder=$FM_TEST_TASK_SET_HOLDER
+  fm_test_wait_until --while-alive "$holder" -- test -f "$ready" || fail 'task-spawn holder never took the task set'
+  if [ "$release_on_wait" = 1 ]; then
+    tick="$case_dir/release-on-wait"
+    fm_test_release_on_lock_wait "$tick" "$release"
+  fi
+  ORCA_HOLDER_STATUS=0
+  ORCA_HOLDER_OUT=$(FM_ROOT_OVERRIDE='' FM_HOME="$home" HOME="$case_dir/user-home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
+    FM_SPAWN_NO_GUARD=1 FM_TEST_ORCA_DIR="$case_dir" \
+    FM_TEST_ORCA_TERMINAL_FAIL=1 FM_TEST_ORCA_REMOVE_FAIL=1 FM_LOCK_WAIT_TICK="$tick" PATH="$fb:$PATH" \
+    "$SPAWN" "$id" "$case_dir/project" --mode no-mistakes --yolo off --backend orca 2>&1) || ORCA_HOLDER_STATUS=$?
+  : > "$release"
+  wait "$holder" 2>/dev/null || true
+  ORCA_HOLDER_HOME=$home
+  ORCA_HOLDER_ID=$id
+}
+
+test_orca_recovery_waits_out_a_task_spawn_holder_that_releases() {
+  orca_task_spawn_holder_case released 1
+  expect_code 1 "$ORCA_HOLDER_STATUS" "Orca terminal failure must abort the spawn"$'\n'"$ORCA_HOLDER_OUT"
+  [ -f "$ORCA_HOLDER_HOME/state/$ORCA_HOLDER_ID.meta" ] || fail "Orca recovery published no record after the task-spawn holder released: $ORCA_HOLDER_OUT"
+  assert_grep 'cleanup_recovery=orca' "$ORCA_HOLDER_HOME/state/$ORCA_HOLDER_ID.meta" 'Orca recovery record lost its marker'
+  assert_grep "orca_worktree_id=wt-fm-$ORCA_HOLDER_ID" "$ORCA_HOLDER_HOME/state/$ORCA_HOLDER_ID.meta" 'Orca recovery record does not name the retained worktree'
+  assert_grep "endpoint_task_id=$ORCA_HOLDER_ID" "$ORCA_HOLDER_HOME/state/$ORCA_HOLDER_ID.meta" 'Orca recovery record does not name the endpoint'
+  pass 'Orca recovery waits out a task-spawn holder that releases, then publishes its retained-copy record'
+}
+
+test_orca_recovery_refuses_when_a_task_spawn_holder_outlasts_the_bound() {
+  orca_task_spawn_holder_case outlasted 0
+  expect_code 1 "$ORCA_HOLDER_STATUS" "Orca terminal failure must abort the spawn"$'\n'"$ORCA_HOLDER_OUT"
+  [ ! -e "$ORCA_HOLDER_HOME/state/$ORCA_HOLDER_ID.meta" ] || fail 'Orca recovery published while the task-spawn holder still owned the task set'
+  assert_contains "$ORCA_HOLDER_OUT" 'task set is locked by another spawn' 'Orca recovery did not refuse with the task-set contention'
+  assert_contains "$ORCA_HOLDER_OUT" "retained Orca worktree wt-fm-$ORCA_HOLDER_ID" 'Orca refusal does not name the retained worktree'
+  pass 'Orca recovery refuses explicitly and writes no record when a task-spawn holder outlasts the bound'
+}
+
 fm_test_only
 
 test_orca_abort_recovery_obeys_task_set_custody
 test_orca_late_admission_refusal_still_records_retained_copy
+test_orca_recovery_waits_out_a_task_spawn_holder_that_releases
+test_orca_recovery_refuses_when_a_task_spawn_holder_outlasts_the_bound
 
 test_orca_fresh_spawn_enters_the_worktree_it_created
 test_orca_relaunch_is_refused_before_the_worktree_carveout_could_run

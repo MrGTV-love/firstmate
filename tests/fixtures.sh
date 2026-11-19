@@ -339,6 +339,30 @@ EOF
 }
 
 # fm_test_make_spawn_fakebin <dir> [extra-exit0-tool...]
+# fm_test_hold_task_set_as_spawn <state-dir> <ready-file> <release-file>: a real background holder of the home
+# task-set lock with role task-spawn. It touches <ready-file> once it holds the lock, then releases and exits
+# when <release-file> exists. Its pid is left in FM_TEST_TASK_SET_HOLDER.
+fm_test_hold_task_set_as_spawn() {
+  local state=$1 ready=$2 release=$3 lock
+  (
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-wake-lib.sh"
+    lock=$(fm_task_set_lock_path "$state") || exit 1
+    fm_lock_try_acquire "$lock" || exit 1
+    trap 'fm_lock_release "$lock"' EXIT
+    fm_lock_set_role "$lock" task-spawn || exit 1
+    : > "$ready"
+    while [ ! -e "$release" ]; do sleep 0.01; done
+  ) >/dev/null 2>&1 &
+  FM_TEST_TASK_SET_HOLDER=$!
+}
+
+# fm_test_release_on_lock_wait <script> <release-file>: writes the FM_LOCK_WAIT_TICK hook that releases the holder
+# above on the first wait tick of a bounded recovery custody.
+fm_test_release_on_lock_wait() {
+  printf '#!/bin/sh\n: > "%s"\n' "$2" > "$1" && chmod +x "$1"
+}
+
 # Creates <dir>/fakebin with the spawn tmux stub, a no-op treehouse, and any
 # extra exit-0 tools. Echoes the fakebin path.
 fm_test_make_spawn_fakebin() {

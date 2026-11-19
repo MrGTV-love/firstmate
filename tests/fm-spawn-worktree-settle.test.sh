@@ -1416,9 +1416,9 @@ test_task_set_abort_shows_only_output_tail() {
   pass 'TL4: abort prints the exact 30/5/0-line capture tails without filtering'
 }
 
-test_task_set_publish_after_forced_teardown_does_not_recreate_home() {
-  local a rc=0 teardown_rc=0 parent
-  make_lock_case lock-torn-down
+teardown_home_during_get() {  # <case>: a real spawn is paused in its get while a real forced teardown removes its home
+  local parent teardown_rc=0
+  make_lock_case "$1"
   parent="$LOCK_DIR/torn-parent"
   mkdir -p "$parent/state" "$parent/data"
   printf '%s\n' domain > "$LOCK_HOME/.fm-secondmate-home"
@@ -1436,19 +1436,47 @@ EOF
   printf '%s\n' "- domain - design domain (home: $LOCK_HOME; scope: design domain; projects: alpha; added 2026-06-22)" > "$parent/data/secondmates.md"
   mkfifo "$LOCK_DIR/get"
   FM_LOCK_GUARD_EVENT_LOG="$LOCK_DIR/guard-events.jsonl" lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" "$LOCK_DIR/get"
-  a=$LOCK_PID
-  lock_ready "$a" "$LOCK_DIR/get"
+  LOCK_A_PID=$LOCK_PID
+  lock_ready "$LOCK_A_PID" "$LOCK_DIR/get"
   FM_HOME=$parent PATH="$LOCK_FAKE:$PATH" "$ROOT/bin/fm-teardown.sh" domain --force \
     --drop-file "$(fm_test_drop_file)" >"$LOCK_DIR/teardown.out" 2>&1 || teardown_rc=$?
   expect_code 0 "$teardown_rc" "forced teardown of the secondmate home failed: $(cat "$LOCK_DIR/teardown.out")"
   [ ! -e "$LOCK_HOME" ] || fail 'forced teardown did not remove the secondmate home'
-  kill -0 "$a" 2>/dev/null || fail "spawn ended before its get returned: $(cat "$LOCK_DIR/lock-a.out")"
+  kill -0 "$LOCK_A_PID" 2>/dev/null || fail "spawn ended before its get returned: $(cat "$LOCK_DIR/lock-a.out")"
+}
+
+test_task_set_publish_after_forced_teardown_does_not_recreate_home() {
+  local rc=0
+  teardown_home_during_get lock-torn-down
   printf 'go\n' > "$LOCK_DIR/get"
-  wait "$a" || rc=$?
-  lock_forget "$a"
-  [ "$rc" -ne 0 ] || fail "a spawn published into a home its forced teardown had removed: $(cat "$LOCK_DIR/lock-a.out")"
+  wait "$LOCK_A_PID" || rc=$?
+  lock_forget "$LOCK_A_PID"
+  expect_code 1 "$rc" "a spawn published into a home its forced teardown had removed: $(cat "$LOCK_DIR/lock-a.out")"
+  assert_contains "$(cat "$LOCK_DIR/lock-a.out")" 'error: spawn refused: state directory is not a real directory at' 'a removed home was not refused as a missing state directory'
   [ ! -e "$LOCK_HOME" ] || fail "a refused spawn recreated the home its forced teardown removed: $(cat "$LOCK_DIR/lock-a.out")"
   pass 'a spawn whose forced teardown finished during its get is refused and recreates nothing'
+}
+
+test_task_set_publish_refuses_a_recreated_state_directory() {
+  local rc=0
+  teardown_home_during_get lock-recreated
+  bash -c 'mkdir -p "$1/state"' _ "$LOCK_HOME" </dev/null || fail 'the detached recreator could not recreate the state directory'
+  [ -d "$LOCK_HOME/state" ] || fail 'the recreated state directory is missing'
+  printf 'go\n' > "$LOCK_DIR/get"
+  wait "$LOCK_A_PID" || rc=$?
+  lock_forget "$LOCK_A_PID"
+  expect_code 1 "$rc" "a spawn published into a recreated state directory: $(cat "$LOCK_DIR/lock-a.out")"
+  assert_contains "$(cat "$LOCK_DIR/lock-a.out")" 'was replaced after admission' 'a recreated state directory was not refused as replaced'
+  [ ! -e "$LOCK_HOME/state/lock-a.meta" ] || fail 'a recreated state directory received the task record'
+  pass 'a spawn whose state directory was recreated during its get refuses publication and writes no record'
+}
+
+test_task_set_unchanged_home_still_publishes() {
+  make_lock_case lock-unchanged
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A"
+  lock_finish "$LOCK_PID" lock-a 0
+  [ -f "$LOCK_HOME/state/lock-a.meta" ] || fail 'an unchanged state directory did not receive the task record'
+  pass 'an unchanged state directory still publishes its task record'
 }
 
 fm_test_only
@@ -1462,6 +1490,8 @@ test_task_set_early_refusal_never_acquires
 test_task_set_teardown_refusal_cleans_acquired_copy
 test_task_set_abort_shows_only_output_tail
 test_task_set_publish_after_forced_teardown_does_not_recreate_home
+test_task_set_publish_refuses_a_recreated_state_directory
+test_task_set_unchanged_home_still_publishes
 test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined

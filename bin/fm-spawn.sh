@@ -248,8 +248,9 @@
 #   creation through metadata publication, so concurrent same-id spawns serialize
 #   even when they select different backends. A fresh worker spawn takes the
 #   per-home task-set lock only around task record publication; a secondmate
-#   takes it before its per-task locks. Both refuse rather than wait when another
-#   operation owns it. The refusal names another spawn or forced teardown when the recorded
+#   takes it before its per-task locks. Publication refuses rather than waits when another
+#   operation owns it; recovery custody alone may wait at most FM_LOCK_STALE_AFTER behind a
+#   task-spawn holder. The refusal names another spawn or forced teardown when the recorded
 #   holder role is known, otherwise another operation. --relaunch is exempt
 #   because the existing task's control lock covers it.
 #   A fresh Treehouse-backed spawn also takes the project-identity lock in the local
@@ -1939,6 +1940,7 @@ HERDR_PRESENTATION_ORDER_LOCK=
 HERDR_PRESENTATION_ORDER_LOCK_HELD=0
 SPAWN_TASK_LOCK=
 SPAWN_TASK_LOCK_HELD=0
+SPAWN_STATE_IDENTITY=
 SPAWN_CONTROL_LOCK=
 SPAWN_CONTROL_LOCK_HELD=0
 SPAWN_CONTROL_PARENT=0
@@ -2106,7 +2108,7 @@ spawn_abort_cleanup() {
           printf '%s\n' "$(status_stamp_line "blocked: Orca worktree $ORCA_WORKTREE_ID could not be removed after a failed spawn; retained worktree: ${WT:-}")" >>"$STATE/$ID.status" 2>/dev/null || true
         fi
         if [ -d "$STATE" ] &&
-          { [ "$RELAUNCH" -eq 1 ] || spawn_take_task_set_custody wait; }; then
+          { [ "$RELAUNCH" -eq 1 ] || { spawn_take_task_set_custody wait && spawn_state_unchanged; }; }; then
           SPAWN_META_TMP="$STATE/.$ID.meta.orca-recovery.${BASHPID:-$$}"
           {
             echo "window=$W"
@@ -2441,6 +2443,15 @@ spawn_require_relocated_queued_work() {
 # Like the spend cap: checked before any argument resolution, endpoint, or
 # project-queue wait, and rechecked after the task-set lock.
 spawn_require_relocated_queued_work
+spawn_state_identity() {
+  stat -c '%d:%i:%W' "$1" 2>/dev/null || stat -f '%d:%i:%B' "$1" 2>/dev/null
+}
+spawn_state_unchanged() {
+  fm_backlog_directory_present "$STATE" "state directory" || return 1
+  [ "$(spawn_state_identity "$STATE")" = "$SPAWN_STATE_IDENTITY" ] && return 0
+  FM_BACKLOG_TRANSITION_ERROR="state directory $STATE was replaced after admission"
+  return 1
+}
 # A FRESH spawn changes which tasks this home has, so it must not interleave
 # with a forced teardown that has already enumerated that set: a record
 # published inside the enumerate-then-remove window is invisible to the
@@ -2457,8 +2468,10 @@ spawn_require_relocated_queued_work
 # get, and launch preparation, and that publication never waits: a busy lock
 # refuses. The one exception is recovery custody, which may wait a bounded
 # FM_LOCK_STALE_AFTER behind another spawn's publication (role task-spawn) so a
-# retained copy's record can still be written, and refuses at once behind a
-# forced teardown. Recovery records a retained copy, not a new worker, so it
+# retained copy's record can still be written. The role check gates only that
+# first try, so a forced teardown or any other holder found there refuses at
+# once; a task-spawn holder that outlasts the wait refuses with the role it then
+# records. Recovery records a retained copy, not a new worker, so it
 # takes custody without the admission recheck. Normal publish refusal uses the
 # existing post-acquisition EXIT cleanup to close this attempt's endpoint and
 # release its process lease and locks.
@@ -2477,9 +2490,9 @@ spawn_take_task_set_custody() {
       return 1
     }
     if ! fm_lock_try_acquire "$SPAWN_TASK_SET_LOCK"; then
-      role=$(fm_lock_role "$SPAWN_TASK_SET_LOCK" 2>/dev/null || true)
-      if [ "${1:-}" != wait ] || [ "$role" != task-spawn ] ||
-        ! fm_lock_acquire_wait_max "$SPAWN_TASK_SET_LOCK" "$FM_LOCK_STALE_AFTER"; then
+      if ! { [ "${1:-}" = wait ] && [ "$(fm_lock_role "$SPAWN_TASK_SET_LOCK" 2>/dev/null || true)" = task-spawn ] &&
+        fm_lock_acquire_wait_max "$SPAWN_TASK_SET_LOCK" "$FM_LOCK_STALE_AFTER"; }; then
+        role=$(fm_lock_role "$SPAWN_TASK_SET_LOCK" 2>/dev/null || true)
         case "$role" in
           task-spawn)
             echo "error: this home's task set is locked by another spawn; refusing to create task $ID rather than racing it" >&2
@@ -2532,6 +2545,10 @@ if [ "$RELAUNCH" -eq 0 ]; then
   }
   fm_backlog_directory_present "$STATE" "state directory" || {
     echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  }
+  SPAWN_STATE_IDENTITY=$(spawn_state_identity "$STATE") || {
+    echo "error: spawn refused: state directory $STATE could not be identified" >&2
     exit 1
   }
   [ "$KIND" != secondmate ] || spawn_take_task_set_lock || exit "$?"
@@ -6641,7 +6658,7 @@ spawn_slot_refused() {
   printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy $WT and endpoint $T retained; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
   if [ "$update_recovery" = 1 ]; then
     if [ "$RELAUNCH" -eq 0 ]; then
-      spawn_take_task_set_custody wait || {
+      spawn_take_task_set_custody wait && spawn_state_unchanged || {
         rm -f -- "$recovery"
         echo "error: assigned copy $WT and endpoint $T retained; task record publication refused" >&2
         exit 1
@@ -7930,6 +7947,10 @@ fi
 }
 if [ "$RELAUNCH" -eq 0 ]; then
   [ "$KIND" = secondmate ] || spawn_take_task_set_lock || exit "$?"
+  spawn_state_unchanged || {
+    echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  }
   if ! fm_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE"; then
     echo "error: task record for $ID could not be published ($FM_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1

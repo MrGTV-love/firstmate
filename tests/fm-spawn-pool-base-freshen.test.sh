@@ -2379,6 +2379,83 @@ test_governed_refusal_retains_prepared_copy_when_publication_is_locked() {
   pass 'governed refusal retains partially prepared copy, late work and acquisition lease even when recovery publication is refused'
 }
 
+slot_task_spawn_holder_case() {  # <name> <release-on-wait 0|1>: sets SLOT_HOLDER_OUT SLOT_HOLDER_STATUS SLOT_HOLDER_ID
+  local name=$1 release_on_wait=$2 rec ready release tick="" holder
+  SLOT_HOLDER_ID="slot-holder-$name-$$"
+  rec=$(make_case "$SLOT_HOLDER_ID" "$SLOT_HOLDER_ID")
+  read_case_record "$rec"
+  write_refusing_slot_owner "$POOL_DIR"
+  git -C "$POOL_DIR" add scripts
+  git -C "$POOL_DIR" -c user.name=T -c user.email=t@example.invalid commit -qm 'governed refusal fixture'
+  ready="$CASE_DIR/holder.ready"
+  release="$CASE_DIR/holder.release"
+  fm_test_hold_task_set_as_spawn "$HOME_DIR/state" "$ready" "$release"
+  holder=$FM_TEST_TASK_SET_HOLDER
+  fm_test_wait_until --while-alive "$holder" -- test -f "$ready" || fail 'task-spawn holder never took the task set'
+  if [ "$release_on_wait" = 1 ]; then
+    tick="$CASE_DIR/release-on-wait"
+    fm_test_release_on_lock_wait "$tick" "$release"
+  fi
+  SLOT_HOLDER_STATUS=0
+  SLOT_HOLDER_OUT=$(FM_LOCK_WAIT_TICK="$tick" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" \
+    FM_TEST_PROVISION_CALLED="$CASE_DIR/provision.called" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$SLOT_HOLDER_ID" "$PROJECT_DIR" \
+    --backend tmux --mode no-mistakes --yolo off 2>&1) || SLOT_HOLDER_STATUS=$?
+  : > "$release"
+  wait "$holder" 2>/dev/null || true
+}
+
+test_slot_recovery_waits_out_a_task_spawn_holder_that_releases() {
+  slot_task_spawn_holder_case released 1
+  expect_code 1 "$SLOT_HOLDER_STATUS" "a governed slot refusal must exit nonzero: $SLOT_HOLDER_OUT"
+  [ -f "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" ] || fail "slot recovery published no record after the task-spawn holder released: $SLOT_HOLDER_OUT"
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" 'slot recovery record lost its marker'
+  assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" 'slot recovery record does not name the retained copy'
+  assert_grep "window=firstmate:fm-$SLOT_HOLDER_ID" "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" 'slot recovery record does not name the endpoint'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'slot recovery launched a worker'
+  pass 'slot recovery waits out a task-spawn holder that releases, then publishes its retained-copy record'
+}
+
+test_slot_recovery_refuses_when_a_task_spawn_holder_outlasts_the_bound() {
+  slot_task_spawn_holder_case outlasted 0
+  expect_code 1 "$SLOT_HOLDER_STATUS" "a governed slot refusal must exit nonzero: $SLOT_HOLDER_OUT"
+  [ ! -e "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" ] || fail 'slot recovery published while the task-spawn holder still owned the task set'
+  assert_contains "$SLOT_HOLDER_OUT" 'task set is locked by another spawn' 'slot recovery did not refuse with the task-set contention'
+  assert_contains "$SLOT_HOLDER_OUT" 'retained; task record publication refused' 'slot refusal does not state the retained copy was left unrecorded'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'slot recovery launched a worker'
+  pass 'slot recovery refuses explicitly and writes no record when a task-spawn holder outlasts the bound'
+}
+
+test_slot_late_cap_refusal_still_records_retained_copy() {
+  local id rec rc=0
+  id="slot-late-cap-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  printf 'manual\n' > "$HOME_DIR/config/backlog-backend"
+  write_refusing_slot_owner "$POOL_DIR"
+  git -C "$POOL_DIR" add scripts
+  git -C "$POOL_DIR" -c user.name=T -c user.email=t@example.invalid commit -qm 'governed refusal fixture'
+  FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/fm-afk-contract.sh" enter --spend 1 >/dev/null || fail 'away fixture entry failed'
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.original"
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = new-window ]; then
+  printf 'kind=ship\n' > '$HOME_DIR/state/other.meta'
+fi
+exec '$FAKEBIN_DIR/tmux.original' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+  FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provision.called" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$id" "$PROJECT_DIR" --backend tmux --mode no-mistakes --yolo off > "$CASE_DIR/spawn.out" 2>&1 || rc=$?
+  expect_code 1 "$rc" "a governed slot refusal at the cap must exit nonzero: $(cat "$CASE_DIR/spawn.out")"
+  assert_grep 'kind=ship' "$HOME_DIR/state/other.meta" 'the other worker did not publish after the early check'
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'a retained copy refused at the cap lost its recovery record'
+  assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$id.meta" 'a retained copy refused at the cap does not name the copy'
+  assert_grep "window=firstmate:fm-$id" "$HOME_DIR/state/$id.meta" 'a retained copy refused at the cap does not name the endpoint'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'a slot refused at the cap launched a worker'
+  pass 'a slot refused at the spend cap still records its retained copy and endpoint without launching'
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
@@ -2470,5 +2547,9 @@ test_a_failed_record_write_refuses_the_spawn
 test_a_failed_origin_head_read_after_a_move_refuses
 test_a_governed_refusal_after_preparation_holds_the_copy_and_refuses
 test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was
+
+test_slot_recovery_waits_out_a_task_spawn_holder_that_releases
+test_slot_recovery_refuses_when_a_task_spawn_holder_outlasts_the_bound
+test_slot_late_cap_refusal_still_records_retained_copy
 
 echo "# all fm-spawn-pool-base-freshen tests passed"
