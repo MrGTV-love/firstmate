@@ -81,11 +81,14 @@ and no removed guard is silently resurrected.
 ## Guard procedure
 
 At scoping, Main, which fills the task brief before dispatch, declares each new, changed, or retired guard by decision point and exact stable ID in that brief.
-A decision point is a code line that decides a guard's outcome; the registry's `site:` entries name the registered ones, and a decision point with no registration is a missing registration that the [review checklist](review-rubric.md#guard-changes) reports.
+A decision point is a code line that decides a guard's outcome, including a changed allow predicate.
+The reviewer reconciles each changed decision point to its exact stable ID by the guard's invariant, owner, and decision behavior; a registry `site:` entry is evidence where one applies, not the definition of the guard.
+A decision point that no registered guard matches is a missing registration that the [review checklist](review-rubric.md#guard-changes) reports, and an allow-only event is neither a scanner site nor a standalone missing registration.
 The worker updates that declaration with the final diff.
-This covers behavior changes even with no registry edit or matching entry, as well as active ID additions or removals and material changes to a guard's contract or test evidence.
-Here the contract is the guard's [Fields](#fields) entry, and a material change is any change other than the bookkeeping below.
-Bookkeeping alone, such as recording a `retirement_decision`, retains its existing obligations without triggering this procedure.
+This procedure applies to any change that adds, changes, or retires an effective decision, including a behavior change with no registry edit or matching entry.
+It also applies to active ID additions or removals, changed proof obligations or relied-on coverage, a changed test oracle or coverage count, a changed allow predicate even with no mapped refusal, and a real owner transfer that changes enforcement or responsibility.
+A declared decision can be code, configuration, or policy.
+A locator fix, or a rename of an owner or test file with unchanged behavior, routing, responsibility, and evidence coverage, does not by itself require replay, and neither does standalone retirement-decision bookkeeping; existing checks still apply.
 
 1. Name the harm and the closest legitimate action the guard could mistake for it.
    For a repair, first reproduce the miss or false refusal at the real entry point in isolation.

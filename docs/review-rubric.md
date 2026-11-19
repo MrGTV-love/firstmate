@@ -29,11 +29,13 @@ That prerequisite adds no tooling, and it leaves merge approver and author-famil
 ### Guard changes
 
 Check for changes within the [guard procedure](guard-spec.md#guard-procedure) even if the declaration or registry diff is absent.
-For those changes, a nonauthor meeting the existing review lane's independence rules reads the complete, unfiltered final base-to-head diff and reconciles the decision points and exact IDs against the base and final registry and retirement ledger.
+For those changes, a nonauthor meeting the existing review lane's independence rules reads the complete, unfiltered final base-to-head diff and reconciles the decision points, as [defined](guard-spec.md#guard-procedure), and exact IDs against the base and final registry and retirement ledger.
 Report an unmatched decision point as missing registration; deleting the row for a still-live guard is not a retirement.
 Assess the executed outcomes against the guard procedure and retain the reviewer identity, trusted policy revision, exact base and head, scope, checked tree, full diff or its digest, evidence references, and verdict.
 A complete diff read from earlier may be reused only for the identical final base, head and scope, and only with independently established provenance from its retained inputs and report, including the trusted configuration and reviewer build that produced it.
-Landing needs a matching recorded final PASS that assesses the executed behavior and the checked tree for that exact base and head; a pre-check read, a green check, or a verdict for a wrong base or head is insufficient.
+Landing needs a matching recorded final PASS whose linked report carries the exact base and head, scope, checked tree, executed-evidence assessment, and verdict for that comparison.
+The recorded verdict binds only the head, so Main checks that report against the current base, head, and tree before marking ready or landing, and does not rely on the report when any of them moved.
+A pre-check read, a green check, or a report for a wrong base or head is insufficient.
 
 Apply this checklist prospectively from the trusted default branch.
 Independently read the full, exact first-adoption diff under the captured trusted rubric and task plan, not the submitted procedure.
