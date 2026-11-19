@@ -20,7 +20,10 @@ prepare-primary STATE ID GENERATION SOURCE_HOME MODEL EFFORT CWD CODE_ROOT
 stages the same private runtime plus CODE_ROOT/.dsh/fm-primary.mjs, the native
 session-open, watcher and passive turn-end adapter. Resume retains that role.
 resume STATE ID MODEL EFFORT CWD rewrites the bound launch patch to resume the
-newest depth-zero session, or prints nothing when the binding changed.
+newest depth-zero session, or prints nothing when the binding changed. When the
+saved binding exists but cannot be read (any OSError except a missing file), resume
+exits 1 with a REFUSED message that names that record and selects nothing; restore
+read access to the same record and retry to resume the same session.
 bound STATE ID prints the binding's model as deepseek/<id> and its effort
 (default when none) on two lines.
 api-key-env prints the environment name every launch patch reads its key from.

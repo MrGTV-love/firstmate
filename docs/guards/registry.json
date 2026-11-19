@@ -7413,10 +7413,10 @@
         {"file": "bin/fm-dsh.py", "match": "REFUSED: saved DSH binding read failed"},
         {"file": "bin/fm-dsh.py", "match": "record_binding_read(state, task, \"deny\")"}
       ],
-      "invariant": "A non-ENOENT filesystem read failure on a saved DSH binding never selects fresh preparation.",
+      "invariant": "On a same-DSH relaunch, a non-ENOENT filesystem read failure of the saved DSH binding in fm-dsh.py resume never selects fresh preparation.",
       "layer": "runtime-block",
-      "source": "The initial read of the task's <state>/<id>.dsh-session by fm-dsh.py resume.",
-      "trigger": "The initial saved-binding read raises a filesystem OSError other than FileNotFoundError.",
+      "source": "The initial read of the task's <state>/<id>.dsh-session by fm-dsh.py resume, called by the same-DSH relaunch in bin/fm-spawn.sh.",
+      "trigger": "A same-DSH relaunch's initial saved-binding read by fm-dsh.py resume raises a filesystem OSError other than FileNotFoundError.",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Restore read access to the same saved record named in the refusal, then retry the same relaunch with bin/fm-control.sh <task-id> relaunch --note <progress>; never remove or replace the binding.",
@@ -7433,7 +7433,7 @@
       "instrumented": true,
       "status": "active",
       "remedy_verified": "fixture",
-      "layer_note": "A readable incompatible or unparseable binding still follows the legacy fallback; an allow is evidence of readability, not proof that a conversation can resume. An absent target is not affirmative proof that its directory entry was absent."
+      "layer_note": "A readable incompatible or unparseable binding still follows the legacy fallback; an allow is evidence of readability, not proof that a conversation can resume. An absent target is not affirmative proof that its directory entry was absent. prepare, prepare-primary and fresh launch treat a non-ENOENT read failure of the saved binding as no previous binding and replace it; that behavior is outside this guard and is not verified by its test."
     },
     {
       "id": "pipeline-start-unreadable-source",
