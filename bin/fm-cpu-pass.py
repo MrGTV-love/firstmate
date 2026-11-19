@@ -95,7 +95,8 @@ Pipeline starts:
     at the moment of a grant (both backstop signals included). With fewer than 2
     recorded runs left to rank for R, or no native memory facts on this platform, the
     start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
-    record never refuses a start and never reads as an empty host.
+    record never reads as an empty host, and the pause-only backstop still
+    refuses while its harm test cannot judge the record.
   - Pause-only backstop: while that reading is unreadable or reports a reason to
     defer (the list that makes fm-mem-guard.sh admit --kind no-mistakes exit
     75: fit, swap or compressor growth, or a part it cannot judge; the one-start

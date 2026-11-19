@@ -2472,13 +2472,14 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 
 On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
 Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
-Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 when a required reading is unavailable or the harm itself is measured.
+Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 when a required reading is unavailable, the harm cannot be judged, or the harm is measured.
 The harm is starting work that exhausts host memory and makes the host thrash or crash.
 It is measured in two ways: the projected resident size of a run of that kind does not fit in available memory minus a reserve, or swap used or the compressor grew at all since the last probe reading.
-The native memory-pressure level is recorded in each reading and never judged, because it does not track available bytes: in the recorded readings it deferred work at 10.9 to 39.0 GiB available while readings that were admitted ran down to 18.2 GiB.
+The native memory-pressure level is recorded in each reading and never judged, because it does not track available bytes; the [engine header](../bin/fm-mem-guard.py) holds the measured evidence.
 The projection, reserve and comparison window are quantiles of this host's own records, derived at each decision, so the [engine header](../bin/fm-mem-guard.py) owns them.
 A part that cannot be judged defers the start too, with its reason, how the record is filled (a new or short record, a kind with too few recorded runs, or a previous probe reading older than the window) and the calibration run below, and the reading's `harm` object names it.
-The one bootstrap admit is a host that is idle (no fleet run is running, so the start is the only run) whose available memory exceeds the largest peak recorded for any kind; a host with no recorded peak admits nothing on an unjudged input.
+The one bootstrap admit is a host that is idle (no fleet run is running, so the start is the only run) whose available memory exceeds the largest peak recorded for any kind, counting runs seen in one reading too; that is a different number from the one-run peak shown in each reading, which needs two readings.
+A host with no recorded peak admits nothing on an unjudged input.
 A host with no measurement, or a busy one with a kind that has too few recorded runs, gets its first measurement from the one-time operator calibration run: `bin/fm-mem-guard.sh calibrate --kind task|no-mistakes -- <representative command>` runs that command once, reads its process tree's largest resident size, and records it in the root home's calibration as a run of that kind, so the next admit sees it.
 Each calibration run counts as one recorded run, and a kind needs two before its fit is judged, so run it again when the deferral says one is still missing.
 It starts only when the readings are readable, swap and the compressor are not growing, more memory is available than the largest recorded peak (with none recorded, no fleet run is running), and no other calibration is measuring; a command that ends before two readings is not recorded.

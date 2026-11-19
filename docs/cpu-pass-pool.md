@@ -130,7 +130,7 @@ Processes appear only in the backstop below.
 ### Fallback
 
 With fewer than 2 recorded runs left to rank for `R`, a record for another host or RAM size, an unreadable record, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
-That is the previous count limit, kept only until the host has measured runs; a missing record never refuses a start and never reads as an empty host.
+That is the previous count limit, kept only until the host has measured runs; a missing record never reads as an empty host, and the pause-only backstop below still refuses while its harm test cannot judge the record.
 
 ### Pause-only backstop
 
