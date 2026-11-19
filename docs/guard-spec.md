@@ -341,12 +341,14 @@ The lint runs in three modes:
 
 - `report` prints violations and always exits 0.
 - `new-or-touched --base <ref>` fails only for guards added or changed since
-  the base, for refusal-site violations the allowlist does not hold, for refusal
-  sites on a changed line, and for an allowlist that grew, so new work cannot add
-  debt.
+  the base that carry an unallowlisted finding under their literal id, for
+  refusal-site violations the allowlist does not hold, for refusal sites on a
+  changed line, and for an allowlist that grew, so new work cannot add debt.
 - `enforce` fails on every violation not listed in the allowlist, and also fails
   on an allowlisted entry whose violation no longer occurs, because that entry
   is stale.
+
+An incomparable base registry fails closed; the `guard-lint-touched-registry` entry in the registry owns that contract.
 
 The legacy refusal sites that map to nothing sit in the allowlist as `S1` entries, once, as the burn-down list.
 Once the base allowlist is at `schema_version` 2, the lint also fails an entry the base does not hold, so the allowlist cannot grow.
