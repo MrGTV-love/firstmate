@@ -1,0 +1,105 @@
+== S1 30 source-failed errors only, reversible
+  old  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  old  undecided-nominations: [gquiet]
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":0,"denies":0,"warns":0,"verdict":"unmeasured","recurrences":0}]
+  new  undecided-nominations: []
+  new  summary: {"guards":1,"measured":0,"cut":0,"unmeasured":1,"malformed_rows":0}
+== S2a 29 real allows, reversible
+  old  guards: [{"id":"gquiet","opportunities":29,"denies":0,"warns":0,"verdict":"unmeasured","recurrences":0}]
+  old  undecided-nominations: []
+  old  summary: {"guards":1,"measured":0,"cut":0,"unmeasured":1,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":29,"denies":0,"warns":0,"verdict":"unmeasured","recurrences":0}]
+  new  undecided-nominations: []
+  new  summary: {"guards":1,"measured":0,"cut":0,"unmeasured":1,"malformed_rows":0}
+== S2b 30 real allows, reversible
+  old  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  old  undecided-nominations: [gquiet]
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  new  undecided-nominations: [gquiet]
+  new  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+== S2c 30 real allows, irreversible
+  old  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"keep","recurrences":0}]
+  old  undecided-nominations: []
+  old  summary: {"guards":1,"measured":1,"cut":0,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"keep","recurrences":0}]
+  new  undecided-nominations: []
+  new  summary: {"guards":1,"measured":1,"cut":0,"unmeasured":0,"malformed_rows":0}
+== S3 29 real allows + 1 error + 1 bypass + 1 extra rule row (no-opportunity)
+  old  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  old  undecided-nominations: [gquiet]
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":29,"denies":0,"warns":0,"verdict":"unmeasured","recurrences":0}]
+  new  undecided-nominations: []
+  new  summary: {"guards":1,"measured":0,"cut":0,"unmeasured":1,"malformed_rows":0}
+== S4 30 bypass events only, reversible
+  old  guards: [{"id":"gquiet","opportunities":0,"denies":0,"warns":0,"verdict":"unmeasured","recurrences":0}]
+  old  undecided-nominations: []
+  old  summary: {"guards":1,"measured":0,"cut":0,"unmeasured":1,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":0,"denies":0,"warns":0,"verdict":"unmeasured","recurrences":0}]
+  new  undecided-nominations: []
+  new  summary: {"guards":1,"measured":0,"cut":0,"unmeasured":1,"malformed_rows":0}
+== S5 1 real deny + 30 real allows, reversible
+  old  guards: [{"id":"gquiet","opportunities":31,"denies":1,"warns":0,"verdict":"keep","recurrences":0}]
+  old  undecided-nominations: []
+  old  summary: {"guards":1,"measured":1,"cut":0,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":31,"denies":1,"warns":0,"verdict":"keep","recurrences":0}]
+  new  undecided-nominations: []
+  new  summary: {"guards":1,"measured":1,"cut":0,"unmeasured":0,"malformed_rows":0}
+== S6a source-failed deny creates a recurrence (irreversible push guard, 30 ops)
+  old  guards: [{"id":"git-push-credential-shapes","opportunities":30,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  old  undecided-nominations: [git-push-credential-shapes]
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"git-push-credential-shapes","opportunities":30,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  new  undecided-nominations: [git-push-credential-shapes]
+  new  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+== S6b control: same sequence with a real second deny
+  old  guards: [{"id":"git-push-credential-shapes","opportunities":30,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  old  undecided-nominations: [git-push-credential-shapes]
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"git-push-credential-shapes","opportunities":30,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  new  undecided-nominations: [git-push-credential-shapes]
+  new  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+== S7a real fire at edge of judged window (keep 2026-02-01), no error
+  old  guards: [{"id":"gquiet","opportunities":62,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  old  undecided-nominations: [gquiet]
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":62,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  new  undecided-nominations: [gquiet]
+  new  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+== S7b same + historical error dated 2026-01-11 inside window
+  old  guards: [{"id":"gquiet","opportunities":63,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  old  undecided-nominations: []
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":62,"denies":2,"warns":0,"verdict":"cut","recurrences":1}]
+  new  undecided-nominations: [gquiet]
+  new  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+== S8a 30 Jan allows, decision keep 2026-02-01 (judged, expect no nomination)
+  old  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  old  undecided-nominations: []
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  new  undecided-nominations: []
+  new  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+== S8b plus later error dated 2026-03-10 (expect re-nomination)
+  old  guards: [{"id":"gquiet","opportunities":31,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  old  undecided-nominations: [gquiet]
+  old  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+  new  guards: [{"id":"gquiet","opportunities":30,"denies":0,"warns":0,"verdict":"cut","recurrences":0}]
+  new  undecided-nominations: [gquiet]
+  new  summary: {"guards":1,"measured":1,"cut":1,"unmeasured":0,"malformed_rows":0}
+== S9 log file absent
+  old  guards: []
+  old  undecided-nominations: []
+  old  summary: {"guards":0,"measured":0,"cut":0,"unmeasured":0,"malformed_rows":0}
+  new  guards: []
+  new  undecided-nominations: []
+  new  summary: {"guards":0,"measured":0,"cut":0,"unmeasured":0,"malformed_rows":0}
+  exit codes: old=0 new=0
+== S10 valid controls (allow/deny/warn/override/bypass/extra row/source-false), reversible: JSON diff old vs new
+  IDENTICAL JSON (old == new)
+{"opportunities":21,"denies":6,"warns":2,"bypasses":1,"overrides":1,"verdict":"unmeasured","recurrences":0,"median_clear_attempts":1}
+  -- same S10 log plus 1 error row: JSON diff old vs new
+  old: {"opportunities":22,"verdict":"unmeasured"}
+  new: {"opportunities":21,"verdict":"unmeasured"}
