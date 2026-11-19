@@ -78,6 +78,26 @@ Entries for uninstrumented families explicitly distinguish their existing caller
 resolves to a file that exists, every retired guard has zero live references,
 and no removed guard is silently resurrected.
 
+## Guard procedure
+
+At scoping, declare each new, changed, or retired guard by decision point and exact stable ID, marking missing registrations, and update the declaration with the diff.
+This covers behavior changes even with no registry edit or matching entry, as well as active ID additions or removals and material changes to a guard's contract or test evidence.
+Bookkeeping alone, such as recording a `retirement_decision`, retains its existing obligations without triggering this procedure.
+
+1. Name the harm and the closest legitimate action the guard could mistake for it.
+   For a repair, first reproduce the miss or false refusal at the real entry point in isolation.
+2. Register each new or retained guard with the existing [fields](#fields), preserving its ID across owner moves.
+   A retirement moves the same ID out of the active registry and into the ledger under the [cut procedure](#cut-procedure), with executed cut evidence in place of the active cases.
+3. Exercise the real enforcement entry point in isolation for the named harm and its nearest legitimate look-alike, recording the deny and allow and their actual downstream effects.
+   For a warning-only guard, prove the warning's intended effect instead of claiming a deny.
+   Use an isolated control or equally discriminating downstream evidence to attribute those effects to the named guard rather than an unrelated check; a diagnostic or event alone is not proof.
+   After a representative refusal, run the documented remedy and show the same work resumes or reaches a safe disposition, or explain why recovery cannot apply.
+4. Record the exact final comparison base and head commit IDs, the tree actually tested, check inputs and validator revision, and the observed results and limits in the delivery evidence.
+   If the tested tree differs from the final head tree, show how it was derived and why the checked inputs and behavior still cover the change.
+   Include passing results from the existing [registry and reference checks](#registry), counts and the base-specific [ratchet](#ratchet), reusing matching trusted CI results or trusted equivalent checks in authorized isolation.
+   Independently qualify a changed validator before relying on its result.
+   These structural checks do not prove the behavioral cases ran or replace the [independent landing review](review-rubric.md#guard-changes).
+
 ## Fields
 
 ```

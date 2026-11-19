@@ -25,6 +25,18 @@ It does not change the selected delivery path, review authority, or merge policy
 - Distinguish a demonstrated intent-breaking defect from missing evidence for a mandatory DoD item:
   - Apply the existing review outcomes, guard-reassessment requirements, and scope-escalation rules below.
 
+### Guard changes
+
+Check for changes within the [guard procedure](guard-spec.md#guard-procedure) even if the declaration or registry diff is absent.
+For those changes, a nonauthor meeting the existing review lane's independence rules reads the complete, unfiltered final base-to-head diff and reconciles the decision points and exact IDs against the base and final registry and retirement ledger.
+Report an unmatched decision point as missing registration; deleting the row for a still-live guard is not a retirement.
+Assess the executed outcomes against the guard procedure and retain the reviewer identity, trusted policy revision, exact base and head, full diff or its digest and scope, evidence references, and verdict.
+Reuse an existing read only when its retained inputs and report establish this coverage, including which trusted configuration and reviewer build produced a pipeline read.
+A read can precede Test or CI, but complete the verdict against matching executed evidence before landing and refresh the read if the comparison base or head changes.
+
+Apply this checklist prospectively from the trusted default branch.
+Independently read the full, exact first-adoption diff under the existing trusted rubric and separately approved adoption criteria, not the proposed procedure.
+
 ## Review outcomes
 
 Each finding takes one of these outcomes:
@@ -34,6 +46,7 @@ Each finding takes one of these outcomes:
   It is never graded pass and does not by itself block the verdict for proceeding; the review's PASS means every item assessable now passed, not final acceptance, and the pending items stay open until that downstream evidence exists.
 - Any other unresolved mandatory item, such as one assessable now but not assessed, one missing its evidence, or one with an open contract question: block until its evidence or the owner's decision is obtained.
 - A real defect that breaks the stated intent, even when no DoD item names it: block.
+- A guard change without a matching independent PASS under [Guard changes](#guard-changes), including its registration or cut and executed proof: block landing even outside the DoD.
 - An improvement outside the DoD: a follow-up note, never a block.
 - A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD where the follow-up-note outcome would otherwise apply, unless the PR cites a recorded reassessment of that guard's harm model, such as `data/<id>/report.md`, and the change follows it.
 - Removing a guard rule that such a recorded reassessment recommends: not a block.
