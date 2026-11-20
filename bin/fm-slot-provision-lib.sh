@@ -113,8 +113,15 @@ fm_slot_run_local() { # <project> <report> <provisioner> <arg>...
 }
 
 fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <local-default-ref-or-empty> <selected-sha-or-empty> <owned-path>...
+  local rc=0
+  fm_slot_provision_run "$@" || rc=$?
+  fm_slot_export_drop
+  return "$rc"
+}
+
+fm_slot_provision_run() {
   local runner=$1 project=$2 copy=$3 id=$4 branch=$5 report=$6 local_ref=$7 selected=$8
-  local base old_branch old_head branch_head rc=0
+  local base old_branch old_head branch_head provisioner rc=0
   shift 8
   FM_SLOT_PROVISIONED=0
   FM_SLOT_MANIFEST=
@@ -123,10 +130,18 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   FM_SLOT_PREPARED_HEAD=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
-  [ -f "$copy/scripts/git-stability/provision_existing_slot.py" ] || {
-    echo "error: slot provisioner is missing from assigned copy $copy" >&2
-    return 1
-  }
+  provisioner=$copy/scripts/git-stability/provision_existing_slot.py
+  FM_SLOT_PYARGS=()
+  if [ ! -f "$provisioner" ]; then
+    # A relaunch of a task whose copy predates the provisioner runs the primary clone's current main (D7); every
+    # other caller still requires the script in the assigned copy.
+    [ "${FM_SLOT_PRIMARY_PROVISIONER:-0}" = 1 ] || {
+      echo "error: slot provisioner is missing from assigned copy $copy" >&2
+      return 1
+    }
+    fm_slot_primary_provisioner "$project" || return 1
+    provisioner=$FM_SLOT_PROVISIONER
+  fi
   git check-ref-format --branch "$branch" >/dev/null || return 1
   old_branch=$(git -C "$copy" branch --show-current) || return 1
   old_head=$(git -C "$copy" rev-parse --verify HEAD) || return 1
@@ -167,9 +182,14 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
-  "$runner" "$project" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
+  "$runner" "$project" "$report" ${FM_SLOT_PYARGS[@]+"${FM_SLOT_PYARGS[@]}"} "$provisioner" \
     --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
     --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
+  if ! fm_slot_export_verify; then
+    echo '{"state": "BLOCKED", "reason": "provisioner_source_changed"}' >"$report"
+    rc=1
+  fi
+  fm_slot_export_drop
   if [ "$rc" -eq 0 ]; then
     python3 - "$report" "$copy" "$id" "$branch" "$base" "$local_ref" "$@" <<'PY' || rc=$?
 import json
@@ -213,6 +233,260 @@ PY
   FM_SLOT_PROVISIONED=1
 }
 
+# The provisioner a relaunch runs for a copy that predates it (D7): the primary clone's, and only when the entry
+# script and every repository-local module it imports (transitively) hold the bytes of the default branch's tip,
+# whatever branch the clone is on. A linked checkout, or a primary checkout whose closure differs from the tip, is
+# refused by name. Sets FM_SLOT_PROVISIONER to the script path.
+FM_SLOT_PROVISIONER=
+FM_SLOT_PRIMARY_PROVISIONER=0
+FM_SLOT_CLOSURE_PY=$(cat <<'FMCLOSUREPY'
+import ast
+import os
+import sys
+
+root = sys.argv[1]
+entry = os.path.join(root, "scripts/git-stability/provision_existing_slot.py")
+seen = []
+queue = [entry]
+relative = []
+
+
+def candidates(module, base_dir):
+    parts = module.split(".")
+    for start in (base_dir, root):
+        stem = os.path.join(start, *parts)
+        yield stem + ".py"
+        yield os.path.join(stem, "__init__.py")
+
+
+while queue:
+    path = queue.pop()
+    if path in seen:
+        continue
+    seen.append(path)
+    # Python runs every ancestor package's __init__.py before the module, so those files are part of the closure too.
+    ancestor = os.path.dirname(path)
+    while os.path.commonpath([root, ancestor]) == root and ancestor != root:
+        init = os.path.join(ancestor, "__init__.py")
+        if os.path.isfile(init) and init not in seen:
+            queue.append(init)
+        ancestor = os.path.dirname(ancestor)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+    except (OSError, SyntaxError, UnicodeDecodeError):
+        print("unreadable\t" + os.path.relpath(path, root))
+        continue
+    names = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names += [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            names.append(node.module)
+            names += [node.module + "." + alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level:
+            # A relative import resolves from the importing file's own package directory.
+            package = os.path.dirname(path)
+            for _ in range(node.level - 1):
+                package = os.path.dirname(package)
+            stem = [node.module] if node.module else []
+            relative.append((package, ".".join(stem), [alias.name for alias in node.names]))
+    for name in names:
+        for found in candidates(name, os.path.dirname(path)):
+            if os.path.isfile(found) and os.path.commonpath([root, os.path.realpath(found)]) == root:
+                queue.append(found)
+                break
+    for package, module, imported in relative:
+        for target in ([module] if module else []) + [(module + "." if module else "") + name for name in imported]:
+            stem = os.path.join(package, *target.split("."))
+            for found in (stem + ".py", os.path.join(stem, "__init__.py")):
+                if os.path.isfile(found) and os.path.commonpath([root, os.path.realpath(found)]) == root:
+                    queue.append(found)
+                    break
+    relative.clear()
+final = []
+for path in seen:
+    directory = os.path.dirname(path)
+    while os.path.commonpath([root, directory]) == root and directory != root:
+        init = os.path.join(directory, "__init__.py")
+        if os.path.isfile(init) and init not in final:
+            final.append(init)
+        directory = os.path.dirname(directory)
+    if path not in final:
+        final.append(path)
+for path in final:
+    print("file\t" + os.path.relpath(path, root))
+FMCLOSUREPY
+)
+
+fm_slot_primary_provisioner() { # <project>
+  local project=$1 common primary default tip closure kind rel
+  FM_SLOT_PROVISIONER=
+  common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || {
+    echo "error: slot provisioner source is not the primary clone's current main: the project's repository is unreadable" >&2
+    return 1
+  }
+  primary=$(dirname "$common")
+  { [ "$(git -C "$primary" rev-parse --show-toplevel 2>/dev/null)" = "$primary" ] &&
+    [ -f "$primary/scripts/git-stability/provision_existing_slot.py" ]; } || {
+    echo "error: slot provisioner source is not the primary clone's current main: $primary is not a checkout holding the provisioner" >&2
+    return 1
+  }
+  default=$(fm_task_copy_default_branch "$primary") || default=
+  tip=
+  [ -z "$default" ] || tip=$(git -C "$primary" rev-parse --verify --quiet "refs/heads/$default^{commit}") || tip=
+  [ -n "$tip" ] || {
+    echo "error: slot provisioner source is not the primary clone's current main: the default branch tip cannot be read" >&2
+    return 1
+  }
+  closure=$(python3 -c "$FM_SLOT_CLOSURE_PY" "$primary") || closure=
+  [ -n "$closure" ] || {
+    echo "error: slot provisioner source is not the primary clone's current main: its import closure cannot be read" >&2
+    return 1
+  }
+  while IFS=$'\t' read -r kind rel; do
+    [ "$kind" = file ] || {
+      echo "error: slot provisioner source is not the primary clone's current main: $rel cannot be read" >&2
+      return 1
+    }
+    [ "$(git -C "$primary" hash-object -- "$rel" 2>/dev/null)" = "$(git -C "$primary" rev-parse --verify --quiet "$tip:$rel" 2>/dev/null)" ] || {
+      echo "error: slot provisioner source is not the primary clone's current main: $rel differs from $default's tip in $primary" >&2
+      return 1
+    }
+  done <<<"$closure"
+  # The bytes that run are the tip's, from a private read-only export of exactly the verified closure (written from the
+  # tip's blobs, never from the working tree), run with an interpreter cache prefix that is a fresh empty directory so no
+  # bytecode that existed before the run can load. Its hashes are checked again after the run (fm_slot_export_verify).
+  FM_SLOT_EXPORT=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-export.XXXXXX") || return 1
+  FM_SLOT_PYCACHE=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-pycache.XXXXXX") || { fm_slot_export_drop; return 1; }
+  FM_SLOT_EXPORT_SUMS=$FM_SLOT_EXPORT.sums
+  : >"$FM_SLOT_EXPORT_SUMS" || { fm_slot_export_drop; return 1; }
+  while IFS=$'\t' read -r kind rel; do
+    if mkdir -p "$FM_SLOT_EXPORT/$(dirname "$rel")" && git -C "$primary" show "$tip:$rel" >"$FM_SLOT_EXPORT/$rel"; then
+      printf '%s %s\n' "$(shasum -a 256 <"$FM_SLOT_EXPORT/$rel" | awk '{print $1}')" "$rel" >>"$FM_SLOT_EXPORT_SUMS"
+    else
+      echo "error: slot provisioner source is not the primary clone's current main: $rel could not be exported from $default's tip" >&2
+      fm_slot_export_drop
+      return 1
+    fi
+  done <<<"$closure"
+  chmod -R a-w "$FM_SLOT_EXPORT" 2>/dev/null || true
+  FM_SLOT_PROVISIONER=$FM_SLOT_EXPORT/scripts/git-stability/provision_existing_slot.py
+  FM_SLOT_PYARGS=(-X "pycache_prefix=$FM_SLOT_PYCACHE")
+}
+
+FM_SLOT_EXPORT=
+FM_SLOT_EXPORT_SUMS=
+FM_SLOT_PYCACHE=
+FM_SLOT_PYARGS=()
+# Refuse by name when any exported file changed or appeared since the export (a substitution after the check).
+fm_slot_export_verify() {
+  local want got rel count
+  [ -n "$FM_SLOT_EXPORT" ] || return 0
+  while read -r want rel; do
+    got=$(shasum -a 256 <"$FM_SLOT_EXPORT/$rel" 2>/dev/null | awk '{print $1}')
+    [ "$got" = "$want" ] || {
+      echo "error: slot provisioner source changed after it was verified: $rel; the run is refused" >&2
+      return 1
+    }
+  done <"$FM_SLOT_EXPORT_SUMS"
+  count=$(find "$FM_SLOT_EXPORT" -type f | wc -l | tr -d ' ')
+  [ "$count" = "$(wc -l <"$FM_SLOT_EXPORT_SUMS" | tr -d ' ')" ] || {
+    echo "error: slot provisioner source gained files after it was verified; the run is refused" >&2
+    return 1
+  }
+}
+fm_slot_export_drop() {
+  [ -z "$FM_SLOT_EXPORT" ] || { chmod -R u+w "$FM_SLOT_EXPORT" 2>/dev/null; rm -rf -- "$FM_SLOT_EXPORT" "$FM_SLOT_EXPORT_SUMS"; }
+  [ -z "$FM_SLOT_PYCACHE" ] || rm -rf -- "$FM_SLOT_PYCACHE"
+  FM_SLOT_EXPORT='' FM_SLOT_EXPORT_SUMS='' FM_SLOT_PYCACHE=''
+  FM_SLOT_PYARGS=()
+}
+
+# The refusals the provisioning route foresees from the task's recorded facts, named before the running agent is
+# stopped (Main 1790 s2): the copy checks fm_slot_provision makes, a recorded scope path that is not tracked at the
+# base the provisioner will use, an own out-of-scope change, and a manifest already at the path the provisioner would
+# write that the record does not adopt (asked of the provisioner's own read-only --check-manifest-only when it has
+# one). A refusal that cannot be foreseen leaves the existing rollback to the prior record.
+fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned-path>...
+  local project=$1 copy=$2 id=$3 branch=$4 meta=$5 base path out reason script scope inside outside mpath
+  local -a args=()
+  shift 5
+  if ! out=$(fm_slot_check_copy "$project" "$copy" 2>&1); then
+    printf '%s\n' "$out" >&2
+    # An uncommitted own edit is the one own work this route refuses (Main 1795): nothing changes and every own
+    # path is printed, so the operator sees what the refusal left untouched.
+    case "$out" in
+      *dirty_worktree*|*operation_in_progress*)
+        fm_slot_drift_report "$copy" "$id" "$branch" \
+          "$(git -C "$copy" merge-base origin/main HEAD 2>/dev/null || git -C "$copy" rev-parse HEAD 2>/dev/null)" "$@" ;;
+    esac
+    return 1
+  fi
+  [ -z "$(fm_meta_get "$meta" slot_source_ref)" ] || return 0
+  base=$(git -C "$copy" merge-base origin/main HEAD 2>/dev/null) || return 0
+  for path in "$@"; do
+    [ -n "$(git -C "$copy" ls-tree -r --name-only "$base" -- ":(literal)${path%/}" 2>/dev/null)" ] || {
+      echo "error: slot provisioning refused: scope_not_tracked: $path is not tracked at the base $base" >&2
+      return 1
+    }
+  done
+  out=$(git -C "$copy" diff --name-only --no-renames -z "$base" HEAD 2>/dev/null | tr '\0' '\n') || out=
+  outside=
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    inside=0
+    for scope in "$@"; do
+      case "$path" in "${scope%/}"|"${scope%/}"/*) inside=1 ;; esac
+    done
+    [ "$inside" = 1 ] || outside=${outside:+$outside, }$path
+  done <<<"$out"
+  if [ -n "$outside" ]; then
+    # Every own out-of-scope path is named, and the drift report prints the same paths with their provenance, so the
+    # refusal leaves the operator exactly what the dirty_worktree refusal does.
+    echo "error: slot provisioning refused: scope_mismatch: $outside changed outside the recorded scope" >&2
+    fm_slot_drift_report "$copy" "$id" "$branch" "$base" "$@"
+    return 1
+  fi
+  # The provisioner that would really run: the copy's own, or for a copy that predates it the verified primary
+  # clone export (D7). Its read-only manifest check, when it has one, names a manifest collision before the stop.
+  script=$copy/scripts/git-stability/provision_existing_slot.py
+  FM_SLOT_PYARGS=()
+  if [ ! -f "$script" ]; then
+    fm_slot_primary_provisioner "$project" || return 1
+    script=$FM_SLOT_PROVISIONER
+  fi
+  if ! grep -q -e '--check-manifest-only' "$script" 2>/dev/null; then
+    fm_slot_export_drop
+    return 0
+  fi
+  for path in "$@"; do args+=(--owned-path "$path"); done
+  out=$(cd "$project" && PYTHONDONTWRITEBYTECODE=1 python3 ${FM_SLOT_PYARGS[@]+"${FM_SLOT_PYARGS[@]}"} "$script" --check-manifest-only --repo-root "$project" \
+    --worktree-path "$copy" --owner-id "$id" --branch "$branch" --base-sha "$base" "${args[@]}" 2>/dev/null) || true
+  fm_slot_export_verify || { fm_slot_export_drop; return 1; }
+  fm_slot_export_drop
+  reason=$(printf '%s' "$out" | python3 -c 'import json, sys
+try:
+    r = json.load(sys.stdin)
+    print(r["reason"] if r.get("state") == "BLOCKED" else "")
+except Exception:
+    print("")' 2>/dev/null) || reason=
+  mpath=$(printf '%s' "$out" | python3 -c 'import json, sys
+try:
+    r = json.load(sys.stdin)
+    value = r.get("manifest_path")
+    print(value if isinstance(value, str) and "\"" not in value and "\n" not in value else "")
+except Exception:
+    print("")' 2>/dev/null) || mpath=
+  case "$reason" in
+    manifest_exists)
+      # The collision file is named in the provisioner's own "manifest_path" form, so the session-end refusal memory can
+      # hash it and a cleared collision permits one new attempt.
+      echo "error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it${mpath:+; \"manifest_path\": \"$mpath\"}" >&2
+      return 1 ;;
+  esac
+}
+
 # Where a copy is, read-only: its branch, "detached" (git says so: exit 1), or "unknown" (any other failure), and its commit.
 fm_slot_where() { # <copy>
   local ref sha rc=0
@@ -230,6 +504,375 @@ Firstmate has provisioned this exact assigned copy on branch \`$1\` before admis
 This section supersedes earlier branch-creation or clean-base reset instructions: verify isolation and the existing branch, then continue in place; do not create the branch again or reset it.
 Do not create another worktree inside this copy, delete a lifecycle manifest, or force a replacement.
 The governed provisioner owns repeat/adoption decisions; a refused renewal, branch change, or wider scope must return to firstmate with the exact refusal, never to a nested-worktree fallback.
+EOF
+}
+
+# --- Adopting the task's own manifest on a relaunch (Main 115, rule S) -------------------------
+# A relaunch is not a new scope declaration. A governed task whose record names its slot manifest
+# is judged by the record of what was already admitted, never by the fresh-admission rules of the
+# provisioner (create-only manifest, scope tracked at the base, every changed path inside scope).
+# fm_slot_adopt_route says when that applies and fm_slot_adopt_check is the one decision: it reads
+# the manifest, the copy and the custody owners and writes nothing, so the manifest file, its
+# directory, the recorded scope and the recorded base stay exactly as they were. Vernant's push-time
+# owned_paths gate stays the control for the task's own out-of-scope work, a pool slot another task claims refuses the
+# relaunch by name unless that task's record places its copy inside the slot, and no other peer claim is checked; the
+# drift report only makes the out-of-scope paths visible.
+FM_SLOT_ADOPTED=0
+
+# 0 when <meta>'s task is relaunched into its own recorded slot: a recorded manifest, no
+# relocation to a replacement copy, and not the recovery of a first provisioning that never finished.
+fm_slot_adopt_route() { # <meta> <relocating 0|1>
+  [ "${2:-0}" = 0 ] || return 1
+  [ -n "$(fm_meta_get "$1" slot_manifest)" ] || return 1
+  [ "$(fm_meta_get "$1" recovery)" != slot-provision-refused ]
+}
+
+fm_slot_adopt_refuse() { # <reason> <detail>
+  local changed='no manifest, scope, record or copy was changed'
+  if [ "${FM_SLOT_ADOPT_WIRED:-0}" = 1 ]; then
+    changed='the launch wiring in the copy and the task record were already written by this relaunch; the recorded manifest and scope were not changed'
+  fi
+  echo "error: slot adoption refused: $1${2:+: $2}; $changed" >&2
+  return 1
+}
+
+# The manifest-versus-record comparison of the adoption decision, as one reusable function so a replay of recorded
+# manifests runs exactly the code a relaunch runs. Prints "ok<TAB><repo_root>" or "<reason><TAB><detail>".
+fm_slot_adopt_verdict() { # <manifest> <real-copy> <branch> <base-sha> <owned-path>...
+  python3 - "$@" <<'PY'
+import json
+import os
+import sys
+
+manifest, copy, branch, base = sys.argv[1:5]
+scope = sys.argv[5:]
+try:
+    with open(manifest, encoding="utf-8") as handle:
+        record = json.load(handle)
+except (OSError, ValueError):
+    print("manifest_unreadable\tthe recorded manifest is not valid JSON")
+    sys.exit(0)
+if not isinstance(record, dict):
+    print("manifest_unreadable\tthe recorded manifest is not a JSON object")
+    sys.exit(0)
+def field(name):
+    value = record.get(name)
+    return value if isinstance(value, str) else ""
+if os.path.realpath(field("worktree_path")) != copy or not field("worktree_path"):
+    print("worktree_path_mismatch\tmanifest names %r, the task copy is %r" % (field("worktree_path"), copy))
+elif field("lifecycle_state") != "worktree_active":
+    print("lifecycle_state_mismatch\tmanifest state is %r, not worktree_active" % field("lifecycle_state"))
+elif field("branch") != branch:
+    print("branch_mismatch\tmanifest branch is %r, the task branch is %r" % (field("branch"), branch))
+elif field("base_sha") != base:
+    print("base_mismatch\tmanifest base is %r, the recorded base is %r" % (field("base_sha"), base))
+elif not isinstance(record.get("owned_paths"), list) or sorted(record["owned_paths"]) != sorted(scope):
+    print("scope_mismatch\tthe manifest scope differs from the recorded task scope")
+elif not field("repo_root"):
+    print("repo_root_missing\tthe manifest names no repository root")
+else:
+    print("ok\t" + field("repo_root"))
+PY
+}
+
+# Judge the recorded manifest against the task's own record, copy and branch. Returns 0 and sets
+# FM_SLOT_MANIFEST, FM_SLOT_BASE_SHA, FM_SLOT_BASE_REF and FM_SLOT_ADOPTED=1 only when every check holds;
+# otherwise prints the refusal by name and returns 1.
+fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
+  local project=$1 copy=$2 id=$3 branch=$4 meta=$5 state=$6
+  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker slot rc
+  local -a scope=()
+  FM_SLOT_ADOPTED=0
+  manifest=$(fm_meta_get "$meta" slot_manifest)
+  base=$(fm_meta_get "$meta" slot_base_sha)
+  ref=$(fm_meta_get "$meta" slot_source_ref)
+  while IFS= read -r line; do scope+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$meta")
+  [ -n "$manifest" ] || { fm_slot_adopt_refuse manifest_not_recorded 'the task record names no slot manifest'; return 1; }
+  [ -n "$base" ] || { fm_slot_adopt_refuse base_not_recorded 'the task record names no slot base'; return 1; }
+  [ "${#scope[@]}" -gt 0 ] || { fm_slot_adopt_refuse scope_not_recorded 'the task record names no slot scope'; return 1; }
+  fm_slot_require_scope "${scope[@]}" >/dev/null 2>&1 || { fm_slot_adopt_refuse scope_invalid 'the recorded scope is not valid'; return 1; }
+  fm_task_copy_isolated "$copy" "$project" || { fm_slot_adopt_refuse not_isolated "$FM_TASK_COPY_REASON"; return 1; }
+  common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { fm_slot_adopt_refuse repository_unreadable "$project"; return 1; }
+  slot_common=$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { fm_slot_adopt_refuse repository_unreadable "$copy"; return 1; }
+  [ "$common" = "$slot_common" ] || { fm_slot_adopt_refuse repository_mismatch "$copy is not a checkout of $project's repository"; return 1; }
+  real_copy=$(CDPATH='' cd -- "$copy" 2>/dev/null && pwd -P) || { fm_slot_adopt_refuse copy_unreadable "$copy"; return 1; }
+  [ -f "$manifest" ] && [ ! -L "$manifest" ] || { fm_slot_adopt_refuse manifest_missing "$manifest"; return 1; }
+  verdict=$(fm_slot_adopt_verdict "$manifest" "$real_copy" "$branch" "$base" "${scope[@]}"
+  ) || { fm_slot_adopt_refuse manifest_unreadable "$manifest"; return 1; }
+  if [ "${verdict%%$'\t'*}" != ok ]; then
+    fm_slot_adopt_refuse "${verdict%%$'\t'*}" "${verdict#*$'\t'}"
+    return 1
+  fi
+  # The repository is judged by identity: the recorded root is the canonical root the provisioner records (the
+  # parent of the common directory, which need not be a checkout) or a checkout of the same repository.
+  root=${verdict#*$'\t'}
+  if ! { [ "$(dirname "$common")" -ef "$root" ] ||
+    [ "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$common" ]; }; then
+    fm_slot_adopt_refuse repository_mismatch "the manifest's repository root $root belongs to another repository"
+    return 1
+  fi
+  git_head=$(git -C "$copy" symbolic-ref -q HEAD 2>/dev/null) || git_head=
+  if [ "$git_head" != "refs/heads/$branch" ]; then
+    head_name=
+    for marker in rebase-merge/head-name rebase-apply/head-name; do
+      line=$(git -C "$copy" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null) || continue
+      [ -f "$line" ] && head_name=$(cat "$line" 2>/dev/null) && break
+    done
+    [ "$head_name" = "refs/heads/$branch" ] || {
+      fm_slot_adopt_refuse branch_not_checked_out "the copy is on ${git_head:-a detached HEAD}, not $branch, and no rebase of $branch is in progress"
+      return 1
+    }
+  fi
+  # Custody is the existing owners' verdict, passed through and fail-closed: another task's record naming this
+  # copy, an unreadable home or record, and a pool-slot claim that is not provably this task's refuse by name.
+  rc=0
+  fm_task_copy_other_record "$meta" "$state" "$copy" || rc=$?
+  case "$rc" in
+    0) fm_slot_adopt_refuse custody_other_record "task $FM_TASK_COPY_OTHER_ID's record names this copy as its $FM_TASK_COPY_OTHER_FIELD"; return 1 ;;
+    1) ;;
+    *) fm_slot_adopt_refuse custody_unreadable 'a registered home or task record could not be read, so no other holder is proved absent'; return 1 ;;
+  esac
+  slot=$(fm_task_copy_enclosing_pool_slot "$project" "$real_copy") || slot=
+  [ -n "$slot" ] || { fm_treehouse_pool_slot "$project" "$real_copy" && slot=$real_copy; } || slot=
+  if [ -n "$slot" ]; then
+    fm_treehouse_slot_owner_state "$slot" "$id"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      absent) ;;
+      mine)
+        # A claim for this task ID from another home is not this task's own (the relocation path's rule).
+        fm_treehouse_slot_claim_home_is_this_home || {
+          fm_slot_adopt_refuse custody_slot_claim "pool slot $slot is claimed for task $id by another home (${FM_TREEHOUSE_SLOT_OWNER_HOME:-no home recorded})"
+          return 1
+        } ;;
+      other)
+        fm_slot_adopt_sibling_claim "$slot" "$real_copy" "$state" ||
+          { fm_slot_adopt_refuse custody_slot_claim "pool slot $slot is claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID"; return 1; } ;;
+      *) fm_slot_adopt_refuse custody_slot_claim "the owner claim of pool slot $slot cannot be read"; return 1 ;;
+    esac
+  fi
+  FM_SLOT_MANIFEST=$manifest
+  FM_SLOT_BASE_SHA=$base
+  FM_SLOT_BASE_REF=$ref
+  FM_SLOT_PROVISIONED=1
+  FM_SLOT_ADOPTED=1
+}
+
+# A pool slot claim naming another task is a legitimate shared slot only when that task's own record, in this
+# home or a registered one, names a copy strictly inside the slot that is not this task's copy.
+fm_slot_adopt_sibling_claim() { # <slot> <copy> <state-dir>
+  local slot=$1 copy=$2 state=$3 state_dir other path real
+  [ -n "$FM_TREEHOUSE_SLOT_OWNER_ID" ] || return 1
+  fm_local_firstmate_state_dirs "$state" || return 1
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    other="$state_dir/$FM_TREEHOUSE_SLOT_OWNER_ID.meta"
+    [ -f "$other" ] && [ ! -L "$other" ] || continue
+    path=$(fm_meta_get "$other" worktree)
+    real=$(fm_task_copy_canonical_dir "$path") || continue
+    case "$real" in "$slot"/*) ;; *) continue ;; esac
+    fm_task_copy_paths_overlap "$real" "$copy" && continue
+    return 0
+  done
+  return 1
+}
+
+FM_SLOT_DRIFT_PY=$(cat <<'FMDRIFTPY'
+import os
+import subprocess
+import sys
+
+copy, base, branch = sys.argv[1:4]
+scope = sys.argv[4:]
+env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+
+
+def git(*args, ok=(0,)):
+    proc = subprocess.run(["git", "-C", copy, *args], capture_output=True, stdin=subprocess.DEVNULL, env=env)
+    if proc.returncode not in ok:
+        raise RuntimeError("git %s exit %d" % (" ".join(args[:2]), proc.returncode))
+    return proc
+
+
+def names(raw):
+    return [part for part in raw.split(b"\0") if part]
+
+
+def in_scope(path):
+    for item in scope:
+        item = item.encode().rstrip(b"/")
+        if path == item or path.startswith(item + b"/"):
+            return True
+    return False
+
+
+def escape(path):
+    out = []
+    for byte in path:
+        ch = chr(byte)
+        if ch == "\\":
+            out.append("\\\\")
+        elif 0x20 <= byte < 0x7F:
+            out.append(ch)
+        else:
+            out.append("\\x%02x" % byte)
+    return "".join(out)
+
+
+limits = []
+proven = {}
+status = {}
+
+
+def add(path, *labels):
+    if in_scope(path):
+        return
+    proven.setdefault(path, "proven")
+    for label in labels:
+        status.setdefault(path, set()).add(label)
+
+
+def uncertain(path, *labels):
+    if in_scope(path):
+        return
+    proven.setdefault(path, "uncertain")
+    for label in labels:
+        status.setdefault(path, set()).add(label)
+
+
+# The default branch tip as the copy sees it, and the point the task forked from it.
+tip = git("rev-parse", "--verify", "--quiet", "origin/main^{commit}", ok=(0, 1)).stdout.decode().strip()
+head = git("rev-parse", "--verify", "HEAD").stdout.decode().strip()
+heads = [head]
+for marker in ("rebase-merge/orig-head", "rebase-apply/orig-head"):
+    path = git("rev-parse", "--path-format=absolute", "--git-path", marker).stdout.decode().strip()
+    if os.path.isfile(path):
+        orig = open(path, encoding="utf-8").read().strip()
+        if orig and orig not in heads:
+            heads.append(orig)
+shallow = git("rev-parse", "--is-shallow-repository").stdout.decode().strip() == "true"
+for tip_head in heads:
+    fork = ""
+    if tip:
+        fork = git("merge-base", tip, tip_head, ok=(0, 1)).stdout.decode().strip()
+    known = bool(fork)
+    if not known:
+        fork = base
+        limits.append("the default branch tip or the fork point is unavailable; the recorded base %s is the reference, so inherited upstream paths may be listed as uncertain" % base[:12])
+    net = set(names(git("diff", "--no-renames", "-z", "--name-only", "--ignore-submodules=none", fork, tip_head).stdout))
+    for path in net:
+        (add if known else uncertain)(path)
+    if known:
+        exclusive = set(names(git("log", "--cc", "--name-only", "-z", "--format=", tip_head, "--not", tip).stdout))
+        for path in exclusive - net:
+            add(path, "reverted-to-base")
+# What the branch's own reflog records the task committing counts as the task's work even when the default branch later
+# absorbed and reverted it (the merge base then moves past it and no net diff remains). Pulls, merges, fast-forwards
+# and rebase picks are not "commit" entries, so work that only came in from the default branch is not attributed here.
+reflog = subprocess.run(["git", "-C", copy, "reflog", "show", "--format=%H%x09%gs", "refs/heads/" + branch],
+                        capture_output=True, stdin=subprocess.DEVNULL, env=env)
+if reflog.returncode != 0:
+    limits.append("the task branch reflog cannot be read, so a change the default branch absorbed and reverted may be missing from the list")
+else:
+    seen_commits = set()
+    for row in reflog.stdout.decode("utf-8", "replace").splitlines():
+        sha, _, subject = row.partition("\t")
+        if not (subject.startswith("commit") or subject.startswith("cherry-pick")) or sha in seen_commits:
+            continue
+        seen_commits.add(sha)
+        shown = git("show", "--cc", "--name-only", "-z", "--format=", sha, ok=(0, 128))
+        for path in names(shown.stdout):
+            if in_scope(path):
+                continue
+            now = git("rev-parse", "--verify", "--quiet", "HEAD:" + os.fsdecode(path), ok=(0, 1)).stdout.strip()
+            then = git("rev-parse", "--verify", "--quiet", base + ":" + os.fsdecode(path), ok=(0, 1)).stdout.strip()
+            add(path, *(("reverted-to-base",) if now == then else ()))
+if shallow:
+    limits.append("the copy is a shallow clone, so history before its cut-off cannot show who changed a path; the list may be incomplete")
+# The working copy: modified, deleted, untracked (every file), renamed or copied (both ends), and ignored.
+raw = git("-c", "core.fileMode=true", "status", "--porcelain=v1", "-z", "--untracked-files=all",
+          "--ignore-submodules=none", "--ignored=traditional").stdout.split(b"\0")
+i = 0
+while i < len(raw):
+    entry = raw[i]
+    i += 1
+    if len(entry) < 4:
+        continue
+    code, path = entry[:2], entry[3:]
+    if code[:1] in b"RC":
+        add(path)
+        if i < len(raw) and raw[i]:
+            add(raw[i])
+        i += 1
+        continue
+    if code == b"!!":
+        if path.endswith(b"/"):
+            uncertain(path.rstrip(b"/"), "ignored", "generated")
+        else:
+            uncertain(path, "ignored")
+    else:
+        add(path.rstrip(b"/") if code == b"??" and path.endswith(b"/") else path)
+# Tracked paths that status cannot report (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ.
+for flagged in names(git("ls-files", "-v", "-z").stdout):
+    tag, path = flagged[:1], flagged[2:]
+    if not (tag.islower() or tag == b"S"):
+        continue
+    full = os.path.join(os.fsencode(copy), path)
+    if not os.path.lexists(full):
+        continue
+    entry = git("ls-files", "-s", "-z", "--", os.fsdecode(path)).stdout.split(b"\0")[0].split()
+    if len(entry) < 2:
+        continue
+    mode = entry[0].decode()
+    if os.path.islink(full):
+        blob = subprocess.run(["git", "-C", copy, "hash-object", "--stdin"], input=os.readlink(full), capture_output=True, env=env)
+        differs = mode != "120000" or blob.stdout.decode().strip() != entry[1].decode()
+    else:
+        blob = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True, env=env)
+        want_mode = "100755" if os.stat(full).st_mode & 0o100 else "100644"
+        differs = blob.stdout.decode().strip() != entry[1].decode() or want_mode != mode
+    if differs:
+        add(path)
+print("drift-count\t%d" % len(proven))
+for path in sorted(proven):
+    labels = [proven[path]] + sorted(status.get(path, ()))
+    print("drift\t%s\t%s" % (",".join(labels), escape(path)))
+for limit in dict.fromkeys(limits):
+    print("limitation\t" + limit)
+FMDRIFTPY
+)
+
+# The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals.
+# Reads only; the recorded scope, manifest and record are never edited by what this reports.
+fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
+  local copy=$1 id=$2 branch=$3 base=$4 out count line
+  shift 4
+  out=$(python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || {
+    echo "relaunch drift report for $id: could not be produced ($(printf '%s' "$out" | tail -n 1)); this is a limitation of the report, not a statement that the task stayed in scope" >&2
+    return 0
+  }
+  count=$(printf '%s\n' "$out" | sed -n 's/^drift-count\t//p')
+  if [ "${count:-0}" -eq 0 ]; then
+    echo "relaunch drift report for $id: no out-of-scope path changed by this task's own work; the recorded scope is unchanged" >&2
+  else
+    echo "relaunch drift report for $id: $count out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)" >&2
+    printf '%s\n' "$out" | while IFS= read -r line; do
+      case "$line" in drift$'\t'*) printf '  drift: %s\n' "${line#drift$'\t'}" | tr '\t' ' ' >&2 ;; esac
+    done
+  fi
+  printf '%s\n' "$out" | while IFS= read -r line; do
+    case "$line" in limitation$'\t'*) printf '  limitation: %s\n' "${line#limitation$'\t'}" >&2 ;; esac
+  done
+  echo "  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot" >&2
+}
+
+# The launch contract for a worker started on an adopted slot: continue in place.
+fm_slot_contract_adopted() { # <branch>
+  cat <<EOF
+
+# Current assigned-copy lifecycle contract
+This is a relaunch into the exact assigned copy and branch \`$1\` that this task already holds, with its slot manifest recorded.
+This section supersedes earlier branch-creation or clean-base reset instructions: verify isolation and the existing branch, then continue in place; do not create the branch again or reset it, and keep every uncommitted change.
+Do not create another worktree inside this copy, delete or edit the lifecycle manifest, or widen the recorded scope.
+Paths you changed outside the recorded scope stay your own work and are reported to firstmate, and the push-time owned_paths check decides what may be pushed; a refused push or a wider scope must return to firstmate with the exact refusal, never to a nested-worktree fallback.
 EOF
 }
 
