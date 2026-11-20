@@ -202,6 +202,9 @@ init_changed_fixture_repo() {
   : >"$repo/CONTRIBUTING.md"
   : >"$repo/src/unmapped.ts"
   git -C "$repo" init -q
+  # The runner's measurement imports bin/fm-cpu-pass.py, so Python writes its
+  # bytecode under bin/__pycache__/; ignore it as the real checkout's .gitignore does.
+  printf '__pycache__/\n' >>"$repo/.git/info/exclude"
   git -C "$repo" add .
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
 }

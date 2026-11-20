@@ -91,6 +91,15 @@ wait_file() {  # <path> <what>
   fail "$2: $1 never appeared"
 }
 
+wait_gone() {  # <pid> <what>
+  # A process killed with its group can still answer kill -0 for a moment, until its new parent reaps it.
+  for _ in $(seq 1 600); do
+    kill -0 "$1" 2>/dev/null || return 0
+    sleep 0.05
+  done
+  fail "$2"
+}
+
 test_size_follows_host() {
   local host got
   host=$(python3 -c 'import os; print(max(1, os.cpu_count() or 1))')
@@ -275,9 +284,7 @@ test_cleanup_terminates_running_work() {
   wait_file "$dir/child.pid" "cleanup holder"
   child=$(cat "$dir/child.pid")
   reap_bg
-  if kill -0 "$child" 2>/dev/null; then
-    fail "cleanup left the workload alive"
-  fi
+  wait_gone "$child" "cleanup left the workload alive"
   assert_equals 0 "$(held_count "$pool" 1)" "cleanup must release the workload's pass"
   pass "failure cleanup terminates and reaps wrappers and their workloads"
 }
@@ -632,6 +639,25 @@ PY
 python3 "$ROOT/tests/fm-cpu-pass-admission.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
   || fail "pipeline admission and child-descriptor regression failed"
 pass "pipeline admission follows measured reservations, the fallback count, the pause-only backstop, priority, start registration, timing and descriptor ownership"
+
+# Attempt attribution and the launch gate read macOS kernel process facts (bin/fm-cpu-pass.py kernel_snapshot).
+# Elsewhere the gate refuses every admitted ci launch with exit 75; the gate driver then proves only that refusal.
+if [ "$(uname -s)" = Darwin ]; then
+  python3 "$ROOT/tests/fm-cpu-pass-attribution.py" "$ROOT" "$TMP_ROOT" \
+    || fail "attempt attribution decision cases failed"
+  pass "attempt attribution holds on every unreadable fact, keeps every owner, and keeps an unproven launch counted while a later one waits"
+else
+  pass "SKIP: attempt attribution reads macOS kernel process facts; this host is $(uname -s)"
+fi
+
+python3 "$ROOT/tests/fm-cpu-pass-gate.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
+  || fail "launch-gate regression failed"
+if [ "$(uname -s)" = Darwin ]; then
+  pass "the launch gate maps its run, scopes by step, holds inside its bound, records its holds and refusals, and passes its agent's streams, signals and exit through"
+else
+  pass "the launch gate without kernel process facts refuses an admitted ci launch with exit 75 and never starts its agent"
+  pass "SKIP: every other launch-gate case needs macOS kernel process facts; this host is $(uname -s)"
+fi
 
 # The concurrency proofs (tests/fm-cpu-pass-concurrency.py) run up to three CPU-bound processes at once, more
 # than the one pass this script holds, so they are not launched here: CI runs them as their own job under

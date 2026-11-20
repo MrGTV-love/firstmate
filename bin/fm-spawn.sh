@@ -4640,10 +4640,11 @@ fi
 # bin/fm-mem-guard.sh owns the native sources, recorded reading and exit 75.
 if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" != secondmate ] || [ ! -e "$STATE/$ID.meta" ]; }; then
   memory_rc=0
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "${FM_MEMORY_GUARD_BIN:-$SCRIPT_DIR/fm-mem-guard.sh}" admit >/dev/null || memory_rc=$?
+  memory_reading=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "${FM_MEMORY_GUARD_BIN:-$SCRIPT_DIR/fm-mem-guard.sh}" admit --kind task) || memory_rc=$?
   if [ "$memory_rc" -ne 0 ]; then
-    echo "deferred: host memory admission refused new task $ID (exit $memory_rc); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl" >&2
+    memory_why=$(printf '%s' "$memory_reading" | jq -r '(.reasons // []) | join("; ")' 2>/dev/null || true)
+    echo "deferred: host memory admission refused new task $ID (exit $memory_rc${memory_why:+: $memory_why}); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl" >&2
     exit 75
   fi
 fi
