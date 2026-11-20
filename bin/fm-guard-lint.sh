@@ -18,9 +18,10 @@
 #   report          print every violation and exit 0 (the ratchet's first step)
 #   enforce         exit 1 on any violation not allowlisted, and on any stale
 #                   allowlisted entry whose violation is gone (the default)
-#   new-or-touched  enforce only for guards added or edited since --base and for
-#                   refusal-site violations the allowlist does not hold, so new
-#                   work cannot add debt while the legacy population burns down
+#   new-or-touched  enforce only for guards added or edited since --base that carry
+#                   a finding under their literal id, and for refusal-site
+#                   violations the allowlist does not hold, so new work cannot add
+#                   debt while the legacy population burns down
 #
 # Rules, each owned by docs/guard-spec.md:
 #   R1 unique id, unique normalized invariant, unique owner+invariant pair

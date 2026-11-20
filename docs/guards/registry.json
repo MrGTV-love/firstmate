@@ -7561,7 +7561,7 @@
       "invariant": "An unallowlisted finding on an added or edited registry entry blocks new-or-touched lint by that entry's literal ID.",
       "layer": "machine-check",
       "source": "The working docs/guards/registry.json, the Git blob at the same path at --base, and the unallowlisted findings computed by bin/fm-guard-lint.sh.",
-      "trigger": "In new-or-touched mode an unallowlisted finding has the same literal ID as a guard absent from --base or whose JSON entry differs from the base entry.",
+      "trigger": "In new-or-touched mode an unallowlisted finding has the same literal ID as a guard absent from --base, or whose complete rows for that ID (duplicates counted, row order ignored) differ from the base rows for that ID.",
       "decision": "deny",
       "fail_direction": "closed",
       "fail_direction_note": "An unavailable base registry blob or an unreadable current guards array prevents a clean invocation. This check does not validate the contents of the historical blob.",

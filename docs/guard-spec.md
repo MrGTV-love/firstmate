@@ -348,7 +348,7 @@ The lint runs in three modes:
   on an allowlisted entry whose violation no longer occurs, because that entry
   is stale.
 
-An incomparable base registry fails closed; the `guard-lint-touched-registry` entry in the registry owns that contract.
+The `guard-lint-touched-registry` registry entry owns the fail-closed contract for an unavailable base or unreadable current registry.
 
 The legacy refusal sites that map to nothing sit in the allowlist as `S1` entries, once, as the burn-down list.
 Once the base allowlist is at `schema_version` 2, the lint also fails an entry the base does not hold, so the allowlist cannot grow.
