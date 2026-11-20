@@ -611,6 +611,396 @@ test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family() {
   pass "plan applies the one-reader relief for an unrecorded pipeline family and the two-reader rule for any other unknown group exactly as verify does, names the families a reader must lie outside, and verify keeps its disclosure"
 }
 
+
+# --- append-only corrections ------------------------------------------------
+# Synthetic rows only: the PR URL, models, digests and report paths below are
+# invented, and every ledger row is written by the test with a fixed epoch so a
+# case controls exactly which row a correction names.
+
+DIGEST_A=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+DIGEST_B=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+ledger_of() { printf '%s/home/state/review-records.jsonl' "$1"; }
+
+# synth_row <case_dir> <at> <head> <verdict> <reader> <author-groups-json> <covered-json> [digest] [widens-guard]
+# Appends one fm-review-record.v1 review row, shaped like the CLI writes it.
+synth_row() {
+  local case_dir=$1 at=$2 head=$3 verdict=$4 reader=$5 groups=$6 covered=$7 digest=${8:-} widens=${9:-no}
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -nc --arg pr "$URL" --argjson at "$at" --arg head "$head" --arg verdict "$verdict" \
+    --arg reader "$reader" --argjson groups "$groups" --argjson covered "$covered" \
+    --arg digest "$digest" --arg widens "$widens" '
+    {schema:"fm-review-record.v1",kind:"review",pr:$pr,at:$at,head:$head,verdict:$verdict,
+     reader_model:$reader,reader_family:"unknown",
+     author_groups:($groups | with_entries(.value |= map({model:., family:"unknown"}))),
+     loosens_deny_allow_list:"no",widens_guard:$widens,customer_data_billing_spend:"no",
+     covered_groups:$covered,report:("/synthetic/report-" + ($at|tostring) + ".md")}
+    + (if $digest == "" then {} else {report_sha256:$digest} end)' >> "$(ledger_of "$case_dir")"
+}
+
+test_older_ledger_without_corrections_verifies_unchanged() {
+  local case_dir out rc=0 row word
+  case_dir=$(make_case older-ledger claude-opus-5-5)
+  row='{"schema":"fm-review-record.v1","kind":"review","pr":"'"$URL"'","at":1700000001,"head":"'"$HEAD1"'","verdict":"PASS","reader_model":"gpt-5.2","reader_family":"openai","author_groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}]},"loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no","covered_groups":["ship"],"report":"/synthetic/report-1.md","report_sha256":"'"$DIGEST_A"'"}'
+  word='{"schema":"fm-review-record.v1","kind":"captain-word","pr":"'"$URL"'","at":1700000002,"head":"'"$HEAD1"'","words":"Merge this PR."}'
+  printf '%s\n' "$row" > "$(ledger_of "$case_dir")"
+  out=$(FM_HOME="$case_dir/home" "$RECORD" latest --pr "$URL")
+  assert_equals '{"review":'"$row"',"captain-word":null}' "$out" "latest output for a ledger without corrections must stay byte-identical"
+  out=$(run_verify "$case_dir" "$HEAD1" --json) || fail "older ledger default verify: $out"
+  assert_equals '{"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"'"$URL"'","head":"'"$HEAD1"'","at":1700000001,"reader_model":"gpt-5.2","reader_family":"openai","author_groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}]},"report":"/synthetic/report-1.md","report_sha256":"'"$DIGEST_A"'"}' \
+    "$out" "older ledger verify --json must stay byte-identical"
+  out=$(run_verify "$case_dir" "$HEAD1") || fail "older ledger text verify: $out"
+  assert_equals "review: PASS" "$out" "older ledger verify text must stay review: PASS"
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" --task task-x1 --base "$BASE")
+  assert_equals '{"schema":"fm-review-plan.v1","ok":true,"pr":"'"$URL"'","head":"'"$HEAD1"'","groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}]},"uncovered":[]}' \
+    "$out" "older ledger plan must stay byte-identical"
+  printf '%s\n' "$word" >> "$(ledger_of "$case_dir")"
+  out=$(FM_HOME="$case_dir/home" "$RECORD" latest --pr "$URL")
+  assert_equals '{"review":'"$row"',"captain-word":'"$word"'}' "$out" "latest output with a captain-word must stay byte-identical"
+  out=$(run_verify "$case_dir" "$HEAD1" --json) || fail "older ledger captain-word verify: $out"
+  assert_equals '{"schema":"fm-review-verification.v1","ok":true,"basis":"captain-word","pr":"'"$URL"'","head":"'"$HEAD1"'","at":1700000002,"words":"Merge this PR."}' \
+    "$out" "older ledger captain-word verify --json must stay byte-identical"
+  out=$(run_verify "$case_dir" "$HEAD1") || fail "older ledger captain-word text verify: $out"
+  assert_equals "review: captain-word" "$out" "older ledger captain-word text must stay review: captain-word"
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || fail "older ledger review-only verify: $out"
+  "$JQ_BIN" -e '.ok == true and .basis == "independent-review" and (has("facts") | not)' <<<"$out" >/dev/null \
+    || fail "older ledger review-only verify must carry no correction fact: $out"
+  out=$(run_verify "$case_dir" "$HEAD2" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "older ledger other head must still refuse"
+  expect_not_qualified "$out" "head mismatch" "older ledger other head"
+  pass "ledgers without correction rows (review and captain-word) verify, plan and report latest exactly as before"
+}
+
+
+record_correction() {  # <case_dir> <head> <effect> <target-at> <reader> <digest|-> <captain-word-at> [extra flags...]
+  local case_dir=$1 head=$2 effect=$3 at=$4 reader=$5 digest=$6 word_at=$7
+  shift 7
+  local flags=()
+  [ "$digest" = - ] || flags=(--target-report-sha256 "$digest")
+  FM_HOME="$case_dir/home" "$RECORD" correction --pr "$URL" --head "$head" --effect "$effect" \
+    --target-at "$at" --target-reader-model "$reader" ${flags[@]+"${flags[@]}"} \
+    --captain-word-at "$word_at" --reason 'synthetic correction' "$@"
+}
+
+word_at() {  # <case_dir>: epoch of the newest recorded captain-word
+  "$JQ_BIN" -r '."captain-word".at' <<<"$(FM_HOME="$1/home" "$RECORD" latest --pr "$URL")"
+}
+
+ledger_sum() {  # <case_dir>: digest of the ledger, or "absent"
+  if [ -e "$(ledger_of "$1")" ]; then sha256_of "$(ledger_of "$1")"; else printf absent; fi
+}
+
+# expect_correction_rejected <label> <needle> <case_dir> <record_correction args after case_dir...>
+# A rejected correction exits 1 (2 for a malformed request, REJECT_CODE=2) naming why and leaves the ledger byte-identical.
+expect_correction_rejected() {
+  local label=$1 needle=$2 case_dir=$3 before after out rc=0
+  shift 3
+  before=$(ledger_sum "$case_dir")
+  out=$(record_correction "$case_dir" "$@") || rc=$?
+  expect_code "${REJECT_CODE:-1}" "$rc" "$label must be rejected: $out"
+  assert_contains "$out" "$needle" "$label must say why"
+  after=$(ledger_sum "$case_dir")
+  assert_equals "$before" "$after" "$label must leave the ledger byte-identical"
+}
+
+# A synthetic PR shaped like the live case: ship authors claude-sonnet-5-5 and
+# openai-codex/gpt-6-luna (task meta plus relaunch history) and one recorded
+# pipeline invocation by claude-opus-5-5, so the derived groups are ship and
+# no-mistakes:anthropic. BAD over-claims coverage with an invented
+# no-mistakes group; GOOD is the genuine independent read and also carries the
+# copied no-mistakes entry.
+LIVE_NM="$TMP_ROOT/live-nm"
+fm_test_empty_pipeline_db "$LIVE_NM"
+python3 -c 'import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("INSERT INTO runs VALUES (?, ?, ?, ?)", ("run-1", "repo-1", "fm/fixture", sys.argv[2]))
+db.execute("INSERT INTO agent_invocations VALUES (?, ?, ?, ?)", ("run-1", "claude", "claude-opus-5-5", ""))
+db.commit()' "$LIVE_NM/state.sqlite" "$URL"
+BAD_AT=1795202232
+GOOD_AT=1795206560
+BAD_READER=openai-codex/gpt-6.1-terra
+GOOD_READER=deepseek/deepseek-v4-pro
+
+live_case() {  # <name> [bad|nobad] [good|nogood]
+  local case_dir
+  case_dir=$(make_case "$1" claude-sonnet-5-5)
+  printf 'model=openai-codex/gpt-6-luna\n' > "$case_dir/home/state/task-x1.control-relaunch.meta-prior"
+  if [ "${2:-bad}" = bad ]; then
+    synth_row "$case_dir" "$BAD_AT" "$HEAD1" PASS "$BAD_READER" \
+      '{"ship":["claude-sonnet-5-5"],"no-mistakes":["anthropic"]}' '["ship","no-mistakes"]' "$DIGEST_A"
+  fi
+  if [ "${3:-good}" = good ]; then
+    synth_row "$case_dir" "$GOOD_AT" "$HEAD1" PASS "$GOOD_READER" \
+      '{"ship":["claude-sonnet-5-5","openai-codex/gpt-6-luna"],"no-mistakes:anthropic":["claude-opus-5-5"],"no-mistakes":["anthropic"]}' \
+      '["ship","no-mistakes:anthropic"]' "$DIGEST_B"
+  fi
+  printf '%s\n' "$case_dir"
+}
+
+run_live_verify() {  # <case_dir> [flags...]
+  local case_dir=$1
+  shift
+  NM_HOME="$LIVE_NM" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE" --review-only --json "$@"
+}
+
+test_correction_live_shape_judges_genuine_coverage_only() {
+  local case_dir out rc=0 word before size
+  # Step 1: before any correction the bad row carries the verdict (the defect).
+  case_dir=$(live_case live-shape)
+  out=$(run_live_verify "$case_dir") || fail "C5 step 1: bad row plus genuine row passes before correction: $out"
+  "$JQ_BIN" -e '.ok == true and .basis == "independent-review" and .reader_model == "deepseek/deepseek-v4-pro"' \
+    <<<"$out" >/dev/null || fail "C5 step 1: expected the genuine row to be the evidence: $out"
+  # The same evidence without the bad row refuses: the pass rests on the bad row.
+  local replay
+  replay=$(live_case live-shape-replay nobad)
+  out=$(run_live_verify "$replay") || rc=$?
+  expect_code 1 "$rc" "C5: replay without the bad row must refuse: $out"
+  expect_not_qualified "$out" "uncovered commit group no-mistakes, family anthropic" "C5 replay without the bad row"
+  # Step 2: exclude the bad row and supersede the copied entry; the genuine read passes alone.
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record the cited captain-word"
+  word=$(word_at "$case_dir")
+  before=$(cat "$(ledger_of "$case_dir")")
+  size=$(wc -c < "$(ledger_of "$case_dir")" | tr -d ' ')
+  record_correction "$case_dir" "$HEAD1" exclude-review "$BAD_AT" "$BAD_READER" "$DIGEST_A" "$word" >/dev/null \
+    || fail "C5: record the exclusion"
+  record_correction "$case_dir" "$HEAD1" supersede-author-group "$GOOD_AT" "$GOOD_READER" "$DIGEST_B" "$word" \
+    --group no-mistakes >/dev/null || fail "C5: record the supersession"
+  [ "$(head -c "$size" "$(ledger_of "$case_dir")")" = "$before" ] \
+    || fail "C1: the rows recorded before the corrections must stay byte-identical"
+  [ "$(wc -l < "$(ledger_of "$case_dir")" | tr -d ' ')" = 5 ] || fail "C1: two corrections append exactly two rows"
+  out=$(run_live_verify "$case_dir") || fail "C5 step 2: corrected evidence must pass: $out"
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e --arg digest "$DIGEST_B" --argjson at "$GOOD_AT" '
+    .ok == true and .basis == "independent-review" and .reader_model == "deepseek/deepseek-v4-pro"
+    and .at == $at and .report_sha256 == $digest and .facts == ["corrections applied: 2"]
+    and (.author_groups | keys) == ["no-mistakes:anthropic","ship"]' <<<"$out" >/dev/null \
+    || fail "C5 step 2: the genuine row must be the evidence and the corrections disclosed: $out"
+  out=$(NM_HOME="$LIVE_NM" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" --task task-x1 --base "$BASE")
+  "$JQ_BIN" -e '.ok == true and .uncovered == [] and (.groups | has("no-mistakes") | not)
+    and (.groups | has("ship") and has("no-mistakes:anthropic"))' <<<"$out" >/dev/null \
+    || fail "C5 step 2: plan must agree and still carry the derived groups: $out"
+  # Step 3: remove the genuine independent row from the corrected ledger; the guard refuses.
+  local stripped
+  stripped=$(live_case live-shape-stripped nobad nogood)
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -c --arg reader "$GOOD_READER" 'select(.kind != "review" or .reader_model != $reader)' \
+    "$(ledger_of "$case_dir")" > "$(ledger_of "$stripped")"
+  [ "$(wc -l < "$(ledger_of "$stripped")" | tr -d ' ')" = 4 ] || fail "C5 step 3 fixture must keep the bad row, the captain-word and both corrections, and only drop the genuine row"
+  out=$(run_live_verify "$stripped") || rc=$?
+  expect_code 1 "$rc" "C5 step 3: corrected ledger without the genuine row must refuse: $out"
+  expect_not_qualified "$out" "no independent review record" "C5 step 3 with no read left"
+  # The same ledger with a read by a builder-family reader in the genuine row's place leaves groups uncovered.
+  synth_row "$stripped" "$GOOD_AT" "$HEAD1" PASS claude-opus-5-5 \
+    '{"ship":["claude-sonnet-5-5","openai-codex/gpt-6-luna"],"no-mistakes:anthropic":["claude-opus-5-5"]}' \
+    '["ship","no-mistakes:anthropic"]' "$DIGEST_B"
+  rc=0
+  out=$(run_live_verify "$stripped") || rc=$?
+  expect_code 1 "$rc" "C5 step 3: a read from a builder family must not stand in for the genuine row: $out"
+  expect_not_qualified "$out" "uncovered commit group no-mistakes:anthropic, family anthropic" "C5 step 3 without genuine coverage"
+  pass "C5 the corrected live-shape ledger passes on the genuine DeepSeek read alone and refuses without it"
+}
+
+test_correction_exclusion_effects() {
+  local case_dir out rc=0 word
+  # (a) coverage: the excluded row is the only cover of the ship family.
+  case_dir=$(make_case excl-coverage gpt-5.1)
+  synth_row "$case_dir" 1700000010 "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_A"
+  synth_row "$case_dir" 1700000020 "$HEAD1" PASS gpt-5.2 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_B"
+  run_verify "$case_dir" "$HEAD1" --review-only >/dev/null || fail "C2 coverage fixture must pass before correction"
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  word=$(word_at "$case_dir")
+  record_correction "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" "$word" >/dev/null \
+    || fail "C2 record exclusion"
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "C2 an excluded row must stop covering its group: $out"
+  expect_not_qualified "$out" "uncovered commit group ship, family openai" "C2 excluded sole cover"
+  # (b) constraint: the excluded row's typed group stops constraining; coverage of ship comes from the other row.
+  case_dir=$(make_case excl-constraint gpt-5.1)
+  synth_row "$case_dir" 1700000010 "$HEAD1" PASS claude-sonnet-4 \
+    '{"ship":["gpt-5.1"],"extra":["claude-opus-5-5"]}' '["ship","extra"]' "$DIGEST_A"
+  synth_row "$case_dir" 1700000020 "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_B"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "C2 the typed group must constrain before correction: $out"
+  expect_not_qualified "$out" "uncovered commit group extra, family anthropic" "C2 typed constraint before correction"
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  word=$(word_at "$case_dir")
+  record_correction "$case_dir" "$HEAD1" exclude-review 1700000010 claude-sonnet-4 "$DIGEST_A" "$word" >/dev/null \
+    || fail "C2 record exclusion of the constraining row"
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || fail "C2 an excluded row's typed groups add no constraint: $out"
+  "$JQ_BIN" -e '.ok == true and .reader_model == "claude-opus-5-5" and .facts == ["corrections applied: 1"]' <<<"$out" >/dev/null \
+    || fail "C2 the remaining read must carry the verdict: $out"
+  # (c) the newest review is the newest row that still counts.
+  case_dir=$(make_case excl-newest claude-opus-5-5)
+  synth_row "$case_dir" 1700000010 "$HEAD1" PASS gpt-5.2 '{"ship":["claude-opus-5-5"]}' '["ship"]' "$DIGEST_A"
+  synth_row "$case_dir" 1700000020 "$HEAD1" PASS mystery-9 '{"ship":["claude-opus-5-5"]}' '["ship"]' "$DIGEST_B"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "C2 an unknown-family newest reader must refuse: $out"
+  expect_not_qualified "$out" "model family unknown for newest reader mystery-9" "C2 newest reader before exclusion"
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  record_correction "$case_dir" "$HEAD1" exclude-review 1700000020 mystery-9 "$DIGEST_B" "$(word_at "$case_dir")" >/dev/null \
+    || fail "C2 record exclusion of the newest row"
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || fail "C2 verification must fall back to the newest remaining read: $out"
+  "$JQ_BIN" -e '.ok == true and .reader_model == "gpt-5.2"' <<<"$out" >/dev/null || fail "C2 fallback evidence: $out"
+  pass "C2 an excluded review row counts for no coverage and adds no author constraint, each shown separately"
+}
+
+test_correction_supersede_effects() {
+  local case_dir out rc=0 word
+  case_dir=$(make_case supersede gpt-5.1)
+  synth_row "$case_dir" 1700000010 "$HEAD1" PASS claude-opus-5-5 \
+    '{"ship":["gpt-5.1"],"extra":["claude-opus-5-4"],"other":["claude-opus-5-4"]}' '["ship"]' "$DIGEST_A"
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "C3 the typed entries must constrain before correction: $out"
+  expect_not_qualified "$out" "uncovered commit group extra, family anthropic" "C3 typed entry before correction"
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  word=$(word_at "$case_dir")
+  expect_correction_rejected "C3 superseding an entry the row does not hold" "holds no author_groups entry nothing" \
+    "$case_dir" "$HEAD1" supersede-author-group 1700000010 claude-opus-5-5 "$DIGEST_A" "$word" --group nothing
+  record_correction "$case_dir" "$HEAD1" supersede-author-group 1700000010 claude-opus-5-5 "$DIGEST_A" "$word" \
+    --group extra >/dev/null || fail "C3 record the first supersession"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "C3 only the named entry stops constraining: $out"
+  expect_not_qualified "$out" "uncovered commit group other, family anthropic" "C3 the row's other entry still constrains"
+  record_correction "$case_dir" "$HEAD1" supersede-author-group 1700000010 claude-opus-5-5 "$DIGEST_A" "$word" \
+    --group other >/dev/null || fail "C3 record the second supersession"
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || fail "C3 both entries superseded must pass: $out"
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e --arg digest "$DIGEST_A" '
+    .ok == true and .reader_model == "claude-opus-5-5" and .at == 1700000010 and .report_sha256 == $digest
+    and (.author_groups | keys) == ["ship"] and .facts == ["corrections applied: 2"]' <<<"$out" >/dev/null \
+    || fail "C3 the row keeps its reader, digest, verdict and ship coverage: $out"
+  pass "C3 superseding one typed entry drops only that entry; the row's other entries, coverage, verdict and digest stay in force"
+}
+
+test_correction_cannot_clear_derived_groups() {
+  local case_dir out rc=0 word
+  case_dir=$(live_case derived-groups nobad)
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  word=$(word_at "$case_dir")
+  record_correction "$case_dir" "$HEAD1" supersede-author-group "$GOOD_AT" "$GOOD_READER" "$DIGEST_B" "$word" \
+    --group no-mistakes >/dev/null || fail "C4 supersede the copied entry"
+  run_live_verify "$case_dir" >/dev/null || fail "C4 fixture must pass once the copied entry is superseded"
+  record_correction "$case_dir" "$HEAD1" supersede-author-group "$GOOD_AT" "$GOOD_READER" "$DIGEST_B" "$word" \
+    --group ship >/dev/null || fail "C4 record the attempt on the derived ship group"
+  out=$(run_live_verify "$case_dir") || rc=$?
+  expect_code 1 "$rc" "C4 superseding the typed ship entry must not clear derived ship: $out"
+  expect_not_qualified "$out" "uncovered commit group ship, family anthropic,openai" "C4 derived ship stays required"
+  case_dir=$(live_case derived-groups-pipeline nobad)
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  word=$(word_at "$case_dir")
+  record_correction "$case_dir" "$HEAD1" supersede-author-group "$GOOD_AT" "$GOOD_READER" "$DIGEST_B" "$word" \
+    --group no-mistakes >/dev/null || fail "C4 supersede the copied entry"
+  record_correction "$case_dir" "$HEAD1" supersede-author-group "$GOOD_AT" "$GOOD_READER" "$DIGEST_B" "$word" \
+    --group no-mistakes:anthropic >/dev/null || fail "C4 record the attempt on the derived pipeline group"
+  rc=0
+  out=$(run_live_verify "$case_dir") || rc=$?
+  expect_code 1 "$rc" "C4 superseding the typed pipeline entry must not clear derived no-mistakes:anthropic: $out"
+  expect_not_qualified "$out" "uncovered commit group no-mistakes:anthropic, family anthropic" "C4 derived pipeline group stays required"
+  pass "C4 a correction cannot clear the derived ship or no-mistakes:anthropic group"
+}
+
+test_correction_rejections_leave_the_ledger_untouched() {
+  local case_dir word other out rc=0 headb
+  case_dir=$(make_case rejections gpt-5.1)
+  synth_row "$case_dir" 1700000010 "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_A"
+  synth_row "$case_dir" 1700000030 "$HEAD1" FAIL claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_B"
+  synth_row "$case_dir" 1700000040 "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_B" yes
+  # Two rows that no field tells apart.
+  synth_row "$case_dir" 1700000050 "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_A"
+  synth_row "$case_dir" 1700000050 "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_A"
+  # A legacy row with no digest.
+  synth_row "$case_dir" 1700000060 "$HEAD1" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]'
+  # The same row fields at another head.
+  headb=$(git -C "$case_dir/wt" -c user.name=Tests -c user.email=tests@example.invalid commit -q --allow-empty -m 'second ship change' && git -C "$case_dir/wt" rev-parse HEAD)
+  synth_row "$case_dir" 1700000010 "$headb" PASS claude-opus-5-5 '{"ship":["gpt-5.1"]}' '["ship"]' "$DIGEST_A"
+  expect_correction_rejected "C4 a correction with no captain-word recorded" "found 0" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" 1700000001
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  word=$(word_at "$case_dir")
+  expect_correction_rejected "C4 a wrong target epoch" "0 rows match" \
+    "$case_dir" "$HEAD1" exclude-review 1700000011 claude-opus-5-5 "$DIGEST_A" "$word"
+  expect_correction_rejected "C4 a wrong target reader" "0 rows match" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 gpt-5.2 "$DIGEST_A" "$word"
+  expect_correction_rejected "C4 a wrong target digest" "0 rows match" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_B" "$word"
+  expect_correction_rejected "C4 a target that omits the digest its row has" "0 rows match" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 - "$word"
+  expect_correction_rejected "C4 a target that names a digest the row lacks" "0 rows match" \
+    "$case_dir" "$HEAD1" exclude-review 1700000060 claude-opus-5-5 "$DIGEST_A" "$word"
+  expect_correction_rejected "C4 an ambiguous target" "2 rows match" \
+    "$case_dir" "$HEAD1" exclude-review 1700000050 claude-opus-5-5 "$DIGEST_A" "$word"
+  expect_correction_rejected "C4 a head with no such row" "0 rows match" \
+    "$case_dir" "$HEAD2" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" "$word"
+  expect_correction_rejected "C4 a target at another head whose captain-word is at this head" "found 0" \
+    "$case_dir" "$headb" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" "$word"
+  expect_correction_rejected "C4 a citation with the wrong epoch" "found 0" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" "$((word + 1))"
+  other=https://github.com/example/repo/pull/10
+  FM_HOME="$case_dir/home" "$RECORD" captain-word --pr "$other" --head "$HEAD1" --words 'Merge the other PR.' >/dev/null \
+    || fail "record the other PR's captain-word"
+  expect_correction_rejected "C4 a citation of another PR's captain-word" "found 0" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" "$(FM_HOME="$case_dir/home" "$RECORD" latest --pr "$other" | "$JQ_BIN" -r '."captain-word".at')"
+  expect_correction_rejected "C4 a FAIL row" "a FAIL row stands" \
+    "$case_dir" "$HEAD1" exclude-review 1700000030 claude-opus-5-5 "$DIGEST_B" "$word"
+  expect_correction_rejected "C4 a row with a yes trigger" "widens_guard is yes" \
+    "$case_dir" "$HEAD1" exclude-review 1700000040 claude-opus-5-5 "$DIGEST_B" "$word"
+  REJECT_CODE=2 expect_correction_rejected "C4 a supersede with no group" "correction group names" \
+    "$case_dir" "$HEAD1" supersede-author-group 1700000010 claude-opus-5-5 "$DIGEST_A" "$word"
+  REJECT_CODE=2 expect_correction_rejected "C4 an exclusion that names a group" "only supersede-author-group takes one" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" "$word" --group ship
+  # A correction naming exactly one row records, and it applies at its own head only.
+  record_correction "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" "$word" >/dev/null \
+    || fail "C4 a correction naming exactly one row must record"
+  out=$(FM_HOME="$case_dir/home" "$RECORD" latest --pr "$URL")
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e --arg head "$headb" '.review.head == $head and .review.at == 1700000010' <<<"$out" >/dev/null \
+    || fail "C4 the other head's row must stay the newest recorded review: $out"
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" --head "$headb" \
+    --task task-x1 --base "$BASE" --review-only --json) || fail "C4 the other head must verify as before: $out"
+  "$JQ_BIN" -e '.ok == true and (has("facts") | not)' <<<"$out" >/dev/null \
+    || fail "C4 a correction at one head must not apply at another: $out"
+  # Away posture: a correction loosens the guard, so it is not recorded while the captain is away.
+  printf 'mode: away\n' > "$case_dir/home/state/.afk-contract"
+  REJECT_CODE=2 expect_correction_rejected "C4 a correction while an away record exists" "away" \
+    "$case_dir" "$HEAD1" exclude-review 1700000050 claude-opus-5-5 "$DIGEST_A" "$word"
+  rm -f "$case_dir/home/state/.afk-contract"
+  # No history at all: nothing to name, and no ledger is created.
+  case_dir=$(make_case rejection-no-ledger gpt-5.1)
+  expect_correction_rejected "C4 a correction with no review history" "0 rows match" \
+    "$case_dir" "$HEAD1" exclude-review 1700000010 claude-opus-5-5 "$DIGEST_A" 1700000001
+  [ ! -e "$(ledger_of "$case_dir")" ] || fail "C4 a rejected correction must not create the ledger"
+  pass "C4 wrong, ambiguous, other-head, uncited, mis-cited, FAIL, trigger and away corrections are each rejected with the ledger byte-identical"
+}
+
+test_unusable_correction_rows_never_loosen_or_block() {
+  local case_dir out forged
+  case_dir=$(live_case forged-correction)
+  record_word "$case_dir" "$HEAD1" 'Merge this PR.' >/dev/null || fail "record captain-word"
+  # Hand-written corrections that no longer resolve: a digest that is not the cited words', a target that
+  # does not exist, and a citation of a captain-word that was never recorded.
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  forged=$("$JQ_BIN" -nc --arg pr "$URL" --arg head "$HEAD1" --arg digest "$DIGEST_A" --argjson word "$(word_at "$case_dir")" '
+    {schema:"fm-review-record.v1",kind:"correction",pr:$pr,at:1795300000,head:$head,effect:"exclude-review",
+     target:{at:1795202232,reader_model:"openai-codex/gpt-6.1-terra",report_sha256:$digest},
+     captain_word:{at:$word,words_sha256:$digest},reason:"forged digest"}')
+  {
+    printf '%s\n' "$forged"
+    printf '%s\n' "${forged/1795202232/1795202233}"
+    printf '%s\n' "${forged/\"at\":$(word_at "$case_dir")/\"at\":1}"
+  } >> "$(ledger_of "$case_dir")"
+  out=$(run_live_verify "$case_dir") || fail "unusable corrections must not block the ledger: $out"
+  "$JQ_BIN" -e '.ok == true and (has("facts") | not)' <<<"$out" >/dev/null \
+    || fail "unusable corrections must apply nothing and disclose nothing: $out"
+  out=$(FM_HOME="$case_dir/home" "$RECORD" latest --pr "$URL")
+  "$JQ_BIN" -e '.review.reader_model == "deepseek/deepseek-v4-pro" and ."captain-word" != null' <<<"$out" >/dev/null \
+    || fail "latest must keep reporting the newest review and captain-word: $out"
+  pass "a correction that does not resolve is ignored: it neither blocks the ledger nor loosens the guard"
+}
+
 fm_test_run_cases \
   test_review_only_json_is_immutable_record_time_evidence \
   test_default_text_and_captain_word_json \
@@ -629,4 +1019,11 @@ fm_test_run_cases \
   test_default_fail_after_captain_word_precedence_holds \
   test_legacy_record_without_report_digest_omits_the_field \
   test_plan_names_the_owed_families_and_decides_nothing \
-  test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family -- "$@"
+  test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family \
+  test_older_ledger_without_corrections_verifies_unchanged \
+  test_correction_live_shape_judges_genuine_coverage_only \
+  test_correction_exclusion_effects \
+  test_correction_supersede_effects \
+  test_correction_cannot_clear_derived_groups \
+  test_correction_rejections_leave_the_ledger_untouched \
+  test_unusable_correction_rows_never_loosen_or_block -- "$@"
