@@ -1906,7 +1906,58 @@ wait_for_file_nonempty() {  # <path>
   return 1
 }
 
+test_identified_safe_read_preserves_bytes_and_refusals() {
+  local dir status size expected rc target
+  dir=$(make_case identified-safe-read); status="$dir/state/bytes.status"
+  printf 'working: raw\000byte\nneeds-decision [key=q]: question\n' > "$status"
+  size=$(file_size "$status")
+  expected=$(perl -e 'my @s=stat($ARGV[0]); print "$s[0]:$s[1]"' "$status")
+  bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2"' _ "$ROOT/bin" "$status" > "$dir/raw" \
+    || fail "default bounded read failed"
+  cmp -s "$status" "$dir/raw" || fail "default bounded read changed raw bytes"
+  bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" --with-identity' _ "$ROOT/bin" "$status" > "$dir/identified" \
+    || fail "identified bounded read failed"
+  assert_equals "$expected" "$(head -n 1 "$dir/identified")" "identified read did not name its actual input"
+  tail -n +2 "$dir/identified" > "$dir/body"
+  cmp -s "$status" "$dir/body" || fail "identity mode changed the bounded raw bytes"
+  for target in short lines cap wholecap symlink directory; do
+    rc=0
+    case "$target" in
+      short)
+        bash -c '. "$1/fm-status-io-lib.sh"; fm_status_read_exact "$2" 0 "$3" 0 --with-identity' \
+          _ "$ROOT/bin" "$status" "$((size + 1))" > "$dir/refused" 2> "$dir/error" || rc=$? ;;
+      lines)
+        bash -c '. "$1/fm-status-io-lib.sh"; fm_status_read_exact "$2" 0 "$3" 1 --with-identity' \
+          _ "$ROOT/bin" "$status" "$size" > "$dir/refused" 2> "$dir/error" || rc=$? ;;
+      cap)
+        FM_STATUS_CAP_BYTES=4 FM_STATUS_CAP_RESERVE_BYTES=1 bash -c \
+          '. "$1/fm-status-io-lib.sh"; fm_status_read_exact "$2" 0 "$3" 0 --with-identity' \
+          _ "$ROOT/bin" "$status" "$size" > "$dir/refused" 2> "$dir/error" || rc=$? ;;
+      wholecap)
+        FM_STATUS_CAP_BYTES=4 FM_STATUS_CAP_RESERVE_BYTES=1 bash -c \
+          '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" --with-identity' \
+          _ "$ROOT/bin" "$status" > "$dir/refused" 2> "$dir/error" || rc=$? ;;
+      symlink)
+        ln -s "$status" "$dir/state/link.status"
+        bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" --with-identity' \
+          _ "$ROOT/bin" "$dir/state/link.status" > "$dir/refused" 2> "$dir/error" || rc=$? ;;
+      directory)
+        bash -c '. "$1/fm-status-io-lib.sh"; fm_status_read_exact "$2" 0 0 0 --with-identity' \
+          _ "$ROOT/bin" "$dir/state" > "$dir/refused" 2> "$dir/error" || rc=$? ;;
+    esac
+    case "$target" in lines|cap|wholecap) assert_equals 2 "$rc" "$target refusal lost limit status" ;;
+      *) assert_equals 1 "$rc" "$target refusal lost failure status" ;; esac
+    [ ! -s "$dir/refused" ] || fail "$target refusal published partial identity or bytes"
+  done
+  : > "$dir/state/empty.status"
+  bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" --with-identity' \
+    _ "$ROOT/bin" "$dir/state/empty.status" > "$dir/empty" || fail "empty identified read failed"
+  [ "$(wc -l < "$dir/empty" | tr -d '[:space:]')" -eq 1 ] || fail "empty identity mode did not emit exactly its header"
+  pass "actual-handle identity preserves raw bytes, empty reads, caps, short-read and unsafe-source refusals"
+}
+
 tests=(
+  test_identified_safe_read_preserves_bytes_and_refusals
   test_sanctioned_loop_stops_growing_at_the_cap
   test_a_verbless_loop_stops_at_the_cap_and_leaves_the_reserve_for_done
   test_a_stopped_lock_holder_never_hangs_a_sanctioned_append
