@@ -62,6 +62,7 @@
     "trust-scope-secondmate-home",
     "trust-store-integrity",
     "typesafe-never-send",
+    "wake-ack-unacked-inbox-note",
     "wake-branch-grant-snapshot",
     "worker-in-recorded-worktree",
     "x-reply-followup-context",
@@ -3042,6 +3043,58 @@
         {
           "file": "bin/fm-wake-drain.sh",
           "match": "echo \"wake drain: no branch-eligible row snapshot at $ELIGIBLE_ROWS_FILE; refusing to guess what this actor may consume\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "wake-ack-unacked-inbox-note",
+      "version": "1",
+      "owner": "bin/fm-wake-drain.sh",
+      "invariant": "A wake acknowledgement never retires the row of a captain inbox note that is not demonstrably acked.",
+      "layer": "runtime-block",
+      "source": "bin/fm-inbox.sh pending, asked about each note id named by the actor's claimed rows at or below the acknowledgement cutoff",
+      "trigger": "--ack-through finds a check row 'check: captain inbox note <id>' whose note is pending or unknown, or cannot read the queue rows, the row set or the inbox",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-inbox.sh drain, read the whole note, then bin/fm-inbox.sh drain --ack <id>, and run the acknowledgement command again",
+      "budget": 1,
+      "budget_reason": "One refused invocation before the reader acks the named note; no cross-invocation counter is implemented, and the refusal never retries by itself. Only the away supervise daemon may add --keep-unacked-notes: the drain then keeps each such row queued and retires the rest, so the refusal never loops it.",
+      "telemetry": "Not instrumented under this family id; only the pending-or-unknown refusal names each id; the queue-scan, missing-row-set and vanished-row-set refusals are generic. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-inbox.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [
+        {
+          "case": "the away supervise daemon's keep path, --keep-unacked-notes",
+          "derivation": "only the away supervise daemon may pass --keep-unacked-notes, and only with FM_WAKE_ACK_AWAY_DAEMON=1 while state/.afk exists, the same actor test as the overdue-gate exemption; the keep path keeps each queued row whose captain inbox note is pending or unknown and retires every other row, and it never acks a note, so no captain inbox note wake is ever consumed and no note is lost or retired unread; any other actor passing the flag gets the ordinary refusal naming the ids",
+          "demotion": "fm-wake-ack-keep-unacked-notes-exemption-demotion"
+        }
+      ],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: the acknowledged row set is missing; acknowledgement refused\" >&2"
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: queue rows could not be read to check captain inbox notes; acknowledgement refused\" >&2"
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: captain inbox note state could not be read; acknowledgement refused\" >&2"
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"error: captain inbox notes presented in this range are not acked; acknowledgement refused\""
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: the acknowledged row set vanished while the queue lock was released; acknowledgement refused\" >&2"
         }
       ]
     },
