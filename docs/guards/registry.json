@@ -6377,7 +6377,13 @@
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",
-      "exemptions": [],
+      "exemptions": [
+        {
+          "case": "a leading --help or -h argument prints usage",
+          "derivation": "The FM_HOME check exists to stop a steer resolving against the wrong home; help prints text and sends nothing, so exempting it permits no wrong-home steer.",
+          "demotion": "fm-send-help-exemption-demotion"
+        }
+      ],
       "instrumented": true,
       "status": "active",
       "telemetry": "state/guard-events.jsonl",
@@ -6391,7 +6397,7 @@
       "invariant": "a steer never resolves task targets against the wrong firstmate home",
       "layer": "runtime-block",
       "source": "presence and value of FM_HOME",
-      "trigger": "FM_HOME is unset or empty",
+      "trigger": "FM_HOME is unset or empty and the first argument is not --help or -h",
       "remedy": "FM_HOME=<home> bin/fm-send.sh <task> <message>",
       "budget": 1,
       "test": "tests/fm-send-strict.test.sh",

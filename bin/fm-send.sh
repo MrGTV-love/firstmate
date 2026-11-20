@@ -17,6 +17,7 @@
 # Special keys instead of text: fm-send.sh <target> --key Enter
 # Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
 # Orca currently supports Enter and C-c only, and rejects Escape.
+# Help: a leading --help or -h prints usage and exits 0 without FM_HOME, after the existing gate-agent containment check; every other call keeps the existing behavior, including the FM_HOME check.
 #
 # Two data planes:
 #
@@ -272,6 +273,13 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # a crewmate (see bin/fm-gate-refuse-lib.sh).
 FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
+
+# Leading --help or -h: print the header's help paragraph and exit 0 (header, "Help:").
+# It runs after the containment check and before the FM_HOME check.
+if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
+  sed -n '2,/^#$/{/^#$/d;s/^# \{0,1\}//;p;}' "${BASH_SOURCE[0]}"
+  exit 0
+fi
 
 if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
   echo "error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home" >&2
