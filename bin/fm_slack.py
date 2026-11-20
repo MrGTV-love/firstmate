@@ -23,6 +23,13 @@ class SecretCollision(SlackError):
 
 # How long a call cut off at its deadline waits for its reader to end once the reader's socket is closed (Slack._bounded).
 CUTOFF_JOIN = 1.0
+# The per-call state of one call, for the thread that makes it (Main 3345 (a)): the second person's pass makes two calls at once on one transport, a post
+# and a thread read, so the time left of a call and the scrub text of a read belong to that call, never to the transport. Unset, the transport's own apply.
+CALL = threading.local()
+# A name lookup's answer, kept for the rest of a short run (one check process): calls made at once need no lookup of their own, so the rule of at most one
+# live lookup per process (F9 of the review of c5868b6f) never refuses a call because another call is looking the same name up.
+RESOLVE_TTL = 60.0
+_RESOLVED = {}
 
 
 class _Fence:
@@ -53,20 +60,27 @@ class _Fence:
         self.check()
         found = []
         with _LOOKUPS:
-            # At most one live name lookup per process (F9 of the review of c5868b6f): a lookup still running from an earlier, cut-off call refuses this one,
-            # which then sends nothing; it cannot be cancelled, so it is never multiplied.
-            if any(t.is_alive() for t in _LOOKUP_THREADS):
-                self.lookup_pending = True
-                raise DeadlineSpent(sent=False)
-            lookup = threading.Thread(target=lambda: found.append(self.resolve(host, port)), name='fm-slack-lookup', daemon=True)
-            _LOOKUP_THREADS[:] = [lookup]
-            lookup.start()
-        lookup.join(self.left())
+            known = _RESOLVED.get((host, port))
+            if known is not None and known[0] > time.monotonic():
+                found.append(known[1])
+            else:
+                # At most one live name lookup per process (F9 of the review of c5868b6f): a lookup still running from an earlier, cut-off call refuses this
+                # one, which then sends nothing; it cannot be cancelled, so it is never multiplied.
+                if any(t.is_alive() for t in _LOOKUP_THREADS):
+                    self.lookup_pending = True
+                    raise DeadlineSpent(sent=False)
+                lookup = threading.Thread(target=lambda: found.append(self.resolve(host, port)), name='fm-slack-lookup', daemon=True)
+                _LOOKUP_THREADS[:] = [lookup]
+                lookup.start()
+        if not found:
+            lookup.join(self.left())
         if not found:
             self.lookup_pending = True
             raise DeadlineSpent(sent=False)
         if isinstance(found[0], BaseException):
             raise found[0]
+        with _LOOKUPS:
+            _RESOLVED[(host, port)] = (time.monotonic() + RESOLVE_TTL, found[0])
         error = None
         for family, kind, proto, _, where in found[0]:
             sock = socket.socket(family, kind, proto)
@@ -269,10 +283,12 @@ class Slack:
         # A hung check can starve supervision: fm-watch.sh owns its progress
         # and absolute bounds. Time between requests is not a socket failure.
         # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
-        if self.time_left is None:
-            date, header, data, error = self._exchange(request, 10)
+        time_left = getattr(CALL, 'time_left', None) or self.time_left
+        scrub_with = getattr(CALL, 'scrub_with', None)
+        if time_left is None:
+            date, header, data, error = self._exchange(request, 10) if scrub_with is None else self._exchange(request, 10, scrub_with=scrub_with)
         else:
-            date, header, data, error = self._bounded(request)
+            date, header, data, error = self._bounded(request, time_left, scrub_with)
         if date is not None:
             self._note_date(date)
         if header:
@@ -288,24 +304,29 @@ class Slack:
             raise SlackError(code if code in SAFE_ERRORS else 'slack_outcome_unknown' if code in OUTCOME_UNKNOWN_ERRORS else 'api_error')
         return data
 
-    def _bounded(self, request):
+    def _bounded(self, request, time_left=None, scrub_with=None):
         """One exchange under the caller's total deadline (Main 1593, 1621 (9) and 1623 (1)): the socket timeout bounds each wait, so a reply that trickles in byte by
         byte never hits it; the exchange therefore runs in a reader thread, with the time left as its socket timeout, that this call waits for only as long as
         time_left() allows. At the deadline the caller ends the exchange itself: it shuts down and closes the exchange's socket, which unblocks the reader with no
         signal, and joins the reader for at most CUTOFF_JOIN seconds; whether it ended is kept in last_cutoff. A reader that had not yet connected (name lookup)
         cannot send after that: its connection is refused at once (_Fence). A call with no time left is not begun. The reader changes nothing of the transport.
-        Returns the exchange's outcome, or raises DeadlineSpent."""
-        left = self.time_left()
+        Returns the exchange's outcome, or raises DeadlineSpent. time_left and scrub_with are this call's own (CALL), else the transport's."""
+        time_left = time_left or self.time_left
+        left = time_left()
         if left <= 0:
             # Not begun: nothing was looked up or sent. Recorded as every cut-off is (F9 of the review of c5868b6f).
             self.last_cutoff = {'ended': True, 'closed_at': time.monotonic(), 'lookup_pending': False, 'sent': False, 'begun': False}
             raise DeadlineSpent(sent=False)
-        fence = _Fence(self.time_left)
+        fence = _Fence(time_left)
         opener = urllib.request.build_opener(_FencedHTTP(fence), _FencedHTTPS(fence))
         outcome = []
-        reader = threading.Thread(target=lambda: outcome.append(self._exchange(request, min(10, left), opener)), name='fm-slack-bounded', daemon=True)
+        if scrub_with is None:
+            exchange = lambda: outcome.append(self._exchange(request, min(10, left), opener))
+        else:
+            exchange = lambda: outcome.append(self._exchange(request, min(10, left), opener, scrub_with=scrub_with))
+        reader = threading.Thread(target=exchange, name='fm-slack-bounded', daemon=True)
         reader.start()
-        reader.join(max(0.0, self.time_left()))
+        reader.join(max(0.0, time_left()))
         if outcome:
             fence.release()
             if isinstance(outcome[0][3], DeadlineSpent):
@@ -318,7 +339,7 @@ class Slack:
         self.last_cutoff = {'ended': not reader.is_alive(), 'closed_at': closed_at, 'lookup_pending': fence.lookup_pending, 'sent': fence.connected, 'begun': True}
         raise DeadlineSpent(sent=fence.connected)
 
-    def _exchange(self, request, timeout, opener=None):
+    def _exchange(self, request, timeout, opener=None, scrub_with=None):
         """One HTTP exchange: (the reply's Date header or None, its x-oauth-scopes header, the parsed body or None, the error to raise or None). It reads and writes
         no state of the transport, so that _bounded() can run it in a thread it may abandon; call() applies what it returns."""
         date, header = None, ''
@@ -330,7 +351,7 @@ class Slack:
                 if len(raw) > 4 * 1024 * 1024:
                     return date, header, None, SlackError('response_too_large')
                 # Scrub before any successful body can reach output or state.
-                return date, header, json.loads(raw.decode(errors='replace').replace(self.token, self.scrub_with)), None
+                return date, header, json.loads(raw.decode(errors='replace').replace(self.token, scrub_with or self.scrub_with)), None
         except urllib.error.HTTPError as error:
             if error.code == 429:
                 return date, header, None, SlackError('rate_limited')

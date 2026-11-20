@@ -507,6 +507,58 @@ SH
   pass "the checks of one sweep share one sweep token and the next sweep gets a new one"
 }
 
+# Main 3345 (1): the owner's Slack check (slack) queues a wake and the second person's check (slacksecond, which sorts after it) is slow. The queued
+# wake is released at once, never after their check; the next watcher run resumes the same sweep at their check, with the same sweep token, and runs no
+# earlier check of that sweep again.
+test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_resumes_that_sweep_at_it() {
+  local home out1 out2 err status1 status2 start took slack_token second_token drained
+  home=$(make_home slack-release)
+  out1="$home/out1.txt"
+  out2="$home/out2.txt"
+  err="$home/err.txt"
+  cat > "$home/state/slack.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'slack %s\n' "${FM_CHECK_SWEEP:-missing}" >> "$FM_HOME/sweeps.log"
+printf 'check: slack request 2000.000100 from U0TESTOWNER: owner wake line\n'
+SH
+  cat > "$home/state/slacksecond.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'slacksecond-start %s\n' "${FM_CHECK_SWEEP:-missing}" >> "$FM_HOME/sweeps.log"
+sleep 12
+printf 'slacksecond-end %s\n' "${FM_CHECK_SWEEP:-missing}" >> "$FM_HOME/sweeps.log"
+printf 'check: slack request 2000.000200 from U0SYNTHSEC1: second wake line\n'
+SH
+  chmod 0700 "$home/state/slack.check.sh" "$home/state/slacksecond.check.sh"
+  FM_HOME="$home" "$ROOT/bin/fm-check-register.sh" slack >/dev/null || fail "could not register slack"
+  FM_HOME="$home" "$ROOT/bin/fm-check-register.sh" slacksecond >/dev/null || fail "could not register slacksecond"
+  : > "$home/sweeps.log"
+  status1=0
+  start=$(date +%s)
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=300 "$CHECKPOINT" --seconds 40 >"$out1" 2>"$err" || status1=$?
+  took=$(( $(date +%s) - start ))
+  expect_code 0 "$status1" "the first checkpoint: $(cat "$out1" "$err")"
+  assert_contains "$(cat "$out1")" "owner wake line" "the owner's queued wake was not released: $(cat "$out1")"
+  if grep -q '^slacksecond-end ' "$home/sweeps.log"; then
+    fail "the owner's wake waited for the second person's check (released after ${took}s): $(cat "$home/sweeps.log")"
+  fi
+  # Firstmate handles the wake: it drains the queue and acknowledges it, then runs the watcher again.
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>"$home/drain.err")
+  assert_contains "$drained" "owner wake line" "the owner's wake was not in the durable queue: $drained"
+  ack_drain_err "$home/state" "$home/drain.err" >/dev/null || fail "could not acknowledge the drain: $(cat "$home/drain.err")"
+  status2=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=300 "$CHECKPOINT" --seconds 40 >"$out2" 2>>"$err" || status2=$?
+  expect_code 0 "$status2" "the resumed checkpoint: $(cat "$out2" "$err")"
+  assert_contains "$(cat "$out2")" "second wake line" "the resumed sweep did not run the second person's check: $(cat "$out2")"
+  case "$(cat "$out2")" in *"owner wake line"*) fail "the owner's wake was released twice: $(cat "$out2")" ;; esac
+  [ "$(grep -c '^slack ' "$home/sweeps.log")" -eq 1 ] || fail "the owner's check ran again in the resumed sweep: $(cat "$home/sweeps.log")"
+  slack_token=$(awk '$1 == "slack" {print $2}' "$home/sweeps.log")
+  second_token=$(awk '$1 == "slacksecond-start" {print $2}' "$home/sweeps.log")
+  [ -n "$slack_token" ] && [ "$slack_token" = "$second_token" ] \
+    || fail "the second person's check did not resume the owner's sweep token: $(cat "$home/sweeps.log")"
+  assert_absent "$home/state/.check-sweep-resume" "the resume record outlived the sweep it resumed"
+  pass "a queued wake is released before the second person's check, and the next run resumes that sweep at it with the same token"
+}
+
 test_due_checks_precede_repeated_unmanaged_recovery() {
   local home bin file status cycle drained notice expected_checks='' expected_recoveries=''
   local sequence generation
@@ -766,6 +818,7 @@ test_queue_append_during_checkpoint_still_resurfaces
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
 test_checks_of_one_sweep_share_one_sweep_token_and_the_next_sweep_gets_a_new_one
+test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_resumes_that_sweep_at_it
 test_due_checks_precede_repeated_unmanaged_recovery
 test_existing_singleton_watcher_is_not_success
 test_host_checkpoint_bounds_the_park_by_posture

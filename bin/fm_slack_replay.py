@@ -9,6 +9,7 @@ import copy
 import json
 import os
 from pathlib import Path
+import threading
 
 from fm_slack import SecretCollision, SlackError, refuse_outbound, value_hits
 
@@ -138,7 +139,12 @@ class Replay:
 
     def call(self, method, **fields):
         """One replayed call. The fields are checked first, as the real transport checks them, before any record of the attempt exists; a call that
-        a log refuses part-way (a value that the log's own lines form) leaves the replayed conversation as it was."""
+        a log refuses part-way (a value that the log's own lines form) leaves the replayed conversation as it was. One call at a time (Main 3345 (a): the
+        second person's pass makes a post and a thread read at once): the replayed conversation and its logs change in one call's turn."""
+        with self.__dict__.setdefault('_turn', threading.RLock()):
+            return self.one_call(method, **fields)
+
+    def one_call(self, method, **fields):
         refuse_outbound(fields, wire=True)
         snapshot = copy.deepcopy(self.state)
         try:

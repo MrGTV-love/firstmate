@@ -4381,7 +4381,9 @@ class SecondPersonTest(unittest.TestCase):
         def call(self, method, **fields):
             now[0] += cost
             return real(self, method, **fields)
-        with patch.object(plane, 'monotonic', lambda: now[0]), patch.object(Replay, 'call', call):
+        # The spacing of their posts (SECOND_POST_SPACING, Main 3350) waits on this clock too: a pause moves it, and no host time passes.
+        with patch.object(plane, 'monotonic', lambda: now[0]), patch.object(Replay, 'call', call), \
+                patch.object(plane, 'pause', lambda seconds: now.__setitem__(0, now[0] + seconds)):
             yield
 
     @contextmanager
@@ -4896,10 +4898,10 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(len([p for p in self.posts(replay) if p[0] == self.SECOND_DM]), 450)
 
     def test_sc4_a_pass_their_21_s_budget_stops_mid_window_delays_messages_and_never_loses_or_repeats_one_or_opens_an_approval(self):
-        # Main 2829: a pass that stops at its 21 s budget (as CPU starvation makes it on the host clock) is accepted only if it delays and never loses or
-        # repeats. At the production constants, none patched, a stated clock of 2.5 s per Slack call fits 8 calls in their pass (the DM proof, the
-        # history read and 6 acknowledgements), so their pass stops in the middle of their window of 10 requests while owner requests are pending too.
-        self.assertEqual((plane.SECOND_BUDGET, plane.SECOND_CALL_BOUND, plane.SECOND_IO_WAIT), (21.0, 10.0, 2.0))
+        # Main 2829: a pass that stops at its budget (as CPU starvation makes it on the host clock) is accepted only if it delays and never loses or repeats.
+        # At the production constants, none patched (27 s since Main 3350), a stated clock of 2.5 s per Slack call fits 10 calls in their pass (the DM proof,
+        # the history read and 8 acknowledgements), so their pass stops in the middle of their window of 10 requests while owner requests are pending too.
+        self.assertEqual((plane.SECOND_BUDGET, plane.SECOND_CALL_BOUND, plane.SECOND_IO_WAIT), (27.0, 10.0, 2.0))
         theirs = ['request %d' % n for n in range(7)] + ['approve', '1', 'merge it']
         their_ts = ['1000.%06d' % (2 * n + 2) for n in range(len(theirs))]
         owner_ts = ['1000.%06d' % (2 * n + 1) for n in range(3)]
@@ -6108,9 +6110,23 @@ sys.path.insert(0, os.environ['INV4_BIN'])
 import fm_slack_watch as plane
 from fm_slack_replay import Replay
 mode = os.environ['INV4_MODE']
-clock = [0.0]
+import threading as _clock_threads, weakref as _clock_weak
+class _Clock:
+    # The fixed clock of this process, kept per thread (Main 3345 (a): their pass runs a reader lane beside the acknowledgement lane, so a call of one lane
+    # never spends another lane's time); the plane's own waits (pause) and hand-overs between its lanes (clock_after) move it, nothing else does.
+    def __init__(self):
+        self.times, self.turn = _clock_weak.WeakKeyDictionary(), _clock_threads.Lock()
+    def __getitem__(self, index):
+        with self.turn:
+            return self.times.get(_clock_threads.current_thread(), 0.0)
+    def __setitem__(self, index, value):
+        with self.turn:
+            self.times[_clock_threads.current_thread()] = value
+clock = _Clock()
 if mode not in ('trickle', 'trickle-accepted'):
     plane.monotonic = lambda: clock[0]
+    plane.pause = lambda seconds: clock.__setitem__(0, clock[0] + seconds)
+    plane.clock_after = lambda moment: clock.__setitem__(0, max(clock[0], moment))
 else:
     # The real transport (urllib, a real socket) carries every call of theirs to the local server of the test, on the real clock, with the time left that the
     # plane gave the transport; the reply the plane uses still comes from the replay.
@@ -8029,8 +8045,12 @@ class Round7Findings(InvariantScenario):
                 self.assertEqual(home.posts().count((INV_OWNER_DM, '200.000100')), 1)
 
     def test_main1650_their_budget_holds_one_proof_and_one_step_of_the_whole_call_bound_and_states_the_owner_wait(self):
-        self.assertGreaterEqual(plane.SECOND_BUDGET, 2 * plane.SECOND_CALL_BOUND)
-        self.assertEqual(plane.OWNER_WAKE_WAIT_BOUND, plane.SECOND_BUDGET + fm_slack_module().CUTOFF_JOIN + 2.0)
+        # Main 1650 as amended by Main 3350 (a): their budget is never less than the proof and one useful step of the whole-call bound, with the margin;
+        # the owner's wake waits at most OWNER_WAKE_WAIT_BOUND (24 s, kept) and, since Main 3345 (1), not for their check at all (the watcher releases it
+        # first), so it is no longer their budget plus the cut-off join plus start-up.
+        self.assertGreaterEqual(plane.SECOND_BUDGET, 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN)
+        self.assertEqual(plane.OWNER_WAKE_WAIT_BOUND, 24.0)
+        self.assertGreater(plane.SECOND_BUDGET + fm_slack_module().CUTOFF_JOIN + 2.0, plane.OWNER_WAKE_WAIT_BOUND)
 
     # ---- finding 10: the journal lock is taken inside their budget ----
 
@@ -8266,14 +8286,15 @@ class Round8Findings(InvariantScenario):
 
     def test_r8_r6_seven_second_calls_after_a_seven_second_lock_wait_still_deliver_once(self):
         # Main 2187: the boundary case, on a fixed clock (the earlier version paced calls and the lock by the wall clock and its 24 s and three-sweep oracles
-        # depended on host load). Another run holds the journal lock for 7.1 s when their check starts and every call of theirs takes 7 s. Their check proves
-        # their DM while it waits, so one more call still fits: in the first sweep the read ends at 14.1 s and the post would end at 21.1 s, 0.1 s past their
-        # 21 s budget, so it is not begun; the second sweep posts it at once. Delivered exactly once, and no run of theirs passes its budget.
+        # depended on host load). Another run holds the journal lock when their check starts and every call of theirs takes 7 s. Their check proves their DM
+        # while it waits, so after the lock their history read and one post are left: the lock is held so long that the post would end 0.1 s past their
+        # budget (SECOND_BUDGET - 2 x 7 + 0.1 s: 7.1 s at 21 s, 13.1 s at 27 s), so it is not begun; the second sweep posts it at once. Delivered exactly
+        # once, and no run of theirs passes its budget.
         with self.home() as home:
             home.trust_check()
             home.cli('poll')
             home.say('200.000200', 'their request')
-            posts, woken, clocks = self.lock_wait_sweeps(home, '7.0', '7.1')
+            posts, woken, clocks = self.lock_wait_sweeps(home, '7.0', '%.1f' % (plane.SECOND_BUDGET - 2 * 7.0 + 0.1))
             self.assertEqual(posts, [0, 1, 1])
             self.assertEqual(woken, 1)
             self.assertTrue(all(c <= plane.SECOND_BUDGET for c in clocks), clocks)
@@ -8360,7 +8381,8 @@ class Round8Findings(InvariantScenario):
             elapsed = time.monotonic() - started
             release.cancel()
             fcntl.flock(holder, fcntl.LOCK_UN)
-            self.assertLessEqual(elapsed, plane.OWNER_WAKE_WAIT_BOUND, elapsed)
+            # Their whole run's own bound (since Main 3345 (1) the owner's wake no longer waits for their check, so OWNER_WAKE_WAIT_BOUND is not its bound).
+            self.assertLessEqual(elapsed, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, elapsed)
             self.assertEqual(first.rc, 0, (first.out, first.err))
             later = home.check_pass()
             self.assertEqual(self.woken([first, later]), ['200.000200'])
@@ -8432,6 +8454,10 @@ class Round8Findings(InvariantScenario):
             self.assertEqual(len(rows), 1, home.refusals())
             self.assertEqual(sum(r.out.count('second person unplaced') for r in passes), 1)
             self.assertEqual(self.woken(passes), [after])
+
+
+# The plane's own binding check and child runner, taken before any test patches them (Main 3345 (2) tests run them for real).
+REAL_BOUND, REAL_RUN = Watch.bound, plane.run
 
 
 class Round9Findings(InvariantScenario):
@@ -8655,9 +8681,77 @@ class Round9Findings(InvariantScenario):
                 first = home.cli('check', action='check-second')
             elapsed = time.monotonic() - started
             fcntl.flock(holder, fcntl.LOCK_UN)
-            self.assertLessEqual(elapsed, plane.OWNER_WAKE_WAIT_BOUND, elapsed)
+            # Their whole run's own bound (since Main 3345 (1) the owner's wake no longer waits for their check, so OWNER_WAKE_WAIT_BOUND is not its bound).
+            self.assertLessEqual(elapsed, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, elapsed)
             later = home.check_pass()
             self.assertEqual(self.woken([first, later]), ['200.000200'])
+
+    # ---- Main 3345 (2): their cutoff covers the binding checks of their delivery, which are child processes ----
+
+    @staticmethod
+    def slow_binding_children(slow):
+        """subprocess.run as the plane's children meet it: a binding check answers bound at once, except while slow() is true, when it is a REAL child process
+        that takes 40 s (exec sleep 40) and is run with whatever timeout the plane gives it; every other child answers as the fixture's own run does."""
+        real = subprocess.run
+
+        def run(args, **kwargs):
+            if list(args[2:3]) == ['binding']:
+                if slow():
+                    return real(['bash', '-c', 'exec sleep 40'], **kwargs)
+                return subprocess.CompletedProcess(args, 0, stdout='slack-dm\n', stderr='')
+            return subprocess.CompletedProcess(args, 0, stdout='x\n', stderr='')
+        return run
+
+    def test_m3345_2_a_slow_binding_check_at_their_final_print_ends_at_their_deadline_and_the_line_is_kept(self):
+        # The measured case of the margin study (feasibility-overlap/margin-study/report.md section 6): the binding check of their final print is a child
+        # process with no time limit, so their check ran past its budget. Their run must end by SECOND_BUDGET + CUTOFF_JOIN whatever that child takes; the
+        # line it could not print stays journaled and a later run prints it once.
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their request')
+            slow, real_emit = [False], plane.emit
+
+            def printing(watch, command):
+                slow[0] = True                                  # every binding check from their final print on is the 40 s child
+                return real_emit(watch, command)
+            home.cli('check', action='check')
+            started = time.monotonic()
+            with patch.object(Watch, 'bound', REAL_BOUND), patch.object(plane, 'run', REAL_RUN), \
+                    patch.object(plane.subprocess, 'run', self.slow_binding_children(lambda: slow[0])), patch.object(plane, 'emit', printing):
+                first = home.cli('check', action='check-second')
+            elapsed = time.monotonic() - started
+            self.assertLessEqual(elapsed, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, elapsed)
+            later = home.check_pass()
+            self.assertEqual(self.woken([first, later]), ['200.000200'])
+            self.assertEqual([p for p in home.posts() if p[0] == INV_SECOND_DM], [(INV_SECOND_DM, '200.000200')])
+
+    def test_m3345_2_a_slow_binding_check_inside_their_pass_ends_at_their_deadline_with_nothing_posted_and_the_request_is_posted_once_later(self):
+        # A binding check of one of their posts that is still running at their deadline: the child is ended there, no attempt is marked and nothing is
+        # posted (the check precedes the attempt mark), their run ends by SECOND_BUDGET + CUTOFF_JOIN, and a later run posts that acknowledgement once.
+        with self.home() as home:
+            home.trust_check()
+            home.cli('poll')
+            home.say('200.000200', 'their first request')
+            home.say('200.000300', 'their second request')
+            posted, real_call = [], plane.Replay.call
+
+            def call(replay, method, **fields):
+                data = real_call(replay, method, **fields)
+                if method == 'chat.postMessage' and fields.get('channel') == INV_SECOND_DM:
+                    posted.append(fields.get('thread_ts'))
+                return data
+            home.cli('check', action='check')
+            started = time.monotonic()
+            with patch.object(Watch, 'bound', REAL_BOUND), patch.object(plane, 'run', REAL_RUN), patch.object(plane.Replay, 'call', call), \
+                    patch.object(plane.subprocess, 'run', self.slow_binding_children(lambda: bool(posted))):
+                first = home.cli('check', action='check-second')
+            elapsed = time.monotonic() - started
+            self.assertLessEqual(elapsed, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, elapsed)
+            self.assertEqual(posted, ['200.000200'])                 # the second post's binding check was ended: nothing of it reached Slack
+            later = [home.check_pass() for _ in range(2)]
+            self.assertEqual(sorted(self.woken([first] + later)), ['200.000200', '200.000300'])
+            self.assertEqual(sorted(p for p in home.posts() if p[0] == INV_SECOND_DM), [(INV_SECOND_DM, '200.000200'), (INV_SECOND_DM, '200.000300')])
 
     # ---- F9: at most one live name-lookup thread, and every cut-off is recorded ----
 

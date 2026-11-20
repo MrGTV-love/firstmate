@@ -20,7 +20,9 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+import weakref
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parent.parent
@@ -82,16 +84,49 @@ class LiveScrub(Traced):
         return json.loads(json.dumps(data, ensure_ascii=False).replace(os.environ['SLACK_BOT_TOKEN'], self.scrub_with))
 
 
-class Priced:
-    """A fake clock for the plane (its monotonic) on which every Slack call costs `cost` seconds, the owner's and the second person's alike, their DM proof
-    included, and nothing else costs time. Each call is recorded with its method and whose it is (second: a call into their DM or the proof of their DM).
-    The clock reads (calls so far) x (cost - 1 ns) plus the time before this cost was set: a product, never a running float sum, and 1 ns under the
-    stated cost, so that floating-point rounding never decides whether a call that ends exactly at the budget's end (70 x 0.3 s = 21 s) begins; the
-    plane's own rule (second_budget) begins it."""
+class LaneClock:
+    """A stated clock for the plane's time (its monotonic) kept PER THREAD (Main 3345 (a): their pass runs a reader lane and an acknowledgement lane at once,
+    so one lane's calls never spend another lane's time). A thread's time moves only by what the test states for it (advance), by the plane's own waits
+    (pause), and to a moment another lane of the plane handed over (clock_after: a lane goes on after what another lane did); a new thread starts at the
+    time the plane hands it. Nothing else costs time, so no host time ever decides a test. Patched in with patched()."""
+
+    def __init__(self, start=0.0):
+        self.base, self.times, self.turn = start, weakref.WeakKeyDictionary(), threading.Lock()
+
+    def read(self):
+        with self.turn:
+            return self.times.get(threading.current_thread(), self.base)
+
+    def advance(self, seconds):
+        with self.turn:
+            me = threading.current_thread()
+            self.times[me] = self.times.get(me, self.base) + seconds
+
+    def after(self, moment):
+        with self.turn:
+            me = threading.current_thread()
+            self.times[me] = max(self.times.get(me, self.base), moment)
+
+    def reset(self, start):
+        with self.turn:
+            self.base, self.times = start, weakref.WeakKeyDictionary()
+
+    @contextlib.contextmanager
+    def patched(self):
+        with patch.object(plane, 'monotonic', self.read), patch.object(plane, 'pause', self.advance), patch.object(plane, 'clock_after', self.after):
+            yield self
+
+
+class Priced(LaneClock):
+    """A stated clock for the plane (a LaneClock) on which every Slack call costs `cost` seconds of the calling thread's time, the owner's and the second
+    person's alike, their DM proof included, and nothing else costs time. Each call is recorded with its method and whose it is (second: a call into their
+    DM or the proof of their DM). A call costs 1 ns under the stated cost, so that floating-point rounding never decides whether a call that ends exactly at
+    the budget's end begins; the plane's own rule (second_budget) begins it."""
     SLACK = 1e-9
 
     def __init__(self, second_user, second_dm):
-        self._cost, self.base, self.count, self.calls, self.who = 0.0, 0.0, 0, [], (second_user, second_dm)
+        super().__init__()
+        self._cost, self.calls, self.who = 0.0, [], (second_user, second_dm)
 
     @property
     def cost(self):
@@ -99,11 +134,12 @@ class Priced:
 
     @cost.setter
     def cost(self, value):
-        self.base, self.count, self._cost = self.now, 0, value
+        self.reset(self.read())
+        self._cost = value
 
     @property
     def now(self):
-        return self.base + self.count * max(0.0, self._cost - self.SLACK)
+        return self.read()
 
     @contextlib.contextmanager
     def on(self):
@@ -111,11 +147,11 @@ class Priced:
         priced = self
 
         def call(replay, method, **fields):
-            priced.count += 1
+            priced.advance(max(0.0, priced._cost - priced.SLACK))
             theirs = fields.get('channel') == priced.who[1] or (method == 'conversations.open' and fields.get('users') == priced.who[0])
             priced.calls.append((method, 'second' if theirs else 'owner'))
             return real(replay, method, **fields)
-        with patch.object(Traced, 'call', call), patch.object(plane, 'monotonic', lambda: priced.now):
+        with patch.object(Traced, 'call', call), self.patched():
             yield self
 
 
@@ -1567,7 +1603,7 @@ class SecondPersonFollowUpTest(unittest.TestCase):
     def scott(self, cap='20', env=None):
         # The owner's bounded wait for a write of their journal (SECOND_IO_WAIT, 2 s) is a wall-clock bound: on a loaded host a write that takes longer
         # gives them no read that poll (the owner never waits). These tests grade the scheduling rule, not the host, so the wait is made long enough that
-        # every write finishes; the stalled write is its own test (test_sc8_6_an_unwritten_share_...). Their pass's time budget (SECOND_BUDGET, 21 s) is
+        # every write finishes; the stalled write is its own test (test_sc8_6_an_unwritten_share_...). Their pass's time budget (SECOND_BUDGET, 27 s) is
         # wall clock too: on a loaded host their share of a large cap does not fit it and is read over more polls. It is made long here for the same reason;
         # the real budget with slow calls is its own test (test_sc8_6_with_slow_calls_...).
         with case(cap=cap, extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT, **(env or {})}) as home, \
@@ -2008,20 +2044,19 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                 self.assertGreaterEqual(len(owner_woken), 6, (mode, owner_woken))
 
     def test_sc8_6_with_slow_calls_of_theirs_each_poll_still_takes_in_their_new_request_and_their_threads_are_read_in_turn(self):
-        # Each call into their DM takes 3 s on their budget's clock, so their pass's budget (SECOND_BUDGET, 21 s) holds about seven calls. Their history
-        # read and one acknowledgement still fit in every poll (finding 3 of the review of d0b0c216), and their thread reads use only the time that leaves:
-        # a thread read that cannot fit is left for the next poll, in its place in their read order, so every thread of theirs is still read in turn.
+        # Each call into their DM takes 3 s of its lane's time on their budget's clock (LaneClock), with the plane's own budget (SECOND_BUDGET). Their history
+        # read and one acknowledgement still fit in every poll (finding 3 of the review of d0b0c216), and their thread reads run on their reader lane beside
+        # them (Main 3345 (a)): a thread read that cannot fit is left for the next poll, in its place in their read order, so every thread is read in turn.
         with self.scott() as home:
             _, threads = self.build(home, 0, 10)
-            clock, real = [0.0], Traced.call
+            clock, real = LaneClock(), Traced.call
 
             def slow(replay, method, **fields):
                 if fields.get('channel') == SCOTT_DM:
-                    clock[0] += 3.0
+                    clock.advance(3.0)
                 return real(replay, method, **fields)
             reads = set()
-            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN             # the plane's own budget, not the long one of scott()
-            with patch.object(Traced, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+            with patch.object(Traced, 'call', slow), clock.patched(), patch.object(plane, 'SECOND_BUDGET', plane.SECOND_BUDGET):
                 for index in range(4):
                     request = self.their_message(home, 'a slow request %d' % index)
                     Traced.TRACE.clear()
@@ -2032,19 +2067,17 @@ class SecondPersonFollowUpTest(unittest.TestCase):
             self.assertEqual(reads, set(threads))
 
     def test_sc8_6_with_slow_calls_their_ready_requests_keep_their_time_and_their_threads_are_read_after(self):
-        # The same 3 s per call and the plane's real 21 s budget, with five requests of theirs ready at once: the poll takes in all five (their thread reads
-        # give way to the acknowledgements the cap lets them post now, never the other way round), and the later polls, with no request waiting, read every
-        # thread of theirs in turn.
+        # The same 3 s per call and the plane's own budget, with five requests of theirs ready at once: the poll takes in all five (their thread reads run on
+        # their reader lane and never take the acknowledgements' time, Main 3345 (a)), and the polls read every thread of theirs in turn.
         with self.scott() as home:
             _, threads = self.build(home, 0, 10)
-            clock, real = [0.0], Traced.call
+            clock, real = LaneClock(), Traced.call
 
             def slow(replay, method, **fields):
                 if fields.get('channel') == SCOTT_DM:
-                    clock[0] += 3.0
+                    clock.advance(3.0)
                 return real(replay, method, **fields)
-            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN
-            with patch.object(Traced, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+            with patch.object(Traced, 'call', slow), clock.patched(), patch.object(plane, 'SECOND_BUDGET', plane.SECOND_BUDGET):
                 requests = [self.their_message(home, 'a slow request %d' % index) for index in range(5)]
                 reads = []
                 for poll in range(4):
@@ -2058,27 +2091,26 @@ class SecondPersonFollowUpTest(unittest.TestCase):
 
     def test_sc8_6_when_their_bookkeeping_is_slow_too_an_acknowledgement_the_budget_stops_before_it_begins_is_posted_next_poll(self):
         # SC8 (6) LIVENESS ("none is dropped or permanently deferred") with SC2's acknowledgement: each call into their DM takes 2.5 s and each write of
-        # their journal 0.3 s on their budget's clock, the plane's real 21 s budget, ten threads of theirs and one request waiting. After their thread reads
+        # their journal 0.3 s on their budget's clock (LaneClock, per lane), the plane's own budget, ten threads of theirs and one request waiting. After their thread reads
         # the acknowledgement's attempt mark is written, and its own write leaves too little time, so the budget stops the post before it begins. Nothing
         # reached Slack, so the post is not an unknown one: the next poll posts it, once, and wakes the request as acknowledged, never as "state unknown".
         with self.scott() as home:
             _, threads = self.build(home, 0, 10)
-            clock, real, real_commit, posts = [0.0], Traced.call, plane.Watch.commit, []
+            clock, real, real_commit, posts = LaneClock(), Traced.call, plane.Watch.commit, []
 
             def slow(replay, method, **fields):
                 if fields.get('channel') == SCOTT_DM:
-                    clock[0] += 2.5
+                    clock.advance(2.5)
                     if method == 'chat.postMessage':
                         posts.append(fields.get('thread_ts'))
                 return real(replay, method, **fields)
 
             def slow_commit(watch):
                 if watch.is_second:
-                    clock[0] += 0.3
+                    clock.advance(0.3)
                 return real_commit(watch)
-            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN
             with patch.object(Traced, 'call', slow), patch.object(plane.Watch, 'commit', slow_commit), \
-                    patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+                    clock.patched(), patch.object(plane, 'SECOND_BUDGET', plane.SECOND_BUDGET):
                 request = self.their_message(home, 'a request behind slow bookkeeping')
                 woken, reads = [], []
                 for poll in range(6):
@@ -2114,27 +2146,26 @@ class SecondPersonFollowUpTest(unittest.TestCase):
 
     def test_sc8_6_when_their_dm_proof_and_history_read_take_9_9_s_each_their_waiting_follow_up_is_still_read_and_woken(self):
         # SC8 (6) LIVENESS and A6 at cap 2, with no new request of theirs: every call of theirs (the DM proof included) takes 9.9 s on their budget's clock,
-        # just under the 10 s call bound, and their budget is the plane's real 21 s. A poll then holds the proof and one more call. Their one thread has a
-        # follow-up waiting: it is read and woken within three polls, never deferred for ever behind their history read.
+        # just under the 10 s call bound, and their budget is the plane's own (LaneClock, per lane). A poll then holds the proof and, on each lane, one more
+        # call. Their one thread has a follow-up waiting: it is read and woken within three polls, never deferred for ever behind their history read.
         with self.scott(cap='2') as home:
             _, threads = self.build(home, 0, 1)
             followup = self.their_message(home, 'a follow-up waiting behind slow calls', thread=threads[0])
-            clock, real = [0.0], Traced.call
+            clock, real = LaneClock(), Traced.call
 
             def slow(replay, method, **fields):
                 if fields.get('channel') == SCOTT_DM or (method == 'conversations.open' and fields.get('users') == SCOTT):
-                    clock[0] += 9.9
+                    clock.advance(9.9)
                 return real(replay, method, **fields)
-            real_budget = 2 * plane.SECOND_CALL_BOUND + plane.SECOND_MARGIN
             woken = []
-            with patch.object(Traced, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'SECOND_BUDGET', real_budget):
+            with patch.object(Traced, 'call', slow), clock.patched(), patch.object(plane, 'SECOND_BUDGET', plane.SECOND_BUDGET):
                 for poll in range(3):
                     rc, out, _ = home.poll()
                     self.assertEqual(rc, 0)
                     woken += [(poll, line) for line in out.splitlines() if line.startswith('check: slack follow-up %s to request %s@%s' % (followup, threads[0], SCOTT))]
             self.assertEqual(len(woken), 1, woken)
 
-    # ---- SC8 (6) and A6 on the real bounded reader: the plane's own SECOND_IO_WAIT (2 s) and SECOND_BUDGET (21 s), never the long ones of scott() ----
+    # ---- SC8 (6) and A6 on the real bounded reader: the plane's own SECOND_IO_WAIT (2 s) and SECOND_BUDGET (27 s), never the long ones of scott() ----
     # The tests above that use scott() grade the split arithmetic with both made 600 s; these grade the same bounds at the plane's own limits, with a fake
     # clock on which every Slack call costs one stated amount (Priced). A case whose calls the budget cannot hold is reported, not asserted as met.
     PRODUCTION_COSTS = (0.05, 0.3, 1.0, 2.5)
@@ -2143,7 +2174,7 @@ class SecondPersonFollowUpTest(unittest.TestCase):
     def production(self):
         """One home with the second person configured at the plane's own limits (no patch of SECOND_IO_WAIT or SECOND_BUDGET), on a priced clock whose
         calls cost nothing until the caller sets its cost."""
-        self.assertEqual((plane.SECOND_IO_WAIT, plane.SECOND_BUDGET, plane.SECOND_CALL_BOUND), (2.0, 21.0, 10.0))
+        self.assertEqual((plane.SECOND_IO_WAIT, plane.SECOND_BUDGET, plane.SECOND_CALL_BOUND), (2.0, 27.0, 10.0))
         priced = Priced(SCOTT, SCOTT_DM)
         with case(cap='20', extra={'dms': {OWNER: OWNER_DM, SCOTT: SCOTT_DM}}, env={'FM_SLACK_SECOND_USER': SCOTT}) as home, priced.on():
             self.assertEqual(home.poll()[0], 0)
@@ -2151,74 +2182,113 @@ class SecondPersonFollowUpTest(unittest.TestCase):
 
     @staticmethod
     def calls_that_fit(cost):
-        """How many calls of theirs begin in one pass when each costs cost: a call begins only when it ends inside SECOND_BUDGET (second_budget)."""
+        """How many calls one lane of their pass begins when each costs cost: a call begins only when it ends inside SECOND_BUDGET (second_budget)."""
         return int((plane.SECOND_BUDGET + 1e-9) // cost)
+
+    @classmethod
+    def reads_that_fit(cls, cost):
+        """Their thread reads one pass begins (Main 3345 (a)): on their reader lane, after the DM proof, one after another, each only if it ends inside
+        SECOND_BUDGET; their history read runs beside them, on the other lane."""
+        return max(0, cls.calls_that_fit(cost) - 1)
+
+    @classmethod
+    def pass_calls_bound(cls, cost):
+        """The most calls one pass of theirs can begin: the proof and the history read, the reads of the reader lane, and posts at most SECOND_POST_SPACING
+        apart, each ending inside SECOND_BUDGET."""
+        return 2 + cls.reads_that_fit(cost) + int((plane.SECOND_BUDGET + 1e-9) // plane.SECOND_POST_SPACING) + 1
 
     @classmethod
     def thread_bounds(cls, cap, cost, owners, theirs):
         """The bounds of SC8 (6) for one flood case, and K. owner: the adopted owner bound (2 To at C = 1, ceil(To / ceil(C / 2)) at C >= 2), whatever the
         cost (the owner's reads have no time budget). dod: the adopted bound for their threads (2 Ts at C = 1, ceil(Ts / floor(C / 2)) at C >= 2). K: the
-        bound at the plane's own limits, from r = floor(SECOND_BUDGET / cost) - 2, the thread reads their pass can begin after the DM proof and the history
-        read: K = 2 Ts at C = 1 and K = ceil(Ts / min(floor(C / 2), r)) at C >= 2, while r >= 1. With r = 0 (the budget holds the proof and one call) their
-        history read and their thread reads take turns (threads_first), one pass in two reads one thread: K = 2 Ts at C >= 2 (not stated at C = 1). K
-        equals dod exactly when the budget holds the proof, the history read and their share (met)."""
-        r = cls.calls_that_fit(cost) - 2
+        bound at the plane's own limits, from r = reads_that_fit(cost) = floor(SECOND_BUDGET / cost) - 1, the thread reads their reader lane begins after
+        the DM proof (Main 3345 (a)): K = 2 Ts at C = 1 and K = ceil(Ts / min(floor(C / 2), r)) at C >= 2, while r >= 1. K equals dod exactly when the
+        budget holds the proof and their share of reads (met)."""
+        r = cls.reads_that_fit(cost)
         if cap == 1:
             owner, dod = 2 * owners, 2 * theirs
             k = dod if r >= 1 else None
         else:
             owner, share = -(-owners // -(-cap // 2)), cap // 2
             dod = -(-theirs // share)
-            k = -(-theirs // min(share, r)) if r >= 1 else (2 * theirs if r == 0 else None)
+            k = -(-theirs // min(share, r)) if r >= 1 else None
         return {'owner': owner, 'dod': dod, 'k': k, 'r': r, 'met': k == dod}
 
     @classmethod
+    def lane_pass(cls, cap, cost, pending, waiting, unread):
+        """One pass of theirs in the LIVENESS case (no owner load, no follow-up) by the rule of their pass (Main 3345 (a)), on a clock where each call costs
+        cost - 1 ns of its lane's time: a call begins only if it ends inside SECOND_BUDGET (after the DM proof every call is as slow as the slowest);
+        1. resume_second: the requests the last pass staged and did not post, first, one after another on this lane, after the DM proof, charged to the cap;
+        2. the DM proof (if not made), then the reader lane reads min(C, threads) threads (the unread first), one after another;
+        3. the history read on this lane, beside the reads;
+        4. the acknowledgement lane: the k-th post begins at least SECOND_POST_SPACING after the one before, not before the history read ended, nor before
+           the read SHARE_READ_LAG before it ended (its share), nor before the post three before it ended (take_in_requests_lane); the first post that cannot
+           begin leaves its request staged (resumed first next pass), and the rest wait in their window.
+        Returns (calls begun, requests woken, staged left, requests still in their window, new threads read)."""
+        B, step, gap, lag = plane.SECOND_BUDGET, cost - Priced.SLACK, plane.SECOND_POST_SPACING, plane.SHARE_READ_LAG
+        calls, woken, left, t, last, slowest, proven = 0, 0, cap, 0.0, None, 0.0, False
+
+        def fits(begin):
+            return begin < B and begin + slowest <= B
+        while pending and left > 0:
+            if not proven:
+                if not fits(t):
+                    return calls, woken, pending, waiting, 0
+                t, calls, slowest, proven = t + step, calls + 1, step, True
+            begin = t if last is None else max(t, last + gap)
+            if not fits(begin):
+                return calls, woken, pending, waiting, 0
+            last, t, calls, pending, left, woken = begin, begin + step, calls + 1, pending - 1, left - 1, woken + 1
+        if not proven:
+            if not fits(t):
+                return calls, woken, pending, waiting, 0
+            t, calls, slowest, proven = t + step, calls + 1, step, True
+        reads, tr = [], t
+        for _ in range(cap):
+            if not fits(tr):
+                break
+            tr, calls = tr + step, calls + 1
+            reads.append(tr)
+        new_reads = min(len(reads), unread)
+        if not fits(t):
+            return calls, woken, pending, waiting, new_reads
+        t, calls = t + step, calls + 1
+        begun = []
+        for k in range(min(left, waiting)):
+            o = t
+            before = max(0, k - lag)
+            if before:
+                o = max(o, reads[before - 1] if before <= len(reads) else tr)
+            if k >= 1:
+                o = max(o, begun[k - 1])
+            if k >= 3:
+                o = max(o, begun[k - 3] + step)
+            begin = o if last is None else max(o, last + gap)
+            if not fits(begin):
+                pending, waiting = pending + 1, waiting - 1
+                break
+            last, calls, woken, waiting = begin, calls + 1, woken + 1, waiting - 1
+            begun.append(begin)
+        return calls, woken, pending, waiting, new_reads
+
+    @classmethod
     def liveness_bounds(cls, cap, cost):
-        """The LIVENESS case of SC8 (6) (3C new requests and 3C request threads of theirs, no owner load) at the plane's own limits, by the rule of their
-        pass (resume_second, take_in_second, read_their_followups, take_in_requests). A pass begins F = floor(SECOND_BUDGET / cost) calls:
-        1. the DM proof;
-        2. the acknowledgement the last pass's budget stopped before it began (it was taken in), first, charged to the cap;
-        3. normally the history read, then thread reads while each leaves time for keep = min(cap left, requests waiting) acknowledgements, so
-           min(C, F - calls - keep) reads; a pass that reads no thread marks their threads first for the next pass; then the requests are taken in and
-           acknowledged while the time lasts: the first acknowledgement that cannot begin leaves its request taken in for the next pass, and the rest wait;
-        4. a pass so marked reads min(C, F - calls) threads first, then the history read and the acknowledgements only while they still fit.
-        A request is woken when its acknowledgement is posted. Returns the poll by which every request is woken and every one of the 3C threads read
-        (K_requests, K_threads), r = F - 2, and met: both within the adopted 3 polls."""
-        fit = cls.calls_that_fit(cost)
-        waiting, pending, unread, first = 3 * cap, 0, 3 * cap, False
+        """The LIVENESS case of SC8 (6) (3C new requests and 3C request threads of theirs, no owner load) at the plane's own limits, pass after pass by
+        lane_pass, the rule of their pass. Returns the poll by which every request is woken and every one of the 3C threads read (K_requests, K_threads),
+        r (reads_that_fit), and met: both within the adopted 3 polls."""
+        waiting, pending, unread = 3 * cap, 0, 3 * cap
         poll, k_requests, k_threads, woken = 0, None, None, 0
-        while (k_requests is None or k_threads is None) and fit >= 2 and poll < 1000:
+        while (k_requests is None or k_threads is None) and poll < 1000:
             poll += 1
-            calls = 1
-            resumed = min(pending, fit - calls)
-            calls, pending, woken, left = calls + resumed, pending - resumed, woken + resumed, cap - resumed
-            reads, history = 0, False
-            if first:
-                reads = min(cap, fit - calls)
-                calls += reads
-                history = calls + 1 <= fit
-                calls += history
-            else:
-                calls += 1
-                history = True
-                reads = min(cap, max(0, fit - calls - min(left, waiting)))
-                calls += reads
-            if history:
-                taken = min(left, waiting)
-                acks = min(taken, fit - calls)
-                woken += acks
-                if acks < taken:
-                    pending += 1
-                    waiting -= acks + 1
-                else:
-                    waiting -= taken
-            first = reads == 0
-            unread = max(0, unread - reads)
+            calls, done, pending, waiting, reads = cls.lane_pass(cap, cost, pending, waiting, unread)
+            woken, unread = woken + done, max(0, unread - reads)
             if woken == 3 * cap and k_requests is None:
                 k_requests = poll
             if unread == 0 and k_threads is None:
                 k_threads = poll
-        return {'k_requests': k_requests, 'k_threads': k_threads, 'r': fit - 2,
+            if not calls:
+                break
+        return {'k_requests': k_requests, 'k_threads': k_threads, 'r': cls.reads_that_fit(cost),
                 'met': k_requests is not None and k_threads is not None and max(k_requests, k_threads) <= 3}
 
     @staticmethod
@@ -2316,7 +2386,7 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                 left = theirs
                 for index, poll in enumerate(r['per_poll'], start=1):
                     self.assertLessEqual(poll['reads'], cap, (label, index))
-                    self.assertLessEqual(poll['their_calls'], self.calls_that_fit(cost), (label, index))
+                    self.assertLessEqual(poll['their_calls'], self.pass_calls_bound(cost), (label, index))
                     if cap > 1 and left:
                         # Progress on their share in every poll: at least min(floor(C / 2), r) of their threads not read yet (all, when fewer are left).
                         self.assertGreaterEqual(poll['their_new'], min(cap // 2, b['r'], left), (label, index))
@@ -2348,22 +2418,22 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                 self.assertTrue(self.thread_bounds(cap, cost, 3, 60)['met'], (cap, cost))
 
     def test_sc8_6_at_the_planes_own_limits_the_default_cap_meets_the_bound_up_to_1_s_per_call_and_reads_within_k_polls_at_2_5_s(self):
-        # The default C = 20: their share is 10 thread reads. At 0.05, 0.3 and 1.0 s per call the budget holds the proof, the history read and the share
-        # (2 + 10 calls), so every thread of theirs is read within ceil(Ts / 10) polls (A6, Main 2787, condition 1). At 2.5 s it holds 8 calls, so r = 6
-        # thread reads a poll: K = ceil(Ts / 6) is asserted, and is reached exactly when Ts = 60 (the owner's spare share flows to them, the budget stops it).
+        # The default C = 20: their share is 10 thread reads. At 0.05, 0.3 and 1.0 s per call their reader lane holds the share after the DM proof (Main
+        # 3345 (a)), so every thread of theirs is read within ceil(Ts / 10) polls (A6, Main 2787, condition 1). At 2.5 s it holds r = floor(27 / 2.5) - 1 = 9
+        # thread reads a poll: K = ceil(Ts / 9) is asserted, and is reached exactly when Ts = 60 (the owner's spare share flows to them, the budget stops it).
         found = self.check_flood_at_production_limits(20, ((3, 60), (22, 1), (19, 20), (5, 5)))
         for cost in (0.05, 0.3, 1.0):
             self.assertTrue(self.thread_bounds(20, cost, 3, 60)['met'], cost)
         slow = self.thread_bounds(20, 2.5, 3, 60)
-        self.assertEqual((slow['r'], slow['dod'], slow['k'], slow['met']), (6, 6, 10, False))
-        self.assertEqual(max(found[(2.5, 3, 60)]['read'][t] for t in found[(2.5, 3, 60)]['others']), 10)
-        self.assertEqual([poll['their_new'] for poll in found[(2.5, 3, 60)]['per_poll']][:10], [6] * 10)
+        self.assertEqual((slow['r'], slow['dod'], slow['k'], slow['met']), (9, 6, 7, False))
+        self.assertEqual(max(found[(2.5, 3, 60)]['read'][t] for t in found[(2.5, 3, 60)]['others']), 7)
+        self.assertEqual([poll['their_new'] for poll in found[(2.5, 3, 60)]['per_poll']][:7], [9] * 6 + [6])
 
     def test_sc8_6_at_the_planes_own_limits_a_larger_cap_40_reads_within_k_polls(self):
-        # C = 40: their share is 20 thread reads. At 0.05 and 0.3 s the budget holds 2 + 20 calls (met); at 1.0 s it holds 21 calls (r = 19) and at 2.5 s
-        # 8 (r = 6), so K = ceil(Ts / 19) and ceil(Ts / 6) are asserted there. The owner bound holds at every cost.
+        # C = 40: their share is 20 thread reads. At 0.05, 0.3 and 1.0 s their reader lane holds the share after the DM proof (r = 539, 89 and 26; Main
+        # 3345 (a)): met; at 2.5 s it holds r = 9, so K = ceil(Ts / 9) is asserted there. The owner bound holds at every cost.
         self.check_flood_at_production_limits(40, ((3, 60), (42, 1), (39, 40), (5, 5)))
-        self.assertEqual([self.thread_bounds(40, cost, 3, 60)['met'] for cost in self.PRODUCTION_COSTS], [True, True, False, False])
+        self.assertEqual([self.thread_bounds(40, cost, 3, 60)['met'] for cost in self.PRODUCTION_COSTS], [True, True, True, False])
 
     def test_sc8_6_liveness_at_the_planes_own_limits_3c_requests_and_threads_of_theirs_are_taken_in_and_read_within_k_polls(self):
         # SC8 (6) LIVENESS on the real bounded reader: 3C new requests and 3C request threads of theirs, no owner load, at C = 1, 2, 3, the default 20 and 40,
@@ -2385,18 +2455,18 @@ class SecondPersonFollowUpTest(unittest.TestCase):
                 done = [sum(1 for v in r['woken'].values() if v <= poll) + sum(1 for v in r['read'].values() if v <= poll)
                         for poll in range(len(r['per_poll']) + 1)]
                 for index, poll in enumerate(r['per_poll'], start=1):
-                    self.assertLessEqual(poll['their_calls'], self.calls_that_fit(cost), (label, index))
+                    self.assertLessEqual(poll['their_calls'], self.pass_calls_bound(cost), (label, index))
                     if index >= 2 and done[index - 2] < 6 * cap:
                         self.assertGreater(done[index], done[index - 2], (label, index))
 
-    def test_sc8_6_u1_at_9_9_s_per_call_their_one_thread_at_cap_2_is_read_within_k_2_polls_by_turn_taking(self):
-        # The U1 input (C = 2, one thread of theirs, every call 9.9 s): the budget holds the proof and one call (r = 0), so the adopted bound of 1 poll cannot
-        # be met; their history read and thread reads take turns, and the thread is read at the second poll (K = 2), never later.
+    def test_sc8_6_u1_at_9_9_s_per_call_their_one_thread_at_cap_2_is_read_in_the_first_poll_on_the_reader_lane(self):
+        # The U1 input (C = 2, one thread of theirs, every call 9.9 s): each lane of their pass holds the proof and one more call (Main 3345 (a): their
+        # thread read runs on the reader lane beside their history read, r = 1), so the adopted bound of 1 poll is met: the thread is read in the first poll.
         b = self.thread_bounds(2, 9.9, 0, 1)
-        self.assertEqual((b['r'], b['dod'], b['k'], b['met']), (0, 1, 2, False))
+        self.assertEqual((b['r'], b['dod'], b['k'], b['met']), (1, 1, 1, True))
         r = self.production_flood(2, (9.9,), 0, 1, lambda cost: 4)[9.9]
-        self.assertEqual(r['read'].get(r['others'][0]), 2, r['per_poll'])
-        self.assertEqual([poll['their_new'] for poll in r['per_poll']][:2], [0, 1])
+        self.assertEqual(r['read'].get(r['others'][0]), 1, r['per_poll'])
+        self.assertEqual([poll['their_new'] for poll in r['per_poll']][:1], [1])
 
     def test_sc2_one_combined_attempt_trace_lists_every_post_attempt_of_both_people_with_its_destination_and_outcome(self):
         # SC2 with SC8: the owner and the second person each have a request, a reply from Main, a follow-up and a reply to it. The attempt trace holds every

@@ -49,7 +49,7 @@ import unicodedata
 import uuid
 import weakref
 
-from fm_slack import CUTOFF_JOIN, SAFE_ERRORS, SCRUB_MARK, DeadlineSpent, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
+from fm_slack import CALL, CUTOFF_JOIN, SAFE_ERRORS, SCRUB_MARK, DeadlineSpent, SecretCollision, Slack, SlackError, outbound_texts, plane_secrets, refuse_outbound, value_hits
 from fm_slack_replay import Replay
 
 ROOT = Path(__file__).resolve().parent
@@ -132,9 +132,23 @@ SECOND_SETTING = 'FM_SLACK_SECOND_USER'
 # returned within 0.18 s of its deadline in 20 of 20 trials, and its reader ended (evidence-round7/budget/); the code's own bound is fm_slack.CUTOFF_JOIN.
 SECOND_CALL_BOUND = 10.0
 SECOND_MARGIN = 1.0
-SECOND_BUDGET = 2 * SECOND_CALL_BOUND + SECOND_MARGIN
-# The longest the owner's wake can wait for their check of the same sweep: their budget, the cancellation of a call cut at its end, and 2 s of process start-up.
-OWNER_WAKE_WAIT_BOUND = SECOND_BUDGET + CUTOFF_JOIN + 2.0
+# Main 3350 (a): their budget holds the three-poll promise of SC8 (6) at the default C and 1.0 s a call (20 acknowledgements a pass, each start at least
+# SECOND_POST_SPACING after the one before, after the fresh DM proof and the history read). Computed in redesign/budget_calc.py from measured inputs: 24.0 s
+# at low load, 26.6 s with the binding checks at their measured load-30 p90; so 27 s. It is never less than the proof plus one useful step
+# (2 x SECOND_CALL_BOUND + SECOND_MARGIN, 21 s).
+SECOND_BUDGET = 27.0
+# The longest the owner's wake can wait for their check of the same sweep (Main 1650; kept at 24 s by Main 3350): since Main 3345 (1) the watcher releases a
+# wake an earlier check of the sweep queued before it starts their check (bin/fm-watch.sh), so the owner's wake no longer waits for their check at all;
+# the bound is no longer their budget plus the cancellation of a cut call plus start-up, which their run alone now exceeds (SECOND_BUDGET + CUTOFF_JOIN).
+OWNER_WAKE_WAIT_BOUND = 24.0
+# The strict documented rate (Main 3345, 3350): chat.postMessage generally takes one message a second in one channel, and all their posts go to their one
+# DM, so the starts of their posts are at least this far apart in every run: 1.0 s, plus 0.05 s for the plane's own send path between its guard and the
+# request leaving (measured up to 0.032 s on the operator host, redesign/report.md), so that no two of their posts reach Slack less than 1.0 s apart. No
+# burst is assumed.
+SECOND_POST_SPACING = 1.05
+# Their pass decides the share of its k-th request (follow-ups first, take_in_second) from the follow-ups found by its reads up to k - SHARE_READ_LAG, so
+# their acknowledgements, spaced SECOND_POST_SPACING apart, never wait for a read that ends a little after them (Main 3345 (a)).
+SHARE_READ_LAG = 3
 # How often the second person's check tries again for a journal lock another run holds (take_lock).
 LOCK_POLL = 0.05
 REFUSAL_FILE = 'refusals.jsonl'
@@ -208,6 +222,13 @@ def fault(point):
         raise RuntimeError('FM_SLACK_FAULT=' + point)
 
 
+# The deadline of the second person's run, for the one child run() starts on this thread now (set only by Watch.bound inside their run, Main 3345 (2)).
+CHILD_DEADLINE = threading.local()
+# The time a child killed at its deadline takes to be ended and reaped (run's timeout kills and waits for it): it is killed this much before the deadline, so
+# the step after it still ends by the deadline. Measured: a killed child is reaped within a few milliseconds.
+CHILD_END = 0.05
+
+
 def run(script, *args, text=None):
     # What a child is handed (its arguments and its input) leaves the process like any other byte: it is checked first, and no child with a plane value in it starts.
     handed = {'child argument %d' % n: str(argument) for n, argument in enumerate(args)}
@@ -217,8 +238,11 @@ def run(script, *args, text=None):
     # No local child needs a Slack credential: drop the token and the signing secret.
     env = {key: value for key, value in os.environ.items() if not key.startswith('SLACK_')}
     env['PYTHONDONTWRITEBYTECODE'] = '1'
+    # Inside their run a child gets only the time their run has left: at its deadline it is killed and subprocess.TimeoutExpired is raised (bound).
+    deadline = getattr(CHILD_DEADLINE, 'at', None)
+    bounded = {} if deadline is None else {'timeout': max(0.001, deadline - monotonic())}
     return subprocess.run(['bash', str(ROOT / script), *args], input=text,
-                          text=True, capture_output=True, check=False, env=env)
+                          text=True, capture_output=True, check=False, env=env, **bounded)
 
 
 def save(path, value):
@@ -588,6 +612,12 @@ def serialize_with_spans(value, ascii_only, leaves):
                 walk(v, item, n)
             put(']')
         elif isinstance(item, str):
+            field = wanted.get((id(parent), key))
+            if not field:
+                # A string that is not a named leaf needs no spans: it is written whole, as json.dumps writes it (Main 3345 (a): writing every string of a
+                # journal one character at a time made each request's settle take most of a second on a full journal; the text is still checked whole below).
+                put(json.dumps(item, ensure_ascii=ascii_only))
+                return
             put('"')
             spans = []
             for ch in item:
@@ -595,9 +625,7 @@ def serialize_with_spans(value, ascii_only, leaves):
                 spans.append((pos[0], pos[0] + len(piece)))
                 put(piece)
             put('"')
-            field = wanted.get((id(parent), key))
-            if field:
-                runs.append((field, spans))
+            runs.append((field, spans))
         else:
             put(json.dumps(item, ensure_ascii=ascii_only))
     walk(value, None, None)
@@ -854,7 +882,22 @@ def slack_ts(seconds):
 # How many times, and how far apart (seconds), an arm whose read of the second person's DM failed asks Slack for its clock until it shows the next whole second.
 ARM_CLOCK_TRIES = 4
 ARM_CLOCK_PAUSE = 0.35
-pause = time.sleep
+
+
+def clock_after(moment):
+    """One lane of their pass goes on after something another lane did at moment (monotonic): on the host clock that is already past, so nothing is done.
+    A name of its own so that a test with a stated clock, kept per thread, can carry the moment across (Main 3345 (a))."""
+
+
+def pause(seconds):
+    """Wait seconds on the host clock, never less, and never much more: one sleep that stops short, then 1 ms slices (Main 3345 (a): on the operator host every
+    sleep of 20 ms or more wakes about 0.145 s late, measured in feasibility-overlap/margin-study/raw/sleep-overshoot.txt, which would space their posts
+    1.2 s apart instead of SECOND_POST_SPACING). A name of its own so that a test with a stated clock can advance that clock instead."""
+    until = time.monotonic() + seconds
+    if seconds > 0.2:
+        time.sleep(seconds - 0.17)
+    while time.monotonic() < until:
+        time.sleep(0.001)
 
 
 def whole_second_before(seconds):
@@ -869,6 +912,196 @@ class SecondBudgetSpent(Exception):
     def __init__(self, sent=True):
         super().__init__()
         self.sent = sent
+
+
+class PerThread:
+    """An attribute of one Watch that each thread of a run sees on its own (Main 3345 (a): their acknowledgements are made by threads of one pass): the
+    binding hold of a delivery, and whether its post was a fresh one, belong to the delivery that thread is making. Unset in a thread, it reads None."""
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return getattr(obj.__dict__.setdefault('_per_thread', threading.local()), self.name, None)
+
+    def __set__(self, obj, value):
+        setattr(obj.__dict__.setdefault('_per_thread', threading.local()), self.name, value)
+
+
+class AckLane:
+    """The acknowledgements of one pass of theirs, in order (Main 3345 (a), 3350). Every step of the plane runs under one baton, so the journal changes in one
+    thread's turn; only a post's exchange runs without it (before_exchange and after_exchange, called by their pass's guard). Each request's own bookkeeping
+    (cursor, stage, record, fresh binding check, attempt mark) is made while the post before it is in flight. A post begins once the post before it has begun
+    (and, in the guard, SECOND_POST_SPACING after it), so post starts are never closer than the documented rate; a request's after-post work (its wake line)
+    waits for the request before it to finish, so wake lines keep the order of the requests. The first request that ends undelivered (stop_at) stops the lane:
+    a later request that has not begun its post ends without one (not begun, so surely absent, staged), and a later one that already posted keeps its row
+    journaled as posted, its wake line for a later run, after the earlier one's."""
+
+    def __init__(self):
+        self.baton = threading.Lock()
+        self.local = threading.local()
+        self.begun, self.released, self.done = [], [], []
+        self.begun_at, self.done_at = [], []
+        self.stop_at = None
+        self.errors = []
+
+    def add(self):
+        for events in (self.begun, self.released, self.done):
+            events.append(threading.Event())
+        self.begun_at.append(None)
+        self.done_at.append(None)
+        return len(self.done) - 1
+
+    def wait(self, events, moments, k):
+        """Wait for request k's event, then go on from the moment it happened (clock_after)."""
+        events[k].wait()
+        if moments[k] is not None:
+            clock_after(moments[k])
+
+    def stop(self, k):
+        self.stop_at = k if self.stop_at is None else min(self.stop_at, k)
+
+    def stopped_before(self, k):
+        return self.stop_at is not None and self.stop_at < k
+
+    def run(self, k, body, started):
+        clock_after(started)
+        with self.baton:
+            self.local.k = k
+            try:
+                body()
+            except BaseException as error:                          # handed back to the pass in request order (take_in_requests_lane)
+                self.errors.append((k, error))
+                self.stop(k)
+            finally:
+                now = monotonic()
+                if self.begun_at[k] is None:
+                    self.begun_at[k] = now
+                self.done_at[k] = now
+                for events in (self.begun, self.released, self.done):
+                    events[k].set()
+
+    def index(self):
+        return getattr(self.local, 'k', None)
+
+    def before_exchange(self):
+        """Their post's exchange is next: give the baton up, then wait for the post before it to begin. False when a request before it ended undelivered."""
+        k = self.index()
+        self.baton.release()
+        self.released[k].set()
+        if k:
+            self.wait(self.begun, self.begun_at, k - 1)
+        return not self.stopped_before(k)
+
+    def began(self):
+        """This request's post is beginning (its guard let it): the next request's post may follow, SECOND_POST_SPACING later."""
+        self.begun_at[self.index()] = monotonic()
+        self.begun[self.index()].set()
+
+    def after_exchange(self):
+        """The exchange ended: take the baton back once the request before it has finished, so wake lines keep the order of the requests."""
+        k = self.index()
+        if k:
+            self.wait(self.done, self.done_at, k - 1)
+        self.baton.acquire()
+
+    def committed(self):
+        """This request's post is committed as posted. When a request before it ended undelivered, this one's wake line waits for a later run (its row stays
+        journaled as posted), so no line is ever printed ahead of an earlier request's."""
+        if self.stopped_before(self.index()):
+            raise SecondBudgetSpent()
+
+
+class ThreadReader:
+    """Their thread reads of one pass on a lane of their own (Main 3345 (a), 3350): the threads of theirs this poll's split gives them (followup_reads), in
+    their own read order, each read with the cursor it had when the lane began, through the pass's own guard (one call at a time on this lane, inside their
+    budget). The lane only reads: it writes nothing of the plane; the pass applies what it read (Watch.apply_their_reads). It begins after the DM proof of
+    this run (H2), which the pass makes first."""
+
+    def __init__(self, watch, count):
+        self.watch, self.results, self.picked, self.order, self.threads = watch, [], [], [], []
+        self.moments, self.ended_at = [], None
+        self.lane = None
+        self.ended = threading.Condition()
+        self.over = False
+        threads = watch.their_threads()
+        if count <= 0 or not threads:
+            self.over = True
+            return
+        entries = watch.state.setdefault('followups', {})
+        # A thread with a turn goes by its turn; a thread new to their order has none yet and goes to the back, oldest first.
+        self.threads = threads
+        self.order = sorted(threads, key=lambda t: (t not in entries, entries.get(t, {}).get('turn', 0), ts_key(t)))
+        self.picked = self.order[:count]
+
+    def start(self):
+        if not self.picked:
+            return
+        channel = self.watch.second_channel()                   # the DM proof of this run, first (H2)
+        self.watch.read_mark = self.watch.read_mark or SCRUB_MARK + os.urandom(6).hex() + SCRUB_MARK
+        cursors = [(thread, self.watch.followup_cursor(thread)) for thread in self.picked]
+        self.lane = threading.Thread(target=self.run, args=(cursors, channel, monotonic()), name='fm-slack-thread-reads', daemon=True)
+        self.lane.start()
+
+    def add(self, result):
+        with self.ended:
+            self.results.append(result)
+            self.moments.append(monotonic())
+            self.ended.notify_all()
+
+    def run(self, cursors, channel, started):
+        clock_after(started)
+        try:
+            for thread, cursor in cursors:
+                try:
+                    messages = self.watch.new_replies(thread, cursor, channel)
+                except SecondBudgetSpent:
+                    self.add((thread, 'stopped', None))
+                    return
+                except SlackError as error:
+                    if str(error) not in THREAD_ERRORS:
+                        self.add((thread, 'fatal', error))
+                        return
+                    self.add((thread, 'error', error))
+                    continue
+                self.add((thread, 'ok', messages))
+        except BaseException as error:                              # handed to the pass (apply_their_reads), never lost in this thread
+            self.add((None, 'fatal', error))
+        finally:
+            with self.ended:
+                self.ended_at = monotonic()
+                self.over = True
+                self.ended.notify_all()
+
+    def wait_for(self, k):
+        """Wait until the lane has ended k reads, or has ended."""
+        with self.ended:
+            while len(self.results) < k and not self.over:
+                self.ended.wait()
+            moment = self.moments[k - 1] if 0 < k <= len(self.moments) else (self.ended_at if k > len(self.moments) else None)
+        if moment is not None:
+            clock_after(moment)
+
+    def read_before(self, k):
+        """The threads and messages of the lane's first k reads that worked."""
+        with self.ended:
+            return [(thread, value) for thread, outcome, value in self.results[:k] if outcome == 'ok']
+
+    def finish(self, deadline):
+        """Wait for the lane until the pass's deadline (its open call ends there), then for one CUTOFF_JOIN; a lane still running after that is left: what it
+        has not handed over was not read in this pass."""
+        if self.lane is None:
+            return
+        self.lane.join(max(0.0, (deadline if deadline is not None else monotonic()) - monotonic()))
+        self.lane.join(CUTOFF_JOIN)
+        if self.ended_at is not None:
+            clock_after(self.ended_at)
+
+    def taken(self):
+        with self.ended:
+            return list(self.results)
 
 
 # Failures after which a post of theirs surely did not happen: the call never left this host (the transport closed, or no token). Nothing is assumed about
@@ -1114,6 +1347,7 @@ class EarlyProof:
     def __init__(self, api, user, started, gate):
         self.api, self.user, self.ends, self.gate = api, user, started + SECOND_CALL_BOUND, gate
         self.found = []
+        self.ended_at = None
         # Set by result() when it stops waiting: a proof that has not begun its call by then never begins it (the transport is the run's again).
         self.abandoned = False
         self.turn = threading.Lock()
@@ -1135,6 +1369,7 @@ class EarlyProof:
         except (SlackError, SecondBudgetSpent, DeadlineSpent, OSError, ValueError):
             pass
         finally:
+            self.ended_at = monotonic()
             if earlier is None:
                 self.api.__dict__.pop('time_left', None)
             else:
@@ -1143,6 +1378,8 @@ class EarlyProof:
     def result(self):
         """(user, channel) of this run's proof, or None; waits at most until the proof's own bound and its cancellation."""
         self.thread.join(max(0.0, self.ends - monotonic()) + CUTOFF_JOIN)
+        if self.ended_at is not None and not self.thread.is_alive():
+            clock_after(self.ended_at)                              # the run goes on after its proof (a stated clock per thread, Main 3345 (a))
         with self.turn:
             self.abandoned = True
         return self.found[0] if self.found and not self.thread.is_alive() else None
@@ -1151,6 +1388,10 @@ class EarlyProof:
 class Watch:
     # The longest wait for the journal lock, counted from the start of the run, or None to wait as long as it takes (main sets it for their check only).
     lock_wait = None
+    # Per thread (Main 3345 (a)): the binding hold of the delivery a thread makes, and whether its post was fresh.
+    hold_depth = PerThread()
+    hold_bound = PerThread()
+    posted_fresh = PerThread()
     # The monotonic start of a run of main, set before its first step, so that their check's budget counts everything from there (F8 of the review of c5868b6f).
     run_origin = None
 
@@ -1422,9 +1663,7 @@ class Watch:
     def take_binding(self, held):
         """The binding fence, shared. Inside the second person's budget (round 8, R8) it is waited for only until their deadline: a fence still held by an unbind
         then ends their pass with nothing posted (no attempt mark is written before the fence is held), and a later sweep goes on. The owner waits as before."""
-        deadline = getattr(self, 'budget_deadline', None)
-        if deadline is None and getattr(self, 'their_check', False) and isinstance(getattr(self, 'run_started', None), (int, float)):
-            deadline = self.run_started + SECOND_BUDGET                # their final print: inside their run's budget too (F8 of the review of c5868b6f)
+        deadline = self.delivery_deadline()
         if deadline is None:
             fcntl.flock(held, fcntl.LOCK_SH)
             return
@@ -1435,7 +1674,18 @@ class Watch:
             except BlockingIOError:
                 if monotonic() >= deadline:
                     raise SecondBudgetSpent() from None
-                time.sleep(LOCK_POLL)
+                pause(max(0.0, min(LOCK_POLL, deadline - monotonic())))
+
+    def delivery_deadline(self):
+        """The deadline of the second person's delivery work in this run, or None outside their run (the owner waits as before): their pass's budget, or
+        for their final print the end of their whole run, SECOND_BUDGET + CUTOFF_JOIN from its start (F8 of the review of c5868b6f; Main 3345 (2)), so a
+        pass that used its whole budget still prints its lines. Their binding fence and their binding checks are both held to it."""
+        if getattr(self, 'apply_deadline', None) is not None:
+            return self.apply_deadline                              # their pass's local delivery after both lanes (apply_their_followups)
+        deadline = getattr(self, 'budget_deadline', None)
+        if deadline is None and getattr(self, 'their_check', False) and isinstance(getattr(self, 'run_started', None), (int, float)):
+            deadline = self.run_started + SECOND_BUDGET + CUTOFF_JOIN - CHILD_END
+        return deadline
 
     @contextlib.contextmanager
     def proof_gate(self):
@@ -1491,7 +1741,22 @@ class Watch:
         return sum(1 for pending in self.state['pending'] if pending.get('kind') == 'notice')
 
     def bound(self):
-        result = run('fm-captain-hold.sh', 'binding', SOURCE)
+        deadline = self.delivery_deadline()
+        if deadline is None:
+            result = run('fm-captain-hold.sh', 'binding', SOURCE)
+        else:
+            # Inside their run the binding check is a child held to their deadline (Main 3345 (2); the margin study measured one that ran 2.8 s past it):
+            # not finished by then, it is killed, and the step it was to allow does not happen, as when the binding fence is still held at the deadline
+            # (take_binding). The check comes before any attempt mark, so nothing was sent: what it was for waits for a later run.
+            if monotonic() >= deadline - CHILD_END:
+                raise SecondBudgetSpent(sent=False)
+            CHILD_DEADLINE.at = deadline - CHILD_END
+            try:
+                result = run('fm-captain-hold.sh', 'binding', SOURCE)
+            except subprocess.TimeoutExpired:
+                raise SecondBudgetSpent(sent=False) from None
+            finally:
+                CHILD_DEADLINE.at = None
         if result.returncode:
             return None
         return result.stdout.strip()
@@ -1707,26 +1972,53 @@ class Watch:
         if self.budget_deadline is not None:
             deadline = min(deadline, self.budget_deadline)
 
+        slow = threading.Lock()
+        self.last_post_start = None
+
         def guarded(method, **fields):
             # A call is not begun when the slowest call of theirs in this run shows it would end after the deadline (finding 5 of the review of d9861b24): a
             # call cut off at the deadline is wasted, and a cut-off post leaves an attempt that a later run must look up first, so runs whose calls are all slow
-            # would otherwise cut the same third call for ever.
-            begun = monotonic()
-            if begun >= deadline or begun + self.slowest_call > deadline:
-                # A call not begun never reached Slack (sent=False): a post stopped here, after its attempt mark was written, is surely absent and is posted by
-                # the next run, never woken as unknown (SC2, SC8 (6) LIVENESS).
-                raise SecondBudgetSpent(sent=False)
-            # Each call is ended at its own whole-call bound or at the budget's end, whichever comes first (Main 1650).
-            ends = min(deadline, begun + SECOND_CALL_BOUND)
-            api.time_left = lambda: ends - monotonic()
+            # would otherwise cut the same third call for ever. Their posts, all into their one DM, begin at least SECOND_POST_SPACING apart (the strict
+            # documented rate, Main 3350); in an acknowledgement lane a post waits for the post before it, without the lane's baton (AckLane).
+            paced = method == 'chat.postMessage' and fields.get('channel') == self.second_window().get('channel')
+            lane = getattr(self, 'ack_lane', None) if paced else None
+            if lane is not None and lane.index() is None:
+                lane = None
+            ready = lane.before_exchange() if lane is not None else True
             try:
-                return bound(method, **fields)
-            except DeadlineSpent as cut:
-                # The real transport cut the call off at the deadline (Main 1593): a deferral like a call that could not begin, never a failure.
-                raise SecondBudgetSpent(sent=getattr(cut, 'sent', True)) from None
+                if not ready:
+                    # The request before this one ended without its post: this post is not begun (nothing was sent), and the lane stops (AckLane).
+                    raise SecondBudgetSpent(sent=False)
+                if paced and self.last_post_start is not None:
+                    wait = self.last_post_start + SECOND_POST_SPACING - monotonic()
+                    if wait > 0:
+                        pause(wait)
+                begun = monotonic()
+                with slow:
+                    slowest = self.slowest_call
+                if begun >= deadline or begun + slowest > deadline:
+                    # A call not begun never reached Slack (sent=False): a post stopped here, after its attempt mark was written, is surely absent and is posted
+                    # by the next run, never woken as unknown (SC2, SC8 (6) LIVENESS).
+                    raise SecondBudgetSpent(sent=False)
+                if paced:
+                    self.last_post_start = begun
+                    if lane is not None:
+                        lane.began()                                        # the next request's post may follow, spaced (AckLane)
+                # Each call is ended at its own whole-call bound or at the budget's end, whichever comes first (Main 1650), for the thread making it (CALL).
+                ends = min(deadline, begun + SECOND_CALL_BOUND)
+                CALL.time_left = lambda: ends - monotonic()
+                try:
+                    return bound(method, **fields)
+                except DeadlineSpent as cut:
+                    # The real transport cut the call off at the deadline (Main 1593): a deferral like a call that could not begin, never a failure.
+                    raise SecondBudgetSpent(sent=getattr(cut, 'sent', True)) from None
+                finally:
+                    CALL.time_left = None
+                    with slow:
+                        self.slowest_call = max(self.slowest_call, monotonic() - begun)
             finally:
-                self.slowest_call = max(self.slowest_call, monotonic() - begun)
-                api.time_left = lambda: deadline - monotonic()
+                if lane is not None:
+                    lane.after_exchange()
 
         # The time left is passed to every call of theirs, and the real transport ends a call at it however slowly its reply arrives (Slack._bounded): the
         # budget is a total bound on their network I/O, not only on when a call may begin.
@@ -2004,6 +2296,13 @@ class Watch:
         # The transport removes the plane's token from a response before it is decoded (a defense that stays); here it
         # also leaves the declared marker and a mark that tells sanitize that a value was removed at the boundary.
         self.read_mark = self.read_mark or SCRUB_MARK + os.urandom(6).hex() + SCRUB_MARK
+        if isinstance(self.api, Slack):
+            # This read's own (CALL): their pass reads a thread while it posts, on the same transport (Main 3345 (a)).
+            CALL.scrub_with = self.read_mark + SECRET_MARKER
+            try:
+                return read()
+            finally:
+                CALL.scrub_with = None
         self.api.scrub_with = self.read_mark + SECRET_MARKER
         try:
             return read()
@@ -2929,6 +3228,8 @@ class Watch:
                         # then never turn an acknowledgement that was posted into a failed one.
                         pending['posted'] = True
                         self.commit()
+                        if getattr(self, 'ack_lane', None) is not None and self.ack_lane.index() is not None:
+                            self.ack_lane.committed()                        # the next request of the lane may post now (AckLane)
                 except LookupFailed as unknown:
                     # The attempt may have posted and the lookup cannot say: never post blindly. After three failed lookups, or at once when a complete lookup of
                     # an unknown attempt of theirs found nothing (AckUnknown), the request is woken once with the state named as unknown, not "not acknowledged".
@@ -3418,6 +3719,8 @@ class Watch:
         if self.second_journal is None:
             view = object.__new__(Watch)
             view.__dict__.update(self.__dict__)
+            view.__dict__.pop('_per_thread', None)
+            view.hold_depth, view.hold_bound, view.posted_fresh = self.hold_depth, self.hold_bound, self.posted_fresh
             view.owner, view.is_second, view.second_journal = self, True, None
             view.path = self.root / SECOND_FILE
             view.record_file = SECOND_RECORD_FILE
@@ -3773,8 +4076,11 @@ class Watch:
         """How many requests the page read holds that are ready to be taken in."""
         return sum(1 for message, row in plan['page'] if row and row['event'] not in self.state['seen']) if plan else 0
 
-    def take_in_requests(self, plan, remaining, second=False):
-        """Take in the requests of the page just read, oldest first, at most remaining of them; returns what the cap has left."""
+    def take_in_requests(self, plan, remaining, second=False, allow=None):
+        """Take in the requests of the page just read, oldest first, at most remaining of them; returns what the cap has left. Their pass (second, inside their
+        budget) takes them in through an acknowledgement lane (take_in_requests_lane); allow(k), when given, says whether its k-th request may begin."""
+        if second and self.budget_deadline is not None:
+            return self.take_in_requests_lane(plan, remaining, allow)
         win = self.second_window() if second else self.state
         bounds = plan['bounds']
         moved, finished = False, True
@@ -3809,6 +4115,80 @@ class Watch:
         if moved:
             self.commit()
         return remaining
+
+    def take_in_requests_lane(self, plan, remaining, allow=None):
+        """take_in_requests for their pass, through one AckLane (Main 3345 (a), 3350): the same steps for each request, in the same order (its page cursor moves,
+        settle_request, the cursor, stage, publish), each request's run in its own thread under the lane's baton, so a request's bookkeeping overlaps the post
+        before it. A request whose row is already journaled (a resumed or held one) begins only after the request before it has finished. The first request
+        left undelivered ends the lane, as it ends take_in_requests; the first error of a request, in request order, is raised once every request has ended."""
+        win, bounds = self.second_window(), plan['bounds']
+        lane, threads, gap = AckLane(), [], []
+        finished, taken = True, 0
+        self.ack_lane = lane
+        try:
+            for message, row in plan['page']:
+                if not (row and row['event'] not in self.state['seen']):
+                    gap.append(message)
+                    continue
+                if remaining <= 0 or (allow is not None and not allow(taken)):
+                    finished = False
+                    break
+                k = lane.add()
+                if k >= 1:
+                    # The next request's bookkeeping begins once the post before it has begun (or that request ended): its bookkeeping overlaps that post,
+                    # and at most one request is ever taken in ahead of a post that has not begun, as in take_in_requests.
+                    lane.wait(lane.begun, lane.begun_at, k - 1)
+                    if any(item['event'] == row['event'] for item in self.state['pending']):
+                        lane.wait(lane.done, lane.done_at, k - 1)
+                if k >= 3:
+                    lane.wait(lane.done, lane.done_at, k - 3)
+                if lane.stop_at is not None:
+                    finished = False
+                    break
+                skipped, gap = gap, []
+                thread = threading.Thread(target=lane.run, args=(k, lambda skipped=skipped, message=message, row=row: self.lane_take_in(win, skipped, message, row),
+                                                                 monotonic()), name='fm-slack-ack-%d' % k, daemon=True)
+                thread.start()
+                threads.append(thread)
+                remaining -= 1
+                taken += 1
+            for thread in threads:
+                thread.join()
+            for moment in lane.done_at:
+                if moment is not None:
+                    clock_after(moment)
+        finally:
+            self.ack_lane = None
+        if lane.errors:
+            raise min(lane.errors, key=lambda pair: pair[0])[1]
+        if lane.stop_at is not None:
+            return remaining
+        moved = False
+        if finished:
+            for message in gap:
+                win['intake_cursor'] = message['ts']
+                moved = True
+        if finished and bounds:
+            if bounds[:-1]:
+                win['intake_bounds'] = bounds[:-1]
+            else:
+                win.pop('intake_bounds')
+            moved = True
+        if moved:
+            self.commit()
+        return remaining
+
+    def lane_take_in(self, win, skipped, message, row):
+        """One request of an AckLane, under its baton: the cursor passes the messages before it that are no request, then the request's own steps, as in
+        take_in_requests. Ends the lane when the request stays journaled undelivered."""
+        for earlier in skipped:
+            win['intake_cursor'] = earlier['ts']
+        self.settle_request(row)
+        win['intake_cursor'] = message['ts']
+        pending = self.stage(row)
+        self.publish(pending)
+        if any(held is pending for held in self.state['pending']) and not pending.get('posted'):
+            self.ack_lane.stop(self.ack_lane.index())
 
     def start_second(self):
         """The second person's starting point. Their window (their id, DM, starting point and page bounds) is kept in their own journal under 'second'. When the
@@ -3959,37 +4339,93 @@ class Watch:
         """Their pass's take-in, as the owner's take_in: the follow-ups in the threads of theirs the owner's check picked from the one read order (SC8 (6)), and
         their new requests (their one history read), share what the cap leaves them (share). Their one history read is made even when nothing of the cap is
         left: it takes nothing in then, and records whether more of theirs waits than this pass can take (backlog), which the next owner check reads at cap 1
-        (reserve_for_second). Their history read is made first, and their thread reads leave time for the acknowledgements of the requests of theirs the cap
-        lets them take in now (read_their_followups): their thread reads never take the time of the base's useful steps. Returns the first per-thread read
-        error, to be reported after their other work."""
+        (reserve_for_second). Main 3345 (a), 3350: after the DM proof of this run, their thread reads run on one reader lane (ThreadReader) while the history
+        read and the acknowledgements run on this one (take_in_requests_lane), each request's share decided before it from the reads ended before it; the
+        reads are applied here, in read order, once both lanes have ended. Returns the first per-thread read error, to be reported after their other work."""
         reads = self.second_reads
-        count = getattr(self, 'followup_reads', 0) or 0
-        if self.state.get('threads_first') and count > 0:
-            # The last pass's time left no thread read: their thread reads go first, and a history read that no longer fits waits for the next pass.
-            read, deferred = self.read_their_followups(count)
-            try:
-                plan = self.read_requests(max(remaining, 1), True)
-            except SecondBudgetSpent:
-                plan = None
-            ready = self.ready_requests(plan)
-        else:
+        reader = ThreadReader(self, getattr(self, 'followup_reads', 0) or 0)
+        reader.start()
+        plan, taken, failure = None, 0, None
+        try:
             plan = self.read_requests(max(remaining, 1), True)
             ready = self.ready_requests(plan)
-            read, deferred = self.read_their_followups(count, keep=min(ready, max(remaining, 0)))
+            if remaining > 0 and plan:
+                def allow(k):
+                    # The k-th request's share is decided from the follow-ups of the reads that ended SHARE_READ_LAG reads before it: the same answer in
+                    # every run whatever the timing, and the post lane never waits on the read the reader lane is making now.
+                    before = max(0, k - SHARE_READ_LAG)
+                    reader.wait_for(before)
+                    return k < self.share(remaining, self.ready_followups(reader.read_before(before)), ready)[1]
+                taken = remaining - self.take_in_requests(plan, remaining, second=True, allow=allow)
+        except BaseException as error:                              # raised once their reads are applied (below): nothing read is lost
+            failure = error
+        reader.finish(self.budget_deadline)
+        read, deferred = self.apply_their_reads(reader)
+        if failure is not None:
+            raise failure
         waiting = self.ready_followups(read)
+        ready = self.ready_requests(plan)
         if self.second_reads > reads:
-            self.state['backlog'] = plan is None or ready + waiting > max(remaining, 0)
+            self.state['backlog'] = plan is None or taken + ready + waiting > max(remaining, 0)
             if remaining <= 0 and self.state['backlog']:
                 self.state['turn'] = 'second'               # the owner's work had this sweep's slot: the next contested one is theirs
             self.commit()
         if remaining <= 0:
             return deferred
-        followups, requests = self.share(remaining, waiting, self.ready_requests(plan))
-        self.take_followups(read, followups)
-        if plan:
-            # As the owner's: the page's other messages move the cursor even when no request of it is taken in now.
-            self.take_in_requests(plan, requests, second=True)
+        self.apply_their_followups(read, max(0, remaining - taken))
         return deferred
+
+    def apply_their_followups(self, read, limit):
+        """Take in the follow-ups their reader lane read (take_followups), once both lanes of their pass have ended (Main 3345 (a)). Their wake lines make no
+        Slack call, so their delivery is held to the end of their run, SECOND_BUDGET + CUTOFF_JOIN from the start of the pass (as their final print is),
+        and one binding hold covers them all: delivering nests, so each wake line uses the fresh check made when the hold began, with the binding fence held
+        until the last of them (no unbind can come in between). Unbound, every follow-up stays journaled for a later run, as before."""
+        outer = getattr(self, 'apply_deadline', None)
+        if self.budget_deadline is not None:
+            self.apply_deadline = self.budget_deadline + CUTOFF_JOIN - CHILD_END
+        try:
+            if limit and any(messages for _, messages in read):
+                with self.delivering():
+                    self.take_followups(read, limit)
+            else:
+                self.take_followups(read, limit)
+        finally:
+            self.apply_deadline = outer
+
+    def apply_their_reads(self, reader):
+        """The reader lane's reads, applied in read order as read_their_followups applies its own: ([(thread, its new messages), ...], the first per-thread read
+        error). The threads read go to the back of their order, the others keep theirs; a pass that read no thread for lack of time marks their threads
+        first for the next pass, and one that read a thread clears the mark. An error that is not a per-thread one is raised, as there."""
+        read, deferred, done, starved, fatal = [], None, [], False, None
+        for thread, outcome, value in reader.taken():
+            if outcome == 'ok':
+                read.append((thread, value))
+                done.append(thread)
+            elif outcome == 'error':
+                deferred = deferred or value
+                done.append(thread)
+            elif outcome == 'stopped':
+                starved = not done
+                break
+            else:
+                fatal = value
+                break
+        if reader.picked and not done and fatal is None:
+            starved = True
+        if starved != bool(self.state.get('threads_first')) and (starved or done):
+            if starved:
+                self.state['threads_first'] = True
+            else:
+                self.state.pop('threads_first', None)
+            self.commit()
+        if reader.picked and len(done) < len(reader.threads):
+            entries = self.state.setdefault('followups', {})
+            for turn, thread in enumerate([t for t in reader.order if t not in done] + done, start=1):
+                entries.setdefault(thread, {'cursor': thread})['turn'] = turn
+            self.commit()
+        if fatal is not None:
+            raise fatal
+        return read, deferred
 
     def resolve_hold(self):
         """A held window (an arm that read no Slack clock at all) is resolved by the first run whose replies carry it: that run's first Date D' is after the arm
@@ -5112,6 +5548,10 @@ def check(watch, action):
         watch.poll('second' if action == 'check-second' else 'owner')
         if not watch.ran_unbound:
             watch.clear_failure()
+    except SecondBudgetSpent:
+        # Their run reached its deadline outside their pass (the poll's own binding check, Main 3345 (2)): nothing was posted or taken in by it, and a later
+        # sweep goes on, as when their check cannot take the journal lock in time.
+        pass
     except SlackError as error:
         watch.report_failure(error)
         if str(error) == 'dm_user_changed':

@@ -3810,6 +3810,40 @@ prelude_step_commit() {
   PRELUDE_STEP=$PRELUDE_NEXT_STEP
 }
 
+# The sweep a released wake left unfinished (Main 3345 (1)): its token and the check it resumes at, kept until that sweep completes. It is used only
+# within one check interval: an older record starts a new sweep instead, so a long watcher outage never resumes a stale sweep.
+SWEEP_RESUME_FILE="$STATE/.check-sweep-resume"
+sweep_resume_save() {  # <check path>
+  printf '%s\n%s\n' "$FM_CHECK_SWEEP" "$1" > "$SWEEP_RESUME_FILE.tmp.$$" \
+    && mv -f "$SWEEP_RESUME_FILE.tmp.$$" "$SWEEP_RESUME_FILE" || { rm -f -- "$SWEEP_RESUME_FILE.tmp.$$"; return 1; }
+}
+sweep_resume_load() {
+  local token='' check=''
+  SWEEP_RESUME_TOKEN='' SWEEP_RESUME_CHECK=''
+  [ -f "$SWEEP_RESUME_FILE" ] && [ ! -L "$SWEEP_RESUME_FILE" ] || return 1
+  if [ "$(age_of "$SWEEP_RESUME_FILE")" -ge "$CHECK_INTERVAL" ]; then
+    rm -f -- "$SWEEP_RESUME_FILE"
+    return 1
+  fi
+  { IFS= read -r token && IFS= read -r check; } < "$SWEEP_RESUME_FILE" || { rm -f -- "$SWEEP_RESUME_FILE"; return 1; }
+  case "$token" in ''|*[!A-Za-z0-9.]*) rm -f -- "$SWEEP_RESUME_FILE"; return 1 ;; esac
+  case "$check" in "$STATE"/*.check.sh) ;; *) rm -f -- "$SWEEP_RESUME_FILE"; return 1 ;; esac
+  SWEEP_RESUME_TOKEN=$token SWEEP_RESUME_CHECK=$check
+}
+# What a sweep reports once its checks have run, or when it releases a wake early: the rejected unauthenticated checks it met, then contribution output.
+sweep_release_pending() {
+  local reason
+  if [ -n "$rejected_checks" ]; then
+    reason="check: rejected unauthenticated state checks:$rejected_checks"
+    fm_wake_append check unauthenticated-state-checks "$reason" || exit 1
+    [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+    rejected_checks=
+  fi
+  if [ -n "$contribution_check_output" ]; then
+    [ -n "$check_wake_reason" ] || check_wake_reason=$contribution_check_output
+  fi
+}
+
 signal_phase_flush() {
   SIGNAL_PHASE_DELIVERY_ONLY=1
   signal_phase
@@ -3994,7 +4028,14 @@ prelude_phase() {
     contribution_check_output=
     # One token for this sweep, the same for every check in it and new for the next sweep: a check that leaves work to a later check of the same sweep
     # (the Slack plane's owner check to the second person's) binds it to this token, so work left by an earlier, interrupted sweep is never taken for this one.
-    FM_CHECK_SWEEP="${WATCHER_PID:-$$}.$(date +%s).$RANDOM"
+    # A sweep that released a queued wake before the second person's check (below) is resumed here, at that check, with its own token.
+    resume_from=
+    if sweep_resume_load; then
+      FM_CHECK_SWEEP=$SWEEP_RESUME_TOKEN
+      resume_from=$SWEEP_RESUME_CHECK
+    else
+      FM_CHECK_SWEEP="${WATCHER_PID:-$$}.$(date +%s).$RANDOM"
+    fi
     export FM_CHECK_SWEEP
     for stopped in "$STATE"/*.check-stopped; do
       [ -e "$stopped" ] || continue
@@ -4003,6 +4044,18 @@ prelude_phase() {
     for c in "$STATE"/*.check.sh; do
       signal_phase_flush
       [ -e "$c" ] || continue
+      if [ -n "$resume_from" ]; then
+        # A resumed sweep: every check before the one it stopped at already ran, with this token, and its output is queued.
+        if [[ "$c" < "$resume_from" ]]; then continue; fi
+        resume_from=
+      elif [ "$(basename "$c")" = slacksecond.check.sh ] && [ -n "$check_wake_reason" ]; then
+        # Main 3345 (1): the second person's Slack check never holds a wake an earlier check of this sweep queued (the owner's Slack wake above all):
+        # that wake is released now, and the next watcher run resumes this sweep here, with this sweep's token, so their check still takes the owner
+        # check's hand-over of the same sweep and no earlier check runs twice. The sweep is not complete, so .last-check is not touched.
+        sweep_resume_save "$c" || exit 1
+        sweep_release_pending
+        wake "$check_wake_reason"
+      fi
       watcher_beat
       is_pr_poll=0
       check_events=0
@@ -4125,16 +4178,10 @@ EOF
       fi
       pr_poll_control_release || exit 1
     done
-    if [ -n "$rejected_checks" ]; then
-      reason="check: rejected unauthenticated state checks:$rejected_checks"
-      fm_wake_append check unauthenticated-state-checks "$reason" || exit 1
-      [ -n "$check_wake_reason" ] || check_wake_reason=$reason
-    fi
+    sweep_release_pending
     signal_phase_flush
+    rm -f -- "$SWEEP_RESUME_FILE"
     touch "$STATE/.last-check"
-    if [ -n "$contribution_check_output" ]; then
-      [ -n "$check_wake_reason" ] || check_wake_reason=$contribution_check_output
-    fi
   fi
   prelude_step_commit || exit 1
   PRELUDE_NEXT_STEP=
