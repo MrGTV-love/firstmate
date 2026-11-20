@@ -130,10 +130,11 @@ watch_bg() {  # <state> <fakebin> <out> [extra env assignments...]
     env "$@" "$WATCH" > "$out" 2>/dev/null &
 }
 
-# The wait ends the moment the watcher exits; the limit is only the hang guard that fails a watcher that
-# never exits. 120 ticks (12 s) was shorter than a watcher's real latency on a loaded host: at load ~80 the
-# draft-risk watcher exited after 104-114 ticks, and past 120 the case failed with "never escalated" although
-# the watcher was about to exit (the same failure on the untouched base). 600 ticks (60 s) clears that.
+# The wait ends the moment the watcher exits; the limit is only the hang guard that fails a watcher that never exits.
+# 120 ticks (12 s) sits inside the latency measured for this case: at load about 80 two passing runs took 104 and 114
+# ticks, so a busier host can pass it. The four recorded failures at the 12 s limit did not record the watcher's later
+# state, so their cause is an inference, not proof; a lab copy with a slowed fake tmux reproduces the same failure message
+# at the 12 s limit and passes, with every escalation assertion, at 60 s (E/suites/draft-risk-witness.log).
 wait_watcher_gone() {  # <pid> [limit-ticks]
   local pid=$1 limit=${2:-600} i=0
   while [ "$i" -lt "$limit" ]; do
