@@ -2110,7 +2110,7 @@
       "invariant": "Fresh task publication never races a task-set mutation; presentation changes respect the presentation-lock owner.",
       "layer": "runtime-block",
       "source": "the home task-set lock holder role and the named Herdr presentation/recovery lock; existing decision points: site:bin/fm-spawn.sh:ee41751d06",
-      "trigger": "publishing a fresh task record into a home whose state directory a forced teardown removed or replaced while the spawn was in its treehouse get (the state-directory identity taken at admission no longer matches at publication), or publishing into a home whose task set another spawn, a forced teardown or other op holds, or changing a Herdr presentation while another operation owns its presentation lock (the presentation-lock warning that skips abort cleanup is also a mapped site)",
+      "trigger": "publishing a fresh task record into a home whose state directory a forced teardown removed or replaced while the spawn was in its treehouse get (the state-directory identity taken at admission no longer matches at publication), a fresh spawn whose state directory cannot be identified at admission, or any spawn or relaunch whose state directory is gone before launch preparation, or publishing into a home whose task set another spawn, a forced teardown or other op holds, or changing a Herdr presentation while another operation owns its presentation lock (the presentation-lock warning that skips abort cleanup is also a mapped site)",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
@@ -2146,6 +2146,20 @@
         {
           "file": "bin/fm-spawn.sh",
           "match": "echo \"error: assigned copy $WT and endpoint $T retained; task record publication refused\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused: state directory $STATE could not be identified\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2",
+          "within": "if ! fm_backlog_directory_present \"$STATE\" \"state directory\"; then"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2",
+          "within": "spawn_state_unchanged || {"
         },
         {
           "file": "bin/fm-spawn.sh",

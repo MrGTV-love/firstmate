@@ -6578,6 +6578,9 @@ spawn_slot_refused() {
   # A refusal does nothing (Main 1886 CUT): the copy stays exactly where the refusal found it, on whatever branch or
   # commit that is, and the refusal record names it. No checkout, no switch of HEAD, no deletion, no undo.
   if [ "$RELAUNCH" -eq 0 ]; then
+    # Probe the path first: a vanished state directory must reach the explicit
+    # publication refusal below instead of ending the shell here under set -e.
+    if : >"$recovery"; then
     {
       echo "window=$window"
       echo "endpoint_task_id=$ID"
@@ -6623,6 +6626,7 @@ spawn_slot_refused() {
       :
     } >"$recovery"
     update_recovery=1
+    fi
   else
     # Relaunch already holds the metadata lock. Preparation may first finish
     # on a refused recovery attempt; save that identity once, preserving the
@@ -6656,14 +6660,14 @@ spawn_slot_refused() {
     fi
   fi
   printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy $WT and endpoint $T retained; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status" 2>/dev/null || true
-  if [ "$update_recovery" = 1 ]; then
-    if [ "$RELAUNCH" -eq 0 ]; then
-      if ! spawn_take_task_set_custody wait || ! spawn_state_unchanged; then
-        rm -f -- "$recovery"
-        echo "error: assigned copy $WT and endpoint $T retained; task record publication refused" >&2
-        exit 1
-      fi
+  if [ "$RELAUNCH" -eq 0 ]; then
+    if [ "$update_recovery" != 1 ] || ! spawn_take_task_set_custody wait || ! spawn_state_unchanged; then
+      rm -f -- "$recovery"
+      echo "error: assigned copy $WT and endpoint $T retained; task record publication refused" >&2
+      exit 1
     fi
+  fi
+  if [ "$update_recovery" = 1 ]; then
     fm_backlog_atomic_transition publish "$recovery" "$STATE/$ID.meta" "task record" "$STATE" || {
       echo "error: could not record retained copy $WT: $FM_BACKLOG_TRANSITION_ERROR" >&2
       rm -f -- "$recovery"
@@ -7014,10 +7018,10 @@ mkdir -p "$TASK_TMP/gotmp"
 # state/<id>.turn-ended when the agent finishes a turn. Worktree-resident hooks
 # and token pointers stay out of git's view so they never block teardown's dirty
 # check or leak into a commit.
-fm_backlog_directory_present "$STATE" "state directory" || {
+if ! fm_backlog_directory_present "$STATE" "state directory"; then
   echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
-}
+fi
 STATE_REAL=$(cd "$STATE" && pwd -P)
 TURNEND="$STATE_REAL/$ID.turn-ended"
 exclude_path() {
