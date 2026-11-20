@@ -4,6 +4,48 @@
 # Refuses when bin/fm-dod-lib.sh will not accept the named head as reachable
 # outside the worker's disposable copy; in no-mistakes mode a forge-reported
 # head is that named head and is already stored on the forge.
+# Harm model of the named-head gate: it protects against registering a PR whose
+# head exists only in the worker's disposable copy, which a later teardown would
+# then discard.
+# (a) Exact equality of the forge's head and this copy's HEAD never stands in for
+#     the gate (Main 1688 Q1): a head held only in the copy refuses even when the
+#     forge reports exactly that head, and passes once a remote ref, such as the
+#     default branch after a true merge, holds it.
+# (b) A done note whose first word is the PR URL names that PR to
+#     bin/fm-dod-lib.sh fm_dod_accept_ship_done exactly as `PR <url>` does. With
+#     the copy missing it is accepted only when fm_dod_pr_merged_on_forge proves
+#     the PR merged (the merge poll's notified marker for that PR); otherwise it
+#     still refuses with the worktree missing.
+# (c) bin/fm-pr-ready-reconcile.sh calls this registrar again for a record that
+#     already has pr= but no runnable merge poll and no sign that the poll ended.
+#     The call takes every gate here exactly as a first registration does, so it
+#     accepts nothing new; once the poll is published, retired or marked merged
+#     the record is not called again, so nothing registers twice. That call sets
+#     FM_PR_CHECK_EXPECT_PR to the pr= it read; when the record names another PR
+#     by the time this registrar holds the metadata lock to commit, it changes
+#     nothing and exits 3, so a stale re-arm never replaces a newer registration;
+#     it checks again under the poll publication lock before it publishes.
+#     From writing pr= until its poll is published a registration holds the
+#     metadata lock or the poll publication lock, and the pass tries both before
+#     it re-arms, so a registration in progress is never re-armed.
+# (d) bin/fm-teardown.sh's lookup for a detached copy (the record's branch=, else
+#     fm/<id>) only identifies the work; the existing landed proofs decide
+#     (bin/fm-task-copy-lib.sh fm_task_copy_landed and
+#     fm_task_copy_pipeline_input): the copy's content is in the default
+#     branch, or its HEAD is an ancestor of the merged PR head and the forge's
+#     merge commit for that PR is in the default branch's history, or its HEAD
+#     is the recorded input of the no-mistakes run that pushed the merged head
+#     (Main 1907). A found PR alone never lands a copy.
+# (e) Another check in state/<id>.check.sh is never replaced or removed: a
+#     check counts as the merge poll only by its bytes (the template, the
+#     template hash this task's registration or retirement recorded, or the
+#     template's generator mark on its first two lines, as in a poll of an
+#     earlier template version), never by a receipt alone. This registrar
+#     refuses before pr= is written; the publisher (bin/fm-pr-lib.sh
+#     fm_pr_poll_check_place) moves an earlier check aside, proves it, and links
+#     the new one into the free name, so a check written meanwhile is kept; a
+#     rollback removes the name only while it holds the bytes this publication
+#     wrote and leaves anything else in place (Main 1820 F5, Main 1871 P-E).
 # A merge call (FM_PR_CHECK_MERGE=1) on a GitHub task that owns several pull
 # requests (bin/fm-dod-lib.sh fm_dod_task_owns_several_prs) is judged on the
 # forge's head for the PR it names instead, because the worker copy's HEAD
@@ -200,6 +242,9 @@ case "$PROVIDER:$MODE" in
   *:no-mistakes|*:) DONE_LINE="done: PR $URL checks green" ;;
   *) DONE_LINE="done: PR $URL" ;;
 esac
+# Exact forge/copy HEAD equality never stands in for the named-head gate (Main
+# 1688 Q1): the gate's reachability proof decides, and a head the default branch
+# already holds passes it through that branch's ref.
 if { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; }; then
   # A merge call on a task that owns several PRs names one PR, and the forge
   # holds that PR's head: the worker copy's HEAD may rest on another PR, on a
@@ -239,6 +284,25 @@ if [ "$CURRENT_WT" != "$WT" ] || [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
   echo "error: task worktree or branch changed while preparing PR registration; refusing" >&2
   exit 1
 fi
+# FM_PR_CHECK_EXPECT_PR names the pr= the caller read without the lock: a recorded
+# PR for a re-arm, or "none" for a first registration. When the record names
+# another PR by now, this registration is stale and changes nothing.
+if [ -n "${FM_PR_CHECK_EXPECT_PR:-}" ]; then
+  CURRENT_PR=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
+  EXPECTED_PR=$FM_PR_CHECK_EXPECT_PR
+  [ "$EXPECTED_PR" != none ] || EXPECTED_PR=
+  if [ "$CURRENT_PR" != "$EXPECTED_PR" ] && [ "$CURRENT_PR" != "$URL" ]; then
+    echo "pr-check: $ID now records ${CURRENT_PR:-no PR}, not ${EXPECTED_PR:-no PR}; this registration is stale and changes nothing" >&2
+    exit 3
+  fi
+fi
+# Another check in state/<id>.check.sh (a registered custom check, or anything that
+# is not the merge poll template) is never replaced: refuse before pr= is written,
+# so a refusal leaves the record as it was (Main 1686 F3).
+if ! fm_pr_poll_check_dest_replaceable "$STATE" "$ID" "$SCRIPT_DIR/fm-pr-poll.sh"; then
+  echo "error: state/$ID.check.sh is another check (a registered custom check, or not the merge poll template); the merge poll for $URL is not armed over it and nothing is recorded" >&2
+  exit 1
+fi
 META_DEVICE=$(fm_pr_file_device "$META") || exit 1
 STATE_DEVICE=$(fm_pr_file_device "$STATE") || exit 1
 [ "$META_DEVICE" = "$STATE_DEVICE" ] || { echo "error: task metadata is unavailable" >&2; exit 1; }
@@ -265,19 +329,39 @@ fm_pr_metadata_identity_parse "$META" || exit 1
 [ "$FM_PR_META_PROVIDER" = "$PROVIDER" ] && [ "$FM_PR_META_URL" = "$URL" ] \
   && [ "$FM_PR_META_HOST" = "$HOST" ] && [ "$FM_PR_META_PATH" = "$PROJECT_PATH" ] \
   && [ "$FM_PR_META_NUMBER" = "$NUMBER" ] || exit 1
-fm_lock_release "$META_LOCK"
-META_LOCK_HELD=0
-
+# Take the poll publication lock before the metadata lock is released, so from the
+# moment pr= is written until the poll is published this registrar holds one of the
+# two: bin/fm-pr-ready-reconcile.sh tries both, in this order, before it judges a
+# poll lost, and would otherwise re-arm a live first registration. pr= is written
+# before the publication wait, so a registration blocked behind another publisher
+# is already recorded. Nothing takes these two locks in the other order.
 PR_POLL_PUBLISH_LOCK="$STATE/.pr-poll-publish-$ID.lock"
 fm_lock_acquire_wait "$PR_POLL_PUBLISH_LOCK"
 PR_POLL_PUBLISH_LOCK_HELD=1
+fm_lock_release "$META_LOCK"
+META_LOCK_HELD=0
+# A re-arm checks again under the publication lock: another registration may have
+# recorded a newer PR after this one committed, and its poll must not be replaced.
+if [ -n "${FM_PR_CHECK_EXPECT_PR:-}" ]; then
+  CURRENT_PR=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
+  if [ "$CURRENT_PR" != "$URL" ]; then
+    fm_lock_release "$PR_POLL_PUBLISH_LOCK" || exit 1
+    PR_POLL_PUBLISH_LOCK_HELD=0
+    echo "pr-check: $ID now records ${CURRENT_PR:-no PR}, not $URL; this re-arm is stale and publishes nothing" >&2
+    exit 3
+  fi
+fi
 if fm_pr_poll_publish_prepared; then
   fm_lock_release "$PR_POLL_PUBLISH_LOCK" || exit 1
   PR_POLL_PUBLISH_LOCK_HELD=0
 else
   fm_lock_release "$PR_POLL_PUBLISH_LOCK" || exit 1
   PR_POLL_PUBLISH_LOCK_HELD=0
-  echo "error: could not publish PR poll" >&2
+  if [ "$FM_PR_POLL_CHECK_CONFLICT" = 1 ]; then
+    echo "error: state/$ID.check.sh is another check (a registered custom check, or not the merge poll template); the merge poll for $URL was not published over it" >&2
+  else
+    echo "error: could not publish PR poll" >&2
+  fi
   exit 1
 fi
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.

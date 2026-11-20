@@ -584,13 +584,14 @@ test_squash_merged_branch_deleted_allows() {
   local case_dir rc pr_head
   case_dir=$(make_case squash-merged)
   write_meta "$case_dir" no-mistakes ship
-  # Real branch content that is NOT pushed and NOT on origin/main: a squash merge
-  # rewrote it into a different commit on main and auto-deleted the head branch, so
-  # HEAD is unreachable from every remote-tracking branch. The matching merged PR is
-  # the only signal that the work landed.
+  # Real branch content that is NOT pushed: a squash merge rewrote it into a
+  # different commit on origin/main and auto-deleted the head branch, so HEAD is
+  # unreachable from every remote-tracking branch. The merged PR names the copy's
+  # HEAD, and origin's default branch holds its content through the squash commit.
   wt_commit_file "$case_dir" feature.txt hello "add feature"
   append_pr_meta_for_current_head "$case_dir"
   pr_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  land_on_origin_main "$case_dir" feature.txt hello
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
   rc=0
@@ -599,6 +600,549 @@ test_squash_merged_branch_deleted_allows() {
   expect_code 0 "$rc" "squash-merged: teardown should succeed when the PR is merged"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-merged: teardown printed a REFUSED line"
   pass "squash-merged + deleted-branch worktree (PR merged) is torn down (the fix)"
+}
+
+# A detached copy has no branch name in HEAD, so the merged PR is looked up
+# through the record's own branch (branch=, else fm/<id>). The same landing proof
+# decides landed: a copy holding a commit the default branch lacks is refused.
+add_gh_axi_pr_for_branch() {  # <case_dir> <branch>: PR 7 is merged only for that exact head branch
+  local case_dir=$1 branch=$2
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$case_dir/gh-axi.calls"
+case "\${1:-} \${2:-}" in
+  "pr list")
+    case " \$* " in
+      *" --head $branch "*) printf '%s\\n' "count: 1" "pull_requests[1]{number,state}:" "  7,merged" ;;
+      *) printf '%s\\n' "count: 0" "pull_requests: []" ;;
+    esac
+    exit 0 ;;
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/gh-axi"
+}
+
+# record_copy_returns <case_dir>: the fake treehouse records each call, so a test can
+# see that teardown handed the copy back (the fake never deletes the folder).
+record_copy_returns() {
+  cat > "$1/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$1/treehouse.calls"
+# A return of this case's own copy really removes it, so a test sees it go.
+if [ "\${1:-}" = return ] && [ "\${!#}" = "$1/wt" ]; then
+  rm -rf -- "$1/wt"
+fi
+exit 0
+SH
+  chmod +x "$1/fakebin/treehouse"
+}
+
+# assert_copy_returned <case_dir> <message>: teardown returned the task copy.
+# assert_copy_returned <case_dir> <message> <completion PR URL | none>: teardown
+# returned the copy, the copy is gone, and the closed backlog item names exactly
+# that completion PR, or none (Main 1871).
+assert_copy_returned() {
+  grep -E '^return( |$)' "$1/treehouse.calls" 2>/dev/null | grep -qF "$1/wt" || fail "$2: $(cat "$1/treehouse.calls" 2>/dev/null)"
+  [ ! -e "$1/wt" ] || fail "$2: the copy is still on disk after its return"
+  if [ "$3" = none ]; then
+    ! grep -q 'https://github.com/[^ ]*/pull/' "$1/data/backlog.md" || fail "$2: a completion PR was named: $(grep -o 'https://github.com/[^ ]*/pull/[0-9]*' "$1/data/backlog.md")"
+  else
+    grep -qF "$3" "$1/data/backlog.md" || fail "$2: the completion PR $3 was not named: $(grep -o 'https://github.com/[^ ]*/pull/[0-9]*' "$1/data/backlog.md")"
+  fi
+}
+
+detached_copy_case() {  # <name> <recorded-branch|-> <extra-commit yes|no> <pr-head own|base>
+  local name=$1 branch=$2 extra=$3 prhead=$4 case_dir pr_head lookup=fm/task-x1
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" direct-PR ship
+  [ "$branch" = - ] || { printf 'branch=%s\n' "$branch" >> "$case_dir/state/task-x1.meta"; lookup=$branch; }
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  pr_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  if [ "$prhead" = own ]; then
+    # The forge merged the PR whose head is the copy's commit into origin's default branch.
+    merge_head_into_origin_main "$case_dir" "$pr_head"
+  else
+    pr_head=$(git -C "$case_dir/project" rev-parse main)
+  fi
+  if [ "$extra" = yes ]; then
+    wt_commit_file "$case_dir" extra.txt different "add extra work the PR never carried"
+  fi
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  add_gh_axi_pr_for_branch "$case_dir" "$lookup"
+  git -C "$case_dir/wt" checkout -q --detach
+  git -C "$case_dir/project" branch -q -D fm/task-x1
+  record_copy_returns "$case_dir"
+  printf '%s\n' "$case_dir"
+}
+
+test_detached_copy_is_judged_through_the_record_branch() {
+  local variant case_dir rc recorded
+  for variant in default-branch recorded-branch; do
+    recorded=-
+    [ "$variant" = default-branch ] || recorded=fm/recorded-x
+    case_dir=$(detached_copy_case "detached-landed-$variant" "$recorded" no own)
+    [ "$(git -C "$case_dir/wt" rev-parse --abbrev-ref HEAD)" = HEAD ] || fail "$variant: the copy is not detached"
+    ! grep -q '^pr=' "$case_dir/state/task-x1.meta" || fail "$variant: the fixture recorded a pr="
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$variant: a detached copy whose merged PR holds its work was refused: $(cat "$case_dir/stderr")"
+    ! grep -q REFUSED "$case_dir/stderr" || fail "$variant: teardown printed a REFUSED line"
+    assert_absent "$case_dir/state/task-x1.meta" "$variant: the record stayed open"
+    assert_copy_returned "$case_dir" "$variant: the copy stayed" https://github.com/example/repo/pull/7
+    grep -q -- "--head ${recorded/#-/fm/task-x1}" "$case_dir/gh-axi.calls" \
+      || fail "$variant: the PR was not looked up by the record's branch: $(cat "$case_dir/gh-axi.calls")"
+  done
+  pass "a detached copy with no pr= is judged landed through the record's branch (branch= or fm/<id>) and torn down"
+}
+
+test_detached_copy_unlanded_work_is_still_refused() {
+  local variant case_dir rc
+  for variant in extra-commit pr-lacks-the-work; do
+    case "$variant" in
+      extra-commit) case_dir=$(detached_copy_case "detached-$variant" - yes own) ;;
+      pr-lacks-the-work) case_dir=$(detached_copy_case "detached-$variant" fm/recorded-x no base) ;;
+    esac
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$variant: a detached copy the merged PR does not carry was torn down"
+    assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "$variant: the refusal does not say not landed"
+    assert_present "$case_dir/state/task-x1.meta" "$variant: the record was closed over unlanded work"
+    [ -d "$case_dir/wt" ] || fail "$variant: the copy was removed"
+    git -C "$case_dir/wt" log -1 --format=%s | grep -q . || fail "$variant: the copy lost its commits"
+  done
+  assert_grep 'add extra work the PR never carried' "$TMP_ROOT/detached-extra-commit/stderr" \
+    "the refusal does not name the commit the merged PR does not contain"
+  pass "a detached copy holding a commit the merged PR lacks, or whose record branch matches a PR that lacks its work, is still refused and kept"
+}
+
+# The merge-notified marker is removed only after the task record, so an unsafe
+# marker (a directory here) must stop teardown before anything is retired: the
+# record stays, with the copy, and the refusal names the unsafe artifact. A valid
+# marker is removed with the rest and the teardown completes.
+test_unsafe_merge_notified_marker_keeps_the_record() {
+  local case_dir rc
+  case_dir=$(detached_copy_case marker-unsafe - no own)
+  mkdir "$case_dir/state/task-x1.pr-poll-merge-notified"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "unsafe marker: teardown succeeded over an unremovable merge-notified marker"
+  assert_present "$case_dir/state/task-x1.meta" "unsafe marker: the record was removed before the marker failed (stderr: $(tail -2 "$case_dir/stderr" | tr '\n' ' '))"
+  assert_grep 'unsafe task PR-check artifact' "$case_dir/stderr" "unsafe marker: the refusal does not name the unsafe artifact"
+  [ -d "$case_dir/wt" ] || fail "unsafe marker: the copy was removed"
+  case_dir=$(detached_copy_case marker-valid - no own)
+  printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
+  chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "valid marker: teardown refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "valid marker: the record stayed open"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified" "valid marker: the marker outlived its record"
+  pass "an unsafe merge-notified marker stops teardown before the record is removed; a valid one goes with the record"
+}
+
+# A regular marker can still resist removal. Whatever cannot remove it must stop
+# teardown while the record is still there, so a later teardown retries; that
+# retry then removes the record and the marker together.
+test_unremovable_merge_notified_marker_leaves_a_retry() {
+  local case_dir rc
+  case_dir=$(detached_copy_case marker-unremovable - no own)
+  # A merge-notified marker exists only for a record whose pr= poll reported the
+  # merge, so the record names that PR; the retry, whose copy the first run
+  # returned, proves the landing through it.
+  append_pr_meta_url "$case_dir"
+  printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
+  chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
+  for tool in rm mv; do
+    cat > "$case_dir/fakebin/$tool" <<SH
+#!/usr/bin/env bash
+case " \$* " in *pr-poll-merge-notified*) echo "$tool: cannot remove the marker (test)" >&2; exit 1 ;; esac
+exec /bin/$tool "\$@"
+SH
+    chmod +x "$case_dir/fakebin/$tool"
+  done
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "unremovable marker: teardown reported success with the marker still in place"
+  assert_present "$case_dir/state/task-x1.meta" "unremovable marker: the record was removed, so no teardown can retry (stderr: $(tail -2 "$case_dir/stderr" | tr '\n' ' '))"
+  rm -f "$case_dir/fakebin/rm" "$case_dir/fakebin/mv"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "unremovable marker: the retry did not complete: $(tail -3 "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "unremovable marker: the retry left the record"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified" "unremovable marker: the retry left the marker"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified.retiring" "unremovable marker: the retry left the set-aside marker"
+  pass "a merge-notified marker that cannot be removed stops teardown before the record goes, and the retry removes both"
+}
+
+# Main 1686 F4: the marker is moved aside and only its removal fails. Teardown must
+# stop with the record still there, so the leftover set-aside marker is retried from
+# that record; the retry removes the record and the set-aside marker.
+test_marker_unlink_failure_after_the_rename_leaves_a_retry() {
+  local case_dir rc
+  case_dir=$(detached_copy_case marker-unlink-fails - no own)
+  # As above, the marker's record names the PR its poll reported merged.
+  append_pr_meta_url "$case_dir"
+  printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
+  chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
+  cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+case " \$* " in *pr-poll-merge-notified.retiring*) echo "rm: cannot remove the set-aside marker (test)" >&2; exit 1 ;; esac
+exec /bin/rm "\$@"
+SH
+  chmod +x "$case_dir/fakebin/rm"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "unlink-only failure: teardown reported success with the set-aside marker still in place"
+  assert_present "$case_dir/state/task-x1.pr-poll-merge-notified.retiring" "unlink-only failure: the rename did not happen, so this case did not test the unlink"
+  assert_present "$case_dir/state/task-x1.meta" "unlink-only failure: the record was removed before the set-aside marker, so no teardown can retry (stderr: $(tail -2 "$case_dir/stderr" | tr '\n' ' '))"
+  rm -f "$case_dir/fakebin/rm"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "unlink-only failure: the retry did not complete: $(tail -3 "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "unlink-only failure: the retry left the record"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified.retiring" "unlink-only failure: the retry left the set-aside marker"
+  pass "a set-aside marker whose removal fails after the rename keeps the record for a retry, and the retry removes both"
+}
+
+# Main 1871 F8: the marker is read and validated before anything is removed. An
+# empty or malformed marker, under either name, stops teardown with the record and
+# the marker as they were; a valid one goes with the record (the unlink-only case
+# above is the control).
+test_empty_or_malformed_marker_refuses_before_anything_is_removed() {
+  local case_dir rc shape name marker bytes
+  for name in pr-poll-merge-notified pr-poll-merge-notified.retiring; do
+    for shape in empty malformed; do
+      case_dir=$(detached_copy_case "marker-$shape-${name##*.}" - no own)
+      marker="$case_dir/state/task-x1.$name"
+      case "$shape" in
+        empty) : > "$marker" ;;
+        malformed) printf 'fm-pr-poll-merge-notified-v1\ngithub\n' > "$marker" ;;
+      esac
+      chmod 600 "$marker"
+      bytes=$(shasum -a 256 < "$marker")
+      rc=0
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      [ "$rc" -ne 0 ] || fail "$shape $name: teardown succeeded over an unusable marker"
+      assert_present "$case_dir/state/task-x1.meta" "$shape $name: the record was touched"
+      [ "$(shasum -a 256 < "$marker" 2>/dev/null)" = "$bytes" ] || fail "$shape $name: the marker was moved or changed"
+      assert_grep 'empty or malformed' "$case_dir/stderr" "$shape $name: the refusal does not name the marker"
+    done
+  done
+  pass "an empty or malformed merge-notified marker, under either name, stops teardown before anything is removed"
+}
+
+# Main 1820 F8, Main 1827 Q2 (B): the marker is retired first, then the record. When
+# removing the record fails, the marker is written back, so the record never stays
+# without it; a retry then removes both. When even that write fails, teardown
+# refuses naming both paths. The unlink-only witness above keeps its own case.
+test_record_removal_failure_restores_the_marker() {
+  local case_dir rc marker bytes variant
+  for variant in restored unrestorable; do
+    case_dir=$(detached_copy_case "record-removal-fails-$variant" - no own)
+    # The marker's record names the PR its poll reported merged.
+    append_pr_meta_url "$case_dir"
+    marker="$case_dir/state/task-x1.pr-poll-merge-notified"
+    printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$marker"
+    chmod 600 "$marker"
+    bytes=$(shasum -a 256 < "$marker")
+    cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" $case_dir/state/task-x1.meta "*) echo "rm: cannot remove the task record (test)" >&2; exit 1 ;; esac
+exec /bin/rm "\$@"
+SH
+    if [ "$variant" = unrestorable ]; then
+      cat > "$case_dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+case "\${!#}" in "$marker") case "\$*" in *merge-notified-restore*) echo "mv: cannot restore the marker (test)" >&2; exit 1 ;; esac ;; esac
+exec /bin/mv "\$@"
+SH
+      chmod +x "$case_dir/fakebin/mv"
+    fi
+    chmod +x "$case_dir/fakebin/rm"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$variant: teardown reported success with the task record still in place"
+    assert_present "$case_dir/state/task-x1.meta" "$variant: the fixture's record removal did not fail"
+    if [ "$variant" = restored ]; then
+      assert_present "$marker" "restored: the record stayed without its merge-notified marker (stderr: $(tail -2 "$case_dir/stderr" | tr '\n' ' '))"
+      [ "$(shasum -a 256 < "$marker")" = "$bytes" ] || fail "restored: the marker came back with other bytes"
+      rm -f "$case_dir/fakebin/rm"
+      rc=0
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "restored: the retry did not complete: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "restored: the retry left the record"
+      assert_absent "$marker" "restored: the retry left the marker"
+      assert_absent "$marker.retiring" "restored: the retry left the set-aside marker"
+    else
+      assert_grep "could not be restored" "$case_dir/stderr" "unrestorable: the refusal does not say the marker could not be restored"
+      assert_grep "$case_dir/state/task-x1.meta" "$case_dir/stderr" "unrestorable: the refusal does not name the record"
+      assert_grep "$marker" "$case_dir/stderr" "unrestorable: the refusal does not name the marker"
+    fi
+  done
+  pass "a failed record removal writes the marker back so a retry removes both; if that write fails too, the refusal names both paths"
+}
+
+# A branch can have several PRs. A newer open PR returned first must not hide an
+# older merged PR that carries the detached copy's work; a merged PR that does not
+# carry it still leaves the copy refused.
+# merge_head_into_origin_main <case_dir> <sha>: a true merge of the copy's commit
+# <sha> into origin's default branch, as a forge merge of a PR whose head is <sha>.
+merge_head_into_origin_main() {
+  local case_dir=$1 sha=$2 tmp
+  tmp="$case_dir/_merge"
+  git -C "$case_dir/wt" push -q origin "$sha:refs/heads/merged-pr-head"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" -c user.email=t@t -c user.name=t merge -q --no-ff -m "merge PR" origin/merged-pr-head
+  git -C "$tmp" push -q origin HEAD:main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin main
+}
+
+two_prs_case() {  # <name> <merged PR carries the work: yes|no>
+  local case_dir carried=$2 head
+  case_dir=$(make_case "$1")
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  if [ "$carried" = yes ]; then
+    merge_head_into_origin_main "$case_dir" "$head"
+  else
+    head=$(git -C "$case_dir/project" rev-parse main)
+  fi
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$case_dir/gh-axi.calls"
+case "\${1:-} \${2:-}" in
+  "pr list")
+    case " \$* " in
+      *" --head fm/task-x1 "*) printf '%s\\n' "count: 2" "pull_requests[2]{number,state}:" "  8,open" "  7,merged" ;;
+      *) printf '%s\\n' "count: 0" "pull_requests: []" ;;
+    esac
+    exit 0 ;;
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-} \${2:-}" = "pr view" ]; then
+  case "\${3:-}:\$*" in
+    8:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' OPEN '$(git -C "$case_dir/project" rev-parse main)' https://github.com/example/repo/pull/8; exit 0 ;;
+    7:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' MERGED '$head' https://github.com/example/repo/pull/7; exit 0 ;;
+    *:*"headRefOid"*) printf '%s\\n' '$head'; exit 0 ;;
+  esac
+fi
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
+  git -C "$case_dir/wt" checkout -q --detach
+  git -C "$case_dir/project" branch -q -D fm/task-x1
+  printf '%s\n' "$case_dir"
+}
+
+# Every PR of the branch is read (Main 1686 F2). Twenty-one PRs share the branch;
+# only the oldest, PR 10, is merged, and its head is the copy's HEAD, merged into
+# origin's default branch. The forge fake honors --limit, so a lookup bounded below
+# 21 never sees PR 10 and the closeout cannot record it. A list whose count line
+# shows it was cut short is never trusted: the closeout names the incomplete list
+# and records no PR from it. Control: a branch with PR 10 alone records it.
+many_prs_case() {  # <name> <complete|cut|single|1000|1001> [landed yes|no]
+  local name=$1 mode=$2 landed=${3:-yes} case_dir head
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  [ "$landed" = no ] || merge_head_into_origin_main "$case_dir" "$head"
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$case_dir/gh-axi.calls"
+[ "\${1:-} \${2:-}" = "pr list" ] || exit 0
+case " \$* " in *" --head fm/task-x1 "*) ;; *) printf '%s\\n' "count: 0" "pull_requests: []"; exit 0 ;; esac
+limit=30
+prev=
+for a in "\$@"; do [ "\$prev" != --limit ] || limit=\$a; prev=\$a; done
+case "$mode" in
+  single) all="10" ;;
+  1000|1001) all=\$(seq $mode -1 1) ;;
+  *) all="30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10" ;;
+esac
+total=0; for n in \$all; do total=\$((total + 1)); done
+shown=\$total; [ "\$limit" -ge "\$total" ] || shown=\$limit
+[ "$mode" != cut ] || shown=20
+if [ "\$shown" -lt "\$total" ]; then echo "count: \$shown of \$total total"; else echo "count: \$shown"; fi
+echo "pull_requests[\$shown]{number,state}:"
+i=0
+for n in \$all; do
+  [ "\$i" -lt "\$shown" ] || break
+  if [ "\$n" = 10 ]; then echo "  10,merged"; else echo "  \$n,open"; fi
+  i=\$((i + 1))
+done
+SH
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-} \${2:-}" = "pr view" ]; then
+  case "\${3:-}:\$*" in
+    10:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' MERGED '$head' https://github.com/example/repo/pull/10; exit 0 ;;
+    [0-9]*:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' OPEN '$(git -C "$case_dir/project" rev-parse main)' "https://github.com/example/repo/pull/\${3}"; exit 0 ;;
+  esac
+fi
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
+  git -C "$case_dir/wt" checkout -q --detach
+  git -C "$case_dir/project" branch -q -D fm/task-x1
+  printf '%s\n' "$case_dir"
+}
+
+test_branch_pr_lookup_reads_every_pr() {
+  local case_dir rc
+  case_dir=$(many_prs_case many-prs-complete complete)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "21 PRs: a copy the default branch carries was refused: $(tail -3 "$case_dir/stderr")"
+  assert_grep 'https://github.com/example/repo/pull/10' "$case_dir/data/backlog.md" \
+    "21 PRs: the merged PR behind twenty newer ones was not found and recorded"
+  case_dir=$(many_prs_case many-prs-cut cut)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  ! grep -q 'https://github.com/example/repo/pull/' "$case_dir/data/backlog.md" \
+    || fail "cut list: a PR was recorded from a list that was not shown complete"
+  case_dir=$(many_prs_case many-prs-single single)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "one PR control: refused: $(tail -3 "$case_dir/stderr")"
+  assert_grep 'https://github.com/example/repo/pull/10' "$case_dir/data/backlog.md" "one PR control: the merged PR was not recorded"
+  pass "the branch PR lookup reads every PR (a merged PR behind twenty newer ones is found), and a list shown cut short records no PR"
+}
+
+# Main 1871 P-C: a PR found by the branch is named as the completion PR only when
+# its merged head is the copy's HEAD. (a) The record's pr= names PR 7, merged at
+# another head, while the copy's change reached the default branch another way:
+# the copy lands by its content, and the close names the recorded PR 7 (Main
+# 1907). (b) The branch lists a newer
+# PR 8 merged at another head before an older PR 7 merged at the copy's HEAD: the
+# scan does not stop at PR 8, and PR 7 is named.
+test_completion_pr_is_named_only_on_head_equality() {
+  local case_dir rc head other
+  case_dir=$(make_case attribution-recorded-mismatch)
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  other=$(git -C "$case_dir/project" rev-parse main)
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  land_on_origin_main "$case_dir" feature.txt hello
+  git -C "$case_dir/project" fetch -q origin main
+  add_gh_pr_merged_for_head "$case_dir" "$other"
+  append_pr_meta_url "$case_dir"
+  record_copy_returns "$case_dir"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "recorded mismatch: a copy whose change the default branch holds was refused: $(cat "$case_dir/stderr")"
+  assert_copy_returned "$case_dir" "recorded mismatch: the copy stayed" https://github.com/example/repo/pull/7
+  case_dir=$(make_case attribution-ordered)
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  other=$(git -C "$case_dir/project" rev-parse main)
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  merge_head_into_origin_main "$case_dir" "$head"
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$case_dir/gh-axi.calls"
+case "\${1:-} \${2:-}" in
+  "pr list") printf '%s\\n' "count: 2" "pull_requests[2]{number,state}:" "  8,merged" "  7,merged"; exit 0 ;;
+esac
+exit 0
+SH
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-} \${2:-}" = "pr view" ]; then
+  case "\${3:-}:\$*" in
+    8:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' MERGED '$other' https://github.com/example/repo/pull/8; exit 0 ;;
+    7:*"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' MERGED '$head' https://github.com/example/repo/pull/7; exit 0 ;;
+  esac
+fi
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
+  git -C "$case_dir/wt" checkout -q --detach
+  git -C "$case_dir/project" branch -q -D fm/task-x1
+  record_copy_returns "$case_dir"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "ordered: refused: $(cat "$case_dir/stderr")"
+  assert_copy_returned "$case_dir" "ordered: the copy stayed" https://github.com/example/repo/pull/7
+  ! grep -q 'https://github.com/example/repo/pull/8' "$case_dir/data/backlog.md" || fail "ordered: the newer PR at another head was named"
+  pass "a copy landed by its content closes with its recorded PR; a newer merged PR at another head does not hide the older one at the copy's HEAD"
+}
+
+# Main 1820 F4(a): the lookup asks for one PR more than its bound and treats a full
+# page as incomplete, never as "no PR". A complete list of exactly 1000 PRs is read
+# and its merged PR recorded. A branch with 1001 PRs fills the page: no PR is judged
+# from it, and when the copy's content is not on the default branch either, the
+# refusal names the incomplete list instead of reading as "no PR". Main 1820 F4(c):
+# the same incomplete list with the copy's content on the default branch still lands
+# by the independent content check, recording no PR.
+test_branch_pr_lookup_treats_a_full_page_as_incomplete() {
+  local case_dir rc
+  case_dir=$(many_prs_case many-prs-1000 1000)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "1000 PRs: refused: $(tail -3 "$case_dir/stderr")"
+  assert_grep 'https://github.com/example/repo/pull/10' "$case_dir/data/backlog.md" "1000 PRs: a complete list of 1000 was not read"
+  case_dir=$(many_prs_case many-prs-1001-unlanded 1001 no)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "1001 PRs, unlanded: a copy whose content is not on the default branch was torn down"
+  assert_grep 'not shown complete' "$case_dir/stderr" "1001 PRs, unlanded: the refusal reads as no PR instead of naming the incomplete list"
+  assert_present "$case_dir/state/task-x1.meta" "1001 PRs, unlanded: the record was closed"
+  case_dir=$(many_prs_case many-prs-1001-landed 1001)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "1001 PRs, content landed: the independent content check did not land it: $(tail -3 "$case_dir/stderr")"
+  ! grep -q 'https://github.com/example/repo/pull/' "$case_dir/data/backlog.md" \
+    || fail "1001 PRs: a PR was recorded from a full page"
+  pass "a complete list of 1000 PRs is read; a full page of 1001 is incomplete, named in a refusal, and only the content check can still land the copy"
+}
+
+test_detached_copy_finds_the_merged_pr_among_several() {
+  local case_dir rc
+  case_dir=$(two_prs_case two-prs-carried yes)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "two PRs: an older merged PR carrying the work was hidden by a newer open one: $(tail -3 "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "two PRs: the record stayed open"
+  case_dir=$(two_prs_case two-prs-not-carried no)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "two PRs: a merged PR that does not carry the work let the copy go"
+  assert_present "$case_dir/state/task-x1.meta" "two PRs: the record was closed over unlanded work"
+  [ -d "$case_dir/wt" ] || fail "two PRs: the copy was removed"
+  pass "a detached copy is judged against every PR of its branch: a newer open PR does not hide an older merged one, and a non-carrying one still refuses"
+}
+
+test_named_branch_copy_without_pr_meta_behaves_as_before() {
+  local case_dir rc
+  case_dir=$(make_case named-branch-no-pr)
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  merge_head_into_origin_main "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  add_gh_axi_pr_for_branch "$case_dir" fm/task-x1
+  [ "$(git -C "$case_dir/wt" rev-parse --abbrev-ref HEAD)" = fm/task-x1 ] || fail "the copy is not on its branch"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a named-branch copy with a merged PR was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "the record stayed open"
+  pass "a copy on a named branch is judged landed through that branch as before"
 }
 
 test_task_archives_reap_only_carried_refs() {
@@ -629,6 +1173,40 @@ test_task_archives_reap_only_carried_refs() {
   assert_archive_ref "$case_dir" archive/task-x1 "$submitted"
   assert_archive_ref "$case_dir" unrelated "$pipeline"
   pass "teardown reaps only this task's ancestor and patch-equivalent archives carried by the squash"
+}
+
+# Main 1820 F3: an archive ref goes only when its head is in the refreshed default
+# branch's history or its net change is in the default branch's content. Archive A
+# adds a feature; the PR replays that patch, reverts it, then adds other work, and
+# is squash-merged, so git cherry still matches A's patch while the default branch
+# lacks the feature. A stays. Control: the archive of the PR's final head, whose
+# change the default branch holds, is reaped.
+test_task_archive_kept_after_its_change_was_replayed_then_reverted() {
+  local case_dir base replay archived final rc=0
+  case_dir=$(make_case archive-replay-revert)
+  write_meta "$case_dir" no-mistakes ship
+  base=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" feature.txt alpha "replay the feature"
+  replay=$(git -C "$case_dir/wt" rev-parse HEAD)
+  archived=$(printf 'submitted feature\n' | git -C "$case_dir/project" commit-tree "$replay^{tree}" -p "$base")
+  git -C "$case_dir/wt" rm -q feature.txt
+  git -C "$case_dir/wt" -c user.email=t@t -c user.name=t commit -q -m "revert the feature"
+  wt_commit_file "$case_dir" other.txt beta "other work"
+  final=$(git -C "$case_dir/wt" rev-parse HEAD)
+  [ "$(git -C "$case_dir/project" cherry "$final" "$archived" | cut -c1)" = - ] \
+    || fail "fixture bug: git cherry does not match the archived patch"
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a01 "$archived"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$final"
+  land_archive_fixture_pr "$case_dir"
+  ! git -C "$case_dir/project" show refs/remotes/origin/main:feature.txt >/dev/null 2>&1 \
+    || fail "fixture bug: the default branch holds the reverted feature"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "the landed copy was refused: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a01 "$archived"
+  assert_grep 'keeping archive/task-x1-submitted-0a0a0a01' "$case_dir/stderr" "the kept archive was not named"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b01 ""
+  assert_grep 'reaped archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "control: the carried archive was not reaped"
+  pass "an archive whose change the PR replayed and then reverted stays; the archive of the landed head is reaped"
 }
 
 test_task_archives_ignore_other_tasks_and_non_custody_names() {
@@ -731,12 +1309,16 @@ test_task_archives_require_matching_squash_content() {
     git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$head"
     append_pr_meta_url "$case_dir"
     if [ "$shape" = different ]; then
+      # The forge's merge commit holds different content from the PR head ...
       land_on_origin_main "$case_dir" feature.txt different
       git -C "$case_dir/project" fetch -q origin
       merge=$(git -C "$case_dir/project" rev-parse origin/main)
     else
       merge=
     fi
+    # ... while origin's default branch does end up holding the copy's content, so
+    # the ordinary landing proof passes and only the archive proof must fail.
+    land_on_origin_main "$case_dir" feature.txt alpha
     add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
     rc=0
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -772,6 +1354,11 @@ test_task_archives_include_deleted_and_literal_paths_in_merge_proof() {
       git -C "$case_dir/project" --literal-pathspecs add -- "$file"
       git -C "$case_dir/project" commit -qm "incomplete rename squash"
       merge=$(git -C "$case_dir/project" rev-parse HEAD)
+      # A later commit completes the rename on origin's default branch, so the
+      # ordinary landing proof passes while the forge's merge commit still lacks
+      # the deletion the archive proof must see.
+      git -C "$case_dir/project" rm -q -- old.txt
+      git -C "$case_dir/project" commit -qm "complete the rename"
       git -C "$case_dir/project" push -q origin main
       append_pr_meta_url "$case_dir"
       add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
@@ -834,6 +1421,9 @@ test_squash_merged_pr_allows_when_head_ancestor_of_pr_head() {
   append_pr_meta_url "$case_dir"
   local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   pr_head=$(commit_tree_from_wt_head "$case_dir" "$local_head" "no-mistakes follow-up")
+  # The merged PR was squashed onto origin's default branch, which is what lands
+  # the copy: being an ancestor of the PR head proves nothing on its own.
+  land_on_origin_main "$case_dir" feature.txt hello
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
   rc=0
@@ -872,30 +1462,284 @@ test_no_pr_recorded_discovers_merged_pr_by_branch_allows() {
 
   expect_code 0 "$rc" "no-pr-branch-discovery: teardown should succeed by discovering the merged PR from the branch name"
   ! grep -q REFUSED "$case_dir/stderr" || fail "no-pr-branch-discovery: teardown printed a REFUSED line"
-  assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
-    "no-pr-branch-discovery: resolved PR URL was not recorded on completion"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "no-pr-branch-discovery: the backlog item is not done: $(backlog_row_state "$case_dir")"
+  # Main 1820 F4(b): the merged head carries the pipeline's auto-fix commit, so it
+  # is not the copy's HEAD and the found PR is not named as the completion PR.
+  ! grep -q 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
+    || fail "no-pr-branch-discovery: a merged PR whose head is not the copy's HEAD was recorded as its completion PR"
   pass "teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded"
 }
 
-test_squash_merged_pr_allows_replayed_unpushed_patch() {
-  local case_dir rc parent_head pr_head
-  case_dir=$(make_case squash-replayed-patch)
-  write_meta "$case_dir" no-mistakes ship
-  wt_commit_file "$case_dir" local-parent.txt parent "local parent"
-  parent_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  git -C "$case_dir/wt" push -q origin "$parent_head:refs/heads/fm/task-x1"
-  git -C "$case_dir/project" fetch -q origin fm/task-x1
+# A replayed unpushed patch is landed only when nothing else the copy holds is
+# missing: a pushed parent that neither the merged PR head nor the default branch
+# carries keeps the copy (Main 038 ruling (a); V2 safety over V6). The detached
+# variant finds the PR through the record's branch and is judged the same way.
+# Control: the same replay with no such parent is torn down.
+replayed_patch_case() {  # <name> <parent yes|no> <detached yes|no>
+  local name=$1 parent=$2 detached=$3 case_dir parent_head pr_head
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  if [ "$parent" = yes ]; then
+    wt_commit_file "$case_dir" local-parent.txt parent "local parent the PR never carried"
+    parent_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    git -C "$case_dir/wt" push -q origin "$parent_head:refs/heads/fm/task-x1"
+    git -C "$case_dir/project" fetch -q origin fm/task-x1
+  fi
   wt_commit_file "$case_dir" feature.txt hello "add feature"
-  append_pr_meta_url "$case_dir"
   pr_head=$(land_equivalent_patch_on_origin_branch "$case_dir" pr-head feature.txt hello "add feature")
+  # The merged PR was squashed onto origin's default branch; the pushed parent never was.
+  land_on_origin_main "$case_dir" feature.txt hello
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  if [ "$detached" = yes ]; then
+    add_gh_axi_pr_for_branch "$case_dir" fm/task-x1
+    git -C "$case_dir/wt" checkout -q --detach
+    git -C "$case_dir/project" branch -q -D fm/task-x1
+  else
+    append_pr_meta_url "$case_dir"
+  fi
+  printf '%s\n' "$case_dir"
+}
 
+test_squash_merged_replayed_patch_over_unlanded_parent_refuses() {
+  local variant case_dir rc before
+  for variant in named detached; do
+    case_dir=$(replayed_patch_case "replayed-parent-$variant" yes "$([ "$variant" = detached ] && echo yes || echo no)")
+    before=$(git -C "$case_dir/wt" rev-parse HEAD)
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$variant: a copy holding a pushed parent the merged PR lacks was torn down"
+    assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "$variant: the refusal does not say not landed"
+    assert_grep 'local parent the PR never carried' "$case_dir/stderr" "$variant: the refusal does not name the pushed parent"
+    assert_present "$case_dir/state/task-x1.meta" "$variant: the record was closed over the unlanded parent"
+    [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$before" ] || fail "$variant: the copy's HEAD changed"
+  done
+  pass "a replayed patch over a pushed parent the merged PR and default branch lack is refused and kept, detached or named"
+}
+
+test_squash_merged_pr_allows_replayed_unpushed_patch() {
+  local variant case_dir rc
+  for variant in named detached; do
+    case_dir=$(replayed_patch_case "replayed-clean-$variant" no "$([ "$variant" = detached ] && echo yes || echo no)")
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$variant: a replayed patch the merged PR head carries was refused: $(cat "$case_dir/stderr")"
+    ! grep -q REFUSED "$case_dir/stderr" || fail "$variant: teardown printed a REFUSED line"
+    assert_absent "$case_dir/state/task-x1.meta" "$variant: the record stayed open"
+  done
+  pass "squash-merged PR accepts replayed unpushed local patches whose content the default branch holds"
+}
+
+# Landed means present in the default branch's final content, not matched in the
+# PR's history (Main 1686 F1). The copy's one unpushed commit adds a feature; the
+# merged PR replays that patch and then reverts it, so neither the PR's final head
+# nor origin's default branch holds the feature. Squash and true-merge variants.
+# Control: the same PR without the revert, whose content is on the default branch.
+reverted_replay_case() {  # <name> <revert yes|no> <merge squash|true> [named|detached]
+  local name=$1 revert=$2 merge=$3 shape=${4:-named} case_dir tmp pr_head
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  tmp="$case_dir/_pr"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" checkout -q -b pr-branch
+  printf '%s\n' hello > "$tmp/feature.txt"
+  git -C "$tmp" add -- feature.txt
+  # Its own message makes it a replay (a new commit with the same patch), not the
+  # copy's own commit, which would put the copy's commit in the default branch.
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add feature (replayed in the PR)"
+  if [ "$revert" = yes ]; then
+    git -C "$tmp" -c user.email=t@t -c user.name=t revert --no-edit HEAD >/dev/null
+  fi
+  pr_head=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/heads/pr-head"
+  git -C "$tmp" checkout -q main
+  if [ "$merge" = squash ]; then
+    git -C "$tmp" -c user.email=t@t -c user.name=t merge -q --squash pr-branch >/dev/null
+    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "squash PR 7"
+  else
+    git -C "$tmp" -c user.email=t@t -c user.name=t merge -q --no-ff -m "merge PR 7" pr-branch
+  fi
+  git -C "$tmp" push -q origin HEAD:main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin pr-head main
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  if [ "$shape" = detached ]; then
+    # The e64b5e545 review's own witness: a detached copy with no pr=, whose
+    # merged PR is found by the record's branch.
+    add_gh_axi_pr_for_branch "$case_dir" fm/task-x1
+    git -C "$case_dir/wt" checkout -q --detach
+    git -C "$case_dir/project" branch -q -D fm/task-x1
+  else
+    append_pr_meta_url "$case_dir"
+  fi
+  record_copy_returns "$case_dir"
+  printf '%s\n' "$case_dir"
+}
+
+test_reverted_replay_is_not_landed() {
+  local merge case_dir rc before
+  for merge in squash true; do
+    case_dir=$(reverted_replay_case "reverted-replay-$merge" yes "$merge")
+    git -C "$case_dir/project" show "refs/remotes/origin/main:feature.txt" >/dev/null 2>&1 \
+      && fail "$merge: fixture bug: origin's default branch holds the reverted feature"
+    before=$(git -C "$case_dir/wt" rev-parse HEAD)
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$merge: a copy whose only change the merged PR replayed and then reverted was torn down"
+    assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "$merge: the refusal does not say not landed"
+    assert_present "$case_dir/state/task-x1.meta" "$merge: the record was closed over work the default branch lacks"
+    [ -d "$case_dir/wt" ] || fail "$merge: the copy was removed"
+    [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$before" ] || fail "$merge: the copy's HEAD changed"
+    case_dir=$(reverted_replay_case "carried-replay-$merge" no "$merge")
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$merge control: a replay the default branch carries was refused: $(cat "$case_dir/stderr")"
+    assert_absent "$case_dir/state/task-x1.meta" "$merge control: the record stayed open"
+  done
+  pass "a replayed patch that the merged PR reverted is not landed and keeps the copy; a carried replay is torn down (squash and true merge)"
+}
+
+# The e64b5e545 review's F1 witness as it was written: a detached copy with no pr=,
+# whose merged PR (found by the record's branch) replayed its change and then
+# reverted it. Refused, with record, copy and HEAD kept; the carried control lands.
+test_detached_reverted_replay_without_pr_meta_is_not_landed() {
+  local case_dir rc before
+  case_dir=$(reverted_replay_case detached-reverted-replay yes true detached)
+  ! grep -q '^pr=' "$case_dir/state/task-x1.meta" || fail "fixture bug: the record names a PR"
+  [ "$(git -C "$case_dir/wt" rev-parse --abbrev-ref HEAD)" = HEAD ] || fail "fixture bug: the copy is not detached"
+  before=$(git -C "$case_dir/wt" rev-parse HEAD)
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a detached copy with no pr= whose change the merged PR replayed and reverted was torn down"
+  assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "the refusal does not say not landed"
+  assert_present "$case_dir/state/task-x1.meta" "the record was closed over work the default branch lacks"
+  [ -d "$case_dir/wt" ] && [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$before" ] || fail "the copy or its HEAD was not kept"
+  case_dir=$(reverted_replay_case detached-carried-replay no true detached)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "control: a detached replay the default branch carries was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "control: the record stayed open"
+  assert_copy_returned "$case_dir" "control: the copy stayed" none
+  pass "a detached copy with no pr= whose merged PR replayed and reverted its change is refused and kept; a carried one is torn down"
+}
 
-  expect_code 0 "$rc" "squash-replayed-patch: teardown should succeed when unpushed local patch is in the merged PR head"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "squash-replayed-patch: teardown printed a REFUSED line"
-  pass "squash-merged PR accepts replayed unpushed local patches contained in the PR head"
+# Ruled by Main 1820 (review F1, not a defect): the copy's commit A adds a feature,
+# a pipeline commit on top of A removes it, and the forge true-merges that pipeline
+# head into the default branch. A's commits stay reachable in the default branch's
+# history, so nothing is lost and the copy lands; this pins that behaviour.
+test_true_merge_of_a_pipeline_head_that_dropped_the_change_lands_by_ancestry() {
+  local case_dir rc copy_head pr_head tmp
+  case_dir=$(make_case pipeline-dropped-true-merge)
+  write_meta "$case_dir" no-mistakes ship
+  record_copy_returns "$case_dir"
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  copy_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  tmp="$case_dir/_pipeline"
+  git -C "$case_dir/wt" push -q origin "$copy_head:refs/heads/pipeline-input"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" checkout -q -b pipeline origin/pipeline-input
+  git -C "$tmp" rm -q feature.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "pipeline drops the feature"
+  pr_head=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" checkout -q main
+  git -C "$tmp" -c user.email=t@t -c user.name=t merge -q --no-ff -m "merge PR 7" pipeline
+  git -C "$tmp" push -q origin HEAD:main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin main
+  ! git -C "$case_dir/project" show refs/remotes/origin/main:feature.txt >/dev/null 2>&1 \
+    || fail "fixture bug: the default branch still holds the dropped feature"
+  git -C "$case_dir/project" merge-base --is-ancestor "$copy_head" refs/remotes/origin/main \
+    || fail "fixture bug: the copy's commit is not in the default branch's history"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  append_pr_meta_url "$case_dir"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a copy whose commit is in the default branch's history was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "the record stayed open"
+  assert_copy_returned "$case_dir" "the copy stayed" https://github.com/example/repo/pull/7
+  git -C "$case_dir/project" merge-base --is-ancestor "$copy_head" refs/remotes/origin/main \
+    || fail "the copy's commit is no longer reachable from the default branch"
+  pass "a copy whose commit a true merge put in the default branch's history lands, although a later pipeline commit dropped its change (Main 1820)"
+}
+
+# The exact-head proof reads a refreshed default branch (Main 1820 F2). The copy's
+# commit is the merged PR head, and the local origin/main (cached by an earlier
+# fetch) holds it; then the real default branch is rewritten without it, or cannot
+# be read at all. Both refuse and keep the copy. Control: an intact default lands.
+stale_default_case() {  # <name> <intact|rewritten|unreachable>
+  local name=$1 shape=$2 case_dir head old tmp
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  old=$(git -C "$case_dir/project" rev-parse main)
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  merge_head_into_origin_main "$case_dir" "$head"
+  git -C "$case_dir/project" merge-base --is-ancestor "$head" refs/remotes/origin/main \
+    || fail "fixture bug: the cached default branch does not hold the head"
+  add_gh_pr_merged_for_head "$case_dir" "$head"
+  append_pr_meta_url "$case_dir"
+  case "$shape" in
+    rewritten)
+      tmp="$case_dir/_rewrite"
+      git clone -q "$case_dir/origin.git" "$tmp"
+      git -C "$tmp" reset -q --hard "$old"
+      git -C "$tmp" push -q -f origin HEAD:main
+      rm -rf "$tmp"
+      ;;
+    unreachable) mv "$case_dir/origin.git" "$case_dir/origin.git.gone" ;;
+  esac
+  record_copy_returns "$case_dir"
+  printf '%s\n' "$case_dir"
+}
+
+test_exact_head_proof_reads_a_refreshed_default_branch() {
+  local shape case_dir rc
+  for shape in rewritten unreachable; do
+    case_dir=$(stale_default_case "stale-default-$shape" "$shape")
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape: a cached default branch proved a head the real default branch does not hold"
+    assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "$shape: the refusal does not say not landed"
+    assert_present "$case_dir/state/task-x1.meta" "$shape: the record was closed"
+    [ -d "$case_dir/wt" ] || fail "$shape: the copy was removed"
+  done
+  assert_grep "origin's default branch could not be read" "$TMP_ROOT/stale-default-unreachable/stderr" "unreachable: the refusal does not say origin's default branch could not be read"
+  ! grep -q 'commits whose change the default branch does not hold' "$TMP_ROOT/stale-default-unreachable/stderr" \
+    || fail "unreachable: with no readable default branch the refusal still listed commits: $(cat "$TMP_ROOT/stale-default-unreachable/stderr")"
+  case_dir=$(stale_default_case stale-default-intact intact)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "control: a head the refreshed default branch holds was refused: $(cat "$case_dir/stderr")"
+  assert_copy_returned "$case_dir" "control: the copy stayed" https://github.com/example/repo/pull/7
+  pass "the exact-head proof refuses when the refreshed default branch lacks the head or cannot be refreshed, then names the cause and lists no commits; an intact one lands"
+}
+
+# Main 1820 F4(b): a completion PR is recorded only when its merged head is the
+# copy's HEAD. The branch's merged PR 7 has an unrelated head, and the copy's own
+# change reached the default branch by another route: the copy lands by its content,
+# and no PR is recorded for it. Control: a PR whose head is the copy's HEAD is recorded.
+test_completion_pr_is_recorded_only_for_the_copys_own_head() {
+  local case_dir rc
+  case_dir=$(detached_copy_case attribution-unrelated fm/recorded-x no base)
+  land_on_origin_main "$case_dir" feature.txt hello
+  git -C "$case_dir/project" fetch -q origin main
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a copy whose change the default branch holds was refused: $(cat "$case_dir/stderr")"
+  assert_copy_returned "$case_dir" "the copy stayed" none
+  ! grep -q 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
+    || fail "a merged PR whose head is not the copy's HEAD was recorded as its completion PR"
+  case_dir=$(detached_copy_case attribution-own fm/recorded-x no own)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "control: refused: $(cat "$case_dir/stderr")"
+  assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" "control: the PR whose head is the copy's HEAD was not recorded"
+  pass "the branch lookup records a merged PR only when its head is the copy's HEAD; a copy landed by its content alone records none"
 }
 
 # A worker can run the suite from a task copy whose git directory is not
@@ -904,16 +1748,16 @@ test_squash_merged_pr_allows_replayed_unpushed_patch() {
 # caller's directory fails. The landed-patch proof must depend only on the copy
 # it reads, or it reports landed work as unproven.
 test_landed_proof_ignores_unresolvable_git_directory_in_cwd() {
-  local case_dir rc parent_head pr_head dangling
+  local case_dir rc pr_head dangling
   case_dir=$(make_case landed-proof-dangling-cwd)
   write_meta "$case_dir" no-mistakes ship
-  wt_commit_file "$case_dir" local-parent.txt parent "local parent"
-  parent_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  git -C "$case_dir/wt" push -q origin "$parent_head:refs/heads/fm/task-x1"
-  git -C "$case_dir/project" fetch -q origin fm/task-x1
+  # No pushed parent: since Main 038 ruling (a) a parent the merged PR lacks refuses,
+  # and this case is about the caller's working directory, not about that history.
   wt_commit_file "$case_dir" feature.txt hello "add feature"
   append_pr_meta_url "$case_dir"
   pr_head=$(land_equivalent_patch_on_origin_branch "$case_dir" pr-head feature.txt hello "add feature")
+  # The merged PR was squashed onto origin's default branch.
+  land_on_origin_main "$case_dir" feature.txt hello
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
   dangling="$case_dir/unresolvable-git-cwd"
   mkdir "$dangling"
@@ -966,15 +1810,19 @@ test_squash_merged_rebased_branch_allows() {
 }
 
 # A Forgejo task whose default branch moved on after the squash merge, editing
-# the same lines, leaves the content check inconclusive, so only the forge's
-# merged record can prove the work landed. With the record merged teardown
-# proceeds; with it unmerged the same history refuses.
+# the same lines the copy wrote, so the content check cannot place the copy. The
+# copy's HEAD is the merged PR head, so the forge's merge commit decides (Main
+# 1907): merged with its merge commit in the default branch's history, teardown
+# proceeds; unmerged, or merged with a merge commit the default branch lacks, the
+# same history refuses and keeps the record and the copy. Every variant reads
+# the pull request through tea.
 test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
-  local case_dir rc pr_head tmp merged expected
-  for merged in true false; do
-    case_dir=$(make_case "forgejo-merged-$merged")
+  local case_dir rc pr_head tmp variant merged merge squash
+  for variant in merged unmerged off-default; do
+    case_dir=$(make_case "forgejo-$variant")
     write_meta "$case_dir" no-mistakes ship
     pr_head=$(setup_squash_rebased_history "$case_dir" rebased)
+    squash=$(git -C "$case_dir/project" rev-parse refs/remotes/origin/main)
     tmp="$case_dir/_main_later"
     git clone -q "$case_dir/origin.git" "$tmp"
     printf '%s\n' base main-edit feature-edit-reworded > "$tmp/shared.txt"
@@ -986,18 +1834,29 @@ test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
       'pr=https://git.example.org/team/repo/pulls/7' \
       "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
     add_gh_axi_error "$case_dir"
-    add_tea_pull_for_head "$case_dir" "$merged" "$pr_head"
+    case "$variant" in
+      merged) merged=true merge=$squash ;;
+      unmerged) merged=false merge= ;;
+      off-default) merged=true merge=$pr_head ;;
+    esac
+    add_tea_pull_for_head "$case_dir" "$merged" "$pr_head" "$merge"
 
     rc=0
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-    expected=1
-    [ "$merged" = false ] || expected=0
-    expect_code "$expected" "$rc" "forgejo-merged-$merged: teardown exit"$'\n'"$(cat "$case_dir/stderr")"
+    if [ "$variant" = merged ]; then
+      expect_code 0 "$rc" "forgejo-$variant: a merged PR whose merge commit is on the default branch was refused"$'\n'"$(cat "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "forgejo-$variant: the record stayed open"
+    else
+      [ "$rc" -ne 0 ] || fail "forgejo-$variant: teardown let the copy go though the default branch rewrote its lines"
+      assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "forgejo-$variant: the refusal does not say not landed"
+      assert_present "$case_dir/state/task-x1.meta" "forgejo-$variant: the record was closed"
+      [ -d "$case_dir/wt" ] || fail "forgejo-$variant: the copy was removed"
+    fi
     grep -qF -- 'api --login fj --repo team/repo /repos/{owner}/{repo}/pulls/7' "$case_dir/tea.log" \
-      || fail "forgejo-merged-$merged: teardown did not read the Forgejo pull request through tea"
+      || fail "forgejo-$variant: teardown did not read the Forgejo pull request through tea"
   done
-  pass "teardown proves a Forgejo task landed from the merged pull request when the content check is inconclusive"
+  pass "a Forgejo task whose default branch later rewrote its lines lands by the merged PR's merge commit on the default branch; unmerged or off-default refuses"
 }
 
 test_squash_merged_same_file_different_content_refuses() {
@@ -1067,29 +1926,58 @@ test_squash_merged_stale_local_refuses_when_forge_unreachable() {
 }
 
 # The task copy stayed on the pre-rebase commits after the pipeline pushed a
-# rebased copy as the PR head and the PR was squash-merged. Every commit's patch
-# is in the PR head and the merge of main adds nothing of its own, so the copy
-# is landed even though its commits sit on another remote.
+# rebased copy as the PR head and the PR was squash-merged. The PR head adds a
+# review edit to a.txt, a line the copy's "add a" also wrote, so the content check
+# cannot place the copy. It lands by the run record (Main 1907): the no-mistakes
+# run that pushed the merged head started from this copy's HEAD. Without that
+# record, or with the PR still open, teardown refuses and keeps the record and copy.
 test_squash_merged_pushed_prerebase_copy_allows() {
-  local case_dir rc pr_head
-  case_dir=$(make_case squash-pushed-prerebase)
-  write_meta "$case_dir" no-mistakes ship
-  pr_head=$(setup_pushed_prerebase_history "$case_dir" landed)
-  printf '%s\n' \
-    'pr=https://github.com/example/repo/pull/7' \
-    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
-  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  local case_dir rc pr_head local_head variant
+  for variant in recorded unrecorded open; do
+    case_dir=$(make_case "squash-pushed-prerebase-$variant")
+    write_meta "$case_dir" no-mistakes ship
+    pr_head=$(setup_pushed_prerebase_history "$case_dir" landed)
+    local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    printf '%s\n' \
+      'pr=https://github.com/example/repo/pull/7' \
+      "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+    add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+    [ "$variant" = unrecorded ] \
+      || write_nm_run_record "$case_dir" 01RUNPRE "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+    if [ "$variant" = open ]; then
+      cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *"state,headRefOid,url"*) printf '%s\\t%s\\t%s\\n' OPEN '$pr_head' 'https://github.com/example/repo/pull/7'; exit 0 ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+      chmod +x "$case_dir/fakebin/gh"
+    fi
 
-  rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-  expect_code 0 "$rc" "squash-pushed-prerebase: teardown should accept a pre-rebase copy whose every patch is in the merged PR head"$'\n'"$(cat "$case_dir/stderr")"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-prerebase: teardown printed a REFUSED line"
-  pass "squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head"
+    if [ "$variant" = recorded ]; then
+      expect_code 0 "$rc" "squash-pushed-prerebase-$variant: the input of the run that pushed the merged head was refused"$'\n'"$(cat "$case_dir/stderr")"
+      ! grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-prerebase-$variant: teardown printed a REFUSED line"
+      assert_absent "$case_dir/state/task-x1.meta" "squash-pushed-prerebase-$variant: the record stayed open"
+    else
+      [ "$rc" -ne 0 ] || fail "squash-pushed-prerebase-$variant: teardown let a copy go whose a.txt the default branch rewrote"
+      assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "squash-pushed-prerebase-$variant: the refusal does not say not landed"
+      assert_refusal_retained_task_state "$case_dir" "squash-pushed-prerebase-$variant" "$local_head"
+    fi
+  done
+  pass "squash-merged PR accepts a pushed pre-rebase copy that its merged run started from; unrecorded or unmerged refuses"
+}
+
+refusal_names_subject() {  # <stderr-file> <subject>
+  grep -Eq "^[[:xdigit:]]+ $2\$" "$1"
 }
 
 refusal_names_add_a() {
-  grep -Eq '^[[:xdigit:]]+ add a$' "$1"
+  refusal_names_subject "$1" 'add a'
 }
 
 test_squash_pushed_missing_subject_match_ignores_hash_boundary() {
@@ -1103,7 +1991,10 @@ test_squash_pushed_missing_subject_match_ignores_hash_boundary() {
 
 # One pre-rebase commit's change never reached the PR head, so the copy still
 # holds work the merged PR lacks. The refusal must name that commit and keep
-# every recovery route.
+# every recovery route. It must not name "add c", whose change the squash put on
+# the default branch unchanged. ("add a" is named too: the PR's review edit
+# changed a.txt on the default branch, so that commit's own patch no longer
+# reverse-applies there.)
 test_squash_merged_pushed_prerebase_copy_missing_commit_refuses() {
   local case_dir rc pr_head local_head
   case_dir=$(make_case squash-pushed-missing)
@@ -1121,7 +2012,7 @@ test_squash_merged_pushed_prerebase_copy_missing_commit_refuses() {
   expect_code 1 "$rc" "squash-pushed-missing: teardown should refuse when one pre-rebase commit's change is not in the PR head"$'\n'"$(cat "$case_dir/stderr")"
   grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-missing: no REFUSED line in stderr"
   grep -q 'add b' "$case_dir/stderr" || fail "squash-pushed-missing: the refusal does not name the commit missing from the PR head"
-  ! refusal_names_add_a "$case_dir/stderr" || fail "squash-pushed-missing: the refusal names a commit whose patch is in the PR head"
+  ! refusal_names_subject "$case_dir/stderr" 'add c' || fail "squash-pushed-missing: the refusal names a commit whose change the default branch holds"
   assert_refusal_retained_task_state "$case_dir" squash-pushed-missing "$local_head"
   pass "squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head"
 }
@@ -1149,12 +2040,14 @@ test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses() {
   pass "squash-merged PR still refuses a merge commit that carries a change of its own"
 }
 
-# Main moved after the PR head was cut, and the copy merged that move in. The
-# commit the merge brought is already in the default branch, so it is not the
-# copy's own work and needs no proof in the PR head; judged without the default
-# branch it would count as a commit the PR head lacks.
-test_squash_merged_prerebase_copy_with_a_later_main_merge_allows() {
-  local case_dir rc tmp pr_head
+# Main moved after the PR head was cut, and the copy merged that move in. The PR
+# head adds a review edit to a.txt, a line the copy's "add a" also wrote, so after
+# the squash merging the copy into the default branch conflicts on a.txt instead
+# of changing nothing. This is the refuse-on-doubt rule of Main 1686 F1: teardown
+# refuses, keeps the record and the copy, and names the copy's unproven commits
+# but not the main commit its merge brought in.
+test_squash_merged_prerebase_copy_with_a_later_main_merge_refuses() {
+  local case_dir rc tmp pr_head local_head
   case_dir=$(make_case squash-prerebase-later-main)
   write_meta "$case_dir" no-mistakes ship
   wt_commit_file "$case_dir" a.txt alpha "add a"
@@ -1189,14 +2082,21 @@ test_squash_merged_prerebase_copy_with_a_later_main_merge_allows() {
     'pr=https://github.com/example/repo/pull/7' \
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-  expect_code 0 "$rc" "squash-prerebase-later-main: teardown should accept a pre-rebase copy that merged a main commit the PR head lacks"$'\n'"$(cat "$case_dir/stderr")"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "squash-prerebase-later-main: teardown printed a REFUSED line"
-  pass "squash-merged PR accepts a pre-rebase copy that merged a later main commit the PR head lacks"
+  [ "$rc" -ne 0 ] || fail "squash-prerebase-later-main: teardown let a copy go whose a.txt the default branch rewrote"
+  assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "squash-prerebase-later-main: the refusal does not say not landed"
+  assert_present "$case_dir/state/task-x1.meta" "squash-prerebase-later-main: the record was closed"
+  [ -d "$case_dir/wt" ] || fail "squash-prerebase-later-main: the copy was removed"
+  assert_refusal_retained_task_state "$case_dir" squash-prerebase-later-main "$local_head"
+  ! refusal_names_subject "$case_dir/stderr" 'main moves' \
+    || fail "squash-prerebase-later-main: the refusal names the main commit the copy's merge brought in"
+  pass "squash-merged PR refuses a pre-rebase copy whose a.txt the PR's review edit changed on the default branch"
 }
+
 
 # PR 93 shape: the copy is an earlier iteration the pipeline rebuilt as different
 # commits, so the PR head shares nothing with it.
@@ -1467,6 +2367,85 @@ test_pipeline_input_refuses_when_the_run_table_lacks_the_input_column() {
   assert_pipeline_input_refusal "$case_dir" pipeline-input-no-column "$local_head" \
     "missing column(s) submitted_head_sha"
   pass "merged PR still refuses and names the column when the run table has no input head"
+}
+
+# The copy's one commit adds a feature; the run pushed that commit plus one
+# pipeline commit, and that pushed head is the PR head that was squash-merged onto
+# origin's default branch. With record=yes the no-mistakes run record names this
+# copy's HEAD as the input of the run that pushed the merged head.
+#   revert: the pipeline commit removes the feature, so the default branch lacks it.
+#   extend: the pipeline commit only adds a separate new file.
+pipeline_input_content_case() {  # <name> <revert|extend> <record yes|no>
+  local name=$1 pipeline=$2 record=$3 case_dir tmp local_head pr_head
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  tmp="$case_dir/_pipeline"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" fetch -q "$case_dir/project" fm/task-x1
+  git -C "$tmp" checkout -q -b pr-branch FETCH_HEAD
+  # Each pipeline commit has its own message, so it is a new commit on top of
+  # the copy's own, never the copy's commit itself.
+  if [ "$pipeline" = revert ]; then
+    git -C "$tmp" rm -q -- feature.txt
+    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "pipeline: drop the feature"
+  else
+    printf '%s\n' reviewed > "$tmp/review.txt"
+    git -C "$tmp" add -- review.txt
+    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "pipeline: add review notes"
+  fi
+  pr_head=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/heads/pr-head"
+  git -C "$tmp" checkout -q main
+  git -C "$tmp" -c user.email=t@t -c user.name=t merge -q --squash pr-branch >/dev/null
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "squash PR 7"
+  git -C "$tmp" push -q origin HEAD:main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin pr-head main
+  [ "$record" = no ] || write_nm_run_record "$case_dir" 01RUNINPUT "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  append_pr_meta_url "$case_dir"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  printf '%s\n' "$case_dir"
+}
+
+# The run record is a positive proof of its own (Main 1907): a copy that is
+# exactly the recorded input of the run that pushed the merged head lands even
+# when a later pipeline commit dropped its change. Without the record the same
+# copy refuses and names its commit; a copy whose content the default branch
+# holds lands by that content alone.
+test_pipeline_input_copy_lands_by_its_run_record_or_its_content() {
+  local case_dir rc before
+  case_dir=$(pipeline_input_content_case pipeline-input-reverted-recorded revert yes)
+  git -C "$case_dir/project" show "refs/remotes/origin/main:feature.txt" >/dev/null 2>&1 \
+    && fail "pipeline-input-reverted-recorded: fixture bug: origin's default branch holds the dropped feature"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "pipeline-input-reverted-recorded: the recorded input of the merged run was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "pipeline-input-reverted-recorded: the record stayed open"
+
+  case_dir=$(pipeline_input_content_case pipeline-input-reverted revert no)
+  ! git -C "$case_dir/project" merge-base --is-ancestor "$(git -C "$case_dir/wt" rev-parse HEAD)" refs/remotes/origin/main \
+    || fail "pipeline-input-reverted: fixture bug: the copy's commit is in origin's default branch"
+  git -C "$case_dir/project" merge-base --is-ancestor "$(git -C "$case_dir/wt" rev-parse HEAD)" refs/remotes/origin/pr-head \
+    || fail "pipeline-input-reverted: fixture bug: the merged PR head does not build on the copy"
+  before=$(git -C "$case_dir/wt" rev-parse HEAD)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "pipeline-input-reverted: a copy with no run record whose change the default branch lacks was torn down"
+  assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "pipeline-input-reverted: the refusal does not say not landed"
+  refusal_names_subject "$case_dir/stderr" 'add feature' \
+    || fail "pipeline-input-reverted: the refusal does not name the commit the default branch lacks: $(cat "$case_dir/stderr")"
+  assert_present "$case_dir/state/task-x1.meta" "pipeline-input-reverted: the record was closed over work the default branch lacks"
+  [ -d "$case_dir/wt" ] || fail "pipeline-input-reverted: the copy was removed"
+  [ "$(git -C "$case_dir/wt" rev-parse HEAD)" = "$before" ] || fail "pipeline-input-reverted: the copy's HEAD changed"
+
+  case_dir=$(pipeline_input_content_case pipeline-input-extended extend no)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "pipeline-input-extended: a copy whose content the default branch holds was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "pipeline-input-extended: the record stayed open"
+  pass "the recorded input of the merged run lands even when the PR later dropped its change; without the record it refuses, and landed content lands alone"
 }
 
 test_pr_check_does_not_refresh_stale_pr_head() {
@@ -4124,6 +5103,23 @@ SH
 
 
 teardown_test_cases=(
+test_reverted_replay_is_not_landed
+test_detached_reverted_replay_without_pr_meta_is_not_landed
+test_true_merge_of_a_pipeline_head_that_dropped_the_change_lands_by_ancestry
+test_exact_head_proof_reads_a_refreshed_default_branch
+test_completion_pr_is_recorded_only_for_the_copys_own_head
+test_branch_pr_lookup_reads_every_pr
+test_branch_pr_lookup_treats_a_full_page_as_incomplete
+test_completion_pr_is_named_only_on_head_equality
+test_detached_copy_is_judged_through_the_record_branch
+test_detached_copy_unlanded_work_is_still_refused
+test_named_branch_copy_without_pr_meta_behaves_as_before
+test_unsafe_merge_notified_marker_keeps_the_record
+test_unremovable_merge_notified_marker_leaves_a_retry
+test_marker_unlink_failure_after_the_rename_leaves_a_retry
+test_record_removal_failure_restores_the_marker
+test_empty_or_malformed_marker_refuses_before_anything_is_removed
+test_detached_copy_finds_the_merged_pr_among_several
 test_empty_recorded_slot_nested_drop
 test_recorded_slot_lost_lease_still_refuses
 test_recorded_slot_intact_lease_completes
@@ -4147,6 +5143,7 @@ test_scout_report_must_be_a_regular_nonempty_file
 test_no_mistakes_truly_unpushed_refuses
 test_squash_merged_branch_deleted_allows
 test_task_archives_reap_only_carried_refs
+test_task_archive_kept_after_its_change_was_replayed_then_reverted
 test_task_archives_ignore_other_tasks_and_non_custody_names
 test_task_archives_keep_unproven_and_checked_out_refs
 test_task_archives_keep_links_to_other_refs
@@ -4157,6 +5154,7 @@ test_task_archives_keep_refs_when_forge_is_unreachable
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows
 test_squash_merged_pr_allows_replayed_unpushed_patch
+test_squash_merged_replayed_patch_over_unlanded_parent_refuses
 test_landed_proof_ignores_unresolvable_git_directory_in_cwd
 test_merged_pr_with_later_local_commit_refuses
 test_squash_merged_rebased_branch_allows
@@ -4168,7 +5166,8 @@ test_squash_merged_pushed_prerebase_copy_allows
 test_squash_pushed_missing_subject_match_ignores_hash_boundary
 test_squash_merged_pushed_prerebase_copy_missing_commit_refuses
 test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
-test_squash_merged_prerebase_copy_with_a_later_main_merge_allows
+test_squash_merged_prerebase_copy_with_a_later_main_merge_refuses
+test_pipeline_input_copy_lands_by_its_run_record_or_its_content
 test_pipeline_input_diverged_iteration_allows
 test_pipeline_input_rewritten_by_pipeline_allows
 test_pipeline_input_slow_record_read_still_proves_the_copy

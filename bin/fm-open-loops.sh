@@ -20,6 +20,9 @@
 # Printing the list delivers nothing.
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.
+# For a working ship whose copy's content is on the default branch with no done
+# report and no merged PR, the request also asks the worker to report done if its
+# work is finished.
 # A pending request suppresses repeats under the same ledger lock. Secondmate sends
 # use fm-send's existing pending-reply correlation, recovery and escalation; ordinary
 # workers report before moving the inbox record into handled/, whose absence is
@@ -57,8 +60,8 @@
 # --heartbeat also atomically publishes state/open-loops.json. The watcher runs it as a
 # detached helper and surfaces overdue rows as a durable check wake; there is no daemon.
 # Sources: the fleet snapshot (backlog and direct reports), status logs, task worktrees,
-# unhandled captured Lavish board answers, interrupted teardown records, the no-mistakes run store, and
-# discovered GitHub pull requests.
+# unhandled captured Lavish board answers, interrupted teardown records, recorded teardown refusals, the
+# no-mistakes run store, and discovered GitHub pull requests.
 # docs/configuration.md owns config/open-loops.json, row fields, age limits, quota
 # refusal, coverage degradation, and supported proof limits. Use --json for each row's limit_seconds.
 # Examples: fm-open-loops.sh; fm-open-loops.sh --json; fm-open-loops.sh --heartbeat

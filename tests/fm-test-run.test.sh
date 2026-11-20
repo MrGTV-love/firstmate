@@ -2480,13 +2480,18 @@ shard_fixture_init() {
   local dir=$1 name weight=${2:-1} filler_weight=${3:-1}
   mkdir -p "$dir/bin" "$dir/tests"
   cp "$RUNNER" "$dir/bin/fm-test-run.sh"
-  # Keep coverage fixtures independent of production duration growth.
+  # Keep coverage fixtures independent of production duration growth. The
+  # optional boundary weight changes only the script tested at that boundary.
+  # Unmeasured production scripts weigh 1 too, so a newly added suite cannot
+  # move the fixture's packing.
   python3 - "$dir/bin/fm-test-run.sh" "$weight" "$filler_weight" <<'PY' \
     || fail "could not seed the fixture's measured timing input"
 from pathlib import Path
 import re, sys
 runner = Path(sys.argv[1])
 text = runner.read_text()
+text, count = re.subn(r"(?m)^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=[0-9]+$", "PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=1", text)
+assert count == 1, "fixture runner has no single PORTABLE_SERIAL_DEFAULT_WEIGHT_MS line"
 start = text.index("portable_serial_weight_hints() {")
 end = text.index("\nEOF", start)
 text = text[:start] + re.sub(

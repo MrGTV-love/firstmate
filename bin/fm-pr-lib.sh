@@ -77,6 +77,7 @@ FM_PR_POLL_EXPECT_TEMPLATE_HASH=
 FM_PR_POLL_EXPECT_DATA_IDENTITY=
 FM_PR_POLL_EXPECT_CHECK_IDENTITY=
 FM_PR_POLL_TEMPLATE=
+FM_PR_POLL_CHECK_RENAMED=0
 FM_PR_POLL_STATE_DEVICE=
 FM_PR_POLL_SNAPSHOT_ID=
 FM_PR_POLL_SNAPSHOT_PROVIDER=
@@ -560,20 +561,146 @@ fm_pr_poll_cleanup() {
   FM_PR_POLL_REG_TMP=
 }
 
+# Every version of bin/fm-pr-poll.sh opens with these two lines; they are its
+# generator mark.
+FM_PR_POLL_GENERATOR_MARK='# Static watcher program for a validated '
+
+# 0 when <file> is a merge poll check that Firstmate wrote for task <id>, proven
+# by its bytes (Main 1820 F5): a regular file, not a link, with no custom-check
+# trust record for <id>, whose SHA-256 is the poll template's, or the template
+# hash that this task's poll registration or retirement receipt recorded, or whose
+# first two lines are the template's generator mark, as in a poll of an earlier
+# template version (Main 1871: never classed custom by default). A receipt on
+# record proves nothing by itself: a check matching none of these is another check.
+fm_pr_poll_check_bytes_ours() {  # <state> <id> <template> <file>
+  local state=$1 id=$2 template=$3 file=$4 hash expected first='' second=
+  [ ! -e "$state/$id.check-trust" ] && [ ! -L "$state/$id.check-trust" ] || return 1
+  [ -f "$file" ] && [ ! -L "$file" ] || return 1
+  hash=$(fm_pr_sha256 "$file") || return 1
+  [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || return 1
+  expected=$(fm_pr_sha256 "$template") || expected=
+  [ "$hash" != "$expected" ] || return 0
+  expected=$(fm_pr_poll_registration_parse "$state/$id.pr-poll-registration" >/dev/null 2>&1 \
+    && [ "$FM_PR_REG_ID" = "$id" ] && printf '%s' "$FM_PR_REG_TEMPLATE_HASH") || expected=
+  [ -z "$expected" ] || [ "$hash" != "$expected" ] || return 0
+  expected=$(fm_pr_poll_retirement_parse "$state/$id.pr-poll-retirement" >/dev/null 2>&1 \
+    && [ "$FM_PR_RETIRE_ID" = "$id" ] && printf '%s' "$FM_PR_RETIRE_TEMPLATE_HASH") || expected=
+  [ -z "$expected" ] || [ "$hash" != "$expected" ] || return 0
+  { IFS= read -r first; IFS= read -r second; } < "$file" 2>/dev/null || true
+  [ "$first" = '#!/usr/bin/env bash' ] || return 1
+  case "$second" in "$FM_PR_POLL_GENERATOR_MARK"*) return 0 ;; esac
+  return 1
+}
+
+# 0 when state/<id>.check.sh may receive the merge poll: the name is free, or it
+# holds a merge poll check that Firstmate wrote for this task, proven by its bytes
+# (fm_pr_poll_check_bytes_ours). Anything else is another check
+# (bin/fm-check-register.sh), and a merge poll is never published over it or
+# removed in its place (Main 1686 F3, Main 1820 F5).
+fm_pr_poll_check_dest_replaceable() {  # <state> <id> <template>
+  local dest="$1/$2.check.sh"
+  [ ! -e "$1/$2.check-trust" ] && [ ! -L "$1/$2.check-trust" ] || return 1
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+    return 0
+  fi
+  fm_pr_poll_check_bytes_ours "$1" "$2" "$3" "$dest"
+}
+
+# Set to 1 when a publication stopped because state/<id>.check.sh is another check.
+FM_PR_POLL_CHECK_CONFLICT=0
+
+# Puts the prepared check at its name without ever replacing another check, even
+# one written after the last guard (Main 1820 F5): a check already there is first
+# moved aside and proven by its bytes, and the new one is then linked into the
+# free name, which fails rather than replace anything that took it meanwhile. A
+# moved check that is not ours is put back exactly as it was.
+fm_pr_poll_check_place() {
+  local dest=$FM_PR_POLL_CHECK_DEST state=${FM_PR_POLL_CHECK_DEST%/*} aside=
+  if [ -e "$dest" ] || [ -L "$dest" ]; then
+    aside=$(mktemp "$state/.fm-pr-poll-prior.XXXXXX") || return 1
+    if ! mv -f -- "$dest" "$aside"; then
+      rm -f -- "$aside"
+      return 1
+    fi
+    if ! fm_pr_poll_check_bytes_ours "$state" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE" "$aside"; then
+      # shellcheck disable=SC2034 # Read by bin/fm-pr-check.sh to word the refusal.
+      FM_PR_POLL_CHECK_CONFLICT=1
+      if ln -P -- "$aside" "$dest" 2>/dev/null; then
+        rm -f -- "$aside"
+      else
+        echo "error: $dest is another check; it was moved to $aside to be replaced and could not be put back because the name was taken again; both are kept" >&2
+      fi
+      return 1
+    fi
+  fi
+  if ! ln -P -- "$FM_PR_POLL_CHECK_TMP" "$dest" 2>/dev/null; then
+    [ -z "$aside" ] || rm -f -- "$aside"
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      # shellcheck disable=SC2034 # Read by bin/fm-pr-check.sh to word the refusal.
+      FM_PR_POLL_CHECK_CONFLICT=1
+    fi
+    return 1
+  fi
+  FM_PR_POLL_CHECK_RENAMED=1
+  [ -z "$aside" ] || rm -f -- "$aside"
+  rm -f -- "$FM_PR_POLL_CHECK_TMP" || return 1
+  FM_PR_POLL_CHECK_TMP=
+}
+
+# The check name, during a rollback: removed only when this publication placed its
+# check there and the name's current bytes still hash-equal the bytes this run
+# wrote (FM_PR_POLL_EXPECT_TEMPLATE_HASH), with no trust record; it is moved aside
+# and hashed there first, so bytes written into the same file meanwhile are seen
+# (Main 1871 P-E). Anything else, a prior poll this run did not write included, is
+# left in place (put back exactly as it was) and named on stderr. The caller holds
+# the task's poll publication lock; bin/fm-check-register.sh takes no lock of its
+# own, so the byte comparison is what protects a check written concurrently.
+# 1 when the name could not be judged or put back.
+fm_pr_poll_check_revoke() {
+  local dest=$FM_PR_POLL_CHECK_DEST state=${FM_PR_POLL_CHECK_DEST%/*} aside hash=
+  [ -e "$dest" ] || [ -L "$dest" ] || return 0
+  if [ "$FM_PR_POLL_CHECK_RENAMED" != 1 ]; then
+    echo "notice: $dest was not written by this publication, so the rollback leaves it" >&2
+    return 0
+  fi
+  aside=$(mktemp "$state/.fm-pr-poll-revoke.XXXXXX") || return 1
+  if ! mv -f -- "$dest" "$aside"; then
+    rm -f -- "$aside"
+    return 1
+  fi
+  if [ -f "$aside" ] && [ ! -L "$aside" ]; then
+    hash=$(fm_pr_sha256 "$aside" 2>/dev/null) || hash=
+  fi
+  if [ -n "$hash" ] && [ "$hash" = "$FM_PR_POLL_EXPECT_TEMPLATE_HASH" ] \
+    && [ ! -e "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ] && [ ! -L "$state/$FM_PR_POLL_EXPECT_ID.check-trust" ]; then
+    rm -f -- "$aside"
+    return
+  fi
+  if ln -P -- "$aside" "$dest" 2>/dev/null; then
+    rm -f -- "$aside"
+    echo "notice: $dest no longer holds the bytes this publication wrote, so the rollback leaves it" >&2
+    return 0
+  fi
+  echo "error: $dest is not this publication's check and could not be put back after the rollback moved it; it is kept at $aside" >&2
+  return 1
+}
+
 fm_pr_poll_revoke_final() {
   local failed=0
   # Neutralize the runnable name first so a failed rearm cannot consume state
   # whose transactional registration did not commit successfully.
-  if [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; then
-    rm -f -- "$FM_PR_POLL_CHECK_DEST" || failed=1
-  fi
+  fm_pr_poll_check_revoke || failed=1
   if [ -e "$FM_PR_POLL_REG_DEST" ] || [ -L "$FM_PR_POLL_REG_DEST" ]; then
     rm -f -- "$FM_PR_POLL_REG_DEST" || failed=1
   fi
   if [ -e "$FM_PR_POLL_DATA_DEST" ] || [ -L "$FM_PR_POLL_DATA_DEST" ]; then
     rm -f -- "$FM_PR_POLL_DATA_DEST" || failed=1
   fi
-  [ ! -e "$FM_PR_POLL_CHECK_DEST" ] && [ ! -L "$FM_PR_POLL_CHECK_DEST" ] || failed=1
+  if [ -f "$FM_PR_POLL_CHECK_DEST" ] && [ ! -L "$FM_PR_POLL_CHECK_DEST" ] && [ "$FM_PR_POLL_CHECK_RENAMED" = 1 ] \
+    && [ "$(fm_pr_sha256 "$FM_PR_POLL_CHECK_DEST" 2>/dev/null)" = "$FM_PR_POLL_EXPECT_TEMPLATE_HASH" ] \
+    && [ ! -e "${FM_PR_POLL_CHECK_DEST%/*}/$FM_PR_POLL_EXPECT_ID.check-trust" ]; then
+    failed=1
+  fi
   [ ! -e "$FM_PR_POLL_REG_DEST" ] && [ ! -L "$FM_PR_POLL_REG_DEST" ] || failed=1
   [ ! -e "$FM_PR_POLL_DATA_DEST" ] && [ ! -L "$FM_PR_POLL_DATA_DEST" ] || failed=1
   return "$failed"
@@ -654,8 +781,15 @@ fm_pr_poll_prepare() {
 # The caller holds the task's poll publication lock while publishing this
 # prepared generation, so no registration can name another generation's files.
 fm_pr_poll_publish_prepared() {
+  FM_PR_POLL_CHECK_CONFLICT=0
+  FM_PR_POLL_CHECK_RENAMED=0
   [ -n "$FM_PR_POLL_DATA_TMP" ] && [ -n "$FM_PR_POLL_CHECK_TMP" ] \
     && [ -n "$FM_PR_POLL_REG_TMP" ] || return 1
+  # Nothing is published over another check: refuse before the first rename.
+  if ! fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
+    FM_PR_POLL_CHECK_CONFLICT=1
+    return 1
+  fi
   fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_DATA_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
   fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_REG_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
   fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
@@ -699,12 +833,18 @@ fm_pr_poll_publish_prepared() {
     return 1
   fi
 
-  if ! fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" \
-    || ! mv -f -- "$FM_PR_POLL_CHECK_TMP" "$FM_PR_POLL_CHECK_DEST"; then
+  # And again just before the runnable name is replaced.
+  if ! fm_pr_poll_check_dest_replaceable "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
+    # shellcheck disable=SC2034 # Read by bin/fm-pr-check.sh to word the refusal.
+    FM_PR_POLL_CHECK_CONFLICT=1
     fm_pr_poll_revoke_final || true
     return 1
   fi
-  FM_PR_POLL_CHECK_TMP=
+  if ! fm_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" \
+    || ! fm_pr_poll_check_place; then
+    fm_pr_poll_revoke_final || true
+    return 1
+  fi
   if ! fm_pr_poll_artifacts_valid "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
     fm_pr_poll_revoke_final || true
     return 1
@@ -1138,17 +1278,19 @@ fm_pr_forgejo_login() {  # <host>
   tea login list --output json 2>/dev/null | jq -er --arg h "$1" "$FM_PR_FORGEJO_LOGIN_JQ" 2>/dev/null
 }
 
-# The state, merged flag, and head commit of one Forgejo pull request, read
+# The state, merged flag, head commit and merge commit (empty when the record
+# names none) of one Forgejo pull request, read
 # from the REST record through "tea api" so the credential never leaves tea.
 # "tea api" exits 0 on an HTTP error and prints the error body instead, so
 # only a record whose state, merged, and head.sha fields all have the expected
 # types is accepted; anything else returns 1 for an honest unknown.
 fm_pr_forgejo_read_record() {  # <host> <path> <number>
   local host=$1 path=$2 number=$3 login json fields line
-  local total=0 named=0 state='' merged='' head=''
+  local total=0 named=0 state='' merged='' head='' merge=''
   FM_PR_RECORD_STATE=
   FM_PR_RECORD_MERGED=
   FM_PR_RECORD_HEAD=
+  FM_PR_RECORD_MERGE_COMMIT=
   command -v jq >/dev/null 2>&1 || return 1
   case "$number" in
     ''|*[!0-9]*) return 1 ;;
@@ -1165,7 +1307,8 @@ fm_pr_forgejo_read_record() {  # <host> <path> <number>
       then
         "state=" + .state,
         "merged=" + (.merged | tostring),
-        "head=" + .head.sha
+        "head=" + .head.sha,
+        "merge=" + (if (.merge_commit_sha | type) == "string" then .merge_commit_sha else "" end)
       else
         error("invalid pull request record")
       end' 2>/dev/null); then
@@ -1177,13 +1320,14 @@ fm_pr_forgejo_read_record() {  # <host> <path> <number>
       state=*) state=${line#state=} ;;
       merged=*) merged=${line#merged=} ;;
       head=*) head=${line#head=} ;;
+      merge=*) merge=${line#merge=} ;;
       *) continue ;;
     esac
     named=$((named + 1))
   done <<FIELDS
 $fields
 FIELDS
-  if [ "$named" -ne 3 ] || [ "$total" -ne 3 ] || [ -z "$state" ] \
+  if [ "$named" -ne 4 ] || [ "$total" -ne 4 ] || [ -z "$state" ] \
     || { [ "$merged" != true ] && [ "$merged" != false ]; }; then
     return 1
   fi
@@ -1197,6 +1341,9 @@ FIELDS
   # Consumed by bin/fm-teardown.sh pr_is_merged.
   # shellcheck disable=SC2034
   FM_PR_RECORD_HEAD=$head
+  # Consumed by bin/fm-teardown.sh pr_is_merged; empty when the forge names none.
+  # shellcheck disable=SC2034
+  FM_PR_RECORD_MERGE_COMMIT=$merge
 }
 
 # gerrit-axi resolves its server from the current directory's origin remote
@@ -1569,8 +1716,11 @@ fm_pr_poll_merge_mark_notified() {  # <state> <id> <provider> <host> <path> <num
   fi
 }
 
-# Removed at teardown alongside the other per-task PR-poll artifacts
-# (bin/fm-teardown.sh) so a retired task id leaves no residue behind.
+# bin/fm-teardown.sh moves the marker aside before it removes the task record and
+# deletes it after (merge_marker_retire_begin and _finish), so a retired task id
+# leaves no residue and a marker that cannot be moved stops teardown with the
+# record in place; until then the marker, or its set-aside copy, tells
+# bin/fm-pr-ready-reconcile.sh the merge was already delivered.
 fm_pr_poll_merge_notified_remove() {  # <state> <id>
   local state=$1 id=$2 marker
   fm_pr_task_id_valid "$id" || return 1

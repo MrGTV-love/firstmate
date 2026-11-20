@@ -30,10 +30,18 @@ DEFAULT_AGES = {
     "failed_task": 1800, "completed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
+# Finished or unaccepted work with an open record adds rows, never a timer: each borrows an existing age class.
+AGE_CLASS = {"pending_cleanup": "interrupted_teardown", "pending_acceptance": "open_pr"}
+# bin/fm-dod-lib.sh's refusal of a done claim because the no-mistakes daemon is down: a wait. A refusal because no
+# run exists or the run is otherwise unreadable is not this wait and keeps its row.
+NM_DAEMON_DOWN = "the no-mistakes daemon is down"
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
                  "Reply through your supervised status/report channel before acknowledging this inbox message; "
                  "secondmates must preserve the request correlation in their parent-channel reply. "
                  "Handle this at your next safe checkpoint; do not interrupt a running step.")
+# Added to the check-in of a working ship whose copy's content is on the default branch with no done report and no
+# merged PR (Main 1968, Main 2009); every other check-in sends CHECK_IN_TEXT alone.
+REPORT_DONE_ASK = "If your work is finished, report done so its cleanup can follow."
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
@@ -101,6 +109,31 @@ def epoch(value):
     return int((parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)).timestamp())
 
 
+
+def read_with_ctime(path):
+    """(status-change time in nanoseconds, text) of one regular file, both read from the same open handle.
+
+    Replacing or removing a file also changes the replaced file's status-change time, so the read is accepted
+    only when, afterwards, the path still names the same linked file with the same time; otherwise it is read
+    again, and a file that keeps changing is an OSError (Main 1871: unknown is never a value).
+    """
+    for _ in range(3):
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise OSError(f"{path} is not a regular file")
+            with os.fdopen(os.dup(fd), "r", encoding="utf-8", errors="replace") as handle:
+                text = handle.read()
+            after = os.fstat(fd)
+        finally:
+            os.close(fd)
+        current = os.stat(path, follow_symlinks=False)
+        if (after.st_nlink > 0 and after.st_ctime_ns == info.st_ctime_ns
+                and (current.st_dev, current.st_ino, current.st_ctime_ns) == (info.st_dev, info.st_ino, info.st_ctime_ns)):
+            return info.st_ctime_ns, text
+    raise OSError(f"{path} changed while it was read")
+
 def mtime(path):
     try:
         return int(Path(path).stat().st_mtime)
@@ -140,6 +173,7 @@ class Collector:
         self.backlog = []
         self.prs = {}
         self.missing_heads = {}
+        self.report_done_asked = set()
         self.state_files = []
         self.owned_urls = set()
         self.owned_branches = set()
@@ -305,7 +339,7 @@ class Collector:
         """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
-        limit = self.ages[category]
+        limit = self.ages[AGE_CLASS.get(category, category)]
         row = dict(id=identity, category=category, subject=str(subject), owner=owner,
                    next_action=action, age_seconds=age, limit_seconds=limit,
                    overdue=not informational and (age is None or age >= limit), evidence=str(evidence)[:400])
@@ -472,7 +506,8 @@ class Collector:
         env = dict(self.env)
         if task.get("spawn_gen"):
             env["FM_SEND_EXPECTED_SPAWN_GEN"] = task["spawn_gen"]
-        self.run([BIN / "fm-send.sh", task_id, "--answers-none", CHECK_IN_TEXT], env=env)
+        text = CHECK_IN_TEXT + (" " + REPORT_DONE_ASK if task_id in self.report_done_asked else "")
+        self.run([BIN / "fm-send.sh", task_id, "--answers-none", text], env=env)
         return dict(check_in="sent", subject=task_id)
 
     def recorded_stop(self, task):
@@ -695,6 +730,25 @@ class Collector:
         return self.git(worktree, "rev-list", "--reverse", "--cherry-pick", "--right-only",
                         "--no-merges", base + "...HEAD").splitlines()
 
+    def unproven_merges(self, worktree, base, cover=None):
+        """Every merge commit on HEAD beyond base that the PR head cover lacks (Main 1871 P-B, Main 1907).
+
+        No merge machinery proves a merge commit. unlanded() asks this only after the landed rule found the copy
+        not landed, so a merge commit whose change base holds never reaches here; one the open or merged
+        PR head carries is that PR's row to own.
+        """
+        return self.git(worktree, "rev-list", "--merges", base + "..HEAD", *(["^" + cover] if cover else [])).split()
+
+    def present_pr_head(self, worktree, pr):
+        """The open or merged PR's head commit when this copy holds it, else None."""
+        if not pr or not (pr.get("merged_at") or pr.get("state") == "open"):
+            return None
+        head = (pr.get("head") or {}).get("sha")
+        if not head or not self.run(["git", "-C", worktree, "rev-parse", "--verify", "--quiet", head + "^{commit}"],
+                                    missing_ok=True).strip():
+            return None
+        return head
+
     def pr_pending(self, worktree, pending, pr):
         head = pr["head"]["sha"]
         # rev-parse --verify --quiet exits 1 without output only for an absent object; any other failure still raises.
@@ -719,25 +773,61 @@ class Collector:
             self.missing_heads[task["id"]] = str(missing)
             return None
 
-    def content_in_default(self, worktree, base):
-        default_tree = self.git(worktree, "rev-parse", base + "^{tree}")
-        try:
-            objects = self.git(worktree, "rev-parse", "--path-format=absolute", "--git-path", "objects")
-            with tempfile.TemporaryDirectory(prefix="fm-open-loops-objects-") as temporary:
-                env = dict(self.env, GIT_OBJECT_DIRECTORY=temporary,
-                           GIT_ALTERNATE_OBJECT_DIRECTORIES=objects)
-                merged_tree = self.run(["git", "-C", worktree, "merge-tree", "--write-tree",
-                                        base, "HEAD"], env=env).splitlines()[0]
-        except RuntimeError:
-            return False
-        return merged_tree == default_tree
+    def landed(self, worktree, base, pr):
+        """The landed rule bin/fm-teardown.sh acts on, read from its one owner (AGENTS.md hard rule 3).
+
+        bin/fm-task-copy-lib.sh fm_task_copy_landed decides by the default branch's content, or for a merged PR
+        by its exact head in the default branch's history or by the forge's merge commit there over a head that
+        carries this copy; fm_task_copy_pipeline_input decides by the no-mistakes run record. Only a PR the forge
+        reports merged lends its head, merge commit and URL. A record read that cannot answer raises, so the
+        task's row says landing could not be read; it is never landed.
+        """
+        merged = pr if pr and pr.get("merged_at") else {}
+        out = self.run(["bash", "-c",
+            '. "$1/fm-pr-lib.sh"; . "$1/fm-task-copy-lib.sh"; . "$1/fm-nm-run-lib.sh"; '
+            'if fm_task_copy_landed "$2" "$3" HEAD "$4" "$5"; then echo landed; exit 0; fi; '
+            'if [ -z "$6" ] || ! fm_pr_head_valid "$4" || ! command -v python3 >/dev/null; then exit 1; fi; '
+            'db=$(fm_nm_state_db "$2"); [ -f "$db" ] || exit 1; '
+            'rows=$(python3 -I - "$db" "$6" <<<"$FM_TASK_COPY_RUN_RECORD_PY") || exit 3; '
+            'rc=0; fm_task_copy_pipeline_input "$(git -C "$2" rev-parse HEAD)" "$4" "$6" "$db" "$rows" || rc=$?; '
+            'if [ "$rc" -eq 0 ]; then echo landed; exit 0; fi; [ "$rc" -ne 2 ] || exit 3; exit 1',
+            "open-loops", BIN, worktree, base, (merged.get("head") or {}).get("sha") or "",
+            merged.get("merge_commit_sha") or "", merged.get("html_url") or ""], missing_ok=True)
+        return out.strip() == "landed"
 
     def captain_dropped(self, task):
         return any(record.get("id") == task["id"] and record.get("captain_drop") for record in self.backlog)
 
     def deliverable_landed(self, task):
-        if self.captain_dropped(task):
+        return self.captain_dropped(task) or self.copy_landed(task)
+
+    def delivered(self, task):
+        """deliverable_landed with positive evidence that something was delivered.
+
+        A clean copy whose HEAD is still on the default branch shows no pending commits whether its work
+        fast-forward landed or it never committed. Without a merged PR, a ruling or a report, its own work is
+        on record only when its HEAD is not on the default branch (its content landed another way, such as a
+        squash) or its HEAD moved off the recorded slot base (slot_base_sha=).
+        """
+        if not self.deliverable_landed(task):
+            return False
+        if self.captain_dropped(task) or task["kind"] == "scout":
             return True
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if pr and pr.get("merged_at"):
+            return True
+        worktree = self.task_worktree(task)
+        if not worktree:
+            return False
+        base = self.default_ref(worktree, task.get("mode"))
+        head = self.git(worktree, "rev-parse", "HEAD").strip()
+        if self.git(worktree, "rev-list", "--count", f"{base}..{head}").strip() != "0":
+            return True
+        slot_base = self.read_fields(self.state / (task["id"] + ".meta")).get("slot_base_sha", "")
+        return bool(slot_base) and head != slot_base
+
+    def copy_landed(self, task):
+        """The task's own report or copy carries its deliverable, whatever a recorded ruling says."""
         if task["kind"] == "scout":
             report = self.data / task["id"] / "report.md"
             return report.is_file() and not report.is_symlink() and report.stat().st_size > 0
@@ -747,13 +837,7 @@ class Collector:
             return bool(pr and pr.get("merged_at"))
         if self.git(worktree, "status", "--porcelain"):
             return False
-        if pr and pr.get("merged_at"):
-            uncovered = self.pr_head_pending(task, worktree, None, pr)
-            if uncovered == []:
-                return True
-        base = self.default_ref(worktree, task.get("mode"))
-        pending = self.pending_commits(worktree, base)
-        return not pending or self.content_in_default(worktree, base)
+        return self.landed(worktree, self.default_ref(worktree, task.get("mode")), pr)
 
     def unlanded(self, task):
         if task["kind"] != "ship" or self.captain_dropped(task):
@@ -762,14 +846,18 @@ class Collector:
         if not worktree:
             return
         base = self.default_ref(worktree, task.get("mode"))
-        pending = self.pending_commits(worktree, base)
-        if not pending or self.content_in_default(worktree, base):
-            return
         pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
-        if pr and (pr.get("merged_at") or pr.get("state") == "open"):
+        if self.landed(worktree, base, pr):
+            return
+        pending = self.pending_commits(worktree, base)
+        if pending and pr and (pr.get("merged_at") or pr.get("state") == "open"):
             covered = self.pr_head_pending(task, worktree, pending, pr)
             if covered is not None:
                 pending = covered
+        # A merge commit is never covered by its parents: one that carries a change of its own, conflicts, or
+        # joins more than two parents stays pending unless the PR head in this copy carries it.
+        merges = self.unproven_merges(worktree, base, self.present_pr_head(worktree, pr))
+        pending = pending + [c for c in merges if c not in pending]
         if not pending:
             return
         oldest = min(int(self.git(worktree, "show", "-s", "--format=%ct", c)) for c in pending)
@@ -1144,6 +1232,258 @@ class Collector:
                 value = line[len("spawn_gen="):]
         return value
 
+    def home_label(self):
+        """The home that owns this ledger's records: a secondmate's id in its own home, else the primary."""
+        if self.lane:
+            first = (self.home / ".fm-secondmate-home").read_text().splitlines()[:1]
+            return re.sub(r"\s", "", first[0]) if first else "secondmate"
+        return "firstmate"
+
+    def teardown_refusal(self, task_id):
+        """The newest refusal of this task's plain teardown on record, or empty.
+
+        Two owners record one: bin/fm-merge-prune.sh keeps it in state/<id>.merge-prune (state=retained, or
+        state=pending for a refusal it will retry), and
+        bin/fm-idle-session-reap.sh in state/.idle-reap/<id>.refused (fm-idle-reap-refused-v1: epoch, status line,
+        reason). A manual teardown records nothing.
+        """
+        return self.teardown_refusal_record(task_id)[0]
+
+    def teardown_refusal_record(self, task_id):
+        """(reason, producer) of the newest recorded refusal, or ("", "").
+
+        Newest means published last. Both producers write a temporary file and rename it into place, so the
+        file's write time is when the temporary was written, and the idle reaper's memo stamps the reaper's start
+        time; neither orders publication. A rename sets the file's status-change time, so records are ordered
+        by that, in nanoseconds. When two records were published at the same instant, both reasons are named,
+        in a fixed order, rather than one chosen. The prune record's reason may come from the prune's own landed
+        proof before any teardown ran, so it is labeled as the prune's. Each record's text and its time come from
+        one opened file (fstat on the handle that is read), so a rename between the two can never pair one
+        record's reason with another file's time (Main 1820 F7).
+        """
+        found = []
+        unreadable = []
+        prune = self.state / (task_id + ".merge-prune")
+        try:
+            published, text = read_with_ctime(prune)
+            fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+            if fields.get("state") in ("retained", "pending") and fields.get("reason"):
+                found.append((published, 0, fields["reason"], "recorded by bin/fm-merge-prune.sh"))
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            unreadable.append(f"{prune} ({error.strerror or error})")
+        memo_path = self.state / ".idle-reap" / (task_id + ".refused")
+        try:
+            published, text = read_with_ctime(memo_path)
+            memo = text.splitlines()
+            if len(memo) >= 4 and memo[0] == "fm-idle-reap-refused-v1" and memo[3] and memo[1].isdigit():
+                found.append((published, 1, memo[3],
+                              "a plain bin/fm-teardown.sh run by bin/fm-idle-session-reap.sh"))
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            unreadable.append(f"{memo_path} ({error.strerror or error})")
+        if unreadable:
+            # An unreadable record may hold the newest refusal, so no older one stands in for it (Main 1871
+            # P-A): the reason says what could not be read, and the ledger's coverage is degraded.
+            self.degraded.append("refusal record of " + task_id + ": " + "; ".join(unreadable))
+            return ("the last recorded refusal is unknown: " + "; ".join(unreadable) + " could not be read",
+                    "unreadable refusal record")
+        if not found:
+            return "", ""
+        newest = max(published for published, _, _, _ in found)
+        tied = sorted(record for record in found if record[0] == newest)
+        if len(tied) == 1:
+            return tied[0][2], tied[0][3]
+        return ("; ".join(f"{producer}: {reason}" for _, _, reason, producer in tied),
+                "published at the same instant by " + " and ".join(producer for _, _, _, producer in tied))
+
+    def covering_rows(self, ident, pr_url):
+        """The rows another source already raised for this task: its own subject, a keyed subject, or its PR."""
+        return [r for r in self.rows.values() if r["category"] not in ("silent_report", "coverage")
+                and (r["subject"] == ident or r["subject"].startswith(ident + ":") or (pr_url and r["subject"] == pr_url))]
+
+    def finished_class(self, task):
+        """Why a task whose deliverable is landed counts as finished, in words for the row's evidence."""
+        if self.captain_dropped(task):
+            return "a recorded ruling drops or supersedes it", None
+        if task["kind"] == "scout":
+            return "its scout report is delivered", None
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if pr and pr.get("merged_at"):
+            return "its PR merged: " + task["pr"]["url"], epoch(pr.get("merged_at"))
+        return "its work is already on the default branch", None
+
+    def completion_rows(self):
+        """Every open record whose work was reported done has a row until its record is gone.
+
+        A deliverable that is landed, delivered or ruled moot leaves the record awaiting plain teardown
+        (pending_cleanup); a done report with no accepted deliverable and no other row for the task awaits
+        acceptance (pending_acceptance). A completed_task row for the task owns its handoff instead of either.
+        Both are derived from the records alone, so a restart finds the same rows. A declared wait, an unanswered decision and a worker that is still running on an item the backlog
+        has not closed (a no-mistakes pipeline runs after the handoff `done`) own the task's next move and add
+        neither; a persistent secondmate is not in self.tasks. A recorded teardown refusal stays on the task's own
+        row, else on every row that covers the task.
+        """
+        owner = "home:" + self.home_label()
+        for task in self.tasks:
+            self.source("completion " + task["id"], self.completion_row, task, owner)
+
+    def completion_row(self, task, owner):
+        """One task's completion row; see completion_rows."""
+        ident = task["id"]
+        pr_url = task["pr"].get("url")
+        refusal, producer = self.teardown_refusal_record(ident)
+        refused = (f"the last recorded cleanup refusal ({producer}): {refusal}; the owning home clears that cause and "
+                   f"runs plain bin/fm-teardown.sh {ident} again (dropping the work needs the captain's own words)") if refusal else ""
+        _, verb, open_decision, pause_limit, _, _ = self.report_status(ident)
+        state = task["current_state"].get("state")
+        detail = task["current_state"].get("detail") or ""
+        backlog_closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog)
+        closed = backlog_closed or self.captain_dropped(task)
+        done_refused = verb == "done" and state == "blocked" and not closed and NM_DAEMON_DOWN not in detail
+        landed = None
+        if open_decision or pause_limit:
+            self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        # A merged PR is a finished deliverable whether or not the worker ever reported done.
+        pr = self.source("completion PR " + ident, self.pr_state, pr_url) if pr_url else None
+        merged = bool(pr and pr.get("merged_at"))
+        # A worker still reading working owns its task: landed content alone cannot tell its own landed commit from
+        # a sync to main, so it owes cleanup only after a done report or a merged PR (Main 1968). Its check-in row
+        # asks it to report done if its work is finished.
+        if not (closed or verb == "done" or state == "done" or merged):
+            if task["kind"] == "ship" and state == "working" \
+                    and self.source("finished deliverable " + ident, self.delivered, task):
+                self.report_done_asked.add(ident)
+                for row in self.rows.values():
+                    if row["category"] == "silent_report" and row["subject"] == ident:
+                        row["next_action"] = (f"{row['next_action']}; its copy's content is on the default branch: "
+                                              "if its work is finished, report done so its cleanup can follow")
+            self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        if merged and not self.captain_dropped(task) and self.merged_cleanup_blocked(task, ident, pr, refusal, refused):
+            return
+        if state in ("working", "paused", "blocked", "parked") and not closed and not done_refused:
+            # A worker still reading working after its done report may be running its pipeline: that is
+            # progress, not a stranded task. Once its deliverable is delivered, the cleanup is owed anyway.
+            if state == "working" and (verb == "done" or merged):
+                landed = self.source("finished deliverable " + ident, self.delivered, task)
+            if not landed:
+                self.attach_refusal(ident, pr_url, refusal, refused)
+                return
+        since = mtime(self.state / (ident + ".status")) or mtime(self.state / (ident + ".meta"))
+        gate = f"resolve the ship-done gate's refusal of the done claim of {ident}: {detail}"
+        if done_refused:
+            covering = self.covering_rows(ident, pr_url)
+            if covering:
+                # The row that already owns the task also names the gate's reason.
+                for row in covering:
+                    row["next_action"] = f"{row['next_action']}; {gate}"
+                    row["evidence"] = f"the ship-done gate did not accept the done claim: {detail}; {row['evidence']}"[:400]
+                self.attach_refusal(ident, pr_url, refusal, refused)
+                return
+            self.add("pending_acceptance", ident, gate + (f"; {refused}" if refused else ""), since, "firstmate",
+                     evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
+                              + "the last report was done and the ship-done gate did not accept it")
+            return
+        if landed is None:
+            landed = self.source("finished deliverable " + ident, self.delivered, task)
+        covering = self.covering_rows(ident, pr_url) if landed else []
+        handoff = [r for r in covering if r["category"] == "completed_task"]
+        if handoff or any(r["category"] == "interrupted_teardown" for r in covering):
+            # A delivered scout report still awaits its owner handoff, which completed_task already owns;
+            # that one row also names the cleanup that ends it. An interrupted slot return already owns the
+            # teardown that ends a landed task. Either row then carries the recorded refusal.
+            for row in handoff:
+                row["next_action"] = (f"{row['next_action']}; once it is accepted, run plain bin/fm-teardown.sh {ident}; "
+                                      "the record stays open until it succeeds")
+            self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        if landed:
+            why, merged_at = self.finished_class(task)
+            row_owner = owner
+            action = f"run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
+            if task["kind"] == "scout":
+                action = f"accept the delivered report, then run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
+            if refused:
+                action = refused
+            if self.captain_dropped(task) and task["kind"] != "scout" \
+                    and not self.source("dropped copy " + ident, self.copy_landed, task):
+                words = self.data / ident / "captain-drop.md"
+                row_owner = "firstmate"
+                if words.is_file() and not words.is_symlink() and words.stat().st_size > 0:
+                    action = (f"Main runs bin/fm-teardown.sh {ident} --force --drop-file {words} attended, citing the "
+                              "recorded drop ruling, because the copy holds work no PR or default branch carries; "
+                              "the ledger never runs it")
+                else:
+                    action = (f"the copy of {ident} holds work no PR or default branch carries and no captain's drop "
+                              f"words are recorded at {words}: Main needs the captain's own words before an attended "
+                              f"bin/fm-teardown.sh {ident} --force --drop-file")
+                if refusal:
+                    action = f"{action}; the last recorded cleanup refusal ({producer}): {refusal}"
+            self.add("pending_cleanup", ident, action, merged_at or since, row_owner,
+                     evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
+                              + f"finished: {why}; the record is still open")
+            return
+        if self.covering_rows(ident, pr_url):
+            self.attach_refusal(ident, pr_url, refusal, refused)
+            return
+        gone = task["endpoint"].get("exists") is False or task["endpoint"].get("agent_alive") in ("dead", "missing")
+        action = (f"review and accept the delivered work of {ident}, or relaunch its worker with "
+                  f"bin/fm-control.sh {ident} relaunch if it is incomplete" if gone else
+                  f"review and accept the delivered work of {ident}; its worker is still live")
+        if refused:
+            action = f"{action}; {refused}"
+        # The evidence names what put the task here: the last report, the task state, the closed backlog item, or
+        # the merged PR.
+        holds = [words for words, held in (("the last report was done", verb == "done"),
+                                           ("the task state is done", state == "done"),
+                                           ("its backlog item is closed", backlog_closed),
+                                           (f"its PR merged: {pr_url}", merged)) if held]
+        self.add("pending_acceptance", ident, action, since, owner,
+                 evidence=(f"last recorded cleanup refusal ({producer}): {refusal}; " if refusal else "")
+                          + " and ".join(holds) + ", and no accepted or landed deliverable is on record"
+                          + ("; landing could not be read" if landed is None else ""))
+
+    def merged_cleanup_blocked(self, task, ident, pr, refusal, refused):
+        """A merged task whose cleanup is refused is an owned, overdue-eligible pending_cleanup row (Main 1871 P-D).
+
+        Refused means its copy holds uncommitted work, or a teardown refusal is recorded while its deliverable is
+        not landed. The row carries the recorded refusal, or names the dirty copy; it is never informational, and
+        the dirty bytes stay where they are. True when this row was added.
+        """
+        worktree = self.task_worktree(task)
+        dirty = bool(worktree) and bool(self.source("copy status " + ident, self.git, worktree, "status", "--porcelain"))
+        if not dirty and not (refusal and not self.source("finished deliverable " + ident, self.delivered, task)):
+            return False
+        # A row that already covers the task keeps the refusal too.
+        self.attach_refusal(ident, task["pr"].get("url"), refusal, refused)
+        action = refused or (f"the copy of {ident} holds uncommitted work after its PR merged: commit and land it, "
+                             f"or obtain the captain's drop, then run plain bin/fm-teardown.sh {ident}; "
+                             "the record stays open until it succeeds")
+        self.add("pending_cleanup", ident, action, epoch(pr.get("merged_at")) or mtime(self.state / (ident + ".status")),
+                 "home:" + self.home_label(),
+                 evidence=(f"last recorded cleanup refusal: {refusal}; " if refusal else "")
+                          + f"its PR merged: {task['pr']['url']}; " + ("its copy is dirty" if dirty else "its deliverable is not landed"))
+        return True
+
+    def attach_refusal(self, ident, pr_url, refusal, refused):
+        """A recorded teardown refusal stays on every row that already covers the task.
+
+        When no other row covers it, the task's own report-silence row carries the refusal, so a working
+        ship with a dirty copy whose only row is its check-in still shows the last recorded refusal
+        (Main 1820 F7). That row is not a covering row: it never stands in for a completion row.
+        """
+        if not refusal:
+            return
+        rows = self.covering_rows(ident, pr_url) or [
+            r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident]
+        for row in rows:
+            row["next_action"] = f"{row['next_action']}; {refused}"
+            row["evidence"] = f"last recorded cleanup refusal: {refusal}; {row['evidence']}"[:400]
+
     def linked_record_text(self, marker, task_id):
         """The evidence text of a linked return-pending record, which counts as pending whatever it holds.
 
@@ -1227,6 +1567,7 @@ class Collector:
         self.source("questions", self.question_rows)
         self.source("board answers", self.board_answer_rows)
         self.source("interrupted teardowns", self.interrupted_teardown_rows)
+        self.source("completion", self.completion_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))

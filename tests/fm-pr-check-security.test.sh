@@ -24,6 +24,7 @@ fm_git_identity fmtest fmtest@example.invalid
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 REAL_CP=$(command -v cp)
 REAL_MV=$(command -v mv)
+REAL_LN=$(command -v ln)
 REAL_STAT=$(command -v stat)
 REAL_CHMOD=$(command -v chmod)
 # The merge path reads a merge request's JSON with the real jq, and BASE_PATH is
@@ -212,7 +213,9 @@ case " $* " in
   *" api repos/"*)
     printf '%s\n' '{"permissions":{"push":false}}'
     ;;
-  *" headRefOid "*) printf '%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" ;;
+  *" headRefOid "*)
+    [ "${FM_TEST_GH_HEAD_FAIL:-0}" = 0 ] || exit 1
+    printf '%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" ;;
   *" state "*)
     [ "${FM_TEST_GH_FAIL:-0}" = 0 ] || exit 1
     [ -z "${FM_TEST_GH_STATE_STARTED:-}" ] || : > "$FM_TEST_GH_STATE_STARTED"
@@ -826,6 +829,87 @@ test_multi_pr_task_registration_still_refuses_a_local_only_head() {
   pass "fm-pr-check registration refuses a multi-PR task's local-only head; only a merge call judges the PR's head"
 }
 
+# Exact forge/copy HEAD equality never stands in for the named-head gate (Main 1688
+# Q1): a head held only in the copy is refused when the forge reports another head,
+# when the forge read fails or yields no valid head, when the forge's head is a
+# commit neither the copy nor any remote ref knows, and also when the forge reports
+# exactly the copy's HEAD. The same exact head registers once origin's default
+# branch holds it, through the gate's own reachability proof.
+test_named_head_gate_is_never_bypassed_by_an_exact_forge_head() {
+  local dir pushed later case rc
+  for case in differs read-fails unreadable neither exact exact-on-default; do
+    dir=$(make_case "named-head-gate-$case")
+    fm_write_meta "$dir/home/state/task-a.meta" \
+      "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+      "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
+    pushed=$(git -C "$dir/wt" rev-parse HEAD)
+    git -C "$dir/wt" commit -q --allow-empty -m 'only in the copy'
+    later=$(git -C "$dir/wt" rev-parse HEAD)
+    [ -z "$(git -C "$dir/wt" for-each-ref --contains "$later" refs/remotes)" ] \
+      || fail "$case: a remote ref already holds the copy's HEAD"
+    [ "$case" != exact-on-default ] || git -C "$dir/wt" update-ref refs/remotes/origin/main "$later"
+    rc=0
+    case "$case" in
+      differs) FM_TEST_GH_HEAD=$pushed run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      read-fails) FM_TEST_GH_HEAD_FAIL=1 run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      unreadable) FM_TEST_GH_HEAD=not-a-head run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      neither) FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+      exact|exact-on-default) FM_TEST_GH_HEAD=$later run_check_entry "$dir" task-a https://github.com/o/r/pull/4 ;;
+    esac > "$dir/stdout" 2> "$dir/stderr" || rc=$?
+    if [ "$case" = exact-on-default ]; then
+      [ "$rc" -eq 0 ] || fail "exact-on-default: a head origin's default branch holds was refused: $(cat "$dir/stderr")"
+      grep -qxF 'pr=https://github.com/o/r/pull/4' "$dir/home/state/task-a.meta" || fail "exact-on-default: pr= was not recorded"
+      grep -qxF "pr_head=$later" "$dir/home/state/task-a.meta" || fail "exact-on-default: pr_head is not the forge's head"
+      [ -f "$dir/home/state/task-a.check.sh" ] || fail "exact-on-default: no merge poll was armed"
+      continue
+    fi
+    [ "$rc" -ne 0 ] || fail "$case: a head held only by the copy was registered"
+    grep -Fq "named head $later is unreachable outside the worker copy" "$dir/stderr" \
+      || fail "$case: the refusal did not name the copy-only head: $(cat "$dir/stderr")"
+    ! grep -q '^pr=' "$dir/home/state/task-a.meta" || fail "$case: the refusal still recorded pr="
+    [ ! -e "$dir/home/state/task-a.check.sh" ] || fail "$case: the refusal still armed a poll"
+  done
+  pass "fm-pr-check never lets an exact forge head stand in for the named-head gate; a copy-only head refuses in every case, and registers once the default branch holds it"
+}
+
+# A done note that leads with the PR URL names that PR to the completion gate.
+# With the copy gone it is accepted only on the merge poll's proof that this PR
+# merged; with no proof, or a proof for another PR, it still refuses.
+test_bare_url_done_note_with_missing_copy_needs_a_merge_proof() {
+  local dir state line rc out proof
+  dir=$(make_case bare-url-missing-copy)
+  state="$dir/home/state"
+  fm_write_meta "$state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/gone" \
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
+  line='done [at=1] [key=close-evidence]: https://github.com/o/r/pull/9 merged by another lane'
+  for proof in none other-pr merged; do
+    rm -f "$state/task-a.pr-poll-merge-notified"
+    case "$proof" in
+      other-pr) printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\no/r\n10\n' > "$state/task-a.pr-poll-merge-notified" ;;
+      merged) printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\no/r\n9\n' > "$state/task-a.pr-poll-merge-notified" ;;
+    esac
+    [ "$proof" = none ] || chmod 0600 "$state/task-a.pr-poll-merge-notified"
+    if [ "$proof" = merged ]; then
+      if ! { fm_pr_url_parse https://github.com/o/r/pull/9 \
+        && fm_pr_poll_merge_already_notified "$state" task-a "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER"; }; then
+        fail "the merged-marker fixture does not match the PR it names"
+      fi
+    fi
+    rc=0
+    # shellcheck source=/dev/null
+    out=$( . "$ROOT/bin/fm-dod-lib.sh"
+      fm_dod_accept_ship_done ship direct-PR "$dir/gone" "$dir/project" "$line" "$state" task-a "$state/task-a.meta" ) || rc=$?
+    if [ "$proof" = merged ]; then
+      [ "$rc" -eq 0 ] || fail "a bare-URL done note was refused for a merged PR whose copy is gone: $out"
+    else
+      [ "$rc" -eq 1 ] || fail "$proof: a bare-URL done note with no copy and no merge proof was accepted (rc=$rc)"
+      case "$out" in *"worktree missing"*) ;; *) fail "$proof: the refusal did not name the missing copy: $out" ;; esac
+    fi
+  done
+  pass "a bare-URL done note with its copy gone is accepted only on the merge proof for its own PR"
+}
+
 test_registration_identity_revalidation() {
   local provider mutation phase dir state url head rc artifact lock_path draft_hook
   for provider in github gitlab gerrit; do
@@ -1421,16 +1505,23 @@ test_live_artifact_single_link_and_privacy_validation() {
 }
 
 install_final_publication_fault() {
-  local dir=$1
-  cat > "$dir/fakebin/mv" <<'SH'
+  local dir=$1 tool
+  # The check name is placed by a no-clobber link and the other names by a
+  # rename, so the fault follows whichever tool first puts the final path in
+  # place, and fires once (a rollback that puts a file back does not re-fire it).
+  for tool in mv ln; do
+    cat > "$dir/fakebin/$tool" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
-"${FM_TEST_REAL_MV:?}" "$@" || exit $?
+case "${0##*/}" in mv) real=${FM_TEST_REAL_MV:?} ;; *) real=${FM_TEST_REAL_LN:-/bin/ln} ;; esac
+"$real" "$@" || exit $?
 [ "$last" = "${FM_TEST_FINAL_PATH:?}" ] || exit 0
+[ ! -e "${FM_TEST_FAULT_LINK_TARGET:?}.fired" ] || exit 0
+: > "$FM_TEST_FAULT_LINK_TARGET.fired"
 case "${FM_TEST_FINAL_ACTION:?}" in
   type)
     rm -f -- "$last"
-    ln -s "${FM_TEST_FAULT_LINK_TARGET:?}" "$last"
+    "${FM_TEST_REAL_LN:-/bin/ln}" -s "$FM_TEST_FAULT_LINK_TARGET" "$last"
     ;;
   mode) "${FM_TEST_REAL_CHMOD:?}" 0644 "$last" ;;
   content) printf 'faulted final bytes\n' > "$last" ;;
@@ -1438,6 +1529,7 @@ case "${FM_TEST_FINAL_ACTION:?}" in
   *) exit 2 ;;
 esac
 SH
+  done
   cat > "$dir/fakebin/stat" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
@@ -1448,7 +1540,7 @@ if [ "$last" = "${FM_TEST_FINAL_PATH:-}" ] && [ -e "${FM_TEST_FAULT_GATE:-/nonex
 fi
 exec "${FM_TEST_REAL_STAT:?}" "$@"
 SH
-  chmod +x "$dir/fakebin/mv" "$dir/fakebin/stat"
+  chmod +x "$dir/fakebin/mv" "$dir/fakebin/ln" "$dir/fakebin/stat"
 }
 
 assert_no_final_poll() {
@@ -1492,12 +1584,49 @@ test_postrename_poll_validation_revokes_and_retries() {
       install_final_publication_fault "$dir"
       if FM_TEST_FINAL_PATH="$destination" FM_TEST_FINAL_ACTION="$action" \
         FM_TEST_FAULT_LINK_TARGET="$link_target" FM_TEST_FAULT_GATE="$gate" \
-        FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REAL_STAT="$REAL_STAT" FM_TEST_REAL_CHMOD="$REAL_CHMOD" \
+        FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REAL_LN="$REAL_LN" FM_TEST_REAL_STAT="$REAL_STAT" FM_TEST_REAL_CHMOD="$REAL_CHMOD" \
         PATH="$dir/fakebin:$BASE_PATH" fm_pr_poll_publish_prepared; then
         fail "post-rename $artifact $action fault was reported as success"
       fi
       fm_pr_poll_cleanup
-      assert_no_final_poll "$state"
+      [ -e "$link_target.fired" ] || fail "post-rename $artifact $action: the fault never fired"
+      if [ "$artifact" != check ]; then
+        # The fault came before this publication placed its check, so the check
+        # name still holds the earlier poll, which this run did not write: the
+        # rollback leaves it (Main 1871 P-E). It is inert without its sidecar and
+        # registration, and the retry below replaces it by its bytes.
+        [ "$(shasum -a 256 < "$state/task-a.check.sh")" = "$(shasum -a 256 < "$POLL")" ] \
+          || fail "post-rename $artifact $action: the earlier poll's check was removed or changed"
+        [ ! -e "$state/task-a.pr-poll" ] && [ ! -L "$state/task-a.pr-poll" ] || fail "post-rename $artifact $action: a sidecar name was left"
+        [ ! -e "$state/task-a.pr-poll-registration" ] && [ ! -L "$state/task-a.pr-poll-registration" ] || fail "post-rename $artifact $action: a registration name was left"
+        ! fm_pr_poll_snapshot_capture "$state" task-a "$POLL" || fail "post-rename $artifact $action: the leftover passed the merge poll gate"
+      elif [ "$action" = type ] || [ "$action" = content ]; then
+        # A link swapped in, or other bytes written, after the check was placed is
+        # not what this publication wrote, so the rollback puts it back and never
+        # removes it (Main 1820 F5, Main 1827 Q1, Main 1871 P-E). It is inert: no
+        # registration, no sidecar and no trust record, so neither watcher gate runs it.
+        if [ "$action" = type ]; then
+          [ -L "$state/task-a.check.sh" ] || fail "post-rename check type: the swapped link was removed or replaced"
+        else
+          [ "$(cat "$state/task-a.check.sh")" = 'faulted final bytes' ] || fail "post-rename check content: the changed bytes were removed or replaced"
+        fi
+        [ ! -e "$state/task-a.pr-poll" ] && [ ! -L "$state/task-a.pr-poll" ] || fail "post-rename check $action: a sidecar name was left"
+        [ ! -e "$state/task-a.pr-poll-registration" ] && [ ! -L "$state/task-a.pr-poll-registration" ] || fail "post-rename check $action: a registration name was left"
+        [ ! -e "$state/task-a.check-trust" ] || fail "post-rename check $action: a trust record exists"
+        ! fm_pr_poll_snapshot_capture "$state" task-a "$POLL" || fail "post-rename check $action: the leftover passed the merge poll gate"
+        fm_custom_check_snapshot_cleanup
+        ! fm_custom_check_snapshot_prepare "$state" task-a || fail "post-rename check $action: the leftover passed the custom check gate"
+        fm_custom_check_snapshot_cleanup
+        # A retry never replaces it either; once it is removed, the retry publishes.
+        fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/2 github.com o/r 2 "$POLL" \
+          || fail "could not prepare poll retry"
+        ! PATH="$BASE_PATH" fm_pr_poll_publish_prepared || fail "post-rename check $action: a retry replaced a check that is not ours"
+        fm_pr_poll_cleanup
+        [ -e "$state/task-a.check.sh" ] || [ -L "$state/task-a.check.sh" ] || fail "post-rename check $action: the retry removed the leftover"
+        rm -f -- "$state/task-a.check.sh"
+      else
+        assert_no_final_poll "$state"
+      fi
       [ "$(cat "$link_target")" = 'external sentinel' ] || fail "poll type fault changed an external target"
       [ "$(file_mode "$link_target")" = 644 ] || fail "poll type fault changed an external target mode"
 
@@ -1508,6 +1637,177 @@ test_postrename_poll_validation_revokes_and_retries() {
     done
   done
   pass "post-rename poll validation faults revoke both names and allow a clean retry"
+}
+
+# A custom check registered while a publication is under way, after the
+# publisher's first check and before its own check rename, is another check:
+# the publisher stands down, its rollback removes only the sidecar and the
+# registration it renamed, and the custom check and its trust stay byte for
+# byte (fm-check-register.sh takes no lock, so this order is reachable).
+test_custom_check_registered_mid_publication_is_left_in_place() {
+  local dir state before outer_path=$PATH
+  dir=$(make_case poll-custom-mid-publication)
+  state="$dir/home/state"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "could not prepare prior poll"
+  fm_pr_poll_publish_prepared || fail "could not publish prior poll"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/2
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/2 github.com o/r 2 "$POLL" \
+    || fail "could not stage replacement poll"
+  cat > "$dir/fakebin/mv" <<'SH'
+#!/usr/bin/env bash
+last=${!#}
+"${FM_TEST_REAL_MV:?}" "$@" || exit $?
+[ "$last" = "${FM_TEST_REGISTER_AFTER:?}" ] || exit 0
+printf '#!/usr/bin/env bash\necho custom check output\n' > "${FM_TEST_CHECK_NAME:?}"
+chmod 700 "$FM_TEST_CHECK_NAME"
+PATH="${FM_TEST_OUTER_PATH:?}" FM_STATE_OVERRIDE="${FM_TEST_STATE:?}" \
+  bash "${FM_TEST_REGISTER:?}" task-a > "${FM_TEST_STATE}/../register.out" 2>&1
+SH
+  chmod +x "$dir/fakebin/mv"
+  if FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REGISTER_AFTER="$state/task-a.pr-poll-registration" \
+    FM_TEST_CHECK_NAME="$state/task-a.check.sh" FM_TEST_OUTER_PATH="$outer_path" FM_TEST_STATE="$state" \
+    FM_TEST_REGISTER="$REGISTER" PATH="$dir/fakebin:$BASE_PATH" fm_pr_poll_publish_prepared; then
+    fail "a publication over a custom check registered mid-way was reported as success"
+  fi
+  [ -f "$state/task-a.check-trust" ] || fail "the custom check was not registered mid-publication: $(cat "$dir/home/register.out" 2>/dev/null)"
+  [ "$FM_PR_POLL_CHECK_CONFLICT" = 1 ] || fail "the publisher did not report the custom check as a conflict"
+  before=$(printf '#!/usr/bin/env bash\necho custom check output\n' | shasum -a 256 | cut -d' ' -f1)
+  [ "$(shasum -a 256 < "$state/task-a.check.sh" | cut -d' ' -f1)" = "$before" ] \
+    || fail "the rollback removed or changed a custom check it never published"
+  [ -f "$state/task-a.check-trust" ] || fail "the rollback removed the custom check's trust record"
+  [ ! -e "$state/task-a.pr-poll" ] && [ ! -L "$state/task-a.pr-poll" ] \
+    || fail "the rollback left the sidecar it renamed"
+  [ ! -e "$state/task-a.pr-poll-registration" ] && [ ! -L "$state/task-a.pr-poll-registration" ] \
+    || fail "the rollback left the registration it renamed"
+  fm_pr_poll_cleanup
+  pass "a custom check registered mid-publication is left in place; the rollback removes only what this publication renamed"
+}
+
+# Main 1820 F5: a custom check registered in either window around the placement of
+# the merge poll's check is never replaced or removed. The windows are driven by
+# stubs of the tools the publisher uses, each writing a custom check and
+# registering it (bin/fm-check-register.sh) at one exact moment:
+#   aside  - while the publisher moves the earlier poll check aside to prove it;
+#   link   - after that move, just before the new check is linked into the name;
+#   placed - after the new check is placed, before the publication is validated.
+# The custom check and its trust record stay byte for byte, the sidecar and the
+# registration this publication wrote are revoked, and no set-aside file is left.
+custom_check_window_case() {  # <window>
+  local window=$1 dir state custom_sum trust_sum leftover outer_path=$PATH
+  dir=$(make_case "poll-window-$window")
+  state="$dir/home/state"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "$window: could not prepare prior poll"
+  fm_pr_poll_publish_prepared || fail "$window: could not publish prior poll"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/2
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/2 github.com o/r 2 "$POLL" \
+    || fail "$window: could not stage replacement poll"
+  cat > "$dir/fakebin/custom-register" <<'SH'
+#!/usr/bin/env bash
+[ ! -e "$FM_TEST_STATE/.custom-done" ] || exit 0
+: > "$FM_TEST_STATE/.custom-done"
+rm -f -- "$FM_TEST_CHECK_NAME"
+printf '#!/usr/bin/env bash\necho custom check output\n' > "$FM_TEST_CHECK_NAME"
+chmod 700 "$FM_TEST_CHECK_NAME"
+PATH="$FM_TEST_OUTER_PATH" FM_STATE_OVERRIDE="$FM_TEST_STATE" bash "$FM_TEST_REGISTER" task-a > "$FM_TEST_STATE/../register.out" 2>&1
+SH
+  cat > "$dir/fakebin/mv" <<'SH'
+#!/usr/bin/env bash
+# The aside window: the earlier check is about to be moved aside.
+if [ "$FM_TEST_WINDOW" = aside ] && [ "${@: -2:1}" = "$FM_TEST_CHECK_NAME" ]; then
+  "$FM_TEST_FAKEBIN/custom-register"
+fi
+exec "$FM_TEST_REAL_MV" "$@"
+SH
+  cat > "$dir/fakebin/ln" <<'SH'
+#!/usr/bin/env bash
+last=${!#}
+src=${@: -2:1}
+placing=0
+[ "$last" = "$FM_TEST_CHECK_NAME" ] && case "${src##*/}" in .fm-pr-poll-check.*) placing=1 ;; esac
+[ "$FM_TEST_WINDOW" = link ] && [ "$placing" = 1 ] && "$FM_TEST_FAKEBIN/custom-register"
+"$FM_TEST_REAL_LN" "$@" || exit $?
+[ "$FM_TEST_WINDOW" = placed ] && [ "$placing" = 1 ] && "$FM_TEST_FAKEBIN/custom-register"
+exit 0
+SH
+  chmod +x "$dir/fakebin/custom-register" "$dir/fakebin/mv" "$dir/fakebin/ln"
+  if FM_TEST_WINDOW="$window" FM_TEST_CHECK_NAME="$state/task-a.check.sh" FM_TEST_STATE="$state" \
+    FM_TEST_FAKEBIN="$dir/fakebin" FM_TEST_OUTER_PATH="$outer_path" FM_TEST_REGISTER="$REGISTER" \
+    FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REAL_LN="$REAL_LN" \
+    PATH="$dir/fakebin:$BASE_PATH" fm_pr_poll_publish_prepared; then
+    fail "$window: a publication over a custom check registered in the window was reported as success"
+  fi
+  fm_pr_poll_cleanup
+  [ -e "$state/.custom-done" ] || fail "$window: the window was never reached"
+  [ -f "$state/task-a.check-trust" ] || fail "$window: the custom check was not registered: $(cat "$dir/home/register.out" 2>/dev/null)"
+  custom_sum=$(printf '#!/usr/bin/env bash\necho custom check output\n' | shasum -a 256 | cut -d' ' -f1)
+  [ -f "$state/task-a.check.sh" ] && [ ! -L "$state/task-a.check.sh" ] \
+    && [ "$(shasum -a 256 < "$state/task-a.check.sh" | cut -d' ' -f1)" = "$custom_sum" ] \
+    || fail "$window: the custom check was replaced or removed"
+  trust_sum=$(shasum -a 256 < "$state/task-a.check-trust")
+  fm_custom_check_snapshot_prepare "$state" task-a || fail "$window: the custom check no longer passes its own gate"
+  fm_custom_check_snapshot_cleanup
+  [ "$(shasum -a 256 < "$state/task-a.check-trust")" = "$trust_sum" ] || fail "$window: the trust record changed"
+  [ ! -e "$state/task-a.pr-poll" ] && [ ! -e "$state/task-a.pr-poll-registration" ] \
+    || fail "$window: the publication's sidecar or registration was left"
+  for leftover in "$state"/.fm-pr-poll-prior.* "$state"/.fm-pr-poll-revoke.* "$state"/.fm-pr-poll-check.*; do
+    [ ! -e "$leftover" ] && [ ! -L "$leftover" ] || fail "$window: a set-aside file was left: $leftover"
+  done
+}
+
+test_custom_check_in_either_placement_window_is_kept() {
+  local window
+  for window in aside link placed; do
+    custom_check_window_case "$window"
+  done
+  pass "a custom check registered while the poll check is moved aside, before it is linked, or after it is placed is kept with its trust record"
+}
+
+# Main 1820 F5: replacement needs proof by content, never a receipt alone. A check
+# that is neither the template nor the template this task's registration recorded
+# is another check even with a registration on record; a check whose bytes are the
+# template the registration recorded (a poll of an earlier template version) is ours.
+test_check_replacement_needs_proof_by_content() {
+  local dir state reg old_sum
+  dir=$(make_case poll-content-proof)
+  state="$dir/home/state"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "could not prepare prior poll"
+  fm_pr_poll_publish_prepared || fail "could not publish prior poll"
+  reg="$state/task-a.pr-poll-registration"
+  [ -f "$reg" ] || fail "fixture: no registration on record"
+  printf '#!/usr/bin/env bash\necho unrelated check\n' > "$state/task-a.check.sh"
+  chmod 700 "$state/task-a.check.sh"
+  ! fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" \
+    || fail "a check that is not ours by its bytes was replaceable because a registration is on record"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/2
+  fm_pr_poll_prepare "$state" task-a github https://github.com/o/r/pull/2 github.com o/r 2 "$POLL" \
+    || fail "could not stage replacement poll"
+  ! fm_pr_poll_publish_prepared || fail "a poll was published over a check that is not ours by its bytes"
+  fm_pr_poll_cleanup
+  [ "$(cat "$state/task-a.check.sh")" = "$(printf '#!/usr/bin/env bash\necho unrelated check')" ] \
+    || fail "the unrelated check was changed"
+  # A poll version whose bytes carry no generator mark: only the registration on
+  # record can name its hash. (A version with the mark is ours by that mark;
+  # tests/fm-pr-lib-rollback.test.sh covers it.)
+  [ -f "$reg" ] || fail "fixture: the refused publication removed the registration on record"
+  { printf '#!/usr/bin/env bash\n# an earlier template version\n'; tail -n +2 "$POLL"; } > "$state/task-a.check.sh"
+  chmod 700 "$state/task-a.check.sh"
+  old_sum=$(shasum -a 256 "$state/task-a.check.sh" | cut -d' ' -f1)
+  ! fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" \
+    || fail "an earlier template version was replaceable before its registration named it"
+  awk -v h="$old_sum" 'NR == 9 { print h; next } { print }' "$reg" > "$reg.new" && "$REAL_MV" -f "$reg.new" "$reg"
+  chmod 600 "$reg"
+  fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" \
+    || fail "a check whose bytes are the template its registration recorded was not replaceable"
+  printf 'trust\n' > "$state/task-a.check-trust"
+  ! fm_pr_poll_check_dest_replaceable "$state" task-a "$POLL" \
+    || fail "a check with a trust record was replaceable"
+  pass "a check is replaceable only when its bytes are the template or the template its own registration recorded; a receipt alone or a trust record never makes it so"
 }
 
 test_bootstrap_leaves_unauthenticated_checks() {
@@ -1783,9 +2083,9 @@ SH
       'model=gpt-5.1-codex' \
       'mode=local-only'
     if [ "$artifact" = check.sh ]; then
-      counterpart=pr-poll
+      counterpart='pr-poll'
     else
-      counterpart=check.sh
+      counterpart='check.sh'
     fi
     mkdir "$dir/home/state/task-a.$artifact"
     printf 'directory sentinel\n' > "$dir/home/state/task-a.$artifact/sentinel"
@@ -3882,6 +4182,8 @@ test_secondmate_record_refuses_a_pr_watch
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_multi_pr_task_registration_still_refuses_a_local_only_head
+test_named_head_gate_is_never_bypassed_by_an_exact_forge_head
+test_bare_url_done_note_with_missing_copy_needs_a_merge_proof
 test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
@@ -3896,6 +4198,9 @@ test_device_rerecord_refuses_tampered_artifacts
 test_device_rerecord_serializes_direct_rearm
 test_device_rerecord_serializes_rerecord
 test_postrename_poll_validation_revokes_and_retries
+test_custom_check_registered_mid_publication_is_left_in_place
+test_custom_check_in_either_placement_window_is_kept
+test_check_replacement_needs_proof_by_content
 test_bootstrap_leaves_unauthenticated_checks
 test_custom_snapshot_cleanup_on_signal
 test_custom_snapshot_cleanup_with_stopped_launcher
