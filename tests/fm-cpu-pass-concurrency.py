@@ -77,10 +77,11 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
         import time as _time
         _sleep = _time.sleep
         def _logged(seconds):
-            frame = sys._getframe(1)
-            if frame.f_code.co_name == 'cmd_pipeline_start':
+            # The wait loop sleeps through Cancellation.sleep, one call below cmd_pipeline_start, which holds the reason.
+            caller = sys._getframe(1)
+            if caller.f_code.co_name == 'sleep' and caller.f_back.f_code.co_name == 'cmd_pipeline_start':
                 with open(os.environ['CASE_ADMISSION_LOG'], 'a') as log:
-                    log.write(str(frame.f_locals.get('reason', '?')) + '\\n')
+                    log.write(str(caller.f_back.f_locals.get('reason', '?')) + '\\n')
             _sleep(seconds)
         _time.sleep = _logged
     if start_path and os.environ.get('CASE_DB'):
@@ -958,6 +959,15 @@ def facts(folder, available=40 * GIB, total=128 * GIB):
         'Anonymous pages: 1048576.\nFile-backed pages: %d.\n'
         'Pages purgeable: 100.\nPages occupied by compressor: 32768.\n' % (available // 16384 - 1100))
     (fixture / 'processes.json').write_text(json.dumps([dict(pid=101, ppid=1, comm='daemon', started='s101', rss_bytes=GIB, fleet=False, run=None)]))
+    # The guard's harm test admits nothing on a host with no recorded run peak, so the root home holds a short
+    # but valid record (one no-mistakes run of 3 GiB): an idle host with more available than that peak admits.
+    import socket
+    state = folder / 'fmhome' / 'state'
+    state.mkdir(parents=True, exist_ok=True)
+    (state / '.memory-calibration.json').write_text(json.dumps(dict(
+        schema='fm-memory-calibration.v1', host=socket.gethostname(), total_bytes=total, pressured=None,
+        runs={'no-mistakes:repo/run-0': dict(peak_bytes=3 * GIB, samples=2, incomplete_samples=0, first_seen='x', last_seen='x',
+                                              max_gap_seconds=0)})))
 
 
 def case_soak():
@@ -1067,6 +1077,11 @@ def case_wait_cause_control():
     world.env.update(CASE_ADMISSION_LOG=str(log), CASE_DB=str(database), CASE_PROCS=str(procs),
                      FM_MEMORY_FIXTURE_DIR=str(world.folder / 'native'), FM_HOME=str(world.folder / 'fmhome'))
     start = world.launch('start', ['bash', tool('fm-cpu-pass.sh'), 'pipeline-start', '--', 'true'])
+    # A slow start may reach its first check after a fixed delay, so the pile-up is lifted only once the start has logged a held-back wait.
+    for _ in range(600):
+        if log.exists() and log.read_text():
+            break
+        time.sleep(0.05)
     time.sleep(1.0)
     procs.write_text(json.dumps(dict(count=100, limit=10666, error=False)))
     code = wait_all([start], timeout=60)

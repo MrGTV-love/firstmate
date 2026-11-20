@@ -95,10 +95,12 @@ Pipeline starts:
     at the moment of a grant (both backstop signals included). With fewer than 2
     recorded runs left to rank for R, or no native memory facts on this platform, the
     start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
-    record never refuses a start and never reads as an empty host.
+    record never reads as an empty host, and the pause-only backstop still
+    refuses while its harm test cannot judge the record.
   - Pause-only backstop: while that reading is unreadable or reports a reason to
-    defer (the same list that makes fm-mem-guard.sh admit exit 75, such as native
-    pressure level 2 or higher) or fm-proc-guard.py reports a pile-up (user
+    defer (the list that makes fm-mem-guard.sh admit --kind no-mistakes exit
+    75: fit, swap or compressor growth, or a part it cannot judge; the one-start
+    minimum below never overrides it) or fm-proc-guard.py reports a pile-up (user
     process count above its warning line) or cannot be read, no start is
     admitted. Nothing running is stopped, and waiting here only delays the start.
   - Admission is before COMMAND (including any measured execution wrapper).
@@ -149,6 +151,43 @@ FIRST_NOTICE_SECS = 2.0
 NOTICE_EVERY_SECS = 60.0
 POLL_MIN_SECS = 0.05
 POLL_MAX_SECS = 0.5
+SLEEP_SLICE_SECS = POLL_MIN_SECS
+
+
+class Cancellation:
+    """A SIGINT that a waiting start remembers, so that no code path can lose it.
+
+    Python raises KeyboardInterrupt from a signal handler into whatever code is running. When
+    that code is a weakref callback or a finalizer (the garbage collector runs them at any
+    allocation), the interpreter prints "Exception ignored" and the exception goes no further:
+    the waiter would sleep on and never exit 130. The handler therefore records the signal
+    first, and the wait loop raises the exception itself from `check()`; `sleep()` wakes in
+    slices so that a recorded signal ends the wait at once. A SIGINT that the caller's shell
+    left ignored stays ignored, as for any Python process.
+    """
+
+    def __init__(self) -> None:
+        self.signalled = False
+        self.installed = signal.getsignal(signal.SIGINT) is not signal.SIG_IGN
+        if self.installed:
+            signal.signal(signal.SIGINT, self.handle)
+
+    def handle(self, signum: int, frame: object) -> None:
+        self.signalled = True
+        raise KeyboardInterrupt
+
+    def check(self) -> None:
+        if self.signalled:
+            raise KeyboardInterrupt
+
+    def sleep(self, seconds: float) -> None:
+        deadline = time.monotonic() + seconds
+        while True:
+            self.check()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(SLEEP_SLICE_SECS, remaining))
 
 
 class PoolUnavailable(Exception):
@@ -752,7 +791,15 @@ def host_observation(fresh: bool = False) -> dict:
         try:
             guard = sibling("fm_mem_guard", "fm-mem-guard.py")
             report = guard.admission_sample()
-            deferred, _, _ = guard.admission_evaluate(report, None)
+            # Every fresh pipeline start also meets the guard's harm test as a no-mistakes run
+            # (fit against the recorded projection and reserve, swap and compressor trend); the
+            # pool's own reservations below add to it and the one-start minimum never overrides it.
+            try:
+                calibration = guard.host_record(root_home() / "state" / ".memory-calibration.json", report,
+                                                "calibration", "fm-memory-calibration.v1", ())
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                calibration = (None, "no root-home calibration: %s" % exc)
+            deferred, _, _ = guard.admission_evaluate(report, None, calibration, "no-mistakes")
             reasons += ["memory: " + text for text in deferred]
             if not report["errors"]:
                 memory = report
@@ -829,6 +876,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         return 125
     waiter_fd = admission_fd = None
     waiter_path = None
+    cancellation = Cancellation()
     try:
         directory = pool_dir()
         ensure_pool_dir(directory)
@@ -843,6 +891,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         next_notice = time.monotonic() + FIRST_NOTICE_SECS
         delay = POLL_MIN_SECS
         while True:
+            cancellation.check()
             reason = "another start is registering"
             if try_lock(admission_fd):
                 before, cores = pipeline_observation()
@@ -862,8 +911,9 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             if now >= next_notice:
                 log(2, "pipeline-start waiting: " + reason)
                 next_notice = now + NOTICE_EVERY_SECS
-            time.sleep(delay)
+            cancellation.sleep(delay)
             delay = min(POLL_MAX_SECS, delay * 2)
+        cancellation.check()
         os.unlink(waiter_path)
         waiter_path = None
         log(2, "pipeline-start admitted: " + reason)
