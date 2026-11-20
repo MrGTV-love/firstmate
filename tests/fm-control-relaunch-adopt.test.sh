@@ -183,10 +183,10 @@ test_adopt_admits_a_dirty_copy_and_a_stopped_rebase() {
   printf 'edit\n' >> "$ADOPT_DIR/wt/src/owned.txt"
   printf 'x\n' > "$ADOPT_DIR/wt/src/run.sh"
   chmod +x "$ADOPT_DIR/wt/src/run.sh"
-  before=$(cd "$ADOPT_DIR/wt" && { git ls-files -s; git diff --cached; cat src/owned.txt; stat -f '%Lp' src/run.sh; } | shasum -a 256)
+  before=$(cd "$ADOPT_DIR/wt" && { git ls-files -s; git diff --cached; cat src/owned.txt; if [ -x src/run.sh ]; then echo executable; else echo not-executable; fi; } | shasum -a 256)
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
   expect_code 0 "$rc" "a dirty own copy must be admitted"$'\n'"$out"
-  [ "$before" = "$(cd "$ADOPT_DIR/wt" && { git ls-files -s; git diff --cached; cat src/owned.txt; stat -f '%Lp' src/run.sh; } | shasum -a 256)" ] \
+  [ "$before" = "$(cd "$ADOPT_DIR/wt" && { git ls-files -s; git diff --cached; cat src/owned.txt; if [ -x src/run.sh ]; then echo executable; else echo not-executable; fi; } | shasum -a 256)" ] \
     || fail 'the relaunch changed the index, the working files or the executable bit'
   [ ! -s "$ADOPT_SENTINEL" ] || fail 'the provisioner ran'
   # a rebase stopped at a conflict: HEAD is detached while it runs
