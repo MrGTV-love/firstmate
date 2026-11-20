@@ -84,7 +84,7 @@ For a contribution wake or linked-issue filing, go directly to Contribution foll
    This is the only file-mode write allowed by the skill.
    The detailed report includes:
    - **Title** - `# Bearings - <day> <YYYY-MM-DD>` (use "Morning status" only when the captain specifically asks for a morning brief), followed by two or three sentences framing where things stand.
-   - **Captain's Call** - every unsuppressed open decision summarized with its options from the structured decision record, plus each PR ready to merge and each needed credential or login, every PR with the full `https://...` URL, never a bare `#number`.
+   - **Captain's Call** - every unsuppressed open decision summarized with its options from the structured decision record, plus each PR ready to merge that needs the captain's own action under `AGENTS.md` section 7 (never one the standing merge rule or `yolo` already lets firstmate merge) and each needed credential or login, every PR with the full `https://...` URL, never a bare `#number`.
      Never present a decision as a guess: state what is being decided and why it is open now, give each option a label that says what it is (never a bare A, B, C or number) and what it does, name the recommended option with the reason it beats the others, and list the facts for and the facts against it, each with its source.
    - **Recently Landed** - the bounded current recent-completions baseline from structured state across the main fleet and every registered secondmate home, rendered in full on every run.
    - **Underway** - each live direct report making progress, with its current state, and the plans or main pickup pointers worth reopening (`data/<id>/report.md` files, `.lavish/*.html` boards).
@@ -150,7 +150,7 @@ Only the exact answer value `merge` authorizes a merge; an answer carrying a fre
 This skill is the one owner of the `/bearings` chat-response format; the snapshot and classifier own the data that feeds it, and no other file restates this contract.
 Every `/bearings` chat response renders EXACTLY these four sections, in THIS order, and nothing else structural (there is no At Anchor section):
 
-1. **Captain's Call** - ONLY unsuppressed items that need the captain's own action now: a decision to make, a PR to approve or merge, a credential or login to provide, or a blocker only the captain can clear.
+1. **Captain's Call** - ONLY unsuppressed items that need the captain's own action now: a decision to make, a PR to approve or merge that needs the captain's own action under `AGENTS.md` section 7 (never one the standing merge rule or `yolo` already lets firstmate merge), a credential or login to provide, or a blocker only the captain can clear.
    Deferred or aged holds follow the presentation safety rule above instead.
    Never present a decision as a guess: state what is being decided and why it is open now, give each option a label that says what it is (never a bare A, B, C or number) and what it does, name the recommended option with the reason it beats the others, and list the facts for and the facts against it, each with its source.
    Include `contributions.captain` rows in this section, deduplicating any row already represented by its live captain hold or merge call.

@@ -6,10 +6,11 @@
 # This is firstmate's merge gate-action (the captain's merge authority applied
 # locally instead of via a GitHub PR). It is the one sanctioned exception to hard
 # rule #1 "never run state-changing git in projects/", and it is narrow: it only
-# runs for mode=local-only tasks, only after the captain approves (or yolo=on
-# auto-approves), and only as a clean fast-forward - it refuses a diverged branch
-# and tells you to have the crewmate rebase. See AGENTS.md prime directives,
-# project management, and task lifecycle.
+# runs for mode=local-only tasks, and only with the captain's recorded approval.
+# It does only a clean fast-forward, and it refuses a diverged branch.
+# In that case it tells you to have the crewmate rebase.
+# See AGENTS.md section 7 for merge authority and task lifecycle, section 1 for prime directives,
+# and section 6 for project management.
 # The task's existing per-task control lock serializes the captain-hold check
 # through that fast-forward. A still-held or unreadable row refuses before the
 # merge, so a captain approval must be recorded as an `answer --release` before
@@ -76,7 +77,7 @@ fi
 
 PROJ=$(grep '^project=' "$META" | cut -d= -f2-)
 MODE=$(grep '^mode=' "$META" | cut -d= -f2- || true)
-[ "$MODE" = local-only ] || { echo "error: task $ID is mode=$MODE, not local-only; merge PR tasks with bin/fm-pr-merge.sh <id> <PR url> after approval" >&2; exit 1; }
+[ "$MODE" = local-only ] || { echo "error: task $ID is mode=$MODE, not local-only; merge PR tasks with bin/fm-pr-merge.sh <id> <PR url> (AGENTS.md section 7 owns who may merge without asking)" >&2; exit 1; }
 
 default_branch() {
   local ref branch
