@@ -1,0 +1,5 @@
+Observation only (load-inflated). Head lib, real writer, same run, back to back. uptime at start: 20:37  up 2 days,  8:09, 1 user, load averages: 71.35 88.37 97.54
+records=0 rc=0 printed=001.msg wall=4.525500000s load=71.08 88.03 97.37
+records=1600 rc=0 printed=1601.msg wall=2.355460000s load=69.87 87.50 97.12
+records=0 rc=0 printed=001.msg wall=.933368000s load=69.87 87.50 97.12
+records=1600 rc=0 printed=1601.msg wall=2.082456000s load=67.24 86.66 96.77

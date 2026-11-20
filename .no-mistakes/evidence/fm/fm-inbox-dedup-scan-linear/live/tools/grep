@@ -1,0 +1,5 @@
+#!/bin/sh
+# launch shim (scratch)
+printf "%s\n" "grep" >> "${FM_LAUNCH_LOG:-/dev/null}"
+if [ "${FM_BLOCK_TOOL:-}" = "grep" ]; then echo $$ > "$FM_BLOCK_PIDFILE"; exec /bin/sleep 600; fi
+exec /usr/bin/grep "$@"

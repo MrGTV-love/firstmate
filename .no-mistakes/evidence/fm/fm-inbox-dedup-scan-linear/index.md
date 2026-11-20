@@ -1,0 +1,19 @@
+# Local live validation: fm-inbox-dedup-scan-linear (head 9f3dee872 vs base 875d3e9ee)
+
+Method: the real `bin/fm-task-inbox-lib.sh` (base and head copies) was driven against scratch inboxes with a PATH shim counting awk/cat/cmp/grep launches, a stub that blocks inside the compare, and real signals. Remote-steer checks ran the existing `tests/fm-send-remote-delivery.test.sh` cases (trimmed to named cases) against scratch git checkouts with the existing fakes. Host load average was 105-220 for the whole session, so every wall-clock number here is load-inflated and is an observation, not an assertion.
+
+| Item | Result | Evidence |
+|---|---|---|
+| DD1 head launch count fixed (50 vs 1600 unrelated records) | Pass: 4 launches (cat 3, grep 1) at both sizes | DD1/launch-counts.txt, DD1/fm-inbox-driver.sh |
+| DD1 base control: launches grow with records | Base at 50 records: 153 launches (awk 50, cat 53, cmp 50). Base at 1600 did not finish (log stalled at 4795 lines). | DD1/launch-counts.txt, DD1/base-1600-shim-launch-log-partial.txt |
+| DD1 wall time (observation only) | Head single write, empty inbox: 9.1 s. 1600 unrelated: 39.4 s (35.3 s in an earlier run). 1600 sharing the first line: 136.2 s. Load 105-134 during these runs. Base timing not captured. | DD1/head-single-write-timing-probe.txt |
+| DD2 dedup outcomes unchanged (16 paired cases) | Pass: identical outputs and record names on base and head; record bodies identical once the `at=` timestamp is excluded (23 records). Covers exact unhandled and handled match, fire-and-forget separation both ways, near-miss, multi-line, leading blank lines, regex first line, leading dash with colon, 6000-character first line, prefix either way, empty text, trailing newline. | DD2/paired-cases-base.txt, DD2/paired-cases-head.txt, DD2/paired-diff-checksums-excluded.txt |
+| DD3 head TERM and INT during the compare | Pass: no `.dedup.*` left, lock released, next call writes 006.msg | DD3/signal-matrix-head.txt |
+| DD3 head SIGKILL (edge) | As DD3 expects: `.work.*` directory and lock left (SIGKILL cannot be trapped); next call still writes 006.msg after stale-lock recovery. No sweep added. | DD3/signal-matrix-head.txt |
+| DD3 base control (hang on cmp) | Reproduces the defect: TERM leaves 2 `.dedup.*` files and the lock. Base INT was absorbed (exit 0, no leftover), so INT does not reproduce on base. | DD3/base-control-hang-on-cmp.txt |
+| DD4 default-budget steer into 1600-record folder | UNTESTED. Control (small inbox, default 30 s budget) failed on both head and base with "remote transport did not complete within its 30s budget" at load 150-200. The 1600 shared-first-line write took 136 s in the probe above. | DD4/remote-steer-targeted-head-run1-load-budget.log, DD4/remote-steer-targeted-base-run1-load-budget.log, DD1/head-single-write-timing-probe.txt |
+| DD4 observation: 1600-record steer lands and resend dedups, budget overridden to 600 s | Observation pass: all three named cases passed on head (`test_remote_steer_lands_behind_a_large_handled_folder`, `..._sharing_its_first_line`, plus the control). This is NOT a within-30 s result. The same-correlation resend through fm-send was not run as its own case. | DD4/1600-record-observation-head-budget600.log |
+| DD4 budget unchanged | Pass by diff: `FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}` unchanged at bin/fm-send.sh lines 989 and 1014; the only BUDGET diff line is a test comment. | git diff 875d3e9ee 9f3dee872 |
+| DDW / DDV | Grader-owned; not assessed here | - |
+
+Verdict for this run: inconclusive. The inbox mechanism is shown live (DD1 head, DD2, DD3). The default-budget DD4 claim is not demonstrated on this host. The shared-first-line shape costs far more than the unrelated one (136 s vs 39 s at load ~110), and the true idle figure is unknown.

@@ -1,0 +1,10 @@
+not ok - a durably recorded remote steer must exit 0: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fmlive/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: steer to remote secondmate rsm is unconfirmed (the remote transport did not complete within its 30s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/Users/charlesabrooker/tmp/fm-send-remote-delivery.lqlNkI/remote-inbox-23151 FM_PENDING_REPLY_EXISTING_CORR=6228e40a44f77f5f /tmp/fmlive/base/bin/fm-send.sh rsm --answers-none -- please\ rename\ the\ metric: expected exit 0, got 1
+RESULT side=base-code-with-head-test test=test_remote_steer_lands_in_remote_inbox budget=default rc=1 wall=173s

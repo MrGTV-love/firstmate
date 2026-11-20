@@ -1,0 +1,11 @@
+ok - fm-send remote: exit 3 from the remote leg is a failure, never a delivery claim
+not ok - a durably recorded remote steer must exit 0: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: steer to remote secondmate rsm is unconfirmed (the remote transport did not complete within its 30s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/Users/charlesabrooker/tmp/fm-send-remote-delivery.iANwiY/remote-inbox-11132 FM_PENDING_REPLY_EXISTING_CORR=3da795932cee6dd5 /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/base/bin/fm-send.sh rsm --answers-none -- please\ rename\ the\ metric: expected exit 0, got 1
+rc=1

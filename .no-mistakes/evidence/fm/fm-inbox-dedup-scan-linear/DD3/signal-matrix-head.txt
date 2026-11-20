@@ -1,0 +1,28 @@
+=== side=head signal=TERM
+hang reached: yes
+inbox while hung: .seq.lock .seq.lock.owner.8ndTPl .work.54586.2467824764 handled 
+writer exit after TERM: 143
+inbox after TERM: handled 
+dedup temp files after TERM: 0
+lock present after TERM: no
+next call: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/sig-head-TERM/state/probe-task.inbox/006.msgrc=0
+inbox at end: 006.msg handled 
+=== side=head signal=INT
+hang reached: yes
+inbox while hung: .seq.lock .seq.lock.owner.b9S4Xp .work.21262.777614653 handled 
+writer exit after INT: 130
+inbox after INT: handled 
+dedup temp files after INT: 0
+lock present after INT: no
+next call: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/sig-head-INT/state/probe-task.inbox/006.msgrc=0
+inbox at end: 006.msg handled 
+=== side=head signal=KILL
+hang reached: yes
+inbox while hung: .seq.lock .seq.lock.owner.r07Xnl .work.94155.1098227345 handled 
+writer exit after KILL: 137
+hung child 12805 still alive after writer exit (killing our own child)
+inbox after KILL: .seq.lock .seq.lock.owner.r07Xnl .work.94155.1098227345 handled 
+dedup temp files after KILL: 0
+lock present after KILL: yes
+next call: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/sig-head-KILL/state/probe-task.inbox/006.msgrc=0
+inbox at end: .work.94155.1098227345 006.msg handled 

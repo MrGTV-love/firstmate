@@ -1,0 +1,4 @@
+side=head shape=none records=0 rc=0 wall_ms=9129 out=<STATE>/probe-task.inbox/001.msg load=119.58 125.58 143.83
+side=head shape=shared records=1600 rc=0 wall_ms=136183 out=<STATE>/probe-task.inbox/1601.msg load=105.34 116.27 133.99
+side=head shape=none records=1600 rc=0 wall_ms=39406 out=<STATE>/probe-task.inbox/1601.msg load=112.18 113.88 128.89
+PROBE_DONE

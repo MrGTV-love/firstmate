@@ -1,0 +1,7 @@
+Observation: one real remote steer leg per round, default budget (30 s, unset), real fm-send/fm-on/host-local leg with the test's fake ssh. Scratch home. Load shown per round.
+tr: Illegal byte sequence
+records=0 round=1 rc=0 leg_wall=9.808600000s load=51.22 66.15 82.90 err=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+records=0 round=2 rc=0 leg_wall=20.535793000s load=57.32 66.54 82.65 err=WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode. notice: doorbell did not reach fm-rem
+inbox_records_now=2
+Terminated: 15
+Terminated: 15

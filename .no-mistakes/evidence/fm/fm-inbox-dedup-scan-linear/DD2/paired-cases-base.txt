@@ -1,0 +1,87 @@
+== C1-unhandled-exact (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 3880444269
+== C2-handled-exact (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/handled/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/handled/001.msg
+records:
+  ./handled/001.msg 2163338089
+== C3-ff-text-vs-ordinary-record (mode='fire-and-forget')
+first : rc=0 out=<STATE>/probe-task.inbox/002.msg
+second: rc=0 out=<STATE>/probe-task.inbox/002.msg
+records:
+  ./001.msg 3273241657
+  ./002.msg 1236348521
+== C4-ordinary-text-vs-ff-record (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/002.msg
+second: rc=0 out=<STATE>/probe-task.inbox/002.msg
+records:
+  ./001.msg 1268967413
+  ./002.msg 2873146780
+== C5-ff-exact-vs-ff-record (mode='fire-and-forget')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 685682763
+== C6-near-miss-same-first-line (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/002.msg
+second: rc=0 out=<STATE>/probe-task.inbox/002.msg
+records:
+  ./001.msg 4050661510
+  ./002.msg 1565962350
+== C7-multiline-exact (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 2487231560
+== C8-leading-blank-lines (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 2559605858
+== C9-regex-first-line (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 3034421124
+== C10-leading-dash-colon (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 990042718
+== C11-6000-char-first-line (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 1694928910
+== C12-prefix-of-record (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/002.msg
+second: rc=0 out=<STATE>/probe-task.inbox/002.msg
+records:
+  ./001.msg 3562365356
+  ./002.msg 2039607645
+== C12b-record-prefix-of-text (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/002.msg
+second: rc=0 out=<STATE>/probe-task.inbox/002.msg
+records:
+  ./001.msg 4242607171
+  ./002.msg 2595664033
+== C13-empty-text (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/001.msg
+second: rc=0 out=<STATE>/probe-task.inbox/001.msg
+records:
+  ./001.msg 1932971205
+== C14-trailing-newline (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/002.msg
+second: rc=0 out=<STATE>/probe-task.inbox/002.msg
+records:
+  ./001.msg 3424317599
+  ./002.msg 3800937682
+== C15-record-with-trailing-newline (mode='')
+first : rc=0 out=<STATE>/probe-task.inbox/002.msg
+second: rc=0 out=<STATE>/probe-task.inbox/002.msg
+records:
+  ./001.msg 180255414
+  ./002.msg 1116957038

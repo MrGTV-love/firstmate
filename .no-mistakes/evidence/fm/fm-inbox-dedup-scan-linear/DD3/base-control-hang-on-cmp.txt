@@ -1,0 +1,20 @@
+=== base control: hang on cmp, signal=TERM
+hang reached: yes
+inbox while hung: .dedup.SCgPum .dedup.rfBI0G .seq.lock .seq.lock.owner.XmEn8m handled 
+writer exit after TERM: 143
+hung child 49941 still alive after writer exit (killing our own child)
+inbox after TERM: .dedup.SCgPum .dedup.rfBI0G .seq.lock .seq.lock.owner.XmEn8m handled 
+dedup temp files after TERM: 2
+lock present after TERM: yes
+next call: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/sig-base-TERM/state/probe-task.inbox/006.msgrc=0
+inbox at end: .dedup.SCgPum .dedup.rfBI0G 006.msg handled 
+=== base control: hang on cmp, signal=INT
+hang reached: yes
+inbox while hung: .dedup.Jmbbwu .dedup.xCKiwc .seq.lock .seq.lock.owner.IBhLd2 handled 
+writer exit after INT: 0
+inbox after INT: handled 
+dedup temp files after INT: 0
+lock present after INT: no
+next call: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/sig-base-INT/state/probe-task.inbox/006.msgrc=0
+inbox at end: 006.msg handled 
+DD3B_DONE

@@ -1,0 +1,12 @@
+DD1 live drive, this run. Real bin/fm-task-inbox-lib.sh (head 9f3dee872 and base 875d3e9ee copies), real fm_task_inbox_write_idempotent via tools/call.sh.
+PATH shim (tools/awk, tools/cat, tools/cmp, tools/grep) logs every launch by name to a launch log. Text: "fresh steer text, not in history" (not in any record).
+Host load average during runs: 105-140 (18 CPU). Wall times are load-inflated observations, not assertions.
+
+lib=head records=50   rc=0 printed=051.msg wall=17s    launches: cat 3, grep 1
+lib=head records=1600 rc=0 printed=1601.msg wall=42s   launches: cat 3, grep 1
+lib=head records=200  rc=0 printed=201.msg wall=11s    launches: cat 3, grep 1
+lib=base records=50   rc=0 printed=051.msg wall=62s    launches: awk 50, cat 53, cmp 50   (153 total)
+lib=base records=200  rc=0 printed=201.msg wall=240s   launches: awk 200, cat 203, cmp 200 (603 total)
+
+Result: head launch count is flat (4 at 50, 200 and 1600). Base grows with record count (153 at 50, 603 at 200).
+Base at 1600 was not run in this session (it would take well over the time budget at this load).

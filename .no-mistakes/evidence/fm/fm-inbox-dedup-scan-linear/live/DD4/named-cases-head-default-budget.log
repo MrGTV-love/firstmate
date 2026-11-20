@@ -1,0 +1,11 @@
+not ok - a durably recorded remote steer must exit 0: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7TX021S91105PBR9PR82R4X/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: steer to remote secondmate rsm is unconfirmed (the remote transport did not complete within its 30s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/Users/charlesabrooker/tmp/fm-send-remote-delivery.RvqqPi/remote-inbox-5895 FM_PENDING_REPLY_EXISTING_CORR=ce24b9a69c36d5e4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7TX021S91105PBR9PR82R4X/bin/fm-send.sh rsm --answers-none -- please\ rename\ the\ metric: expected exit 0, got 1
+bash $S/rd-head.sh > $EV/DD4/named-cases-head-default-budget.log 2>&1  1.21s user 3.17s system 2% cpu 3:39.07 total
+head-exit 1

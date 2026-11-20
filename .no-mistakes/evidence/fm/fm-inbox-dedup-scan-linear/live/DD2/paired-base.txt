@@ -1,0 +1,191 @@
+### exact_unhandled_match
+rc=0 printed=001.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+steer alpha
+line two
+leftover: 001.msg
+
+### exact_handled_match
+rc=0 printed=handled/001.msg
+-- handled/001.msg
+schema=fm-task-inbox.v1
+--
+steer beta
+
+### ff_new_vs_ordinary_record
+rc=0 printed=002.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+steer gamma
+-- 002.msg
+schema=fm-task-inbox.v1
+delivery=fire-and-forget
+--
+steer gamma
+leftover: 001.msg
+leftover: 002.msg
+
+### ordinary_new_vs_ff_record
+rc=0 printed=002.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+delivery=fire-and-forget
+--
+steer delta
+-- 002.msg
+schema=fm-task-inbox.v1
+--
+steer delta
+leftover: 001.msg
+leftover: 002.msg
+
+### ff_exact_match_ff_record
+rc=0 printed=handled/001.msg
+-- handled/001.msg
+schema=fm-task-inbox.v1
+delivery=fire-and-forget
+--
+steer eps
+
+### near_miss_same_first_line
+rc=0 printed=002.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+shared first
+old tail
+-- 002.msg
+schema=fm-task-inbox.v1
+--
+shared first
+new tail
+leftover: 001.msg
+leftover: 002.msg
+
+### multiline_exact_handled
+rc=0 printed=handled/001.msg
+-- handled/001.msg
+schema=fm-task-inbox.v1
+--
+a
+b
+c
+
+### leading_blank_lines_exact
+rc=0 printed=001.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+
+
+hello world
+leftover: 001.msg
+
+### regex_first_line_exact
+rc=0 printed=001.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+a.*[b]^$\(x) y
+leftover: 001.msg
+
+### leading_dash_colon_exact
+rc=0 printed=handled/001.msg
+-- handled/001.msg
+schema=fm-task-inbox.v1
+--
+-n foo: bar
+
+### leading_dash_near_miss
+rc=0 printed=002.msg
+-- 002.msg
+schema=fm-task-inbox.v1
+--
+-n foo: baz
+-- handled/001.msg
+schema=fm-task-inbox.v1
+--
+-n foo: bar
+leftover: 002.msg
+
+### colon_first_line_exact
+rc=0 printed=001.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+key: value one
+leftover: 001.msg
+
+### six_thousand_char_first_line_exact
+rc=0 printed=001.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+leftover: 001.msg
+
+### empty_text_vs_nonempty_record
+rc=0 printed=002.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+steer zeta
+-- 002.msg
+schema=fm-task-inbox.v1
+--
+
+leftover: 001.msg
+leftover: 002.msg
+
+### empty_text_vs_empty_record
+rc=0 printed=001.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+
+leftover: 001.msg
+
+### prefix_new_shorter_than_record
+rc=0 printed=002.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+steer eta extended tail
+-- 002.msg
+schema=fm-task-inbox.v1
+--
+steer eta
+leftover: 001.msg
+leftover: 002.msg
+
+### prefix_record_shorter_than_new
+rc=0 printed=002.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+steer theta
+-- 002.msg
+schema=fm-task-inbox.v1
+--
+steer theta extra
+leftover: 001.msg
+leftover: 002.msg
+
+### trailing_newline_new_vs_record
+rc=0 printed=002.msg
+-- 001.msg
+schema=fm-task-inbox.v1
+--
+steer iota
+-- 002.msg
+schema=fm-task-inbox.v1
+--
+steer iota
+
+leftover: 001.msg
+leftover: 002.msg
+

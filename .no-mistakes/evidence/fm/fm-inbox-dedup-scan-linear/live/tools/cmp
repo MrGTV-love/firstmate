@@ -1,0 +1,5 @@
+#!/bin/sh
+# launch shim (scratch)
+printf "%s\n" "cmp" >> "${FM_LAUNCH_LOG:-/dev/null}"
+if [ "${FM_BLOCK_TOOL:-}" = "cmp" ]; then echo $$ > "$FM_BLOCK_PIDFILE"; exec /bin/sleep 600; fi
+exec /usr/bin/cmp "$@"

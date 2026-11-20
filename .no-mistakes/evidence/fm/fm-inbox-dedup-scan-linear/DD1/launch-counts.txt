@@ -1,0 +1,19 @@
+side=head records=50 rc=0 out=<STATE>/probe-task.inbox/051.msg
+awk=0 cat=3 cmp=0 grep=1 
+total_shim_launches=4
+side=head records=1600 rc=0 out=<STATE>/probe-task.inbox/1601.msg
+awk=0 cat=3 cmp=0 grep=1 
+total_shim_launches=4
+side=base records=50 rc=0 out=<STATE>/probe-task.inbox/051.msg
+awk=50 cat=53 cmp=50 grep=0 
+total_shim_launches=153
+side=base records=1600 rc=0 out=<STATE>/probe-task.inbox/1601.msg
+awk=1598 cat=1600 cmp=1598 grep=0 
+total_shim_launches=4796
+bash: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/drv/drv.sh: No such file or directory
+bash: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/drv/drv.sh: No such file or directory
+bash: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/drv/drv.sh: No such file or directory
+bash: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/drv/drv.sh: No such file or directory
+bash: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/drv/drv.sh: No such file or directory
+bash: /Users/charlesabrooker/tmp/fm-dd-validate.m9hIyr/drv/drv.sh: No such file or directory
+DD1_DONE

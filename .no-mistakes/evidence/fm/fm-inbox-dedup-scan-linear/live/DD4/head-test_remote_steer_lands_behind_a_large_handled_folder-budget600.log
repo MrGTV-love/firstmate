@@ -1,0 +1,3 @@
+ok - fm-send remote: a steer lands within the default budget behind 1600 handled records and a same-id resend dedups
+PASSED-BLOCK-END
+RESULT side=head test=test_remote_steer_lands_behind_a_large_handled_folder budget=600 rc=0 wall=512s

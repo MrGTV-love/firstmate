@@ -1,0 +1,10 @@
+lib=/tmp/fmlive/head blocked_tool=grep signal=KILL
+blocked_inside_compare=True writer_rc=-9 writer_stdout=''
+entries_before_signal=['.seq.lock', '.seq.lock.owner.kX8UxA', '.work.43627.3197025824', 'handled']
+entries_after_signal=['.seq.lock', '.seq.lock.owner.kX8UxA', '.work.43627.3197025824', 'handled']
+temp_dedup_left=[] lock_left=True work_dir_left=['.work.43627.3197025824']
+blocked_child_still_alive=True
+second_call_rc=0 printed='/tmp/fmlive/dd3._fy3tg2h/t.inbox/003.msg' wall=18.5s stderr=''
+entries_final=['.work.43627.3197025824', '003.msg', 'handled']
+record_final_body='steer for signal test'
+exit 0

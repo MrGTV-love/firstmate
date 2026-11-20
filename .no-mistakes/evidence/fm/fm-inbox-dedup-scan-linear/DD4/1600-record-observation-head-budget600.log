@@ -1,0 +1,7 @@
+NOTE: budget overridden to FM_SEND_REMOTE_BUDGET=600 for this run (observation, not the default 30 s). The pass-line text inside the test reads 'within the default budget' and does not reflect this override.
+
+ok - fm-send remote: exit 3 from the remote leg is a failure, never a delivery claim
+ok - fm-send remote: a steer lands within the default budget behind 1600 handled records and a same-id resend dedups
+ok - fm-send remote: a steer lands within the default budget behind 1600 handled records that share its first line
+observation: 1600-record remote steer tests passed
+rc=0

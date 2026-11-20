@@ -1,0 +1,35 @@
+## head: TERM inside candidate grep
+lib=/tmp/fmlive/head blocked_tool=grep signal=TERM
+blocked_inside_compare=True writer_rc=-15 writer_stdout=''
+entries_before_signal=['.seq.lock', '.seq.lock.owner.PvvEKf', '.work.24340.2844527063', 'handled']
+entries_after_signal=['handled']
+temp_dedup_left=[] lock_left=False work_dir_left=[]
+blocked_child_still_alive=False
+second_call_rc=0 printed='/tmp/fmlive/dd3.zdnl6s94/t.inbox/003.msg' wall=11.3s stderr=''
+entries_final=['003.msg', 'handled']
+record_final_body='steer for signal test'
+----
+## head: INT inside candidate grep
+lib=/tmp/fmlive/head blocked_tool=grep signal=INT
+blocked_inside_compare=True writer_rc=-2 writer_stdout=''
+entries_before_signal=['.seq.lock', '.seq.lock.owner.zhoOl1', '.work.97061.5311996', 'handled']
+entries_after_signal=['handled']
+temp_dedup_left=[] lock_left=False work_dir_left=[]
+blocked_child_still_alive=False
+second_call_rc=0 printed='/tmp/fmlive/dd3.cgyeppu_/t.inbox/003.msg' wall=11.0s stderr=''
+entries_final=['003.msg', 'handled']
+record_final_body='steer for signal test'
+----
+## base: TERM inside cmp
+WRITER DID NOT EXIT
+lib=/tmp/fmlive/base blocked_tool=cmp signal=TERM
+blocked_inside_compare=True writer_rc=-15 writer_stdout=''
+entries_before_signal=['.dedup.2w7ANw', '.dedup.KCi5Tu', '.seq.lock', '.seq.lock.owner.YkuXdI', 'handled']
+entries_after_signal=['.dedup.2w7ANw', '.dedup.KCi5Tu', '.seq.lock', '.seq.lock.owner.YkuXdI', 'handled']
+temp_dedup_left=['.dedup.2w7ANw', '.dedup.KCi5Tu'] lock_left=True work_dir_left=[]
+blocked_child_still_alive=False
+second_call_rc=0 printed='/tmp/fmlive/dd3.dgou4sfq/t.inbox/003.msg' wall=23.5s stderr=''
+entries_final=['.dedup.2w7ANw', '.dedup.KCi5Tu', '003.msg', 'handled']
+record_final_body='steer for signal test'
+----
+## base: INT inside cmp
