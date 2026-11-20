@@ -555,6 +555,17 @@
 #   it is leased durably in place to this home (`treehouse lease --path`, holder firstmate-skipped:<task>,
 #   because Treehouse resets a slot when its shell exits), recorded in $DATA/<task>/skipped-copies.tsv with the
 #   row read back, listed in the spawn output, and a second `treehouse get` in the same pane takes another copy.
+#   A copy the pool hands out that already carries another holder's lease (an ordinary lease of another holder or
+#   Treehouse's recovered lease), shown by one consistent row of Treehouse's pool state read before anything is written, is
+#   passed over before any claim, lease command or idle proof: nothing is written to it, the claim marker beside it is
+#   never created, replaced or removed, and this home takes no lease (the pool state already holds it; Treehouse leaves a
+#   stands inside it, so the pane is not closed for the rest of the spawn). It is recorded in skipped-copies.tsv with the holder the pool
+#   names, which bin/fm-teardown.sh never returns, and listed as passed over. A recovered lease is freed by Treehouse itself
+#   once the copy is idle, clean and landed. Each passed-over copy is a distinct copy the acquisition never accepts again,
+#   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
+#   A pool state that cannot be read as exactly one consistent row for the copy (unreadable, a duplicate row by name or by
+#   physical path, a conflicting entry, a lease that is this task's own) refuses the whole spawn at that point, before any
+#   claim; only a copy whose one row is positively unleased goes on to the claim and the idle proof.
 #   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
 #   One absolute thirty-minute bound covers every get and is read before each get, after the custody scan.
@@ -6212,6 +6223,8 @@ spawn_path_is_prior_copy() { # <path>
 # copy (spawn_skip_copy); the pane then still sits in the skipped copy until the new get moves it.
 SPAWN_SKIPPED_SLOTS=()
 SPAWN_SKIPPED_INFO=()
+# The copies among SPAWN_SKIPPED_SLOTS that already carried another holder's lease: skipped without a lease of this home.
+SPAWN_REFUSED_INFO=()
 SPAWN_PROVEN_COPY=
 SPAWN_APPLY_FAILED=0
 SPAWN_ACQUIRE_T0=
@@ -6236,11 +6249,18 @@ spawn_pane_pid() {
 # firstmate-skipped:<task>) and recorded in $DATA/<task>/skipped-copies.tsv. Nothing here releases a lease.
 spawn_report_leased_copies() {
   local entry
-  [ "${#SPAWN_SKIPPED_INFO[@]}" -gt 0 ] || return 0
-  echo "leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: $DATA/$ID/skipped-copies.tsv):"
-  for entry in "${SPAWN_SKIPPED_INFO[@]}"; do
-    echo "  ${entry%%|*} (${entry#*|}) held by firstmate-skipped:$ID"
-  done
+  if [ "${#SPAWN_SKIPPED_INFO[@]}" -gt 0 ]; then
+    echo "leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: $DATA/$ID/skipped-copies.tsv):"
+    for entry in "${SPAWN_SKIPPED_INFO[@]}"; do
+      echo "  ${entry%%|*} (${entry#*|}) held by firstmate-skipped:$ID"
+    done
+  fi
+  if [ "${#SPAWN_REFUSED_INFO[@]}" -gt 0 ]; then
+    echo "copies left untouched (each already carries another holder's lease, so this home holds no lease on it and wrote nothing to it; record: $DATA/$ID/skipped-copies.tsv):"
+    for entry in "${SPAWN_REFUSED_INFO[@]}"; do
+      echo "  ${entry%%|*} (${entry#*|})"
+    done
+  fi
 }
 spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
   local skipped real
@@ -6384,6 +6404,28 @@ spawn_acquire_pool_slot() {
 
   validate_spawn_worktree "treehouse get" "$T"
 
+  # The pool state decides before any claim is written: a copy that already carries another holder's lease is passed over; a
+  # copy whose state cannot be read as one consistent record is refused (the copy may hold work, so its endpoint stays open on
+  # it, untouched, exactly as for a lease that cannot be taken); only a positively unleased copy goes on to the claim.
+  if [ "$RELAUNCH" -eq 0 ]; then
+    spawn_classify_copy "$WT"
+    case "$SPAWN_COPY_LEASE_STATE" in
+      other)
+        spawn_pass_over_copy
+        spawn_acquire_pool_slot
+        return
+        ;;
+      unknown)
+        SPAWN_TREEHOUSE_ABORT_TARGET=
+        HERDR_PROJECTION_ABORT_CLEANUP=0
+        ORCA_ABORT_CLEANUP=0
+        spawn_report_leased_copies >&2
+        echo "error: the pool state does not show copy $WT as one consistent record (${FM_TASK_COPY_SLOT_REASON:-state ${FM_TASK_COPY_SLOT_STATE:-unknown}}, ${FM_TASK_COPY_SLOT_ROWS:-0} row(s) for it); nothing was written to it and no claim was made, its endpoint $T stays open on it because closing that endpoint would let Treehouse reset it; no worker admitted" >&2
+        exit 1
+        ;;
+    esac
+  fi
+
   # Claim the pool slot for this task. The interactive `treehouse get` sent to
   # the pane above records only a process lease (Treehouse's durable
   # `get --lease --lease-holder`, which bin/fm-home-seed.sh uses for secondmate
@@ -6403,6 +6445,118 @@ spawn_acquire_pool_slot() {
     fi
     SPAWN_SLOT_CLAIMED=1
   fi
+}
+# What Treehouse's own pool state, read now and read-only and before anything is written, says about pool copy <path>.
+# Sets SPAWN_COPY_LEASE_STATE to one of
+#   ordinary  the copy is positively NOT in this project's pool: Treehouse named the pool directory and the copy is not under
+#             it. Handled as before. No other proof is accepted: a lookup that fails is not a proof;
+#   unleased  the whole state file passed the strict proof, exactly one row is the copy and it is not leased: a normal
+#             candidate;
+#   other     the whole state file passed the strict proof, exactly one row is the copy, and it is leased by a holder other
+#             than this task's own firstmate-skipped:<id> (an ordinary lease or Treehouse's recovered lease);
+#             SPAWN_OTHER_LEASE_HOLDER holds that holder. Only this state passes a copy over;
+#   unknown   anything else: a copy that lies in the pool, or that cannot be shown to lie outside it, whose state is missing,
+#             a symlink or unreadable; a state that fails the strict proof in ANY row (fm_task_copy_pool_state_strict: one
+#             JSON document read exactly, every row's field types, nothing coerced); an escaped or relative path; no row for
+#             the copy; a row that is also another row by name or by physical identity (a differently spelled path or a
+#             symlink, whatever the names and holders, in either order); a conflicting entry; a lease that is this task's
+#             own; or a state that, read twice, does not give the copy the same row count, state, holder and name.
+# This is called for a copy the pool just handed this spawn, so it is a pool copy by construction; a pool-slot test that
+# fails therefore leaves it unknown unless the pool directory resolves and excludes it. The copy is classified from the rows
+# of the very document the strict proof read (the proof leaves them in fm_task_copy_pool_slot_held's cache), so the file is
+# never read leniently for a classification. Every physical alias and every duplicate name counts
+# (fm_task_copy_pool_slot_held counts them), so one row is never read out of several. No command's message is ever the
+# proof, and treehouse is not asked: its status command can rewrite state. Treehouse writes its state under its own lock,
+# which this spawn does not hold (the Firstmate project lock does not stop a treehouse command run elsewhere), so the file
+# is proved and classified a second time, and the copy is classified only when both readings pass the proof and agree for
+# it; a state that changed for the copy, or became one the proof refuses, between the two readings is unknown. This is a
+# sampling limit: "no corrupt state reaches a worker" holds for a corruption that a reading sees. A change made and undone
+# between two readings, or made after the second, is seen by no reading and can be seen by no read-only classifier; the copy
+# is then classified from a state that passed the proof twice, and a worker may be launched.
+spawn_classify_copy() { # <path>
+  local real pool_dir state reading first_rows='' first_state='' first_holder='' first_name=''
+  SPAWN_COPY_LEASE_STATE=unknown
+  SPAWN_OTHER_LEASE_HOLDER=
+  FM_TASK_COPY_SLOT_STATE=unknown
+  FM_TASK_COPY_SLOT_ROWS=0
+  FM_TASK_COPY_SLOT_REASON="the copy path cannot be resolved"
+  real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) && [ -n "$real" ] || return 0
+  if ! fm_treehouse_pool_slot "$PROJ_ABS" "$real"; then
+    # Not a readable pool slot. That alone proves nothing: a pool copy whose state is missing, a symlink or unparseable looks
+    # the same. It is ordinary ONLY when Treehouse names this project's pool directory and the copy is not under it.
+    if pool_dir=$(fm_task_copy_treehouse_pool_dir "$PROJ_ABS") && pool_dir=$(CDPATH='' cd -- "$pool_dir" 2>/dev/null && pwd -P) && [ -n "$pool_dir" ]; then
+      case "$real" in
+        "$pool_dir"/*)
+          FM_TASK_COPY_SLOT_STATE=missing-state
+          FM_TASK_COPY_SLOT_REASON="lies in this project's pool $pool_dir whose state file cannot be used (missing, a symlink or not a Git-matching pool)"
+          ;;
+        *) SPAWN_COPY_LEASE_STATE=ordinary ;;
+      esac
+    else
+      FM_TASK_COPY_SLOT_STATE=missing-state
+      FM_TASK_COPY_SLOT_REASON="is not a readable pool slot and Treehouse did not name this project's pool directory, so it is not shown to lie outside the pool"
+    fi
+    return 0
+  fi
+  # Each reading proves the whole state file exactly as written and classifies the copy from the rows of that proved
+  # document; no row of a file that fails the proof is read as a classification.
+  state="${real%/*/*}/treehouse-state.json"
+  for reading in first second; do
+    if ! fm_task_copy_pool_state_strict "$state"; then
+      FM_TASK_COPY_SLOT_STATE=invalid
+      FM_TASK_COPY_SLOT_REASON="cannot be classified on the $reading reading of the pool state: $FM_TASK_COPY_STRICT_REASON"
+      return 0
+    fi
+    fm_task_copy_pool_slot_held "$real" || :
+    # No later reader in this spawn may take this reading's rows for a newer one.
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    if [ "$reading" = first ]; then
+      first_rows=$FM_TASK_COPY_SLOT_ROWS first_state=$FM_TASK_COPY_SLOT_STATE first_holder=$FM_TASK_COPY_SLOT_HOLDER first_name=$FM_TASK_COPY_SLOT_NAME
+    elif [ "$first_rows" != "$FM_TASK_COPY_SLOT_ROWS" ] || [ "$first_state" != "$FM_TASK_COPY_SLOT_STATE" ] ||
+      [ "$first_holder" != "$FM_TASK_COPY_SLOT_HOLDER" ] || [ "$first_name" != "$FM_TASK_COPY_SLOT_NAME" ]; then
+      FM_TASK_COPY_SLOT_REASON="changed between two readings of the pool state $state (first $first_rows row(s), state ${first_state:-none}, holder '${first_holder}'; then $FM_TASK_COPY_SLOT_ROWS row(s), state ${FM_TASK_COPY_SLOT_STATE:-none}, holder '${FM_TASK_COPY_SLOT_HOLDER}')"
+      FM_TASK_COPY_SLOT_STATE=changed
+      return 0
+    fi
+  done
+  [ "$FM_TASK_COPY_SLOT_ROWS" = 1 ] || return 0
+  case "$FM_TASK_COPY_SLOT_STATE" in
+    unleased) SPAWN_COPY_LEASE_STATE=unleased ;;
+    held | recovered)
+      [ -n "$FM_TASK_COPY_SLOT_HOLDER" ] && [ "$FM_TASK_COPY_SLOT_HOLDER" != "firstmate-skipped:$ID" ] || return 0
+      SPAWN_OTHER_LEASE_HOLDER=$FM_TASK_COPY_SLOT_HOLDER
+      SPAWN_COPY_LEASE_STATE=other
+      ;;
+  esac
+  return 0
+}
+# A copy the pool handed this spawn that already carries another holder's lease is passed over before anything is written to
+# it: no claim (the claim marker beside the copy is never created, replaced or removed), no lease command, no idle proof.
+# The pool state already holds the copy's lease, so this home adds no lease of its own; the pane is not closed for the rest of
+# this spawn, since its shell stands inside the copy. It is recorded in $DATA/<task>/skipped-copies.tsv with the
+# lease holder the pool state names in the holder column, never a holder this home could own, so bin/fm-teardown.sh never
+# returns it. The record is read back; a record that cannot be written and read back refuses the whole spawn.
+spawn_pass_over_copy() {
+  local passed=$WT real row reason
+  # The pane's shell stands inside this passed-over copy. Closing the pane would let Treehouse reset a copy another holder
+  # may lease, so the pane stays open for the rest of this spawn.
+  SPAWN_TREEHOUSE_ABORT_TARGET=
+  HERDR_PROJECTION_ABORT_CLEANUP=0
+  real=$(CDPATH='' cd -- "$passed" 2>/dev/null && pwd -P) && [ -n "$real" ] || {
+    echo "error: copy '$passed' cannot be resolved to a real path, so its record cannot be trusted; nothing was written to it and the spawn is refused (no worker admitted)" >&2
+    exit 1
+  }
+  reason=$(printf 'already carries another holder'"'"'s lease in the pool state (holder: %s); this spawn wrote nothing to it' "$SPAWN_OTHER_LEASE_HOLDER" | tr '\t\r\n' '   ')
+  row=$(printf '%s\t%s\t%s\t%s' "$real" "$reason" "$(printf '%s' "$SPAWN_OTHER_LEASE_HOLDER" | tr '\t\r\n' '   ')" "$(date +%s)")
+  if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/skipped-copies.tsv" && grep -Fxq -- "$row" "$DATA/$ID/skipped-copies.tsv"; } 2>/dev/null; then
+    echo "error: could not write and read back the record of passed-over copy $real in $DATA/$ID/skipped-copies.tsv; nothing was written to the copy and the spawn is refused (no worker admitted)" >&2
+    exit 1
+  fi
+  SPAWN_SKIPPED_SLOTS+=("$real")
+  SPAWN_REFUSED_INFO+=("$real|$reason")
+  echo "skipped: copy $real $reason; taking another copy" >&2
+  WT=
 }
 # A copy that is not plainly clean, idle and behind the target is never used and never touched
 # (bin/fm-slot-provision-lib.sh owns the rules). Treehouse resets a slot when its shell exits,

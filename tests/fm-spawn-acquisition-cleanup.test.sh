@@ -101,8 +101,12 @@ fi
 exec /bin/sleep 0.02
 SH
 chmod +x "$FAKEBIN/sleep"
+# The real `treehouse pool-dir` always names the project's pool folder; every copy here is a plain folder, so the folder
+# it names (empty) holds none of them, and the spawn may use one as an ordinary copy.
+mkdir -p "$TMP_ROOT/treehouse-pool"
 cat > "$FAKEBIN/treehouse" <<SH
 #!/usr/bin/env bash
+[ "\${1:-}" != pool-dir ] || { printf '%s\n' '$TMP_ROOT/treehouse-pool'; exit 0; }
 [ "\${1:-}" = get ] || exit 0
 . '$TMP_ROOT/get-config'
 trap 'rm -f "\$LEASE"; exit 0' HUP INT TERM

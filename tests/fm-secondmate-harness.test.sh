@@ -1070,6 +1070,9 @@ test_spawn_fallback_chain_and_crew_scout_unaffected() {
   proj="$w/crew-project"
   wt="$w/crew-wt"
   fakebin=$(make_launch_capturing_tmux "$w/tmux-crew")
+  # A crew spawn takes its copy through Treehouse, so it runs with the shared no-op treehouse the spawn suites use
+  # (tests/lib.sh fm_fake_exit0), whose pool-dir names an empty pool folder that does not hold this plain worktree.
+  fm_fake_exit0 "$fakebin" treehouse
   fm_git_worktree "$proj" "$wt" "wt-crew"
   mkdir -p "$home/data/$id" "$home/projects" "$home/state"
   cat > "$home/data/$id/brief.md" <<'EOF'

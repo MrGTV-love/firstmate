@@ -44,7 +44,7 @@ make_retained_case() {
   fm_test_spawn_brief "$HOME_DIR" "new-$name"
   mkdir -p "$HOME_DIR/user-home"
   fm_git_worktree "$PROJECT_DIR" "$SLOT_DIR" "retained-$name"
-  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":99999999,"owner_started_at":1}]}\n' "$SLOT_DIR" > "$CASE_DIR/pool/treehouse-state.json"
+  printf '{"worktrees":[{"name":"1","path":"%s","created_at":"2026-01-01T00:00:00Z","owner_pid":99999999,"owner_started_at":1}]}\n' "$SLOT_DIR" > "$CASE_DIR/pool/treehouse-state.json"
   PANE_DIR=$SLOT_DIR
   : > "$CASE_DIR/pane-log"
   : > "$CASE_DIR/launch-log"
@@ -56,7 +56,7 @@ make_retained_case() {
 add_free_second_slot() {  # <slot1-entry>
   PANE_DIR="$CASE_DIR/pool/2/project"
   git -C "$PROJECT_DIR" worktree add --quiet --detach "$PANE_DIR"
-  printf '{"worktrees":[{"name":"1","path":"%s"%s},{"name":"2","path":"%s"}]}\n' \
+  printf '{"worktrees":[{"name":"1","path":"%s","created_at":"2026-01-01T00:00:00Z"%s},{"name":"2","path":"%s","created_at":"2026-01-01T00:00:00Z"}]}\n' \
     "$SLOT_DIR" "$1" "$PANE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
 }
 
@@ -515,7 +515,7 @@ test_nested_copy_in_leased_slot_allows_allocation() {
       # Treehouse state spelling the leased slot through a symlinked pool still
       # names that slot.
       ln -s "$CASE_DIR/pool" "$CASE_DIR/pool-alias"
-      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"2","path":"%s"}]}\n' \
+      printf '{"worktrees":[{"name":"1","path":"%s","created_at":"2026-01-01T00:00:00Z","leased":true,"lease_holder":"holder"},{"name":"2","path":"%s","created_at":"2026-01-01T00:00:00Z"}]}\n' \
         "$CASE_DIR/pool-alias/1/project" "$PANE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
     fi
     retained_fingerprint > "$CASE_DIR/before-copy"
@@ -555,7 +555,7 @@ test_nested_copy_in_superseded_slot_allows_allocation() {
     git -C "$PROJECT_DIR" worktree add --quiet --detach "$current"
     current=$(cd "$current" && pwd -P)
     old=${SLOT_DIR%/*/*}
-    printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$current" > "$CASE_DIR/current-pool/treehouse-state.json"
+    printf '{"worktrees":[{"name":"1","path":"%s","created_at":"2026-01-01T00:00:00Z"}]}\n' "$current" > "$CASE_DIR/current-pool/treehouse-state.json"
     PANE_DIR=$current
     cat > "$FAKEBIN_DIR/treehouse" <<SH
 #!/usr/bin/env bash
