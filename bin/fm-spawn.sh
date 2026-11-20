@@ -8113,9 +8113,9 @@ dsh)
   DSH_RUNTIME=
   if [ "$RELAUNCH" = 1 ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
     if [ "$KIND" = secondmate ]; then
-      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" --primary-root "$FM_ROOT") || exit 1
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" --primary-root "$FM_ROOT" --record-binding-decision) || exit 1
     else
-      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT") || exit 1
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" --record-binding-decision) || exit 1
     fi
   fi
   # Inside a DSH primary or secondmate DSH_HOME is that session's private
