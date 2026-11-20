@@ -904,10 +904,10 @@
       "invariant": "Omp adoption changes a session binding only after proving the exact unpinned replacement process.",
       "layer": "runtime-block",
       "source": "the recorded task endpoint, unique foreground PID, process identity, launch generation and absolute session-file registration; existing decision points: site:bin/fm-control.sh:0dfe8ac0db, site:bin/fm-launch-proof-lib.sh:d457d36dad",
-      "trigger": "adopt (rewrite an omp session record) unless the recorded PID is not the live one, not a live omp, and the live process is provably unpinned / fm-control adopt of a live omp process as a task's agent unless all proofs hold: one recorded window, readable pane, one unique foreground pid, pid is omp, not pinned to another spawn_gen, readable absolute session-file registration matching the task session",
+      "trigger": "adopt (rewrite an omp session record) unless the recorded PID is not the live one, not a live omp, and the live process is provably unpinned / fm-control adopt of a live omp process as a task's agent unless all proofs hold: one recorded window, readable pane, one unique foreground pid, pid is omp (by name, or as the installed omp's Bun runtime: actual executable and resolved entry script each equal to the one trusted installed identity (bin/fm-omp-identity.py installed_identity; a complete omp-shaped tree elsewhere is refused), plus interactive role, terminal input and an open writable task session file), not pinned to another spawn_gen, readable absolute session-file registration matching the task session",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Preserve both session records; establish the exact unpinned live omp process before retrying FM_HOME=<home> bash bin/fm-control.sh <task> adopt.",
+      "remedy": "Preserve both session records; establish the exact unpinned live omp process before retrying FM_HOME=<home> bash bin/fm-control.sh <task> adopt. A refusal naming the process proof for a Bun-runtime worker means its executable or entry script is not the installed omp's, or its role or terminal input is not the interactive agent (python3 bin/fm-omp-identity.py interactive <pid> prints the reason).",
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
@@ -964,6 +964,14 @@
         {
           "file": "bin/fm-launch-proof-lib.sh",
           "match": "print(f\"adopt refused: {message}\", file=sys.stderr)"
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "die \"adopt refused: another writer published the session record while adoption claimed it; that record was not overwritten\""
+        },
+        {
+          "file": "bin/fm-omp-identity.py",
+          "match": "print(f\"refused: {error}\", file=sys.stderr)"
         }
       ]
     },
