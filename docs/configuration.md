@@ -14,6 +14,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [status log size bounds](#status-log-size-bounds-fm_status_cap_bytes), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
+| Aged scratch directories filling `/private/tmp` and `~/tmp` | [Scratch reaper](#scratch-reaper-configscratch-reaper) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Automatic exact-head review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
@@ -91,6 +92,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The nested-copy sweep's removal log `data/copy-sweep.log` and preservation, driver-retention receipts and per-copy waiting records under `data/copy-sweep/`, owned by `bin/fm-copy-sweep.sh --apply`; `bin/fm-teardown.sh` also writes a receipt, in its complete form, as soon as Vernant's closeout driver keeps an own nested copy of a task (whether the task then closes or refuses), and [Agent control](agent-control.md)'s kept-own-copy rule owns its fields.
 - A task's own-copy preserves under `data/<task>/nested-copy-preserved/` (never rebuilt, overwritten or removed) and its refusal records under `data/<task>/closeout-refused/`, written by `bin/fm-teardown.sh` when a kept own copy's receipt cannot be written; [Agent control](agent-control.md)'s kept-own-copy rule owns both.
 - The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
+- The [scratch reaper](#scratch-reaper-configscratch-reaper) archive of small logs under `data/scratch-reaper-archive/<UTC date>/`, written before it removes a scratch directory; `bin/fm-scratch-reaper.sh` owns it.
 
 `state/` holds runtime records:
 
@@ -119,6 +121,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The [host memory admission](#host-memory-admission) readings `state/memory-readings.jsonl` and, in the root home only, the alarm episode marker `state/.memory-alarmed`, calibration record `state/.memory-calibration.json` and alarm baseline `state/.memory-baseline.json`, all owned by `bin/fm-mem-guard.sh`; `bin/fm-watch.sh` owns the persistent probe deadline `state/.memory-health-next` and surfaced-row marker `state/.seen-memory-health`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
+- The [scratch reaper](#scratch-reaper-configscratch-reaper) decision log `state/scratch-reaper.log`, window marker `state/.scratch-reaper-next`, single-flight lock `state/.scratch-reaper.lock`, and low-disk marker `state/.scratch-reaper-alarmed`, all written by `bin/fm-scratch-reaper.sh`.
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
@@ -869,6 +872,85 @@ The wake is recorded as sent only after the wake queue took it, so a failed appe
 Each outcome is one line in `data/<id>/merge-prune.log`; a pruned copy raises no wake, and only a copy that stays raises its one wake, `check: merge-prune kept <copy> for <id>: <reason>`; the prune never writes to the task's status file.
 The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.
 `bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.
+
+## Scratch reaper (config/scratch-reaper)
+
+Killed or keeping test, build, and agent runs leak scratch directories into `/private/tmp` and `~/tmp`, and nothing removes them on a schedule.
+`bin/fm-scratch-reaper.sh` removes the aged ones that nothing uses, and the watcher runs it, so no person has to.
+The script's header owns the mechanics; this section states the contract an operator relies on.
+
+A direct child directory of a listed root, whose name matches that root's glob, is removed only when every one of these holds:
+
+- A name that holds a control character, such as a newline, is kept with reason `control-character-name`, and its printed name shows each control character as `?`.
+- It is not a symlink, and its real path is exactly the real root plus its name.
+- It is not protected: not under `~/.treehouse`, `~/firstmate`, `/Volumes`, this home, or this home's `data/` or `state/` folder.
+- No recorded task owns it: it equals the `tasktmp=` value of a `state/*.meta` file, or it is named `fm-<id>` or starts with `fm-<id>+` for a `state/<id>.meta` file, in this home or in a local secondmate home that `data/secondmates.md` lists.
+- Nothing in its whole tree is newer than the age, which is 24 hours unless `age_hours` says otherwise.
+- No `.git` entry and no `.fm-slot-owner` entry exists anywhere in its tree, so worktrees, pool slots, and nested repositories stay.
+- No process has an open file or a current directory inside it, judged from one `lsof` snapshot per run.
+- Its small logs were archived.
+
+Any doubt keeps the directory, and an `lsof` that fails or prints nothing keeps everything and exits 3.
+Plain files are never removed, whatever their name.
+A file name inside a directory that holds a newline, a space, or a leading dash is archived like any other, because the script keeps paths NUL-delimited from the listing to the copy.
+
+The one `lsof` snapshot is the only check for open handles, so it has one honest limit.
+A process that starts after the snapshot and opens a file in a candidate, or enters it, before that candidate is removed is not seen.
+The window runs from the snapshot to the removal of that one directory, and the directory has been untouched for the whole age first.
+
+`config/scratch-reaper` lists one `<root> <glob>` per line, with `~/` allowed at the start of a root and `#` starting a comment.
+A line `age_hours <n>` sets the age.
+The file replaces the built-in defaults when it names at least one root, and a file with no root line keeps them.
+The defaults are `/private/tmp` with `fm-*`, `omp-*`, `fm-fm-*`, `fm-omp-*`, `fm-joined-generation.*`, `fm-bash-*`, `fm-pre-generic.*`, `fm-prekey-matcher.*`, and `fm-ttsr-pending.*`, and `~/tmp` with `backpass-*`, `fm-spawn-tree-*`, `dsh-*`, `nm-e2e-bin*`, and `nm-timeout-bin*`.
+A root that is a symlink, is not a directory, or is, contains, or lies under a protected path stops the run with exit 2 before it touches anything.
+A configured root that is missing stops the run with exit 2 the same way, and the message names the config file and the root.
+A built-in default root that is missing is skipped.
+
+Why each default glob is there:
+
+- `/private/tmp` `fm-*`: every firstmate scratch name, including the `fm-<task-id>` temp roots that the recorded-task rule keeps while their record exists, and the fixture families `fm-acct-*`, `fm-atomic-*` and `fm-batch-*`.
+- `/private/tmp` `omp-*`: omp scratch; no producer of this bare name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-fm-*`: named by the captain as suite fixture directories.
+- `/private/tmp` `fm-omp-*`: named by the captain as omp scratch.
+- `/private/tmp` `fm-joined-generation.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-bash-*`: the bash timeout command's scratch name in `bin/fm-timeout-lib.sh`.
+- `/private/tmp` `fm-pre-generic.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-prekey-matcher.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `/private/tmp` `fm-ttsr-pending.*`: no producer of this name is in this repository, so its origin is unresolved here.
+- `~/tmp` `backpass-*`: named by the captain as backpass scratch.
+- `~/tmp` `fm-spawn-tree-*`: named by the captain as spawn-tree scratch.
+- `~/tmp` `dsh-*`: the captain named only `dsh-workspace-changes`, and the wider glob has no producer in this repository, so its origin is unresolved here.
+- `~/tmp` `nm-e2e-bin*`: named by the captain as end-to-end test scratch.
+- `~/tmp` `nm-timeout-bin*`: no producer of this name is in this repository, so its origin is unresolved here.
+
+The recorded-task rule reads `state/*.meta` in this home and in each local secondmate home that `data/secondmates.md` lists, read only.
+A remote secondmate record is not read, because its home is on another host.
+A listed home that is not an absolute path, a `data/secondmates.md` that is not a regular file, or a malformed secondmate line stops the run with exit 2 before it touches anything.
+Residual: another home's own task temp roots are not protected, and a listed home whose `state/` cannot be read is not seen.
+
+Before a directory is removed, each regular file in it named `*.log`, `*.txt`, `*.out`, `*.err`, `*.json`, or `*.md` of at most 1 MiB is copied, with its relative path and verified byte for byte, to `data/scratch-reaper-archive/<UTC date>/<directory name>/`, up to 20 MiB per directory.
+The whole archive finishes before the removal starts.
+A file whose size cannot be read, a copy that fails, and a copy that differs from its source each keep the whole directory, even when an earlier file was already copied.
+A larger log is not copied, the directory is still removed when every other check passes, and the decision line carries `skipped_logs=<n>`.
+Neither the archive nor the log below is pruned.
+
+The script has exactly four production `rm` calls, and only the first removes a scratch directory.
+The first is `rm -rf --` of `<real root>/<name>` for a listed root, run after a re-check that it is a real directory and its own real path.
+The second is `rm -rf --` of the script's own temp folder `<TMPDIR>/.scratch-reaper.XXXXXX`.
+The third is `rm -f --` of the `lsof` snapshot file inside that temp folder.
+The fourth is `rm -f --` of `state/.scratch-reaper-alarmed`.
+The last three touch only the script's own files, never a scratch directory and never a path under a listed root.
+
+Every decision is one line, printed and appended to `state/scratch-reaper.log`: `removed` with the bytes freed, or `kept` with its reason (`control-character-name`, `symlink`, `outside root`, `protected`, `task-record`, `young`, `git`, `open handle`, `archive failed`, `lsof failed`, `remove failed`).
+A run without `--apply` is a dry run that prints the same lines as `would-remove` or `kept` and writes nothing.
+
+The watcher offers the run at most every `FM_SCRATCH_REAPER_TICK` seconds ([environment variables](#environment-variables)), starting `bin/fm-scratch-reaper.sh --scheduled` detached and single-flight, with no daemon and no LaunchAgent.
+The script owns the 30-minute window, a lock, and its failure log, so a failed, busy, or hung run never reaches the supervision cycle.
+A secondmate home's scheduled run exits at once without work.
+It raises one `check: scratch-reaper low-disk` wake only when free space on the roots' volume is below 20 GiB and the run removed nothing, repeats it after six hours at most, and stays quiet once space recovers or a run frees bytes.
+On a 100 percent full volume the reaper's own writes (its temp folder, its `lsof` snapshot and its log) can fail, so it frees little there; it runs at most once every 30 minutes and raises the low-disk wake under 20 GiB.
+A suite that sets `FM_TEST_SEAM` never starts the real script from the watcher.
+Regression coverage is `tests/fm-scratch-reaper.test.sh` and `tests/fm-watch-scratch-reaper.test.sh`, which run the script only through `tests/scratch-reaper-helpers.sh`; that helper's header owns the test-world guard.
 
 ## Waiting worker spends no turns (config/wait-no-turns)
 
@@ -4958,6 +5040,8 @@ FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by
 FM_TEST_SLOT_WAIT_SECONDS=   # retired and ignored: a waiter waits for a slot until a holder ends (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
 FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
+FM_SCRATCH_REAPER_TICK=60   # seconds between the watcher's offers of the detached scratch-reaper run (bin/fm-scratch-reaper.sh --scheduled); the script owns its 30-minute window; 0 turns the offer off; invalid values use 60
+FM_SCRATCH_REAPER_BIN=   # test seam: the script the watcher launches instead of bin/fm-scratch-reaper.sh; under FM_TEST_SEAM=1 the watcher starts nothing unless this is set
 FM_HOME_SUMMARY_TIMEOUT=900    # no-output/no-CPU seconds for home-summary initialization through atomic publication, never a wall-clock cutoff; independent failure-accounting bounds are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 900
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2
