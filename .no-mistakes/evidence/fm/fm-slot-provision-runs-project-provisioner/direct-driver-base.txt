@@ -1,0 +1,67 @@
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=different
+project=/Users/charlesabrooker/tmp/fmslot-different-wrpu/project
+copy=/Users/charlesabrooker/tmp/fmslot-different-wrpu/copy with space
+exit=0 FM_SLOT_PROVISIONED=1
+-- stderr:
+   {"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmslot-different-wrpu/manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fmslot-different-wrpu/copy with space", "owner_id": "t1", "branch": "fm/t1", "base_sha": "72392b736eb1f7eaf36d8d4e708d48d1e0237ae6", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+-- executed provisioner records:
+   {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fmslot-different-wrpu/copy with space/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fmslot-different-wrpu/copy with space/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fmslot-different-wrpu/project", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-different-wrpu/copy with space", "--owner-id", "t1", "--branch", "fm/t1", "--base-sha", "72392b736eb1f7eaf36d8d4e708d48d1e0237ae6", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- manifest written: yes
+-- copy HEAD/branch/refs unchanged: yes
+
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=stale
+project=/Users/charlesabrooker/tmp/fmslot-stale-OvUP/project
+copy=/Users/charlesabrooker/tmp/fmslot-stale-OvUP/copy with space
+exit=2 FM_SLOT_PROVISIONED=0
+-- stderr:
+   {"state": "BLOCKED", "reason": "guard_B_refused"}
+   error: slot provisioner refused task t1 (exit 2); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/t1 at 1165fb35a095f163fa3f95798e00657ee20ff31a); report: /Users/charlesabrooker/tmp/fmslot-stale-OvUP/report.json
+-- executed provisioner records:
+   {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fmslot-stale-OvUP/copy with space/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fmslot-stale-OvUP/copy with space/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fmslot-stale-OvUP/project", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-stale-OvUP/copy with space", "--owner-id", "t1", "--branch", "fm/t1", "--base-sha", "91036671cfb4ef68668ed3fddd1589c1b3e7d54a", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- manifest written: no
+-- copy HEAD/branch/refs unchanged: yes
+
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=clone-refuses
+project=/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/project
+copy=/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/copy with space
+exit=0 FM_SLOT_PROVISIONED=1
+-- stderr:
+   {"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/copy with space", "owner_id": "t1", "branch": "fm/t1", "base_sha": "b06a4b7027971730e59922939a45fa499e2bed68", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+-- executed provisioner records:
+   {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/copy with space/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/copy with space/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/project", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-clone-refuses-VH8f/copy with space", "--owner-id", "t1", "--branch", "fm/t1", "--base-sha", "b06a4b7027971730e59922939a45fa499e2bed68", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- manifest written: yes
+-- copy HEAD/branch/refs unchanged: yes
+
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=missing-clone
+project=/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/project
+copy=/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/copy with space
+exit=0 FM_SLOT_PROVISIONED=1
+-- stderr:
+   {"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/copy with space", "owner_id": "t1", "branch": "fm/t1", "base_sha": "949984af32bbcf57b4c791cb7a238c2667627ca2", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+-- executed provisioner records:
+   {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/copy with space/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/copy with space/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/project", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-missing-clone-ZGjr/copy with space", "--owner-id", "t1", "--branch", "fm/t1", "--base-sha", "949984af32bbcf57b4c791cb7a238c2667627ca2", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- manifest written: yes
+-- copy HEAD/branch/refs unchanged: yes
+
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=copy-missing
+project=/Users/charlesabrooker/tmp/fmslot-copy-missing-Lw6f/project
+copy=/Users/charlesabrooker/tmp/fmslot-copy-missing-Lw6f/copy with space
+exit=1 FM_SLOT_PROVISIONED=0
+-- stderr:
+   error: slot provisioner is missing from assigned copy /Users/charlesabrooker/tmp/fmslot-copy-missing-Lw6f/copy with space
+-- executed provisioner records:
+   (none ran)
+-- manifest written: no
+-- copy HEAD/branch/refs unchanged: yes
+
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=lagging-clone
+project=/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/project
+copy=/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/copy with space
+exit=0 FM_SLOT_PROVISIONED=1
+-- stderr:
+   {"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/copy with space", "owner_id": "t1", "branch": "fm/t1", "base_sha": "18d1631630b9bb217860701afe017d55916d2ce5", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+-- executed provisioner records:
+   {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/copy with space/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/copy with space/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/project", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-lagging-clone-HcMz/copy with space", "--owner-id", "t1", "--branch", "fm/t1", "--base-sha", "18d1631630b9bb217860701afe017d55916d2ce5", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- manifest written: yes
+-- copy HEAD/branch/refs unchanged: yes
+

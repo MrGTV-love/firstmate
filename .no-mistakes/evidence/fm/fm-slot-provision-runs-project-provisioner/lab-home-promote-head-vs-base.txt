@@ -1,0 +1,65 @@
+== impl=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7VBWJABC9AJQJTZWT5F3NZP scenario=different task=lab-different-18688
+project clone=/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-different-18688
+task copy=/Users/charlesabrooker/tmp/fmslot-promote-6lAO/copy lab-different-18688
+fm-promote.sh exit=0
+-- output:
+   WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+   warn: no registry at /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/projects.md; defaulting demo-lab-different-18688 to no-mistakes off
+   {"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmslot-promote-6lAO/manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fmslot-promote-6lAO/copy lab-different-18688", "owner_id": "lab-different-18688", "branch": "fm/lab-different-18688", "base_sha": "4c3474863231e1b425722197ff95ab8e8b2ce655", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+   promoted lab-different-18688 to ship mode=local-only yolo=off (teardown protection restored)
+   wrote ship instructions for mode=local-only: /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/lab-different-18688/ship-instructions.md
+   next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.OeGcx1 bin/fm-send.sh fm-lab-different-18688 "$(cat /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/lab-different-18688/ship-instructions.md)"
+   choice: when fm-lab-different-18688 has open keyed decisions, fm-send stops that send and lists them; add --resolve-key <key> after the target (one key per flag) when it answers one, or --answers-none when it answers none (rule: bin/fm-send.sh header, "Decision closure")
+-- executed provisioner records:
+   {"identity": "A", "realpath": "/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-different-18688/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-different-18688/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-different-18688", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-promote-6lAO/copy lab-different-18688", "--owner-id", "lab-different-18688", "--branch", "fm/lab-different-18688", "--base-sha", "4c3474863231e1b425722197ff95ab8e8b2ce655", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- meta kind now: kind=ship
+-- meta slot lines: slot_manifest=/Users/charlesabrooker/tmp/fmslot-promote-6lAO/manifest.json slot_base_sha=4c3474863231e1b425722197ff95ab8e8b2ce655 slot_owned_path=README.md slot_owned_path=scripts 
+
+== impl=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7VBWJABC9AJQJTZWT5F3NZP scenario=missing-clone task=lab-missing-clone-30400
+project clone=/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-missing-clone-30400
+task copy=/Users/charlesabrooker/tmp/fmslot-promote-Vfjx/copy lab-missing-clone-30400
+fm-promote.sh exit=1
+-- output:
+   WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+   warn: no registry at /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/projects.md; defaulting demo-lab-missing-clone-30400 to no-mistakes off
+   error: slot provisioner is missing from project clone /Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-missing-clone-30400: /Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-missing-clone-30400/scripts/git-stability/provision_existing_slot.py; run fleet sync
+   error: promotion of lab-missing-clone-30400 was not admitted; the copy /Users/charlesabrooker/tmp/fmslot-promote-Vfjx/copy lab-missing-clone-30400 is on branch fm/lab-missing-clone-30400; next: keep scout work on it, resolve the provisioner's refusal above, then rerun bin/fm-promote.sh lab-missing-clone-30400
+-- executed provisioner records:
+   (none ran)
+-- meta kind now: kind=scout
+-- meta slot lines: 
+
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=different task=lab-different-35399
+project clone=/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-different-35399
+task copy=/Users/charlesabrooker/tmp/fmslot-promote-x0Pr/copy lab-different-35399
+fm-promote.sh exit=0
+-- output:
+   WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+   warn: no registry at /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/projects.md; defaulting demo-lab-different-35399 to no-mistakes off
+   {"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmslot-promote-x0Pr/manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fmslot-promote-x0Pr/copy lab-different-35399", "owner_id": "lab-different-35399", "branch": "fm/lab-different-35399", "base_sha": "2a44e6c53220a2e26437ac27663715b6e2fd9240", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+   promoted lab-different-35399 to ship mode=local-only yolo=off (teardown protection restored)
+   wrote ship instructions for mode=local-only: /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/lab-different-35399/ship-instructions.md
+   next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.OeGcx1 bin/fm-send.sh fm-lab-different-35399 "$(cat /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/lab-different-35399/ship-instructions.md)"
+   choice: when fm-lab-different-35399 has open keyed decisions, fm-send stops that send and lists them; add --resolve-key <key> after the target (one key per flag) when it answers one, or --answers-none when it answers none (rule: bin/fm-send.sh header, "Decision closure")
+-- executed provisioner records:
+   {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fmslot-promote-x0Pr/copy lab-different-35399/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fmslot-promote-x0Pr/copy lab-different-35399/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-different-35399", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-promote-x0Pr/copy lab-different-35399", "--owner-id", "lab-different-35399", "--branch", "fm/lab-different-35399", "--base-sha", "2a44e6c53220a2e26437ac27663715b6e2fd9240", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- meta kind now: kind=ship
+-- meta slot lines: slot_manifest=/Users/charlesabrooker/tmp/fmslot-promote-x0Pr/manifest.json slot_base_sha=2a44e6c53220a2e26437ac27663715b6e2fd9240 slot_owned_path=README.md slot_owned_path=scripts 
+
+== impl=/Users/charlesabrooker/tmp/fmslot-base scenario=missing-clone task=lab-missing-clone-55201
+project clone=/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-missing-clone-55201
+task copy=/Users/charlesabrooker/tmp/fmslot-promote-Ono0/copy lab-missing-clone-55201
+fm-promote.sh exit=0
+-- output:
+   WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+   warn: no registry at /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/projects.md; defaulting demo-lab-missing-clone-55201 to no-mistakes off
+   {"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmslot-promote-Ono0/manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fmslot-promote-Ono0/copy lab-missing-clone-55201", "owner_id": "lab-missing-clone-55201", "branch": "fm/lab-missing-clone-55201", "base_sha": "fb546f539ed8bcdc76b086f39b09ae69c2dc6a13", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktr
+   promoted lab-missing-clone-55201 to ship mode=local-only yolo=off (teardown protection restored)
+   wrote ship instructions for mode=local-only: /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/lab-missing-clone-55201/ship-instructions.md
+   next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.OeGcx1 bin/fm-send.sh fm-lab-missing-clone-55201 "$(cat /Users/charlesabrooker/tmp/fm-lab.OeGcx1/data/lab-missing-clone-55201/ship-instructions.md)"
+   choice: when fm-lab-missing-clone-55201 has open keyed decisions, fm-send stops that send and lists them; add --resolve-key <key> after the target (one key per flag) when it answers one, or --answers-none when it answers none (rule: bin/fm-send.sh header, "Decision closure")
+-- executed provisioner records:
+   {"identity": "B", "realpath": "/Users/charlesabrooker/tmp/fmslot-promote-Ono0/copy lab-missing-clone-55201/scripts/git-stability/provision_existing_slot.py", "argv": ["/Users/charlesabrooker/tmp/fmslot-promote-Ono0/copy lab-missing-clone-55201/scripts/git-stability/provision_existing_slot.py", "--repo-root", "/Users/charlesabrooker/tmp/fm-lab.OeGcx1/projects/demo-lab-missing-clone-55201", "--worktree-path", "/Users/charlesabrooker/tmp/fmslot-promote-Ono0/copy lab-missing-clone-55201", "--owner-id", "lab-missing-clone-55201", "--branch", "fm/lab-missing-clone-55201", "--base-sha", "fb546f539ed8bcdc76b086f39b09ae69c2dc6a13", "--owned-path", "README.md", "--owned-path", "scripts"]}
+-- meta kind now: kind=ship
+-- meta slot lines: slot_manifest=/Users/charlesabrooker/tmp/fmslot-promote-Ono0/manifest.json slot_base_sha=fb546f539ed8bcdc76b086f39b09ae69c2dc6a13 slot_owned_path=README.md slot_owned_path=scripts 
+
