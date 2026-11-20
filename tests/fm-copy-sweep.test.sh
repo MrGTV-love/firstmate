@@ -5010,6 +5010,60 @@ test_the_sweep_reads_the_recorded_base_again_at_the_execute() {
   pass "a recorded base that changes between the sweep's plan and its execute keeps the copy at the execute with no execute call"
 }
 
+# Only a released_worktree= value equal to or inside the copy gives the copy its base (R2(c)). In a
+# secondmate lane the root home's kind=secondmate record names the lane home, which encloses every
+# copy in the lane, and records no base; it does not count, so the lane task that released the copy
+# decides: base main, remote default main, the copy routes and is released.
+test_a_lane_copy_takes_its_base_from_the_lane_task_that_released_it_and_not_from_the_secondmate_record() {
+  local lane proj copy merge tip lines
+  route_world route-base-lane
+  make_lane rl
+  lane=$W/lane-rl
+  proj=$lane/projects/p
+  git -C "$proj" config "url.file://$(cd "$W/rl-origin.git" && pwd).insteadOf" "$ROUTE_REMOTE_URL"
+  git -C "$proj" remote set-url origin "$ROUTE_REMOTE_URL"
+  git -C "$proj" commit --allow-empty -qm "merge of the superseding pull request"
+  git -C "$proj" push -q origin main
+  git -C "$proj" fetch -q origin
+  merge=$(git -C "$proj" rev-parse HEAD)
+  install_driver "$proj" "$W"
+  route_install_row_driver "$proj" "$W"
+  copy=$proj/.claude/worktrees/lanecopy
+  git -C "$proj" worktree add -q -b fm/lanecopy "$copy" "$merge"
+  git -C "$copy" push -q origin fm/lanecopy
+  git -C "$proj" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$copy"
+  tip=$(git -C "$copy" rev-parse HEAD)
+  route_write_profile "$W/profiles/lanecopy.json" 7 "$tip"
+  printf '%s\t%s\t%s\t%s\n' "$copy" "$tip" 7 "$W/profiles/lanecopy.json" >> "$HOMED/data/supersedence-records.tsv"
+  route_script_row "$W" lanecopy allowed success 7
+  route_set_pr "$W/forge" 7 MERGED "$merge"
+  ! grep -q '^base_branch=' "$HOMED/state/rl.meta" && grep -qxF "home=$lane" "$HOMED/state/rl.meta" \
+    && grep -qx 'kind=secondmate' "$HOMED/state/rl.meta" || fail "the root home's secondmate record does not name the lane home without a base"
+  fm_write_meta "$lane/state/lane-task.meta" kind=ship "released_worktree=$copy" base_branch=main
+  route_sweep --apply
+  [ ! -e "$copy" ] || fail "the lane copy whose releasing task records the remote's default was kept: $OUT"
+  ! git -C "$proj" worktree list --porcelain | grep -qxF "worktree $copy" || fail "the lane copy is still registered"
+  assert_contains "$OUT" "REMOVED"$'\t'"$copy"$'\t' "the lane copy was not reported removed"
+  assert_not_contains "$OUT" "disagree on the base branch" "the secondmate record was counted as a task base"
+  lines=$(grep -F -- "--cleanup-worktree $copy" "$W/closeout.log")
+  assert_equals 2 "$(printf '%s\n' "$lines" | grep -c -- '--pr 7')" "the lane copy was not planned and executed through the route: $lines"
+  pass "a secondmate record whose lane home encloses a copy gives the copy no base, and the lane task that released the copy decides it"
+}
+
+# A released pool slot root encloses every copy a later tenant leaves in that slot. The older task's
+# base is not the base of those copies: the copy follows the remote's default rule and is released.
+test_a_released_pool_slot_root_does_not_give_its_old_base_to_a_copy_nested_in_it() {
+  route_world route-base-slot-root
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy nested 7
+  fm_write_meta "$HOMED/state/t-old.meta" kind=ship "released_worktree=$SLOT" base_branch=release
+  route_sweep --apply
+  route_assert_released nested "an older task released the slot root with base release, remote default main"
+  route_assert_calls nested 7 "a copy nested in a released slot root"
+  assert_not_contains "$OUT" "recorded base release" "the slot root's old base was applied to a copy nested in it"
+  pass "a released pool slot root's base is not applied to a copy nested in it, and the remote's default decides"
+}
+
 # The stated envelope, plan and execute: every document outside it keeps the copy.
 # shellcheck disable=SC2016 # the snippet runs in the library bash, which expands its own variables
 test_the_routes_answer_must_be_the_stated_fifteen_key_envelope_for_the_plan_and_the_execute() {
@@ -6490,6 +6544,8 @@ test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an
 test_a_recorded_base_must_agree_with_the_remotes_default_and_its_own_origin_ref_decides_landing
 test_the_sweep_reads_the_recorded_base_of_a_copy_and_keeps_one_the_remotes_default_disagrees_with
 test_the_sweep_reads_the_recorded_base_again_at_the_execute
+test_a_lane_copy_takes_its_base_from_the_lane_task_that_released_it_and_not_from_the_secondmate_record
+test_a_released_pool_slot_root_does_not_give_its_old_base_to_a_copy_nested_in_it
 test_the_routes_answer_must_be_the_stated_fifteen_key_envelope_for_the_plan_and_the_execute
 test_the_route_takes_and_releases_its_own_project_lock_when_its_caller_holds_none
 test_the_route_borrows_a_hold_its_caller_proves_and_leaves_it_held

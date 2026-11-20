@@ -106,10 +106,11 @@
 # origin/HEAD is never read, because it can be stale, and a local main or master is a
 # guess. The base_branch= that the copy's task recorded must name that same branch or
 # the copy is kept: teardown reads its own task's (TEARDOWN_ROUTE_BASE); the sweep reads
-# the task records of every local home that name the copy (teardown_route_recorded_base),
-# and records that name it and disagree, or cannot be read, leave the base unknown and
-# keep the copy. A remote that cannot be read, names no branch, or names one the
-# clone has no ref for holds the copy. A forge read that
+# the task records of every local home whose released_worktree= value equals the copy
+# or lies inside it (teardown_route_recorded_base), and records that count and
+# disagree, or a record that cannot be read, leave the base unknown and keep the copy.
+# A remote that cannot be read, names no branch, or names one the clone has no ref for
+# holds the copy. A forge read that
 # fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 when the setting is unset; a
 # value that is empty or not a whole number of seconds from 1 to 999999999, written
 # without a leading zero, refuses the route with the value named and is never read as
@@ -2262,13 +2263,12 @@ teardown_route_forge_read() {  # <seconds> <pr> <owner/repo>
 # Teardown names its own task's base in TEARDOWN_ROUTE_BASE (empty: the task records
 # none) and leaves TEARDOWN_ROUTE_BASE_FROM empty. The sweep has no task of its own: it
 # sets TEARDOWN_ROUTE_BASE_FROM=records and TEARDOWN_ROUTE_STATE, and the base is then
-# read from the task records of every local home (fm_local_firstmate_state_dirs) that
-# name the copy in worktree=, home=, prior_worktree= or released_worktree= (an
-# overlapping path counts). The sweep holds a copy that a record names in the first
-# three before it asks the driver, so in practice the record that reaches here names it
-# in released_worktree=, the copy a task left when it gave its pool slot back. No record
-# names it: the task records no base, which is the route's own rule (the remote's
-# default). Records that name it and disagree on the base, a record that cannot be read,
+# read from the task records of every local home (fm_local_firstmate_state_dirs) whose
+# released_worktree= value equals the copy or lies inside it, the copy a task left when
+# it gave its pool slot back. No other field counts, and a value that only encloses the
+# copy (a secondmate lane home, a released pool slot root) does not count. No record
+# counts: the task records no base, which is the route's own rule (the remote's
+# default). Records that count and disagree on the base, a record that cannot be read,
 # a home whose records cannot be listed, a copy that cannot be resolved, and a sweep
 # with no state directory named all return 1 with WHY set, so the base is unknown and
 # the copy is kept before the driver.
@@ -2297,10 +2297,9 @@ teardown_route_recorded_base() {  # <copy>
       while IFS= read -r line || [ -n "$line" ]; do
         field=${line%%=*}
         value=${line#*=}
-        case "$field" in worktree | home | prior_worktree | released_worktree) ;; *) continue ;; esac
-        [ -n "$value" ] || continue
+        [ "$field" = released_worktree ] && [ -n "$value" ] || continue
         other_real=$(fm_task_copy_canonical_dir "$value") || continue
-        fm_task_copy_paths_overlap "$other_real" "$real" || continue
+        case "$other_real" in "$real" | "$real"/*) ;; *) continue ;; esac
         found=1
         break
       done < "$meta"
