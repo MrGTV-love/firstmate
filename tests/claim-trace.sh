@@ -4,9 +4,11 @@
 # that file as one tab-separated line: the function, then its arguments as the call expanded them. Nothing in the spawn is
 # changed. The trace names what the spawn asked those two functions to do, whatever the functions then do to the marker.
 __fm_claim_trace() {
-  case "$BASH_COMMAND" in
+  # The command is read once, here: bash 5 runs the DEBUG trap again inside the subshell below, which rewrites BASH_COMMAND.
+  local __fm_cmd=$BASH_COMMAND
+  case "$__fm_cmd" in
     fm_treehouse_slot_owner_claim\ * | fm_treehouse_slot_owner_release\ *)
-      [ -z "${FM_TEST_CLAIM_TRACE:-}" ] || (eval "set -- $BASH_COMMAND"; printf '%s\t' "$@"; echo) >> "$FM_TEST_CLAIM_TRACE" 2>/dev/null
+      [ -z "${FM_TEST_CLAIM_TRACE:-}" ] || (eval "set -- $__fm_cmd"; printf '%s\t' "$@"; echo) >> "$FM_TEST_CLAIM_TRACE" 2>/dev/null
       ;;
   esac
   return 0
