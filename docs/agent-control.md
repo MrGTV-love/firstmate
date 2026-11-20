@@ -362,6 +362,14 @@ For a copy held for commits on no remote: list the commits only it holds with `g
 For a copy held for unique ignored files: review them with `git -C <copy> status --ignored` and save the ones needed, with any commits only the copy holds, before the copy is removed in any way; the output names no removal command for it, because `git worktree remove` deletes ignored files without asking.
 The output shows every copy path, slot path and reason with control characters replaced by `?`, and quotes each path in a printed command with `printf %q`; the record carries the same cleaned text.
 
+**Record-less nested copies.**
+A nested worktree whose task record is gone cannot be torn down by task id, because `bin/fm-teardown.sh <task-id>` refuses first with `task record is not a regular file`.
+Remove it by path from the home that holds it: `FM_HOME=<home> bin/fm-teardown.sh --copy <absolute path> [--record-id <id>]`.
+The header of [`bin/fm-teardown.sh`](../bin/fm-teardown.sh) ("By-path teardown") owns what the entry proves, what it refuses, its audit record and its rerun rules.
+For a copy held only by a recorded bundle, record the bundle in `data/<record-id>/preservation-bundles.tsv` with the recipe in that header; a refusal prints the record id, and `--record-id` names another one, because one record serves one copy.
+When no open captain-held row names the bundle and every recorded tip, the refusal prints the exact `bin/fm-captain-hold.sh hold` command that files the call; run it, then run the same teardown again.
+A refusal leaves the copy as it was, and the entry never takes `--force`.
+
 **Kept own copies.**
 A task whose own nested copy Vernant's closeout driver keeps (exit 3, `cleanup_ignored_payload_archived_tree_retained`) closes instead of refusing on every retry.
 Asking the driver again can only add archives: each `--execute-cleanup` call writes one more timestamped tar of the same ignored files under the slot's `.claude/bug-evidence/worktree-preservation/` and keeps the tree.
