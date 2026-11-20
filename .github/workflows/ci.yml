@@ -121,7 +121,9 @@ jobs:
         id: touched-guard-lint
         if: github.event_name == 'pull_request'
         env:
+          FM_HOME: ${{ runner.temp }}
           FM_GUARD_EVENT_LOG: ${{ runner.temp }}/fm-guard-lint-touched.jsonl
+          FM_GUARD_LINT_EVENT_ACTOR: gate
         run: bin/fm-cpu-pass.sh run --label ci-guard-lint-new-or-touched -- bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
       - name: Retain the touched-registry guard decision
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.touched-guard-lint.outcome != 'skipped' }}

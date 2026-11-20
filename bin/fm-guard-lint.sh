@@ -412,18 +412,19 @@ case "$MODE" in
 $touched
 TOUCHED_GUARDS
       # Record only this stage, before independent site and allowlist verdicts.
-      # Use an explicit sink so a standalone lint cannot write fleet state.
-      if [ -n "${FM_GUARD_EVENT_LOG:-}" ]; then
-        touch_decision=allow touch_source_ok=true
-        if [ "$touched_status" -ne 0 ]; then
-          touch_decision=error touch_source_ok=false
-        elif [ "$out" -ne 0 ]; then
-          touch_decision=deny
-        fi
-        "$SCRIPT_DIR/fm-guard-event.sh" guard-lint-touched-registry "$touch_decision" \
-          --source-ok "$touch_source_ok" --base "$BASE_REF" \
-          >/dev/null 2>&1 || true
+      # The shared writer resolves the explicit log or established home.
+      touch_decision=allow touch_source_ok=true
+      if [ "$touched_status" -ne 0 ]; then
+        touch_decision=error touch_source_ok=false
+      elif [ "$out" -ne 0 ]; then
+        touch_decision=deny
       fi
+      touch_event_args=(--source-ok "$touch_source_ok" --base "$BASE_REF")
+      if [ "${FM_GUARD_LINT_EVENT_ACTOR:-}" = gate ]; then
+        touch_event_args+=(--actor gate)
+      fi
+      "$SCRIPT_DIR/fm-guard-event.sh" guard-lint-touched-registry "$touch_decision" \
+        "${touch_event_args[@]}" >/dev/null 2>&1 || true
       if [ "$touched_status" -ne 0 ]; then
         echo "error: touched-registry comparison against '$BASE_REF' failed (status $touched_status); no touched guard is cleared" >&2
         out=1

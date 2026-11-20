@@ -41,8 +41,11 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 LINT="$ROOT/bin/fm-guard-lint.sh"
-TMP=$(fm_test_tmproot fm-guard-lint)
+TMP=$(fm_test_tmproot fm-guard-lint) || exit 1
 trap 'fm_test_cleanup' EXIT
+# A checker invocation without an explicit log must never inherit a live home.
+export FM_HOME="$TMP/guard-home"
+unset FM_GUARD_EVENT_LOG FM_GUARD_LINT_EVENT_ACTOR FM_TASK_ID
 
 # fixture <name> -> echoes a fresh root with a valid single-guard registry and
 # the files its owner and test paths name.
@@ -312,6 +315,9 @@ mutate "$LITERAL_NAT" '.guards[0] |= (.id = "01" | .fail_direction = "unspecifie
   | .guards += [(.guards[0] | .id = "1" | .invariant = "a second invariant" | .fail_direction = "closed")]'
 literal_registry=docs/guards/registry.json
 literal_log="$LITERAL_NAT/guard-events.jsonl"
+literal_home="$TMP/literal-event-home"
+literal_default_log="$literal_home/state/guard-events.jsonl"
+mkdir -p "$literal_home/state" "$LITERAL_NAT/state"
 literal_base=$(
   builtin cd "$LITERAL_NAT" && git init -q --template= &&
   git add -- "$literal_registry" && tree=$(git write-tree) &&
@@ -320,7 +326,7 @@ literal_base=$(
 
 mutate "$LITERAL_NAT" '(.guards[] | select(.id == "01") | .source) += " with updated wording"'
 literal_rc=0
-out=$(FM_GUARD_EVENT_LOG="$literal_log" "$LINT" --root "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json 2>/dev/null) || literal_rc=$?
+out=$(FM_HOME="$literal_home" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) || literal_rc=$?
 literal_message="fail_direction 'unspecified' is not closed or open"
 if [ "$literal_rc" -ne 1 ] ||
   ! jq -es --arg message "$literal_message" 'length == 1 and .[0].findings == [{rule:"R4", id:"01", message:$message}]' \
@@ -332,7 +338,7 @@ pass "new-or-touched fails when offending literal id 01 itself is edited"
 # A regular file cannot host a log beneath it; keep both the result and diagnostic.
 : >"$LITERAL_NAT/not-a-directory"
 unavailable_rc=0
-unavailable_out=$(FM_GUARD_EVENT_LOG="$LITERAL_NAT/not-a-directory/events.jsonl" \
+unavailable_out=$(FM_HOME="$literal_home" FM_GUARD_EVENT_LOG="$LITERAL_NAT/not-a-directory/events.jsonl" \
   run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) || unavailable_rc=$?
 if [ "$unavailable_rc" -ne "$literal_rc" ] || [ "$unavailable_out" != "$out" ]; then
   fail "an unavailable event log changed the touched refusal, got exit $unavailable_rc: $unavailable_out"
@@ -341,29 +347,44 @@ pass "an unavailable event log does not change the touched refusal"
 
 # Keep the attempted source edit; change only the offending field in that same row.
 mutate "$LITERAL_NAT" '(.guards[] | select(.id == "01") | .fail_direction) = "closed"'
-out=$(FM_GUARD_EVENT_LOG="$literal_log" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+out=$(FM_HOME="$literal_home" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
   || fail "correcting only id 01's fail direction must clear the same edit (exit $?): $out"
 jq -es 'length == 1 and .[0].findings == []' <<< "$out" >/dev/null \
   || fail "expected no findings or touched diagnostics after correcting the field, got: $out"
 pass "new-or-touched passes the same edit after correcting the offending field"
 
+[ -f "$literal_default_log" ] || fail "the established private home received no default decision records"
+jq -es --arg base "$literal_base" '
+    map(.decision) == ["deny", "allow"]
+    and all(.[]; .guard == "guard-lint-touched-registry" and .actor == "main"
+      and .source_ok and .opportunity and .base == $base)
+  ' "$literal_default_log" >/dev/null || fail "expected default home records for the refusal and recovery only"
+[ ! -e "$LITERAL_NAT/state/guard-events.jsonl" ] || fail "the registry root received the caller home's records"
+missing_home_out=$(run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+  || fail "a missing home changed the corrected verdict"
+if [ "$missing_home_out" != "$out" ] || [ -e "$FM_HOME" ]; then
+  fail "a missing home changed the corrected output or was created"
+fi
+pass "new-or-touched records in the established home without creating a missing home"
+
 git -C "$LITERAL_NAT" show "$literal_base:$literal_registry" >"$LITERAL_NAT/$literal_registry" \
   || fail "could not restore the literal id fixture base"
 mutate "$LITERAL_NAT" '(.guards[] | select(.id == "1") | .source) += " with updated wording"'
-out=$(FM_GUARD_EVENT_LOG="$literal_log" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+out=$(FM_HOME="$literal_home" FM_GUARD_EVENT_LOG="$literal_log" FM_GUARD_LINT_EVENT_ACTOR=gate \
+  run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
   || fail "editing only valid id 1 must not fail for untouched id 01 (exit $?): $out"
 jq -es --arg message "$literal_message" 'length == 1 and .[0].findings == [{rule:"R4", id:"01", message:$message}]' \
   <<< "$out" >/dev/null \
   || fail "expected only the existing R4 finding in the summary, not a touched diagnostic, got: $out"
 pass "new-or-touched passes an edit to valid id 1 despite untouched debt on id 01"
 
-[ -f "$literal_log" ] || fail "the touched-registry stage emitted no decision events"
 jq -es --arg base "$literal_base" '
-    map(select(.guard == "guard-lint-touched-registry")) as $events
-    | ($events | map(.decision)) == ["deny", "allow", "allow"]
-      and all($events[]; .source_ok and .opportunity and .base == $base)
-  ' "$literal_log" >/dev/null || fail "expected one event per touched-registry verdict with the same base"
-pass "new-or-touched records the touched-registry refusal, recovery and unrelated admission"
+    length == 1 and all(.[]; .guard == "guard-lint-touched-registry" and .actor == "gate"
+      and .decision == "allow" and .source_ok and .opportunity and .base == $base)
+  ' "$literal_log" >/dev/null || fail "expected one gate decision in the explicit log"
+jq -es 'length == 2' "$literal_default_log" >/dev/null || fail "the explicit log did not supersede the default log"
+[ ! -e "$LITERAL_NAT/state/guard-events.jsonl" ] || fail "the registry root received the gate's records"
+pass "new-or-touched records a gate decision only in the explicit log"
 
 DUP_NAT=$(fixture duplicate_newortouched)
 git -C "$DUP_NAT" init -q

@@ -7568,7 +7568,7 @@
       "remedy": "Keep the intended edit, correct the field identified in the touched guard's finding, then rerun bin/fm-guard-lint.sh --mode new-or-touched --base <same-base-ref>.",
       "budget": 1,
       "budget_reason": "One verdict per invocation; no cross-invocation counter or escalation is implemented for this check.",
-      "telemetry": "One best-effort guard-lint-touched-registry event per reached literal-ID stage when FM_GUARD_EVENT_LOG is set: deny for a matched finding, allow for no match, or error with source_ok false if the stage could not be evaluated. Later site and allowlist checks can still fail lint. The pull-request CI step uses a runner-temporary log and retains it as an artifact; an unset or unavailable sink does not change lint output or verdict.",
+      "telemetry": "One best-effort guard-lint-touched-registry event per reached literal-ID stage through bin/fm-guard-event.sh: deny for a matched finding, allow for no match, or error with source_ok false if the stage could not be evaluated. The writer uses the explicit log or the established caller home's default log. The pull-request CI step uses a runner-temporary log with actor gate and retains it as an artifact. An unavailable sink does not change lint output or verdict; later site and allowlist checks can still fail lint.",
       "test": "tests/fm-guard-lint.test.sh",
       "tier": "C",
       "harm": "reversible",
