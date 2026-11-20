@@ -6,6 +6,9 @@
 # and real processes, with no harness: it passes on a lab in the shape up builds
 # and fails, by name, on the recorded lab miss it exists to catch. The live
 # end-to-end run on the real harnesses is the builder's own `up`.
+# Fixture startup waits up to 10 seconds for the actual primary path and reply;
+# `up` already gates its ready verdict on these same inputs. To exercise only
+# the controlled startup cases: bash tests/fm-live-lab.test.sh --fixture-readiness
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -90,7 +93,7 @@ make_lab() {
 
   lab_tmux "$root" new-session -d -s firstmate -n lab -c "$root" 'exec sleep 600'
   record_pid "$root" "$(lab_tmux "$root" display-message -p '#{pid}')"
-  lab_tmux "$root" new-window -d -t firstmate: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
+  start_main "$root" "$home" || return 1
   lab_tmux "$root" new-window -d -t firstmate: -n "fm-$MATE_ID" -c "$root/mate" 'exec sleep 600'
   lab_tmux "$root" new-window -d -t firstmate: -n "fm-$WORKER_ID" -c "$root" 'exec sleep 600'
   fm_write_meta "$home/state/$MATE_ID.meta" "window=firstmate:fm-$MATE_ID" "tasktmp=/tmp/fm-$MATE_ID"
@@ -160,9 +163,107 @@ set_record() {  # <root> <key> <value>
   sed -i.bak "s|^$2=.*|$2=$3|" "$1/.fm-live-lab" && rm -f "$1/.fm-live-lab.bak"
 }
 
+# Shared by make_lab and the controlled startup cases below.
+start_main() {  # <root> <home>
+  local root=$1 home deadline current='' reply=''
+  home=$(cd "$2" && pwd -P) || return 1
+  lab_tmux "$root" new-window -d -t firstmate: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600" || return 1
+  # new-window can return before its child has changed directory or printed.
+  # Observe both inputs of the one-shot check; do not retry that verdict.
+  deadline=$((SECONDS + 10))
+  while :; do
+    current=$(lab_tmux "$root" display-message -p -t firstmate:=main '#{pane_current_path}')
+    reply=$(lab_tmux "$root" capture-pane -p -t firstmate:=main -S -200)
+    if [ "$current" = "$home" ] && [[ "$reply" == *"LABREADY-$NONCE"* ]]; then return 0; fi
+    [ "$SECONDS" -lt "$deadline" ] || break
+    sleep 0.05
+  done
+  printf 'fail fixture readiness: window main did not reach lab home %s with LABREADY-%s within 10 seconds (path=%s)\n' \
+    "$home" "$NONCE" "$current" >&2
+  return 1
+}
+
+# Hold the real pane before chdir, then before its reply, until each pending
+# condition is observed. No elapsed-time delay determines whether this races.
+fixture_startup_case() (
+  local mode=$1 root="$TMP_ROOT/startup-$1" home dir output rc current reply
+  home="$root/home"
+  mkdir -p "$root"
+  "$ROOT/bin/fm-lab-home.sh" create "$home" >/dev/null || fail "startup home create"
+  dir=$("$ROOT/bin/fm-lab-home.sh" tmux-dir "$home") || fail "startup tmux dir"
+  printf '%s\n' "$dir" >> "$TMP_ROOT/tmux-dirs"
+  printf 'tmux_dir=%s\n' "$dir" > "$root/.fm-live-lab"
+  root=$(cd "$root" && pwd -P)
+  home=$(cd "$home" && pwd -P)
+  cat > "$root/primary.sh" <<'SH'
+#!/usr/bin/env bash
+while [ ! -f "$1/directory" ] && [ ! -f "$1/reply" ]; do sleep 0.01; done
+[ ! -f "$1/directory" ] || cd "$2" || exit 1
+while [ ! -f "$1/reply" ]; do sleep 0.01; done
+printf 'LABREADY-%s\n' "$3"
+exec sleep 600
+SH
+  # This override changes only main's initial working directory and gates its
+  # progress. All observations still come from the real private tmux server.
+  lab_tmux() {
+    local snapshot
+    shift
+    if [ "$1" = new-window ]; then
+      env -u TMUX TMUX_TMPDIR="$dir" tmux new-window -d -t firstmate: -n main -c "$root" \
+        "bash '$root/primary.sh' '$root' '$home' '$NONCE'"
+      return
+    fi
+    snapshot=$(env -u TMUX TMUX_TMPDIR="$dir" tmux "$@") || return 1
+    if [ "$1" = display-message ] && [ "${*: -1}" = '#{pane_current_path}' ] && [ "$snapshot" = "$root" ]; then
+      : > "$root/saw-directory-pending"
+      if [ "$mode" = never-directory ]; then : > "$root/reply"; else : > "$root/directory"; fi
+    elif [ "$1" = capture-pane ] && [[ "$snapshot" != *"LABREADY-$NONCE"* ]] &&
+         [ "$(env -u TMUX TMUX_TMPDIR="$dir" tmux display-message -p -t firstmate:=main '#{pane_current_path}')" = "$home" ]; then
+      : > "$root/saw-reply-pending"
+      [ "$mode" = never-reply ] || : > "$root/reply"
+    fi
+    printf '%s\n' "$snapshot"
+  }
+  lab_tmux "$root" new-session -d -s firstmate -n lab -c "$root" 'exec sleep 600'
+  output=$(start_main "$root" "$home" 2>&1)
+  rc=$?
+  current=$(lab_tmux "$root" display-message -p -t firstmate:=main '#{pane_current_path}')
+  reply=$(lab_tmux "$root" capture-pane -p -t firstmate:=main -S -200)
+  case "$mode" in
+    delayed)
+      expect_code 0 "$rc" "delayed fixture producer succeeds: $output"
+      [ "$current" = "$home" ] && [[ "$reply" == *"LABREADY-$NONCE"* ]] ||
+        fail "fixture producer returned before main reached lab home and replied (path=$current, reply=$reply)"
+      assert_present "$root/saw-directory-pending" "delay exposed the old directory"
+      assert_present "$root/saw-reply-pending" "delay exposed the pending reply separately"
+      pass "fixture producer waits for both real directory and probe reply"
+      ;;
+    never-directory|never-reply)
+      expect_code 1 "$rc" "fixture producer fails when $mode never becomes ready"
+      assert_contains "$output" "fail fixture readiness:" "startup timeout names fixture readiness"
+      printf '%s\n' "$output"
+      if [ "$mode" = never-directory ]; then
+        assert_equals "$root" "$current" "timed-out pane never entered the lab home"
+        assert_contains "$reply" "LABREADY-$NONCE" "the reply alone does not make main ready outside the lab home"
+      else
+        assert_equals "$home" "$current" "missing reply is tested in the correct directory"
+        assert_not_contains "$reply" "LABREADY-$NONCE" "timed-out pane never replied"
+      fi
+      pass "fixture producer bounds $mode with a named failure"
+      ;;
+  esac
+)
+
+# --fixture-readiness exercises only the producer, without the unrelated host
+# process/kill checks that need an unconfined runner. Normal runs include both.
+fixture_startup_case delayed || exit $?
+fixture_startup_case never-directory || exit $?
+fixture_startup_case never-reply || exit $?
+[ "${1:-}" != --fixture-readiness ] || exit 0
+
 # ---- Claude lab: every check passes on the shape up builds -----------------
 
-C=$(make_lab c claude)
+C=$(make_lab c claude) || fail "Claude fixture startup"
 CH="$C/home"
 run_check "$C"
 expect_code 0 "$CHECK_RC" "a Claude lab in up's shape is ready: $CHECK_OUT"
@@ -185,13 +286,12 @@ WT_CASE="$TMP_ROOT/wtcase"
 fm_git_worktree "$WT_CASE/project" "$WT_CASE/wt" lab-wt
 cp "$C/.fm-live-lab" "$WT_CASE/.fm-live-lab"
 set_record "$WT_CASE" home "$WT_CASE/wt"
-lab_tmux "$C" new-window -d -t firstmate: -n wtmain -c "$WT_CASE/wt" 'exec sleep 600'
 lab_tmux "$C" kill-window -t firstmate:=main
-lab_tmux "$C" rename-window -t firstmate:=wtmain main
+start_main "$C" "$WT_CASE/wt" || fail "linked-worktree fixture startup"
 run_check "$WT_CASE"
 assert_contains "$CHECK_OUT" "fail primary: the lab home is not a primary checkout" "primary refuses a linked-worktree home"
 lab_tmux "$C" kill-window -t firstmate:=main
-lab_tmux "$C" new-window -d -t firstmate: -n main -c "$CH" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
+start_main "$C" "$CH" || fail "restored Claude fixture startup"
 lab_tmux "$C" display-message -p -t firstmate:=main '#{pane_pid}' > "$CH/state/.lock"
 pass "primary fails when the primary runs in a linked worktree instead of the lab's primary checkout"
 
@@ -310,7 +410,7 @@ pass "treehouse fails when a pool lands in ~/.treehouse"
 
 # ---- Pi lab: extensions and the session-only trust store -------------------
 
-P=$(make_lab p pi)
+P=$(make_lab p pi) || fail "Pi fixture startup"
 PH="$P/home"
 run_check "$P"
 expect_code 0 "$CHECK_RC" "a Pi lab in up's shape is ready: $CHECK_OUT"
@@ -392,7 +492,7 @@ pass "down stops only recorded lab processes, removes trust entries and task tem
 # shell with another CLAUDE_CONFIG_DIR, and a symlinked store stays a symlink.
 SC="$TMP_ROOT/claude-config"
 mkdir -p "$SC"
-S=$(make_lab s claude "$SC")
+S=$(make_lab s claude "$SC") || fail "custom-config Claude fixture startup"
 mv "$SC/.claude.json" "$TMP_ROOT/claude-store-target.json"
 ln -s "$TMP_ROOT/claude-store-target.json" "$SC/.claude.json"
 HOME_STORE_BEFORE=$(digest "$HOME/.claude.json")
@@ -409,7 +509,7 @@ pass "check and down use the recorded Claude store and keep a symlinked store li
 
 # TERM handlers may write trust again, and an uncooperative lab process must
 # be killed before the store or lab directory is removed.
-X=$(make_lab x claude)
+X=$(make_lab x claude) || fail "x fixture startup"
 cat > "$TMP_ROOT/exit-rewriter.sh" <<'SH'
 store=$1 key=$2 marker=$3
 trap 'sleep 1; node -e "const fs=require(\"node:fs\");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,\"utf8\"));j.projects[k]={hasTrustDialogAccepted:true};fs.writeFileSync(s,JSON.stringify(j))" "$store" "$key"; echo rewrote > "$marker"; exit 0' TERM
@@ -435,7 +535,7 @@ pass "down waits for TERM handlers and escalates before removing trust"
 
 # A pane root may exit on TERM while its child remains alive, reparented and
 # still able to write Claude trust. Teardown must wait for the captured child.
-ORPHAN=$(make_lab orphan claude)
+ORPHAN=$(make_lab orphan claude) || fail "orphan fixture startup"
 cat > "$TMP_ROOT/orphan-rewriter.sh" <<'SH'
 store=$1 key=$2 marker=$3
 trap 'sleep 1; node -e "const fs=require(\"node:fs\");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,\"utf8\"));j.projects[k]={hasTrustDialogAccepted:true};fs.writeFileSync(s,JSON.stringify(j))" "$store" "$key"; echo rewrote > "$marker"; exit 0' TERM
@@ -457,7 +557,7 @@ assert_equals "" "$lab_keys" "reparented child cannot re-add trust after down"
 pass "down waits for captured descendants after their root exits"
 
 # A recorded process can create a new descendant only after TERM arrives.
-LATE=$(make_lab late claude)
+LATE=$(make_lab late claude) || fail "late fixture startup"
 cat > "$TMP_ROOT/late-rewriter.sh" <<'SH'
 store=$1 key=$2 marker=$3
 trap 'bash -c '\''sleep 1; node -e "const fs=require(\"node:fs\");const [s,k]=process.argv.slice(1);const j=JSON.parse(fs.readFileSync(s,\"utf8\"));j.projects[k]={hasTrustDialogAccepted:true};fs.writeFileSync(s,JSON.stringify(j))" "$1" "$2"'\'' _ "$store" "$key" >/dev/null 2>&1 & echo $! > "$marker"; exit 0' TERM
@@ -484,7 +584,7 @@ assert_equals "" "$lab_keys" "TERM-spawned child cannot re-add trust after down"
 pass "down tracks descendants spawned during TERM"
 
 # A reused PID with a different start time must not own its new process tree.
-Y=$(make_lab y claude)
+Y=$(make_lab y claude) || fail "y fixture startup"
 # shellcheck disable=SC2016 # Positional parameters expand in the launched shell.
 start_group bash -c 'sleep 600 & echo $! > "$1"; wait' _ "$TMP_ROOT/reused-child"; REUSED=$!
 until [ -s "$TMP_ROOT/reused-child" ]; do sleep 0.1; done
@@ -500,7 +600,7 @@ pass "down ignores roots with mismatched start times"
 # A group observed empty must not be admitted again if its id is later reused.
 # The ps shim hides the first group's only member on pass 2, then presents an
 # unrelated process under that pgid on pass 3 while another lab group waits.
-GROUP_REUSE=$(make_lab group-reuse claude)
+GROUP_REUSE=$(make_lab group-reuse claude) || fail "group-reuse fixture startup"
 start_group python3 -c 'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)'
 GROUP_ROOT=$!
 start_group python3 -c 'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)'
@@ -538,7 +638,7 @@ pass "down drops empty groups permanently before their ids can be reused"
 
 # Simulate a recorded PID changing identity after TERM: the first process
 # snapshot matches its start time, subsequent snapshots describe a reused PID.
-Z=$(make_lab z claude)
+Z=$(make_lab z claude) || fail "z fixture startup"
 start_group python3 -c 'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)'
 REPLACED=$!
 printf '%s\n' "$REPLACED" >> "$TMP_ROOT/pids"
