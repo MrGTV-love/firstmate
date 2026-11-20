@@ -626,6 +626,26 @@ test_idempotent_write_ignores_nested_directories() {
   pass "inbox: the idempotent enqueue treats only the inbox and handled/ files as records, never a nested directory's"
 }
 
+test_idempotent_write_state_path_with_newline() {
+  local state base rec r2 log
+  state="$TMP_ROOT/idem-newline"$'\n'"state"; base="$state/t1.inbox"; log="$TMP_ROOT/idem-newline.calls.log"
+  # grep path: a body with a first line is found through the candidate list
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 $'same body\nsecond') || fail "write into a newline path failed"
+  [ "$rec" = "$base/001.msg" ] || fail "first record should be 001, got $rec"
+  r2=$(enqueue_counting "$state" $'same body\nsecond' "$log") || fail "resend into a newline path failed"
+  [ "$r2" = "$rec" ] || fail "a resend must return the original record in a state path holding a newline, got $r2 (a duplicate would be 002)"
+  # handled/ record in the same path
+  mv "$rec" "$base/handled/001.msg"
+  r2=$(enqueue_counting "$state" $'same body\nsecond' "$log") || fail "resend of an acknowledged record into a newline path failed"
+  [ "$r2" = "$base/handled/001.msg" ] || fail "a resend must find the acknowledged record in handled/, got $r2"
+  # fallback path: an empty first line cannot be prefiltered, so the full glob scan must also keep the path intact
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 $'\nbody after an empty first line') || fail "write of an empty-first-line body failed"
+  r2=$(enqueue_counting "$state" $'\nbody after an empty first line' "$log") || fail "empty-first-line resend failed"
+  [ "$r2" = "$rec" ] || fail "the full-scan fallback must return the original record in a newline path, got $r2 vs $rec"
+  [ "$(find "$state" -name '*.msg' -print0 | tr -dc '\0' | wc -c | tr -d ' ')" = 2 ] || fail "a newline in the state path produced a duplicate record"
+  pass "inbox: the idempotent enqueue finds its record when the state directory path contains a newline (candidate and fallback paths)"
+}
+
 test_next_seq_does_not_fork_per_record() {
   local state seq log
   state="$TMP_ROOT/seq-scale/state"; log="$TMP_ROOT/seq-scale/forks.log"
@@ -1507,6 +1527,7 @@ test_idempotent_write_forks_per_candidate_not_per_record
 test_idempotent_write_dedup_answers_are_unchanged
 test_idempotent_write_survives_an_ack_during_the_scan
 test_idempotent_write_ignores_nested_directories
+test_idempotent_write_state_path_with_newline
 test_next_seq_does_not_fork_per_record
 test_handled_mv_dedups_by_sequence
 test_survivor_doorbells_stay_bounded_until_acknowledged

@@ -256,7 +256,7 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # secondmate request embeds a per-request correlation token in its body. The
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
-# Candidate records for the dedup scan, one path per line, in scan order (inbox
+# Candidate records for the dedup scan, as array elements in scan order (inbox
 # records first, then handled/, each in name order). A record can only equal the
 # new body when it contains the body's first line, so a fixed-string grep names a
 # superset of the matches and the exact byte comparison below runs on those few
@@ -274,47 +274,55 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # be in neither list. Each pass names only the .msg files directly inside its own
 # directory (the two record sets the full scan always covered), never a nested
 # directory's files.
-_fm_task_inbox_grep_dir() {  # <dir> <first-line> -> matching direct .msg files; 2 on a grep error
-  local d=$1 first=$2 f out rc=0 r chunk=()
+# Names travel as array elements and NUL-terminated records, never as newline-separated text, so a state
+# directory whose path contains a newline still finds its records.
+_fm_task_inbox_grep_dir() {  # <dir> <first-line> <out-file> : appends NUL-terminated names of the matching direct .msg files; 2 on a grep error
+  local d=$1 first=$2 out=$3 f r rc=0 chunk=()
   for f in "$d"/*.msg; do
     [ -e "$f" ] || continue
     chunk+=("$f")
     if [ "${#chunk[@]}" -ge 500 ]; then
-      out=$(LC_ALL=C grep -lF -e "$first" -- "${chunk[@]}" 2>/dev/null); r=$?
+      LC_ALL=C grep -lF --null -e "$first" -- "${chunk[@]}" >> "$out" 2>/dev/null; r=$?
       [ "$r" -le 1 ] || rc=2
-      [ -z "$out" ] || printf '%s\n' "$out"
       chunk=()
     fi
   done
   if [ "${#chunk[@]}" -gt 0 ]; then
-    out=$(LC_ALL=C grep -lF -e "$first" -- "${chunk[@]}" 2>/dev/null); r=$?
+    LC_ALL=C grep -lF --null -e "$first" -- "${chunk[@]}" >> "$out" 2>/dev/null; r=$?
     [ "$r" -le 1 ] || rc=2
-    [ -z "$out" ] || printf '%s\n' "$out"
   fi
   return "$rc"
 }
 
-_fm_task_inbox_dedup_candidates() {  # <inbox-dir> <text>
-  local dir=$1 text=$2 first=${2%%$'\n'*} pend hand
+# Fills the array _fm_task_inbox_cands (the caller's loop reads it) with the candidate record paths, inbox first.
+_fm_task_inbox_dedup_candidates() {  # <inbox-dir> <text> <scratch-file>
+  local dir=$1 text=$2 scratch=$3 first=${2%%$'\n'*} f
+  _fm_task_inbox_cands=()
   if [ -n "$first" ]; then
-    if pend=$(_fm_task_inbox_grep_dir "$dir" "$first") && hand=$(_fm_task_inbox_grep_dir "$dir/handled" "$first"); then
-      [ -z "$pend" ] || printf '%s\n' "$pend"
-      [ -z "$hand" ] || printf '%s\n' "$hand"
+    : > "$scratch"
+    if _fm_task_inbox_grep_dir "$dir" "$first" "$scratch" && _fm_task_inbox_grep_dir "$dir/handled" "$first" "$scratch"; then
+      while IFS= read -r -d '' f; do
+        _fm_task_inbox_cands+=("$f")
+      done < "$scratch"
       return 0
     fi
+    _fm_task_inbox_cands=()
   fi
-  printf '%s\n' "$dir"/*.msg "$dir/handled"/*.msg
+  for f in "$dir"/*.msg "$dir/handled"/*.msg; do
+    _fm_task_inbox_cands+=("$f")
+  done
 }
 
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
-  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have f rec='' status=0
+  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have cand f rec='' status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
   mkdir -p "$dir/handled" || return 1
   lock="$dir/.seq.lock"
   fm_task_inbox_lock_acquire "$lock" || return 1
-  if want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX"); then
+  if want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX") && cand=$(mktemp "$dir/.dedup.XXXXXX"); then
     if printf '%s' "$text" > "$want"; then
-      while IFS= read -r f; do
+      _fm_task_inbox_dedup_candidates "$dir" "$text" "$cand"
+      for f in ${_fm_task_inbox_cands[@]+"${_fm_task_inbox_cands[@]}"}; do
         [ -n "$f" ] || continue
         if [ ! -e "$f" ]; then
           case "$f" in
@@ -343,13 +351,13 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
         [ ! -e "$dir/handled/${f##*/}" ] || f="$dir/handled/${f##*/}"
         rec=$f
         break
-      done < <(_fm_task_inbox_dedup_candidates "$dir" "$text")
+      done
     else
       status=1
     fi
-    rm -f "$want" "$have"
+    rm -f "$want" "$have" "$cand"
   else
-    rm -f "${want:-}" 2>/dev/null || true
+    rm -f "${want:-}" "${have:-}" "${cand:-}" 2>/dev/null || true
     status=1
   fi
   if [ "$status" -eq 0 ] && [ -z "$rec" ]; then
