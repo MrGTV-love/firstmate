@@ -62,6 +62,7 @@
     "trust-scope-secondmate-home",
     "trust-store-integrity",
     "typesafe-never-send",
+    "wake-ack-unacked-inbox-note",
     "wake-branch-grant-snapshot",
     "worker-in-recorded-worktree",
     "x-reply-followup-context",
@@ -162,7 +163,8 @@
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
     "teardown-entry-preflight",
-    "dsh-resume-binding-read"
+    "dsh-resume-binding-read",
+    "guard-lint-touched-registry"
   ],
   "guards": [
     {
@@ -3032,6 +3034,58 @@
         {
           "file": "bin/fm-wake-drain.sh",
           "match": "echo \"wake drain: no branch-eligible row snapshot at $ELIGIBLE_ROWS_FILE; refusing to guess what this actor may consume\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "wake-ack-unacked-inbox-note",
+      "version": "1",
+      "owner": "bin/fm-wake-drain.sh",
+      "invariant": "A wake acknowledgement never retires the row of a captain inbox note that is not demonstrably acked.",
+      "layer": "runtime-block",
+      "source": "bin/fm-inbox.sh pending, asked about each note id named by the actor's claimed rows at or below the acknowledgement cutoff",
+      "trigger": "--ack-through finds a check row 'check: captain inbox note <id>' whose note is pending or unknown, or cannot read the queue rows, the row set or the inbox",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "bin/fm-inbox.sh drain, read the whole note, then bin/fm-inbox.sh drain --ack <id>, and run the acknowledgement command again",
+      "budget": 1,
+      "budget_reason": "One refused invocation before the reader acks the named note; no cross-invocation counter is implemented, and the refusal never retries by itself. Only the away supervise daemon may add --keep-unacked-notes: the drain then keeps each such row queued and retires the rest, so the refusal never loops it.",
+      "telemetry": "Not instrumented under this family id; only the pending-or-unknown refusal names each id; the queue-scan, missing-row-set and vanished-row-set refusals are generic. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-inbox.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [
+        {
+          "case": "the away supervise daemon's keep path, --keep-unacked-notes",
+          "derivation": "only the away supervise daemon may pass --keep-unacked-notes, and only with FM_WAKE_ACK_AWAY_DAEMON=1 while state/.afk exists, the same actor test as the overdue-gate exemption; the keep path keeps each queued row whose captain inbox note is pending or unknown and retires every other row, and it never acks a note, so no captain inbox note wake is ever consumed and no note is lost or retired unread; any other actor passing the flag gets the ordinary refusal naming the ids",
+          "demotion": "fm-wake-ack-keep-unacked-notes-exemption-demotion"
+        }
+      ],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: the acknowledged row set is missing; acknowledgement refused\" >&2"
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: queue rows could not be read to check captain inbox notes; acknowledgement refused\" >&2"
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: captain inbox note state could not be read; acknowledgement refused\" >&2"
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"error: captain inbox notes presented in this range are not acked; acknowledgement refused\""
+        },
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: the acknowledged row set vanished while the queue lock was released; acknowledgement refused\" >&2"
         }
       ]
     },
@@ -7527,6 +7581,35 @@
         }
       ],
       "layer_note": "Registers the existing per-line protection, not a new refusal or permission. test_malformed_check_events_keep_delivery_and_cadence drives the real watcher with missing delimiters, invalid identities, valid events and ordinary state; it checks malformed payload exclusion and reported counts while valid delivery, coalescing and cadence continue. The site mapping preserves S1/S2 visibility rather than removing refusal vocabulary from the scan."
+    },
+    {
+      "id": "guard-lint-touched-registry",
+      "version": "1",
+      "owner": "bin/fm-guard-lint.sh",
+      "sites": [
+        {"file": "bin/fm-guard-lint.sh", "match": "fm-guard-event.sh\" guard-lint-touched-registry"}
+      ],
+      "invariant": "An unallowlisted finding on an added or edited registry entry blocks new-or-touched lint by that entry's literal ID.",
+      "layer": "machine-check",
+      "source": "The working docs/guards/registry.json, the Git blob at the same path at --base, and the unallowlisted findings computed by bin/fm-guard-lint.sh.",
+      "trigger": "In new-or-touched mode an unallowlisted finding has the same literal ID as a guard absent from --base, or whose complete rows for that ID (duplicates counted, row order ignored) differ from the base rows for that ID.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "fail_direction_note": "An unavailable base registry blob or an unreadable current guards array prevents a clean invocation. This check does not validate the contents of the historical blob.",
+      "remedy": "Keep the intended edit, correct the field identified in the touched guard's finding, then rerun bin/fm-guard-lint.sh --mode new-or-touched --base <same-base-ref>.",
+      "budget": 1,
+      "budget_reason": "One verdict per invocation; no cross-invocation counter or escalation is implemented for this check.",
+      "telemetry": "One best-effort guard-lint-touched-registry event per reached literal-ID stage through bin/fm-guard-event.sh: deny for a matched finding, allow for no match, or error with source_ok false if the stage could not be evaluated. The writer uses the explicit log or the established caller home's default log. The pull-request CI step uses a runner-temporary log with actor gate and retains it as an artifact. An unavailable sink does not change lint output or verdict; later site and allowlist checks can still fail lint.",
+      "test": "tests/fm-guard-lint.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active"
     }
   ],
   "excluded": [
