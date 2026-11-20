@@ -8,8 +8,8 @@
 # the event log. Distinct signatures count once per task, head, rule and kind.
 # No durable signature feed exists yet: without --workarounds, workarounds is
 # null (not measured) and the ratio counts escape records only.
-# Opportunities exclude bypasses, and a guard row counts one per guarded
-# operation, not one per rule row; refusal_to_bypass_ratio is
+# Only allow, deny and warn count as opportunities; a guard row counts one per
+# guarded operation, not one per rule row. The refusal_to_bypass_ratio is
 # (override/bypass events + supplied workaround signatures) / denies, null if no
 # denies. A row whose guard is not a nonempty string, or whose ts, rule, task,
 # session, actor, decision, head or kind is present and not a string, is skipped
@@ -89,11 +89,17 @@ signatures = list(json_lines(a.workarounds)) if a.workarounds else []
 cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=WINDOW_DAYS)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
+def is_opportunity(event, *, per_rule=False):
+    # A guard row skips the extra rule rows of one operation. A rule row keeps its own.
+    return (event.get('decision') in ('allow', 'deny', 'warn')
+            and (per_rule or event.get('opportunity') is not False))
+
+
 def metric(guard, events, rule=None):
     denies = sum(e.get('decision') == 'deny' for e in events)
     warns = sum(e.get('decision') == 'warn' for e in events)
-    # A guard row skips the extra rule rows of one operation. A rule row keeps its own.
-    counted = [e for e in events if rule is not None or e.get('opportunity') is not False]
+    counted = [e for e in events if is_opportunity(e, per_rule=rule is not None)]
+    opportunities = len(counted)
     allows = sum(e.get('decision') == 'allow' for e in counted)
     bypasses = sum(e.get('decision') == 'bypass' for e in events)
     overrides = sum(e.get('override') is True for e in events)
@@ -101,7 +107,6 @@ def metric(guard, events, rule=None):
     workarounds = len({(e.get('task'), e.get('head'), e.get('rule'), e.get('kind'))
                        for e in signatures if e['guard'] == guard
                        and (rule is None or e.get('rule', guard) == rule)}) if a.workarounds else None
-    opportunities = sum(e.get('decision') in ('deny', 'warn', 'allow', 'error') for e in counted)
     rate = round(overrides / (denies + warns), 3) if denies + warns else 0
     attempts, recurrences = [], 0
     sessions = collections.defaultdict(list)
@@ -162,8 +167,8 @@ def judged(guard, events):
         return False
     if metric(guard, fresh)['verdict'] != 'cut':
         return True
-    window = sorted((e for e in events if e.get('ts', '') <= after and e.get('opportunity') is not False
-                     and e.get('decision') in ('deny', 'warn', 'allow', 'error')), key=lambda e: e.get('ts', ''))
+    window = sorted((e for e in events if e.get('ts', '') <= after and is_opportunity(e)),
+                    key=lambda e: e.get('ts', ''))
     return not any(e.get('decision') in ('deny', 'warn') for e in window[-a.min_opportunities:])
 
 

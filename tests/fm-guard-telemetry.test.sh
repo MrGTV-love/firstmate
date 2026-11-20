@@ -11,7 +11,7 @@
 #   - the writer appends exactly one schema-complete row per call
 #   - the writer cannot fail its caller, including with an unwritable log
 #   - twenty replayed rows parse, and the counts match the fixture
-#   - a reversible guard with thirty opportunities and no fire is cut
+#   - a reversible guard with thirty real opportunities and no fire is cut
 #   - an irreversible guard with no fire is kept (the documented exemption)
 #   - an override rate above 20% cuts a reversible guard
 #   - a median above three clear attempts cuts even an irreversible guard
@@ -79,6 +79,82 @@ test_claude_session_attribution() {
   pass "trusted Claude session IDs are stable, distinct, and never borrowed from unrelated ancestry"
 }
 
+assert_retirement_metrics() {  # <log> <registry> <expected JSON tuple> <expected nomination>
+  local report got nomination
+  report=$("$METRICS" --log "$1" --registry "$2" --guards gquiet --json) || fail "metrics failed for $1"
+  nomination=$("$METRICS" --log "$1" --registry "$2" --guards gquiet --undecided) || fail "nominations failed for $1"
+  got=$(jq -c '.guards[0] | [.opportunities, .denies, .warns, .verdict]' <<<"$report") || fail "invalid metrics JSON for $1"
+  [ "$got" = "$3" ] && [ "$nomination" = "$4" ] \
+    || fail "${1##*/}: expected $3 with nomination '$4', got $got with nomination '$nomination'"
+}
+
+test_retirement_opportunity_cutoff() {
+  local errors="$TMP/retirement-errors.jsonl" allows="$TMP/retirement-allows.jsonl"
+  local rev="$TMP/retirement-rev.json" irr="$TMP/retirement-irr.json" fires="$TMP/retirement-fires.jsonl" i
+  registry_with_harm "$rev" gquiet reversible
+  registry_with_harm "$irr" gquiet irreversible
+  for ((i = 0; i < 30; i++)); do
+    "$EVENT" gquiet error --log "$errors" --session "e$i" --source-ok false
+  done
+  jq -se 'length == 30 and all(.[]; .decision == "error" and .source_ok == false)' "$errors" >/dev/null \
+    || fail "the error-only fixture must contain 30 errors"
+  assert_retirement_metrics "$errors" "$rev" '[0,0,0,"unmeasured"]' ''
+
+  for ((i = 0; i < 29; i++)); do
+    "$EVENT" gquiet allow --log "$allows" --session "q$i"
+  done
+  assert_retirement_metrics "$allows" "$rev" '[29,0,0,"unmeasured"]' ''
+  head -n 28 "$allows" > "$fires"
+  "$EVENT" gquiet error --log "$allows" --session gap --source-ok false
+  "$EVENT" gquiet bypass --log "$allows" --session skip
+  "$EVENT" gquiet allow --log "$allows" --session q28 --rule extra --no-opportunity
+  assert_retirement_metrics "$allows" "$rev" '[29,0,0,"unmeasured"]' ''
+  "$EVENT" gquiet allow --log "$allows" --session q29
+  assert_retirement_metrics "$allows" "$rev" '[30,0,0,"cut"]' gquiet
+  assert_retirement_metrics "$allows" "$irr" '[30,0,0,"keep"]' ''
+
+  "$EVENT" gquiet deny --log "$fires" --session denied --source-ok false
+  "$EVENT" gquiet warn --log "$fires" --session warned
+  assert_retirement_metrics "$fires" "$rev" '[30,1,1,"keep"]' ''
+  pass "only real opportunities reach the quiet retirement cutoff"
+}
+
+dated_rows() {  # <log> <day> <count> [decision] [override]
+  local n=0
+  while [ "$n" -lt "$3" ]; do
+    printf '{"ts":"%sT12:00:%02dZ","guard":"gquiet","session":"w%s-%s-%s","decision":"%s","override":%s}\n' \
+      "$2" "$((n % 60))" "$2" "${4:-allow}" "$n" "${4:-allow}" "${5:-false}" >>"$1"
+    n=$((n + 1))
+  done
+}
+
+assert_retirement_nomination() {  # <log> <registry> <expected nomination> <reason>
+  local got
+  got=$("$METRICS" --log "$1" --registry "$2" --guards gquiet --undecided) || fail "nominations failed for $1"
+  [ "$got" = "$3" ] || fail "$4: expected nomination '$3', got '$got'"
+}
+
+test_retirement_judged_window() {
+  local log="$TMP/retirement-judged.jsonl" reg="$TMP/retirement-judged.json" decision
+  printf '%s\n' '{"guards":[{"id":"gquiet","harm":"reversible","retirement_decision":"keep 2026-02-01: judged the January window"}]}' > "$reg"
+  # This recurrence makes the aggregate a cut candidate independently of the
+  # dated decision. The last deny is the 30th most recent real opportunity.
+  for decision in deny allow deny; do
+    printf '{"ts":"2026-01-09T12:00:00Z","guard":"gquiet","session":"jan-recur","decision":"%s"}\n' "$decision" >> "$log"
+  done
+  dated_rows "$log" 2026-01-10 29
+  dated_rows "$log" 2026-03-10 30
+  assert_retirement_nomination "$log" "$reg" gquiet "a fire at the edge of the judged window must count"
+  dated_rows "$log" 2026-01-11 1 error
+  assert_retirement_nomination "$log" "$reg" gquiet "an error cannot displace a fire from the judged window"
+  dated_rows "$log" 2026-01-12 1 bypass
+  printf '%s\n' '{"ts":"2026-01-13T12:00:00Z","guard":"gquiet","decision":"allow","rule":"extra","opportunity":false}' >> "$log"
+  assert_retirement_nomination "$log" "$reg" gquiet "a bypass or extra rule row cannot displace a fire from the judged window"
+  dated_rows "$log" 2026-01-14 1
+  assert_retirement_nomination "$log" "$reg" '' "one more real allow displaces the fire, leaving two quiet windows"
+  pass "only real opportunities define the judged retirement window"
+}
+
 fm_test_only
 
 # --- writer schema ----------------------------------------------------------
@@ -125,6 +201,7 @@ printf '%s\n' "$out" | grep -q '^METRIC greplay opportunities=20 denies=4 warns=
 pass "twenty replayed rows parse and count correctly"
 
 # --- zero fires -------------------------------------------------------------
+test_retirement_opportunity_cutoff
 ZERO="$TMP/zero.jsonl"
 : >"$ZERO"
 i=0
@@ -157,14 +234,6 @@ pass "an undecided nomination is reported and a recorded decision retires it"
 # A decision judges the evidence through its date and stands until the evidence
 # changes. Unchanged zero-fire evidence after it never re-nominates; a new deny,
 # override, or a changed fire rate does, so a keep or redesign never hides it.
-dated_rows() {  # <log> <day> <count> [decision] [override]
-  local n=0
-  while [ "$n" -lt "$3" ]; do
-    printf '{"ts":"%sT12:00:%02dZ","guard":"gquiet","session":"w%s-%s-%s","decision":"%s","override":%s}\n' \
-      "$2" "$((n % 60))" "$2" "${4:-allow}" "$n" "${4:-allow}" "${5:-false}" >>"$1"
-    n=$((n + 1))
-  done
-}
 decided_with() {  # <decision> <out>
   jq --arg d "$1" '.guards[0].retirement_decision = $d' "$TMP/undecided.json" > "$2"
 }
@@ -230,16 +299,7 @@ dated_rows "$RATE" 2026-06-12 1 deny
 got=$(undecided_for "$RATE" "$TMP/same-day.json")
 [ "$got" = gquiet ] || fail "a deny on a later date than a keep must re-nominate, got '$got'"
 
-ERRWIN="$TMP/error-window.jsonl"
-: >"$ERRWIN"
-for k in deny allow deny allow; do
-  printf '{"ts":"2026-01-09T12:00:00Z","guard":"gquiet","session":"jan-recur","decision":"%s","override":false}\n' "$k" >>"$ERRWIN"
-done
-dated_rows "$ERRWIN" 2026-01-10 29
-dated_rows "$ERRWIN" 2026-01-10 1 error
-dated_rows "$ERRWIN" 2026-03-10 30
-got=$(undecided_for "$ERRWIN" "$TMP/dated-keep.json")
-[ -z "$got" ] || fail "an error in the judged window is not a fire, so a quiet window after it must not re-nominate, got '$got'"
+test_retirement_judged_window
 
 BYPASSWIN="$TMP/bypass-window.jsonl"
 : >"$BYPASSWIN"
