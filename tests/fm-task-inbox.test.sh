@@ -714,8 +714,11 @@ test_survivor_doorbells_stay_bounded_until_acknowledged() {
 test_concurrent_writers_never_clobber() {
   local state i pids=() count
   state="$TMP_ROOT/race/state"; mkdir -p "$state"
+  # The writers serialize on .seq.lock and a writer that waits longer than FM_TASK_INBOX_LOCK_WAIT_SECS (default 5 s)
+  # refuses by design. Six writers each starting a shell can wait longer than that on a loaded host, so the wait is a
+  # hang guard here (60 s); the case checks that the writers serialize and lose nothing, not how long the host takes.
   for i in 1 2 3 4 5 6; do
-    inbox_lib "$state" fm_task_inbox_write "$state" t1 "steer number $i" >/dev/null &
+    FM_TASK_INBOX_LOCK_WAIT_SECS=60 inbox_lib "$state" fm_task_inbox_write "$state" t1 "steer number $i" >/dev/null &
     pids+=($!)
   done
   for i in "${pids[@]}"; do
