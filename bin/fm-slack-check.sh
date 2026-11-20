@@ -5,7 +5,8 @@
 #   fm-slack-check.sh arm [--replay <transcript.json>]
 #   fm-slack-check.sh disarm [--replay <transcript.json>]
 #   fm-slack-check.sh retarget [--replay <transcript.json>]   after FM_SLACK_DM_USER changed
-#   fm-slack-check.sh resolve <request-ts>   close one failed owner request that Main has dealt with
+#   fm-slack-check.sh resolve <request-ts>[@<member id>]   close one failed request that Main has dealt with
+#     (the bare ts is the owner's request; the second person's is listed and closed as <ts>@<member id>)
 # A request whose acknowledgement failed in its own thread on 3 polls is woken once as not acknowledged and stays
 # open in state.pending as failed, owner Main, until resolve closes it. After that wake each run, a run that finds the
 # slack-dm source unbound included (the one thing such a run prints for a request), lists it once as
@@ -38,7 +39,7 @@ case "${1:-}" in
   -h|--help)
     printf '%s\n' \
       'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]' \
-      '       fm-slack-check.sh resolve <request-ts>' \
+      '       fm-slack-check.sh resolve <request-ts>[@<member id>]' \
       'Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.' \
       'Retarget stops tracking the old DM after FM_SLACK_DM_USER changed, opens the new DM and records its newest message as the' \
       'starting point, so the next poll takes in the requests sent after it; arm records a fresh starting point again.' \

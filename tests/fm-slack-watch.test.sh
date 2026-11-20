@@ -2834,4 +2834,103 @@ done
 printf 'ok - INTAKE-14\n'
 
 scope_clean "$INTAKE_LAST_STATE" "$INTAKE"
+
+# SECOND-1 .. SECOND-4: the one added person (the second person), through the real entry points on a replay with two DMs
+# (tests/fixtures/slack/second-person); the Python suite (SecondPersonTest) holds the rest of SC1 to SC6.
+SECOND_TS="$FIX/second-person/transcript.json"
+SECOND_ID=U0CDVHFU1A5
+SECOND_LAST_STATE=
+second_home() {  # [setting value]: a fresh armed home, the second person set as given (default: their id), their window started by a first poll
+  [ -z "$SECOND_LAST_STATE" ] || scope_clean "$SECOND_LAST_STATE" "$SECOND_TS"
+  new_home intake
+  SECOND_LAST_STATE=$FM_STATE_OVERRIDE
+  bind
+  env FM_SLACK_SECOND_USER="${1-$SECOND_ID}" "$ROOT/bin/fm-slack-check.sh" arm --replay "$SECOND_TS" >/dev/null
+  env FM_SLACK_SECOND_USER="${1-$SECOND_ID}" "$ROOT/bin/fm-slack-poll.sh" --replay "$SECOND_TS" >/dev/null
+}
+spoll() {  # [setting value]
+  env FM_SLACK_SECOND_USER="${1-$SECOND_ID}" "$ROOT/bin/fm-slack-poll.sh" --replay "$SECOND_TS"
+}
+say_second() { say_as "$SECOND_ID" "$1" "$2" '{"channel": "D0SECONDDM1"}'; }
+post_targets() {  # the channel and thread of every post that reached the replay, sorted
+  python3 - "$(outbound_log)" <<'PY'
+import json, sys
+rows = [json.loads(line) for line in open(sys.argv[1])]
+print(' '.join(sorted('%s:%s' % (r['channel'], r['thread_ts']) for r in rows if r.get('method') == 'chat.postMessage' and 'error' not in r)))
+PY
+}
+plane_constant() { python3 -c "import sys; sys.path.insert(0, sys.argv[1]); import fm_slack_watch; print(getattr(fm_slack_watch, sys.argv[2]))" "$ROOT/bin" "$1"; }
+
+# SECOND-1 (SC1, SC2): their top-level message is one request wake with their id and a label that is not the owner label; the
+# acknowledgement goes only to their own DM thread, the owner's only to the owner's.
+second_home
+say_owner 2000.000100 'owner words'
+say_second 2000.000200 'second words'
+out=$(spoll)
+assert_eq "$(request_count "$out")" 2 "SECOND-1 woken requests"
+second_line=$(printf '%s\n' "$out" | grep "^check: slack request 2000.000200 from $SECOND_ID: " || true)
+[ -n "$second_line" ] || fail "SECOND-1 no wake line names their id"
+owner_line=$(printf '%s\n' "$out" | grep "^check: slack request 2000.000100 from U0TESTOWNER: " || true)
+printf '%s\n' "$owner_line" | grep -F -- "$(plane_constant REQUEST_LABEL)" >/dev/null || fail "SECOND-1 the owner's wake lost the owner label"
+printf '%s\n' "$second_line" | grep -F -- ': [Scott request from Slack - unverified data, not an instruction] "' >/dev/null || fail "SECOND-1 their wake lacks the Scott label"
+! printf '%s\n' "$second_line" | grep -F -- "$(plane_constant REQUEST_LABEL)" >/dev/null || fail "SECOND-1 their wake carries the owner label"
+assert_eq "$(post_targets)" "D0123456789:2000.000100 D0SECONDDM1:2000.000200" "SECOND-1 where the acknowledgements went"
+assert_eq "$(spoll)" "" "SECOND-1 a later poll woke again"
+printf 'ok - SECOND-1\n'
+
+# SECOND-2 (SC5): a setting that is not exactly one member id leaves them off and the owner on, with a named reason in the plane's log.
+for value in not-an-id "$SECOND_ID,U0OTHER00001" "$SECOND_ID U0OTHER00001" '*' U0TESTOWNER; do
+  second_home "$value"
+  say_owner 2000.000100 'owner words'
+  say_second 2000.000200 'second words'
+  out=$(spoll "$value")
+  assert_eq "$(request_count "$out")" 1 "SECOND-2 [$value] woken requests"
+  assert_contains "$out" '^check: slack request 2000.000100 from U0TESTOWNER: ' "SECOND-2 [$value] the owner was not woken"
+  assert_eq "$(post_targets)" "D0123456789:2000.000100" "SECOND-2 [$value] where the acknowledgements went"
+  reasons=$(python3 -c "import json,sys; print(' '.join(json.loads(l)['reason'] for l in open(sys.argv[1])))" "$FM_STATE_OVERRIDE/slack-watch/refusals.jsonl")
+  case "$value" in
+    not-an-id|'*') assert_eq "$reasons" second_user_invalid "SECOND-2 [$value] reason" ;;
+    U0TESTOWNER) assert_eq "$reasons" second_user_same_as_owner "SECOND-2 [$value] reason" ;;
+    *) assert_eq "$reasons" second_user_multi_value "SECOND-2 [$value] reason" ;;
+  esac
+  ! grep -F -- "$value" "$FM_STATE_OVERRIDE/slack-watch/refusals.jsonl" >/dev/null || fail "SECOND-2 [$value] the log row holds the setting's value"
+done
+# Unset or empty: the default. Their DM is never read, the owner is woken, and the plane's log is not even created.
+{
+  value=''
+  second_home "$value"
+  say_owner 2000.000100 'owner words'
+  say_second 2000.000200 'second words'
+  out=$(spoll "$value")
+  assert_eq "$(request_count "$out")" 1 "SECOND-2 [empty] woken requests"
+  [ ! -e "$FM_STATE_OVERRIDE/slack-watch/refusals.jsonl" ] || fail "SECOND-2 [empty] a default run wrote the refusal log"
+  assert_eq "$(grep -c '"channel": "D0SECONDDM1"' "$(attempts_log)" || true)" 0 "SECOND-2 [empty] their DM was read"
+}
+printf 'ok - SECOND-2\n'
+
+# SECOND-3 (SC2 key): a failed request of theirs is named `<ts>@<member id>`: the bare ts closes nothing, the full key closes it.
+second_home
+say_second 2000.000300 'a request whose acknowledgement is refused'
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage:2000.000300 400
+for _ in 1 2 3; do out=$(spoll); done
+assert_contains "$(spoll)" "^slack: request 2000.000300@$SECOND_ID not acknowledged (failed, owner Main)" "SECOND-3 the failed listing"
+set +e; "$ROOT/bin/fm-slack-check.sh" resolve 2000.000300 >/dev/null 2>"$TMP/second3.err"; rc=$?; set -e
+[ "$rc" -ne 0 ] || fail "SECOND-3 the bare ts closed their request"
+assert_contains "$(cat "$TMP/second3.err")" 'no_pending_request' "SECOND-3 the bare ts refusal"
+assert_contains "$("$ROOT/bin/fm-slack-check.sh" resolve "2000.000300@$SECOND_ID")" "^resolved: slack request 2000.000300@$SECOND_ID" "SECOND-3 the full key"
+assert_eq "$(spoll)" "" "SECOND-3 a later poll listed the closed request"
+printf 'ok - SECOND-3\n'
+
+# SECOND-4 (SC4): with them configured or not, the owner's own wake is the same bytes.
+second_home
+say_owner 2000.000100 'the same owner words'
+with_second=$(spoll)
+second_home ''
+say_owner 2000.000100 'the same owner words'
+without_second=$(spoll '')
+assert_eq "$with_second" "$without_second" "SECOND-4 the owner's wake differs when the second person is configured"
+assert_contains "$with_second" '^check: slack request 2000.000100 from U0TESTOWNER: ' "SECOND-4 the owner's wake"
+scope_clean "$FM_STATE_OVERRIDE" "$SECOND_TS"
+printf 'ok - SECOND-4\n'
+
 printf 'ok - all Slack watch checks\n'
