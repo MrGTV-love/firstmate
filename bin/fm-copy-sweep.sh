@@ -175,7 +175,7 @@
 # that route's dry-run answer (exit 3, state BLOCKED, predicates_failed exactly
 # ["cleanup_not_executed"]); bin/fm-teardown-nested-lib.sh's header owns the record
 # format, the merged-PR and content conditions, the task base that the landing branch
-# is checked against (read here from the task records that name the copy), the project
+# is checked against and which task records the sweep reads it from, the project
 # lock the route takes here
 # and the reads of the slot's primary checkout, and a record that fails one, or any
 # other answer, holds the copy as above with the route and PR named; a plan that times
