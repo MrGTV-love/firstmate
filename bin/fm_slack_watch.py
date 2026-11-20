@@ -142,9 +142,10 @@ SECOND_BUDGET = 27.0
 # the bound is no longer their budget plus the cancellation of a cut call plus start-up, which their run alone now exceeds (SECOND_BUDGET + CUTOFF_JOIN).
 OWNER_WAKE_WAIT_BOUND = 24.0
 # The strict documented rate (Main 3345, 3350): chat.postMessage generally takes one message a second in one channel, and all their posts go to their one
-# DM, so the starts of their posts are at least this far apart in every run: 1.0 s, plus 0.05 s for the plane's own send path between its guard and the
-# request leaving (measured up to 0.032 s on the operator host, redesign/report.md), so that no two of their posts reach Slack less than 1.0 s apart. No
-# burst is assumed.
+# DM, so the starts of their posts are at least this far apart in every run: 1.0 s plus 0.05 s of margin. The spacing is kept again where each post really
+# leaves (post_leaving, called by the transport just before the request is sent), because the plane's own send path between its guard and the request leaving
+# varies: before that, posts reached the fake Slack as little as 0.968 s apart at low load and 0.799 s apart at load about 15 (redesign/report.md). No burst
+# is assumed.
 SECOND_POST_SPACING = 1.05
 # Their pass decides the share of its k-th request (follow-ups first, take_in_second) from the follow-ups found by its reads up to k - SHARE_READ_LAG, so
 # their acknowledgements, spaced SECOND_POST_SPACING apart, never wait for a read that ends a little after them (Main 3345 (a)).
