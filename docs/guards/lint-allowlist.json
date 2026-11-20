@@ -601,11 +601,6 @@
       "text": "|| die \"task $ID has no instructions at $RELAUNCH_BRIEF; refusing to relaunch a worker with nothing "
     },
     {
-      "id": "site:bin/fm-copy-sweep.sh:f9f22a7d61",
-      "rule": "S1",
-      "text": "refusal=$(printf '%s\\n' \"$err\" | sed -n '/^REFUSED:/,$p')"
-    },
-    {
       "id": "site:bin/fm-copy-sweep.sh:f7031d0539",
       "rule": "S1",
       "text": "REMOVAL_REPORT=\"${REMOVAL_REPORT}FAILED\"$'\\t'\"$copy\"$'\\t'\"git worktree remove refused and the copy w"
