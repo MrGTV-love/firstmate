@@ -161,7 +161,8 @@
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
-    "teardown-entry-preflight"
+    "teardown-entry-preflight",
+    "model-picker-daily-promotion-refusal"
   ],
   "guards": [
     {
@@ -7496,6 +7497,41 @@
         }
       ],
       "layer_note": "Registers the existing per-line protection, not a new refusal or permission. test_malformed_check_events_keep_delivery_and_cadence drives the real watcher with missing delimiters, invalid identities, valid events and ordinary state; it checks malformed payload exclusion and reported counts while valid delivery, coalescing and cadence continue. The site mapping preserves S1/S2 visibility rather than removing refusal vocabulary from the scan."
+    },
+    {
+      "id": "model-picker-daily-promotion-refusal",
+      "version": "1",
+      "owner": "bin/fm_model_picker/daily.py",
+      "invariant": "A refused daily collector promotion or recovery leaves the live model-picker snapshot unchanged.",
+      "layer": "runtime-block",
+      "source": "the staged directory's aa.sqlite and verdict.json, the data root's reader lock, the names this module installs, and the promotion journal, read by promote and recover in bin/fm_model_picker/daily.py",
+      "trigger": "promote is given a staged directory without both aa.sqlite and verdict.json from a finished run, or a reader holds the lock past its wait, or a name this module installs already exists in the data root, or the promotion journal cannot be written",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Wait for any running daily collector to finish, then run bash bin/fm-model-picker-daily.sh run once to stage and promote a new snapshot.",
+      "budget": 1,
+      "budget_reason": "One refused promotion per daily run; the runner makes no retry inside a run, so the next attempt is the next scheduled run.",
+      "telemetry": "Not instrumented under this family id; the refusal detail reaches the daily runner's check wake and its exit code, which are the existing caller diagnostics. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-model-picker-daily.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm_model_picker/daily.py",
+          "match": "return \"refused\", f\"{dest} holds no aa.sqlite and verdict.json from a finished run; nothing was changed\""
+        },
+        {
+          "file": "bin/fm_model_picker/daily.py",
+          "match": "return \"refused\", str(refused)",
+          "count": 2
+        }
+      ]
     }
   ],
   "excluded": [
