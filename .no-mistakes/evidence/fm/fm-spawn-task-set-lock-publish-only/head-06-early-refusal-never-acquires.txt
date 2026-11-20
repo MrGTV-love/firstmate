@@ -1,0 +1,1 @@
+ok - TL2: early cap refusal creates no acquisition endpoint or task-set holder

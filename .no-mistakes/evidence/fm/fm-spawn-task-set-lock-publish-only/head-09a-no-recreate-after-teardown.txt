@@ -1,0 +1,1 @@
+ok - a spawn whose forced teardown finished during its get is refused and recreates nothing

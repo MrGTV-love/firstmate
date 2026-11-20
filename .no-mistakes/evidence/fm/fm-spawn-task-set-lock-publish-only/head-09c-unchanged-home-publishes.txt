@@ -1,0 +1,1 @@
+ok - an unchanged state directory still publishes its task record

@@ -1,0 +1,1 @@
+ok - a fresh remote secondmate spawn refuses while the task set is owned

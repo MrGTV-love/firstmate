@@ -1,0 +1,1 @@
+ok - a spawn whose state directory was recreated during its get refuses publication and writes no record

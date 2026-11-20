@@ -1,0 +1,1 @@
+ok - slot recovery waits out a task-spawn holder that releases, then publishes its retained-copy record

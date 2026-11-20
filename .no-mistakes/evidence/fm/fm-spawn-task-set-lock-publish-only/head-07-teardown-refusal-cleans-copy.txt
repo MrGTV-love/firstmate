@@ -1,0 +1,3 @@
+ok - TL3: publish refusal closes the acquired endpoint and releases its process lease and locks
+rm: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.cXBYsN/lock-cleanup: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.cXBYsN: Directory not empty

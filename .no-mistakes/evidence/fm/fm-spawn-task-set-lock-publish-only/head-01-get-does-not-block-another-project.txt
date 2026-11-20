@@ -1,0 +1,8 @@
+TL1 observed: probe=0 B=0
+warning: task lock-b: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.KepLVl/lock-get/home/data/lock-b/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.KepLVl/lock-get/home/data/lock-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/lock-b
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.KepLVl/lock-get/home/data/lock-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for lock-b: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned lock-b harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-lock-b worktree=/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.KepLVl/lock-get/pool/b/copy
+ok - TL1: another project launches while get waits, and the first spawn finishes

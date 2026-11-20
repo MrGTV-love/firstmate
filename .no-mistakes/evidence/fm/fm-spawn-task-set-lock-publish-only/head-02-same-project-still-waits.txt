@@ -1,0 +1,1 @@
+ok - TL1: same-project spawn waits for the existing shared project lock

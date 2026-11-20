@@ -1,0 +1,1 @@
+ok - a fresh spawn refuses to publish while a forced teardown owns the task set

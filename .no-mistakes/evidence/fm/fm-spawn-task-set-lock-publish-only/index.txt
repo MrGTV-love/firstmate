@@ -1,0 +1,22 @@
+Evidence index for branch fm/fm-spawn-task-set-lock-publish-only (head 9467496110d376cbf715d91ef5db9ee048a0b56c).
+Each file is the stdout of one real test case run (bash tests/<file> with FM_TEST_ONLY=<case>), or the captured spawn output.
+The spawn under test is the real bin/fm-spawn.sh with the real lock library; treehouse and tmux are fakes from the fixture (as the verification plan requires).
+"base-" files run the head test files against a scratch export of base 7f3a198b (with its own git history).
+
+head-01-get-does-not-block-another-project.txt   spawn B for another project launches while spawn A waits in a fake treehouse get; probe shows the task-set lock free; B publishes its record; A finishes
+head-02-same-project-still-waits.txt             same-project spawn still queues on the shared project lock
+head-03-publish-serializes.txt                   a competing publisher is refused by the holder while A holds publish custody
+head-04-cap-rechecked-at-publish.txt             spend cap 1: both early checks pass, publish-time recheck admits exactly one
+head-05-relocated-rechecked-at-publish.txt       queued work relocated after early check is refused at publish
+head-06-early-refusal-never-acquires.txt         an early refusal never takes the task-set lock
+head-07-teardown-refusal-cleans-copy.txt         forced-teardown refusal at publish: no record, lease and claim released, locks free, healthy successor publishes
+head-08-abort-shows-output-tail.txt              get abort: label and last-20 check (30/5/0-line captures)
+head-08-abort-capture-run.txt                    same test, with the captured spawn output written to tl4-get-abort-capture.txt
+tl4-get-abort-capture.txt                        real spawn stderr for get captures of 30, 5 and 0 lines (25 captured lines total = 20+5+0)
+head-09a/09b/09c-*.txt                           recreated/removed state directory during get: refused, nothing recreated; unchanged dir publishes
+head-10a..10d-*.txt                              forced-teardown and task-set-holder refusals, incl. the three named tests
+head-11a..11d-orca-*.txt                         Orca recovery custody (abort, late refusal records copy, waits for a releasing holder, refuses past bound)
+head-121..126-*.txt                              slot recovery custody and governed refusal (six cases in tests/fm-spawn-pool-base-freshen.test.sh)
+base-01-get-does-not-block-another-project.txt   base: spawn B refused with "task set is locked by another spawn" while A waits (TL1 baseline)
+base-08-abort-shows-output-tail.txt              base: "expected one captured output label" - label absent on base (TL4 baseline)
+base-10a/10b/10c-*.txt                           base: the three named forced-teardown tests also pass on base (refusal behaviour is shared)

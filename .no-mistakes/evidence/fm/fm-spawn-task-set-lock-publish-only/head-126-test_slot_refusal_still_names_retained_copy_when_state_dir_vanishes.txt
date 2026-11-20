@@ -1,0 +1,9 @@
+warning: task slot-state-gone-66343: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.69hZgy/slot-state-gone-66343/home/data/slot-state-gone-66343/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.69hZgy/slot-state-gone-66343/home/data/slot-state-gone-66343/launch-brief.md records no ship branch; defaulting to legacy branch fm/slot-state-gone-66343
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.69hZgy/slot-state-gone-66343/home/data/slot-state-gone-66343/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: governed slot provisioning requires --owned-path <tracked-path> (repeatable)
+/Users/charlesabrooker/tmp/fm-spawn-tree-501-339abdeb06ec2e8a/bin/fm-spawn.sh: line 6570: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.69hZgy/slot-state-gone-66343/home/state/.slot-state-gone-66343.meta.slot-refused.26089: No such file or directory
+/Users/charlesabrooker/tmp/fm-spawn-tree-501-339abdeb06ec2e8a/bin/fm-spawn.sh: line 6658: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.69hZgy/slot-state-gone-66343/home/state/slot-state-gone-66343.status: No such file or directory
+error: this home's task set is locked by another operation; refusing to create task slot-state-gone-66343 rather than racing it
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.69hZgy/slot-state-gone-66343/pool and endpoint firstmate:fm-slot-state-gone-66343 retained; task record publication refused
+ok - a slot refusal whose state directory vanishes still names the retained copy and endpoint, publishes nothing and launches nothing

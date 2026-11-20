@@ -1,0 +1,1 @@
+ok - TL2: both early checks pass, but the publication cap admits exactly one

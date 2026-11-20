@@ -1,0 +1,73 @@
+=== get lines=30 exit_status=1
+warning: task lock-output: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/home/data/lock-output/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/home/data/lock-output/launch-brief.md records no ship branch; defaulting to legacy branch fm/lock-output
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/home/data/lock-output/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 70s; no path/output progress for 65s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 133s; no path/output progress for 128s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 197s; no path/output progress for 192s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 258s; no path/output progress for 253s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 319s; no path/output progress for 314s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 379s; no path/output progress for 374s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 441s; no path/output progress for 436s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 502s; no path/output progress for 497s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 562s; no path/output progress for 557s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+error: treehouse get did not enter an isolated worktree after 11 polls (no path or output progress for 600s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/primary': it is the repository's primary checkout (its git dir is the project's common git dir); spawning project '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-30/mate'; copies skipped by this spawn: none); aborting acquisition
+treehouse get output:
+get line 11 token=credential-like
+get line 12 token=credential-like
+get line 13 token=credential-like
+get line 14 token=credential-like
+get line 15 token=credential-like
+get line 16 token=credential-like
+get line 17 token=credential-like
+get line 18 token=credential-like
+get line 19 token=credential-like
+get line 20 token=credential-like
+get line 21 token=credential-like
+get line 22 token=credential-like
+get line 23 token=credential-like
+get line 24 token=credential-like
+get line 25 token=credential-like
+get line 26 token=credential-like
+get line 27 token=credential-like
+get line 28 token=credential-like
+get line 29 token=credential-like
+get line 30 token=credential-like
+=== end
+=== get lines=5 exit_status=1
+warning: task lock-output: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/home/data/lock-output/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/home/data/lock-output/launch-brief.md records no ship branch; defaulting to legacy branch fm/lock-output
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/home/data/lock-output/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 62s; no path/output progress for 61s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 123s; no path/output progress for 122s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 185s; no path/output progress for 184s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 246s; no path/output progress for 245s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 307s; no path/output progress for 306s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 367s; no path/output progress for 366s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 428s; no path/output progress for 427s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 488s; no path/output progress for 487s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 548s; no path/output progress for 547s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+error: treehouse get did not enter an isolated worktree after 11 polls (no path or output progress for 600s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/primary': it is the repository's primary checkout (its git dir is the project's common git dir); spawning project '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-5/mate'; copies skipped by this spawn: none); aborting acquisition
+treehouse get output:
+get line 01 token=credential-like
+get line 02 token=credential-like
+get line 03 token=credential-like
+get line 04 token=credential-like
+get line 05 token=credential-like
+=== end
+=== get lines=0 exit_status=1
+warning: task lock-output: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/home/data/lock-output/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/home/data/lock-output/launch-brief.md records no ship branch; defaulting to legacy branch fm/lock-output
+warning: /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/home/data/lock-output/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 60s; no path/output progress for 60s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 121s; no path/output progress for 121s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 181s; no path/output progress for 181s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 242s; no path/output progress for 242s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 303s; no path/output progress for 303s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 364s; no path/output progress for 364s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 426s; no path/output progress for 426s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 489s; no path/output progress for 489s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 552s; no path/output progress for 552s; last path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary' (it is the repository's primary checkout (its git dir is the project's common git dir))
+error: treehouse get did not enter an isolated worktree after 11 polls (no path or output progress for 600s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/primary': it is the repository's primary checkout (its git dir is the project's common git dir); spawning project '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.LMzolv/lock-output-0/mate'; copies skipped by this spawn: none); aborting acquisition
+treehouse get output:
+=== end

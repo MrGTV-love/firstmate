@@ -1,0 +1,1 @@
+ok - a fresh spawn refusal identifies another spawn as the task-set holder

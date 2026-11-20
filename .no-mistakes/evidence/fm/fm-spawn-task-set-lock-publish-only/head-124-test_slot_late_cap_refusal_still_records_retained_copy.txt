@@ -1,0 +1,1 @@
+ok - a slot refused at the spend cap still records its retained copy and endpoint without launching

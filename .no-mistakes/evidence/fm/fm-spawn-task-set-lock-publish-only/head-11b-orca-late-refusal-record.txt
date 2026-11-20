@@ -1,0 +1,18 @@
+Orca late admission reason=cap exit=1
+warning: task orca-late-cap-45601: /Users/charlesabrooker/tmp/fm-spawn-orca-worktree.aX8tuZ/orca-late-cap-45601/home/data/orca-late-cap-45601/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-orca-worktree.aX8tuZ/orca-late-cap-45601/home/data/orca-late-cap-45601/launch-brief.md records no ship branch; defaulting to legacy branch fm/orca-late-cap-45601
+warning: /Users/charlesabrooker/tmp/fm-spawn-orca-worktree.aX8tuZ/orca-late-cap-45601/home/data/orca-late-cap-45601/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for orca-late-cap-45601: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+error: spawn refused - the away-posture record caps concurrent workers at 1 and 1 ordinary task(s) are live in this home; task orca-late-cap-45601 stays queued for the captain's return or for a worker to finish (spend cap: bin/fm-afk-contract.sh)
+Orca late admission reason=queued exit=1
+note: new-task spawn (fm-spawn) proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md "Postures")
+note: new-task spawn (fm-spawn) proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md "Postures")
+warning: task orca-late-queued-45601: /Users/charlesabrooker/tmp/fm-spawn-orca-worktree.aX8tuZ/orca-late-queued-45601/home/data/orca-late-queued-45601/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-orca-worktree.aX8tuZ/orca-late-queued-45601/home/data/orca-late-queued-45601/launch-brief.md records no ship branch; defaulting to legacy branch fm/orca-late-queued-45601
+warning: /Users/charlesabrooker/tmp/fm-spawn-orca-worktree.aX8tuZ/orca-late-queued-45601/home/data/orca-late-queued-45601/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for orca-late-queued-45601: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+note: new-task spawn (fm-spawn) proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md "Postures")
+error: spawn refused - the supervision branch under the away-posture record may dispatch only queued unblocked work (already queued, or filed by the branch from the captain's away words); task orca-late-queued-45601 has no dispatchable backlog item in this home
+ok - late spend-cap and relocated-work refusals still record the retained Orca copy without admitting a worker

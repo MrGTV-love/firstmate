@@ -1,0 +1,1 @@
+not ok - TL4: expected one captured output label
