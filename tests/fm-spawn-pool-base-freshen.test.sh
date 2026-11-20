@@ -1277,10 +1277,15 @@ run_local_only_binding_case() { # <prepared|unprepared>
   git -C "$PROJECT_DIR" fetch --quiet origin
   git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
   git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
-  remote=$(git -C "$PROJECT_DIR" rev-parse origin/main)
   write_refusing_slot_owner "$PROJECT_DIR"
-  git -C "$PROJECT_DIR" add scripts
-  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted local owner'
+  git -C "$PROJECT_DIR" add scripts || fail 'binding guard add failed'
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'published binding owner' || fail 'binding guard commit failed'
+  git -C "$PROJECT_DIR" push --quiet origin main || fail 'binding guard publish failed'
+  remote=$(git -C "$PROJECT_DIR" rev-parse origin/main) || fail 'binding origin resolution failed'
+  # Keep the selected local baseline ahead while its policy equals fetched authority.
+  printf 'accepted local-only binding work\n' > "$PROJECT_DIR/binding-local.txt"
+  git -C "$PROJECT_DIR" add binding-local.txt || fail 'binding local work add failed'
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted local binding work' || fail 'binding local work commit failed'
   selected=$(git -C "$PROJECT_DIR" rev-parse main)
   token=$(printf '%s' "$HOME_DIR" | shasum -a 256 | awk '{print $1}')
   [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail 'binding task temp already exists'
@@ -2431,12 +2436,13 @@ PY
   } > "$repo/scripts/git-stability/provision_existing_slot.py" || fail 'fixture provisioner write failed'
 }
 
-# The clone carries A; the task branch carries B. Fresh spawn selects that
-# named task base so freshness preserves the differing B while the clone's A
-# judges it. No real pane or pool is used.
-make_source_case() { # <shape> <entrypoint>
+# Origin's default and the clone carry A; the task branch carries B. Fresh
+# spawn selects that named task base so freshness preserves the differing B
+# while the guard authority remains the fetched default. No real pane or pool
+# is used.
+make_source_case() { # <shape> <entrypoint> [<origin-case>]
   local shape=$1 entry=$2 rec id publisher diff_rc=0
-  id="source-$shape-$entry-$$"
+  id="source-$shape-$entry-${3:-case}-$$"
   rec=$(make_case "$id" "$id")
   read_case_record "$rec"
   fm_test_fake_no_mistakes "$FAKEBIN_DIR" || fail 'fake no-mistakes setup failed'
@@ -2695,6 +2701,107 @@ test_project_provisioner_missing_preserves_copy() {
   pass 'missing clone refuses before any provisioning, branch, HEAD, ref or manifest mutation, including after preparation'
 }
 
+# The fetched ref and the registered clone are independent inputs. All git
+# changes below belong to local fixture repositories, never the worker's repo.
+project_provisioner_origin_case() { # <current|lagging|whitespace|mode|unreadable-clone|unreadable-origin|missing-origin|no-origin|missing-clone|default-branch>
+  local shape=$1 before after out rc=0 origin_blob object_path
+  make_source_case identical direct "$shape"
+  git -C "$PROJECT_DIR" push -q origin main || fail 'origin baseline publish failed'
+  git -C "$PROJECT_DIR" fetch -q origin || fail 'origin baseline fetch failed'
+  case "$shape" in
+    lagging|whitespace|missing-origin|owner-mode)
+      git -C "$CASE_DIR/publisher" pull -q --ff-only origin main || fail 'publisher baseline update failed'
+      case "$shape" in
+        lagging) write_source_slot_owner "$CASE_DIR/publisher" STRICT 2 ;;
+        owner-mode) chmod 755 "$CASE_DIR/publisher/scripts/git-stability/provision_existing_slot.py" || fail 'owner execute authority fixture failed' ;;
+        whitespace) printf '\n' >> "$CASE_DIR/publisher/scripts/git-stability/provision_existing_slot.py" || fail 'whitespace fixture write failed' ;;
+        missing-origin) git -C "$CASE_DIR/publisher" rm -q scripts/git-stability/provision_existing_slot.py || fail 'origin guard deletion failed' ;;
+      esac
+      git -C "$CASE_DIR/publisher" add -A || fail 'origin guard add failed'
+      git -C "$CASE_DIR/publisher" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'advance authoritative guard' || fail 'origin guard commit failed'
+      git -C "$CASE_DIR/publisher" push -q origin main || fail 'origin guard publish failed'
+      git -C "$PROJECT_DIR" fetch -q origin || fail 'origin guard fetch failed'
+      if [ "$shape" = owner-mode ]; then
+        chmod 655 "$SOURCE_TARGET" || fail 'owner execute mismatch fixture failed'
+      fi
+      ;;
+    mode) chmod +x "$SOURCE_TARGET" || fail 'mode fixture preparation failed' ;;
+    unreadable-clone) chmod 000 "$SOURCE_TARGET" || fail 'clone permissions fixture failed' ;;
+    unreadable-origin|missing-promisor)
+      origin_blob=$(git -C "$PROJECT_DIR" rev-parse origin/main:scripts/git-stability/provision_existing_slot.py) || fail 'origin fixture blob lookup failed'
+      [[ "$origin_blob" =~ ^[0-9a-f]{40}$ ]] || fail 'origin blob id malformed'
+      object_path="$PROJECT_DIR/.git/objects/${origin_blob:0:2}/${origin_blob:2}"
+      [ -f "$object_path" ] || fail 'fixture origin blob is not loose'
+      if [ "$shape" = unreadable-origin ]; then
+        chmod 000 "$object_path" || fail 'origin object permissions fixture failed'
+      else
+        git -C "$PROJECT_DIR" config remote.origin.promisor true || fail 'promisor fixture config failed'
+        git -C "$PROJECT_DIR" config remote.origin.partialclonefilter blob:none || fail 'promisor filter config failed'
+        mv "$object_path" "$CASE_DIR/held-origin-blob" || fail 'promisor object removal failed'
+      fi
+      ;;
+    no-origin) git -C "$PROJECT_DIR" update-ref -d refs/remotes/origin/main || fail 'origin ref removal failed' ;;
+    missing-clone) rm "$SOURCE_TARGET" || fail 'clone removal failed' ;;
+    default-branch)
+      origin_blob=$(git -C "$PROJECT_DIR" rev-parse origin/main) || fail 'default branch fixture lookup failed'
+      git -C "$PROJECT_DIR" update-ref refs/remotes/origin/trunk "$origin_blob" || fail 'trunk fixture ref failed'
+      git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk || fail 'default branch fixture ref failed'
+      git -C "$PROJECT_DIR" update-ref refs/remotes/origin/main "$INITIAL_SHA" || fail 'main fixture ref failed'
+      ;;
+  esac
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  # shellcheck source=bin/fm-slot-provision-lib.sh
+  . "$ROOT/bin/fm-slot-provision-lib.sh"
+  before=$(git -C "$POOL_DIR" rev-parse HEAD && git -C "$POOL_DIR" symbolic-ref -q HEAD && git -C "$POOL_DIR" for-each-ref) || fail 'cannot snapshot fixture before guard'
+  out=$(GIT_TRACE="$CASE_DIR/guard-git.trace" fm_slot_provision fm_slot_run_local "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "fm/new-$SOURCE_ID" "$CASE_DIR/report" refs/heads/main "$SOURCE_BASE" README.md scripts 2>&1) || rc=$?
+  if grep -E 'built-in: git (fetch|pull|push|ls-remote)' "$CASE_DIR/guard-git.trace"; then
+    fail 'guard invoked network-facing Git instead of reading fetched refs'
+  fi
+  after=$(git -C "$POOL_DIR" rev-parse HEAD && git -C "$POOL_DIR" symbolic-ref -q HEAD && git -C "$POOL_DIR" for-each-ref) || fail 'cannot snapshot fixture after guard'
+  # Restore fixture readability even when an assertion below fails.
+  [ "$shape" != unreadable-clone ] || chmod 644 "$SOURCE_TARGET"
+  [ "$shape" != unreadable-origin ] || chmod 444 "$object_path"
+  printf 'origin-check case=%s exit=%s\n%s\n' "$shape" "$rc" "$out"
+  if [ -e "$FM_TEST_SOURCE_RECORD" ]; then cat "$FM_TEST_SOURCE_RECORD"; fi
+  case "$shape" in
+    current|default-branch)
+      expect_code 0 "$rc" "current clone was refused: $out"
+      assert_grep '"identity": "A"' "$FM_TEST_SOURCE_RECORD" 'current clone guard did not run'
+      [ -s "$FM_TEST_SLOT_RECORD" ] || fail 'current clone did not produce its manifest'
+      ;;
+    *)
+      [ "$before" = "$after" ] || fail "$shape changed HEAD, symbolic HEAD or refs before refusing"
+      [ "$rc" -ne 0 ] || fail "$shape admitted provisioning"
+      [ ! -e "$FM_TEST_SOURCE_RECORD" ] || fail "$shape ran a provisioner"
+      [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail "$shape wrote a manifest"
+      assert_contains "$out" "$SOURCE_TARGET" "$shape refusal lost the clone file path"
+      assert_contains "$out" 'run fleet sync' "$shape refusal lost the recovery instruction"
+      case "$shape" in
+        lagging|whitespace) assert_contains "$out" 'differs from fetched origin' 'byte mismatch reason lost' ;;
+        mode|owner-mode) assert_contains "$out" 'mode differs from fetched origin' 'mode mismatch reason lost' ;;
+        unreadable-clone) assert_contains "$out" 'cannot read project clone provisioner' 'clone read reason lost' ;;
+        unreadable-origin|missing-origin|no-origin|missing-promisor) assert_contains "$out" 'cannot read fetched origin' 'origin read reason lost' ;;
+        missing-clone) assert_contains "$out" "slot provisioner is missing from project clone $PROJECT_DIR" 'missing clone reason lost' ;;
+      esac
+      ;;
+  esac
+  pass "fetched-origin guard: $shape"
+}
+
+test_project_provisioner_origin_current() { project_provisioner_origin_case current; }
+test_project_provisioner_origin_lagging() { project_provisioner_origin_case lagging; }
+test_project_provisioner_origin_whitespace() { project_provisioner_origin_case whitespace; }
+test_project_provisioner_origin_mode() { project_provisioner_origin_case mode; }
+test_project_provisioner_origin_owner_mode() { project_provisioner_origin_case owner-mode; }
+test_project_provisioner_origin_unreadable_clone() { project_provisioner_origin_case unreadable-clone; }
+test_project_provisioner_origin_unreadable_object() { project_provisioner_origin_case unreadable-origin; }
+test_project_provisioner_origin_missing_promisor() { project_provisioner_origin_case missing-promisor; }
+test_project_provisioner_origin_missing_path() { project_provisioner_origin_case missing-origin; }
+test_project_provisioner_origin_missing_ref() { project_provisioner_origin_case no-origin; }
+test_project_provisioner_origin_missing_clone() { project_provisioner_origin_case missing-clone; }
+test_project_provisioner_origin_default_branch() { project_provisioner_origin_case default-branch; }
+
 # Scratch exports let the same behavioral cases discriminate base and mutants.
 ROOT=${FM_TEST_SOURCE_IMPLEMENTATION_ROOT:-$ROOT}
 
@@ -2716,6 +2823,18 @@ test_project_provisioner_missing_spawn
 test_project_provisioner_missing_promotion
 test_project_provisioner_missing_relaunch
 test_project_provisioner_missing_preserves_copy
+test_project_provisioner_origin_current
+test_project_provisioner_origin_lagging
+test_project_provisioner_origin_whitespace
+test_project_provisioner_origin_mode
+test_project_provisioner_origin_owner_mode
+test_project_provisioner_origin_unreadable_clone
+test_project_provisioner_origin_unreadable_object
+test_project_provisioner_origin_missing_promisor
+test_project_provisioner_origin_missing_path
+test_project_provisioner_origin_missing_ref
+test_project_provisioner_origin_missing_clone
+test_project_provisioner_origin_default_branch
 test_local_only_source_selection
 test_local_only_source_binding
 test_local_only_unprepared_retry
