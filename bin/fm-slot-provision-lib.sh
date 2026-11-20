@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # Existing-copy lifecycle integration for fm-spawn.sh and fm-promote.sh.
-# Projects carrying scripts/git-stability/provision_existing_slot.py must attest
-# the assigned isolated copy before admission. --owned-path is an explicit,
-# repeatable task scope, never inferred from prose or expanded to the whole repo.
+# Run scripts/git-stability/provision_existing_slot.py from the registered project
+# clone passed as project, never from the task copy. Before any provisioning or
+# branch change, require its raw bytes and Git executable mode to match that path
+# at the fetched origin default-branch ref (the same default selection as fleet
+# sync). Missing, unreadable or different inputs refuse and say to run fleet sync;
+# this check never fetches or repairs the clone.
+# Governed projects must attest the assigned isolated copy before admission.
+# --owned-path is an explicit, repeatable task scope, never inferred from prose
+# or expanded to the whole repo.
 # The provisioner owns schema, default origin/main merge-base validation, explicit
 # local-default qualification, same-owner adoption and lease/liveness-gated replacement.
 # A selected local-default ref/SHA is passed explicitly by spawn; no local choice
@@ -10,7 +16,7 @@
 # Firstmate never deletes/replaces its manifests or creates another worktree.
 # Call from a clean checkout on the task branch, using the project's existing
 # Python environment (no environment installation/sync). Preserve its full report.
-# Requires fm-task-copy-lib.sh for isolation and preservation predicates.
+# Requires fm-task-copy-lib.sh for isolation, preservation and default selection.
 # shellcheck disable=SC2034 # Output globals consumed by the entrypoints.
 FM_SLOT_PROVISIONED=0
 FM_SLOT_MANIFEST=
@@ -123,10 +129,47 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   FM_SLOT_PREPARED_HEAD=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
-  [ -f "$copy/scripts/git-stability/provision_existing_slot.py" ] || {
-    echo "error: slot provisioner is missing from assigned copy $copy" >&2
+  local provisioner_path=scripts/git-stability/provision_existing_slot.py default_branch
+  [ -f "$project/$provisioner_path" ] || {
+    echo "error: slot provisioner is missing from project clone $project: $project/$provisioner_path; run fleet sync" >&2
     return 1
   }
+  default_branch=$(fm_task_copy_default_branch "$project") || {
+    echo "error: cannot read fetched origin default branch for $project/$provisioner_path; run fleet sync" >&2
+    return 1
+  }
+  # Read only the fetched remote-tracking ref; provisioning never fetches or
+  # repairs the clone. Compare raw bytes (no Git filters) and the Git file mode.
+  GIT_NO_LAZY_FETCH=1 python3 - "$project" "$provisioner_path" "refs/remotes/origin/$default_branch" <<'PY' || return 1
+import os
+import subprocess
+import sys
+
+project, relative, ref = sys.argv[1:]
+path = os.path.join(project, relative)
+try:
+    with open(path, 'rb') as source:
+        content = source.read()
+        mode = '100755' if os.fstat(source.fileno()).st_mode & 0o100 else '100644'
+except OSError as exc:
+    print(f'error: cannot read project clone provisioner {path}: {exc}; run fleet sync', file=sys.stderr)
+    sys.exit(1)
+try:
+    entry = subprocess.check_output(['git', '-C', project, 'ls-tree', ref, '--', relative], stderr=subprocess.PIPE)
+    origin_mode, kind, blob = entry.split(b'\t', 1)[0].split()
+    if kind != b'blob' or origin_mode not in (b'100644', b'100755'):
+        raise ValueError('origin path is not a regular provisioner file')
+    origin_content = subprocess.check_output(['git', '-C', project, 'cat-file', 'blob', blob.decode('ascii')], stderr=subprocess.PIPE)
+except (OSError, subprocess.CalledProcessError, ValueError) as exc:
+    print(f'error: cannot read fetched origin version {ref}:{relative} for {path}: {exc}; run fleet sync', file=sys.stderr)
+    sys.exit(1)
+if content != origin_content:
+    print(f'error: slot provisioner {path} differs from fetched origin version {ref}:{relative}; run fleet sync', file=sys.stderr)
+    sys.exit(1)
+if mode.encode() != origin_mode:
+    print(f'error: slot provisioner {path} mode differs from fetched origin version {ref}:{relative}; run fleet sync', file=sys.stderr)
+    sys.exit(1)
+PY
   git check-ref-format --branch "$branch" >/dev/null || return 1
   old_branch=$(git -C "$copy" branch --show-current) || return 1
   old_head=$(git -C "$copy" rev-parse --verify HEAD) || return 1
@@ -167,7 +210,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
-  "$runner" "$project" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
+  "$runner" "$project" "$report" "$project/scripts/git-stability/provision_existing_slot.py" \
     --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
     --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
   if [ "$rc" -eq 0 ]; then

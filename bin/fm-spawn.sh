@@ -585,8 +585,9 @@
 #   history; a non-clean or otherwise doubtful copy is skipped as described above.
 #   A project carrying scripts/git-stability/provision_existing_slot.py additionally
 #   requires repeatable --owned-path <tracked-path> flags: explicit task scope,
-#   never inferred from the brief. bin/fm-slot-provision-lib.sh calls that actual
-#   provisioner before any harness admission, with origin/main's merge-base by
+#   never inferred from the brief. bin/fm-slot-provision-lib.sh calls the registered
+#   project clone's provisioner, never the copy's (its header owns the origin check),
+#   before any harness admission, with origin/main's merge-base by
 #   default or the selected qualified local-default ref/SHA for unpublished local
 #   delivery. The latter requires the project's explicit --base-source local-default
 #   capability; an older project owner refuses rather than widening scope. Task id

@@ -15,9 +15,17 @@ TMP_ROOT=$(fm_test_tmproot fm-spawn-pool-base-freshen)
 # Every spawn in this file runs with its detached home-summary refresh stubbed (tests/fixtures.sh fm_test_spawn_script).
 export FM_TEST_STUB_SUMMARY_REFRESH=1
 
-make_case() {
+make_case() (
+  # A failed setup never emits a partial record. Each call owns a new directory,
+  # including repeated selections in one shell.
+  set -e
   local name=$1 id=$2 default=${3:-main} case_dir home project origin pool publisher fakebin initial
-  case_dir="$TMP_ROOT/$name"
+  [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] || fail 'invalid fixture name'
+  [[ "$id" =~ ^[A-Za-z0-9_.-]+$ ]] || fail 'invalid fixture owner'
+  [[ "$default" =~ ^[A-Za-z0-9_-]+$ ]] || fail 'invalid fixture default'
+  case "$TMP_ROOT" in /*) ;; *) fail 'fixture root is not absolute' ;; esac
+  [ -d "$TMP_ROOT" ] && [ ! -L "$TMP_ROOT" ] || fail 'fixture root is not a private directory'
+  case_dir=$(mktemp -d "$TMP_ROOT/$name.XXXXXX")
   home="$case_dir/home"
   project="$case_dir/project"
   origin="$case_dir/origin.git"
@@ -30,25 +38,57 @@ make_case() {
   fm_test_spawn_brief "$home" "$id"
   touch "$home/state/.last-watcher-beat"
 
-  git init --quiet -b "$default" "$project"
+  git -C "$case_dir" init --quiet -b "$default" "$project"
   printf 'base\n' > "$project/README.md"
   git -C "$project" add README.md
   git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
-  git clone --quiet --bare "$project" "$origin"
+  git -C "$case_dir" clone --quiet --bare "$project" "$origin"
   git -C "$project" remote add origin "file://$origin"
   initial=$(git -C "$project" rev-parse HEAD)
   git -C "$project" worktree add --quiet --detach "$pool" "$initial"
 
-  git clone --quiet "file://$origin" "$publisher"
+  git -C "$case_dir" clone --quiet "file://$origin" "$publisher"
   printf 'must survive a newly spawned branch\n' > "$publisher/advanced-main.txt"
   git -C "$publisher" add advanced-main.txt
   git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm advance-main
   git -C "$publisher" push --quiet origin "$default"
 
   printf '%s\n' "$case_dir|$home|$project|$pool|$fakebin|$initial|$default"
-}
+)
 
 read_case_record() {
+  # Validate every field before publishing paths that later setup can mutate.
+  python3 - "$TMP_ROOT" "$1" <<'PY' || fail 'invalid fixture case record; no setup mutation permitted'
+import os
+import re
+import sys
+
+root, record = sys.argv[1:]
+try:
+    fields = record.split('|')
+    if len(fields) != 7 or '\n' in record or '\r' in record:
+        raise ValueError('expected one seven-field record')
+    case, home, project, pool, fakebin, sha, branch = fields
+    if not os.path.isabs(root) or os.path.realpath(root) != root or not os.path.isdir(root):
+        raise ValueError('private temporary root is invalid')
+    for path in (case, home, project, pool, fakebin):
+        if not path or not os.path.isabs(path) or not os.path.isdir(path):
+            raise ValueError('fixture path is empty, relative or absent')
+        resolved = os.path.realpath(path)
+        if os.path.commonpath((root, resolved)) != root or resolved == root:
+            raise ValueError('fixture path escapes private temporary root')
+        if os.path.commonpath((os.path.realpath(case), resolved)) != os.path.realpath(case):
+            raise ValueError('fixture path escapes its case')
+    if (home, project, pool, fakebin) != (case + '/home', case + '/project', case + '/pool', case + '/fake/fakebin'):
+        raise ValueError('unexpected fixture directory layout')
+    if not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', sha):
+        raise ValueError('invalid initial commit')
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._/-]*', branch) or '..' in branch:
+        raise ValueError('invalid default branch')
+except (OSError, ValueError) as exc:
+    print(f'invalid fixture case record: {exc}', file=sys.stderr)
+    sys.exit(1)
+PY
   IFS='|' read -r CASE_DIR HOME_DIR PROJECT_DIR POOL_DIR FAKEBIN_DIR INITIAL_SHA DEFAULT_BRANCH <<EOF
 $1
 EOF
@@ -239,9 +279,13 @@ test_non_main_default_branch_refreshes_before_branching() {
   pass "a stale pooled worktree resolves and refreshes a non-main default branch"
 }
 
-make_originless_case() {  # <name> <id>
+make_originless_case() (  # <name> <id>
+  set -e
   local name=$1 id=$2 case_dir home project pool fakebin initial
-  case_dir="$TMP_ROOT/$name"
+  [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$id" =~ ^[A-Za-z0-9_.-]+$ ]] || fail 'invalid originless fixture name'
+  case "$TMP_ROOT" in /*) ;; *) fail 'fixture root is not absolute' ;; esac
+  [ -d "$TMP_ROOT" ] && [ ! -L "$TMP_ROOT" ] || fail 'fixture root is not a private directory'
+  case_dir=$(mktemp -d "$TMP_ROOT/$name.XXXXXX")
   home="$case_dir/home"
   project="$case_dir/project"
   pool="$case_dir/pool"
@@ -252,7 +296,7 @@ make_originless_case() {  # <name> <id>
   fm_test_spawn_brief "$home" "$id"
   touch "$home/state/.last-watcher-beat"
 
-  git init --quiet -b main "$project"
+  git -C "$case_dir" init --quiet -b main "$project"
   printf 'base\n' > "$project/README.md"
   git -C "$project" add README.md
   git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
@@ -260,7 +304,7 @@ make_originless_case() {  # <name> <id>
   git -C "$project" worktree add --quiet --detach "$pool" "$initial"
 
   printf '%s\n' "$case_dir|$home|$project|$pool|$fakebin|$initial|main"
-}
+)
 
 test_originless_pool_launches_without_a_freshness_fetch() {
   local rec id out status before
@@ -483,9 +527,13 @@ test_unresolved_remote_default_refuses_pool() {
 # operator. Nothing here is converged - the gate only has to say why. The fixture
 # only builds the repositories; the residue itself is produced by a real spawn, so
 # these tests cover the reset that actually strands the submodule.
-make_submodule_case() {  # <name> <id>
+make_submodule_case() (  # <name> <id>
+  set -e
   local name=$1 id=$2 case_dir home project origin pool publisher fakebin sub subpin1 subpin2 advanced
-  case_dir="$TMP_ROOT/$name"
+  [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$id" =~ ^[A-Za-z0-9_.-]+$ ]] || fail 'invalid submodule fixture name'
+  case "$TMP_ROOT" in /*) ;; *) fail 'fixture root is not absolute' ;; esac
+  [ -d "$TMP_ROOT" ] && [ ! -L "$TMP_ROOT" ] || fail 'fixture root is not a private directory'
+  case_dir=$(mktemp -d "$TMP_ROOT/$name.XXXXXX")
   home="$case_dir/home"
   project="$case_dir/project"
   origin="$case_dir/origin.git"
@@ -499,7 +547,7 @@ make_submodule_case() {  # <name> <id>
   fm_test_spawn_brief "$home" "$id"
   touch "$home/state/.last-watcher-beat"
 
-  git init --quiet -b main "$sub"
+  git -C "$case_dir" init --quiet -b main "$sub"
   printf 'pin one\n' > "$sub/lib.txt"
   git -C "$sub" add lib.txt
   git -C "$sub" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm sub-one
@@ -509,19 +557,19 @@ make_submodule_case() {  # <name> <id>
   subpin2=$(git -C "$sub" rev-parse HEAD)
   git -C "$sub" checkout --quiet "$subpin1"
 
-  git init --quiet -b main "$project"
+  git -C "$case_dir" init --quiet -b main "$project"
   printf 'base\n' > "$project/README.md"
   git -C "$project" add README.md
   git -C "$project" -c protocol.file.allow=always -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
     submodule --quiet add "file://$sub" ui
   git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
-  git clone --quiet --bare "$project" "$origin"
+  git -C "$case_dir" clone --quiet --bare "$project" "$origin"
   git -C "$project" remote add origin "file://$origin"
   git -C "$project" worktree add --quiet --detach "$pool" HEAD
   git -C "$pool" -c protocol.file.allow=always submodule --quiet update --init
 
   # Advance origin and move the submodule pin, exactly as the field incident did.
-  git clone --quiet "file://$origin" "$publisher"
+  git -C "$case_dir" clone --quiet "file://$origin" "$publisher"
   git -C "$publisher" -c protocol.file.allow=always submodule --quiet update --init
   git -C "$publisher/ui" checkout --quiet "$subpin2"
   git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam advance-pin
@@ -529,12 +577,17 @@ make_submodule_case() {  # <name> <id>
   advanced=$(git -C "$publisher" rev-parse HEAD)
 
   printf '%s\n' "$case_dir|$home|$project|$pool|$fakebin|$subpin1|$subpin2|$advanced"
-}
+)
 
 read_submodule_case() {
-  IFS='|' read -r CASE_DIR HOME_DIR PROJECT_DIR POOL_DIR FAKEBIN_DIR SUBPIN1 SUBPIN2 ADVANCED_SHA <<EOF
+  local case_dir home project pool fakebin subpin1 subpin2 advanced extra
+  case "$1" in *$'\n'*|*$'\r'*) fail 'invalid multiline submodule fixture record' ;; esac
+  IFS='|' read -r case_dir home project pool fakebin subpin1 subpin2 advanced extra <<EOF
 $1
 EOF
+  [ -z "$extra" ] && [[ "$subpin2" =~ ^[0-9a-f]{40}$ ]] && [[ "$advanced" =~ ^[0-9a-f]{40}$ ]] || fail 'invalid submodule fixture commits'
+  read_case_record "$case_dir|$home|$project|$pool|$fakebin|$subpin1|main"
+  SUBPIN1=$subpin1 SUBPIN2=$subpin2 ADVANCED_SHA=$advanced
 }
 
 # The first of two consecutive spawns: it succeeds, resets the superproject onto
@@ -946,7 +999,7 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
     # Only the acquired copy initially requires governance; afterward neither does.
     git -C "$project" checkout --quiet --detach HEAD^
   fi
-  git clone --quiet "file://$origin" "$publisher"
+  git -C "$case_dir" clone --quiet "file://$origin" "$publisher"
   case "$shape" in
     introduced|missing-scope) write_refusing_slot_owner "$publisher" ;;
     removed) git -C "$publisher" rm -q scripts/git-stability/provision_existing_slot.py ;;
@@ -956,6 +1009,9 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
   git -C "$publisher" commit -qm 'advance owner fixture'
   git -C "$publisher" push --quiet origin main
   advanced=$(git -C "$publisher" rev-parse HEAD)
+  # Provisioning now executes the registered clone's owner, not the freshly
+  # moved copy's owner. Supply that authoritative fixture for these cases.
+  case "$shape" in introduced) write_refusing_slot_owner "$project" ;; esac
   if [ "$kind" = scout ]; then args+=(--scout); else args+=(--mode local-only --yolo off); fi
   [ "$shape" = missing-scope ] || [ "$shape" = absent ] || args+=(--owned-path scripts)
   temp="/tmp/fm-$id"
@@ -1221,10 +1277,15 @@ run_local_only_binding_case() { # <prepared|unprepared>
   git -C "$PROJECT_DIR" fetch --quiet origin
   git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
   git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
-  remote=$(git -C "$PROJECT_DIR" rev-parse origin/main)
   write_refusing_slot_owner "$PROJECT_DIR"
-  git -C "$PROJECT_DIR" add scripts
-  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted local owner'
+  git -C "$PROJECT_DIR" add scripts || fail 'binding guard add failed'
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'published binding owner' || fail 'binding guard commit failed'
+  git -C "$PROJECT_DIR" push --quiet origin main || fail 'binding guard publish failed'
+  remote=$(git -C "$PROJECT_DIR" rev-parse origin/main) || fail 'binding origin resolution failed'
+  # Keep the selected local baseline ahead while its policy equals fetched authority.
+  printf 'accepted local-only binding work\n' > "$PROJECT_DIR/binding-local.txt"
+  git -C "$PROJECT_DIR" add binding-local.txt || fail 'binding local work add failed'
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted local binding work' || fail 'binding local work commit failed'
   selected=$(git -C "$PROJECT_DIR" rev-parse main)
   token=$(printf '%s' "$HOME_DIR" | shasum -a 256 | awk '{print $1}')
   [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail 'binding task temp already exists'
@@ -1400,7 +1461,7 @@ run_local_only_equal_retry_case() { # <advanced|adopted-scope|diverged|invalid-r
   case "$shape" in
     diverged)
       publisher="$CASE_DIR/divergent-publisher"
-      git clone --quiet "file://$CASE_DIR/origin.git" "$publisher"
+      git -C "$CASE_DIR" clone --quiet "file://$CASE_DIR/origin.git" "$publisher" || fail 'divergent publisher clone failed'
       printf 'unrelated upstream\n' > "$publisher/upstream.txt"
       git -C "$publisher" add upstream.txt
       git -C "$publisher" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'divergent upstream'
@@ -2313,18 +2374,467 @@ test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
   pass "the branch the preparation detached from is where it was"
 }
 
+test_malformed_case_record_cannot_escape_fixture_root() {
+  local sentinel="$TMP_ROOT/record-sentinel" snapshot="$TMP_ROOT/record-snapshot" record rc out
+  mkdir -p "$sentinel/home" "$sentinel/project" "$sentinel/pool" "$sentinel/fake/fakebin" || fail 'sentinel directories failed'
+  git -C "$sentinel" init -q -b main || fail 'sentinel init failed'
+  printf 'preserve sentinel bytes\n' > "$sentinel/README"
+  git -C "$sentinel" add README || fail 'sentinel add failed'
+  git -C "$sentinel" -c user.name=Tests -c user.email=tests@example.invalid commit -qm sentinel || fail 'sentinel commit failed'
+  cp -R "$sentinel" "$snapshot" || fail 'sentinel snapshot failed'
+  for record in 'On branch main' '' 'relative|bad' \
+    "|$sentinel/home|$sentinel/project|$sentinel/pool|$sentinel/fake/fakebin|0123456789012345678901234567890123456789|main" \
+    "relative|$sentinel/home|$sentinel/project|$sentinel/pool|$sentinel/fake/fakebin|0123456789012345678901234567890123456789|main" \
+    "/outside|$sentinel/home|$sentinel/project|$sentinel/pool|$sentinel/fake/fakebin|0123456789012345678901234567890123456789|main" \
+    "$sentinel||$sentinel/project|$sentinel/pool|$sentinel/fake/fakebin|0123456789012345678901234567890123456789|main" \
+    "$sentinel|$sentinel/home|$sentinel/project|$sentinel/pool|$sentinel/fake/fakebin|bad-sha|main" \
+    "$sentinel|$sentinel/home|$sentinel/project|$sentinel/pool|$sentinel/fake/fakebin|0123456789012345678901234567890123456789|../bad" \
+    "$sentinel|$sentinel/home|$sentinel/project|$sentinel/pool|$sentinel/fake/fakebin|0123456789012345678901234567890123456789|main|extra"; do
+    rc=0
+    out=$(
+      cd "$sentinel" || exit 1
+      read_case_record "$record"
+      printf 'escaped setup\n' > "$sentinel/escaped"
+    ) 2>&1 || rc=$?
+    [ "$rc" -ne 0 ] || fail "malformed case record admitted setup: $record ($out)"
+    diff -r "$snapshot" "$sentinel" || fail 'malformed record changed sentinel repository bytes'
+  done
+  pass 'malformed fixture records stop before mutations and preserve sentinel repository bytes'
+}
+
+# Source provenance is observed inside the executed Python file, not inferred
+# from a manifest or from the runner's command construction.
+write_source_slot_owner() { # <repository> <A|B> [<exit-code>]
+  local repo=$1 identity=$2 code=${3:-0} physical
+  physical=$(cd -P -- "$repo" && pwd -P) || fail 'fixture provisioner repository is absent'
+  case "$physical" in "$TMP_ROOT"/*) ;; *) fail 'fixture provisioner path escapes private root' ;; esac
+  mkdir -p "$repo/scripts/git-stability" || fail 'fixture provisioner directory failed'
+  {
+    printf 'IDENTITY = "%s"\nEXIT_CODE = %s\n' "$identity" "$code"
+    cat <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+arg = lambda flag: sys.argv[sys.argv.index(flag) + 1]
+with open(os.environ['FM_TEST_SOURCE_RECORD'], 'a', encoding='utf-8') as output:
+    output.write(json.dumps(dict(identity=IDENTITY, realpath=os.path.realpath(__file__), argv=sys.argv)) + '\n')
+if EXIT_CODE:
+    print(json.dumps(dict(state='BLOCKED', reason='stale_copy_guard')))
+    sys.exit(EXIT_CODE)
+record = dict(worktree_path=os.path.realpath(arg('--worktree-path')), owner_id=arg('--owner-id'),
+              branch=arg('--branch'), base_sha=arg('--base-sha'),
+              owned_paths=[value for flag, value in zip(sys.argv, sys.argv[1:]) if flag == '--owned-path'],
+              lifecycle_state='worktree_active')
+if '--base-source' in sys.argv:
+    record.update(base_source=arg('--base-source'), base_ref='refs/heads/main')
+manifest = Path(os.environ['FM_TEST_SLOT_RECORD'])
+manifest.write_text(json.dumps(record), encoding='utf-8')
+print(json.dumps(dict(state='PASS', manifest_path=str(manifest), **record)))
+PY
+  } > "$repo/scripts/git-stability/provision_existing_slot.py" || fail 'fixture provisioner write failed'
+}
+
+# Origin's default and the clone carry A; the task branch carries B. Fresh
+# spawn selects that named task base so freshness preserves the differing B
+# while the guard authority remains the fetched default. No real pane or pool
+# is used.
+make_source_case() { # <shape> <entrypoint> [<origin-case>]
+  local shape=$1 entry=$2 rec id publisher diff_rc=0
+  id="source-$shape-$entry-${3:-case}-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR" || fail 'fake no-mistakes setup failed'
+  fm_test_fake_gh "$FAKEBIN_DIR" || fail 'fake gh setup failed'
+  fm_test_fake_gh_axi "$FAKEBIN_DIR" || fail 'fake gh-axi setup failed'
+  printf 'manual\n' > "$HOME_DIR/config/backlog-backend" || fail 'fixture config write failed'
+  publisher="$CASE_DIR/publisher"
+  write_source_slot_owner "$publisher" A
+  git -C "$publisher" add scripts || fail 'guard add failed'
+  git -C "$publisher" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'authoritative guard A' || fail 'guard commit failed'
+  git -C "$publisher" push -q origin main || fail 'guard publish failed'
+  git -C "$PROJECT_DIR" fetch -q origin || fail 'guard fetch failed'
+  git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null || fail 'clone guard update failed'
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main || fail 'fixture default ref failed'
+  git -C "$POOL_DIR" merge --ff-only origin/main >/dev/null || fail 'copy guard update failed'
+  # Exercise intact quoting in both runners and through relaunch metadata.
+  git -C "$PROJECT_DIR" worktree move "$POOL_DIR" "$CASE_DIR/copy with space" || fail 'fixture copy move failed'
+  POOL_DIR="$CASE_DIR/copy with space"
+  SOURCE_ID=$id
+  SOURCE_TARGET="$PROJECT_DIR/scripts/git-stability/provision_existing_slot.py"
+  case "$shape" in identical|symlink|copy-missing) ;; *) write_source_slot_owner "$POOL_DIR" B ;; esac
+  case "$shape" in
+    identical) cp "$SOURCE_TARGET" "$POOL_DIR/scripts/git-stability/provision_existing_slot.py" || fail 'identical guard copy failed' ;;
+    symlink)
+      cp "$SOURCE_TARGET" "$CASE_DIR/external-owner.py" || fail 'symlink target copy failed'
+      rm "$SOURCE_TARGET" || fail 'symlink preparation failed'
+      ln -s "$CASE_DIR/external-owner.py" "$SOURCE_TARGET" || fail 'guard symlink failed'
+      ;;
+    missing) rm "$SOURCE_TARGET" || fail 'missing clone preparation failed' ;;
+    copy-missing) git -C "$POOL_DIR" rm -q scripts/git-stability/provision_existing_slot.py || fail 'missing copy preparation failed' ;;
+  esac
+  if [ "$entry" = relaunch ] && [ "$shape" != missing ]; then
+    write_source_slot_owner "$POOL_DIR" B 2
+  fi
+  git -C "$POOL_DIR" diff --quiet HEAD || diff_rc=$?
+  case "$diff_rc" in
+    0) ;;
+    1)
+      git -C "$POOL_DIR" add -A || fail 'task guard add failed'
+      git -C "$POOL_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'task guard variant' || fail 'task guard commit failed'
+      ;;
+    *) fail 'cannot read fixture copy diff' ;;
+  esac
+  git -C "$POOL_DIR" checkout -q -b "fm/$id" || fail 'task fixture branch failed'
+  if [ "$entry" = fresh ]; then
+    git -C "$POOL_DIR" push -q origin HEAD:refs/heads/feature/source-guard || fail 'task base publish failed'
+    brief_with_base "$id" feature/source-guard || fail 'fixture base brief failed'
+  fi
+  SOURCE_BASE=$(git -C "$POOL_DIR" merge-base origin/main HEAD) || fail 'fixture base resolution failed'
+  SOURCE_LOCAL_REF=
+  SOURCE_SELECTED=
+  if [ "$entry" = spawn ] && [ "$shape" = local-default ]; then
+    # The selected default contains A, but the copy has the distinct B guard.
+    SOURCE_LOCAL_REF=refs/heads/main
+    SOURCE_SELECTED=$(git -C "$PROJECT_DIR" rev-parse main) || fail 'fixture selected base failed'
+    SOURCE_BASE=$SOURCE_SELECTED
+  fi
+  SOURCE_REALPATH=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$SOURCE_TARGET") || fail 'fixture guard realpath failed'
+  export FM_TEST_SOURCE_RECORD="$CASE_DIR/executed.jsonl"
+  export FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json"
+  export FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log"
+  # Explicit recorded-copy spawn avoids a freshness move replacing the task
+  # branch before the source-provenance assertion; this is also spawn's runner.
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=firstmate:fm-%s\nbranch=fm/%s\nharness=codex\nmode=scout\nyolo=off\nslot_owned_path=README.md\nslot_owned_path=scripts\n' \
+    "$PROJECT_DIR" "$POOL_DIR" "$id" "$id" > "$HOME_DIR/state/$id.meta" || fail 'fixture metadata write failed'
+  if [ -n "$SOURCE_LOCAL_REF" ]; then
+    # Local-default declarations belong only to local-only ships.
+    printf 'kind=ship\nproject=%s\nworktree=%s\nwindow=firstmate:fm-%s\nbranch=fm/%s\nharness=codex\nmode=local-only\nyolo=off\nslot_owned_path=README.md\nslot_owned_path=scripts\nslot_source_ref=%s\nslot_base_sha=%s\n' \
+      "$PROJECT_DIR" "$POOL_DIR" "$id" "$id" "$SOURCE_LOCAL_REF" "$SOURCE_SELECTED" > "$HOME_DIR/state/$id.meta" || fail 'fixture selected metadata write failed'
+  fi
+  [ "$entry" != fresh ] || rm "$HOME_DIR/state/$id.meta" || fail 'fixture fresh metadata removal failed'
+  preflight_task_temp "$id" || fail 'fixture task preflight failed'
+}
+
+assert_source_execution() { # <entrypoint>
+  python3 - "$FM_TEST_SOURCE_RECORD" "$SOURCE_TARGET" "$SOURCE_REALPATH" "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "$SOURCE_BASE" "$SOURCE_LOCAL_REF" "$1" <<'PY'
+import json, os, sys
+record, target, realpath, project, copy, owner, base, local_ref, entry = sys.argv[1:]
+rows = [json.loads(line) for line in open(record, encoding='utf-8')]
+assert len(rows) == 1, ('expected exactly one clone execution, never B', rows)
+r = rows[0]
+print('source-record', entry, json.dumps(r, sort_keys=True), flush=True)
+assert r['identity'] == 'A', ('copy guard B ran instead of clone guard A', r)
+assert r['argv'][0] == target, ('executed script pathname is not the exact clone pathname', r)
+assert r['realpath'] == realpath, ('executed realpath differs from clone file', r)
+expected = ['--repo-root', project, '--worktree-path', os.path.realpath(copy), '--owner-id', owner,
+            '--branch', 'fm/' + owner, '--base-sha', base]
+if local_ref:
+    expected += ['--base-source', 'local-default']
+expected += ['--owned-path', 'README.md', '--owned-path', 'scripts']
+assert r['argv'][1:] == expected, ('provisioner argv changed', r['argv'], expected)
+print('source-proof', entry, json.dumps(r, sort_keys=True))
+PY
+}
+
+run_source_entry() { # <fresh|spawn|promotion|relaunch>
+  case "$1" in
+    fresh)
+      run_spawn "$SOURCE_ID" --mode no-mistakes --yolo off --base-branch feature/source-guard --owned-path README.md --owned-path scripts
+      ;;
+    spawn)
+      run_relaunch "$SOURCE_ID"
+      ;;
+    promotion)
+      FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+        FM_CONFIG_OVERRIDE="$HOME_DIR/config" PATH="$FAKEBIN_DIR:$PATH" \
+        bash "$ROOT/bin/fm-promote.sh" "$SOURCE_ID" --mode local-only --yolo off 2>&1
+      ;;
+    relaunch)
+      # Control is real; only its endpoint and launched harness are fixtures.
+      FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+        FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 \
+        FM_FAKE_PANE_PATH="$POOL_DIR" FM_FAKE_DUPLICATE_WINDOW="fm-$SOURCE_ID" \
+        PATH="$CASE_DIR/stopped:$FAKEBIN_DIR:$PATH" FM_BACKEND=tmux TMUX=fake,1,0 \
+        bash "$ROOT/bin/fm-control.sh" "$SOURCE_ID" relaunch --note 'exercise stale task guard' 2>&1
+      ;;
+  esac
+}
+
+source_entry_case() { # <shape> <entry>
+  local shape=$1 entry=$2 out rc=0
+  make_source_case "$shape" "$entry"
+  case "$entry" in spawn|relaunch) make_stopped_tmux "$CASE_DIR/stopped" ;; esac
+  if [ "$entry" = relaunch ]; then
+    export FM_TEST_SOURCE_PANE_COMMAND="$CASE_DIR/pane-command"
+    printf 'zsh\n' > "$FM_TEST_SOURCE_PANE_COMMAND"
+    mv "$CASE_DIR/stopped/tmux" "$CASE_DIR/stopped/tmux.original"
+    cat > "$CASE_DIR/stopped/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$*" in *'#{pane_current_command}'*) cat "$FM_TEST_SOURCE_PANE_COMMAND"; exit 0 ;; esac
+"$(dirname "$0")/tmux.original" "$@"
+rc=$?
+# A fake launch is a state transition only, never execution of the harness.
+if [ -f "$FM_FAKE_LAUNCH_LOG" ] && grep -q 'codex' "$FM_FAKE_LAUNCH_LOG"; then
+  printf 'codex\n' > "$FM_TEST_SOURCE_PANE_COMMAND"
+fi
+exit "$rc"
+SH
+    chmod +x "$CASE_DIR/stopped/tmux"
+  fi
+  if [ -f "$HOME_DIR/state/$SOURCE_ID.meta" ]; then
+    cp "$HOME_DIR/state/$SOURCE_ID.meta" "$CASE_DIR/meta.before"
+  fi
+  out=$(run_source_entry "$entry") || rc=$?
+  printf '%s\n' "$out" > "$CASE_DIR/entry.out"
+  if [ "$shape" = missing ]; then
+    # Emit the base's actual execution before any admission assertion can end
+    # the case and fixture cleanup removes its record.
+    if [ -e "$FM_TEST_SOURCE_RECORD" ]; then
+      python3 - "$FM_TEST_SOURCE_RECORD" "$POOL_DIR" <<'PY' || fail 'missing-clone execution record is not the expected copy control'
+import json, os, sys
+rows = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
+print('missing-clone-runtime-record', json.dumps(rows, sort_keys=True), flush=True)
+assert len(rows) == 1 and rows[0]['identity'] == 'B', rows
+expected = sys.argv[2] + '/scripts/git-stability/provision_existing_slot.py'
+assert rows[0]['argv'][0] == expected, rows
+assert rows[0]['realpath'] == os.path.realpath(expected), rows
+PY
+      fail 'missing clone executed copy guard B instead of refusing'
+    fi
+    [ "$rc" -ne 0 ] || fail "$entry admitted a copy when the clone owner is missing"
+    assert_contains "$out" "slot provisioner is missing from project clone $PROJECT_DIR" 'missing clone refusal must name the clone'
+    [ ! -e "$FM_TEST_SOURCE_RECORD" ] || fail 'missing clone ran a provisioner'
+    [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail 'missing clone wrote a manifest'
+    [ ! -s "$FM_FAKE_LAUNCH_LOG" ] || fail 'missing clone launched an agent'
+    if [ "$entry" = promotion ]; then
+      assert_grep kind=scout "$HOME_DIR/state/$SOURCE_ID.meta" 'missing clone admitted promotion'
+      assert_absent "$HOME_DIR/data/$SOURCE_ID/ship-instructions.md" 'missing clone published ship instructions'
+    else
+      assert_grep 'slot provisioning refused before admission' "$HOME_DIR/state/$SOURCE_ID.status" 'missing clone lost slot refusal status'
+      assert_contains "$out" 'retained; no worker admitted' 'missing clone lost retained-copy refusal'
+    fi
+  else
+    assert_source_execution "$entry" || fail "$entry violated clone execution or argv contract: $out"
+    expect_code 0 "$rc" "$entry refused the clone owner: $out"
+    # An optional immutable base export lets delivery evidence replay the real
+    # entrypoint on the very same repositories, paths, owner, branch and base.
+    if [ -n "${FM_TEST_SOURCE_COMPARE_ROOT:-}" ] && { [ "$shape" = different ] || [ "$shape" = stale ] || [ "$shape" = local-default ]; }; then
+      cp "$FM_TEST_SOURCE_RECORD" "$CASE_DIR/head.argv.jsonl"
+      if [ -f "$CASE_DIR/meta.before" ]; then
+        cp "$CASE_DIR/meta.before" "$HOME_DIR/state/$SOURCE_ID.meta"
+      else
+        rm "$HOME_DIR/state/$SOURCE_ID.meta"
+      fi
+      rm "$FM_TEST_SOURCE_RECORD" "$FM_TEST_SLOT_RECORD"
+      rm -f "$FM_FAKE_LAUNCH_LOG"
+      [ "$entry" != relaunch ] || printf 'zsh\n' > "$FM_TEST_SOURCE_PANE_COMMAND"
+      local head_root=$ROOT base_rc=0
+      ROOT=$FM_TEST_SOURCE_COMPARE_ROOT
+      run_source_entry "$entry" > "$CASE_DIR/base.out" 2>&1 || base_rc=$?
+      ROOT=$head_root
+      if [ "$shape" = stale ]; then
+        [ "$base_rc" -ne 0 ] || fail 'base admitted the stale rejecting guard'
+        assert_grep stale_copy_guard "$CASE_DIR/base.out" 'base refusal was not the stale guard'
+      else
+        expect_code 0 "$base_rc" "base comparison setup failed: $(cat "$CASE_DIR/base.out")"
+      fi
+      python3 - "$CASE_DIR/head.argv.jsonl" "$FM_TEST_SOURCE_RECORD" "$PROJECT_DIR" "$POOL_DIR" <<'PY' || fail 'same-input base/head argv comparison failed'
+import json, sys
+head_file, base_file, project, copy = sys.argv[1:]
+head = [json.loads(line) for line in open(head_file)]
+base = [json.loads(line) for line in open(base_file)]
+assert len(head) == len(base) == 1, (head, base)
+a, b = head[0]['argv'], base[0]['argv']
+assert base[0]['identity'] == 'B', ('base did not execute B', base)
+assert a[0] == project + '/scripts/git-stability/provision_existing_slot.py', a
+assert b[0] == copy + '/scripts/git-stability/provision_existing_slot.py', b
+assert a[1:] == b[1:], ('argv changed beyond executed source', a, b)
+print('same-input-argv-comparison PASS', json.dumps(dict(head=a, base=b), sort_keys=True))
+PY
+    fi
+  fi
+  pass "project provisioner: $shape $entry"
+}
+
+test_project_provisioner_spawn() { source_entry_case different fresh; }
+test_project_provisioner_promotion() { source_entry_case different promotion; }
+test_project_provisioner_relaunch() { source_entry_case stale relaunch; }
+test_project_provisioner_identical() { source_entry_case identical spawn; }
+test_project_provisioner_symlink() { source_entry_case symlink spawn; }
+test_project_provisioner_local_default() { source_entry_case local-default spawn; }
+test_project_provisioner_copy_missing() { source_entry_case copy-missing spawn; }
+test_project_provisioner_missing_spawn() { source_entry_case missing fresh; }
+test_project_provisioner_missing_promotion() { source_entry_case missing promotion; }
+test_project_provisioner_missing_relaunch() { source_entry_case missing relaunch; }
+
+test_project_provisioner_missing_preserves_copy() {
+  local before after rc=0 out
+  make_source_case missing direct
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  # shellcheck source=bin/fm-slot-provision-lib.sh
+  . "$ROOT/bin/fm-slot-provision-lib.sh"
+  before=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  out=$(fm_slot_provision fm_slot_run_local "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "fm/new-$SOURCE_ID" "$CASE_DIR/report" '' '' README.md scripts 2>&1) || rc=$?
+  after=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  if [ -e "$FM_TEST_SOURCE_RECORD" ]; then
+    printf 'direct-missing-clone-runtime-record '
+    cat "$FM_TEST_SOURCE_RECORD"
+  fi
+  [ "$before" = "$after" ] || fail 'missing clone changed HEAD, symbolic HEAD or refs before refusing'
+  [ "$rc" -ne 0 ] || fail 'missing clone admitted direct provisioning'
+  assert_contains "$out" "slot provisioner is missing from project clone $PROJECT_DIR" 'missing clone diagnostic lost'
+  [ ! -e "$FM_TEST_SOURCE_RECORD" ] || fail 'missing clone fell back to B'
+  [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail 'missing clone wrote a manifest'
+  # Preparation may already have detached the copy before the call boundary.
+  fm_slot_prepare_base "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" || fail 'fixture preparation failed'
+  before=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  rc=0
+  fm_slot_provision fm_slot_run_local "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "fm/new-$SOURCE_ID" "$CASE_DIR/report" '' '' README.md scripts >"$CASE_DIR/prepared.out" 2>&1 || rc=$?
+  after=$(git -C "$POOL_DIR" rev-parse HEAD; git -C "$POOL_DIR" symbolic-ref -q HEAD; git -C "$POOL_DIR" for-each-ref)
+  [ "$rc" -ne 0 ] && [ "$before" = "$after" ] || fail 'missing clone changed the prepared copy'
+  [ ! -e "$FM_TEST_SOURCE_RECORD" ] && [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail 'prepared missing clone ran an owner or wrote a manifest'
+  rm "$POOL_DIR/scripts/git-stability/provision_existing_slot.py"
+  if fm_slot_required "$PROJECT_DIR" "$POOL_DIR"; then fail 'neither side has a provisioner but governance was required'; fi
+  pass 'missing clone refuses before any provisioning, branch, HEAD, ref or manifest mutation, including after preparation'
+}
+
+# The fetched ref and the registered clone are independent inputs. All git
+# changes below belong to local fixture repositories, never the worker's repo.
+project_provisioner_origin_case() { # <current|lagging|whitespace|mode|unreadable-clone|unreadable-origin|missing-origin|no-origin|missing-clone|default-branch>
+  local shape=$1 before after out rc=0 origin_blob object_path
+  make_source_case identical direct "$shape"
+  git -C "$PROJECT_DIR" push -q origin main || fail 'origin baseline publish failed'
+  git -C "$PROJECT_DIR" fetch -q origin || fail 'origin baseline fetch failed'
+  case "$shape" in
+    lagging|whitespace|missing-origin|owner-mode)
+      git -C "$CASE_DIR/publisher" pull -q --ff-only origin main || fail 'publisher baseline update failed'
+      case "$shape" in
+        lagging) write_source_slot_owner "$CASE_DIR/publisher" STRICT 2 ;;
+        owner-mode) chmod 755 "$CASE_DIR/publisher/scripts/git-stability/provision_existing_slot.py" || fail 'owner execute authority fixture failed' ;;
+        whitespace) printf '\n' >> "$CASE_DIR/publisher/scripts/git-stability/provision_existing_slot.py" || fail 'whitespace fixture write failed' ;;
+        missing-origin) git -C "$CASE_DIR/publisher" rm -q scripts/git-stability/provision_existing_slot.py || fail 'origin guard deletion failed' ;;
+      esac
+      git -C "$CASE_DIR/publisher" add -A || fail 'origin guard add failed'
+      git -C "$CASE_DIR/publisher" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'advance authoritative guard' || fail 'origin guard commit failed'
+      git -C "$CASE_DIR/publisher" push -q origin main || fail 'origin guard publish failed'
+      git -C "$PROJECT_DIR" fetch -q origin || fail 'origin guard fetch failed'
+      if [ "$shape" = owner-mode ]; then
+        chmod 655 "$SOURCE_TARGET" || fail 'owner execute mismatch fixture failed'
+      fi
+      ;;
+    mode) chmod +x "$SOURCE_TARGET" || fail 'mode fixture preparation failed' ;;
+    unreadable-clone) chmod 000 "$SOURCE_TARGET" || fail 'clone permissions fixture failed' ;;
+    unreadable-origin|missing-promisor)
+      origin_blob=$(git -C "$PROJECT_DIR" rev-parse origin/main:scripts/git-stability/provision_existing_slot.py) || fail 'origin fixture blob lookup failed'
+      [[ "$origin_blob" =~ ^[0-9a-f]{40}$ ]] || fail 'origin blob id malformed'
+      object_path="$PROJECT_DIR/.git/objects/${origin_blob:0:2}/${origin_blob:2}"
+      [ -f "$object_path" ] || fail 'fixture origin blob is not loose'
+      if [ "$shape" = unreadable-origin ]; then
+        chmod 000 "$object_path" || fail 'origin object permissions fixture failed'
+      else
+        git -C "$PROJECT_DIR" config remote.origin.promisor true || fail 'promisor fixture config failed'
+        git -C "$PROJECT_DIR" config remote.origin.partialclonefilter blob:none || fail 'promisor filter config failed'
+        mv "$object_path" "$CASE_DIR/held-origin-blob" || fail 'promisor object removal failed'
+      fi
+      ;;
+    no-origin) git -C "$PROJECT_DIR" update-ref -d refs/remotes/origin/main || fail 'origin ref removal failed' ;;
+    missing-clone) rm "$SOURCE_TARGET" || fail 'clone removal failed' ;;
+    default-branch)
+      origin_blob=$(git -C "$PROJECT_DIR" rev-parse origin/main) || fail 'default branch fixture lookup failed'
+      git -C "$PROJECT_DIR" update-ref refs/remotes/origin/trunk "$origin_blob" || fail 'trunk fixture ref failed'
+      git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk || fail 'default branch fixture ref failed'
+      git -C "$PROJECT_DIR" update-ref refs/remotes/origin/main "$INITIAL_SHA" || fail 'main fixture ref failed'
+      ;;
+  esac
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  # shellcheck source=bin/fm-slot-provision-lib.sh
+  . "$ROOT/bin/fm-slot-provision-lib.sh"
+  before=$(git -C "$POOL_DIR" rev-parse HEAD && git -C "$POOL_DIR" symbolic-ref -q HEAD && git -C "$POOL_DIR" for-each-ref) || fail 'cannot snapshot fixture before guard'
+  out=$(GIT_TRACE="$CASE_DIR/guard-git.trace" fm_slot_provision fm_slot_run_local "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "fm/new-$SOURCE_ID" "$CASE_DIR/report" refs/heads/main "$SOURCE_BASE" README.md scripts 2>&1) || rc=$?
+  if grep -E 'built-in: git (fetch|pull|push|ls-remote)' "$CASE_DIR/guard-git.trace"; then
+    fail 'guard invoked network-facing Git instead of reading fetched refs'
+  fi
+  after=$(git -C "$POOL_DIR" rev-parse HEAD && git -C "$POOL_DIR" symbolic-ref -q HEAD && git -C "$POOL_DIR" for-each-ref) || fail 'cannot snapshot fixture after guard'
+  # Restore fixture readability even when an assertion below fails.
+  [ "$shape" != unreadable-clone ] || chmod 644 "$SOURCE_TARGET"
+  [ "$shape" != unreadable-origin ] || chmod 444 "$object_path"
+  printf 'origin-check case=%s exit=%s\n%s\n' "$shape" "$rc" "$out"
+  if [ -e "$FM_TEST_SOURCE_RECORD" ]; then cat "$FM_TEST_SOURCE_RECORD"; fi
+  case "$shape" in
+    current|default-branch)
+      expect_code 0 "$rc" "current clone was refused: $out"
+      assert_grep '"identity": "A"' "$FM_TEST_SOURCE_RECORD" 'current clone guard did not run'
+      [ -s "$FM_TEST_SLOT_RECORD" ] || fail 'current clone did not produce its manifest'
+      ;;
+    *)
+      [ "$before" = "$after" ] || fail "$shape changed HEAD, symbolic HEAD or refs before refusing"
+      [ "$rc" -ne 0 ] || fail "$shape admitted provisioning"
+      [ ! -e "$FM_TEST_SOURCE_RECORD" ] || fail "$shape ran a provisioner"
+      [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail "$shape wrote a manifest"
+      assert_contains "$out" "$SOURCE_TARGET" "$shape refusal lost the clone file path"
+      assert_contains "$out" 'run fleet sync' "$shape refusal lost the recovery instruction"
+      case "$shape" in
+        lagging|whitespace) assert_contains "$out" 'differs from fetched origin' 'byte mismatch reason lost' ;;
+        mode|owner-mode) assert_contains "$out" 'mode differs from fetched origin' 'mode mismatch reason lost' ;;
+        unreadable-clone) assert_contains "$out" 'cannot read project clone provisioner' 'clone read reason lost' ;;
+        unreadable-origin|missing-origin|no-origin|missing-promisor) assert_contains "$out" 'cannot read fetched origin' 'origin read reason lost' ;;
+        missing-clone) assert_contains "$out" "slot provisioner is missing from project clone $PROJECT_DIR" 'missing clone reason lost' ;;
+      esac
+      ;;
+  esac
+  pass "fetched-origin guard: $shape"
+}
+
+test_project_provisioner_origin_current() { project_provisioner_origin_case current; }
+test_project_provisioner_origin_lagging() { project_provisioner_origin_case lagging; }
+test_project_provisioner_origin_whitespace() { project_provisioner_origin_case whitespace; }
+test_project_provisioner_origin_mode() { project_provisioner_origin_case mode; }
+test_project_provisioner_origin_owner_mode() { project_provisioner_origin_case owner-mode; }
+test_project_provisioner_origin_unreadable_clone() { project_provisioner_origin_case unreadable-clone; }
+test_project_provisioner_origin_unreadable_object() { project_provisioner_origin_case unreadable-origin; }
+test_project_provisioner_origin_missing_promisor() { project_provisioner_origin_case missing-promisor; }
+test_project_provisioner_origin_missing_path() { project_provisioner_origin_case missing-origin; }
+test_project_provisioner_origin_missing_ref() { project_provisioner_origin_case no-origin; }
+test_project_provisioner_origin_missing_clone() { project_provisioner_origin_case missing-clone; }
+test_project_provisioner_origin_default_branch() { project_provisioner_origin_case default-branch; }
+
+# Scratch exports let the same behavioral cases discriminate base and mutants.
+ROOT=${FM_TEST_SOURCE_IMPLEMENTATION_ROOT:-$ROOT}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
-  for selected_test in "$@"; do
-    case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
-      test_*) if declare -F "$selected_test" >/dev/null 2>&1; then "$selected_test"; else fail "unknown selected test: $selected_test"; fi ;;
-      *) fail "unknown selected acquisition test: $selected_test" ;;
-    esac
-  done
+  fm_test_run_cases -- "$@"
   exit 0
 fi
 
+test_malformed_case_record_cannot_escape_fixture_root
+test_project_provisioner_spawn
+test_project_provisioner_promotion
+test_project_provisioner_relaunch
+test_project_provisioner_identical
+test_project_provisioner_symlink
+test_project_provisioner_local_default
+test_project_provisioner_copy_missing
+test_project_provisioner_missing_spawn
+test_project_provisioner_missing_promotion
+test_project_provisioner_missing_relaunch
+test_project_provisioner_missing_preserves_copy
+test_project_provisioner_origin_current
+test_project_provisioner_origin_lagging
+test_project_provisioner_origin_whitespace
+test_project_provisioner_origin_mode
+test_project_provisioner_origin_owner_mode
+test_project_provisioner_origin_unreadable_clone
+test_project_provisioner_origin_unreadable_object
+test_project_provisioner_origin_missing_promisor
+test_project_provisioner_origin_missing_path
+test_project_provisioner_origin_missing_ref
+test_project_provisioner_origin_missing_clone
+test_project_provisioner_origin_default_branch
 test_local_only_source_selection
 test_local_only_source_binding
 test_local_only_unprepared_retry
