@@ -1,0 +1,267 @@
+
+======================== S1-route-release-and-no-record-plain ========================
+--- $DATA/supersedence-records.tsv (copy, tip, PR, profile)
+<world>/th/pool1/1/repo/.claude/worktrees/twin	db92dbd550003703d67b44f4cc5803bfe45d59ed	7	<world>/profiles/twin.json
+--- task records ($FM_HOME/state/*.meta and lane state)
+--- fake forge answers (state TAB merge commit TAB head branch)
+pr-7: MERGED db92dbd550003703d67b44f4cc5803bfe45d59ed fm/pr-7-head
+--- bin/fm-copy-sweep.sh --apply  (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/plain	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/twin	branch fm/twin at db92dbd55000, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=1 freed=0.00
+--- closeout driver argv log (cwd|argv); one line per driver call
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/plain
+--- gh forge reads
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+--- git worktree list of the slot after the run
+<world>/th/pool1/1/repo                         db92dbd [main]
+<world>/th/pool1/1/repo/.claude/worktrees/plain 74f1dc5 [fm/plain] locked
+
+======================== S2-closed-and-open-pr-kept ========================
+--- $DATA/supersedence-records.tsv (copy, tip, PR, profile)
+<world>/th/pool1/1/repo/.claude/worktrees/closed	3b8c85e4db1bf00c16bc2416ce79483a2e573e6f	8	<world>/profiles/closed.json
+<world>/th/pool1/1/repo/.claude/worktrees/open	3b8c85e4db1bf00c16bc2416ce79483a2e573e6f	9	<world>/profiles/open.json
+<world>/th/pool1/1/repo/.claude/worktrees/ctl	3b8c85e4db1bf00c16bc2416ce79483a2e573e6f	7	<world>/profiles/ctl.json
+--- task records ($FM_HOME/state/*.meta and lane state)
+--- fake forge answers (state TAB merge commit TAB head branch)
+pr-7: MERGED 3b8c85e4db1bf00c16bc2416ce79483a2e573e6f fm/pr-7-head
+pr-8: CLOSED  fm/pr-8-head
+pr-9: OPEN  fm/pr-9-head
+--- bin/fm-copy-sweep.sh --apply  (exit 0)
+copy-sweep: mode=apply containers=1 copies=2
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/closed	its supersedence record cannot be used (the closeout driver was not asked): the forge shows PR 8 as CLOSED, not MERGED
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/open	its supersedence record cannot be used (the closeout driver was not asked): the forge shows PR 9 as OPEN, not MERGED
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/ctl	branch fm/ctl at 3b8c85e4db1b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.00 reaped=1 freed=0.00
+--- closeout driver argv log (cwd|argv); one line per driver call
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/ctl --pr 7 --supersedence-profile <world>/profiles/ctl.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/ctl --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/ctl.json --no-evidence-files
+--- gh forge reads
+pr view 9 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 8 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+--- git worktree list of the slot after the run
+<world>/th/pool1/1/repo                          3b8c85e [main]
+<world>/th/pool1/1/repo/.claude/worktrees/closed 3b8c85e [fm/closed] locked
+<world>/th/pool1/1/repo/.claude/worktrees/open   3b8c85e [fm/open] locked
+
+======================== S3-merge-commit-lacks-copy-lines-kept ========================
+--- $DATA/supersedence-records.tsv (copy, tip, PR, profile)
+<world>/th/pool1/1/repo/.claude/worktrees/policy	109412863e3b1df4d466e7e860331b3a0d2cdf00	7	<world>/profiles/policy.json
+<world>/th/pool1/1/repo/.claude/worktrees/twin	70a2e939cb48d62ea2eba4984ed48b067942a536	8	<world>/profiles/twin.json
+--- task records ($FM_HOME/state/*.meta and lane state)
+--- fake forge answers (state TAB merge commit TAB head branch)
+pr-7: MERGED cdf78875b62d04bef78194870deec5936775a7d4 fm/pr-7-head
+pr-8: MERGED b3e992527dde5192f8b770ee351e701aff6a795e fm/pr-8-head
+--- bin/fm-copy-sweep.sh --apply  (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/policy	its supersedence record cannot be used (the closeout driver was not asked): the merge commit does not hold the copy's entry at policy.txt (the same mode and the same blob), so that change is not proved landed
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/twin	branch fm/twin at 70a2e939cb48, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=1 freed=0.00
+--- closeout driver argv log (cwd|argv); one line per driver call
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --pr 8 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/twin --execute-cleanup --pr 8 --supersedence-profile <world>/profiles/twin.json --no-evidence-files
+--- gh forge reads
+pr view 8 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 8 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+--- git worktree list of the slot after the run
+<world>/th/pool1/1/repo                          b3e9925 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/policy 1094128 [fm/policy] locked
+
+======================== S4-slot-on-pr-head-branch-refused ========================
+--- $DATA/supersedence-records.tsv (copy, tip, PR, profile)
+<world>/th/pool1/1/repo/.claude/worktrees/onhead	faf68fcb688342fe166dfb5370b083d28431087d	7	<world>/profiles/onhead.json
+--- task records ($FM_HOME/state/*.meta and lane state)
+--- fake forge answers (state TAB merge commit TAB head branch)
+pr-7: MERGED faf68fcb688342fe166dfb5370b083d28431087d main
+--- bin/fm-copy-sweep.sh --apply  (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/onhead	its supersedence record cannot be used (the closeout driver was not asked): the clone's primary checkout is on PR 7's head branch main, which the driver would switch to the base branch even on a plan
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+--- closeout driver argv log (cwd|argv); one line per driver call
+(empty: the driver was never called)
+--- gh forge reads
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+--- git worktree list of the slot after the run
+<world>/th/pool1/1/repo                          faf68fc [main]
+<world>/th/pool1/1/repo/.claude/worktrees/onhead faf68fc [fm/onhead] locked
+
+======================== S5-retained-ignored-payload-kept ========================
+--- $DATA/supersedence-records.tsv (copy, tip, PR, profile)
+<world>/th/pool1/1/repo/.claude/worktrees/pay	5fa062461bb03af194315528ec19d20446e49c93	7	<world>/profiles/pay.json
+--- task records ($FM_HOME/state/*.meta and lane state)
+--- fake forge answers (state TAB merge commit TAB head branch)
+pr-7: MERGED 5fa062461bb03af194315528ec19d20446e49c93 fm/pr-7-head
+--- bin/fm-copy-sweep.sh --apply  (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/pay	teardown: preserved ignored files from <world>/th/pool1/1/repo/.claude/worktrees/pay in <world>/home/data/copy-sweep/20261120T104303Z.33303-5fa062461bb03af194315528ec19d20446e49c93/nested-copy-preserved/34ae491142c2b7c68d3f16c4ec8c6522a1bee67112ae3638ac3f6c92e01e4f81 REFUSED: Vernant's closeout driver did not release <world>/th/pool1/1/repo/.claude/worktrees/pay (exit 3): cleanup_ignored_payload_archived_tree_retained: supersedence route (--pr 7): the driver keeps a tree with unique ignored files after archiving them and never removes it automatically?closeout_pr: ignored_payload_disposition=archive_then_retain_tree cleanup_ignored_payload_archived_tree_retained?{"base_ref":"origin/main","base_strategy":"merge-base","branch_delete":null,"branch_reap":null,"cleanup_recovery_reason":"cleanup_ignored_payload_archived_tree_retained","cleanup_requested":true,"evidence_digest":"0","launch_cwd":null,"next_command":"scripted","owner":"agent","pr":7,"predicates_failed":["cleanup_gate"],"primary_checkout_repair":null,
+KEPT	<world>/th/pool1/1/repo/.claude/worktrees/pay	teardown: preserved ignored files from <world>/th/pool1/1/repo/.claude/worktrees/pay in <world>/home/data/copy-sweep/20261120T104303Z.33303-5fa062461bb03af194315528ec19d20446e49c93/nested-copy-preserved/34ae491142c2b7c68d3f16c4ec8c6522a1bee67112ae3638ac3f6c92e01e4f81 REFUSED: Vernant's closeout driver did not release <world>/th/pool1/1/repo/.claude/worktrees/pay (exit 3): cleanup_ignored_payload_archived_tree_retained: supersedence route (--pr 7): the driver keeps a tree with unique ignored files after archiving them and never removes it automatically?closeout_pr: ignored_payload_disposition=archive_then_retain_tree cleanup_ignored_payload_archived_tree_retained?{"base_ref":"origin/main","base_strategy":"merge-base","branch_delete":null,"branch_reap":null,"cleanup_recovery_reason":"cleanup_ignored_payload_archived_tree_retained","cleanup_requested":true,"evidence_digest":"0","launch_cwd":null,"next_command":"scripted","owner":"agent","pr":7,"predicates_failed":["cleanup_gate"],"primary_checkout_repair":null,
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+--- closeout driver argv log (cwd|argv); one line per driver call
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/pay --pr 7 --supersedence-profile <world>/profiles/pay.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/pay --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/pay.json --no-evidence-files
+--- gh forge reads
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+--- git worktree list of the slot after the run
+<world>/th/pool1/1/repo                       5fa0624 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/pay 5fa0624 [fm/pay] locked
+--- unique ignored files before:
+bd6a5d05c8656d22c6c378b2344bfaeb123c841fbb929b7ae2dee7ff9f8a7db0  unique.dat
+7f2c8e45ce665e86461c1d117e7f9e66598191f9f404dc2804f198d90c681f10  unique-dir/nested/rows.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  unique-dir/empty.txt
+link unique.dat
+unique-dir
+unique-dir/empty.txt
+unique-dir/nested
+unique-dir/nested/rows.bin
+unique-link
+unique.dat
+--- after:
+bd6a5d05c8656d22c6c378b2344bfaeb123c841fbb929b7ae2dee7ff9f8a7db0  unique.dat
+7f2c8e45ce665e86461c1d117e7f9e66598191f9f404dc2804f198d90c681f10  unique-dir/nested/rows.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  unique-dir/empty.txt
+link unique.dat
+unique-dir
+unique-dir/empty.txt
+unique-dir/nested
+unique-dir/nested/rows.bin
+unique-link
+unique.dat
+
+======================== S6-recorded-base-only-released_worktree-at-or-inside-copy ========================
+--- $DATA/supersedence-records.tsv (copy, tip, PR, profile)
+<world>/th/pool1/1/repo/.claude/worktrees/eqrel	b0f372547f3607ed6d752ba8920a715152448248	7	<world>/profiles/eqrel.json
+<world>/th/pool1/1/repo/.claude/worktrees/inside	b0f372547f3607ed6d752ba8920a715152448248	7	<world>/profiles/inside.json
+<world>/th/pool1/1/repo/.claude/worktrees/sibling	b0f372547f3607ed6d752ba8920a715152448248	7	<world>/profiles/sibling.json
+<world>/th/pool1/1/repo/.claude/worktrees/prior	b0f372547f3607ed6d752ba8920a715152448248	7	<world>/profiles/prior.json
+<world>/th/pool1/1/repo/.claude/worktrees/split	b0f372547f3607ed6d752ba8920a715152448248	7	<world>/profiles/split.json
+<world>/th/pool1/1/repo/.claude/worktrees/slotroot	b0f372547f3607ed6d752ba8920a715152448248	7	<world>/profiles/slotroot.json
+<world>/th/pool1/1/repo/.claude/worktrees/agree	b0f372547f3607ed6d752ba8920a715152448248	7	<world>/profiles/agree.json
+--- task records ($FM_HOME/state/*.meta and lane state)
+home/state/t-agree.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/agree base_branch=main 
+home/state/t-eqrel.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/eqrel base_branch=release 
+home/state/t-inside.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/inside/sub base_branch=release 
+home/state/t-prior.meta: kind=ship prior_worktree=<world>/th/pool1/1/repo/.claude/worktrees/prior base_branch=release 
+home/state/t-sibling.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/sibling-x base_branch=release 
+home/state/t-slotroot.meta: kind=ship released_worktree=<world>/th/pool1/1/repo base_branch=release 
+home/state/t-split-a.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/split base_branch=main 
+home/state/t-split-b.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/split/sub base_branch=release 
+--- fake forge answers (state TAB merge commit TAB head branch)
+pr-7: MERGED b0f372547f3607ed6d752ba8920a715152448248 fm/pr-7-head
+--- bin/fm-copy-sweep.sh --apply  (exit 0)
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/eqrel	its supersedence record cannot be used (the closeout driver was not asked): the task's recorded base release disagrees with the remote's default branch main, so the landing branch of PR 7 is not settled
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/inside	its supersedence record cannot be used (the closeout driver was not asked): the task's recorded base release disagrees with the remote's default branch main, so the landing branch of PR 7 is not settled
+HELD-LIVE-TASK	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/prior	task t-prior's active record names it as its prior_worktree
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/split	its supersedence record cannot be used (the closeout driver was not asked): the task records that name the copy disagree on the base branch (main and release), so the landing branch is not settled
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/slotroot	branch fm/slotroot at b0f372547f36, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/sibling	branch fm/sibling at b0f372547f36, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/agree	branch fm/agree at b0f372547f36, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=7 GiB=0.00 reaped=3 freed=0.00
+--- closeout driver argv log (cwd|argv); one line per driver call
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/slotroot --pr 7 --supersedence-profile <world>/profiles/slotroot.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/slotroot --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/slotroot.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/sibling --pr 7 --supersedence-profile <world>/profiles/sibling.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/sibling --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/sibling.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/agree --pr 7 --supersedence-profile <world>/profiles/agree.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/agree --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/agree.json --no-evidence-files
+--- gh forge reads
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+--- git worktree list of the slot after the run
+<world>/th/pool1/1/repo                          b0f3725 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/eqrel  b0f3725 [fm/eqrel] locked
+<world>/th/pool1/1/repo/.claude/worktrees/inside b0f3725 [fm/inside] locked
+<world>/th/pool1/1/repo/.claude/worktrees/prior  b0f3725 [fm/prior] locked
+<world>/th/pool1/1/repo/.claude/worktrees/split  b0f3725 [fm/split] locked

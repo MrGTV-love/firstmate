@@ -1,0 +1,2 @@
+ok - a checkout found on the PR's head at the read made just before the driver is entered is refused with an empty driver log
+exit=0

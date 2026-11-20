@@ -1,0 +1,66 @@
+
+======================== S6-recorded-base-only-released_worktree-at-or-inside-copy ========================
+--- $DATA/supersedence-records.tsv (copy, tip, PR, profile)
+<world>/th/pool1/1/repo/.claude/worktrees/eqrel	c9348133c2431f9acadb497090fad9fdbc8156c8	7	<world>/profiles/eqrel.json
+<world>/th/pool1/1/repo/.claude/worktrees/inside	c9348133c2431f9acadb497090fad9fdbc8156c8	7	<world>/profiles/inside.json
+<world>/th/pool1/1/repo/.claude/worktrees/sibling	c9348133c2431f9acadb497090fad9fdbc8156c8	7	<world>/profiles/sibling.json
+<world>/th/pool1/1/repo/.claude/worktrees/prior	c9348133c2431f9acadb497090fad9fdbc8156c8	7	<world>/profiles/prior.json
+<world>/th/pool1/1/repo/.claude/worktrees/split	c9348133c2431f9acadb497090fad9fdbc8156c8	7	<world>/profiles/split.json
+<world>/th/pool1/1/repo/.claude/worktrees/slotroot	c9348133c2431f9acadb497090fad9fdbc8156c8	7	<world>/profiles/slotroot.json
+<world>/th/pool1/1/repo/.claude/worktrees/agree	c9348133c2431f9acadb497090fad9fdbc8156c8	7	<world>/profiles/agree.json
+--- task records ($FM_HOME/state/*.meta and lane state)
+home/state/t-agree.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/agree base_branch=main 
+home/state/t-eqrel.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/eqrel base_branch=release 
+home/state/t-inside.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/inside/sub base_branch=release 
+home/state/t-prior.meta: kind=ship prior_worktree=<world>/th/pool1/1/repo/.claude/worktrees/prior base_branch=release 
+home/state/t-sibling.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/sibling-x base_branch=release 
+home/state/t-slotroot.meta: kind=ship released_worktree=<world>/th/pool1/1/repo base_branch=release 
+home/state/t-split-a.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/split base_branch=main 
+home/state/t-split-b.meta: kind=ship released_worktree=<world>/th/pool1/1/repo/.claude/worktrees/split/sub base_branch=release 
+--- fake forge answers (state TAB merge commit TAB head branch)
+pr-7: MERGED c9348133c2431f9acadb497090fad9fdbc8156c8 fm/pr-7-head
+--- bin/fm-copy-sweep.sh --apply  (exit 0)
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/eqrel	its supersedence record cannot be used (the closeout driver was not asked): the task's recorded base release disagrees with the remote's default branch main, so the landing branch of PR 7 is not settled
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/inside	its supersedence record cannot be used (the closeout driver was not asked): the task's recorded base release disagrees with the remote's default branch main, so the landing branch of PR 7 is not settled
+HELD-LIVE-TASK	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/prior	task t-prior's active record names it as its prior_worktree
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/split	its supersedence record cannot be used (the closeout driver was not asked): the task records that name the copy disagree on the base branch (main and release), so the landing branch is not settled
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/slotroot	branch fm/slotroot at c9348133c243, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/sibling	branch fm/sibling at c9348133c243, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/agree	branch fm/agree at c9348133c243, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 999999 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=7 GiB=0.00 reaped=3 freed=0.00
+--- closeout driver argv log (cwd|argv); one line per driver call
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/slotroot --pr 7 --supersedence-profile <world>/profiles/slotroot.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/slotroot --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/slotroot.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/sibling --pr 7 --supersedence-profile <world>/profiles/sibling.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/sibling --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/sibling.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/agree --pr 7 --supersedence-profile <world>/profiles/agree.json --no-evidence-files
+<world>/th/pool1/1/repo|--cleanup-worktree <world>/th/pool1/1/repo/.claude/worktrees/agree --execute-cleanup --pr 7 --supersedence-profile <world>/profiles/agree.json --no-evidence-files
+--- gh forge reads
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+pr view 7 --repo acme/widgets --json state,mergeCommit,headRefName -q [.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")
+--- git worktree list of the slot after the run
+<world>/th/pool1/1/repo                          c934813 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/eqrel  c934813 [fm/eqrel] locked
+<world>/th/pool1/1/repo/.claude/worktrees/inside c934813 [fm/inside] locked
+<world>/th/pool1/1/repo/.claude/worktrees/prior  c934813 [fm/prior] locked
+<world>/th/pool1/1/repo/.claude/worktrees/split  c934813 [fm/split] locked

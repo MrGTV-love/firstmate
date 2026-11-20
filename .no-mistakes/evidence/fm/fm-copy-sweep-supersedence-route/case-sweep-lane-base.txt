@@ -1,0 +1,2 @@
+ok - a secondmate record whose lane home encloses a copy gives the copy no base, and the lane task that released the copy decides it
+exit=0

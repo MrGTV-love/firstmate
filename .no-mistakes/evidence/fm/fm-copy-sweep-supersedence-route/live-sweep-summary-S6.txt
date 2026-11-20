@@ -1,0 +1,14 @@
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree == copy, base release != remote default main: kept
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... and no driver call
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... reason names the disagreement
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree inside copy (copy/sub), base release: counts, kept
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... and no driver call
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree = <copy>-x (string-prefix sibling): does not count, released
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | prior_worktree == copy: held earlier by the classifier as HELD-LIVE-TASK (pre-driver hold), kept
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... and no driver call
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... class HELD-LIVE-TASK
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | two counting records disagree (main vs release): kept
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... and no driver call
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... reason names the disagreement
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | copy inside a slot root released with base release (no own record): released
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree == copy, base main == remote default (slot-root record base release also present): released via route

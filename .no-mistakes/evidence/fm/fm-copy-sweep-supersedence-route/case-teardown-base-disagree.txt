@@ -1,0 +1,5 @@
+argv: recorded base release, remote default release: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: recorded base release, remote default release: plan: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+argv: recorded base release, remote default release: execute: --cleanup-worktree <case>/pool/1/project/.claude/worktrees/fc-one --execute-cleanup --pr 7 --supersedence-profile <case>/profiles/fc-one.json --no-evidence-files
+ok - a teardown keeps a foreign copy whose task records base release while the remote's default is main, with no route call, and routes it once the remote's default is release
+exit=0

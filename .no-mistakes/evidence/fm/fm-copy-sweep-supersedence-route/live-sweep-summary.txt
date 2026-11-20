@@ -1,0 +1,35 @@
+PASS | S1-route-release-and-no-record-plain | sweep exit 0
+PASS | S1-route-release-and-no-record-plain | twin removed and unregistered
+PASS | S1-route-release-and-no-record-plain | twin reported REMOVED
+PASS | S1-route-release-and-no-record-plain | twin: exactly one plan and one execute with --pr 7 --supersedence-profile --cleanup-worktree --no-evidence-files (+--execute-cleanup)
+PASS | S1-route-release-and-no-record-plain | no-record copy asked exactly '--cleanup-worktree <copy>' (base argv)
+PASS | S2-closed-and-open-pr-kept | closed-PR copy kept
+PASS | S2-closed-and-open-pr-kept | closed-PR copy: driver never called
+PASS | S2-closed-and-open-pr-kept | open-PR copy kept
+PASS | S2-closed-and-open-pr-kept | open-PR copy: driver never called
+PASS | S2-closed-and-open-pr-kept | merged control released through the route
+PASS | S2-closed-and-open-pr-kept | merged control: route argv
+PASS | S3-merge-commit-lacks-copy-lines-kept | copy whose line the merge commit lacks is kept
+PASS | S3-merge-commit-lacks-copy-lines-kept | that copy: driver never called
+PASS | S3-merge-commit-lacks-copy-lines-kept | twin whose content landed is released
+PASS | S3-merge-commit-lacks-copy-lines-kept | twin: route argv
+PASS | S4-slot-on-pr-head-branch-refused | copy kept while slot sits on the PR head branch
+PASS | S4-slot-on-pr-head-branch-refused | driver never called
+PASS | S4-slot-on-pr-head-branch-refused | report names the head branch
+PASS | S5-retained-ignored-payload-kept | payload copy kept and registered
+PASS | S5-retained-ignored-payload-kept | unique ignored files byte for byte
+PASS | S5-retained-ignored-payload-kept | route plan+execute were called with route argv
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree == copy, base release != remote default main: kept
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... and no driver call
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... reason names the disagreement
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree inside copy (copy/sub), base release: counts, kept
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... and no driver call
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree = <copy>-x (string-prefix sibling): does not count, released
+FAIL | S6-recorded-base-only-released_worktree-at-or-inside-copy | prior_worktree == copy with base release: does not count, released
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | two counting records disagree (main vs release): kept
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... and no driver call
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy |   ... reason names the disagreement
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | copy inside a slot root released with base release (no own record): released
+PASS | S6-recorded-base-only-released_worktree-at-or-inside-copy | released_worktree == copy, base main == remote default (slot-root record base release also present): released via route
+
+NOTE: the S6 FAIL line above was a wrong expectation in the first harness run. The transcript shows the prior_worktree= copy was held before the route as HELD-LIVE-TASK ("task t-prior's active record names it as its prior_worktree"), with no driver call. The harness was corrected and S6 re-run alone: see live-sweep-summary-S6.txt (14/14 PASS) and live-sweep-transcript-S6.txt.
