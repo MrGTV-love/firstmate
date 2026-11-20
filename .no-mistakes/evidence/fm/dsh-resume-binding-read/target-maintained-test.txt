@@ -1,0 +1,3 @@
+$ bash tests/fm-dsh-resume-binding.test.sh   # target 89c471dd
+ok - saved DSH read refusal records one decision, stays quiet outside relaunch, and restores the same session
+exit=0

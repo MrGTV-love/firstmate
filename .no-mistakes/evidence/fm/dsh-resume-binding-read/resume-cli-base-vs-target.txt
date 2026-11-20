@@ -1,0 +1,122 @@
+# fm-dsh.py resume CLI, base d432729a vs target 89c471dd (temp paths shown as <TMP>)
+# 'unchanged' compares inode, mode and bytes of every path before and right after the resume call; a readable resume rewrites launch.yml by design.
+--- [BASE] readable binding (control)
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): False
+--- [BASE] binding missing (genuine absence)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [BASE] binding chmod 000 (EACCES)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [BASE] binding chmod 000 (EACCES) -> after restoring access
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    overlay sessionId = 11111111-1111-4111-8111-111111111111 ; generations = ['g1']
+--- [BASE] binding is a directory (EISDIR)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [BASE] binding is a directory (EISDIR) -> after restoring access
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    overlay sessionId = 11111111-1111-4111-8111-111111111111 ; generations = ['g1']
+--- [BASE] binding is a self-looping symlink (ELOOP)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [BASE] state dir chmod 600, no search permission
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): n/a: state dir not listable while broken
+--- [BASE] state dir chmod 600, no search permission -> after restoring access
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    overlay sessionId = 11111111-1111-4111-8111-111111111111 ; generations = ['g1']
+--- [BASE] binding is a dangling symlink (ENOENT by design)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [BASE] binding malformed JSON (legacy fallback)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [BASE] binding non-UTF-8 bytes (legacy decode fallback)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [TARGET] readable binding (control)
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): False
+--- [TARGET] binding missing (genuine absence)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [TARGET] binding chmod 000 (EACCES)
+    exit=1
+    stdout=''
+    stderr="error: REFUSED: saved DSH binding read failed: [Errno 13] Permission denied: '<TMP>/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it"
+    state tree unchanged by this call (incl. launch.yml): True
+--- [TARGET] binding chmod 000 (EACCES) -> after restoring access
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    overlay sessionId = 11111111-1111-4111-8111-111111111111 ; generations = ['g1']
+--- [TARGET] binding is a directory (EISDIR)
+    exit=1
+    stdout=''
+    stderr="error: REFUSED: saved DSH binding read failed: [Errno 21] Is a directory: '<TMP>/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it"
+    state tree unchanged by this call (incl. launch.yml): True
+--- [TARGET] binding is a directory (EISDIR) -> after restoring access
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    overlay sessionId = 11111111-1111-4111-8111-111111111111 ; generations = ['g1']
+--- [TARGET] binding is a self-looping symlink (ELOOP)
+    exit=1
+    stdout=''
+    stderr="error: REFUSED: saved DSH binding read failed: [Errno 62] Too many levels of symbolic links: '<TMP>/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it"
+    state tree unchanged by this call (incl. launch.yml): True
+--- [TARGET] state dir chmod 600, no search permission
+    exit=1
+    stdout=''
+    stderr="error: REFUSED: saved DSH binding read failed: [Errno 13] Permission denied: '<TMP>/state/task.dsh-session'; restore read access to the same saved record and retry without removing or replacing it"
+    state tree unchanged by this call (incl. launch.yml): n/a: state dir not listable while broken
+--- [TARGET] state dir chmod 600, no search permission -> after restoring access
+    exit=0
+    stdout='<TMP>/state/task.dsh/g1\n'
+    stderr=''
+    overlay sessionId = 11111111-1111-4111-8111-111111111111 ; generations = ['g1']
+--- [TARGET] binding is a dangling symlink (ENOENT by design)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [TARGET] binding malformed JSON (legacy fallback)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True
+--- [TARGET] binding non-UTF-8 bytes (legacy decode fallback)
+    exit=0
+    stdout=''
+    stderr=''
+    state tree unchanged by this call (incl. launch.yml): True

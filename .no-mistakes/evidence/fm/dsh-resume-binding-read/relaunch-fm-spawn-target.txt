@@ -1,0 +1,33 @@
+== step 1: fresh dsh ship spawn: exit=0
+confinement audit: harness=dsh write_confinement=unconfined-macos-dsh
+spawned dsh-bind-proof harness=dsh kind=ship mode=local-only yolo=off window=firstmate:fm-dsh-bind-proof worktree=<TMP>/bind-proof/wt
+bound generation: s1795186685.73726.18020; bound session id: 026595f8-44af-4d66-8aa1-3ccecd61dbdf
+
+== step 2: relaunch with binding chmod 000: exit=1
+warning: <TMP>/bind-proof/home/data/dsh-bind-proof/launch-brief.md records no ship branch; defaulting to legacy branch fm/dsh-bind-proof
+warning: <TMP>/bind-proof/home/data/dsh-bind-proof/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-bind-proof ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-bind-proof: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=dsh write_confinement=unconfined-macos-dsh
+error: REFUSED: saved DSH binding read failed: [Errno 13] Permission denied: '<TMP>/bind-proof/home/state/dsh-bind-proof.dsh-session'; restore read access to the same saved record and retry without removing or replacing it
+launch log bytes (dsh-tui started?): 0
+binding + generation tree unchanged (inode/mode/size): yes
+conversation log unchanged: yes
+generations: s1795186685.73726.18020
+receipts:
+{"guard":"dsh-resume-binding-read","task":"dsh-bind-proof","decision":"deny","source_ok":false,"opportunity":true}
+
+== step 3: relaunch after restoring read access: exit=0
+confinement audit: harness=dsh write_confinement=unconfined-macos-dsh
+<HOME>/.no-mistakes/worktrees/021f438de9bf/01M7S35CA2W027A8TCNMA8A69J/bin/fm-home-summary-refresh.sh: child setpgid (76517 to 76517): Operation not permitted
+spawned dsh-bind-proof harness=dsh kind=ship mode=local-only yolo=off window=firstmate:fm-dsh-bind-proof worktree=<TMP>/bind-proof/wt
+bound generation now: s1795186685.73726.18020 (was s1795186685.73726.18020)
+generations: s1795186685.73726.18020
+launch patch sessionId: 026595f8-44af-4d66-8aa1-3ccecd61dbdf (bound session 026595f8-44af-4d66-8aa1-3ccecd61dbdf)
+launch log bytes (dsh-tui started?): 7972
+receipts:
+{"guard":"dsh-resume-binding-read","task":"dsh-bind-proof","decision":"deny","source_ok":false,"opportunity":true}
+{"guard":"dsh-resume-binding-read","task":"dsh-bind-proof","decision":"allow","source_ok":true,"opportunity":true}
+real 145.04
+user 4.86
+sys 8.51

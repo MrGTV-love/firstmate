@@ -1,0 +1,63 @@
+== step 1: fresh dsh ship spawn: exit=0
+confinement audit: harness=dsh write_confinement=unconfined-macos-dsh
+spawned dsh-bind-proof harness=dsh kind=ship mode=local-only yolo=off window=firstmate:fm-dsh-bind-proof worktree=<TMP>/bind-proof/wt
+bound generation: s1795186750.21196.14357; bound session id: 70fc33d8-5c9a-40be-811d-480a003dba85
+
+== step 2: relaunch with binding chmod 000: exit=1
+warning: <TMP>/bind-proof/home/data/dsh-bind-proof/launch-brief.md records no ship branch; defaulting to legacy branch fm/dsh-bind-proof
+warning: <TMP>/bind-proof/home/data/dsh-bind-proof/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-bind-proof ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-bind-proof: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=dsh write_confinement=unconfined-macos-dsh
+error: dsh-tui session log: no depth-zero dsh session log yet; inspect window firstmate:fm-dsh-bind-proof
+launch log bytes (dsh-tui started?): 7918
+binding + generation tree CHANGED
+1,2c1,2
+< 2010976581 40755 96 dsh-bind-proof.dsh
+< 2010976605 100600 320 dsh-bind-proof.dsh-session
+---
+> 2010976581 40755 128 dsh-bind-proof.dsh
+> 2010984755 100600 320 dsh-bind-proof.dsh-session
+18c18
+< 2010977310 100644 215 dsh-bind-proof.dsh/s1795186750.21196.14357/dsh/sessions/workspace/session/session.v4.jsonl
+---
+> 2010977310 100644 279 dsh-bind-proof.dsh/s1795186750.21196.14357/dsh/sessions/workspace/session/session.v4.jsonl
+24a25,43
+> 2010984709 40700 160 dsh-bind-proof.dsh/s1795186768.76224.14611
+> 2010984722 40755 128 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh
+> 2010984740 100600 7 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/.credentials.yaml
+> 2010984723 40755 96 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles
+> 2010984724 40700 192 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui
+> 2010984729 100644 3 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui/cordis.patch.yml
+> 2010984728 100644 3 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui/cordis.yml
+> 2010984736 40755 96 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui/node_modules
+> 2010984737 40755 96 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui
+> 2010984738 40755 96 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+> 2010922991 100644 21 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/package.json
+> 2010984725 100644 3 dsh-bind-proof.dsh/s1795186768.76224.14611/dsh/profiles/dsh-tui/package.json
+> 2010984710 40755 192 dsh-bind-proof.dsh/s1795186768.76224.14611/home
+> 2010984717 120755 89 dsh-bind-proof.dsh/s1795186768.76224.14611/home/.config
+> 2010984720 120755 124 dsh-bind-proof.dsh/s1795186768.76224.14611/home/.dsh
+> 2010984711 40700 96 dsh-bind-proof.dsh/s1795186768.76224.14611/home/.dsh-tui
+> 2010984748 100600 64 dsh-bind-proof.dsh/s1795186768.76224.14611/home/.dsh-tui/model.json
+> 2010984718 120755 94 dsh-bind-proof.dsh/s1795186768.76224.14611/home/.no-mistakes
+> 2010984754 100600 543 dsh-bind-proof.dsh/s1795186768.76224.14611/launch.yml
+generations: s1795186750.21196.14357
+s1795186768.76224.14611
+receipts:
+(no guard-events.jsonl)
+
+== step 3: relaunch after restoring read access: exit=1
+skill selection for dsh-bind-proof: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=dsh write_confinement=unconfined-macos-dsh
+error: dsh-tui session log: no depth-zero dsh session log yet; inspect window firstmate:fm-dsh-bind-proof
+bound generation now: s1795186856.42719.13227 (was s1795186750.21196.14357)
+generations: s1795186750.21196.14357
+s1795186856.42719.13227
+launch patch sessionId: null (bound session 70fc33d8-5c9a-40be-811d-480a003dba85)
+launch log bytes (dsh-tui started?): 7918
+receipts:
+(no guard-events.jsonl)
+real 271.14
+user 13.42
+sys 13.31
