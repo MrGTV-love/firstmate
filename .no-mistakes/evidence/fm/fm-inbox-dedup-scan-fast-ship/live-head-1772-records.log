@@ -1,0 +1,104 @@
+== [HEAD c49c460da (change)] lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.CCCvDr TMUX_TMPDIR=/tmp/fml.203psR fm-send root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7WQJGBZ5ZT09K4H00NP2K39
+-- tmux sessions on the private fm-lab socket:
+fmlab: 1 windows (created Fri Nov 20 09:18:36 2026)
+
+== seed: one real send to learn the exact record shape
+send id=00000000000000aa rc=0 fm-send-wall=55.48s inbox-.seq.lock-hold(observed)=[2.274s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7WQJGBZ5ZT09K4H00NP2K39/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+seed record: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/001.msg
+--- seed record bytes:
+schema=fm-task-inbox.v1
+at=2026-11-20T15:19:08Z
+delivery=fire-and-forget
+--
+[fm-from-firstmate]⁣delivery=00000000000000aa seed message
+---
+derived body prefix bytes:            [   f   m   -   f   r   o   m   -   f   i   r   s   t   m   a
+           t   e   ] 342 201 243                                        
+
+== bulk: 1500 records in handled/ + 271 in the inbox root, distinct first lines, fire-and-forget
+records: root=275 handled=1502
+highest real sequence: handled/02000.msg (leading zero); junk names present: 12a.msg abc.msg 99999x.msg .9999.msg
+
+== S1 big-inbox fresh send (expect a NEW record 2001.msg, well under the 30 s remote budget)
+send id=1111111111111111 rc=0 fm-send-wall=76.01s inbox-.seq.lock-hold(observed)=[29.664s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+record: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2001.msg
+records: root=276 handled=1502
+leftover temp/lock files: []
+
+== S2a exact re-run, record still in the inbox root (expect SAME path, no new record)
+send id=1111111111111111 rc=0 fm-send-wall=60.68s inbox-.seq.lock-hold(observed)=[21.089s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+newest record now: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2001.msg
+records: root=276 handled=1502
+leftover temp/lock files: []
+
+== S2b exact re-run of a bulk record deep in handled/ (#1200, past the 500-file grep chunk) (expect handled/1200.msg, no new record)
+send id=00000000000004b0 rc=0 fm-send-wall=71.77s inbox-.seq.lock-hold(observed)=[29.017s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+newest record now: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2002.msg
+records: root=277 handled=1502
+leftover temp/lock files: []
+== S2c exact re-run of a bulk record in the inbox root (#1700) (expect 1700.msg, no new record)
+send id=00000000000006a4 rc=0 fm-send-wall=73.03s inbox-.seq.lock-hold(observed)=[32.773s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2003.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+newest record now: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2003.msg
+records: root=278 handled=1502
+leftover temp/lock files: []
+
+== S3 near-duplicate: same id, same first line, different second line (expect a NEW record)
+send id=3333333333333333 rc=0 fm-send-wall=83.48s inbox-.seq.lock-hold(observed)=[30.687s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2004.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+record A: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2004.msg
+send id=3333333333333333 rc=0 fm-send-wall=94.31s inbox-.seq.lock-hold(observed)=[40.021s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2005.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+record B: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2005.msg
+records: root=280 handled=1502
+RESULT S3: distinct records
+
+== S4 hostile regex/glob bytes in the first line, sent twice (expect ONE record)
+send id=4444444444444444 rc=0 fm-send-wall=52.22s inbox-.seq.lock-hold(observed)=[20.140s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2006.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+record: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2006.msg
+records: root=281 handled=1502
+send id=4444444444444444 rc=0 fm-send-wall=79.25s inbox-.seq.lock-hold(observed)=[26.010s]
+  fm-send said: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CCCvDr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+doorbell seen in lab pane: : Firstmate instruction waiting: 'domain.inbox/2006.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+newest after re-run: /Users/charlesabrooker/tmp/fm-lab.CCCvDr/state/domain.inbox/2006.msg
+records: root=281 handled=1502
+leftover temp/lock files: []
+
+== final listing of the newest root records
+2001.msg
+2002.msg
+2003.msg
+2004.msg
+2005.msg
+2006.msg
+99999x.msg
+abc.msg
+== [HEAD c49c460da (change)] done
