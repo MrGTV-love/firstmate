@@ -451,6 +451,116 @@ test_idempotent_write_follows_concurrent_ack() {
   pass "inbox: idempotent enqueue follows a record concurrently moved to handled"
 }
 
+# A long-lived secondmate's inbox holds well over a thousand records. The idempotent enqueue (the remote
+# steer leg) used to fork awk, cat and cmp for EVERY record under the sequence lock and next_seq forked a
+# subshell per record, which took 36 s on a 1772-record inbox under load, past the remote steer's 30 s
+# budget. These cases pin the work done per enqueue by counting forks of the external commands, never by
+# timing, and pin that every dedup answer is unchanged.
+fill_inbox() {  # <inbox-dir> <count> : records 001..<count>, the odd ones acknowledged (in handled/)
+  local dir=$1 n=$2 i rec
+  mkdir -p "$dir/handled"
+  for ((i = 1; i <= n; i++)); do
+    rec="$dir/$(printf '%03d' "$i").msg"
+    [ $((i % 2)) -eq 0 ] || rec="$dir/handled/$(printf '%03d' "$i").msg"
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-20T00:00:00Z\n--\n[fm-from-firstmate] corr=%016x filler steer %d\nsecond line\n' "$((i * 7919))" "$i" > "$rec"
+  done
+}
+
+counting_shims() {  # <dir> <log> -> counts every call of cmp, awk and cat, then runs the real one
+  local dir=$1 log=$2 c real
+  mkdir -p "$dir"
+  for c in cmp awk cat; do
+    real=$(command -v "$c")
+    printf '#!/bin/bash\nprintf "%s\\n" >> "%s"\nexec "%s" "$@"\n' "$c" "$log" "$real" > "$dir/$c"
+    chmod +x "$dir/$c"
+  done
+}
+
+enqueue_counting() {  # <state> <text> <log> [mode] -> record path on stdout, forks counted in <log>
+  local state=$1 text=$2 log=$3 mode=${4:-} shims
+  shims="$TMP_ROOT/shims-$$"
+  : > "$log"
+  counting_shims "$shims" "$log"
+  PATH="$shims:$PATH" FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_task_inbox_write_idempotent "$2" t1 "$3" "$4"
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$text" "$mode"
+}
+
+test_idempotent_write_forks_per_candidate_not_per_record() {
+  local state log rec calls text
+  state="$TMP_ROOT/idem-scale/state"; log="$TMP_ROOT/idem-scale/calls.log"
+  fill_inbox "$state/t1.inbox" 400
+  rec=$(enqueue_counting "$state" $'[fm-from-firstmate] corr=ffffffffffffffff a brand new steer\nsecond line' "$log") \
+    || fail "enqueue into a 400-record inbox failed"
+  [ "$rec" = "$state/t1.inbox/401.msg" ] || fail "a new body should take the next sequence 401, got $rec"
+  calls=$(wc -l < "$log" | tr -d ' ')
+  [ "$calls" -le 4 ] || fail "enqueue forked cmp/awk/cat $calls times for a body no record contains (400 records): the scan must touch only candidates"
+  # A body that IS in a handled record (here 003) is still found, with a handful of forks, not 400.
+  text=$(printf '[fm-from-firstmate] corr=%016x filler steer %d\nsecond line\nEND' "$((3 * 7919))" 3)
+  text=${text%END}
+  rec=$(enqueue_counting "$state" "$text" "$log") \
+    || fail "re-run of a body held by a handled record failed"
+  [ "$rec" = "$state/t1.inbox/handled/003.msg" ] || fail "a re-run must land on the acknowledged record 003, got $rec"
+  calls=$(wc -l < "$log" | tr -d ' ')
+  [ "$calls" -le 8 ] || fail "dedup of a handled body forked $calls times in a 401-record inbox"
+  pass "inbox: the idempotent enqueue forks per candidate record, not per record ever written"
+}
+
+test_idempotent_write_dedup_answers_are_unchanged() {
+  local state log rec r2 body
+  state="$TMP_ROOT/idem-answers/state"; log="$TMP_ROOT/idem-answers/calls.log"
+  fill_inbox "$state/t1.inbox" 40
+  # first line shared by many records with different second lines: candidates are many, the exact compare decides
+  for i in 1 2 3 4 5 6; do
+    inbox_lib "$state" fm_task_inbox_write "$state" t1 "shared first line
+variant $i" >/dev/null || fail "setup write failed"
+  done
+  rec=$(enqueue_counting "$state" $'shared first line\nvariant 4' "$log") || fail "dedup with a shared first line failed"
+  [ "$rec" = "$state/t1.inbox/$(printf '%03d' 44).msg" ] || fail "the exact body (variant 4) must be found, got $rec"
+  r2=$(enqueue_counting "$state" $'shared first line\nvariant 99' "$log") || fail "enqueue of a new variant failed"
+  [ "$r2" = "$state/t1.inbox/047.msg" ] || fail "an unseen variant must take the next sequence, got $r2"
+  # characters that are special to a regex or an option parser are matched as plain text
+  r2=$(enqueue_counting "$state" $'-n a.*[b]\\ (c)|d\nline two' "$log") || fail "special-character enqueue failed"
+  rec=$(enqueue_counting "$state" $'-n a.*[b]\\ (c)|d\nline two' "$log") || fail "special-character re-run failed"
+  [ "$rec" = "$r2" ] || fail "a body of regex and option characters must dedup onto its own record: $rec vs $r2"
+  rec=$(enqueue_counting "$state" $'-n a.*[b]\\ (c)|d\nline TWO' "$log") || fail "near-match enqueue failed"
+  [ "$rec" != "$r2" ] || fail "a body differing in its second line must not dedup"
+  # an empty first line cannot be prefiltered: the full scan still finds the duplicate
+  r2=$(enqueue_counting "$state" $'\nbody after an empty first line' "$log") || fail "empty-first-line enqueue failed"
+  rec=$(enqueue_counting "$state" $'\nbody after an empty first line' "$log") || fail "empty-first-line re-run failed"
+  [ "$rec" = "$r2" ] || fail "an empty-first-line body must dedup (full scan), got $rec vs $r2"
+  # an unhandled and a handled record with the same body: the inbox record wins, as before
+  body=$'twin body\nsecond'
+  r2=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "$body") || fail "twin write failed"
+  cp "$r2" "$state/t1.inbox/handled/000.msg"
+  rec=$(enqueue_counting "$state" "$body" "$log") || fail "twin dedup failed"
+  [ "$rec" = "$r2" ] || fail "with a twin in handled/, the unhandled record must win, got $rec"
+  # fire-and-forget keeps its own lane
+  rec=$(enqueue_counting "$state" $'twin body\nsecond' "$log" fire-and-forget) || fail "fire-and-forget enqueue failed"
+  [ "$rec" != "$r2" ] || fail "a fire-and-forget enqueue must not dedup onto an ordinary record"
+  pass "inbox: dedup answers are unchanged (shared first line, special characters, empty first line, twin, fire-and-forget)"
+}
+
+test_next_seq_does_not_fork_per_record() {
+  local state seq log
+  state="$TMP_ROOT/seq-scale/state"; log="$TMP_ROOT/seq-scale/forks.log"
+  fill_inbox "$state/t1.inbox" 120
+  : > "$state/t1.inbox/notes.msg"; : > "$state/t1.inbox/12x.msg"; : > "$state/t1.inbox/handled/abc.msg"
+  : > "$log"
+  seq=$(FM_STATE_OVERRIDE="$state" FORK_LOG="$log" bash -c '
+    . "$1"
+    fm_task_inbox_seq_of() { printf "x\n" >> "$FORK_LOG"; local n=${1%.msg}; [ "$n" != "$1" ] || return 1; case "$n" in ""|*[!0-9]*) return 1 ;; esac; printf "%s" "$((10#$n))"; }
+    fm_task_inbox_next_seq "$2"
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state/t1.inbox") || fail "next_seq failed"
+  [ "$seq" = 121 ] || fail "next sequence after 120 records (non-record names ignored) must be 121, got $seq"
+  [ ! -s "$log" ] || fail "next_seq called fm_task_inbox_seq_of $(wc -l < "$log" | tr -d ' ') times: no per-record subshell is allowed"
+  : > "$state/t1.inbox/handled/998.msg"
+  seq=$(inbox_lib "$state" fm_task_inbox_next_seq "$state/t1.inbox") || fail "next_seq failed"
+  [ "$seq" = 999 ] || fail "an acknowledged high sequence must still be counted, got $seq"
+  pass "inbox: next_seq reads the highest sequence without a subshell per record"
+}
+
 test_handled_mv_dedups_by_sequence() {
   local state r1 r2 oldest r3
   state="$TMP_ROOT/dedup/state"; mkdir -p "$state"
@@ -1309,6 +1419,9 @@ test_ring_skips_dead_agent
 test_ring_submits_its_own_stuck_doorbell
 test_idempotent_write_dedups_exact_body
 test_idempotent_write_follows_concurrent_ack
+test_idempotent_write_forks_per_candidate_not_per_record
+test_idempotent_write_dedup_answers_are_unchanged
+test_next_seq_does_not_fork_per_record
 test_handled_mv_dedups_by_sequence
 test_survivor_doorbells_stay_bounded_until_acknowledged
 test_concurrent_writers_never_clobber

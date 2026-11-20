@@ -177,11 +177,17 @@ fm_task_inbox_seq_of() {  # <basename>
 # Next unused sequence, scanning the inbox root AND handled/ so an
 # acknowledged sequence is never reissued. Caller must hold .seq.lock.
 fm_task_inbox_next_seq() {  # <inbox-dir>
+  # No command substitution per record: an inbox that has seen ~1700 records (a long-lived
+  # secondmate) made the old per-record subshell the bulk of the sequence lock's hold time.
+  # The rule is fm_task_inbox_seq_of's: a name ending .msg whose stem is all digits.
   local dir=$1 max=0 d f n
   for d in "$dir" "$dir/handled"; do
     for f in "$d"/*.msg; do
       [ -e "$f" ] || continue
-      n=$(fm_task_inbox_seq_of "${f##*/}") || continue
+      n=${f##*/}
+      n=${n%.msg}
+      case "$n" in ''|*[!0-9]*) continue ;; esac
+      n=$((10#$n))
       [ "$n" -le "$max" ] || max=$n
     done
   done
@@ -250,6 +256,28 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # secondmate request embeds a per-request correlation token in its body. The
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
+# Candidate records for the dedup scan, one path per line, in scan order (inbox
+# records first, then handled/, each in name order). A record can only equal the
+# new body when it contains the body's first line, so ONE fixed-string grep over
+# the inbox names a superset of the matches and the exact byte comparison below runs
+# on those few files instead of forking awk, cat and cmp for every record ever
+# written (a 1772-record inbox took 36 s here under load, past the remote steer's
+# 30 s budget, and left the sequence lock and temp files behind when it was
+# killed). An empty first line, or any grep failure, returns every record, which
+# is the full scan this replaced, so the filter can only skip files that cannot match.
+_fm_task_inbox_dedup_candidates() {  # <inbox-dir> <text>
+  local dir=$1 text=$2 first=${2%%$'\n'*} found grc
+  if [ -n "$first" ]; then
+    found=$(LC_ALL=C grep -rlF --include='*.msg' -e "$first" -- "$dir" 2>/dev/null)
+    grc=$?
+    if [ "$grc" -le 1 ]; then
+      [ -z "$found" ] || printf '%s\n' "$found" | LC_ALL=C sort
+      return 0
+    fi
+  fi
+  printf '%s\n' "$dir"/*.msg "$dir/handled"/*.msg
+}
+
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have f rec='' status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
@@ -258,7 +286,8 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
   fm_task_inbox_lock_acquire "$lock" || return 1
   if want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX"); then
     if printf '%s' "$text" > "$want"; then
-      for f in "$dir"/*.msg "$dir/handled"/*.msg; do
+      while IFS= read -r f; do
+        [ -n "$f" ] || continue
         if [ ! -e "$f" ]; then
           case "$f" in
             "$dir"/*.msg)
@@ -286,7 +315,7 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
         [ ! -e "$dir/handled/${f##*/}" ] || f="$dir/handled/${f##*/}"
         rec=$f
         break
-      done
+      done < <(_fm_task_inbox_dedup_candidates "$dir" "$text")
     else
       status=1
     fi
