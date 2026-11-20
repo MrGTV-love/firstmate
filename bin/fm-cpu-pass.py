@@ -115,10 +115,12 @@ Pipeline starts:
     A is R, so every visible active run counts at least R. With fewer than 2
     recorded runs left to rank for R, or no native memory facts on this platform,
     the start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
-    record never refuses a start and never reads as an empty host.
+    record never reads as an empty host, and the pause-only backstop still
+    refuses while its harm test cannot judge the record.
   - Pause-only backstop: while that reading is unreadable or reports a reason to
-    defer (the same list that makes fm-mem-guard.sh admit exit 75, such as native
-    pressure level 2 or higher) or fm-proc-guard.py reports a pile-up (user
+    defer (the list that makes fm-mem-guard.sh admit --kind no-mistakes exit
+    75: fit, swap or compressor growth, or a part it cannot judge; the one-start
+    minimum below never overrides it) or fm-proc-guard.py reports a pile-up (user
     process count above its warning line) or cannot be read, no start is
     admitted. Nothing running is stopped, and waiting here only delays the start.
   - Admission is before COMMAND (including any measured execution wrapper).
@@ -289,8 +291,6 @@ FIRST_NOTICE_SECS = 2.0
 NOTICE_EVERY_SECS = 60.0
 POLL_MIN_SECS = 0.05
 POLL_MAX_SECS = 0.5
-
-
 class PoolUnavailable(Exception):
     """The pool cannot be used on this host; callers run without a pass."""
 
@@ -1383,7 +1383,15 @@ def host_observation(fresh: bool = False) -> dict:
         try:
             guard = sibling("fm_mem_guard", "fm-mem-guard.py")
             report = guard.admission_sample()
-            deferred, _, _ = guard.admission_evaluate(report, None)
+            # Every fresh pipeline start also meets the guard's harm test as a no-mistakes run
+            # (fit against the recorded projection and reserve, swap and compressor trend); the
+            # pool's own reservations below add to it and the one-start minimum never overrides it.
+            try:
+                calibration = guard.host_record(root_home() / "state" / ".memory-calibration.json", report,
+                                                "calibration", "fm-memory-calibration.v1", ())
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                calibration = (None, "no root-home calibration: %s" % exc)
+            deferred, _, _ = guard.admission_evaluate(report, None, calibration, "no-mistakes")
             reasons += ["memory: " + text for text in deferred]
             if not report["errors"]:
                 memory = report

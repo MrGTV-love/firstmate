@@ -145,13 +145,13 @@ Processes appear only in the backstop below.
 
 With fewer than 2 recorded runs left to rank for `R`, a calibration record for another host or RAM size, an unreadable calibration record, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
 No recorded reading of this host and RAM size with at least 2 runs for `A` is not a fallback: `A` is then `R`, so every visible active run counts at least `R`.
-That is the previous count limit, kept only until the host has measured runs; a missing record never refuses a start and never reads as an empty host.
+That is the previous count limit, kept only until the host has measured runs; a missing record never reads as an empty host, and the pause-only backstop below still refuses while its harm test cannot judge the record.
 
 ### Pause-only backstop
 
 While either signal reports an actual overload, or cannot be read, no new start is admitted and a notice names the reason:
 
-- the memory reading is unreadable or would make `bin/fm-mem-guard.sh admit` exit 75 (native pressure level 2 or higher, or a required fact unavailable; `admission_evaluate` returns the same list);
+- the memory reading is unreadable or the harm test of `bin/fm-mem-guard.py` `admission_evaluate` defers it as a no-mistakes run (the projected run does not fit in available memory minus the reserve, swap used or the compressor grew since the last probe reading, or a part cannot be judged), the same list that makes `bin/fm-mem-guard.sh admit --kind no-mistakes` exit 75; the one-start minimum never overrides it;
 - `bin/fm-proc-guard.py` reports a pile-up (user process count above its fixed 60 % warning line of the host's per-user cap, a proc-guard constant) or cannot read the count or, on macOS, the per-user cap.
 
 Nothing running is stopped, paused or reprioritised.

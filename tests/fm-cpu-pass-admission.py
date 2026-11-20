@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Executable fixtures for fm-cpu-pass.test.sh; never use fleet state, load or the live host."""
+import datetime
 import hashlib
 import json
 import os
@@ -56,20 +57,34 @@ try:
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
     finish(child)
     assert marker.exists()
-    # One qualifying recorded run, a record for another host and unreadable text fall back (the base's three
-    # triggers); none refuses and none reads as an empty host.
-    for name, record in (('one-run', lambda f: calibrate(f, peaks=[3.0])), ('other-host', lambda f: calibrate(f, host='other-host')),
+    # One qualifying recorded run still falls back to the counted-run limit (the idle host's bootstrap admit
+    # above the largest recorded peak, then the pool's own formula); it neither refuses nor reads as an empty host.
+    folder, db, env = case('fallback-one-run', running=6)
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=6 limit=6 basis=fallback' in (folder / 'f.stderr').read_text(), 'one-run fallback count')
+    assert child.poll() is None
+    change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+    finish(child)
+    # A record for another host or RAM size, unreadable text, a record the root-home walk cannot reach, and no
+    # record at all are no measurement of this host: the start waits with the harm's reason and the calibration
+    # run, and never reads as an empty host or runs.
+    for name, record in (('other-host', lambda f: calibrate(f, host='other-host')),
                          ('other-ram', lambda f: calibrate(f, total=64 * GIB)),
                          ('garbage', lambda f: (f / 'fmhome/state').mkdir(parents=True, exist_ok=True) or (f / 'fmhome/state/.memory-calibration.json').write_text('{')),
+                         ('absent', lambda f: (f / 'fmhome/state/.memory-calibration.json').unlink()),
                          ('walk-fails', lambda f: calibrate(f) or (f / 'fmhome/.fm-secondmate-parent').write_text('garbage\n'))):
-        folder, db, env = case('fallback-' + name, running=6)
+        folder, db, env = case('unmeasured-' + name, running=6)
         record(folder)
         child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
         pending(folder, 1)
-        wait_for(lambda: 'waiting: counted=6 limit=6 basis=fallback' in (folder / 'f.stderr').read_text(), name + ' fallback count')
-        assert child.poll() is None
-        change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
-        finish(child)
+        wait_for(lambda: 'waiting: overload: memory: the harm cannot be judged: ' in (folder / 'f.stderr').read_text(), name + ' unjudged harm')
+        text = (folder / 'f.stderr').read_text()
+        assert 'bin/fm-mem-guard.sh calibrate --kind no-mistakes -- <command>' in text and 'no run peak has ever been recorded' in text, text
+        time.sleep(0.6)
+        assert not (folder / 'm').exists() and child.poll() is None
+        os.killpg(child.pid, signal.SIGTERM)
+        finish(child, -signal.SIGTERM)
     # A secondmate home reads its parent's record (the root home owns the calibration).
     folder, db, env = case('root-home', running=6)
     calibrate(folder)
@@ -110,19 +125,36 @@ try:
     # Nothing counted: the new run alone reserves S.
     assert 'admitted: counted=0 projected=%d ' % (20 * GIB) in text and 'reservation=%d active_term=%d slack=%d runs_measured=14 ' % (4 * GIB, GIB, 20 * GIB) in text, text
 
-    # One-start minimum: with nothing counted, one start is admitted although S = 8 GiB
-    # exceeds the 7 GiB budget, unless the backstop reports an overload.
-    folder, db, env = case('floor', measured=True, available=7 * GIB)
-    facts(folder, available=7 * GIB, pressure=2)
+    # With nothing counted, a start whose projection fits is still paused by the backstop while the guard's
+    # harm test sees swap growing, and is admitted once the trend clears.
+    folder, db, env = case('floor', measured=True, available=10 * GIB)
+    swap(folder, growing=True)
     marker = folder / 'floor.marker'
     child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'floor')
     pending(folder, 1)
-    wait_for(lambda: 'waiting: overload: memory: native memory pressure level 2' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
+    wait_for(lambda: 'waiting: overload: memory: swap used grew by 104857600 bytes (0.098 GiB)' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
     time.sleep(0.6)
     assert not marker.exists() and child.poll() is None
-    facts(folder, available=7 * GIB)
+    swap(folder, growing=False)
     finish(child)
-    assert marker.exists() and 'admitted: counted=0 projected=%d budget=%d' % (8 * GIB, 7 * GIB) in (folder / 'floor.stderr').read_text()
+    assert marker.exists() and 'admitted: counted=0 projected=%d budget=%d' % (8 * GIB, 10 * GIB) in (folder / 'floor.stderr').read_text()
+
+    # Every fresh start also meets the guard's harm test as a no-mistakes run: the recorded projection
+    # (p95 of the 13 peaks is the largest, 8 GiB) plus the 198 MiB reserve must fit in available memory,
+    # at normal and at elevated pressure, and the one-start minimum never overrides it.
+    for pressure in (1, 2):
+        folder, db, env = case('nonfit-%d' % pressure, measured=True, available=5 * GIB)
+        facts(folder, available=5 * GIB, pressure=pressure)
+        marker, log = folder / 'nonfit.marker', folder / 'nonfit.stderr'
+        child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'nonfit')
+        pending(folder, 1)
+        wait_for(lambda: 'waiting: overload: memory: projected no-mistakes run of 8.00 GiB (p95 of 13 recorded) does not fit in 5.00 GiB available' in log.read_text(),
+                 'the start that does not fit waits with the numbers (pressure %d)' % pressure)
+        time.sleep(0.6)
+        assert not marker.exists() and child.poll() is None
+        facts(folder, available=9 * GIB, pressure=pressure)
+        finish(child)
+        assert marker.exists() and 'admitted: counted=0 projected=%d budget=%d' % (8 * GIB, 9 * GIB) in log.read_text(), log.read_text()
 
     # Measured mode. R = 3 GiB (75th percentile of the 13 recorded peaks), S = 8 GiB
     # (the largest) and A = 1 GiB; the task:crewmate record is not a no-mistakes run and is ignored.
@@ -207,31 +239,22 @@ try:
     facts(folder, available=10 * GIB, runs=[(None, 'baseline-0', GIB)])
     finish(child)
     assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (9 * GIB, 11 * GIB) in (folder / 'idle-full.stderr').read_text()
-    # A counted run's memory is never capped at R or S: 7 GiB held counts 7 GiB in the projection
-    # and 7 GiB in the budget, so it nets to nothing free. 7 GiB available: 15 > 14 waits; 8 GiB fits.
-    folder, db, env = case('never-capped', cores=18, running=1, measured=True, available=7 * GIB)
-    facts(folder, available=7 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
+    # A counted run's memory is never capped at R or S: 7 GiB held counts 7 GiB in the projection (7 + S = 15 GiB,
+    # not R + S = 11) and 7 GiB in the budget (10 + 7 = 17 GiB). The guard's harm test (S plus the reserve must fit in
+    # available memory) now decides every start at the boundary the budget alone used to decide, so the boundary
+    # is shown by the numbers in the admission line, not by a wait.
+    folder, db, env = case('never-capped', cores=18, running=1, measured=True, available=10 * GIB)
+    facts(folder, available=10 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
     marker = folder / 'over.marker'
-    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'over')
-    pending(folder, 1)
-    wait_for(lambda: 'waiting: counted=1 projected=%d budget=%d' % (15 * GIB, 14 * GIB) in (folder / 'over.stderr').read_text(), 'resident memory above R is counted')
-    time.sleep(0.6)
-    assert not marker.exists() and child.poll() is None
-    facts(folder, available=8 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
-    finish(child)
-    assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (15 * GIB, 15 * GIB) in (folder / 'over.stderr').read_text()
-    # Above the largest recorded peak: a run at 10 GiB (above S = 8 GiB) counts 10 GiB, so 7.5 GiB available waits
-    # (10 + 8 = 18 > 17.5); a rule capped at S would count 8 and admit (16 <= 17.5). 8 GiB available fits (18 <= 18).
-    folder, db, env = case('above-peak', cores=18, running=1, measured=True, available=int(7.5 * GIB))
-    facts(folder, available=int(7.5 * GIB), runs=[(None, 'baseline-0', 10 * GIB)])
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'over'))
+    assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (15 * GIB, 17 * GIB) in (folder / 'over.stderr').read_text()
+    # Above the largest recorded peak: a run at 10 GiB (above S = 8 GiB) counts 10 GiB, so the projection is 18 GiB;
+    # a rule capped at S would count 8 and project 16 GiB.
+    folder, db, env = case('above-peak', cores=18, running=1, measured=True, available=10 * GIB)
+    facts(folder, available=10 * GIB, runs=[(None, 'baseline-0', 10 * GIB)])
     marker = folder / 'above.marker'
-    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'above')
-    pending(folder, 1)
-    wait_for(lambda: 'waiting: counted=1 projected=%d budget=%d' % (18 * GIB, int(17.5 * GIB)) in (folder / 'above.stderr').read_text(), 'memory above S is counted')
-    assert not marker.exists() and child.poll() is None
-    facts(folder, available=8 * GIB, runs=[(None, 'baseline-0', 10 * GIB)])
-    finish(child)
-    assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (18 * GIB, 18 * GIB) in (folder / 'above.stderr').read_text()
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'above'))
+    assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (18 * GIB, 20 * GIB) in (folder / 'above.stderr').read_text()
     folder, db, env = case('busy-but-fits', cores=18, running=0, measured=True, available=40 * GIB, load=500)
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'busy.marker')], env, folder / 'busy'))
     assert (folder / 'busy.marker').exists()
@@ -351,10 +374,7 @@ try:
     wait_for(lambda: (folder / 'already-running.started').exists(), 'a run already started')
     before_hash = hashlib.sha256(db.read_bytes()).hexdigest()
     for label, bad, good, expected in (
-            ('pressure', lambda: facts(folder, available=100 * GIB, pressure=2, runs=[(None, 'already-running', GIB)]),
-             lambda: facts(folder, available=100 * GIB, runs=[(None, 'already-running', GIB)]), 'memory: native memory pressure level 2'),
-            ('pressure-3', lambda: facts(folder, available=100 * GIB, pressure=3, runs=[(None, 'already-running', GIB)]),
-             lambda: facts(folder, available=100 * GIB, runs=[(None, 'already-running', GIB)]), 'memory: native memory pressure level 3'),
+            ('swap', lambda: swap(folder, growing=True), lambda: swap(folder, growing=False), 'memory: swap used grew by 104857600 bytes (0.098 GiB)'),
             ('pileup', lambda: procs(folder, count=6400), lambda: procs(folder, count=6399), 'process pile-up: 6400 of 10666'),
             ('memory-unreadable', lambda: facts(folder, broken=True), lambda: facts(folder, available=100 * GIB), 'memory: '),
             ('procs-unreadable', lambda: procs(folder, error=True), lambda: procs(folder), 'process count unreadable'),
@@ -389,15 +409,20 @@ try:
     change(db, "UPDATE runs SET status='completed' WHERE id='held'")
     finish(child)
     assert (folder / 'at').exists()
+    # The kernel pressure level is telemetry, never an input: level 4 with no measured harm admits.
+    folder, db, env = case('pressure-flag', measured=True, available=100 * GIB)
+    facts(folder, available=100 * GIB, pressure=4)
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'flag.marker')], env, folder / 'flag'))
+    assert (folder / 'flag.marker').exists()
 
     # A reading that was healthy a moment ago cannot admit a start after the signal turns bad:
     # the grant takes a new reading. Each case first lets a waiter see healthy inputs (it waits
     # at the full counted limit), then changes the signal and frees the slot together, so the old
     # cached reading is the only thing that could grant. It must keep waiting, then start once clear.
     for label, bad, good in (
-            ('pressure', lambda f: facts(f, pressure=2), lambda f: facts(f)),
+            ('swap', lambda f: swap(f, growing=True, peaks=[]), lambda f: swap(f, growing=False, peaks=[])),
             ('pileup', lambda f: procs(f, count=6400), lambda f: procs(f, count=100)),
-            ('memory-unreadable', lambda f: facts(f, broken=True), lambda f: facts(f)),
+            ('memory-unreadable', lambda f: facts(f, broken=True), lambda f: facts(f, available=100 * GIB)),
             ('procs-unreadable', lambda f: procs(f, error=True), lambda f: procs(f))):
         folder, db, env = case('transition-' + label, cores=3, running=1)
         marker, log = folder / 'transition.marker', folder / 'transition.stderr'
@@ -560,12 +585,14 @@ try:
     assert not marker.exists()
     # Waiters cancelled by SIGINT remove their own records while another queued
     # start scans them; that scan must never refuse the surviving start.
+    known = waiters(folder)
     survivor = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'survivor')], env, folder / 'survivor')
-    pending(folder, 1)
+    registered(folder, known)
     for i in range(20):
+        known = waiters(folder)
         cancelled = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', 'touch', str(folder / 'cancelled')],
                            env, folder / ('cancelled-' + str(i)))
-        pending(folder, 2)
+        registered(folder, known)
         os.killpg(cancelled.pid, signal.SIGINT)
         finish(cancelled, 130)
         assert survivor.poll() is None, (folder / 'survivor.stderr').read_text()
@@ -1739,6 +1766,9 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         shared = dict(env, HOME=str(folder / 'user'))
         shared.pop('FM_CPU_POOL_DIR')
         (folder / 'home-a').mkdir(); (folder / 'home-b').mkdir()
+        # Each home reads its own root home's record for the guard's harm test (the case's one fixture record is in its fmhome).
+        for home in ('home-a', 'home-b'):
+            shutil.copytree(folder / 'fmhome', folder / home, dirs_exist_ok=True)
         low = launch(cli + ['pipeline-start', '--priority', 'other', '--', 'touch', str(folder / 'low')], dict(shared, FM_HOME=str(folder / 'home-a')), folder / 'low')
         wait_for(lambda: len(list((folder / 'user/.cache/fm-cpu-pool').glob('pipeline-waiter-*.lock'))) == 1, 'the pool under HOME')
         high = launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'touch', str(folder / 'high')], dict(shared, FM_HOME=str(folder / 'home-b')), folder / 'high')

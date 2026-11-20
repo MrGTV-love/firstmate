@@ -3,6 +3,7 @@
 
 Imported by tests/fm-cpu-pass-admission.py and tests/fm-cpu-pass-gate.py, each called as SCRIPT REPO TMP PYTHON.
 """
+import datetime
 import hashlib
 import json
 import math
@@ -352,12 +353,18 @@ def readings(folder, active=GIB, total=128 * GIB, host=None):
     (state / 'memory-readings.jsonl').write_text(''.join(json.dumps(line) + '\n' for line in lines))
 
 
-def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None, active=GIB):
+SWAP_USED = int(1565.88 * 2 ** 20)  # the swap the facts() fixture reads
+
+
+def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None, active=GIB, last_swap=SWAP_USED):
     """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
 
     live names runs (repo_id NULL) whose young, low peak the probe has folded in already;
     extra maps more runs (repo_id NULL) to their recorded peak in bytes. The readings
     record beside it sets the active-run term A (active, None for no record).
+    The probe's step record (200 steps 300 s apart, available drops of k MiB so the reserve is 198 MiB)
+    and a previous probe reading a minute old that held last_swap of swap used and the compressor the
+    fixture reads are always written, so the guard's harm test can judge the trend and the fit.
     """
     state = folder / 'fmhome' / 'state'
     state.mkdir(parents=True, exist_ok=True)
@@ -373,8 +380,18 @@ def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=No
     for run, peak in (extra or {}).items():
         runs['no-mistakes:None/' + run] = dict(peak_bytes=peak, samples=2, incomplete_samples=0,
                                                 first_seen='x', last_seen='x', max_gap_seconds=0)
-    write_json(state / '.memory-calibration.json', dict(
-        schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs, pressured=None))
+    record = dict(schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs,
+                  pressured=None)
+    stamp = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=60)
+    record['trail'] = dict(
+        last=dict(at=stamp.isoformat(), available_bytes=40 * GIB, compressor_bytes=32768 * 16384, swap_used_bytes=last_swap),
+        steps=[[300, k * 2 ** 20, k * 2 ** 20, 0] for k in range(1, 201)])
+    write_json(state / '.memory-calibration.json', record)
+
+
+def swap(folder, growing, peaks=PEAKS):
+    """The previous probe reading held less swap than the fixture reads now (growing), or the same."""
+    calibrate(folder, peaks=peaks, last_swap=SWAP_USED - 100 * 2 ** 20 if growing else SWAP_USED)
 
 
 def activate(folder, at=None):
@@ -384,7 +401,12 @@ def activate(folder, at=None):
                                                              gate_sha256='0' * 64))
 
 
-def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB, activated=True):
+def case(name, cores=18, running=0, load=0, measured=False, available=None, activated=True):
+    # An unmeasured case writes a short but valid record (one no-mistakes run): the guard's harm test admits
+    # the start on an idle host only when more is available than the largest recorded peak (the 64 GiB task
+    # peak), so these cases read 100 GiB, and the pool's own formula falls back to the counted-run limit.
+    if available is None:
+        available = 40 * GIB if measured else 100 * GIB
     folder = root / name
     folder.mkdir()
     db = folder / 'state.sqlite'
@@ -406,8 +428,7 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB, 
     write_json(load_file, [0, load, 0])
     facts(folder, available=available)
     procs(folder)
-    if measured:
-        calibrate(folder)
+    calibrate(folder) if measured else calibrate(folder, peaks=[3.0], active=None)
     (folder / 'fmhome').mkdir(exist_ok=True)
     if activated:
         activate(folder)
@@ -478,6 +499,19 @@ def live_entries(folder, pattern='pipeline-waiter-*.lock'):
 
 def pending(folder, count):
     wait_for(lambda: live_entries(folder) == count, str(count) + ' registered waiters')
+
+
+def waiters(folder):
+    return set((folder / 'pool').glob('pipeline-waiter-*.lock'))
+
+
+def registered(folder, before):
+    """Wait for a waiter record that was not there before this launch, so the registration seen is this start's own.
+
+    A waiter killed by SIGTERM leaves its record until the next scan removes it, so counting records alone can
+    be satisfied by the dead one while the start just launched is still starting up and has no handler yet.
+    """
+    wait_for(lambda: bool(waiters(folder) - before), 'this start registered its own waiter')
 
 
 def held(env):
