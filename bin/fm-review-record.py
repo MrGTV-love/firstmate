@@ -10,7 +10,7 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
   fm-review-record.py captain-word --pr URL --head SHA --words 'Exact captain merge instruction'
   fm-review-record.py correction --pr URL --head SHA --effect exclude-review|supersede-author-group
     --target-at EPOCH --target-reader-model MODEL [--target-report-sha256 HEX]
-    [--group NAME] --captain-word-at EPOCH --reason TEXT
+    [--group NAME] --authority-words 'Exact captain words' --authority-at EPOCH --reason TEXT
   fm-review-record.py latest --pr URL
   fm-review-record.py verify --pr URL --head SHA --task TASK --base BASE_SHA [--review-only] [--json]
   fm-review-record.py plan --pr URL --head SHA --task TASK --base BASE_SHA
@@ -178,18 +178,25 @@ A correction names its target exactly: the PR and head it is recorded for, the
 row's at, reader_model and, when the row has one, report_sha256 (a row without a
 digest is named without one). It is recorded only when exactly one review row
 before it matches, that row is a PASS with no yes trigger answer (a FAIL, or an
-escalation trigger, is never cleared), a supersede names an entry the row holds,
-and exactly one captain-word recorded earlier for the same PR and head sits at
---captain-word-at; its words digest is stored with the correction. Like captain-word,
-it is not recorded while an away-posture record exists. A correction can only
-remove what a typed row declared, so it never adds coverage and never removes a
-derived group: derived groups come from task meta, launch-models and the pipeline
-database on every verify, and a superseded entry stops covering its group too.
+escalation trigger, is never cleared), and a supersede names an entry the row holds.
+A correction carries its OWN authority inside the row: --authority-words, the
+captain's authorizing words verbatim, and --authority-at, the epoch they were
+given; both are required and the words must be non-empty. It cites no captain-word
+row and is never merge authority: verify without --review-only returns
+captain-word only for a captain-word row, so a ledger with a correction and no
+captain-word is judged by review coverage alone, and corrections never change
+which captain-word is newest or what a FAIL after it does. Like captain-word,
+a correction is not recorded while an away-posture record exists. A correction
+can only remove what a typed row declared, so it never adds coverage and never
+removes a derived group: derived groups come from task meta, launch-models and
+the pipeline database on every verify, and a superseded entry stops covering
+its group too.
 verify and plan apply a correction only when it still resolves against the rows
-before it (the strict direction), so a correction can never block or loosen the
-rest of a ledger; one applied at the verified head adds the fact 'corrections
-applied: N'. The cited captain-word row keeps its ordinary meaning, so verify
-without --review-only accepts it as the captain's merge instruction at that head.
+before it and its authority holds non-empty words and an epoch (the strict
+direction), so a correction can never block or loosen the rest of a ledger; one
+applied at the verified head adds the fact 'corrections applied: N' followed by
+one fact per applied correction that prints its authority words (JSON-quoted) and
+epoch.
 Code from before correction rows existed treats the kind as an invalid record:
 every command reading the ledger, writes included, fails for every PR in that
 home with 'review record history is invalid', so such code fails closed rather
@@ -278,10 +285,6 @@ def is_sha256(value):
     return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
-def words_digest(words):
-    return hashlib.sha256(words.encode("utf-8")).hexdigest()
-
-
 def validate(row):
     if not isinstance(row, dict) or row.get("schema") != "fm-review-record.v1":
         raise RecordError("review record schema is invalid")
@@ -307,10 +310,9 @@ def validate(row):
             raise RecordError("correction group names the author_groups entry to supersede, and only supersede-author-group takes one")
         if "group" in row:
             nonempty(row["group"], "correction group")
-        cited = row.get("captain_word")
-        if (not isinstance(cited, dict) or type(cited.get("at")) is not int or cited["at"] < 0
-                or not is_sha256(cited.get("words_sha256"))):
-            raise RecordError("correction must cite a recorded captain-word by its epoch at and words digest")
+        # The authority is judged where a correction applies, not here: a correction whose
+        # authority is missing or empty must read as a row that does nothing, never as a ledger
+        # that no command can read.
         nonempty(row.get("reason"), "reason")
         return
     if row.get("verdict") not in ("PASS", "FAIL"):
@@ -428,14 +430,19 @@ def newest(fd, pr):
     return result, rows
 
 
-def cited_word(prior, correction):
-    """The one captain-word row among `prior` that `correction` cites, else RecordError."""
-    at = correction["captain_word"]["at"]
-    found = [row for row in prior if row["kind"] == "captain-word" and row["pr"] == correction["pr"]
-             and row["head"] == correction["head"] and row["at"] == at]
-    if len(found) != 1:
-        raise RecordError(f"correction must cite one recorded captain-word for this PR at head {correction['head']} with at {at}; found {len(found)}")
-    return found[0]
+def correction_authority(correction):
+    """The (words, at) authority a correction carries inside its own row, else RecordError.
+
+    The words are the captain's authorizing words verbatim and at is the epoch they were given.
+    A correction never cites a captain-word row, so it can never be merge authority.
+    """
+    authority = correction.get("authority")
+    if not isinstance(authority, dict):
+        raise RecordError("correction must carry its authority: the captain's authorizing words and the epoch they were given")
+    nonempty(authority.get("words"), "correction authority words")
+    if type(authority.get("at")) is not int or authority["at"] < 0:
+        raise RecordError("correction authority at must be the epoch the words were given")
+    return authority["words"], authority["at"]
 
 
 def named_row(prior, correction):
@@ -465,10 +472,8 @@ def named_row(prior, correction):
 
 def correction_target(prior, correction):
     """Index in `prior` of the review row a recorded `correction` still resolves to, else RecordError."""
-    index = named_row(prior, correction)
-    if words_digest(cited_word(prior, correction)["words"]) != correction["captain_word"]["words_sha256"]:
-        raise RecordError("the cited captain-word words do not match the digest in the correction")
-    return index
+    correction_authority(correction)
+    return named_row(prior, correction)
 
 
 def apply_corrections(records, rows, head):
@@ -476,11 +481,12 @@ def apply_corrections(records, rows, head):
 
     The ledger rows are never touched. A correction that no longer resolves against the rows
     before it is ignored, the strict direction, so it can neither block nor loosen anything.
-    `applied` counts the corrections at `head` that took effect.
+    `applied` lists the corrections at `head` that took effect, in ledger order. The newest
+    captain-word is passed through untouched: a correction is never merge authority.
     """
     if not any(row["kind"] == "correction" for row in rows):
-        return records, rows, 0
-    excluded, superseded, applied = set(), {}, 0
+        return records, rows, []
+    excluded, superseded, applied = set(), {}, []
     for index, row in enumerate(rows):
         if row["kind"] != "correction":
             continue
@@ -488,7 +494,8 @@ def apply_corrections(records, rows, head):
             target = correction_target(rows[:index], row)
         except RecordError:
             continue
-        applied += row["head"] == head
+        if row["head"] == head:
+            applied.append(row)
         if row["effect"] == "exclude-review":
             excluded.add(target)
         else:
@@ -609,7 +616,20 @@ def derived_authors(home, pr, head, task, base):
     return task, groups
 
 
-def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False, corrections=0):
+def correction_facts(applied):
+    """The facts verify prints for the corrections it applied: the count, then each one's own authority."""
+    if not applied:
+        return []
+    facts = [f"corrections applied: {len(applied)}"]
+    for row in applied:
+        words, at = correction_authority(row)
+        # JSON quoting keeps a verbatim authority on one line and escapes control characters.
+        facts.append(f"correction {row['effect']} of the review row at {row['target']['at']} (reader {row['target']['reader_model']}): "
+                     f"authority given at {at}: {json.dumps(words)}")
+    return facts
+
+
+def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False, corrections=()):
     word = records["captain-word"]
     review = records["review"]
     at_word = not (review_only or plan) and word is not None and word["head"] == head
@@ -686,7 +706,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
 
     def with_facts(row):
         return {**row, "facts": (["pipeline author family not recorded"] if relief_used else [])
-                + ([f"corrections applied: {corrections}"] if corrections else [])}
+                + correction_facts(corrections)}
 
     def uncovered(group, authors, reads):
         families = {a["family"] for a in authors}
@@ -810,7 +830,8 @@ def main():
             command.add_argument("--target-reader-model", required=True)
             command.add_argument("--target-report-sha256", help="the row's report_sha256, when the row has one")
             command.add_argument("--group", help="the author_groups entry to supersede (supersede-author-group only)")
-            command.add_argument("--captain-word-at", required=True, type=int, help="epoch at of the captain-word row this correction cites")
+            command.add_argument("--authority-words", required=True, help="the captain's authorizing words, verbatim")
+            command.add_argument("--authority-at", required=True, type=int, help="epoch the captain gave those words")
             command.add_argument("--reason", required=True)
         if name == "verify":
             command.add_argument("--review-only", action="store_true", help="require the recorded independent PASS itself; a captain-word is not a substitute")
@@ -844,14 +865,18 @@ def main():
             target = {"at": args.target_at, "reader_model": args.target_reader_model}
             if args.target_report_sha256:
                 target["report_sha256"] = args.target_report_sha256
-            # The words digest is filled from the cited row under the ledger lock.
             row.update(head=args.head, effect=args.effect, target=target,
-                       captain_word={"at": args.captain_word_at, "words_sha256": "0" * 64}, reason=args.reason)
+                       authority={"words": args.authority_words, "at": args.authority_at}, reason=args.reason)
             if args.group is not None:
                 row["group"] = args.group
         write = args.command in ("review", "captain-word", "correction")
         if write:
             validate(row)
+            if args.command == "correction":
+                try:
+                    correction_authority(row)
+                except RecordError as exc:
+                    raise RecordError(f"correction not recorded; {exc}") from exc
         if args.command == "review":
             row.setdefault("covered_groups", list(groups))
             if any(g != "all" and g not in groups for g in row["covered_groups"]):
@@ -876,7 +901,6 @@ def main():
             if write:
                 if args.command == "correction":
                     named_row(rows, row)
-                    row["captain_word"]["words_sha256"] = words_digest(cited_word(rows, row)["words"])
                 data = (json.dumps(row, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
                 if os.write(fd, data) != len(data):
                     raise UnavailableError("partial review record append; preserve history for reconciliation before retrying")
