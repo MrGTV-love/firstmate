@@ -92,8 +92,8 @@
 # (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
-# The sourced word names the file literally so fm-lint-cache.pl can resolve
-# it; a whole path held in a variable makes every caller uncacheable.
+# The sourced word names the file literally so fm-lint-cache.pl can resolve it;
+# a whole path held in a variable across this guard makes callers uncacheable.
 _fm_timeout_dir=${BASH_SOURCE[0]%/*}
 [ "$_fm_timeout_dir" != "${BASH_SOURCE[0]}" ] || _fm_timeout_dir=.
 _fm_timeout_dir=${_fm_timeout_dir:-/}
