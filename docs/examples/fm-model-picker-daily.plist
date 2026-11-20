@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent template for bin/fm-model-picker-daily.sh (docs/configuration.md, "Daily collection").
+  bin/fm-model-picker-daily-install.sh renders it twice, once per verb (run and check), filling the
+  tokens between at signs, and writes the results to ~/Library/LaunchAgents; do not load this file directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>@LABEL@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>@FM_ROOT@/bin/fm-model-picker-daily.sh</string>
+    <string>@VERB@</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FM_HOME</key>
+    <string>@FM_HOME@</string>
+@EXTRA_ENV@
+    <key>PATH</key>
+    <string>@PATH@</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>@FM_HOME@</string>
+  <key>RunAtLoad</key>
+  <@RUN_AT_LOAD@/>
+  <key>StartInterval</key>
+  <integer>@INTERVAL@</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>@FM_HOME@/state/.model-picker-daily-@VERB@.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>@FM_HOME@/state/.model-picker-daily-@VERB@.launchd.log</string>
+</dict>
+</plist>

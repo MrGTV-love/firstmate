@@ -14,6 +14,8 @@ changes when a seed mix, floor or veto changes.
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import hashlib
 import json
 import os
@@ -181,8 +183,50 @@ def work_type_spec(name):
     return work_type_spec("none-fit")
 
 
+class PromotionInProgress(Exception):
+    """The data root's snapshot is being replaced, so a read must not start."""
+
+
+def _reader_hold_seam():
+    """Test seam, honored only under FM_TEST_SEAM=1: FM_MODEL_PICKER_READER_HOLD=ANNOUNCE:RELEASE
+    creates ANNOUNCE and waits until RELEASE exists, with the lock held."""
+    spec = os.environ.get("FM_MODEL_PICKER_READER_HOLD") if os.environ.get("FM_TEST_SEAM") == "1" else None
+    if spec:
+        announce, _, release = spec.partition(":")
+        Path(announce).write_text("")
+        while not os.path.exists(release):
+            time.sleep(0.05)
+
+
+@contextlib.contextmanager
+def generation_hold(data_root):
+    """Hold the data root's promotion lock shared for a whole read of the verdict and projections,
+    so one promotion (bin/fm_model_picker/daily.py promote, which holds it exclusively from its
+    first change to its last) never overlaps the read: the read sees one generation, whole.
+    Fails closed: a promotion in progress, or a root that cannot be opened, raises
+    PromotionInProgress. A root that does not exist has nothing to span; verdict_state refuses it.
+    Every read of the verdict and projections in this module goes through this hold."""
+    try:
+        fd = os.open(str(data_root), os.O_RDONLY)
+    except FileNotFoundError:
+        yield
+        return
+    except OSError as error:
+        raise PromotionInProgress("the data root cannot be opened (%s)" % error) from error
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise PromotionInProgress("a promotion is replacing the benchmark snapshot") from None
+        _reader_hold_seam()
+        yield
+    finally:
+        os.close(fd)
+
+
 def verdict_state(data_root):
-    """Fail closed: only a regular, non-symlinked, parseable file saying TRUSTED is trusted."""
+    """Fail closed: only a regular, non-symlinked, parseable file saying TRUSTED is trusted.
+    A caller holds generation_hold across this check and every projection read that relies on it."""
     path = Path(data_root) / "verdict.json"
     try:
         info = path.lstat()
@@ -1115,20 +1159,28 @@ def observe(args, key, helper, data_root):
         record(simple_row("resolver-error", reason or "resolver error", task_key, rule))
         return 0
 
-    trusted, verdict_reason, _ = verdict_state(data_root)
+    table = table_error = candidates = None
+    try:
+        with generation_hold(data_root):
+            trusted, verdict_reason, _ = verdict_state(data_root)
+            if trusted:
+                try:
+                    table = load_table(args["table"])
+                except (OSError, ValueError) as error:
+                    table_error = error
+                else:
+                    candidates = build_candidates(rules_doc, table, data_root, quota_doc, result)
+    except PromotionInProgress as busy:
+        trusted, verdict_reason = False, str(busy)
     if not trusted:
         record(simple_row("no-trusted-snapshot", verdict_reason, task_key, rule,
                           verdict_reason))
         return 0
-
-    try:
-        table = load_table(args["table"])
-    except (OSError, ValueError) as error:
-        record(simple_row("error", "route table unusable: %s" % error, task_key, rule))
+    if table_error is not None:
+        record(simple_row("error", "route table unusable: %s" % table_error, task_key, rule))
         return 0
 
     det_complexity, det_components = deterministic_complexity(task_text, rules_doc)
-    candidates = build_candidates(rules_doc, table, data_root, quota_doc, result)
     request = classify_request(task_text, args.get("project"))
     body, error = jev_call(request, key, never_send_path(args), helper, args["scratch"])
     if error:
@@ -1361,23 +1413,7 @@ def report(data_root):
     return 0
 
 
-def check_routes(data_root, rules_path, bin_dir, table_path):
-    table = load_table(table_path)
-    if rules_path:
-        rules_doc = load_json(rules_path)
-    else:
-        config_dir = Path(os.environ.get("FM_CONFIG_OVERRIDE")
-                          or (Path(os.environ.get("FM_HOME") or os.getcwd()) / "config"))
-        rules_file = config_dir / "crew-dispatch.json"
-        proc = subprocess.run(
-            ["bash", str(Path(bin_dir) / "fm-model-index.sh"), "profiles", str(rules_file)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=dict(os.environ, FM_CONFIG_OVERRIDE=str(config_dir)))
-        if proc.returncode != 0:
-            warn("could not resolve %s against the model index" % rules_file)
-            return 2
-        rules_doc = json.loads(proc.stdout.decode("utf-8"))
-    routes = routes_from_rules(rules_doc)
+def _check_projection_rows(routes, table, data_root):
     ok = True
     print("route                              family     currency      projection                         asserted")
     for route in sorted(routes):
@@ -1400,6 +1436,31 @@ def check_routes(data_root, rules_path, bin_dir, table_path):
                  "yes" if projection is not None else "REFUSED: %s" % why))
         ok = ok and projection is not None
     return 0 if ok else 1
+
+
+def check_routes(data_root, rules_path, bin_dir, table_path):
+    table = load_table(table_path)
+    if rules_path:
+        rules_doc = load_json(rules_path)
+    else:
+        config_dir = Path(os.environ.get("FM_CONFIG_OVERRIDE")
+                          or (Path(os.environ.get("FM_HOME") or os.getcwd()) / "config"))
+        rules_file = config_dir / "crew-dispatch.json"
+        proc = subprocess.run(
+            ["bash", str(Path(bin_dir) / "fm-model-index.sh"), "profiles", str(rules_file)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=dict(os.environ, FM_CONFIG_OVERRIDE=str(config_dir)))
+        if proc.returncode != 0:
+            warn("could not resolve %s against the model index" % rules_file)
+            return 2
+        rules_doc = json.loads(proc.stdout.decode("utf-8"))
+    routes = routes_from_rules(rules_doc)
+    try:
+        with generation_hold(data_root):
+            return _check_projection_rows(routes, table, data_root)
+    except PromotionInProgress as busy:
+        warn("%s; try again" % busy)
+        return 2
 
 
 HELP = """usage: fm-model-picker-shadow.sh --observe [options]

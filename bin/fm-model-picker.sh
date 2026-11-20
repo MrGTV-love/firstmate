@@ -25,6 +25,7 @@
 #                   says how many metrics and how many evaluation leaderboard cells it did not compare, so TRUSTED is never
 #                   read as complete; verdict.json carries the second count as leaderboard_not_compared.
 # Order when combined: acquisition, chart-diff, database. Long runs go through bin/fm-proc-budget.sh.
+# The daily sweep runs through bin/fm-model-picker-daily.sh (docs/configuration.md "Daily collection").
 # A page enters raw/ only if it parses, and a cached page is read only if it still parses. Five kinds are judged by one
 #   rule: a comparison page needs a table, a payload, a matching header and exactly the requested slugs (the chart-diff
 #   re-fetch too); an evaluation page a table or a payload; the sitemap <loc> entries; the selector catalog models; a

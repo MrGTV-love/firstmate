@@ -493,6 +493,10 @@
       "audience": "operator-example"
     },
     {
+      "path": "docs/examples/fm-model-picker-daily.plist",
+      "audience": "operator-example"
+    },
+    {
       "path": "docs/examples/wedge-alarm",
       "audience": "operator-example"
     },

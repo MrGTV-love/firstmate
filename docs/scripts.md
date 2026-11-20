@@ -19,6 +19,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
 | [`fm-open-loops.sh`](../bin/fm-open-loops.sh) | Reconcile this home's recorded obligations ([ledger contract](configuration.md#open-work-ledger-configopen-loopsjson)) |
 | [`fm-model-picker.sh`](../bin/fm-model-picker.sh) | Collect Artificial Analysis benchmarks for the model picker, with calibration tables ([data layout](configuration.md#model-picker-benchmark-data-fm_model_picker_data)) |
+| [`fm-model-picker-daily.sh`](../bin/fm-model-picker-daily.sh) | Run the collector in a staged copy through `fm-proc-budget.sh`, promote only a clean run, and raise one `check:` wake for a failed run or (`check`) a snapshot older than 36 hours ([daily collection](configuration.md#daily-collection)) |
+| [`fm-model-picker-daily-install.sh`](../bin/fm-model-picker-daily-install.sh) | Install, inspect, or remove the two per-user launchd agents (daily `run`, hourly `check`) for one home |
 | `fm-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
 | `fm-bearings-snapshot.sh` | Project the bounded remote-ledger fleet snapshot to compact TOON; `--include-prs` adds live GitHub enrichment |
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
