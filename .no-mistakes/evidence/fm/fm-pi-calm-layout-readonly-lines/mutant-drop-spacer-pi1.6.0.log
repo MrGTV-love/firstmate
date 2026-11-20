@@ -1,0 +1,12 @@
+mutant drop-spacer: -      return this.hasLeadingSpacer ? ["", ...lines] : [...lines];
++      return [...lines];
+not ok - Pi calm renderer and lifecycle contract failed: file:///Users/charlesabrooker/tmp/fm-calm-pi-extension.gVLICU/renderer/[eval1]:191
+  throw new Error("Calm-off operational user rendering changed from Pi stock rows");
+        ^
+
+Error: Calm-off operational user rendering changed from Pi stock rows
+    at file:///Users/charlesabrooker/tmp/fm-calm-pi-extension.gVLICU/renderer/[eval1]:191:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.13.0
+render exit=1

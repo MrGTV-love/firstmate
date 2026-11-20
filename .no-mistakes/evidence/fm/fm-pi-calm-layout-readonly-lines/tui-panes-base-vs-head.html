@@ -1,0 +1,302 @@
+<!doctype html><meta charset=utf-8><title>Pi calm operational user rows: base vs head</title><style>body{font-family:sans-serif;background:#111;color:#ddd}pre{background:#000;color:#e6e6e6;padding:8px;font:12px/1.25 Menlo,monospace;border:1px solid #444;white-space:pre}td{vertical-align:top;padding:6px}h2{font-size:15px}</style>
+<h1>Real Pi TUI (tmux 160x36, PI_OFFLINE) operational follow-up E2E panes</h1><p>Left: base d432729a2. Right: head 26b929766. Pi 1.6.0 for base and head; head also with Pi 1.5.2. Only the random temp dir in the footer differs between base and head.</p>
+<h2>Calm off (operational row shown with Pi stock leading spacer)</h2><table><tr><th>base, Pi 1.6.0</th><th>head, Pi 1.6.0</th><th>head, Pi 1.5.2</th></tr><tr>
+<td><pre>
+ ▀▀█  v1.6.0
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-calm.ts, followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_loaded_off
+
+
+ CAPTAIN_ANSWER_loaded_off
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: MONITOR_loaded_off_ONE
+
+
+ MONITOR_HANDLED_loaded_off_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.bHwc0J/followup-project (main)
+33.5%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+<td><pre>
+ ▀▀█  v1.6.0
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-calm.ts, followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_loaded_off
+
+
+ CAPTAIN_ANSWER_loaded_off
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: MONITOR_loaded_off_ONE
+
+
+ MONITOR_HANDLED_loaded_off_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.fJRhrF/followup-project (main)
+33.5%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+<td><pre>
+ ▀▀█  v1.5.2
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-calm.ts, followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_loaded_off
+
+
+ CAPTAIN_ANSWER_loaded_off
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: MONITOR_loaded_off_ONE
+
+
+ MONITOR_HANDLED_loaded_off_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.WoPlmJ/followup-project (main)
+33.5%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+</tr></table>
+<h2>Calm on (operational row hidden)</h2><table><tr><th>base, Pi 1.6.0</th><th>head, Pi 1.6.0</th><th>head, Pi 1.5.2</th></tr><tr>
+<td><pre>
+ ▀▀█  v1.6.0
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-calm.ts, followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_loaded_on
+
+
+ CAPTAIN_ANSWER_loaded_on
+
+ MONITOR_HANDLED_loaded_on_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.bHwc0J/followup-project (main)
+47.3%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+<td><pre>
+ ▀▀█  v1.6.0
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-calm.ts, followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_loaded_on
+
+
+ CAPTAIN_ANSWER_loaded_on
+
+ MONITOR_HANDLED_loaded_on_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.fJRhrF/followup-project (main)
+47.3%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+<td><pre>
+ ▀▀█  v1.5.2
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-calm.ts, followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+
+ CAPTAIN_PROMPT_loaded_on
+
+
+ CAPTAIN_ANSWER_loaded_on
+
+ MONITOR_HANDLED_loaded_on_ONE
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.WoPlmJ/followup-project (main)
+47.1%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+</tr></table>
+<h2>Calm extension absent (Pi stock)</h2><table><tr><th>base, Pi 1.6.0</th><th>head, Pi 1.6.0</th><th>head, Pi 1.5.2</th></tr><tr>
+<td><pre>
+ ▀▀█  v1.6.0
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_absent
+
+
+ CAPTAIN_ANSWER_absent
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: MONITOR_absent_ONE
+
+
+ MONITOR_HANDLED_absent_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.bHwc0J/followup-project (main)
+33.4%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+<td><pre>
+ ▀▀█  v1.6.0
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_absent
+
+
+ CAPTAIN_ANSWER_absent
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: MONITOR_absent_ONE
+
+
+ MONITOR_HANDLED_absent_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.fJRhrF/followup-project (main)
+33.4%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+<td><pre>
+ ▀▀█  v1.5.2
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  followup-e2e.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+
+ CAPTAIN_PROMPT_absent
+
+
+ CAPTAIN_ANSWER_absent
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: MONITOR_absent_ONE
+
+
+ MONITOR_HANDLED_absent_ONE
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-calm-pi-extension.WoPlmJ/followup-project (main)
+33.4%/4.1k (auto)                                                                                                                                  deterministic
+</pre></td>
+</tr></table>

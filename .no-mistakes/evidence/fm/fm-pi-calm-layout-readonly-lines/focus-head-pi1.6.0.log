@@ -1,0 +1,7 @@
+head sha=26b929766865e2071a8ad64073480db6fbb78dea pi=1.6.0
+$ FOCUS=render bash tests/fm-calm-focus.sh
+ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+render exit=0
+$ FOCUS=e2e PANE_DUMP_DIR=... bash tests/fm-calm-focus.sh
+ok - Pi operational follow-up E2E processes exact user-role notifications once while Calm hides current and adjacent rows, Calm off and absent render them, and restart preserves semantics
+e2e exit=0

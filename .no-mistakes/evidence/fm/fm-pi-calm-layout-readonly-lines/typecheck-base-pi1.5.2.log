@@ -1,0 +1,7 @@
+$ (cd /tmp/fm-pi-scratch.uP9D/base && git rev-parse HEAD)
+d432729a223a2532040522714b42c4ba2b406655
+Pi: 1.5.2
+tsc: Version 7.0.2 (/opt/homebrew/bin/tsc); npm latest typescript: 7.0.2
+$ FM_PI_PACKAGE_DIR=/tmp/fm-pi-scratch.uP9D/g1.5.2/lib/node_modules/@earendil-works/pi-coding-agent bash tests/fm-pi-primary-types.test.sh
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.5.2
+exit=0

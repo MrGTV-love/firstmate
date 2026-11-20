@@ -1,0 +1,12 @@
+mutant always-spacer: -      return this.hasLeadingSpacer ? ["", ...lines] : [...lines];
++      return ["", ...lines];
+not ok - Pi calm renderer and lifecycle contract failed: file:///Users/charlesabrooker/tmp/fm-calm-pi-extension.vCCeM6/renderer/[eval1]:204
+  throw new Error("Calm-off first operational user row gained a leading spacer or lost a stock row");
+        ^
+
+Error: Calm-off first operational user row gained a leading spacer or lost a stock row
+    at file:///Users/charlesabrooker/tmp/fm-calm-pi-extension.vCCeM6/renderer/[eval1]:204:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.13.0
+render exit=1
