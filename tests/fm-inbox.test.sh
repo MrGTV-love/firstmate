@@ -388,6 +388,695 @@ assert_equals "2" "$(printf '%s' "$binary" | json_len pending)" \
   "the undecodable note and the readable note are both listed"
 pass "a non-UTF-8 note does not break the receipts view"
 
+# --- the wake drain refuses to acknowledge an unacked presented note ----------
+# A drain presents "check: captain inbox note <id>" rows; acknowledging them
+# while the note itself is unread would retire the only reminder. These cases
+# run the real fm-wake-drain.sh and fm-inbox.sh in a scratch home only.
+
+DRAIN_BIN="$ROOT/bin/fm-wake-drain.sh"
+DRAIN_ROOT=$(fm_test_tmproot fm-inbox-drain-root)
+
+make_drain_home() {
+  local home
+  home=$(make_home "$1")
+  : > "$home/config/supervision-host-off"
+  printf '%s\n' "$home"
+}
+
+run_drain() {  # <home> <drain arguments...>
+  local home=$1
+  shift
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_ROOT_OVERRIDE="$DRAIN_ROOT" \
+    "$DRAIN_BIN" "$@"
+}
+
+# present <home>: drain once and print the exact arguments of its WAKE_ACK_REQUIRED command.
+present() {
+  local home=$1 err
+  err=$(run_drain "$home" 2>&1 >/dev/null) || fail "presentation drain failed: $err"
+  printf '%s\n' "$err" | sed -n 's|^WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh ||p'
+}
+
+queue_note() {  # <home> <text> -> note id
+  local out
+  out=$(run_inbox "$1" note "$2") || fail "note failed"
+  out=${out#queued }
+  printf '%s\n' "${out%%$'\n'*}"
+}
+
+queue_rows() {  # <home>
+  awk 'END { print NR + 0 }' "$1/state/.wake-queue" 2>/dev/null || printf '0\n'
+}
+
+# Unacked note in range: refused, id named, queue untouched; acked: passes.
+home=$(make_drain_home ack-gate-one)
+note_id=$(queue_note "$home" "advisor note")
+ack_args=$(present "$home")
+[ -n "$ack_args" ] || fail "the presentation drain printed no WAKE_ACK_REQUIRED command"
+rows_before=$(queue_rows "$home")
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "ack of an unacked presented note is refused"
+assert_contains "$refusal" "$note_id" "the refusal names the unacked note id"
+assert_equals "$rows_before" "$(queue_rows "$home")" "a refused ack consumes no wake row"
+assert_present "$home/state/inbox/$note_id.note" "a refused ack leaves the note pending"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "ack after the note was acked should pass"
+assert_equals "0" "$(queue_rows "$home")" "the passing ack consumes the wake row"
+# A repeat of the already processed acknowledgement keeps its earlier outcome.
+set +e
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1
+repeat_rc=$?
+set -e
+assert_equals "0" "$repeat_rc" "a repeated ack of an already processed sequence still succeeds"
+pass "the drain refuses to ack an unacked presented note and passes once it is acked"
+
+# Two unacked notes: both ids named; acking only one still refuses and names the other.
+home=$(make_drain_home ack-gate-two)
+note_a=$(queue_note "$home" "first advisor note")
+note_b=$(queue_note "$home" "second advisor note")
+ack_args=$(present "$home")
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "ack with two unacked notes is refused"
+assert_contains "$refusal" "$note_a" "the refusal names the first unacked note"
+assert_contains "$refusal" "$note_b" "the refusal names the second unacked note"
+run_inbox "$home" drain --ack "$note_a" >/dev/null || fail "drain --ack failed"
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "ack with one note still unacked is refused"
+assert_contains "$refusal" "$note_b" "the refusal names the note still unacked"
+assert_not_contains "$refusal" "$note_a" "the refusal does not name the acked note"
+pass "every unacked note in the range is named, and an acked note is not"
+
+# An unacked note whose wake row is above the cutoff does not block.
+home=$(make_drain_home ack-gate-outside)
+note_a=$(queue_note "$home" "presented note")
+ack_args=$(present "$home")
+run_inbox "$home" drain --ack "$note_a" >/dev/null || fail "drain --ack failed"
+note_late=$(queue_note "$home" "note that arrived after presentation")
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "an unacked note above the cutoff must not block the ack"
+assert_present "$home/state/inbox/$note_late.note" "the later note stays pending"
+assert_equals "1" "$(queue_rows "$home")" "only the later note's wake row remains"
+pass "an unacked note outside the acknowledged range does not block"
+
+# A range with no inbox note rows acks as before, even with an unacked note elsewhere.
+home=$(make_drain_home ack-gate-none)
+append_signal_row() {
+  FM_STATE_OVERRIDE="$1/state" bash -c '. "$1"; fm_wake_append signal task1 "signal: task1 done"' _ "$ROOT/bin/fm-wake-lib.sh"
+}
+append_signal_row "$home"
+ack_args=$(present "$home")
+queue_note "$home" "unrelated pending note" >/dev/null
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "a range with no inbox note rows must ack"
+pass "a range with no inbox note rows acks exactly as before"
+
+# A note whose state is not established is not an acked note: the ack must keep
+# its rows. An absent inbox and an id with no record are as unknown as an
+# unreadable inbox. Handled-note control: a note moved to handled/ is plainly
+# not pending.
+home=$(make_drain_home ack-gate-state-unknown)
+note_id=$(queue_note "$home" "note whose inbox goes missing")
+ack_args=$(present "$home")
+handled_id=$(queue_note "$home" "note acked before the check")
+run_inbox "$home" drain --ack "$handled_id" >/dev/null || fail "drain --ack failed"
+rows_before=$(queue_rows "$home")
+assert_equals "handled $handled_id" "$(run_inbox "$home" pending "$handled_id")" "an acked note reads as handled"
+assert_equals "pending $note_id" "$(run_inbox "$home" pending "$note_id")" "an unacked note reads as pending"
+mv "$home/state/inbox" "$home/state/inbox.away"
+set +e
+absent_out=$(run_inbox "$home" pending "$note_id" 2>/dev/null)
+absent_rc=$?
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+run_inbox "$home" drain --ack "$note_id" >/dev/null 2>&1
+absent_ack_rc=$?
+set -e
+mv "$home/state/inbox.away" "$home/state/inbox"
+assert_not_equals "0" "$absent_rc" "pending fails closed when the inbox is absent"
+assert_equals "unknown $note_id" "$absent_out" "an absent inbox reads as unknown, never as handled"
+assert_not_equals "0" "$refusal_rc" "the wake ack is refused while the inbox is absent"
+assert_contains "$refusal" "$note_id" "the refusal names the note whose state is unknown"
+assert_equals "$rows_before" "$(queue_rows "$home")" "a refused ack keeps every wake row"
+assert_not_equals "0" "$absent_ack_rc" "drain --ack records nothing while the inbox is absent"
+assert_present "$home/state/inbox/$note_id.note" "the note is still pending once the inbox is back"
+assert_absent "$home/state/inbox/handled/$note_id.acked" "no ack was recorded for an unreadable inbox"
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "with the inbox back the unacked note still refuses"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "an acked note must let the ack pass"
+pass "an absent inbox fails closed, then an acked note lets the ack pass"
+
+# A wake row that names a note with no record at all keeps its row until the ack
+# of that id is recorded; a handled note beside it is the control.
+home=$(make_drain_home ack-gate-missing-id)
+seed_id=$(queue_note "$home" "seed note, acked")
+run_inbox "$home" drain --ack "$seed_id" >/dev/null || fail "drain --ack failed"
+FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_wake_append check "inbox:ghost-1" "check: captain inbox note ghost-1 - the note file was lost"' _ "$ROOT/bin/fm-wake-lib.sh"
+ack_args=$(present "$home")
+rows_before=$(queue_rows "$home")
+set +e
+# shellcheck disable=SC2086
+refusal=$(run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "a wake naming a note with no record is refused"
+assert_contains "$refusal" "ghost-1" "the refusal names the unknown note id"
+assert_not_contains "$refusal" "$seed_id" "the handled control note is not named"
+assert_equals "$rows_before" "$(queue_rows "$home")" "a refused ack keeps every wake row"
+assert_contains "$(run_inbox "$home" drain --ack ghost-1)" "already-acked ghost-1" "the ack of an unknown id is recorded"
+assert_present "$home/state/inbox/handled/ghost-1.acked" "the explicit ack is on record"
+assert_equals "handled ghost-1" "$(run_inbox "$home" pending ghost-1)" "a recorded ack reads as handled"
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "the ack must pass once the unknown id is recorded"
+assert_equals "0" "$(queue_rows "$home")" "the passing ack consumes both rows"
+pass "a wake naming an unknown note refuses until its ack is recorded; a handled note does not"
+
+# An inbox the drain cannot read is not an acked note either.
+home=$(make_drain_home ack-gate-unreadable)
+note_id=$(queue_note "$home" "note in an unreadable inbox")
+ack_args=$(present "$home")
+rows_before=$(queue_rows "$home")
+if [ "$(id -u)" -eq 0 ]; then
+  pass "an unreadable inbox cannot be simulated as root; the absent-inbox and unknown-id cases hold"
+else
+  chmod 000 "$home/state/inbox"
+  set +e
+  pending_out=$(run_inbox "$home" pending "$note_id" 2>/dev/null)
+  pending_rc=$?
+  # shellcheck disable=SC2086
+  refusal=$(run_drain "$home" $ack_args 2>&1)
+  refusal_rc=$?
+  set -e
+  chmod 700 "$home/state/inbox"
+  assert_not_equals "0" "$pending_rc" "pending fails closed when the inbox cannot be read"
+  assert_equals "unknown $note_id" "$pending_out" "an unreadable inbox is reported as unknown"
+  assert_not_equals "0" "$refusal_rc" "the wake ack is refused when the inbox cannot be read"
+  assert_equals "$rows_before" "$(queue_rows "$home")" "a refused ack keeps every wake row"
+  assert_present "$home/state/inbox/$note_id.note" "the note is still pending after the refused ack"
+  pass "an unreadable inbox fails closed and the wake rows stay"
+fi
+
+# A queue scan that fails is not an empty range. The awk shim fails only the
+# captain-note scan and runs every other awk as itself; the control runs the same
+# shim unarmed over a range that holds no note row.
+home=$(make_drain_home ack-gate-scan-fault)
+note_id=$(queue_note "$home" "note behind a failing queue scan")
+ack_args=$(present "$home")
+rows_before=$(queue_rows "$home")
+shim_dir="$home/shim"
+mkdir -p "$shim_dir"
+real_awk=$(command -v awk)
+cat > "$shim_dir/awk" <<SHIM
+#!/bin/sh
+case "\$*" in
+  *"captain inbox note"*)
+    if [ -e "$home/fail-scan" ]; then echo "injected queue reader failure" >&2; : > "$home/scan-fired"; exit 1; fi ;;
+esac
+exec "$real_awk" "\$@"
+SHIM
+chmod +x "$shim_dir/awk"
+: > "$home/fail-scan"
+set +e
+# shellcheck disable=SC2086
+refusal=$(PATH="$shim_dir:$PATH" run_drain "$home" $ack_args 2>&1)
+refusal_rc=$?
+set -e
+assert_present "$home/scan-fired" "the injected scan failure never fired"
+assert_not_equals "0" "$refusal_rc" "an ack whose queue scan failed is refused"
+assert_contains "$refusal" "could not be read" "the refusal says the queue scan failed"
+assert_equals "$rows_before" "$(queue_rows "$home")" "a failed scan keeps every wake row"
+assert_present "$home/state/inbox/$note_id.note" "the note is still pending after the failed scan"
+rm -f "$home/fail-scan" "$home/scan-fired"
+home=$(make_drain_home ack-gate-scan-control)
+append_signal_row "$home"
+ack_args=$(present "$home")
+# shellcheck disable=SC2086
+PATH="$shim_dir:$PATH" run_drain "$home" $ack_args >/dev/null 2>&1 || fail "the unarmed shim must not stop a range with no note row"
+assert_equals "0" "$(queue_rows "$home")" "the control ack consumes its row"
+pass "a failed queue scan refuses the ack and keeps the rows; an empty range still acks"
+
+# --keep-unacked-notes is the away daemon's alone (FM_WAKE_ACK_AWAY_DAEMON=1 with
+# state/.afk). It retires every other row and keeps each row whose note is not
+# acked; it never acks a note. An ordinary actor passing it gets the plain
+# refusal naming the ids, and nothing is consumed.
+home=$(make_drain_home ack-keep-notes)
+append_keyed_signal() { FM_STATE_OVERRIDE="$1/state" bash -c '. "$1"; fm_wake_append signal "$2" "signal: $2 done"' _ "$ROOT/bin/fm-wake-lib.sh" "$2"; }
+append_keyed_signal "$home" taska
+note_id=$(queue_note "$home" "note a daemon cannot read")
+append_keyed_signal "$home" taskb
+ack_args=$(present "$home")
+set +e
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1
+plain_rc=$?
+# shellcheck disable=SC2086
+ordinary=$(run_drain "$home" $ack_args --keep-unacked-notes 2>&1)
+ordinary_rc=$?
+# the daemon variable alone, without the away record, is still an ordinary actor
+# shellcheck disable=SC2086
+FM_WAKE_ACK_AWAY_DAEMON=1 run_drain "$home" $ack_args --keep-unacked-notes >/dev/null 2>&1
+no_afk_rc=$?
+set -e
+assert_not_equals "0" "$plain_rc" "the plain ack of the range still refuses"
+assert_not_equals "0" "$ordinary_rc" "an ordinary actor cannot use keep mode for a partial ack"
+assert_contains "$ordinary" "$note_id" "the ordinary refusal names the unacked note id"
+assert_not_equals "0" "$no_afk_rc" "the daemon variable without the away record is an ordinary actor"
+assert_equals "3" "$(queue_rows "$home")" "the refusals consumed nothing"
+: > "$home/state/.afk"
+# shellcheck disable=SC2086
+FM_WAKE_ACK_AWAY_DAEMON=1 run_drain "$home" $ack_args --keep-unacked-notes >/dev/null 2>&1 || fail "the away daemon's keep-mode ack must succeed"
+assert_equals "1" "$(queue_rows "$home")" "only the note's row stays"
+assert_contains "$(cat "$home/state/.wake-queue")" "inbox:$note_id" "the kept row is the note's row"
+assert_present "$home/state/inbox/$note_id.note" "keep mode never acks the note"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+# shellcheck disable=SC2086
+FM_WAKE_ACK_AWAY_DAEMON=1 run_drain "$home" $ack_args --keep-unacked-notes >/dev/null 2>&1 || fail "the keep-mode ack after the note ack must succeed"
+assert_equals "0" "$(queue_rows "$home")" "once the note is acked the kept row retires"
+home=$(make_drain_home ack-keep-notes-absent)
+: > "$home/state/.afk"
+note_id=$(queue_note "$home" "note with its inbox missing")
+ack_args=$(present "$home")
+mv "$home/state/inbox" "$home/state/inbox.away"
+# shellcheck disable=SC2086
+FM_WAKE_ACK_AWAY_DAEMON=1 run_drain "$home" $ack_args --keep-unacked-notes >/dev/null 2>&1 || fail "the daemon's keep-mode ack must succeed with the inbox absent"
+mv "$home/state/inbox.away" "$home/state/inbox"
+assert_equals "1" "$(queue_rows "$home")" "an absent inbox keeps the note's row in keep mode"
+pass "keep mode is the away daemon's alone: it keeps note rows and retires the rest, and an ordinary actor refuses with the ids"
+
+# A refused ack must not change main's claim. Rows 1-3 are presented and claimed;
+# row 4 is a pending captain inbox note and row 5 arrives unclaimed. The refused
+# ack of 1-5 leaves the claim file byte-identical, so rows 4 and 5 are not main-owned;
+# once the note is acked the same ack consumes all five rows.
+home=$(make_drain_home ack-refusal-keeps-claim)
+append_keyed_signal "$home" taska
+append_keyed_signal "$home" taskb
+append_keyed_signal "$home" taskc
+ack_args=$(present "$home")
+generation=$(printf '%s' "$ack_args" | sed 's/.*--recovery-generation //')
+note_id=$(queue_note "$home" "note in a range main is refusing")
+append_keyed_signal "$home" taskd
+assert_equals "1 2 3 4 5" "$(awk -F '\t' 'NF >= 5 { printf "%s%s", (n++ ? " " : ""), $2 }' "$home/state/.wake-queue")" "the range holds rows 1-5"
+claim_before=$(cat "$home/state/.main-eligible-rows")
+set +e
+refusal=$(run_drain "$home" --ack-through 5 --recovery-generation "$generation" 2>&1)
+refusal_rc=$?
+set -e
+assert_not_equals "0" "$refusal_rc" "the ack of a range holding a pending note is refused"
+assert_contains "$refusal" "$note_id" "the refusal names the pending note"
+assert_equals "$claim_before" "$(cat "$home/state/.main-eligible-rows")" "a refused ack leaves main's claim unchanged, so rows 4 and 5 stay unowned"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+run_drain "$home" --ack-through 5 --recovery-generation "$generation" >/dev/null 2>&1 || fail "the ack must pass once the note is acked"
+assert_equals "0" "$(queue_rows "$home")" "the passing ack consumes rows 4 and 5 with the rest of the range"
+pass "a refused ack does not change main's claim; after the note is acked the same ack consumes the whole range"
+
+# A note acked at the first check and pending again at the second check refuses the
+# ack inside its receipt window. A shim inside a copied bin/ makes the note pending
+# on the second fm-inbox.sh pending call, which is the second check. The row claimed
+# during that ack must not stay main-owned.
+home=$(make_drain_home ack-window-refusal)
+append_keyed_signal "$home" taska
+note_id=$(queue_note "$home" "note acked before the first check")
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+ack_args=$(present "$home")
+generation=$(printf '%s' "$ack_args" | sed 's/.*--recovery-generation //')
+append_keyed_signal "$home" taskc
+claim_before=$(cat "$home/state/.main-eligible-rows")
+cp -R "$ROOT/bin" "$home/bin"
+cat > "$home/bin/fm-inbox.sh" <<SHIM
+#!/usr/bin/env bash
+if [ "\${1:-}" = pending ]; then
+  n=\$(cat "$home/pending-calls" 2>/dev/null || echo 0)
+  n=\$((n + 1))
+  printf '%s\n' "\$n" > "$home/pending-calls"
+  if [ "\$n" -eq 2 ]; then
+    mv "$home/state/inbox/handled/$note_id.note" "$home/state/inbox/$note_id.note"
+  fi
+fi
+exec "$ROOT/bin/fm-inbox.sh" "\$@"
+SHIM
+chmod +x "$home/bin/fm-inbox.sh"
+set +e
+refusal=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+  FM_CONFIG_OVERRIDE="$home/config" FM_ROOT_OVERRIDE="$DRAIN_ROOT" \
+  "$home/bin/fm-wake-drain.sh" --ack-through 3 --recovery-generation "$generation" 2>&1)
+refusal_rc=$?
+set -e
+assert_equals "2" "$(cat "$home/pending-calls")" "the refusal came from the second note check, inside the receipt window"
+assert_not_equals "0" "$refusal_rc" "the ack is refused when the note is pending again at the second check"
+assert_contains "$refusal" "$note_id" "the refusal names the note"
+assert_equals "$claim_before" "$(cat "$home/state/.main-eligible-rows")" "a refused ack leaves main's claim as it was, so row 3 stays unowned"
+assert_equals "3" "$(queue_rows "$home")" "a refused ack consumes no wake row"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+run_drain "$home" --ack-through 3 --recovery-generation "$generation" >/dev/null 2>&1 || fail "the ack must pass once the note is acked again"
+assert_equals "0" "$(queue_rows "$home")" "the second ack consumes the rows the refused ack left unclaimed"
+pass "a note pending again at the second check refuses the ack without changing main's claim"
+
+# A request-id replay of an identity that was acked with no note record must not
+# publish a new pending note, even inside the ack's unlocked receipt window, and
+# the ack's final decision is made under the lock that consumes. The barrier holds
+# the ack after its real receipt call. Control: replay of a normally handled note.
+home=$(make_drain_home ack-replay-terminal)
+race_pid=
+fifo="$home/barrier.fifo"
+reached="$home/barrier.reached"
+mkdir -p "$home/state/terminal-outcomes"
+fp=$(printf 'cd%.0s' $(seq 1 32))
+printf 'phase=presentation\n' > "$home/state/terminal-outcomes/$fp.pending"
+replay_out=$(run_inbox "$home" note --request-id retryable "UNREAD RECONSTRUCTED BODY") || fail "the first retryable note failed"
+note_id=$(printf '%s\n' "$replay_out" | sed -n '1s/^queued //p')
+mv "$home/state/inbox/$note_id.note" "$home/note.aside"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "the ack of a note with no record failed"
+assert_present "$home/state/inbox/handled/$note_id.acked" "the explicit ack is on record"
+FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_wake_append check "inactive-reconcile:$2" "check: inactive outcome $2"' _ "$ROOT/bin/fm-wake-lib.sh" "$fp"
+ack_args=$(present "$home")
+cp -R "$ROOT/bin" "$home/bin"
+cat > "$home/bin/fm-inactive-reconcile.sh" <<SHIM
+#!/usr/bin/env bash
+"$ROOT/bin/fm-inactive-reconcile.sh" "\$@" || exit \$?
+if [ "\${1:-}" = acknowledge-notice ]; then
+  : > "$reached"
+  read -r _ < "$fifo"
+fi
+SHIM
+chmod +x "$home/bin/fm-inactive-reconcile.sh"
+mkfifo "$fifo"
+trap '[ -z "$race_pid" ] || kill "$race_pid" 2>/dev/null || true; fm_test_cleanup' EXIT
+# shellcheck disable=SC2086
+FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+  FM_CONFIG_OVERRIDE="$home/config" FM_ROOT_OVERRIDE="$DRAIN_ROOT" \
+  "$home/bin/fm-wake-drain.sh" $ack_args > "$home/replay-ack.out" 2>&1 &
+race_pid=$!
+waited=0
+while [ ! -e "$reached" ] && [ "$waited" -lt 200 ]; do sleep 0.1; waited=$((waited + 1)); done
+assert_present "$reached" "the ack never reached the receipt window"
+replay_rc=0
+run_inbox "$home" note --request-id retryable "UNREAD RECONSTRUCTED BODY" >/dev/null 2>&1 || replay_rc=$?
+state_in_window=$(run_inbox "$home" pending "$note_id" 2>/dev/null) || true
+printf 'go\n' > "$fifo"
+race_rc=0
+wait "$race_pid" || race_rc=$?
+race_pid=
+trap 'fm_test_cleanup' EXIT
+assert_equals "0" "$replay_rc" "the replay of an acknowledged identity succeeds"
+assert_equals "handled $note_id" "$state_in_window" "the replay did not recreate a pending note"
+assert_absent "$home/state/inbox/$note_id.note" "no pending note exists after the replay"
+assert_equals "0" "$race_rc" "the ack completes: $(cat "$home/replay-ack.out")"
+assert_equals "0" "$(queue_rows "$home")" "the checked rows were consumed"
+assert_contains "$(cat "$home/state/terminal-outcomes/$fp.pending")" "notice_emitted=1" "the receipt was recorded"
+# Whatever order the lock is taken in, a pending note always keeps its wake: a note
+# that appears before the final check refuses and keeps the rows.
+home=$(make_drain_home ack-final-recheck)
+note_id=$(queue_note "$home" "note restored in the window")
+ack_args=$(present "$home")
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+cp -R "$ROOT/bin" "$home/bin"
+cat > "$home/bin/fm-inactive-reconcile.sh" <<SHIM
+#!/usr/bin/env bash
+exec "$ROOT/bin/fm-inactive-reconcile.sh" "\$@"
+SHIM
+chmod +x "$home/bin/fm-inactive-reconcile.sh"
+fp=$(printf 'ef%.0s' $(seq 1 32))
+mkdir -p "$home/state/terminal-outcomes"
+printf 'phase=presentation\n' > "$home/state/terminal-outcomes/$fp.pending"
+FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_wake_append check "inactive-reconcile:$2" "check: inactive outcome $2"' _ "$ROOT/bin/fm-wake-lib.sh" "$fp"
+ack_args=$(present "$home")
+fifo="$home/barrier.fifo"
+reached="$home/barrier.reached"
+cat > "$home/bin/fm-inactive-reconcile.sh" <<SHIM
+#!/usr/bin/env bash
+"$ROOT/bin/fm-inactive-reconcile.sh" "\$@" || exit \$?
+if [ "\${1:-}" = acknowledge-notice ]; then
+  : > "$reached"
+  read -r _ < "$fifo"
+fi
+SHIM
+mkfifo "$fifo"
+# shellcheck disable=SC2086
+FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+  FM_CONFIG_OVERRIDE="$home/config" FM_ROOT_OVERRIDE="$DRAIN_ROOT" \
+  "$home/bin/fm-wake-drain.sh" $ack_args > "$home/recheck-ack.out" 2>&1 &
+race_pid=$!
+trap '[ -z "$race_pid" ] || kill "$race_pid" 2>/dev/null || true; fm_test_cleanup' EXIT
+waited=0
+while [ ! -e "$reached" ] && [ "$waited" -lt 200 ]; do sleep 0.1; waited=$((waited + 1)); done
+assert_present "$reached" "the ack never reached the receipt window"
+mv "$home/state/inbox/handled/$note_id.note" "$home/state/inbox/$note_id.note"
+printf 'go\n' > "$fifo"
+race_rc=0
+wait "$race_pid" || race_rc=$?
+race_pid=
+trap 'fm_test_cleanup' EXIT
+assert_not_equals "0" "$race_rc" "an ack whose note became pending in the window is refused"
+assert_contains "$(cat "$home/recheck-ack.out")" "$note_id" "the final refusal names the note"
+assert_equals "2" "$(queue_rows "$home")" "the final refusal keeps every row"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "the ack must pass once the note is acked again"
+assert_equals "0" "$(queue_rows "$home")" "the rerun consumes both rows"
+# Control: the replay of a note acked the ordinary way creates nothing and still acks.
+home=$(make_drain_home ack-replay-control)
+replay_out=$(run_inbox "$home" note --request-id ordinary "ordinary body") || fail "the control note failed"
+note_id=$(printf '%s\n' "$replay_out" | sed -n '1s/^queued //p')
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+run_inbox "$home" note --request-id ordinary "ordinary body" >/dev/null || fail "the control replay failed"
+assert_absent "$home/state/inbox/$note_id.note" "a replay of a handled note creates no pending note"
+ack_args=$(present "$home")
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "the control ack must pass"
+pass "an acknowledged identity is terminal for replay, and the final pending check runs under the consuming lock"
+
+# The rows the guard checks are the rows the ack consumes, and they stay valid
+# while the ack has released the queue lock for its receipts. The barrier holds
+# the ack inside that window after its real receipt call. "claim": a concurrent
+# main drain rotates scratch and claims the note row the grant just released;
+# "vanish": the row set disappears. Either way the checked row, the unchecked
+# note, and the receipt must agree.
+barrier_ack_case() {  # <name> <claim|vanish>
+  local name=$1 mode=$2 home race_pid='' fifo reached fp note_id ack_args second race_rc grant_pid queue
+  home=$(make_drain_home "$name")
+  fifo="$home/barrier.fifo"
+  reached="$home/barrier.reached"
+  mkdir -p "$home/state/terminal-outcomes"
+  fp=$(printf 'ab%.0s' $(seq 1 32))
+  printf 'phase=presentation\n' > "$home/state/terminal-outcomes/$fp.pending"
+  note_id=$(queue_note "$home" "note held by a branch grant")
+  FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_wake_append check "inactive-reconcile:$2" "check: inactive outcome $2"' _ "$ROOT/bin/fm-wake-lib.sh" "$fp"
+  sleep 300 &
+  grant_pid=$!
+  trap 'kill "$grant_pid" 2>/dev/null || true; [ -z "$race_pid" ] || kill "$race_pid" 2>/dev/null || true; fm_test_cleanup' EXIT
+  grant() { FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-wake-grant.sh" "$@"; }
+  grant activate "$grant_pid" g1 || fail "branch grant activation failed"
+  grant publish g1 1 || fail "branch grant publish failed"
+  ack_args=$(present "$home")
+  case "$ack_args" in "--ack-through 2 "*) ;; *) fail "main did not present exactly the receipt row: $ack_args" ;; esac
+  cp -R "$ROOT/bin" "$home/bin"
+  cat > "$home/bin/fm-inactive-reconcile.sh" <<SHIM
+#!/usr/bin/env bash
+"$ROOT/bin/fm-inactive-reconcile.sh" "\$@" || exit \$?
+if [ "\${1:-}" = acknowledge-notice ]; then
+  : > "$reached"
+  read -r _ < "$fifo"
+fi
+SHIM
+  chmod +x "$home/bin/fm-inactive-reconcile.sh"
+  mkfifo "$fifo"
+  # shellcheck disable=SC2086
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_ROOT_OVERRIDE="$DRAIN_ROOT" \
+    "$home/bin/fm-wake-drain.sh" $ack_args > "$home/race-ack.out" 2>&1 &
+  race_pid=$!
+  local waited=0
+  while [ ! -e "$reached" ] && [ "$waited" -lt 200 ]; do sleep 0.1; waited=$((waited + 1)); done
+  assert_present "$reached" "$mode: the ack never reached the receipt window"
+  if [ "$mode" = claim ]; then
+    grant release g1 || fail "branch grant release failed"
+    second=$(run_drain "$home" 2>&1) || fail "the second main drain failed"
+    assert_contains "$second" "$note_id" "the second main drain presented the note released from the grant"
+    ls "$home"/state/.wake-ack-rows.* >/dev/null 2>&1 \
+      || fail "the concurrent drain removed the live ack's row set"
+  else
+    rm -f "$home"/state/.wake-ack-rows.*
+  fi
+  printf 'go\n' > "$fifo"
+  race_rc=0
+  wait "$race_pid" || race_rc=$?
+  race_pid=
+  queue=$(cat "$home/state/.wake-queue")
+  assert_present "$home/state/inbox/$note_id.note" "$mode: the note is still pending"
+  assert_contains "$queue" "inbox:$note_id" "$mode: the unchecked note's wake row survives"
+  if [ "$mode" = claim ]; then
+    assert_equals "0" "$race_rc" "the ack with the claim grown in its window completes: $(cat "$home/race-ack.out")"
+    assert_not_contains "$queue" "inactive-reconcile:$fp" "the checked row was consumed by the ack that checked it"
+    assert_equals "1" "$(queue_rows "$home")" "only the unchecked note's row remains"
+    assert_contains "$(cat "$home/state/terminal-outcomes/$fp.pending")" "notice_emitted=1" "the checked row's real receipt was recorded"
+    set +e
+    refusal=$(run_drain "$home" --ack-through 1 --recovery-generation "$(printf '%s' "$ack_args" | sed 's/.*--recovery-generation //')" 2>&1)
+    race_rc=$?
+    set -e
+    assert_not_equals "0" "$race_rc" "the later ack through the note's row is refused"
+    assert_contains "$refusal" "$note_id" "the later refusal names the note"
+  else
+    assert_not_equals "0" "$race_rc" "an ack whose row set vanished must fail, not report success"
+    assert_contains "$(cat "$home/race-ack.out")" "vanished" "the failure says the row set vanished"
+    assert_contains "$queue" "inactive-reconcile:$fp" "a failed ack keeps the checked row"
+  fi
+  kill "$grant_pid" 2>/dev/null || true
+  trap 'fm_test_cleanup' EXIT
+}
+barrier_ack_case ack-gate-claim-grows claim
+pass "a row claimed while the lock is released is not consumed unchecked: checked row removed, note kept, receipt consistent"
+barrier_ack_case ack-gate-rowset-vanishes vanish
+pass "a row set that vanishes while the lock is released is an explicit failure"
+
+# Scratch rotation spares the row set of a live ack and removes one whose pid is gone.
+home=$(make_drain_home ack-rows-rotation)
+append_signal_row "$home"
+sleep 300 &
+live_pid=$!
+( : ) &
+dead_pid=$!
+wait "$dead_pid" || true
+: > "$home/state/.wake-ack-rows.$dead_pid.AAAAAA"
+: > "$home/state/.wake-ack-rows.$live_pid.BBBBBB"
+run_drain "$home" >/dev/null 2>&1 || fail "the presentation drain failed"
+kill "$live_pid" 2>/dev/null || true
+assert_absent "$home/state/.wake-ack-rows.$dead_pid.AAAAAA" "a row set whose pid is gone is rotated away"
+assert_present "$home/state/.wake-ack-rows.$live_pid.BBBBBB" "a row set whose pid is live is kept"
+pass "scratch rotation keeps a live ack's row set and removes a dead one's"
+
+# One lock serializes the ack decision and the replay publication. A writer is
+# paused with a PATH shim at a boundary of publish_from_reservation while the
+# missing-record ack and the wake ack run; in every valid order the final state
+# keeps the invariant: a pending note always has its wake row, and a note that
+# was acked is never published afterward.
+#   inside: paused at the staging rename, which is inside the lock
+#   before: paused before the lock, so both acks finish first
+paused_writer_case() {  # <name> <inside|before>
+  local name=$1 where=$2 home shim fifo reached real_mv real_tr writer_pid ack_pid wake_pid note_id ack_args rows
+  local waited=0 writer_out writer_rc=0 wake_rc=0 pending_present=no
+  home=$(make_drain_home "$name")
+  shim="$home/shim"; fifo="$home/writer.fifo"; reached="$home/writer.reached"
+  mkdir -p "$shim"
+  real_mv=$(command -v mv); real_tr=$(command -v tr)
+  writer_out=$(run_inbox "$home" note --request-id "$name" "UNREAD CONCURRENT BODY") || fail "$name: the first note failed"
+  note_id=$(printf '%s\n' "$writer_out" | sed -n '1s/^queued //p')
+  "$real_mv" "$home/state/inbox/$note_id.note" "$home/note.aside"
+  ack_args=$(present "$home")
+  cat > "$shim/mv" <<SHIM
+#!/bin/sh
+case "\$1" in
+  */.staging-*)
+    if [ "$where" = inside ] && [ ! -e "$reached" ]; then : > "$reached"; read -r _ < "$fifo"; fi ;;
+esac
+exec "$real_mv" "\$@"
+SHIM
+  cat > "$shim/tr" <<SHIM
+#!/bin/sh
+if [ "$where" = before ] && [ "\$1" = -d ] && [ ! -e "$reached" ]; then : > "$reached"; read -r _ < "$fifo"; fi
+exec "$real_tr" "\$@"
+SHIM
+  chmod +x "$shim/mv" "$shim/tr"
+  mkfifo "$fifo"
+  PATH="$shim:$PATH" run_inbox "$home" note --request-id "$name" "UNREAD CONCURRENT BODY" > "$home/writer.out" 2>&1 &
+  writer_pid=$!
+  while [ ! -e "$reached" ] && [ "$waited" -lt 200 ]; do sleep 0.1; waited=$((waited + 1)); done
+  assert_present "$reached" "$name: the writer never reached its pause point"
+  run_inbox "$home" drain --ack "$note_id" > "$home/ack.out" 2>&1 &
+  ack_pid=$!
+  # shellcheck disable=SC2086
+  run_drain "$home" $ack_args > "$home/wake.out" 2>&1 &
+  wake_pid=$!
+  if [ "$where" = before ]; then
+    wait "$ack_pid" || fail "$name: the missing-record ack failed"
+    wait "$wake_pid" || fail "$name: the wake ack failed while the writer was paused before the lock"
+    assert_equals "0" "$(queue_rows "$home")" "$name: both acks completed before the writer was released"
+  else
+    waited=0
+    while [ "$waited" -lt 20 ]; do sleep 0.1; waited=$((waited + 1)); done
+    assert_absent "$home/state/inbox/handled/$note_id.acked" "$name: the ack decided while the writer was inside the lock"
+  fi
+  printf 'go\n' > "$fifo"
+  wait "$writer_pid" || writer_rc=$?
+  if [ "$where" = inside ]; then
+    wait "$ack_pid" || true
+    wait "$wake_pid" || wake_rc=$?
+  fi
+  rows=$(queue_rows "$home")
+  [ ! -f "$home/state/inbox/$note_id.note" ] || pending_present=yes
+  assert_equals "0" "$writer_rc" "$name: the writer ended cleanly"
+  if [ "$pending_present" = yes ] && [ "$rows" -eq 0 ]; then
+    fail "$name: a pending note was left with no wake row (wake ack rc=$wake_rc, marker: $(find "$home/state/inbox/handled" -type f 2>/dev/null | tr '\n' ' '))"
+  fi
+  if [ "$pending_present" = yes ] && [ -e "$home/state/inbox/handled/$note_id.acked" ]; then
+    fail "$name: a note was published after its identity was acked"
+  fi
+  # Whatever the order, one more ack of the wake passes once the note is handled, and no unread note remains.
+  run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "$name: the final note ack failed"
+  # shellcheck disable=SC2086
+  run_drain "$home" $ack_args >/dev/null 2>&1 || fail "$name: the final wake ack did not pass: $(run_drain "$home" $ack_args 2>&1)"
+  assert_equals "0" "$(queue_rows "$home")" "$name: no wake row is left behind"
+  assert_absent "$home/state/inbox/$note_id.note" "$name: no unread note is left behind"
+}
+paused_writer_case ack-writer-paused-inside inside
+pass "a replay paused inside the lock keeps the invariant in whichever order the acks follow it"
+paused_writer_case ack-writer-paused-before before
+pass "a replay paused before the lock cannot publish an identity acked meanwhile"
+
+# A replay of an identity that has only an ack record reports acknowledgement, in
+# human and JSON form, saves nothing and wakes nothing. Control: a note that was
+# handled the ordinary way reports acknowledgement with its handled path.
+home=$(make_drain_home ack-replay-report)
+first=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the reported note failed"
+note_id=$(printf '%s\n' "$first" | sed -n '1s/^queued //p')
+mv "$home/state/inbox/$note_id.note" "$home/note.aside"
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+ack_args=$(present "$home")
+# shellcheck disable=SC2086
+run_drain "$home" $ack_args >/dev/null 2>&1 || fail "the wake ack must pass"
+human=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the human replay failed"
+json=$(run_inbox "$home" note --request-id reported --json "REPORTED BODY") || fail "the json replay failed"
+assert_contains "$human" "replay $note_id" "the replay names the identity"
+assert_contains "$human" "already acknowledged" "the replay says the note was acknowledged"
+assert_not_contains "$human" "pick this up" "the replay promises no pickup"
+assert_equals "False" "$(printf '%s' "$json" | json_get saved)" "the replay claims nothing was saved"
+assert_equals "True" "$(printf '%s' "$json" | json_get acknowledged)" "the json replay reports acknowledgement"
+assert_equals "None" "$(printf '%s' "$json" | json_get path)" "the json replay names no path"
+assert_equals "0" "$(queue_rows "$home")" "the replay queued no wake"
+assert_absent "$home/state/inbox/$note_id.note" "the replay published no note"
+home=$(make_drain_home ack-replay-report-control)
+first=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the control note failed"
+note_id=$(printf '%s\n' "$first" | sed -n '1s/^queued //p')
+run_inbox "$home" drain --ack "$note_id" >/dev/null || fail "drain --ack failed"
+human=$(run_inbox "$home" note --request-id reported "REPORTED BODY") || fail "the control human replay failed"
+json=$(run_inbox "$home" note --request-id reported --json "REPORTED BODY") || fail "the control json replay failed"
+assert_contains "$human" "already acknowledged" "the control replay says the note was acknowledged"
+assert_not_contains "$human" "pick this up" "the control replay promises no pickup"
+assert_equals "True" "$(printf '%s' "$json" | json_get saved)" "the control record still exists"
+assert_equals "True" "$(printf '%s' "$json" | json_get acknowledged)" "the control json replay reports acknowledgement"
+assert_equals "$home/state/inbox/handled/$note_id.note" "$(printf '%s' "$json" | json_get path)" "the control replay names the handled path"
+pass "a replay of an acknowledged identity reports acknowledgement, and a path only when a record exists"
+
 # --- readiness projection, including unknown -------------------------------
 
 home=$(make_home ready-free)
@@ -544,3 +1233,4 @@ run_inbox "$home" drain --ack "$did" >/dev/null || fail "drain --ack failed"
 assert_absent "$home/state/inbox/$did.note" "acked note leaves pending"
 assert_present "$home/state/inbox/handled/$did.note" "acked note is in handled"
 pass "drain --ack still moves the note to handled"
+
