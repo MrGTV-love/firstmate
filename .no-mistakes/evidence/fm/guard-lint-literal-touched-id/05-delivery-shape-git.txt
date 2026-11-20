@@ -1,0 +1,39 @@
+$ git rev-parse HEAD
+3167a794c6afba22d7473087dd41f967b131afd8
+$ git merge-base --is-ancestor 4e7a1a6b6426d94bca332c7ebd8ae7a3bc1e5fca HEAD
+exit=0
+$ git merge-base --is-ancestor ee9cf4984e1e090a70ddc75e58d63e4bc6100795 HEAD
+exit=0
+$ git log --first-parent --oneline 4e7a1a6b..ee9cf498
+ee9cf4984 fix(bin): record reached guard lint decisions
+70d3eb4dc no-mistakes(document): Update touched-registry trigger, spec pointer, and lint header
+0963eec3b no-mistakes(review): Compare touched registry rows per literal guard ID
+b6bc9c999 Merge remote-tracking branch 'origin/main' into HEAD
+$ git rev-parse HEAD^1 HEAD^2
+ee9cf4984e1e090a70ddc75e58d63e4bc6100795
+ef5b3c923c8bda3737838bd237af0082ff5906d0
+$ git branch -r --contains HEAD^2 (main?)
+  origin/HEAD -> origin/main
+  origin/fm/fm-slot-provision-runs-project-provisioner
+  origin/main
+$ git log --oneline ee9cf498..HEAD^2 | head
+ef5b3c923 fix: let firstmate merge under the standing merge rule without asking (#424)
+$ git diff --stat ee9cf498 HEAD
+ .agents/skills/bearings/SKILL.md               |  4 ++--
+ .agents/skills/captain-facing-wording/SKILL.md |  2 +-
+ .agents/skills/ship-landing/SKILL.md           |  2 +-
+ .agents/skills/stow/SKILL.md                   |  2 +-
+ AGENTS.md                                      |  8 +++++---
+ CONTRIBUTING.md                                |  2 +-
+ VISION.md                                      |  3 ++-
+ bin/fm-contributions.sh                        |  1 +
+ bin/fm-merge-local.sh                          | 11 ++++++-----
+ 9 files changed, 20 insertions(+), 15 deletions(-)
+$ git diff --stat HEAD^2 HEAD -- bin/fm-guard-lint.sh tests/fm-guard-lint.test.sh docs/guards/registry.json docs/guard-spec.md .github/workflows/ci.yml
+ .github/workflows/ci.yml    |  13 ++++
+ bin/fm-guard-lint.sh        |  51 ++++++++++-----
+ docs/guard-spec.md          |   8 ++-
+ docs/guards/registry.json   |  32 +++++++++-
+ tests/fm-guard-lint.test.sh | 148 +++++++++++++++++++++++++++++++++++++++++++-
+ 5 files changed, 231 insertions(+), 21 deletions(-)
+$ git diff ee9cf498 HEAD -- bin/fm-guard-lint.sh tests/fm-guard-lint.test.sh (lint files changed by the merge)

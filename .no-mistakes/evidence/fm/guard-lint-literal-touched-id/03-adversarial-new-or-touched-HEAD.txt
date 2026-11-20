@@ -1,0 +1,41 @@
+# lint under test: 3167a794c6afba22d7473087dd41f967b131afd8 bin/fm-guard-lint.sh
+=== A_numeric_untouched_1e1_edit_10
+exit=0
+  VIOLATION R4 1e1: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  event: {"guard":"guard-lint-touched-registry","decision":"allow","source_ok":true,"actor":"main","base":"HEAD"}
+=== B_backslash_id_added_with_finding
+exit=1
+  VIOLATION R4 g\tx: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  event: {"guard":"guard-lint-touched-registry","decision":"deny","source_ok":true,"actor":"main","base":"HEAD"}
+=== C_reorder_rows_and_keys_only
+exit=0
+  VIOLATION R4 gbad: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  event: {"guard":"guard-lint-touched-registry","decision":"allow","source_ok":true,"actor":"main","base":"HEAD"}
+=== D_exact_duplicate_row_added
+exit=1
+  VIOLATION R1 gdup: duplicate guard id
+  VIOLATION R1 gdup: invariant shared with: gdup
+  VIOLATION R1 gdup: invariant shared with: gdup
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=3 allowlisted=0 stale=0 shown=3 sites=0
+  event: {"guard":"guard-lint-touched-registry","decision":"deny","source_ok":true,"actor":"main","base":"HEAD"}
+=== E_unreadable_current_guards
+exit=1
+  LINT_SUMMARY mode=new-or-touched guards=1 violations=0 allowlisted=0 stale=0 shown=0 sites=0
+  error: touched-registry comparison against 'HEAD' failed (status 5); no touched guard is cleared
+  event: {"guard":"guard-lint-touched-registry","decision":"error","source_ok":false,"actor":"main","base":"HEAD"}
+=== F_unreadable_base_guards
+exit=1
+  LINT_SUMMARY mode=new-or-touched guards=1 violations=0 allowlisted=0 stale=0 shown=0 sites=0
+  error: touched-registry comparison against 'HEAD' failed (status 5); no touched guard is cleared
+  event: {"guard":"guard-lint-touched-registry","decision":"error","source_ok":false,"actor":"main","base":"HEAD"}
+=== G_gate_actor_deny
+exit=1
+  VIOLATION R4 gnew: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  event: {"guard":"guard-lint-touched-registry","decision":"deny","source_ok":true,"actor":"gate","base":"HEAD"}
+=== G2_unavailable_sink_same_refusal
+exit=1
+  nohome dirs created: 0

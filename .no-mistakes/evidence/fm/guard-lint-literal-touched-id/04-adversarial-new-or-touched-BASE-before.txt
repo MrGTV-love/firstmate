@@ -1,0 +1,40 @@
+# lint under test: base ef5b3c923 bin/fm-guard-lint.sh (before the change)
+=== A_numeric_untouched_1e1_edit_10
+exit=1
+  VIOLATION R4 1e1: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  VIOLATION R4 1e1: fail_direction 'unspecified' is not closed or open
+  event: (none)
+=== B_backslash_id_added_with_finding
+exit=0
+  VIOLATION R4 g\tx: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  event: (none)
+=== C_reorder_rows_and_keys_only
+exit=0
+  VIOLATION R4 gbad: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  event: (none)
+=== D_exact_duplicate_row_added
+exit=0
+  VIOLATION R1 gdup: duplicate guard id
+  VIOLATION R1 gdup: invariant shared with: gdup
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=2 allowlisted=0 stale=0 shown=2 sites=0
+  event: (none)
+=== E_unreadable_current_guards
+exit=0
+  LINT_SUMMARY mode=new-or-touched guards=1 violations=0 allowlisted=0 stale=0 shown=0 sites=0
+  event: (none)
+=== F_unreadable_base_guards
+exit=0
+  LINT_SUMMARY mode=new-or-touched guards=1 violations=0 allowlisted=0 stale=0 shown=0 sites=0
+  event: (none)
+=== G_gate_actor_deny
+exit=1
+  VIOLATION R4 gnew: fail_direction 'unspecified' is not closed or open
+  LINT_SUMMARY mode=new-or-touched guards=2 violations=1 allowlisted=0 stale=0 shown=1 sites=0
+  VIOLATION R4 gnew: fail_direction 'unspecified' is not closed or open
+  event: (none)
+=== G2_unavailable_sink_same_refusal
+exit=1
+  nohome dirs created: 0
