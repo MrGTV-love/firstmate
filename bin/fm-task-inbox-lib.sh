@@ -258,20 +258,48 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # a repeated identical local steer is a deliberate new instruction.
 # Candidate records for the dedup scan, one path per line, in scan order (inbox
 # records first, then handled/, each in name order). A record can only equal the
-# new body when it contains the body's first line, so ONE fixed-string grep over
-# the inbox names a superset of the matches and the exact byte comparison below runs
-# on those few files instead of forking awk, cat and cmp for every record ever
-# written (a 1772-record inbox took 36 s here under load, past the remote steer's
-# 30 s budget, and left the sequence lock and temp files behind when it was
-# killed). An empty first line, or any grep failure, returns every record, which
-# is the full scan this replaced, so the filter can only skip files that cannot match.
+# new body when it contains the body's first line, so a fixed-string grep names a
+# superset of the matches and the exact byte comparison below runs on those few
+# files instead of forking awk, cat and cmp for every record ever written (a
+# 1772-record inbox took 36 s here under load, past the remote steer's 30 s
+# budget, and left the sequence lock and temp files behind when it was killed).
+# An empty first line, or any grep failure, returns every record, which is the
+# full scan this replaced, so the filter can only skip files that cannot match.
+# The worker acknowledges a record by moving it from the inbox into handled/
+# WITHOUT holding .seq.lock, so the two trees are read in two separate passes, the
+# inbox first and handled/ second: a record moved between the passes is read in
+# the second one, and a record moved before the first is already there. One
+# recursive grep over both trees would read them in the directory's own order,
+# and a record moved after it read handled/ but before it read the inbox would
+# be in neither list. Each pass names only the .msg files directly inside its own
+# directory (the two record sets the full scan always covered), never a nested
+# directory's files.
+_fm_task_inbox_grep_dir() {  # <dir> <first-line> -> matching direct .msg files; 2 on a grep error
+  local d=$1 first=$2 f out rc=0 r chunk=()
+  for f in "$d"/*.msg; do
+    [ -e "$f" ] || continue
+    chunk+=("$f")
+    if [ "${#chunk[@]}" -ge 500 ]; then
+      out=$(LC_ALL=C grep -lF -e "$first" -- "${chunk[@]}" 2>/dev/null); r=$?
+      [ "$r" -le 1 ] || rc=2
+      [ -z "$out" ] || printf '%s\n' "$out"
+      chunk=()
+    fi
+  done
+  if [ "${#chunk[@]}" -gt 0 ]; then
+    out=$(LC_ALL=C grep -lF -e "$first" -- "${chunk[@]}" 2>/dev/null); r=$?
+    [ "$r" -le 1 ] || rc=2
+    [ -z "$out" ] || printf '%s\n' "$out"
+  fi
+  return "$rc"
+}
+
 _fm_task_inbox_dedup_candidates() {  # <inbox-dir> <text>
-  local dir=$1 text=$2 first=${2%%$'\n'*} found grc
+  local dir=$1 text=$2 first=${2%%$'\n'*} pend hand
   if [ -n "$first" ]; then
-    found=$(LC_ALL=C grep -rlF --include='*.msg' -e "$first" -- "$dir" 2>/dev/null)
-    grc=$?
-    if [ "$grc" -le 1 ]; then
-      [ -z "$found" ] || printf '%s\n' "$found" | LC_ALL=C sort
+    if pend=$(_fm_task_inbox_grep_dir "$dir" "$first") && hand=$(_fm_task_inbox_grep_dir "$dir/handled" "$first"); then
+      [ -z "$pend" ] || printf '%s\n' "$pend"
+      [ -z "$hand" ] || printf '%s\n' "$hand"
       return 0
     fi
   fi

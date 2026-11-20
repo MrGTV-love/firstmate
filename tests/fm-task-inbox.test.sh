@@ -130,8 +130,12 @@ watch_bg() {  # <state> <fakebin> <out> [extra env assignments...]
     env "$@" "$WATCH" > "$out" 2>/dev/null &
 }
 
+# The wait ends the moment the watcher exits; the limit is only the hang guard that fails a watcher that
+# never exits. 120 ticks (12 s) was shorter than a watcher's real latency on a loaded host: at load ~80 the
+# draft-risk watcher exited after 104-114 ticks, and past 120 the case failed with "never escalated" although
+# the watcher was about to exit (the same failure on the untouched base). 600 ticks (60 s) clears that.
 wait_watcher_gone() {  # <pid> [limit-ticks]
-  local pid=$1 limit=${2:-120} i=0
+  local pid=$1 limit=${2:-600} i=0
   while [ "$i" -lt "$limit" ]; do
     kill -0 "$pid" 2>/dev/null || return 0
     sleep 0.1
@@ -540,6 +544,86 @@ variant $i" >/dev/null || fail "setup write failed"
   rec=$(enqueue_counting "$state" $'twin body\nsecond' "$log" fire-and-forget) || fail "fire-and-forget enqueue failed"
   [ "$rec" != "$r2" ] || fail "a fire-and-forget enqueue must not dedup onto an ordinary record"
   pass "inbox: dedup answers are unchanged (shared first line, special characters, empty first line, twin, fire-and-forget)"
+}
+
+# The worker acknowledges a record by moving it into handled/ without taking .seq.lock, so a record can move
+# while the dedup scan reads the two trees. This grep double counts each tree read as one step and moves the
+# target record just before step number $GREP_MOVE_BEFORE (or after the last step when it equals the step count).
+# A single recursive grep over the inbox is modelled in the adversarial directory order that is permitted for
+# it: handled/ first, then the inbox's own files. It is deterministic: the move happens at a named point of
+# the scan, never by timing.
+interleave_grep_shim() {  # <dir> <counter-file>
+  local dir=$1 real
+  real=$(type -P grep)
+  mkdir -p "$dir"
+  cat > "$dir/grep" <<SHIM
+#!/bin/bash
+real="$real"; cnt="$2"
+args=(); ops=(); after=0
+for a in "\$@"; do
+  if [ "\$after" = 1 ]; then ops+=("\$a"); elif [ "\$a" = -- ]; then after=1; else args+=("\$a"); fi
+done
+recursive=0; excl=0
+for a in "\${args[@]}"; do
+  case "\$a" in --exclude-dir=handled) excl=1 ;; --*) ;; -*r*) recursive=1 ;; esac
+done
+move() { [ ! -e "\$GREP_MOVE_SRC" ] || mv "\$GREP_MOVE_SRC" "\$GREP_MOVE_DST"; }
+step() {  # one tree read: move first when it is the chosen step, then count it
+  local n; n=\$(cat "\$cnt" 2>/dev/null); n=\${n:-0}
+  [ "\$n" != "\$GREP_MOVE_BEFORE" ] || move
+  echo \$((n + 1)) > "\$cnt"
+}
+rc=1
+note() { if [ "\$1" -ge 2 ]; then rc=2; elif [ "\$1" -eq 0 ] && [ "\$rc" -ne 2 ]; then rc=0; fi; }
+if [ "\$recursive" = 1 ] && [ "\$excl" = 0 ] && [ "\${#ops[@]}" = 1 ] && [ -d "\${ops[0]}/handled" ]; then
+  step; "\$real" "\${args[@]}" -- "\${ops[0]}/handled"; note \$?
+  step; "\$real" "\${args[@]}" --exclude-dir=handled -- "\${ops[0]}"; note \$?
+else
+  step; "\$real" "\$@"; note \$?
+fi
+n=\$(cat "\$cnt" 2>/dev/null); n=\${n:-0}
+[ "\$n" != "\$GREP_MOVE_BEFORE" ] || move
+exit \$rc
+SHIM
+  chmod +x "$dir/grep"
+}
+
+test_idempotent_write_survives_an_ack_during_the_scan() {
+  local state base k rec shims cnt body n dups
+  body=$'[fm-from-firstmate] corr=0123456789abcdef the steer that is acknowledged mid-scan\nsecond line'
+  for k in 0 1 2; do
+    state="$TMP_ROOT/idem-ack-$k/state"; base="$state/t1.inbox"; shims="$TMP_ROOT/idem-ack-$k/shims"; cnt="$TMP_ROOT/idem-ack-$k/count"
+    fill_inbox "$base" 20
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-20T00:00:00Z\n--\n%s' "$body" > "$base/010.msg"   # the target: an unhandled record
+    : > "$cnt"
+    interleave_grep_shim "$shims" "$cnt"
+    rec=$(PATH="$shims:$PATH" FM_STATE_OVERRIDE="$state" GREP_MOVE_BEFORE="$k" GREP_MOVE_SRC="$base/010.msg" GREP_MOVE_DST="$base/handled/010.msg" bash -c '
+      . "$1"
+      fm_task_inbox_write_idempotent "$2" t1 "$3"
+    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$body") || fail "same-correlation recovery failed when the ack landed at scan point $k"
+    [ ! -e "$base/010.msg" ] && [ -e "$base/handled/010.msg" ] || fail "scan point $k: the double never moved the record, so the case proved nothing"
+    case "$rec" in "$base/010.msg"|"$base/handled/010.msg") ;; *) fail "scan point $k: recovery must return the original record 010, got $rec" ;; esac
+    n=$(find "$base" -name '*.msg' | wc -l | tr -d ' ')
+    [ "$n" = 20 ] || fail "scan point $k: exactly one durable record must exist for the correlation (20 records expected), found $n"
+    dups=$(grep -rlF -e 'acknowledged mid-scan' "$base" | wc -l | tr -d ' ')
+    [ "$dups" = 1 ] || fail "scan point $k: the correlation body exists in $dups records"
+    [ -z "$(find "$base" -maxdepth 1 -name '.dedup.*' -o -maxdepth 1 -name '.seq.lock*' | head -1)" ] || fail "scan point $k: a temp file or the lock was left behind"
+  done
+  pass "inbox: an acknowledgement landing during the dedup scan (before, between, after the tree reads) still finds the original record and writes no duplicate"
+}
+
+test_idempotent_write_ignores_nested_directories() {
+  local state base rec log
+  state="$TMP_ROOT/idem-nested/state"; base="$state/t1.inbox"; log="$TMP_ROOT/idem-nested/calls.log"
+  fill_inbox "$base" 6
+  mkdir -p "$base/extra" "$base/handled/extra"
+  printf 'schema=fm-task-inbox.v1\nat=2026-11-20T00:00:00Z\n--\nnested twin body\nsecond' > "$base/extra/001.msg"
+  printf 'schema=fm-task-inbox.v1\nat=2026-11-20T00:00:00Z\n--\nnested twin body\nsecond' > "$base/handled/extra/002.msg"
+  rec=$(enqueue_counting "$state" $'nested twin body\nsecond' "$log") || fail "enqueue beside nested directories failed"
+  [ "$rec" = "$base/007.msg" ] || fail "a body found only in a nested directory is not a record: a new record 007 must be written, got $rec"
+  rec=$(enqueue_counting "$state" $'nested twin body\nsecond' "$log") || fail "re-run beside nested directories failed"
+  [ "$rec" = "$base/007.msg" ] || fail "the re-run must land on the real record 007, got $rec"
+  pass "inbox: the idempotent enqueue treats only the inbox and handled/ files as records, never a nested directory's"
 }
 
 test_next_seq_does_not_fork_per_record() {
@@ -1421,6 +1505,8 @@ test_idempotent_write_dedups_exact_body
 test_idempotent_write_follows_concurrent_ack
 test_idempotent_write_forks_per_candidate_not_per_record
 test_idempotent_write_dedup_answers_are_unchanged
+test_idempotent_write_survives_an_ack_during_the_scan
+test_idempotent_write_ignores_nested_directories
 test_next_seq_does_not_fork_per_record
 test_handled_mv_dedups_by_sequence
 test_survivor_doorbells_stay_bounded_until_acknowledged
