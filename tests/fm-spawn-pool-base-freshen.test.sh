@@ -914,9 +914,10 @@ raise SystemExit(2)
 PY
 }
 
-run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> <ship|scout>
+run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> <ship|scout> [forced-teardown]
   local shape=$1 kind=$2 id case_dir home project origin pool publisher fakebin before advanced out status=0 token temp staging
   local args=()
+  local task_set_lock=
   fm_git_identity
   id="pool-owner-$shape-$kind-$(date +%s)-$$"
   case_dir="$TMP_ROOT/$id"
@@ -965,10 +966,29 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
   [ ! -e "$staging" ] && [ ! -L "$staging" ] || fail "staging already exists: $staging"
   printf 'case=%s kind=%s task=%s root=%s before=%s advanced=%s temp=%s staging=%s\n' \
     "$shape" "$kind" "$id" "$case_dir" "$before" "$advanced" "$temp" "$staging"
+  if [ "${3:-}" = forced-teardown ]; then
+    . "$ROOT/bin/fm-wake-lib.sh"
+    task_set_lock=$(fm_task_set_lock_path "$home/state") || fail 'cannot resolve fixture task-set lock'
+    fm_lock_try_acquire "$task_set_lock" || fail 'cannot hold fixture task set'
+    fm_lock_set_role "$task_set_lock" forced-teardown || fail 'cannot label fixture task-set holder'
+  fi
   out=$(FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" FM_TEST_PROVISION_CALLED="$case_dir/provisioner.called" \
     fm_test_run_spawn "$home" "$pool" "$fakebin" "$id" "$project" --backend tmux "${args[@]}" 2>&1) || status=$?
   printf '%s\n' "$out" > "$case_dir/spawn.out"
   printf 'spawn_exit=%s after=%s\n%s\n' "$status" "$(git -C "$pool" rev-parse HEAD)" "$out"
+  if [ -n "$task_set_lock" ]; then
+    expect_code 1 "$status" "slot recovery must refuse the held task set: $out"
+    assert_contains "$out" 'task set is locked by a forced teardown' 'slot recovery bypassed task-set contention'
+    [ ! -e "$home/state/$id.meta" ] || fail 'slot recovery published inside forced teardown custody'
+    [ ! -s "$case_dir/launch.log" ] || fail 'slot recovery launched a worker'
+    [ "$(cat "$task_set_lock/role")" = forced-teardown ] || fail 'slot recovery removed teardown custody'
+    fm_lock_release "$task_set_lock"
+    fm_lock_try_acquire "$task_set_lock" || fail 'slot recovery retained task-set custody'
+    fm_lock_release "$task_set_lock"
+    rm -rf -- "$temp" "$staging"
+    pass 'slot refusal cannot publish a fresh recovery record inside forced teardown custody'
+    return 0
+  fi
   case "$shape" in
     absent)
       expect_code 0 "$status" "genuinely ungoverned copy should launch: $out"
@@ -1024,6 +1044,7 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
 test_freshness_introduces_slot_owner() { run_freshness_slot_case introduced ship; }
 test_freshness_introduces_scout_slot_owner() { run_freshness_slot_case introduced scout; }
 test_freshness_slot_owner_requires_scope() { run_freshness_slot_case missing-scope ship; }
+test_slot_recovery_refuses_while_task_set_is_owned() { run_freshness_slot_case missing-scope ship forced-teardown; }
 test_freshness_present_slot_owner_refuses() { run_freshness_slot_case present ship; }
 test_freshness_absent_slot_owner_launches() { run_freshness_slot_case absent ship; }
 test_freshness_removed_slot_owner_refuses() { run_freshness_slot_case removed ship; }
@@ -2279,18 +2300,42 @@ SH
 # untouched: its branch is as found, or the output says it was detached.
 # Main 1829: git refuses the move after the preparation detached a governed copy. The detach is undone by ref (no file is
 # touched) because the proof holds, so the previous owner's branch is checked out again and is where it was.
-refuse_governed_after_preparation() { # <name> <id>; sets GOV_OUT
+refuse_governed_after_preparation() { # <name> <id> [forced-teardown]; sets GOV_OUT, GOV_STATUS
   local name=$1 id=$2 real_git
   make_governed_skip_case "$name" "$id"
   git -C "${SKIP_SLOTS[0]}" checkout --quiet -b previous-owner
   real_git=$(command -v git)
   cat > "$FAKEBIN_DIR/git" <<SH
 #!/usr/bin/env bash
-case " \$* " in *' merge --ff-only '*) exit 1 ;; esac
+case " \$* " in *' merge --ff-only '*)
+  [ "\${FM_TEST_RETAIN_LATE_WORK:-0}" != 1 ] || printf 'preserve late assigned work\n' > '${SKIP_SLOTS[0]}/late-work.txt'
+  exit 1 ;;
+esac
 exec '$real_git' "\$@"
 SH
   chmod +x "$FAKEBIN_DIR/git"
-  GOV_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn_skipping "$id" --mode no-mistakes --yolo off --owned-path scripts) || true
+  if [ "${3:-}" = forced-teardown ]; then
+    . "$ROOT/bin/fm-wake-lib.sh"
+    GOV_TASK_SET_LOCK=$(fm_task_set_lock_path "$HOME_DIR/state") || fail 'cannot resolve held task set'
+    fm_lock_try_acquire "$GOV_TASK_SET_LOCK" || fail 'cannot hold task set'
+    fm_lock_set_role "$GOV_TASK_SET_LOCK" forced-teardown || fail 'cannot label task-set custody'
+    mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.retention"
+    cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  new-window)
+    : > '$CASE_DIR/pane.live'; : > '$CASE_DIR/lease.live'
+    printf '@184\n'
+    exit 0 ;;
+  kill-window)
+    if [ "\${3:-}" = @184 ]; then rm -f '$CASE_DIR/pane.live' '$CASE_DIR/lease.live'; fi ;;
+esac
+exec '$FAKEBIN_DIR/tmux.retention' "\$@"
+SH
+    chmod +x "$FAKEBIN_DIR/tmux"
+  fi
+  GOV_STATUS=0
+  GOV_OUT=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn_skipping "$id" --mode no-mistakes --yolo off --owned-path scripts) || GOV_STATUS=$?
 }
 
 # Main 1886 CUT: git refuses the move after the preparation detached a governed copy. The spawn stops, writes nothing more,
@@ -2311,6 +2356,134 @@ test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
   after=$(git -C "${SKIP_SLOTS[0]}" rev-parse refs/heads/previous-owner)
   [ "$after" = "$INITIAL_SHA" ] || fail "the previous owner's branch moved to $after"$'\n'"$GOV_OUT"
   pass "the branch the preparation detached from is where it was"
+}
+
+test_governed_refusal_retains_prepared_copy_when_publication_is_locked() {
+  local id="pool-governed-held-$$"
+  FM_TEST_RETAIN_LATE_WORK=1 refuse_governed_after_preparation governed-held "$id" forced-teardown
+  expect_code 1 "$GOV_STATUS" 'governed recovery must refuse task-set contention'
+  assert_contains "$GOV_OUT" 'task set is locked by a forced teardown' 'governed recovery bypassed custody'
+  assert_contains "$GOV_OUT" 'retained; task record publication refused' 'refusal did not name retained recovery resources'
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'governed recovery published inside teardown custody'
+  assert_grep "${SKIP_SLOTS[0]}" "$HOME_DIR/state/$id.status" 'retained copy is not named by a durable record'
+  assert_grep ":fm-$id" "$HOME_DIR/state/$id.status" 'retained endpoint is not named by a durable record'
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ -e "$CASE_DIR/pane.live" ] && [ -e "$CASE_DIR/lease.live" ] || fail 'governed refusal closed the retained acquisition lease'
+  [ "$(cat "${SKIP_SLOTS[0]}/late-work.txt")" = 'preserve late assigned work' ] || fail 'governed refusal lost late assigned work'
+  ! git -C "${SKIP_SLOTS[0]}" symbolic-ref -q HEAD >/dev/null || fail 'governed refusal undid preparation'
+  [ "$(git -C "${SKIP_SLOTS[0]}" rev-parse refs/heads/previous-owner)" = "$INITIAL_SHA" ] || fail 'governed refusal moved the previous owner branch'
+  [ "$(cat "$GOV_TASK_SET_LOCK/role")" = forced-teardown ] || fail 'governed refusal removed teardown custody'
+  fm_lock_release "$GOV_TASK_SET_LOCK"
+  fm_lock_try_acquire "$GOV_TASK_SET_LOCK" || fail 'governed refusal retained task-set custody'
+  fm_lock_release "$GOV_TASK_SET_LOCK"
+  pass 'governed refusal retains partially prepared copy, late work and acquisition lease even when recovery publication is refused'
+}
+
+slot_task_spawn_holder_case() {  # <name> <release-on-wait 0|1>: sets SLOT_HOLDER_OUT SLOT_HOLDER_STATUS SLOT_HOLDER_ID
+  local name=$1 release_on_wait=$2 rec ready release tick="" holder
+  SLOT_HOLDER_ID="slot-holder-$name-$$"
+  rec=$(make_case "$SLOT_HOLDER_ID" "$SLOT_HOLDER_ID")
+  read_case_record "$rec"
+  write_refusing_slot_owner "$POOL_DIR"
+  git -C "$POOL_DIR" add scripts
+  git -C "$POOL_DIR" -c user.name=T -c user.email=t@example.invalid commit -qm 'governed refusal fixture'
+  ready="$CASE_DIR/holder.ready"
+  release="$CASE_DIR/holder.release"
+  fm_test_hold_task_set_as_spawn "$HOME_DIR/state" "$ready" "$release"
+  holder=$FM_TEST_TASK_SET_HOLDER
+  fm_test_wait_until --while-alive "$holder" -- test -f "$ready" || fail 'task-spawn holder never took the task set'
+  if [ "$release_on_wait" = 1 ]; then
+    tick="$CASE_DIR/release-on-wait"
+    fm_test_release_on_lock_wait "$tick" "$release"
+  fi
+  SLOT_HOLDER_STATUS=0
+  SLOT_HOLDER_OUT=$(FM_LOCK_WAIT_TICK="$tick" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" \
+    FM_TEST_PROVISION_CALLED="$CASE_DIR/provision.called" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$SLOT_HOLDER_ID" "$PROJECT_DIR" \
+    --backend tmux --mode no-mistakes --yolo off 2>&1) || SLOT_HOLDER_STATUS=$?
+  : > "$release"
+  wait "$holder" 2>/dev/null || true
+}
+
+test_slot_recovery_waits_out_a_task_spawn_holder_that_releases() {
+  slot_task_spawn_holder_case released 1
+  expect_code 1 "$SLOT_HOLDER_STATUS" "a governed slot refusal must exit nonzero: $SLOT_HOLDER_OUT"
+  [ -f "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" ] || fail "slot recovery published no record after the task-spawn holder released: $SLOT_HOLDER_OUT"
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" 'slot recovery record lost its marker'
+  assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" 'slot recovery record does not name the retained copy'
+  assert_grep "window=firstmate:fm-$SLOT_HOLDER_ID" "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" 'slot recovery record does not name the endpoint'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'slot recovery launched a worker'
+  pass 'slot recovery waits out a task-spawn holder that releases, then publishes its retained-copy record'
+}
+
+test_slot_recovery_refuses_when_a_task_spawn_holder_outlasts_the_bound() {
+  slot_task_spawn_holder_case outlasted 0
+  expect_code 1 "$SLOT_HOLDER_STATUS" "a governed slot refusal must exit nonzero: $SLOT_HOLDER_OUT"
+  [ ! -e "$HOME_DIR/state/$SLOT_HOLDER_ID.meta" ] || fail 'slot recovery published while the task-spawn holder still owned the task set'
+  assert_contains "$SLOT_HOLDER_OUT" 'task set is locked by another spawn' 'slot recovery did not refuse with the task-set contention'
+  assert_contains "$SLOT_HOLDER_OUT" 'retained; task record publication refused' 'slot refusal does not state the retained copy was left unrecorded'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'slot recovery launched a worker'
+  pass 'slot recovery refuses explicitly and writes no record when a task-spawn holder outlasts the bound'
+}
+
+test_slot_late_cap_refusal_still_records_retained_copy() {
+  local id rec rc=0
+  id="slot-late-cap-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  printf 'manual\n' > "$HOME_DIR/config/backlog-backend"
+  write_refusing_slot_owner "$POOL_DIR"
+  git -C "$POOL_DIR" add scripts
+  git -C "$POOL_DIR" -c user.name=T -c user.email=t@example.invalid commit -qm 'governed refusal fixture'
+  FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/fm-afk-contract.sh" enter --spend 1 >/dev/null || fail 'away fixture entry failed'
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.original"
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = new-window ]; then
+  printf 'kind=ship\n' > '$HOME_DIR/state/other.meta'
+fi
+exec '$FAKEBIN_DIR/tmux.original' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+  FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provision.called" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$id" "$PROJECT_DIR" --backend tmux --mode no-mistakes --yolo off > "$CASE_DIR/spawn.out" 2>&1 || rc=$?
+  expect_code 1 "$rc" "a governed slot refusal at the cap must exit nonzero: $(cat "$CASE_DIR/spawn.out")"
+  assert_grep 'kind=ship' "$HOME_DIR/state/other.meta" 'the other worker did not publish after the early check'
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'a retained copy refused at the cap lost its recovery record'
+  assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$id.meta" 'a retained copy refused at the cap does not name the copy'
+  assert_grep "window=firstmate:fm-$id" "$HOME_DIR/state/$id.meta" 'a retained copy refused at the cap does not name the endpoint'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'a slot refused at the cap launched a worker'
+  pass 'a slot refused at the spend cap still records its retained copy and endpoint without launching'
+}
+
+test_slot_refusal_still_names_retained_copy_when_state_dir_vanishes() {
+  local id rec rc=0
+  id="slot-state-gone-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  printf 'manual\n' > "$HOME_DIR/config/backlog-backend"
+  write_refusing_slot_owner "$POOL_DIR"
+  git -C "$POOL_DIR" add scripts
+  git -C "$POOL_DIR" -c user.name=T -c user.email=t@example.invalid commit -qm 'governed refusal fixture'
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.original"
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = new-window ]; then
+  rm -rf '$HOME_DIR/state'
+fi
+exec '$FAKEBIN_DIR/tmux.original' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+  FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provision.called" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$id" "$PROJECT_DIR" --backend tmux --mode no-mistakes --yolo off > "$CASE_DIR/spawn.out" 2>&1 || rc=$?
+  cat "$CASE_DIR/spawn.out"
+  expect_code 1 "$rc" "a slot refusal whose state directory vanished must exit nonzero: $(cat "$CASE_DIR/spawn.out")"
+  assert_contains "$(cat "$CASE_DIR/spawn.out")" "error: assigned copy $POOL_DIR and endpoint" 'the retained copy was not named when the state directory vanished'
+  assert_contains "$(cat "$CASE_DIR/spawn.out")" 'retained; task record publication refused' 'the retained-copy refusal did not print when the state directory vanished'
+  [ -d "$POOL_DIR" ] || fail 'the retained copy was removed when the state directory vanished'
+  [ ! -s "$CASE_DIR/launch.log" ] || fail 'a slot refusal with a vanished state directory launched a worker'
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'a slot refusal with a vanished state directory published a task record'
+  pass 'a slot refusal whose state directory vanishes still names the retained copy and endpoint, publishes nothing and launches nothing'
 }
 
 # Explicit selection keeps focused acquisition regressions independently runnable.
@@ -2348,6 +2521,8 @@ test_remote_seeded_home_spawns_from_treehouse_pool
 test_pool_slot_claim_follows_the_spawn_outcome
 test_linked_spawning_home_rejects_primary_before_refresh
 test_stale_pool_base_refreshes_before_branching
+test_slot_recovery_refuses_while_task_set_is_owned
+test_governed_refusal_retains_prepared_copy_when_publication_is_locked
 test_named_base_branch_starts_from_that_branch
 test_base_branch_must_agree_with_the_brief
 test_prose_base_branch_line_is_ignored
@@ -2402,5 +2577,10 @@ test_a_failed_record_write_refuses_the_spawn
 test_a_failed_origin_head_read_after_a_move_refuses
 test_a_governed_refusal_after_preparation_holds_the_copy_and_refuses
 test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was
+
+test_slot_recovery_waits_out_a_task_spawn_holder_that_releases
+test_slot_recovery_refuses_when_a_task_spawn_holder_outlasts_the_bound
+test_slot_late_cap_refusal_still_records_retained_copy
+test_slot_refusal_still_names_retained_copy_when_state_dir_vanishes
 
 echo "# all fm-spawn-pool-base-freshen tests passed"

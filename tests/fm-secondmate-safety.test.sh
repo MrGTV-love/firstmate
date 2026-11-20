@@ -9,6 +9,8 @@ set -u
 
 # shellcheck source=tests/secondmate-helpers.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/secondmate-helpers.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-secondmate-safety)
 export FM_BACKEND=tmux
@@ -2831,7 +2833,7 @@ hold_task_set_lock() {  # <state-dir> [role] -> echoes "<holder-pid> <lock-path>
     . "$ROOT/bin/fm-wake-lib.sh"
     fm_lock_try_acquire "$lock" || exit 1
     [ -z "$role" ] || fm_lock_set_role "$lock" "$role" || exit 1
-    sleep 30
+    sleep 900
   ) >/dev/null 2>&1 &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   holder=$!
@@ -3019,6 +3021,16 @@ EOF
   pass "forced teardown refuses while a fresh task is being published in the home"
 }
 
+# A worker reaches task-set contention only after acquisition and preparation.
+# Supply a valid brief and fake pane rather than stopping at an earlier guard.
+prepare_task_set_worker_spawn() {
+  local home=$1 copy=$2
+  fm_test_spawn_home "$home" claude
+  fm_test_spawn_brief "$home" newtask 'Refuse publication while the task set is owned.'
+  TASK_SET_FAKE=$(make_spawn_fakebin "$copy-fake" claude)
+  fm_test_fake_sleep_noop "$TASK_SET_FAKE"
+}
+
 test_fresh_spawn_refuses_while_a_forced_teardown_owns_the_task_set() {
   local home subhome err rec held holder lock
   rec=$(seed_task_set_lock_home taskset-spawn)
@@ -3031,10 +3043,9 @@ EOF
     || fail "could not stage a held task-set lock"
   holder=${held%% *}
   lock=${held#* }
-  # A worker spawn takes the task-set lock after harness resolution and the
-  # project lock, so name a harness rather than depend on host detection.
-  if FM_HOME="$subhome" FM_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/fm-spawn.sh" newtask "$subhome/projects/alpha" claude --scout >/dev/null 2>"$err"; then
+  prepare_task_set_worker_spawn "$subhome" "$TMP_ROOT/taskset-spawn-child-worktree"
+  if fm_test_run_spawn "$subhome" "$TMP_ROOT/taskset-spawn-child-worktree" "$TASK_SET_FAKE" \
+    newtask "$subhome/projects/alpha" claude --scout >"$err" 2>&1; then
     kill "$holder" 2>/dev/null || true
     fail "a fresh spawn published a task while a forced teardown owned the set"
   fi
@@ -3060,9 +3071,9 @@ EOF
   held=$(hold_task_set_lock "$subhome/state" task-spawn) \
     || fail "could not stage a fresh spawn holding the task-set lock"
   holder=${held%% *}
-  # Name a harness so the task-set lock is reached without host detection.
-  if FM_HOME="$subhome" FM_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/fm-spawn.sh" newtask "$subhome/projects/alpha" claude --scout >/dev/null 2>"$err"; then
+  prepare_task_set_worker_spawn "$subhome" "$TMP_ROOT/taskset-two-spawns-child-worktree"
+  if fm_test_run_spawn "$subhome" "$TMP_ROOT/taskset-two-spawns-child-worktree" "$TASK_SET_FAKE" \
+    newtask "$subhome/projects/alpha" claude --scout >"$err" 2>&1; then
     kill "$holder" 2>/dev/null || true
     fail "a fresh spawn published while another spawn owned the task set"
   fi
@@ -3418,6 +3429,8 @@ EOF
   grep -F 'symlink-task' "$home/data/backlog.md" >/dev/null || fail "symlink refusal lost the main backlog item"
   pass "fm-backlog-handoff refuses Done items under whitespace section headings and unsafe homes"
 }
+
+fm_test_only
 
 test_fm_home_parameterization
 test_lock_status_is_per_home

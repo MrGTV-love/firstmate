@@ -28,8 +28,9 @@ SPAWN="$ROOT/bin/fm-spawn.sh"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-worktree-settle)
 # Scale only the acquisition's one-second sleeps; fixture commands keep real time.
 cat > "$TMP_ROOT/clock.sh" <<'SH'
+[ -z "${FM_LOCK_SYNC:-}" ] || . "$FM_LOCK_SYNC"
 sleep() {
-  if [ "${1:-}" = 1 ]; then SECONDS=$((SECONDS + 60)); fi
+  if [ "${1:-}" = 1 ] && [ "${FM_LOCK_UNSCALED:-0}" = 0 ]; then SECONDS=$((SECONDS + 60)); fi
   command sleep "$@"
 }
 SH
@@ -46,6 +47,10 @@ make_settle_fakebin() {
 set -u
 case "$*" in
   *"#{pane_current_path}"*)
+    if [ -n "${FM_LOCK_GET_GATE:-}" ] && [ ! -e "$FM_LOCK_GET_GATE.ready" ]; then
+      : > "$FM_LOCK_GET_GATE.ready"
+      IFS= read -r _ < "$FM_LOCK_GET_GATE"
+    fi
     countfile="${FM_FAKE_PANE_COUNTFILE:?FM_FAKE_PANE_COUNTFILE unset}"
     n=0
     [ -f "$countfile" ] && n=$(cat "$countfile")
@@ -62,13 +67,54 @@ esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
   capture-pane)
-    if [ "${FM_FAKE_OUTPUT_PROGRESS:-0}" = 1 ]; then
+    if [ -n "${FM_LOCK_GET_OUTPUT:-}" ]; then
+      cat "$FM_LOCK_GET_OUTPUT"
+    elif [ "${FM_FAKE_OUTPUT_PROGRESS:-0}" = 1 ]; then
       printf 'fetch progress %s\n' "$(cat "$FM_FAKE_PANE_COUNTFILE")"
     fi
     exit 0 ;;
   list-windows) exit 0 ;;
-  has-session|new-session|new-window|kill-window) exit 0 ;;
+  new-window)
+    window=@41
+    if [ -n "${FM_LOCK_PANE_LOG:-}" ]; then
+      printf 'opened\n' >> "$FM_LOCK_PANE_LOG"
+      case "${FM_LOCK_PANE_LOG##*/}" in
+        lock-a.panes) window=@41 ;;
+        lock-b.panes) window=@42 ;;
+        *) window=@43 ;;
+      esac
+      printf '%s\n' "$window" > "$FM_LOCK_PANE_LOG.window"
+      : > "$FM_LOCK_PANE_LOG.live"
+      : > "$FM_LOCK_PANE_LOG.lease"
+    fi
+    printf '%s\n' "$window"
+    exit 0 ;;
+  kill-window)
+    if [ -n "${FM_LOCK_PANE_LOG:-}" ]; then
+      printf 'closed %s\n' "$*" >> "$FM_LOCK_PANE_LOG"
+      # Apply the close to the named pane, not whichever caller issued it.
+      # Ending that process-leased get releases its lease, not a guessed return.
+      for record in "${FM_LOCK_PANE_LOG%/*}"/*.panes.window; do
+        [ -f "$record" ] || continue
+        [ "$(cat "$record")" = "${3:-}" ] || continue
+        pane=${record%.window}
+        rm -f "$pane.live" "$pane.lease"
+      done
+    fi
+    exit 0 ;;
+  has-session|new-session) exit 0 ;;
   send-keys)
+    if [ -n "${FM_LOCK_LAUNCH_LOG:-}" ]; then
+      for arg in "$@"; do
+        case "$arg" in
+          ". '"*"'")
+            staged=${arg#". '"}
+            staged=${staged%"'"}
+            cat "$staged" >> "$FM_LOCK_LAUNCH_LOG"
+            ;;
+        esac
+      done
+    fi
     if [ -n "${FM_COMPAT_LAUNCH_LOG:-}" ]; then
       for arg in "$@"; do
         case "$arg" in '. '*) printf '%s\n' "$arg" > "$FM_COMPAT_LAUNCH_LOG" ;; esac
@@ -94,7 +140,7 @@ make_settle_case() {
   case_dir="$TMP_ROOT/$name"
   home="$case_dir/home"
   proj="$case_dir/project"
-  wt="$case_dir/wt"
+  wt="$case_dir/${4:-wt}"
   stale="$case_dir/stale-other-checkout"
   countfile="$case_dir/pane-call-count"
   fakebin=$(make_settle_fakebin "$case_dir/fake")
@@ -127,7 +173,7 @@ run_settle_spawn() {
     FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
     FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
     FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" BASH_ENV="$TMP_ROOT/clock.sh" \
-    FM_GUARD_EVENT_LOG="$HOME_DIR/state/guard-events.jsonl" \
+    FM_GUARD_EVENT_LOG="${FM_LOCK_GUARD_EVENT_LOG:-$HOME_DIR/state/guard-events.jsonl}" \
     CLAUDE_CONFIG_DIR=${SETTLE_CLAUDE_CONFIG_DIR:-} PI_CODING_AGENT_DIR='' OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp \
     FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_PANE_STALE="$STALE_DIR" \
     FM_FAKE_PANE_STALE_READS="$STALE_READS" FM_FAKE_PANE_COUNTFILE="$COUNTFILE" \
@@ -140,7 +186,7 @@ run_settle_spawn() {
 # real settled worktree instead.
 test_single_stale_first_read_is_not_accepted() {
   local rec id out status
-  id=settle-single-stale-z1
+  id='settle-single-stale-z1'
   rec=$(make_settle_case settle-single "$id" 1)
   read_settle_record "$rec"
 
@@ -161,7 +207,7 @@ test_single_stale_first_read_is_not_accepted() {
 # other cost of a spawn (fetch, trust registration) and drift with the machine.
 test_already_settled_pane_costs_one_confirm_read() {
   local rec id out status reads
-  id=settle-already-settled-z2
+  id='settle-already-settled-z2'
   rec=$(make_settle_case settle-already-settled "$id" 0)
   read_settle_record "$rec"
 
@@ -205,7 +251,7 @@ make_primary_case() {
 # never be adopted as the worktree, so the spawn lands on the settled slot.
 test_transient_primary_checkout_is_not_accepted() {
   local rec id out status
-  id=settle-primary-transient-z3
+  id='settle-primary-transient-z3'
   rec=$(make_primary_case settle-primary-transient "$id" 3)
   read_settle_record "$rec"
   fm_test_fake_sleep_noop "$FAKEBIN_DIR"
@@ -224,7 +270,7 @@ test_transient_primary_checkout_is_not_accepted() {
 # rather than waiting forever or recording the primary.
 test_primary_checkout_that_never_settles_fails_at_the_deadline() {
   local rec id out status
-  id=settle-primary-stuck-z4
+  id='settle-primary-stuck-z4'
   rec=$(make_primary_case settle-primary-stuck "$id" 100000)
   read_settle_record "$rec"
   fm_test_fake_sleep_noop "$FAKEBIN_DIR"
@@ -246,7 +292,7 @@ test_primary_checkout_that_never_settles_fails_at_the_deadline() {
 
 test_slow_progressing_get_survives_old_window() {
   local rec id out status
-  id=settle-slow-progress-z5
+  id='settle-slow-progress-z5'
   rec=$(make_primary_case settle-slow-progress "$id" 12)
   read_settle_record "$rec"
   fm_test_fake_sleep_noop "$FAKEBIN_DIR"
@@ -259,7 +305,7 @@ test_slow_progressing_get_survives_old_window() {
 
 test_progress_cannot_outlast_absolute_extreme() {
   local rec id out status
-  id=settle-runaway-z6
+  id='settle-runaway-z6'
   rec=$(make_primary_case settle-runaway "$id" 100000)
   read_settle_record "$rec"
   fm_test_fake_sleep_noop "$FAKEBIN_DIR"
@@ -277,7 +323,7 @@ test_progress_cannot_outlast_absolute_extreme() {
 test_nonmeasured_harness_stays_unconfined_and_audited() {
   local rec id out source_line
   local FM_COMPAT_LAUNCH_LOG FM_COMPAT_MARKER FM_EXPECT_INBOX
-  id=settle-unconfined-codex-z7
+  id='settle-unconfined-codex-z7'
   rec=$(make_settle_case unconfined-codex "$id" 0)
   read_settle_record "$rec"
   FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
@@ -341,7 +387,7 @@ test_confined_claude_creates_a_missing_config_root_owner_only() {
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
     return 0
   fi
-  id=settle-confined-new-root-z8
+  id='settle-confined-new-root-z8'
   rec=$(make_settle_case confined-new-root "$id" 0)
   read_settle_record "$rec"
   printf 'claude\n' > "$HOME_DIR/config/crew-harness"
@@ -367,7 +413,7 @@ test_confined_claude_creates_a_missing_config_root_chain_owner_only() {
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
     return 0
   fi
-  id=settle-confined-new-root-chain-z9
+  id='settle-confined-new-root-chain-z9'
   rec=$(make_settle_case confined-new-root-chain "$id" 0)
   read_settle_record "$rec"
   printf 'claude\n' > "$HOME_DIR/config/crew-harness"
@@ -475,7 +521,7 @@ test_confined_raw_claude_launch_runs_through_teamclaude() {
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
     return 0
   fi
-  id=settle-raw-claude-z9
+  id='settle-raw-claude-z9'
   rec=$(make_settle_case raw-claude "$id" 0)
   read_settle_record "$rec"
   printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
@@ -595,7 +641,7 @@ SH
   # Text the scanner cannot read before it finds a claude launches unchanged and
   # unconfined under its first program, recorded as such.
   index=$((index + 1))
-  id=settle-raw-compound-$index-z9
+  id="settle-raw-compound-$index-z9"
   rec=$(make_settle_case "raw-compound-$index" "$id" 0)
   read_settle_record "$rec"
   FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
@@ -655,7 +701,7 @@ SH
 test_unconfined_raw_claude_launch_keeps_shell_constructs() {
   local rec id out source_line probe
   local FM_COMPAT_LAUNCH_LOG
-  id=settle-raw-claude-linux-z9
+  id='settle-raw-claude-linux-z9'
   rec=$(make_settle_case raw-claude-linux "$id" 0)
   read_settle_record "$rec"
   if [ "$(uname -s)" != Linux ]; then
@@ -695,7 +741,7 @@ SH
 test_unconfined_raw_claude_launch_keeps_the_caller_shell() {
   local id out source_line staged probe
   local FM_COMPAT_LAUNCH_LOG
-  id=settle-raw-claude-caller-z9
+  id='settle-raw-claude-caller-z9'
   make_unconfined_claude_case raw-claude-caller "$id"
   probe="$HOME_DIR/data/$id/probe"
   # --allow-api-key with no account pin and the ordinary launcher is the
@@ -725,7 +771,7 @@ test_unconfined_raw_claude_launch_keeps_the_caller_shell() {
   fi
   # Bash-only syntax stays under the pane's own shell: a process substitution must
   # reach claude as data, never fail as a /bin/sh parse error of the raw text.
-  id=settle-raw-claude-bash-z9
+  id='settle-raw-claude-bash-z9'
   make_unconfined_claude_case raw-claude-bash "$id"
   probe="$HOME_DIR/data/$id/probe"
   # shellcheck disable=SC2016 # the literal process substitution is the raw launch text under test
@@ -774,7 +820,7 @@ test_confined_raw_launch_keeps_the_pane_shell() {
   [ ! -x /bin/dash ] || dash_bin=/bin/dash
   bash_bin=$(command -v bash || true)
   [ -n "$bash_bin" ] || fail "no bash on PATH for the bash pane case"
-  id=settle-pane-shell-z9
+  id='settle-pane-shell-z9'
   make_pane_shell_case pane-shell "$id"
   probe="$HOME_DIR/data/$id/probe"
   # shellcheck disable=SC2016 # the literal zsh modifier is the raw launch text under test
@@ -802,7 +848,7 @@ test_confined_raw_launch_keeps_the_pane_shell() {
   else
     printf 'skip: zsh is absent, so the zsh pane case is not run\n'
   fi
-  id=settle-pane-shell-expansion-z9
+  id='settle-pane-shell-expansion-z9'
   make_pane_shell_case pane-shell-expansion "$id"
   probe="$HOME_DIR/data/$id/probe"
   out=$(run_settle_spawn "$id" --harness 'omp --config /tmp/{pane,shell}.yml')
@@ -1058,6 +1104,394 @@ PY
   expect_code 0 "$?" "raw Claude shell-data or refusal regression failed"
 }
 
+# Task-set regressions use the same fake-pane lab, with FIFO rendezvous rather
+# than wall-clock overlap. BASH_ENV observes runtime state to pause immediately
+# before publication or after task-set acquisition, without a production seam.
+LOCK_PIDS=()
+lock_cleanup() {
+  local pid
+  for pid in ${LOCK_PIDS[@]+"${LOCK_PIDS[@]}"}; do
+    "$ROOT/bin/fm-test-reap-orphans.sh" --owner-pid "$pid" --root "$TMP_ROOT" >/dev/null 2>&1 || true
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+  fm_test_cleanup
+}
+trap lock_cleanup EXIT
+
+make_lock_case() {
+  local rec
+  rec=$(make_settle_case "$1" lock-a 0 pool/a/copy)
+  read_settle_record "$rec"
+  LOCK_HOME=$HOME_DIR LOCK_PROJ_A=$PROJ_DIR LOCK_WT_A=$WT_DIR
+  LOCK_FAKE=$FAKEBIN_DIR LOCK_DIR=${HOME_DIR%/home}
+  # The fake pool has the real slot-owner layout, entirely under TMP_ROOT.
+  mkdir -p "$LOCK_DIR/pool/a" "$LOCK_DIR/pool/b"
+  printf '{}\n' > "$LOCK_DIR/pool/treehouse-state.json"
+  LOCK_PROJ_B="$LOCK_DIR/project-b" LOCK_WT_B="$LOCK_DIR/pool/b/copy"
+  fm_git_worktree "$LOCK_PROJ_B" "$LOCK_WT_B" "wt-b-$1"
+  fm_test_spawn_brief "$LOCK_HOME" lock-b 'Launch an independent project while acquisition waits.'
+  fm_test_fake_sleep_noop "$LOCK_FAKE"
+  cat > "$LOCK_DIR/sync.sh" <<'SH'
+  lock_sync() {
+    if [ "${SPAWN_TASK_SET_LOCK_HELD:-0}" = 1 ] && [ -n "${FM_LOCK_TAKE_OBSERVED:-}" ]; then
+      : > "$FM_LOCK_TAKE_OBSERVED"
+    fi
+    if [ -n "${FM_LOCK_PUBLISH_OBSERVED:-}" ] &&
+      [ ! -e "$FM_LOCK_PUBLISH_OBSERVED" ] &&
+      [ -f "${STATE:-}/${ID:-}.meta" ]; then
+      if [ "${SPAWN_TASK_SET_LOCK_HELD:-0}" != 1 ] ||
+        [ ! -d "${SPAWN_TASK_SET_LOCK:-}" ]; then
+        echo 'TL2: task record appeared without task-set custody' >&2
+        exit 97
+      fi
+      : > "$FM_LOCK_PUBLISH_OBSERVED"
+    fi
+    if [ -n "${FM_LOCK_PRE_GATE:-}" ] && [ "${SPAWN_META_LOCK_HELD:-0}" = 1 ] &&
+      [ -n "${SPAWN_META_TMP:-}" ] && [ -s "$SPAWN_META_TMP" ] &&
+      [ "${lock_pre_seen:-0}" = 0 ]; then
+      lock_pre_seen=1
+      : > "$FM_LOCK_PRE_GATE.ready"
+      IFS= read -r _ < "$FM_LOCK_PRE_GATE"
+    fi
+    # Observe first appearance inside publish, but pause only in the parent
+    # after publish returns and clears its temporary path, never a subshell.
+    if [ -n "${FM_LOCK_POST_GATE:-}" ] && [ -e "$FM_LOCK_PUBLISH_OBSERVED" ] &&
+      [ "${BASH_SUBSHELL:-0}" = 0 ] && [ "${SPAWN_TASK_SET_LOCK_HELD:-0}" = 1 ] &&
+      [ -z "${SPAWN_META_TMP:-}" ] && [ "${lock_post_seen:-0}" = 0 ]; then
+      lock_post_seen=1
+      : > "$FM_LOCK_POST_GATE.ready"
+      IFS= read -r _ < "$FM_LOCK_POST_GATE"
+    fi
+  }
+  set -T
+  trap lock_sync DEBUG
+SH
+}
+
+lock_spawn() { # <id> <project> <copy> [<get-gate> <pre-gate> <post-gate>]
+  local id=$1 project=$2 copy=$3
+  HOME_DIR=$LOCK_HOME PROJ_DIR=$project WT_DIR=$copy STALE_DIR=$project
+  FAKEBIN_DIR=$LOCK_FAKE COUNTFILE="$LOCK_DIR/$id.count" STALE_READS=0
+  # run_settle_spawn retains its clock; the exported BASH_ENV is injected by
+  # the clock only for this task-set lab.
+  FM_LOCK_SYNC="$LOCK_DIR/sync.sh" FM_LOCK_GET_GATE=${4:-} FM_LOCK_PRE_GATE=${5:-} FM_LOCK_POST_GATE=${6:-} \
+    FM_LOCK_PANE_LOG="$LOCK_DIR/$id.panes" FM_LOCK_LAUNCH_LOG="$LOCK_DIR/$id.launch" \
+    FM_LOCK_TAKE_OBSERVED="$LOCK_DIR/$id.took-task-set" \
+    FM_LOCK_PUBLISH_OBSERVED="$LOCK_DIR/$id.published-under-lock" \
+    run_settle_spawn "$id"
+}
+
+lock_start() {
+  lock_spawn "$@" > "$LOCK_DIR/$1.out" 2>&1 &
+  LOCK_PID=$!
+  LOCK_PIDS+=("$LOCK_PID")
+}
+
+lock_ready() {
+  fm_test_wait_until --while-alive "$1" --progress-file "$LOCK_DIR/lock-a.out" \
+    --progress-file "$LOCK_DIR/lock-b.out" -- test -f "$2.ready" ||
+    fail "spawn did not reach rendezvous $2: $(cat "$LOCK_DIR"/*.out)"
+}
+
+lock_forget() {
+  local i
+  for i in "${!LOCK_PIDS[@]}"; do
+    [ "${LOCK_PIDS[$i]}" != "$1" ] || unset 'LOCK_PIDS[i]'
+  done
+}
+
+lock_finish() {
+  local pid=$1 id=$2 expected=$3 rc=0
+  wait "$pid" || rc=$?
+  lock_forget "$pid"
+  expect_code "$expected" "$rc" "unexpected spawn result for $id: $(cat "$LOCK_DIR/$id.out")"
+}
+
+lock_probe() {
+  (
+    . "$ROOT/bin/fm-wake-lib.sh"
+    local lock
+    lock=$(fm_task_set_lock_path "$LOCK_HOME/state") || exit 1
+    fm_lock_try_acquire "$lock" || exit 1
+    fm_lock_release "$lock"
+  )
+}
+
+lock_probe_project() {
+  (
+    . "$ROOT/bin/fm-wake-lib.sh"
+    . "$ROOT/bin/fm-project-lock-lib.sh"
+    local lock
+    lock=$(FM_HOME=$LOCK_HOME FM_STATE_OVERRIDE=$LOCK_HOME/state fm_treehouse_project_lock_path "$LOCK_PROJ_A") || exit 1
+    fm_lock_try_acquire "$lock" || exit 1
+    fm_lock_release "$lock"
+  )
+}
+
+test_task_set_get_does_not_block_another_project() {
+  local a b_rc=0 probe_rc=0
+  make_lock_case lock-get
+  mkfifo "$LOCK_DIR/get"
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" "$LOCK_DIR/get"
+  a=$LOCK_PID
+  lock_ready "$a" "$LOCK_DIR/get"
+  lock_probe || probe_rc=$?
+  lock_start lock-b "$LOCK_PROJ_B" "$LOCK_WT_B"
+  wait "$LOCK_PID" || b_rc=$?
+  lock_forget "$LOCK_PID"
+  printf 'TL1 observed: probe=%s B=%s\n%s\n' "$probe_rc" "$b_rc" "$(cat "$LOCK_DIR/lock-b.out")"
+  expect_code 0 "$b_rc" 'TL1: another project was refused while get waited'
+  expect_code 0 "$probe_rc" 'TL1: task-set lock held across blocked get'
+  [ -f "$LOCK_HOME/state/lock-b.meta" ] || fail 'TL1: B did not publish while A waited'
+  assert_grep 'codex ' "$LOCK_DIR/lock-b.launch" 'TL1: B did not reach launch'
+  printf 'go\n' > "$LOCK_DIR/get"
+  lock_finish "$a" lock-a 0
+  [ -f "$LOCK_HOME/state/lock-a.meta" ] || fail 'TL1: A did not finish'
+  assert_no_grep 'task set is locked by another spawn' "$LOCK_DIR/lock-a.out" 'TL1: A refused'
+  assert_no_grep 'task set is locked by another spawn' "$LOCK_DIR/lock-b.out" 'TL1: B refused'
+  pass 'TL1: another project launches while get waits, and the first spawn finishes'
+}
+
+test_task_set_same_project_still_waits() {
+  local a b same_copy
+  make_lock_case lock-same-project
+  same_copy="$LOCK_DIR/pool/c/copy"
+  git -C "$LOCK_PROJ_A" worktree add --quiet -b lock-same-copy "$same_copy" || fail 'cannot prepare same-project copy'
+  mkfifo "$LOCK_DIR/get"
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" "$LOCK_DIR/get"
+  a=$LOCK_PID
+  lock_ready "$a" "$LOCK_DIR/get"
+  if lock_probe_project; then fail 'TL1: acquisition lost the shared project lock'; fi
+  FM_LOCK_UNSCALED=1 lock_start lock-b "$LOCK_PROJ_A" "$same_copy"
+  b=$LOCK_PID
+  fm_test_wait_until --while-alive "$b" --progress-file "$LOCK_DIR/lock-b.out" -- \
+    grep -q 'fm-project-lock: waiting for spawn lock-b' "$LOCK_DIR/lock-b.out" ||
+    fail "TL1: same-project spawn did not queue: $(cat "$LOCK_DIR/lock-b.out")"
+  [ ! -e "$LOCK_HOME/state/lock-b.meta" ] || fail 'TL1: same-project spawn published during acquisition'
+  [ ! -e "$LOCK_DIR/lock-b.panes" ] || fail 'TL1: same-project spawn acquired before its turn'
+  printf 'go\n' > "$LOCK_DIR/get"
+  lock_finish "$a" lock-a 0
+  lock_finish "$b" lock-b 0
+  pass 'TL1: same-project spawn waits for the existing shared project lock'
+}
+
+test_task_set_publish_serializes_publishers() {
+  local a
+  make_lock_case lock-publish
+  mkfifo "$LOCK_DIR/post"
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" '' '' "$LOCK_DIR/post"
+  a=$LOCK_PID
+  lock_ready "$a" "$LOCK_DIR/post"
+  if lock_probe; then fail 'TL2: publication did not retain task-set custody'; fi
+  lock_start lock-b "$LOCK_PROJ_B" "$LOCK_WT_B"
+  lock_finish "$LOCK_PID" lock-b 1
+  assert_grep 'task set is locked by another spawn' "$LOCK_DIR/lock-b.out" 'TL2: holder role was lost'
+  [ ! -f "$LOCK_HOME/state/lock-b.meta" ] || fail 'TL2: two publishers entered together'
+  printf 'go\n' > "$LOCK_DIR/post"
+  lock_finish "$a" lock-a 0
+  [ -e "$LOCK_DIR/lock-a.published-under-lock" ] || fail 'TL2: publication custody was not observed'
+  lock_probe || fail 'TL2: published spawn retained lock'
+  pass 'TL2: publication excludes a competing publisher and releases custody'
+}
+
+test_task_set_cap_is_rechecked_at_publication() {
+  local a b
+  make_lock_case lock-cap
+  FM_HOME=$LOCK_HOME FM_STATE_OVERRIDE=$LOCK_HOME/state "$ROOT/bin/fm-afk-contract.sh" enter --spend 1 >/dev/null || fail 'away entry failed'
+  mkfifo "$LOCK_DIR/pre-a" "$LOCK_DIR/pre-b"
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" '' "$LOCK_DIR/pre-a"
+  a=$LOCK_PID
+  lock_ready "$a" "$LOCK_DIR/pre-a"
+  lock_start lock-b "$LOCK_PROJ_B" "$LOCK_WT_B" '' "$LOCK_DIR/pre-b"
+  b=$LOCK_PID
+  lock_ready "$b" "$LOCK_DIR/pre-b"
+  lock_probe || fail 'TL2: early checks or launch preparation retained task-set custody'
+  printf 'go\n' > "$LOCK_DIR/pre-a"
+  lock_finish "$a" lock-a 0
+  printf 'go\n' > "$LOCK_DIR/pre-b"
+  lock_finish "$b" lock-b 1
+  assert_grep 'caps concurrent workers at 1 and 1 ordinary task(s) are live' "$LOCK_DIR/lock-b.out" 'TL2: stale cap admitted B'
+  [ -f "$LOCK_HOME/state/lock-a.meta" ] && [ ! -e "$LOCK_HOME/state/lock-b.meta" ] || fail 'TL2: cap did not admit exactly one'
+  lock_probe || fail 'TL2: cap refusal retained lock'
+  pass 'TL2: both early checks pass, but the publication cap admits exactly one'
+}
+
+test_task_set_relocated_work_is_rechecked_at_publication() {
+  local a
+  make_lock_case lock-relocated
+  printf 'manual\n' > "$LOCK_HOME/config/backlog-backend"
+  fm_test_tasks_toml "$LOCK_HOME/.tasks.toml"
+  printf '## Queued\n- [ ] lock-a - queued work\n' > "$LOCK_HOME/data/backlog.md"
+  FM_HOME=$LOCK_HOME FM_STATE_OVERRIDE=$LOCK_HOME/state "$ROOT/bin/fm-afk-contract.sh" enter --spend 2 >/dev/null || fail 'away entry failed'
+  mkfifo "$LOCK_DIR/pre"
+  FM_SUPERVISION_ACTOR=branch lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" '' "$LOCK_DIR/pre"
+  a=$LOCK_PID
+  lock_ready "$a" "$LOCK_DIR/pre"
+  lock_probe || fail 'TL2: relocated early check held task-set custody'
+  # Work relocated away from the dispatchable queue after the early check.
+  printf '## In flight\n- [ ] lock-a - already dispatched elsewhere\n' > "$LOCK_HOME/data/backlog.md"
+  printf 'go\n' > "$LOCK_DIR/pre"
+  lock_finish "$a" lock-a 1
+  assert_grep 'may dispatch only queued unblocked work' "$LOCK_DIR/lock-a.out" 'TL2: relocated work bypassed the publication recheck'
+  [ ! -e "$LOCK_HOME/state/lock-a.meta" ] || fail 'TL2: relocated work was published'
+  [ ! -s "$LOCK_DIR/lock-a.launch" ] || fail 'TL2: relocated work launched'
+  lock_probe || fail 'TL2: relocated refusal retained task-set custody'
+  # An immediate healthy publisher exercises cleanup after a locked recheck.
+  lock_start lock-b "$LOCK_PROJ_B" "$LOCK_WT_B"
+  lock_finish "$LOCK_PID" lock-b 0
+  pass 'TL2: work removed from the queue after early admission is refused at publication'
+}
+
+test_task_set_early_refusal_never_acquires() {
+  make_lock_case lock-early
+  FM_HOME=$LOCK_HOME FM_STATE_OVERRIDE=$LOCK_HOME/state "$ROOT/bin/fm-afk-contract.sh" enter --spend 1 >/dev/null || fail 'away entry failed'
+  printf 'kind=ship\n' > "$LOCK_HOME/state/existing.meta"
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A"
+  lock_finish "$LOCK_PID" lock-a 1
+  assert_grep 'caps concurrent workers at 1' "$LOCK_DIR/lock-a.out" 'TL2: early cap did not refuse'
+  [ ! -e "$LOCK_DIR/lock-a.panes" ] || fail 'TL2: early refusal created an endpoint'
+  [ ! -e "$LOCK_HOME/state/.task-set.lock" ] || fail 'TL2: early refusal retained custody'
+  [ ! -e "$LOCK_DIR/lock-a.took-task-set" ] || fail 'TL2: early refusal acquired custody'
+  lock_probe || fail 'TL2: early refusal blocked the next publisher'
+  pass 'TL2: early cap refusal creates no acquisition endpoint or task-set holder'
+}
+
+test_task_set_teardown_refusal_cleans_acquired_copy() {
+  local a lock
+  make_lock_case lock-cleanup
+  lock_start lock-b "$LOCK_PROJ_B" "$LOCK_WT_B"
+  lock_finish "$LOCK_PID" lock-b 0
+  mkfifo "$LOCK_DIR/pre"
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" '' "$LOCK_DIR/pre"
+  a=$LOCK_PID
+  lock_ready "$a" "$LOCK_DIR/pre"
+  [ -e "$LOCK_DIR/lock-a.panes.live" ] && [ -e "$LOCK_DIR/lock-a.panes.lease" ] || fail 'TL3: no acquired pane lease to clean'
+  assert_grep 'task=lock-a' "$LOCK_DIR/pool/a/.fm-slot-owner" 'TL3: no task-slot claim to clean'
+  . "$ROOT/bin/fm-wake-lib.sh"
+  lock=$(fm_task_set_lock_path "$LOCK_HOME/state") || fail 'lock path failed'
+  fm_lock_try_acquire "$lock" || fail 'TL3: spawn held lock before publication'
+  fm_lock_set_role "$lock" forced-teardown || fail 'holder role failed'
+  printf 'go\n' > "$LOCK_DIR/pre"
+  lock_finish "$a" lock-a 1
+  assert_grep 'task set is locked by a forced teardown' "$LOCK_DIR/lock-a.out" 'TL3: wrong refusal'
+  [ ! -e "$LOCK_HOME/state/lock-a.meta" ] || fail 'TL3: refused spawn published metadata'
+  [ ! -s "$LOCK_DIR/lock-a.launch" ] || fail 'TL3: refused spawn launched worker'
+  [ ! -e "$LOCK_DIR/lock-a.panes.live" ] || fail 'TL3: acquired pane remains live'
+  [ ! -e "$LOCK_DIR/lock-a.panes.lease" ] || fail 'TL3: process lease was not released'
+  [ ! -e "$LOCK_DIR/pool/a/.fm-slot-owner" ] || fail 'TL3: task-slot claim was not released'
+  [ "$(cat "$lock/role")" = forced-teardown ] || fail 'TL3: spawn removed teardown custody'
+  fm_lock_release "$lock"
+  lock_probe || fail 'TL3: spawn retained task-set lock'
+  lock_probe_project || fail 'TL3: spawn retained project lock'
+  [ ! -e "$LOCK_HOME/state/.control-lock-a.lock" ] || fail 'TL3: spawn retained control lock'
+  [ ! -e "$LOCK_HOME/state/.spawn-lock-a.lock" ] || fail 'TL3: spawn retained task lock'
+  [ -e "$LOCK_DIR/lock-b.panes.live" ] && [ -e "$LOCK_DIR/lock-b.panes.lease" ] || fail 'TL3: unrelated worker lease was removed'
+  assert_grep 'task=lock-b' "$LOCK_DIR/pool/b/.fm-slot-owner" 'TL3: unrelated task-slot claim was removed'
+  # Immediate healthy successor proves refusal did not strand custody.
+  fm_test_spawn_brief "$LOCK_HOME" lock-successor 'Publish immediately after acquisition refusal.'
+  lock_start lock-successor "$LOCK_PROJ_A" "$LOCK_WT_A"
+  lock_finish "$LOCK_PID" lock-successor 0
+  pass 'TL3: publish refusal closes the acquired endpoint and releases its process lease and locks'
+}
+
+test_task_set_abort_shows_only_output_tail() {
+  local n rec out rc i
+  for n in 30 5 0; do
+    rec=$(make_primary_case "lock-output-$n" lock-output 100000)
+    read_settle_record "$rec"
+    fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+    : > "$HOME_DIR/get-output"
+    for ((i=1; i<=n; i++)); do printf 'get line %02d token=credential-like\n' "$i" >> "$HOME_DIR/get-output"; done
+    rc=0
+    FM_LOCK_GET_OUTPUT="$HOME_DIR/get-output" run_settle_spawn lock-output > "$HOME_DIR/abort-output" || rc=$?
+    out=$(cat "$HOME_DIR/abort-output")
+    expect_code 1 "$rc" "TL4: abort status changed: $out"
+    assert_contains "$out" 'error: treehouse get did not enter an isolated worktree after ' 'TL4: original abort absent'
+    [ "$(grep -c '^treehouse get output:$' "$HOME_DIR/abort-output")" = 1 ] || fail 'TL4: expected one captured output label'
+    tail -n 20 "$HOME_DIR/get-output" > "$HOME_DIR/expected"
+    awk '/^treehouse get output:$/ {found=1; next} found {print}' "$HOME_DIR/abort-output" > "$HOME_DIR/actual"
+    cmp -s "$HOME_DIR/expected" "$HOME_DIR/actual" || fail "TL4: expected exact last 20 captured lines ($n lines): $out"
+  done
+  pass 'TL4: abort prints the exact 30/5/0-line capture tails without filtering'
+}
+
+teardown_home_during_get() {  # <case>: a real spawn is paused in its get while a real forced teardown removes its home
+  local parent teardown_rc=0
+  make_lock_case "$1"
+  parent="$LOCK_DIR/torn-parent"
+  mkdir -p "$parent/state" "$parent/data"
+  printf '%s\n' domain > "$LOCK_HOME/.fm-secondmate-home"
+  cat > "$parent/state/domain.meta" <<EOF
+window=firstmate:fm-domain
+worktree=$LOCK_HOME
+project=$LOCK_HOME
+harness=echo
+kind=secondmate
+mode=secondmate
+yolo=off
+home=$LOCK_HOME
+projects=alpha
+EOF
+  printf '%s\n' "- domain - design domain (home: $LOCK_HOME; scope: design domain; projects: alpha; added 2026-06-22)" > "$parent/data/secondmates.md"
+  mkfifo "$LOCK_DIR/get"
+  FM_LOCK_GUARD_EVENT_LOG="$LOCK_DIR/guard-events.jsonl" lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A" "$LOCK_DIR/get"
+  LOCK_A_PID=$LOCK_PID
+  lock_ready "$LOCK_A_PID" "$LOCK_DIR/get"
+  FM_HOME=$parent PATH="$LOCK_FAKE:$PATH" "$ROOT/bin/fm-teardown.sh" domain --force \
+    --drop-file "$(fm_test_drop_file)" >"$LOCK_DIR/teardown.out" 2>&1 || teardown_rc=$?
+  expect_code 0 "$teardown_rc" "forced teardown of the secondmate home failed: $(cat "$LOCK_DIR/teardown.out")"
+  [ ! -e "$LOCK_HOME" ] || fail 'forced teardown did not remove the secondmate home'
+  kill -0 "$LOCK_A_PID" 2>/dev/null || fail "spawn ended before its get returned: $(cat "$LOCK_DIR/lock-a.out")"
+}
+
+test_task_set_publish_after_forced_teardown_does_not_recreate_home() {
+  local rc=0
+  teardown_home_during_get lock-torn-down
+  printf 'go\n' > "$LOCK_DIR/get"
+  wait "$LOCK_A_PID" || rc=$?
+  lock_forget "$LOCK_A_PID"
+  expect_code 1 "$rc" "a spawn published into a home its forced teardown had removed: $(cat "$LOCK_DIR/lock-a.out")"
+  assert_contains "$(cat "$LOCK_DIR/lock-a.out")" 'error: spawn refused: state directory is not a real directory at' 'a removed home was not refused as a missing state directory'
+  [ ! -e "$LOCK_HOME" ] || fail "a refused spawn recreated the home its forced teardown removed: $(cat "$LOCK_DIR/lock-a.out")"
+  pass 'a spawn whose forced teardown finished during its get is refused and recreates nothing'
+}
+
+test_task_set_publish_refuses_a_recreated_state_directory() {
+  local rc=0
+  teardown_home_during_get lock-recreated
+  bash -c 'mkdir -p "$1/state"' _ "$LOCK_HOME" </dev/null || fail 'the detached recreator could not recreate the state directory'
+  [ -d "$LOCK_HOME/state" ] || fail 'the recreated state directory is missing'
+  printf 'go\n' > "$LOCK_DIR/get"
+  wait "$LOCK_A_PID" || rc=$?
+  lock_forget "$LOCK_A_PID"
+  expect_code 1 "$rc" "a spawn published into a recreated state directory: $(cat "$LOCK_DIR/lock-a.out")"
+  assert_contains "$(cat "$LOCK_DIR/lock-a.out")" 'was replaced after admission' 'a recreated state directory was not refused as replaced'
+  [ ! -e "$LOCK_HOME/state/lock-a.meta" ] || fail 'a recreated state directory received the task record'
+  pass 'a spawn whose state directory was recreated during its get refuses publication and writes no record'
+}
+
+test_task_set_unchanged_home_still_publishes() {
+  make_lock_case lock-unchanged
+  lock_start lock-a "$LOCK_PROJ_A" "$LOCK_WT_A"
+  lock_finish "$LOCK_PID" lock-a 0
+  [ -f "$LOCK_HOME/state/lock-a.meta" ] || fail 'an unchanged state directory did not receive the task record'
+  pass 'an unchanged state directory still publishes its task record'
+}
+
+fm_test_only
+
+test_task_set_get_does_not_block_another_project
+test_task_set_same_project_still_waits
+test_task_set_publish_serializes_publishers
+test_task_set_cap_is_rechecked_at_publication
+test_task_set_relocated_work_is_rechecked_at_publication
+test_task_set_early_refusal_never_acquires
+test_task_set_teardown_refusal_cleans_acquired_copy
+test_task_set_abort_shows_only_output_tail
+test_task_set_publish_after_forced_teardown_does_not_recreate_home
+test_task_set_publish_refuses_a_recreated_state_directory
+test_task_set_unchanged_home_still_publishes
 test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined
