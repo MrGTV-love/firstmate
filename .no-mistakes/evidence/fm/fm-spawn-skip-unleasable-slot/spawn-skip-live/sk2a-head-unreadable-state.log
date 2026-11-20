@@ -1,0 +1,2 @@
+ok - an unreadable state (clean or dirty copy), two rows by name, an own-and-other pair and a symlink alias each refuse before any claim
+EXIT=0

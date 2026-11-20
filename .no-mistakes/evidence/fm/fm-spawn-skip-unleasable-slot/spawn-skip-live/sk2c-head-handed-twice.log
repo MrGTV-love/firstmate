@@ -1,0 +1,2 @@
+ok - a refused copy handed out again is not taken, tried again or looped on, and the spawn ends within its bound
+EXIT=0

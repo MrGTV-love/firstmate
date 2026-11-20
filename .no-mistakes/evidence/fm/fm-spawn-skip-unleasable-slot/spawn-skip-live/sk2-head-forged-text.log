@@ -1,0 +1,2 @@
+ok - text that says 'already leased', with no such lease in the pool state, does not skip the copy
+EXIT=0

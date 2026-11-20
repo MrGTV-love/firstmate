@@ -1,0 +1,2 @@
+ok - an abort leaves a pane in a passed-over copy open, and an abort before any copy closes the pane it created
+EXIT=0

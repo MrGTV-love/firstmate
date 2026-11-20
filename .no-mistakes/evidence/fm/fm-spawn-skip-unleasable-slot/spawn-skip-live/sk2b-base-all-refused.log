@@ -1,0 +1,10 @@
+not ok - the spawn did not end with its acquisition refusal (missing: 'aborting acquisition')
+--- output ---
+warning: task pool-skip-all-refused: /private/tmp/fm-run-sk2b-base-all-refused-kKbN/fm-spawn-pool-base-freshen.x3tAXy/all-refused/home/data/pool-skip-all-refused/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fm-run-sk2b-base-all-refused-kKbN/fm-spawn-pool-base-freshen.x3tAXy/all-refused/home/data/pool-skip-all-refused/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-skip-all-refused
+warning: /private/tmp/fm-run-sk2b-base-all-refused-kKbN/fm-spawn-pool-base-freshen.x3tAXy/all-refused/home/data/pool-skip-all-refused/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skip: pooled copy '/private/tmp/fm-run-sk2b-base-all-refused-kKbN/fm-spawn-pool-base-freshen.x3tAXy/all-refused/th-root/.treehouse/project-e11aa3/1/project' was not moved (dirty_tree): it is not clean, it holds uncommitted work ( M README.md)
+error: could not lease skipped copy /private/tmp/fm-run-sk2b-base-all-refused-kKbN/fm-spawn-pool-base-freshen.x3tAXy/all-refused/th-root/.treehouse/project-e11aa3/1/project durably (worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")); its endpoint firstmate:fm-pool-skip-all-refused stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted
+error: could not lease skipped copy /private/tmp/fm-run-sk2b-base-all-refused-kKbN/fm-spawn-pool-base-freshen.x3tAXy/all-refused/th-root/.treehouse/project-e11aa3/1/project durably (worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")); its endpoint firstmate:fm-pool-skip-all-refused stays open on it, untouched, because closing that endpoint would let Treehouse reset it; no worker admitted
+error: copy held and the spawn refused (dirty_tree); nothing more was written to it
+EXIT=1

@@ -1,0 +1,2 @@
+ok - a pool copy whose state is missing or a symlink is refused before any claim when Treehouse names no pool directory (it fails, answers a relative path or nothing) and when the pool directory it names holds the copy
+EXIT=0

@@ -1,0 +1,11 @@
+ok - a recovered-lease copy is passed over untouched and the task runs in the next clean copy
+ok - a copy leased by another holder is passed over untouched too
+ok - when every copy carries another holder's lease the spawn ends in one refusal that names each copy and its reason
+ok - a refused copy handed out again is not taken, tried again or looped on, and the spawn ends within its bound
+ok - text that says 'already leased', with no such lease in the pool state, does not skip the copy
+ok - a known-doubt copy nobody leased is still leased to this task, as before
+ok - an unreadable state (clean or dirty copy), two rows by name, an own-and-other pair and a symlink alias each refuse before any claim
+ok - a pool copy whose state is missing or a symlink is refused before any claim when Treehouse names no pool directory (it fails, answers a relative path or nothing) and when the pool directory it names holds the copy
+ok - an abort leaves a pane in a passed-over copy open, and an abort before any copy closes the pane it created
+ok - every copy a spawn leases is recorded and listed
+EXIT=0
