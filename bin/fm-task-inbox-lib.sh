@@ -245,17 +245,6 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
   printf '%s' "$rec"
 }
 
-# Durably enqueue one steer at most once: when a record with the exact same
-# body already exists - unhandled or already acknowledged in handled/ - no new
-# record is written and the existing record's path is printed instead.
-# This is the enqueue primitive for a transport that can fail with completion
-# unknown (the remote steer leg over ssh): the caller's safe recovery is to run
-# the same enqueue again, and this dedup is what makes the re-run land on the
-# same record instead of a duplicate the worker would act on twice. Two
-# distinct logical requests never collapse in practice because a marked
-# secondmate request embeds a per-request correlation token in its body. The
-# local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
-# a repeated identical local steer is a deliberate new instruction.
 # Candidate records for the dedup scan, as array elements in scan order (inbox
 # records first, then handled/, each in name order). A record can only equal the
 # new body when it contains the body's first line, so a fixed-string grep names a
@@ -313,6 +302,17 @@ _fm_task_inbox_dedup_candidates() {  # <inbox-dir> <text> <scratch-file>
   done
 }
 
+# Durably enqueue one steer at most once: when a record with the exact same
+# body already exists - unhandled or already acknowledged in handled/ - no new
+# record is written and the existing record's path is printed instead.
+# This is the enqueue primitive for a transport that can fail with completion
+# unknown (the remote steer leg over ssh): the caller's safe recovery is to run
+# the same enqueue again, and this dedup is what makes the re-run land on the
+# same record instead of a duplicate the worker would act on twice. Two
+# distinct logical requests never collapse in practice because a marked
+# secondmate request embeds a per-request correlation token in its body. The
+# local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
+# a repeated identical local steer is a deliberate new instruction.
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
   local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have cand f rec='' status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
