@@ -7526,6 +7526,38 @@ test_a_teardown_routes_a_copy_when_the_clone_has_no_local_origin_head() {
   pass "a teardown routes a foreign copy whose merge commit is on the remote's default branch when the clone has no local origin/HEAD"
 }
 
+# The recorded non-main base of the sweep's test_the_sweep_reads_the_recorded_base_of_a_copy_and_keeps_one_the_remotes_default_disagrees_with,
+# through teardown: the task records base_branch=release while the remote's default is main, so a PR
+# merged on main does not settle the landing branch and the copy is kept with no route call; with the
+# remote's default release the same record routes a PR merged on release.
+test_a_teardown_keeps_a_copy_whose_task_base_disagrees_with_the_remotes_default_and_routes_it_when_they_agree() {
+  local rc copy
+  route_teardown_world route-base-disagrees foreign
+  copy=$FOREIGN_COPY
+  route_teardown_release_branch
+  git -C "$FOREIGN_CASE/origin.git" symbolic-ref HEAD refs/heads/main
+  git -C "$FOREIGN_CASE/project" fetch -q origin
+  route_set_pr "$FOREIGN_CASE/forge" 7 MERGED "$MAIN_MERGE"
+  route_script_row "$FOREIGN_CASE" "${copy##*/}" allowed success 7
+  route_teardown_record "$copy" 7
+  run_foreign_teardown rc FM_TEARDOWN_FORGE_TIMEOUT=2
+  expect_code 1 "$rc" "a recorded base release with the remote's default main must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$copy/.git" "the copy was removed although its task's base disagrees with the remote's default"
+  assert_grep "recorded base release disagrees with the remote's default branch main" "$FOREIGN_CASE/stderr" "the refusal does not name the disagreement"
+  assert_not_contains "$(route_teardown_calls "$copy")" "--pr" "the copy reached the driver by the route although its task's base disagrees"
+  route_teardown_world route-base-agrees foreign
+  copy=$FOREIGN_COPY
+  route_teardown_release_branch
+  route_set_pr "$FOREIGN_CASE/forge" 7 MERGED "$RELEASE_MERGE"
+  route_script_row "$FOREIGN_CASE" "${copy##*/}" allowed success 7
+  route_teardown_record "$copy" 7
+  run_foreign_teardown rc FM_TEARDOWN_FORGE_TIMEOUT=2
+  expect_code 0 "$rc" "a recorded base release with the remote's default release must route: $(cat "$FOREIGN_CASE/stderr")"
+  route_teardown_assert_execute "$copy" 7 "recorded base release, remote default release"
+  assert_absent "$copy" "the copy whose task base agrees with the remote's default was not released"
+  pass "a teardown keeps a foreign copy whose task records base release while the remote's default is main, with no route call, and routes it once the remote's default is release"
+}
+
 test_a_teardown_holds_a_copy_when_a_row_is_written_while_the_forge_is_read() {
   route_teardown_hold_rows record-moves
   pass "a teardown holds a foreign copy with no driver call when a row for it is written while the forge is read, and releases it by the route once the record is steady"
@@ -9564,6 +9596,7 @@ test_the_recorded_cases_are_decided_by_their_records_in_teardown
 test_a_teardown_holds_every_locked_copy_for_a_records_file_that_cannot_be_read
 test_a_teardown_holds_a_copy_for_a_row_of_another_tip_before_or_after_its_valid_row
 test_a_teardown_routes_a_copy_when_the_clone_has_no_local_origin_head
+test_a_teardown_keeps_a_copy_whose_task_base_disagrees_with_the_remotes_default_and_routes_it_when_they_agree
 test_a_teardown_holds_a_copy_when_a_row_is_written_while_the_forge_is_read
 test_a_teardown_routes_a_ten_digit_pr_and_ends_a_forge_read_whose_parent_exits_at_once
 test_a_missing_or_unknown_scripted_answer_is_seen_and_never_read_as_a_refusal

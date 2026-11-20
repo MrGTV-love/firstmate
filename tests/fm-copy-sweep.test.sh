@@ -4606,7 +4606,7 @@ test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the
   pass "the content proof proves a twin, a squash onto a main that moved at another path and an ancestor, and keeps an added line, a result that the merge commit lacks and a path the target changed further"
 }
 
-test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_changes_the_meaning() {
+test_the_content_proof_compares_whole_files_by_blob_and_keeps_an_order_or_prefix_that_changes_the_meaning() {
   local comments
   make_world world-content-lines
   route_content_fixture exactline f.txt 'a\n' 'a\nrequire_tls=true\n' 'a\nrequire_tls=true\n'
@@ -4939,6 +4939,75 @@ test_a_recorded_base_must_agree_with_the_remotes_default_and_its_own_origin_ref_
   route_closeout plan based 'TEARDOWN_ROUTE_BASE=release'
   [ "$CO_RC" = 0 ] && [ "$CO_ROUTE" = pr ] || fail "a recorded base that agrees with the remote's default did not route ($CO_RC $CO_ROUTE): $CO_OUT"
   pass "a recorded base routes only when it agrees with the remote's own default branch"
+}
+
+# The task base of a copy the sweep routes (R2(c)). A task record that names the copy in worktree=
+# holds it before the driver; one that names it in released_worktree= (the copy the task left when
+# it gave its pool slot back) does not, and carries the base_branch= that decides the landing branch.
+# The teardown suite's test_a_teardown_keeps_a_copy_whose_task_base_disagrees_with_the_remotes_default_and_routes_it_when_they_agree
+# runs the same recorded base through teardown. Here: recorded base release, remote default main, merge on main.
+test_the_sweep_reads_the_recorded_base_of_a_copy_and_keeps_one_the_remotes_default_disagrees_with() {
+  local name line
+  route_world route-base
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  for name in based agree none split held; do route_copy "$name" 7; done
+  fm_write_meta "$HOMED/state/t-release.meta" kind=ship "released_worktree=$(copy_path based)" base_branch=release
+  fm_write_meta "$HOMED/state/t-main.meta" kind=ship "released_worktree=$(copy_path agree)" base_branch=main
+  fm_write_meta "$HOMED/state/t-none.meta" kind=ship "released_worktree=$(copy_path none)"
+  fm_write_meta "$HOMED/state/t-split-a.meta" kind=ship "released_worktree=$(copy_path split)" base_branch=main
+  fm_write_meta "$HOMED/state/t-split-b.meta" kind=ship "released_worktree=$(copy_path split)" base_branch=release
+  fm_write_meta "$HOMED/state/t-held.meta" kind=ship "worktree=$(copy_path held)" base_branch=main
+  route_sweep --apply
+  # The recorded base disagrees with the remote's default: kept before the driver, the reason names both.
+  route_assert_kept based "recorded base release, remote default main"
+  [ -z "$(route_calls_for based)" ] || fail "the copy whose task base disagrees reached the driver: $(route_calls_for based)"
+  line=$(route_line_of based)
+  assert_contains "$line" "recorded base release disagrees with the remote's default branch main" "the refusal does not name the disagreement"
+  # Controls: the record that agrees, and no record that names the copy, route.
+  route_assert_released agree "recorded base main, remote default main"
+  route_assert_released none "no task record names the copy: the remote's default decides"
+  # Two task records that name the copy and disagree: the base is unknown, kept before the driver.
+  route_assert_kept split "two task records disagree on the base"
+  [ -z "$(route_calls_for split)" ] || fail "the copy whose task records disagree reached the driver: $(route_calls_for split)"
+  assert_contains "$(route_line_of split)" "disagree on the base branch" "the refusal does not name the disagreeing records"
+  # A record that holds the copy by worktree= keeps it before any route work, as before this change.
+  route_assert_kept held "a task record holds the copy by worktree="
+  [ -z "$(route_calls_for held)" ] || fail "the held copy reached the driver: $(route_calls_for held)"
+  assert_contains "$(route_line_of held)" "active record names it" "a copy a task holds by worktree= was not held by that record"
+  # A task record that cannot be read may name any copy, so the base of every routed copy is unknown while it stays.
+  # The copies the first run kept and a new copy that no record names are asked again with the record unreadable.
+  if [ "$(id -u)" = 0 ]; then
+    printf 'task record unreadable: skipped (root reads any file)\n'
+  else
+    route_copy unread 7
+    fm_write_meta "$HOMED/state/t-unread.meta" kind=ship "released_worktree=$(copy_path unread)" base_branch=main
+    chmod 000 "$HOMED/state/t-unread.meta"
+    route_sweep --apply
+    route_assert_kept unread "an unreadable task record"
+    [ -z "$(route_calls_for unread)" ] || fail "the copy with an unreadable task record reached the driver: $(route_calls_for unread)"
+    assert_contains "$(route_line_of unread)" "cannot be read" "the refusal does not name the unreadable record"
+    chmod 600 "$HOMED/state/t-unread.meta"
+    route_sweep --apply
+    route_assert_released unread "the record reads again"
+  fi
+  pass "the sweep passes the recorded base of the task records that name a copy into the route: a base that disagrees with the remote's default, two records that disagree and an unreadable record keep the copy before the driver, and a base that agrees or no record that names it routes"
+}
+
+# The execute settles the base again (R2(c)): a record that changes between the plan and the execute is read afresh.
+test_the_sweep_reads_the_recorded_base_again_at_the_execute() {
+  local lines
+  route_world route-base-execute
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy swung 7
+  fm_write_meta "$HOMED/state/t-swing.meta" kind=ship "released_worktree=$(copy_path swung)" base_branch=main
+  printf 'printf "released_worktree=%%s\\nkind=ship\\nbase_branch=release\\n" %q > %q\n' "$(copy_path swung)" "$HOMED/state/t-swing.meta" > "$W/ans/swung/plan.hook"
+  route_sweep --apply
+  route_assert_kept swung "the recorded base changed to release after the plan"
+  lines=$(route_calls_for swung)
+  assert_equals 1 "$(printf '%s\n' "$lines" | grep -c .)" "the driver was asked more than once: $lines"
+  assert_not_contains "$lines" "--execute-cleanup" "the execute reached the driver after the recorded base changed"
+  assert_contains "$OUT" "recorded base release disagrees with the remote's default branch main" "the execute's refusal does not name the changed base"
+  pass "a recorded base that changes between the sweep's plan and its execute keeps the copy at the execute with no execute call"
 }
 
 # The stated envelope, plan and execute: every document outside it keeps the copy.
@@ -6411,7 +6480,7 @@ test_the_hold_matrix_checks_fail_without_a_receipt_and_after_any_driver_call
 test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers
 test_the_content_proof_proves_a_twin_a_squash_and_an_ancestor_and_keeps_what_the_merge_commit_lacks
-test_the_content_proof_compares_whole_lines_and_keeps_an_order_or_prefix_that_changes_the_meaning
+test_the_content_proof_compares_whole_files_by_blob_and_keeps_an_order_or_prefix_that_changes_the_meaning
 test_the_content_proof_judges_mode_and_text_together_and_needs_identical_entries_for_removals_and_binaries
 test_the_content_proof_keeps_an_empty_change_that_is_not_an_ancestor_and_histories_without_one_merge_base
 test_the_content_proof_writes_nothing_to_the_clone_and_runs_no_merge
@@ -6419,6 +6488,8 @@ test_a_lying_merge_driver_in_any_channel_cannot_make_a_copy_count_as_landed
 test_a_lying_merge_driver_keeps_the_copy_before_the_driver_through_the_whole_route
 test_the_landing_branch_is_the_remotes_own_default_and_a_stale_origin_head_or_an_unreachable_remote_keeps_the_copy
 test_a_recorded_base_must_agree_with_the_remotes_default_and_its_own_origin_ref_decides_landing
+test_the_sweep_reads_the_recorded_base_of_a_copy_and_keeps_one_the_remotes_default_disagrees_with
+test_the_sweep_reads_the_recorded_base_again_at_the_execute
 test_the_routes_answer_must_be_the_stated_fifteen_key_envelope_for_the_plan_and_the_execute
 test_the_route_takes_and_releases_its_own_project_lock_when_its_caller_holds_none
 test_the_route_borrows_a_hold_its_caller_proves_and_leaves_it_held

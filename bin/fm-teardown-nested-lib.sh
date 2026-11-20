@@ -104,8 +104,11 @@
 # itself (git ls-remote --symref origin HEAD, bounded like the forge read, no fetch)
 # and used only when the clone holds refs/remotes/origin/<branch>. The clone's local
 # origin/HEAD is never read, because it can be stale, and a local main or master is a
-# guess. A recorded base_branch= (TEARDOWN_ROUTE_BASE) must name that same branch or
-# the copy is kept. A remote that cannot be read, names no branch, or names one the
+# guess. The base_branch= that the copy's task recorded must name that same branch or
+# the copy is kept: teardown reads its own task's (TEARDOWN_ROUTE_BASE); the sweep reads
+# the task records of every local home that name the copy (teardown_route_recorded_base),
+# and records that name it and disagree, or cannot be read, leave the base unknown and
+# keep the copy. A remote that cannot be read, names no branch, or names one the
 # clone has no ref for holds the copy. A forge read that
 # fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 when the setting is unset; a
 # value that is empty or not a whole number of seconds from 1 to 999999999, written
@@ -132,10 +135,11 @@
 # run no merge driver, textconv or external diff, so nothing configured in the
 # repository (a driver of any name, in any scope) can decide the proof: a copy whose
 # change a lying driver would have called landed is kept, and a legitimate twin routes
-# under the same configuration. A path that M changed further than the copy is kept
-# (Main 1887: so is the separated AUTH_DISABLED twin and a moved file whose blob
-# differs; keeping a copy discards nothing), and so is any git command that fails or
-# prints output that cannot be parsed. A merge driver found in the configuration is
+# under the same configuration. A path whose blob in M differs from the copy's is kept
+# even when M carries the copy's change inside a file that a later change also edited
+# (a copy that sets AUTH_DISABLED=false, a merge commit that holds that line and a later
+# AUTH_DISABLED=true further down, is kept; so is a moved file); keeping a copy discards
+# nothing. So is any git command that fails or prints output that cannot be parsed. A merge driver found in the configuration is
 # reported as a notice, never a refusal. An empty net change is proved; it is not a
 # claim that T is an ancestor of M.
 #
@@ -1712,6 +1716,9 @@ teardown_foreign_procs_retire() {
 # called and the reason names that condition).
 TEARDOWN_ROUTE_DATA=
 TEARDOWN_ROUTE_BASE=
+TEARDOWN_ROUTE_BASE_FROM=
+TEARDOWN_ROUTE_STATE=
+TEARDOWN_ROUTE_BASE_NOW=
 TEARDOWN_ROUTE_TIP=
 TEARDOWN_CLOSEOUT_ROUTE=
 TEARDOWN_CLOSEOUT_ROUTE_PR=
@@ -2249,15 +2256,80 @@ teardown_route_forge_read() {  # <seconds> <pr> <owner/repo>
   return "$rc"
 }
 
+# Sets TEARDOWN_ROUTE_BASE_NOW to the base_branch= that the task of <copy> recorded,
+# empty when that task records none. The one owner of where the recorded base comes
+# from, read at every call, so the sweep's plan and its execute each settle it again.
+# Teardown names its own task's base in TEARDOWN_ROUTE_BASE (empty: the task records
+# none) and leaves TEARDOWN_ROUTE_BASE_FROM empty. The sweep has no task of its own: it
+# sets TEARDOWN_ROUTE_BASE_FROM=records and TEARDOWN_ROUTE_STATE, and the base is then
+# read from the task records of every local home (fm_local_firstmate_state_dirs) that
+# name the copy in worktree=, home=, prior_worktree= or released_worktree= (an
+# overlapping path counts). The sweep holds a copy that a record names in the first
+# three before it asks the driver, so in practice the record that reaches here names it
+# in released_worktree=, the copy a task left when it gave its pool slot back. No record
+# names it: the task records no base, which is the route's own rule (the remote's
+# default). Records that name it and disagree on the base, a record that cannot be read,
+# a home whose records cannot be listed, a copy that cannot be resolved, and a sweep
+# with no state directory named all return 1 with WHY set, so the base is unknown and
+# the copy is kept before the driver.
+teardown_route_recorded_base() {  # <copy>
+  local copy=$1 real state_dir meta line field value other_real base found=0 first=1
+  TEARDOWN_ROUTE_BASE_NOW=
+  if [ "${TEARDOWN_ROUTE_BASE_FROM:-}" != records ]; then
+    TEARDOWN_ROUTE_BASE_NOW=${TEARDOWN_ROUTE_BASE:-}
+    return 0
+  fi
+  if [ -z "$copy" ] || [ -z "${TEARDOWN_ROUTE_STATE:-}" ] || ! real=$(fm_task_copy_canonical_dir "$copy"); then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the task base branch of the copy cannot be determined (the copy or the state directory cannot be resolved), so the landing branch is not settled"
+    return 1
+  fi
+  if ! fm_local_firstmate_state_dirs "$TEARDOWN_ROUTE_STATE"; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the task base branch of the copy cannot be determined ($FM_LOCAL_FIRSTMATE_ERROR), so the landing branch is not settled"
+    return 1
+  fi
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    for meta in "$state_dir"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      if [ ! -r "$meta" ]; then
+        TEARDOWN_CLOSEOUT_ROUTE_WHY="the task record ${meta##*/} cannot be read, so the base branch of the task that holds the copy is not settled"
+        return 1
+      fi
+      while IFS= read -r line || [ -n "$line" ]; do
+        field=${line%%=*}
+        value=${line#*=}
+        case "$field" in worktree | home | prior_worktree | released_worktree) ;; *) continue ;; esac
+        [ -n "$value" ] || continue
+        other_real=$(fm_task_copy_canonical_dir "$value") || continue
+        fm_task_copy_paths_overlap "$other_real" "$real" || continue
+        found=1
+        break
+      done < "$meta"
+      [ "$found" = 1 ] || continue
+      found=0
+      base=$(fm_meta_get "$meta" base_branch)
+      if [ "$first" = 1 ]; then
+        TEARDOWN_ROUTE_BASE_NOW=$base
+        first=0
+      elif [ "$base" != "$TEARDOWN_ROUTE_BASE_NOW" ]; then
+        TEARDOWN_CLOSEOUT_ROUTE_WHY="the task records that name the copy disagree on the base branch (${TEARDOWN_ROUTE_BASE_NOW:-none} and ${base:-none}), so the landing branch is not settled"
+        TEARDOWN_ROUTE_BASE_NOW=
+        return 1
+      fi
+    done
+  done
+  return 0
+}
+
 # True when the forge shows PR <pr> MERGED with a merge commit that the clone has
 # and that is an ancestor of origin/<landing branch>, read with git and no fetch.
-# The landing branch is the task's base_branch= (TEARDOWN_ROUTE_BASE) or the
-# remote's own default branch, read from the remote. False too while the clone's
-# primary checkout is on the PR's head branch. The forge is read with gh and the repository named from the
+# The landing branch is the base_branch= that the task of <copy> recorded
+# (teardown_route_recorded_base) or the remote's own default branch, read from the
+# remote. False too while the clone's primary checkout is on the PR's head branch. The forge is read with gh and the repository named from the
 # clone's origin URL; a read that fails, times out or cannot be parsed is
 # unknown, never merged.
-teardown_route_pr_landed() {  # <slot> <pr>
+teardown_route_pr_landed() {  # <slot> <pr> [<copy>]
   local slot=$1 pr=$2 url path owner repo out limit rc=0 forge_state merge head current branch ref shown
+  teardown_route_recorded_base "${3:-}" || return 1
   # fm_pr_url_parse writes these globals; keep them out of the calling script.
   local FM_PR_PROVIDER FM_PR_URL FM_PR_HOST FM_PR_PATH FM_PR_OWNER FM_PR_REPO FM_PR_NUMBER
   url=$(git -C "$slot" config --get-all remote.origin.url 2>/dev/null) || url=
@@ -2337,7 +2409,7 @@ teardown_route_pr_landed() {  # <slot> <pr>
   # recorded base that disagrees with it keeps the copy. The local origin/HEAD is
   # never trusted, and a local main or master is only a guess.
   teardown_route_remote_default "$slot" "$limit" || return 1
-  branch=${TEARDOWN_ROUTE_BASE:-}
+  branch=$TEARDOWN_ROUTE_BASE_NOW
   if [ -z "$branch" ]; then
     branch=$TEARDOWN_ROUTE_REMOTE_DEFAULT
   elif [ "$branch" != "$TEARDOWN_ROUTE_REMOTE_DEFAULT" ]; then
@@ -2402,7 +2474,7 @@ teardown_closeout_route() {  # <slot> <copy>
       && teardown_route_checkout_open "$1" "$2" \
       && { teardown_closeout_route_publish; true; } \
       && teardown_route_profile_ok "$profile" "$pr" "$tip" \
-      && teardown_route_pr_landed "$1" "$pr" \
+      && teardown_route_pr_landed "$1" "$pr" "$2" \
       && teardown_route_content_proven "$1" "$tip" "$TEARDOWN_ROUTE_MERGE" \
       && teardown_route_reread "$2" "$pr" "$profile" "$tip" \
       && teardown_route_profile_ok "$profile" "$pr" "$tip"; then

@@ -174,7 +174,9 @@
 # executed through the driver's own --pr route instead, and its plan allows only on
 # that route's dry-run answer (exit 3, state BLOCKED, predicates_failed exactly
 # ["cleanup_not_executed"]); bin/fm-teardown-nested-lib.sh's header owns the record
-# format, the merged-PR and content conditions, the project lock the route takes here
+# format, the merged-PR and content conditions, the task base that the landing branch
+# is checked against (read here from the task records that name the copy), the project
+# lock the route takes here
 # and the reads of the slot's primary checkout, and a record that fails one, or any
 # other answer, holds the copy as above with the route and PR named; a plan that times
 # out names the route and PR too. A route execute that claims success uses a release
@@ -384,6 +386,8 @@ MAX_LINE=1600
 # shellcheck source=bin/fm-check-lib.sh
 . "$SCRIPT_DIR/fm-check-lib.sh"
 TEARDOWN_ROUTE_DATA=$DATA_DIR
+TEARDOWN_ROUTE_BASE_FROM=records
+TEARDOWN_ROUTE_STATE=$STATE
 
 usage() {
   sed -n '2,/^set -u$/{/^set -u$/d;s/^# \{0,1\}//;p;}' "$0"
