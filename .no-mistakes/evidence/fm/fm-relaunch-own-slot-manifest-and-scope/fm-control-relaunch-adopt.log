@@ -1,0 +1,12 @@
+ok - manifest inventory oracle: a same-byte rewrite and a created-then-deleted receipt both change it; an untouched directory does not
+ok - fm-control relaunch: a governed relaunch adopts its own manifest, twice, without the provisioner
+ok - fm-control relaunch: adoption refuses a manifest that is not the task's own, by name, changing nothing
+ok - fm-control relaunch: adoption passes the existing custody owner's verdict through
+ok - fm-control relaunch: own out-of-scope commits and edits are admitted, printed, and never added to the scope
+ok - fm-control relaunch: a dirty copy and a stopped own rebase are admitted with every byte kept
+ok - fm-control relaunch: only a relaunch into the task's own recorded slot takes the adopt route
+ok - fm-control relaunch: an edited launch artifact (bytes, mode, or cut off) is kept byte for byte, parseable protections stay effective, an unchanged one is regenerated
+ok - fm-control relaunch: a worker's override keys stay in its kept copy, its hook and permission entries are merged into the active file
+Updating files: 100% (3/3)Updating files: 100% (3/3), done.
+ok - fm-control relaunch: the worker's allow, deny and ask rule lists reach the active file; a mode and other permission keys do not
+rc=0

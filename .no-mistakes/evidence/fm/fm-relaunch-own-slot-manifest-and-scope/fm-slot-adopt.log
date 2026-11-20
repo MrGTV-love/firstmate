@@ -1,0 +1,10 @@
+ok - adoption: a same-task claim naming another home or no home is refused; the own claim (alias too) and no claim are admitted
+ok - adoption: an unreadable foreign custody record is refused by name, a readable one is named, the own copy is admitted
+ok - drift: a hidden (assume-unchanged) tracked symlink retarget is listed, an unchanged one is not
+ok - drift: a task change that main absorbed and reverted is listed; an upstream-only path is not
+ok - primary provisioner: a forged cached module does not run, a substituted export file is detected, a locally changed module is refused
+ok - preflight: an old copy is judged by the primary provisioner's read-only check, collision refused, clean admitted
+ok - adopt check: a refusal after the wiring and record were written says so; the first-check refusal keeps its text
+ok - provision: a refused provision after the verified export leaves no export or bytecode directory
+# all fm-slot-adopt tests passed
+rc=0

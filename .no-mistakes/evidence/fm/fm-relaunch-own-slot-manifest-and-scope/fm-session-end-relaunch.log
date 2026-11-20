@@ -1,0 +1,10 @@
+ok - a dead session-end lane is relaunched once and then left alone
+ok - an unchanged slot refusal is reported once and not retried by successor scanners; a changed cause permits one attempt
+ok - an unchanged slot refusal is not retried after a new generation or an unrelated commit; a real change to the obstruction permits one attempt
+ok - a long drift report keeps its durable reference through the fallback cap; a short one stays whole
+ok - a failure that is not a refusal keeps today's retry
+ok - the complete drift report reaches the observer on a relaunch and on a dirty refusal
+ok - the relaunch hands control the watcher's home, state, and a launch wait inside its bound
+ok - a missing endpoint with session-end is not relaunched
+not ok - the relaunch call blocked for 23s, past the 66s grace less its 60s margin
+rc=1
