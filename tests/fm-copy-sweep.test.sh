@@ -5037,8 +5037,10 @@ test_a_lane_copy_takes_its_base_from_the_lane_task_that_released_it_and_not_from
   printf '%s\t%s\t%s\t%s\n' "$copy" "$tip" 7 "$W/profiles/lanecopy.json" >> "$HOMED/data/supersedence-records.tsv"
   route_script_row "$W" lanecopy allowed success 7
   route_set_pr "$W/forge" 7 MERGED "$merge"
-  ! grep -q '^base_branch=' "$HOMED/state/rl.meta" && grep -qxF "home=$lane" "$HOMED/state/rl.meta" \
-    && grep -qx 'kind=secondmate' "$HOMED/state/rl.meta" || fail "the root home's secondmate record does not name the lane home without a base"
+  if grep -q '^base_branch=' "$HOMED/state/rl.meta" || ! grep -qxF "home=$lane" "$HOMED/state/rl.meta" \
+    || ! grep -qx 'kind=secondmate' "$HOMED/state/rl.meta"; then
+    fail "the root home's secondmate record does not name the lane home without a base"
+  fi
   fm_write_meta "$lane/state/lane-task.meta" kind=ship "released_worktree=$copy" base_branch=main
   route_sweep --apply
   [ ! -e "$copy" ] || fail "the lane copy whose releasing task records the remote's default was kept: $OUT"
