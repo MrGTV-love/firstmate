@@ -222,7 +222,7 @@ A local skill exists only in this home, so offloading an entry out of `data/capt
      In a secondmate home, route a newly discovered shared preference to the main firstmate through marked status or a document pointer instead of editing the inherited file.
    - Project-intrinsic knowledge never goes into a project's `AGENTS.md` through this fleet: a crewmate edits those files only to correct factually wrong information (AGENTS.md section 6), so no ship task carries an addition.
      Keep the candidate in `data/learnings.md` or surface it in the completion receipt so the captain can extend the file by hand.
-   - Knowledge general to every Firstmate user belongs in this repo's shared tracked material through the normal branch, no-mistakes, PR, and captain-merge path, which exists only under this home's firstmate-repository publication authority (`AGENTS.md` section 1's role boundary).
+   - Knowledge general to every Firstmate user belongs in this repo's shared tracked material through the normal branch, no-mistakes, and PR path, merged under the merge authority and boundaries in `AGENTS.md` section 7, which exists only under this home's firstmate-repository publication authority (`AGENTS.md` section 1's role boundary).
      A user/operator home instead keeps the lesson in `data/learnings.md` and may leave a sanitized local draft for the captain to carry upstream.
    - For task-scoped notes, inspect the item with `bin/fm-tasks-axi.sh show <id> --full`, classify the change as new, duplicate, superseding, or obsolete, then use a considered replacement body through `bin/fm-tasks-axi.sh update <id> --body-file <path>`.
      Use `--archive-body` when recoverability matters.
