@@ -73,10 +73,13 @@ make_case() {  # <name> [task-id...]
   case_dir="$TMP_ROOT/$name"
   mkdir -p "$case_dir"
   fakebin=$(fm_fakebin "$case_dir")
+  fm_test_fake_tmux_acquisition_support "$fakebin" || return
   : > "$case_dir/calls.log"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 case "$*" in
   *"#{pane_current_path}"*)
     # A spawn that is told to hold waits here, after its capacity check and
@@ -1353,6 +1356,8 @@ test_spawn_progresses_during_non_pool_teardown_phases() {
     cat > "$case_dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 case "$*" in
   *'treehouse get'*)
     if [ -f "$FM_SLOW_META" ]; then
@@ -1942,6 +1947,8 @@ test_fresh_same_id_spawn_cannot_cycle_with_slow_teardown() {
   cat > "$case_dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 case "$*" in *'#{pane_current_path}'*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;; esac
 case "${1:-}" in
   list-windows)

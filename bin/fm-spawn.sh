@@ -82,9 +82,13 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
-#   A fresh spawn's `treehouse get` wait is progress-based: it ends after ten
-#   minutes with no new pane path or changed output, or at an absolute
-#   thirty-minute extreme. docs/agent-control.md owns the rule, and
+#   A fresh spawn's `treehouse get` wait ends after the measured stall allowance
+#   (default 1605 s, SPAWN_ACQUIRE_STALL overrides) with no new pane path,
+#   newly finished candidate or Git start.
+#   Separate per-get path sets reject repeats without letting a stale pane path
+#   suppress a later completion; a per-get output boundary excludes older records.
+#   Repeated candidates are not progress; there is no default absolute acquisition ceiling.
+#   docs/agent-control.md owns the rule, and
 #   docs/verification/runtime-backends.md "Treehouse get entry wait" records
 #   the earlier acquisition timings and their limits.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only] [--worktree <path>] [--owned-path <tracked-path>]...
@@ -557,7 +561,10 @@
 #   row read back, listed in the spawn output, and a second `treehouse get` in the same pane takes another copy.
 #   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
-#   One absolute thirty-minute bound covers every get and is read before each get, after the custody scan.
+#   Each get retains the measured stall allowance (default 1605 s,
+#   SPAWN_ACQUIRE_STALL overrides) with no new pane path, newly finished candidate
+#   or Git start; elapsed total time prevents another get only when an explicit
+#   positive SPAWN_ACQUIRE_CEILING is reached.
 #   After the move a second snapshot is compared with the first. The copy's own refs (HEAD, the
 #   branch it had at the first snapshot, the branch the move advances, and the one anchor ref
 #   this task's own preparation creates) must show only the expected move: any other difference
@@ -593,9 +600,10 @@
 #   remains the owner. Spawn executes it through the acquired shell, retaining
 #   the primary-project Python cwd, so get/bash holders are actual ancestors;
 #   unrelated live holders remain the provisioner's refusal, not a PID allow-list.
-#   The shell must start that helper within the same ten-minute no-progress
-#   budget as treehouse get, and the attempt ends at the thirty-minute absolute
-#   extreme. Either stop, or a vanished endpoint, ends only that attempt's own
+#   The shell must start that helper within its fixed ten-minute allowance,
+#   and provisioning ends at its fixed thirty-minute absolute extreme.
+#   Acquisition overrides do not change either provisioning bound.
+#   Either stop, or a vanished endpoint, ends only that attempt's own
 #   provisioner process group before any lock release or refusal record,
 #   and a shell that starts late finds the attempt already claimed and runs nothing.
 #   It uses the assigned copy, never another worktree. Governed
@@ -1957,10 +1965,20 @@ SPAWN_LOCAL_SHA=
 SLOT_SOURCE_REF=
 SLOT_SOURCE_SHA=
 SPAWN_FRESH_SOURCE=0
-# One owner for the acquired-pane budgets: ten minutes without progress and a
-# thirty-minute absolute extreme bound both treehouse get and slot provisioning.
-SPAWN_ACQUIRE_STALL=600
-SPAWN_ACQUIRE_CEILING=1800
+# Pool walks measured 509-535s at load ~100; allow three times that maximum
+# without a new path, candidate or Git start. Total time is not a default stop.
+# measured: value=1605 date=2026-11-18 host=Mac-mini margin=3
+SPAWN_ACQUIRE_STALL=${SPAWN_ACQUIRE_STALL:-1605}
+SPAWN_ACQUIRE_CEILING=${SPAWN_ACQUIRE_CEILING:-0}
+if ! [[ "$SPAWN_ACQUIRE_STALL" =~ ^[1-9][0-9]*$ ]] ||
+  ! [[ "$SPAWN_ACQUIRE_CEILING" =~ ^(0|[1-9][0-9]*)$ ]]; then
+  echo 'error: SPAWN_ACQUIRE_STALL must be positive decimal seconds; SPAWN_ACQUIRE_CEILING must be nonnegative decimal seconds' >&2
+  exit 1
+fi
+# Provisioning is a separate mechanism, unchanged by acquisition overrides.
+SPAWN_PROVISION_STALL=600
+SPAWN_PROVISION_CEILING=1800
+SPAWN_ACQUIRE_TRACE_DIR=
 SPAWN_SLOT_UNQUIESCED=0
 SPAWN_BASE_DEFAULT=
 SPAWN_BASE_REF=
@@ -2086,6 +2104,10 @@ spawn_abort_cleanup() {
         status=1
       fi
     fi
+  fi
+  if [ -n "$SPAWN_ACQUIRE_TRACE_DIR" ]; then
+    rm -rf -- "$SPAWN_ACQUIRE_TRACE_DIR"
+    SPAWN_ACQUIRE_TRACE_DIR=
   fi
   if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
     ORCA_ABORT_CLEANUP=0
@@ -5701,7 +5723,8 @@ spawn_current_path() { # <target>
 }
 spawn_acquisition_output() { # <target>
   case "$BACKEND" in
-  tmux) fm_backend_tmux_capture "$1" 200 ;;
+  # Acquisition alone needs logical records; other capture consumers keep physical lines.
+  tmux) tmux capture-pane -p -J -t "$1" -S -200 ;;
   herdr) fm_backend_herdr_capture "$1" 200 ;;
   zellij) fm_backend_zellij_capture "$1" 200 "$W" ;;
   cmux) fm_backend_cmux_capture "$1" 200 "$W" ;;
@@ -5712,7 +5735,7 @@ spawn_acquisition_output() { # <target>
 # unknown (the backend cannot say, the read failed, or a non-shell helper is
 # the only thing listed). zellij and cmux expose no foreground process, so they
 # always read unknown. Only the minute waiting line reads this; path/output
-# progress governs the wait.
+# and Git-start progress govern the wait.
 spawn_get_state() { # <target>
   local lines line first shells=0 other=0
   case "$BACKEND" in
@@ -6215,6 +6238,7 @@ SPAWN_SKIPPED_INFO=()
 SPAWN_PROVEN_COPY=
 SPAWN_APPLY_FAILED=0
 SPAWN_ACQUIRE_T0=
+SPAWN_ACQUIRE_EPOCH=0
 # The pid of the shell this spawn's pane was started with (tmux and herdr report it); nothing for a backend
 # that does not, which makes the holder rule fall back to the `treehouse` launcher (bin/fm-slot-provision-lib.sh).
 spawn_pane_pid() {
@@ -6250,20 +6274,35 @@ spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
   done
   return 1
 }
-# No new get once the one absolute bound is spent: the copies skipped so far stay leased where they are.
-spawn_acquire_bound_check() {
-  if [ -n "$SPAWN_ACQUIRE_T0" ] && [ $((SECONDS - SPAWN_ACQUIRE_T0)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
+spawn_acquire_pool_slot() {
+  fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
+  if [ "$SPAWN_ACQUIRE_CEILING" -gt 0 ] && [ -n "$SPAWN_ACQUIRE_T0" ] &&
+    [ $((SECONDS - SPAWN_ACQUIRE_T0)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
     echo "error: absolute extreme ${SPAWN_ACQUIRE_CEILING}s reached across every treehouse get of this spawn; no further copy is requested (spawning project '$PROJ_ABS'; copies skipped by this spawn: ${SPAWN_SKIPPED_SLOTS[*]:-none})" >&2
     spawn_report_leased_copies >&2
     exit 1
   fi
-}
-spawn_acquire_pool_slot() {
-  spawn_acquire_bound_check
-  fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" || exit 1
-  # The scan above takes time. The bound is read again immediately before the get is sent (Main 1886 N9).
-  spawn_acquire_bound_check
-  spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
+  if [ -z "$SPAWN_ACQUIRE_TRACE_DIR" ]; then
+    SPAWN_ACQUIRE_TRACE_DIR=$(umask 077; mktemp -d "$DATA/$ID/.acquire-trace.XXXXXX") || exit 1
+  fi
+  acquire_trace=$(mktemp "$SPAWN_ACQUIRE_TRACE_DIR/get.XXXXXX") || exit 1
+  acquire_git_starts=0
+  # Keep earlier gets' scrollback, but distinguish their records from this get's.
+  SPAWN_ACQUIRE_EPOCH=$((SPAWN_ACQUIRE_EPOCH + 1))
+  acquire_marker_prefix=__firstmate_acquire_
+  acquire_marker_suffix="$$_${SPAWN_ACQUIRE_EPOCH}__"
+  acquire_marker="$acquire_marker_prefix$acquire_marker_suffix"
+  # Only this control record tolerates physical wraps. Its compact identity
+  # stays within the bounded capture even when the task id is very long.
+  acquire_marker_pattern=$'\n'
+  for ((acquire_marker_index=0; acquire_marker_index<${#acquire_marker}; acquire_marker_index++)); do
+    [ "$acquire_marker_index" -eq 0 ] || acquire_marker_pattern+=$'\n''?'
+    acquire_marker_pattern+="${acquire_marker:acquire_marker_index:1}"
+  done
+  acquire_marker_pattern+=$'\n'
+  # Separate arguments prevent the echoed command from containing the marker.
+  spawn_send_or_abort "treehouse get boundary" spawn_send_text_line "$WT_TARGET" \
+    "printf '\n%s%s\n' $(shell_quote "$acquire_marker_prefix") $(shell_quote "$acquire_marker_suffix")"
 
   # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
   # Target the stable window id, not the name: if the name is ever lost (e.g. an
@@ -6298,75 +6337,164 @@ spawn_acquire_pool_slot() {
   # refusal has to be self-explaining instead: carry the last path seen and the
   # reason it was rejected, and report both at the deadline.
   #
-  # A loaded host can keep a live get queued for minutes. Refuse only after
-  # ten minutes with neither a new pane path nor changed output, or after the
-  # absolute runaway bound of thirty minutes. Foreground liveness explains
-  # the wait but is not itself progress: a hung get must still end eventually.
+  # A loaded host can keep a live get queued for minutes. Refuse after the
+  # measured stall allowance without a new pane path, candidate or Git start.
+  # Checked-candidate lines count once per exact path per get; changing
+  # counters, reasons and waiting messages never renew the clock.
+  # Total time is not a stop unless an operator explicitly sets a ceiling.
+  # Liveness alone is not progress; starting actual Git calls is pool activity.
   # The existing acquisition EXIT cleanup retains ownership of any lease.
   # Sample output at most every five seconds; print a waiting line each minute.
   acquire_stall=$SPAWN_ACQUIRE_STALL
-  acquire_ceiling=$SPAWN_ACQUIRE_CEILING
   acquire_notice=60
-  # One absolute bound covers every get this spawn types, not each get alone.
-  [ -n "$SPAWN_ACQUIRE_T0" ] || SPAWN_ACQUIRE_T0=$SECONDS
-  acquire_start=$SPAWN_ACQUIRE_T0
+  # Retain total elapsed time for waiting notices, not as a stop condition.
+  acquire_start=${SPAWN_ACQUIRE_T0:-$SECONDS}
   acquire_progress=$SECONDS
   acquire_next_output=$SECONDS
   acquire_next_notice=$((SECONDS + acquire_notice))
-  acquire_output=''
+  # Separate per-get histories: a transient stale pane path must not suppress
+  # the later genuine completion of that candidate. Literal newline delimiters
+  # keep exact comparisons without associative arrays (stock macOS Bash 3.2).
+  acquire_seen_pane_paths=$'\n'
+  acquire_seen_candidates=$'\n'
+  acquire_epoch_seen=0
+  acquire_get_sent=0
+  acquire_progress_pattern='^treehouse: checked (/.*): (accepted|refused|skipped): .+$'
   acquire_stop=''
   candidate=""
   last_seen=""
-  last_reason="the pane reported no path"
+  last_reason="the pane has not acknowledged this get's output boundary"
   tick=0
   while :; do
-    tick=$((tick + 1))
-    # The one absolute bound is read before a copy can be accepted, so a long jump between two agreeing reads
-    # still ends the spawn instead of admitting that copy.
-    if [ $((SECONDS - acquire_start)) -ge "$acquire_ceiling" ]; then
-      acquire_stop="absolute extreme ${acquire_ceiling}s reached"
+    if [ "$SPAWN_ACQUIRE_CEILING" -gt 0 ] &&
+      [ $((SECONDS - acquire_start)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
+      acquire_stop="absolute extreme ${SPAWN_ACQUIRE_CEILING}s reached (explicit SPAWN_ACQUIRE_CEILING override)"
       break
     fi
-    p=$(spawn_current_path "$WT_TARGET" || true)
-    if [ -n "$p" ] && [ "$p" != "$last_seen" ]; then
-      acquire_progress=$SECONDS
-      last_seen="$p"
-    fi
-    p_skipped=0
-    [ -z "$p" ] || ! spawn_slot_skipped "$p" || p_skipped=1
-    if [ "$p_skipped" = 1 ]; then
-      candidate=""
-      last_reason="the pane is still in a copy this spawn skipped"
-    elif [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
-      p_real=$(real_path_or_raw "$p")
-      last_reason="it is an isolated worktree, but no second read agreed with it"
-      if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
-        # The bound is read once more, here, immediately before the copy is accepted (Main 1823 D-D).
-        if [ $((SECONDS - acquire_start)) -ge "$acquire_ceiling" ]; then
-          acquire_stop="absolute extreme ${acquire_ceiling}s reached"
+    if [ "$acquire_get_sent" = 1 ]; then
+      tick=$((tick + 1))
+      p=$(spawn_current_path "$WT_TARGET" || true)
+      if [ -n "$p" ] && [ "$p" != "$last_seen" ]; then
+        last_seen="$p"
+        case "$acquire_seen_pane_paths" in
+          *$'\n'"$p"$'\n'*) ;;
+          *)
+            acquire_seen_pane_paths+="$p"$'\n'
+            acquire_progress=$SECONDS
+            ;;
+        esac
+      fi
+      p_skipped=0
+      [ -z "$p" ] || ! spawn_slot_skipped "$p" || p_skipped=1
+      if [ "$p_skipped" = 1 ]; then
+        candidate=""
+        last_reason="the pane is still in a copy this spawn skipped"
+      elif [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
+        p_real=$(real_path_or_raw "$p")
+        last_reason="it is an isolated worktree, but no second read agreed with it"
+        if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
+          WT="$p"
           break
         fi
-        WT="$p"
-        break
+        candidate="$p_real"
+      else
+        candidate=""
+        [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
       fi
-      candidate="$p_real"
-    else
-      candidate=""
-      [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
     fi
     if [ "$SECONDS" -ge "$acquire_next_output" ]; then
-      if output=$(spawn_acquisition_output "$WT_TARGET" 2>/dev/null) && [ "$output" != "$acquire_output" ]; then
-        acquire_output=$output
-        acquire_progress=$SECONDS
+      # Trace2 start events come from Git execs inherited from this get, even
+      # when the short-lived children finish between samples. Mere liveness,
+      # CPU use or repeated pane text is not enough to renew the allowance.
+      acquire_git_sample=$(grep -c '"event":"start"' "$acquire_trace" 2>/dev/null || true)
+      case "$acquire_git_sample" in
+        ''|*[!0-9]*) ;;
+        *)
+          if [ "$acquire_git_sample" -gt "$acquire_git_starts" ]; then
+            acquire_git_starts=$acquire_git_sample
+            acquire_progress=$SECONDS
+          fi
+          ;;
+      esac
+      if output=$(spawn_acquisition_output "$WT_TARGET" 2>/dev/null) && [ -n "$output" ]; then
+        # A first sample may mix retained records and this get's new completions.
+        # Cut at the emitted boundary, never discard that entire first sample.
+        output=$'\n'"$output"$'\n'
+        if [[ "$output" =~ $acquire_marker_pattern ]]; then
+          acquire_marker_capture=${BASH_REMATCH[0]}
+          output=${output##*"$acquire_marker_capture"}
+          acquire_epoch_seen=1
+        else
+          [ "$acquire_epoch_seen" = 1 ] || output=''
+        fi
+        if [ "$acquire_get_sent" = 0 ] && [ "$acquire_epoch_seen" = 1 ]; then
+          # Use this same poll loop for the acknowledgement. Get cannot emit a
+          # burst and scroll the marker out of the bounded capture before it is seen.
+          spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" \
+            "GIT_TRACE2_EVENT=$(shell_quote "$acquire_trace") treehouse get"
+          acquire_get_sent=1
+          [ -n "$SPAWN_ACQUIRE_T0" ] || SPAWN_ACQUIRE_T0=$SECONDS
+          acquire_start=$SPAWN_ACQUIRE_T0
+          acquire_progress=$SECONDS
+          acquire_next_output=$SECONDS
+          acquire_next_notice=$((SECONDS + acquire_notice))
+          last_reason="the pane reported no path"
+          continue
+        fi
+        # Non-tmux captures can retain physical wraps, even inside the prefix
+        # or decision delimiter. Reassemble only checked-candidate records;
+        # never change the capture seen by other consumers or join samples.
+        acquire_record=''
+        acquire_record_prefix='treehouse: checked /'
+        while IFS= read -r output_line; do
+          if [ "$BACKEND" = tmux ]; then
+            # -J already preserves logical records. Never borrow the next
+            # record as the reason of a malformed empty-reason line.
+            acquire_record=$output_line
+          else
+            if [ -z "$output_line" ]; then
+              acquire_record=''
+              continue
+            fi
+            case "$output_line" in
+              'treehouse: checked /'*) acquire_record=$output_line ;;
+              *) acquire_record+=$output_line ;;
+            esac
+            case "$acquire_record" in
+              "$acquire_record_prefix"*) ;;
+              *)
+                # A short prefix can itself wrap. Anything else is noise.
+                case "$acquire_record_prefix" in "$acquire_record"*) continue ;; esac
+                acquire_record=''
+                continue
+                ;;
+            esac
+          fi
+          [[ "$acquire_record" =~ $acquire_progress_pattern ]] || continue
+          # Take the first decision delimiter, not a later one inside the reason.
+          acquire_candidate=${acquire_record#'treehouse: checked '}
+          acquire_record=''
+          acquire_candidate=${acquire_candidate%%: accepted: *}
+          acquire_candidate=${acquire_candidate%%: refused: *}
+          acquire_candidate=${acquire_candidate%%: skipped: *}
+          case "$acquire_seen_candidates" in
+            *$'\n'"$acquire_candidate"$'\n'*) ;;
+            *)
+              acquire_seen_candidates+="$acquire_candidate"$'\n'
+              acquire_progress=$SECONDS
+              ;;
+          esac
+        done <<< "$output"
       fi
       acquire_next_output=$((SECONDS + 5))
     fi
-    if [ $((SECONDS - acquire_start)) -ge "$acquire_ceiling" ]; then
-      acquire_stop="absolute extreme ${acquire_ceiling}s reached"
-      break
-    fi
     if [ $((SECONDS - acquire_progress)) -ge "$acquire_stall" ]; then
       acquire_stop="no path or output progress for ${acquire_stall}s"
+      break
+    fi
+    if [ "$SPAWN_ACQUIRE_CEILING" -gt 0 ] &&
+      [ $((SECONDS - acquire_start)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
+      acquire_stop="absolute extreme ${SPAWN_ACQUIRE_CEILING}s reached (explicit SPAWN_ACQUIRE_CEILING override)"
       break
     fi
     if [ "$SECONDS" -ge "$acquire_next_notice" ]; then
@@ -6382,6 +6510,11 @@ spawn_acquire_pool_slot() {
     exit 1
   fi
 
+  # Get opens a subshell, so a command-local assignment is inherited there.
+  # Queue the unset before any provisioning/launch command on that same shell.
+  # Keep its private trace until EXIT cleanup, after the shell has consumed it.
+  spawn_send_or_abort "clear acquisition tracing" spawn_send_text_line "$WT_TARGET" \
+    'unset GIT_TRACE2_EVENT'
   validate_spawn_worktree "treehouse get" "$T"
 
   # Claim the pool slot for this task. The interactive `treehouse get` sent to
@@ -6800,10 +6933,10 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
     while [ ! -f "$result" ]; do
       if ! fm_backend_target_exists "$BACKEND" "$T" "$W"; then
         stop="assigned endpoint $T became unreadable before provisioning completed"
-      elif [ $((SECONDS - started)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
-        stop="provisioning reached the absolute extreme ${SPAWN_ACQUIRE_CEILING}s"
-      elif [ ! -e "$claim" ] && [ $((SECONDS - started)) -ge "$SPAWN_ACQUIRE_STALL" ]; then
-        stop="the acquired shell did not start provisioning within ${SPAWN_ACQUIRE_STALL}s"
+      elif [ $((SECONDS - started)) -ge "$SPAWN_PROVISION_CEILING" ]; then
+        stop="provisioning reached the absolute extreme ${SPAWN_PROVISION_CEILING}s"
+      elif [ ! -e "$claim" ] && [ $((SECONDS - started)) -ge "$SPAWN_PROVISION_STALL" ]; then
+        stop="the acquired shell did not start provisioning within ${SPAWN_PROVISION_STALL}s"
       fi
       [ -z "$stop" ] || break
       sleep 1

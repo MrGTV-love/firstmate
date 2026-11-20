@@ -24,12 +24,34 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-SPAWN="$ROOT/bin/fm-spawn.sh"
+# Historical boundary cases exercise the supported 600s override, not the
+# measured production default; all elapsed time still comes from clock.sh.
+export SPAWN_ACQUIRE_STALL=600 SPAWN_ACQUIRE_CEILING=0
+SPAWN="${FM_TEST_SPAWN:-$ROOT/bin/fm-spawn.sh}"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-worktree-settle)
 # Scale only the acquisition's one-second sleeps; fixture commands keep real time.
 cat > "$TMP_ROOT/clock.sh" <<'SH'
+__fm_scaled_time=0
+__fm_scaled_polls=0
+set -T
+trap 'SECONDS=$__fm_scaled_time' DEBUG
 sleep() {
-  if [ "${1:-}" = 1 ]; then SECONDS=$((SECONDS + 60)); fi
+  if [ "${1:-}" = 1 ]; then
+    __fm_scaled_polls=$((__fm_scaled_polls + 1))
+    if [ "$__fm_scaled_polls" = 1 ]; then
+      __fm_scaled_time=$((__fm_scaled_time + ${FM_SETTLE_FIRST_TICK:-${FM_SETTLE_TICK:-60}}))
+    else
+      if [ "${FM_SETTLE_MODE:-}" = stalecompletion ] && [ "$__fm_scaled_time" = 1 ]; then
+        __fm_scaled_time=599
+      elif { [ "${FM_SETTLE_MODE:-}" = novel ] || [ "${FM_SETTLE_MODE:-}" = gitactive ]; } && [ "$__fm_scaled_time" -ge 5400 ]; then
+        __fm_scaled_time=$((__fm_scaled_time + 5))
+      else
+        __fm_scaled_time=$((__fm_scaled_time + ${FM_SETTLE_TICK:-60}))
+      fi
+    fi
+    [ -z "${FM_SETTLE_CLOCK_FILE:-}" ] || printf '%s\n' "$__fm_scaled_time" > "$FM_SETTLE_CLOCK_FILE"
+    return 0
+  fi
   command sleep "$@"
 }
 SH
@@ -51,6 +73,21 @@ case "$*" in
     [ -f "$countfile" ] && n=$(cat "$countfile")
     n=$((n + 1))
     printf '%s\n' "$n" > "$countfile"
+    if [ -n "${FM_SETTLE_MODE:-}" ]; then
+      now=$(cat "$FM_SETTLE_CLOCK_FILE" 2>/dev/null || printf 0)
+      if [ "$FM_SETTLE_MODE" = stalecompletion ] && [ "$now" = 0 ]; then
+        printf '%s\n' "$FM_FAKE_PANE_PATH"
+      elif [ "$now" -ge "${FM_SETTLE_ENTER_AT:-5400}" ]; then
+        printf '%s\n' "$FM_FAKE_PANE_PATH"
+      elif [ "$FM_SETTLE_MODE" = pathcycle ] && [ "$now" -ge 300 ] && [ "$(((now / 5) % 2))" = 0 ]; then
+        printf '%s/not-a-copy\n' "$FM_FAKE_PANE_STALE"
+      elif [ "$FM_SETTLE_MODE" = newpath ] && [ "$now" -ge 850 ]; then
+        printf '%s/new-path\n' "$FM_FAKE_PANE_STALE"
+      else
+        printf '%s\n' "$FM_FAKE_PANE_STALE"
+      fi
+      exit 0
+    fi
     if [ "$n" -le "${FM_FAKE_PANE_STALE_READS:-0}" ]; then
       printf '%s\n' "${FM_FAKE_PANE_STALE:-}"
     else
@@ -62,13 +99,79 @@ esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
   capture-pane)
+    [ ! -f "$FM_FAKE_PANE_COUNTFILE.marker" ] || cat "$FM_FAKE_PANE_COUNTFILE.marker"
+    now=$(cat "${FM_SETTLE_CLOCK_FILE:-/dev/null}" 2>/dev/null || printf 0)
+    case "${FM_SETTLE_MODE:-}" in
+      gitactive|gitidle|gitnoise)
+        trace=$(cat "$FM_FAKE_PANE_COUNTFILE.tracepath" 2>/dev/null || true)
+        if [ -n "$trace" ]; then
+          if [ "$FM_SETTLE_MODE" = gitactive ] ||
+            { [ "$FM_SETTLE_MODE" = gitidle ] && [ "$now" -le 300 ]; }; then
+            printf '{"event":"start","argv":["git","status"]}\n' >> "$trace"
+          elif [ "$FM_SETTLE_MODE" = gitnoise ]; then
+            printf '{"event":"region_enter","label":"still alive"}\n' >> "$trace"
+          fi
+        fi
+        printf 'treehouse: checked /fixture/repeated: skipped: counter=%s\n' "$now"
+        exit 0 ;;
+      novel) printf 'treehouse: checked /fixture/candidate-%04d: skipped: fixture reason\n' "$((now / 300))"; exit 0 ;;
+      churn)
+        decision=skipped
+        [ "$(((now / 5) % 2))" = 0 ] || decision=accepted
+        printf 'treehouse: checked /fixture/same: %s: counter=%s timestamp=%s: refused: still the same candidate\n' "$decision" "$now" "$now"
+        exit 0 ;;
+      alternate) printf 'treehouse: checked /fixture/%s: skipped: reason\n' "$(((now / 5) % 2))"; exit 0 ;;
+      finite) printf 'treehouse: checked /fixture/%s: skipped: reason\n' "$(((now / 300) % 2))"; exit 0 ;;
+      pathcycle) printf 'treehouse: checked %s/not-a-copy: skipped: already observed candidate\n' "$FM_FAKE_PANE_STALE"; exit 0 ;;
+      newpath)
+        [ "$now" -lt 300 ] || printf 'treehouse: checked /fixture/A: skipped: one candidate\n'
+        exit 0 ;;
+      stalecompletion)
+        [ "$now" -lt 599 ] || printf 'treehouse: checked %s: skipped: genuine completion\n' "$FM_FAKE_PANE_PATH"
+        exit 0 ;;
+      waiting) printf 'waiting: treehouse get to enter an isolated worktree; elapsed %ss\n' "$now"; exit 0 ;;
+      noise)
+        printf 'Setting up worktree... %s\n' "$now"
+        printf ' treehouse: checked /fixture/indented: skipped: %s\n' "$now"
+        printf 'treehouse: checked relative-%s: refused: reason\n' "$now"
+        printf 'treehouse: checked /fixture/bad-%s: pending: reason\n' "$now"
+        printf 'treehouse: checked /fixture/empty-%s: accepted: \n' "$now"
+        printf 'waiting: tick %s\n' "$now"
+        exit 0 ;;
+      exact)
+        if [ "$now" -lt 300 ]; then
+          printf 'treehouse: checked /fixture/Case [*?]\\ path: accepted: first\n'
+        else
+          printf 'treehouse: checked /fixture/case [*?]\\ path: refused: changing reason %s\n' "$now"
+        fi
+        exit 0 ;;
+      unchanged) printf 'treehouse: checked /fixture/A: skipped: unchanged reason\n'; exit 0 ;;
+      scroll)
+        # All 200 filler lines first appear at t=0; the returning block is not new.
+        if [ "$(((now / 5) % 2))" = 0 ]; then printf 'treehouse: checked /fixture/scroll: skipped: original reason\n'; fi
+        seq 1 199
+        if [ "$(((now / 5) % 2))" = 1 ]; then printf '199\n'; fi
+        exit 0 ;;
+      reorder) if [ "$(((now / 5) % 2))" = 0 ]; then printf 'treehouse: checked /fixture/A: skipped: reason\ntreehouse: checked /fixture/B: refused: reason\n'; else printf 'treehouse: checked /fixture/B: refused: reason\ntreehouse: checked /fixture/A: skipped: reason\n'; fi; exit 0 ;;
+      boundary595|boundary599)
+        if [ "$now" -ge "${FM_SETTLE_MODE#boundary}" ]; then printf 'treehouse: checked /fixture/new: skipped: observed candidate\n'; else printf 'initial setup\n'; fi
+        exit 0 ;;
+    esac
     if [ "${FM_FAKE_OUTPUT_PROGRESS:-0}" = 1 ]; then
-      printf 'fetch progress %s\n' "$(cat "$FM_FAKE_PANE_COUNTFILE")"
+      printf 'treehouse: checked /fixture/candidate-%s: skipped: fixture reason\n' "$(cat "$FM_FAKE_PANE_COUNTFILE")"
     fi
     exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
+    for arg in "$@"; do
+      case "$arg" in
+        printf*__firstmate_acquire_*) bash -c "$arg" > "$FM_FAKE_PANE_COUNTFILE.marker" ;;
+        GIT_TRACE2_EVENT=*' treehouse get')
+          bash -c "${arg% treehouse get}; printf '%s\\n' \"\$GIT_TRACE2_EVENT\"" > "$FM_FAKE_PANE_COUNTFILE.tracepath" ;;
+        'unset GIT_TRACE2_EVENT') : > "$FM_FAKE_PANE_COUNTFILE.trace-cleared" ;;
+      esac
+    done
     if [ -n "${FM_COMPAT_LAUNCH_LOG:-}" ]; then
       for arg in "$@"; do
         case "$arg" in '. '*) printf '%s\n' "$arg" > "$FM_COMPAT_LAUNCH_LOG" ;; esac
@@ -131,6 +234,7 @@ run_settle_spawn() {
     CLAUDE_CONFIG_DIR=${SETTLE_CLAUDE_CONFIG_DIR:-} PI_CODING_AGENT_DIR='' OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp \
     FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_PANE_STALE="$STALE_DIR" \
     FM_FAKE_PANE_STALE_READS="$STALE_READS" FM_FAKE_PANE_COUNTFILE="$COUNTFILE" \
+    FM_SETTLE_CLOCK_FILE="$HOME_DIR/acquisition-clock" \
     PATH="$FAKEBIN_DIR:$PATH" \
     "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off "${@:2}" 2>&1
 }
@@ -257,22 +361,156 @@ test_slow_progressing_get_survives_old_window() {
   pass "a get with changing output keeps waiting beyond ten minutes of scaled total time"
 }
 
-test_progress_cannot_outlast_absolute_extreme() {
+# The former extreme test protected against runaway activity. Repeated activity
+# is rejected by the history cases below; genuinely new candidates may finish.
+test_new_candidates_finish_after_5400_seconds() {
   local rec id out status
-  id=settle-runaway-z6
-  rec=$(make_primary_case settle-runaway "$id" 100000)
+  id=settle-long-progress
+  rec=$(make_primary_case long-progress "$id" 100000)
   read_settle_record "$rec"
   fm_test_fake_sleep_noop "$FAKEBIN_DIR"
-  out=$(FM_FAKE_OUTPUT_PROGRESS=1 run_settle_spawn "$id")
+  out=$(FM_SETTLE_MODE=novel FM_SETTLE_TICK=300 run_settle_spawn "$id")
   status=$?
-  [ "$status" -ne 0 ] || fail "endlessly changing output bypassed the absolute extreme"
-  assert_contains "$out" "absolute extreme 1800s reached" \
-    "spawn did not name the absolute extreme that ended the runaway wait"
-  assert_not_contains "$out" "no path or output progress" \
-    "ongoing output was counted as a stall"
-  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "runaway acquisition published metadata"
-  pass "output activity cannot keep an acquisition alive beyond the absolute extreme"
+  expect_code 0 "$status" "new candidates were refused: $out"
+  assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$id.meta" "the final copy was not accepted"
+  assert_not_contains "$out" 'absolute extreme' 'progress hit an elapsed-time ceiling'
+  [ "$(cat "$HOME_DIR/acquisition-clock")" = 5405 ] || fail "copy did not settle at 5400 plus one confirming poll"
+  assert_contains "$out" 'waiting: treehouse get' 'minute waiting notices disappeared'
+  pass "distinct same-length finished-candidate lines finish at 5405 scaled seconds"
 }
+
+# Hand-derived deadlines: unchanged/reordered/scrolling content was all seen at
+# t=0; alternating B is first seen at t=5. A line emitted at 595 is sampled
+# at 595; one emitted at 599 is first sampled at 600 (five-second sampling).
+run_content_stall_case() { # <mode> <deadline> [first-tick] [tick]
+  local mode=$1 deadline=$2 rec id out status
+  id="settle-content-$mode"
+  rec=$(make_primary_case "content-$mode" "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(FM_SETTLE_MODE="$mode" FM_SETTLE_FIRST_TICK="${3:-5}" FM_SETTLE_TICK="${4:-5}" run_settle_spawn "$id")
+  status=$?
+  expect_code 1 "$status" "stalled capture was not refused: $out"
+  assert_contains "$out" 'no path or output progress for 600s' "wrong refusal: $out"
+  assert_contains "$out" "$STALE_DIR" 'last path absent from refusal'
+  case "$mode" in
+    pathcycle|newpath) ;;
+    *) assert_contains "$out" "repository's primary checkout" 'rejection reason absent' ;;
+  esac
+  assert_contains "$out" "spawning project '$PROJ_DIR'" 'project absent from refusal'
+  assert_contains "$out" 'copies skipped by this spawn: none' 'skipped-copy context absent'
+  [ "$(cat "$HOME_DIR/acquisition-clock")" = "$deadline" ] || fail "$mode stopped at $(cat "$HOME_DIR/acquisition-clock"), expected $deadline: $out"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'refusal published task metadata'
+  assert_absent "$(cat "$COUNTFILE.tracepath")" 'refusal retained its private acquisition trace'
+  printf '%s\n' "$out"
+  pass "$mode stops at $deadline scaled seconds"
+}
+test_git_starts_keep_a_silent_walk_alive() {
+  local rec id out trace
+  id=settle-git-active
+  rec=$(make_primary_case git-active "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(FM_SETTLE_MODE=gitactive FM_SETTLE_TICK=300 run_settle_spawn "$id")
+  expect_code 0 "$?" "actual start observations did not renew: $out"
+  assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$id.meta" 'silent walk did not reach its copy'
+  assert_equals 5405 "$(cat "$HOME_DIR/acquisition-clock")" 'active walk ended at the wrong time'
+  assert_present "$COUNTFILE.trace-cleared" 'successful acquisition did not clear inherited tracing'
+  trace=$(cat "$COUNTFILE.tracepath")
+  assert_absent "$trace" 'successful acquisition retained its private trace'
+  pass 'Git starts keep repeated-candidate walk alive past 5400; tracing is cleared'
+}
+test_git_activity_stops_then_stalls() { run_content_stall_case gitidle 905; }
+test_nonstart_trace_growth_is_not_progress() { run_content_stall_case gitnoise 600; }
+test_explicit_acquisition_ceiling_is_honored() {
+  local rec id out status
+  id=settle-explicit-ceiling
+  rec=$(make_primary_case explicit-ceiling "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  # A first isolated read at1500 must not be confirmed at the1800 ceiling.
+  out=$(SPAWN_ACQUIRE_CEILING=1800 FM_SETTLE_MODE=novel FM_SETTLE_TICK=300 FM_SETTLE_ENTER_AT=1500 run_settle_spawn "$id")
+  status=$?
+  expect_code 1 "$status" "explicit ceiling did not stop: $out"
+  assert_contains "$out" 'explicit SPAWN_ACQUIRE_CEILING override' 'operator limit not identified'
+  assert_equals 1800 "$(cat "$HOME_DIR/acquisition-clock")" 'explicit limit ignored'
+  pass 'positive ceiling is an explicit operator override, not a default'
+}
+test_stall_override_selects_the_idle_allowance() {
+  local rec id out status
+  id=settle-stall-override
+  rec=$(make_primary_case stall-override "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(SPAWN_ACQUIRE_STALL=900 FM_SETTLE_MODE=unchanged FM_SETTLE_TICK=5 run_settle_spawn "$id")
+  status=$?
+  expect_code 1 "$status" "stall override did not refuse: $out"
+  assert_contains "$out" 'no path or output progress for 900s' 'stall override was not applied'
+  assert_equals 900 "$(cat "$HOME_DIR/acquisition-clock")" 'stall override ended at the wrong time'
+  pass 'positive stall override controls idle refusal'
+}
+# Exercise the shipped defaults, not the historical override exported above.
+# Both an idle refusal and legitimate completion must keep working with no
+# operator configuration; an unintended default ceiling rejects the latter.
+test_production_defaults_bound_idle_not_walk_time() {
+  local rec id out status
+  id=settle-default-idle
+  rec=$(make_primary_case default-idle "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(
+    unset SPAWN_ACQUIRE_STALL SPAWN_ACQUIRE_CEILING
+    FM_SETTLE_MODE=unchanged FM_SETTLE_TICK=15 run_settle_spawn "$id"
+  )
+  status=$?
+  expect_code 1 "$status" "idle acquisition did not refuse with production defaults: $out"
+  assert_contains "$out" 'no path or output progress for 1605s' 'wrong production-default stall allowance'
+  assert_equals 1605 "$(cat "$HOME_DIR/acquisition-clock")" 'production-default idle stop occurred at the wrong time'
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'default idle refusal published task metadata'
+
+  id=settle-default-walk
+  rec=$(make_primary_case default-walk "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(
+    unset SPAWN_ACQUIRE_STALL SPAWN_ACQUIRE_CEILING
+    FM_SETTLE_MODE=novel FM_SETTLE_TICK=300 run_settle_spawn "$id"
+  )
+  status=$?
+  expect_code 0 "$status" "production defaults ended a progressing walk: $out"
+  assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$id.meta" 'production-default walk did not publish its copy'
+  assert_equals 5405 "$(cat "$HOME_DIR/acquisition-clock")" 'production-default walk did not settle after 5400'
+  pass 'unset acquisition overrides refuse idle at1605 and accept a5405-second walk'
+}
+
+test_invalid_acquisition_override_refuses_before_launch() {
+  local rec id out status
+  id=settle-invalid-override
+  rec=$(make_primary_case invalid-override "$id" 100000)
+  read_settle_record "$rec"
+  out=$(SPAWN_ACQUIRE_STALL=not-a-duration run_settle_spawn "$id")
+  status=$?
+  expect_code 1 "$status" "invalid acquisition override was accepted: $out"
+  assert_contains "$out" 'error: SPAWN_ACQUIRE_STALL must be positive decimal seconds; SPAWN_ACQUIRE_CEILING must be nonnegative decimal seconds' 'invalid override did not explain the permitted values'
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail 'invalid override published task metadata'
+  assert_absent "$COUNTFILE.tracepath" 'invalid override sent a get'
+  pass 'an invalid acquisition override exits1 before sending get'
+}
+
+test_unchanged_capture_stops_at_600() { run_content_stall_case unchanged 600; }
+test_new_content_observed_at_595_resets_stall() { run_content_stall_case boundary595 1195; }
+test_new_content_emitted_at_599_is_observed_at_600() { run_content_stall_case boundary599 1200; }
+test_repeated_candidate_with_changing_reason_stalls() { run_content_stall_case churn 600; }
+test_alternating_seen_captures_stall() { run_content_stall_case alternate 605; }
+test_fixed_pool_candidates_end_after_one_walk() { run_content_stall_case finite 900; }
+test_cycling_seen_pane_paths_does_not_renew() { run_content_stall_case pathcycle 900; }
+test_new_pane_path_renews_once() { run_content_stall_case newpath 1450; }
+test_stale_pane_path_does_not_suppress_genuine_completion() { run_content_stall_case stalecompletion 1199 1 1; }
+test_waiting_messages_do_not_renew_progress() { run_content_stall_case waiting 600; }
+test_nonmatching_output_does_not_renew_progress() { run_content_stall_case noise 600; }
+test_candidate_paths_are_compared_exactly() { run_content_stall_case exact 900; }
+test_scrolled_out_lines_are_not_new() { run_content_stall_case scroll 600; }
+test_reordered_lines_are_not_new() { run_content_stall_case reorder 600; }
 
 test_nonmeasured_harness_stays_unconfined_and_audited() {
   local rec id out source_line
@@ -1058,6 +1296,8 @@ PY
   expect_code 0 "$?" "raw Claude shell-data or refusal regression failed"
 }
 
+fm_test_only
+
 test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined
@@ -1073,6 +1313,27 @@ test_already_settled_pane_costs_one_confirm_read
 test_transient_primary_checkout_is_not_accepted
 test_primary_checkout_that_never_settles_fails_at_the_deadline
 test_slow_progressing_get_survives_old_window
-test_progress_cannot_outlast_absolute_extreme
+test_new_candidates_finish_after_5400_seconds
+test_git_starts_keep_a_silent_walk_alive
+test_git_activity_stops_then_stalls
+test_nonstart_trace_growth_is_not_progress
+test_explicit_acquisition_ceiling_is_honored
+test_stall_override_selects_the_idle_allowance
+test_production_defaults_bound_idle_not_walk_time
+test_invalid_acquisition_override_refuses_before_launch
+test_unchanged_capture_stops_at_600
+test_new_content_observed_at_595_resets_stall
+test_new_content_emitted_at_599_is_observed_at_600
+test_repeated_candidate_with_changing_reason_stalls
+test_alternating_seen_captures_stall
+test_fixed_pool_candidates_end_after_one_walk
+test_cycling_seen_pane_paths_does_not_renew
+test_new_pane_path_renews_once
+test_stale_pane_path_does_not_suppress_genuine_completion
+test_waiting_messages_do_not_renew_progress
+test_nonmatching_output_does_not_renew_progress
+test_candidate_paths_are_compared_exactly
+test_scrolled_out_lines_are_not_new
+test_reordered_lines_are_not_new
 
 echo "# all fm-spawn-worktree-settle tests passed"

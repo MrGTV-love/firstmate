@@ -34,10 +34,14 @@ make_spawn_fakebin() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
   fm_test_link_ts_runtime "$fakebin"
+  fm_test_fake_tmux_acquisition_support "$fakebin" || return
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
 printf '%s\n' "$*" >> "$FM_FAKE_TMUX_CALL_LOG"
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
+[ "$__fm_fake_acquisition_command" = 0 ] || exit 0
 state=$(cat "$FM_FAKE_KIMI_STATE" 2>/dev/null || true)
 fake_screen() {
   case "$state" in

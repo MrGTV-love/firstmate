@@ -11,6 +11,8 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
+# Pin the documented override for the existing scaled 600s boundary cases.
+export SPAWN_ACQUIRE_STALL=600 SPAWN_ACQUIRE_CEILING=0
 TMP_ROOT=$(fm_test_tmproot fm-spawn-pool-base-freshen)
 # Every spawn in this file runs with its detached home-summary refresh stubbed (tests/fixtures.sh fm_test_spawn_script).
 export FM_TEST_STUB_SUMMARY_REFRESH=1
@@ -57,8 +59,13 @@ EOF
 run_spawn() {
   local id=$1
   shift
-  fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" \
-    "$id" "$PROJECT_DIR" "$@"
+  (
+    if [ -n "${FM_TEST_SPAWN:-}" ]; then
+      fm_test_spawn_script() { printf '%s\n' "$FM_TEST_SPAWN"; }
+    fi
+    fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" \
+      "$id" "$PROJECT_DIR" "$@"
+  )
 }
 
 # A copy the slot rules skip is left as found and another is requested; this fake world has no other
@@ -1622,7 +1629,45 @@ make_skip_transport() {
   cat > "$FAKEBIN_DIR/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in
-  *'#{pane_current_path}'*) cat '$CASE_DIR/panepath'; exit 0 ;;
+  *'#{pane_current_path}'*)
+    if [ "\${FM_TEST_FIRST_GET_WALK:-0}" = 1 ] && [ "\$(cat '$CASE_DIR/get-count')" = 1 ]; then
+      reads=0
+      [ ! -e '$CASE_DIR/walk-reads' ] || reads=\$(cat '$CASE_DIR/walk-reads')
+      reads=\$((reads + 1))
+      printf '%s\\n' "\$reads" > '$CASE_DIR/walk-reads'
+      if [ "\$reads" -lt "\${FM_TEST_WALK_READS:-9}" ]; then printf '%s\\n' '$PROJECT_DIR'; exit 0; fi
+    fi
+    if [ "\${FM_TEST_REVISIT_CANDIDATE:-0}" = 1 ]; then
+      get=\$(cat '$CASE_DIR/get-count')
+      reads=0
+      [ ! -e '$CASE_DIR/revisit-'"\$get" ] || reads=\$(cat '$CASE_DIR/revisit-'"\$get")
+      reads=\$((reads + 1))
+      printf '%s\\n' "\$reads" > '$CASE_DIR/revisit-'"\$get"
+      if [ "\$get" = 1 ] && [ "\$reads" = 1 ]; then printf '%s\\n' '$PROJECT_DIR'; exit 0; fi
+      if [ "\$get" = 2 ] && [ "\$reads" -lt 9 ]; then sed -n '1p' '$CASE_DIR/slots'; exit 0; fi
+    fi
+    cat '$CASE_DIR/panepath'; exit 0 ;;
+  *capture-pane*)
+    [ ! -f '$CASE_DIR/acquisition-marker' ] || cat '$CASE_DIR/acquisition-marker'
+    if [ "\${FM_TEST_REVISIT_CANDIDATE:-0}" = 1 ]; then
+      get=\$(cat '$CASE_DIR/get-count')
+      reads=\$(cat '$CASE_DIR/revisit-'"\$get")
+      if [ "\$get" = 1 ] || [ "\$reads" -ge 6 ]; then
+        printf 'treehouse: checked /fixture/revisited: skipped: same candidate in each get\\n'
+      else
+        printf 'Setting up worktree...\\n'
+      fi
+      exit 0
+    fi
+    if [ "\${FM_TEST_FIRST_GET_WALK:-0}" = 1 ]; then
+      printf 'treehouse: checked /fixture/candidate-%s: skipped: fixture reason\\n' "\$(cat '$CASE_DIR/walk-reads' 2>/dev/null)"
+      exit 0
+    fi ;;
+  *send-keys*'__firstmate_acquire_'*)
+    for arg in "\$@"; do
+      case "\$arg" in printf*) bash -c "\$arg" > '$CASE_DIR/acquisition-marker' ;; esac
+    done
+    exit 0 ;;
   *send-keys*'treehouse get'*)
     n=\$(( \$(cat '$CASE_DIR/get-count') + 1 ))
     echo "\$n" > '$CASE_DIR/get-count'
@@ -1642,6 +1687,275 @@ exit 0
 SH
   chmod +x "$FAKEBIN_DIR/treehouse"
 }
+
+# Opt-in actual TG8 producer. No PATH lookup/install and no inherited HOME or
+# Treehouse configuration; --root and every repository stay in this test's tmp.
+make_real_candidate_progress() {
+  local binary=${FM_TEST_TREEHOUSE_PRODUCER:-} n pool_segment pool_root accepted
+  [ -n "$binary" ] || fail 'actual TG8 producer path was not supplied'
+  case "$binary" in /*) ;; *) fail 'TG8 producer must be an absolute binary path' ;; esac
+  [ -x "$binary" ] || fail 'supplied TG8 producer is not executable'
+  case "$CASE_DIR" in /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*) ;; *) fail 'refusing a producer pool outside scratch storage' ;; esac
+  printf -v pool_segment '%0180d' 0
+  pool_root="$CASE_DIR/pool-$pool_segment"
+  mkdir -p "$CASE_DIR/producer-home" "$CASE_DIR/producer-tmp"
+  # The default cap is 16. Check 19 existing leased candidates, then create
+  # the twentieth copy; a newly created copy need not be a checked candidate.
+  printf 'max_trees = 20\n' > "$PROJECT_DIR/treehouse.toml"
+  for ((n=1; n<=20; n++)); do
+    (
+      cd "$PROJECT_DIR" || exit 1
+      env -i PATH="$PATH" HOME="$CASE_DIR/producer-home" \
+        XDG_CONFIG_HOME="$CASE_DIR/producer-home/.config" XDG_DATA_HOME="$CASE_DIR/producer-home/.local/share" \
+        TMPDIR="$CASE_DIR/producer-tmp" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null SHELL=/bin/bash \
+        "$binary" --root "$pool_root" get --lease --json --no-fetch --lease-holder "private-fixture-$n"
+    ) > "$CASE_DIR/producer-$n.json" 2> "$CASE_DIR/producer-$n.stderr" || fail "private TG8 acquisition $n failed: $(cat "$CASE_DIR/producer-$n.stderr")"
+  done
+  printf 'actual TG8 producer %s\n' "$binary"
+  shasum -a 256 "$binary"
+  cat "$CASE_DIR/producer-20.stderr" "$CASE_DIR/producer-20.json"
+  grep '^treehouse: checked ' "$CASE_DIR/producer-20.stderr" > "$CASE_DIR/real-progress-lines"
+  [ "$(wc -l < "$CASE_DIR/real-progress-lines" | tr -d ' ')" -ge 19 ] || fail 'the actual private get did not finish at least 19 existing candidate checks'
+  accepted=$(jq -er .path "$CASE_DIR/producer-20.json") || fail 'actual producer did not return its private copy'
+  case "$accepted" in "$pool_root"/*) ;; *) fail 'actual producer escaped its explicit private pool' ;; esac
+  SKIP_SLOTS[0]=$accepted
+  printf '%s\n' "${SKIP_SLOTS[@]}" > "$CASE_DIR/slots"
+}
+
+# Real rendering, fake acquisition: only capture-pane reaches this private tmux
+# socket. Pane paths, gets, leases and agent launch remain fixture transports.
+make_acquisition_capture_lab() { # <width>
+  local width=$1 real_tmux
+  real_tmux=$(command -v tmux)
+  LAB_SOCKET_DIR=$(TMPDIR=/tmp fm_test_tmproot fm-acquire) || fail 'cannot create private socket directory'
+  LAB_SOCKET="$LAB_SOCKET_DIR/s"
+  trap '"$real_tmux" -S "$LAB_SOCKET" kill-server 2>/dev/null || true; rm -rf "$LAB_SOCKET_DIR"' EXIT
+  LAB_RENDER="$CASE_DIR/render.fifo"
+  mkfifo "$LAB_RENDER" || fail 'cannot create private rendering FIFO'
+  "$real_tmux" -S "$LAB_SOCKET" -f /dev/null new-session -d -s capture -x "$width" -y 24 \
+    "exec 3<> '$LAB_RENDER'; exec /bin/cat <&3" || fail 'cannot create private rendering pane'
+  LAB_PANE=$("$real_tmux" -S "$LAB_SOCKET" display-message -p -t capture '#{pane_id}') || fail 'cannot identify private rendering pane'
+  printf '0\n' > "$CASE_DIR/scaled-time"
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.transport"
+  cat > "$CASE_DIR/lab-clock.sh" <<'SH'
+__fm_lab_time=0
+__fm_lab_clock() {
+  # First parser observation is at 5, while the current get emits A at 4.
+  case "$BASH_COMMAND" in
+    'output=$(spawn_acquisition_output '* )
+      if [ "${FM_LAB_MODE:-}" = epoch-mixed ] && [ "$(cat "$FM_LAB_CASE/get-count")" = 2 ] && [ ! -e "$FM_LAB_CASE/mixed-first-sample" ]; then
+        : > "$FM_LAB_CASE/mixed-first-sample"
+        __fm_lab_time=$((__fm_lab_time + 4))
+        printf '%s\n' "$__fm_lab_time" > "$FM_LAB_CASE/scaled-time"
+        tmux capture-pane -p -t ignored -S -200 >/dev/null
+        __fm_lab_time=$((__fm_lab_time + 1))
+        printf '%s\n' "$__fm_lab_time" > "$FM_LAB_CASE/scaled-time"
+      fi ;;
+  esac
+  SECONDS=$__fm_lab_time
+}
+set -T
+trap '__fm_lab_clock' DEBUG
+sleep() {
+  if [ "${1:-}" = 1 ]; then
+    if { [ "${FM_LAB_MODE:-}" = wrap ] || [ "${FM_LAB_MODE:-}" = producer ]; } && [ "$__fm_lab_time" -lt 5400 ]; then
+      __fm_lab_time=$((__fm_lab_time + 300))
+    elif [ "${FM_LAB_MODE:-}" = burst ] && [ "$__fm_lab_time" -lt 900 ]; then
+      __fm_lab_time=$((__fm_lab_time + 100))
+    else
+      __fm_lab_time=$((__fm_lab_time + 5))
+    fi
+    printf '%s\n' "$__fm_lab_time" > "$FM_LAB_CASE/scaled-time"
+    return 0
+  fi
+  command sleep "$@"
+}
+SH
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+set -eu
+real_tmux='$real_tmux'
+socket='$LAB_SOCKET'
+pane='$LAB_PANE'
+case_dir='$CASE_DIR'
+transport='$FAKEBIN_DIR/tmux.transport'
+# The shared outcome wait supplies synchronization, not a guessed render sleep.
+render() {
+  . '$ROOT/tests/lib.sh'
+  local text=\$1 n=0 ack
+  [ ! -e "\$case_dir/render-count" ] || n=\$(cat "\$case_dir/render-count")
+  n=\$((n + 1))
+  printf '%s\n' "\$n" > "\$case_dir/render-count"
+  ack="__fm_test_render_\${n}__"
+  printf '%s\n%s\n' "\$text" "\$ack" > "\$case_dir/render.fifo"
+  render_ready() { "\$real_tmux" -S "\$socket" capture-pane -p -J -t "\$pane" -S -200 | grep -qxF "\$ack"; }
+  fm_test_wait_until --progress-file "\$case_dir/render-count" -- render_ready || exit 1
+}
+now=\$(cat "\$case_dir/scaled-time")
+get=\$(cat "\$case_dir/get-count")
+start=0
+[ ! -e "\$case_dir/get-start-\$get" ] || start=\$(cat "\$case_dir/get-start-\$get")
+elapsed=\$((now - start))
+case "\$*" in
+  *'#{pane_current_path}'*)
+    if [ "\$get" = 0 ]; then printf '%s\n' '$PROJECT_DIR'; exit 0; fi
+    case "\${FM_LAB_MODE:?}" in
+      wrap|producer) if [ "\$elapsed" -lt 5400 ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi ;;
+      wrap-repeat) printf '%s\n' '$PROJECT_DIR' ;;
+      burst) if [ "\$elapsed" -lt 900 ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi ;;
+      fresh|epoch|epoch-repeat|epoch-history|epoch-mixed)
+        if [ "\$get" = 1 ] && [ "\$FM_LAB_MODE" != fresh ]; then
+          if [ "\$elapsed" = 0 ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi
+        elif [ "\$elapsed" -lt 1700 ]; then
+          if [ "\$FM_LAB_MODE" = fresh ]; then printf '%s\n' '$PROJECT_DIR'; else sed -n 1p "\$case_dir/slots"; fi
+        else sed -n 2p "\$case_dir/slots"
+        fi ;;
+    esac
+    exit 0 ;;
+  *send-keys*'treehouse get'*)
+    "\$transport" "\$@"
+    get=\$(cat "\$case_dir/get-count")
+    printf '%s\n' "\$now" > "\$case_dir/get-start-\$get"
+    exit 0 ;;
+  *send-keys*'__firstmate_acquire_'*)
+    for arg in "\$@"; do
+      case "\$arg" in printf*) text=\$(bash -c "\$arg"); render "\$text" ;; esac
+    done
+    exit 0 ;;
+esac
+if [ "\${1:-}" = capture-pane ]; then
+  text=''
+  case "\${FM_LAB_MODE:?}" in
+    producer)
+      index=\$((elapsed / 300 + 1))
+      [ "\$index" -le 19 ] || index=19
+      text=\$(sed -n "\${index}p" "\$case_dir/real-progress-lines")
+      ;;
+    burst)
+      if [ "\$elapsed" -ge 500 ]; then
+        printf -v text 'treehouse: checked /fixture/%0180d/last-candidate: accepted: late completion' 0
+      else
+        text=\$(for ((i=0; i<100; i++)); do printf 'treehouse: checked /fixture/%0180d/candidate-%04d: skipped: initial burst\n' 0 "\$i"; done)
+      fi ;;
+    wrap|wrap-repeat)
+      candidate=\$((elapsed / 300))
+      [ "\$FM_LAB_MODE" != wrap-repeat ] || candidate=0
+      printf -v long_path '/fixture/%0180d/candidate-%04d' 0 "\$candidate"
+      printf -v text 'treehouse: checked %s: skipped: reason at %s' "\$long_path" "\$elapsed"
+      ;;
+    epoch|epoch-repeat|epoch-history|epoch-mixed|fresh)
+      if [ "\$get" = 1 ] && [ "\$FM_LAB_MODE" != fresh ]; then
+        text=\$(printf 'treehouse: checked /fixture/%s: skipped: get1-owned\n' A B C; seq 1 30)
+      elif [ "\$FM_LAB_MODE" = epoch-mixed ]; then
+        if [ "\$elapsed" -ge 4 ]; then
+          text='treehouse: checked /fixture/A: skipped: get2-emitted-at-4'
+          [ -e "\$case_dir/mixed-emission-time" ] || printf '%s\n' "\$elapsed" > "\$case_dir/mixed-emission-time"
+        fi
+      elif [ "\$FM_LAB_MODE" != epoch-history ]; then
+        if [ "\$elapsed" -ge 1300 ] && [ "\$FM_LAB_MODE" != epoch-repeat ]; then text='treehouse: checked /fixture/C: skipped: get2-owned'
+        elif [ "\$elapsed" -ge 800 ] && [ "\$FM_LAB_MODE" != epoch-repeat ]; then text='treehouse: checked /fixture/B: skipped: get2-owned'
+        elif [ "\$elapsed" -ge 595 ]; then text='treehouse: checked /fixture/A: refused: changed reason in get2'
+        elif [ "\$elapsed" -ge 300 ]; then text='treehouse: checked /fixture/A: skipped: get2-owned'
+        fi
+      fi ;;
+  esac
+  if [ "\$get" = 0 ] && [ "\${FM_LAB_RENDER_WITHOUT_GET:-0}" != 1 ]; then text=''; fi
+  previous=''
+  [ ! -e "\$case_dir/last-rendered" ] || previous=\$(cat "\$case_dir/last-rendered")
+  if [ -n "\$text" ] && [ "\$text" != "\$previous" ]; then
+    render "\$text"
+    printf '%s' "\$text" > "\$case_dir/last-rendered"
+  fi
+  args=()
+  while [ "\$#" -gt 0 ]; do
+    if [ "\$1" = -t ]; then args+=(-t "\$pane"); shift 2; else args+=("\$1"); shift; fi
+  done
+  "\$real_tmux" -S "\$socket" "\${args[@]}" > "\$case_dir/raw-capture"
+  cat "\$case_dir/raw-capture"
+  exit 0
+fi
+exec "\$transport" "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+}
+
+run_private_capture_case() { # <mode> <width> <expected-exit> [expected-relative-stop]
+  (
+    local mode=$1 width=$2 expected=$3 stop=${4:-} id out rc=0 real_tmux start
+    command -v tmux >/dev/null || { echo 'skip: tmux not found'; exit 0; }
+    real_tmux=$(command -v tmux)
+    id="pool-capture-$mode-$width"
+    make_skip_case "capture-$mode-$width" "$id" 2
+    [ "$mode" != producer ] || make_real_candidate_progress
+    case "$mode" in epoch*) printf 'keep local work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt" ;; esac
+    make_acquisition_capture_lab "$width"
+    trap '"$real_tmux" -S "$LAB_SOCKET" kill-server 2>/dev/null || true; rm -rf "$LAB_SOCKET_DIR"' EXIT
+    out=$(FM_LAB_MODE="$mode" FM_LAB_CASE="$CASE_DIR" BASH_ENV="$CASE_DIR/lab-clock.sh" \
+      run_spawn "$id" --mode no-mistakes --yolo off) || rc=$?
+    expect_code "$expected" "$rc" "private $mode/$width acquisition disagreed: $out"
+    if [ "$expected" = 0 ]; then
+      if [ "$mode" = wrap ] || [ "$mode" = burst ] || [ "$mode" = producer ]; then
+        assert_grep "worktree=${SKIP_SLOTS[0]}" "$HOME_DIR/state/$id.meta" 'wrapped walk did not accept its copy'
+      else
+        assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" 'the current get did not accept the second copy'
+      fi
+    else
+      assert_contains "$out" 'no path or output progress for 600s' 'private capture refusal lost the stall reason'
+      start=$(cat "$CASE_DIR/get-start-$(cat "$CASE_DIR/get-count")")
+      [ "$(( $(cat "$CASE_DIR/scaled-time") - start ))" = "$stop" ] || fail "private $mode stopped at wrong scaled deadline: $out"
+    fi
+    if [ "$mode" = epoch-mixed ]; then
+      [ "$(cat "$CASE_DIR/mixed-emission-time")" = 4 ] || fail 'mixed candidate was not emitted at scaled second four'
+    fi
+    if [[ "$mode" = epoch* ]]; then
+      "$real_tmux" -S "$LAB_SOCKET" capture-pane -p -J -t "$LAB_PANE" -S -200 > "$CASE_DIR/retained-history"
+      assert_grep 'get1-owned' "$CASE_DIR/retained-history" 'an epoch change cleared pane history'
+      assert_grep 'get1-owned' "$CASE_DIR/raw-capture" 'acquisition hid inherited scrollback instead of marking its boundary'
+    fi
+    printf '%s\n' "$out"
+    pass "private tmux $mode width=$width gives the hand-derived acquisition decision"
+  ) || fail "private capture case $1 failed"
+}
+test_other_tmux_capture_consumers_keep_physical_lines() {
+  (
+    local id real_tmux direct dispatched joined
+    command -v tmux >/dev/null || { echo 'skip: tmux not found'; exit 0; }
+    real_tmux=$(command -v tmux)
+    id='pool-capture-unjoined-consumers'
+    make_skip_case capture-unjoined-consumers "$id" 1
+    make_acquisition_capture_lab 40
+    trap '"$real_tmux" -S "$LAB_SOCKET" kill-server 2>/dev/null || true; rm -rf "$LAB_SOCKET_DIR"' EXIT
+    export FM_LAB_MODE=wrap FM_LAB_CASE="$CASE_DIR" FM_LAB_RENDER_WITHOUT_GET=1
+    # Both retained production entry points use the same real narrow pane.
+    direct=$(PATH="$FAKEBIN_DIR:$PATH" bash -c '. "$1/bin/fm-backend.sh"; fm_backend_source tmux; fm_backend_tmux_capture "$2" 200' _ "$ROOT" "$LAB_PANE") || fail 'normal tmux helper failed'
+    dispatched=$(PATH="$FAKEBIN_DIR:$PATH" bash -c '. "$1/bin/fm-backend.sh"; fm_backend_source tmux; fm_backend_capture tmux "$2" 200' _ "$ROOT" "$LAB_PANE") || fail 'generic capture caller failed'
+    joined=$("$real_tmux" -S "$LAB_SOCKET" capture-pane -p -J -t "$LAB_PANE" -S -200) || fail 'joined control failed'
+    assert_contains "$joined" 'treehouse: checked /fixture/' 'the pane never rendered its long record'
+    assert_not_contains "$direct" "$(cat "$CASE_DIR/last-rendered")" 'normal tmux helper joined a wrapped record'
+    assert_not_contains "$dispatched" "$(cat "$CASE_DIR/last-rendered")" 'generic capture caller joined a wrapped record'
+    assert_contains "$joined" "$(cat "$CASE_DIR/last-rendered")" 'the joined control did not distinguish physical from logical capture'
+    [ "$direct" = "$dispatched" ] || fail 'generic capture changed the retained helper output'
+    pass 'ordinary tmux capture and its generic production caller retain unjoined physical lines'
+  ) || fail 'ordinary capture control failed'
+}
+
+test_actual_tg8_producer_in_narrow_pane() {
+  [ -n "${FM_TEST_TREEHOUSE_PRODUCER:-}" ] || { echo 'skip: FM_TEST_TREEHOUSE_PRODUCER absolute scratch binary not supplied'; return 0; }
+  run_private_capture_case producer 40 0
+}
+test_actual_tg8_producer_in_wide_pane() {
+  [ -n "${FM_TEST_TREEHOUSE_PRODUCER:-}" ] || { echo 'skip: FM_TEST_TREEHOUSE_PRODUCER absolute scratch binary not supplied'; return 0; }
+  run_private_capture_case producer 400 0
+}
+test_initial_candidate_burst_cannot_hide_the_get_boundary() { run_private_capture_case burst 40 0; }
+test_wrapped_candidates_finish_in_a_narrow_pane() { run_private_capture_case wrap 40 0; }
+test_wrapped_candidates_finish_in_a_wide_pane() { run_private_capture_case wrap 400 0; }
+test_wrapped_repeated_candidate_stalls() { run_private_capture_case wrap-repeat 40 1 600; }
+test_inherited_candidates_do_not_consume_new_get_identity() { run_private_capture_case epoch 400 0; }
+test_inherited_history_alone_does_not_renew_the_get() { run_private_capture_case epoch-history 400 1 600; }
+test_mixed_first_sample_keeps_current_get_completion() { run_private_capture_case epoch-mixed 400 1 605; }
+test_current_get_repeat_does_not_renew_again() { run_private_capture_case epoch-repeat 400 1 900; }
+test_fresh_pane_candidate_epoch_control() { run_private_capture_case fresh 400 0; }
 
 # slot_digest <slot>: HEAD, its branch, EVERY ref of the repository (the refs are shared by every copy), the index, and
 # every file outside .git (a regular file by sha256, a symlink by its target). It FAILS (nonzero) when any read fails,
@@ -1940,34 +2254,52 @@ test_a_dirty_governed_copy_is_skipped_and_another_is_taken() {
   pass "a dirty governed copy is skipped like any other and another copy is requested"
 }
 
-test_the_loop_budget_is_one_bound_across_all_gets() {
-  local id out
+test_multiple_skips_end_only_when_the_get_stalls() {
+  local id out slot
   id='pool-skip-budget'
   make_skip_case skip-budget "$id" 5
   for slot in "${SKIP_SLOTS[@]}"; do printf 'work\n' > "$slot/uncommitted.txt"; done
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=1000 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=300 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
   assert_no_launch "$CASE_DIR/launch.log"
-  [ "$(cat "$CASE_DIR/get-count")" -le 2 ] || fail "the loop went on to get $(cat "$CASE_DIR/get-count") copies past the absolute bound"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  pass "one absolute bound covers every get in the skip loop"
+  [ "$(cat "$CASE_DIR/get-count")" = 6 ] || fail "not every skipped copy was tried: $out"
+  assert_contains "$out" 'no path or output progress for 600s' 'the exhausted pool did not stall'
+  assert_not_contains "$out" 'absolute extreme' 'total age stopped the skip loop'
+  pass 'multiple skips retain their leases and end only when the next get stalls'
 }
 
-# The bound is also read before a get is typed: when the time is spent between two gets (here, while the first
-# skipped copy is recorded), no second get is typed at all.
-test_no_get_is_typed_once_the_bound_was_spent_between_two_gets() {
+# Slow skip recording is not a reason to refuse the next copy.
+test_a_get_is_typed_after_slow_skip_recording() {
   local id out
   id='pool-bound-between-gets'
   make_skip_case skip-bound-between "$id" 3
   printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_MKDIR_JUMP=2000 FM_TEST_MKDIR_JUMP_PATH="$HOME_DIR/data/$id" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
-  assert_no_launch "$CASE_DIR/launch.log"
-  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was typed after the absolute bound was spent: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  pass "no get is typed once the bound was spent between two gets"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_FIRST_GET_WALK=1 FM_TEST_WALK_READS=3 FM_TEST_TICK_SECONDS=300 FM_TEST_MKDIR_JUMP=2400 FM_TEST_MKDIR_JUMP_PATH="$HOME_DIR/data/$id" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "slow recording prevented a legitimate second get: $out"
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "a second get was not typed: $out"
+  [ -s "$CASE_DIR/launch.log" ] || fail "the second copy was not launched: $out"
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" 'the skipped copy lost its lease'
+  pass 'a second get finishes after 2400 seconds spent recording the first skip'
 }
 
-# Main 1886 N9: the absolute bound is read immediately before each get, AFTER the custody scan. The clock jumps while the scan
-# runs for the second get: at 1799 of 1800 the get is sent (control); at 1800 no get is sent and nothing is launched.
+test_an_explicit_ceiling_between_gets_reports_leased_copies() {
+  local id out status
+  id='pool-ceiling-between-gets'
+  make_skip_case skip-ceiling-between "$id" 3
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(SPAWN_ACQUIRE_CEILING=1800 FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_FIRST_GET_WALK=1 FM_TEST_WALK_READS=3 FM_TEST_TICK_SECONDS=300 FM_TEST_MKDIR_JUMP=2400 FM_TEST_MKDIR_JUMP_PATH="$HOME_DIR/data/$id" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 1 "$status" "the explicit ceiling did not refuse the second get: $out"
+  assert_no_launch "$CASE_DIR/launch.log"
+  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was typed after the explicit ceiling: $out"
+  assert_contains "$out" 'absolute extreme 1800s reached across every treehouse get of this spawn' 'the cross-get ceiling was not named'
+  assert_contains "$out" "spawning project '" 'the spawning project was not named'
+  assert_contains "$out" "copies skipped by this spawn: $(cd "${SKIP_SLOTS[0]}" && pwd -P)" 'the skipped copy was not named'
+  assert_contains "$out" "skipped-copies.tsv" 'the skipped-copy record was not named'
+  assert_contains "$out" "held by firstmate-skipped:$id" 'the leased copy was not reported'
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" 'the skipped copy lost its lease'
+  pass 'an explicit ceiling between gets refuses with the leased copies reported'
+}
+
+# Custody remains checked before each get, regardless of the scan duration.
 test_a_get_is_sent_when_the_scan_ends_at_1799() {
   local id out
   id='pool-bound-scan-1799'
@@ -1980,17 +2312,16 @@ test_a_get_is_sent_when_the_scan_ends_at_1799() {
   pass "a get is sent when the custody scan ends at 1799 of 1800"
 }
 
-test_no_get_is_sent_when_the_scan_crosses_the_bound() {
+test_a_get_is_sent_after_a_slow_custody_scan() {
   local id out
   id='pool-bound-scan-1800'
   make_skip_case skip-bound-scan-1800 "$id" 3
   printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=1800 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
-  [ -f "$CASE_DIR/jumped" ] || fail "the clock seam never fired, so the 1800 crossing was not simulated"$'\n'"$out"
-  assert_no_launch "$CASE_DIR/launch.log"
-  [ "$(cat "$CASE_DIR/get-count")" = 1 ] || fail "a get was sent after the custody scan crossed the bound: $(cat "$CASE_DIR/get-count") gets"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  pass "no get is sent when the custody scan crosses the bound"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_SCAN=2400 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "a slow custody scan prevented the next get: $out"
+  [ -f "$CASE_DIR/jumped" ] || fail 'the custody scan seam never fired'
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "no second get after the scan: $out"
+  [ -s "$CASE_DIR/launch.log" ] || fail "the second copy was not launched: $out"
+  pass 'a get is sent after a 2400-second custody scan'
 }
 
 # Main 1886 rule Q: a copy that fails an unknown check (here a failed git status) refuses the whole spawn. It is leased where it
@@ -2207,45 +2538,64 @@ test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_tak
   pass "a stale-submodule copy with an unlanded commit is leased where it stands and another copy is requested"
 }
 
-# 5b. The absolute bound is checked before a copy is accepted: a jump of the whole bound between the two agreeing
-# reads must stop the spawn, not launch it.
-test_the_bound_is_checked_before_a_copy_is_accepted() {
+# Two agreeing reads still establish a settled copy after a slow confirming poll.
+test_a_copy_is_accepted_after_a_long_confirming_poll() {
   local rec id out status
   id='pool-bound-before-accept'
   rec=$(make_case bound-before-accept "$id")
   read_case_record "$rec"
   out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_TICK_SECONDS=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  [ "$status" -ne 0 ] || fail "spawn accepted a copy after the absolute bound was spent"$'\n'"$out"
-  assert_contains "$out" "absolute extreme" "the refusal did not name the absolute bound"
-  assert_no_launch "$CASE_DIR/launch.log"
-  pass "the absolute bound is enforced before a copy is accepted"
+  expect_code 0 "$status" "two agreeing reads were refused because of elapsed time: $out"
+  [ -s "$CASE_DIR/launch.log" ] || fail 'the confirmed copy was not launched'
+  pass 'a long confirming poll does not prevent accepting a settled isolated copy'
 }
 
-# Main 1823 D-D / F6: the bound is read again immediately before the copy is accepted. The clock jumps to the very
-# second the bound ends (1800 of 1800) at the moment the second agreeing read would accept the copy.
-test_the_bound_is_rechecked_just_before_a_copy_is_accepted() {
+# Slow isolation proof is not harm when the pane has reached its isolated copy.
+test_a_copy_is_accepted_after_a_slow_isolation_check() {
   local rec id out status
   id='pool-bound-at-accept'
   rec=$(make_case bound-at-accept "$id")
   read_case_record "$rec"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 FM_TEST_JUMP_MARK="$CASE_DIR/jumped" BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  [ "$status" -ne 0 ] || fail "spawn accepted a copy at the second the absolute bound ended"$'\n'"$out"
-  pass "the absolute bound is enforced at the moment a copy would be accepted"
+  expect_code 0 "$status" "a slow isolation check prevented accepting a settled copy: $out"
+  [ -f "$CASE_DIR/jumped" ] || fail 'the acceptance clock seam never fired'
+  [ -s "$CASE_DIR/launch.log" ] || fail 'the confirmed copy was not launched'
+  pass 'elapsed time during isolation proof does not prevent accepting a settled copy'
 }
 
-test_the_bound_refusal_at_accept_launches_nothing() {
-  local rec id out
-  id='pool-bound-at-accept-none'
-  rec=$(make_case bound-at-accept-none "$id")
-  read_case_record "$rec"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_JUMP_AT_ACCEPT=1800 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || true
-  assert_no_launch "$CASE_DIR/launch.log"
-  pass "no harness is launched when the bound ends as a copy would be accepted"
+# The second get observes the SAME candidate 500 seconds after it starts. That
+# observation must renew its own allowance, allowing arrival at 800 and confirmation
+# at 900; carrying the first get's history would refuse at 600 instead.
+test_each_get_starts_with_empty_candidate_history() {
+  local id out
+  id='pool-candidate-history-reset'
+  make_skip_case candidate-history-reset "$id" 2
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(FM_TEST_REVISIT_CANDIDATE=1 FM_TEST_TICK_SECONDS=100 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "candidate history leaked across gets: $out"
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail 'the second get was not requested'
+  [ "$(cat "$CASE_DIR/revisit-2")" -ge 10 ] || fail 'the second get did not exercise its delayed observation'
+  assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" 'the second copy was not accepted'
+  pass 'each get counts an earlier get candidate anew and finishes its delayed walk'
 }
 
-# The control: ten seconds inside the bound, the same copy is accepted and launched.
+test_a_long_walk_then_skip_requests_and_accepts_another_copy() {
+  local id out
+  id='pool-long-walk-skip'
+  make_skip_case long-walk-skip "$id" 2
+  printf 'work\n' > "${SKIP_SLOTS[0]}/uncommitted.txt"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_FIRST_GET_WALK=1 FM_TEST_TICK_SECONDS=300 BASH_ENV="$SKIP_CLOCK" run_spawn "$id" --mode no-mistakes --yolo off) || fail "long walk or cross-get age stopped progress: $out"
+  [ "$(cat "$CASE_DIR/walk-reads")" -ge 10 ] || fail 'first get did not walk beyond 2400 scaled seconds'
+  [ "$(cat "$CASE_DIR/get-count")" = 2 ] || fail "the second get was not sent: $out"
+  assert_grep "lease --path ${SKIP_SLOTS[0]}" "$SKIP_LOG" 'skipped copy was not leased'
+  assert_grep "worktree=${SKIP_SLOTS[1]}" "$HOME_DIR/state/$id.meta" 'the second copy was not accepted'
+  [ -s "$CASE_DIR/launch.log" ] || fail 'the second copy was not launched'
+  assert_not_contains "$out" 'absolute extreme' 'long progress hit an elapsed-time ceiling'
+  pass 'a 2400-second candidate walk can skip its first copy and accept the second'
+}
+
+# A shorter isolation proof also accepts and launches the same copy.
 test_a_copy_accepted_inside_the_bound_is_launched() {
   local rec id out
   id='pool-bound-inside'
@@ -2315,13 +2665,7 @@ test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
 
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
-  for selected_test in "$@"; do
-    case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
-      test_*) if declare -F "$selected_test" >/dev/null 2>&1; then "$selected_test"; else fail "unknown selected test: $selected_test"; fi ;;
-      *) fail "unknown selected acquisition test: $selected_test" ;;
-    esac
-  done
+  fm_test_run_cases -- "$@"
   exit 0
 fi
 
@@ -2378,8 +2722,9 @@ test_a_copy_that_changes_during_the_move_is_leased_where_it_stands
 test_a_nondefault_base_ref_does_not_move_before_a_skip
 test_a_governed_attached_copy_keeps_its_branch_when_skipped
 test_a_dirty_governed_copy_is_skipped_and_another_is_taken
-test_the_loop_budget_is_one_bound_across_all_gets
-  test_no_get_is_typed_once_the_bound_was_spent_between_two_gets
+test_multiple_skips_end_only_when_the_get_stalls
+  test_a_get_is_typed_after_slow_skip_recording
+test_an_explicit_ceiling_between_gets_reports_leased_copies
 test_skipped_copies_are_recorded_and_listed
 test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_new_foreign_ref
@@ -2390,13 +2735,26 @@ test_slot_digest_sees_a_symlink_retarget
 test_slot_digest_fails_when_git_cannot_be_read
 test_the_no_launch_check_fails_when_a_launch_was_logged
 test_a_stale_submodule_copy_with_an_unlanded_commit_is_leased_and_another_is_taken
-test_the_bound_is_checked_before_a_copy_is_accepted
-test_the_bound_is_rechecked_just_before_a_copy_is_accepted
-test_the_bound_refusal_at_accept_launches_nothing
+test_a_copy_is_accepted_after_a_long_confirming_poll
+test_a_copy_is_accepted_after_a_slow_isolation_check
+test_each_get_starts_with_empty_candidate_history
+test_other_tmux_capture_consumers_keep_physical_lines
+test_actual_tg8_producer_in_narrow_pane
+test_actual_tg8_producer_in_wide_pane
+test_initial_candidate_burst_cannot_hide_the_get_boundary
+test_wrapped_candidates_finish_in_a_narrow_pane
+test_wrapped_candidates_finish_in_a_wide_pane
+test_wrapped_repeated_candidate_stalls
+test_inherited_candidates_do_not_consume_new_get_identity
+test_inherited_history_alone_does_not_renew_the_get
+test_mixed_first_sample_keeps_current_get_completion
+test_current_get_repeat_does_not_renew_again
+test_fresh_pane_candidate_epoch_control
+test_a_long_walk_then_skip_requests_and_accepts_another_copy
 test_a_copy_accepted_inside_the_bound_is_launched
 test_a_refused_move_leaves_every_ref_unchanged
 test_a_get_is_sent_when_the_scan_ends_at_1799
-test_no_get_is_sent_when_the_scan_crosses_the_bound
+test_a_get_is_sent_after_a_slow_custody_scan
 test_an_unreadable_copy_refuses_the_whole_spawn_and_is_leased
 test_a_failed_record_write_refuses_the_spawn
 test_a_failed_origin_head_read_after_a_move_refuses

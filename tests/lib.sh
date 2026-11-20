@@ -944,6 +944,43 @@ fm_live_gate() {
 # cannot be reported as an unparseable build simply for answering `--version`
 # with nothing.
 
+# Install sourceable support for recording fake tmux clients, not a real terminal wrapper.
+# Boundary printf commands feed per-target receipts only to joined acquisition captures.
+# Call capture handling after fixture history; ordinary captures receive no receipt.
+# A caller may skip vendor-input dispatch when __fm_fake_acquisition_command is 1,
+# while retaining its own raw-call logging.
+fm_test_fake_tmux_acquisition_support() { # <fakebin>
+  cat > "$1/.fm-tmux-acquisition.sh" <<'SH'
+# shellcheck shell=bash
+fm_test_fake_tmux_acquisition() {
+  local target='' previous='' arg marker_file
+  __fm_fake_acquisition_command=0
+  for arg in "$@"; do
+    [ "$previous" != -t ] || target=$arg
+    previous=$arg
+  done
+  marker_file="${0%/*}/.acquisition-marker-${target//[^a-zA-Z0-9]/_}"
+  case "${1:-}" in
+    send-keys)
+      for arg in "$@"; do
+        case "$arg" in
+          printf*__firstmate_acquire_*)
+            bash -c "$arg" > "$marker_file" || return
+            __fm_fake_acquisition_command=1
+            ;;
+        esac
+      done
+      ;;
+    capture-pane)
+      case " $* " in
+        *' -J '*) [ ! -f "$marker_file" ] || cat "$marker_file" ;;
+      esac
+      ;;
+  esac
+}
+SH
+}
+
 fm_fakebin() {
   local dir=$1 fakebin="$1/fakebin"
   mkdir -p "$fakebin"

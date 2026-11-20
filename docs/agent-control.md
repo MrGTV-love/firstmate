@@ -517,11 +517,33 @@ A slot is recognized by the rule teardown uses: Treehouse's `<pool>/<slot>/<repo
 A slot a task merely left holds no record's current copy, so it never blocks allocation.
 
 After sending `treehouse get`, a fresh spawn polls the pane until two reads agree on an isolated worktree of the project.
-The wait ends only after ten minutes without a changed pane path or changed output, or at the absolute thirty-minute extreme.
+The wait ends after the acquisition stall allowance without a new pane path, a newly finished candidate or a Git call started by the walking get.
+The default allowance is 1605 seconds, three times the reported 535-second maximum pool walk at load about 100; `SPAWN_ACQUIRE_STALL` selects a positive decimal number of seconds.
+Acquisition samples Git Trace2 start events from a private per-get file, so Git calls that finish between polls still count; merely remaining alive or using CPU does not count.
+Tracing is cleared in the acquired shell before provisioning or worker launch, and the attempt's private trace files are removed on exit.
+A finished candidate is reported at column zero as `treehouse: checked <absolute copy path>: <accepted|refused|skipped>: <reason>`.
+Its identity is the path field compared exactly, counted only once per get.
+Pane-path changes have a separate per-get seen set: returning to a pane path already observed does not renew, but a stale pane observation cannot suppress a later genuine completion of that candidate.
+Both sets start empty for each get.
+Tmux acquisition capture joins soft wraps; the acquisition parser also reconstructs checked-candidate records split across physical lines by other backends, including wraps within the record prefix, path and decision delimiter.
+Other capture consumers retain their existing physical-line output.
+Tmux's joined logical records are parsed separately and never borrow a following record as an empty reason.
+A non-tmux text capture cannot distinguish a wrapped non-empty reason from a malformed empty-reason record followed by unrelated output.
+Acquisition interprets that ambiguous alignment as the valid wrapped record, rather than stopping a legitimate progressing walk.
+An empty reason violates the producer format; this interpretation does not let a candidate path already seen in the get renew again.
+Acquisition requires a readable capture: the pane must acknowledge a compact per-get output boundary across physical line wraps before `treehouse get` is sent, so even a burst larger than the bounded capture cannot hide the boundary before it is established.
+If that boundary cannot be read, no get is sent and the same configured no-progress allowance refuses the acquisition.
+That boundary excludes inherited records without clearing pane history, including when the first get sample also contains a current completion.
+Changed counters, timestamps, decisions or reasons for a seen candidate, scrolling it out and back, `waiting:` messages and all non-matching output renew nothing.
+A get without those progress lines is judged by pane path and actual Git starts.
+Repeated candidates alone cannot keep a get alive; a walk that keeps starting Git can, and the finite-walk guarantee applies only after that activity also stops.
+There is no default absolute acquisition ceiling, including across skipped copies.
+An operator can explicitly set `SPAWN_ACQUIRE_CEILING` to a positive decimal number of seconds to impose a total acquisition limit; unset or zero disables it.
+The separate slot-provisioning 600-second start allowance and thirty-minute absolute bound are fixed and unaffected by either acquisition override.
 A live `treehouse get` does not expire at a short wall-clock window, but liveness alone does not reset the no-progress clock.
 The same rule applies when the foreground cannot be read, as on zellij and cmux.
 A waiting line every minute names the foreground evidence, elapsed time, idle time and last rejected path.
-A refusal names the no-progress or absolute limit, the poll count, the last path seen, why it was rejected, and the spawning project.
+A refusal names the no-progress limit or the explicit ceiling it reached, the poll count, the last path seen, why it was rejected, and the spawning project.
 Existing acquisition cleanup remains responsible for ending only the refused attempt and its process lease.
 The [measurement record](verification/runtime-backends.md#treehouse-get-entry-wait) retains the earlier acquisition timings and their limitations; those timings did not justify the former short hard cutoff.
 The shared project-lock wait follows observed holder progress rather than total hold age; [`bin/fm-project-lock-lib.sh`](../bin/fm-project-lock-lib.sh) owns its sampling and idle allowance.
@@ -653,7 +675,7 @@ Uncommitted changes in the vanished copy are not recoverable, and the progress n
 **Why the caller prepares the copy.**
 The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
 It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration, which changes repository administration that every lane's worktrees share, or force the checkout on the caller's behalf.
-It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a progress-based isolation poll (pane path or output) that has an absolute extreme, and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
+It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a progress-based isolation poll (changed pane path or newly finished candidate), and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 The caller prepares the copy from the lease, never after `git worktree prune`: run `treehouse get` with no `-b` from the recorded project, then run `git checkout --ignore-other-worktrees <branch>` inside the slot it enters, and pass that slot.
 `treehouse get -b <branch>` fails because the branch already exists, and a plain `git checkout <branch>` refuses while the vanished copy's registration still names the branch.

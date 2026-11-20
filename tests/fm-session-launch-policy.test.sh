@@ -48,6 +48,7 @@ make_case() {
   cat > "$FAKEBIN/tmux" <<'SH'
 #!/usr/bin/env bash
 set -eu
+. "${0%/*}/.fm-tmux-acquisition.sh"
 check_child_policy() {
   [ -n "${FM_POLICY_CHILD:-}" ] || return 0
   [ "$FM_POLICY_EXPECT_ENABLED" = 1 ] || return 0
@@ -69,7 +70,7 @@ case "$1" in
       printf 'fm-%s\n' "$FM_POLICY_ID"
     fi
     exit 0 ;;
-  capture-pane) printf '╭────╮\n│    │\n╰────╯\n'; exit 0 ;;
+  capture-pane) fm_test_fake_tmux_acquisition "$@" || exit $?; printf '╭────╮\n│    │\n╰────╯\n'; exit 0 ;;
   new-session|new-window)
     printf '%s\n' "$1" >> "$FM_POLICY_CASE/effects"
     rm -f "$FM_POLICY_CASE/endpoint-killed" ;;
@@ -79,6 +80,8 @@ case "$1" in
     : > "$FM_POLICY_CASE/endpoint-killed" ;;
   send-keys)
     [ -z "${FM_POLICY_CHILD:-}" ] || printf 'send-keys\n' >> "$FM_POLICY_CASE/terminal-input"
+    fm_test_fake_tmux_acquisition "$@" || exit $?
+    [ "$__fm_fake_acquisition_command" = 0 ] || exit 0
     shift
     literal=0
     target=default

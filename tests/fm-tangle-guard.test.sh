@@ -231,10 +231,13 @@ SH
 make_spawn_record_fakebin() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
+  fm_test_fake_tmux_acquisition_support "$fakebin" || return
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
 [ -n "${FM_TMUX_REC:-}" ] && printf 'tmux %s\n' "$*" >> "$FM_TMUX_REC"
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
@@ -287,8 +290,9 @@ test_spawn_tmux_window_construction() {
     "must disable allow-rename on the spawned window"
 
   # Bug 2 fix (b): treehouse-get and the worktree wait loop target the stable id.
-  assert_grep "send-keys -t @spawnwid treehouse get Enter" "$rec" \
-    "treehouse get must be sent to the stable window id"
+  # The get carries its private GIT_TRACE2_EVENT prefix, so match the whole recorded call.
+  grep -qE '^tmux send-keys -t @spawnwid GIT_TRACE2_EVENT=.* treehouse get Enter$' "$rec" \
+    || fail "treehouse get must be sent to the stable window id"
   assert_grep "display-message -p -t @spawnwid #{pane_current_path}" "$rec" \
     "the worktree wait loop must query the stable window id, not the name"
 

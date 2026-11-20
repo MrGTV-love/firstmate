@@ -106,11 +106,14 @@ fm_test_fake_gh_axi() {
 # The pane path defaults to empty when FM_FAKE_PANE_PATH is unset. Window
 # cleanup and option operations are no-ops. Launch logging is env-gated, so
 # suites that do not set FM_FAKE_LAUNCH_LOG keep a silent send-keys.
+# Acquisition control feedback is owned by fm_test_fake_tmux_acquisition_support in lib.sh.
 fm_test_fake_tmux_spawn() {
   local fakebin=$1
+  fm_test_fake_tmux_acquisition_support "$fakebin" || return
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
+. "${0%/*}/.fm-tmux-acquisition.sh"
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
@@ -133,6 +136,7 @@ case "${1:-}" in
       *" -S -0 "*) ;;
       *) [ -z "${FM_FAKE_CAPTURE_HISTORY_FILE:-}" ] || [ ! -f "$FM_FAKE_CAPTURE_HISTORY_FILE" ] || cat "$FM_FAKE_CAPTURE_HISTORY_FILE" ;;
     esac
+    fm_test_fake_tmux_acquisition "$@" || exit $?
     [ -z "${FM_FAKE_CAPTURE_FILE:-}" ] || [ ! -f "$FM_FAKE_CAPTURE_FILE" ] || cat "$FM_FAKE_CAPTURE_FILE"
     exit 0
     ;;
@@ -155,6 +159,7 @@ case "${1:-}" in
     exit 0
     ;;
   send-keys)
+    fm_test_fake_tmux_acquisition "$@" || exit $?
     # The actual pre-admission provisioning command needs a shell result, even
     # in fixture transport. Only its private staged script is executed here;
     # harness launches retain the existing non-executing recorder below.
