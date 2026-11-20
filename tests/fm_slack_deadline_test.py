@@ -87,8 +87,8 @@ def install():
         import fm_slack
         bounded_exchange = fm_slack.Slack._exchange
 
-        def exchange(slack, request, timeout, opener=None):
-            return bounded_exchange(slack, request, max(timeout, slack.time_left()) if opener is not None else timeout, opener)
+        def exchange(slack, request, timeout, opener=None, **more):
+            return bounded_exchange(slack, request, max(timeout, slack.time_left()) if opener is not None else timeout, opener, **more)
         fm_slack.Slack._exchange = exchange
 
         def budget_clock():

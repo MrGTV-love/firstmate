@@ -1973,7 +1973,7 @@ class Watch:
             deadline = min(deadline, self.budget_deadline)
 
         slow = threading.Lock()
-        self.last_post_start = None
+        self.last_post_start = self.post_left_at = None
 
         def guarded(method, **fields):
             # A call is not begun when the slowest call of theirs in this run shows it would end after the deadline (finding 5 of the review of d9861b24): a
@@ -2007,6 +2007,10 @@ class Watch:
                 # Each call is ended at its own whole-call bound or at the budget's end, whichever comes first (Main 1650), for the thread making it (CALL).
                 ends = min(deadline, begun + SECOND_CALL_BOUND)
                 CALL.time_left = lambda: ends - monotonic()
+                if paced:
+                    # The real transport says when the post really leaves: the spacing is kept again there, from the moment the post before it really left,
+                    # so a delay between this guard and the send never brings two posts of theirs closer than SECOND_POST_SPACING (Main 3350).
+                    CALL.sending = self.post_leaving
                 try:
                     return bound(method, **fields)
                 except DeadlineSpent as cut:
@@ -2014,6 +2018,7 @@ class Watch:
                     raise SecondBudgetSpent(sent=getattr(cut, 'sent', True)) from None
                 finally:
                     CALL.time_left = None
+                    CALL.sending = None
                     with slow:
                         self.slowest_call = max(self.slowest_call, monotonic() - begun)
             finally:
@@ -2037,6 +2042,17 @@ class Watch:
                 del api.time_left
             else:
                 api.time_left = earlier_left
+
+    def post_leaving(self):
+        """Called by the real transport just before a post of theirs leaves (in its reader thread): wait until SECOND_POST_SPACING after the post before it
+        really left, then note this one. Host time, as the transport's own; a post the guard began late is never sent early."""
+        with self.__dict__.setdefault('_post_leaving_turn', threading.Lock()):
+            left_at = getattr(self, 'post_left_at', None)
+            if left_at is not None:
+                wait = left_at + SECOND_POST_SPACING - time.monotonic()
+                if wait > 0:
+                    pause(wait)
+            self.post_left_at = time.monotonic()
 
     def slack_now(self):
         """Slack's own clock as of the last answer this run received (the transport records the Date of each reply), or None when no reply carried one. It is the

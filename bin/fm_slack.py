@@ -285,10 +285,11 @@ class Slack:
         # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
         time_left = getattr(CALL, 'time_left', None) or self.time_left
         scrub_with = getattr(CALL, 'scrub_with', None)
+        sending = getattr(CALL, 'sending', None)
         if time_left is None:
             date, header, data, error = self._exchange(request, 10) if scrub_with is None else self._exchange(request, 10, scrub_with=scrub_with)
         else:
-            date, header, data, error = self._bounded(request, time_left, scrub_with)
+            date, header, data, error = self._bounded(request, time_left, scrub_with, sending)
         if date is not None:
             self._note_date(date)
         if header:
@@ -304,7 +305,7 @@ class Slack:
             raise SlackError(code if code in SAFE_ERRORS else 'slack_outcome_unknown' if code in OUTCOME_UNKNOWN_ERRORS else 'api_error')
         return data
 
-    def _bounded(self, request, time_left=None, scrub_with=None):
+    def _bounded(self, request, time_left=None, scrub_with=None, sending=None):
         """One exchange under the caller's total deadline (Main 1593, 1621 (9) and 1623 (1)): the socket timeout bounds each wait, so a reply that trickles in byte by
         byte never hits it; the exchange therefore runs in a reader thread, with the time left as its socket timeout, that this call waits for only as long as
         time_left() allows. At the deadline the caller ends the exchange itself: it shuts down and closes the exchange's socket, which unblocks the reader with no
@@ -320,10 +321,10 @@ class Slack:
         fence = _Fence(time_left)
         opener = urllib.request.build_opener(_FencedHTTP(fence), _FencedHTTPS(fence))
         outcome = []
-        if scrub_with is None:
-            exchange = lambda: outcome.append(self._exchange(request, min(10, left), opener))
-        else:
-            exchange = lambda: outcome.append(self._exchange(request, min(10, left), opener, scrub_with=scrub_with))
+        extra = {} if scrub_with is None else {'scrub_with': scrub_with}
+        if sending is not None:
+            extra['sending'] = sending
+        exchange = lambda: outcome.append(self._exchange(request, min(10, left), opener, **extra))
         reader = threading.Thread(target=exchange, name='fm-slack-bounded', daemon=True)
         reader.start()
         reader.join(max(0.0, time_left()))
@@ -339,10 +340,13 @@ class Slack:
         self.last_cutoff = {'ended': not reader.is_alive(), 'closed_at': closed_at, 'lookup_pending': fence.lookup_pending, 'sent': fence.connected, 'begun': True}
         raise DeadlineSpent(sent=fence.connected)
 
-    def _exchange(self, request, timeout, opener=None, scrub_with=None):
+    def _exchange(self, request, timeout, opener=None, scrub_with=None, sending=None):
         """One HTTP exchange: (the reply's Date header or None, its x-oauth-scopes header, the parsed body or None, the error to raise or None). It reads and writes
-        no state of the transport, so that _bounded() can run it in a thread it may abandon; call() applies what it returns."""
+        no state of the transport, so that _bounded() can run it in a thread it may abandon; call() applies what it returns. sending, when given, is called
+        just before the request leaves (Main 3350: the caller spaces its posts from the moment each one is really sent)."""
         date, header = None, ''
+        if sending is not None:
+            sending()
         try:
             with (opener.open if opener else urllib.request.urlopen)(request, timeout=timeout) as response:
                 date = response.headers.get('Date', '')
