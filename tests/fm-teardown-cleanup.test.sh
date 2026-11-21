@@ -10447,10 +10447,10 @@ test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing() {
   make_retained_case retained-retry enclosing
   held_plain_get_slot "$FOREIGN_CASE"
   held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "retained-retry: a slot that cannot be leased must refuse the close: $(cat "$FOREIGN_CASE/stderr")"
-  assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-retry: the refusal did not say why"
+  assert_grep 'which another live task still works in' "$FOREIGN_CASE/stderr" "retained-retry: the refusal did not say why"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-retry: run 1 should have asked the driver once"
   record=$(retained_record_path)
   assert_present "$record" "retained-retry: run 1 wrote no record"
@@ -10461,7 +10461,7 @@ test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing() {
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-retry: an unchanged copy asked the driver again"
   assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-retry: a retry saved another driver output"
   cmp -s "$FOREIGN_CASE/record.run1" "$record" || fail "retained-retry: the unchanged copy's record was rewritten"
-  rm -f "$FOREIGN_CASE/no-lease-command"
+  retained_peer_drop
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 0 "$rc" "retained-retry: run 3 with a lease must close: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-retry: the closing run asked the driver again"
@@ -10475,7 +10475,7 @@ test_a_changed_kept_copy_is_assessed_afresh() {
   for change in more-ignored opencode-entry tab-name link-newline dirty-tracked unlanded; do
     make_retained_case "retained-changed-$change" enclosing
     held_plain_get_slot "$FOREIGN_CASE"
-    : > "$FOREIGN_CASE/no-lease-command"
+    retained_peer_add
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 1 "$rc" "retained-changed-$change: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
     record=$(retained_record_path)
@@ -10499,7 +10499,7 @@ test_a_changed_kept_copy_is_assessed_afresh() {
     case "$change" in
       more-ignored|opencode-entry|tab-name|link-newline)
         assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-changed-$change: a changed copy that passes every proof was not evaluated again"
-        assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-changed-$change: run 2 did not reach the lease check"
+        assert_grep 'which another live task still works in' "$FOREIGN_CASE/stderr" "retained-changed-$change: run 2 did not reach the lease check"
         cmp -s "$FOREIGN_CASE/record.run1" "$record" && fail "retained-changed-$change: the stale record was not replaced"
         # No earlier preserved byte is overwritten or removed. A changed selected file goes
         # beside the earlier preserve; a new payload-only entry is copied into the earlier
