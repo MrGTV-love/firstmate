@@ -8634,6 +8634,53 @@ class Round8Findings(InvariantScenario):
 REAL_BOUND, REAL_RUN = Watch.bound, plane.run
 
 
+class BoundedBindingChildDeadlineTest(unittest.TestCase):
+    """A binding check inside their run is held to one absolute deadline from before its child is launched to its result (T7): the time the launch takes
+    counts against that deadline, and a result seen after it allows nothing. Run through the real Watch.bound and run() with real child processes; only
+    the launch is slowed (a delay inside subprocess.Popen after the child has started, as a slow fork/exec meets it) and the binding command replaced."""
+
+    def bound_with(self, launch_delay, deadline_in, child):
+        real_popen, launched = subprocess.Popen, []
+
+        class SlowLaunch(real_popen):
+            def __init__(self, args, *rest, **kwargs):
+                if list(args[2:3]) == ['binding']:
+                    args = ['bash', '-c', child]
+                super().__init__(args, *rest, **kwargs)
+                launched.append(self)
+                time.sleep(launch_delay)
+
+        started = time.monotonic()
+        watch = type('Their', (), {'delivery_deadline': lambda self: started + deadline_in})()
+        with patch.object(plane, 'run', REAL_RUN), patch.object(subprocess, 'Popen', SlowLaunch):
+            try:
+                outcome = REAL_BOUND(watch)
+            except plane.SecondBudgetSpent as spent:
+                outcome = spent
+        return outcome, time.monotonic() - started, launched
+
+    def test_a_timely_binding_answer_after_a_slow_launch_is_still_used(self):
+        outcome, _, launched = self.bound_with(0.3, 3.0, "printf 'slack-dm\\n'")
+        self.assertEqual(outcome, 'slack-dm')
+        self.assertEqual([p.returncode for p in launched], [0])
+
+    def test_a_binding_answer_seen_only_after_the_deadline_allows_nothing(self):
+        # The child answers at once, but its launch alone runs past the deadline: the answer is seen after the cutoff and must not allow a post.
+        outcome, _, launched = self.bound_with(1.2, 0.8, "printf 'slack-dm\\n'")
+        self.assertIsInstance(outcome, plane.SecondBudgetSpent)
+        self.assertFalse(outcome.sent)
+        self.assertEqual(len(launched), 1)
+        self.assertIsNotNone(launched[0].returncode)
+
+    def test_a_slow_binding_child_is_ended_at_the_deadline_counted_from_before_its_launch(self):
+        # Launch 0.5 s, deadline 1.0 s: a timeout taken before the launch ends the child near 1.5 s; one taken after it ends the child near 1.0 s.
+        outcome, elapsed, launched = self.bound_with(0.5, 1.0, 'exec sleep 40')
+        self.assertIsInstance(outcome, plane.SecondBudgetSpent)
+        self.assertFalse(outcome.sent)
+        self.assertLess(elapsed, 1.25, elapsed)
+        self.assertEqual([p.returncode for p in launched], [-9])           # killed and reaped, not left running
+
+
 class Round9Findings(InvariantScenario):
     """Round 9 (the outside review of c5868b6f, Main 1706: refuse or stay unknown on doubt): F1 to F10 through the production entry points."""
 
@@ -8863,18 +8910,25 @@ class Round9Findings(InvariantScenario):
     # ---- Main 3345 (2): their cutoff covers the binding checks of their delivery, which are child processes ----
 
     @staticmethod
+    @contextmanager
     def slow_binding_children(slow):
-        """subprocess.run as the plane's children meet it: a binding check answers bound at once, except while slow() is true, when it is a REAL child process
-        that takes 40 s (exec sleep 40) and is run with whatever timeout the plane gives it; every other child answers as the fixture's own run does."""
-        real = subprocess.run
+        """The plane's children as they meet it: a binding check is a REAL child process that answers bound at once, except while slow() is true, when it
+        takes 40 s (exec sleep 40) and is held to whatever deadline the plane gives it; every other child answers as the fixture's own run does. A binding
+        check inside their run is launched with subprocess.Popen (run's bounded path), any other child with subprocess.run."""
+        real_popen = subprocess.Popen
+
+        class Binding(real_popen):
+            def __init__(self, args, *rest, **kwargs):
+                if list(args[2:3]) == ['binding']:
+                    args = ['bash', '-c', 'exec sleep 40' if slow() else "printf 'slack-dm\\n'"]
+                super().__init__(args, *rest, **kwargs)
 
         def run(args, **kwargs):
             if list(args[2:3]) == ['binding']:
-                if slow():
-                    return real(['bash', '-c', 'exec sleep 40'], **kwargs)
                 return subprocess.CompletedProcess(args, 0, stdout='slack-dm\n', stderr='')
             return subprocess.CompletedProcess(args, 0, stdout='x\n', stderr='')
-        return run
+        with patch.object(plane.subprocess, 'Popen', Binding), patch.object(plane.subprocess, 'run', run):
+            yield
 
     def test_m3345_2_a_slow_binding_check_at_their_final_print_ends_at_their_deadline_and_the_line_is_kept(self):
         # The measured case of the margin study (feasibility-overlap/margin-study/report.md section 6): the binding check of their final print is a child
@@ -8892,7 +8946,7 @@ class Round9Findings(InvariantScenario):
             home.cli('check', action='check')
             started = time.monotonic()
             with patch.object(Watch, 'bound', REAL_BOUND), patch.object(plane, 'run', REAL_RUN), \
-                    patch.object(plane.subprocess, 'run', self.slow_binding_children(lambda: slow[0])), patch.object(plane, 'emit', printing):
+                    self.slow_binding_children(lambda: slow[0]), patch.object(plane, 'emit', printing):
                 first = home.cli('check', action='check-second')
             elapsed = time.monotonic() - started
             self.assertLessEqual(elapsed, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, elapsed)
@@ -8919,7 +8973,7 @@ class Round9Findings(InvariantScenario):
             home.cli('check', action='check')
             started = time.monotonic()
             with patch.object(Watch, 'bound', REAL_BOUND), patch.object(plane, 'run', REAL_RUN), patch.object(plane.Replay, 'call', call), \
-                    patch.object(plane.subprocess, 'run', self.slow_binding_children(lambda: bool(posted))):
+                    self.slow_binding_children(lambda: bool(posted)):
                 first = home.cli('check', action='check-second')
             elapsed = time.monotonic() - started
             self.assertLessEqual(elapsed, plane.SECOND_BUDGET + plane.CUTOFF_JOIN, elapsed)

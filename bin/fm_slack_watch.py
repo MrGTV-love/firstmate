@@ -243,11 +243,30 @@ def run(script, *args, text=None):
     # No local child needs a Slack credential: drop the token and the signing secret.
     env = {key: value for key, value in os.environ.items() if not key.startswith('SLACK_')}
     env['PYTHONDONTWRITEBYTECODE'] = '1'
-    # Inside their run a child gets only the time their run has left: at its deadline it is killed and subprocess.TimeoutExpired is raised (bound).
+    command = ['bash', str(ROOT / script), *args]
     deadline = getattr(CHILD_DEADLINE, 'at', None)
-    bounded = {} if deadline is None else {'timeout': max(0.001, deadline - monotonic())}
-    return subprocess.run(['bash', str(ROOT / script), *args], input=text,
-                          text=True, capture_output=True, check=False, env=env, **bounded)
+    if deadline is None:
+        return subprocess.run(command, input=text, text=True, capture_output=True, check=False, env=env)
+    # Inside their run a child gets only the time their run has left, counted from before its launch: the time left is taken after the child is started,
+    # so a slow launch does not move the deadline. At the deadline it is killed and reaped and subprocess.TimeoutExpired is raised (bound); an answer that
+    # is only seen after the deadline is refused the same way.
+    with subprocess.Popen(command, stdin=None if text is None else subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, env=env) as process:
+        try:
+            left = deadline - monotonic()
+            if left <= 0:
+                raise subprocess.TimeoutExpired(command, 0)
+            stdout, stderr = process.communicate(text, timeout=left)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            raise
+        except BaseException:
+            process.kill()
+            raise
+    if monotonic() > deadline:
+        raise subprocess.TimeoutExpired(command, 0)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 def save(path, value):

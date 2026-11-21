@@ -182,8 +182,35 @@ class Children:
             return subprocess.CompletedProcess(args, 0 if bound else 1, stdout='slack-dm\n' if bound else '', stderr='')
         return subprocess.CompletedProcess(args, 0, stdout='', stderr='')
 
+    def popen(self, args, **kwargs):
+        """The stand-in for subprocess.Popen, which run() uses for a child held to their deadline (their binding checks): the same record and answer as
+        run gives, as a child that has already finished."""
+        return FinishedChild(self.run(args, **kwargs))
+
     def scripts(self):
         return [(Path(c['args'][1]).name, tuple(c['args'][2:])) for c in self.calls]
+
+
+class FinishedChild:
+    """A child that has already ended with the answer of Children.run: the part of subprocess.Popen that run() uses."""
+
+    def __init__(self, done):
+        self.args, self.returncode, self.done = done.args, done.returncode, done
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def communicate(self, input=None, timeout=None):
+        return self.done.stdout, self.done.stderr
+
+    def kill(self):
+        pass
+
+    def wait(self, timeout=None):
+        return self.returncode
 
 
 class Plane:
@@ -338,6 +365,7 @@ def case(**options):
         with contextlib.ExitStack() as stack:
             stack.enter_context(patch.object(plane, 'Replay', Traced))
             stack.enter_context(patch.object(plane.subprocess, 'run', home.children.run))
+            stack.enter_context(patch.object(plane.subprocess, 'Popen', home.children.popen))
             for name in ('socket.socket', 'socket.create_connection', 'socket.getaddrinfo'):
                 stack.enter_context(patch(name, side_effect=no_socket))
             home.arm()
