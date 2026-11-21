@@ -6395,6 +6395,33 @@ sys.exit(code)
             self.assertIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
             self.assertEqual(len(their_post_attempts(home, '200.000200')), 1)
 
+    def test_r10_1_a_legacy_clear_mark_on_an_attempted_acknowledgement_of_theirs_never_lets_it_be_posted_again(self):
+        # Slack stores their acknowledgement and still answers internal_error: the attempt mark stays. A journal row written by an older plane also carries the
+        # retired `clear` mark. That mark is no proof Slack never got the post: the next run looks the acknowledgement up, finds its marker, posts nothing
+        # more, and wakes the request once.
+        with self.home() as home:
+            home.cli('poll')
+            home.say('200.000200', 'second person request', user=INV_SECOND, dm=INV_SECOND_DM)
+            home.edit_replay(lambda data: data['failures'].update(
+                {'chat.postMessage:200.000200': {'answer_error': 'internal_error', 'applied': True, 'times': 1}}))
+            rc, first, _ = self.run_check(home, 'normal', 'attempt')
+            self.assertEqual(rc, 0)
+            self.assertEqual(self.wakes_of(first, INV_SECOND), [])
+            self.assertEqual(len(their_post_attempts(home, '200.000200')), 1)
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)          # Slack holds it
+            own = home.state_dir / plane.SECOND_FILE
+            journal = json.loads(own.read_text())
+            [row] = [r for r in journal['pending'] if r.get('thread') == '200.000200']
+            self.assertTrue(row.get('attempted') and not row.get('ack_unknown'), row)
+            row['clear'] = True
+            own.write_text(json.dumps(journal))
+            captured = [self.run_check(home, 'normal', 'after%d' % n)[1] for n in range(2)]
+            woken = [w for c in captured for w in self.wakes_of(c, INV_SECOND)]
+            self.assertEqual(len(woken), 1, captured)
+            self.assertNotIn(plane.REQUEST_UNKNOWN.strip(), woken[0])
+            self.assertEqual(len(their_post_attempts(home, '200.000200')), 1)
+            self.assertEqual(home.posts().count((INV_SECOND_DM, '200.000200')), 1)
+
     def second_rows(self, home):
         """Their journaled request rows, wherever the plane keeps them (the owner's journal or their own file in the state folder)."""
         rows = [r for r in home.state().get('pending', []) if r.get('person') == 'second']

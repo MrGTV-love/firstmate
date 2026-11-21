@@ -2195,20 +2195,18 @@ class Watch:
             try:
                 # The second person's acknowledgement with no attempt mark has never been posted (the mark is committed before the post): there is nothing to
                 # find, so no lookup is made, and a run whose calls of theirs are slow spends its budget on the post itself (finding 3 of the review of d0b0c216).
-                # A previously attempted one is looked up once after that attempt: a lookup that found nothing is kept (clear), so the next run posts without
-                # repeating it, and a new attempt clears it again (finding 3 of the review of 4e0b1bd4); the marker lookup still guards every attempt.
+                # A previously attempted one is looked up, whatever else its row holds (a `clear` mark an older plane wrote is no proof of absence), and is
+                # never posted again (finding 3 of the review of 4e0b1bd4); only surely_absent, before anything left this host, removes the attempt mark.
                 if row is not None and row.get('person') == 'second' and row.get('ack_unknown'):
                     raise AckUnknown('ack_state_unknown')              # written before any later step: never posted again (F6)
-                if row is not None and row.get('person') == 'second' and row.get('attempted') and not row.get('clear'):
+                if row is not None and row.get('person') == 'second' and row.get('attempted'):
                     found = self.look_up_ack(row, thread, channel, marker)
                     if found:
                         return found
                     # A complete lookup that finds nothing is no proof of absence (a post Slack accepted may not be visible yet; Main 1673 (3), Main 2082):
                     # nothing is posted again with its client_msg_id and the request is woken with its state named unknown (R9 of the review of 64ac348b; F6 of
                     # the reviews of c5868b6f and 5048f815).
-                    if not row.get('clear'):
-                        raise AckUnknown('ack_state_unknown')
-                    earlier = []
+                    raise AckUnknown('ack_state_unknown')
                 else:
                     earlier = [] if row is not None and row.get('person') == 'second' else self.recent(thread, channel)
             except SlackError as error:
@@ -2222,14 +2220,11 @@ class Watch:
             for message in earlier:
                 if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                     return message['ts']
-            if row is not None and row.get('person') == 'second' and row.get('attempted') and not row.get('clear'):
-                row['clear'] = True
-                self.commit()
             args = self.post_fields(event, text, thread, channel)
             # The body is checked BEFORE the attempt mark: a post that a plane value refuses is not an attempt (it counts for none of the three tries and
             # leaves no "state unknown"), and the transport checks the same fields again.
             refuse_outbound(args, wire=True)
-            if row is not None and (not row.get('attempted') or row.get('clear')):
+            if row is not None and not row.get('attempted'):
                 # Inside the second person's budget, a post that could not begin is no attempt: the budget is checked before the mark, so a deferral never leaves
                 # a mark that would make every later run look the acknowledgement up again (finding 3 of the review of d0b0c216).
                 if self.budget_deadline is not None and (monotonic() >= self.budget_deadline or monotonic() + self.slowest_call > self.budget_deadline):
@@ -2292,7 +2287,7 @@ class Watch:
 
     def look_up_ack(self, row, thread, channel, marker):
         """The ts of the acknowledgement of a previously attempted post of theirs, if its thread holds it; None once the whole thread after the attempt has been
-        read without it (row['clear'] is set). Each page read is kept (row['looked_after']), so a run whose calls are slow continues where the last one stopped
+        read without it (row['ack_unknown'] is set). Each page read is kept (row['looked_after']), so a run whose calls are slow continues where the last one stopped
         instead of reading the first page again (finding 5 of the review of fca2a73d). A page that says more exists with no way to it is a failed lookup."""
         cursor = ''
         # One starting point for the whole paged read of this run, with Slack's cursor between its pages (finding 7 of the review of d9861b24): the progress kept
@@ -2321,10 +2316,7 @@ class Watch:
         # The empty lookup and its consequence are one write (round 9, F6). An empty lookup is never proof that their post is absent (Main 2082): whatever
         # Slack answered, their attempt stays unknown for good and is never posted again, so a run that dies after this commit can never post it twice. Only a
         # failure before anything left this host (surely_absent) lets their post be made again.
-        if row.get('person') == 'second':
-            row['ack_unknown'] = True
-        else:
-            row['clear'] = True
+        row['ack_unknown'] = True
         self.commit()
         return None
 
@@ -3157,7 +3149,7 @@ class Watch:
         add_state('delivered', REQUEST_UNKNOWN, {**attempted, 'lookups': 3})
         add_state('failed', REQUEST_UNACKNOWLEDGED, {**attempted, 'tries': 3})
         if row.get('person') == 'second':
-            # Their previously attempted acknowledgement keeps its lookup progress and the clear mark in the row (look_up_ack).
+            # Their previously attempted acknowledgement keeps its lookup progress in the row (look_up_ack); a row an older plane wrote may also hold `clear`.
             for count in (0, 1, 2):
                 more = {'tries': count} if count else {}
                 add_state('staged', None, {**attempted, **more, 'looked_after': row['thread']})
