@@ -1783,6 +1783,27 @@ class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
             self.assertGreaterEqual(ack - answer, plane.SECOND_POST_SPACING - self.NS)
             self.assertEqual([line for line in home.journal()['outbox'] if owner in line], [])
 
+    def test_a_manual_poll_that_waits_for_their_spacing_prints_the_owners_queue_marker_once(self):
+        with self.scott() as (home, clock, starts):
+            key = self.take_in_scott(home, 'first request')
+            clock.advance(5.0)
+            self.assertEqual(home.reply(key, key, 'an answer')[0], 0)              # a post of theirs just now
+            owner = home.say('an owner request')
+            ts = home.tick()
+            home.add({'ts': ts, 'user': SCOTT, 'text': 'second request', 'channel': SCOTT_DM})
+            # Two owner notices held in the owner's journal behind its outbox (its queued count); none in theirs.
+            with patch.object(plane.Watch, 'queued', lambda watch: 0 if watch.is_second else 2):
+                rc, out, _ = home.poll()
+            self.assertEqual(rc, 0)
+            lines = out.splitlines()
+            owner_at = next(i for i, line in enumerate(lines) if line.startswith('check: slack request %s from %s: ' % (owner, OWNER)))
+            their_at = next(i for i, line in enumerate(lines) if line.startswith('check: slack request %s from %s: ' % (ts, SCOTT)))
+            self.assertLess(owner_at, their_at)
+            self.assertEqual(out.count('+2 queued'), 1, out)
+            self.assertTrue(lines[owner_at].endswith('; +2 queued'), lines[owner_at])
+            answer, ack = self.theirs(starts)[1:]
+            self.assertGreaterEqual(ack - answer, plane.SECOND_POST_SPACING - self.NS)  # the poll did wait for their spacing
+
     def test_the_owners_post_right_after_a_post_of_theirs_never_waits(self):
         with self.scott() as (home, clock, starts):
             owner = home.say('an owner request')

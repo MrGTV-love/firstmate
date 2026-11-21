@@ -1510,8 +1510,11 @@ class Watch:
         # Which part of the plane this run is (poll): 'both', the owner's check 'owner', or the second person's check 'second'.
         self.part = 'both'
         self.owner_deferred = None
-        # The journal lines this run has already printed (the owner's, before the second person's pass): cleared from the journal only when the run ends.
+        # The journal lines this run has already printed (the owner's, before the second person's pass): cleared from the journal when the run ends, or
+        # before a manual poll lets the journal lock go to wait for their spacing (pace_their_part). Whether that print happened, kept apart from the lines
+        # and never undone by that clearing: the owner's print carried the queue marker, so the run's last print does not carry it again (emit).
         self.early_printed = []
+        self.owner_printed = False
         # Whether a plane value is part of a fixed text of theirs in this run (block_second_on_collision): their work pauses and their lines are withheld.
         self.second_blocked = False
         self.hold_depth = 0
@@ -4014,7 +4017,8 @@ class Watch:
             return
         # The owner's wake lines are written before any Slack call of the second person's in this poll (Main 1547 on SC4): the caller's printer runs here,
         # and the lines stay journaled until the run has ended, so a run stopped in their pass prints them again in the next run and a completed run never
-        # prints them twice. Their pass then takes only what the one shared cap leaves.
+        # prints them twice; a manual poll that must wait for their spacing clears them first (pace_their_part), so no run prints them again while it waits.
+        # Their pass then takes only what the one shared cap leaves.
         if self.before_second is not None:
             self.before_second()
         self.pace_their_part()
@@ -5063,7 +5067,8 @@ def state_home():
 def emit_owner_first(watch, command):
     """Print the owner's wake lines before the second person's pass (Main 1547 on SC4), as their own stream: their text is settled against what was already
     sent and nothing of the second person's, so a line of theirs can never change an owner line (finding 8 of the review of fca2a73d). The lines are not cleared
-    from the journal here: the end of the run clears them (emit), so a run stopped in the second person's pass prints them again."""
+    from the journal here: the end of the run clears them (emit), so a run stopped in the second person's pass prints them again, unless the poll must wait for
+    their spacing, which clears them before it lets the journal lock go (pace_their_part)."""
     fault('before-emit')
     owner = lambda line: not is_second_line(line)
     for attempt in range(2):
@@ -5075,11 +5080,12 @@ def emit_owner_first(watch, command):
         if not plan[2] or attempt or not watch.note_collision():
             break
     watch.early_printed = emit_write(watch, plan, clear=False)
+    watch.owner_printed = bool(watch.early_printed)
 
 
 def emit(watch, command):
     """Print the wake lines that are ready."""
-    if not watch.early_printed:
+    if not watch.owner_printed:
         fault('before-emit')
     # A request line journaled while the source was bound is selected for printing only while it is still bound, and an
     # unbind cannot complete between that check and the selection: the binding is held across both. The write to
@@ -5090,13 +5096,14 @@ def emit(watch, command):
     for attempt in range(2):
         if watch.has_request_line():
             with watch.delivering() as bound:
-                plan = emit_plan(watch, command, bound, select=rest, queue=not early)
+                plan = emit_plan(watch, command, bound, select=rest, queue=not watch.owner_printed)
         else:
-            plan = emit_plan(watch, command, True, select=rest, queue=not early)
+            plan = emit_plan(watch, command, True, select=rest, queue=not watch.owner_printed)
         if not plan[2] or attempt or not watch.note_collision():
             break
     emit_write(watch, plan, already=early)
     watch.early_printed = []
+    watch.owner_printed = False
     list_failed_requests(command, watch.failed_requests(), watch.out)
 
 
