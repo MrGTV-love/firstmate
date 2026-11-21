@@ -512,8 +512,9 @@ if (($ARGV[0] // '') eq 'probe') {
 # needs a readable table: while neither ps nor fm-proc-info.py answers, the
 # request whose turn it is retries, and after about 5 s it names the table on
 # stderr and exits 2 without starting its command. A request waiting for its turn
-# reads the table at most every 0.5 s and reuses that reading until the next read
-# (a failed read is never reused); the ledger and the slot charges are read fresh
+# reads the table at most every 0.5 s, before it takes the host lock, and reuses
+# that reading until the next read (a failed read is never reused); the ledger and
+# the slot charges are read fresh
 # on every pass under the host lock, and the decision is taken under that lock.
 # When the analysis
 # completes (no signal reached the gate, and it exited 0, 1, 98 or 251), the
@@ -953,9 +954,9 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                     || $oldest{$a} cmp $oldest{$b}
             } keys %oldest;
             if (defined $next && $oldest{$next} eq $ticket_path) {
-                # My turn. The memory budget decides, from the ledger and a table
-                # read under the host-wide admission lock, at most 0.5 s old (see
-                # the header) (FM_LINT_INTERNAL_HOST_LOCK), which an admitted gate keeps until
+                # My turn. The memory budget decides, from the ledger read under the
+                # host-wide admission lock and a table at most 0.5 s old (see the
+                # header) (FM_LINT_INTERNAL_HOST_LOCK), which an admitted gate keeps until
                 # its command has started, so no two pools admit on one reading. A
                 # gate that cannot take that lock waits; nothing decides without
                 # it. The budget counts the held roots, the memory outside them and the
@@ -977,7 +978,13 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                 # continues or dies). The ledger is read after the lock is taken,
                 # immediately before the decision, so a root another pool admitted
                 # while this gate waited is read at its charge; the table is read
-                # again only when its last reading is 0.5 s old or more.
+                # again only when its last reading is 0.5 s old or more, before the
+                # lock is taken, so a table read that does not answer never holds
+                # the host lock and stops every other gate's decision.
+                if (!$table || Time::HiRes::time() - $table_at >= 0.5) {
+                    $table = $process_table->();
+                    $table_at = Time::HiRes::time() if $table;
+                }
                 my $held = flock($host, LOCK_EX | LOCK_NB);
                 $held || $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR} or $refuse->($host_lock, $!);
                 if ($held) {
@@ -989,10 +996,6 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                         if (defined $held_root->[0]) { $by_gate{$held_root->[0]} = $held_root; } else { push @unnamed, $held_root; }
                     }
                     my @host_charges = (values %by_gate, @unnamed);
-                    if (!$table || Time::HiRes::time() - $table_at >= 0.5) {
-                        $table = $process_table->();
-                        $table_at = Time::HiRes::time() if $table;
-                    }
                     if (!$table) {
                         $census_from //= $now;
                         if ($now - $census_from >= 5) {

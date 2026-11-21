@@ -249,18 +249,22 @@ test_pinned_shellcheck_memory_limit() {
   awk -F '\t' '$1 == "end" && $3 ~ /small\.sh$/ && $10 == "ok" { found=1 } END { exit !found }' \
     "$roots_log" || fail "the pinned root did not complete ok under the memory limit"
 
-  # A limit below the pinned binary's own mapped size must bind the same
-  # pinned root: it is refused or killed and named, never silently uncapped.
-  # GHC shrinks its heap reservation to fit a larger cap, so a small file can
-  # still lint under a few hundred MiB; only a cap under the binary itself
-  # binds on every Linux architecture.
+  # A limit below the pinned binary's own mapped size must bind the pinned
+  # ShellCheck: it is killed and named, never silently uncapped. GHC shrinks its
+  # heap reservation to fit a larger cap, so a small file can still lint under a
+  # few hundred MiB; only a cap under the binary itself binds on every Linux
+  # architecture. The version probe runs under the same address-space limit and
+  # is the run's first ShellCheck start, so the limit binds there: the run names
+  # the probe and the limit and starts no root.
   rc=0
   out=$(FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_MEMORY_KIB=8192 \
     "$LINT" --telemetry "$tmp/tiny.tsv" "$fixture" 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "pinned ShellCheck ignored an 8 MiB address-space limit"
-  assert_contains "$out" "small.sh" "the memory-bound pinned root was not named"
-  awk -F '\t' '$1 == "end" && $3 ~ /small\.sh$/ && $10 != "ok" && $10 != "findings" { found=1 } END { exit !found }' \
-    "$tmp/tiny.roots.tsv" || fail "the over-limit pinned root was not recorded as an abnormal end"$'\n'"$out"
+  [ "$rc" -eq 2 ] || fail "pinned ShellCheck under an 8 MiB address-space limit exited $rc, expected 2"$'\n'"$out"
+  assert_contains "$out" "version probe exited with status" "the memory-bound version probe was not named"
+  assert_contains "$out" "under the 8192 KiB address-space limit" "the binding limit was not named"
+  if [ -e "$tmp/tiny.roots.tsv" ] && grep -q 'small\.sh' "$tmp/tiny.roots.tsv"; then
+    fail "a root started after the version probe failed under the limit: $(cat "$tmp/tiny.roots.tsv")"
+  fi
   pass "the pinned ShellCheck both respects and survives under the memory envelope"
 }
 

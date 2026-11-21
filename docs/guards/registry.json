@@ -123,6 +123,8 @@
     "lease-actor-impersonation",
     "lease-cross-actor",
     "lint-require-bounds",
+    "lint-strict-mode-uncapped-host",
+    "lint-watch-signal-recorded-group",
     "live-lab-fresh-root-only",
     "live-lab-own-record-only",
     "jev-block-renderer",
@@ -5318,6 +5320,66 @@
         {
           "file": "bin/fm-lint.sh",
           "match": "printf 'fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.\\n' >&2"
+        }
+      ]
+    },
+    {
+      "id": "lint-strict-mode-uncapped-host",
+      "version": "1",
+      "owner": "bin/fm-lint.sh",
+      "invariant": "A lint run given --strict-version never starts ShellCheck on a host where the per-root resident cap cannot be enforced.",
+      "layer": "runtime-block",
+      "source": "uname and this run's own --strict-version argument; existing decision points: site:bin/fm-lint.sh:8fff9466f6",
+      "trigger": "refuses a run given --strict-version when uname is not Darwin, before the version probe or any root starts",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Run the strict lint on macOS with bash bin/fm-lint.sh --strict-version <script>, or on this host run bash bin/fm-lint.sh <script> without --strict-version.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before the caller moves to macOS or drops --strict-version; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; the refusal message on stderr names the host and the caps it cannot enforce. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-lint-slots.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-lint.sh",
+          "match": "printf 'fm-lint.sh: strict mode refuses on %s: the per-root resident cap"
+        }
+      ]
+    },
+    {
+      "id": "lint-watch-signal-recorded-group",
+      "version": "1",
+      "owner": "bin/fm-lint-cache.pl",
+      "invariant": "The lint resident watch never signals a process group other than the one it recorded at its root's launch.",
+      "layer": "runtime-block",
+      "source": "the launch record the resident watch wrote for its root (group id, start seconds and microseconds) and the signal name; existing decision points: site:bin/fm-lint-cache.pl:0169e974f3",
+      "trigger": "refuses fm_signal_root when the launch record is missing, names group 0, group 1 or a non-numeric group, or has a non-numeric start time, or when the signal is not TERM, KILL, STOP or CONT",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Nothing is sent and the watched root fails; rerun bash bin/fm-lint.sh <script> and report the resident-memory watch warning that names 'refused' to Main.",
+      "budget": 1,
+      "budget_reason": "One refused signal per watch decision; the watch never retries a refused signal into another group, and the root fails instead.",
+      "telemetry": "Not instrumented under this family id; the watch warning on stderr names the refused result. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-lint-slots.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-lint-cache.pl",
+          "match": "return 'refused' unless ref $launch eq 'HASH'"
         }
       ]
     },

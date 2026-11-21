@@ -155,8 +155,9 @@
 # only, from ps or libproc) and, where the macOS watch runs, the watch's own
 # peak of resident size and footprint. A held root is charged the worst case
 # when its record names no charge. A root waiting for its turn reads that table
-# at most every 0.5 s and reuses the reading until the next read; the ledger and
-# the slot charges are read fresh on every pass under the host lock. Admission
+# at most every 0.5 s, before it takes the host lock, and reuses the reading until
+# the next read; the ledger and the slot charges are read fresh on every pass under
+# the host lock. Admission
 # needs that table: while neither ps
 # nor bin/fm-proc-info.py (its table and memory commands) can read it, no root
 # is admitted in any pool. This script reads that table once, before any root
@@ -2586,6 +2587,11 @@ resolved=$(awk '/^version:/ {print $2; exit}' "$TMP_ROOT/probe.out")
 # The probe's stderr (a refusal, or a blocked report while the lane is held past its
 # bound) reaches this run's stderr as it is written.
 if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
+  # A probe ended by a signal (one past its address-space limit) prints nothing
+  # itself, so the run names the probe, its status and the limit it ran under.
+  probe_limit=
+  [ "$BOUND_MECH" = none ] || probe_limit=" under the $ROOT_MEMORY_KIB KiB address-space limit"
+  printf 'fm-lint.sh: the ShellCheck version probe exited with status %s%s; no root was started.\n' "$probe_rc" "$probe_limit" >&2
   exit 2
 fi
 printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$$" "$PERL_BIN" "$WATCH_PYTHON" "$BOUND_MECH" "$ROOT_MEMORY_KIB" "$ROOT_RSS_KIB" > "$RUN_ENTRY" || {

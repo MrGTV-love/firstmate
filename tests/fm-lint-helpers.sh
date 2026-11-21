@@ -40,21 +40,23 @@ FM_LINT_REAL_PS=$(command -v ps)
 # drops the rows of processes named shellcheck, except the pid in
 # FM_TEST_COUNTED_SHELLCHECK_PID, and the rows of gates that use another pool
 # directory (FM_TEST_GATE_POOL_PREFIX, when set, names every pool directory it
-# keeps by a common prefix). A gate of the live host pool and every other call
-# get plain ps, so the shim never hides memory from the host pool.
+# keeps by a common prefix). A gate with neither name has no known pool, so no
+# gate row is dropped and the gate always reads its own row. A gate of the live
+# host pool and every other call get plain ps, so the shim never hides memory
+# from the host pool.
 fm_lint_hide_outside_shellcheck() {
   cat > "$1/ps" <<SH
 #!/bin/sh
 [ "\$*" = '-axww -o pid=,ppid=,rss=,lstart=,command=' ] || exec "$FM_LINT_REAL_PS" "\$@"
 [ "\${FM_LINT_INTERNAL_SLOT_DIR:-}" != "/var/tmp/firstmate-lint-$UID/lint-slots" ] || exec "$FM_LINT_REAL_PS" "\$@"
-"$FM_LINT_REAL_PS" "\$@" | /usr/bin/awk -v counted="\${FM_TEST_COUNTED_SHELLCHECK_PID:-}" -v keep=" gate \${FM_TEST_GATE_POOL_PREFIX:-\${FM_LINT_INTERNAL_SLOT_DIR:-} }" '{
+"$FM_LINT_REAL_PS" "\$@" | /usr/bin/awk -v counted="\${FM_TEST_COUNTED_SHELLCHECK_PID:-}" -v keep=" gate \${FM_TEST_GATE_POOL_PREFIX:-\${FM_LINT_INTERNAL_SLOT_DIR:-} }" -v pool="\${FM_TEST_GATE_POOL_PREFIX:-\${FM_LINT_INTERNAL_SLOT_DIR:-}}" '{
   cmd = \$0
   sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ +[A-Za-z]+ +[A-Za-z]+ +[0-9]+ +[0-9:]+ +[0-9]+ +/, "", cmd)
   name = cmd
   sub(/ .*/, "", name)
   sub(/.*\//, "", name)
   if (name == "shellcheck" && \$1 != counted) next
-  if (cmd ~ /fm-lint-cache[.]pl gate / && index(cmd, keep) == 0) next
+  if (pool != "" && cmd ~ /fm-lint-cache[.]pl gate / && index(cmd, keep) == 0) next
   print
 }'
 SH

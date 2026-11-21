@@ -798,22 +798,24 @@ SH
   # The delegate reports the pinned version: strict mode accepts it.
   printf '0.11.0\n' > "$tmp/delegate.version"
   rc=0
+  # FM_LINT_STRICT_VERSION=1 sets the strict version policy on every host; --strict-version
+  # also refuses off macOS (exit 2) before the probe.
   ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
-      "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/first.out" 2>&1 ) || rc=$?
+      FM_LINT_STRICT_VERSION=1 "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/first.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fail "a wrapper whose delegate reports the pinned version was rejected ($rc): $(cat "$tmp/first.out")"
   # The delegate changes; the wrapper's own bytes do not. The run must see the
   # new version and refuse it under the strict policy.
   printf '0.10.0\n' > "$tmp/delegate.version"
   rc=0
   ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
-      "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/second.out" 2>&1 ) || rc=$?
+      FM_LINT_STRICT_VERSION=1 "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/second.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 1 ] || fail "a wrapper whose delegate changed to 0.10.0 passed the strict version policy on a remembered version ($rc): $(cat "$tmp/second.out")"
   grep -q 'found 0.10.0' "$tmp/second.out" || fail "the refusal did not name the delegate's current version: $(cat "$tmp/second.out")"
   # And back: the corrected delegate is accepted again, not rejected on the record of the bad one.
   printf '0.11.0\n' > "$tmp/delegate.version"
   rc=0
   ( cd "$repo" && PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
-      "$repo/bin/fm-lint.sh" --strict-version bin/consumer.sh > "$tmp/third.out" 2>&1 ) || rc=$?
+      FM_LINT_STRICT_VERSION=1 "$repo/bin/fm-lint.sh" bin/consumer.sh > "$tmp/third.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fail "a corrected delegate was rejected on a remembered version ($rc): $(cat "$tmp/third.out")"
   pass "a script ShellCheck is probed every run: a changed delegate is refused under the strict policy and a corrected one accepted, with the wrapper's bytes unchanged"
 }
@@ -1587,7 +1589,9 @@ SH
       retry) set -- "$tmp/b.sh" ;;
       ci-bounds) set -- "$tmp/b.sh" ;;
     esac
-    local bin=$tmp/bin lint=$repo/bin/fm-lint.sh require=0
+    local bin=$tmp/bin lint=$repo/bin/fm-lint.sh require=0 ci=${CI:-} gha=${GITHUB_ACTIONS:-}
+    # --fast is local-only (CI refuses it), so that leg runs as a local run.
+    [ "$mode" != fast ] || { ci=; gha=; }
     [ "$mode" != retry ] || bin=$tmp/retry-bin
     [ "$mode" != ci-bounds ] || require=1
     rc=0
@@ -1595,7 +1599,7 @@ SH
     env HOME="$tmp/home.$mode" XDG_CACHE_HOME="$tmp/home.$mode/.cache" FM_HOME="$tmp/fm.$mode" \
       FM_LINT_SLOT_DIR="$tmp/pool.$mode" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 \
       FM_LINT_ROOT_MEMORY_KIB=33554432 FM_LINT_REQUIRE_BOUNDS="$require" FM_LINT_TELEMETRY="$tmp/$mode.tsv" \
-      FM_TEST_MEM_HOLD=0.3 FM_TEST_GATE_POOL_PREFIX="$tmp/pool." PATH="$bin:$PATH" \
+      FM_TEST_MEM_HOLD=0.3 FM_TEST_GATE_POOL_PREFIX="$tmp/pool." PATH="$bin:$PATH" CI="$ci" GITHUB_ACTIONS="$gha" \
       "$lint" "$@" > "$tmp/$mode.out" 2>&1 || rc=$?
     wait "$holder" || fail "the run that holds the budget failed ($mode)"
     [ "$rc" -eq 0 ] || fail "the $mode run failed behind a run that holds the budget (rc=$rc)"$'\n'"$(cat "$tmp/$mode.out")"
@@ -1658,6 +1662,11 @@ test_a_second_run_finds_the_budget_restored_and_repeats_the_first() {
   for run in first second; do
     : > "$tmp/mem.starts"
     : > "$tmp/mem.starts.spans"
+    # Where /usr/bin/time runs, the first run leaves each root a memory record that
+    # lowers its charge in the second; this test is about the slots and tickets a
+    # run leaves, so both runs start without records and charge each root the
+    # worst case, above the budget.
+    rm -rf "$tmp/pool/history"
     rc=0
     out=$(env FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_HOST_SLOTS=9 FM_LINT_ROOT_RSS_KIB=8388608 \
       FM_TEST_MEM_HOLD=0.5 FM_TEST_GATE_POOL_PREFIX="$tmp/pool" PATH="$tmp/bin:$PATH" \
@@ -2582,16 +2591,20 @@ test_default_pool_is_one_directory_for_every_home() {
 }
 
 test_slot_survives_gate_death() {
-  local tmp bounded=none
-  if fm_lint_bounds_supported; then bounded=perl; fi
+  local tmp mode
+  local -a modes=(none)
+  if fm_lint_bounds_supported; then modes+=(perl); fi
   tmp=$(fm_test_tmproot fm-lint-slot-inheritance)
   # The worker runs under a lint run's entry, in a copy whose host-wide directory
   # is the test's own.
   local repo
   repo=$(fm_lint_isolated_copy "$tmp" death)
   fm_lint_write_owner_stand_in "$tmp/owner" "$repo" "$(command -v python3)"
-  FM_TEST_RUN_BOUNDED="$bounded" FM_TEST_RUN_MEMORY_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
-    perl - "$repo/bin/fm-lint.sh" "$repo/bin/fm-lint-cache.pl" "$tmp" "$bounded" <<'PL' || fail "slot lifetime regression failed"
+  # A worker takes its bound mechanism from its run's ledger entry, so each mode
+  # runs under a run entry that names that mode.
+  for mode in "${modes[@]}"; do
+  FM_TEST_RUN_BOUNDED="$mode" FM_TEST_RUN_MEMORY_KIB=2097152 bash "$tmp/owner/fm-lint.sh" \
+    perl - "$repo/bin/fm-lint.sh" "$repo/bin/fm-lint-cache.pl" "$tmp" "$mode" <<'PL' || fail "slot lifetime regression failed ($mode)"
 use strict;
 use warnings;
 use File::Path qw(make_path);
@@ -2616,7 +2629,7 @@ waitpid($child, 0);
 STUB
 close $stub;
 chmod 0755, "$tmp/shellcheck";
-for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
+for my $bounded ($bound_mechanism) {
     my $dir = "$tmp/$bounded";
     make_path("$dir/out");
     open(my $root, '>', "$dir/root.sh") or die "$!";
@@ -2715,6 +2728,7 @@ for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
     }
 }
 PL
+  done
   pass "inherited slots prevent overlap after gate death and allow admission after watchdog cleanup"
 }
 
@@ -3734,7 +3748,12 @@ test_a_high_host_slot_count_does_not_raise_the_memory_limit() {
   [ "$most" -ge 3 ] || fail "four runs with FM_LINT_HOST_SLOTS=100 and small charges peaked at only $most roots at once, so this test cannot show the memory limit: $control"
   # The same four runs with the default per-root charge, 8 GiB, above the whole
   # budget: FM_LINT_HOST_SLOTS=100 leaves each root alone in the pool and every
-  # root completes.
+  # root completes. A completed root would leave a memory record (where
+  # /usr/bin/time or the macOS watch measures it) that lowers the next run's charge
+  # for the same root, so this pool's history path is a plain file and no record
+  # forms: every root keeps the default charge.
+  mkdir -p "$tmp/capped"
+  : > "$tmp/capped/history"
   capped=$( unset FM_LINT_ROOT_RSS_KIB
     fm_lint_memory_runs "$tmp" "$tmp/bin" 4 FM_LINT_SLOT_DIR="$tmp/capped" FM_LINT_HOST_SLOTS=100 FM_TEST_MEM_HOLD=0.4 )
   read -r most starts <<<"$capped"
@@ -4813,19 +4832,21 @@ test_a_compiled_launcher_is_probed_every_run_and_its_delegates_version_decides()
   fm_lint_native_launcher "$tmp/fake" "$tmp/starts.log" "$tmp/delegate.version" \
     || { pass "SKIP (no C compiler for a compiled launcher): native launcher probed every run"; return; }
   rc=0
+  # FM_LINT_STRICT_VERSION=1 sets the strict version policy on every host; --strict-version
+  # also refuses off macOS (exit 2) before the probe.
   ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-      bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/first.out" 2>&1 ) || rc=$?
+      FM_LINT_STRICT_VERSION=1 bash bin/fm-lint.sh bin/consumer.sh > "$tmp/first.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fm_lint_fail_settled "a launcher whose delegate reports the pinned version was rejected ($rc): $(cat "$tmp/first.out")"
   printf '0.10.0\n' > "$tmp/delegate.version"
   rc=0
   ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-      bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/second.out" 2>&1 ) || rc=$?
+      FM_LINT_STRICT_VERSION=1 bash bin/fm-lint.sh bin/consumer.sh > "$tmp/second.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 1 ] || fm_lint_fail_settled "a compiled launcher whose delegate changed to 0.10.0 passed the strict version policy ($rc): $(cat "$tmp/second.out")"
   grep -q 'found 0.10.0' "$tmp/second.out" || fm_lint_fail_settled "the refusal did not name the delegate's current version: $(cat "$tmp/second.out")"
   printf '0.11.0\n' > "$tmp/delegate.version"
   rc=0
   ( cd "$repo" && PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-      bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/third.out" 2>&1 ) || rc=$?
+      FM_LINT_STRICT_VERSION=1 bash bin/fm-lint.sh bin/consumer.sh > "$tmp/third.out" 2>&1 ) || rc=$?
   [ "$rc" -eq 0 ] || fm_lint_fail_settled "a corrected delegate was rejected ($rc): $(cat "$tmp/third.out")"
   [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 3 ] || fm_lint_fail_settled "the launcher was not probed on each of its three runs: $(cat "$tmp/starts.log")"
   wait 2>/dev/null || true
@@ -4972,8 +4993,10 @@ test_a_run_never_takes_a_version_from_a_probe_that_started_before_it_waited() {
   while ! grep -q -- '^--version$' "$tmp/starts.log" && [ "$waited" -lt 100 ]; do sleep 0.1; waited=$((waited + 1)); done
   grep -q -- '^--version$' "$tmp/starts.log" || fm_lint_fail_settled "run 1's probe never started"
   printf '0.10.0\n' > "$tmp/delegate.version"
+  # FM_LINT_STRICT_VERSION=1 sets the strict version policy on every host; --strict-version
+  # also refuses off macOS (exit 2) before the probe.
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_ANALYSIS_RC=0 \
-      bash bin/fm-lint.sh --strict-version bin/library.sh > "$tmp/run2.out" 2>&1 ) || rc2=$?
+      FM_LINT_STRICT_VERSION=1 bash bin/fm-lint.sh bin/library.sh > "$tmp/run2.out" 2>&1 ) || rc2=$?
   wait "$run1" || rc1=$?
   [ "$rc2" -eq 1 ] || fm_lint_fail_settled "a strict run that began waiting during another run's probe exited $rc2 on that probe's older version: $(cat "$tmp/run2.out")"
   grep -q 'found 0.10.0' "$tmp/run2.out" || fm_lint_fail_settled "the strict run did not name the delegate's version when it waited: $(cat "$tmp/run2.out")"
@@ -5021,12 +5044,14 @@ test_runs_with_different_delegates_each_probe_their_own_shellcheck() {
     while [ ! -e "$tmp/lane.ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
     : > "$tmp/starts.log"
     rc_a=0; rc_b=0
+    # FM_LINT_STRICT_VERSION=1 sets the strict version policy on every host; --strict-version
+    # also refuses off macOS (exit 2) before the probe.
     ( cd "$repo" && env HOME="$tmp/home.new" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-        bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/$label.a.out" 2>&1 ) &
+        FM_LINT_STRICT_VERSION=1 bash bin/fm-lint.sh bin/consumer.sh > "$tmp/$label.a.out" 2>&1 ) &
     run_a=$!
     sleep 0.5
     ( cd "$repo" && env HOME="$home_b" PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-        bash bin/fm-lint.sh --strict-version bin/library.sh > "$tmp/$label.b.out" 2>&1 ) &
+        FM_LINT_STRICT_VERSION=1 bash bin/fm-lint.sh bin/library.sh > "$tmp/$label.b.out" 2>&1 ) &
     sleep 2
     : > "$tmp/lane.release.$label"
     wait "$run_a" || rc_a=$?
