@@ -6521,7 +6521,9 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       done
       # An own nested copy whose record says the closeout driver kept it, unchanged since,
       # is not a swept root: nothing here ends a run, retires an agent or signals a process
-      # in it. A process found in it through the slot's scan refuses by name instead.
+      # in it. A process found in it through the scan of a swept root that encloses it
+      # refuses by name instead. The unclaimed route sweeps no enclosing root here, and its
+      # held close leaves the kept copy out of the slot scan (teardown_unclaimed_outside_kept_copies).
       still=()
       for root in "${swept[@]}"; do
         copy=$(fm_task_copy_canonical_dir "$root" 2>/dev/null) || copy=$root
