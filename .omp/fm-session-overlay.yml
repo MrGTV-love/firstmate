@@ -42,4 +42,5 @@ lsp:
   # Main 3115 measured basedpyright servers under live omp sessions at 25 to 95 percent CPU and a host load average of 117.
   # Captain-side omp sessions never layer this file, so they keep the language server.
   # A raw omp command passed to bin/fm-spawn.sh receives no overlay from the launcher and is not covered.
+  # an omp session that live-reloads the overlay may turn its language server off mid-session; this is not tested either way.
   enabled: false
