@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.v54vDS/wt-ua
+
+  Fable 5.2 is here for your longest and toughest coding tasks. It draws down usage faster than Opus 5.5. Switch with
+  /model.
+
+❯ lab fixture: idle
+
+❯ : Firstmate instruction waiting: 'ua.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+
+  Listed 1 directory · 1 failed
+
+⏺ $FM_TASK_INBOX is empty in this shell. I'll look for the inbox nearby.
+
+  Ran 1 shell command
+
+⏺ I didn't act on anything, because I couldn't find the instruction.
+
+  - $FM_TASK_INBOX isn't set in my shell. The only FM_ variables present are FM_ARM_CONFIRM_TIMEOUT and
+    FM_MODEL_PICKER_SHADOW, so "$FM_TASK_INBOX"/ua.inbox/001.msg points to a path that doesn't exist.
+  - There's no ua.inbox directory within three levels of /Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS.
+
+  Nothing was read, run or moved to handled/, and the worktree is unchanged. To go ahead I need either the inbox's
+  absolute path or FM_TASK_INBOX exported in the environment this session starts from.
+
+✻ Brewed for 23s · done 12:41 PM
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

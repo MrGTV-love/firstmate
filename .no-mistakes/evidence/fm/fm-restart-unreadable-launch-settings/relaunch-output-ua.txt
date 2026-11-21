@@ -1,0 +1,10 @@
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ua relaunch --note MUST-NOT-ARRIVE
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF
+error: task ua cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+[exit 1]
+
+$ bash -c cd '/Users/charlesabrooker/tmp/fm-rsa-lab.VxpTMl/base' && '/Users/charlesabrooker/tmp/fm-rsa-lab.VxpTMl/base/bin/fm-control.sh' ua relaunch --note MUST-NOT-ARRIVE
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF
+error: task ua cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+[exit 1]

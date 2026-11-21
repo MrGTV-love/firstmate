@@ -1,0 +1,24 @@
+row	check	result	detail
+ua	relaunch-HEAD	pass	rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ua cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record pr
+ua	relaunch-head:screen-unchanged	pass	pane text identical before/after
+ua	relaunch-head:state-unchanged	pass	no protected state file created/changed
+ua	no-input	pass	marker absent
+ua	no-txn	pass	no relaunch transaction started
+ub	relaunch-HEAD	pass	rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ub cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record pr
+ub	relaunch-head:screen-unchanged	pass	pane text identical before/after
+ub	relaunch-head:state-unchanged	pass	no protected state file created/changed
+ub	no-input	pass	marker absent
+ub	no-txn	pass	no relaunch transaction started
+uc	relaunch-HEAD	pass	rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task uc cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can
+uc	relaunch-head:screen-unchanged	pass	pane text identical before/after
+uc	relaunch-head:state-unchanged	pass	no protected state file created/changed
+uc	no-input	pass	marker absent
+uc	no-txn	pass	no relaunch transaction started
+ud	relaunch-HEAD	pass	rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ud cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belong
+ud	relaunch-head:screen-unchanged	pass	pane text identical before/after
+ud	relaunch-head:state-unchanged	pass	no protected state file created/changed
+ud	no-input	pass	marker absent
+ud	no-txn	pass	no relaunch transaction started
+ua	relaunch-BASE	pass	rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ua cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+ua	relaunch-base:screen-unchanged	pass	pane text identical before/after
+ua	relaunch-base:state-unchanged	pass	no protected state file created/changed

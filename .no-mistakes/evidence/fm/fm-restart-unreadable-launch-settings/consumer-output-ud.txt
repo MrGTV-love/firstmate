@@ -1,0 +1,30 @@
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ud interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: task ud cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ud exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: task ud cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ud relaunch --note MUST-NOT-ARRIVE
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: task ud has no instructions at /Users/charlesabrooker/tmp/fm-lab.hnNeea/data/ud/brief.md; refusing to relaunch a worker with nothing to work from
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ud relaunch --recover-launch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: launch recovery for ud found live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ud adopt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh ud relaunch"; nothing was changed
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-send.sh ud MUST-NOT-ARRIVE send
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+[exit 0]

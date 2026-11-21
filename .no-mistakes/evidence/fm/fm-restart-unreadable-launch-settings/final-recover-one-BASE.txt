@@ -1,0 +1,32 @@
+#1 cursor=mk rc=0 notices=[]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#2 cursor=rx rc=1 notices=[rx.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+REBOOT_RECOVERY: rx: live launch settings are unreadable; no lifecycle action taken
+#3 cursor=sh rc=0 notices=[rx.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#4 cursor=sk rc=0 notices=[rx.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#5 cursor=sm rc=1 notices=[rx.reboot-notice sm.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+REBOOT_RECOVERY: sm: live launch settings are unreadable; no lifecycle action taken
+#6 cursor=ua rc=1 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+REBOOT_RECOVERY: ua: live launch settings are unreadable; no lifecycle action taken
+#7 cursor=uc rc=1 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+REBOOT_RECOVERY: uc: live launch settings are unreadable; no lifecycle action taken
+#8 cursor=mk rc=0 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#9 cursor=rx rc=0 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#10 cursor=sh rc=0 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#11 cursor=sk rc=0 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#12 cursor=sm rc=0 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#13 cursor=ua rc=0 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+#14 cursor=uc rc=0 notices=[rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI

@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.dSwMwK/wt-sk
+
+  Fable 5.2 is here for your longest and toughest coding tasks. It draws down usage faster than Opus 5.5. Switch with
+  /model.
+
+❯ lab fixture: idle
+
+❯ : Firstmate instruction waiting: 'sk.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+
+⏺ Locating inbox directory and FM env vars
+  ⎿  $ cd /Users/charlesabrooker/tmp/fm-rsa-lab.dSwMwK && find . -maxdepth 4 -name '*inbox*' 2>/dev/null; env | grep -i
+     '^FM_'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+✽ Meandering… (9s · ↓ 351 tokens · thinking)
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt

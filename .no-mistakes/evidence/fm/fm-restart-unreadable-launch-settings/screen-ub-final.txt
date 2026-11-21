@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.v54vDS/wt-ub
+
+  Fable 5.2 is here for your longest and toughest coding tasks. It draws down usage faster than Opus 5.5. Switch with
+  /model.
+
+❯ lab fixture: idle
+
+❯ : Firstmate instruction waiting: 'ub.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+
+  Listed 1 directory, ran 2 shell commands · 1 failed
+
+⏺ I couldn't find the message, so I haven't acted on anything or moved any files.
+
+  - $FM_TASK_INBOX isn't set in my shell. ls "$FM_TASK_INBOX/ub.inbox" therefore pointed at /ub.inbox, which doesn't
+    exist. This lab (fm-rsa-lab.v54vDS) has no ub.inbox anywhere.
+  - The only ub.inbox on the machine is in a different lab: /Users/charlesabrooker/tmp/fm-lab.hnNeea/state/ub.inbox. It
+    belongs to fm-lab.hnNeea, not this one. Reading and moving messages there could take work meant for another
+    session, so I left it alone.
+
+  To go ahead, either export the right FM_TASK_INBOX into this session or confirm that the fm-lab.hnNeea/state inbox is
+  the one meant for me.
+
+✻ Baked for 36s · done 12:42 PM
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

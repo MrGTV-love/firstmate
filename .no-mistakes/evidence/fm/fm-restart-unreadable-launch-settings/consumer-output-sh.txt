@@ -1,0 +1,10 @@
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh sh exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+already-stopped sh harness=claude backend=herdr endpoint=fm-lab-rs-attr-56708-263:w7:p1 worktree=/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/wt-sh
+[exit 0]
+
+$ bash -c cd '/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/base' && '/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/base/bin/fm-control.sh' sh exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+already-stopped sh harness=claude backend=herdr endpoint=fm-lab-rs-attr-56708-263:w7:p1 worktree=/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/wt-sh
+[exit 0]

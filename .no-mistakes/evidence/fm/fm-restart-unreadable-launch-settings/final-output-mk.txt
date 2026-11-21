@@ -1,0 +1,5 @@
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh mk interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+interrupt-delivered mk harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+[exit 0]

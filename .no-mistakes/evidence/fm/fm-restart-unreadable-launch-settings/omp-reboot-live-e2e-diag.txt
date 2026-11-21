@@ -1,0 +1,9 @@
+installed omp integration to /Users/charlesabrooker/tmp/fm-omp-reboot.0NPG3i/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+native child captured: pid=91462 start=Sat Nov 21 12:46:00 2026    
+0a1,3
+> /Users/charlesabrooker/tmp/fm-omp-reboot.0NPG3i/home/state/.omp-turnend-extension-loaded
+> /Users/charlesabrooker/tmp/fm-omp-reboot.0NPG3i/home/state/.omp-watch-extension-loaded
+> /Users/charlesabrooker/tmp/fm-omp-reboot.0NPG3i/home/state/extensions/omp-primary-watch/lifecycle.log
+guarded teardown completed for session 'fm-lab-omp-reboot-68738-21615'; waiting for native child exit
+native child exit confirmed: pid=91462 start=Sat Nov 21 12:46:00 2026    
+private fixture tree removed: /Users/charlesabrooker/tmp/fm-omp-reboot.0NPG3i

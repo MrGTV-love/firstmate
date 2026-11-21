@@ -1,0 +1,5 @@
+$ fm-secondmate-restart.sh rx
+unreached: rx: its worker runtime 'mytool' has no verified restart mechanics for a second mate; its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+[exit 3]
+--- state files added/changed:

@@ -1,0 +1,12 @@
+$ attribution hu fm-remote:w1:p1  (source row ua)
+attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh hu relaunch", or decide the lane by hand
+
+$ attribution hu fm-remote:w99:p9 (wrong target)
+attribution=refuse: this host's endpoint for hu is 'fm-remote:w1:p1', not the recorded route's 'fm-remote:w99:p9'
+
+$ attribution hm fm-remote:w3:p1  (source row mk)
+attribution=proceed
+
+$ attribution hs fm-remote:w7:p1  (source row sh)
+attribution=proceed
+

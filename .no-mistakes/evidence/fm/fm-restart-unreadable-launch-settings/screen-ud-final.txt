@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.v54vDS/wt-ud
+
+  Fable 5.2 is here for your longest and toughest coding tasks. It draws down usage faster than Opus 5.5. Switch with
+  /model.
+
+❯ lab fixture: idle
+
+❯ : Firstmate instruction waiting: 'ud.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+
+  Listed 1 directory, ran 1 shell command · 1 failed
+
+⏺ I couldn't act on this instruction because the message it points to isn't there.
+
+  - $FM_TASK_INBOX isn't set in this session. The only Firstmate variables present are FM_ARM_CONFIRM_TIMEOUT,
+    FM_MODEL_PICKER_SHADOW and FM_SPAWN_GEN=g-other.
+  - I searched fm-rsa-lab.v54vDS three directory levels deep for anything named like an inbox. There's no ud.inbox/
+    directory and no 001.msg. The only matches were scripts and tests under base/bin and base/tests.
+
+  I read nothing, ran nothing and moved nothing to handled/. Also, FM_SPAWN_GEN=g-other suggests this session may have
+  been started for a different task than the one that sent this instruction. If you give me the inbox path, or relaunch
+  with FM_TASK_INBOX set, I'll read 001.msg, act on it, and move it to handled/.
+
+✻ Sautéed for 36s · done 12:42 PM
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

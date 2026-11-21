@@ -1,0 +1,72 @@
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state:
+total 104
+drwxr-xr-x@ 17 charlesabrooker  staff   544 Nov 21 12:41 .
+drwx------@  7 charlesabrooker  staff   224 Nov 21 12:38 ..
+-rw-------@  1 charlesabrooker  staff    16 Nov 21 12:38 .fm-lab-tmux-dir
+-rw-r--r--@  1 charlesabrooker  staff    13 Nov 21 12:41 .guard-watcher-stale-banner
+-rw-r--r--@  1 charlesabrooker  staff  9322 Nov 21 12:41 guard-events.jsonl
+-rw-r--r--@  1 charlesabrooker  staff   378 Nov 21 12:38 lg.meta
+-rw-r--r--@  1 charlesabrooker  staff   398 Nov 21 12:38 mk.meta
+-rw-r--r--@  1 charlesabrooker  staff   398 Nov 21 12:38 sh.meta
+-rw-r--r--@  1 charlesabrooker  staff   459 Nov 21 12:38 sm.meta
+drwxr-xr-x@  4 charlesabrooker  staff   128 Nov 21 12:41 ua.inbox
+-rw-r--r--@  1 charlesabrooker  staff   398 Nov 21 12:38 ua.meta
+drwxr-xr-x@  4 charlesabrooker  staff   128 Nov 21 12:41 ub.inbox
+-rw-r--r--@  1 charlesabrooker  staff   398 Nov 21 12:38 ub.meta
+drwxr-xr-x@  4 charlesabrooker  staff   128 Nov 21 12:41 uc.inbox
+-rw-r--r--@  1 charlesabrooker  staff   398 Nov 21 12:38 uc.meta
+drwxr-xr-x@  4 charlesabrooker  staff   128 Nov 21 12:41 ud.inbox
+-rw-r--r--@  1 charlesabrooker  staff   398 Nov 21 12:38 ud.meta
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/ua.inbox:
+total 8
+drwxr-xr-x@  4 charlesabrooker  staff  128 Nov 21 12:41 .
+drwxr-xr-x@ 17 charlesabrooker  staff  544 Nov 21 12:41 ..
+-rw-------@  1 charlesabrooker  staff   71 Nov 21 12:41 001.msg
+drwxr-xr-x@  2 charlesabrooker  staff   64 Nov 21 12:41 handled
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/ua.inbox/handled:
+total 0
+drwxr-xr-x@ 2 charlesabrooker  staff   64 Nov 21 12:41 .
+drwxr-xr-x@ 4 charlesabrooker  staff  128 Nov 21 12:41 ..
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/ub.inbox:
+total 8
+drwxr-xr-x@  4 charlesabrooker  staff  128 Nov 21 12:41 .
+drwxr-xr-x@ 17 charlesabrooker  staff  544 Nov 21 12:41 ..
+-rw-------@  1 charlesabrooker  staff   71 Nov 21 12:41 001.msg
+drwxr-xr-x@  2 charlesabrooker  staff   64 Nov 21 12:41 handled
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/ub.inbox/handled:
+total 0
+drwxr-xr-x@ 2 charlesabrooker  staff   64 Nov 21 12:41 .
+drwxr-xr-x@ 4 charlesabrooker  staff  128 Nov 21 12:41 ..
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/uc.inbox:
+total 8
+drwxr-xr-x@  4 charlesabrooker  staff  128 Nov 21 12:41 .
+drwxr-xr-x@ 17 charlesabrooker  staff  544 Nov 21 12:41 ..
+-rw-------@  1 charlesabrooker  staff   71 Nov 21 12:41 001.msg
+drwxr-xr-x@  2 charlesabrooker  staff   64 Nov 21 12:41 handled
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/uc.inbox/handled:
+total 0
+drwxr-xr-x@ 2 charlesabrooker  staff   64 Nov 21 12:41 .
+drwxr-xr-x@ 4 charlesabrooker  staff  128 Nov 21 12:41 ..
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/ud.inbox:
+total 8
+drwxr-xr-x@  4 charlesabrooker  staff  128 Nov 21 12:41 .
+drwxr-xr-x@ 17 charlesabrooker  staff  544 Nov 21 12:41 ..
+-rw-------@  1 charlesabrooker  staff   71 Nov 21 12:41 001.msg
+drwxr-xr-x@  2 charlesabrooker  staff   64 Nov 21 12:41 handled
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state/ud.inbox/handled:
+total 0
+drwxr-xr-x@ 2 charlesabrooker  staff   64 Nov 21 12:41 .
+drwxr-xr-x@ 4 charlesabrooker  staff  128 Nov 21 12:41 ..
+
+/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/wt-sm/state:
+total 0
+drwxr-xr-x@ 2 charlesabrooker  staff   64 Nov 21 12:38 .
+drwxr-xr-x@ 7 charlesabrooker  staff  224 Nov 21 12:38 ..

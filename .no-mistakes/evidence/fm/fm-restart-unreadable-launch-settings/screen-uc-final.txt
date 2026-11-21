@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.v54vDS/wt-uc
+
+⚠ Remote managed settings failed to load (authentication rejected (401)) · no remote policy applied · /status for
+  details
+
+❯ lab fixture: idle
+
+❯ : Firstmate instruction waiting: 'uc.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+  ⎿  Invalid API key · Fix external API key
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Once fixed, resend your message
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts

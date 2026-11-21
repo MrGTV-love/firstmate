@@ -1,0 +1,13 @@
+exec bash /Users/charlesabrooker/tmp/fm-rsa-lab.VxpTMl/launch-w4:p1.sh
+charlesabrooker@Mac-Studio wt-ud % exec bash /Users/charlesabrooker/tmp/fm-rsa-lab.VxpTMl/launch-w4:p1.sh
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.VxpTMl/wt-ud
+
+
+❯ lab fixture: idle
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

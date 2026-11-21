@@ -1,0 +1,41 @@
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ua interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ua exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ua relaunch --note MUST-NOT-ARRIVE
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: task ua has no instructions at /Users/charlesabrooker/tmp/fm-lab.hnNeea/data/ua/brief.md; refusing to relaunch a worker with nothing to work from
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ua relaunch --recover-launch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: launch recovery for ua found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh ua adopt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh ua relaunch"; nothing was changed
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-send.sh ua MUST-NOT-ARRIVE send
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  8 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[exit 0]
+
+$ bash -c cd '/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/base' && '/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/base/bin/fm-control.sh' ua interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+[exit 1]

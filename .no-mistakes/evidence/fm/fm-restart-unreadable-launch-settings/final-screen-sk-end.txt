@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.dSwMwK/wt-sk
+
+  Fable 5.2 is here for your longest and toughest coding tasks. It draws down usage faster than Opus 5.5. Switch with
+  /model.
+
+❯ lab fixture: idle
+
+❯ : Firstmate instruction waiting: 'sk.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+
+  Listed 2 directories, ran 2 shell commands · 1 failed
+
+⏺ I couldn't act on the Firstmate instruction because the message file doesn't exist. Nothing was run or moved to
+  handled/.
+
+  - $FM_TASK_INBOX is not set in this shell. The only FM_* variables are FM_ARM_CONFIRM_TIMEOUT, FM_MODEL_PICKER_SHADOW
+    and FM_SPAWN_GEN=g-sk. That made the path resolve to /sk.inbox/001.msg, which isn't there.
+  - No 001.msg or sk.inbox exists anywhere under /Users/charlesabrooker/tmp/fm-rsa-lab.dSwMwK. .fm-secondmate-home in
+    the worktree is a 3-byte file, not an inbox directory.
+
+  To fix it, re-send with FM_TASK_INBOX exported into this session, or give me the full path to the inbox.
+
+✻ Crunched for 21s · done 1:10 PM
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

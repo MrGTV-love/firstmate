@@ -1,0 +1,5 @@
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh uc relaunch --note MUST-NOT-ARRIVE
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF
+error: task uc cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+[exit 1]

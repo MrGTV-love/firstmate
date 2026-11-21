@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-rsa-lab.v54vDS/wt-sm
+
+  Fable 5.2 is here for your longest and toughest coding tasks. It draws down usage faster than Opus 5.5. Switch with
+  /model.
+
+❯ lab fixture: idle
+
+❯ : Firstmate instruction waiting: 'sm.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+
+  Listed 2 directories, ran 1 shell command · 1 failed
+
+❯ : Firstmate instruction waiting: 'sm.inbox/002.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+  - act, mv handled/.
+
+  Ran 1 shell command
+
+⏺ I couldn't read either instruction, so I haven't acted on 001.msg or 002.msg.
+
+  - $FM_TASK_INBOX is not set in my shell. The only FM_ variables present are FM_ARM_CONFIRM_TIMEOUT and
+    FM_MODEL_PICKER_SHADOW.
+  - The inbox doesn't exist anywhere I can see. I searched /Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS five levels
+    deep and found no sm.inbox directory and no *.msg files.
+  - My worktree (wt-sm) contains only AGENTS.md ("# lab secondmate"), .fm-secondmate-home (which reads sm),
+    data/charter.md, and an empty state/. There's no handled/ folder either.
+
+  To continue, I need one of two things: the actual path to the inbox, or FM_TASK_INBOX exported in this session (for
+  example by typing ! export FM_TASK_INBOX=<path>). Once I have it, I'll read 001 and then 002, act on each, and move
+  them to handled/.
+
+✻ Churned for 20s · done 12:42 PM
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

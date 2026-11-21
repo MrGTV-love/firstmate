@@ -1,0 +1,13 @@
+### BASE d432729a223a2532040522714b42c4ba2b406655 recover [exit 1]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+REBOOT_RECOVERY: rx: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: sm: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: ua: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: uc: live launch settings are unreadable; no lifecycle action taken
+
+### HEAD 9d432bade48edce34be7f1698b04dff8457d7aa4 recover [exit 1]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI
+REBOOT_RECOVERY: rx: live launch settings are unreadable; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+REBOOT_RECOVERY: sm: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+REBOOT_RECOVERY: ua: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+REBOOT_RECOVERY: uc: live launch settings are unreadable; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand

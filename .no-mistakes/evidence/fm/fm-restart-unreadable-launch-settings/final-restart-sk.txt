@@ -1,0 +1,9 @@
+$ fm-secondmate-restart.sh sk
+unreached: sk: it did not confirm within 5s that its open work is written down, so its conversation was not spent; at the fallback nudge, its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: the environment of live group process 79158 cannot be read, so the agent's process group cannot be judged; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+[exit 3]
+--- state files added/changed:
+3a4
+> 1195474477 816 /Users/charlesabrooker/tmp/fm-lab.axhPGI/state/pending-replies/3303b197e4dac738
+6a8
+> 2135393161 835 /Users/charlesabrooker/tmp/fm-lab.axhPGI/state/sk.inbox/001.msg

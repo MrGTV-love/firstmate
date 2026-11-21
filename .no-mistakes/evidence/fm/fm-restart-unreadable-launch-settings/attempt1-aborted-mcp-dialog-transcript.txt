@@ -1,0 +1,26 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.mSguUE
+export TMUX_TMPDIR=/tmp/fml.1GPebY
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.mSguUE && rm -rf /Users/charlesabrooker/tmp/fm-lab.mSguUE
+/Users/charlesabrooker/tmp/fm-lab.mSguUE:
+total 8
+drwx------@     7 charlesabrooker  staff     224 Nov 21 12:22 .
+drwxr-xr-x  24294 charlesabrooker  staff  777408 Nov 21 12:22 ..
+-rw-r--r--@     1 charlesabrooker  staff     189 Nov 21 12:22 .fm-lab-home
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 12:22 config
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 12:22 data
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 12:22 projects
+drwxr-xr-x@     3 charlesabrooker  staff      96 Nov 21 12:22 state
+
+/Users/charlesabrooker/tmp/fm-lab.mSguUE/state:
+total 8
+drwxr-xr-x@ 3 charlesabrooker  staff   96 Nov 21 12:22 .
+drwx------@ 7 charlesabrooker  staff  224 Nov 21 12:22 ..
+-rw-------@ 1 charlesabrooker  staff   16 Nov 21 12:22 .fm-lab-tmux-dir
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.mSguUE
+TMP=/Users/charlesabrooker/tmp/fm-rsa-lab.P4Uy1v
+SESSION=fm-lab-rs-attr-51704-46
+=== build rows
+row ua: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row ub: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row uc: verdict=unknown agent_state=alive (want unknown/alive)
+--- cleanup

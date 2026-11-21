@@ -1,0 +1,37 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Ns93CF
+TMP=/Users/charlesabrooker/tmp/fm-rsa-lab.VxpTMl
+SESSION=fm-lab-rs-attr-65114-18751
+=== build rows
+row ua: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row ub: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row uc: verdict=unknown agent_state=alive (want unknown/alive)
+row ud: verdict=pinned-elsewhere agent_state=alive (want pinned-elsewhere/alive)
+RESULT ua relaunch-HEAD pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ua cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record pr
+RESULT ua relaunch-head:screen-unchanged pass :: pane text identical before/after
+RESULT ua relaunch-head:state-unchanged pass :: no protected state file created/changed
+RESULT ua no-input pass :: marker absent
+RESULT ua no-txn pass :: no relaunch transaction started
+RESULT ub relaunch-HEAD pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ub cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record pr
+RESULT ub relaunch-head:screen-unchanged pass :: pane text identical before/after
+RESULT ub relaunch-head:state-unchanged pass :: no protected state file created/changed
+RESULT ub no-input pass :: marker absent
+RESULT ub no-txn pass :: no relaunch transaction started
+RESULT uc relaunch-HEAD pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task uc cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can
+RESULT uc relaunch-head:screen-unchanged pass :: pane text identical before/after
+RESULT uc relaunch-head:state-unchanged pass :: no protected state file created/changed
+RESULT uc no-input pass :: marker absent
+RESULT uc no-txn pass :: no relaunch transaction started
+RESULT ud relaunch-HEAD pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ud cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belong
+RESULT ud relaunch-head:screen-unchanged pass :: pane text identical before/after
+RESULT ud relaunch-head:state-unchanged pass :: no protected state file created/changed
+RESULT ud no-input pass :: marker absent
+RESULT ud no-txn pass :: no relaunch transaction started
+RESULT ua relaunch-BASE pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ns93CF error: task ua cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+RESULT ua relaunch-base:screen-unchanged pass :: pane text identical before/after
+RESULT ua relaunch-base:state-unchanged pass :: no protected state file created/changed
+=== done
+--- cleanup
+herdr lab teardown ok
+no lab processes remain
+lab home removed
+scratch removed

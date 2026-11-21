@@ -1,0 +1,5 @@
+$ fm-secondmate-restart.sh sm
+unreached: sm: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+[exit 3]
+--- state files added/changed:

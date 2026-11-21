@@ -1,0 +1,145 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.hnNeea
+export TMUX_TMPDIR=/tmp/fml.JZyJWU
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.hnNeea && rm -rf /Users/charlesabrooker/tmp/fm-lab.hnNeea
+/Users/charlesabrooker/tmp/fm-lab.hnNeea:
+total 8
+drwx------@     7 charlesabrooker  staff     224 Nov 21 12:38 .
+drwxr-xr-x  24291 charlesabrooker  staff  777312 Nov 21 12:38 ..
+-rw-r--r--@     1 charlesabrooker  staff     189 Nov 21 12:38 .fm-lab-home
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 12:38 config
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 12:38 data
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 12:38 projects
+drwxr-xr-x@     3 charlesabrooker  staff      96 Nov 21 12:38 state
+
+/Users/charlesabrooker/tmp/fm-lab.hnNeea/state:
+total 8
+drwxr-xr-x@ 3 charlesabrooker  staff   96 Nov 21 12:38 .
+drwx------@ 7 charlesabrooker  staff  224 Nov 21 12:38 ..
+-rw-------@ 1 charlesabrooker  staff   16 Nov 21 12:38 .fm-lab-tmux-dir
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.hnNeea
+TMP=/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS
+SESSION=fm-lab-rs-attr-56708-263
+=== build rows
+row ua: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row ub: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row uc: verdict=unknown agent_state=alive (want unknown/alive)
+row ud: verdict=pinned-elsewhere agent_state=alive (want pinned-elsewhere/alive)
+row mk: verdict=managed agent_state=alive (want managed/alive)
+row lg: verdict=unknown agent_state=alive (want unmanaged/alive)
+RESULT lg setup NOTE :: legacy row verdict differs (legacy is judged by record, not verdict)
+row sm: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+shell row agent_state=dead
+  PID  PPID  PGID COMMAND
+61533 57398 61533 /Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin/node /Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/tcbin/teamclaude run -- --strict-mcp-config --resume 8a6f3c1e-4b7d-4e21-9c55-2f0d1e9b7a10
+66733 61533 61533 claude --strict-mcp-config --resume 8a6f3c1e-4b7d-4e21-9c55-2f0d1e9b7a10
+=== reboot sweep: base vs head (all rows present)
+### BASE d432729a223a2532040522714b42c4ba2b406655  fm-reboot-recover.sh recover  [exit 1]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+REBOOT_RECOVERY: sm: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: ua: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: ub: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: uc: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: ud: live launch settings are unreadable; no lifecycle action taken
+
+### HEAD 9d432bade48edce34be7f1698b04dff8457d7aa4  fm-reboot-recover.sh recover  [exit 1]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+REBOOT_RECOVERY: sm: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+REBOOT_RECOVERY: ua: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+REBOOT_RECOVERY: ub: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ub relaunch", or decide the lane by hand
+REBOOT_RECOVERY: uc: live launch settings are unreadable; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+REBOOT_RECOVERY: ud: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+RESULT ua sweep pass :: REBOOT_RECOVERY: ua: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+RESULT ua sweep-base pass :: base defect reproduced: REBOOT_RECOVERY: ua: live launch settings are unreadable; no lifecycle action taken
+RESULT ub sweep pass :: REBOOT_RECOVERY: ub: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ub relaunch", or decide the lane by hand
+RESULT uc sweep pass :: REBOOT_RECOVERY: uc: live launch settings are unreadable; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+RESULT ud sweep pass :: REBOOT_RECOVERY: ud: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+RESULT mk sweep pass :: managed agent: no sweep line
+RESULT sm sweep pass :: REBOOT_RECOVERY: sm: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+RESULT lg sweep-base-eq-head pass :: no line on either
+RESULT ua sweep:screen-unchanged pass :: pane text identical before/after
+RESULT ua sweep:state-unchanged FAIL :: 1a2|> 3311768991 738 state/guard-events.jsonl|
+RESULT ub sweep:screen-unchanged pass :: pane text identical before/after
+RESULT ub sweep:state-unchanged FAIL :: 1a2|> 3311768991 738 state/guard-events.jsonl|
+RESULT uc sweep:screen-unchanged pass :: pane text identical before/after
+RESULT uc sweep:state-unchanged FAIL :: 1a2|> 3311768991 738 state/guard-events.jsonl|
+RESULT ud sweep:screen-unchanged pass :: pane text identical before/after
+RESULT ud sweep:state-unchanged FAIL :: 1a2|> 3311768991 738 state/guard-events.jsonl|
+RESULT mk sweep:screen-unchanged pass :: pane text identical before/after
+RESULT mk sweep:state-unchanged FAIL :: 1a2|> 3311768991 738 state/guard-events.jsonl|
+RESULT sm sweep:screen-unchanged pass :: pane text identical before/after
+RESULT sm sweep:state-unchanged FAIL :: 1a2|> 3311768991 738 state/guard-events.jsonl|
+=== control-plane consumers on unproven live agents
+RESULT ua interrupt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ua exit FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ua relaunch FAIL :: rc=1; missing 'live agent is an unpinned native restore'; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ua has no instructions at /Users/charlesabrooker/tmp/fm-lab.hnNeea/data/ua/brief.md; refusing to relaunch a worker with nothing to work from
+RESULT ua recover-launch FAIL :: rc=1; missing 'launch='; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: launch recovery for ua found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothi
+RESULT ua adopt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh ua relaunch"; nothing was changed
+RESULT ua fm-send FAIL :: expected nonzero, got 0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ●  WATCHER DOWN - SUPERVISION IS OFF ●  8 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s). ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher
+RESULT ua consumers:screen-unchanged CHECK :: 10a11,12|> ❯ : Firstmate instruction waiting: 'ua.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw|>   - act, mv handled/.|32a35|> ✽ Moseying…|34,36d36|< |< |
+RESULT ua consumers:state-unchanged FAIL :: 2c2,3|< 3311768991 738 state/guard-events.jsonl|---|> 226804325 13 state/.guard-watcher-stale-banner|> 1682084789 2810 state/guard-events.jsonl|6a8|> 3419465864 71 state/ua.inbox/001.msg|
+RESULT ua no-input pass :: marker text absent from pane
+RESULT ub interrupt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ub cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ub exit FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ub cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ub relaunch FAIL :: rc=1; missing 'live agent is an unpinned native restore'; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ub has no instructions at /Users/charlesabrooker/tmp/fm-lab.hnNeea/data/ub/brief.md; refusing to relaunch a worker with nothing to work from
+RESULT ub recover-launch FAIL :: rc=1; missing 'launch='; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: launch recovery for ub found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothi
+RESULT ub adopt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh ub relaunch"; nothing was changed
+RESULT ub fm-send FAIL :: expected nonzero, got 0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+RESULT ub consumers:screen-unchanged CHECK :: 10a11,12|> ❯ : Firstmate instruction waiting: 'ub.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw|>   - act, mv handled/.|32a35|> ✽ Cooking…|34,36d36|< |< |
+RESULT ub consumers:state-unchanged FAIL :: 3c3|< 1682084789 2810 state/guard-events.jsonl|---|> 1351547633 4882 state/guard-events.jsonl|9a10|> 2670269799 71 state/ub.inbox/001.msg|
+RESULT ub no-input pass :: marker text absent from pane
+RESULT uc interrupt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task uc cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane b
+RESULT uc exit FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task uc cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane b
+RESULT uc relaunch FAIL :: rc=1; missing 'live launch settings are unreadable'; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task uc has no instructions at /Users/charlesabrooker/tmp/fm-lab.hnNeea/data/uc/brief.md; refusing to relaunch a worker with nothing to work from
+RESULT uc recover-launch FAIL :: rc=1; missing 'launch='; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: launch recovery for uc cannot prove its live launch settings; no lifecycle action taken (live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand)
+RESULT uc adopt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh uc relaunch"; nothing was changed
+RESULT uc fm-send FAIL :: expected nonzero, got 0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+RESULT uc consumers:screen-unchanged CHECK :: 10a11,13|> ❯ : Firstmate instruction waiting: 'uc.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw|>   - act, mv handled/.|>   ⎿  Invalid API key · Fix external API key|34,36d36|< |< |< |
+RESULT uc consumers:state-unchanged FAIL :: 3c3|< 1351547633 4882 state/guard-events.jsonl|---|> 2280285515 6954 state/guard-events.jsonl|11a12|> 490246520 71 state/uc.inbox/001.msg|
+RESULT uc no-input pass :: marker text absent from pane
+RESULT ud interrupt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ud cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main insp
+RESULT ud exit FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ud cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main insp
+RESULT ud relaunch FAIL :: rc=1; missing 'pinned to another launch generation'; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ud has no instructions at /Users/charlesabrooker/tmp/fm-lab.hnNeea/data/ud/brief.md; refusing to relaunch a worker with nothing to work from
+RESULT ud recover-launch FAIL :: rc=1; missing 'launch='; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: launch recovery for ud found live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by han
+RESULT ud adopt FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh ud relaunch"; nothing was changed
+RESULT ud fm-send FAIL :: expected nonzero, got 0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+RESULT ud consumers:screen-unchanged CHECK :: 10a11,12|> ❯ : Firstmate instruction waiting: 'ud.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw|>   - act, mv handled/.|32a35|> ✳ Onioning…|34,36d36|< |< |
+RESULT ud consumers:state-unchanged FAIL :: 3c3|< 2280285515 6954 state/guard-events.jsonl|---|> 1637865303 9026 state/guard-events.jsonl|13a14|> 3445916032 71 state/ud.inbox/001.msg|
+RESULT ud no-input pass :: marker text absent from pane
+=== base comparison of control refusal for the d1 shape
+RESULT ua interrupt-BASE FAIL :: rc=1; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+RESULT ua base-interrupt:screen-unchanged pass :: pane text identical before/after
+RESULT ua base-interrupt:state-unchanged FAIL :: 3c3|< 1637865303 9026 state/guard-events.jsonl|---|> 470763207 9322 state/guard-events.jsonl|
+=== restart on an unpinned restored secondmate
+$ fm-secondmate-restart.sh sm
+unreached: sm: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+[exit 3]
+RESULT sm restart pass :: unreached: sm: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+RESULT sm restart:screen-unchanged pass :: pane text identical before/after
+RESULT sm restart:state-unchanged pass :: no protected state file created/changed
+RESULT sm restart-no-records FAIL :: 4 records
+RESULT sm restart-BASE NOTE :: base rc=3 :: nudged: sm: it did not confirm within 5s that its open work is written down, so its conversation was not spent summary: 0 of 1 restarted, 1 nudged, 0 unreached
+=== positive controls
+RESULT mk interrupt-HEAD FAIL :: rc=0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea interrupt-delivered mk harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+RESULT mk interrupt-BASE FAIL :: rc=0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea interrupt-delivered mk harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+RESULT lg interrupt-HEAD FAIL :: rc=0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea interrupt-delivered lg harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+RESULT lg interrupt-BASE FAIL :: rc=0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea interrupt-delivered lg harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+RESULT sh exit-HEAD FAIL :: rc=0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea already-stopped sh harness=claude backend=herdr endpoint=fm-lab-rs-attr-56708-263:w7:p1 worktree=/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/wt-sh
+RESULT sh exit-BASE FAIL :: rc=0; GATE REFUSAL not attribution :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea already-stopped sh harness=claude backend=herdr endpoint=fm-lab-rs-attr-56708-263:w7:p1 worktree=/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/wt-sh
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-control.sh sh exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+already-stopped sh harness=claude backend=herdr endpoint=fm-lab-rs-attr-56708-263:w7:p1 worktree=/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/wt-sh
+[exit 0]
+
+$ bash -c cd '/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/base' && '/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/base/bin/fm-control.sh' sh exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hnNeea
+already-stopped sh harness=claude backend=herdr endpoint=fm-lab-rs-attr-56708-263:w7:p1 worktree=/Users/charlesabrooker/tmp/fm-rsa-lab.v54vDS/wt-sh
+[exit 0]
+=== done
+--- cleanup
+herdr lab teardown ok
+no lab processes remain
+lab home removed
+scratch removed

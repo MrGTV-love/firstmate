@@ -1,0 +1,129 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.axhPGI
+export TMUX_TMPDIR=/tmp/fml.kY6zuE
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7ZHXJJ5NP3Q71F1QFF9JDCY/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.axhPGI && rm -rf /Users/charlesabrooker/tmp/fm-lab.axhPGI
+/Users/charlesabrooker/tmp/fm-lab.axhPGI:
+total 8
+drwx------@     7 charlesabrooker  staff     224 Nov 21 13:04 .
+drwxr-xr-x  24298 charlesabrooker  staff  777536 Nov 21 13:04 ..
+-rw-r--r--@     1 charlesabrooker  staff     189 Nov 21 13:04 .fm-lab-home
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 13:04 config
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 13:04 data
+drwxr-xr-x@     2 charlesabrooker  staff      64 Nov 21 13:04 projects
+drwxr-xr-x@     3 charlesabrooker  staff      96 Nov 21 13:04 state
+
+/Users/charlesabrooker/tmp/fm-lab.axhPGI/state:
+total 8
+drwxr-xr-x@ 3 charlesabrooker  staff   96 Nov 21 13:04 .
+drwx------@ 7 charlesabrooker  staff  224 Nov 21 13:04 ..
+-rw-------@ 1 charlesabrooker  staff   16 Nov 21 13:04 .fm-lab-tmux-dir
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.axhPGI
+TMP=/Users/charlesabrooker/tmp/fm-rsa-lab.dSwMwK
+SESSION=fm-lab-rs-attr-25776-15243
+=== build rows
+row ua: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row uc: verdict=unknown agent_state=alive (want unknown/alive)
+row mk: verdict=managed agent_state=alive (want managed/alive)
+row sm: verdict=unmanaged agent_state=alive (want unmanaged/alive)
+row sk: verdict=managed agent_state=alive (want managed/alive)
+row rx: verdict=unknown agent_state=alive (want unknown/alive)
+shell row agent_state=dead
+=== unbounded sweep, base and head
+RESULT ua sweep pass :: REBOOT_RECOVERY: ua: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh ua relaunch", or decide the lane by hand
+RESULT uc sweep pass :: REBOOT_RECOVERY: uc: live launch settings are unreadable; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+RESULT sm sweep pass :: REBOOT_RECOVERY: sm: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+RESULT mk sweep pass :: no line (managed or stopped)
+RESULT sk sweep pass :: no line (managed or stopped)
+RESULT sh sweep pass :: no line (managed or stopped)
+RESULT all sweep-exit pass :: base=1 head=1
+=== bounded recover --one: two full cycles, head then base
+RESULT all recover-one-HEAD NOTE :: report lines over 14 ticks=4; notices=rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice 
+RESULT all recover-one-BASE NOTE :: report lines over 14 ticks=4; notices=rx.reboot-notice sm.reboot-notice ua.reboot-notice uc.reboot-notice 
+=== control verbs, one snapshot pair each
+RESULT ua interrupt pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ua interrupt:screen-unchanged pass :: pane text identical before/after
+RESULT ua interrupt:state-unchanged pass :: no protected state file created/changed
+RESULT ua interrupt:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT ua exit pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ua exit:screen-unchanged pass :: pane text identical before/after
+RESULT ua exit:state-unchanged pass :: no protected state file created/changed
+RESULT ua exit:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT ua relaunch pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task ua cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record pr
+RESULT ua relaunch:screen-unchanged pass :: pane text identical before/after
+RESULT ua relaunch:state-unchanged pass :: no protected state file created/changed
+RESULT ua relaunch:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT ua recover-launch pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: launch recovery for ua found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothi
+RESULT ua recover-launch:screen-unchanged pass :: pane text identical before/after
+RESULT ua recover-launch:state-unchanged pass :: no protected state file created/changed
+RESULT ua recover-launch:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT ua adopt pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh ua relaunch"; nothing was changed
+RESULT ua adopt:screen-unchanged pass :: pane text identical before/after
+RESULT ua adopt:state-unchanged pass :: no protected state file created/changed
+RESULT ua adopt:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT uc interrupt pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task uc cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane b
+RESULT uc interrupt:screen-unchanged pass :: pane text identical before/after
+RESULT uc interrupt:state-unchanged pass :: no protected state file created/changed
+RESULT uc interrupt:same-agent pass :: 31319@Sat Nov 21 13:04:29 2026    
+RESULT uc exit pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task uc cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane b
+RESULT uc exit:screen-unchanged pass :: pane text identical before/after
+RESULT uc exit:state-unchanged pass :: no protected state file created/changed
+RESULT uc exit:same-agent pass :: 31319@Sat Nov 21 13:04:29 2026    
+RESULT uc relaunch pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task uc cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can
+RESULT uc relaunch:screen-unchanged pass :: pane text identical before/after
+RESULT uc relaunch:state-unchanged pass :: no protected state file created/changed
+RESULT uc relaunch:same-agent pass :: 31319@Sat Nov 21 13:04:29 2026    
+RESULT uc recover-launch pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: launch recovery for uc cannot prove its live launch settings; no lifecycle action taken (live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand)
+RESULT uc recover-launch:screen-unchanged pass :: pane text identical before/after
+RESULT uc recover-launch:state-unchanged pass :: no protected state file created/changed
+RESULT uc recover-launch:same-agent pass :: 31319@Sat Nov 21 13:04:29 2026    
+RESULT uc adopt pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh uc relaunch"; nothing was changed
+RESULT uc adopt:screen-unchanged pass :: pane text identical before/after
+RESULT uc adopt:state-unchanged pass :: no protected state file created/changed
+RESULT uc adopt:same-agent pass :: 31319@Sat Nov 21 13:04:29 2026    
+RESULT ua recover-launch-BASE pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: launch recovery for ua cannot prove its live launch settings; no lifecycle action taken
+RESULT ua recover-launch-BASE:screen-unchanged pass :: pane text identical before/after
+RESULT ua recover-launch-BASE:state-unchanged pass :: no protected state file created/changed
+RESULT ua recover-launch-BASE:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+=== detector check: a draft in the composer
+RESULT ua interrupt-with-draft pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ua interrupt-with-draft:screen-unchanged pass :: pane text identical before/after
+RESULT ua interrupt-with-draft:state-unchanged pass :: no protected state file created/changed
+RESULT ua interrupt-with-draft:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT ua exit-with-draft pass :: rc=1 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI error: task ua cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restor
+RESULT ua exit-with-draft:screen-unchanged pass :: pane text identical before/after
+RESULT ua exit-with-draft:state-unchanged pass :: no protected state file created/changed
+RESULT ua exit-with-draft:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT ua draft-kept pass :: draft still in composer
+RESULT mk interrupt-managed pass :: rc=0 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI interrupt-delivered mk harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+RESULT mk detector NOTE :: delivered interrupt left the screen identical
+=== restart rows
+RESULT sm restart pass :: unreached: sm: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh sm relaunch", or decide the lane by hand
+RESULT sm restart-no-records pass :: no record created
+RESULT sm restart:screen-unchanged pass :: pane text identical before/after
+RESULT sm restart:state-unchanged pass :: no protected state file created/changed
+RESULT rx restart pass :: unreached: rx: its worker runtime 'mytool' has no verified restart mechanics for a second mate; its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it
+RESULT rx restart-no-records pass :: no record created
+RESULT rx restart:screen-unchanged pass :: pane text identical before/after
+RESULT rx restart:state-unchanged pass :: no protected state file created/changed
+RESULT sk restart FAIL :: managed mate refused: unreached: sk: it did not confirm within 5s that its open work is written down, so its conversation was not spent; at the fallback nudge, its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: the environment of live group process 79158 cannot be read, so the agent's process group cannot be judged; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+RESULT sk restart-effects pass :: > 1195474477 816 /Users/charlesabrooker/tmp/fm-lab.axhPGI/state/pending-replies/3303b197e4dac738|> 2135393161 835 /Users/charlesabrooker/tmp/fm-lab.axhPGI/state/sk.inbox/001.msg|
+=== host attribution verb (fm-remote mapped to the lab session)
+RESULT hu host-attribution pass :: attribution=refuse: its live Herdr agent cannot be positively attributed to this task: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh hu relaunch", or decide the lane by hand
+RESULT hu host-wrong-target pass :: attribution=refuse: this host's endpoint for hu is 'fm-remote:w1:p1', not the recorded route's 'fm-remote:w99:p9'
+RESULT hm host-attribution pass :: attribution=proceed
+RESULT hs host-attribution pass :: attribution=proceed
+=== plain fm-send steer (not a lifecycle consumer), head then base
+RESULT ua fm-send-HEAD pass :: rc=0 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode. fm-send: doorbell skipped (composer holds pending text or identified draft risk); the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.axhPGI/state/ua.in
+RESULT ua fm-send-HEAD:screen-unchanged pass :: pane text identical before/after
+RESULT ua fm-send-HEAD:state-unchanged FAIL :: 8a9|> 2305781872 67 state/ua.inbox/001.msg|
+RESULT ua fm-send-HEAD:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+RESULT ua fm-send-BASE pass :: rc=0 :: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.axhPGI WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode. fm-send: doorbell skipped (composer holds pending text or identified draft risk); the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.axhPGI/state/ua.in
+RESULT ua fm-send-BASE:screen-unchanged pass :: pane text identical before/after
+RESULT ua fm-send-BASE:state-unchanged FAIL :: 9a10|> 4114033243 67 state/ua.inbox/002.msg|
+RESULT ua fm-send-BASE:same-agent pass :: 30528@Sat Nov 21 13:04:28 2026    
+=== done
+--- cleanup
+herdr lab teardown ok
+no lab processes remain
+lab home removed
+scratch removed
