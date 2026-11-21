@@ -71,7 +71,7 @@ Coordinate any workflow rollback with its required-check names so a retired chec
   Test scripts and helpers in `tests/` are plain bash too.
   Teardown real-process regressions in `tests/fm-teardown-cleanup.test.sh` use the suite-local fixture helpers in `tests/fm-teardown-helpers.sh`; preserve their identity-checked cleanup, replacement-readiness synchronization, audit-collection exit/live-failure controls, and exempt-retry close-replay checks when extending those cases.
   `bin/fm-lint.sh` must pass: it is the single owner of the lint definition (the shellcheck file set, config, pinned shellcheck version, pinned actionlint workflow lint, and the backend-purity check rejecting direct Beads CLI calls in core `bin/` scripts).
-  CI checks its full canonical partitions without cache reuse; the no-mistakes pre-push gate uses the context-selected default.
+  CI checks its full canonical partitions; the no-mistakes pre-push gate uses the context-selected default.
   `docs/fm-test-portable-shards.md` owns partition verification and performance evidence.
   Its header and `--help` output own the exact local lint modes, dependency selection, and analysis flags.
   A malformed `.github/workflows/*.yml`, including a self-broken `ci.yml`, fails that local lint path before merge because a broken workflow cannot report its own breakage.

@@ -354,7 +354,7 @@
 # test scripts together never exceed the pool. The changed-root dependency scan and
 # the backend-purity audit take one pass each. A run already inside a pass
 # (FM_CPU_PASS_HELD above 0) takes none and runs at most that many workers.
-# Waiting roots queue rather than fail; cache-key, host-slot and CPU-pass queue time
+# Waiting roots queue rather than fail; host-slot and CPU-pass queue time
 # consume neither the root deadline nor its retry budget.
 # A pool that cannot be used (its directory, lock, ticket, slot or queue file)
 # never lets a root run unbounded: lint exits 2 before any root starts, or a gate
