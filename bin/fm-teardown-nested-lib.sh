@@ -1122,16 +1122,24 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 #   - the bundle that admitted the whole cleanup, when one did, is unchanged;
 #   - ignored files: none outside the preserve allow-list (refuse), or all of
 #     them preserved again outside every removal root and the preserved payload
-#     matched by SHA-256 to the manifest and to the copy (preserve);
+#     matched by SHA-256 to the manifest and to the copy (preserve), or, for an
+#     own nested copy before its driver call, the preserve #380's
+#     teardown_own_preserve chose (TEARDOWN_PRESERVE_DIR) lies outside every
+#     removal root and still holds the copy's selected ignored files byte for
+#     byte, and is left as it is (own; Main 3529 Ruling 2);
 #   - locked: the launcher <pid> is gone by pid and start time against the lock
 #     time read before the unlock; an empty or non-numeric pid or time refuses.
+# With <forced> (only the own nested copy's call before its driver, under
+# --force), the HEAD-and-status and admission refusals are not taken: --force
+# keeps main's kept route there, where the driver is asked once and the kept
+# route's own proof refuses after it (Main 3541 B). Every other check still runs.
 # Returns 1 with TEARDOWN_FINAL_WHY and TEARDOWN_FINAL_STABLE (1 when the fact
 # stays until someone acts, such as dirt or unpreserved ignored files, so a
 # re-run cannot help; empty when a re-run for a fresh proof can).
 TEARDOWN_FINAL_WHY=
 TEARDOWN_FINAL_STABLE=
-teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [<launcher-pid> <lock-mtime>]
-  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} head status unique canonical i latest found=0 rc=0 snap ref now
+teardown_removal_final_proof() {  # <copy> <preserve|refuse|own> <locked|unlocked> [<launcher-pid> <lock-mtime> [forced]]
+  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} forced=${6:-} head status unique canonical i latest found=0 rc=0 snap ref now work
   TEARDOWN_FINAL_WHY=
   TEARDOWN_FINAL_STABLE=
   head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) \
@@ -1139,7 +1147,7 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [
   status=$(git -C "$copy" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) \
     || { TEARDOWN_FINAL_WHY='its status cannot be read at the removal'; return 1; }
   status=$(teardown_removal_dirty_status "$status" "$copy" ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"})
-  if [ -n "$status" ]; then
+  if [ -n "$status" ] && [ "$forced" != forced ]; then
     TEARDOWN_FINAL_STABLE=1
     TEARDOWN_FINAL_WHY="it holds uncommitted or untracked content nothing holds: $(printf '%s' "$status" | head -n 3 | paste -sd ' ' -)"
     return 1
@@ -1194,7 +1202,7 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [
       *) TEARDOWN_FINAL_WHY='it was admitted by an unknown proof'; return 1 ;;
     esac
   done
-  [ "$found" = 1 ] || { TEARDOWN_FINAL_WHY="no proof in this run admitted its removal at HEAD ${head:0:12}"; return 1; }
+  [ "$found" = 1 ] || [ "$forced" = forced ] || { TEARDOWN_FINAL_WHY="no proof in this run admitted its removal at HEAD ${head:0:12}"; return 1; }
   if [ -n "${TEARDOWN_BUNDLE_SWEEP_PROOF:-}" ] \
       && ! teardown_bundle_bytes_current "$copy" "$TEARDOWN_BUNDLE_SWEEP_PROOF" "$TEARDOWN_SWEEP_RECORD"; then
     TEARDOWN_FINAL_WHY="the recorded bundle that admitted this cleanup changed ($TEARDOWN_BUNDLE_REASON)"
@@ -1219,6 +1227,25 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse> <locked|unlocked> [
     preserve)
       if ! teardown_preserve_ignored "$copy" || ! teardown_ignored_preserved_current "$copy"; then
         TEARDOWN_FINAL_WHY="its ignored files could not be preserved and verified outside every removal root (${TEARDOWN_PRESERVE_WHY:-preservation failed})"
+        return 1
+      fi
+      ;;
+    own)
+      work=$(mktemp -d "${TMPDIR:-/tmp}/fm-teardown-own-final.XXXXXX") || { TEARDOWN_FINAL_WHY='a scratch directory cannot be made at the removal'; return 1; }
+      rc=0
+      TEARDOWN_PRESERVE_WHY=
+      if [ -n "${TEARDOWN_PRESERVE_DIR:-}" ]; then
+        teardown_preserve_dest_outside "$copy" "$TEARDOWN_PRESERVE_DIR" \
+          && teardown_own_preserve_current "$copy" "$TEARDOWN_PRESERVE_DIR" "$work/list" \
+          && teardown_own_preserve_holds "$copy" "$TEARDOWN_PRESERVE_DIR" "$work/list" || rc=1
+      else
+        # Nothing was selected when the copy was preserved: anything selected now appeared since.
+        teardown_own_preserve_list "$copy" "$work/list" selected && [ ! -s "$work/list" ] || rc=1
+      fi
+      rm -rf "$work"
+      if [ "$rc" != 0 ]; then
+        TEARDOWN_FINAL_STABLE=
+        TEARDOWN_FINAL_WHY="its preserve ${TEARDOWN_PRESERVE_DIR:-(none was needed when it was preserved)} does not hold its selected ignored files as the copy holds them now, outside every removal root${TEARDOWN_PRESERVE_WHY:+ ($TEARDOWN_PRESERVE_WHY)}"
         return 1
       fi
       ;;
@@ -2541,7 +2568,7 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
 # release did not apply.
 TEARDOWN_CLOSEOUT_NOT_RUN=
 teardown_closeout_release() {  # <slot> <copy> <foreign|own nested>
-  local slot=$1 copy=$2 kind=$3 rc=0 head pid='' mtime='' lock_rc=0
+  local slot=$1 copy=$2 kind=$3 rc=0 head pid='' mtime='' lock_rc=0 final_mode forced
   TEARDOWN_RELEASE_WHY=
   TEARDOWN_CLOSEOUT_NOT_RUN=
   # The driver never runs under the project lock (Main 011). When teardown keeps
@@ -2577,7 +2604,16 @@ teardown_closeout_release() {  # <slot> <copy> <foreign|own nested>
     || TEARDOWN_CLOSEOUT_NOT_RUN=$TEARDOWN_HOLDER_WHY
   # The same final proof as every removal, just before the driver's execute call
   # (the driver then removes the copy itself).
-  if [ -z "$TEARDOWN_CLOSEOUT_NOT_RUN" ] && ! teardown_removal_final_proof "$copy" preserve locked "$pid" "$mtime"; then
+  # An own nested copy's ignored files are in the preserve #380's dispose chose just before
+  # this call, which the proof checks and leaves as it is (Main 3529 Ruling 2); under --force
+  # the driver is asked as on main and the kept route refuses after it (Main 3541 B).
+  final_mode=preserve
+  forced=
+  if [ "$kind" = 'own nested' ]; then
+    final_mode=own
+    [ "${FORCE:-}" != --force ] || forced=forced
+  fi
+  if [ -z "$TEARDOWN_CLOSEOUT_NOT_RUN" ] && ! teardown_removal_final_proof "$copy" "$final_mode" locked "$pid" "$mtime" ${forced:+"$forced"}; then
     TEARDOWN_CLOSEOUT_NOT_RUN="the final proof before the driver failed: $TEARDOWN_FINAL_WHY"
   fi
   if [ -n "$TEARDOWN_CLOSEOUT_NOT_RUN" ]; then
