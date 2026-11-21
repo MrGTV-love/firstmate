@@ -1,0 +1,8 @@
+== before
+a24c0d1b01e3871be92cb9efe28736bf5e75ff054a414a93b792d2f9d74bf094
+{"name":"1","path":"/Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/1/project","created_at":"2026-11-21T02:48:36.181549-06:00","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse","leased_at":"2026-11-21T02:48:36.191091-06:00","seed_inventory_known":true,"seed_inventory_digest":"434be56c4fad880c2519aeec24c3a6f14cb528d76309413f51fa45b07e39af0a"}
+163f2b1ef9d05e476e0eae6e68699e47c51f0270
+?? .claude/worktrees/nested-holder/
+.claude
+.git
+README.md

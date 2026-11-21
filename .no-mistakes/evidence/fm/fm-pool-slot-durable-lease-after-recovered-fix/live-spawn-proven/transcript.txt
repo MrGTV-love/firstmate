@@ -1,0 +1,57 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.eVGMTC TMUX_TMPDIR=/tmp/fml.3KxOPu
+slot A (recovered, holder 'quarantined: persistent recovered lease') = /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/1/project
+slot B (free) = /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project
+spawn command: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh new-live /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/project --scout --harness sleep\ 900 
+---- fm-spawn.sh output ----
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.eVGMTC
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 8s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task new-live: /Users/charlesabrooker/tmp/fm-lab.eVGMTC/data/new-live/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-live: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned new-live harness=sleep kind=scout window=primary:fm-new-live worktree=/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project
+rc=0
+---- treehouse calls (cwd<TAB>argv) ----
+/	capabilities --json
+/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/project	get
+---- slot A snapshot diff (before vs after) ----
+  1,2c1,2
+  < == before
+  < b77bbb50b20ff98ad33c42b53cee14b36b14d4bb9fecd2626a69c6025607601b
+  ---
+  > == after
+  > ccd9031bcd95dc7b065329105bea386f6261ebecb3dc1f7a1a593b245545cc7d
+---- new task record ----
+window=primary:fm-new-live
+endpoint_task_id=new-live
+worktree=/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project
+project=/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/project
+harness=sleep
+kind=scout
+tasktmp=/tmp/fm-new-live
+write_confinement=unconfined-macos-sleep
+model=default
+effort=default
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+egress=[]
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+spawn_gen=s1795250906.82524.25756
+---- slot B claim file /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/.fm-slot-owner ----
+task=new-live
+home=/Users/charlesabrooker/tmp/fm-lab.eVGMTC
+---- slot A claim file ----
+(no claim file in A)
+---- tmux windows on fm-lab ----
+primary:bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ sleep
+primary:fm-new-live /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project sleep
+---- final state entries ----
+{"path":"/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/1/project","leased":true,"lease_holder":"quarantined: persistent recovered lease"}
+{"path":"/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project","leased":null,"lease_holder":null}
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.eVGMTC && rm -rf /Users/charlesabrooker/tmp/fm-lab.eVGMTC
+scratch removed: /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q

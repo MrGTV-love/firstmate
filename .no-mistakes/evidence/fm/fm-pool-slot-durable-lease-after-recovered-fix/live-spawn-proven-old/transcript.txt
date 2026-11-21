@@ -1,0 +1,36 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.MdL9nk TMUX_TMPDIR=/tmp/fml.Lpo92D
+slot A (recovered, holder 'recovered: state file was corrupt or truncated; verify before reuse') = /Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/1/project
+slot B (free) = /Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/2/project
+spawn command: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh new-live /Users/charlesabrooker/tmp/fm-live-scr.n14KMU/project --scout --harness sleep\ 900 
+---- fm-spawn.sh output ----
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MdL9nk
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task new-live: /Users/charlesabrooker/tmp/fm-lab.MdL9nk/data/new-live/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/1/project contains task holder's current copy /Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/1/project/.claude/worktrees/nested-holder and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/treehouse-state.json, and it is not on the protected holder 'quarantined: persistent recovered lease', so the exit of an older Treehouse session could still free the slot and move the copy; refusing allocation before treehouse get
+Run the provider's cutover adoption first, then retry: it moves the entry to the protected holder (one adopting treehouse status of the proven build, a cutover step owned by the provider side). This guard and teardown never change a lease or a holder themselves; treehouse lease refuses a slot that is already leased.
+rc=1
+---- treehouse calls (cwd<TAB>argv) ----
+/	capabilities --json
+---- slot A snapshot diff (before vs after) ----
+  1c1
+  < == before
+  ---
+  > == after
+---- new task record ----
+---- slot B claim file /Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/2/.fm-slot-owner ----
+(no claim file in B)
+---- slot A claim file ----
+(no claim file in A)
+---- tmux windows on fm-lab ----
+primary:bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ sleep
+---- final state entries ----
+{"path":"/Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/1/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"path":"/Users/charlesabrooker/tmp/fm-live-scr.n14KMU/root/.treehouse/project-a5756e/2/project","leased":null,"lease_holder":null}
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.MdL9nk && rm -rf /Users/charlesabrooker/tmp/fm-lab.MdL9nk
+scratch removed: /Users/charlesabrooker/tmp/fm-live-scr.n14KMU

@@ -1,0 +1,24 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/1/project",
+      "created_at": "2026-11-21T02:47:44.777665-06:00",
+      "leased": true,
+      "lease_holder": "quarantined: persistent recovered lease",
+      "leased_at": "2026-11-21T02:47:44.787468-06:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "3b183c6a2abfa09c7ae098b3dd88ce1ea3c44c69609602ea2c76bdf9f3eeebb1"
+    },
+    {
+      "name": "2",
+      "path": "/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project",
+      "created_at": "2026-11-21T02:47:45.346865-06:00",
+      "owner_pid": 45054,
+      "owner_started_at": 1795250896497,
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "9b91a27e3960854ae900dfad7a2c507c0fcef847c41cdb627a31fb3c368e6b60"
+    }
+  ]
+}

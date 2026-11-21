@@ -1,0 +1,13 @@
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-ordinary-real/real-root/.treehouse/project-d89d8d/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-ordinary-real/real-root/.treehouse/project-d89d8d/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-ordinary-real/real-root/.treehouse/project-d89d8d/1/project' to release it.
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-recovered-real/real-root/.treehouse/project-169338/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-recovered-real/real-root/.treehouse/project-169338/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-recovered-real/real-root/.treehouse/project-169338/1/project' to release it.
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-recovered-id-real/real-root/.treehouse/project-d93980/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-recovered-id-real/real-root/.treehouse/project-d93980/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.3aP2hI/unclaimed-release-recovered-id-real/real-root/.treehouse/project-d93980/1/project' to release it.
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched
+ok - R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry
+ok - on an unproven treehouse a recovered entry holding the reassociated copy refuses and keeps the record, the copy and the pool state, and an ordinary lease keeps the inert completion; no return and no marker either way
+rc=0

@@ -1,0 +1,5 @@
+ok - a lease scan that fails anywhere (a relative or escaped path before or after the target entry) ends unreadable with every value cleared and a failing status, and valid leased and unleased scans are unchanged
+ok - lease holders compare as raw values: one backslash and two backslashes never match through their @tsv text, equal backslash and tab holders match, and the holder read back is the stored value
+ok - a missing-state path is a slot only by positive proof: an unprovable linked worktree (custom root, no pool-dir) refuses without suggesting a status, a worktree pool-dir proves outside the pool admits, and a project clone inside a Treehouse-backed home is never taken for a slot
+# all fm-task-copy-slot-identity tests passed
+rc=0

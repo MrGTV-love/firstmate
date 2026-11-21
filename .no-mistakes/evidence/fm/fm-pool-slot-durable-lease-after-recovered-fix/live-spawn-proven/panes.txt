@@ -1,0 +1,102 @@
+== pane primary:0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+== pane primary:1
+charlesabrooker@Mac-Studio project % treehouse get
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/1/project: refused: durably leased
+treehouse: checked /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project: accepted: clean reusable copy
+🌳 Entered worktree at /Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project. Type 'exit' to return.
+charlesabrooker@Mac-Studio project % cd -- '/Users/charlesabrooker/tmp/fm-live-scr.PBT33Q/root/.treehouse/project-6397f4/2/project'
+charlesabrooker@Mac-Studio project % export GOTMPDIR=/tmp/fm-new-live/gotmp
+charlesabrooker@Mac-Studio project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio project % export FM_TASK_ID=new-live
+charlesabrooker@Mac-Studio project % . '/tmp/fm-new-live+aa70d5581c7d640c50ea5270ce4f3f2a570f053eef6a1bbe95a68dd668cbbe78/launch.s1795250906.82524.25756.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

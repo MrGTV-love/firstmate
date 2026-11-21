@@ -1,0 +1,20 @@
+ok - a recovered lease keeps refusing allocation on a treehouse that does not prove persistent recovered leases, names the upgrade, and runs no pool command
+ok - an ordinary lease with a lease id is admitted without the proof; id-less, recovery-reason, recovered-prefix, holderless and duplicate entries refuse, and with the proof only an entry on the published protected holder is admitted
+ok - a failed fresh read refuses on an unproven provider (an ordinary entry still admits), and a whitespace-only version is not a proof
+ok - neither an unproven nor a proven provider is asked for status to place an unleased slot (the unproven refusal names the upgrade, the proven one the lease remedy)
+ok - a recorded copy in a pool slot with no state file refuses (pool-dir evidence), while a copy under the project's own checkout and a home with no pool use still spawn
+ok - a recorded copy in a linked worktree with no state file refuses when the pool is evidenced by a .treehouse path or by treehouse pool-dir, and when pool-dir cannot say; it is not taken for a pool slot only when pool-dir names another folder
+ok - the preservation fingerprint reads the nested copy's HEAD: a same-bytes HEAD move changes it, and the old enclosing-slot-only fingerprint did not
+ok - the lease-entry oracle accepts the named holder rewrite and unrelated slots changing, and rejects a change to the lease id, lease time, leased flag, recovery reason, owner fields or a second entry
+ok - the real-provider fixture wrapper refuses a treehouse get with no explicit --root before the binary runs, and passes rooted gets and other commands through unchanged
+ok - a capability answer whose holder is the old holder plus a newline, or only a newline, is not proof and cannot make an old-holder slot pass; a distinct protected holder still refuses an old-holder slot, and the guard runs no status and changes no holder
+ok - with a proven persistent-recovered-lease capability a recovered slot on the protected holder holding a current copy stays untouched while the spawn takes the free slot, whatever its root's state or state order
+ok - a proven capability relaxes only the recovered lease: unleased, missing, and unreadable entries still refuse
+ok - the guard refuses an old holder with its bytes unchanged and runs no status; once the provider's cutover has adopted it, the recovered slot survives an old session's exit before and after the allocation, with the new owner's lease and copy intact
+ok - an old holder refuses before treehouse get with a named cause and the cutover remedy, and the guard never runs treehouse status, so no holder or lease changes when the consumer is the caller
+ok - the shared guard bin/fm-home-seed.sh runs refuses an old recovered holder until the provider's cutover adopts it, changes no holder, and passes beside a protected slot
+ok - the combined rollout keeps the recovered copy and the new owner's copy intact at every step
+ok - the spawn's own treehouse get is executed against the private pool with an explicit root, the test reads the slot that command chose, the recovered slot is byte-preserved, and a get that hands out the recovered slot is detected
+skip - real-provider recovered-slot allocation: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the case did NOT run
+skip - installed schema-1 provider: FM_TEST_TREEHOUSE_SCHEMA1_PROVIDER names no executable treehouse; the case did NOT run
+rc=0

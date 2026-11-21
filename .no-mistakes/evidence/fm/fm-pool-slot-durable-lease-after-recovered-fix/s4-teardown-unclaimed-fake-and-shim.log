@@ -1,0 +1,10 @@
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-ordinary-real/real-root/.treehouse/project-e29ebc/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-ordinary-real/real-root/.treehouse/project-e29ebc/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-ordinary-real/real-root/.treehouse/project-e29ebc/1/project' to release it.
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-recovered-real/real-root/.treehouse/project-40c333/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-recovered-real/real-root/.treehouse/project-40c333/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-recovered-real/real-root/.treehouse/project-40c333/1/project' to release it.
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-recovered-id-real/real-root/.treehouse/project-483f11/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-recovered-id-real/real-root/.treehouse/project-483f11/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.gGxLfl/unclaimed-release-recovered-id-real/real-root/.treehouse/project-483f11/1/project' to release it.
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched

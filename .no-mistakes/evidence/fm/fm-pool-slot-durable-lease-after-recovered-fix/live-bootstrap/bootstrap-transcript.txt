@@ -1,0 +1,27 @@
+===== mode=real-schema1  FM_HOME=/Users/charlesabrooker/tmp/fm-lab.LukuYx
+--- treehouse capabilities --json (as bootstrap sees it):
+{"schema_version":1,"version":"v3.1.7-fm.b8ea2fd.slot-return-r3","persistent_recovered_leases":true}
+--- fm-bootstrap.sh output (FM_BOOTSTRAP_NETWORK=skip):
+BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+rc=0
+--- lines mentioning treehouse:
+BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
+--- treehouse commands bootstrap ran:
+   2 get --help
+   3 capabilities --json
+   2 get --help
+teardown real-schema1: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.LukuYx && rm -rf /Users/charlesabrooker/tmp/fm-lab.LukuYx
+===== mode=shim-schema2  FM_HOME=/Users/charlesabrooker/tmp/fm-lab.217DJV
+--- treehouse capabilities --json (as bootstrap sees it):
+{"schema_version":2,"version":"v3.1.7-lab-shim","persistent_recovered_leases":true,"recovered_quarantine_holder":"quarantined: persistent recovered lease"}
+--- fm-bootstrap.sh output (FM_BOOTSTRAP_NETWORK=skip):
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+rc=0
+--- lines mentioning treehouse:
+(none)
+--- treehouse commands bootstrap ran:
+   2 get --help
+   3 capabilities --json
+   2 get --help
+teardown shim-schema2: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.217DJV && rm -rf /Users/charlesabrooker/tmp/fm-lab.217DJV

@@ -1,0 +1,1722 @@
++ set -u
+++ dirname tests/fm-spawn-retained-copy.test.sh
++ . tests/fixtures.sh
++++ dirname tests/fixtures.sh
+++ . tests/lib.sh
++++ '[' -n '' ']'
++++ FM_TEST_LIB_SOURCED=1
++++ umask 022
+++++ dirname tests/lib.sh
++++ . tests/git-config-helpers.sh
+++++ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+++++ GIT_CONFIG_GLOBAL=/dev/null
+++++ GIT_CONFIG_NOSYSTEM=1
+++++ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
+++++ __fm_git_env_i=0
+++++ __fm_git_env_n=0
+++++ __fm_git_env_keys=()
+++++ __fm_git_env_values=()
+++++ '[' 0 -lt 0 ']'
+++++ '[' 0 -gt 0 ']'
+++++ unset GIT_CONFIG_COUNT
+++++ unset __fm_git_env_i __fm_git_env_n __fm_git_env_keys __fm_git_env_values __fm_git_env_k __fm_git_env_v
++++ export FM_GATE_REFUSE_BYPASS=1
++++ FM_GATE_REFUSE_BYPASS=1
++++ export FM_TEST_SEAM=1
++++ FM_TEST_SEAM=1
++++ unset FM_HERDR_RUNTIME
++++ export FM_MODEL_FRESHNESS=0
++++ FM_MODEL_FRESHNESS=0
+++++ command -v true
++++ FM_REVIEW_AGENT_SELECT_BIN=true
++++ export FM_REVIEW_AGENT_SELECT_BIN
+++++ command -v true
++++ FM_MEMORY_GUARD_BIN=true
++++ export FM_MEMORY_GUARD_BIN
++++ unset FM_MEMORY_FIXTURE_DIR
++++ export FM_DURATION_FILE=off
++++ FM_DURATION_FILE=off
++++ unset FM_DURATION_HOME
++++ export FM_CREW_STATE_NM_CACHE=off
++++ FM_CREW_STATE_NM_CACHE=off
++++ unset FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE
++++ export FM_MERGE_PRUNE=0
++++ FM_MERGE_PRUNE=0
++++ export FM_GITHUB_ACCOUNTING=0
++++ FM_GITHUB_ACCOUNTING=0
++++ unset FM_TASK_ID FM_WRITE_CONFINEMENT
++++ unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
++++ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
++++ unset FM_ARM_CONFIRM_TIMEOUT
++++ unset NM_HOME
++++++ dirname tests/lib.sh
+++++ cd tests/..
+++++ pwd
++++ ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ
++++ export FM_GUARD_AUDIT_READER=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-jev-audit-read.mjs
++++ FM_GUARD_AUDIT_READER=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-jev-audit-read.mjs
+++++ fm_test_tmpdir
+++++ local base=/Users/charlesabrooker/tmp physical
+++++ base=/Users/charlesabrooker/tmp
+++++ '[' -n /Users/charlesabrooker/tmp ']'
+++++ case "$base" in
++++++ CDPATH=
++++++ cd -- /Users/charlesabrooker/tmp
++++++ pwd -P
+++++ physical=/Users/charlesabrooker/tmp
+++++ base=/Users/charlesabrooker/tmp
+++++ '[' -e /Users/charlesabrooker/tmp/.git ']'
+++++ printf '%s\n' /Users/charlesabrooker/tmp
++++ FM_TEST_TMPDIR=/Users/charlesabrooker/tmp
++++ FM_TEST_OWNERS_DIR=/Users/charlesabrooker/tmp/fm-test-owners
++++ umask 077
++++ mkdir -p /Users/charlesabrooker/tmp/fm-test-owners
++++ '[' '!' -d /Users/charlesabrooker/tmp/fm-test-owners ']'
++++ '[' -L /Users/charlesabrooker/tmp/fm-test-owners ']'
++++ '[' '!' -O /Users/charlesabrooker/tmp/fm-test-owners ']'
+++++ fm_test_pid_identity 83873
+++++ local pid=83873
+++++ FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp
+++++ bash -c '. "$1"; fm_pid_identity "$2"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-wake-lib.sh 83873
++++ FM_TEST_OWNER_IDENTITY='Sat Nov 21 02:08:37 2026     bash -x tests/fm-spawn-retained-copy.test.sh test_real_provider_recovered_slot_allows_free_slot_allocation'
+++++ umask 077
+++++ mktemp -d /Users/charlesabrooker/tmp/fm-test-owners/83873.XXXXXX
++++ FM_TEST_SHELL_DIR=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR
++++ printf '%s\n%s\n' 83873 'Sat Nov 21 02:08:37 2026     bash -x tests/fm-spawn-retained-copy.test.sh test_real_provider_recovered_slot_allows_free_slot_allocation'
+++++ cd -P -- /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR
+++++ pwd -P
++++ FM_TEST_SHELL_DIR=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR
++++ FM_TEST_CLEANUP_DIRS=()
++++ FM_TEST_CLEANUP_REGISTRY=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/cleanup
++++ :
++++ FM_TEST_PROCEVENT_REGISTRY=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/procevent
++++ :
++++ FM_TEST_WATCHER_REGISTRY=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/watcher
++++ :
++++ FM_TEST_PROCESS_REGISTRY=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/process
++++ :
++++ export FM_TEST_PROC_INFO=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-proc-info.py
++++ FM_TEST_PROC_INFO=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-proc-info.py
++++ export -f fm_test_process_read fm_test_process_start fm_test_record_process
++++ FM_TEST_STUB_MAX_BLOCK_SECONDS=120
++++ export FM_TEST_STUB_MAX_BLOCK_SECONDS
++++ fm_test_drop_file
++++ '[' '!' -f '' ']'
++++ mkdir -p /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/drop-words
++++ FM_TEST_DROP_WORDS=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/drop-words/captain-words.txt
++++ printf 'Fixture: the captain approved discarding this work.\n'
++++ export FM_TEST_DROP_WORDS
++++ printf '%s\n' /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/drop-words/captain-words.txt
++++ '[' -z '' ']'
++++ FM_TEST_SLOT_DIR=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/slots
++++ mkdir -p /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/slots
++++ export FM_TEST_SLOT_DIR
++++ export FM_OPEN_LOOPS_BIN=/usr/bin/true
++++ FM_OPEN_LOOPS_BIN=/usr/bin/true
++++ FM_PROCEVENT_CLAIM_ROOT=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/procevent-claims/claims
++++ export FM_PROCEVENT_CLAIM_ROOT
++++ umask 077
++++ mkdir -p /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/procevent-claims/claims
++++ printf '%s\n%s\n%s\n%s\n' /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/procevent-claims/no-detector-home 83873 fm-test-held 'Sat Nov 21 02:08:37 2026     bash -x tests/fm-spawn-retained-copy.test.sh test_real_provider_recovered_slot_allows_free_slot_allocation'
++++ FM_GUARD_EVENT_LOG=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/guard-events.jsonl
++++ export FM_GUARD_EVENT_LOG
++++ trap fm_test_cleanup EXIT
++++ trap 'fm_test_cleanup; exit 130' INT
++++ trap 'fm_test_cleanup; exit 143' TERM
++++ trap 'fm_test_cleanup; exit 129' HUP
++++ trap 'fm_test_cleanup; exit 131' QUIT
++++ FM_TEST_ORPHAN_MAX_AGE_SECONDS=3600
++++ '[' 0 '!=' 1 ']'
++++ fm_test_reap_orphans
++++ local marker dir mtime now owner_pid owner_identity current_identity shell root entry
++++ local 'pattern=fm-test-*' stamp=/Users/charlesabrooker/tmp/fm-test-owners/.legacy-discovery stamp_mtime
++++ local kept_list=/Users/charlesabrooker/tmp/fm-test-owners/.legacy-kept kept_root kept_tmp discovered=0
++++ local 'seen=
+'
++++ markers=()
++++ fm_test_sweep_candidates=()
++++ reaper_args=()
++++ local -a markers fm_test_sweep_candidates reaper_args
++++ '[' 0 = 1 ']'
+++++ stat -c %Y /Users/charlesabrooker/tmp/fm-test-owners/.legacy-discovery
+++++ stat -f %m /Users/charlesabrooker/tmp/fm-test-owners/.legacy-discovery
++++ stamp_mtime=1795247086
++++ '[' -L /Users/charlesabrooker/tmp/fm-test-owners/.legacy-discovery ']'
++++ '[' -z 1795247086 ']'
+++++ date +%s
++++ '[' 1431 -ge 3600 ']'
++++ for shell in '"$FM_TEST_OWNERS_DIR"/*'
++++ '[' -d /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR ']'
++++ '[' '!' -L /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR ']'
++++ '[' -O /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR ']'
++++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/cleanup ']'
++++ '[' '!' -L /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/cleanup ']'
++++ '[' -O /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/cleanup ']'
++++ IFS=
++++ read -r root
++++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/.fm-test-fixture ']'
++++ markers+=("$shell/.fm-test-fixture")
++++ for shell in '"$FM_TEST_OWNERS_DIR"/*'
++++ '[' -d /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd ']'
++++ '[' '!' -L /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd ']'
++++ '[' -O /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd ']'
++++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd/cleanup ']'
++++ '[' '!' -L /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd/cleanup ']'
++++ '[' -O /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd/cleanup ']'
++++ IFS=
++++ read -r root
++++ '[' -n /Users/charlesabrooker/tmp/fm-teardown-tests.yOVJgu ']'
++++ '[' -f /Users/charlesabrooker/tmp/fm-teardown-tests.yOVJgu/.fm-test-fixture ']'
++++ markers+=("$root/.fm-test-fixture")
++++ seen+='/Users/charlesabrooker/tmp/fm-teardown-tests.yOVJgu/.fm-test-fixture
+'
++++ IFS=
++++ read -r root
++++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd/.fm-test-fixture ']'
++++ markers+=("$shell/.fm-test-fixture")
++++ for marker in '"$FM_TEST_TMPDIR"/$pattern/.fm-test-fixture'
++++ '[' -e '/Users/charlesabrooker/tmp/fm-test-*/.fm-test-fixture' ']'
++++ continue
++++ '[' 0 = 0 ']'
++++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/.legacy-kept ']'
++++ '[' 0 = 1 ']'
++++ '[' 3 -gt 0 ']'
++++ '[' 0 = 1 ']'
++++ reaper_args=(--owners "$FM_TEST_OWNERS_DIR")
++++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-test-reap-orphans.sh --owners /Users/charlesabrooker/tmp/fm-test-owners
+++++ date +%s
++++ now=1795248519
++++ for marker in '"${markers[@]}"'
++++ '[' -e /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/.fm-test-fixture ']'
+++++ stat -c %Y /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/.fm-test-fixture
+++++ stat -f %m /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/.fm-test-fixture
++++ mtime=1795248517
++++ '[' 2 -ge 3600 ']'
++++ continue
++++ for marker in '"${markers[@]}"'
++++ '[' -e /Users/charlesabrooker/tmp/fm-teardown-tests.yOVJgu/.fm-test-fixture ']'
+++++ stat -c %Y /Users/charlesabrooker/tmp/fm-teardown-tests.yOVJgu/.fm-test-fixture
+++++ stat -f %m /Users/charlesabrooker/tmp/fm-teardown-tests.yOVJgu/.fm-test-fixture
++++ mtime=1795246382
++++ '[' 2137 -ge 3600 ']'
++++ continue
++++ for marker in '"${markers[@]}"'
++++ '[' -e /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd/.fm-test-fixture ']'
+++++ stat -c %Y /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd/.fm-test-fixture
+++++ stat -f %m /Users/charlesabrooker/tmp/fm-test-owners/8704.kzgrTd/.fm-test-fixture
++++ mtime=1795246378
++++ '[' 2141 -ge 3600 ']'
++++ continue
++++ '[' 0 = 1 ']'
++++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/.legacy-kept ']'
++++ return 0
++++ readonly FM_TEST_TREE_PROCS=128
++++ FM_TEST_TREE_PROCS=128
+++ '[' -n '' ']'
+++ FM_TEST_FIXTURES_SOURCED=1
+++ export FM_TEST_NO_MISTAKES_VERSION=1.46.0
+++ FM_TEST_NO_MISTAKES_VERSION=1.46.0
+++ export 'FM_TEST_NO_MISTAKES_FAKE_VERSION=no-mistakes version v1.46.0 (fake)'
+++ FM_TEST_NO_MISTAKES_FAKE_VERSION='no-mistakes version v1.46.0 (fake)'
+++ export 'FM_TEST_NO_MISTAKES_FAKE_VERSION_TS=no-mistakes version v1.46.0 (fake) 2026-06-27T00:02:18Z'
+++ FM_TEST_NO_MISTAKES_FAKE_VERSION_TS='no-mistakes version v1.46.0 (fake) 2026-06-27T00:02:18Z'
+++ export FM_TEST_GH_AXI_VERSION=0.1.29
+++ FM_TEST_GH_AXI_VERSION=0.1.29
+++ FM_TEST_TEAMCLAUDE_PROXY=http://127.0.0.1:13456
+++ FM_TEST_TEAMCLAUDE_CA=/fm-test/teamclaude-ca.pem
+++ fm_test_tmproot fm-spawn-retained-copy
+++ local prefix=fm-spawn-retained-copy root tmp_base
++++ fm_test_tmpdir
++++ local base=/Users/charlesabrooker/tmp physical
++++ base=/Users/charlesabrooker/tmp
++++ '[' -n /Users/charlesabrooker/tmp ']'
++++ case "$base" in
+++++ CDPATH=
+++++ cd -- /Users/charlesabrooker/tmp
+++++ pwd -P
++++ physical=/Users/charlesabrooker/tmp
++++ base=/Users/charlesabrooker/tmp
++++ '[' -e /Users/charlesabrooker/tmp/.git ']'
++++ printf '%s\n' /Users/charlesabrooker/tmp
+++ tmp_base=/Users/charlesabrooker/tmp
+++ tmp_base=/Users/charlesabrooker/tmp
++++ mktemp -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.XXXXXX
+++ root=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++++ cd -P -- /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++++ pwd -P
+++ root=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
+++ printf '%s\n%s\n' 83873 'Sat Nov 21 02:08:37 2026     bash -x tests/fm-spawn-retained-copy.test.sh test_real_provider_recovered_slot_allows_free_slot_allocation'
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++ TMP_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++ fm_git_identity fmtest fmtest@example.invalid
++ export GIT_AUTHOR_NAME=fmtest GIT_AUTHOR_EMAIL=fmtest@example.invalid
++ GIT_AUTHOR_NAME=fmtest
++ GIT_AUTHOR_EMAIL=fmtest@example.invalid
++ export GIT_COMMITTER_NAME=fmtest GIT_COMMITTER_EMAIL=fmtest@example.invalid
++ GIT_COMMITTER_NAME=fmtest
++ GIT_COMMITTER_EMAIL=fmtest@example.invalid
++ OLD_RECOVERED='recovered: state file was corrupt or truncated; verify before reuse'
++ PROTECTED_HOLDER='quarantined: persistent recovered lease'
++ fm_test_run_cases test_conflicting_unleased_alias_refuses_before_allocation test_unsupported_entry_paths_are_unproved test_unleased_alias_beside_leased_entry_is_not_held test_prefiltered_leased_alias_still_needs_repair test_missing_jq_refusal_names_install test_unleased_directory_identity_aliases_are_not_held test_recovered_alias_beside_leased_entry_is_not_held test_slot_holding_live_nested_current_copy_refuses test_conflicting_recovered_alias_refuses_before_allocation test_unprovable_entry_path_refusal_names_no_lease test_unprovable_slot_hold_still_refuses test_recovered_slot_refuses_without_proven_capability test_unproven_provider_admits_only_ordinary_leases test_unproved_fresh_read_and_blank_version_are_refused test_unproven_allocation_runs_no_status_to_place_a_slot test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn test_missing_state_slot_under_a_dot_treehouse_path_refuses test_retained_fingerprint_sees_the_nested_copy_head test_lease_entry_oracle_checks_every_field test_fixture_provider_gets_name_a_root test_forged_capability_holder_cannot_collapse_to_the_old_literal test_recovered_slot_allows_allocation_with_proven_capability test_proven_capability_does_not_relax_other_refusals test_old_holder_is_refused_unchanged_then_survives_old_exit_after_cutover_adoption test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status test_home_seed_guard_follows_the_protected_holder test_combined_rollout_keeps_recovered_and_new_copies test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose test_real_provider_recovered_slot_allows_free_slot_allocation test_installed_schema1_provider_refuses_safely_and_damages_nothing test_nested_copy_in_leased_slot_allows_allocation test_nested_copy_in_superseded_slot_allows_allocation test_secondmate_home_slot_with_other_project_copy_allows_allocation test_slot_left_by_reassociated_task_is_allocatable test_unreadable_local_home_warns_and_proceeds -- test_real_provider_recovered_slot_allows_free_slot_allocation
++ registered=()
++ local -a registered
++ local name case_name selected
++ '[' 37 -gt 0 ']'
++ '[' test_conflicting_unleased_alias_refuses_before_allocation '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 36 -gt 0 ']'
++ '[' test_unsupported_entry_paths_are_unproved '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 35 -gt 0 ']'
++ '[' test_unleased_alias_beside_leased_entry_is_not_held '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 34 -gt 0 ']'
++ '[' test_prefiltered_leased_alias_still_needs_repair '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 33 -gt 0 ']'
++ '[' test_missing_jq_refusal_names_install '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 32 -gt 0 ']'
++ '[' test_unleased_directory_identity_aliases_are_not_held '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 31 -gt 0 ']'
++ '[' test_recovered_alias_beside_leased_entry_is_not_held '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 30 -gt 0 ']'
++ '[' test_slot_holding_live_nested_current_copy_refuses '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 29 -gt 0 ']'
++ '[' test_conflicting_recovered_alias_refuses_before_allocation '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 28 -gt 0 ']'
++ '[' test_unprovable_entry_path_refusal_names_no_lease '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 27 -gt 0 ']'
++ '[' test_unprovable_slot_hold_still_refuses '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 26 -gt 0 ']'
++ '[' test_recovered_slot_refuses_without_proven_capability '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 25 -gt 0 ']'
++ '[' test_unproven_provider_admits_only_ordinary_leases '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 24 -gt 0 ']'
++ '[' test_unproved_fresh_read_and_blank_version_are_refused '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 23 -gt 0 ']'
++ '[' test_unproven_allocation_runs_no_status_to_place_a_slot '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 22 -gt 0 ']'
++ '[' test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 21 -gt 0 ']'
++ '[' test_missing_state_slot_under_a_dot_treehouse_path_refuses '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 20 -gt 0 ']'
++ '[' test_retained_fingerprint_sees_the_nested_copy_head '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 19 -gt 0 ']'
++ '[' test_lease_entry_oracle_checks_every_field '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 18 -gt 0 ']'
++ '[' test_fixture_provider_gets_name_a_root '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 17 -gt 0 ']'
++ '[' test_forged_capability_holder_cannot_collapse_to_the_old_literal '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 16 -gt 0 ']'
++ '[' test_recovered_slot_allows_allocation_with_proven_capability '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 15 -gt 0 ']'
++ '[' test_proven_capability_does_not_relax_other_refusals '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 14 -gt 0 ']'
++ '[' test_old_holder_is_refused_unchanged_then_survives_old_exit_after_cutover_adoption '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 13 -gt 0 ']'
++ '[' test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 12 -gt 0 ']'
++ '[' test_home_seed_guard_follows_the_protected_holder '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 11 -gt 0 ']'
++ '[' test_combined_rollout_keeps_recovered_and_new_copies '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 10 -gt 0 ']'
++ '[' test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 9 -gt 0 ']'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 8 -gt 0 ']'
++ '[' test_installed_schema1_provider_refuses_safely_and_damages_nothing '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 7 -gt 0 ']'
++ '[' test_nested_copy_in_leased_slot_allows_allocation '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 6 -gt 0 ']'
++ '[' test_nested_copy_in_superseded_slot_allows_allocation '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 5 -gt 0 ']'
++ '[' test_secondmate_home_slot_with_other_project_copy_allows_allocation '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 4 -gt 0 ']'
++ '[' test_slot_left_by_reassociated_task_is_allocatable '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 3 -gt 0 ']'
++ '[' test_unreadable_local_home_warns_and_proceeds '!=' -- ']'
++ registered+=("$1")
++ shift
++ '[' 2 -gt 0 ']'
++ '[' -- '!=' -- ']'
++ '[' 2 -gt 0 ']'
++ shift
++ for name in '"$@"'
++ '[' 35 -gt 0 ']'
++ fm_test_case_known test_real_provider_recovered_slot_allows_free_slot_allocation test_conflicting_unleased_alias_refuses_before_allocation test_unsupported_entry_paths_are_unproved test_unleased_alias_beside_leased_entry_is_not_held test_prefiltered_leased_alias_still_needs_repair test_missing_jq_refusal_names_install test_unleased_directory_identity_aliases_are_not_held test_recovered_alias_beside_leased_entry_is_not_held test_slot_holding_live_nested_current_copy_refuses test_conflicting_recovered_alias_refuses_before_allocation test_unprovable_entry_path_refusal_names_no_lease test_unprovable_slot_hold_still_refuses test_recovered_slot_refuses_without_proven_capability test_unproven_provider_admits_only_ordinary_leases test_unproved_fresh_read_and_blank_version_are_refused test_unproven_allocation_runs_no_status_to_place_a_slot test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn test_missing_state_slot_under_a_dot_treehouse_path_refuses test_retained_fingerprint_sees_the_nested_copy_head test_lease_entry_oracle_checks_every_field test_fixture_provider_gets_name_a_root test_forged_capability_holder_cannot_collapse_to_the_old_literal test_recovered_slot_allows_allocation_with_proven_capability test_proven_capability_does_not_relax_other_refusals test_old_holder_is_refused_unchanged_then_survives_old_exit_after_cutover_adoption test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status test_home_seed_guard_follows_the_protected_holder test_combined_rollout_keeps_recovered_and_new_copies test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose test_real_provider_recovered_slot_allows_free_slot_allocation test_installed_schema1_provider_refuses_safely_and_damages_nothing test_nested_copy_in_leased_slot_allows_allocation test_nested_copy_in_superseded_slot_allows_allocation test_secondmate_home_slot_with_other_project_copy_allows_allocation test_slot_left_by_reassociated_task_is_allocatable test_unreadable_local_home_warns_and_proceeds
++ local name=test_real_provider_recovered_slot_allows_free_slot_allocation registered
++ shift
++ '[' 35 -gt 0 ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_conflicting_unleased_alias_refuses_before_allocation ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unsupported_entry_paths_are_unproved ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unleased_alias_beside_leased_entry_is_not_held ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_prefiltered_leased_alias_still_needs_repair ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_missing_jq_refusal_names_install ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unleased_directory_identity_aliases_are_not_held ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_recovered_alias_beside_leased_entry_is_not_held ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_slot_holding_live_nested_current_copy_refuses ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_conflicting_recovered_alias_refuses_before_allocation ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unprovable_entry_path_refusal_names_no_lease ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unprovable_slot_hold_still_refuses ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_recovered_slot_refuses_without_proven_capability ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unproven_provider_admits_only_ordinary_leases ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unproved_fresh_read_and_blank_version_are_refused ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unproven_allocation_runs_no_status_to_place_a_slot ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_missing_state_slot_under_a_dot_treehouse_path_refuses ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_retained_fingerprint_sees_the_nested_copy_head ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_lease_entry_oracle_checks_every_field ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_fixture_provider_gets_name_a_root ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_forged_capability_holder_cannot_collapse_to_the_old_literal ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_recovered_slot_allows_allocation_with_proven_capability ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_proven_capability_does_not_relax_other_refusals ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_old_holder_is_refused_unchanged_then_survives_old_exit_after_cutover_adoption ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_home_seed_guard_follows_the_protected_holder ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_combined_rollout_keeps_recovered_and_new_copies ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose ']'
++ for registered in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_real_provider_recovered_slot_allows_free_slot_allocation ']'
++ return 0
++ continue
++ '[' 35 -eq 0 ']'
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_conflicting_unleased_alias_refuses_before_allocation ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unsupported_entry_paths_are_unproved ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unleased_alias_beside_leased_entry_is_not_held ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_prefiltered_leased_alias_still_needs_repair ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_missing_jq_refusal_names_install ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unleased_directory_identity_aliases_are_not_held ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_recovered_alias_beside_leased_entry_is_not_held ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_slot_holding_live_nested_current_copy_refuses ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_conflicting_recovered_alias_refuses_before_allocation ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unprovable_entry_path_refusal_names_no_lease ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unprovable_slot_hold_still_refuses ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_recovered_slot_refuses_without_proven_capability ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unproven_provider_admits_only_ordinary_leases ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unproved_fresh_read_and_blank_version_are_refused ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_unproven_allocation_runs_no_status_to_place_a_slot ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_missing_state_file_in_a_pool_slot_refuses_and_plain_checkouts_spawn ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_missing_state_slot_under_a_dot_treehouse_path_refuses ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_retained_fingerprint_sees_the_nested_copy_head ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_lease_entry_oracle_checks_every_field ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_fixture_provider_gets_name_a_root ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_forged_capability_holder_cannot_collapse_to_the_old_literal ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_recovered_slot_allows_allocation_with_proven_capability ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_proven_capability_does_not_relax_other_refusals ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_old_holder_is_refused_unchanged_then_survives_old_exit_after_cutover_adoption ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_home_seed_guard_follows_the_protected_holder ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_combined_rollout_keeps_recovered_and_new_copies ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose ']'
++ '[' false = true ']'
++ continue
++ for case_name in '"${registered[@]}"'
++ declare -F fm_test_before_case
++ '[' 1 -gt 0 ']'
++ selected=false
++ for name in '"$@"'
++ '[' test_real_provider_recovered_slot_allows_free_slot_allocation = test_real_provider_recovered_slot_allows_free_slot_allocation ']'
++ selected=true
++ '[' true = true ']'
++ fm_test_run_one test_real_provider_recovered_slot_allows_free_slot_allocation
++ local rc errexit=
++ test_real_provider_recovered_slot_allows_free_slot_allocation
++ local recovered
++ '[' -z /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse ']'
++ '[' '!' -x /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse ']'
+++ cd /
+++ TREEHOUSE_NO_UPDATE_CHECK=1
+++ /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse capabilities --json
+++ jq -r --arg old 'recovered: state file was corrupt or truncated; verify before reuse' 'select(.schema_version == 2 and (.version | type == "string" and length > 0) and .persistent_recovered_leases == true) | .recovered_quarantine_holder // "" | select(. != $old)'
++ recovered='quarantined: persistent recovered lease'
++ '[' -z 'quarantined: persistent recovered lease' ']'
++ real_provider_recovered_slot_cases
++ local name order start out rc a b entry state pool
++ for start in protected old
++ for order in recovered-first free-first
++ name=real-provider-protected-recovered-first
++ CASE_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first
++ HOME_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home
++ PROJECT_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
+++ make_spawn_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake
+++ fm_test_make_spawn_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake
+++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake fakebin
+++ shift
++++ fm_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake
++++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
++++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
++++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
+++ fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
+++ fm_test_fake_tmux_spawn /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
+++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/tmux
+++ fm_fake_exit0 /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin treehouse
+++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin tool
+++ shift
+++ for tool in '"$@"'
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse
+++ '[' -x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/omp ']'
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
++ FAKEBIN_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
++ fm_test_fake_sleep_noop /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/sleep
++ fm_test_spawn_home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home codex
++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home harness=codex
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/projects /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/config
++ touch /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/.last-watcher-beat
++ '[' -n codex ']'
++ printf '%s\n' codex
++ fm_test_spawn_brief /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home new-real-provider-protected-recovered-first
++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home id=new-real-provider-protected-recovered-first 'intent=brief for new-real-provider-protected-recovered-first'
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data/new-real-provider-protected-recovered-first
++ cat
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/user-home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-xdg
++ fm_git_init_commit /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project init -q -b main
+++ basename /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
++ printf '# %s\n' project
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project add README.md
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project -c 'user.name=Firstmate Tests' -c user.email=tests@example.invalid commit -qm initial
++ fm_git_add_origin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/origin.git
++ local repo=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project remote=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/origin.git remote_abs
++ git clone --quiet --bare /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/origin.git
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/origin.git
+++ pwd
++ remote_abs=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/origin.git
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project remote add origin file:///Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/origin.git
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project remote set-head origin main
++ true
++ fm_test_rooted_treehouse /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
++ local q
++ printf -v q %q /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
++ rm -f /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse
++ export HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-home XDG_CONFIG_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-xdg TREEHOUSE_NO_UPDATE_CHECK=1 TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
++ HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-home
++ XDG_CONFIG_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-xdg
++ TREEHOUSE_NO_UPDATE_CHECK=1
++ TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root
++ GIT_CONFIG_GLOBAL=/dev/null
++ GIT_CONFIG_NOSYSTEM=1
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root --no-fetch --lease --lease-holder holder
++ a=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root --no-fetch --lease --lease-holder spare
++ b=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
+++ pwd -P
++ a=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project
+++ pwd -P
++ b=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse return /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project --if-lease-holder spare
++ pool=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee
++ state=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ '[' protected = old ']'
++ jq --arg r 'quarantined: persistent recovered lease' --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project '.worktrees |= map(if .path == $a then (.lease_holder = $r | del(.lease_id)) else . end)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ mv /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json.tmp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ '[' recovered-first = free-first ']'
++ SLOT_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
++ PANE_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
++ rm -f /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/pane-path
++ add_nested_record /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/holder.meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project nested-real-provider-protected-recovered-first
++ local meta=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/holder.meta repo=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project parent=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project branch=nested-real-provider-protected-recovered-first
++ NESTED_COPY=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project worktree add --quiet -b nested-real-provider-protected-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first
++ printf 'nested unlanded commit\n'
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first add nested-owned.txt
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first commit -qm nested-unlanded
+++ basename /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/holder.meta .meta
++ fm_write_meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/holder.meta window=fmses:fm-holder worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first project=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project kind=ship
++ local file=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/holder.meta kv
++ shift
++ :
++ for kv in '"$@"'
++ printf '%s\n' window=fmses:fm-holder
++ for kv in '"$@"'
++ printf '%s\n' worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first
++ for kv in '"$@"'
++ printf '%s\n' project=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
++ for kv in '"$@"'
++ printf '%s\n' kind=ship
++ :
++ :
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-state
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/holder.meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-meta
++ '[' protected = old ']'
++ rc=0
+++ FM_FAKE_TMUX_GET_LIVE=pty
+++ FM_FAKE_TMUX_GET_BIN=/Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
+++ run_spawn_with_own_get real-provider-protected-recovered-first
+++ FM_FAKE_TMUX_GET_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
+++ FM_FAKE_TMUX_GET_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root
+++ FM_FAKE_PANE_PATH_FILE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/pane-path
+++ FM_FAKE_TMUX_GET_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/get-log
+++ run_retained_spawn real-provider-protected-recovered-first
+++ FM_FAKE_PANE_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/pane-log
+++ FM_FAKE_LAUNCH_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/launch-log
+++ fm_test_run_spawn /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin new-real-provider-protected-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project --scout
+++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home pane=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin spawn_script
+++ shift 3
++++ fm_test_spawn_script
++++ local key tree
++++ '[' 0 '!=' 1 ']'
++++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh
++++ return
+++ spawn_script=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh
+++ local spawn_home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/user-home
+++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/user-home
+++ FM_ROOT_OVERRIDE=
+++ FM_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home
+++ HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/user-home
+++ CLAUDE_CONFIG_DIR=
+++ FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state
+++ FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data
+++ FM_PROJECTS_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/projects
+++ FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/config
+++ FM_SPAWN_NO_GUARD=1
+++ FM_FAKE_PANE_PATH=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
+++ TMUX=fake,1,0
+++ FM_CLAUDE_START_POLL_INTERVAL=0.02
+++ PATH=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources
+++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh new-real-provider-protected-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project --scout
++ out='warning: task new-real-provider-protected-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data/new-real-provider-protected-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-recovered-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-recovered-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-recovered-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project'
++ expect_code 0 0 'recovered-first: the spawn beside a real recovered quarantine failed
+warning: task new-real-provider-protected-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data/new-real-provider-protected-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-recovered-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-recovered-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-recovered-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project'
++ local expected=0 actual=0 'label=recovered-first: the spawn beside a real recovered quarantine failed
+warning: task new-real-provider-protected-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data/new-real-provider-protected-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-recovered-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-recovered-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-recovered-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project'
++ '[' 0 = 0 ']'
++ assert_not_contains 'warning: task new-real-provider-protected-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data/new-real-provider-protected-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-recovered-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-recovered-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-recovered-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project' 'refusing allocation' 'recovered-first: the recovered quarantine still blocked allocation'
++ case "$1" in
++ :
++ assert_contains 'warning: task new-real-provider-protected-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/data/new-real-provider-protected-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-recovered-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-recovered-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-recovered-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project' 'spawned new-real-provider-protected-recovered-first' 'recovered-first: spawn did not launch'
++ case "$1" in
++ :
++ grep -Fq 'treehouse get' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/pane-log /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/launch-log
+++ cat /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/pane-path
++ '[' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project = /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project ']'
++ assert_grep task=new-real-provider-protected-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project/../.fm-slot-owner 'recovered-first: spawn did not claim the free slot'
++ grep -F -- task=new-real-provider-protected-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/2/project/../.fm-slot-owner
++ '[' '!' -e /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/../.fm-slot-owner ']'
++ retained_fingerprint
++ cmp -s - /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-copy
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ cmp -s /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/home/state/holder.meta
++ assert_lease_entry_preserved /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project 'protected/recovered-first: after the spawn'
++ local before=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-state after=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json path=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project 'label=protected/recovered-first: after the spawn' drop
++ shift 4
+++ jq -cn '$ARGS.positional' --args --
++ drop='[]'
++ jq -e --slurpfile b /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-state --arg p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project --argjson drop '[]' '
+    def entry($f): [$f.worktrees[]? | select(.path == $p)];
+    def strip: map(reduce $drop[] as $k (.; del(.[$k])));
+    (entry($b[0]) | length) == 1
+    and (entry(.) | length) == 1
+    and (entry($b[0]) | strip) == (entry(.) | strip)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/after-spawn-state
++ jq -e --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project --arg r 'quarantined: persistent recovered lease' '[.worktrees[] | select(.path == $a)] | length == 1 and .[0].leased == true and .[0].lease_holder == $r and ((.[0].lease_id // "") == "")' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ old_session_exit /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ local state=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json path n=0
++ IFS=
++ read -r path
+++ jq -r --arg old 'recovered: state file was corrupt or truncated; verify before reuse' '.worktrees[] | select(.leased == true and .lease_holder == $old) | .path' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ jq --arg old 'recovered: state file was corrupt or truncated; verify before reuse' '.worktrees |= map(if .leased == true and .lease_holder == $old then del(.leased, .lease_holder) else . end)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ mv /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json.tmp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first rev-parse HEAD
++ cmp -s - /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-copy
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ compgen -G '/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/../treehouse-recovered-backup-*'
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root --no-fetch --lease --lease-holder next
++ entry=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/3/project
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/3/project ']'
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/3/project
+++ pwd -P
++ entry=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/3/project
++ '[' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/3/project '!=' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project ']'
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project/.claude/worktrees/nested-real-provider-protected-recovered-first rev-parse HEAD
++ cmp -s - /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/before-copy
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-recovered-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ jq -e --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project --arg r 'quarantined: persistent recovered lease' '.worktrees[] | select(.path == $a) | .lease_holder == $r and (.lease_id // "") == ""' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ assert_lease_entry_preserved /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/after-spawn-state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project 'protected/recovered-first: after the further get'
++ local before=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/after-spawn-state after=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json path=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project 'label=protected/recovered-first: after the further get' drop
++ shift 4
+++ jq -cn '$ARGS.positional' --args --
++ drop='[]'
++ jq -e --slurpfile b /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/after-spawn-state --arg p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/1/project --argjson drop '[]' '
+    def entry($f): [$f.worktrees[]? | select(.path == $p)];
+    def strip: map(reduce $drop[] as $k (.; del(.[$k])));
+    (entry($b[0]) | length) == 1
+    and (entry(.) | length) == 1
+    and (entry($b[0]) | strip) == (entry(.) | strip)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/treehouse-state.json
++ compgen -G '/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-recovered-first/real-root/.treehouse/project-b7f8ee/../treehouse-recovered-backup-*'
++ for order in recovered-first free-first
++ name=real-provider-protected-free-first
++ CASE_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first
++ HOME_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home
++ PROJECT_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
+++ make_spawn_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake
+++ fm_test_make_spawn_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake
+++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake fakebin
+++ shift
++++ fm_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake
++++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
++++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
++++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
+++ fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
+++ fm_test_fake_tmux_spawn /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
+++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/tmux
+++ fm_fake_exit0 /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin treehouse
+++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin tool
+++ shift
+++ for tool in '"$@"'
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse
+++ '[' -x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/omp ']'
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
++ FAKEBIN_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
++ fm_test_fake_sleep_noop /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/sleep
++ fm_test_spawn_home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home codex
++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home harness=codex
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/projects /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/config
++ touch /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/.last-watcher-beat
++ '[' -n codex ']'
++ printf '%s\n' codex
++ fm_test_spawn_brief /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home new-real-provider-protected-free-first
++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home id=new-real-provider-protected-free-first 'intent=brief for new-real-provider-protected-free-first'
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data/new-real-provider-protected-free-first
++ cat
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/user-home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-xdg
++ fm_git_init_commit /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project init -q -b main
+++ basename /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
++ printf '# %s\n' project
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project add README.md
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project -c 'user.name=Firstmate Tests' -c user.email=tests@example.invalid commit -qm initial
++ fm_git_add_origin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/origin.git
++ local repo=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project remote=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/origin.git remote_abs
++ git clone --quiet --bare /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/origin.git
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/origin.git
+++ pwd
++ remote_abs=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/origin.git
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project remote add origin file:///Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/origin.git
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project remote set-head origin main
++ true
++ fm_test_rooted_treehouse /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
++ local q
++ printf -v q %q /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
++ rm -f /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse
++ export HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-home XDG_CONFIG_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-xdg TREEHOUSE_NO_UPDATE_CHECK=1 TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
++ HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-home
++ XDG_CONFIG_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-xdg
++ TREEHOUSE_NO_UPDATE_CHECK=1
++ TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root
++ GIT_CONFIG_GLOBAL=/dev/null
++ GIT_CONFIG_NOSYSTEM=1
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root --no-fetch --lease --lease-holder holder
++ a=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root --no-fetch --lease --lease-holder spare
++ b=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
+++ pwd -P
++ a=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project
+++ pwd -P
++ b=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse return /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project --if-lease-holder spare
++ pool=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50
++ state=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ '[' protected = old ']'
++ jq --arg r 'quarantined: persistent recovered lease' --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project '.worktrees |= map(if .path == $a then (.lease_holder = $r | del(.lease_id)) else . end)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ mv /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json.tmp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ '[' free-first = free-first ']'
++ jq '.worktrees |= reverse' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ mv /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json.tmp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ SLOT_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
++ PANE_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
++ rm -f /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/pane-path
++ add_nested_record /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/holder.meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project nested-real-provider-protected-free-first
++ local meta=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/holder.meta repo=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project parent=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project branch=nested-real-provider-protected-free-first
++ NESTED_COPY=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project worktree add --quiet -b nested-real-provider-protected-free-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first
++ printf 'nested unlanded commit\n'
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first add nested-owned.txt
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first commit -qm nested-unlanded
+++ basename /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/holder.meta .meta
++ fm_write_meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/holder.meta window=fmses:fm-holder worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first project=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project kind=ship
++ local file=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/holder.meta kv
++ shift
++ :
++ for kv in '"$@"'
++ printf '%s\n' window=fmses:fm-holder
++ for kv in '"$@"'
++ printf '%s\n' worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first
++ for kv in '"$@"'
++ printf '%s\n' project=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
++ for kv in '"$@"'
++ printf '%s\n' kind=ship
++ :
++ :
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-state
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/holder.meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-meta
++ '[' protected = old ']'
++ rc=0
+++ FM_FAKE_TMUX_GET_LIVE=pty
+++ FM_FAKE_TMUX_GET_BIN=/Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
+++ run_spawn_with_own_get real-provider-protected-free-first
+++ FM_FAKE_TMUX_GET_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
+++ FM_FAKE_TMUX_GET_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root
+++ FM_FAKE_PANE_PATH_FILE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/pane-path
+++ FM_FAKE_TMUX_GET_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/get-log
+++ run_retained_spawn real-provider-protected-free-first
+++ FM_FAKE_PANE_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/pane-log
+++ FM_FAKE_LAUNCH_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/launch-log
+++ fm_test_run_spawn /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin new-real-provider-protected-free-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project --scout
+++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home pane=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin spawn_script
+++ shift 3
++++ fm_test_spawn_script
++++ local key tree
++++ '[' 0 '!=' 1 ']'
++++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh
++++ return
+++ spawn_script=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh
+++ local spawn_home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/user-home
+++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/user-home
+++ FM_ROOT_OVERRIDE=
+++ FM_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home
+++ HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/user-home
+++ CLAUDE_CONFIG_DIR=
+++ FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state
+++ FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data
+++ FM_PROJECTS_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/projects
+++ FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/config
+++ FM_SPAWN_NO_GUARD=1
+++ FM_FAKE_PANE_PATH=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
+++ TMUX=fake,1,0
+++ FM_CLAUDE_START_POLL_INTERVAL=0.02
+++ PATH=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources
+++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh new-real-provider-protected-free-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project --scout
++ out='warning: task new-real-provider-protected-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data/new-real-provider-protected-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-free-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-free-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-free-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project'
++ expect_code 0 0 'free-first: the spawn beside a real recovered quarantine failed
+warning: task new-real-provider-protected-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data/new-real-provider-protected-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-free-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-free-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-free-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project'
++ local expected=0 actual=0 'label=free-first: the spawn beside a real recovered quarantine failed
+warning: task new-real-provider-protected-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data/new-real-provider-protected-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-free-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-free-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-free-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project'
++ '[' 0 = 0 ']'
++ assert_not_contains 'warning: task new-real-provider-protected-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data/new-real-provider-protected-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-free-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-free-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-free-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project' 'refusing allocation' 'free-first: the recovered quarantine still blocked allocation'
++ case "$1" in
++ :
++ assert_contains 'warning: task new-real-provider-protected-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/data/new-real-provider-protected-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-free-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-free-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-free-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project' 'spawned new-real-provider-protected-free-first' 'free-first: spawn did not launch'
++ case "$1" in
++ :
++ grep -Fq 'treehouse get' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/pane-log /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/launch-log
+++ cat /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/pane-path
++ '[' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project = /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project ']'
++ assert_grep task=new-real-provider-protected-free-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project/../.fm-slot-owner 'free-first: spawn did not claim the free slot'
++ grep -F -- task=new-real-provider-protected-free-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/2/project/../.fm-slot-owner
++ '[' '!' -e /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/../.fm-slot-owner ']'
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first rev-parse HEAD
++ cmp -s - /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-copy
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ cmp -s /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/home/state/holder.meta
++ assert_lease_entry_preserved /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project 'protected/free-first: after the spawn'
++ local before=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-state after=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json path=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project 'label=protected/free-first: after the spawn' drop
++ shift 4
+++ jq -cn '$ARGS.positional' --args --
++ drop='[]'
++ jq -e --slurpfile b /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-state --arg p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project --argjson drop '[]' '
+    def entry($f): [$f.worktrees[]? | select(.path == $p)];
+    def strip: map(reduce $drop[] as $k (.; del(.[$k])));
+    (entry($b[0]) | length) == 1
+    and (entry(.) | length) == 1
+    and (entry($b[0]) | strip) == (entry(.) | strip)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/after-spawn-state
++ jq -e --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project --arg r 'quarantined: persistent recovered lease' '[.worktrees[] | select(.path == $a)] | length == 1 and .[0].leased == true and .[0].lease_holder == $r and ((.[0].lease_id // "") == "")' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ old_session_exit /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ local state=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json path n=0
++ IFS=
++ read -r path
+++ jq -r --arg old 'recovered: state file was corrupt or truncated; verify before reuse' '.worktrees[] | select(.leased == true and .lease_holder == $old) | .path' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ jq --arg old 'recovered: state file was corrupt or truncated; verify before reuse' '.worktrees |= map(if .leased == true and .lease_holder == $old then del(.leased, .lease_holder) else . end)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ mv /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json.tmp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first rev-parse HEAD
++ cmp -s - /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-copy
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
++ find . -path ./.git -prune -o -type f -print
++ IFS=
++ read -r file
++ LC_ALL=C
++ sort
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ compgen -G '/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/../treehouse-recovered-backup-*'
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root --no-fetch --lease --lease-holder next
++ entry=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/3/project
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/3/project ']'
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/3/project
+++ pwd -P
++ entry=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/3/project
++ '[' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/3/project '!=' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project ']'
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project/.claude/worktrees/nested-real-provider-protected-free-first rev-parse HEAD
++ cmp -s - /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/before-copy
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-protected-free-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ jq -e --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project --arg r 'quarantined: persistent recovered lease' '.worktrees[] | select(.path == $a) | .lease_holder == $r and (.lease_id // "") == ""' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ assert_lease_entry_preserved /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/after-spawn-state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project 'protected/free-first: after the further get'
++ local before=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/after-spawn-state after=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json path=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project 'label=protected/free-first: after the further get' drop
++ shift 4
+++ jq -cn '$ARGS.positional' --args --
++ drop='[]'
++ jq -e --slurpfile b /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/after-spawn-state --arg p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/1/project --argjson drop '[]' '
+    def entry($f): [$f.worktrees[]? | select(.path == $p)];
+    def strip: map(reduce $drop[] as $k (.; del(.[$k])));
+    (entry($b[0]) | length) == 1
+    and (entry(.) | length) == 1
+    and (entry($b[0]) | strip) == (entry(.) | strip)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/treehouse-state.json
++ compgen -G '/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-protected-free-first/real-root/.treehouse/project-c0af50/../treehouse-recovered-backup-*'
++ for start in protected old
++ for order in recovered-first free-first
++ name=real-provider-old-recovered-first
++ CASE_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first
++ HOME_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home
++ PROJECT_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
+++ make_spawn_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake
+++ fm_test_make_spawn_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake
+++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake fakebin
+++ shift
++++ fm_fakebin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake
++++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
++++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
++++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
+++ fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
+++ fm_test_fake_tmux_spawn /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
+++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/tmux
+++ fm_fake_exit0 /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin treehouse
+++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin tool
+++ shift
+++ for tool in '"$@"'
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse
+++ '[' -x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/omp ']'
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
++ FAKEBIN_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
++ fm_test_fake_sleep_noop /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
++ local fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/sleep
++ fm_test_spawn_home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home codex
++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home harness=codex
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/data /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/projects /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/config
++ touch /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state/.last-watcher-beat
++ '[' -n codex ']'
++ printf '%s\n' codex
++ fm_test_spawn_brief /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home new-real-provider-old-recovered-first
++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home id=new-real-provider-old-recovered-first 'intent=brief for new-real-provider-old-recovered-first'
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/data/new-real-provider-old-recovered-first
++ cat
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/user-home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-xdg
++ fm_git_init_commit /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project init -q -b main
+++ basename /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ printf '# %s\n' project
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project add README.md
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project -c 'user.name=Firstmate Tests' -c user.email=tests@example.invalid commit -qm initial
++ fm_git_add_origin /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/origin.git
++ local repo=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project remote=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/origin.git remote_abs
++ git clone --quiet --bare /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/origin.git
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/origin.git
+++ pwd
++ remote_abs=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/origin.git
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project remote add origin file:///Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/origin.git
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project remote set-head origin main
++ true
++ fm_test_rooted_treehouse /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
++ local q
++ printf -v q %q /Users/charlesabrooker/.no-mistakes/evidence/01M7W0RMHJX3TG89Q7TVS1Y7HQ/drivers/capability-shim-treehouse
++ rm -f /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse
++ export HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-home XDG_CONFIG_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-xdg TREEHOUSE_NO_UPDATE_CHECK=1 TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
++ HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-home
++ XDG_CONFIG_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-xdg
++ TREEHOUSE_NO_UPDATE_CHECK=1
++ TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root
++ GIT_CONFIG_GLOBAL=/dev/null
++ GIT_CONFIG_NOSYSTEM=1
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root --no-fetch --lease --lease-holder holder
++ a=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
+++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root --no-fetch --lease --lease-holder spare
++ b=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/2/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project
+++ pwd -P
++ a=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project
+++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/2/project
+++ pwd -P
++ b=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/2/project
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse return /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/2/project --if-lease-holder spare
++ pool=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca
++ state=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json
++ '[' old = old ']'
++ jq --arg r 'recovered: state file was corrupt or truncated; verify before reuse' --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project '.worktrees |= map(if .path == $a then (.lease_holder = $r | del(.lease_id)) else . end)' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json
++ mv /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json.tmp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json
++ '[' recovered-first = free-first ']'
++ SLOT_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project
++ PANE_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ rm -f /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/pane-path
++ add_nested_record /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state/holder.meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project nested-real-provider-old-recovered-first
++ local meta=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state/holder.meta repo=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project parent=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project branch=nested-real-provider-old-recovered-first
++ NESTED_COPY=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first
++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project worktree add --quiet -b nested-real-provider-old-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first
++ printf 'nested unlanded commit\n'
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first add nested-owned.txt
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first commit -qm nested-unlanded
+++ basename /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state/holder.meta .meta
++ fm_write_meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state/holder.meta window=fmses:fm-holder worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first project=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project kind=ship
++ local file=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state/holder.meta kv
++ shift
++ :
++ for kv in '"$@"'
++ printf '%s\n' window=fmses:fm-holder
++ for kv in '"$@"'
++ printf '%s\n' worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first
++ for kv in '"$@"'
++ printf '%s\n' project=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ for kv in '"$@"'
++ printf '%s\n' kind=ship
++ :
++ :
++ retained_fingerprint
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first ']'
++ printf 'nested HEAD '
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project rev-parse HEAD
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project symbolic-ref --quiet HEAD
++ true
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project reflog
++ git -C /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project status --porcelain --untracked-files=all
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project
++ find . -path ./.git -prune -o -type f -print
++ LC_ALL=C
++ sort
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-old-recovered-first/.git
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-old-recovered-first/README.md
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./.claude/worktrees/nested-real-provider-old-recovered-first/nested-owned.txt
++ cksum
++ IFS=
++ read -r file
++ printf '%s ' ./README.md
++ cksum
++ IFS=
++ read -r file
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/before-state
++ cp /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state/holder.meta /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/before-meta
++ '[' old = old ']'
++ rc=0
+++ run_spawn_with_own_get real-provider-old-recovered-first
+++ FM_FAKE_TMUX_GET_DIR=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
+++ FM_FAKE_TMUX_GET_ROOT=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root
+++ FM_FAKE_PANE_PATH_FILE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/pane-path
+++ FM_FAKE_TMUX_GET_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/get-log
+++ run_retained_spawn real-provider-old-recovered-first
+++ FM_FAKE_PANE_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/pane-log
+++ FM_FAKE_LAUNCH_LOG=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/launch-log
+++ fm_test_run_spawn /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin new-real-provider-old-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project --scout
+++ local home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home pane=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project fakebin=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin spawn_script
+++ shift 3
++++ fm_test_spawn_script
++++ local key tree
++++ '[' 0 '!=' 1 ']'
++++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh
++++ return
+++ spawn_script=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh
+++ local spawn_home=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/user-home
+++ mkdir -p /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/user-home
+++ FM_ROOT_OVERRIDE=
+++ FM_HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home
+++ HOME=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/user-home
+++ CLAUDE_CONFIG_DIR=
+++ FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/state
+++ FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/data
+++ FM_PROJECTS_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/projects
+++ FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/config
+++ FM_SPAWN_NO_GUARD=1
+++ FM_FAKE_PANE_PATH=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
+++ TMUX=fake,1,0
+++ FM_CLAUDE_START_POLL_INTERVAL=0.02
+++ PATH=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources
+++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-spawn.sh new-real-provider-old-recovered-first /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project --scout
++ out='warning: task new-real-provider-old-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/data/new-real-provider-old-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project contains task holder'\''s current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first and is not a Firstmate home and carries Treehouse'\''s recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json, and it is not on the protected holder '\''quarantined: persistent recovered lease'\'', so the exit of an older Treehouse session could still free the slot and move the copy; refusing allocation before treehouse get
+Run the provider'\''s cutover adoption first, then retry: it moves the entry to the protected holder (one adopting treehouse status of the proven build, a cutover step owned by the provider side). This guard and teardown never change a lease or a holder themselves; treehouse lease refuses a slot that is already leased.'
++ rc=1
++ '[' 1 -ne 0 ']'
++ assert_contains 'warning: task new-real-provider-old-recovered-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/home/data/new-real-provider-old-recovered-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project contains task holder'\''s current copy /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project/.claude/worktrees/nested-real-provider-old-recovered-first and is not a Firstmate home and carries Treehouse'\''s recovered-state lease in /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json, and it is not on the protected holder '\''quarantined: persistent recovered lease'\'', so the exit of an older Treehouse session could still free the slot and move the copy; refusing allocation before treehouse get
+Run the provider'\''s cutover adoption first, then retry: it moves the entry to the protected holder (one adopting treehouse status of the proven build, a cutover step owned by the provider side). This guard and teardown never change a lease or a holder themselves; treehouse lease refuses a slot that is already leased.' 'Run the provider'\''s cutover adoption first' 'old/recovered-first: the refusal did not name the cutover'
++ case "$1" in
++ :
++ cmp -s /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/before-state /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json
++ cd /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/project
++ /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/fake/fakebin/treehouse status --json
++ jq -e --arg a /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/1/project --arg r 'quarantined: persistent recovered lease' '.worktrees[] | select(.path == $a) | .lease_holder == $r' /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD/real-provider-old-recovered-first/real-root/.treehouse/project-15d1ca/treehouse-state.json
++ fail 'old/recovered-first: the provider'\''s cutover did not move the entry to the protected holder'
++ printf 'not ok - %s\n' 'old/recovered-first: the provider'\''s cutover did not move the entry to the protected holder'
+not ok - old/recovered-first: the provider's cutover did not move the entry to the protected holder
++ exit 1
++ exit 1
++ fm_test_cleanup
++ local d
++ fm_test_reap_watchers
++ local state lock_home lock_pid 'seen=
+'
++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/watcher ']'
++ IFS=
++ read -r state
++ rm -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/watcher
++ fm_test_reap_jobs
++ local pid
+++ jobs -p
++ fm_test_reap_processes
++ local pidfile needle pid pgid rc=0
++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/process ']'
++ IFS='	'
++ read -r pidfile needle
++ rm -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/process
++ return 0
++ fm_test_reap_procevent_homes
++ local home claim_root 'seen=
+'
++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/procevent ']'
++ IFS='	'
++ read -r home claim_root
++ rm -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/procevent
++ fm_test_reap_fixture_processes
++ local d
++ args=()
++ local -a args
++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/cleanup ']'
++ '[' '!' -d /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR ']'
++ args+=(--root "$FM_TEST_SHELL_DIR")
++ IFS=
++ read -r d
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD ']'
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD ']'
++ args+=(--root "$d")
++ IFS=
++ read -r d
++ '[' 4 -gt 0 ']'
++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M7W0RMHJX3TG89Q7TVS1Y7HQ/bin/fm-test-reap-orphans.sh --owner-pid 83873 --root /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++ for d in '"${FM_TEST_CLEANUP_DIRS[@]:-}"'
++ '[' -n '' ']'
++ '[' -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/cleanup ']'
++ IFS=
++ read -r d
++ '[' -n /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD ']'
++ fm_test_remove_tree /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++ local dir=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++ '[' -d /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD ']'
++ '[' '!' -L /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD ']'
++ find /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD -type d -exec chmod u+rwx '{}' +
++ rm -rf /Users/charlesabrooker/tmp/fm-spawn-retained-copy.6xYxXD
++ IFS=
++ read -r d
++ rm -f /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR/cleanup
++ fm_test_remove_tree /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR
++ local dir=/Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR
++ '[' -d /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR ']'
++ '[' '!' -L /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR ']'
++ find /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR -type d -exec chmod u+rwx '{}' +
++ rm -rf /Users/charlesabrooker/tmp/fm-test-owners/83873.TkSiBR

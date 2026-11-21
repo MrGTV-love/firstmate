@@ -1,0 +1,34 @@
+provider: /Users/charlesabrooker/.local/bin/treehouse
+provider capabilities: {"schema_version":1,"version":"v3.1.7-fm.b8ea2fd.slot-return-r3","persistent_recovered_leases":true}
+
+=== case: slot A on old-holder (recovered: state file was corrupt or truncated; verify before reuse) ===
+slot A: /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/real-root/.treehouse/project-72c051/1/project (recovered, holds nested copy /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/real-root/.treehouse/project-72c051/1/project/.claude/worktrees/nested-old-holder)
+slot B: /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/real-root/.treehouse/project-72c051/2/project (free)
+slot A entry before: {"name":"1","path":"/Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/real-root/.treehouse/project-72c051/1/project","created_at":"2026-11-21T01:58:49.875242-06:00","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse","leased_at":"2026-11-21T01:58:49.886716-06:00","seed_inventory_known":true,"seed_inventory_digest":"ea7cf4e461c34f6e43c277f08021b94f2ef0f0454543e6cbac2612c2a25036dd"}
+--- fm-spawn.sh new-task /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/project --scout output:
+warning: task new-task: /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/home/data/new-task/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: Treehouse pool slot /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/real-root/.treehouse/project-72c051/1/project contains task holder's current copy /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/real-root/.treehouse/project-72c051/1/project/.claude/worktrees/nested-old-holder and is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/s1-live.z2QLVW/old-holder/real-root/.treehouse/project-72c051/treehouse-state.json, and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+--- exit code: 1
+--- treehouse argv during spawn:
+capabilities --json
+state sha before=c88d912ce36f1df9 after=c88d912ce36f1df9 IDENTICAL
+nested HEAD before=b7629f70c4dd641966a8724ac50e25bdb3cee86e after=b7629f70c4dd641966a8724ac50e25bdb3cee86e IDENTICAL; dirty lines        0 ->        0
+new-task meta published: no
+slot claimed (.fm-slot-owner): A=no B=no
+
+=== case: slot A on schema2-style-holder (recovered: persistent quarantine; verify before reuse) ===
+slot A: /Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/real-root/.treehouse/project-c8ffab/1/project (recovered, holds nested copy /Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/real-root/.treehouse/project-c8ffab/1/project/.claude/worktrees/nested-schema2-style-holder)
+slot B: /Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/real-root/.treehouse/project-c8ffab/2/project (free)
+slot A entry before: {"name":"1","path":"/Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/real-root/.treehouse/project-c8ffab/1/project","created_at":"2026-11-21T01:58:56.034936-06:00","leased":true,"lease_holder":"recovered: persistent quarantine; verify before reuse","leased_at":"2026-11-21T01:58:56.044986-06:00","seed_inventory_known":true,"seed_inventory_digest":"eb00dd4001ac171b0227acf07a60a326ae4644cd5f22f14c2e4220d2ba37b535"}
+--- fm-spawn.sh new-task /Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/project --scout output:
+warning: task new-task: /Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/home/data/new-task/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+error: Treehouse pool slot /Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/real-root/.treehouse/project-c8ffab/1/project contains task holder's current copy /Users/charlesabrooker/tmp/s1-live.z2QLVW/schema2-style-holder/real-root/.treehouse/project-c8ffab/1/project/.claude/worktrees/nested-schema2-style-holder and carries a lease that is not provably an ordinary one (state legacy, holder 'recovered: persistent quarantine; verify before reuse', lease id absent), and the installed treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder), so its own recovery could free the slot and move the copy; refusing allocation before treehouse get
+Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry; treehouse lease refuses a slot that is already leased. No pool read is suggested before the upgrade, because on the installed treehouse even a status read can run its own recovery and move the copy.
+--- exit code: 1
+--- treehouse argv during spawn:
+capabilities --json
+state sha before=7054d7183e1d7d86 after=7054d7183e1d7d86 IDENTICAL
+nested HEAD before=7e2d18e1e6d47a2799646c53530bde7f1787f66d after=7e2d18e1e6d47a2799646c53530bde7f1787f66d IDENTICAL; dirty lines        0 ->        0
+new-task meta published: no
+slot claimed (.fm-slot-owner): A=no B=no

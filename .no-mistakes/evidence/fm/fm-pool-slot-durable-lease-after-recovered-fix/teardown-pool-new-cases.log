@@ -1,0 +1,36 @@
+skip - R3/R6 real-provider release: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched
+skip - R4 real-provider interruptions: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id, before or after the verify, is never cleared
+skip - R5 real-provider custody refusals: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry
+skip - unclaimed-route gate on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - on an unproven treehouse a recovered entry holding the reassociated copy refuses and keeps the record, the copy and the pool state, and an ordinary lease keeps the inert completion; no return and no marker either way
+skip - unclaimed-route gate on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - an ignored root file where the return target tracks a path refuses the unclaimed return before anything is removed, and an ignored file it keeps does not
+skip - unclaimed-route gate on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - an unlocked own nested copy with a unique ignored file is preserved before removal, or the route refuses with the copy and the file intact
+skip - ordinary lease of another holder on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - an ordinary lease held by another task stays outside the unclaimed-slot route: no marker, no return, the copy and slot left as they were
+ok - the early-refusal assertion needs the facts (the claim or home, that it cannot be read or reached, and its path) in any wording: a generic refusal, the other early refusal, or another path does not pass
+skip - unclaimed route for a record without slot history on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - a nested copy whose record names no slot (no history, an unrelated released_worktree, an unrelated prior_worktree) is returned only by the exact non-forced conditional return, with no --force in any git or treehouse command, and a failed first attempt leaves the marker and is rediscovered through the marker on retry
+ok - retry discovery finds the slot through prior_worktree=, released_worktree= or a current pending-return marker that encloses the recorded path, and finds nothing for a missing, stale or non-enclosing marker
+ok - the final bind refuses a same-holder successor with a new lease id and another holder after the gate, with no cleanup and no provider call, and returns by the gate's own id when the lease is unchanged
+ok - no run, launch-agent, foreign-process or reap helper runs unless one pass (lease state, holder, lease id and name, landed check, live process outside the own folders, readable scans) just held; a successor or a process that appears between helpers stops the next one; a process under the own copy stays the reap's job
+ok - the return-pending marker records the lease the gate proved (any characters, exactly), carries it across later writes of the same slot, never overwrites it with an unleased tuple, records none for another slot or for a tuple that was never bindable
+ok - a retry refuses when the lease is not the one the marker recorded (new id for the same holder, another holder, an unreadable entry, an undecodable record), converges when the slot is already returned, and has nothing to compare when the marker records no lease
+ok - on a retry the early proof binds to the lease the marker recorded (the present lease is only what it saw, so any difference refuses at the gate), and an already-returned slot converges unbound
+ok - a no-history copy in a pool slot nobody claims, with the route not planned (an unproven provider or a lease that is another task's), refuses before any helper; a record with history stays inert, a claimed slot, a shared slot, a gone copy and a secondmate are untouched
+ok - the custody walk refuses an ignored independent clone inside an own copy and a live process or a failed scan in the task temp folder, and passes the clean control
+ok - the unclaimed route closes held, with no return, for this task's own copy the closeout driver kept under a durable recovered lease of a proven treehouse, on the first run and on a retry; an ordinary lease, an unproven provider and another task's held copy refuse and name the copy and whose it is
+ok - the unclaimed retire step leaves the own copy and a prior copy the closeout driver kept out of every run conclusion, agent retirement and reap, also when the record names the kept copy by an alias, and still retires the slot root and the plain prior copy
+ok - the held close leaves only processes inside the own copy the closeout driver kept out of its slot scan (real processes, real scan); a process elsewhere in the slot, and any process on the returned-slot path, still refuses
+ok - the retirement gate refuses before any retirement, launch-agent or process-reaping helper when a successor appears before or after the planning (different holder, or the same holder with a new lease id) or when the entry is still on the old holder (refused with no status run), and lets an unchanged lease and an interrupted release retire; another holder from the start stays outside the route
+skip - old-holder refusal on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - an entry still on the old recovered holder refuses before the own-copy cleanup and any retirement with no status run and the copy, slot and record untouched; a retry converges when the cutover adopted slot A in between and refuses when it then carries a new lease id or another holder
+skip - unclaimed-route retirement on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - the unclaimed-slot route aborts the parked run and retires the launch agent rooted in the slot before it returns the slot
+skip - unclaimed-route refusal retirement on the real provider: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the real-provider pass did NOT run
+ok - a slot root the read-only checks do not show as this task alone keeps its parked run and launch agent while the custody walk refuses
+rc=0

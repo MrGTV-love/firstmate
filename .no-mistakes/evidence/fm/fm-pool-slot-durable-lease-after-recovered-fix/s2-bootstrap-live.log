@@ -1,0 +1,13 @@
+provider: /Users/charlesabrooker/.local/bin/treehouse
+capabilities: {"schema_version":1,"version":"v3.1.7-fm.b8ea2fd.slot-return-r3","persistent_recovered_leases":true}
+--- bin/fm-bootstrap.sh output (lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.v7wEx7):
+BOOTSTRAP_INFO: treehouse does not prove persistent recovered leases (treehouse capabilities --json did not report schema_version 2, a version, persistent_recovered_leases: true and a protected recovered_quarantine_holder); upgrade to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, because until then a Treehouse recovered-state lease on a pool slot refuses every new copy for that project
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.v7wEx7
+--- exit code: 0
+--- treehouse argv during bootstrap:
+get --help
+capabilities --json

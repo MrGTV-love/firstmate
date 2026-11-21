@@ -1,0 +1,6 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-live-scr.Mqtg71/root/.treehouse/project-cb94d0/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-live-scr.Mqtg71/root/.treehouse/project-cb94d0/1/project' to release it.
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-live-scr.Mqtg71/root/.treehouse/project-cb94d0/1/project: refused: durably leased
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-live-scr.Mqtg71/root/.treehouse/project-cb94d0/2/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-live-scr.Mqtg71/root/.treehouse/project-cb94d0/2/project' to release it.
+🌳 Worktree returned to pool.
