@@ -1204,7 +1204,9 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # reply may take 2 s; each later reply has 0.5 s. A reply that is late, or that
 # cannot be bound to the processes it measured, is read once more in the same tick:
 # a late reply is given 1 s more, an unbound one a new request with 1 s; no tick
-# has more than that one retry, and no older sample is reused.
+# has more than that one retry, and no older sample is reused. Each wait has a
+# deadline: a signal that interrupts it (EINTR) waits again for the time left and
+# does not spend the retry.
 # The reader is the only source of a sample. A tick whose reply (after that retry)
 # is late, malformed or cannot be bound to the processes it measured is a miss, never a
 # zero and never a guess from another table: the reply is discarded and a new
@@ -1225,7 +1227,10 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # Crossing the limit ends the root's group with KILL, records the peak sampled as
 # max_rss_kib=<KiB> in <rss-file>, names the bound on stderr, and exits 98, which
 # fm-lint.sh reports as a memory failure so the root takes its narrower retry.
-# Every end appends rss_samples=libproc:<n> and watch_peak_kib=<KiB>. Each new
+# Every end appends rss_samples=libproc:<n> and watch_peak_kib=<KiB>, then, as
+# measurement only, one rss_miss=<late|unbound|malformed|unavailable>,wait_ms=<n>,
+# interrupted=<n> per missed tick (its branch, reply wait and interrupted waits),
+# rss_ticks=<n>, rss_longest_tick_ms=<n> and rss_longest_reply_ms=<n>. Each new
 # peak is written to FM_LINT_INTERNAL_SLOT_PEAK_FILE when the gate names one, so
 # the gate's admission charges it.
 # Any miss while the root runs that is followed by a later tick makes the root exit
@@ -1281,6 +1286,10 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
     my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
     my ($reader_failures, $libproc_samples) = (0, 0);
+    # Measurement only: this tick's miss branch, reply wait (s) and interrupted
+    # waits; the misses' records; ticks, longest tick (s), longest reply latency (s).
+    my ($miss_branch, $tick_wait, $tick_interrupts, @miss_records) = ('', 0, 0);
+    my ($tick_count, $longest_tick, $longest_reply) = (0, 0, 0);
     my %known;    # pid => [start seconds, start microseconds], every member counted
     my ($child_reaped, $reaped_status);
     # A reader exits when its input closes; only a reader still running 2 s later,
@@ -1450,18 +1459,34 @@ PYTHON
     $tree_rss = sub {
         my ($root_pid, $retry) = @_;
         $start_reader->($root_pid) unless $reader_pid || $reader_down;
+        $miss_branch = 'unavailable';
         return undef unless $reader_pid;
         local $SIG{PIPE} = 'IGNORE';
         my ($answer, $ready) = ('', '');
         vec($ready, fileno($from_reader), 1) = 1;
         my $gone = !syswrite($to_reader, "\n");
+        my $asked = Time::HiRes::time();
         my $wait = $retry ? 1 : $reader_answered ? 0.5 : 2;
         while (1) {
-            while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
+            # Each wait has a deadline: a signal that interrupts it (EINTR) waits
+            # again for the time left and does not spend the retry.
+            my $began = Time::HiRes::time();
+            my $deadline = $began + $wait;
+            while (!$gone && $answer !~ /\n/) {
+                my $left = $deadline - Time::HiRes::time();
+                last if $left <= 0;
+                my $ready_count = select(my $readable = $ready, undef, undef, $left);
+                if ($ready_count < 0 && $!{EINTR}) { $tick_interrupts++; next; }
+                last if $ready_count <= 0;
                 $gone = !sysread($from_reader, $answer, 64, length $answer);
             }
+            $tick_wait += Time::HiRes::time() - $began;
             last if $gone || $answer =~ /\n/ || $retry++;
             $wait = 1;
+        }
+        if ($answer =~ /\n/) {
+            my $latency = Time::HiRes::time() - $asked;
+            $longest_reply = $latency if $latency > $longest_reply;
         }
         if ($answer =~ /\A\{"rss_kib":([0-9]+),[^\n]*\}\n\z/) {
             my $kib = $1 + 0;
@@ -1477,6 +1502,7 @@ PYTHON
             # identity is counted, any other answer is a miss.
             my $found = %reply && $verify_members->($root_pid, %reply)
                 ? $exact_members->(map { "$_:$known{$_}[0]:$known{$_}[1]" } grep { !$reply{$_} } keys %known) : undef;
+            $miss_branch = 'unbound';
             return $retry ? undef : $tree_rss->($root_pid, 1) unless $found;
             for my $pid (keys %$found) {
                 next if $reply{$pid};
@@ -1487,6 +1513,7 @@ PYTHON
             $libproc_samples++;
             return $kib;
         }
+        $miss_branch = !$gone && $answer !~ /\n/ ? 'late' : 'malformed';
         my $fresh = $reader_fresh;
         $stop_reader->();
         $reader_down = $answer eq "-\n" || $answer =~ /\A\{"rss_kib":null,/ ? 'libproc-unreadable'
@@ -1611,9 +1638,12 @@ PYTHON
             if ($gone == $child) { ($child_reaped, $reaped_status) = (1, $?); return; }
             return if $gone == -1 && $!{ECHILD};
         }
+        ($miss_branch, $tick_wait, $tick_interrupts) = ('', 0, 0);
         my $rss = $tree_rss->($child);
         if (!defined $rss) {
             return if $child_reaped;
+            push @miss_records, sprintf("rss_miss=%s,wait_ms=%d,interrupted=%d\n",
+                $miss_branch, $tick_wait * 1000, $tick_interrupts);
             # A miss in the root's last tick can be its own exit (a zombie no reader
             # measures); a miss followed by any later tick is an unmeasured interval
             # (fm_watch_unmeasured, judged once the root is reaped). The measurement
@@ -1653,7 +1683,11 @@ PYTHON
         local ($?, $!);
         return if $busy || !$launch;
         $busy = 1;
+        my $began = Time::HiRes::time();
         $sample->();
+        my $took = Time::HiRes::time() - $began;
+        $tick_count++;
+        $longest_tick = $took if $took > $longest_tick;
         $busy = 0;
     };
     # Launch: the root waits on a pipe until its exact start time is recorded.
@@ -1735,6 +1769,9 @@ PYTHON
         print {$fh} "rss_invalidation_failed=1\n" if $invalidation_failed;
         print {$fh} "rss_unmeasured=1\n" if $warned || $unmeasured || $unpublished;
         print {$fh} "rss_mark_failed=1\n" if $mark_failed;
+        print {$fh} @miss_records;
+        printf {$fh} "rss_ticks=%d\nrss_longest_tick_ms=%d\nrss_longest_reply_ms=%d\n",
+            $tick_count, $longest_tick * 1000, $longest_reply * 1000;
         close $fh;
     }
     # The host lock the watch kept is released only now, after its root is reaped.

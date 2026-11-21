@@ -4536,6 +4536,30 @@ if len(args) >= 3 and args[1] == "rss-tree":
                     answer = "-"
                 print(answer, flush=True)
             sys.exit(0)
+    if mode.startswith("interrupt:"):
+        # On the Nth request, signal the watch (SIGUSR1) twice while it waits,
+        # 0.1 s apart, then answer 0.3 s after the request.
+        mark = os.environ["FM_TEST_READER_MARK"]
+        if not os.path.exists(mark):
+            open(mark, "w").close()
+            import importlib.util, signal, time
+            spec = importlib.util.spec_from_file_location("fp", args[0])
+            fp = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(fp)
+            root, known, asked = int(args[2]), {}, 0
+            while sys.stdin.readline():
+                asked += 1
+                if asked == int(mode.split(":")[1]):
+                    for _ in range(2):
+                        time.sleep(0.1)
+                        os.kill(os.getppid(), signal.SIGUSR1)
+                    time.sleep(0.1)
+                try:
+                    answer = fp.rss_tree(root, known)
+                except Exception:
+                    answer = "-"
+                print(answer, flush=True)
+            sys.exit(0)
     if mode.startswith("dieafter:"):
         mark = os.environ["FM_TEST_READER_MARK"]
         if not os.path.exists(mark):
@@ -5660,6 +5684,47 @@ test_a_late_reply_is_retried_once_in_the_same_tick() {
   pass "a reply late on its first read and good on the same-tick retry keeps the root to its own result (0); a tick whose read and retry both miss still ends the root with 96 (unmeasured)"
 }
 
+# (Main 3511) A signal that interrupts a reply wait (EINTR) waits again for the time
+# left and does not spend the retry. The watch runs with a USR1 handler that logs
+# each signal; the reader signals it twice while it waits for its second reply,
+# then answers 0.3 s after the request, inside the 0.5 s wait. No tick is a miss
+# and the root runs to its own result (0). Without the deadline, the first
+# interrupt spent the retry and the second made the tick a miss (96).
+test_an_interrupted_reply_wait_with_a_reply_in_time_is_no_miss() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident watch runs on native macOS only): interrupted reply wait"
+    return
+  fi
+  local tmp real_python rc=0 latency
+  tmp=$(fm_test_tmproot fm-lint-interrupted-wait)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  mkdir -p "$tmp/lib"
+  cat > "$tmp/lib/FmTestInterrupt.pm" <<'PERL'
+package FmTestInterrupt;
+$SIG{USR1} = sub {
+    if (open(my $log, '>>', $ENV{FM_TEST_INTERRUPT_LOG})) { print {$log} "interrupted\n"; close $log; }
+};
+1;
+PERL
+  FM_TEST_SIGNAL_LOG="$tmp/signals" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER="interrupt:2" \
+    FM_TEST_READER_MARK="$tmp/mark" FM_TEST_INTERRUPT_LOG="$tmp/interrupts" \
+    perl -I"$tmp/lib" -MFmTestInterrupt "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- sleep 5 \
+    > "$tmp/err" 2>&1 || rc=$?
+  [ -e "$tmp/mark" ] || fail "the interrupting reader never ran: $(cat "$tmp/err")"
+  [ "$(grep -c '^interrupted$' "$tmp/interrupts" 2>/dev/null)" = 2 ] \
+    || fail "the watch did not receive both interrupts: $(cat "$tmp/interrupts" 2>/dev/null) $(cat "$tmp/err")"
+  [ "$rc" -eq 0 ] || fail "a root whose reply wait was interrupted, with the reply in time, exited $rc, expected 0: $(cat "$tmp/err") $(cat "$tmp/rss" 2>/dev/null)"
+  # A miss on the root's own last tick (its exit) is exempt and may be recorded;
+  # no tick that was interrupted may be a miss.
+  ! grep -Eq '^rss_miss=.*interrupted=[1-9]' "$tmp/rss" || fail "an interrupted reply wait with the reply in time was recorded as a miss: $(cat "$tmp/rss")"
+  ! grep -q '^rss_unmeasured=1$' "$tmp/rss" || fail "an interrupted reply wait with the reply in time was recorded as unmeasured: $(cat "$tmp/rss")"
+  grep -Eq '^rss_samples=libproc:[2-9]' "$tmp/rss" || fail "the watch did not sample the root through the interrupted tick: $(cat "$tmp/rss")"
+  latency=$(sed -n 's/^rss_longest_reply_ms=//p' "$tmp/rss")
+  [ "${latency:-0}" -ge 250 ] || fail "the interrupted reply (0.3 s) was not the one waited for: longest reply ${latency:-none} ms"
+  pass "a reply wait interrupted twice, with the reply in time, is no miss: the root runs to its own result (0), measured throughout"
+}
+
 # (Main 2981, Main 2988) On a loaded host each one-shot check starts late, so a tick
 # that meets the root's own exit (a zombie, refused by the reply check and retried)
 # outlasts the 1 s timer and the next tick ran before the watch could reap the root:
@@ -6076,6 +6141,7 @@ test_an_empty_or_damaged_lane_record_holds_the_lane
 test_a_stale_measurement_record_admits_no_new_root
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
 test_a_late_reply_is_retried_once_in_the_same_tick
+test_an_interrupted_reply_wait_with_a_reply_in_time_is_no_miss
 test_a_root_exit_under_slow_checks_keeps_its_own_status
 test_a_compiled_launcher_switching_delegates_is_analysed_every_run
 test_resident_watch_replaces_a_stalled_reader
