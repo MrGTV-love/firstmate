@@ -9818,6 +9818,9 @@ printf "rc=%s\n" "$rc"
 printf "%s\n" "${TEARDOWN_FOREIGN_PROCS[@]}"
 ' 2>"$tmp/stderr")
   assert_equals "rc=0"$'\n'"4242	identity	$tmp/other" "$out" "kept-helper-queue: the proof kept a signal queued for the matching kept copy, or dropped another copy's"
+  # Main 3529 Ruling 3b: stderr stays checked. The only line this path may write is the
+  # credit line of the copy whose plan runs ($tmp/other); any other line is an error.
+  assert_equals "" "$(grep -v '^teardown: closeout credit for ' "$tmp/stderr")" "kept-helper-queue: the proof wrote error output: $(cat "$tmp/stderr")"
   rm -rf "$tmp"
   pass "on a retry whose record matches, the kept copy's proof runs but queues nothing for the retire signal, and another copy's queue stays"
 }
