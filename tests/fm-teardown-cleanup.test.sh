@@ -4951,6 +4951,42 @@ test_own_locked_copy_with_no_closeout_interpreter_releases_a_dead_launchers_lock
   pass "an own Vernant-locked copy whose closeout interpreter cannot run is released directly when its launcher is gone, for both record shapes"
 }
 
+# Main 3556 F1 (Main 3529 Ruling 2): an own nested copy released directly after a
+# driver gap (no interpreter, dead launcher) keeps #380's own preserve where it is.
+# The case holds a selected ignored file and an earlier own preserve at the base
+# path that agrees with the copy and also holds a file the copy no longer has. The
+# release must leave that directory in place, with the same inode and every byte
+# unchanged, and set nothing aside; the copy is then removed without force.
+test_pr400_own_direct_release_leaves_the_own_preserve_in_place() {
+  local rc label root pres exclude before inode_before
+  label=pr400-own-direct-preserve
+  dead_launcher_pid
+  make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' 'notes/unique.dat' >> "$exclude"
+  mkdir -p "$FOREIGN_COPY/notes"
+  printf 'only here\n' > "$FOREIGN_COPY/notes/unique.dat"
+  root=$FOREIGN_CASE/data/task-x1/nested-copy-preserved
+  pres=$root/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  mkdir -p "$pres/files/notes" "$pres/meta"
+  printf 'only here\n' > "$pres/files/notes/unique.dat"
+  printf 'from an earlier run\n' > "$pres/files/earlier-only.dat"
+  printf '%s\n' "$FOREIGN_COPY" > "$pres/meta/copy-path"
+  (cd "$pres/files" && shasum -a 256 notes/unique.dat earlier-only.dat) > "$pres/meta/SHA256SUMS"
+  before=$(kept_tree "$pres")
+  inode_before=$(perl -e 'print((lstat $ARGV[0])[1])' "$pres")
+  run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
+  expect_code 0 "$rc" "$label: a landed own copy under a dead launcher's lock must close with no interpreter: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on own nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+    "$label: the direct release did not run"
+  assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+  assert_absent "$FOREIGN_COPY" "$label: the copy survived the release"
+  assert_equals "$inode_before" "$(perl -e 'print((lstat $ARGV[0])[1] // "gone")' "$pres")" "$label: the own preserve directory was moved or replaced"
+  assert_equals "$before" "$(kept_tree "$pres")" "$label: a byte of the own preserve changed"
+  assert_equals "" "$(find "$root" -mindepth 1 -maxdepth 1 -name '.*' -print)" "$label: a preserve was set aside or left staged"
+  pass "an own nested copy released directly after a driver gap leaves #380's own preserve in place, byte for byte, and sets nothing aside"
+}
+
 # Vernant's closeout driver is asked in plan mode at entry for every locked copy
 # the release will hand it: a plan that declines, or answers with no verdict,
 # refuses before any protected step, for an own copy of either record shape and
@@ -11418,6 +11454,7 @@ test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
 test_missing_closeout_driver_or_interpreter_releases_a_dead_launchers_lock
 test_own_locked_copy_with_no_closeout_interpreter_releases_a_dead_launchers_lock
+test_pr400_own_direct_release_leaves_the_own_preserve_in_place
 test_closeout_plan_refusal_refuses_at_entry
 test_linux_removability_refuses_an_entry_it_cannot_open
 test_preserve_parent_and_metadata_boundaries

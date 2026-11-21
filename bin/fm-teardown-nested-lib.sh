@@ -1123,10 +1123,11 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 #   - ignored files: none outside the preserve allow-list (refuse), or all of
 #     them preserved again outside every removal root and the preserved payload
 #     matched by SHA-256 to the manifest and to the copy (preserve), or, for an
-#     own nested copy before its driver call, the preserve #380's
-#     teardown_own_preserve chose (TEARDOWN_PRESERVE_DIR) lies outside every
-#     removal root and still holds the copy's selected ignored files byte for
-#     byte, and is left as it is (own; Main 3529 Ruling 2);
+#     own nested copy Vernant's lock holds (before its driver call and on its
+#     direct release), the preserve #380's teardown_own_preserve chose
+#     (TEARDOWN_PRESERVE_DIR) lies outside every removal root and still holds
+#     the copy's selected ignored files byte for byte, and is left as it is,
+#     never rebuilt, moved or replaced (own; Main 3529 Ruling 2, Main 3556 F1);
 #   - locked: the launcher <pid> is gone by pid and start time against the lock
 #     time read before the unlock; an empty or non-numeric pid or time refuses.
 # With <forced> (only the own nested copy's call before its driver, under
@@ -2457,7 +2458,7 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
 TEARDOWN_RELEASE_WHY=
 teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
-  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap final_mode=preserve
   TEARDOWN_RELEASE_WHY=
   # Main 1843: an Orca-backed task keeps base behaviour, which has no direct release.
   if [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; then
@@ -2540,8 +2541,13 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   mtime=$(fm_lock_path_mtime "$TEARDOWN_FOREIGN_LOCK_FILE") || mtime=
   git -C "$slot" worktree unlock "$copy" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='git worktree unlock failed'; return 1; }
   # The final proof runs after the last unlock and the remove is the very next
-  # action; a failed proof puts the lock back and refuses.
-  if ! teardown_removal_final_proof "$copy" preserve locked "$pid" "$mtime"; then
+  # action; a failed proof puts the lock back and refuses. An own nested copy's
+  # ignored files are in the preserve #380's dispose chose before the driver: the
+  # proof checks that preserve and leaves it in place (own), never rebuilding,
+  # moving or replacing it (Main 3529 Ruling 2, Main 3556 F1); a foreign copy's
+  # are preserved again here.
+  [ "$kind" != 'own nested' ] || final_mode=own
+  if ! teardown_removal_final_proof "$copy" "$final_mode" locked "$pid" "$mtime"; then
     git -C "$slot" worktree lock --reason "$lock" "$copy" >/dev/null 2>&1 || true
     if teardown_copy_lock_file "$copy" && [ "$TEARDOWN_FOREIGN_LOCK" = "$lock" ]; then
       TEARDOWN_RELEASE_WHY="$TEARDOWN_FINAL_WHY; its lock was restored"
