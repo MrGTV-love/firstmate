@@ -1124,6 +1124,44 @@ class SchedulingTest(unittest.TestCase):
             self.assertIn('transport failure: api_error', out)
             self.assertLess(out.index('check: slack follow-up'), out.index('transport failure'))   # the failure is reported after the healthy read
 
+    def test_an_internal_error_on_one_thread_read_holds_back_neither_another_thread_nor_a_new_owner_request(self):
+        # The second person is not set (case()): Slack answers one thread read {"ok": false, "error": "internal_error"}.
+        with case() as home:
+            bad, good = home.take_in('the bad thread'), home.take_in('the good thread')
+            follow = home.reply_in(good, 'a follow-up in the healthy thread')
+            later = home.reply_in(bad, 'a follow-up in the failing thread')
+            new = home.say('a new owner request')
+            state, path = home.replay_state()
+            state['failures']['conversations.replies:%s' % bad] = {'error': 'internal_error', 'times': 1}
+            path.write_text(json.dumps(state))
+            Traced.TRACE.clear()
+            rc, out, _ = home.poll()
+            self.assertLessEqual({(bad, 'failed:slack_outcome_unknown'), (good, 'ok')},
+                                 {(r['thread'], r['outcome']) for r in home.calls('conversations.replies')})
+            self.assertEqual([f['reply'] for f in home.followups(out)], [follow])
+            self.assertEqual([r['ts'] for r in home.requests(out)], [new])
+            self.assertIn('transport failure: slack_outcome_unknown', out)
+            rc, out, _ = home.poll()
+            self.assertEqual([f['reply'] for f in home.followups(out)], [later])  # the failing thread is kept and read again by the next poll
+
+    def test_an_internal_error_on_an_owner_acknowledgement_holds_back_no_other_request_and_is_never_posted_twice(self):
+        # The second person is not set (case()): Slack answers the first request's acknowledgement {"ok": false, "error": "internal_error"}, an outcome it may
+        # have partly carried out. The poll goes on; the requests are woken once each, in order (the second never ahead of the first), and no acknowledgement
+        # is doubled.
+        with case() as home:
+            first, second = home.say('the first request'), home.say('the second request')
+            state, path = home.replay_state()
+            state['failures']['chat.postMessage:%s' % first] = {'error': 'internal_error', 'times': 1}
+            path.write_text(json.dumps(state))
+            Traced.TRACE.clear()
+            outs = [home.poll()[1] for _ in range(3)]
+            self.assertIn('transport failure: slack_outcome_unknown', outs[0])
+            self.assertEqual([r['ts'] for out in outs for r in home.requests(out)], [first, second])
+            self.assertEqual([outcome for row in home.calls('chat.postMessage') if row['thread'] == first for outcome in [row['outcome']]][:1],
+                             ['failed:slack_outcome_unknown'])
+            self.assertEqual(len(home.posts(first)), 1)
+            self.assertEqual(len(home.posts(second)), 1)
+
     def test_a_failing_card_thread_holds_back_neither_a_follow_up_nor_a_new_request_and_is_still_reported(self):
         with case() as home:
             thread = home.take_in('an old request')

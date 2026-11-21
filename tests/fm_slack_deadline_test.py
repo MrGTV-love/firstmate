@@ -447,7 +447,8 @@ def second_person_watcher():
         line, result, rows, elapsed = watch(home, env, 'second-stall', 'b.1', stall=9, check='slacksecond')
         assert line == 'status=0 stopped= notice=', line
         theirs = [r for r in rows if r['second']]
-        # A call of theirs begins only inside the 12 s budget of their pass: two held 9 s calls fit (the third would begin at about 18 s).
+        # A call of theirs begins only inside the 27 s budget of their pass, and not when the slowest call of theirs so far would end after it: two held
+        # 9 s calls fit, and a third, which would begin at about 18 s and end at about 27 s, is not begun.
         assert 1 <= len(theirs) <= 2, rows
         line, result, rows, elapsed = watch(home, env, '', 'b.2')
         assert wakes(result, '2000.000100', 'U0TESTOWNER') == [], result  # delivered once, never again

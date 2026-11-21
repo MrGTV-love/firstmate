@@ -65,8 +65,9 @@ REACTIONS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'ni
 USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
 # A failure of one thread's own read, journaled-row post, or resolution post must not stop the other
-# threads' replies from being read.
-THREAD_ERRORS = ('api_error', 'channel_not_found')
+# threads' replies from being read. slack_outcome_unknown is a Slack answer that base named api_error; a post it ends stays an attempt of
+# unknown outcome (post, definite_refusal), never a refusal that is simply tried again.
+THREAD_ERRORS = ('api_error', 'channel_not_found', 'slack_outcome_unknown')
 # A request's acknowledgement post counts as a failed attempt of the three only when Slack itself refused it: the API answered with an error
 # name (missing_scope, not_in_channel, invalid_arguments, channel_not_found, api_error, an authentication refusal). An outage, a rate limit,
 # an HTTP failure or a closed network says nothing about whether the post reached Slack, so it counts nothing and the next poll tries again

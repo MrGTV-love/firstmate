@@ -238,6 +238,12 @@ def refuse_outbound(fields, wire=False):
 
 # Slack's chat.postMessage documents that internal_error and fatal_error can follow a partly successful operation; service_unavailable says no more.
 OUTCOME_UNKNOWN_ERRORS = frozenset({'internal_error', 'fatal_error', 'service_unavailable'})
+
+
+def answer_error(code):
+    """The name a Slack answer that is not ok raises. Never relay arbitrary API text, including an echoed Authorization header. The errors after which Slack
+    says an operation may have partly succeeded get one fixed name of their own (round 8, R9); every other unnamed error stays api_error."""
+    return code if code in SAFE_ERRORS else 'slack_outcome_unknown' if code in OUTCOME_UNKNOWN_ERRORS else 'api_error'
 SAFE_ERRORS = {
     'invalid_auth', 'token_revoked', 'not_authed', 'account_inactive',
     'missing_scope', 'not_in_channel', 'channel_not_found', 'user_not_found',
@@ -300,10 +306,7 @@ class Slack:
         if self.on_reply:
             self.on_reply()
         if not isinstance(data, dict) or not data.get('ok'):
-            code = data.get('error', '') if isinstance(data, dict) else ''
-            # Never relay arbitrary API text, including an echoed Authorization header. The errors after which Slack says an operation may have partly
-            # succeeded get one fixed name of their own (round 8, R9); every other unnamed error stays api_error.
-            raise SlackError(code if code in SAFE_ERRORS else 'slack_outcome_unknown' if code in OUTCOME_UNKNOWN_ERRORS else 'api_error')
+            raise SlackError(answer_error(data.get('error', '') if isinstance(data, dict) else ''))
         return data
 
     def _bounded(self, request, time_left=None, scrub_with=None, sending=None):

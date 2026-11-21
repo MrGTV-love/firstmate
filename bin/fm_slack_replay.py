@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import threading
 
-from fm_slack import SecretCollision, SlackError, refuse_outbound, value_hits
+from fm_slack import SecretCollision, SlackError, answer_error, refuse_outbound, value_hits
 
 # The scope Slack requires for each method the plane calls. A transcript that sets
 # "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does; one that sets
@@ -178,6 +178,9 @@ class Replay:
             raise SlackError('missing_scope')
         rule = self.fail(method, fields.get('ts'), fields.get('timestamp'), fields.get('thread_ts'))
         if rule:
+            if 'error' in rule:
+                # A Slack answer {"ok": false, "error": <name>}, named as the real transport names it.
+                raise SlackError(answer_error(str(rule['error'])))
             status = int(rule.get('status', 503))
             if status == 429:
                 raise SlackError('rate_limited')
