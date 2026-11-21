@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import weakref
 from unittest.mock import patch
@@ -46,6 +47,13 @@ FOLLOWUP_SEGMENT = re.compile(r'check: slack follow-up ([0-9]+\.[0-9]+) to reque
                               + re.escape(FOLLOWUP_LABEL) + r' ("(?:[^"\\]|\\.)*")((?:; secret removed)?)((?:; cut, full text in Slack thread [0-9.]+)?)')
 REQUEST_SEGMENT = re.compile(r'check: slack request ([0-9]+\.[0-9]+) from (U[A-Z0-9]+): ' + re.escape(REQUEST_LABEL) + r' ("(?:[^"\\]|\\.)*")')
 DEFAULT_ENV = {'FM_SLACK_POLL_MAX_ANSWERS': '20', 'SLACK_BOT_TOKEN': 'fixture-token-not-a-secret', 'SLACK_SIGNING_SECRET': 'fixture-signing-not-a-secret'}
+
+
+def stated_post_clock(read):
+    """The wall clock their post spacing reads (plane.post_clock), driven by a stated clock: it starts one SECOND_POST_SPACING after this host's wall clock,
+    so a stated run follows every earlier run of the test as a later sweep does, and then moves only as the stated clock moves."""
+    base = time.time() + plane.SECOND_POST_SPACING - read()
+    return lambda: base + read()
 
 
 class Traced(Replay):
@@ -113,7 +121,8 @@ class LaneClock:
 
     @contextlib.contextmanager
     def patched(self):
-        with patch.object(plane, 'monotonic', self.read), patch.object(plane, 'pause', self.advance), patch.object(plane, 'clock_after', self.after):
+        with patch.object(plane, 'monotonic', self.read), patch.object(plane, 'pause', self.advance), patch.object(plane, 'clock_after', self.after), \
+                patch.object(plane, 'post_clock', stated_post_clock(self.read)):
             yield self
 
 
@@ -1586,9 +1595,9 @@ class SecondPersonReplyTest(unittest.TestCase):
 class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
     """Their posts, all into their one DM, begin at least SECOND_POST_SPACING apart also from one run to the next: each part of a reply is its own run of
     fm-slack-reply.sh, and an acknowledgement of their pass and a reply to them are separate runs too; their journal is the only thing the runs share. The
-    clock is stated: Slack calls cost nothing, the plane's waits move it, and the start of every post is read at the fake Slack. Gaps are compared to 1 ns,
-    so that floating-point rounding of the stated clock never decides them."""
-    NS = 1e-9
+    clock is stated: Slack calls cost nothing, the plane's waits move it, and the start of every post is read at the fake Slack. Gaps are compared to 1 µs,
+    so that floating-point rounding of the wall clock the record holds never decides them."""
+    NS = 1e-6
 
     @contextlib.contextmanager
     def scott(self):
@@ -1599,7 +1608,7 @@ class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
                 if method == 'chat.postMessage':
                     starts.append((fields.get('channel'), fields.get('thread_ts'), clock.read()))
                 return real(replay, method, **fields)
-            with patch.object(Traced, 'call', call), clock.patched(), patch.object(plane, 'post_clock', clock.read):
+            with patch.object(Traced, 'call', call), clock.patched():
                 self.assertEqual(home.poll()[0], 0)
                 yield home, clock, starts
 
@@ -1623,7 +1632,7 @@ class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
             self.assertEqual(home.reply(key, key, 'part two', part=2)[0], 0)
             self.assertEqual(home.reply(key, key, 'part three', part=3)[0], 0)
             ack, one, two, three = self.theirs(starts)
-            self.assertAlmostEqual(one - ack, 5.0)                                   # already further apart: no wait
+            self.assertAlmostEqual(one - ack, 5.0, delta=self.NS)                                   # already further apart: no wait
             self.assertGreaterEqual(two - one, plane.SECOND_POST_SPACING - self.NS)
             self.assertGreaterEqual(three - two, plane.SECOND_POST_SPACING - self.NS)
             self.assertLess(three - one, 2 * plane.SECOND_POST_SPACING + self.NS)   # never more than the spacing
@@ -1636,8 +1645,8 @@ class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
             clock.advance(0.4)
             self.assertEqual(home.reply(key, key, 'part two', part=2)[0], 0)
             ack, one, two = self.theirs(starts)
-            self.assertAlmostEqual(one - ack, plane.SECOND_POST_SPACING)
-            self.assertAlmostEqual(two - one, plane.SECOND_POST_SPACING)
+            self.assertAlmostEqual(one - ack, plane.SECOND_POST_SPACING, delta=self.NS)
+            self.assertAlmostEqual(two - one, plane.SECOND_POST_SPACING, delta=self.NS)
 
     def test_a_reply_right_after_their_acknowledgement_waits_and_an_acknowledgement_right_after_a_reply_waits(self):
         with self.scott() as (home, clock, starts):
@@ -1650,22 +1659,59 @@ class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
             for before, after in zip(moments, moments[1:]):
                 self.assertGreaterEqual(after - before, plane.SECOND_POST_SPACING - self.NS)
 
-    def test_an_acknowledgement_whose_wait_would_end_after_their_budget_is_not_begun_and_is_posted_next_poll(self):
+    def sweep(self, home, token):
+        """One sweep of the standing checks (both armed): the owner's check, then theirs, with one sweep token; the output of both."""
+        (home.dir / 'slacksecond.check.sh').write_text('')
+        (home.dir / 'slacksecond.check-trust').write_text('')
+        out = ''
+        for action in ('check', 'check-second'):
+            rc, part, _ = home.run(['check', '--replay', str(home.transcript)], env={'FM_SLACK_CHECK_ACTION': action, 'FM_CHECK_SWEEP': token})
+            self.assertEqual(rc, 0, action)
+            out += part
+        return out
+
+    def test_their_check_waits_out_the_spacing_and_a_wait_past_its_budget_ends_it_with_nothing_done_for_a_later_sweep(self):
         with self.scott() as (home, clock, starts):
             key = self.take_in_scott(home, 'first request')
             self.assertEqual(home.reply(key, key, 'an answer')[0], 0)
             ts = home.tick()
             home.add({'ts': ts, 'user': SCOTT, 'text': 'second request', 'channel': SCOTT_DM})
             with patch.object(plane, 'SECOND_BUDGET', plane.SECOND_POST_SPACING / 2):
-                self.assertEqual(home.poll()[0], 0)
+                out = self.sweep(home, 'sweep.1')
+            self.assertNotIn(ts, out)
             self.assertEqual(len(self.theirs(starts)), 2)                        # their acknowledgement was never begun
-            self.assertEqual([row.get('attempted') for row in home.their_journal()['pending'] if row.get('thread') == ts], [None])
-            clock.advance(5.0)
-            rc, out, _ = home.poll()
-            self.assertEqual(rc, 0)
+            self.assertEqual([row for row in home.their_journal()['pending'] if row.get('thread') == ts], [])
+            out = self.sweep(home, 'sweep.2')
             self.assertIn('check: slack request %s from %s: %s %s' % (ts, SCOTT, SCOTT_LABEL, json.dumps('second request')), out)
+            answer, ack = self.theirs(starts)[1:]
+            self.assertGreaterEqual(ack - answer, plane.SECOND_POST_SPACING - self.NS)
             self.assertEqual([thread for channel, thread, _ in starts if channel == SCOTT_DM].count(ts), 1)
-            self.assertEqual(len(home.posts(ts)), 1)
+
+    def test_a_start_that_cannot_be_read_or_lies_ahead_of_the_clock_counts_as_just_now_and_never_waits_longer(self):
+        with self.scott() as (home, clock, starts):
+            key = self.take_in_scott(home, 'a question')
+            stamp = home.root / plane.SECOND_POST_FILE
+            for part, text in ((1, repr(plane.post_clock() + 3600.0)), (2, 'not a time'), (3, 'nan')):
+                clock.advance(10.0)
+                stamp.write_text(text)
+                before = clock.read()
+                self.assertEqual(home.reply(key, key, 'part %d' % part, part=part)[0], 0)
+                self.assertAlmostEqual(self.theirs(starts)[-1] - before, plane.SECOND_POST_SPACING, delta=self.NS)
+
+    def test_a_reply_whose_start_cannot_be_recorded_posts_nothing_and_says_why(self):
+        with self.scott() as (home, clock, starts):
+            key = self.take_in_scott(home, 'a question')
+            clock.advance(5.0)
+            stamp = home.root / plane.SECOND_POST_FILE
+            stamp.unlink()
+            stamp.mkdir()                                                        # a record that can be neither read nor replaced
+            rc, out, err = home.reply(key, key, 'an answer')
+            self.assertNotEqual(rc, 0)
+            self.assertIn('their_post_unrecorded', err)
+            self.assertEqual(len(self.theirs(starts)), 1)
+            stamp.rmdir()
+            self.assertEqual(home.reply(key, key, 'an answer')[0], 0)
+            self.assertEqual(len(self.theirs(starts)), 2)
 
     def test_the_owners_post_right_after_a_post_of_theirs_never_waits(self):
         with self.scott() as (home, clock, starts):
@@ -1675,6 +1721,48 @@ class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
             theirs = clock.read()
             self.assertEqual(home.reply(owner, owner, 'the owner answer')[0], 0)
             self.assertEqual([moment for channel, thread, moment in starts if channel == OWNER_DM and thread == owner][-1], theirs)
+
+    def test_an_owner_reply_started_while_a_reply_to_them_waits_out_the_spacing_runs_at_once(self):
+        with self.scott() as (home, clock, starts):
+            owner = home.say('an owner request')
+            key = self.take_in_scott(home, 'their request')
+            pacing, go, results, earlier = threading.Event(), threading.Event(), {}, len(starts)
+            texts = {'their-reply': 'their answer', 'owner-reply': 'the owner answer'}
+
+            class Stdin:
+                def read(self):
+                    return texts[threading.current_thread().name]
+
+            class Captured(plane.Out):
+                def write(self, stream, text):
+                    self.sent[stream] += text
+                    return True
+            stated = plane.pause
+
+            def pause(seconds):
+                if threading.current_thread().name == 'their-reply':
+                    pacing.set()
+                    go.wait(30)
+                stated(seconds)
+
+            def reply(name, thread):
+                out = Captured()
+                results[name] = (plane.reply_command(['--thread', thread, '--to', thread, '--replay', str(home.transcript)], out), out.sent['err'])
+            with patch.dict(os.environ, home.env), patch('sys.stdin', Stdin()), patch.object(plane, 'pause', pause):
+                theirs = threading.Thread(target=reply, args=('their-reply', key), name='their-reply', daemon=True)
+                theirs.start()
+                self.assertTrue(pacing.wait(30), 'the reply to them did not wait out the spacing')
+                mine = threading.Thread(target=reply, args=('owner-reply', owner), name='owner-reply', daemon=True)
+                mine.start()
+                mine.join(30)
+                finished_while_paced = not mine.is_alive() and theirs.is_alive()
+                go.set()
+                theirs.join(30)
+            self.assertTrue(finished_while_paced, 'the owner reply waited for the reply to them')
+            self.assertEqual(results, {'owner-reply': (0, ''), 'their-reply': (0, '')})
+            self.assertEqual([(channel, thread) for channel, thread, _ in starts[earlier:]], [(OWNER_DM, owner), (SCOTT_DM, key.partition('@')[0])])
+            ack, answer = self.theirs(starts)
+            self.assertGreaterEqual(answer - ack, plane.SECOND_POST_SPACING - self.NS)
 
 
 

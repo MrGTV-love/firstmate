@@ -89,6 +89,13 @@ from fm_slack_replay import Replay, ts_key
 REPO = Path(__file__).resolve().parents[1]
 
 
+def stated_post_clock(read):
+    """The wall clock their post spacing reads (plane.post_clock), driven by a stated clock: it starts one SECOND_POST_SPACING after this host's wall clock,
+    so a stated run follows every earlier run of the test as a later sweep does, and then moves only as the stated clock moves."""
+    base = time.time() + plane.SECOND_POST_SPACING - read()
+    return lambda: base + read()
+
+
 class CardRenderingTest(unittest.TestCase):
     def render(self, reason, body=(), scopes=True, card=None):
         watch = Watch.__new__(Watch)
@@ -4381,9 +4388,11 @@ class SecondPersonTest(unittest.TestCase):
         def call(self, method, **fields):
             now[0] += cost
             return real(self, method, **fields)
-        # The spacing of their posts (SECOND_POST_SPACING, Main 3350) waits on this clock too: a pause moves it, and no host time passes.
+        # The spacing of their posts (SECOND_POST_SPACING, Main 3350) waits on this clock too, from one run to the next as well (post_clock): a pause moves
+        # it, and no host time passes.
         with patch.object(plane, 'monotonic', lambda: now[0]), patch.object(Replay, 'call', call), \
-                patch.object(plane, 'pause', lambda seconds: now.__setitem__(0, now[0] + seconds)):
+                patch.object(plane, 'pause', lambda seconds: now.__setitem__(0, now[0] + seconds)), \
+                patch.object(plane, 'post_clock', stated_post_clock(lambda: now[0])):
             yield
 
     @contextmanager
@@ -5193,7 +5202,9 @@ class SecondPersonTest(unittest.TestCase):
             self.assertEqual(len(self.wakes(watch)), len(hostile))
             self.assertEqual({(tuple(c[0][2:]), c[1], tuple(c[2])) for c in children}, {(('binding', plane.SOURCE), None, ())})
             self.assertTrue(all(c[0][0] == 'bash' and c[0][1].endswith('fm-captain-hold.sh') for c in children))
-            self.assertEqual(sorted(path.name for path in watch.root.iterdir()), sorted(set(files_before) | {plane.SECOND_RECORD_FILE}))
+            # The only new files are their record store and the start of their latest post, which holds one number and nothing of their text.
+            self.assertEqual(sorted(path.name for path in watch.root.iterdir()), sorted(set(files_before) | {plane.SECOND_RECORD_FILE, plane.SECOND_POST_FILE}))
+            self.assertRegex((watch.root / plane.SECOND_POST_FILE).read_text(), r'\A[0-9]+(\.[0-9]+)?(e[+-]?[0-9]+)?\Z')
             self.assertFalse(Path('/tmp/pwned').exists())
 
     def test_sc6_a_plane_value_in_their_text_is_replaced_in_the_wake_the_record_and_the_journal(self):
@@ -5582,7 +5593,8 @@ class Invariant1Boundary(InvariantScenario):
                 if fields.get('channel') == INV_SECOND_DM or fields.get('users') == INV_SECOND:
                     clock[0] += 13.0                                         # one call of theirs uses up the whole budget
                 return real(replay, method, **fields)
-            with patch.object(Replay, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]):
+            with patch.object(Replay, 'call', slow), patch.object(plane, 'monotonic', lambda: clock[0]), \
+                    patch.object(plane, 'post_clock', stated_post_clock(lambda: clock[0])):
                 self.assertEqual(home.cli('check', action='arm', extra=None).rc, 0)
             post = '%.6f' % (home.replay_time(150.3, 0.4) + 0.05)
             home.say(post, 'typed after the arm')
@@ -5838,7 +5850,8 @@ class Invariant1Boundary(InvariantScenario):
                 if method == 'auth.test':
                     clock[0] += 9.0                                         # each clock probe is a slow, successful call
                 return real(replay, method, **fields)
-            with patch.object(Replay, 'call', call), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'pause', lambda seconds: None):
+            with patch.object(Replay, 'call', call), patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(plane, 'pause', lambda seconds: None), \
+                    patch.object(plane, 'post_clock', stated_post_clock(lambda: clock[0])):
                 self.assertEqual(home.cli('check', action='arm').rc, 0)
             self.assertLessEqual(clock[0], 9.0 + plane.SECOND_BUDGET + 9.0, clock)    # the owner's own auth.test, their budget, and one call begun inside it
 
@@ -6127,6 +6140,8 @@ if mode not in ('trickle', 'trickle-accepted'):
     plane.monotonic = lambda: clock[0]
     plane.pause = lambda seconds: clock.__setitem__(0, clock[0] + seconds)
     plane.clock_after = lambda moment: clock.__setitem__(0, max(clock[0], moment))
+    _wall_base = plane.post_clock() + plane.SECOND_POST_SPACING
+    plane.post_clock = lambda: _wall_base + clock[0]
 else:
     # The real transport (urllib, a real socket) carries every call of theirs to the local server of the test, on the real clock, with the time left that the
     # plane gave the transport; the reply the plane uses still comes from the replay.
@@ -7814,7 +7829,8 @@ class Round7Findings(InvariantScenario):
                 if left is not None and left() < 0:
                     raise fm_slack_module().DeadlineSpent()
             return real(replay, method, **fields)
-        with patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(Replay, 'call', slow):
+        with patch.object(plane, 'monotonic', lambda: clock[0]), patch.object(Replay, 'call', slow), \
+                patch.object(plane, 'post_clock', stated_post_clock(lambda: clock[0])):
             yield clock
 
     def test_r7_f5_a_span_longer_than_a_page_completes_under_repeated_deadline_cutoffs_and_its_requests_arrive_once(self):

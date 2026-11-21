@@ -343,10 +343,14 @@ class Slack:
     def _exchange(self, request, timeout, opener=None, scrub_with=None, sending=None):
         """One HTTP exchange: (the reply's Date header or None, its x-oauth-scopes header, the parsed body or None, the error to raise or None). It reads and writes
         no state of the transport, so that _bounded() can run it in a thread it may abandon; call() applies what it returns. sending, when given, is called
-        just before the request leaves (Main 3350: the caller spaces its posts from the moment each one is really sent)."""
+        just before the request leaves (Main 3350: the caller spaces its posts from the moment each one is really sent); a sending that raises OSError leaves
+        the request unsent, as a call not begun (DeadlineSpent with sent False)."""
         date, header = None, ''
         if sending is not None:
-            sending()
+            try:
+                sending()
+            except OSError:
+                return date, header, None, DeadlineSpent(sent=False)
         try:
             with (opener.open if opener else urllib.request.urlopen)(request, timeout=timeout) as response:
                 date = response.headers.get('Date', '')

@@ -3815,20 +3815,54 @@ prelude_step_commit() {
   PRELUDE_STEP=$PRELUDE_NEXT_STEP
 }
 
-# The sweep a released wake left unfinished (Main 3345 (1)): its token and the check it resumes at, kept until that sweep completes, however long
-# Firstmate's turn on the released wake took, so a busy sweep never starts over and starves the check it stopped before.
+# The sweep a released wake left unfinished (Main 3345 (1)): its token, the check it resumes at, the running Firstmate session (its session-lock pid and
+# that process's start time) and that check's registration (its trusted hash and the trust record's inode and mtime). It is kept until that sweep completes,
+# however long Firstmate's turn on the released wake took, so a busy sweep never starts over and starves the check it stopped before. A record of another
+# or ended session (a restart, a reboot, an outage), or of a check that changed, was removed, re-armed or is no longer trusted, is dropped, and a new
+# sweep starts from its first check with a new token.
 SWEEP_RESUME_FILE="$STATE/.check-sweep-resume"
+sweep_session_identity() {
+  local pid start
+  pid=$(cat "$STATE/.lock" 2>/dev/null) || return 1
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  start=$(LC_ALL=C ps -o lstart= -p "$pid" 2>/dev/null | awk '{$1=$1; print}')
+  [ -n "$start" ] || return 1
+  printf '%s %s\n' "$pid" "$start"
+}
+sweep_check_identity() {  # <check path>
+  local id trust inode mtime
+  id=$(basename "$1" .check.sh)
+  fm_custom_check_registered "$STATE" "$id" || return 1
+  trust="$STATE/$id.check-trust"
+  inode=$(fm_pr_file_inode "$trust") && mtime=$(stat_mtime "$trust") || return 1
+  [ -n "$inode" ] && [ -n "$mtime" ] || return 1
+  printf '%s %s %s\n' "$FM_CUSTOM_CHECK_HASH" "$inode" "$mtime"
+}
 sweep_resume_save() {  # <check path>
-  printf '%s\n%s\n' "$FM_CHECK_SWEEP" "$1" > "$SWEEP_RESUME_FILE.tmp.$$" \
-    && mv -f "$SWEEP_RESUME_FILE.tmp.$$" "$SWEEP_RESUME_FILE" || { rm -f -- "$SWEEP_RESUME_FILE.tmp.$$"; return 1; }
+  local session check
+  if ! session=$(sweep_session_identity) || ! check=$(sweep_check_identity "$1"); then
+    rm -f -- "$SWEEP_RESUME_FILE"
+    return 0
+  fi
+  if ! { printf '%s\n%s\n%s\n%s\n' "$FM_CHECK_SWEEP" "$1" "$session" "$check" > "$SWEEP_RESUME_FILE.tmp.$$" \
+    && mv -f "$SWEEP_RESUME_FILE.tmp.$$" "$SWEEP_RESUME_FILE"; }; then
+    rm -f -- "$SWEEP_RESUME_FILE.tmp.$$"
+    return 1
+  fi
 }
 sweep_resume_load() {
-  local token='' check=''
+  local token='' check='' session='' identity='' current
   SWEEP_RESUME_TOKEN='' SWEEP_RESUME_CHECK=''
   [ -f "$SWEEP_RESUME_FILE" ] && [ ! -L "$SWEEP_RESUME_FILE" ] || return 1
-  { IFS= read -r token && IFS= read -r check; } < "$SWEEP_RESUME_FILE" || { rm -f -- "$SWEEP_RESUME_FILE"; return 1; }
+  { IFS= read -r token && IFS= read -r check && IFS= read -r session && IFS= read -r identity; } < "$SWEEP_RESUME_FILE" \
+    || { rm -f -- "$SWEEP_RESUME_FILE"; return 1; }
   case "$token" in ''|*[!A-Za-z0-9.]*) rm -f -- "$SWEEP_RESUME_FILE"; return 1 ;; esac
   case "$check" in "$STATE"/*.check.sh) ;; *) rm -f -- "$SWEEP_RESUME_FILE"; return 1 ;; esac
+  if ! current=$(sweep_session_identity) || [ -z "$session" ] || [ "$current" != "$session" ] \
+    || ! current=$(sweep_check_identity "$check") || [ -z "$identity" ] || [ "$current" != "$identity" ]; then
+    rm -f -- "$SWEEP_RESUME_FILE"
+    return 1
+  fi
   SWEEP_RESUME_TOKEN=$token SWEEP_RESUME_CHECK=$check
 }
 # What a sweep reports once its checks have run, or when it releases a wake early: the rejected unauthenticated checks it met, then contribution output.

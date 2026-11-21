@@ -36,6 +36,7 @@ import fcntl
 import hashlib
 import itertools
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -143,8 +144,8 @@ SECOND_BUDGET = 27.0
 OWNER_WAKE_WAIT_BOUND = 24.0
 # The strict documented rate (Main 3345, 3350): chat.postMessage generally takes one message a second in one channel, and all their posts go to their one
 # DM, so the starts of their posts are at least this far apart in every run and from one run to the next: 1.0 s plus 0.05 s of margin. Each post of theirs
-# that may have reached Slack journals when its exchange ended (post_at, in their journal), and the first post of theirs of the next run (an acknowledgement
-# of their check or a reply to them) begins at least this long after it (their_post_wait). The spacing is kept again where each post really
+# records when it begins, before it is sent and again where it really leaves (SECOND_POST_FILE); a run that may post into their DM waits out the rest of
+# the spacing before it takes the journal lock (take_lock), never while holding it or the binding fence. The spacing is kept again where each post really
 # leaves (post_leaving, called by the transport just before the request is sent), because the plane's own send path between its guard and the request leaving
 # varies: before that, posts reached the fake Slack as little as 0.968 s apart at low load and 0.799 s apart at load about 15 (redesign/report.md). No burst
 # is assumed.
@@ -330,6 +331,10 @@ RECORD_FILE = 'requests.jsonl'
 # The second person's pass keeps its own journal and its own record store in the plane's state folder, apart from the owner's state.json and requests.jsonl, so
 # that the owner's pass reads and writes exactly the base state bytes (Main's design ruling of order 1307).
 SECOND_FILE = 'second.json'
+# When the latest post into their DM began, on this host's wall clock (post_clock), from any run: written before each post of theirs is sent and again
+# where it really leaves, under the journal lock; one process writes it in one turn (SECOND_POST_TURN).
+SECOND_POST_FILE = 'second-post-at'
+SECOND_POST_TURN = threading.Lock()
 SECOND_RECORD_FILE = 'second-requests.jsonl'
 SECOND_SCHEMA = 'fm-slack-second.v1'
 # Every member id the setting has named, as a one-way hash (so that a protected value equal to an id never stops it being recorded), one per line, append only:
@@ -904,7 +909,7 @@ def pause(seconds):
 
 
 def post_clock():
-    """This host's wall clock for the spacing of their posts from one run to the next (post_at): runs are separate processes, so their monotonic clocks do
+    """This host's wall clock for the spacing of their posts from one run to the next (SECOND_POST_FILE): runs are separate processes, so their monotonic clocks do
     not compare. A name of its own so that a test with a stated clock can state it too."""
     return time.time()
 
@@ -1404,7 +1409,7 @@ class Watch:
     # The monotonic start of a run of main, set before its first step, so that their check's budget counts everything from there (F8 of the review of c5868b6f).
     run_origin = None
 
-    def __init__(self, replay=None, token=None):
+    def __init__(self, replay=None, token=None, pace=False):
         # The monotonic time this run began, before its journal lock (and, for a run of main, before its early id record): the second person's check counts
         # every wait inside its own time budget; and its wall time, which dates a cap hand-over (R5 of the review of 64ac348b).
         self.run_started = Watch.run_origin if Watch.run_origin is not None else monotonic()
@@ -1425,6 +1430,9 @@ class Watch:
         if self.path.is_symlink() or self.lock_path.is_symlink():
             raise SlackError('unsafe_state_path')
         self.lock = open(self.lock_path, 'a')
+        # A run that may post into their DM (a reply to them, their check, the manual poll) takes the journal lock only once the spacing from the latest
+        # post of theirs has passed (take_lock); the owner's standing check and every other run never wait for it.
+        self.pacing = bool(pace) and bool(second_user()[0])
         self.replay = replay
         self.token = token or ''
         # FM_SLACK_NO_NETWORK (test and verification runs) closes the real transport: a run that forgot its replay
@@ -1495,7 +1503,7 @@ class Watch:
         # The end of the second person's time budget while one is in force (second_budget), else None, and the longest call of theirs this run has made.
         self.budget_deadline = None
         self.slowest_call = 0.0
-        # When this run's last post into their DM began (their pass's guard) and really left (post_leaving); none yet (their_post_wait reads their journal).
+        # When this run's last post into their DM began (their pass's guard) and really left (post_leaving); none yet in this run.
         self.last_post_start = self.post_left_at = None
         # The printer the caller runs between the owner's pass and the second person's (poll), and the owner's failure of this poll, raised after both.
         self.before_second = None
@@ -1529,19 +1537,33 @@ class Watch:
 
     def take_lock(self, wait):
         """The journal lock. With wait (the second person's check, Main 1621 (10)): only while their time budget lasts, counted from the start of the run; a
-        lock still held then ends their check with nothing done and nothing lost (SecondBudgetSpent), so another holder never keeps the sweep past their budget."""
-        if wait is None:
-            fcntl.flock(self.lock, fcntl.LOCK_EX)
-            return
+        lock still held then ends their check with nothing done and nothing lost (SecondBudgetSpent), so another holder never keeps the sweep past their budget.
+        A pacing run that finds the latest post of theirs less than SECOND_POST_SPACING ago lets the lock go, waits out the rest and takes it again, so the
+        wait holds no lock and every check of the run comes after it; a wait that would end past their budget ends their check the same way. A record still
+        unchanged after its whole wait (an unknown start, counted as just now) is not waited for again."""
+        waited = None
         while True:
-            try:
-                fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if wait is None:
+                fcntl.flock(self.lock, fcntl.LOCK_EX)
+            else:
+                while True:
+                    try:
+                        fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if monotonic() - self.run_started >= wait:
+                            self.lock.close()
+                            raise SecondBudgetSpent() from None
+                        time.sleep(LOCK_POLL)
+            record, rest = self.their_spacing() if self.pacing else (None, 0.0)
+            if rest <= 0 or (waited is not None and record == waited):
                 return
-            except BlockingIOError:
-                if monotonic() - self.run_started >= wait:
-                    self.lock.close()
-                    raise SecondBudgetSpent() from None
-                time.sleep(LOCK_POLL)
+            fcntl.flock(self.lock, fcntl.LOCK_UN)
+            if wait is not None and monotonic() + rest - self.run_started >= wait:
+                self.lock.close()
+                raise SecondBudgetSpent()
+            pause(rest)
+            waited = record
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -2000,8 +2022,8 @@ class Watch:
                 if not ready:
                     # The request before this one ended without its post: this post is not begun (nothing was sent), and the lane stops (AckLane).
                     raise SecondBudgetSpent(sent=False)
-                if paced:
-                    wait = self.their_post_wait()
+                if paced and self.last_post_start is not None:
+                    wait = self.last_post_start + SECOND_POST_SPACING - monotonic()
                     if wait > 0:
                         pause(wait)
                 begun = monotonic()
@@ -2012,6 +2034,11 @@ class Watch:
                     # by the next run, never woken as unknown (SC2, SC8 (6) LIVENESS).
                     raise SecondBudgetSpent(sent=False)
                 if paced:
+                    try:
+                        self.record_their_post()
+                    except OSError:
+                        # A start that cannot be recorded never certifies the spacing: the post is not begun.
+                        raise SecondBudgetSpent(sent=False) from None
                     self.last_post_start = begun
                     if lane is not None:
                         lane.began()                                        # the next request's post may follow, spaced (AckLane)
@@ -2054,37 +2081,52 @@ class Watch:
             else:
                 api.time_left = earlier_left
 
-    def their_post_wait(self):
-        """How long the next post into their DM waits, never more than SECOND_POST_SPACING: until SECOND_POST_SPACING after the start of this run's last post of
-        theirs, or, before this run has begun one, after the end of the last post of theirs the journal holds (post_at, of an earlier run or an earlier phase
-        of this one). A clock step can neither stall a post nor bring it closer than that."""
-        if self.last_post_start is not None:
-            wait = self.last_post_start + SECOND_POST_SPACING - monotonic()
-        else:
-            ended = self.state.get('post_at')
-            if not isinstance(ended, (int, float)) or isinstance(ended, bool):
-                return 0.0
-            wait = ended + SECOND_POST_SPACING - post_clock()
-        return min(SECOND_POST_SPACING, max(0.0, wait))
+    def their_spacing(self):
+        """(the record, how much of SECOND_POST_SPACING is still left) since the latest post into their DM began, in any run (SECOND_POST_FILE): nothing left
+        when no post of theirs was ever recorded; the whole spacing when the record cannot be read or lies ahead of this host's clock (a clock that stepped
+        back), since an unknown start is never taken for an old one; never more than SECOND_POST_SPACING."""
+        try:
+            text = (self.root / SECOND_POST_FILE).read_text()
+        except FileNotFoundError:
+            return None, 0.0
+        except OSError:
+            return OSError, SECOND_POST_SPACING
+        try:
+            began = float(text)
+        except ValueError:
+            return text, SECOND_POST_SPACING
+        now = post_clock()
+        if not math.isfinite(began) or began > now:
+            return text, SECOND_POST_SPACING
+        return text, min(SECOND_POST_SPACING, max(0.0, began + SECOND_POST_SPACING - now))
 
-    def note_their_post(self, commit=False):
-        """A post of theirs may have reached Slack and its exchange has ended: their journal keeps when (post_at), for the first post of theirs of the next run.
-        An acknowledgement's own next commit carries it; a reply, which has none, commits it here, and a failure to write it never turns a post into a
-        refusal."""
-        self.state['post_at'] = post_clock()
-        if commit:
-            with contextlib.suppress(SlackError, OSError):
-                self.commit()
+    def record_their_post(self):
+        """Record that a post into their DM begins now (SECOND_POST_FILE), before anything of it is sent: a record that cannot be written raises OSError,
+        and the caller sends nothing. It is replaced whole and not synced to disk: it orders posts of one boot only, and a later boot is past it anyway."""
+        with SECOND_POST_TURN:
+            path = self.root / SECOND_POST_FILE
+            if path.is_symlink():
+                raise OSError('unsafe_state_path')
+            fd, name = tempfile.mkstemp(prefix='.slack-', dir=self.root)
+            try:
+                with os.fdopen(fd, 'w') as out:
+                    out.write(repr(post_clock()))
+                os.replace(name, path)
+            finally:
+                if os.path.exists(name):
+                    os.unlink(name)
 
     def post_leaving(self):
         """Called by the real transport just before a post of theirs leaves (in its reader thread): wait until SECOND_POST_SPACING after the post before it
-        really left, then note this one. Host time, as the transport's own; a post the guard began late is never sent early."""
+        really left, then note this one, and record this moment as its start for later runs (a record that cannot be written raises OSError, and the
+        transport sends nothing). Host time, as the transport's own; a post the guard began late is never sent early."""
         with self.__dict__.setdefault('_post_leaving_turn', threading.Lock()):
             left_at = getattr(self, 'post_left_at', None)
             if left_at is not None:
                 wait = left_at + SECOND_POST_SPACING - time.monotonic()
                 if wait > 0:
                     pause(wait)
+            self.record_their_post()
             self.post_left_at = time.monotonic()
 
     def second_window(self):
@@ -2175,18 +2217,19 @@ class Watch:
                 # class is read back from this commit after a restart (F6 of the review of 5048f815).
                 row.pop('attempt_class', None)
                 self.commit()
-            their = person == 'second' or (row is not None and row.get('person') == 'second')
-            if their and self.budget_deadline is None:
-                # A post of theirs outside their pass's guard (a reply to them, its own run) keeps the spacing from the last post of theirs the journal holds.
-                pause(self.their_post_wait())
+            if person == 'second':
+                # Firstmate's answer to them: its run took the journal lock only once the spacing had passed (take_lock), and it records its start before it is
+                # sent; a start that cannot be recorded sends nothing.
+                try:
+                    self.record_their_post()
+                except OSError:
+                    raise SlackError('their_post_unrecorded') from None
             try:
                 answer = self.api.call('chat.postMessage', **args)
                 if not isinstance(answer, dict) or not isinstance(answer.get('ts'), str):
                     raise SlackError('slack_outcome_unknown')        # an answer that is not ok with a ts proves nothing
                 ts = answer['ts']
             except SecondBudgetSpent as cut:
-                if their and cut.sent:
-                    self.note_their_post(commit=row is None)
                 if row is not None and row.get('person') == 'second':
                     if not cut.sent:
                         self.surely_absent(row)
@@ -2194,16 +2237,12 @@ class Watch:
                         self.attempt_class(row, 'ambiguous')
                 raise
             except SlackError as error:
-                if their and str(error) not in SURELY_ABSENT:
-                    self.note_their_post(commit=row is None)
                 if row is not None and row.get('person') == 'second':
                     if str(error) in SURELY_ABSENT:
                         self.surely_absent(row)
                     else:
                         self.attempt_class(row, 'answered' if str(error) in ANSWERED else 'ambiguous')
                 raise
-            if their:
-                self.note_their_post(commit=row is None)
             self.posted_fresh = True
             return ts
 
@@ -3868,8 +3907,8 @@ class Watch:
         Proof (Main 1706, 1710 (c), 2190, 2214; F5 of the review of 5048f815): a hand-over gives them part of the cap only when it is the owner check's final
         write of THIS sweep: it carries the watcher's token of the sweep this check runs in (FM_CHECK_SWEEP, the same for both checks of one sweep) and
         `complete` (leave_cap writes it after all owner work). The watcher's end-of-sweep mark (.last-check) comes after this check in the same sweep, so it
-        cannot be that proof; a hand-over of an interrupted or earlier sweep never matches again, because every later sweep, and a restarted watcher, has
-        another token. With no token (a check run by hand), another token, or no complete write (the owner check stopped before it), nothing of the cap is
+        cannot be that proof; a hand-over of an interrupted or earlier sweep never matches again, because every later sweep has another token, and a
+        restarted watcher keeps a sweep's token only to resume that sweep at this check in the same Firstmate session (bin/fm-watch.sh). With no token (a check run by hand), another token, or no complete write (the owner check stopped before it), nothing of the cap is
         given and the last completed watermark stays; the owner's work and their work that takes no slot (refusals, card observation) go on."""
         view = self.second_view()
         ledger = view.state.get('cap_left') if isinstance(view.state.get('cap_left'), dict) else {}
@@ -5275,7 +5314,7 @@ def plane_watch(name, options, out):
         raise SlackError(reason)
     replay = Replay(options['replay'], state_home() / STATE_KEY,
                     token_present=bool(env_value('SLACK_BOT_TOKEN'))) if options.get('replay') else None
-    watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
+    watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip(), pace=name == 'reply' and '@' in (options.get('thread') or ''))
     try:
         watch.out = out
         watch.remember_safely()
@@ -5430,7 +5469,7 @@ def main(argv, out=None):
         # Their check waits for the journal lock only inside its budget (take_lock); the token read below is the base's, unchanged (SC6).
         Watch.lock_wait = SECOND_BUDGET if action == 'check-second' else None
         try:
-            watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
+            watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip(), pace=command == 'poll' or action == 'check-second')
         except SecondBudgetSpent:
             # Their check could not take the journal lock inside its budget (finding 10 of the review of d9861b24): nothing was read or written; the next sweep
             # takes their work.

@@ -510,14 +510,14 @@ SH
 # Main 3345 (1): the owner's Slack check (slack) queues a wake in every sweep and the second person's check (slacksecond, which sorts after it) is slow.
 # The queued wake is released at once, never after their check; the next watcher run resumes the same sweep at their check, with the same sweep token, and
 # runs no earlier check of that sweep again. With <long-turn> set, Firstmate's turn on the released wake outlasts the check interval before the watcher runs
-# again: the sweep is still resumed at their check, so an owner wake in every sweep never starves it.
-released_wake_resumes_the_sweep_at_the_second_person_check() {  # <name> [long-turn]
-  local name=$1 long_turn=${2:-} home out1 out2 out3 err status1 status2 status3 start took slack_token second_token drained
+# again: the sweep is still resumed at their check, so an owner wake in every sweep never starves it. The running Firstmate session is this test's shell
+# (its pid in state/.lock).
+released_wake_setup() {  # <name>: prints the home after the first sweep released the owner's wake before the second person's check
+  local name=$1 home out1 err status1 start took drained
   home=$(make_home "$name")
   out1="$home/out1.txt"
-  out2="$home/out2.txt"
-  out3="$home/out3.txt"
   err="$home/err.txt"
+  printf '%s\n' "$$" > "$home/state/.lock"
   cat > "$home/state/slack.check.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'slack %s\n' "${FM_CHECK_SWEEP:-missing}" >> "$FM_HOME/sweeps.log"
@@ -543,12 +543,21 @@ SH
   if grep -q '^slacksecond-end ' "$home/sweeps.log"; then
     fail "the owner's wake waited for the second person's check (released after ${took}s): $(cat "$home/sweeps.log")"
   fi
+  [ -f "$home/state/.check-sweep-resume" ] || fail "the released sweep left no resume record"
   # Firstmate handles the wake: it drains the queue and acknowledges it, then runs the watcher again.
   drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>"$home/drain.err")
   assert_contains "$drained" "owner wake line" "the owner's wake was not in the durable queue: $drained"
   ack_drain_err "$home/state" "$home/drain.err" >/dev/null || fail "could not acknowledge the drain: $(cat "$home/drain.err")"
+  printf '%s\n' "$home"
+}
+
+released_wake_resumes_the_sweep_at_the_second_person_check() {  # <name> [long-turn]
+  local name=$1 long_turn=${2:-} home out2 out3 err status2 status3 slack_token second_token drained
+  home=$(released_wake_setup "$name") || exit 1
+  out2="$home/out2.txt"
+  out3="$home/out3.txt"
+  err="$home/err.txt"
   if [ -n "$long_turn" ]; then
-    [ -f "$home/state/.check-sweep-resume" ] || fail "the released sweep left no resume record"
     touch -t 200001010000 "$home/state/.check-sweep-resume"
   fi
   status2=0
@@ -587,6 +596,52 @@ test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_r
 test_an_owner_turn_longer_than_the_check_interval_still_resumes_the_sweep_at_the_second_person_check() {
   released_wake_resumes_the_sweep_at_the_second_person_check slack-release-long-turn long-turn
   pass "an owner turn longer than the check interval still resumes the released sweep at the second person's check"
+}
+
+# A resume record that no longer names the running session and the registered check is dropped: the next sweep starts from its first check with a new
+# token, so the owner's check runs again and its wake is again released before the second person's check, which takes no stale token.
+stale_resume_starts_a_new_sweep() {  # <name> <session-replaced|session-ended|check-rearmed|check-changed|check-removed|record-invalid>
+  local name=$1 how=$2 home out2 err status2 ended
+  home=$(released_wake_setup "$name") || exit 1
+  out2="$home/out2.txt"
+  err="$home/err.txt"
+  case "$how" in
+    session-replaced)
+      printf '%s\n' "$PPID" > "$home/state/.lock" ;;
+    session-ended)
+      sh -c 'exit 0' &
+      ended=$!
+      wait "$ended"
+      printf '%s\n' "$ended" > "$home/state/.lock" ;;
+    check-rearmed)
+      sleep 1
+      rm -f -- "$home/state/slacksecond.check-trust"
+      FM_HOME="$home" "$ROOT/bin/fm-check-register.sh" slacksecond >/dev/null || fail "could not register slacksecond again" ;;
+    check-changed)
+      printf '# changed\n' >> "$home/state/slacksecond.check.sh" ;;
+    check-removed)
+      rm -f -- "$home/state/slacksecond.check.sh" "$home/state/slacksecond.check-trust" ;;
+    record-invalid)
+      printf 'not a token!\n' > "$home/state/.check-sweep-resume" ;;
+  esac
+  status2=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=300 "$CHECKPOINT" --seconds 40 >"$out2" 2>>"$err" || status2=$?
+  expect_code 0 "$status2" "the checkpoint after a stale record ($how): $(cat "$out2" "$err")"
+  assert_contains "$(cat "$out2")" "owner wake line" "a stale record ($how) skipped the owner's check: $(cat "$out2")"
+  [ "$(grep -c '^slack ' "$home/sweeps.log")" -eq 2 ] || fail "a stale record ($how) did not run the owner's check again: $(cat "$home/sweeps.log")"
+  [ "$(awk '$1 == "slack" {print $2}' "$home/sweeps.log" | sort -u | wc -l | tr -d ' ')" -eq 2 ] \
+    || fail "a stale record ($how) kept its token: $(cat "$home/sweeps.log")"
+  if grep -q '^slacksecond-start ' "$home/sweeps.log"; then
+    fail "a stale record ($how) ran the second person's check before the owner's wake: $(cat "$home/sweeps.log")"
+  fi
+}
+
+test_a_resume_record_of_another_or_ended_session_or_a_changed_check_starts_a_new_sweep() {
+  local how
+  for how in session-replaced session-ended check-rearmed check-changed check-removed record-invalid; do
+    stale_resume_starts_a_new_sweep "slack-release-stale-$how" "$how"
+  done
+  pass "a resume record of another or ended session, or of a changed, re-armed or removed check, starts a new sweep"
 }
 
 test_due_checks_precede_repeated_unmanaged_recovery() {
@@ -850,6 +905,7 @@ test_registered_check_uses_preserved_watcher_environment
 test_checks_of_one_sweep_share_one_sweep_token_and_the_next_sweep_gets_a_new_one
 test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_resumes_that_sweep_at_it
 test_an_owner_turn_longer_than_the_check_interval_still_resumes_the_sweep_at_the_second_person_check
+test_a_resume_record_of_another_or_ended_session_or_a_changed_check_starts_a_new_sweep
 test_due_checks_precede_repeated_unmanaged_recovery
 test_existing_singleton_watcher_is_not_success
 test_host_checkpoint_bounds_the_park_by_posture

@@ -527,6 +527,8 @@ def second_person_owner_release():
     import fm_slack_watch as plane
     with tempfile.TemporaryDirectory(prefix='fm-slack-second-release-') as tmp:
         home, env = home_for(tmp, True)
+        # The running Firstmate session is this test's process (its pid in state/.lock): the released sweep is resumed only in that session.
+        (home / 'state/.lock').write_text('%d\n' % os.getpid())
         say(home, '2000.000100', 'U0TESTOWNER', 'an owner request')
         say(home, '2000.000200', SECOND, 'a second person request', SECOND_DM)
         run_env = dict(env, FM_TEST_SLACK_SCENARIO='priced', FM_TEST_SLACK_COST='1.0', FM_POLL='1', FM_SIGNAL_GRACE='1', FM_CHECK_INTERVAL='300')
