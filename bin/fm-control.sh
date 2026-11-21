@@ -1538,10 +1538,6 @@ require_live_task_attribution() {
     ATTRIBUTION_REFUSAL=$FM_LAUNCH_PROOF_RECORD_CAUSE
     return 1
   fi
-  if [ "$(fm_launch_proof_field "$META" window)" != "$T" ]; then
-    ATTRIBUTION_REFUSAL="its record no longer names the endpoint $T this action targets"
-    return 1
-  fi
   if ATTRIBUTION_REFUSAL=$(fm_launch_proof_herdr_refusal "$META" "$T"); then
     ATTRIBUTION_REFUSAL=''
     return 0
