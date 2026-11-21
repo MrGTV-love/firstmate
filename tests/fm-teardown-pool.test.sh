@@ -6424,50 +6424,62 @@ test_unclaimed_held_close_leaves_only_the_kept_copy_out_of_the_process_scan() {
 
 # The retire step of the unclaimed route on a retry: the own copy the closeout driver kept (WT, which the
 # route lists in no nested-copy array before its custody walk) and a kept prior copy inside the slot are no
-# swept or retired root, so no run is concluded, no agent retired and no process reaped in them.
+# swept or retired root, so no run is concluded, no agent retired and no process reaped in them. The
+# driver's record is keyed on the copy's canonical path, so a record whose worktree= is an alias of the
+# kept copy (a symlink to it) is found the same way.
 # The functions eval'd from bin/fm-teardown.sh read these variables and call these stubs.
 # shellcheck disable=SC2030,SC2031,SC2034,SC2329
 test_unclaimed_retire_step_leaves_a_kept_own_copy_alone() {
-  local dir out
-  dir=$TMP_ROOT/unc7-retire-kept
-  rm -rf "$dir"
-  mkdir -p "$dir/pool/1/proj/nested" "$dir/pool/1/proj/prior-kept" "$dir/pool/1/proj/prior-plain" "$dir/tmp" "$dir/state"
-  : > "$dir/state/meta"
-  out=$(
-    set -u
-    exec 2>&1
-    # shellcheck source=bin/fm-refuse-lib.sh
-    . "$ROOT/bin/fm-refuse-lib.sh"
-    # shellcheck source=bin/fm-task-copy-lib.sh
-    . "$ROOT/bin/fm-task-copy-lib.sh"
-    eval "$(unc6_functions teardown_nested_slot)"
-    ID=task-x1 KIND=ship FORCE='' PROJ=$dir/project WT=$dir/pool/1/proj/nested TASK_TMP=$dir/tmp META=$dir/state/meta STATE=$dir/state
-    SLOT=$dir/pool/1/proj
-    TEARDOWN_UNCLAIMED_SLOT=$SLOT TEARDOWN_UNCLAIMED_EARLY='recovered|protected: new|id-1|1'
-    TEARDOWN_RETURN_SLOT='' TEARDOWN_NESTED_COPIES=() TEARDOWN_PROOF_COPIES=() TEARDOWN_PRIOR_COPIES=()
-    teardown_unclaimed_retire_gate() { return 0; }
-    teardown_unclaimed_pass() { return 0; }
-    teardown_mark_return_pending() { :; }
-    teardown_unclaimed_root_is_own() { return 0; }
-    fm_task_copy_priors_inside() { printf '%s\n' "$SLOT/prior-kept" "$SLOT/prior-plain"; }
-    teardown_retained_copy_held() { [ "$1" = "$WT" ] || [ "$1" = "$SLOT/prior-kept" ]; }
-    conclude_task_no_mistakes_run() { echo "CONCLUDE $1"; }
-    retire_task_private_nm_launch_agents() { echo "AGENTS $1"; }
-    teardown_foreign_procs_retire() { :; }
-    reap_task_worktree_processes() { shift; echo "REAP $*"; }
-    teardown_nested_slot retire
-    echo RETIRE_DONE
-  ) 2>&1
-  assert_contains "$out" "RETIRE_DONE" "the retire step did not finish:"$'\n'"$out"
-  assert_contains "$out" "own nested copy $dir/pool/1/proj/nested was kept by Vernant's closeout driver" \
-    "the retire step did not name the kept own copy it leaves alone:"$'\n'"$out"
-  assert_not_contains "$out" "CONCLUDE $dir/pool/1/proj/nested" "a run was concluded in the kept own copy:"$'\n'"$out"
-  assert_not_contains "$out" "AGENTS $dir/pool/1/proj/nested" "an agent was retired in the kept own copy:"$'\n'"$out"
-  assert_not_contains "$out" "REAP $dir/pool/1/proj/nested" "processes were reaped in the kept own copy:"$'\n'"$out"
-  assert_not_contains "$out" "$dir/pool/1/proj/prior-kept" "the kept prior copy was retired:"$'\n'"$out"
-  assert_contains "$out" "CONCLUDE $dir/pool/1/proj/prior-plain" "the plain prior copy lost its run conclusion:"$'\n'"$out"
-  assert_contains "$out" "CONCLUDE $dir/pool/1/proj"$'\n' "the slot root lost its run conclusion:"$'\n'"$out"
-  pass 'the unclaimed retire step leaves the own copy and a prior copy the closeout driver kept out of every run conclusion, agent retirement and reap, and still retires the slot root and the plain prior copy'
+  local dir out spelling wt
+  for spelling in canonical alias; do
+    dir=$TMP_ROOT/unc7-retire-kept-$spelling
+    rm -rf "$dir"
+    mkdir -p "$dir/pool/1/proj/nested" "$dir/pool/1/proj/prior-kept" "$dir/pool/1/proj/prior-plain" "$dir/tmp" "$dir/state"
+    : > "$dir/state/meta"
+    wt=$dir/pool/1/proj/nested
+    if [ "$spelling" = alias ]; then
+      ln -s "$dir/pool/1/proj/nested" "$dir/pool/1/proj/alias-of-copy"
+      wt=$dir/pool/1/proj/alias-of-copy
+    fi
+    out=$(
+      set -u
+      exec 2>&1
+      # shellcheck source=bin/fm-refuse-lib.sh
+      . "$ROOT/bin/fm-refuse-lib.sh"
+      # shellcheck source=bin/fm-task-copy-lib.sh
+      . "$ROOT/bin/fm-task-copy-lib.sh"
+      eval "$(unc6_functions teardown_nested_slot)"
+      ID=task-x1 KIND=ship FORCE='' PROJ=$dir/project WT=$wt TASK_TMP=$dir/tmp META=$dir/state/meta STATE=$dir/state
+      SLOT=$dir/pool/1/proj
+      TEARDOWN_UNCLAIMED_SLOT=$SLOT TEARDOWN_UNCLAIMED_EARLY='recovered|protected: new|id-1|1'
+      TEARDOWN_RETURN_SLOT='' TEARDOWN_NESTED_COPIES=() TEARDOWN_PROOF_COPIES=() TEARDOWN_PRIOR_COPIES=()
+      teardown_unclaimed_retire_gate() { return 0; }
+      teardown_unclaimed_pass() { return 0; }
+      teardown_mark_return_pending() { :; }
+      teardown_unclaimed_root_is_own() { return 0; }
+      fm_task_copy_priors_inside() { printf '%s\n' "$SLOT/prior-kept" "$SLOT/prior-plain"; }
+      teardown_retained_copy_held() { [ "$1" = "$SLOT/nested" ] || [ "$1" = "$SLOT/prior-kept" ]; }
+      conclude_task_no_mistakes_run() { echo "CONCLUDE $1"; }
+      retire_task_private_nm_launch_agents() { echo "AGENTS $1"; }
+      teardown_foreign_procs_retire() { :; }
+      reap_task_worktree_processes() { shift; echo "REAP $*"; }
+      teardown_nested_slot retire
+      echo RETIRE_DONE
+    ) 2>&1
+    assert_contains "$out" "RETIRE_DONE" "$spelling: the retire step did not finish:"$'\n'"$out"
+    assert_contains "$out" "own nested copy $dir/pool/1/proj/nested was kept by Vernant's closeout driver" \
+      "$spelling: the retire step did not name the kept own copy it leaves alone:"$'\n'"$out"
+    assert_not_contains "$out" "CONCLUDE $dir/pool/1/proj/nested" "$spelling: a run was concluded in the kept own copy:"$'\n'"$out"
+    assert_not_contains "$out" "AGENTS $dir/pool/1/proj/nested" "$spelling: an agent was retired in the kept own copy:"$'\n'"$out"
+    assert_not_contains "$out" "REAP $dir/pool/1/proj/nested" "$spelling: processes were reaped in the kept own copy:"$'\n'"$out"
+    assert_not_contains "$out" "CONCLUDE $wt" "$spelling: a run was concluded in the record's spelling of the kept copy:"$'\n'"$out"
+    assert_not_contains "$out" "AGENTS $wt" "$spelling: an agent was retired in the record's spelling of the kept copy:"$'\n'"$out"
+    assert_not_contains "$out" "REAP $wt" "$spelling: processes were reaped in the record's spelling of the kept copy:"$'\n'"$out"
+    assert_not_contains "$out" "$dir/pool/1/proj/prior-kept" "$spelling: the kept prior copy was retired:"$'\n'"$out"
+    assert_contains "$out" "CONCLUDE $dir/pool/1/proj/prior-plain" "$spelling: the plain prior copy lost its run conclusion:"$'\n'"$out"
+    assert_contains "$out" "CONCLUDE $dir/pool/1/proj"$'\n' "$spelling: the slot root lost its run conclusion:"$'\n'"$out"
+  done
+  pass 'the unclaimed retire step leaves the own copy and a prior copy the closeout driver kept out of every run conclusion, agent retirement and reap, also when the record names the kept copy by an alias, and still retires the slot root and the plain prior copy'
 }
 
 # Copies a spawn skipped and left leased (bin/fm-spawn.sh) are released by teardown, and only by it, and only

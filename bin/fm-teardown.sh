@@ -6524,8 +6524,9 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       # in it. A process found in it through the slot's scan refuses by name instead.
       still=()
       for root in "${swept[@]}"; do
-        if teardown_retained_copy_held "$root"; then
-          echo "teardown: own nested copy $(fm_refuse_text "$root") was kept by Vernant's closeout driver and is unchanged since; nothing in it is ended or signalled" >&2
+        copy=$(fm_task_copy_canonical_dir "$root" 2>/dev/null) || copy=$root
+        if teardown_retained_copy_held "$copy"; then
+          echo "teardown: own nested copy $(fm_refuse_text "$copy") was kept by Vernant's closeout driver and is unchanged since; nothing in it is ended or signalled" >&2
           continue
         fi
         still+=("$root")
