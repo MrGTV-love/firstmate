@@ -277,7 +277,7 @@ The four lint partition hints in `bin/fm-lint.sh` for the split files (1280, 125
 
 The 2026-10-25 main run measured `tests/fm-lint.test.sh` at 1241630 ms, the parallel lane's longest script and above the 1200000 ms budget on its own, so no packing could bring that lane under the target while it stayed whole.
 It is now a shared helpers module plus four groups cut as contiguous slices of the former registration order, so the themes below are approximate at the slice edges.
-The groups are changed-file and cache selection (21 cases), modes and installer and policy refusals (16), host slots and scheduling with memory-limit retry (19), and memory fallback and evidence, required bounds, the sidecar, seeded parity, and CI inputs (17).
+The groups are changed-file selection and no reuse of results (21 cases), modes and installer and policy refusals (16), host slots and scheduling with memory-limit retry (19), and memory fallback and evidence, required bounds, the sidecar, seeded parity, and CI inputs (17).
 Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `fm_lint_run`, and `test_fm_lint_groups_partition_one_inventory` judges that cover by the partition rules above `partition_problems` in `tests/fm-test-run.test.sh`, without pinning a case total; the split moved 73 cases.
 The four parallel hints were apportioned from that measured 1241630 ms by case share (357000, 272000, 323000, and 289000 ms) as estimates pending the first artifacts for the groups; the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced all four with measured walls, and they were poor estimates: the groups measure 26825, 203319, 264177, and 673504 ms.
 The same change rebalanced the two parallel lanes on their hint sums, 2772520 ms and 2772637 ms, after replacing only the former fm-lint hint, and re-sorts both lanes longest-hint-first; `--check-coverage` then reported `parallel_makespan_ms` 1004983 from lane 1's three-bin packing, a number the 2026-10-26 refresh supersedes.
@@ -468,14 +468,14 @@ The script header owns missing-root fallback and partition syntax; local worker 
 Refresh the duration table from successful `end` records' `duration_ms`, retaining complete canonical root coverage independently of hints.
 `tests/fm-lint.test.sh` proves the measured-cost selection with equal-byte roots whose independently seeded durations require a different split.
 CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
-Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, changed-source selection, and shared-cache invalidation.
+Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, and changed-source selection.
 `tests/fm-lint-report.test.sh` verifies initial analysis flags, fallback reporting, and seeded finding parity.
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, or paid runner provisioning is part of this layout.
-The [lint script header](../bin/fm-lint.sh) owns host-wide slot controls and queue-time accounting; `tests/fm-lint-slots.test.sh` covers the CPU-derived cap, concurrent admission, per-run fair share between unequal runs, FIFO progress without barging past older or stopped waiters, cache-hit slot bypass, ungated fallback, inherited-slot lifetime, queued-root timing, and the macOS resident-memory watch's bound, footprint bound, narrower retry, owner-loss cleanup, own-tree sampling, reader reply deadlines, stalled-reader replacement, and restart limit, plus refusal of a test shim that resolves to itself.
+The [lint script header](../bin/fm-lint.sh) owns host-wide slot controls and queue-time accounting; `tests/fm-lint-slots.test.sh` covers the CPU-derived cap, concurrent admission, per-run fair share between unequal runs, FIFO progress without barging past older or stopped waiters, refusal of an unusable pool instead of an ungated run, inherited-slot lifetime, queued-root timing, and the macOS resident-memory watch's bound, footprint bound, narrower retry, owner-loss cleanup, own-tree sampling, reader reply deadlines, stalled-reader replacement, and restart limit, plus refusal of a test shim that resolves to itself.
 
-The [lint script header](../bin/fm-lint.sh) owns local dependency discovery, conservative unresolved-import selection, and successful-result cache controls; these do not replace full joint source analysis.
-Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
+The [lint script header](../bin/fm-lint.sh) owns local dependency discovery and conservative unresolved-import selection; these do not replace full joint source analysis, and no analysis result is reused between runs.
+Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, simultaneous and repeated runs that each analyse every root, and the separation between fast and full analysis.
 Spawn, control, and remote secondmate relaunch obtain configuration inheritance through their shared launch-policy import rather than importing it again.
 The shared Claude-launcher library uses that caller-provided configuration dependency rather than importing it a second time.
 Spawn also obtains classification and PR helpers through its definition-of-done import, and timeout helpers through its backlog-transition import, instead of duplicating those source graphs with direct imports.
@@ -494,7 +494,7 @@ Both roots exited 0 before and after, without success-cache reuse.
 
 Pending-reply's observed peak was lower, but watcher's was higher and both wall times increased under higher host load; these measurements do not establish a general cold-memory or latency improvement.
 Seeded joint checks retained SC2119 across the pending import seams, watcher UTC import, and resolve caller; owner-only and hidden-source counterfactuals did not retain that call-dependent finding.
-Cache reuse remains a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
+No analysis result is reused at this revision, so these figures are for runs that analyse every selected root; they are not a Linux CI duration, aggregate RSS, or P95 claim.
 macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.

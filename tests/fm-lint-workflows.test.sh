@@ -505,6 +505,7 @@ test_fm_lint_default_path_catches_broken_ci_yml() {
   cp "$LINT" "$tmp/bin/fm-lint.sh"
   cp "$LINT_WF" "$tmp/bin/fm-lint-workflows.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/bin/"
   chmod +x "$tmp/bin/fm-lint.sh" "$tmp/bin/fm-lint-workflows.sh"
   write_col0_heredoc_workflow "$tmp/.github/workflows/ci.yml"
 
@@ -542,6 +543,7 @@ SH
 
   rc=0
   out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
+    FM_LINT_SLOT_DIR="$tmp/slots" \
     FM_TEST_GIT_DIFF_FILE="$diff_file" "$tmp/bin/fm-lint.sh" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "fm-lint.sh default path missed a broken ci.yml"$'\n'"$out"
   assert_contains "$out" "could not parse as YAML" \

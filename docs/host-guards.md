@@ -18,6 +18,12 @@ The process census reuses `fm-proc-info.py` for sandbox-safe kernel facts, suppl
 Paired task markers, a kernel cwd inside a no-mistakes run worktree or the declared local home, and their descendant trees provide fleet and run attribution without relying on process names or publishing cwd and environment contents.
 [Host memory admission](configuration.md#host-memory-admission) owns operator setup; `tests/fm-mem-guard.test.sh`, `tests/fm-project-capacity.test.sh`, and `tests/fm-watch-typesafe-health.test.sh` cover classification, actual admission, and identifying wake delivery.
 
+The lint family is not a verdict guard: `bin/fm-lint.sh` bounds the resident memory of every ShellCheck it starts across all runs, homes and sandboxes of one user, in bytes, through the host-slot gate in `bin/fm-lint-cache.pl`.
+The budget is fixed at 3670016 KiB (3.5 GiB, 3758096384 bytes), the value Main recorded on 2026-11-06, set only by `bin/fm-lint.sh`, whose header owns the measured basis and the rules; no setting overrides it, and the run prints it as `host_memory_budget_kib` in the lint roots log.
+When the host process table cannot be read, or a live entry of its host ledger cannot be opened, the gate refuses and starts no root; it never runs a root unbounded.
+The bound is per user: the pool, its lock and its ledger belong to one OS user, so a lint run by another user on the same host is not counted.
+The resident caps (the per-root watch and the 64 MiB version-probe lane) hold on native macOS only: on CI and every other non-macOS run no memory cap is claimed or enforced, and the admission still counts every root.
+
 The process family is `fm-proc-guard`; its engine header owns the count semantics, thresholds, and census document.
 Only its `check` command follows the one-shot verdict contract below.
 Its `census` command writes a diagnostic artifact, while `watch` is the long-running, fork-free sampling mode.

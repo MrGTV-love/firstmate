@@ -90,7 +90,7 @@ optional sample ids deduplicate imported no-mistakes steps, whose historical
 load is unknown; import-nm records them under no-mistakes-step.<step>, apart from
 the no-mistakes.<step> key of a wrapped drive call, and they are record-only: no
 run or limit for another key ever reads them. Only successful completed calibration-eligible samples enter
-nearest-rank percentiles. Cache hits, partial lint selections and memory-fallback
+nearest-rank percentiles. Partial lint selections and memory-fallback
 successes remain recorded with calibration=false and cannot shrink a
 cold-analysis deadline. --uncalibrated records other successful work that is not
 evidence for that command's ceiling. Timeout rows are censored lower bounds, not

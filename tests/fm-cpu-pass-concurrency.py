@@ -467,7 +467,7 @@ def case_padded_marker():
         roots.append(str(script))
     lint.sample_start()
     run = lint.launch('lint', holder + ['bash', tool('fm-lint.sh'), '--jobs', '2'] + roots,
-                      extra=dict(PATH=str(fakebin) + os.pathsep + lint.env['PATH'], FM_LINT_CACHE_DIR='off', FM_LINT_SLOT_DIR='off', FM_LINT_JOBS='2'))
+                      extra=dict(PATH=str(fakebin) + os.pathsep + lint.env['PATH'], FM_LINT_SLOT_DIR=str(lint.folder / 'lint-slots'), FM_LINT_JOBS='2'))
     lint_code = wait_all([run])
     lint_seen = lint.sample_stop()
     case.measure(lint_sampled_max_shellchecks=lint_seen['peak_total'])
@@ -647,7 +647,7 @@ def case_lint():
             script = world.folder / ('root%d-%d.sh' % (run, index))
             script.write_text('#!/usr/bin/env bash\nexit 0\n')
             roots.append(script)
-    extra = dict(PATH=str(fakebin) + os.pathsep + world.env['PATH'], FM_LINT_CACHE_DIR='off', FM_LINT_SLOT_DIR='off', FM_LINT_JOBS='2')
+    extra = dict(PATH=str(fakebin) + os.pathsep + world.env['PATH'], FM_LINT_SLOT_DIR=str(world.folder / 'lint-slots'), FM_LINT_JOBS='2')
     world.sample_start()
     runs = [world.launch('lint%d' % i, ['bash', tool('fm-lint.sh'), '--jobs', '2', '--telemetry', str(world.folder / ('t%d.tsv' % i))]
                          + [str(path) for path in roots[i * 4:(i + 1) * 4]], extra=extra) for i in range(2)]

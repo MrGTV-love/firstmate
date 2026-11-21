@@ -44,6 +44,7 @@ sleep 60
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
 
   # A 3s first attempt leaves about 3s of the 6s deadline, so the retry is
   # killed there; a fresh deadline would let the root run for about 9s.
@@ -183,6 +184,7 @@ test_require_bounds_refuses_when_enforcement_is_missing() {
   mkdir -p "$lone_dir"
   cp "$LINT" "$lone_dir/fm-lint.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$lone_dir/"
+  cp "$ROOT/bin/fm-proc-info.py" "$lone_dir/"
   chmod +x "$lone_dir/fm-lint.sh"
   rc=0
   out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
@@ -272,6 +274,7 @@ test_sidecar_result_exit_reflects_final_status() {
   mkdir -p "$tmp/repo/bin/backends" "$tmp/repo/tests" "$tmp/repo/.github/workflows"
   cp "$LINT" "$tmp/repo/bin/fm-lint.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$tmp/repo/bin/fm-timeout-lib.sh"
   cat > "$tmp/repo/bin/fm-lint-workflows.sh" <<'SH'
 #!/usr/bin/env bash
@@ -426,19 +429,18 @@ test_ci_forces_full_lint_even_with_empty_diff() {
     "$repo/bin/fm-lint.sh" --list-files)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "CI=true did not force the full canonical file set"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
-    || fail "local cache warm-up failed: $out"
+    || fail "local run before the CI runs failed: $out"
   for run in 1 2; do
     : > "$log"
-    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' \
       FM_TEST_GIT_DIFF_FILE="$diff_file" \
       "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || fail "CI inventory lint failed: $out"
     [ "$(LC_ALL=C sort "$log")" = "$expected" ] \
-      || fail "CI run $run did not analyze the complete uncached inventory: $(cat "$log")"
-    assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
+      || fail "CI run $run did not analyze the complete inventory: $(cat "$log")"
   done
-  pass "CI=true checks the complete uncached inventory even with an empty diff"
+  pass "CI=true checks the complete inventory even with an empty diff"
 }
 
 test_main_branch_forces_full_lint() {
