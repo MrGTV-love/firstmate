@@ -3897,7 +3897,8 @@ class Watch:
         return 1
 
     def pass_turn(self, reserved, owner_left):
-        """At cap 1: when the owner's work used the one slot of a contested sweep, the next contested slot is theirs (the turn in their journal)."""
+        """At cap 1: when the owner's work held the one slot of a contested sweep (it used it, or its work failed on it), the next contested slot is theirs
+        (the turn in their journal). A failure to write the turn is never raised over the owner's own outcome."""
         if reserved or not self.cap_one_contested or owner_left > 0:
             return
         try:
@@ -3951,7 +3952,6 @@ class Watch:
         proven = bool(token) and bool(ledger.get('fresh')) and ledger.get('sweep') == token and ledger.get('complete') is True
         left = ledger.get('left') if proven and isinstance(ledger.get('left'), int) and not isinstance(ledger.get('left'), bool) else 0
         view.state['second_started'] = getattr(self, 'run_wall', None)
-        self.hand_over_incomplete = not proven
         if ledger.get('fresh'):
             view.state['cap_left'] = dict(ledger, fresh=False)
             try:
@@ -3962,6 +3962,7 @@ class Watch:
                 # The Slack clock of the owner's check of this sweep is this run's clock too (finding 4): their activation and a held window use it.
                 for value in (ledger.get('clock_first'), ledger.get('clock_last')):
                     self.note_date(value)
+        self.hand_over_incomplete = not proven
         pick = view.state.get('followup_pick') if isinstance(view.state.get('followup_pick'), dict) else {}
         reads = pick.get('reads')
         # Their share of this sweep's thread reads (SC8 (6)), split by the owner's check of THIS sweep, is used only with the same proof as the cap.
@@ -4005,6 +4006,10 @@ class Watch:
             reserved = self.reserved = self.reserve_for_second()
             try:
                 owner_left = self.poll_work()
+            except (SlackError, OSError, ValueError, KeyError, TypeError):
+                # The owner was given this contested sweep's slot and its work failed on it: the slot was the owner's, so the next contested one is theirs.
+                self.pass_turn(reserved, 0)
+                raise
             finally:
                 self.reserved = 0
             self.pass_turn(reserved, owner_left)
@@ -4420,7 +4425,8 @@ class Watch:
         (reserve_for_second). Main 3345 (a), 3350: after the DM proof of this run, their thread reads run on one reader lane (ThreadReader) while the history
         read and the acknowledgements run on this one (take_in_requests_lane), each request's share decided before it from the reads ended before it; the
         reads are applied here, in read order, once both lanes have ended. Returns the first per-thread read error, to be reported after their other work.
-        handed is what the owner's check left them this sweep, before their own journaled requests used any of it (resume_second)."""
+        handed is what the owner's check left them this sweep, before their own journaled requests used any of it (resume_second); a hand-over their check
+        could not prove is no hand-over at all, so it never moves the turn."""
         reads = self.second_reads
         reader = ThreadReader(self, getattr(self, 'followup_reads', 0) or 0)
         reader.start()
@@ -4446,7 +4452,7 @@ class Watch:
         ready = self.ready_requests(plan)
         if self.second_reads > reads:
             self.state['backlog'] = plan is None or taken + ready + waiting > max(remaining, 0)
-            if handed <= 0 and self.state['backlog']:
+            if handed <= 0 and self.state['backlog'] and not getattr(self.owner, 'hand_over_incomplete', False):
                 self.state['turn'] = 'second'               # the owner's work had this sweep's slot: the next contested one is theirs
             self.commit()
         if remaining <= 0:

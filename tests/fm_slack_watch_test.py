@@ -7679,6 +7679,65 @@ class Round6CapOne(InvariantScenario):
             self.assertEqual(sum(w.count(INV_OWNER) for w in woken), 5, woken)
             self.assertEqual(sum(w.count(INV_SECOND) for w in woken), 5, woken)
 
+    def one_sweep(self, home, k, owners=0, theirs=0, their_token=None, owner_failure=None):
+        """One sweep at cap 1: the requests, the owner's check, then theirs (with their_token in place of the sweep's own when given). Returns
+        (the owner check's output, the sides woken, the turn in their journal after the sweep)."""
+        global_n = getattr(self, '_n', 0)
+        for who, count in ((INV_OWNER, owners), (INV_SECOND, theirs)):
+            for _ in range(count):
+                global_n += 1
+                home.say('%d.%06d' % (5000 + global_n, 100 if who == INV_OWNER else 200), 'request %d' % global_n, user=who,
+                         dm=INV_OWNER_DM if who == INV_OWNER else INV_SECOND_DM)
+        self._n = global_n
+        if owner_failure:
+            home.edit_replay(lambda data: data['failures'].update(owner_failure))
+        rc1, out1, calls1 = self.run_check(home, 'normal', 'owner-%d' % k, command='check')
+        self.assertEqual(calls1, [], 'the owner check made a call of theirs')
+        if owner_failure:
+            home.edit_replay(lambda data: [data['failures'].pop(key, None) for key in owner_failure])
+        env = {'FM_CHECK_SWEEP': their_token} if their_token else {}
+        with patch.dict(os.environ, env):
+            rc2, out2, _ = self.run_check(home, 'normal', 'second-%d' % k, command='check-second')
+        self.assertEqual((rc1, rc2), (0, 0))
+        woken = [who for _, who in self.REQ.findall(out1 + '\n' + out2)]
+        self.assertLessEqual(len(woken), 1, 'over the cap of 1: %s' % woken)
+        return out1, woken, json.loads((home.state_dir / 'second.json').read_text()).get('turn')
+
+    def test_r6_d6_at_cap_1_a_slot_given_to_them_with_no_proven_hand_over_leaves_the_next_contested_slot_to_the_owner(self):
+        # Both busy at cap 1. The owner's check gives their check the slot of a sweep (its turn), but their check of that sweep has no proof of the hand-over
+        # (another sweep's token, as a check run by hand or a hand-over that never completed has none): it takes nothing in, and it never moves the turn,
+        # so the next contested slot is the owner's. A proven hand-over of zero still passes the turn to them.
+        with self.home(cap='1') as home:
+            home.trust_check()
+            home.cli('poll')
+            _, woken, turn = self.one_sweep(home, 0, owners=3, theirs=3)
+            self.assertEqual((woken, turn), ([INV_OWNER], 'second'))              # a proven zero: the owner held the slot
+            _, woken, turn = self.one_sweep(home, 1, their_token='test.unproven')
+            self.assertEqual((woken, turn), ([], 'owner'))                        # theirs by turn, unproven: nothing taken, turn kept
+            _, woken, turn = self.one_sweep(home, 2)
+            self.assertEqual((woken, turn), ([INV_OWNER], 'second'))
+            _, woken, turn = self.one_sweep(home, 3)
+            self.assertEqual((woken, turn), ([INV_SECOND], 'owner'))
+            self.assertEqual([home.posts().count((INV_SECOND_DM, '%d.000200' % (5000 + n))) for n in (4, 5, 6)], [1, 0, 0])
+
+    def test_r6_d7_at_cap_1_when_the_owners_work_fails_after_it_was_given_the_slot_the_next_contested_slot_is_theirs(self):
+        # Both busy at cap 1, the owner's turn. The owner's history read fails (Slack unreachable): the owner held the slot, so the turn passes to them, and
+        # their check of the same sweep, which has no complete hand-over, takes nothing in. The next contested slot is theirs, the one after it the owner's.
+        with self.home(cap='1') as home:
+            home.trust_check()
+            home.cli('poll')
+            _, woken, turn = self.one_sweep(home, 0, owners=3, theirs=3)
+            self.assertEqual((woken, turn), ([INV_OWNER], 'second'))
+            _, woken, turn = self.one_sweep(home, 1)
+            self.assertEqual((woken, turn), ([INV_SECOND], 'owner'))
+            out, woken, turn = self.one_sweep(home, 2, owner_failure={'conversations.history': {'status': 503}})
+            self.assertIn('transport failure: unreachable', out)
+            self.assertEqual((woken, turn), ([], 'second'))
+            _, woken, turn = self.one_sweep(home, 3)
+            self.assertEqual((woken, turn), ([INV_SECOND], 'owner'))
+            _, woken, turn = self.one_sweep(home, 4)
+            self.assertEqual((woken, turn), ([INV_OWNER], 'second'))
+
     def test_r6_d4_at_cap_1_a_check_of_theirs_stopped_mid_call_and_restarted_loses_nothing(self):
         with self.home(cap='1') as home:
             home.trust_check()
