@@ -507,14 +507,16 @@ SH
   pass "the checks of one sweep share one sweep token and the next sweep gets a new one"
 }
 
-# Main 3345 (1): the owner's Slack check (slack) queues a wake and the second person's check (slacksecond, which sorts after it) is slow. The queued
-# wake is released at once, never after their check; the next watcher run resumes the same sweep at their check, with the same sweep token, and runs no
-# earlier check of that sweep again.
-test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_resumes_that_sweep_at_it() {
-  local home out1 out2 err status1 status2 start took slack_token second_token drained
-  home=$(make_home slack-release)
+# Main 3345 (1): the owner's Slack check (slack) queues a wake in every sweep and the second person's check (slacksecond, which sorts after it) is slow.
+# The queued wake is released at once, never after their check; the next watcher run resumes the same sweep at their check, with the same sweep token, and
+# runs no earlier check of that sweep again. With <long-turn> set, Firstmate's turn on the released wake outlasts the check interval before the watcher runs
+# again: the sweep is still resumed at their check, so an owner wake in every sweep never starves it.
+released_wake_resumes_the_sweep_at_the_second_person_check() {  # <name> [long-turn]
+  local name=$1 long_turn=${2:-} home out1 out2 out3 err status1 status2 status3 start took slack_token second_token drained
+  home=$(make_home "$name")
   out1="$home/out1.txt"
   out2="$home/out2.txt"
+  out3="$home/out3.txt"
   err="$home/err.txt"
   cat > "$home/state/slack.check.sh" <<'SH'
 #!/usr/bin/env bash
@@ -545,6 +547,10 @@ SH
   drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>"$home/drain.err")
   assert_contains "$drained" "owner wake line" "the owner's wake was not in the durable queue: $drained"
   ack_drain_err "$home/state" "$home/drain.err" >/dev/null || fail "could not acknowledge the drain: $(cat "$home/drain.err")"
+  if [ -n "$long_turn" ]; then
+    [ -f "$home/state/.check-sweep-resume" ] || fail "the released sweep left no resume record"
+    touch -t 200001010000 "$home/state/.check-sweep-resume"
+  fi
   status2=0
   FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=300 "$CHECKPOINT" --seconds 40 >"$out2" 2>>"$err" || status2=$?
   expect_code 0 "$status2" "the resumed checkpoint: $(cat "$out2" "$err")"
@@ -556,7 +562,31 @@ SH
   [ -n "$slack_token" ] && [ "$slack_token" = "$second_token" ] \
     || fail "the second person's check did not resume the owner's sweep token: $(cat "$home/sweeps.log")"
   assert_absent "$home/state/.check-sweep-resume" "the resume record outlived the sweep it resumed"
+  # The next sweep is due: it is a new sweep with a new token, and the owner's wake of it is again released before their check.
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>"$home/drain.err")
+  assert_contains "$drained" "second wake line" "the second person's wake was not in the durable queue: $drained"
+  ack_drain_err "$home/state" "$home/drain.err" >/dev/null || fail "could not acknowledge the drain: $(cat "$home/drain.err")"
+  touch -t 200001010000 "$home/state/.last-check"
+  status3=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=300 "$CHECKPOINT" --seconds 40 >"$out3" 2>>"$err" || status3=$?
+  expect_code 0 "$status3" "the next sweep's checkpoint: $(cat "$out3" "$err")"
+  assert_contains "$(cat "$out3")" "owner wake line" "the next sweep did not release the owner's wake: $(cat "$out3")"
+  [ "$(grep -c '^slack ' "$home/sweeps.log")" -eq 2 ] || fail "the owner's check did not run once in each sweep: $(cat "$home/sweeps.log")"
+  [ "$(grep -c '^slacksecond-start ' "$home/sweeps.log")" -eq 1 ] \
+    || fail "the second person's check ran before the next sweep released the owner's wake: $(cat "$home/sweeps.log")"
+  [ "$(awk '$1 == "slack" {print $2}' "$home/sweeps.log" | sort -u | wc -l | tr -d ' ')" -eq 2 ] \
+    || fail "the next sweep did not get a new token: $(cat "$home/sweeps.log")"
+  [ -f "$home/state/.check-sweep-resume" ] || fail "the next released sweep left no resume record"
+}
+
+test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_resumes_that_sweep_at_it() {
+  released_wake_resumes_the_sweep_at_the_second_person_check slack-release
   pass "a queued wake is released before the second person's check, and the next run resumes that sweep at it with the same token"
+}
+
+test_an_owner_turn_longer_than_the_check_interval_still_resumes_the_sweep_at_the_second_person_check() {
+  released_wake_resumes_the_sweep_at_the_second_person_check slack-release-long-turn long-turn
+  pass "an owner turn longer than the check interval still resumes the released sweep at the second person's check"
 }
 
 test_due_checks_precede_repeated_unmanaged_recovery() {
@@ -819,6 +849,7 @@ test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
 test_checks_of_one_sweep_share_one_sweep_token_and_the_next_sweep_gets_a_new_one
 test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_resumes_that_sweep_at_it
+test_an_owner_turn_longer_than_the_check_interval_still_resumes_the_sweep_at_the_second_person_check
 test_due_checks_precede_repeated_unmanaged_recovery
 test_existing_singleton_watcher_is_not_success
 test_host_checkpoint_bounds_the_park_by_posture

@@ -142,7 +142,9 @@ SECOND_BUDGET = 27.0
 # the bound is no longer their budget plus the cancellation of a cut call plus start-up, which their run alone now exceeds (SECOND_BUDGET + CUTOFF_JOIN).
 OWNER_WAKE_WAIT_BOUND = 24.0
 # The strict documented rate (Main 3345, 3350): chat.postMessage generally takes one message a second in one channel, and all their posts go to their one
-# DM, so the starts of their posts are at least this far apart in every run: 1.0 s plus 0.05 s of margin. The spacing is kept again where each post really
+# DM, so the starts of their posts are at least this far apart in every run and from one run to the next: 1.0 s plus 0.05 s of margin. Each post of theirs
+# that may have reached Slack journals when its exchange ended (post_at, in their journal), and the first post of theirs of the next run (an acknowledgement
+# of their check or a reply to them) begins at least this long after it (their_post_wait). The spacing is kept again where each post really
 # leaves (post_leaving, called by the transport just before the request is sent), because the plane's own send path between its guard and the request leaving
 # varies: before that, posts reached the fake Slack as little as 0.968 s apart at low load and 0.799 s apart at load about 15 (redesign/report.md). No burst
 # is assumed.
@@ -901,6 +903,12 @@ def pause(seconds):
         time.sleep(0.001)
 
 
+def post_clock():
+    """This host's wall clock for the spacing of their posts from one run to the next (post_at): runs are separate processes, so their monotonic clocks do
+    not compare. A name of its own so that a test with a stated clock can state it too."""
+    return time.time()
+
+
 def whole_second_before(seconds):
     """The Slack timestamp just before a whole second: a cursor that takes in every message whose ts is that second or later."""
     return '%d.999999' % (int(seconds) - 1)
@@ -1487,6 +1495,8 @@ class Watch:
         # The end of the second person's time budget while one is in force (second_budget), else None, and the longest call of theirs this run has made.
         self.budget_deadline = None
         self.slowest_call = 0.0
+        # When this run's last post into their DM began (their pass's guard) and really left (post_leaving); none yet (their_post_wait reads their journal).
+        self.last_post_start = self.post_left_at = None
         # The printer the caller runs between the owner's pass and the second person's (poll), and the owner's failure of this poll, raised after both.
         self.before_second = None
         # Which part of the plane this run is (poll): 'both', the owner's check 'owner', or the second person's check 'second'.
@@ -1990,8 +2000,8 @@ class Watch:
                 if not ready:
                     # The request before this one ended without its post: this post is not begun (nothing was sent), and the lane stops (AckLane).
                     raise SecondBudgetSpent(sent=False)
-                if paced and self.last_post_start is not None:
-                    wait = self.last_post_start + SECOND_POST_SPACING - monotonic()
+                if paced:
+                    wait = self.their_post_wait()
                     if wait > 0:
                         pause(wait)
                 begun = monotonic()
@@ -2044,6 +2054,28 @@ class Watch:
             else:
                 api.time_left = earlier_left
 
+    def their_post_wait(self):
+        """How long the next post into their DM waits, never more than SECOND_POST_SPACING: until SECOND_POST_SPACING after the start of this run's last post of
+        theirs, or, before this run has begun one, after the end of the last post of theirs the journal holds (post_at, of an earlier run or an earlier phase
+        of this one). A clock step can neither stall a post nor bring it closer than that."""
+        if self.last_post_start is not None:
+            wait = self.last_post_start + SECOND_POST_SPACING - monotonic()
+        else:
+            ended = self.state.get('post_at')
+            if not isinstance(ended, (int, float)) or isinstance(ended, bool):
+                return 0.0
+            wait = ended + SECOND_POST_SPACING - post_clock()
+        return min(SECOND_POST_SPACING, max(0.0, wait))
+
+    def note_their_post(self, commit=False):
+        """A post of theirs may have reached Slack and its exchange has ended: their journal keeps when (post_at), for the first post of theirs of the next run.
+        An acknowledgement's own next commit carries it; a reply, which has none, commits it here, and a failure to write it never turns a post into a
+        refusal."""
+        self.state['post_at'] = post_clock()
+        if commit:
+            with contextlib.suppress(SlackError, OSError):
+                self.commit()
+
     def post_leaving(self):
         """Called by the real transport just before a post of theirs leaves (in its reader thread): wait until SECOND_POST_SPACING after the post before it
         really left, then note this one. Host time, as the transport's own; a post the guard began late is never sent early."""
@@ -2054,12 +2086,6 @@ class Watch:
                 if wait > 0:
                     pause(wait)
             self.post_left_at = time.monotonic()
-
-    def slack_now(self):
-        """Slack's own clock as of the last answer this run received (the transport records the Date of each reply), or None when no reply carried one. It is the
-        only clock a Slack timestamp may be ordered against."""
-        value = getattr(self.api, 'server_time', None)
-        return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
     def second_window(self):
         """The second person's window in the journal: their member id, their DM, and the starting point and walk bounds of their requests. It is kept apart
@@ -2149,12 +2175,18 @@ class Watch:
                 # class is read back from this commit after a restart (F6 of the review of 5048f815).
                 row.pop('attempt_class', None)
                 self.commit()
+            their = person == 'second' or (row is not None and row.get('person') == 'second')
+            if their and self.budget_deadline is None:
+                # A post of theirs outside their pass's guard (a reply to them, its own run) keeps the spacing from the last post of theirs the journal holds.
+                pause(self.their_post_wait())
             try:
                 answer = self.api.call('chat.postMessage', **args)
                 if not isinstance(answer, dict) or not isinstance(answer.get('ts'), str):
                     raise SlackError('slack_outcome_unknown')        # an answer that is not ok with a ts proves nothing
                 ts = answer['ts']
             except SecondBudgetSpent as cut:
+                if their and cut.sent:
+                    self.note_their_post(commit=row is None)
                 if row is not None and row.get('person') == 'second':
                     if not cut.sent:
                         self.surely_absent(row)
@@ -2162,12 +2194,16 @@ class Watch:
                         self.attempt_class(row, 'ambiguous')
                 raise
             except SlackError as error:
+                if their and str(error) not in SURELY_ABSENT:
+                    self.note_their_post(commit=row is None)
                 if row is not None and row.get('person') == 'second':
                     if str(error) in SURELY_ABSENT:
                         self.surely_absent(row)
                     else:
                         self.attempt_class(row, 'answered' if str(error) in ANSWERED else 'ambiguous')
                 raise
+            if their:
+                self.note_their_post(commit=row is None)
             self.posted_fresh = True
             return ts
 
@@ -2439,23 +2475,22 @@ class Watch:
 
     def arm_fallback(self, carried):
         """Their starting point from Slack's clock when the arm's read of their DM failed (see arm_second)."""
-        if True:
-            kept = self.second_window()
-            if kept.get('user') != self.second:
-                kept = self.state['second'] = {'user': self.second}
-            lower = self.arm_lower()
-            if self.clock_first is None:
-                kept['hold'] = 'boundary_unknown'
-                kept['after'] = slack_ts(lower if carried is None else min(lower, carried))
-            else:
-                boundary = int(self.clock_first) + 1
-                kept['intake_cursor'] = whole_second_before(boundary)
-                if not self.clock_reaches(boundary):
-                    carried = lower if carried is None else min(lower, carried)
-                if carried is not None:
-                    # The span the plane cannot place is taken in, not dropped, and named (option A of main-scott-failed-arm-span).
-                    kept['intake_cursor'] = just_before(slack_ts(carried))
-                    kept['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(boundary)}
+        kept = self.second_window()
+        if kept.get('user') != self.second:
+            kept = self.state['second'] = {'user': self.second}
+        lower = self.arm_lower()
+        if self.clock_first is None:
+            kept['hold'] = 'boundary_unknown'
+            kept['after'] = slack_ts(lower if carried is None else min(lower, carried))
+        else:
+            boundary = int(self.clock_first) + 1
+            kept['intake_cursor'] = whole_second_before(boundary)
+            if not self.clock_reaches(boundary):
+                carried = lower if carried is None else min(lower, carried)
+            if carried is not None:
+                # The span the plane cannot place is taken in, not dropped, and named (option A of main-scott-failed-arm-span).
+                kept['intake_cursor'] = just_before(slack_ts(carried))
+                kept['unplaced'] = {'after': slack_ts(carried), 'before': slack_ts(boundary)}
 
     @staticmethod
     def held_window(win):
@@ -2763,57 +2798,6 @@ class Watch:
             return
         view.followup_reads = other
         self.owner_reads = own
-
-    def second_time_for(self, calls):
-        """Whether calls more calls of theirs, each as slow as the slowest call of theirs in this run, still end inside their time budget (always true outside
-        it): the test the budget itself makes before each call (second_budget), for several calls at once."""
-        return self.budget_deadline is None or monotonic() + calls * self.slowest_call <= self.budget_deadline
-
-    def read_their_followups(self, count, keep=0):
-        """Read up to count of the second person's request threads (their share of this poll's reads, split_reads), in their own read order and their own
-        proven DM: ([(thread, its new messages), ...], the first per-thread read error), as read_followups returns the owner's. Their order works as the
-        owner's: the threads read go to the back, whether their read works or not. Inside their time budget their ready requests come first: a thread is read
-        only while that read and keep more calls (the acknowledgements of every request the cap lets their pass take in now) fit, and a read the budget cuts
-        off ends the thread reads only. So their history read and their acknowledgements keep the time they had before thread reads existed (finding 3 of
-        the review of d0b0c216), and a thread not read keeps its place for the next poll: with slow calls their thread reads wait for a poll in which their
-        new requests leave the time, and never cost the owner anything."""
-        threads = self.their_threads()
-        if count <= 0 or not threads:
-            return [], None
-        channel = self.second_channel()
-        entries = self.state.setdefault('followups', {})
-        # A thread with a turn goes by its turn; a thread new to their order has none yet and goes to the back, oldest first.
-        order = sorted(threads, key=lambda t: (t not in entries, entries.get(t, {}).get('turn', 0), ts_key(t)))
-        read, deferred, done, starved = [], None, [], False
-        for thread in order[:count]:
-            if not self.second_time_for(1 + keep):
-                starved = not done
-                break
-            try:
-                read.append((thread, self.new_replies(thread, self.followup_cursor(thread), channel)))
-            except SecondBudgetSpent:
-                starved = not done
-                break
-            except SlackError as error:
-                if str(error) not in THREAD_ERRORS:
-                    raise
-                deferred = deferred or error
-            done.append(thread)
-        # A pass whose time left no thread read at all marks that their threads go first in their next pass (take_in_second); a pass that read one clears
-        # the mark. So when their budget holds only one call after the DM proof, their history read and their thread reads take turns, and neither waits for
-        # ever (SC8 (6) LIVENESS, A6).
-        if starved != bool(self.state.get('threads_first')) and (starved or done):
-            if starved:
-                self.state['threads_first'] = True
-            else:
-                self.state.pop('threads_first', None)
-            self.commit()
-        if len(done) < len(threads):
-            # The threads read go to the back; the others keep their order (every thread of theirs gets a turn, numbered from 1 in the new order).
-            for turn, thread in enumerate([t for t in order if t not in done] + done, start=1):
-                entries.setdefault(thread, {'cursor': thread})['turn'] = turn
-            self.commit()
-        return read, deferred
 
     def ready_followups(self, read):
         """How many follow-ups the threads just read hold that are ready to be taken in."""
@@ -4410,9 +4394,9 @@ class Watch:
             self.apply_deadline = outer
 
     def apply_their_reads(self, reader):
-        """The reader lane's reads, applied in read order as read_their_followups applies its own: ([(thread, its new messages), ...], the first per-thread read
+        """The reader lane's reads, applied in read order: ([(thread, its new messages), ...], the first per-thread read
         error). The threads read go to the back of their order, the others keep theirs; a pass that read no thread for lack of time marks their threads
-        first for the next pass, and one that read a thread clears the mark. An error that is not a per-thread one is raised, as there."""
+        first for the next pass, and one that read a thread clears the mark. An error that is not a per-thread one is raised."""
         read, deferred, done, starved, fatal = [], None, [], False, None
         for thread, outcome, value in reader.taken():
             if outcome == 'ok':

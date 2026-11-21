@@ -3815,8 +3815,8 @@ prelude_step_commit() {
   PRELUDE_STEP=$PRELUDE_NEXT_STEP
 }
 
-# The sweep a released wake left unfinished (Main 3345 (1)): its token and the check it resumes at, kept until that sweep completes. It is used only
-# within one check interval: an older record starts a new sweep instead, so a long watcher outage never resumes a stale sweep.
+# The sweep a released wake left unfinished (Main 3345 (1)): its token and the check it resumes at, kept until that sweep completes, however long
+# Firstmate's turn on the released wake took, so a busy sweep never starts over and starves the check it stopped before.
 SWEEP_RESUME_FILE="$STATE/.check-sweep-resume"
 sweep_resume_save() {  # <check path>
   printf '%s\n%s\n' "$FM_CHECK_SWEEP" "$1" > "$SWEEP_RESUME_FILE.tmp.$$" \
@@ -3826,10 +3826,6 @@ sweep_resume_load() {
   local token='' check=''
   SWEEP_RESUME_TOKEN='' SWEEP_RESUME_CHECK=''
   [ -f "$SWEEP_RESUME_FILE" ] && [ ! -L "$SWEEP_RESUME_FILE" ] || return 1
-  if [ "$(age_of "$SWEEP_RESUME_FILE")" -ge "$CHECK_INTERVAL" ]; then
-    rm -f -- "$SWEEP_RESUME_FILE"
-    return 1
-  fi
   { IFS= read -r token && IFS= read -r check; } < "$SWEEP_RESUME_FILE" || { rm -f -- "$SWEEP_RESUME_FILE"; return 1; }
   case "$token" in ''|*[!A-Za-z0-9.]*) rm -f -- "$SWEEP_RESUME_FILE"; return 1 ;; esac
   case "$check" in "$STATE"/*.check.sh) ;; *) rm -f -- "$SWEEP_RESUME_FILE"; return 1 ;; esac
