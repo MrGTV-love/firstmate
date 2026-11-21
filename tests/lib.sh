@@ -632,6 +632,33 @@ fm_test_tmproot() {
   printf '%s\n' "$root"
 }
 
+# fm_test_rooted_treehouse <wrapper-path> <real-treehouse>
+# Writes an executable at <wrapper-path> that runs <real-treehouse> with its argv, except
+# that a `get` with no explicit `--root <dir>` (or `--root=<dir>`) fails with exit 97
+# before the real binary runs: the real-provider fixtures allocate only in a pool root
+# they name, never the one TREEHOUSE_ROOT or the user's configuration would pick.
+fm_test_rooted_treehouse() {
+  local q
+  printf -v q '%q' "$2"
+  rm -f "$1"
+  cat > "$1" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = get ]; then
+  rooted=
+  prev=
+  for arg in "\$@"; do
+    case "\$prev|\$arg" in
+      --root\|?*|*\|--root=?*) rooted=1 ;;
+    esac
+    prev=\$arg
+  done
+  [ -n "\$rooted" ] || { echo "fm test: refusing a treehouse get with no explicit --root: \$*" >&2; exit 97; }
+fi
+exec $q "\$@"
+SH
+  chmod +x "$1"
+}
+
 # Ordinary-work teardown --force needs the captain's own words. One fixture words file serves every
 # case; it is created here, in the sourcing shell, so command substitutions reuse it.
 fm_test_drop_file() {

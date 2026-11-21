@@ -103,6 +103,22 @@ fm_test_fake_gh_axi() {
 # removal marker -NAME, any other value prints NAME=value, and an unset knob
 # fails like tmux's "unknown variable".
 #
+# Executing the allocation: when FM_FAKE_TMUX_GET_DIR is set, a text-line payload
+# that is exactly `treehouse get` (what bin/fm-spawn.sh types into the pane) is run
+# for real from that directory, with an explicit `--root "$FM_FAKE_TMUX_GET_ROOT"`
+# appended (every fixture allocation names its pool root), the command found first
+# on PATH, EOF on stdin. Like a real pane, the fixture keeps a LIVE subshell: the
+# command runs in the background, its last output line is the slot the command itself
+# chose, and the subshell (under a launcher named treehouse, as a real interactive get
+# is) cd's into that slot, records its own working directory in
+# FM_FAKE_PANE_PATH_FILE (which pane_current_path then reports) and stays alive,
+# touching FM_FAKE_PANE_PATH_FILE.beat every second, until the test removes
+# FM_FAKE_PANE_PATH_FILE.alive (or about two minutes pass): no signal is ever sent.
+# tmux does not wait for it to exit. A get that fails or names no directory leaves no
+# path file and fails the send. The call is appended to FM_FAKE_TMUX_GET_LOG. Without
+# the variable the payload is only recorded, as before, and the pane path stays the
+# preselected one.
+#
 # The pane path defaults to empty when FM_FAKE_PANE_PATH is unset. Window
 # cleanup and option operations are no-ops. Launch logging is env-gated, so
 # suites that do not set FM_FAKE_LAUNCH_LOG keep a silent send-keys.
@@ -112,7 +128,14 @@ fm_test_fake_tmux_spawn() {
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*)
+    if [ -n "${FM_FAKE_PANE_PATH_FILE:-}" ] && [ -s "$FM_FAKE_PANE_PATH_FILE" ]; then
+      cat "$FM_FAKE_PANE_PATH_FILE"
+    else
+      printf '%s\n' "${FM_FAKE_PANE_PATH:-}"
+    fi
+    exit 0
+    ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
@@ -167,6 +190,115 @@ case "${1:-}" in
           ;;
       esac
     done
+    if [ -n "${FM_FAKE_TMUX_GET_DIR:-}" ]; then
+      for a in "$@"; do
+        if [ "$a" = "treehouse get" ]; then
+          printf 'treehouse get --root %s\n' "${FM_FAKE_TMUX_GET_ROOT:?FM_FAKE_TMUX_GET_ROOT is required with FM_FAKE_TMUX_GET_DIR}" >> "${FM_FAKE_TMUX_GET_LOG:-/dev/null}"
+          pane_file=${FM_FAKE_PANE_PATH_FILE:?FM_FAKE_PANE_PATH_FILE is required with FM_FAKE_TMUX_GET_DIR}
+          rm -f "$pane_file"
+          : > "$pane_file.alive"
+          (
+            if [ "${FM_FAKE_TMUX_GET_LIVE:-}" = pty ]; then
+              # The real provider's get is interactive: it runs $SHELL in the chosen slot and
+              # returns the slot when that shell exits, and with no terminal the shell exits at
+              # once, so nothing is printed and nothing stays allocated. Drive the real get under
+              # a pseudo-terminal whose shell publishes the directory it was started in (the
+              # slot the provider chose) and stays until the .alive marker goes. No worker
+              # starts, and the real provider process stays the shell's parent, as in a pane.
+              shell=$pane_file.shell
+              tick=$pane_file.tick
+              rm -f "$tick"
+              mkfifo "$tick" || exit 1
+              cat > "$shell" <<'PTYSH'
+#!/bin/bash
+pwd -P > "$FM_PTY_PANE_FILE.tmp" && mv "$FM_PTY_PANE_FILE.tmp" "$FM_PTY_PANE_FILE"
+exec 3<>"$FM_PTY_TICK"
+n=0
+while [ -e "$FM_PTY_ALIVE" ] && [ "$n" -lt 120 ]; do
+  n=$((n + 1))
+  read -r -t 1 -u 3 _ || :
+done
+PTYSH
+              chmod +x "$shell" || exit 1
+              # The provider process is named `treehouse`, as the installed one is (a copy: the
+              # kernel names a process after the file, not a link): the spawn's live-holder
+              # rule knows its own get by that launcher name.
+              launcher=$pane_file.launcher/treehouse
+              mkdir -p "${launcher%/*}" && cp "${FM_FAKE_TMUX_GET_BIN:?FM_FAKE_TMUX_GET_BIN is required with FM_FAKE_TMUX_GET_LIVE=pty}" "$launcher" || exit 1
+              [ "$(uname)" != Darwin ] || codesign -f -s - "$launcher" >/dev/null 2>&1 || true
+              exec env SHELL="$shell" FM_PTY_LAUNCHER="$launcher" FM_PTY_PANE_FILE="$pane_file" FM_PTY_ALIVE="$pane_file.alive" FM_PTY_TICK="$tick" \
+                python3 -I -c 'import os, pty, sys, time
+alive = os.environ["FM_PTY_ALIVE"]
+pid, fd = pty.fork()
+if pid == 0:
+    os.chdir(sys.argv[1])
+    os.execv(os.environ["FM_PTY_LAUNCHER"], ["treehouse", "get", "--root", sys.argv[2]])
+deadline = time.time() + 120
+while os.path.exists(alive) and time.time() < deadline:
+    try:
+        os.read(fd, 4096)
+    except OSError:
+        break
+os.close(fd)
+os.waitpid(pid, 0)' "$FM_FAKE_TMUX_GET_DIR" "$FM_FAKE_TMUX_GET_ROOT"
+            fi
+            if [ "${FM_FAKE_TMUX_GET_LIVE:-}" = beat ]; then
+              # Like a real pane, the get itself stays alive: its interactive subshell owns the
+              # allocation. It runs in the background, prints its path, then keeps beating
+              # (FM_FAKE_GET_BEAT) until the .alive marker goes. A get that prints its path and
+              # exits never beats, so no pane path is published and the case fails.
+              out=$pane_file.get-out
+              : > "$out"
+              rm -f "$pane_file.getbeat"
+              ( cd "$FM_FAKE_TMUX_GET_DIR" && FM_FAKE_GET_BEAT="$pane_file.getbeat" FM_FAKE_GET_ALIVE="$pane_file.alive" \
+                  exec treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null >"$out" 2>/dev/null ) &
+              n=0
+              while [ ! -s "$out" ] && [ "$n" -lt 50 ]; do
+                n=$((n + 1))
+                /bin/sleep 0.1
+              done
+              [ -s "$out" ] || exit 1
+              n=0
+              while [ ! -e "$pane_file.getbeat" ] && [ "$n" -lt 20 ]; do
+                n=$((n + 1))
+                /bin/sleep 0.1
+              done
+              [ -e "$pane_file.getbeat" ] || exit 1
+              chosen=$(tail -n 1 "$out")
+            else
+              chosen=$(cd "$FM_FAKE_TMUX_GET_DIR" && treehouse get --root "$FM_FAKE_TMUX_GET_ROOT" </dev/null) || exit 1
+            fi
+            # A real pane's shell in the slot runs under the interactive `treehouse get`
+            # launcher, which the spawn's live-holder rule (bin/fm-slot-provision-lib.sh
+            # is_own) knows by its process name. The fake get is a bash script, so the
+            # live subshell runs under a copy of bash named treehouse instead. It waits
+            # between beats on a read timeout of an idle FIFO, never a forked sleep: a
+            # short-lived child in the slot can exit between the holder scan and its
+            # parent-chain read, and an unreadable chain is a holder.
+            launcher=$pane_file.launcher/treehouse
+            mkdir -p "${launcher%/*}" && cp /bin/bash "$launcher" || exit 1
+            [ "$(uname)" != Darwin ] || codesign -f -s - "$launcher" >/dev/null 2>&1 || true
+            rm -f "$pane_file.tick"
+            mkfifo "$pane_file.tick" && exec 3<>"$pane_file.tick" && rm -f "$pane_file.tick" || exit 1
+            # shellcheck disable=SC2016 # The single-quoted program expands its own positional arguments.
+            exec "$launcher" -c 'cd "$1" || exit 1
+              pwd -P > "$2"
+              n=0
+              while [ -e "$2.alive" ] && [ "$n" -lt 120 ]; do
+                : > "$2.beat"
+                n=$((n + 1))
+                read -r -t 1 -u 3 _ || :
+              done' get "${chosen##*$'\n'}" "$pane_file"
+          ) </dev/null >/dev/null 2>&1 &
+          n=0
+          while [ ! -s "$pane_file" ] && [ "$n" -lt 100 ]; do
+            n=$((n + 1))
+            /bin/sleep 0.1
+          done
+          [ -s "$pane_file" ] || exit 1
+        fi
+      done
+    fi
     if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
       for a in "$@"; do
