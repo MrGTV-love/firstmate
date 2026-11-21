@@ -8911,10 +8911,11 @@ class Round9Findings(InvariantScenario):
             posted, real_call = [], plane.Replay.call
 
             def call(replay, method, **fields):
-                data = real_call(replay, method, **fields)
+                # Recorded as the post is sent, not when it returns: the next post's binding check runs in its own thread and can begin before
+                # the first post's call has returned, and it must already meet the slow child.
                 if method == 'chat.postMessage' and fields.get('channel') == INV_SECOND_DM:
                     posted.append(fields.get('thread_ts'))
-                return data
+                return real_call(replay, method, **fields)
             home.cli('check', action='check')
             started = time.monotonic()
             with patch.object(Watch, 'bound', REAL_BOUND), patch.object(plane, 'run', REAL_RUN), patch.object(plane.Replay, 'call', call), \
