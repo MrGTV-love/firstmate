@@ -487,16 +487,19 @@ test_checks_of_one_sweep_share_one_sweep_token_and_the_next_sweep_gets_a_new_one
   err="$home/err.txt"
   for id in a-sweep b-sweep; do
     # The watcher runs a trusted snapshot of the check (state/.fm-custom-check.*, bin/fm-check-lib.sh), so $0 is not the check's name:
-    # each check writes its own id.
+    # each check writes its own id. Only the first two complete sweeps are recorded (b-sweep runs last in a sweep): the checkpoint's bound can end a
+    # later sweep between its two checks, and such a cut sweep is never part of the record.
     cat > "$home/state/$id.check.sh" <<SH
 #!/usr/bin/env bash
+complete=\$(grep -c '^b-sweep ' "\$FM_HOME/sweeps.log" 2>/dev/null) || complete=0
+[ "\$complete" -ge 2 ] && exit 0
 printf '%s %s\n' '$id' "\${FM_CHECK_SWEEP:-missing}" >> "\$FM_HOME/sweeps.log"
 SH
     chmod 0700 "$home/state/$id.check.sh"
     FM_HOME="$home" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "could not register $id"
   done
   status=0
-  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=1 "$CHECKPOINT" --seconds 20 >"$out" 2>"$err" || status=$?
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=1 "$CHECKPOINT" --seconds 8 >"$out" 2>"$err" || status=$?
   expect_code 124 "$status" "a quiet sweep checkpoint: $(cat "$out" "$err")"
   [ -s "$home/sweeps.log" ] || fail "no check ran"
   if grep -q ' missing$' "$home/sweeps.log"; then fail "a check ran with no sweep token"; fi
