@@ -14,12 +14,17 @@
 # session is the only place the layered value shows.
 # The language server is a fixture that records its own start, and the model is
 # a scripted local one, so the guard spends no tokens and needs no real server.
+# It skips only when omp is absent or FM_LIVE=0 is set, and the skip line names the reason.
+# The own switch FM_OMP_LSP_OVERLAY_LIVE=0 and a missing python3 do not skip it, and a missing python3 fails it.
+# The pipeline test step must not set FM_LIVE=0, and the reader checks in the pipeline log that this test ran and did not skip.
 # It fails naming omp and `omp --version`, so run it after any omp upgrade.
 set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# The own off switch must not hide a broken overlay, so drop a 0 there; the shared FM_LIVE=0 opt-out stays honored.
+[ "${FM_OMP_LSP_OVERLAY_LIVE:-}" != 0 ] || unset FM_OMP_LSP_OVERLAY_LIVE
 fm_live_gate default-on FM_OMP_LSP_OVERLAY_LIVE omp
 command -v python3 > /dev/null 2>&1 || fail "python3 is missing; the fixture language server and the scripted model need it"
 

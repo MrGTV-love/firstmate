@@ -1,5 +1,5 @@
 # Firstmate session posture for omp (Oh My Pi), passed as `--config` on every
-# Firstmate-launched omp session (crewmate, scout, and secondmate alike) by
+# canonical Firstmate-launched omp session (crewmate, scout, and secondmate alike) by
 # bin/fm-spawn.sh, whose header owns why the launch carries it. It is the omp
 # analogue of the Pi adapter's `--tui-mode regular` pin: a per-launch overlay,
 # never a write to the captain's own ~/.omp/agent/config.yml, which stays
@@ -38,7 +38,8 @@ retry:
   # Keep omp's native return behavior for permitted non-DeepSeek chains.
   fallbackRevertPolicy: cooldown-expiry
 lsp:
-  # Unattended fleet sessions keep the language server off.
+  # Canonical omp launches by bin/fm-spawn.sh keep the language server off in unattended fleet sessions.
   # Main 3115 measured basedpyright servers under live omp sessions at 25 to 95 percent CPU and a host load average of 117.
   # Captain-side omp sessions never layer this file, so they keep the language server.
+  # A raw omp command passed to bin/fm-spawn.sh receives no overlay from the launcher and is not covered.
   enabled: false
