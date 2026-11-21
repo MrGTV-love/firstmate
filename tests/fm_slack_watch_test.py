@@ -7646,14 +7646,38 @@ class Round6CapOne(InvariantScenario):
             sent, got, rows = self.sweeps(home, [(0, 1, 'normal'), (0, 1, 'normal'), (1, 0, 'normal'), (1, 0, 'normal'), (0, 1, 'normal')])
             self.assertEqual({ts: got.get(ts, [None])[0] - k for ts, (_, k) in sent.items()}, {ts: 0 for ts in sent}, rows)
 
-    @unittest.skip('held for the owner (Main 1706): the cap-1 alternation is the owner-held capacity design; its round-8 turn change is reverted, and with the '
-                   'unknown-outcome rule of round 8 this sequence passes the owner over twice (a known defect of the held design, not built on)')
     def test_r6_d3_at_cap_1_failed_reads_and_deadline_cutoffs_of_theirs_lose_nothing_and_pass_no_side_over_twice(self):
         with self.home(cap='1') as home:
             home.trust_check()
             home.cli('poll')
             plan = [(3, 3, 'normal'), (1, 1, 'fail'), (0, 0, 'fail'), (1, 0, 'slow'), (0, 1, 'slow'), (0, 0, 'normal')] + [(0, 0, 'normal')] * 10
             self.check_fair(*self.sweeps(home, plan))
+
+    def test_r6_d3_at_cap_1_a_slot_their_own_journaled_request_used_is_never_handed_to_them_again_on_the_manual_poll(self):
+        # The manual poll (owner's part, then theirs, in one run): a request of theirs left journaled by a cut-off pass uses the slot the turn gave them, and
+        # the next contested slot is the owner's, so the owner is never passed over in two contested passes in a row there either.
+        with self.home(cap='1') as home:
+            home.trust_check()
+            home.cli('poll')
+            woken, owner_waiting, n, owner_sent = [], [], 0, 0
+            for k, (owners, theirs, mode) in enumerate([(3, 3, 'normal'), (1, 1, 'slow'), (1, 0, 'normal'), (0, 1, 'normal'), (0, 0, 'normal')]
+                                                       + [(0, 0, 'normal')] * 6):
+                owner_sent += owners
+                for who, count in ((INV_OWNER, owners), (INV_SECOND, theirs)):
+                    for _ in range(count):
+                        n += 1
+                        home.say('%d.%06d' % (5000 + n, 100 if who == INV_OWNER else 200), 'request %d' % n, user=who,
+                                 dm=INV_OWNER_DM if who == INV_OWNER else INV_SECOND_DM)
+                owner_waiting.append(owner_sent > sum(w.count(INV_OWNER) for w in woken))
+                rc, out, _ = self.run_check(home, mode, 'poll-%d' % k, command='poll', delay='13.0')
+                self.assertEqual(rc, 0)
+                woken.append([who for _, who in self.REQ.findall(out)])
+            self.assertEqual([len(w) for w in woken if len(w) > 1], [], woken)
+            for k in range(1, len(woken)):
+                self.assertFalse(owner_waiting[k - 1] and owner_waiting[k] and woken[k - 1] == woken[k] == [INV_SECOND],
+                                 'the owner was passed over twice in a row at passes %d and %d: %s' % (k - 1, k, woken))
+            self.assertEqual(sum(w.count(INV_OWNER) for w in woken), 5, woken)
+            self.assertEqual(sum(w.count(INV_SECOND) for w in woken), 5, woken)
 
     def test_r6_d4_at_cap_1_a_check_of_theirs_stopped_mid_call_and_restarted_loses_nothing(self):
         with self.home(cap='1') as home:

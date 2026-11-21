@@ -4379,6 +4379,7 @@ class Watch:
                         self.api.call('auth.test')
                     self.resolve_hold()
                     self.start_second()
+                    handed = remaining
                     remaining = self.resume_second(remaining)
                     if self.second_window().get('hold') and self.second_window().get('user') == self.second:
                         # An arm that could not date its starting point left their intake held, and no reply of this run carried Slack's clock: one episode,
@@ -4387,7 +4388,7 @@ class Watch:
                         self.second_episode('boundary_unknown')
                     else:
                         self.report_unplaced()
-                        deferred = self.take_in_second(remaining)
+                        deferred = self.take_in_second(remaining, handed)
                 self.observe_second_cards()
                 if deferred:
                     raise deferred
@@ -4412,13 +4413,14 @@ class Watch:
             self.state['pending'] = kept
             self.commit()
 
-    def take_in_second(self, remaining):
+    def take_in_second(self, remaining, handed):
         """Their pass's take-in, as the owner's take_in: the follow-ups in the threads of theirs the owner's check picked from the one read order (SC8 (6)), and
         their new requests (their one history read), share what the cap leaves them (share). Their one history read is made even when nothing of the cap is
         left: it takes nothing in then, and records whether more of theirs waits than this pass can take (backlog), which the next owner check reads at cap 1
         (reserve_for_second). Main 3345 (a), 3350: after the DM proof of this run, their thread reads run on one reader lane (ThreadReader) while the history
         read and the acknowledgements run on this one (take_in_requests_lane), each request's share decided before it from the reads ended before it; the
-        reads are applied here, in read order, once both lanes have ended. Returns the first per-thread read error, to be reported after their other work."""
+        reads are applied here, in read order, once both lanes have ended. Returns the first per-thread read error, to be reported after their other work.
+        handed is what the owner's check left them this sweep, before their own journaled requests used any of it (resume_second)."""
         reads = self.second_reads
         reader = ThreadReader(self, getattr(self, 'followup_reads', 0) or 0)
         reader.start()
@@ -4444,7 +4446,7 @@ class Watch:
         ready = self.ready_requests(plan)
         if self.second_reads > reads:
             self.state['backlog'] = plan is None or taken + ready + waiting > max(remaining, 0)
-            if remaining <= 0 and self.state['backlog']:
+            if handed <= 0 and self.state['backlog']:
                 self.state['turn'] = 'second'               # the owner's work had this sweep's slot: the next contested one is theirs
             self.commit()
         if remaining <= 0:
