@@ -310,7 +310,11 @@
 # attempt that gave up its reader, with the reason; the reader is the only source
 # of a sample, and a tick it cannot answer is a miss. A late or unconfirmed reply
 # is read once more in the same tick (at most 1 s more) before it is a miss; no
-# other source and no older sample is used. The root is never signalled
+# other source and no older sample is used. As measurement only, each missed tick's
+# rss_miss=<branch>,wait_ms=<n>,interrupted=<n> record is printed on stderr with its
+# root's path, and at exit one stderr line names the largest rss_longest_reply_ms
+# and rss_longest_tick_ms of the run's roots, with the root of each (none when no
+# root recorded a tick). The root is never signalled
 # by its pid or by a group taken from input: the watch records its root's exact
 # start time before the root executes and signals only that root's group, after
 # proving the group's leader unchanged (to end it, or to stop and resume it while
@@ -561,6 +565,39 @@ fm_lint_root_rss_samples() {  # <rss-file>...
     /^rss_launch_unrecorded=1$/ { reasons = reasons ",launch-unrecorded" }
     END { if (found) printf "libproc:%d%s\n", count["libproc"], reasons; else print "none" }
   '
+}
+
+# Measurement only: print each missed tick the macOS watch recorded across a root's
+# attempts on stderr, verbatim with the root's path, and append the root's longest
+# reply and tick to the run's record, which fm_lint_finish reads before the scratch
+# dir (and every rss file) is removed.
+fm_lint_report_watch() {  # <path> <run-record> <rss-file>...
+  local path=$1 record=$2 line
+  shift 2
+  grep -h '^rss_miss=' "$@" 2>/dev/null | while IFS= read -r line; do
+    printf 'fm-lint: watch miss %s %s\n' "$path" "$line" >&2
+  done
+  cat "$@" 2>/dev/null | awk -F= -v path="$path" '
+    $1 == "rss_longest_reply_ms" { found = 1; if ($2 + 0 > reply) reply = $2 + 0 }
+    $1 == "rss_longest_tick_ms" { found = 1; if ($2 + 0 > tick) tick = $2 + 0 }
+    END { if (found) printf "%d\t%d\t%s\n", reply, tick, path }
+  ' >> "$record"
+}
+
+# Measurement only: the one run-level line of the largest longest reply and longest
+# tick across the run's roots, naming the root of each.
+# shellcheck disable=SC2329 # Invoked by the EXIT trap's fm_lint_finish.
+fm_lint_report_watch_run() {  # <run-record>
+  { cat "$1" 2>/dev/null || true; } | awk -F '\t' '
+    NF >= 3 {
+      if (reply_root == "" || $1 + 0 > reply) { reply = $1 + 0; reply_root = $3 }
+      if (tick_root == "" || $2 + 0 > tick) { tick = $2 + 0; tick_root = $3 }
+    }
+    END {
+      if (reply_root == "") print "fm-lint: watch run rss_longest_reply_ms=none rss_longest_tick_ms=none (no root recorded a tick)"
+      else printf "fm-lint: watch run rss_longest_reply_ms=%d root=%s rss_longest_tick_ms=%d root=%s\n", reply, reply_root, tick, tick_root
+    }
+  ' >&2
 }
 
 fm_lint_max_root_rss() {  # <rss-kib> <rss-kib>
@@ -826,6 +863,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" "$queued_ms" \
       "$(fm_lint_root_time_rss "$rss_file" "$fallback_rss")" "$(fm_lint_root_watch_peak "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
+  fm_lint_report_watch "$path" "$output_dir/watch-longest.tsv" "$rss_file" "$fallback_rss"
   # The watch's own record of a root it failed (status 96): its samples and the
   # reasons it wrote, so the run's stop mark and the end line say what happened.
   FM_LINT_LAST_WATCH=
@@ -2389,6 +2427,9 @@ FM_LINT_DURATION_START=$(fm_lint_now_ms)
 fm_lint_finish() {
   local result=$? calibration=0
   fm_lint_stop_workers
+  if [ "${FM_LINT_WATCH_RUN:-0}" = 1 ]; then
+    fm_lint_report_watch_run "${OUTPUT_DIR:-}/watch-longest.tsv"
+  fi
   if [ "$EXPLICIT_PATHS" -eq 0 ] && [ "$CHANGED_MODE" -eq 0 ] && [ -s "${ROOTS_LOG:-}" ]; then
     calibration=$(awk -F '\t' '$1 == "end" { count++; if ($13 != 1) ineligible++ } END { print (count > 0 && !ineligible) ? 1 : 0 }' "$ROOTS_LOG")
   fi
@@ -2749,6 +2790,11 @@ fm_lint_wait_workers() {
   done
 }
 
+# The macOS resident-memory watch wraps every root of this run (fm_lint_exec_root),
+# so the exit trap prints the run's watch line.
+if [ "$BOUND_MECH" = none ] && [ "$(uname)" = Darwin ]; then
+  FM_LINT_WATCH_RUN=1
+fi
 if [ "$JOBS" -eq 1 ]; then
   worker=0
   while [ "$worker" -lt "$SHARD_COUNT" ]; do

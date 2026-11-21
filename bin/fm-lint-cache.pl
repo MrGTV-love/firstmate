@@ -1230,7 +1230,8 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # Every end appends rss_samples=libproc:<n> and watch_peak_kib=<KiB>, then, as
 # measurement only, one rss_miss=<late|unbound|malformed|unavailable>,wait_ms=<n>,
 # interrupted=<n> per missed tick (its branch, reply wait and interrupted waits),
-# rss_ticks=<n>, rss_longest_tick_ms=<n> and rss_longest_reply_ms=<n>. Each new
+# rss_ticks=<n>, rss_longest_tick_ms=<n> and rss_longest_reply_ms=<n>; fm-lint.sh
+# prints each rss_miss record and the run's longest reply and tick on stderr. Each new
 # peak is written to FM_LINT_INTERNAL_SLOT_PEAK_FILE when the gate names one, so
 # the gate's admission charges it.
 # Any miss while the root runs that is followed by a later tick makes the root exit
