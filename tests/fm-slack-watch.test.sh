@@ -106,7 +106,7 @@ mirror card-payload
 python3 "$HELPER" card-payload "$(replay_file)"
 python3 -c 'print("PRIVATE_TASK_BODY " + "x" * 45000); print("Option 1: Ship it (ship) - Deploy now\nOption 2: Wait (wait) - Hold current\nRecommendation: wait\nEvidence: /tmp/oversized-evidence.md")' > "$FM_HOME/oversized.body"
 (cd "$FM_HOME" && tasks-axi add oversized-card "Oversized decision" --kind captain --repo sample --body-file "$FM_HOME/oversized.body" >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold oversized-card --reason "Select the release approach $(python3 -c 'print("q" * 45000)')" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold oversized-card --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Select the release approach $(python3 -c 'print("q" * 45000)')" >/dev/null
 mirror card-payload >/dev/null
 card=$(python3 "$HELPER" card-text "$(replay_file)" oversized-card)
 assert_contains "$card" 'Task: oversized-card' "DOD-02 oversized card lost its task id"
@@ -129,7 +129,7 @@ assert_not_contains "$(thread_texts "$ts")" 'PRIVATE_TASK_BODY' "T1 task body le
 assert_eq "$(thread_field oversized-card retired)" True "DOD-02 oversized thread was not retired"
 question="Pick the rollout $(python3 -c 'print("r" * 5000)')"
 (cd "$FM_HOME" && tasks-axi add long-question "Long question" --kind captain --repo sample --body-file "$FM_HOME/oversized.body" >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold long-question --reason "$question" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold long-question --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "$question" >/dev/null
 mirror card-payload >/dev/null
 card=$(python3 "$HELPER" card-text "$(replay_file)" long-question)
 assert_contains "$card" "Question: $question" "DOD-02 an under-budget card cut its question"
@@ -630,7 +630,7 @@ shim_poll() { env "$@" "$SHIM/fm-slack-poll.sh" --replay "$FIX/$SHIM_FIXTURE/tra
 rehold() {  # <task-id>
   printf 'released for rework\n' > "$FM_HOME/decision.txt"
   "$CAPTAIN" answer "$1" --decision-file "$FM_HOME/decision.txt" --release >/dev/null
-  FM_CAPTAIN_HOLD_NOW=2026-10-02T00:00:00Z "$CAPTAIN" hold "$1" --reason "Second round" >/dev/null
+  FM_CAPTAIN_HOLD_NOW=2026-10-02T00:00:00Z "$CAPTAIN" hold "$1" --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Second round" >/dev/null
 }
 new_home reaction-answer
 bind
@@ -763,7 +763,7 @@ bind
 mirror single-char-answer >/dev/null
 poll single-char-answer >/dev/null
 (cd "$FM_HOME" && tasks-axi add board-call "Board call" --kind captain --repo sample --body-file "$FM_HOME/options.body" >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold board-call --reason "Select the release approach" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold board-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Select the release approach" >/dev/null
 cat > "$FM_HOME/board.result" <<'RESULT'
 session:
   file: /review.html
@@ -909,7 +909,7 @@ bind
 mirror mirror >/dev/null
 python3 "$HELPER" pad-history "$(replay_file)" 300
 (cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Late" >/dev/null
 before=$(outbound_count conversations.history)
 mirror mirror >/dev/null
 assert_eq "$(thread_count late-call)" 1 "X13 late card mirrored"
@@ -1132,7 +1132,7 @@ bind
 mirror card-payload >/dev/null
 printf 'Option 1: Keep <old> & new (keep) - when a > b\nOption 2: Wait (wait)\nRecommendation: keep\n' > "$FM_HOME/literal.body"
 (cd "$FM_HOME" && tasks-axi add literal-card "R&D <beta> rollout" --kind captain --repo sample --body-file "$FM_HOME/literal.body" >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold literal-card --reason "Run fm-captain-hold.sh bind <source-id> & confirm" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold literal-card --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Run fm-captain-hold.sh bind <source-id> & confirm" >/dev/null
 mirror card-payload >/dev/null
 card=$(python3 "$HELPER" card-text "$(replay_file)" literal-card)
 assert_contains "$card" 'Decision: R&amp;D &lt;beta&gt; rollout' "X23 the decision title was not escaped"
@@ -1141,7 +1141,7 @@ assert_contains "$card" '1. Keep &lt;old&gt; &amp; new (keep) - when a &gt; b' "
 assert_not_contains "$card" '[<>]' "X23 a raw angle bracket reached Slack"
 printf '%s' "$card" | entities_whole || fail "X23 the card has a bare ampersand"
 (cd "$FM_HOME" && tasks-axi add literal-oversized "Oversized literal" --kind captain --repo sample --body-file "$FM_HOME/literal.body" >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold literal-oversized --reason "Escape budget $(python3 -c 'print("<" * 45000)')" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold literal-oversized --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Escape budget $(python3 -c 'print("<" * 45000)')" >/dev/null
 mirror card-payload >/dev/null
 card=$(python3 "$HELPER" card-text "$(replay_file)" literal-oversized)
 [ "${#card}" -le 38000 ] || fail "X23 escaping pushed an oversized card past the card budget"
@@ -1289,7 +1289,7 @@ mirror mirror >/dev/null
 python3 "$HELPER" move-transcript "$FIX/mirror/transcript.json" "$TMP/public.json" C0PUBLIC0001
 python3 "$HELPER" set-state "$(state_file)" channel C0PUBLIC0001
 (cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Late" >/dev/null
 set +e
 out=$("$ROOT/bin/fm-slack-mirror.sh" --replay "$TMP/public.json" 2>&1); rc=$?
 set -e
@@ -1309,7 +1309,7 @@ new_home reaction-answer
 bind
 mirror reaction-answer >/dev/null
 (cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Late" >/dev/null
 python3 "$HELPER" fail-call "$(replay_file)" conversations.history 400
 set +e
 out=$(poll reaction-answer); rc=$?
@@ -1582,7 +1582,7 @@ mirror mirror >/dev/null
 python3 "$HELPER" split-transcript "$FIX/mirror/transcript.json" "$TMP/other-dm.json" D0OTHERDM01 D0123456789
 python3 "$HELPER" set-state "$(state_file)" channel D0OTHERDM01
 (cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Late" >/dev/null
 set +e
 out=$("$ROOT/bin/fm-slack-mirror.sh" --replay "$TMP/other-dm.json" 2>&1); rc=$?
 set -e
@@ -1593,7 +1593,7 @@ new_home mirror
 bind
 mirror mirror >/dev/null
 (cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Late" >/dev/null
 mirror mirror >/dev/null
 assert_eq "$(thread_count late-call)" 1 "X42 the legitimate owner DM stopped receiving cards"
 assert_contains "$(python3 "$HELPER" outbound-targets "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" chat.postMessage)" 'U0TESTOWNER@D0123456789' "X42 no card reached the owner DM"
@@ -1601,7 +1601,7 @@ new_home mirror
 bind
 mirror mirror >/dev/null
 (cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
-FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "Late" >/dev/null
 python3 "$HELPER" add-failure "$FIX/mirror/transcript.json" "$TMP/open-fails.json" conversations.open 503
 sent=$(outbound_count chat.postMessage)
 set +e
@@ -1638,7 +1638,7 @@ python3 "$HELPER" react "$(replay_file)" "$ts" two U0DISPLAYNAME
 reactions=$(python3 "$HELPER" reaction-state "$(replay_file)" "$ts")
 sent=$(outbound_count chat.postMessage)
 reason=$'Decision sought: Wait for approval?\nBrief: Rollout lacks approval.\nRecommendation: Wait because approval is required.\nAlternatives: Shipping now skips approval.'
-"$CAPTAIN" hold with-options --reason "$reason" >/dev/null
+"$CAPTAIN" hold with-options --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "$reason" >/dev/null
 out=$(poll card-payload)
 assert_eq "$(outbound_count chat.update)" 1 "X44 changed reason updated once"
 assert_eq "$(outbound_count chat.update "$ts")" 1 "X44 update targeted the existing card"
@@ -1658,7 +1658,7 @@ printf 'ok - X44\n'
 
 # X45: an option-set change cannot silently change an existing card's answer bindings.
 write_board 2026-10-02T00:00Z '[{"key":"with-options","options":[{"value":"changed","label":"Changed choice"}],"recommend_value":"changed"}]'
-"$CAPTAIN" hold with-options --reason "${reason/Wait for approval/Approve the new choice}" >/dev/null
+"$CAPTAIN" hold with-options --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "${reason/Wait for approval/Approve the new choice}" >/dev/null
 poll card-payload >/dev/null
 assert_eq "$(outbound_count chat.update)" 1 "X45 changed options allowed an edit"
 assert_eq "$(outbound_count chat.postMessage)" "$sent" "X45 changed options posted another card"
@@ -1688,14 +1688,14 @@ bind
 mirror card-payload >/dev/null
 ts=$(thread_field with-options ts)
 python3 "$HELPER" retire-thread "$(state_file)" with-options
-"$CAPTAIN" hold with-options --reason "$reason" >/dev/null
+"$CAPTAIN" hold with-options --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "$reason" >/dev/null
 poll card-payload >/dev/null
 assert_eq "$(outbound_count chat.update "$ts")" 0 "X47 retired card was edited"
 # Release an open call, then start a genuinely new hold lifecycle.
 old_ts=$(thread_field no-options ts)
 printf 'release for a new lifecycle\n' > "$FM_HOME/decision.txt"
 "$CAPTAIN" answer no-options --decision-file "$FM_HOME/decision.txt" --release >/dev/null
-FM_CAPTAIN_HOLD_NOW=2026-10-03T00:00:00Z "$CAPTAIN" hold no-options --reason "$reason" >/dev/null
+FM_CAPTAIN_HOLD_NOW=2026-10-03T00:00:00Z "$CAPTAIN" hold no-options --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "$reason" >/dev/null
 poll card-payload >/dev/null
 assert_eq "$(outbound_count chat.update "$old_ts")" 0 "X47 replaced card was edited"
 assert_eq "$(python3 "$HELPER" root-count "$(replay_file)" no-options)" 2 "X47 new lifecycle did not get its own card"
@@ -1739,8 +1739,8 @@ ts=$(thread_field with-options ts)
 card=$(python3 "$HELPER" card-text "$(replay_file)" with-options)
 python3 "$HELPER" fail-call "$(replay_file)" "chat.update:$ts" 400 1
 reason=$'Decision sought: Wait for approval?\nBrief: Rollout lacks approval.\nRecommendation: Wait for approval.\nAlternatives: Shipping skips approval.'
-"$CAPTAIN" hold with-options --reason "$reason" >/dev/null
-"$CAPTAIN" hold no-options --reason "$reason" >/dev/null
+"$CAPTAIN" hold with-options --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "$reason" >/dev/null
+"$CAPTAIN" hold no-options --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "$reason" >/dev/null
 out=$(mirror card-payload) || { printf '%s\n' "$out"; fail "X49 failed edit aborted the pass"; }
 assert_contains "$out" 'card update failed:' "X49 failed edit was not reported"
 assert_eq "$(outbound_count chat.update "$ts")" 0 "X49 failed edit was reported as successful"
@@ -1750,7 +1750,7 @@ out=$(mirror card-payload)
 assert_not_contains "$out" 'card update failed:' "X49 unchanged failed edit was reported again"
 assert_eq "$(outbound_count chat.update "$ts")" 0 "X49 restart retried the failed text change"
 assert_eq "$(outbound_count chat.postMessage)" 3 "X49 failed edit posted another card"
-"$CAPTAIN" hold with-options --reason "${reason/Wait for approval?/Approve waiting?}" >/dev/null
+"$CAPTAIN" hold with-options --boundary owner-rule-change --if-no 'Keep the existing release rule' --reason "${reason/Wait for approval?/Approve waiting?}" >/dev/null
 mirror card-payload >/dev/null
 assert_eq "$(outbound_count chat.update "$ts")" 1 "X49 a new text change was not attempted"
 assert_eq "$(python3 "$HELPER" root-count "$(replay_file)" with-options)" 1 "X49 new attempt replaced the root"

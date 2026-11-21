@@ -75,7 +75,7 @@ A Claude secondmate's busy hooks are not that file: `bin/fm-spawn.sh` passes the
 
 Primary `.claude/settings.json` registers `../../../bin/fm-turnend-guard.sh --claude` and `../../../bin/fm-claude-stop-autoarm.sh` with `asyncRewake: true` and `timeout: 28800`.
 Guard exit 2 plus stderr forces continuation.
-Stop payload `stop_hook_active=true` follows any hook-driven continuation, including async reawakening, so Claude mode ignores it and uses cooperative claim and epoch plus bounded re-block; default Codex mode keeps it as a one-block loop guard.
+Stop payload `stop_hook_active=true` follows any hook-driven continuation, including async reawakening, so Claude supervision recovery ignores it and uses cooperative claim and epoch plus bounded re-block; the separate [Claude final-message ask check](../../../docs/turnend-guard.md#claude-final-message-ask-check) honors it as a one-block bound, as default Codex supervision does.
 
 Project `.claude/settings.json` loads only when the exact project root is the session root; Claude does not search parents, so Firstmate starts at repository root.
 Hooks still run through cwd-sensitive `/bin/sh`, so tracked commands anchor through `"$CLAUDE_PROJECT_DIR"/bin/...`.

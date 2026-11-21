@@ -14,6 +14,7 @@ import re
 import runpy
 import signal
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -38,6 +39,9 @@ GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
 RECEIPT_SECONDS = int(dt.timedelta(hours=4).total_seconds())  # policy: current-turn receipt answer bound
 RECORD_NAME = re.compile(r"[0-9]+[.]msg")
+# A return-pending record holds three short lines (spawn_gen=, slot=, child=); a linked one is
+# read only up to this many bytes, and a longer target gives no evidence.
+LINKED_RECORD_MAX_BYTES = 4096
 REPLY_ID = re.compile(r"[0-9a-fA-F]{16}")  # bin/fm-pending-reply-lib.sh correlation id
 # A prerequisite carrying one of these overdue rows is stalled, missing or failed: it no longer carries a wait.
 PREREQUISITE_TROUBLE = ("stalled_worker", "missing_worker", "failed_task")
@@ -125,6 +129,8 @@ class Collector:
                         GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
         self.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.rows = {}
+        self.consumer_tasks = {}
+        self.silence_transport = {}
         self.stale_reason = None
         self.stale_generated = None
         self.degraded = []
@@ -295,7 +301,7 @@ class Collector:
         return self.run(["bash", "-c", script, "open-loops", *args])
 
     def add(self, category, subject, action, since=None, owner="firstmate", evidence="", informational=False,
-            source=None):
+            source=None, opening=None, consumer_task=None):
         """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
@@ -307,7 +313,12 @@ class Collector:
             row["informational"] = True
         if source is not None:
             row["source"] = source
+        if opening is not None:
+            row["opening"] = opening
         self.rows[identity] = row
+        if consumer_task is not None:
+            self.consumer_tasks[identity] = consumer_task
+        return row
 
     def source(self, name, reader, *args):
         """Run one reader; its failure marks the ledger partly blind and never aborts the others."""
@@ -434,10 +445,14 @@ class Collector:
             evidence += "; " + excluded
         if not stamps:
             evidence += "; no report yet: clock starts at dispatch"
-        self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
-                 since, evidence=evidence, informational=informational)
+        row = self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
+                       since, evidence=evidence, informational=informational, consumer_task=ident)
+        if not excluded and (pending or (ack_at is not None and since == ack_at)):
+            # Transport activity may reset the ordinary check-in cadence, but
+            # only a report or resolved reply can settle a recorded steer.
+            self.silence_transport[row["id"]] = max(
+                (stamp for stamp in (status_at, reply_at) if stamp is not None and stamp <= self.now), default=-1)
         if long_wait:
-            row = next(r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident)
             row["limit_seconds"] = pause_limit
             row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit)
 
@@ -457,7 +472,7 @@ class Collector:
         env = dict(self.env)
         if task.get("spawn_gen"):
             env["FM_SEND_EXPECTED_SPAWN_GEN"] = task["spawn_gen"]
-        self.run([BIN / "fm-send.sh", task_id, CHECK_IN_TEXT], env=env)
+        self.run([BIN / "fm-send.sh", task_id, "--answers-none", CHECK_IN_TEXT], env=env)
         return dict(check_in="sent", subject=task_id)
 
     def recorded_stop(self, task):
@@ -534,7 +549,8 @@ class Collector:
                                      + (task["current_state"].get("detail") or "observation unavailable"))
             if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
-                         mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
+                         mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")),
+                         consumer_task=task["id"])
             state = task["current_state"].get("state")
             if state == "failed":
                 # A scout's report is output to consume, not proof its failed
@@ -542,7 +558,8 @@ class Collector:
                 if not self.captain_dropped(task) and (task["kind"] == "scout" or not self.source(
                         "failed deliverable " + task["id"], self.deliverable_landed, task)):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
-                             mtime(self.state / (task["id"] + ".status")))
+                             mtime(self.state / (task["id"] + ".status")),
+                             consumer_task=task["id"])
             elif ((state == "done" or (state == "unknown" and stopped)) and not task["pr"].get("url")
                   and not self.captain_dropped(task)
                   # The durable status log, not the live pane, owns the completion declaration: a closed
@@ -644,7 +661,8 @@ class Collector:
         if signatures:
             evidence += "; " + signatures[-1][:150]
         self.add("stalled_worker", task["id"], "follow up on the recorded wait and recover the worker", since,
-                 owner="worker:" + task["id"], evidence=evidence)
+                 owner="worker:" + task["id"], evidence=evidence,
+                 consumer_task=task["id"])
 
     def task_worktree(self, task):
         worktree = task["paths"]["worktree"].get("path")
@@ -1011,16 +1029,38 @@ class Collector:
         meta = self.state / (task + ".meta")
         if meta.is_symlink():
             raise ValueError(f"task metadata {meta.name} must not be a symbolic link")
-        source["generation"] = fingerprint(meta.read_text()) if meta.exists() else None
+        if meta.exists() and not meta.is_file():
+            raise ValueError(f"task metadata {meta.name} must be a regular file")
+        source["generation"] = fingerprint(meta.read_text()) if meta.is_file() else None
         return source
 
-    def decision_source(self, task, key, decision, observed_pr=None):
+    @staticmethod
+    def decision_identity(stream, key, decision):
+        """The canonical opening's identity, independent of optional task provenance."""
+        return dict(stream=stream, key=key, decision=fingerprint(decision))
+
+    def status_decisions(self, task):
         path = self.state / (task + ".status")
         if path.is_symlink() or not path.is_file():
             raise ValueError("decision status must be a regular file")
-        stat = path.stat()
-        source = dict(self.task_source(task), kind="status", key=key, decision=fingerprint(decision),
-                      stream=[stat.st_dev, stat.st_ino])
+        out = self.bash('[ -r "$2" ] || exit 1; . "$1/fm-status-decision-lib.sh"; '
+                        'status_open_decisions_dated "$2" "" --with-identity', BIN, path)
+        decisions = []
+        for line in out.splitlines():
+            key, verb, opened, opening, stream, summary = line.split("\t", 5)
+            device, inode = stream.split(":")
+            # The digest now includes the opening ordinal, so a binding recorded under the older digest
+            # no longer matches and that question needs one fresh action to reconcile it.
+            decision = "\t".join((key, verb, opened, opening, summary))
+            decisions.append(dict(key=key, verb=verb, opened=opened, summary=summary,
+                                  identity=self.decision_identity([int(device), int(inode)], key, decision)))
+        return decisions
+
+    def decision_source(self, task, identity, observed_pr=None):
+        path = self.state / (task + ".status")
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("decision status must be a regular file")
+        source = dict(self.task_source(task), kind="status", **identity)
         if observed_pr is None:
             assigned = next((t for t in self.tasks if t["id"] == task), {})
             pr = self.prs.get(assigned.get("pr", {}).get("url"))
@@ -1049,18 +1089,18 @@ class Collector:
             if status.is_symlink():
                 continue
             try:
-                out = self.bash('[ -r "$2" ] || exit 1; '
-                                '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
+                decisions = self.status_decisions(status.stem)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
                 continue
-            for line in out.splitlines():
-                key, verb, opened, summary = (line.split("\t", 3) + ["", "", "", ""])[:4]
+            for decision in decisions:
+                key, opened = decision["key"], decision["opened"]
                 self.add("unanswered_question", f"{status.stem}:{key}",
                          "answer or close this question, or record why it no longer applies",
-                         int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}",
+                         int(opened) if opened.isdigit() else None,
+                         evidence=f"{decision['verb']}: {decision['summary']}", opening=decision["identity"],
                          source=self.source("question provenance " + status.name,
-                                            self.decision_source, status.stem, key, line))
+                                            self.decision_source, status.stem, decision["identity"]))
 
     def board_answer_rows(self):
         inbox = self.state / "procevent-inbox"
@@ -1104,18 +1144,58 @@ class Collector:
                 value = line[len("spawn_gen="):]
         return value
 
+    def linked_record_text(self, marker, task_id):
+        """The evidence text of a linked return-pending record, which counts as pending whatever it holds.
+
+        The target is read only when it is a regular file of at most LINKED_RECORD_MAX_BYTES and is not
+        another task's record; a FIFO, device, directory, oversized, missing or unreadable target, or another
+        task's record, gives empty text, the same outcome as an unreadable record.
+        """
+        try:
+            target = marker.resolve(strict=True)
+            if not stat.S_ISREG(os.lstat(target).st_mode):
+                return ""
+        except (OSError, RuntimeError, ValueError):
+            return ""
+        own = task_id + ".teardown-return-pending"
+        prefix = target.name.split(".", 1)[0]
+        if target.name.endswith(".teardown-return-pending") and target.name != own:
+            return ""
+        if prefix != task_id and (self.state / (prefix + ".meta")).exists():
+            return ""
+        try:
+            fd = os.open(target, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+        except OSError:
+            return ""
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_size > LINKED_RECORD_MAX_BYTES:
+                return ""
+            data = os.read(fd, LINKED_RECORD_MAX_BYTES + 1)
+        except OSError:
+            return ""
+        finally:
+            os.close(fd)
+        if len(data) > LINKED_RECORD_MAX_BYTES:
+            return ""
+        return data.decode("utf-8", "replace")
+
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
         for marker in self.state_files:
-            if not marker.name.endswith(".teardown-return-pending") or marker.is_symlink() or not marker.is_file():
+            if not marker.name.endswith(".teardown-return-pending"):
+                continue
+            linked = marker.is_symlink()
+            if not linked and not marker.is_file():
                 continue
             task_id = marker.name[:-len(".teardown-return-pending")]
             meta = self.state / (task_id + ".meta")
             if meta.is_symlink() or not meta.is_file():
                 continue
-            if self.spawn_gen(marker) != self.spawn_gen(meta):
+            if not linked and self.spawn_gen(marker) != self.spawn_gen(meta):
                 continue
-            fields = dict(line.split("=", 1) for line in marker.read_text().splitlines() if "=" in line)
+            text = self.linked_record_text(marker, task_id) if linked else marker.read_text()
+            fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
             child = f" for child {fields['child']}" if fields.get("child") else ""
             self.add("interrupted_teardown", task_id,
                      f"re-run bin/fm-teardown.sh {task_id} to finish returning its pool slot{child}; "
@@ -1178,8 +1258,45 @@ class Collector:
         self.add("coverage", "ledger stale", "wait for the GitHub quota window to reset; the next run refreshes every row",
                  None, evidence=reason, informational=True)
 
-    def result(self):
+    def consumer_observations(self):
+        """Reuse this collection's liveness, bound to the captured task generation."""
+        observations = {}
+        for task in self.direct_reports:
+            if not task.get("spawn_gen") or task["current_state"].get("detail") == "task generation changed during snapshot":
+                continue
+            meta = self.state / (task["id"] + ".meta")
+            try:
+                if meta.is_symlink() or not meta.is_file():
+                    continue
+                text = meta.read_text()
+                fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+                if fields.get("spawn_gen") != task["spawn_gen"]:
+                    continue
+            except SOURCE_ERRORS:
+                continue  # optional/unknown availability is not proof of a healthy consumer
+            endpoint = task["endpoint"]
+            unavailable = endpoint.get("exists") is False or endpoint.get("agent_alive") in ("dead", "missing")
+            available = False if unavailable else True if endpoint.get("agent_alive") == "alive" else None
+            observations[task["id"]] = dict(
+                source=dict(self.source_context(), task=task["id"], generation=fingerprint(text)),
+                spawn_gen=task["spawn_gen"], available=available)
+        return observations
+
+    def result(self, consumers=None):
         rows = sorted(self.rows.values(), key=lambda r: (r["category"], r["subject"]))
+        if consumers is None:
+            consumers = self.consumer_observations()
+        for row in rows:
+            source = row.get("source")
+            task = source.get("task") if isinstance(source, dict) else self.consumer_tasks.get(row["id"])
+            observed = consumers.get(task)
+            if observed and (source is None or all(source.get(key) == value for key, value in observed["source"].items())):
+                # These direct-report rows are bound by their producer. Missing optional liveness
+                # provenance must not change the existing collector coverage verdict.
+                if source is None:
+                    row["source"] = observed["source"]
+                row["consumer"] = observed
+            row["current_identity"] = row_digest(row)
         report = dict(schema="fm-open-loops.v1", generated_epoch=self.stale_generated or self.now,
                       home=str(self.home), complete=not self.degraded and not self.stale_reason,
                       rows=rows)
@@ -1201,15 +1318,73 @@ class Collector:
         target = self.state / "open-loops.json"
         if target.is_symlink():
             raise ValueError("open-loop ledger must not be a symbolic link")
-        report = self.result()
+        consumers = self.consumer_observations()
+        report = self.result(consumers)
         try:
             previous = read_ledger(self.state)
         except (OSError, ValueError):  # an unreadable ledger has no handling to keep; this publication replaces it
             previous = None
         if previous and "handling" in previous:
             handling = report["handling"] = previous["handling"]
+            current = {row["id"]: idx for idx, row in enumerate(report["rows"])}
+            unfinished = {task["id"] for task in self.tasks
+                          if task["current_state"].get("state") not in STOP_STATES | {"failed"}}
+            losses = {row["source"]["task"]: row["consumer"] for row in report["rows"]
+                      if row["category"] == "missing_worker" and consumer_unavailable(row)
+                      and row["source"]["task"] in unfinished}
+            # Secondmate silence uses the same producer, but secondmates do not
+            # enter worker_rows. Use only their already verified local endpoint.
+            for task in self.direct_reports:
+                observed = consumers.get(task["id"])
+                if task["kind"] == "secondmate" and not task.get("remote") and observed \
+                        and observed["available"] is False \
+                        and task["current_state"].get("state") not in STOP_STATES | {"failed"}:
+                    losses[task["id"]] = observed
+            for row in previous["rows"]:
+                ident = row["id"]
+                if not row.get("overdue") or row.get("stale") \
+                        or row.get("category") not in ("silent_report", "stalled_worker"):
+                    continue
+                action = handling["actions"].get(ident, {})
+                if action.get("kind") != "steered" or not same_work(action, row, previous["generated_epoch"]):
+                    continue
+                source = row.get("source")
+                if source is not None and not isinstance(source, dict):
+                    continue
+                source = source or {}
+                slot = current.get(ident)
+                if slot is not None:
+                    # The silence producer's ordinary cadence is transport-aware.
+                    # Preserve the original result clock and evidence while only
+                    # transport changed, not a report, reply, or intentional wait.
+                    observed = report["rows"][slot]
+                    sent = action.get("sent_epoch", action.get("at_epoch"))
+                    if ident not in self.silence_transport or type(sent) is not int \
+                            or self.silence_transport[ident] >= sent or observed.get("stale") \
+                            or observed["limit_seconds"] != row["limit_seconds"]:
+                        continue
+                    new_source = observed.get("source") or {}
+                    if source and new_source and any(source.get(key) != new_source.get(key)
+                                                     for key in ("home", "state", "data", "config", "task")):
+                        continue
+                    retained = dict(observed, age_seconds=row["age_seconds"], overdue=True, evidence=row["evidence"])
+                    retained.pop("informational", None)
+                else:
+                    # Endpoint loss stops these live-only producers, but is
+                    # not a report or resumed work. Keep only verified losses.
+                    loss = losses.get(source.get("task"))
+                    if not loss or not all(source.get(key) == loss["source"][key]
+                                           for key in ("home", "state", "data", "config", "task")):
+                        continue
+                    retained = dict(row, source=loss["source"], consumer=loss)
+                if type(retained.get("age_seconds")) is int:
+                    retained["age_seconds"] += max(0, self.now - previous["generated_epoch"])
+                if slot is None:
+                    current[ident] = len(report["rows"])
+                    report["rows"].append(retained)
+                else:
+                    report["rows"][slot] = retained
             if not report["complete"]:
-                current = {row["id"] for row in report["rows"]}
                 presented = {ident for actor in handling["presentations"].values() for ident in actor}
                 for row in previous["rows"]:
                     # Unconfirmed either way: shown stale, never an overdue obligation needing a receipt.
@@ -1233,6 +1408,11 @@ class Collector:
             for row in report["rows"]:
                 if captain_visible(handling["actions"].get(row["id"], {}), row, self.now):
                     row["captain_visible"] = True
+        for row in report["rows"]:
+            action = report.get("handling", {}).get("actions", {}).get(row["id"], {})
+            if steer_needs_followup(action, row, self.now):
+                action["requires_followup"] = True
+            row["current_identity"] = notification_identity(row, action, self.now)
         write_ledger(self.state, report)
         try:
             (self.state / ".open-loops-stale-surfaced").unlink()
@@ -1316,9 +1496,16 @@ def overdue_rows(report, now):
 
 
 def row_digest(row):
-    # Preserve the original escalation/deferral receipt identity. A waiting receipt
-    # separately compares its full collected source and authoritative dependency.
+    # Preserve ordinary receipt identity, except that a status question belongs
+    # to its canonical opening, not just its display text or available clock.
+    # Waiting also verifies its full collected source and dependency live.
     fields = [row.get(f) for f in ("category", "subject", "owner", "next_action", "evidence")]
+    source, opening = row.get("source"), row.get("opening")
+    if row.get("category") == "unanswered_question":
+        if not isinstance(opening, dict) and isinstance(source, dict) and source.get("kind") == "status":
+            opening = source  # an already identified receipt from before identity was retained separately
+        if isinstance(opening, dict):
+            fields.append([opening.get(key) for key in ("stream", "key", "decision")])
     if row.get("category") == "stalled_worker" and isinstance(fields[-1], str):
         fields[-1] = ELAPSED_TIME.sub("<age>", fields[-1])  # a heartbeat's growing age is not a changed obligation
     return hashlib.sha256(json.dumps(fields).encode()).hexdigest()[:24]
@@ -1507,18 +1694,14 @@ class WaitVerifier:
             raise ValueError("waiting source has no task identity; recollect before binding it")
         if kind == "status":
             if task not in self.decisions:
-                path = c.state / (task + ".status")
-                if path.is_symlink() or not path.is_file():
-                    raise ValueError("prerequisite status is unavailable")
-                self.decisions[task] = c.bash('. "$1/fm-status-decision-lib.sh"; '
-                    'status_open_decisions_dated "$2"', BIN, path).splitlines()
-            decision = next((line for line in self.decisions[task]
-                             if line.split("\t", 1)[0] == source.get("key")), None)
+                self.decisions[task] = c.status_decisions(task)
+            decision = next((record for record in self.decisions[task]
+                             if record["key"] == source.get("key")), None)
             if decision is None:
                 raise ValueError("prerequisite decision is no longer open")
             # PR identity is the collector's latest forge observation; full source
             # comparisons invalidate a changed head on publication, while this read rechecks the live local key.
-            return c.decision_source(task, source["key"], decision, source.get("pr"))
+            return c.decision_source(task, decision["identity"], source.get("pr"))
         if kind in ("pr", "commits"):
             current = dict(source, **c.task_source(task))
             if kind == "commits":
@@ -1739,10 +1922,51 @@ def same_work(action, row, now):
         age is not None and now - age > action.get("clock_start", action.get("at_epoch", now)))
 
 
+def consumer_unavailable(row):
+    """Use only the current collected launch bound to this row, not a name match or old launch."""
+    source, observed = row.get("source"), row.get("consumer")
+    if row.get("stale") or not isinstance(source, dict) or not isinstance(observed, dict) \
+            or observed.get("available") is not False or not observed.get("spawn_gen"):
+        return False
+    proof = observed.get("source")
+    keys = ("home", "state", "data", "config", "task", "generation")
+    return isinstance(proof, dict) and all(source.get(key) and proof.get(key) == source[key] for key in keys)
+
+
+def steer_stands(action, row, now):
+    """Delivery buys a bounded reconciliation window, never proof of its intended result."""
+    sent = action.get("sent_epoch", action.get("at_epoch"))
+    limit = row.get("limit_seconds")
+    if type(sent) is not int or type(limit) is not int or limit < 0:
+        return False
+    elapsed = now - sent
+    # Zero-limit work may be handled in its delivery instant, not indefinitely.
+    if elapsed < 0 or (elapsed != 0 and elapsed >= limit):
+        return False
+    return not consumer_unavailable(row)
+
+
+def steer_needs_followup(action, row, now):
+    return action.get("kind") == "steered" and same_work(action, row, now) \
+        and (action.get("requires_followup") or not steer_stands(action, row, now))
+
+
+def notification_identity(row, action, now):
+    """Expose one due-follow-up transition to the existing opaque-token watcher."""
+    identity = row_digest(row)
+    if same_work(action, row, now):
+        previous = action.get("notification_identity")
+        if isinstance(previous, str) and re.fullmatch(r"[0-9a-f]{24}", previous):
+            identity = previous
+    if steer_needs_followup(action, row, now):
+        return fingerprint([identity, "steer-result-due", action.get("sent_epoch", action.get("at_epoch"))])[:24]
+    return identity
+
+
 def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
-    A standing receipt answers its row on unchanged evidence; a reviewed green PR never has one.
+    A steer buys only its bounded result-follow-up window; a reviewed green PR never has standing cover.
     An escalation never stands: only a bound captain hold is proof it waits on the captain,
     and the end of that hold is a change that needs firstmate's next action.
     A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
@@ -1760,7 +1984,9 @@ def receipt_covers(action, row, now, waits=None):
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not captain_visible(action, row, now)
-    return kind in ("steered", "merged")
+    if kind == "steered":
+        return steer_stands(action, row, now)
+    return kind == "merged"
 
 
 def needs_no_action(action, row, now, waits=None):
@@ -1782,6 +2008,9 @@ def action_answers(action, row, required, now, waits):
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
     if kind == "waiting" or action.get("hold"):
         return receipt_covers(action, row, now, waits)
+    if kind == "steered":
+        return steer_stands(action, row, now) and (row.get("category") != "review_pass_not_merged"
+                                                  or 0 <= now - answered_at(action) < RECEIPT_SECONDS)
     return 0 <= now - answered_at(action) < RECEIPT_SECONDS
 
 
@@ -1851,10 +2080,14 @@ def render_digest(rows, actions, captain_waiting):
     return "\n".join(lines)
 
 
-def render_overdue(rows):
+def render_overdue(rows, actions=None, now=None):
     fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "captain_visible"]
     lines = ["OVERDUE:", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
-    lines += ["  " + ",".join(json.dumps(r.get(f), ensure_ascii=False) for f in fields) for r in rows]
+    for row in rows:
+        shown = dict(row)
+        if actions is not None and steer_needs_followup(actions.get(row["id"], {}), row, now):
+            shown["evidence"] = str(row.get("evidence", "")) + "; steered, result not observed"
+        lines.append("  " + ",".join(json.dumps(shown.get(field), ensure_ascii=False) for field in fields))
     return "\n".join(lines)
 
 
@@ -1930,7 +2163,7 @@ def ledger_action(args, state, now, batch=()):
             print("note: PR source unreadable this pass for " + ", ".join(sorted(waits.unread))
                   + "; its standing wait is unchanged and the read repeats next pass", file=sys.stderr)
         if needing:
-            print(render_overdue(needing))
+            print(render_overdue(needing, actions, now))
             if standing and args.include_standing:
                 print(render_overdue(standing).replace(
                     "OVERDUE:", "STANDING (unchanged since its last action; no action needed):", 1))
@@ -1961,13 +2194,13 @@ def ledger_action(args, state, now, batch=()):
                              or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
-            print(render_overdue(missing))
+            print(render_overdue(missing, actions, now))
             return 1
         return 0
     if args.report:
         print(f"generated_epoch: {report['generated_epoch']}")
         print("complete: " + str(report.get("complete", False)).lower())
-        print(render_overdue(rows) if rows else "OVERDUE: none")
+        print(render_overdue(rows, actions, now) if rows else "OVERDUE: none")
         return 0
     if args.batch:
         return record_batch(batch, state, now, report, waits, waits_error)
@@ -2039,6 +2272,12 @@ def record_action(args, state, now, report, waits, waits_error):
                              " or its evidence last changed")
         if now - sent >= RECEIPT_SECONDS:
             raise ValueError("steered evidence is older than four hours; send a new delivery")
+        if old.get("kind") == "steered" and old.get("requires_followup") \
+                and same_work(old, by_id[ident], now) and sent <= answered_at(old):
+            raise ValueError("this delivery already needs result follow-up; old evidence cannot renew it")
+        if not steer_stands(dict(sent_epoch=sent), by_id[ident], now):
+            raise ValueError("steered delivery needs result follow-up: its row limit has elapsed or its consumer"
+                             " is unavailable; reconcile the outcome or use an applicable explicit wait")
     if args.kind == "merged" and not merge_recorded(state, by_id[ident], args.evidence):
         raise ValueError("merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh")
     recheck = epoch(args.recheck)
@@ -2085,9 +2324,11 @@ def record_action(args, state, now, report, waits, waits_error):
                     marked[ident] = now
             write_ledger(state, report, receipt=True)
             category = by_id[ident]["category"]
-            remedy = ("steer, merge, wait on a named live task or escalate it" if category in REASON_WAITABLE
-                      else "steer, wait on a task through a delivery naming the row or escalate it"
-                      if category in TASK_WAITABLE else "steer, merge or escalate it")
+            remedy = ("merge, wait on a named live task or escalate it" if category in REASON_WAITABLE
+                      else "wait on a task through a delivery naming the row or escalate it"
+                      if category in TASK_WAITABLE else "merge or escalate it")
+            if by_id[ident].get("limit_seconds") != 0:
+                remedy = "steer, " + remedy
             raise ValueError("second deferral refused; row is captain-visible; " + remedy)
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
@@ -2121,6 +2362,10 @@ def record_action(args, state, now, report, waits, waits_error):
                          sequence=controls["sequence"], deferrals=prior_deferrals
                          + int(args.kind == "deferred"), captain_visible=visible,
                          digest=row_digest(by_id[ident]), cited=cited)
+    previous_identity = by_id[ident].get("current_identity")
+    if same and isinstance(previous_identity, str) and re.fullmatch(r"[0-9a-f]{24}", previous_identity):
+        # Handling the due notification is not another notification; the next due result is.
+        actions[ident]["notification_identity"] = previous_identity
     if sent is not None:
         actions[ident]["sent_epoch"] = sent
     if by_id[ident].get("age_seconds") is not None:
@@ -2138,6 +2383,8 @@ def record_action(args, state, now, report, waits, waits_error):
     shown = captain_visible(actions[ident], by_id[ident], now)
     for row in report["rows"]:
         if row["id"] == ident:
+            # Only the collector publishes notification identities. A receipt
+            # write must not migrate a legacy row or create a new wake by itself.
             if shown:
                 row["captain_visible"] = True
             else:
