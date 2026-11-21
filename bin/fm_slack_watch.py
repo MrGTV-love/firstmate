@@ -3557,7 +3557,10 @@ class Watch:
                 except SlackError as error:
                     if str(error) not in THREAD_ERRORS:
                         raise
-                    if record.get('retired'):
+                    if str(error) == 'slack_outcome_unknown':
+                        # A read Slack may answer later: the card stays to be looked at (not every attempt on it is on record).
+                        everything = False
+                    elif record.get('retired'):
                         cards.setdefault(self.card_key(record), {})['final'] = True
                         self.commit()
                     continue

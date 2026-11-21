@@ -177,10 +177,14 @@ class Replay:
             self.log({'method': method, 'error': 'missing_scope', 'scope': needed})
             raise SlackError('missing_scope')
         rule = self.fail(method, fields.get('ts'), fields.get('timestamp'), fields.get('thread_ts'))
-        if rule:
-            if 'error' in rule:
-                # A Slack answer {"ok": false, "error": <name>}, named as the real transport names it.
-                raise SlackError(answer_error(str(rule['error'])))
+        answered = None
+        if rule and 'answer_error' in rule:
+            # A Slack answer {"ok": false, "error": <answer_error>}, named as the real transport names it; with "applied" Slack carried the call out first
+            # (a post it stored although its answer was an error). An "error" beside a "status" stays a label of the HTTP failure below.
+            answered = SlackError(answer_error(str(rule['answer_error'])))
+            if not rule.get('applied'):
+                raise answered
+        elif rule:
             status = int(rule.get('status', 503))
             if status == 429:
                 raise SlackError('rate_limited')
@@ -313,6 +317,8 @@ class Replay:
         else:
             raise SlackError('unsupported_replay_method')
         self.save()
+        if answered is not None:
+            raise answered
         return data
 
     def pages(self, method, field, **fields):

@@ -6718,6 +6718,23 @@ class Invariant5Reactions(InvariantScenario):
                 self.assertEqual(len(self.reaction_rows(home)), 1, home.refusals())
                 self.assertEqual([c for c in calls if c[1][:1] == ('answers',)], [])
 
+    def test_inv5_a_closed_card_whose_reactions_read_has_an_unknown_outcome_stays_to_be_read_and_their_reaction_is_refused_once(self):
+        # The owner closes the card in the poll in which their reactions read is answered {"ok": false, "error": "service_unavailable"}: the card is not
+        # marked looked at, the next read records their reaction as one refused attempt, and no answer is ever made.
+        with self.card_flow(options=False) as (home, ts, answers):
+            self.react(home, ts, 'thumbsup')
+            home.edit_replay(lambda data: data['failures'].update({'reactions.get:' + ts: {'answer_error': 'service_unavailable', 'times': 1}}))
+            with patch.object(Watch, 'probe', lambda self, key: (1, 'unknown')):
+                home.cli('poll')
+                self.assertTrue(next(iter(home.state()['threads'].values())).get('retired'))
+                self.assertEqual(self.reaction_rows(home), [])
+                cards = json.loads((home.state_dir / plane.SECOND_FILE).read_text()).get('cards', {})
+                self.assertFalse(any(entry.get('final') for entry in cards.values()), cards)
+                home.cli('poll')
+                home.cli('poll')
+            self.assertEqual(len(self.reaction_rows(home)), 1, home.refusals())
+            self.assertEqual(answers(), [])
+
     def test_inv5_a_card_whose_reactions_the_owner_path_read_is_not_read_again_in_their_phase_of_the_same_run(self):
         # Finding 5: a card with options has its reactions read once by the owner's answer path; their phase uses that read and does not call reactions.get
         # again in the same run. The control is a card without options, which only their phase reads: also one read per run, and never none.

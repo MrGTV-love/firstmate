@@ -1132,7 +1132,7 @@ class SchedulingTest(unittest.TestCase):
             later = home.reply_in(bad, 'a follow-up in the failing thread')
             new = home.say('a new owner request')
             state, path = home.replay_state()
-            state['failures']['conversations.replies:%s' % bad] = {'error': 'internal_error', 'times': 1}
+            state['failures']['conversations.replies:%s' % bad] = {'answer_error': 'internal_error', 'times': 1}
             path.write_text(json.dumps(state))
             Traced.TRACE.clear()
             rc, out, _ = home.poll()
@@ -1144,23 +1144,38 @@ class SchedulingTest(unittest.TestCase):
             rc, out, _ = home.poll()
             self.assertEqual([f['reply'] for f in home.followups(out)], [later])  # the failing thread is kept and read again by the next poll
 
-    def test_an_internal_error_on_an_owner_acknowledgement_holds_back_no_other_request_and_is_never_posted_twice(self):
-        # The second person is not set (case()): Slack answers the first request's acknowledgement {"ok": false, "error": "internal_error"}, an outcome it may
-        # have partly carried out. The poll goes on; the requests are woken once each, in order (the second never ahead of the first), and no acknowledgement
-        # is doubled.
+    def test_an_internal_error_on_an_owner_acknowledgement_that_slack_stored_is_never_posted_again(self):
+        # The second person is not set (case()). Slack stores the first request's acknowledgement and still answers {"ok": false, "error": "internal_error"}:
+        # an outcome the plane cannot know. The poll goes on; the next poll finds the stored acknowledgement by its marker and posts nothing more. Both
+        # requests are woken once each, in order (the second never ahead of the first).
         with case() as home:
             first, second = home.say('the first request'), home.say('the second request')
             state, path = home.replay_state()
-            state['failures']['chat.postMessage:%s' % first] = {'error': 'internal_error', 'times': 1}
+            state['failures']['chat.postMessage:%s' % first] = {'answer_error': 'internal_error', 'applied': True, 'times': 1}
             path.write_text(json.dumps(state))
             Traced.TRACE.clear()
             outs = [home.poll()[1] for _ in range(3)]
             self.assertIn('transport failure: slack_outcome_unknown', outs[0])
             self.assertEqual([r['ts'] for out in outs for r in home.requests(out)], [first, second])
-            self.assertEqual([outcome for row in home.calls('chat.postMessage') if row['thread'] == first for outcome in [row['outcome']]][:1],
-                             ['failed:slack_outcome_unknown'])
+            self.assertEqual([row['outcome'] for row in home.calls('chat.postMessage') if row['thread'] == first], ['failed:slack_outcome_unknown'])
+            self.assertEqual([row['outcome'] for row in home.calls('chat.postMessage') if row['thread'] == second], ['ok'])
+            self.assertEqual([(m['user'], m['text']) for m in home.messages(first) if m.get('ts') != first],
+                             [(m['user'], m['text']) for m in home.messages(first) if m.get('metadata')])
             self.assertEqual(len(home.posts(first)), 1)
             self.assertEqual(len(home.posts(second)), 1)
+
+    def test_a_replay_status_rule_keeps_its_transport_name_and_an_answer_error_rule_is_named_as_slack_answers_it(self):
+        for rule, outcome in (({'status': 429, 'error': 'fixture'}, 'failed:rate_limited'), ({'status': 503, 'error': 'fixture'}, 'failed:unreachable'),
+                              ({'status': 400, 'error': 'fixture'}, 'failed:api_error'), ({'answer_error': 'internal_error'}, 'failed:slack_outcome_unknown'),
+                              ({'answer_error': 'channel_not_found'}, 'failed:channel_not_found'), ({'answer_error': 'something_new'}, 'failed:api_error')):
+            with self.subTest(rule=rule), case() as home:
+                thread = home.take_in('a request')
+                state, path = home.replay_state()
+                state['failures']['conversations.replies:%s' % thread] = dict(rule, times=1)
+                path.write_text(json.dumps(state))
+                Traced.TRACE.clear()
+                home.poll()
+                self.assertEqual([row['outcome'] for row in home.calls('conversations.replies') if row['thread'] == thread][:1], [outcome])
 
     def test_a_failing_card_thread_holds_back_neither_a_follow_up_nor_a_new_request_and_is_still_reported(self):
         with case() as home:
