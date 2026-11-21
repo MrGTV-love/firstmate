@@ -5176,7 +5176,7 @@ unc_ignore_path() {  # <relative-path>
 # the record, the marker, the bytes, the copy and the pool state. Control: an ignored file
 # at a path that branch does not track is kept by the return, which then runs.
 test_unclaimed_return_refuses_to_overwrite_an_ignored_root_file() {
-  local provider variant case_dir out rc before origin
+  local provider variant case_dir out rc before origin dirty
   unc_providers "unclaimed-route gate on the real provider"
   for provider in "${UNC_PROVIDERS[@]}"; do
     for variant in colliding unrelated; do
@@ -5201,7 +5201,8 @@ test_unclaimed_return_refuses_to_overwrite_an_ignored_root_file() {
         printf 'unique ignored local bytes\n' > "$UNC_A/scratch.dat"
         git -C "$UNC_A" check-ignore -q scratch.dat || fail "$provider $variant: the fixture file is not ignored"
       fi
-      [ -z "$(git -C "$UNC_A" status --porcelain --untracked-files=all | grep -v '^?? .claude')" ] || fail "$provider $variant: git status shows the ignored file, so the fixture does not model the defect"
+      dirty=$(git -C "$UNC_A" status --porcelain --untracked-files=all | grep -v '^?? .claude') || :
+      [ -z "$dirty" ] || fail "$provider $variant: git status shows the ignored file, so the fixture does not model the defect"
       before=$(cat "$UNC_STATE")
       rc=0
       out=$(unc_run_teardown "$case_dir") || rc=$?

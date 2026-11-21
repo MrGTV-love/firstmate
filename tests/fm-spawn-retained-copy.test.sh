@@ -1210,7 +1210,7 @@ test_old_holder_refuses_with_the_cutover_remedy_and_the_guard_never_runs_status(
     cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$mode: the refusal changed the pool state (a holder or a lease)"
   done
 
-  name=old-holder-two-slots
+  name='old-holder-two-slots'
   make_retained_case "$name"
   add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
   add_free_second_slot ''
@@ -1677,8 +1677,10 @@ real_schema1_provider_cases() {  # <provider-binary>
     state=$pool/treehouse-state.json
     holder=$OLD_RECOVERED
     [ "$start" = old ] || holder='recovered: persistent quarantine; verify before reuse'
-    jq --arg r "$holder" --arg a "$a" '.worktrees |= map(if .path == $a then (.lease_holder = $r | del(.lease_id)) else . end)' \
-      "$state" > "$state.tmp" && mv "$state.tmp" "$state" || fail "$name: cannot make slot A recovered"
+    if ! jq --arg r "$holder" --arg a "$a" '.worktrees |= map(if .path == $a then (.lease_holder = $r | del(.lease_id)) else . end)' \
+      "$state" > "$state.tmp" || ! mv "$state.tmp" "$state"; then
+      fail "$name: cannot make slot A recovered"
+    fi
     SLOT_DIR=$a
     PANE_DIR=$PROJECT_DIR
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$a" "nested-$name"
