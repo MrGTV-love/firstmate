@@ -1863,10 +1863,9 @@ esac
 exit 0
 SH
     chmod +x "$FAKEBIN_DIR/treehouse"
-    # A treehouse without pool-dir is placed through its status listing, a state-lock
-    # command an unproven provider answers with its own recovery: only a provider that
-    # proved the capability may be asked (status), and an unproven one is refused with
-    # no status call (status-unproven).
+    # Neither status mode answers pool-dir: status runs a provider that proved the
+    # capability and status-unproven one that did not. Without pool-dir the guard never
+    # places the slot through a status listing, proven or not.
     [ "$mode" != status ] || : > "$CASE_DIR/proven"
     if [ "$mode" = status-unproven ] || [ "$mode" = status ]; then
       # Without pool-dir the guard never places the slot through a status listing, proven
