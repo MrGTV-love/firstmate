@@ -7759,6 +7759,35 @@ test_r4_locked_copy_is_deferred_under_project_custody() {
   pass 'under project custody for an unprovable slot a locked copy is deferred, twice in a row, and the driver never runs under the lock; a leased slot closes'
 }
 
+# Main 3529 Ruling 1: a kept-copy close (FM_STUB_CLOSEOUT=retained) in a slot whose
+# Treehouse has no lease command keeps project custody, so the locked own copy is
+# deferred: the driver is never asked, no tar and no retained record is written, and
+# the copy, its lock and the task record stay, on the first run and its retry. With a
+# lease command the same case closes around the kept copy (control).
+test_pr400_kept_copy_without_a_lease_is_deferred_and_asks_the_driver_nothing() {
+  local rc run
+  make_retained_case pr400-kept-no-lease enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  for run in 1 2; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "pr400-kept-no-lease run $run: a kept copy in a slot that cannot be leased must not close: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep 'deferred' "$FOREIGN_CASE/stderr" "pr400-kept-no-lease run $run: the deferral was not named"
+    assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "pr400-kept-no-lease run $run: the driver was asked or a tar was written under project custody"
+    assert_absent "$(retained_record_path)" "pr400-kept-no-lease run $run: a retained record was written though the driver was never asked"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "pr400-kept-no-lease run $run: the task record was removed"
+    assert_present "$FOREIGN_COPY/.git" "pr400-kept-no-lease run $run: the copy was removed"
+    git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+      || fail "pr400-kept-no-lease run $run: the copy is no longer locked"
+  done
+  rm -f "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "pr400-kept-no-lease control: with a lease command the kept copy must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "pr400-kept-no-lease control: the leased close did not ask the driver exactly once"
+  assert_present "$(retained_record_path)" "pr400-kept-no-lease control: the leased close wrote no retained record"
+  pass 'a kept-copy close in a slot with no lease command is deferred twice with no driver call, no tar and no retained record; with a lease command it closes'
+}
+
 # The open-file listing is filtered in one pass, and a listing line of a shape
 # the filter does not know still fails the scan, so the copy stays locked.
 test_direct_release_refuses_a_malformed_open_file_listing() {
@@ -10506,6 +10535,28 @@ test_a_changed_kept_copy_is_assessed_afresh() {
   pass "a kept copy whose ignored files, tracked status or HEAD changed is assessed afresh: still-eligible goes to the driver again, failing a proof refuses before any driver call"
 }
 
+# retained_peer_add: another live task (task-y1) works in the slot of the current
+# retained case, so a kept-copy close takes the peer route: no slot reservation and
+# no project lock, so the driver runs and the kept copy then refuses after it
+# (teardown_retained_hold). Main 3529 Ruling 1 moves the setup of the #380 cases that
+# used a slot with no lease command here, since such a slot now keeps project custody
+# and defers the driver (Main 1681 R5); their assertions are unchanged.
+# retained_peer_drop: the peer's record goes and the slot claim it was handed
+# (teardown_peer_claim_handoff) is put back as the case snapshot it (Main 3541 C).
+retained_peer_add() {
+  local peer=$FOREIGN_SLOT/peer-copy
+  mkdir -p "$peer"
+  fm_write_meta "$FOREIGN_CASE/state/task-y1.meta" \
+    "window=firstmate:fm-task-y1" "endpoint_task_id=task-y1" \
+    "worktree=$peer" "branch=fm/task-y1" "project=$FOREIGN_CASE/project" \
+    "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-y1" \
+    "prior_worktree=$FOREIGN_SLOT"
+}
+retained_peer_drop() {
+  rm -f "$FOREIGN_CASE/state/task-y1.meta"
+  cp "$FOREIGN_CASE/claim-before" "$FOREIGN_CASE/pool/1/.fm-slot-owner"
+}
+
 # A kept copy in a slot another live task still works in (the peer route) cannot
 # be held under this task's lease, so the close refuses, and its retry, with the
 # record matching, asks the driver nothing.
@@ -10817,7 +10868,7 @@ test_a_head_only_change_of_a_kept_copy_asks_the_driver_exactly_once_more() {
   local rc record head
   make_retained_case retained-head-only enclosing
   held_plain_get_slot "$FOREIGN_CASE"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "retained-head-only: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-head-only: run 1 should have asked the driver once"
@@ -10845,7 +10896,7 @@ test_a_changed_payload_is_archived_once_per_change_and_never_again_while_unchang
   local rc step want=1 run
   make_retained_case retained-p3 enclosing
   held_plain_get_slot "$FOREIGN_CASE"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   for step in none new-entry changed-bytes second-change earlier-payload; do
     case "$step" in
       none) ;;
@@ -10868,7 +10919,7 @@ test_a_replaced_creation_lock_of_a_kept_copy_asks_the_driver_once_more() {
   local rc pid
   make_retained_case retained-lock enclosing
   held_plain_get_slot "$FOREIGN_CASE"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-lock: run 1 should have asked the driver once"
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
@@ -11001,7 +11052,7 @@ test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed() {
   make_retained_case retained-closed-shape enclosing
   held_plain_get_slot "$FOREIGN_CASE"
   held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "closed-shape: the close without a durable lease must refuse"
   assert_present "$(retained_record_path)" "closed-shape: the refused close wrote no retained record, so the case tests nothing"
@@ -11157,7 +11208,7 @@ test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
   for age in 30 400; do
     make_retained_case "retained-aged-$age" enclosing
     held_plain_get_slot "$FOREIGN_CASE"
-    : > "$FOREIGN_CASE/no-lease-command"
+    retained_peer_add
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 1 "$rc" "retained-aged-$age: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
     record=$(retained_record_path)
@@ -11167,7 +11218,7 @@ test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 1 "$rc" "retained-aged-$age: the aged run must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
     assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: an aged record asked the driver again"
-    rm -f "$FOREIGN_CASE/no-lease-command"
+    retained_peer_drop
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 0 "$rc" "retained-aged-$age: the aged record must still close the task: $(cat "$FOREIGN_CASE/stderr")"
     assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: the closing run asked the driver again"
@@ -11396,6 +11447,7 @@ test_r4_own_nested_untracked_claude_file_refuses
 test_r4_late_lock_change_refuses_before_the_driver
 test_r4_ignored_preserve_storage_and_payload_are_proved
 test_r4_locked_copy_is_deferred_under_project_custody
+test_pr400_kept_copy_without_a_lease_is_deferred_and_asks_the_driver_nothing
 test_r5_ignored_newline_name_is_preserved
 test_r5_history_copy_keeps_a_newline_named_ignored_file
 test_r5_preserve_leaf_moved_into_the_copy_refuses
