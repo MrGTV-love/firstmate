@@ -3816,18 +3816,18 @@ prelude_step_commit() {
 }
 
 # The sweep a released wake left unfinished (Main 3345 (1)): its token, the check it resumes at, the running Firstmate session (its session-lock pid and
-# that process's start time) and that check's registration (its trusted hash and the trust record's inode and mtime). It is kept until that sweep completes,
+# that process's identity, fm_pid_identity) and that check's registration (its trusted hash and the trust record's inode and mtime). It is kept until that sweep completes,
 # however long Firstmate's turn on the released wake took, so a busy sweep never starts over and starves the check it stopped before. A record of another
 # or ended session (a restart, a reboot, an outage), or of a check that changed, was removed, re-armed or is no longer trusted, is dropped, and a new
 # sweep starts from its first check with a new token.
 SWEEP_RESUME_FILE="$STATE/.check-sweep-resume"
 sweep_session_identity() {
-  local pid start
+  local pid identity
   pid=$(cat "$STATE/.lock" 2>/dev/null) || return 1
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  start=$(LC_ALL=C ps -o lstart= -p "$pid" 2>/dev/null | awk '{$1=$1; print}')
-  [ -n "$start" ] || return 1
-  printf '%s %s\n' "$pid" "$start"
+  identity=$(fm_pid_identity "$pid") || return 1
+  [ -n "$identity" ] || return 1
+  printf '%s %s\n' "$pid" "${identity//$'\n'/ }"
 }
 sweep_check_identity() {  # <check path>
   local id trust inode mtime

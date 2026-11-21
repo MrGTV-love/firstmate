@@ -287,7 +287,8 @@ class Slack:
         scrub_with = getattr(CALL, 'scrub_with', None)
         sending = getattr(CALL, 'sending', None)
         if time_left is None:
-            date, header, data, error = self._exchange(request, 10) if scrub_with is None else self._exchange(request, 10, scrub_with=scrub_with)
+            extra = {name: value for name, value in (('scrub_with', scrub_with), ('sending', sending)) if value is not None}
+            date, header, data, error = self._exchange(request, 10, **extra)
         else:
             date, header, data, error = self._bounded(request, time_left, scrub_with, sending)
         if date is not None:

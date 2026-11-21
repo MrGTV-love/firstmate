@@ -9,6 +9,7 @@ against live Slack, and no test reads the text of a script or module.
 Usage: python3 tests/fm_slack_reply_test.py
 """
 import contextlib
+import fcntl
 import hashlib
 import io
 import json
@@ -32,6 +33,7 @@ BIN = Path(os.environ.get('FM_SLACK_TEST_BIN') or REPO / 'bin')
 sys.path.insert(0, str(BIN))
 
 import fm_slack_watch as plane  # noqa: E402
+import fm_slack  # noqa: E402
 from fm_slack import SlackError  # noqa: E402
 from fm_slack_replay import Replay  # noqa: E402
 
@@ -1712,6 +1714,74 @@ class SecondPostSpacingAcrossRunsTest(unittest.TestCase):
             stamp.rmdir()
             self.assertEqual(home.reply(key, key, 'an answer')[0], 0)
             self.assertEqual(len(self.theirs(starts)), 2)
+
+    def test_a_reply_to_them_hands_the_transport_a_callback_that_records_its_start_where_it_really_leaves(self):
+        with self.scott() as (home, clock, starts):
+            owner = home.say('an owner request')
+            key = self.take_in_scott(home, 'a question')
+            clock.advance(5.0)
+            handed, inner, stamp = {}, Traced.call, home.root / plane.SECOND_POST_FILE
+
+            def transport(replay, method, **fields):
+                # The real transport calls sending just before the request leaves (Slack._exchange); here the request leaves 0.3 s after the plane began it.
+                if method == 'chat.postMessage':
+                    handed[fields['channel']] = sending = getattr(fm_slack.CALL, 'sending', None)
+                    if sending is not None:
+                        clock.advance(0.3)
+                        sending()
+                return inner(replay, method, **fields)
+            with patch.object(Traced, 'call', transport):
+                self.assertEqual(home.reply(key, key, 'part one', part=1)[0], 0)
+                self.assertAlmostEqual(float(stamp.read_text()), plane.post_clock(), delta=self.NS)
+                self.assertEqual(home.reply(owner, owner, 'the owner answer')[0], 0)
+                self.assertEqual(home.reply(key, key, 'part two', part=2)[0], 0)
+            self.assertIsNotNone(handed[SCOTT_DM])
+            self.assertIsNone(handed[OWNER_DM])
+            one, two = self.theirs(starts)[1:]
+            self.assertGreaterEqual(two - one, plane.SECOND_POST_SPACING - self.NS)    # spaced from where part one really left
+
+    def test_the_manual_poll_prints_the_owners_lines_before_it_waits_for_their_spacing_and_holds_no_lock_while_it_waits(self):
+        with self.scott() as (home, clock, starts):
+            key = self.take_in_scott(home, 'first request')
+            clock.advance(5.0)
+            self.assertEqual(home.reply(key, key, 'an answer')[0], 0)              # a post of theirs just now
+            owner = home.say('an owner request')
+            ts = home.tick()
+            home.add({'ts': ts, 'user': SCOTT, 'text': 'second request', 'channel': SCOTT_DM})
+            owner_line = 'check: slack request %s from %s: %s' % (owner, OWNER, REQUEST_LABEL)
+            their_line = 'check: slack request %s from %s: %s %s' % (ts, SCOTT, SCOTT_LABEL, json.dumps('second request'))
+
+            class Captured(plane.Out):
+                def write(self, stream, text):
+                    self.sent[stream] += text
+                    return True
+            out, seen, stated = Captured(), [], plane.pause
+
+            def pause(seconds):
+                probe = open(home.root / 'lock', 'a')
+                try:
+                    fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(probe, fcntl.LOCK_UN)
+                    free = True
+                except BlockingIOError:
+                    free = False
+                finally:
+                    probe.close()
+                seen.append((out.sent['out'], free, list(starts)))
+                stated(seconds)
+            with patch.dict(os.environ, home.env), patch.object(plane, 'pause', pause):
+                rc = plane.main(['poll', '--replay', str(home.transcript)], out)
+            self.assertEqual(rc, 0)
+            printed, free, posted = seen[0]
+            self.assertIn(owner_line, printed)                                     # the owner's part and its lines came first
+            self.assertNotIn(their_line, printed)
+            self.assertEqual(posted[-1][:2], (OWNER_DM, owner))
+            self.assertTrue(free, 'the manual poll held the journal lock while it waited for their spacing')
+            self.assertEqual(out.sent['out'].count(owner_line), 1)
+            self.assertIn(their_line, out.sent['out'])
+            answer, ack = self.theirs(starts)[1:]
+            self.assertGreaterEqual(ack - answer, plane.SECOND_POST_SPACING - self.NS)
+            self.assertEqual([line for line in home.journal()['outbox'] if owner in line], [])
 
     def test_the_owners_post_right_after_a_post_of_theirs_never_waits(self):
         with self.scott() as (home, clock, starts):

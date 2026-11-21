@@ -598,6 +598,26 @@ test_an_owner_turn_longer_than_the_check_interval_still_resumes_the_sweep_at_the
   pass "an owner turn longer than the check interval still resumes the released sweep at the second person's check"
 }
 
+# A confined host refuses setuid ps (exit 126): the session's identity still resolves through the watcher's own fallback (fm_pid_identity), so the same
+# session resumes its released sweep.
+test_a_released_sweep_resumes_in_the_same_session_when_ps_is_refused() {
+  local bin
+  bin="$TMP_ROOT/ps-refused-bin"
+  mkdir -p "$bin"
+  cat > "$bin/ps" <<SH
+#!/usr/bin/env bash
+printf 'refused\n' >> '$bin/calls'
+printf 'fixture ps: Operation not permitted\n' >&2
+exit 126
+SH
+  chmod +x "$bin/ps"
+  PATH="$bin:$PATH" released_wake_resumes_the_sweep_at_the_second_person_check slack-release-ps-refused
+  if [ ! -r "/proc/$$/stat" ]; then
+    [ -s "$bin/calls" ] || fail "the refused ps was never asked, so the fallback was not exercised"
+  fi
+  pass "with ps refused the same session still resumes its released sweep at the second person's check"
+}
+
 # A resume record that no longer names the running session and the registered check is dropped: the next sweep starts from its first check with a new
 # token, so the owner's check runs again and its wake is again released before the second person's check, which takes no stale token.
 stale_resume_starts_a_new_sweep() {  # <name> <session-replaced|session-ended|check-rearmed|check-changed|check-removed|record-invalid>
@@ -906,6 +926,7 @@ test_checks_of_one_sweep_share_one_sweep_token_and_the_next_sweep_gets_a_new_one
 test_a_queued_wake_is_released_before_the_second_person_check_and_the_next_run_resumes_that_sweep_at_it
 test_an_owner_turn_longer_than_the_check_interval_still_resumes_the_sweep_at_the_second_person_check
 test_a_resume_record_of_another_or_ended_session_or_a_changed_check_starts_a_new_sweep
+test_a_released_sweep_resumes_in_the_same_session_when_ps_is_refused
 test_due_checks_precede_repeated_unmanaged_recovery
 test_existing_singleton_watcher_is_not_success
 test_host_checkpoint_bounds_the_park_by_posture

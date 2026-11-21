@@ -7412,6 +7412,37 @@ class TrickleServer:
         self.sock.close()
 
 
+class TheirPostSendingTest(unittest.TestCase):
+    """The real transport calls the caller's sending just before a post leaves, with or without a total deadline (a reply to the second person has none),
+    and a sending that cannot record the post's start leaves it unsent: nothing reaches the server and the call is one not begun."""
+
+    def test_a_plain_post_calls_sending_before_it_leaves_and_a_failing_sending_sends_nothing(self):
+        import fm_slack
+        server = TrickleServer()
+        server.mode = 'fast'
+        self.addCleanup(server.close)
+        slack = plane.Slack('fixture-token-not-a-secret-sending')
+        slack.base = server.url
+        calls = []
+        fm_slack.CALL.sending = lambda: calls.append(server.requests)
+        try:
+            self.assertEqual(slack.call('chat.postMessage', channel=INV_SECOND_DM, text='x'), {'ok': True})
+        finally:
+            fm_slack.CALL.sending = None
+        self.assertEqual((calls, server.requests), ([0], 1))
+
+        def unrecorded():
+            raise OSError('start_not_recorded')
+        fm_slack.CALL.sending = unrecorded
+        try:
+            with self.assertRaises(fm_slack.DeadlineSpent) as cut:
+                slack.call('chat.postMessage', channel=INV_SECOND_DM, text='x')
+        finally:
+            fm_slack.CALL.sending = None
+        self.assertFalse(cut.exception.sent)
+        self.assertEqual(server.requests, 1)
+
+
 class Round6TotalBound(InvariantScenario):
     """Main 1593: the second person's Slack I/O in one sweep has a real total deadline (SECOND_BUDGET), passed to every call of theirs as the time left and
     enforced inside the real transport, so a reply that trickles in is cut off although no single socket wait times out; what the deadline cuts off is read

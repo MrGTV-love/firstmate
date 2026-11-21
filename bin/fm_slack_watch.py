@@ -1430,8 +1430,8 @@ class Watch:
         if self.path.is_symlink() or self.lock_path.is_symlink():
             raise SlackError('unsafe_state_path')
         self.lock = open(self.lock_path, 'a')
-        # A run that may post into their DM (a reply to them, their check, the manual poll) takes the journal lock only once the spacing from the latest
-        # post of theirs has passed (take_lock); the owner's standing check and every other run never wait for it.
+        # A run that is all theirs (a reply to them, their check) takes the journal lock only once the spacing from the latest post of theirs has passed
+        # (take_lock); the manual poll waits for it only after its owner part (pace_their_part); the owner's standing check and every other run never do.
         self.pacing = bool(pace) and bool(second_user()[0])
         self.replay = replay
         self.token = token or ''
@@ -1446,7 +1446,7 @@ class Watch:
         early = EarlyProof(self.api, second_user()[0], self.run_started, self.proof_gate) \
             if self.lock_wait is not None and second_user()[0] and self.bound() else None
         try:
-            self.take_lock(self.lock_wait)
+            self.take_lock(self.lock_wait, pace=self.pacing)
         finally:
             if early is not None:
                 self.early_proof = early.result()
@@ -1535,15 +1535,17 @@ class Watch:
             return early[1]
         return self.api.call('conversations.open', users=self.second, return_im=True).get('channel', {})
 
-    def take_lock(self, wait):
+    def take_lock(self, wait, pace=False, held=False):
         """The journal lock. With wait (the second person's check, Main 1621 (10)): only while their time budget lasts, counted from the start of the run; a
         lock still held then ends their check with nothing done and nothing lost (SecondBudgetSpent), so another holder never keeps the sweep past their budget.
         A pacing run that finds the latest post of theirs less than SECOND_POST_SPACING ago lets the lock go, waits out the rest and takes it again, so the
         wait holds no lock and every check of the run comes after it; a wait that would end past their budget ends their check the same way. A record still
-        unchanged after its whole wait (an unknown start, counted as just now) is not waited for again."""
+        unchanged after its whole wait (an unknown start, counted as just now) is not waited for again. held: the lock is already this run's."""
         waited = None
         while True:
-            if wait is None:
+            if held:
+                held = False
+            elif wait is None:
                 fcntl.flock(self.lock, fcntl.LOCK_EX)
             else:
                 while True:
@@ -1555,7 +1557,7 @@ class Watch:
                             self.lock.close()
                             raise SecondBudgetSpent() from None
                         time.sleep(LOCK_POLL)
-            record, rest = self.their_spacing() if self.pacing else (None, 0.0)
+            record, rest = self.their_spacing() if pace else (None, 0.0)
             if rest <= 0 or (waited is not None and record == waited):
                 return
             fcntl.flock(self.lock, fcntl.LOCK_UN)
@@ -1564,6 +1566,24 @@ class Watch:
                 raise SecondBudgetSpent()
             pause(rest)
             waited = record
+
+    def pace_their_part(self):
+        """The manual poll between its owner part and their part, the owner's lines already printed: when the latest post of theirs began less than
+        SECOND_POST_SPACING ago, those lines leave the journal, the journal lock is let go for the rest of the spacing and taken again (take_lock), and both
+        journals are read again (their pass keeps this poll's share of the cap and of the thread reads, which the owner's part gave it). So the owner's part
+        never waits for theirs, and no run meanwhile prints the owner's lines again or loses a write to this one."""
+        if not self.second or self.their_spacing()[1] <= 0:
+            return
+        if self.early_printed:
+            self.printed(self.early_printed)
+            self.early_printed = []
+        self.take_lock(None, pace=True, held=True)
+        self.state = self.start_state()
+        self.output = list(self.state['outbox'])
+        view = self.second_journal
+        if view is not None:
+            view.state = view.load_second()
+            view.output = list(view.state['outbox'])
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -2219,16 +2239,21 @@ class Watch:
                 self.commit()
             if person == 'second':
                 # Firstmate's answer to them: its run took the journal lock only once the spacing had passed (take_lock), and it records its start before it is
-                # sent; a start that cannot be recorded sends nothing.
+                # sent and again where it really leaves (the transport's sending); a start that cannot be recorded sends nothing.
                 try:
                     self.record_their_post()
                 except OSError:
                     raise SlackError('their_post_unrecorded') from None
+                CALL.sending = self.record_their_post
             try:
                 answer = self.api.call('chat.postMessage', **args)
                 if not isinstance(answer, dict) or not isinstance(answer.get('ts'), str):
                     raise SlackError('slack_outcome_unknown')        # an answer that is not ok with a ts proves nothing
                 ts = answer['ts']
+            except DeadlineSpent as cut:
+                if person == 'second' and not cut.sent:
+                    raise SlackError('their_post_unrecorded') from None
+                raise
             except SecondBudgetSpent as cut:
                 if row is not None and row.get('person') == 'second':
                     if not cut.sent:
@@ -2243,6 +2268,9 @@ class Watch:
                     else:
                         self.attempt_class(row, 'answered' if str(error) in ANSWERED else 'ambiguous')
                 raise
+            finally:
+                if person == 'second':
+                    CALL.sending = None
             self.posted_fresh = True
             return ts
 
@@ -3989,6 +4017,7 @@ class Watch:
         # prints them twice. Their pass then takes only what the one shared cap leaves.
         if self.before_second is not None:
             self.before_second()
+        self.pace_their_part()
         self.in_their_pass = True
         try:
             self.second_view().second_poll(max(0, left))
@@ -5469,7 +5498,7 @@ def main(argv, out=None):
         # Their check waits for the journal lock only inside its budget (take_lock); the token read below is the base's, unchanged (SC6).
         Watch.lock_wait = SECOND_BUDGET if action == 'check-second' else None
         try:
-            watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip(), pace=command == 'poll' or action == 'check-second')
+            watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip(), pace=action == 'check-second')
         except SecondBudgetSpent:
             # Their check could not take the journal lock inside its budget (finding 10 of the review of d9861b24): nothing was read or written; the next sweep
             # takes their work.
