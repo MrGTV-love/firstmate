@@ -4909,8 +4909,9 @@ test_concurrent_runs_against_an_unusable_slot_both_refuse_and_then_both_run() {
   chmod 600 "$tmp/pool/slot.0"
   [ "$rc1" -ne 0 ] && [ "$rc2" -ne 0 ] || fm_lint_fail_settled "concurrent runs against an unusable slot file exited $rc1 and $rc2; both must refuse: $(cat "$tmp/run1.out" "$tmp/run2.out")"
   ! grep -q -- '-- bin/' "$tmp/starts.log" || fm_lint_fail_settled "a run against an unusable slot file started an analysis: $(cat "$tmp/starts.log")"
-  grep -q "$tmp/pool/slot.0" "$tmp/run1.out" && grep -q "$tmp/pool/slot.0" "$tmp/run2.out" \
-    || fm_lint_fail_settled "a refusal did not name the unusable slot file: $(cat "$tmp/run1.out" "$tmp/run2.out")"
+  if ! { grep -q "$tmp/pool/slot.0" "$tmp/run1.out" && grep -q "$tmp/pool/slot.0" "$tmp/run2.out"; }; then
+    fm_lint_fail_settled "a refusal did not name the unusable slot file: $(cat "$tmp/run1.out" "$tmp/run2.out")"
+  fi
   # The control.
   rc1=0; rc2=0
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_SLOT_DIR="$tmp/pool" \
@@ -4953,7 +4954,9 @@ test_a_run_never_takes_a_version_from_a_probe_that_started_before_it_waited() {
   [ "$rc2" -eq 1 ] || fm_lint_fail_settled "a strict run that began waiting during another run's probe exited $rc2 on that probe's older version: $(cat "$tmp/run2.out")"
   grep -q 'found 0.10.0' "$tmp/run2.out" || fm_lint_fail_settled "the strict run did not name the delegate's version when it waited: $(cat "$tmp/run2.out")"
   [ "$(grep -c -- '^--version$' "$tmp/starts.log")" -eq 2 ] || fm_lint_fail_settled "the strict run did not probe again: $(cat "$tmp/starts.log")"
-  [ "$rc1" -eq 0 ] && grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/run1.out" || fm_lint_fail_settled "run 1 did not report its own probe's version ($rc1): $(cat "$tmp/run1.out")"
+  if ! { [ "$rc1" -eq 0 ] && grep -q 'ShellCheck 0.11.0 (pinned 0.11.0)' "$tmp/run1.out"; }; then
+    fm_lint_fail_settled "run 1 did not report its own probe's version ($rc1): $(cat "$tmp/run1.out")"
+  fi
   wait 2>/dev/null || true
   pass "a run that began waiting during another run's probe probed again and refused the delegate's 0.10.0 under the strict policy; the earlier run reported its own probe's 0.11.0"
 }
@@ -5079,6 +5082,7 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   tmp=$(fm_test_tmproot fm-lint-unenforced)
   repo=$(fm_lint_isolated_copy "$tmp" linux)
   fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
+  # shellcheck disable=SC2016 # single quotes intended: this writes a literal script
   printf '#!/bin/sh\ncase "${1:-}" in -m) echo x86_64 ;; *) echo Linux ;; esac\n' > "$tmp/fake/uname"
   chmod +x "$tmp/fake/uname"
   : > "$tmp/starts.log"
@@ -5091,7 +5095,9 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   rc=0
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_REQUIRE_BOUNDS=0 FM_TEST_ANALYSIS_RC=0 \
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/plain.out" 2>&1 ) || rc=$?
-  [ "$rc" -ne 2 ] && ! grep -q 'strict mode refuses' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run there was refused ($rc): $(cat "$tmp/plain.out")"
+  if ! { [ "$rc" -ne 2 ] && ! grep -q 'strict mode refuses' "$tmp/plain.out"; }; then
+    fm_lint_fail_settled "the non-strict run there was refused ($rc): $(cat "$tmp/plain.out")"
+  fi
   grep -q 'are not enforced' "$tmp/plain.out" || fm_lint_fail_settled "the non-strict run did not warn that the caps are not enforced: $(cat "$tmp/plain.out")"
   grep -q -- '^--version$' "$tmp/starts.log" || fm_lint_fail_settled "the non-strict run did not go on to probe the version: $(cat "$tmp/starts.log")"
   # An FM_LINT_STRICT_VERSION=1 inherited from the environment still refuses a
@@ -5104,8 +5110,9 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
       bash bin/fm-lint.sh bin/consumer.sh > "$tmp/inherited.out" 2>&1 ) || rc=$?
   ! grep -q 'strict mode refuses' "$tmp/inherited.out" \
     || fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION took the memory-cap refusal: $(cat "$tmp/inherited.out")"
-  [ "$rc" -eq 1 ] && grep -q 'ShellCheck 0.11.0 required for CI parity, found 0.10.0' "$tmp/inherited.out" \
-    || fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION=1 did not refuse a mismatched version ($rc): $(cat "$tmp/inherited.out")"
+  if ! { [ "$rc" -eq 1 ] && grep -q 'ShellCheck 0.11.0 required for CI parity, found 0.10.0' "$tmp/inherited.out"; }; then
+    fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION=1 did not refuse a mismatched version ($rc): $(cat "$tmp/inherited.out")"
+  fi
   # Whatever the bound mechanism: the refusal, taken from this script and run with the
   # enforced envelope's mechanism on a host that reports Linux, refuses a strict run.
   local branch
@@ -5113,8 +5120,9 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   [ -n "$branch" ] || fm_lint_fail_settled "the strict-mode block was not found in the script"
   rc=0
   env PATH="$tmp/fake:$PATH" GITHUB_ACTIONS='' CI='' bash -c 'STRICT_VERSION=1 BOUND_MECH=perl ROOT_MEMORY_KIB=12582912; '"$branch"'; printf reached_probe' > "$tmp/envelope.out" 2>&1 || rc=$?
-  [ "$rc" -eq 2 ] && grep -q 'strict mode refuses on Linux' "$tmp/envelope.out" \
-    || fm_lint_fail_settled "a strict run under the enforced envelope on Linux was not refused ($rc): $(cat "$tmp/envelope.out")"
+  if ! { [ "$rc" -eq 2 ] && grep -q 'strict mode refuses on Linux' "$tmp/envelope.out"; }; then
+    fm_lint_fail_settled "a strict run under the enforced envelope on Linux was not refused ($rc): $(cat "$tmp/envelope.out")"
+  fi
   pass "where the resident cap and the probe lane are not enforced a strict run refuses before any ShellCheck starts and names why, also under the enforced envelope; a non-strict run warns and goes on; an inherited FM_LINT_STRICT_VERSION=1 refuses a mismatched version but not on memory caps"
 }
 
@@ -5193,8 +5201,9 @@ test_a_same_second_replacement_is_not_counted_against_the_root() {
       ! grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group was signalled over a same-second replacement: $(cat "$log")"
       # Main 1775/1791: the replacement makes the tree unknown, so the root ends
       # unmeasured (96), never quietly passed.
-      [ "$rc" -eq 96 ] && grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" \
-        || fm_lint_fail_settled "a same-second replacement did not make the tree unknown (exit $rc): $(cat "$tmp/rss.$label")"
+      if ! { [ "$rc" -eq 96 ] && grep -q '^rss_unmeasured=1$' "$tmp/rss.$label"; }; then
+        fm_lint_fail_settled "a same-second replacement did not make the tree unknown (exit $rc): $(cat "$tmp/rss.$label")"
+      fi
     else
       [ "$rc" -eq 96 ] || fm_lint_fail_settled "the watch did not count a member with its true start time, or did not fail the root it outlived ($rc): $(cat "$tmp/err.$label")"
       grep -q '^killpg ' "$log" || fm_lint_fail_settled "the root's group over the bound was not ended (recorded): $(cat "$log")"
@@ -5490,13 +5499,15 @@ exec(compile(sys.stdin.read(), 'reader', 'exec'))
 test_the_exact_member_reader_adopts_a_child_only_with_its_listed_identity() {
   local out
   out=$(fm_lint_descendant_reader recycled)
-  [ "$(printf '%s\n' "$out" | tail -n 1)" = unknown ] && ! printf '%s\n' "$out" | grep -q '^member 43 ' \
-    || fail "a child whose pid was recycled after the census was adopted: '$out'"
+  if ! { [ "$(printf '%s\n' "$out" | tail -n 1)" = unknown ] && ! printf '%s\n' "$out" | grep -q '^member 43 '; }; then
+    fail "a child whose pid was recycled after the census was adopted: '$out'"
+  fi
   out=$(fm_lint_descendant_reader unreadable)
   [ "$(printf '%s\n' "$out" | tail -n 1)" = unknown ] || fail "a listed child whose identity cannot be read did not make the tick unknown: '$out'"
   out=$(fm_lint_descendant_reader same)
-  printf '%s\n' "$out" | grep -qx 'member 42 100 1 163840' && printf '%s\n' "$out" | grep -qx 'member 43 200 1 163840' \
-    || fail "an unchanged child of an unchanged member was not counted: '$out'"
+  if ! { printf '%s\n' "$out" | grep -qx 'member 42 100 1 163840' && printf '%s\n' "$out" | grep -qx 'member 43 200 1 163840'; }; then
+    fail "an unchanged child of an unchanged member was not counted: '$out'"
+  fi
   pass "the reader adopts a child only with the identity the census listed it under its member; a recycled or unreadable child makes the tick unknown; an unchanged child is counted"
 }
 
