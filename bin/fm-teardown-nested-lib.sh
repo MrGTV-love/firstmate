@@ -989,8 +989,7 @@ teardown_preserve_parent_safe() {  # <copy>
 # at entry so a preserve that would refuse is refused before any protected step:
 # every proved foreign copy, and every own nested copy Vernant's creation lock
 # holds, when a return or peer slot is released (as teardown_foreign_copy_dispose
-# and teardown_own_copy_dispose preserve them, in the same mode), and every unlocked
-# own nested copy the unclaimed-slot route removes. Sets
+# and teardown_own_copy_dispose preserve them, in the same mode). Sets
 # TEARDOWN_PRESERVE_COPIES to those that hold ignored files to preserve, and
 # requires a safe preserve parent for each (teardown_preserve_parent_safe). A
 # clean copy, or one the plain removal takes, adds nothing. Returns 1 with
@@ -1010,11 +1009,7 @@ teardown_preserve_plan() {
     [ -d "$copy" ] || continue
     rc=0
     teardown_copy_lock_file "$copy" || rc=$?
-    # The unclaimed-slot route also removes an unlocked own copy, and plain
-    # `git worktree remove` deletes its ignored files, so it is preserved the same way.
-    if [ "$rc" = 0 ] || [ -n "${TEARDOWN_UNCLAIMED_SLOT:-}" ]; then
-      candidates+=("$copy")
-    fi
+    [ "$rc" != 0 ] || candidates+=("$copy")
   done
   for copy in ${candidates[@]+"${candidates[@]}"}; do
     if ! entries=$(teardown_preservable_ignored "$copy"); then

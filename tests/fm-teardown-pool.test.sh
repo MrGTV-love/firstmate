@@ -4669,9 +4669,7 @@ unc_pool_case() {
   # $case/capability-fail makes `capabilities` fail, $case/capability-old answers
   # it as an older treehouse that has no such command, $case/capability-no-holder
   # answers it as a schema 1 build that publishes no protected holder, and
-  # $case/capability-no-version answers it with no version field; $case/status-fail
-  # makes `status` (the call that adopts an old recovered holder) fail and
-  # $case/status-noop makes it succeed without rewriting anything.
+  # $case/capability-no-version answers it with no version field.
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$case_dir/treehouse.argv"
@@ -4688,8 +4686,6 @@ if [ "\${1:-}" = capabilities ] && [ -e "$case_dir/capability-no-version" ]; the
   jq -cn --arg h "$UNC_FAKE_PROTECTED_HOLDER" '{schema_version:2,persistent_recovered_leases:true,recovered_quarantine_holder:\$h}'
   exit 0
 fi
-if [ "\${1:-}" = status ] && [ -e "$case_dir/status-fail" ]; then echo "injected status failure" >&2; exit 1; fi
-if [ "\${1:-}" = status ] && [ -e "$case_dir/status-noop" ]; then printf '[]\n'; exit 0; fi
 if [ "\${1:-}" = return ] && [ -s "$case_dir/inject" ]; then
   mode=\$(cat "$case_dir/inject"); rm -f "$case_dir/inject"
   case "\$mode" in

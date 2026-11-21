@@ -1778,13 +1778,10 @@ real_provider_recovered_slot_cases() {
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$start/$order: an old session's exit changed the recovered slot"
     ! compgen -G "$pool/../treehouse-recovered-backup-*" >/dev/null || fail "$order: a recovered backup appeared"
     # A further get, run for real as an extra check (not a substitute for the spawn's own get
-    # above). No assumption is made about which free slot it returns: this case runs the
-    # spawn's get in a command substitution, so that get has already exited and a later get
-    # may hand out B (earlier records show it does) or another slot or fail at capacity. It
-    # must never hand out the recovered slot A. The live-get lifecycle (the spawn's get
-    # staying alive and holding its allocation) is exercised for the FAKE provider only, in
-    # test_spawn_runs_its_own_get_and_takes_the_slot_that_command_chose: the live mode needs
-    # the beat file the fake writes, which a real provider never does.
+    # above, which the fixture tmux drove live against the real provider under
+    # FM_FAKE_TMUX_GET_LIVE=pty). No assumption is made about which free slot it returns: it
+    # may hand out B or another slot or fail at capacity. It must never hand out the
+    # recovered slot A.
     entry=$(cd "$PROJECT_DIR" && "$FAKEBIN_DIR/treehouse" get --root "$CASE_DIR/real-root" --no-fetch --lease --lease-holder next </dev/null 2>/dev/null) || entry=
     if [ -n "$entry" ]; then
       entry=$(cd "$entry" && pwd -P)
@@ -1888,11 +1885,7 @@ SH
       [ ! -e "$CASE_DIR/status-calls" ] || fail "$mode: the guard read a status listing, which can rewrite a holder"
       continue
     fi
-    if [ "$mode" = status ]; then
-      printf '[{"name":"1","path":"%s"}]\n' "$current" > "$CASE_DIR/status.json"
-    else
-      printf '%s\n' "${current%/*/*}" > "$CASE_DIR/pool-dir"
-    fi
+    printf '%s\n' "${current%/*/*}" > "$CASE_DIR/pool-dir"
     retained_fingerprint > "$CASE_DIR/before-copy"
     cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
     out=$(run_retained_spawn "$name") || rc=$?
@@ -1904,13 +1897,9 @@ SH
     [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "$mode: spawn claimed the superseded slot"
     retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$mode: spawn changed the superseded slot"
     cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$mode: spawn changed the holder's record"
-    [ "$mode" = status ] || [ ! -e "$CASE_DIR/status-calls" ] || fail "$mode: the guard read a status listing although pool-dir answered"
+    [ ! -e "$CASE_DIR/status-calls" ] || fail "$mode: the guard read a status listing although pool-dir answered"
 
-    if [ "$mode" = status ]; then
-      printf '[{"name":"1","path":"%s"}]\n' "$SLOT_DIR" > "$CASE_DIR/status.json"
-    else
-      printf '%s\n' "$old" > "$CASE_DIR/pool-dir"
-    fi
+    printf '%s\n' "$old" > "$CASE_DIR/pool-dir"
     fm_test_spawn_brief "$HOME_DIR" "new-$name-again"
     PANE_DIR=$SLOT_DIR
     : > "$CASE_DIR/pane-log"
