@@ -1,0 +1,7 @@
+$ env -u FM_LIVE -u FM_OMP_LSP_OVERLAY_LIVE bash tests/fm-omp-lsp-overlay-live-e2e.test.sh  # head 17ad5fa0c, omp/19.0.0
+ok - no overlay: omp offers the lsp tool and starts a language server on a write
+ok - session overlay alone (secondmate launch): no lsp tool and no language server
+ok - worker overlay alone: no lsp tool and no language server
+ok - session then worker overlay (crewmate and scout launch): no lsp tool and no language server
+env -u FM_LIVE -u FM_OMP_LSP_OVERLAY_LIVE bash   10.42s user 4.39s system 10% cpu 2:16.36 total
+exit=0

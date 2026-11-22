@@ -1,0 +1,7 @@
+$ bash $BASE_SNAPSHOT/tests/fm-omp-fallback-chain-live-e2e.test.sh   # base d432729a2, nothing else of this run active; 16:54  up 4 days,  4:26, 2 users, load averages: 19.00 18.11 18.69
+ok - omp (omp/19.0.0): control - the global Sol chain alone still falls to the weak model
+ok - omp (omp/19.0.0): the overlay prevents DeepSeek-through-omp when the Sol usage window is out
+ok - omp (omp/19.0.0): the overlay prevents DeepSeek-through-omp when the Sol provider answers 500
+ok - omp (omp/19.0.0): the overlay leaves another model's global chain in place
+not ok - omp (omp/19.0.0): the first prompt never ran on the chain's route while the primary refused
+exit=1

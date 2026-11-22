@@ -1,0 +1,5 @@
+$ env -u FM_LIVE PATH=<omp+coreutils, no python3>:/bin bash tests/fm-omp-lsp-overlay-live-e2e.test.sh
+python3: not on PATH
+/tmp/fm-lsp-nopy.AbvT/omp
+not ok - python3 is missing; the fixture language server and the scripted model need it
+exit=1

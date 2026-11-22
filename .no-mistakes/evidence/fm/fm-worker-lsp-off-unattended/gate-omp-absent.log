@@ -1,0 +1,3 @@
+$ env -u FM_LIVE PATH=/usr/bin:/bin bash tests/fm-omp-lsp-overlay-live-e2e.test.sh   # omp not on PATH
+skip: live: omp absent
+exit=0

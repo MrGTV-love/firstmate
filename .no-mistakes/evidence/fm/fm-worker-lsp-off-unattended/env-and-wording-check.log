@@ -1,0 +1,39 @@
+$ env | grep -E "^(FM_LIVE|FM_OMP_LSP_OVERLAY_LIVE)=" || echo none-set
+none-set
+$ git log -1 --format=%B HEAD | grep -cF "<owner sentence>"
+0
+$ git grep -n "not stopped" -- .omp docs tests
+docs/guards/registry.json:2180:          "match": "die \"refusing to relaunch $ID onto a stale model - $stale; the running agent was not stopped (relaunch onto the newer model, or pass --captain-model-pin $TARGET_MODEL only when the captain explicitly asked for $TARGET_MODEL)\""
+docs/guards/registry.json:4632:          "match": "fm_herdr_lab_error \"session '$name' is not stopped; refusing to re-provision it\""
+tests/fm-control-relaunch.test.sh:2372:    assert_contains "$out" 'the running agent was not stopped' "$shape refusal did not report the worker untouched"
+tests/fm-copy-sweep-orphan.test.sh:585:      assert_contains "$OUT" "FAILED"$'\t'"$CLONE/.claude/worktrees/$name"$'\t'"ignored payload changed" "run $run: $name was not stopped"
+tests/fm-lint-report.test.sh:60:    "the fallback was not stopped by the root's remaining deadline"$'\n'"$out"
+tests/fm-merge-prune.test.sh:258:# STOP_FAIL_FILE has content the agent is reported as not stopped and nothing
+tests/fm-merge-prune.test.sh:500:  [ -s "$W/control.log" ] || why "the finished worker was not stopped by 't1 exit': $(cat "$W/control.log")" || return 1
+tests/fm-merge-prune.test.sh:501:  ! grep -qvx 't1 exit' "$W/control.log" || why "the finished worker was not stopped by 't1 exit': $(cat "$W/control.log")" || return 1
+tests/fm-merge-prune.test.sh:2104:# the fallback does not run: the worker is not stopped, nothing is destroyed,
+tests/fm-merge-prune.test.sh:3121:test_fallback_does_not_stop_a_worker_steered_after_the_first_verdict() { assert_scenario scn_worker_steered_after_the_first_verdict "a worker steered between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off"; }
+tests/fm-merge-prune.test.sh:3122:test_fallback_does_not_stop_a_worker_busy_after_the_first_verdict() { assert_scenario scn_worker_busy_after_the_first_verdict "a worker that turns busy between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off"; }
+tests/fm-pr-ready-reconcile.test.sh:632:printf '%s\n' "$out" | grep -q 'aa-reg: the review step made no progress for 2s' || fail "a hung review step was not stopped and named: $out"
+tests/fm-session-start.test.sh:1683:    "a read that never answered was not stopped and reported unknown"
+tests/fm-status-runaway-guard.test.sh:342:  [ "$(state_letter "$pid")" = T ] || fail "the omp writer pid $pid was not stopped (state $(state_letter "$pid"))"
+tests/fm-status-runaway-guard.test.sh:401:  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the writer was not stopped (state $(state_letter "$wpid"))"; }
+tests/fm-status-runaway-guard.test.sh:455:  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$wpid"))"; }
+tests/fm-status-runaway-guard.test.sh:539:  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$wpid"))"; }
+tests/fm-status-runaway-guard.test.sh:612:  [ "$stopped" -eq 1 ] || fail "the writer was not stopped, and the over-cap wake not queued, within 20 s of the $walk walk capturing a 20000 line span that the writer then pushed past the cap (writer state ${writer_state:-gone})"
+tests/fm-status-runaway-guard.test.sh:683:  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" "$w2pid" 2>/dev/null; fail "the first writer was not stopped (state $(state_letter "$wpid"))"; }
+tests/fm-status-runaway-guard.test.sh:684:  [ "$(state_letter "$w2pid")" = T ] || { kill -9 "$wpid" "$w2pid" 2>/dev/null; fail "the second writer was not stopped (state $(state_letter "$w2pid")); rows for lane B: ${rows_b:-0}"; }
+tests/fm-status-runaway-guard.test.sh:743:  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$wpid"))"; }
+tests/fm-status-runaway-guard.test.sh:1086:  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the bash writer pid $wpid was not stopped (state $(state_letter "$wpid"))"; }
+tests/fm-status-runaway-guard.test.sh:1126:  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the resumed writer was not stopped again"; }
+tests/fm-supervision-host.test.sh:1507:  [ "$rc" -gt 128 ] || fail "fixture: the host was not stopped mid-turn (rc=$rc): $(cat "$home/host.out")"
+tests/fm-watchdog-check.test.sh:322:  assert_absent "$dir/arm.calls" "the preserved watcher was not stopped"
+tests/fm-watcher-lock.test.sh:1939:    || fail "watcher was not stopped after its beacon write completed"
+tests/fm-work-progress.test.sh:465:                f'complete truly idle tree was not stopped: {code} {errors}')
+tests/fm-work-progress.test.sh:632:            require(code == 124, f'{runner}/{sampler}: a timed-poll idle process was not stopped: {code} {stderr}')
+tests/fm-work-progress.test.sh:877:    require(result.returncode == 124, 'silent source was not stopped for inactivity: ' + str(result.returncode) + result.stderr)
+$ git log -1 --format=%B HEAD
+no-mistakes(review): docs(omp): note live-reload language-server caveat in session overlay
+
+$ git grep -nF "may turn its language server off mid-session" -- .omp docs tests
+.omp/fm-session-overlay.yml:45:  # an omp session that live-reloads the overlay may turn its language server off mid-session; this is not tested either way.

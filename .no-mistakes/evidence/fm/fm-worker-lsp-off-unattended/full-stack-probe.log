@@ -1,0 +1,5 @@
+$ bash $HEAD_SNAPSHOT/tests/fm-omp-lsp-overlay-stack-probe.sh   # head 17ad5fa0c, omp/19.0.0
+ok - session, worker, fallback overlays (crewmate/scout launch): no lsp tool and no language server
+ok - session, worker, fallback, no-helpers overlays (no-helpers crewmate launch): no lsp tool and no language server
+ok - no-helpers overlay alone does not turn the language server off (it is not a fleet session overlay by itself)
+exit=0

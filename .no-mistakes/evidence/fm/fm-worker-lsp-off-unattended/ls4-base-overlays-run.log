@@ -1,0 +1,5 @@
+$ bash $BASE_SNAPSHOT/tests/fm-omp-lsp-overlay-live-e2e.test.sh  # base d432729a2 overlays, head test, omp/19.0.0
+ok - no overlay: omp offers the lsp tool and starts a language server on a write
+not ok - secondmate: omp accepted the lsp tool, so the overlays did not turn the language server off (omp/19.0.0)
+/tmp/fm-lsp-base.P1K3/tests/lib.sh: line 526: 38191 Killed: 9               python3 -I "$LAB/model.py" "$case_dir/ws/note.fakels" "$case_dir/model.port"
+exit=1
