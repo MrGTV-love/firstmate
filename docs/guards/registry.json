@@ -7652,6 +7652,31 @@
       "exemptions": [],
       "instrumented": true,
       "status": "active"
+    },
+    {
+      "id": "home-state-write",
+      "version": "1",
+      "owner": "bin/fm-home-write.py",
+      "emitters": ["bin/fm-home-write.sh"],
+      "invariant": "a home-state write through fm-home-write lands only on an untracked gitignored regular file under the home's data/ reached without links or nested repositories",
+      "layer": "runtime-block",
+      "source": "the resolved target path, lstat of each existing component, O_NOFOLLOW directory opens at write time, .git entries in every directory walked below data/, git ls-files --error-unmatch and git check-ignore --no-index in the FM_HOME working tree with inherited GIT_* variables removed, and the existing directory entries for case and Unicode variants",
+      "trigger": "a caller runs FM_HOME=<home> bin/fm-home-write.sh [--replace] <path> with a target outside data/, tracked, not ignored, behind a symbolic link or dot segment, inside a git repository or worktree nested below data/, a case variant of an existing name, or an existing file without --replace",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "write a data/ record with FM_HOME=<home> bin/fm-home-write.sh [--replace] data/<path> < <content-file>; change tracked material only in a task worktree made by bin/fm-spawn.sh",
+      "budget": 1,
+      "budget_reason": "one decision per invocation with no internal retry; a refusal names the rule, and a second refusal of the same target is a wrong target, not a transient",
+      "telemetry": "state/guard-events.jsonl; one home-state-write event per invocation with guard, decision, source_ok, elapsed_ms",
+      "test": "tests/fm-home-write.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active"
     }
   ],
   "excluded": [
@@ -7726,31 +7751,6 @@
       "point": "Write judgment outage denial",
       "evidence": "data/fm-jev-guard-e2e/report.md",
       "reason": "a write decision inside the audited jev-pretool-deny guard, which stays active for write/edit input and audit failures, so its retirement record adds to the audited population"
-    },
-    {
-      "id": "home-state-write",
-      "version": "1",
-      "owner": "bin/fm-home-write.py",
-      "emitters": ["bin/fm-home-write.sh"],
-      "invariant": "a home-state write through fm-home-write lands only on an untracked gitignored regular file under the home's data/ reached without links",
-      "layer": "runtime-block",
-      "source": "the resolved target path, lstat of each existing component, O_NOFOLLOW directory opens at write time, git ls-files --error-unmatch and git check-ignore --no-index in the FM_HOME working tree, and the existing directory entries for case and Unicode variants",
-      "trigger": "a caller runs FM_HOME=<home> bin/fm-home-write.sh [--replace] <path> with a target outside data/, tracked, not ignored, behind a symbolic link or dot segment, a case variant of an existing name, or an existing file without --replace",
-      "decision": "deny",
-      "fail_direction": "closed",
-      "remedy": "write a data/ record with FM_HOME=<home> bin/fm-home-write.sh [--replace] data/<path> < <content-file>; change tracked material only in a task worktree made by bin/fm-spawn.sh",
-      "budget": 1,
-      "budget_reason": "one decision per invocation with no internal retry; a refusal names the rule, and a second refusal of the same target is a wrong target, not a transient",
-      "telemetry": "state/guard-events.jsonl; one home-state-write event per invocation with guard, decision, source_ok, elapsed_ms",
-      "test": "tests/fm-home-write.test.sh",
-      "tier": "C",
-      "harm": "irreversible",
-      "proxy": false,
-      "proxy_reason": "",
-      "precheck_gap": "",
-      "exemptions": [],
-      "instrumented": true,
-      "status": "active"
     }
   ]
 }

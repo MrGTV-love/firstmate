@@ -162,6 +162,26 @@ test_case_variant() {
   pass "case-variant-refused"
 }
 
+test_nested_repository() {
+  local nested="$H/data/nested" wt="$H/data/nested-wt" listing
+  mkdir -p "$nested"
+  git -C "$nested" init -q
+  printf 'nested tracked\n' > "$nested/tracked.txt"
+  git -C "$nested" add tracked.txt
+  git -C "$nested" -c user.name=fixture -c user.email=fixture@example.invalid commit -q -m nested
+  git -C "$nested" worktree add -q "$wt" -b wt
+  listing=$(ls -a "$nested/.git/hooks")
+  expect_refused C13 "$H" "$nested/tracked.txt" --replace data/nested/tracked.txt
+  expect_refused C13 "$H" "$nested/new.txt" data/nested/new.txt
+  expect_refused C13 "$H" "$wt/tracked.txt" --replace data/nested-wt/tracked.txt
+  expect_refused C13 "$H" "$nested/.git/hooks/post-checkout" data/nested/.git/hooks/post-checkout
+  expect_refused C13 "$H" "$nested/.git/hooks/post-checkout" data/nested/.GIT/hooks/post-checkout
+  [ "$(ls -a "$nested/.git/hooks")" = "$listing" ] || fail "C13: nested hooks changed"
+  printf 'x' | GIT_DIR="$H/.git-elsewhere" GIT_WORK_TREE=/ FM_HOME="$H" FM_GUARD_EVENT_LOG="$H.events" "$WRITE" --replace data/forced.md >/dev/null 2>&1
+  [ "$(cat "$H/data/forced.md")" = "forced record" ] || fail "C13: inherited GIT_DIR redirected the tracked check"
+  pass "C13-nested-repository"
+}
+
 test_telemetry() {
   local t
   t=$(make_home telemetry)
@@ -211,5 +231,6 @@ test_outside_home
 test_unignored_data
 test_missing_evidence
 test_case_variant
+test_nested_repository
 test_telemetry
 test_sensitivity_unguarded_engine_is_detected

@@ -45,12 +45,23 @@ def split_target(home_spellings, raw):
         raise Refusal(f"{raw} has an empty, '.' or '..' segment; pass the plain path")
     if parts[0] != ALLOWED_ROOT or len(parts) < 2:
         raise Refusal(f"{rel} is not under {ALLOWED_ROOT}/; tracked material, projects/, state/, config/ and .env are not home-state records this route may write")
+    if any(fold(part) == ".git" for part in parts):
+        raise Refusal(f"{rel} names a .git directory; repository internals are never home-state records")
     return parts
 
 
 def git(home, *args):
+    # Inherited GIT_DIR, GIT_WORK_TREE or GIT_INDEX_FILE would point the checks at another repository.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     return subprocess.run(["git", "-C", home, *args], capture_output=True, text=True,
-                          env=dict(os.environ, LC_ALL="C", GIT_OPTIONAL_LOCKS="0"))
+                          env=dict(env, LC_ALL="C", GIT_OPTIONAL_LOCKS="0"))
+
+
+def reject_nested_repository(dir_fd, shown):
+    # The home's index says nothing about a repository or worktree nested below data/.
+    for entry in os.listdir(dir_fd):
+        if fold(entry) == ".git":
+            raise Refusal(f"{shown} is inside a nested git repository or worktree ({shown}/{entry}); its tracked files are not home-state records")
 
 
 def reject_links(home, parts):
@@ -111,6 +122,7 @@ def open_dirs(home, parts):
                 raise
             os.close(fd)
             fd = child
+            reject_nested_repository(fd, shown)
         return fd
     except BaseException:
         os.close(fd)

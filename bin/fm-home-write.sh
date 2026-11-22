@@ -12,7 +12,9 @@
 # guard protects against directly: it writes only when the resolved target
 # is under $FM_HOME/data/, is not tracked by git, is gitignored, is reached
 # without symbolic links, '.' or '..' segments, or case variants of an
-# existing name, and is a regular file or absent.
+# existing name, is not inside a git repository or worktree nested below
+# data/ (no directory on the way holds a .git entry), and is a regular file
+# or absent.
 # Everything else is refused unchanged: tracked source, force-added files,
 # projects/, state/, config/, .env, paths outside the home, and data/ paths a
 # gitignore negation un-ignores.
@@ -28,7 +30,7 @@ set -u
 
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-usage() { sed -n '3,27p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,28p' "$0" | sed 's/^# \{0,1\}//'; }
 
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 
