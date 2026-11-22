@@ -6177,13 +6177,13 @@ if os.environ.get('INV4_LOCK_WAIT'):
     # modes): their DM proof, made while the check waits for the lock, ends first; the lock is then taken at the later of the two (Main 2187).
     import threading as _lock_threads
     _real_take = plane.Watch.take_lock
-    def _take_after_wait(self, wait):
+    def _take_after_wait(self, wait, **options):
         if wait is not None:
             for _t in _lock_threads.enumerate():
                 if _t.name == 'fm-slack-early-proof':
                     _t.join()
             clock[0] = max(clock[0], self.run_started + float(os.environ['INV4_LOCK_WAIT']))
-        return _real_take(self, wait)
+        return _real_take(self, wait, **options)          # pace and held pass through unchanged
     plane.Watch.take_lock = _take_after_wait
 order = os.environ.get('INV4_ORDER')
 if order:
