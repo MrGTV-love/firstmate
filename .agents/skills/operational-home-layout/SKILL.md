@@ -158,4 +158,6 @@ Load `operational-home-layout` when locating, interpreting, or changing Firstmat
 `FM_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
 Each secondmate has a persistent isolated `FM_HOME`, including its own state, backlog, projects, and session lock.
 
+When Claude Code refuses a background session's Write or Edit on a `data/` record because the session has not isolated into a worktree, write the record with `bin/fm-home-write.sh` (its header owns the contract) rather than a raw shell redirect or a copy from the job temp directory; tracked material still changes only in a task worktree.
+
 Tracked files hold shared instructions and tooling; `data/` holds durable private fleet records; `state/` holds runtime records and append-only status events; `config/` holds local operating choices; and `projects/` contains clones that are read-only to firstmate except under hard rule 1's concrete captain-approved project operation exception.
