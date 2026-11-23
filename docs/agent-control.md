@@ -303,7 +303,7 @@ It refuses without changing the record, instructions, or copies when:
 
 Two or more live ordinary records can name the same pool slot root while each task's real copy is nested in that root.
 Until they are repaired, each of those lanes is contested for every lifecycle consumer, even when its launch pin matches: `interrupt`, `exit`, `stay`, `relaunch`, the reboot sweep, and the secondmate restart refuse it, because another live task record names the same home or worktree.
-This is fail closed: no consumer sends input to such a lane until `bin/fm-control.sh <task> reassociate --worktree <copy> --also <other-task>=<other-copy> --note <why>` re-points the records that share the root.
+This is fail closed: no consumer sends input to such a lane until the records that share the root are re-pointed together with `reassociate --also`, as below.
 No order of single reassociations works for them: whichever record goes first, the other record's `worktree=` is the enclosing root and overlaps the first replacement copy, and the first record's new `prior_worktree=` then overlaps the second replacement copy.
 Re-point them together with `fm-control <task> reassociate --worktree <copy> --also <other-task>=<other-copy> [--also ...] --note <why>`.
 One call takes each named task's lifecycle lock, then the shared Treehouse project lock, then each record lock, and every named task must be a ship or scout of this home and of one project.
