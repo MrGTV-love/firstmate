@@ -429,6 +429,7 @@ printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture; incom
 # Real `tmux capture-pane -e` screens of a fresh dsh-tui 0.16.1 launch, before
 # any usage sample: no meter row, and a status row without the ctx cell. The
 # 45-column capture truncates every cell. They start at the context banner.
+# The configured effort was `xhigh`; that route renders it as `high`.
 dsh_fresh=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-empty.ansi")
 dsh_fresh_draft=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-pending.ansi")
 dsh_fresh_narrow=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-45col-empty.ansi")
@@ -462,10 +463,25 @@ dsh_expect pending 'typed draft above the fresh dsh row' \
 dsh_refuse 'plain text flush under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   fix the tests')"
 dsh_refuse 'two-cell row flush under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · high')"
 dsh_refuse 'fresh dsh row with text below it' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   fix the tests')"
-# The busy-hint tail is dsh's own constant, so a rendered-busy override that
-# happens to match the text below cannot make it furniture.
-FM_BUSY_REGEX='fix the tests' dsh_refuse 'fresh dsh row with text below it under a busy-regex override' \
+# Once the pre-usage row is present its rule alone decides, and its busy-hint
+# tail is dsh's own constant: an override matching both that row and the text
+# below it cannot turn either into furniture.
+FM_BUSY_REGEX='deepseek|fix the tests' dsh_refuse 'fresh dsh row with text below it under a busy-regex override' \
   "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   fix the tests')"
+# A stale dsh frame above a shell prompt holding a draft is not a dsh composer,
+# whether it is the only frame or sits below a complete earlier dsh screen.
+dsh_shell_line='alice · ~/work · % echo hello'
+dsh_stale_box=$(printf '%s\n' '  ╭─────────────────────╮' '  ⌸ ❯                   ⛶' '  ╰─────────────────────╯')
+dsh_refuse 'stale dsh frame above a shell prompt' "$(printf '%s\n' "$dsh_stale_box" "$dsh_shell_line")"
+dsh_refuse 'second stale dsh frame above a shell prompt' \
+  "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '' "$dsh_stale_box" "$dsh_shell_line")"
+dsh_refuse 'effort-shaped shell prompt under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   alice · high · % echo hello')"
+dsh_refuse 'unknown effort label under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · highest · plaindir')"
+dsh_refuse 'model cell with whitespace under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek v4 · high · plaindir')"
+dsh_refuse 'four-cell row under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · high · main · plaindir')"
+# A 30-column pane wraps the row's separators onto their own line; that real
+# capture is not the proven shape and stays refused.
+dsh_refuse 'wrapped 30-column fresh dsh screen' "$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-30col-wrapped.ansi")"
 dsh_refuse 'fresh dsh row, a blank row, then text' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '' 'user@host plaindir %')"
 dsh_refuse 'fresh dsh row with an empty cell' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 ·  · plaindir')"
 dsh_refuse 'fresh dsh row under a box that is not dsh' "$(printf '%s\n' "  ╭$(printf '─%.0s' $(seq 1 40))╮" "  │ ❯$(printf ' %.0s' $(seq 1 38))│" "  ╰$(printf '─%.0s' $(seq 1 40))╯" "$dsh_fresh_row")"

@@ -4025,6 +4025,7 @@ ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible 
 
 On 2026-11-23, on macOS arm64 with `dsh-tui` 0.16.1 (launcher and profile) and DSH CLI 0.2.1-rc.2, a fresh launch prepared by `bin/fm-dsh.py prepare` with `deepseek/deepseek-v4.1-flash-1017` at `xhigh` ran in a private tmux session with no opening prompt and spent no model tokens.
 After Escape dismissed the first-run guide and then the sessions view, `tmux capture-pane -e -p` showed no meter row and one status row without a `ctx` cell, flush under the frame: `deepseek-v4.1-flash-1017 · high · <directory>` at 200, 120, 80 and 60 columns (`plaindir` and `gitdir`, a fresh Git repository, which added no branch cell), and `deepseek-v4.1-flash-10… · hi…  · gitd…` at 45 columns.
+At 30 columns the row wrapped its separators onto a second line (`deepseek-v4.1…  h…  gi…` above the dots), and that screen stays refused.
 The configured `xhigh` effort rendered as `high` in that row and as `High effort` in the banner.
 Before the pre-usage status row was recognized, `fm_composer_dsh_screen_check` refused that screen; it now classifies `empty`, and `pending` with an unsubmitted typed draft.
 The trimmed captures are the `tests/fixtures/dsh-tui-0.16.1-fresh-*.ansi` regressions in `tests/fm-dsh-harness.test.sh`; the busy screen between a turn's start and its first usage sample was not captured.

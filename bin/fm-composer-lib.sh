@@ -66,9 +66,9 @@
 #                frame (`<used>/<window> <pct>%`, then a middle-dot row with
 #                dsh's `ctx` cell), plus `esc to interrupt` while a turn runs;
 #                all three are furniture for the staleness probe. Before any
-#                usage sample only the middle-dot row is drawn, without the
-#                `ctx` cell; it is furniture only flush under the frame and
-#                as the screen's last row apart from that hint.
+#                usage sample only `<model> · <effort> · <cwd>` is drawn,
+#                without the `ctx` cell; it is furniture only flush under the
+#                frame and as the screen's last row apart from that hint.
 #   omp-box    - omp's titled `╭── π > ...╮` header, zero or more
 #                side-bordered rows, and `╰─ <input> ─╯` input-bearing floor.
 #                Unlike ordinary boxes, the floor is content, not just a rule.
@@ -1883,15 +1883,36 @@ _fm_composer_row_is_dsh_status() {  # <trimmed-row>
 
 # Before dsh-tui has any usage sample it draws neither the meter nor the ctx
 # cell (observed on a fresh dsh-tui 0.16.1; its status-line source gates both on
-# context occupancy): the status row holds only its middle-dot separated cells,
-# at least model, effort and directory
-# (`deepseek-v4.1-flash-1017 · high · plaindir`), each cell truncated with `…`
-# on a narrow pane.
-# _fm_composer_row_is_dsh_fresh_status: 0 when the trimmed row is three or more
-# non-empty cells joined by ` · `. No cell value is assumed, because the model,
-# effort and directory labels differ per launch.
+# context occupancy). With a launch's default status-bar fields its compact row
+# is then exactly `<model> · <effort> · <cwd basename>`, for example
+# `deepseek-v4.1-flash-1017 · high · plaindir`, and each cell truncates with `…`
+# on a narrow pane (`deepseek-v4.1-flash-10… · hi…  · gitd…`). The effort cell
+# is one of dsh's provider reasoning levels (a configured level the route lacks
+# renders as the nearest offered one: `xhigh` showed `high`).
+FM_COMPOSER_DSH_EFFORT_LABELS='off minimal low medium high xhigh max'
+
+# _fm_composer_dsh_effort_cell: 0 when the cell is a dsh effort label, or a
+# non-empty prefix of one cut by dsh's own `…` truncation.
+_fm_composer_dsh_effort_cell() {  # <cell>
+  local cell=$1 stem label
+  stem=${cell%…}
+  [ -n "$stem" ] || return 1
+  for label in $FM_COMPOSER_DSH_EFFORT_LABELS; do
+    if [ "$stem" = "$cell" ]; then
+      [ "$cell" = "$label" ] && return 0
+    else
+      case "$label" in "$stem"?*) return 0 ;; esac
+    fi
+  done
+  return 1
+}
+
+# _fm_composer_row_is_dsh_fresh_status: 0 when the trimmed row has exactly
+# dsh's three pre-usage cells joined by ` · `: a model id token (no whitespace),
+# an effort cell, and a directory basename (no `/` and no shell-prompt sigil).
+# No model name or directory is assumed, because both differ per launch.
 _fm_composer_row_is_dsh_fresh_status() {  # <trimmed-row>
-  local rest=$1 cell cells=0
+  local rest=$1 cell cells=()
   while :; do
     case "$rest" in
       *' · '*) cell=${rest%% · *}; rest=${rest#* · } ;;
@@ -1899,23 +1920,24 @@ _fm_composer_row_is_dsh_fresh_status() {  # <trimmed-row>
     esac
     fm_composer_normalize_trim_var cell
     case "$cell" in '' | *'·'*) return 1 ;; esac
-    cells=$((cells + 1))
+    cells+=("$cell")
     [ -n "$rest" ] || break
   done
-  [ "$cells" -ge 3 ]
+  [ "${#cells[@]}" = 3 ] || return 1
+  [[ ${cells[0]} =~ ^[A-Za-z0-9][A-Za-z0-9._:+-]*(…)?$ ]] || return 1
+  _fm_composer_dsh_effort_cell "${cells[1]}" || return 1
+  case "${cells[2]}" in
+    */* | *'%'* | *'$'* | *'#'* | *'>'* | *'❯'* | *'›'*) return 1 ;;
+  esac
 }
 
-# _fm_composer_dsh_fresh_tail: 0 when the row flush under a dsh box's bottom
-# border is dsh's pre-usage status row and every row below it is blank or dsh's
-# own `esc to interrupt` hint, so the row is the screen's last furniture rather
+# _fm_composer_dsh_fresh_tail: 0 when every row below dsh's pre-usage status
+# row (flush under the box's bottom border) is blank or dsh's own
+# `esc to interrupt` hint, so the row is the screen's last furniture rather
 # than one line of some lower live surface.
 _fm_composer_dsh_fresh_tail() {  # <plain-screen> <bottom-border-row>
-  local row=$(($2 + 1)) line
+  local row=$(($2 + 2)) line
   _fm_composer_rows_load "$1"
-  line=${_FM_COMPOSER_ROWS[$row]:-}
-  fm_composer_normalize_trim_var line
-  _fm_composer_row_is_dsh_fresh_status "$line" || return 1
-  row=$((row + 1))
   while [ "$row" -lt "${#_FM_COMPOSER_ROWS[@]}" ]; do
     line=${_FM_COMPOSER_ROWS[$row]}
     fm_composer_normalize_trim_var line
@@ -2488,11 +2510,22 @@ _fm_composer_select_cursorless() {
     # separator, and adds `esc to interrupt` while a turn runs. They are
     # furniture, not the lower live shape that would make this box stale.
     # The pre-usage status row is accepted only flush under the border and
-    # only as the screen's last furniture, which consumes the rest of it.
+    # only as the screen's last furniture, which consumes the rest of it. Once
+    # that row is present its rule alone decides, so the override-widenable
+    # furniture loop below never reconsiders the rows it refused.
     if [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ]; then
-      if [ "$next" = $((boundary + 1)) ] && _fm_composer_dsh_fresh_tail "$plain" "$boundary"; then
-        _fm_composer_rows_load "$plain"
-        next=${#_FM_COMPOSER_ROWS[@]}
+      if [ "$next" = $((boundary + 1)) ]; then
+        raw=$(_fm_composer_screen_row "$next" "$plain")
+        trimmed=$raw
+        fm_composer_normalize_trim_var trimmed
+        if _fm_composer_row_is_dsh_fresh_status "$trimmed"; then
+          if ! _fm_composer_dsh_fresh_tail "$plain" "$boundary"; then
+            FM_COMPOSER_SELECTED_KIND=
+            return 1
+          fi
+          _fm_composer_rows_load "$plain"
+          next=${#_FM_COMPOSER_ROWS[@]}
+        fi
       fi
       while :; do
         raw=$(_fm_composer_screen_row "$next" "$plain")
