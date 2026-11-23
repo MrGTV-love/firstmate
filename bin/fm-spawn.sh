@@ -6146,9 +6146,12 @@ agy_spawn_fail() {  # <detail>
 # both mean the brief reached the agent. A resumed launch already holds the
 # earlier conversation, so only a turn that started beyond DSH_START_POSITION,
 # the log position taken before launch, counts. No pane-scrape fallback exists
-# because the log is the same source the busy classifier trusts. Separately,
-# require the live composer shape the steering parser understands: a successful
-# version command is not proof that a changed frontend remains compatible.
+# because the log is the same source the busy classifier trusts. A turn that
+# already ended in error with no other attempt outcome (for example a model id
+# the API rejects) is not a start: it refuses at once with the provider's text,
+# and no composer verdict is consulted. Separately, require the live composer
+# shape the steering parser understands: a successful version command is not
+# proof that a changed frontend remains compatible.
 dsh_wait_for_start() {
   local state pane parse_error identity i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
   # shellcheck source=bin/fm-composer-lib.sh
@@ -6158,8 +6161,12 @@ dsh_wait_for_start() {
   # dsh's pre-usage status row; with no readable binding that row stays unproven.
   identity=$(python3 "$SCRIPT_DIR/fm-dsh.py" status-identity "$STATE_REAL" "$ID" 2>/dev/null) || identity=
   while [ "$i" -lt "$max" ]; do
-    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
+    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" start-state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
     case "$state" in
+      failed:*)
+        DSH_START_ERROR="dsh: first turn failed: ${state#failed: }"
+        return 1
+        ;;
       busy | idle)
         if fm_backend_visible_capture_supported "$BACKEND"; then
           pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=

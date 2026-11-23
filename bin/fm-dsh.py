@@ -47,6 +47,9 @@ data, or data that fails one of
 those checks, prints "unknown: <the failed check>". With --since, anything
 recorded at or before POSITION is history: a turn must have started beyond
 it, or the state is unknown.
+start-state STATE ID [--since POSITION] is the launch start proof: the same
+fold, except that a turn which ended in error (turn/end reason error) with
+every assistant attempt finishing in error prints "failed: <provider text>".
 route MODEL [PROVIDER] prints the default model-family adapter. DeepSeek is
 matched as omp resolves it: provider deepseek, or a deepseek/ model prefix,
 trimmed and case-insensitive.
@@ -310,6 +313,8 @@ def fold(path):
             stream.readline()
         result = "unknown"
         last_seq = started = -1
+        failure = attempt_error = None
+        attempt_ok = False
         for line in stream:
             if not line.endswith(b"\n"):
                 break  # An incomplete append is not a committed event.
@@ -330,20 +335,55 @@ def fold(path):
             if event.get("type") == "turn/start":
                 result = "busy"
                 started = seq
+                failure = attempt_error = None
+                attempt_ok = False
+            elif event.get("type") == "assistant/attempt":
+                for kind, message in attempt_finishes(event):
+                    if kind == "error":
+                        attempt_error = message
+                    else:
+                        attempt_ok = True
             elif event.get("type") == "turn/end":
                 result = "idle"
-        return result, last_seq, started
+                reason = (event.get("data") or {}).get("reason") or {}
+                if isinstance(reason, dict) and reason.get("kind") == "error" \
+                        and attempt_error is not None and not attempt_ok:
+                    error = reason.get("error") if isinstance(reason.get("error"), dict) else {}
+                    failure = error.get("message") or attempt_error
+        return result, last_seq, started, failure
+
+
+def attempt_finishes(event):
+    # Each finish chunk of an assistant attempt, as (reason kind, failure text).
+    stream = (event.get("data") or {}).get("stream")
+    for item in stream if isinstance(stream, list) else []:
+        chunk = item.get("chunk") if isinstance(item, dict) else None
+        if not isinstance(chunk, dict) or chunk.get("type") != "finish":
+            continue
+        reason = chunk.get("reason") if isinstance(chunk.get("reason"), dict) else {}
+        failure = reason.get("failure") if isinstance(reason.get("failure"), dict) else {}
+        yield reason.get("kind"), failure.get("message") or ""
 
 
 def turn_state(state, task, since=None):
     path = live_log(state, task)
     if path is None:
         raise ValueError("no depth-zero dsh session log yet")
-    result, _, started = fold(path)
+    result, _, started, failure = fold(path)
     if result == "unknown":
         raise ValueError("dsh session log has no turn/start or turn/end yet")
     if since is not None and started <= (since[1] if since[0] == str(path) else -1):
         raise ValueError("no turn started beyond the launch position")
+    return result, failure
+
+
+def start_state(state, task, since=None):
+    # The launch's start proof: the newest turn beyond the launch position is
+    # busy or idle, or it failed when it ended in error with no attempt that
+    # finished any other way. The provider's text is kept, on one line.
+    result, failure = turn_state(state, task, since)
+    if result == "idle" and failure is not None:
+        return "failed: " + (" ".join(str(failure).split("\n")).strip() or "the turn ended in error with no provider text")
     return result
 
 
@@ -450,10 +490,11 @@ def main():
     p = sub.add_parser("position")
     p.add_argument("state")
     p.add_argument("task")
-    p = sub.add_parser("state")
-    p.add_argument("state")
-    p.add_argument("task")
-    p.add_argument("--since", default="")
+    for name in ("state", "start-state"):
+        p = sub.add_parser(name)
+        p.add_argument("state")
+        p.add_argument("task")
+        p.add_argument("--since", default="")
     p = sub.add_parser("route")
     p.add_argument("model")
     p.add_argument("provider", nargs="?", default="")
@@ -499,9 +540,13 @@ def main():
             where = position(args.state, args.task)
             if where is not None:
                 print(json.dumps(where))
-        elif args.command == "state":
+        elif args.command in ("state", "start-state"):
             try:
-                print(turn_state(args.state, args.task, json.loads(args.since) if args.since else None))
+                since = json.loads(args.since) if args.since else None
+                if args.command == "state":
+                    print(turn_state(args.state, args.task, since)[0])
+                else:
+                    print(start_state(args.state, args.task, since))
             except KeyError as error:
                 print(f"unknown: dsh session binding lacks {error}")
             except (OSError, ValueError, TypeError) as error:

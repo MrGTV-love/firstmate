@@ -438,7 +438,10 @@ bound = json.loads(binding.read_text())
 store = Path(bound["root"]) / "dsh" / "sessions" / "workspace" / "session"
 store.mkdir(parents=True, exist_ok=True)
 header = {"type": "session", "version": 4, "id": str(uuid.uuid4()), "cwd": bound["cwd"], "delegationDepth": 0}
-(store / "session.v4.jsonl").write_text(json.dumps(header) + "\n" + json.dumps({"type": "turn/start", "seq": 1}) + "\n")
+# FM_FAKE_DSH_EVENTS names a file of recorded turn events to replay instead.
+events = Path(os.environ["FM_FAKE_DSH_EVENTS"]).read_text() if os.environ.get("FM_FAKE_DSH_EVENTS") \
+    else json.dumps({"type": "turn/start", "seq": 1}) + "\n"
+(store / "session.v4.jsonl").write_text(json.dumps(header) + "\n" + events)
 PY
 
 make_dsh_case() {  # <name> <id> [crew-harness]
@@ -955,6 +958,36 @@ test_unrecognized_dsh_screen_refuses_launch() {
   pass "fm-spawn: a successful version probe and durable turn cannot admit an unrecognized dsh screen"
 }
 
+# The first turn's own outcome is part of the start proof. The turn-error log
+# is a real launch's, trimmed to its turn events; the busy log is its opening
+# events; the completed log changes only its two finish reasons (synthetic).
+test_first_turn_error_refuses_launch() {
+  local id out status fixtures=$ROOT/tests/fixtures
+  id=dsh-turn-error
+  make_dsh_case turn-error "$id"
+  out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_EVENTS="$fixtures/dsh-session-turn-error.jsonl" \
+    FM_FAKE_CAPTURE_FILE="$fixtures/dsh-tui-0.16.1-launch-xhigh-turn-error-idle.ansi" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 1 "$status" "a first turn that ended in error must refuse the launch: $out"
+  assert_contains "$out" 'dsh: first turn failed: The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)' \
+    'the refusal must carry the provider text verbatim'
+  assert_not_contains "$out" 'could not parse the composer frame' 'a failed first turn must not be reported as an unreadable composer'
+  assert_grep ']: dsh: first turn failed: The supported API model names' "$HOME_DIR/state/$id.status" \
+    'the failed start must be recorded through the spawn failure path'
+  id=dsh-turn-busy
+  make_dsh_case turn-busy "$id"
+  head -n 2 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/busy.jsonl"
+  out=$(FM_FAKE_DSH_EVENTS="$CASE_DIR/busy.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 0 "$status" "a first turn still running must launch: $out"
+  id=dsh-turn-completed
+  make_dsh_case turn-completed "$id"
+  out=$(FM_FAKE_DSH_EVENTS="$fixtures/dsh-session-completed-synthetic.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 0 "$status" "a first turn that completed must launch: $out"
+  pass 'fm-spawn: a dsh first turn that ended in error refuses with the provider text; busy and completed turns launch'
+}
+
 test_exhausted_omp_replaces_deepseek_harness() {
   local id=dsh-replacement out status
   make_dsh_case replacement "$id"
@@ -1072,5 +1105,6 @@ test_launch_policy_admits_dsh
 test_deepseek_cannot_launch_on_omp
 test_omp_default_cannot_hide_a_deepseek_route
 test_unrecognized_dsh_screen_refuses_launch
+test_first_turn_error_refuses_launch
 test_exhausted_omp_replaces_deepseek_harness
 test_live_guard_refuses_missing_lab_inputs

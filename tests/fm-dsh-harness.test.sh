@@ -435,6 +435,44 @@ printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture; incom
 # starts below the banner rows that carry home paths. The configured effort was
 # `xhigh` (that route renders `high`) or none (dsh still rendered `high`).
 dsh_fx() { cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-$1.ansi"; }
+# The start proof reads the first turn's outcome: a real launch's turn-error log
+# fails with the provider's text, its opening events are busy, and a synthetic
+# copy with only the two finish reasons changed is idle. The busy classifier's
+# own `state` still reads a finished error turn as idle.
+dsh_start_log() {  # <events-file> -> prints start-state and state for it
+  local dir=$TMP/start-$RANDOM
+  mkdir -p "$dir/root/dsh/sessions/workspace/session" "$dir/state"
+  printf '{"root": "%s", "cwd": "/w", "generation": "g1", "model": "m", "effort": ""}' "$dir/root" > "$dir/state/t.dsh-session"
+  { printf '{"type": "session", "version": 4, "id": "8578f75e-697c-461f-b778-227432316ca2", "cwd": "/w", "delegationDepth": 0}\n'; cat "$1"; } \
+    > "$dir/root/dsh/sessions/workspace/session/session.v4.jsonl"
+  python3 "$ROOT/bin/fm-dsh.py" start-state "$dir/state" t
+  python3 "$ROOT/bin/fm-dsh.py" state "$dir/state" t
+}
+dsh_turn_error="$ROOT/tests/fixtures/dsh-session-turn-error.jsonl"
+[ "$(dsh_start_log "$dsh_turn_error")" = "$(printf '%s\n%s' 'failed: The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)' idle)" ] \
+  || { echo "a turn-error first turn must fail the start proof: $(dsh_start_log "$dsh_turn_error")" >&2; exit 1; }
+head -n 2 "$dsh_turn_error" > "$TMP/start-busy.jsonl"
+[ "$(dsh_start_log "$TMP/start-busy.jsonl")" = "$(printf 'busy\nbusy')" ] || { echo 'a running first turn must read busy' >&2; exit 1; }
+[ "$(dsh_start_log "$ROOT/tests/fixtures/dsh-session-completed-synthetic.jsonl")" = "$(printf 'idle\nidle')" ] \
+  || { echo 'a completed first turn must read idle' >&2; exit 1; }
+# Synthetic edits of the real log: an earlier attempt that finished normally,
+# or an error turn/end with no assistant attempt at all, is not the rejected
+# first turn the start proof refuses.
+{ head -n 2 "$dsh_turn_error"
+  printf '%s\n' '{"type": "assistant/attempt", "seq": 15, "data": {"turn": 1, "step": 1, "stream": [{"type": "chunk", "chunk": {"type": "finish", "reason": {"kind": "completed"}}}]}}'
+  tail -n 3 "$dsh_turn_error"; } > "$TMP/start-mixed.jsonl"
+[ "$(dsh_start_log "$TMP/start-mixed.jsonl")" = "$(printf 'idle\nidle')" ] \
+  || { echo 'a turn with a successful attempt must not fail the start proof' >&2; exit 1; }
+grep -v '"assistant/attempt"' "$dsh_turn_error" > "$TMP/start-no-attempt.jsonl"
+[ "$(dsh_start_log "$TMP/start-no-attempt.jsonl")" = "$(printf 'idle\nidle')" ] \
+  || { echo 'an error turn/end without an errored attempt must not fail the start proof' >&2; exit 1; }
+# Only the newest turn counts: an earlier turn's errored attempt does not
+# carry into a later turn.
+{ cat "$dsh_turn_error"
+  printf '%s\n' '{"type": "turn/start", "seq": 19, "data": {"turn": 2}}' \
+    '{"type": "turn/end", "seq": 20, "data": {"turn": 2, "reason": {"kind": "error", "error": {"message": "later"}}}}'; } > "$TMP/start-second.jsonl"
+[ "$(dsh_start_log "$TMP/start-second.jsonl")" = "$(printf 'idle\nidle')" ] \
+  || { echo "an earlier turn's errored attempt must not fail a later turn" >&2; exit 1; }
 # fm-spawn reads the launch identity from the binding prepare recorded.
 mkdir -p "$TMP/identity"
 printf '{"root": "/r", "cwd": "/w/fm/plaindir", "generation": "g1", "model": "deepseek-v4.1-flash-1017", "effort": "xhigh"}' > "$TMP/identity/t.dsh-session"
