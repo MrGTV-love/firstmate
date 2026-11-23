@@ -24,6 +24,9 @@ newest depth-zero session, or prints nothing when the binding changed.
 bound STATE ID prints the binding's model as deepseek/<id> and its effort
 (default when none) on two lines.
 api-key-env prints the environment name every launch patch reads its key from.
+status-identity STATE ID prints one tab-separated line, the binding's bare
+model id, its effort (empty when none) and the basename of its recorded cwd:
+what dsh-tui's pre-usage status row shows for that launch.
 own-model prints, as deepseek/<id>, the model bound to the Firstmate-prepared
 generation that DSH_HOME names, and fails unless that binding still names it.
 preferred-model OPERATOR_HOME prints, as deepseek/<id>, the operator's persisted
@@ -383,6 +386,11 @@ def bound(state, task):
     print(binding.get("effort") or "default")
 
 
+def status_identity(state, task):
+    binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
+    print("\t".join((binding["model"], binding.get("effort") or "", Path(binding["cwd"]).name)))
+
+
 def own_model():
     dsh = os.environ.get("DSH_HOME", "")
     runtime = Path(dsh).resolve().parent
@@ -430,6 +438,9 @@ def main():
     p = sub.add_parser("bound")
     p.add_argument("state")
     p.add_argument("task")
+    p = sub.add_parser("status-identity")
+    p.add_argument("state")
+    p.add_argument("task")
     sub.add_parser("own-model")
     sub.add_parser("api-key-env")
     p = sub.add_parser("preferred-model")
@@ -466,6 +477,8 @@ def main():
             resume(args.values, args.primary_root)
         elif args.command == "bound":
             bound(args.state, args.task)
+        elif args.command == "status-identity":
+            status_identity(args.state, args.task)
         elif args.command == "own-model":
             own_model()
         elif args.command == "api-key-env":

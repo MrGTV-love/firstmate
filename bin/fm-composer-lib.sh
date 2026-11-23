@@ -37,6 +37,10 @@
 #               Pi's blank separated composer provable; with identity=0 that
 #               shape stays `unknown`.
 #   rows=<n>    the capture's bounded row count (informational).
+#   dsh-status=<model>\t<effort>\t<cwd>  the launch's own dsh identity; only
+#               with it is dsh-tui's pre-usage status row furniture (see
+#               _fm_composer_row_is_dsh_fresh_status). Only the dsh launch
+#               check supplies it.
 #
 # THE STRICT BLANK-ROW RULE (captain decision blank-row-injection-posture,
 # 2026-08-09): a blank or otherwise unidentified input row with no positive
@@ -1882,37 +1886,69 @@ _fm_composer_row_is_dsh_status() {  # <trimmed-row>
 }
 
 # Before dsh-tui has any usage sample it draws neither the meter nor the ctx
-# cell (observed on a fresh dsh-tui 0.16.1; its status-line source gates both on
-# context occupancy). With a launch's default status-bar fields its compact row
-# is then exactly `<model> · <effort> · <cwd basename>`, for example
-# `deepseek-v4.1-flash-1017 · high · plaindir`, and each cell truncates with `…`
-# on a narrow pane (`deepseek-v4.1-flash-10… · hi…  · gitd…`). The effort cell
-# is one of dsh's provider reasoning levels (a configured level the route lacks
-# renders as the nearest offered one: `xhigh` showed `high`).
+# cell (observed on dsh-tui 0.16.1; StatusLine.js gates the bar and the ctx
+# field on context occupancy, which a turn that ends before any usage, such as
+# one the API rejects, never supplies). With a launch's default status-bar
+# fields the compact row is then `<model> · <effort> · <cwd basename>`,
+# observed fresh and during and after a launch's first turn:
+# `deepseek-v4.1-flash-1017 · high · fmcapwt`; each cell truncates with `…` on
+# a narrow pane (`deepseek-v4.1-flash-10… · hi…  · gitd…`). StatusLine.js
+# omits the effort cell while the channel holds no reasoning effort; a launch
+# with no effort was observed to render the route's default (`high`) anyway.
+# dsh applies a configured effort the route lacks as the nearest LOWER level
+# (model-actions.js applyPreferredEffort): `xhigh` rendered `high`.
+# The row is forgeable by any shell prompt, so it is furniture only when the
+# caller supplies the launch's own identity in its caps as
+# `dsh-status=<model>\t<effort-or-empty>\t<cwd basename>` (the binding
+# bin/fm-dsh.py prepare recorded); without it the row stays unrecognized.
+# These are dsh's PROVIDER_REASONING_LEVELS, weakest first.
 FM_COMPOSER_DSH_EFFORT_LABELS='off minimal low medium high xhigh max'
 
-# _fm_composer_dsh_effort_cell: 0 when the cell is a dsh effort label, or a
-# non-empty prefix of one cut by dsh's own `…` truncation.
-_fm_composer_dsh_effort_cell() {  # <cell>
-  local cell=$1 stem label
+# _fm_composer_dsh_cell_is: 0 when the rendered cell is <expected>, or a
+# non-empty proper prefix of it cut by dsh's own `…` truncation.
+_fm_composer_dsh_cell_is() {  # <cell> <expected>
+  local cell=$1 expected=$2 stem
+  [ -n "$expected" ] || return 1
+  [ "$cell" = "$expected" ] && return 0
   stem=${cell%…}
-  [ -n "$stem" ] || return 1
+  [ "$stem" != "$cell" ] && [ -n "$stem" ] || return 1
+  case "$expected" in "$stem"?*) return 0 ;; esac
+  return 1
+}
+
+# _fm_composer_dsh_effort_cell: 0 when the cell renders a dsh effort level at
+# or below the configured one (any level when none was configured).
+_fm_composer_dsh_effort_cell() {  # <cell> <configured-or-empty>
+  local cell=$1 configured=$2 label
   for label in $FM_COMPOSER_DSH_EFFORT_LABELS; do
-    if [ "$stem" = "$cell" ]; then
-      [ "$cell" = "$label" ] && return 0
-    else
-      case "$label" in "$stem"?*) return 0 ;; esac
-    fi
+    _fm_composer_dsh_cell_is "$cell" "$label" && return 0
+    [ "$label" != "$configured" ] || return 1
   done
   return 1
 }
 
-# _fm_composer_row_is_dsh_fresh_status: 0 when the trimmed row has exactly
-# dsh's three pre-usage cells joined by ` · `: a model id token (no whitespace),
-# an effort cell, and a directory basename (no `/` and no shell-prompt sigil).
-# No model name or directory is assumed, because both differ per launch.
+# _fm_composer_row_is_dsh_fresh_status: 0 when the trimmed row is the launch's
+# own pre-usage status row: its model, an effort cell, and its cwd basename,
+# joined by ` · `. A configured effort requires the effort cell; with none the
+# cell may be absent. The identity comes only from the caller's caps, held in
+# the classifier entry point's local _fm_composer_dsh_expect.
 _fm_composer_row_is_dsh_fresh_status() {  # <trimmed-row>
-  local rest=$1 cell cells=()
+  local rest=$1 cell cells=() model effort cwd label known=0
+  [ -n "${_fm_composer_dsh_expect:-}" ] || return 1
+  # Split by hand: tab is IFS whitespace, so `read` would collapse an empty
+  # effort field into the cwd.
+  case "$_fm_composer_dsh_expect" in *$'\t'*$'\t'*) ;; *) return 1 ;; esac
+  model=${_fm_composer_dsh_expect%%$'\t'*}
+  rest=${_fm_composer_dsh_expect#*$'\t'}
+  effort=${rest%%$'\t'*}
+  cwd=${rest#*$'\t'}
+  rest=$1
+  [[ $model =~ ^[A-Za-z0-9][A-Za-z0-9._:+-]*$ ]] || return 1
+  [[ $cwd =~ ^[A-Za-z0-9._@+-]+$ ]] || return 1
+  if [ -n "$effort" ]; then
+    for label in $FM_COMPOSER_DSH_EFFORT_LABELS; do [ "$label" != "$effort" ] || known=1; done
+    [ "$known" = 1 ] || return 1
+  fi
   while :; do
     case "$rest" in
       *' · '*) cell=${rest%% · *}; rest=${rest#* · } ;;
@@ -1923,18 +1959,19 @@ _fm_composer_row_is_dsh_fresh_status() {  # <trimmed-row>
     cells+=("$cell")
     [ -n "$rest" ] || break
   done
-  [ "${#cells[@]}" = 3 ] || return 1
-  [[ ${cells[0]} =~ ^[A-Za-z0-9][A-Za-z0-9._:+-]*(…)?$ ]] || return 1
-  _fm_composer_dsh_effort_cell "${cells[1]}" || return 1
-  case "${cells[2]}" in
-    */* | *'%'* | *'$'* | *'#'* | *'>'* | *'❯'* | *'›'*) return 1 ;;
+  _fm_composer_dsh_cell_is "${cells[0]}" "$model" || return 1
+  _fm_composer_dsh_cell_is "${cells[${#cells[@]}-1]}" "$cwd" || return 1
+  case "${#cells[@]}" in
+    3) _fm_composer_dsh_effort_cell "${cells[1]}" "$effort" ;;
+    2) [ -z "$effort" ] ;;
+    *) return 1 ;;
   esac
 }
 
 # _fm_composer_dsh_fresh_tail: 0 when every row below dsh's pre-usage status
-# row (flush under the box's bottom border) is blank or dsh's own
-# `esc to interrupt` hint, so the row is the screen's last furniture rather
-# than one line of some lower live surface.
+# row (flush under the box's bottom border) is blank or exactly dsh's busy hint
+# row (`esc to interrupt`, i18n statusline-hint-working), so the row is the
+# screen's last furniture rather than one line of some lower live surface.
 _fm_composer_dsh_fresh_tail() {  # <plain-screen> <bottom-border-row>
   local row=$(($2 + 2)) line
   _fm_composer_rows_load "$1"
@@ -1942,8 +1979,8 @@ _fm_composer_dsh_fresh_tail() {  # <plain-screen> <bottom-border-row>
     line=${_FM_COMPOSER_ROWS[$row]}
     fm_composer_normalize_trim_var line
     # dsh's own busy hint constant, never the FM_BUSY_REGEX override, and
-    # only as the whole row's start.
-    [ -z "$line" ] || fm_composer_idle_matches "$line" "^($FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT)" sensitive || return 1
+    # only as the whole row.
+    [ -z "$line" ] || fm_composer_idle_matches "$line" "^($FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT)\$" sensitive || return 1
     row=$((row + 1))
   done
   return 0
@@ -2555,9 +2592,13 @@ _fm_composer_select_cursorless() {
 fm_composer_extract_selected_content() {  # <caps> <screen>
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
   local leading_blank=1 placeholder_position=0 prompt_is_shell=0 omp=0 literal=0 is_last omp_plain pair_prompt_row
+  local _fm_composer_dsh_expect=
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
-    [ "$kv" = styled=1 ] && styled=1
+    case "$kv" in
+      styled=1) styled=1 ;;
+      dsh-status=*) _fm_composer_dsh_expect=${kv#dsh-status=} ;;
+    esac
   done <<EOF
 $caps
 EOF
@@ -2735,7 +2776,7 @@ fm_composer_dialog_sink_release() {
 
 fm_composer_classify_screen() {  # <caps> <screen> [cursor_row] [identity]
   local caps=$1 screen=$2 cy=${3:-} identity=${4:-}
-  local styled=0 cursor=0 has_identity=0 kv plain
+  local styled=0 cursor=0 has_identity=0 kv plain _fm_composer_dsh_expect=
   # Note the dialog before any early return so a pending picker is still named.
   fm_composer_note_blocking_dialog "$screen" || true
   while IFS= read -r kv; do
@@ -2743,6 +2784,7 @@ fm_composer_classify_screen() {  # <caps> <screen> [cursor_row] [identity]
       styled=1) styled=1 ;;
       cursor=1) cursor=1 ;;
       identity=1) has_identity=1 ;;
+      dsh-status=*) _fm_composer_dsh_expect=${kv#dsh-status=} ;;
     esac
   done <<EOF
 $caps
@@ -2928,10 +2970,13 @@ EOF
 
 # Require the DSH-specific frame and a proven content verdict, not a release
 # number or a generic prompt glyph. This is a launch compatibility check; busy
-# state remains owned by the durable session log.
-fm_composer_dsh_screen_check() {  # <styled-screen>
-  local proof
-  proof=$(fm_composer_classify_screen $'styled=1\ncursor=0\nidentity=0' "$1"
+# state remains owned by the durable session log. The optional launch identity
+# (`bin/fm-dsh.py status-identity`: model, effort or empty, and cwd basename,
+# tab separated) is what lets dsh's pre-usage status row count as furniture.
+fm_composer_dsh_screen_check() {  # <styled-screen> [status-identity]
+  local proof caps=$'styled=1\ncursor=0\nidentity=0'
+  [ -z "${2:-}" ] || caps+=$'\ndsh-status='"$2"
+  proof=$(fm_composer_classify_screen "$caps" "$1"
     printf '/%s/%s' "${FM_COMPOSER_SELECTED_KIND:-}" "${FM_COMPOSER_SCAN_BOX_DSH:-0}")
   case "$proof" in
     empty/box/1 | pending/box/1) return 0 ;;

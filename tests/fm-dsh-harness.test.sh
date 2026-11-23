@@ -426,66 +426,111 @@ if out=$(fm_composer_dsh_screen_check 'new frontend without a recognized compose
 fi
 case "$out" in *'could not parse the composer frame or its input content'*) ;; *) echo "$out" >&2; exit 1 ;; esac
 printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic\n'
-# Real `tmux capture-pane -e` screens of a fresh dsh-tui 0.16.1 launch, before
-# any usage sample: no meter row, and a status row without the ctx cell. The
-# 45-column capture truncates every cell. They start at the context banner.
-# The configured effort was `xhigh`; that route renders it as `high`.
-dsh_fresh=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-empty.ansi")
-dsh_fresh_draft=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-pending.ansi")
-dsh_fresh_narrow=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-45col-empty.ansi")
-dsh_expect() {  # <want> <label> <screen>
+# Real `tmux capture-pane -e` screens of dsh-tui 0.16.1 before any usage
+# sample: no meter row, and a status row without the ctx cell. The fresh
+# captures had no opening prompt (the 45- and 30-column ones truncate or wrap
+# every cell); the launch captures ran the fm-spawn launch shape with a one-line
+# opening prompt, read while bin/fm-dsh.py state reported busy and then idle,
+# where the API rejected the model id so the turn ended without usage. Each
+# starts below the banner rows that carry home paths. The configured effort was
+# `xhigh` (that route renders `high`) or none (dsh still rendered `high`).
+dsh_fx() { cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-$1.ansi"; }
+# fm-spawn reads the launch identity from the binding prepare recorded.
+mkdir -p "$TMP/identity"
+printf '{"root": "/r", "cwd": "/w/fm/plaindir", "generation": "g1", "model": "deepseek-v4.1-flash-1017", "effort": "xhigh"}' > "$TMP/identity/t.dsh-session"
+[ "$(python3 "$ROOT/bin/fm-dsh.py" status-identity "$TMP/identity" t)" = "$(printf 'deepseek-v4.1-flash-1017\txhigh\tplaindir')" ] \
+  || { echo 'status-identity must print the bound model, effort and cwd basename' >&2; exit 1; }
+printf '{"root": "/r", "cwd": "/w/fm/plaindir", "generation": "g1", "model": "deepseek-v4.1-flash-1017", "effort": ""}' > "$TMP/identity/d.dsh-session"
+[ "$(python3 "$ROOT/bin/fm-dsh.py" status-identity "$TMP/identity" d)" = "$(printf 'deepseek-v4.1-flash-1017\t\tplaindir')" ] \
+  || { echo 'status-identity must print an empty effort when none was configured' >&2; exit 1; }
+dsh_id_plain=$(printf 'deepseek-v4.1-flash-1017\txhigh\tplaindir')
+dsh_id_git=$(printf 'deepseek-v4.1-flash-1017\txhigh\t%s' 'gitdir')
+dsh_id_launch=$(printf 'deepseek-v4.1-flash-1017\txhigh\tfmcapwt')
+dsh_id_default=$(printf 'deepseek-v4.1-flash-1017\t\tfmcapwt')
+dsh_id_verdict() {  # <identity> <screen>
+  fm_composer_classify_screen "$(printf '%s\ndsh-status=%s' "$dsh_caps" "$1")" "$2" '' ''
+}
+dsh_expect() {  # <want> <label> <identity> <screen>
   local got
-  got=$(dsh_verdict "$3")
+  got=$(dsh_id_verdict "$3" "$4")
   [ "$got" = "$1" ] || { echo "$2: expected $1, got $got" >&2; exit 1; }
+  fm_composer_dsh_screen_check "$4" "$3" || { echo "$2: the launch check must accept" >&2; exit 1; }
 }
-dsh_refuse() {  # <label> <screen>
+dsh_refuse() {  # <label> <identity> <screen>
   local got
-  got=$(dsh_verdict "$2")
+  got=$(dsh_id_verdict "$2" "$3")
   case "$got" in empty | pending) echo "$1: must not be accepted, got $got" >&2; exit 1 ;; esac
-  if fm_composer_dsh_screen_check "$2" 2>/dev/null; then echo "$1: the launch check must refuse" >&2; exit 1; fi
+  if fm_composer_dsh_screen_check "$3" "$2" 2>/dev/null; then echo "$1: the launch check must refuse" >&2; exit 1; fi
 }
-dsh_expect empty 'fresh dsh screen' "$dsh_fresh"
-dsh_expect pending 'fresh dsh screen with a typed draft' "$dsh_fresh_draft"
-dsh_expect empty 'narrow fresh dsh screen' "$dsh_fresh_narrow"
-fm_composer_dsh_screen_check "$dsh_fresh"
-fm_composer_dsh_screen_check "$dsh_fresh_draft"
-fm_composer_dsh_screen_check "$dsh_fresh_narrow"
-# The launch check runs once the brief turn has started, so the pre-usage
-# status row can sit above the busy hint (synthetic: that screen was not captured).
+dsh_expect empty 'fresh dsh screen' "$dsh_id_plain" "$(dsh_fx fresh-empty)"
+dsh_expect pending 'fresh dsh screen with a typed draft' "$dsh_id_plain" "$(dsh_fx fresh-pending)"
+dsh_expect empty 'narrow fresh dsh screen' "$dsh_id_git" "$(dsh_fx fresh-45col-empty)"
+dsh_expect empty 'busy first turn of an xhigh launch' "$dsh_id_launch" "$(dsh_fx launch-xhigh-busy)"
+dsh_expect empty 'idle turn-error screen of an xhigh launch' "$dsh_id_launch" "$(dsh_fx launch-xhigh-turn-error-idle)"
+dsh_expect empty 'busy first turn of a default-effort launch' "$dsh_id_default" "$(dsh_fx launch-default-busy)"
+dsh_expect empty 'idle turn-error screen of a default-effort launch' "$dsh_id_default" "$(dsh_fx launch-default-turn-error-idle)"
+# A 30-column pane wraps the row's separators onto their own line; that real
+# capture is not the proven shape and stays refused.
+dsh_refuse 'wrapped 30-column fresh dsh screen' "$dsh_id_git" "$(dsh_fx fresh-30col-wrapped)"
+# The row is furniture only for the launch identity the caller supplies: with
+# no identity, or another launch's, every real capture stays unproven, and a
+# same-named variable in the environment supplies nothing.
+for fx in fresh-empty launch-xhigh-busy launch-default-turn-error-idle; do
+  got=$(fm_composer_classify_screen "$dsh_caps" "$(dsh_fx "$fx")" '' '')
+  [ "$got" = unknown ] || { echo "$fx without a launch identity: expected unknown, got $got" >&2; exit 1; }
+  got=$(_fm_composer_dsh_expect=$dsh_id_launch fm_composer_classify_screen "$dsh_caps" "$(dsh_fx "$fx")" '' '')
+  [ "$got" = unknown ] || { echo "$fx with only an inherited identity variable: expected unknown, got $got" >&2; exit 1; }
+  if fm_composer_dsh_screen_check "$(dsh_fx "$fx")" 2>/dev/null; then echo "$fx: the launch check needs the identity" >&2; exit 1; fi
+done
+dsh_refuse 'another model in the status row' "$(printf 'deepseek-flash\txhigh\tfmcapwt')" "$(dsh_fx launch-xhigh-busy)"
+dsh_refuse 'another directory in the status row' "$(printf 'deepseek-v4.1-flash-1017\txhigh\tvernant')" "$(dsh_fx launch-xhigh-busy)"
+dsh_refuse 'an effort above the configured one' "$(printf 'deepseek-v4.1-flash-1017\tmedium\tfmcapwt')" "$(dsh_fx launch-xhigh-busy)"
+# An identity without its three tab-separated fields is refused even when a
+# row happens to fit the one way it could be misread.
+dsh_refuse 'a malformed launch identity' "$(printf 'deepseek-v4.1-flash-1017\thigh')" \
+  "$(printf '%s\n' "$dsh_frame_top" "$(dsh_row '')" "$dsh_frame_bottom" '   deepseek-v4.1-flash-1017 · high · high')"
 dsh_fresh_row='   deepseek-v4.1-flash-1017 · high · plaindir'
 dsh_fresh_box=$(printf '%s\n' "$dsh_frame_top" "$(dsh_row '')" "$dsh_frame_bottom")
-dsh_expect empty 'fresh dsh row above the busy hint' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   esc to interrupt' '' '')"
-dsh_expect pending 'typed draft above the fresh dsh row' \
+dsh_expect pending 'typed draft above the fresh dsh row' "$dsh_id_plain" \
   "$(printf '%s\n' "$dsh_frame_top" "$(dsh_row 'fix the tests')" "$dsh_frame_bottom" "$dsh_fresh_row")"
-# The pre-usage row is furniture only in dsh's shape, flush under the frame,
-# and as the screen's last furniture; anything else below the box stays a
-# lower live surface.
-dsh_refuse 'plain text flush under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   fix the tests')"
-dsh_refuse 'two-cell row flush under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · high')"
-dsh_refuse 'fresh dsh row with text below it' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   fix the tests')"
+# Without a configured effort dsh may omit the effort cell; with one it must not.
+dsh_expect empty 'two-cell row of a launch with no effort' "$(printf 'deepseek-v4.1-flash-1017\t\tplaindir')" \
+  "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · plaindir')"
+dsh_refuse 'two-cell row of a launch with an effort' "$dsh_id_plain" \
+  "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · plaindir')"
+# The row is furniture only flush under the frame and as the screen's last
+# furniture apart from dsh's whole busy-hint row; anything else below the box
+# stays a lower live surface.
+dsh_refuse 'plain text flush under a dsh box' "$dsh_id_plain" "$(printf '%s\n' "$dsh_fresh_box" '   fix the tests')"
+dsh_refuse 'fresh dsh row with text below it' "$dsh_id_plain" "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   fix the tests')"
+dsh_refuse 'busy hint followed by a shell prompt' "$dsh_id_plain" \
+  "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   esc to interrupt user@host % echo hello')"
 # Once the pre-usage row is present its rule alone decides, and its busy-hint
 # tail is dsh's own constant: an override matching both that row and the text
 # below it cannot turn either into furniture.
-FM_BUSY_REGEX='deepseek|fix the tests' dsh_refuse 'fresh dsh row with text below it under a busy-regex override' \
+FM_BUSY_REGEX='deepseek|fix the tests' dsh_refuse 'fresh dsh row with text below it under a busy-regex override' "$dsh_id_plain" \
   "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   fix the tests')"
+dsh_refuse 'fresh dsh row, a blank row, then text' "$dsh_id_plain" "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '' 'user@host plaindir %')"
+dsh_refuse 'fresh dsh row with an empty cell' "$dsh_id_plain" "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 ·  · plaindir')"
+dsh_refuse 'four-cell row under a dsh box' "$dsh_id_plain" "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · high · main · plaindir')"
 # A stale dsh frame above a shell prompt holding a draft is not a dsh composer,
-# whether it is the only frame or sits below a complete earlier dsh screen.
-dsh_shell_line='alice · ~/work · % echo hello'
+# whatever its prompt imitates, whether it is the only frame or sits below a
+# complete earlier dsh screen.
 dsh_stale_box=$(printf '%s\n' '  ╭─────────────────────╮' '  ⌸ ❯                   ⛶' '  ╰─────────────────────╯')
-dsh_refuse 'stale dsh frame above a shell prompt' "$(printf '%s\n' "$dsh_stale_box" "$dsh_shell_line")"
-dsh_refuse 'second stale dsh frame above a shell prompt' \
-  "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '' "$dsh_stale_box" "$dsh_shell_line")"
-dsh_refuse 'effort-shaped shell prompt under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   alice · high · % echo hello')"
-dsh_refuse 'unknown effort label under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · highest · plaindir')"
-dsh_refuse 'model cell with whitespace under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek v4 · high · plaindir')"
-dsh_refuse 'four-cell row under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · high · main · plaindir')"
-# A 30-column pane wraps the row's separators onto their own line; that real
-# capture is not the proven shape and stays refused.
-dsh_refuse 'wrapped 30-column fresh dsh screen' "$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-30col-wrapped.ansi")"
-dsh_refuse 'fresh dsh row, a blank row, then text' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '' 'user@host plaindir %')"
-dsh_refuse 'fresh dsh row with an empty cell' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 ·  · plaindir')"
-dsh_refuse 'fresh dsh row under a box that is not dsh' "$(printf '%s\n' "  ╭$(printf '─%.0s' $(seq 1 40))╮" "  │ ❯$(printf ' %.0s' $(seq 1 38))│" "  ╰$(printf '─%.0s' $(seq 1 40))╯" "$dsh_fresh_row")"
-printf 'ok - a fresh dsh-tui screen proves empty or typed draft through its pre-usage status row, which is accepted only as flush last furniture\n'
+for line in 'alice · ~/work · % echo hello' 'alice · high · λ echo hello' 'deepseek-v4.1-flash-1017 · high · λ echo hello'; do
+  dsh_refuse "stale dsh frame above the shell prompt '$line'" "$dsh_id_plain" "$(printf '%s\n' "$dsh_stale_box" "$line")"
+  dsh_refuse "second stale dsh frame above the shell prompt '$line'" "$dsh_id_plain" \
+    "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '' "$dsh_stale_box" "$line")"
+done
+# A generic rounded composer the classifier proves empty is still not dsh-tui.
+dsh_generic=$(printf '%s\n' "  ╭$(printf '─%.0s' $(seq 1 40))╮" "  │ ❯$(printf ' %.0s' $(seq 1 38))│" "  ╰$(printf '─%.0s' $(seq 1 40))╯")
+got=$(dsh_verdict "$dsh_generic")
+[ "$got" = empty ] || { echo "the generic composer fixture must classify empty, got $got" >&2; exit 1; }
+if fm_composer_dsh_screen_check "$dsh_generic" "$dsh_id_plain" 2>/dev/null; then
+  echo 'an empty composer without the dsh frame must fail the dsh launch check' >&2; exit 1
+fi
+dsh_refuse 'fresh dsh row under a box that is not dsh' "$dsh_id_plain" "$(printf '%s\n' "$dsh_generic" "$dsh_fresh_row")"
+printf 'ok - real fresh and launch dsh-tui screens prove empty or typed draft through the launch-identity status row, which is accepted only as flush last furniture\n'
 # shellcheck source=bin/fm-control-lib.sh
 . "$ROOT/bin/fm-control-lib.sh"
 [ "$(fm_control_interrupt_key dsh)" = Escape ]

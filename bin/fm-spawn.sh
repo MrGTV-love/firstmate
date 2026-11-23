@@ -6150,10 +6150,13 @@ agy_spawn_fail() {  # <detail>
 # require the live composer shape the steering parser understands: a successful
 # version command is not proof that a changed frontend remains compatible.
 dsh_wait_for_start() {
-  local state pane parse_error i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local state pane parse_error identity i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
   # shellcheck source=bin/fm-composer-lib.sh
   . "$SCRIPT_DIR/fm-composer-lib.sh"
   DSH_START_ERROR=
+  # The launch's recorded model, effort and cwd let the composer check prove
+  # dsh's pre-usage status row; with no readable binding that row stays unproven.
+  identity=$(python3 "$SCRIPT_DIR/fm-dsh.py" status-identity "$STATE_REAL" "$ID" 2>/dev/null) || identity=
   while [ "$i" -lt "$max" ]; do
     state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
     case "$state" in
@@ -6163,7 +6166,7 @@ dsh_wait_for_start() {
         else
           pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null) || pane=
         fi
-        if parse_error=$(fm_composer_dsh_screen_check "$pane" 2>&1); then
+        if parse_error=$(fm_composer_dsh_screen_check "$pane" "$identity" 2>&1); then
           return 0
         fi
         DSH_START_ERROR=${parse_error#error: }

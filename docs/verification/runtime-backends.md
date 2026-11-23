@@ -4027,8 +4027,13 @@ On 2026-11-23, on macOS arm64 with `dsh-tui` 0.16.1 (launcher and profile) and D
 After Escape dismissed the first-run guide and then the sessions view, `tmux capture-pane -e -p` showed no meter row and one status row without a `ctx` cell, flush under the frame: `deepseek-v4.1-flash-1017 · high · <directory>` at 200, 120, 80 and 60 columns (`plaindir` and `gitdir`, a fresh Git repository, which added no branch cell), and `deepseek-v4.1-flash-10… · hi…  · gitd…` at 45 columns.
 At 30 columns the row wrapped its separators onto a second line (`deepseek-v4.1…  h…  gi…` above the dots), and that screen stays refused.
 The configured `xhigh` effort rendered as `high` in that row and as `High effort` in the banner.
-Before the pre-usage status row was recognized, `fm_composer_dsh_screen_check` refused that screen; it now classifies `empty`, and `pending` with an unsubmitted typed draft.
-The trimmed captures are the `tests/fixtures/dsh-tui-0.16.1-fresh-*.ansi` regressions in `tests/fm-dsh-harness.test.sh`; the busy screen between a turn's start and its first usage sample was not captured.
+The same day, two launches in the fm-spawn launch shape (the `prepare` runtime, `--patch`, and the one-line opening prompt `reply with the word ok` after `--`), one at `xhigh` and one with no effort, were captured with `tmux capture-pane -e -p` while `bin/fm-dsh.py state` reported `busy` and then `idle`.
+Both busy screens showed `deepseek-v4.1-flash-1017 · high · fmcapwt` flush under the frame and then exactly `esc to interrupt`; with no configured effort dsh still rendered `high`.
+The API rejected the model id in both turns (`The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017.`), so each turn ended without usage and the idle screens kept the same status row under a turn-error notice.
+Before the pre-usage status row was recognized, `fm_composer_dsh_screen_check` refused all of these screens.
+It now accepts that row only for the launch identity the caller supplies (`bin/fm-dsh.py status-identity`, which fm-spawn passes), so they classify `empty`, and `pending` with an unsubmitted typed draft; without that identity they stay refused.
+Because the check proves a compatible composer, not a successful turn, a launch whose first turn errors now passes it.
+The trimmed captures are the `tests/fixtures/dsh-tui-0.16.1-fresh-*.ansi` and `tests/fixtures/dsh-tui-0.16.1-launch-*.ansi` regressions in `tests/fm-dsh-harness.test.sh`; no successful turn was captured on this version.
 The launcher and CLI must resolve and their version commands must exit successfully; no release string is compared.
 The actual frontend must then provide a recognizable DSH composer and a new durable turn, so a changed frontend refuses with a diagnostic naming the unreadable composer rather than being accepted because of its version.
 No screen-based DSH quota parser exists: dispatch quota uses structured snapshots and the DSH busy classifier reads its durable session log.
