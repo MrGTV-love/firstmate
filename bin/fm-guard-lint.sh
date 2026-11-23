@@ -18,9 +18,10 @@
 #   report          print every violation and exit 0 (the ratchet's first step)
 #   enforce         exit 1 on any violation not allowlisted, and on any stale
 #                   allowlisted entry whose violation is gone (the default)
-#   new-or-touched  enforce only for guards added or edited since --base and for
-#                   refusal-site violations the allowlist does not hold, so new
-#                   work cannot add debt while the legacy population burns down
+#   new-or-touched  enforce only for guards added or edited since --base that carry
+#                   a finding under their literal id, and for refusal-site
+#                   violations the allowlist does not hold, so new work cannot add
+#                   debt while the legacy population burns down
 #
 # Rules, each owned by docs/guard-spec.md:
 #   R1 unique id, unique normalized invariant, unique owner+invariant pair
@@ -177,7 +178,8 @@ jq -r '.guards
   | map(select(length > 1))
   | .[]
   | (map(.id) | sort) as $ids
-  | [$ids[0], ($ids[1:] | join(","))] | @tsv' "$REGISTRY" 2>/dev/null \
+  | range($ids | length) as $i
+  | [$ids[$i], ($ids | del(.[$i]) | join(","))] | @tsv' "$REGISTRY" 2>/dev/null \
   | while IFS=$'\t' read -r first rest; do
       [ -n "$first" ] || continue
       violation R1 "$first" "invariant shared with: $rest"
@@ -384,28 +386,49 @@ case "$MODE" in
   report) exit 0 ;;
   enforce) [ "$stale" -eq 0 ] && [ "$shown" -eq 0 ] && exit 0; exit 1 ;;
   new-or-touched)
-    # Only guards added or edited since the base are in scope. A changed guard is
-    # one whose canonical JSON differs between the base registry and this one.
+    # Only guards added or edited since the base are in scope. An id is changed when
+    # the multiset of its complete rows differs between the base registry and this one.
     base_json=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base.XXXXXX") || exit 2
     base_allow=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base-allow.XXXXXX") || exit 2
     trap 'rm -f "$VIOLATIONS" "$SITES_JSON" "$ALLOWED_FILE" "$SC" "$base_json" "$base_allow"' EXIT
     if git -C "$ROOT" rev-parse --verify "$BASE_REF" >/dev/null 2>&1 \
       && git -C "$ROOT" show "$BASE_REF:docs/guards/registry.json" >"$base_json" 2>/dev/null; then
+      touched_status=0
       touched=$(jq -r --slurpfile base "$base_json" '
-        (.guards | map({key: .id, value: .}) | from_entries) as $now
-        | ($base[0].guards | map({key: .id, value: .}) | from_entries) as $was
-        | $now | keys[] | select(($was[.] == null) or ($was[.] != $now[.]))' "$REGISTRY")
+        (.guards | group_by(.id) | map(sort)) as $now
+        | ($base[0].guards | group_by(.id) | map(sort)) as $was
+        | ($now - $was)[] | .[0].id' "$REGISTRY") || touched_status=$?
       out=0
       while IFS= read -r gid; do
         [ -n "$gid" ] || continue
-        awk -F'\t' -v id="$gid" '$2 == id {print}' "$SC" | while IFS=$'\t' read -r r i m; do
-          [ -n "$r" ] || continue
-          printf 'VIOLATION %s %s: %s\n' "$r" "$i" "$m"
-        done
-        awk -F'\t' -v id="$gid" '$2 == id {found = 1} END {exit !found}' "$SC" && out=1
+        # A nonnumeric prefix forces text comparison; ENVIRON preserves the literal ID.
+        if FM_GUARD_LINT_ID="id:$gid" awk -F'\t' '("id:" $2) == ENVIRON["FM_GUARD_LINT_ID"] {found = 1} END {exit !found}' "$SC"; then
+          out=1
+        else
+          match_status=$?
+          [ "$match_status" -eq 1 ] || touched_status=$match_status
+        fi
       done <<TOUCHED_GUARDS
 $touched
 TOUCHED_GUARDS
+      # Record only this stage, before independent site and allowlist verdicts.
+      # The shared writer resolves the explicit log or established home.
+      touch_decision=allow touch_source_ok=true
+      if [ "$touched_status" -ne 0 ]; then
+        touch_decision=error touch_source_ok=false
+      elif [ "$out" -ne 0 ]; then
+        touch_decision=deny
+      fi
+      touch_event_args=(--source-ok "$touch_source_ok" --base "$BASE_REF")
+      if [ "${FM_GUARD_LINT_EVENT_ACTOR:-}" = gate ]; then
+        touch_event_args+=(--actor gate)
+      fi
+      "$SCRIPT_DIR/fm-guard-event.sh" guard-lint-touched-registry "$touch_decision" \
+        "${touch_event_args[@]}" >/dev/null 2>&1 || true
+      if [ "$touched_status" -ne 0 ]; then
+        echo "error: touched-registry comparison against '$BASE_REF' failed (status $touched_status); no touched guard is cleared" >&2
+        out=1
+      fi
       # The allowlist holds every legacy refusal-site violation, so one it does not
       # hold is new, whichever guard or site it names.
       awk -F'\t' '$1 ~ /^S[0-9]+$/ {found = 1} END {exit !found}' "$SC" && out=1
