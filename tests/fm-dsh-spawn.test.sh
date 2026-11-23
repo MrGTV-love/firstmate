@@ -440,8 +440,15 @@ store.mkdir(parents=True, exist_ok=True)
 header = {"type": "session", "version": 4, "id": str(uuid.uuid4()), "cwd": bound["cwd"], "delegationDepth": 0}
 # FM_FAKE_DSH_EVENTS names a file of recorded turn events to replay instead.
 events = Path(os.environ["FM_FAKE_DSH_EVENTS"]).read_text() if os.environ.get("FM_FAKE_DSH_EVENTS") \
-    else json.dumps({"type": "turn/start", "seq": 1}) + "\n"
-(store / "session.v4.jsonl").write_text(json.dumps(header) + "\n" + events)
+    else json.dumps({"type": "turn/start", "seq": 1}) + "\n" + json.dumps({"type": "assistant/message", "seq": 2}) + "\n"
+log = store / "session.v4.jsonl"
+log.write_text(json.dumps(header) + "\n" + events)
+# FM_FAKE_DSH_LATER is appended after FM_FAKE_DSH_LATER_DELAY seconds, so the
+# spawn first reads the earlier events alone.
+if os.environ.get("FM_FAKE_DSH_LATER"):
+    time.sleep(float(os.environ.get("FM_FAKE_DSH_LATER_DELAY", "1")))
+    with log.open("a") as stream:
+        stream.write(Path(os.environ["FM_FAKE_DSH_LATER"]).read_text())
 PY
 
 make_dsh_case() {  # <name> <id> [crew-harness]
@@ -766,7 +773,7 @@ SH
   # --effort, and the exact profile bin/fm-control.sh hands over each resume the
   # same conversation.
   printf '{"version":1,"roles":{"bound":{"dsh":{"model":"%s"}}},"retired":[]}\n' "$DSH_MODEL" > "$HOME_DIR/config/model-index.json"
-  seq=2
+  seq=3
   for args in '' "--model $DSH_MODEL" "--model DeepSeek/${DSH_MODEL#deepseek/}" "--model role:bound" "--harness dsh --model $DSH_MODEL --effort high"; do
     : > "$LAUNCH_LOG"
     python3 - "$generation/dsh/sessions/workspace/session/session.v4.jsonl" "$LAUNCH_LOG" "$seq" <<'PY' &
@@ -776,7 +783,8 @@ deadline = time.time() + 120
 while time.time() < deadline and not (os.path.exists(launch) and os.path.getsize(launch) > 0):
     time.sleep(0.02)
 with open(log, "a") as stream:
-    stream.write(json.dumps({"type": "turn/end", "seq": seq}) + "\n" + json.dumps({"type": "turn/start", "seq": seq + 1}) + "\n")
+    stream.write(json.dumps({"type": "turn/end", "seq": seq}) + "\n" + json.dumps({"type": "turn/start", "seq": seq + 1}) + "\n"
+                 + json.dumps({"type": "assistant/message", "seq": seq + 2}) + "\n")
 PY
     writer=$!
     # shellcheck disable=SC2086 # each case is a deliberate word list of flags
@@ -787,7 +795,7 @@ PY
     status=$?
     kill "$writer" 2>/dev/null
     wait "$writer" 2>/dev/null
-    seq=$((seq + 2))
+    seq=$((seq + 3))
     expect_code 0 "$status" "a dsh secondmate relaunch '$args' must resume it: $out"
     assert_grep "model=$DSH_MODEL" "$HOME_DIR/state/$id.meta" "relaunch '$args' must keep the recorded model, not the primary's"
     assert_grep "effort=high" "$HOME_DIR/state/$id.meta" "relaunch '$args' must keep the recorded effort"
@@ -845,7 +853,8 @@ deadline = time.time() + 120
 while time.time() < deadline and not (os.path.exists(launch) and os.path.getsize(launch) > 0):
     time.sleep(0.02)
 with open(log, "a") as stream:
-    stream.write(json.dumps({"type": "turn/end", "seq": 2}) + "\n" + json.dumps({"type": "turn/start", "seq": 3}) + "\n")
+    stream.write(json.dumps({"type": "turn/end", "seq": 3}) + "\n" + json.dumps({"type": "turn/start", "seq": 4}) + "\n"
+                 + json.dumps({"type": "assistant/message", "seq": 5}) + "\n")
 PY
   writer=$!
   out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 \
@@ -959,33 +968,46 @@ test_unrecognized_dsh_screen_refuses_launch() {
 }
 
 # The first turn's own outcome is part of the start proof. The turn-error log
-# is a real launch's, trimmed to its turn events; the busy log is its opening
-# events; the completed log changes only its two finish reasons (synthetic).
+# is a real launch's, trimmed to its turn events, replayed so the spawn first
+# reads it busy and only later reads its turn/end. The accepted log is a real
+# successful first step trimmed to event types, seq and time plus the
+# assistant/message usage and finish (content stripped). The completed log
+# changes only the turn-error log's two finish reasons (synthetic).
 test_first_turn_error_refuses_launch() {
   local id out status fixtures=$ROOT/tests/fixtures
   id=dsh-turn-error
   make_dsh_case turn-error "$id"
-  out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_EVENTS="$fixtures/dsh-session-turn-error.jsonl" \
-    FM_FAKE_CAPTURE_FILE="$fixtures/dsh-tui-0.16.1-launch-xhigh-turn-error-idle.ansi" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  head -n 4 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/opening.jsonl"
+  tail -n 1 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/closing.jsonl"
+  out=$(FM_DSH_START_POLLS=60 FM_FAKE_DSH_EVENTS="$CASE_DIR/opening.jsonl" FM_FAKE_DSH_LATER="$CASE_DIR/closing.jsonl" \
+    FM_FAKE_DSH_LATER_DELAY=1 FM_FAKE_CAPTURE_FILE="$fixtures/dsh-tui-0.16.1-launch-xhigh-busy.ansi" \
+    run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
   status=$?
-  expect_code 1 "$status" "a first turn that ended in error must refuse the launch: $out"
+  expect_code 1 "$status" "a first turn that ended in error must refuse the launch, even after it was read busy: $out"
   assert_contains "$out" 'dsh: first turn failed: The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)' \
     'the refusal must carry the provider text verbatim'
   assert_not_contains "$out" 'could not parse the composer frame' 'a failed first turn must not be reported as an unreadable composer'
   assert_grep ']: dsh: first turn failed: The supported API model names' "$HOME_DIR/state/$id.status" \
     'the failed start must be recorded through the spawn failure path'
-  id=dsh-turn-busy
-  make_dsh_case turn-busy "$id"
-  head -n 2 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/busy.jsonl"
-  out=$(FM_FAKE_DSH_EVENTS="$CASE_DIR/busy.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  id=dsh-turn-unaccepted
+  make_dsh_case turn-unaccepted "$id"
+  out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_EVENTS="$CASE_DIR/../turn-error/opening.jsonl" \
+    FM_FAKE_CAPTURE_FILE="$fixtures/dsh-tui-0.16.1-launch-xhigh-busy.ansi" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
   status=$?
-  expect_code 0 "$status" "a first turn still running must launch: $out"
+  expect_code 1 "$status" "a first turn the provider never accepted must refuse the launch: $out"
+  assert_contains "$out" 'dsh: first turn not accepted by the provider within 0.5s' 'the refusal must name the unaccepted turn and the window'
+  assert_not_contains "$out" 'could not parse the composer frame' 'an unaccepted first turn must not be reported as an unreadable composer'
+  id=dsh-turn-accepted
+  make_dsh_case turn-accepted "$id"
+  out=$(FM_FAKE_DSH_EVENTS="$fixtures/dsh-session-accepted-busy.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 0 "$status" "a first turn the provider accepted must launch while still busy: $out"
   id=dsh-turn-completed
   make_dsh_case turn-completed "$id"
   out=$(FM_FAKE_DSH_EVENTS="$fixtures/dsh-session-completed-synthetic.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
   status=$?
   expect_code 0 "$status" "a first turn that completed must launch: $out"
-  pass 'fm-spawn: a dsh first turn that ended in error refuses with the provider text; busy and completed turns launch'
+  pass 'fm-spawn: a dsh first turn launches once the provider accepted it or it completed; an errored or never-accepted turn refuses by name'
 }
 
 test_exhausted_omp_replaces_deepseek_harness() {

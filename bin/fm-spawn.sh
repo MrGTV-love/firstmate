@@ -6142,8 +6142,12 @@ agy_spawn_fail() {  # <detail>
 }
 
 # dsh-tui submits the brief as its opening prompt, so its own durable session
-# log is the start proof: a turn opening (busy) or already finishing (idle)
-# both mean the brief reached the agent. A resumed launch already holds the
+# log is the start proof: a turn the provider has accepted (busy with an
+# assistant/message) or one that already finished (idle) means the brief
+# reached the agent. A busy turn the provider has not yet accepted is polled
+# again, because a rejected request is busy for well under a second before its
+# turn/end; one still unaccepted when the window ends refuses as such. A
+# resumed launch already holds the
 # earlier conversation, so only a turn that started beyond DSH_START_POSITION,
 # the log position taken before launch, counts. No pane-scrape fallback exists
 # because the log is the same source the busy classifier trusts. A turn that
@@ -6153,7 +6157,7 @@ agy_spawn_fail() {  # <detail>
 # shape the steering parser understands: a successful version command is not
 # proof that a changed frontend remains compatible.
 dsh_wait_for_start() {
-  local state pane parse_error identity i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local state pane parse_error identity unaccepted=0 i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
   # shellcheck source=bin/fm-composer-lib.sh
   . "$SCRIPT_DIR/fm-composer-lib.sh"
   DSH_START_ERROR=
@@ -6162,11 +6166,13 @@ dsh_wait_for_start() {
   identity=$(python3 "$SCRIPT_DIR/fm-dsh.py" status-identity "$STATE_REAL" "$ID" 2>/dev/null) || identity=
   while [ "$i" -lt "$max" ]; do
     state=$(python3 "$SCRIPT_DIR/fm-dsh.py" start-state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
+    unaccepted=0
     case "$state" in
       failed:*)
         DSH_START_ERROR="dsh: first turn failed: ${state#failed: }"
         return 1
         ;;
+      unaccepted) unaccepted=1 ;;
       busy | idle)
         if fm_backend_visible_capture_supported "$BACKEND"; then
           pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=
@@ -6183,6 +6189,9 @@ dsh_wait_for_start() {
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
   done
+  if [ "$unaccepted" = 1 ]; then
+    DSH_START_ERROR="dsh: first turn not accepted by the provider within $(awk -v n="$max" -v s="$interval" 'BEGIN { printf "%g", n * s }')s"
+  fi
   return 1
 }
 

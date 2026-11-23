@@ -451,8 +451,21 @@ dsh_start_log() {  # <events-file> -> prints start-state and state for it
 dsh_turn_error="$ROOT/tests/fixtures/dsh-session-turn-error.jsonl"
 [ "$(dsh_start_log "$dsh_turn_error")" = "$(printf '%s\n%s' 'failed: The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)' idle)" ] \
   || { echo "a turn-error first turn must fail the start proof: $(dsh_start_log "$dsh_turn_error")" >&2; exit 1; }
-head -n 2 "$dsh_turn_error" > "$TMP/start-busy.jsonl"
-[ "$(dsh_start_log "$TMP/start-busy.jsonl")" = "$(printf 'busy\nbusy')" ] || { echo 'a running first turn must read busy' >&2; exit 1; }
+# A running first turn counts as started only once the provider accepted the
+# request: the real rejected turn's opening events (up to its failed attempt)
+# are `unaccepted`, and a real accepted first step, trimmed to event types and
+# its assistant/message usage and finish, is `busy`. `state` reads both busy.
+head -n 4 "$dsh_turn_error" > "$TMP/start-busy.jsonl"
+[ "$(dsh_start_log "$TMP/start-busy.jsonl")" = "$(printf 'unaccepted\nbusy')" ] \
+  || { echo "a running first turn the provider has not accepted must read unaccepted: $(dsh_start_log "$TMP/start-busy.jsonl")" >&2; exit 1; }
+[ "$(dsh_start_log "$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl")" = "$(printf 'busy\nbusy')" ] \
+  || { echo 'a running first turn with an assistant/message must read busy' >&2; exit 1; }
+# Acceptance belongs to its own turn: a later turn starts unaccepted again.
+{ cat "$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl"
+  printf '%s\n' '{"type": "turn/end", "seq": 20, "data": {"turn": 1, "reason": {"kind": "completed"}}}' \
+    '{"type": "turn/start", "seq": 21, "data": {"turn": 2}}'; } > "$TMP/start-reaccept.jsonl"
+[ "$(dsh_start_log "$TMP/start-reaccept.jsonl")" = "$(printf 'unaccepted\nbusy')" ] \
+  || { echo "an earlier turn's acceptance must not carry into a later turn" >&2; exit 1; }
 [ "$(dsh_start_log "$ROOT/tests/fixtures/dsh-session-completed-synthetic.jsonl")" = "$(printf 'idle\nidle')" ] \
   || { echo 'a completed first turn must read idle' >&2; exit 1; }
 # Synthetic edits of the real log: an earlier attempt that finished normally,

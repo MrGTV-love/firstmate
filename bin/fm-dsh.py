@@ -49,7 +49,9 @@ recorded at or before POSITION is history: a turn must have started beyond
 it, or the state is unknown.
 start-state STATE ID [--since POSITION] is the launch start proof: the same
 fold, except that a turn which ended in error (turn/end reason error) with
-every assistant attempt finishing in error prints "failed: <provider text>".
+every assistant attempt finishing in error prints "failed: <provider text>",
+and a busy turn prints "unaccepted" until it records an assistant/message, the
+step's committed response, which a rejected request never writes.
 route MODEL [PROVIDER] prints the default model-family adapter. DeepSeek is
 matched as omp resolves it: provider deepseek, or a deepseek/ model prefix,
 trimmed and case-insensitive.
@@ -314,7 +316,7 @@ def fold(path):
         result = "unknown"
         last_seq = started = -1
         failure = attempt_error = None
-        attempt_ok = False
+        attempt_ok = accepted = False
         for line in stream:
             if not line.endswith(b"\n"):
                 break  # An incomplete append is not a committed event.
@@ -336,7 +338,11 @@ def fold(path):
                 result = "busy"
                 started = seq
                 failure = attempt_error = None
-                attempt_ok = False
+                attempt_ok = accepted = False
+            elif event.get("type") == "assistant/message":
+                # A step's committed response: the provider accepted the
+                # request. A rejected request writes only assistant/attempt.
+                accepted = attempt_ok = True
             elif event.get("type") == "assistant/attempt":
                 for kind, message in attempt_finishes(event):
                     if kind == "error":
@@ -350,7 +356,7 @@ def fold(path):
                         and attempt_error is not None and not attempt_ok:
                     error = reason.get("error") if isinstance(reason.get("error"), dict) else {}
                     failure = error.get("message") or attempt_error
-        return result, last_seq, started, failure
+        return result, last_seq, started, failure, accepted
 
 
 def attempt_finishes(event):
@@ -369,21 +375,25 @@ def turn_state(state, task, since=None):
     path = live_log(state, task)
     if path is None:
         raise ValueError("no depth-zero dsh session log yet")
-    result, _, started, failure = fold(path)
+    result, _, started, failure, accepted = fold(path)
     if result == "unknown":
         raise ValueError("dsh session log has no turn/start or turn/end yet")
     if since is not None and started <= (since[1] if since[0] == str(path) else -1):
         raise ValueError("no turn started beyond the launch position")
-    return result, failure
+    return result, failure, accepted
 
 
 def start_state(state, task, since=None):
-    # The launch's start proof: the newest turn beyond the launch position is
-    # busy or idle, or it failed when it ended in error with no attempt that
-    # finished any other way. The provider's text is kept, on one line.
-    result, failure = turn_state(state, task, since)
+    # The launch's start proof for the newest turn beyond the launch position:
+    # failed when it ended in error with no attempt that finished any other
+    # way (the provider's text kept, on one line); idle once it ended
+    # otherwise; busy only once the provider accepted the request (an
+    # assistant/message); unaccepted while busy without one.
+    result, failure, accepted = turn_state(state, task, since)
     if result == "idle" and failure is not None:
         return "failed: " + (" ".join(str(failure).split("\n")).strip() or "the turn ended in error with no provider text")
+    if result == "busy" and not accepted:
+        return "unaccepted"
     return result
 
 

@@ -1,0 +1,15 @@
+{"type": "turn/start", "seq": 5, "time": 1795226127285, "data": {"turn": 1}}
+{"type": "agent/inbox/spliced", "seq": 6, "time": 1795226127285}
+{"type": "step/start", "seq": 7, "time": 1795226127308, "data": {"turn": 1, "step": 1}}
+{"type": "system/message", "seq": 8, "time": 1795226127309}
+{"type": "user/message", "seq": 9, "time": 1795226127309}
+{"type": "user/message", "seq": 10, "time": 1795226127310}
+{"type": "user/message", "seq": 11, "time": 1795226127310}
+{"type": "user/message", "seq": 12, "time": 1795226127310}
+{"type": "user/message", "seq": 13, "time": 1795226127310}
+{"type": "request/header", "seq": 14, "time": 1795226127310}
+{"type": "request/context", "seq": 15, "time": 1795226127311}
+{"type": "session/title", "seq": 16, "time": 1795226127312}
+{"type": "session/title-llm-request", "seq": 17, "time": 1795226127314}
+{"type": "session/title", "seq": 18, "time": 1795226129200}
+{"type": "assistant/message", "seq": 19, "time": 1795226130555, "data": {"turn": 1, "step": 1, "usage": {"inputTokens": 18529, "outputTokens": 55, "totalTokens": 18584}, "stream": [{"type": "chunk", "time": 1795226130555, "chunk": {"type": "usage", "usage": {"inputTokens": 18529, "outputTokens": 55, "totalTokens": 18584}}}, {"type": "chunk", "time": 1795226130555, "chunk": {"type": "finish", "reason": {"kind": "tool-calls"}, "replayState": {"response": {"kind": "pi-ai", "version": 2, "api": "openai-codex-responses", "provider": "openai-codex", "model": "gpt-6.1-terra", "responseId": "resp_0e439952a721340e016b00fa108a8887d1854a5eaf05b33d28", "stopReason": "toolUse"}, "blocks": [{"type": "tool-call"}]}}}]}}
