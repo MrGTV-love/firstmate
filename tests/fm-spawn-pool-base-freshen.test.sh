@@ -2742,6 +2742,28 @@ test_reconciled_source_interrupt_term() { run_reconciled_interrupt_case TERM; }
 test_reconciled_source_interrupt_kill() { run_reconciled_interrupt_case KILL; }
 
 # Corrected same-task retry after a planning refusal and after a locked refusal.
+# The second locked checkpoint (before the assigned copy is prepared) is its own
+# guard: the source branch moves only AFTER the first checkpoint's last check
+# (R contained in S) passed, so only the second checkpoint can refuse it.
+test_reconciled_source_second_checkpoint_refuses() {
+  local alt before_claim
+  make_reconciled_case rs-checkpoint2 "rs-checkpoint2-$$"
+  alt=$(printf 'moved after checkpoint one\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_TREE" -p "$RS_S")
+  RS_MUTATE_AT="-C * merge-base --is-ancestor $RS_R $RS_S"
+  rs_trace_shim "'$(command -v git)' -C '$PROJECT_DIR' update-ref '$RS_REF' '$alt' '$RS_S'"
+  rs_spawn
+  [ -e "$CASE_DIR/mutated" ] || fail 'checkpoint-two mutation did not run'
+  [ "$(grep -c -- "merge-base --is-ancestor $RS_R $RS_S" "$CASE_DIR/git.trace")" = 1 ] || fail 'the first checkpoint did not finish exactly once before the move'
+  [ "$RS_RC" -ne 0 ] || fail 'a source moved between the locked checkpoints was admitted'
+  assert_contains "$RS_OUT" "not the approved $RS_S" 'second-checkpoint refusal reason missing'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_POOL_BEFORE" ] || fail 'second-checkpoint refusal reset or prepared the copy'
+  [ "$(git -C "$PROJECT_DIR" rev-parse "$RS_REF")" = "$alt" ] || fail 'the moved source branch was rewritten'
+  [ ! -f "$HOME_DIR/state/$RS_ID.meta" ] || fail 'second-checkpoint refusal published task metadata'
+  rs_assert_defaults_kept 'second checkpoint'
+  rs_assert_lock_released 'second checkpoint'
+  pass 'reconciled source: a source moved after the first locked checkpoint is refused at the second, before the copy is prepared'
+}
+
 test_reconciled_source_same_task_retry() {
   make_reconciled_case rs-retry "rs-retry-$$"
   rs_trace_shim
@@ -2830,7 +2852,7 @@ test_reconciled_source_lands_by_fast_forward() {
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_reconciled_source_selects_approved_successor|test_reconciled_source_refusals|test_reconciled_source_rewrite_and_sentinel|test_reconciled_source_interrupt_term|test_reconciled_source_interrupt_kill|test_reconciled_source_same_task_retry|test_reconciled_source_old_governed_owner_refuses|test_reconciled_source_lands_by_fast_forward) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_reconciled_source_selects_approved_successor|test_reconciled_source_refusals|test_reconciled_source_rewrite_and_sentinel|test_reconciled_source_interrupt_term|test_reconciled_source_interrupt_kill|test_reconciled_source_second_checkpoint_refuses|test_reconciled_source_same_task_retry|test_reconciled_source_old_governed_owner_refuses|test_reconciled_source_lands_by_fast_forward) "$selected_test" ;;
       test_*) if declare -F "$selected_test" >/dev/null 2>&1; then "$selected_test"; else fail "unknown selected test: $selected_test"; fi ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
@@ -2856,6 +2878,7 @@ test_reconciled_source_refusals
 test_reconciled_source_rewrite_and_sentinel
 test_reconciled_source_interrupt_term
 test_reconciled_source_interrupt_kill
+test_reconciled_source_second_checkpoint_refuses
 test_reconciled_source_same_task_retry
 test_reconciled_source_old_governed_owner_refuses
 test_reconciled_source_lands_by_fast_forward

@@ -593,9 +593,11 @@
 #   Delivery contract line must carry reconciled-source=<declaration sha256>
 #   (bin/fm-brief.sh --reconciled-source), the task record gains source_* lines,
 #   and a governed project owner is passed --base-source reconciled-successor and
-#   must attest it or refuse; it is never retried as local-default. A relaunch
-#   keeps its retained copy as a retained admission. Omitting the flag leaves every
-#   ordinary path above unchanged. When no origin is detected, spawn skips that comparison
+#   must attest it or refuse; it is never retried as local-default. Preparation
+#   never falls back to fetching when R is not readable in the assigned copy. A
+#   relaunch restores the recorded identities and keeps its retained copy as a
+#   retained admission (only the source branch is rechecked, not fresh defaults).
+#   Omitting the flag leaves every ordinary path above unchanged. When no origin is detected, spawn skips that comparison
 #   and launches from the clean, idle worktree's current HEAD. Relaunch reuses the recorded worktree without
 #   fetching or moving its base. An unreachable detected origin or unresolved
 #   default branch refuses a fresh spawn rather than risking a PR based on stale
@@ -2652,6 +2654,12 @@ if [ "$RELAUNCH" -eq 0 ]; then
   fi
   spawn_require_spawn_capable_backend "$BACKEND" || exit 1
   fm_backend_source "$BACKEND" || exit 1
+  # Orca assigns its own worktree outside this source selector, so a reconciled
+  # successor is refused here, before any worktree, lock or endpoint exists.
+  if [ "$BACKEND" = orca ] && [ "$RECONCILED_SOURCE_COUNT" -gt 0 ]; then
+    echo "error: --reconciled-source is not supported on the orca backend, which assigns its own worktree outside this source selector; refusing" >&2
+    exit 1
+  fi
   if [ "$BACKEND" = orca ] && [ "$KIND" = secondmate ]; then
     echo "error: backend=orca does not support --secondmate spawns yet" >&2
     exit 1
@@ -2800,6 +2808,18 @@ if [ "$RELAUNCH" -eq 1 ]; then
   MODE=$(fm_meta_get "$RELAUNCH_META" mode)
   YOLO=$(fm_meta_get "$RELAUNCH_META" yolo)
   UPSTREAM_CONSENT=$(fm_meta_get "$RELAUNCH_META" upstream_consent)
+  # A retained reconciled-successor admission keeps its recorded identities, so
+  # the brief binding and a governed owner see the same kind, never local-default.
+  if [ "$(fm_meta_get "$RELAUNCH_META" source_kind)" = reconciled-successor ]; then
+    SPAWN_SOURCE_KIND=reconciled-successor
+    FM_RS_DECL_SHA256=$(fm_meta_get "$RELAUNCH_META" source_declaration_sha256)
+    FM_RS_EVIDENCE_SHA256=$(fm_meta_get "$RELAUNCH_META" source_evidence_sha256)
+    FM_RS_SOURCE_REF=$(fm_meta_get "$RELAUNCH_META" source_ref)
+    [ -n "$FM_RS_DECL_SHA256" ] && [ -n "$FM_RS_EVIDENCE_SHA256" ] && [ -n "$FM_RS_SOURCE_REF" ] || {
+      echo "error: task $ID records a reconciled-successor source without its declaration, evidence or source identity; preserving the assigned copy" >&2
+      exit 1
+    }
+  fi
   if [ "$KIND" = ship ]; then
     BRANCH=$(fm_meta_get "$RELAUNCH_META" branch)
     [ -n "$BRANCH" ] || BRANCH="fm/$ID"
@@ -4766,10 +4786,7 @@ spawn_validate_local_base() {
   if [ -n "$RECONCILED_SOURCE" ]; then
     # A planning refusal is reported here, under the lock, before any
     # origin-qualification comparison could print a less exact reason.
-    [ "$BACKEND" != orca ] || {
-      echo "error: --reconciled-source is not supported on the orca backend, which assigns its own worktree outside this source selector; refusing" >&2
-      return 1
-    }
+    # (Orca is refused when the backend is resolved, before any worktree.)
     [ -z "$SPAWN_BASE_ERROR" ] || {
       echo "error: $SPAWN_BASE_ERROR; local-only source selection refused" >&2
       return 1
@@ -4780,7 +4797,7 @@ spawn_validate_local_base() {
   if [ "$recorded" = 1 ]; then
     [ -n "$SLOT_SOURCE_REF" ] || return 0
     case "$SLOT_SOURCE_REF" in refs/heads/*) ;; *) echo 'error: invalid recorded local-default ref' >&2; return 1 ;; esac
-    if [ "$(fm_meta_get "$RELAUNCH_META" source_kind)" = reconciled-successor ]; then
+    if [ "$SPAWN_SOURCE_KIND" = reconciled-successor ]; then
       # A retained reconciled-successor admission: its copy keeps S or its useful
       # descendant even after a default advances outside S. This is retained
       # admission, never a fresh-current qualification, so only the dedicated
@@ -5354,6 +5371,11 @@ spawn_resolve_move_target() { # <worktree> [<base-branch>]
     SPAWN_MOVE_EXPECTED=$SPAWN_BASE_SHA
     SPAWN_MOVE_DISCOVERED=$SPAWN_BASE_DISCOVERED
   else
+    if [ "$SPAWN_SOURCE_KIND" = reconciled-successor ]; then
+      # The reconciled path never fetches through a private store.
+      echo "error: reconciled source refused: origin's default $SPAWN_BASE_SHA is not readable in assigned copy '$worktree'; refusing rather than fetching; preserving the assigned copy" >&2
+      return 1
+    fi
     # No tip was fetched before this spawn queued. Ask origin what it advertises (read-only) and take the
     # objects with no ref written: the tracking refs are recorded only after the copy is proven.
     if ! advertised=$(GIT_TERMINAL_PROMPT=0 git -C "$worktree" ls-remote --symref origin HEAD 'refs/heads/*' </dev/null 2>/dev/null); then
@@ -7116,6 +7138,7 @@ elif [ "$SLOT_GOVERNED" = 1 ]; then
   [ "$RELAUNCH" -eq 0 ] || [ "$RELAUNCH_RELOCATING" = 1 ] ||
     fm_slot_provision_custody "$PROJ_ABS" "$WT" "$ID" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
   if [ "$SPAWN_SOURCE_KIND" = reconciled-successor ]; then
+    # Fresh admission and retained relaunch both carry the same tuple.
     FM_SLOT_SOURCE_KIND=reconciled-successor
     FM_SLOT_SOURCE_DECLARATION_SHA256=$FM_RS_DECL_SHA256
     FM_SLOT_SOURCE_EVIDENCE_SHA256=$FM_RS_EVIDENCE_SHA256
