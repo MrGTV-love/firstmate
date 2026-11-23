@@ -4023,6 +4023,11 @@ ok - PATH-selected DSH probes accept arbitrary releases and refuse failed comman
 ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic
 ```
 
+On 2026-11-23, on macOS arm64 with `dsh-tui` 0.16.1 (launcher and profile) and DSH CLI 0.2.1-rc.2, a fresh launch prepared by `bin/fm-dsh.py prepare` with `deepseek/deepseek-v4.1-flash-1017` at `xhigh` ran in a private tmux session with no opening prompt and spent no model tokens.
+After Escape dismissed the first-run guide and then the sessions view, `tmux capture-pane -e -p` showed no meter row and one status row without a `ctx` cell, flush under the frame: `deepseek-v4.1-flash-1017 · high · <directory>` at 200, 120, 80 and 60 columns (`plaindir` and `gitdir`, a fresh Git repository, which added no branch cell), and `deepseek-v4.1-flash-10… · hi…  · gitd…` at 45 columns.
+The configured `xhigh` effort rendered as `high` in that row and as `High effort` in the banner.
+Before the pre-usage status row was recognized, `fm_composer_dsh_screen_check` refused that screen; it now classifies `empty`, and `pending` with an unsubmitted typed draft.
+The trimmed captures are the `tests/fixtures/dsh-tui-0.16.1-fresh-*.ansi` regressions in `tests/fm-dsh-harness.test.sh`; the busy screen between a turn's start and its first usage sample was not captured.
 The launcher and CLI must resolve and their version commands must exit successfully; no release string is compared.
 The actual frontend must then provide a recognizable DSH composer and a new durable turn, so a changed frontend refuses with a diagnostic naming the unreadable composer rather than being accepted because of its version.
 No screen-based DSH quota parser exists: dispatch quota uses structured snapshots and the DSH busy classifier reads its durable session log.

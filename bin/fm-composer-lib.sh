@@ -65,7 +65,10 @@
 #                rules are the proof. Two status rows sit flush under the
 #                frame (`<used>/<window> <pct>%`, then a middle-dot row with
 #                dsh's `ctx` cell), plus `esc to interrupt` while a turn runs;
-#                all three are furniture for the staleness probe.
+#                all three are furniture for the staleness probe. Before any
+#                usage sample only the middle-dot row is drawn, without the
+#                `ctx` cell; it is furniture only flush under the frame and
+#                as the screen's last row apart from that hint.
 #   omp-box    - omp's titled `╭── π > ...╮` header, zero or more
 #                side-bordered rows, and `╰─ <input> ─╯` input-bearing floor.
 #                Unlike ordinary boxes, the floor is content, not just a rule.
@@ -1878,6 +1881,52 @@ _fm_composer_row_is_dsh_status() {  # <trimmed-row>
   fm_composer_idle_matches "$row" "$FM_COMPOSER_DSH_STATUS_RE_DEFAULT" sensitive
 }
 
+# Before dsh-tui has any usage sample it draws neither the meter nor the ctx
+# cell (observed on a fresh dsh-tui 0.16.1; its status-line source gates both on
+# context occupancy): the status row holds only its middle-dot separated cells,
+# at least model, effort and directory
+# (`deepseek-v4.1-flash-1017 · high · plaindir`), each cell truncated with `…`
+# on a narrow pane.
+# _fm_composer_row_is_dsh_fresh_status: 0 when the trimmed row is three or more
+# non-empty cells joined by ` · `. No cell value is assumed, because the model,
+# effort and directory labels differ per launch.
+_fm_composer_row_is_dsh_fresh_status() {  # <trimmed-row>
+  local rest=$1 cell cells=0
+  while :; do
+    case "$rest" in
+      *' · '*) cell=${rest%% · *}; rest=${rest#* · } ;;
+      *) cell=$rest; rest= ;;
+    esac
+    fm_composer_normalize_trim_var cell
+    case "$cell" in '' | *'·'*) return 1 ;; esac
+    cells=$((cells + 1))
+    [ -n "$rest" ] || break
+  done
+  [ "$cells" -ge 3 ]
+}
+
+# _fm_composer_dsh_fresh_tail: 0 when the row flush under a dsh box's bottom
+# border is dsh's pre-usage status row and every row below it is blank or dsh's
+# own `esc to interrupt` hint, so the row is the screen's last furniture rather
+# than one line of some lower live surface.
+_fm_composer_dsh_fresh_tail() {  # <plain-screen> <bottom-border-row>
+  local row=$(($2 + 1)) line
+  _fm_composer_rows_load "$1"
+  line=${_FM_COMPOSER_ROWS[$row]:-}
+  fm_composer_normalize_trim_var line
+  _fm_composer_row_is_dsh_fresh_status "$line" || return 1
+  row=$((row + 1))
+  while [ "$row" -lt "${#_FM_COMPOSER_ROWS[@]}" ]; do
+    line=${_FM_COMPOSER_ROWS[$row]}
+    fm_composer_normalize_trim_var line
+    # dsh's own busy hint constant, never the FM_BUSY_REGEX override, and
+    # only as the whole row's start.
+    [ -z "$line" ] || fm_composer_idle_matches "$line" "^($FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT)" sensitive || return 1
+    row=$((row + 1))
+  done
+  return 0
+}
+
 # omp's whole status row: the identity cell first and the context-usage cell
 # last. Rows that only open or only close like one are not this shape.
 FM_COMPOSER_OMP_BAND_STATUS_RE_DEFAULT='^(π|󰵗)[[:space:]]+·[[:space:]].*[[:space:]]·[[:space:]]+(◫[[:space:]]+)?[0-9]+(\.[0-9]+)?%/[0-9]+(\.[0-9]+)?[KM]$'
@@ -2438,7 +2487,13 @@ _fm_composer_select_cursorless() {
     # dsh keeps its own status rows flush under the frame with no blank
     # separator, and adds `esc to interrupt` while a turn runs. They are
     # furniture, not the lower live shape that would make this box stale.
+    # The pre-usage status row is accepted only flush under the border and
+    # only as the screen's last furniture, which consumes the rest of it.
     if [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ]; then
+      if [ "$next" = $((boundary + 1)) ] && _fm_composer_dsh_fresh_tail "$plain" "$boundary"; then
+        _fm_composer_rows_load "$plain"
+        next=${#_FM_COMPOSER_ROWS[@]}
+      fi
       while :; do
         raw=$(_fm_composer_screen_row "$next" "$plain")
         trimmed=$raw

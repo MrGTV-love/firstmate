@@ -426,6 +426,50 @@ if out=$(fm_composer_dsh_screen_check 'new frontend without a recognized compose
 fi
 case "$out" in *'could not parse the composer frame or its input content'*) ;; *) echo "$out" >&2; exit 1 ;; esac
 printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic\n'
+# Real `tmux capture-pane -e` screens of a fresh dsh-tui 0.16.1 launch, before
+# any usage sample: no meter row, and a status row without the ctx cell. The
+# 45-column capture truncates every cell. They start at the context banner.
+dsh_fresh=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-empty.ansi")
+dsh_fresh_draft=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-pending.ansi")
+dsh_fresh_narrow=$(cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-fresh-45col-empty.ansi")
+dsh_expect() {  # <want> <label> <screen>
+  local got
+  got=$(dsh_verdict "$3")
+  [ "$got" = "$1" ] || { echo "$2: expected $1, got $got" >&2; exit 1; }
+}
+dsh_refuse() {  # <label> <screen>
+  local got
+  got=$(dsh_verdict "$2")
+  case "$got" in empty | pending) echo "$1: must not be accepted, got $got" >&2; exit 1 ;; esac
+  if fm_composer_dsh_screen_check "$2" 2>/dev/null; then echo "$1: the launch check must refuse" >&2; exit 1; fi
+}
+dsh_expect empty 'fresh dsh screen' "$dsh_fresh"
+dsh_expect pending 'fresh dsh screen with a typed draft' "$dsh_fresh_draft"
+dsh_expect empty 'narrow fresh dsh screen' "$dsh_fresh_narrow"
+fm_composer_dsh_screen_check "$dsh_fresh"
+fm_composer_dsh_screen_check "$dsh_fresh_draft"
+fm_composer_dsh_screen_check "$dsh_fresh_narrow"
+# The launch check runs once the brief turn has started, so the pre-usage
+# status row can sit above the busy hint (synthetic: that screen was not captured).
+dsh_fresh_row='   deepseek-v4.1-flash-1017 · high · plaindir'
+dsh_fresh_box=$(printf '%s\n' "$dsh_frame_top" "$(dsh_row '')" "$dsh_frame_bottom")
+dsh_expect empty 'fresh dsh row above the busy hint' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   esc to interrupt' '' '')"
+dsh_expect pending 'typed draft above the fresh dsh row' \
+  "$(printf '%s\n' "$dsh_frame_top" "$(dsh_row 'fix the tests')" "$dsh_frame_bottom" "$dsh_fresh_row")"
+# The pre-usage row is furniture only in dsh's shape, flush under the frame,
+# and as the screen's last furniture; anything else below the box stays a
+# lower live surface.
+dsh_refuse 'plain text flush under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   fix the tests')"
+dsh_refuse 'two-cell row flush under a dsh box' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 · high')"
+dsh_refuse 'fresh dsh row with text below it' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   fix the tests')"
+# The busy-hint tail is dsh's own constant, so a rendered-busy override that
+# happens to match the text below cannot make it furniture.
+FM_BUSY_REGEX='fix the tests' dsh_refuse 'fresh dsh row with text below it under a busy-regex override' \
+  "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '   fix the tests')"
+dsh_refuse 'fresh dsh row, a blank row, then text' "$(printf '%s\n' "$dsh_fresh_box" "$dsh_fresh_row" '' 'user@host plaindir %')"
+dsh_refuse 'fresh dsh row with an empty cell' "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-v4.1-flash-1017 ·  · plaindir')"
+dsh_refuse 'fresh dsh row under a box that is not dsh' "$(printf '%s\n' "  ╭$(printf '─%.0s' $(seq 1 40))╮" "  │ ❯$(printf ' %.0s' $(seq 1 38))│" "  ╰$(printf '─%.0s' $(seq 1 40))╯" "$dsh_fresh_row")"
+printf 'ok - a fresh dsh-tui screen proves empty or typed draft through its pre-usage status row, which is accepted only as flush last furniture\n'
 # shellcheck source=bin/fm-control-lib.sh
 . "$ROOT/bin/fm-control-lib.sh"
 [ "$(fm_control_interrupt_key dsh)" = Escape ]
