@@ -228,7 +228,7 @@ test_pinned_shellcheck_memory_limit() {
     pass "SKIP (host cannot enforce the bounded envelope): pinned memory-envelope check"
     return
   fi
-  local tmp telemetry roots_log out rc fixture
+  local tmp telemetry roots_log out rc fixture fakebin real_shellcheck real_log
   tmp=$(fm_test_tmproot fm-lint-pinned-memory)
   telemetry="$tmp/lint.tsv"
   roots_log="$tmp/lint.roots.tsv"
@@ -265,6 +265,40 @@ test_pinned_shellcheck_memory_limit() {
   if [ -e "$tmp/tiny.roots.tsv" ] && grep -q 'small\.sh' "$tmp/tiny.roots.tsv"; then
     fail "a root started after the version probe failed under the limit: $(cat "$tmp/tiny.roots.tsv")"
   fi
+
+  # The same limit must bind a root, not only the probe. A shellcheck on PATH
+  # answers the version probe itself, with the pin, and runs the real pinned
+  # ShellCheck for every root, so the root is the first real ShellCheck under
+  # the limit: it is refused or killed and named, never silently uncapped.
+  fakebin=$(fm_fakebin "$tmp")
+  real_shellcheck=$(command -v shellcheck)
+  real_log="$tmp/real-roots.log"
+  cat > "$fakebin/shellcheck" <<SH
+#!/bin/sh
+if [ "\$*" = --version ]; then
+  printf 'version: %s\n' '$REQUIRED'
+  exit 0
+fi
+printf '%s\n' "\$*" >> '$real_log'
+exec '$real_shellcheck' "\$@"
+SH
+  chmod +x "$fakebin/shellcheck"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
+    "$LINT" --telemetry "$tmp/control.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the pinned root through the probe stand-in did not lint under the default limit"$'\n'"$out"
+  awk -F '\t' '$1 == "end" && $3 ~ /small\.sh$/ && $10 == "ok" { found=1 } END { exit !found }' \
+    "$tmp/control.roots.tsv" || fail "the pinned root through the probe stand-in did not complete ok"$'\n'"$out"
+  : > "$real_log"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_MEMORY_KIB=8192 \
+    "$LINT" --telemetry "$tmp/root.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "pinned ShellCheck root ignored an 8 MiB address-space limit"$'\n'"$out"
+  grep -q 'small\.sh' "$real_log" 2>/dev/null \
+    || fail "the real pinned ShellCheck never started for the root under the limit"$'\n'"$out"
+  assert_contains "$out" "small.sh" "the memory-bound pinned root was not named"
+  awk -F '\t' '$1 == "end" && $3 ~ /small\.sh$/ && $10 != "ok" && $10 != "findings" { found=1 } END { exit !found }' \
+    "$tmp/root.roots.tsv" || fail "the over-limit pinned root was not recorded as an abnormal end"$'\n'"$out"
   pass "the pinned ShellCheck both respects and survives under the memory envelope"
 }
 
