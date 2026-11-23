@@ -979,9 +979,10 @@ test_first_turn_error_refuses_launch() {
   make_dsh_case turn-error "$id"
   head -n 4 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/opening.jsonl"
   tail -n 1 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/closing.jsonl"
+  # The case's default screen is a composer the check proves empty, so only
+  # the acceptance rule keeps the busy window from passing.
   out=$(FM_DSH_START_POLLS=60 FM_FAKE_DSH_EVENTS="$CASE_DIR/opening.jsonl" FM_FAKE_DSH_LATER="$CASE_DIR/closing.jsonl" \
-    FM_FAKE_DSH_LATER_DELAY=1 FM_FAKE_CAPTURE_FILE="$fixtures/dsh-tui-0.16.1-launch-xhigh-busy.ansi" \
-    run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+    FM_FAKE_DSH_LATER_DELAY=1 run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
   status=$?
   expect_code 1 "$status" "a first turn that ended in error must refuse the launch, even after it was read busy: $out"
   assert_contains "$out" 'dsh: first turn failed: The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)' \
@@ -992,7 +993,7 @@ test_first_turn_error_refuses_launch() {
   id=dsh-turn-unaccepted
   make_dsh_case turn-unaccepted "$id"
   out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_EVENTS="$CASE_DIR/../turn-error/opening.jsonl" \
-    FM_FAKE_CAPTURE_FILE="$fixtures/dsh-tui-0.16.1-launch-xhigh-busy.ansi" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+    run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
   status=$?
   expect_code 1 "$status" "a first turn the provider never accepted must refuse the launch: $out"
   assert_contains "$out" 'dsh: first turn not accepted by the provider within 0.5s' 'the refusal must name the unaccepted turn and the window'
