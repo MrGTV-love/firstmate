@@ -261,7 +261,7 @@ pre = active["hooks"]["PreToolUse"]
 commands = [h["command"] for entry in pre for h in entry["hooks"]]
 assert any(c == "deny-task-tool" for c in commands), commands
 assert any("fm-jev-guard-hook" in c for c in commands), commands
-assert any(e.get("matcher") == "Task" for e in pre), pre
+assert any(e.get("matcher") == "Task" and any(h.get("command") == "deny-task-tool" for h in e["hooks"]) for e in pre), pre
 assert active["permissions"]["allow"] == ["Bash(make test)"], active
 assert "UserPromptSubmit" in active["hooks"], active
 PY

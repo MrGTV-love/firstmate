@@ -137,7 +137,7 @@ test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift() {
   git -C "$W_SLOT" update-ref refs/remotes/origin/main "$revert"
   out=$(drift)
   assert_contains "$out" 'docs/out.txt' 'a task change that main absorbed and reverted vanished from the drift report'
-  assert_contains "$out" 'proven' 'the attributed path is not labelled proven'
+  assert_contains "$out" 'drift: proven docs/out.txt' 'the attributed path is not labelled proven on its own drift line (the report header text "provenance" must not satisfy this)'
   # control: upstream-only work that the task merely received is not the task's drift
   make_world drift-upstream
   git -C "$W_PROJ" checkout --quiet -b side
