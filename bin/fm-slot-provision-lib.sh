@@ -270,7 +270,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
   if [ -n "$FM_SLOT_SUPERSEDES" ] && ! fm_slot_successor_still_bound; then
-    # Same refusal path as the provisioner's own: the checkout is restored below.
+    # Same refusal path as the provisioner's own: the copy is left where it is.
     printf '{"state": "REFUSED", "reason": "successor_predecessor_moved"}\n' > "$report"
     rc=2
   else

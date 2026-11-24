@@ -1790,6 +1790,16 @@ assert_successor_untouched() { # <label> <snapshot-before>
 }
 
 # F1, F5: a live predecessor is resolved and handed to the provisioner once.
+# The refusal does nothing to the copy (Main 1886 CUT): it stays where the refusal found it, which is the commit it was handed at
+# or the task branch the spawn moved it onto, never restored and never switched to any other branch.
+successor_copy_left_alone() { # <head> <branch>
+  local cur task
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$1" ] && return 0
+  cur=$(git -C "$POOL_DIR" branch --show-current)
+  task=$(sed -n 's/^branch=//p' "$HOME_DIR/state/$SUCC_ID.meta" | head -n 1)
+  [ -n "$task" ] && [ "$cur" = "$task" ]
+}
+
 test_successor_of_reaches_the_provisioner() {
   local out rc=0 real
   make_successor_case reaches advertise
@@ -1914,8 +1924,7 @@ test_successor_of_retained_retry() {
   assert_contains "$out" "slot provisioner refused task $SUCC_ID" 'the existing refusal error is missing'
   assert_contains "$out" 'fixture_predecessor_not_live' 'the provisioner refusal was not preserved'
   [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
-  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
-    || fail 'the refusal did not restore the assigned checkout'
+  successor_copy_left_alone "$head" "$branch" || fail 'the refusal moved the assigned copy'
   assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
   [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
   [ "$(successor_calls)" = 1 ] || fail 'the refused spawn did not call the provisioner once'
@@ -2053,8 +2062,7 @@ test_successor_of_branch_is_rechecked_at_handover() {
   [ "$(wc -l < "$CALLS.help" | tr -d ' ')" = 2 ] || fail 'the stub was probed an unexpected number of times, so the switch point is wrong'
   [ "$(successor_calls)" = 0 ] || fail 'the provisioner was called for a predecessor that had moved, so a proof could be minted'
   [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
-  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
-    || fail 'the refusal did not restore the assigned checkout'
+  successor_copy_left_alone "$head" "$branch" || fail 'the refusal moved the assigned copy'
   assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
   [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
   # The retry re-resolves the predecessor and refuses it while it is on the wrong branch.
@@ -2083,8 +2091,7 @@ test_successor_of_task_record_is_rechecked_at_handover() {
   [ "$(wc -l < "$CALLS.help" | tr -d ' ')" = 2 ] || fail 'the stub was probed an unexpected number of times, so the switch point is wrong'
   [ "$(successor_calls)" = 0 ] || fail 'the provisioner was called for a predecessor whose record changed'
   [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
-  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
-    || fail 'the refusal did not restore the assigned checkout'
+  successor_copy_left_alone "$head" "$branch" || fail 'the refusal moved the assigned copy'
   pass 'a predecessor whose task record changes after preflight is refused before the provisioner'
 }
 
@@ -2132,7 +2139,7 @@ test_successor_of_binds_the_verified_branch_and_head() {
   [ "$(successor_calls)" = 1 ] || fail 'the provisioner was not called once'
   successor_argv_ok 1 "$real" fm/pred-live "$head" || fail 'the provisioner was not given the verified branch and head'
   [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
-  [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] || fail 'the refusal did not restore the assigned checkout'
+  [ "$(git -C "$POOL_DIR" branch --show-current)" = "$(sed -n 's/^branch=//p' "$meta" | head -n 1)" ] || fail 'the refusal moved the assigned copy off the task branch'
   assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
   [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
   pass 'the record is bound to the verified branch and head: a switch after the check is refused and marks nothing; a legitimate or advancing predecessor is admitted'
