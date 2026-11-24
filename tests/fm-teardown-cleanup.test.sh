@@ -10832,9 +10832,12 @@ test_the_preserve_and_the_archives_survive_the_close_and_every_later_run() {
 
 # C1 (config): the production default interpreter (<slot>/.venv/bin/python, with
 # FM_TEARDOWN_VERNANT_PYTHON truly unset, and set to an empty string) and the explicit
-# override give the same close; a missing default interpreter refuses and removes nothing.
+# override give the same close; with a missing interpreter the driver never runs, so
+# the copy, whose launcher is gone, takes the direct release of a dead launcher's lock:
+# its unique ignored file is preserved, the copy is removed and no retained record is
+# written.
 test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
-  local rc mode
+  local rc mode preserved
   for mode in default default-empty override missing missing-empty override-missing; do
     make_retained_case "retained-config-$mode" enclosing
     case "$mode" in
@@ -10861,19 +10864,23 @@ test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
         ;;
     esac
     if [ "$mode" = missing ] || [ "$mode" = missing-empty ] || [ "$mode" = override-missing ]; then
-      assert_grep 'is not available' "$FOREIGN_CASE/stderr" "retained-config-$mode: the refusal did not say the interpreter is not available"
-      expect_code 1 "$rc" "retained-config-$mode: a missing default interpreter must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      expect_code 0 "$rc" "retained-config-$mode: a landed copy under a dead launcher's lock must close with no interpreter: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on own nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+        "retained-config-$mode: the script's own release was not reported"
       assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver ran without an interpreter"
-      assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-config-$mode: the refusal removed the task record"
-      assert_present "$FOREIGN_COPY/.git" "retained-config-$mode: the copy was removed"
-      kept_assert_lacks 'complete' "$FOREIGN_CASE/stdout" "retained-config-$mode: the task closed"
+      assert_absent "$FOREIGN_COPY" "retained-config-$mode: the copy survived the release"
+      assert_absent "$FOREIGN_CASE/state/task-x1.meta" "retained-config-$mode: the task record survived the release"
+      assert_absent "$(retained_record_path)" "retained-config-$mode: a retained record was written with no driver answer"
+      preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -path '*/notes/unique.dat' -type f 2>/dev/null | head -n 1)
+      [ -n "$preserved" ] || fail "retained-config-$mode: the unique ignored file was not preserved"
+      assert_equals "only here" "$(cat "$preserved")" "retained-config-$mode: the preserved file changed"
     else
       expect_code 0 "$rc" "retained-config-$mode: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
       assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver was not asked exactly once"
       retained_assert_closed "retained-config-$mode"
     fi
   done
-  pass "the default interpreter and the explicit override close the kept-copy task the same way, and a missing default interpreter refuses with nothing removed"
+  pass "the default interpreter and the explicit override close the kept-copy task the same way, and with a missing interpreter a dead launcher's lock is released directly with the unique ignored file preserved"
 }
 
 # C2 (legacy): a copy that already holds driver tars and saved outputs, with no
