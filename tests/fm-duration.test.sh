@@ -187,9 +187,10 @@ assert any(r.get('event') == 'timeout' and r['key'] == 'no-mistakes.capped' for 
 # CPU growth is progress even with no output, so a busy command outlives the stall
 # bound. The bound is several times the one-second CPU-time granularity of Linux
 # ps, so a loaded host that gives the loop under half a core still shows growth.
-busy = override_run('busy.cpu', [sys.executable, '-c', 'import time\nend = time.monotonic() + 10\nwhile time.monotonic() < end: pass'],
+busy_done = tmp / 'busy-cpu.done'
+busy = override_run('busy.cpu', [sys.executable, '-c', 'import pathlib, sys, time\nend = time.monotonic() + 10\nwhile time.monotonic() < end: pass\npathlib.Path(sys.argv[1]).touch()', str(busy_done)],
                     FM_DURATION_NO_PROGRESS_SECS='5', FM_DURATION_ABSOLUTE_SECS='60')
-assert busy.returncode == 0, busy.stderr
+assert busy.returncode == 0 and busy_done.exists(), busy.stderr
 assert not any(r.get('event') == 'timeout' and r['key'] == 'busy.cpu' for r in rows())
 
 # The absolute wall-clock limit is the other extreme, and it stops even a
@@ -197,6 +198,89 @@ assert not any(r.get('event') == 'timeout' and r['key'] == 'busy.cpu' for r in r
 absolute = override_run('absolute', ['bash', '-c', 'while true; do echo tick; done'], FM_DURATION_ABSOLUTE_SECS='2')
 assert absolute.returncode == 124 and 'absolute_limit' in absolute.stderr, (absolute.returncode, absolute.stderr)
 assert any(r.get('event') == 'timeout' and r['key'] == 'absolute' for r in rows())
+
+
+def trip_snapshot(stderr, rule):
+    """The snapshot file a trip line names, read from disk."""
+    match = re.search(rf'^{rule}: .*snapshot=([^"]+)"$', stderr, re.M)
+    assert match, (rule, stderr)
+    path = Path(match.group(1))
+    assert path.parent == ledger.parent / 'command-duration-trips' and path.is_file(), (path, stderr)
+    return path.read_text()
+
+
+assert 'rule: absolute_limit' in trip_snapshot(absolute.stderr, 'absolute_limit')
+
+# Idle CPU creep is not progress. A command blocked on a peer keeps accruing
+# housekeeping CPU in its sleeping processes; the stalled C5 corpus run crept
+# 0.03-0.08 s per minute and was stopped only by the 6 hour absolute limit.
+# This child creeps faster (about 0.36 s per minute, a tick every two seconds,
+# so any-growth would reset a 4 second clock forever) but stays under the
+# 0.5 s per minute floor. It records its own CPU, pid and an argv marker; the
+# environment carries another marker that the snapshot must not copy.
+creep = """import os, sys, time
+cpu_file, pid_file = sys.argv[1:3]
+open(pid_file, 'w').write(str(os.getpid()))
+while True:
+    mark = time.process_time()
+    while time.process_time() - mark < 0.003:
+        pass
+    open(cpu_file, 'w').write(repr(time.process_time()))
+    time.sleep(0.5)
+"""
+
+
+def creep_run(key, case, **extra):
+    cpu_file, pid_file = tmp / f'{case}.cpu', tmp / f'{case}.pid'
+    begun = time.monotonic()
+    # The child runs under an argv[0] marker as well as a later argv marker.
+    result = subprocess.run([sys.executable, str(helper), 'run', key, '--', 'bash', '-c', 'exec -a MARKER_ARGV0_c5creep "$0" "$@"',
+                             sys.executable, '-c', creep, str(cpu_file), str(pid_file), 'MARKER_ARGV_c5creep'],
+                            env=dict(env, FM_TEST_SNAPSHOT_SECRET='MARKER_ENV_c5creep', **extra), cwd=workrepo, capture_output=True, text=True)
+    elapsed = time.monotonic() - begun
+    child_cpu = float(cpu_file.read_text()) if cpu_file.exists() else 0.0
+    child_pid = int(pid_file.read_text())
+    with contextlib.suppress(ProcessLookupError):
+        os.kill(child_pid, 0)
+        raise AssertionError(f'{key}: creeping child {child_pid} outlived its run')
+    return result, elapsed, child_cpu, child_pid
+
+
+crept, crept_elapsed, crept_cpu, crept_pid = creep_run('creep.stall', 'creep', FM_DURATION_NO_PROGRESS_SECS='4', FM_DURATION_ABSOLUTE_SECS='60')
+assert crept.returncode == 124 and 'no_progress' in crept.stderr and 'absolute_limit' not in crept.stderr, (crept.returncode, crept.stderr)
+assert crept_elapsed < 30, f'idle CPU creep held off the no-progress stop: {crept_elapsed:.1f}s'
+# Precondition: the creep really grew the child's CPU, yet the run (shorter than
+# the 60 s window) gained less than the 0.5 s floor in total, startup included.
+assert 0.02 <= crept_cpu < 0.5, (crept_cpu, crept_elapsed)
+assert any(r.get('event') == 'timeout' and r['key'] == 'creep.stall' for r in rows())
+snapshot = trip_snapshot(crept.stderr, 'no_progress')
+assert 'rule: no_progress' in snapshot and 'columns: pid ppid stat cpu elapsed comm' in snapshot, snapshot
+assert any(line.split()[0] == str(crept_pid) for line in snapshot.splitlines() if line[:1].isdigit()), (crept_pid, snapshot)
+assert not any(marker in snapshot for marker in ('MARKER_ARGV0_c5creep', 'MARKER_ARGV_c5creep', 'MARKER_ENV_c5creep')), snapshot
+
+
+# A no-mistakes.<step> key keeps only the absolute stop, creep or not.
+nm_crept, nm_elapsed, _, _ = creep_run('no-mistakes.creep', 'nm-creep', FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='6')
+assert nm_crept.returncode == 124 and 'absolute_limit' in nm_crept.stderr and 'no_progress' not in nm_crept.stderr, (nm_crept.returncode, nm_crept.stderr)
+assert nm_elapsed >= 6, nm_elapsed
+
+# Missing telemetry is never a stall: with no complete CPU sample the creeping
+# child is stopped only by the absolute limit.
+blind_modules = tmp / 'blind-modules'
+blind_modules.mkdir()
+(blind_modules / 'ctypes.py').write_text('raise ImportError("fixture: ctypes unavailable")\n')
+(blind_modules / 'sitecustomize.py').write_text('import sys\nsys.platform = "darwin"\n')
+blind, blind_elapsed, _, _ = creep_run('creep.blind', 'blind-creep', FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='6',
+                                       PYTHONPATH=str(blind_modules), FM_PROC_ROOT_OVERRIDE=str(tmp / 'no-proc'))
+assert blind.returncode == 124 and 'absolute_limit' in blind.stderr and 'no_progress' not in blind.stderr, (blind.returncode, blind.stderr)
+assert 'cpu_telemetry_unavailable' in blind.stderr and blind_elapsed >= 6, (blind_elapsed, blind.stderr)
+
+# Output alone is progress: a slow child that prints each second and uses
+# almost no CPU outlives a 3 second no-progress bound.
+slow_done = tmp / 'slow-output.done'
+slow_output = override_run('slow.output', [sys.executable, '-c', 'import pathlib, sys, time\nfor i in range(8):\n    print(i, flush=True)\n    time.sleep(1)\npathlib.Path(sys.argv[1]).touch()', str(slow_done)],
+                           FM_DURATION_NO_PROGRESS_SECS='3', FM_DURATION_ABSOLUTE_SECS='60')
+assert slow_output.returncode == 0 and 'no_progress' not in slow_output.stderr and slow_done.exists(), (slow_output.returncode, slow_output.stderr)
 
 # A stop never starts a fixed kill clock. The cleanup a stop asks for runs for as
 # long as it keeps making progress, however long that is; it is killed only when
@@ -214,6 +298,20 @@ spec.loader.exec_module(module)
 sys.argv = sys.argv[1:]
 sys.exit(module.main())
 """)
+
+# The C5 shape: a real CPU burst, then creep. The burst is progress while it is
+# inside the trailing window; once the window slides past it the creep alone
+# is idle. Under the 30x clock the 60 s window is 2 real seconds and the 30 s
+# bound 1, so the stop lands a few real seconds after the burst ends.
+burst = creep.replace('while True:', 'while time.process_time() < 1.5:\n    pass\nwhile True:', 1)
+burst_cpu, burst_pid = tmp / 'burst.cpu', tmp / 'burst.pid'
+begun = time.monotonic()
+bursted = subprocess.run([sys.executable, str(scaled_clock), str(helper), 'run', 'creep.burst', '--', sys.executable, '-c', burst, str(burst_cpu), str(burst_pid)],
+                         env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='900'), cwd=workrepo, capture_output=True, text=True)
+bursted_elapsed = time.monotonic() - begun
+assert bursted.returncode == 124 and 'no_progress' in bursted.stderr and 'absolute_limit' not in bursted.stderr, (bursted.returncode, bursted.stderr)
+assert bursted_elapsed < 20, f'a past CPU burst held off the no-progress stop: {bursted_elapsed:.1f}s'
+assert float(burst_cpu.read_text()) >= 1.5, burst_cpu.read_text()
 
 
 def wait_for(path):
