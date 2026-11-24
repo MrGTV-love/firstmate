@@ -1,0 +1,5 @@
+$ FM_PI_PACKAGE_DIR=/Users/charlesabrooker/tmp/fm-pi-test.MSUg8Q/g-1.6.0/lib/node_modules/@earendil-works/pi-coding-agent PATH=/Users/charlesabrooker/tmp/fm-pi-test.MSUg8Q/g-1.6.0/bin:$PATH bash tests/fm-pi-primary-types.test.sh
+tree=base (87836f79b)
+pi=1.6.0 tsc=Version 7.0.2
+../../fm-pi-primary-types.taS9kx/lib/fm-calm-operational-user-layout.ts(108,55): error TS4104: The type 'readonly string[]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+exit=1

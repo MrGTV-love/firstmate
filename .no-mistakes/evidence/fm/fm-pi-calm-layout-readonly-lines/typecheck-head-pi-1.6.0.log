@@ -1,0 +1,5 @@
+$ FM_PI_PACKAGE_DIR=/Users/charlesabrooker/tmp/fm-pi-test.MSUg8Q/g-1.6.0/lib/node_modules/@earendil-works/pi-coding-agent PATH=/Users/charlesabrooker/tmp/fm-pi-test.MSUg8Q/g-1.6.0/bin:$PATH bash tests/fm-pi-primary-types.test.sh
+tree=head (54a26cfab)
+pi=1.6.0 tsc=Version 7.0.2
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.6.0
+exit=0
