@@ -4,7 +4,7 @@
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
 # The late, laterexit, earlyexit, clock and gone cases read the pane's foreground process and run on tmux only.
 # FM_TEST_ACQUISITION_CASES=cleanup-writer leaves a detached child writing during this script's own cleanup.
-# FM_TEST_ACQUISITION_CASES=lab-teardown runs only the lab teardown case (tmux).
+# FM_TEST_ACQUISITION_CASES=lab-teardown runs only the lab teardown case, and lab-primary only the lab primary case (tmux).
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -79,6 +79,10 @@ cleanup_acquisition() {
   if [ -n "${LAB_CASE_SOCKET:-}" ]; then
     TMUX_TMPDIR="$LAB_CASE_SOCKET" "$REAL_TMUX" -L fm-lab kill-server 2>/dev/null || true
     "$LAB_HOME_HELPER" teardown "$LAB_CASE_HOME" >/dev/null 2>&1 || rc=1
+  fi
+  if [ -n "${LAB_PRIMARY_SOCKET:-}" ]; then
+    TMUX_TMPDIR="$LAB_PRIMARY_SOCKET" "$REAL_TMUX" -L fm-lab kill-server 2>/dev/null || true
+    "$LAB_HOME_HELPER" teardown "$LAB_PRIMARY_HOME" >/dev/null 2>&1 || rc=1
   fi
   if [ -n "$HERDR_LAB_SESSION" ]; then
     "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || rc=1
@@ -271,6 +275,37 @@ lab_case_alive() { # <proc-file>: the recorded process is still the same process
   [ "$current" = "$start" ]
 }
 lab_case_sid() { python3 -c 'import os, sys; print(os.getsid(int(sys.argv[1])))' "$1"; }
+# start_outside_decoy <case-dir> <cwd> <lab>: a process outside the lab that looks like one by every
+# path: its own session, parent pid 1, its working directory in <cwd> and the lab home in its argv.
+# It logs every signal it gets to <case-dir>/decoy.signals; <case-dir>/decoy.proc records it.
+start_outside_decoy() {
+  python3 -c "$(cat <<'PY'
+import os, signal, sys, time
+cwd, pidfile, log = sys.argv[1], sys.argv[2], sys.argv[3]
+if os.fork():
+    sys.exit(0)
+os.setsid()
+if os.fork():
+    os._exit(0)
+os.chdir(cwd)
+def note(signum, _frame):
+    with open(log, "a") as out:
+        out.write("%d\n" % signum)
+for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM, signal.SIGCONT, signal.SIGUSR1):
+    signal.signal(signum, note)
+open(pidfile, "w").write("%d\n" % os.getpid())
+deadline = time.time() + 600
+while time.time() < deadline:
+    time.sleep(0.2)
+PY
+)" "$2" "$1/decoy.pid" "$1/decoy.signals" "$3" </dev/null >/dev/null 2>&1
+  for _ in $(seq 1 500); do
+    [ ! -s "$1/decoy.pid" ] || break
+    /bin/sleep 0.02
+  done
+  fm_test_record_process "$1/decoy.proc" "$(cat "$1/decoy.pid")" || fail 'cannot record the outside decoy'
+  fm_test_track_process "$1/decoy.proc" python
+}
 run_lab_teardown_case() {
   local case_dir="$TMP_ROOT/case-lab-teardown" lab socket id=lab-teardown-$$ out rc pid sid name i
   local env_out server project copy standin_bin teardown_line recorded dead
@@ -328,34 +363,7 @@ SH
   ! grep -q "^launch"$'\t'"$id"$'\t'"$sid"$'\t' "$lab/state/.fm-lab-launches" 2>/dev/null || recorded=yes
   read -r i _ < "$case_dir/subshell.proc"
   [ "$i" != "$sid" ] || fail 'the stand-in is a direct job of the pane shell, not the treehouse-subshell shape under test'
-  # A process outside the lab that looks like one by every path: its own session, parent pid 1,
-  # its working directory in the lab copy and the lab home in its argv. It logs every signal it gets.
-  python3 -c "$(cat <<'PY'
-import os, signal, sys, time
-copy, pidfile, log = sys.argv[1], sys.argv[2], sys.argv[3]
-if os.fork():
-    sys.exit(0)
-os.setsid()
-if os.fork():
-    os._exit(0)
-os.chdir(copy)
-def note(signum, _frame):
-    with open(log, "a") as out:
-        out.write("%d\n" % signum)
-for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM, signal.SIGCONT, signal.SIGUSR1):
-    signal.signal(signum, note)
-open(pidfile, "w").write("%d\n" % os.getpid())
-deadline = time.time() + 600
-while time.time() < deadline:
-    time.sleep(0.2)
-PY
-)" "$copy" "$case_dir/decoy.pid" "$case_dir/decoy.signals" "$lab" </dev/null >/dev/null 2>&1
-  for _ in $(seq 1 500); do
-    [ ! -s "$case_dir/decoy.pid" ] || break
-    /bin/sleep 0.02
-  done
-  fm_test_record_process "$case_dir/decoy.proc" "$(cat "$case_dir/decoy.pid")" || fail 'cannot record the outside decoy'
-  fm_test_track_process "$case_dir/decoy.proc" python
+  start_outside_decoy "$case_dir" "$copy" "$lab"
 
   TMUX_TMPDIR="$socket" "$REAL_TMUX" -L fm-lab kill-server || fail 'cannot stop the lab tmux server'
   for _ in $(seq 1 500); do
@@ -443,11 +451,98 @@ PY
   ! lab_case_alive "$case_dir/stuck.proc" || fail 'the retried teardown left the stuck process running'
   pass 'lab teardown exits 1 on an unreadable process table or a lab process that survives TERM and KILL, and a retry ends it'
 }
+# The gate's lab primary: bin/fm-lab-home.sh primary starts it in the lab's own pane, then the
+# recipe's `tmux -L fm-lab kill-server` and printed teardown end the lab. The stand-in primary and
+# the child it starts ignore SIGHUP, so only the teardown can end them.
+run_lab_primary_case() {
+  local case_dir="$TMP_ROOT/case-lab-primary" lab socket env_out teardown_line out rc server pid name
+  mkdir -p "$case_dir"
+  env_out=$(TMPDIR="$case_dir" "$LAB_HOME_HELPER" env 2>"$case_dir/env.err") || fail "lab env failed: $(cat "$case_dir/env.err")"
+  lab=$(printf '%s\n' "$env_out" | sed -n "s/^export FM_HOME=//p")
+  socket=$(printf '%s\n' "$env_out" | sed -n "s/^export TMUX_TMPDIR=//p")
+  [ -d "$lab" ] && [ -d "$socket" ] || fail "lab env printed no usable exports: $env_out"
+  teardown_line=$(sed -n 's/^fm-lab-home: teardown: //p' "$case_dir/env.err")
+  case "$teardown_line" in *" teardown "*" && rm -rf "*) ;; *) fail "lab env printed no teardown line: $(cat "$case_dir/env.err")" ;; esac
+  LAB_PRIMARY_HOME=$lab LAB_PRIMARY_SOCKET=$socket
+  cat > "$case_dir/primary" <<SH
+#!/bin/bash
+trap '' HUP
+printf '%s\n' "\$\$" > '$case_dir/primary.pid'
+/bin/sleep 600 &
+printf '%s\n' "\$!" > '$case_dir/child.pid'
+wait
+SH
+  chmod +x "$case_dir/primary"
+  out=$(cd "$case_dir" && TMUX_TMPDIR="$socket" "$LAB_HOME_HELPER" primary "$lab" "$case_dir/primary" 2>&1)
+  rc=$?
+  expect_code 0 "$rc" "the lab primary did not start: $out"
+  for _ in $(seq 1 500); do
+    [ ! -s "$case_dir/child.pid" ] || break
+    /bin/sleep 0.02
+  done
+  for name in primary:primary child:sleep; do
+    pid=$(cat "$case_dir/${name%%:*}.pid" 2>/dev/null) || fail "the stand-in ${name%%:*} never started: $out"
+    fm_test_record_process "$case_dir/${name%%:*}.proc" "$pid" || fail "cannot record the stand-in ${name%%:*}"
+    fm_test_track_process "$case_dir/${name%%:*}.proc" "${name#*:}"
+  done
+  server=$(TMUX_TMPDIR="$socket" "$REAL_TMUX" -L fm-lab display-message -p -t primary '#{pid}') || fail 'cannot read the lab tmux server pid'
+  read -r pid _ < "$case_dir/primary.proc"
+  [ "$(TMUX_TMPDIR="$socket" "$REAL_TMUX" -L fm-lab display-message -p -t primary '#{pane_pid}')" = "$pid" ] \
+    || fail 'the stand-in primary is not the command of the lab primary pane'
+  start_outside_decoy "$case_dir" "$lab" "$lab"
+
+  TMUX_TMPDIR="$socket" "$REAL_TMUX" -L fm-lab kill-server || fail 'cannot stop the lab tmux server'
+  for _ in $(seq 1 500); do
+    kill -0 "$server" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  ! kill -0 "$server" 2>/dev/null || fail 'the lab tmux server outlived kill-server'
+  lab_case_alive "$case_dir/primary.proc" \
+    || fail 'precondition: the stand-in primary ended with the server, so this run cannot show what the teardown reaps'
+  out=$(cd / && eval "${teardown_line%% && rm -rf *}" 2>&1)
+  rc=$?
+  expect_code 0 "$rc" "the lab teardown failed: $out"
+  for name in primary child; do
+    ! lab_case_alive "$case_dir/$name.proc" || fail "the lab teardown left the lab $name running (pid $(cut -f1 "$case_dir/$name.proc"))"
+  done
+  lab_case_alive "$case_dir/decoy.proc" || fail 'the lab teardown ended a process outside the lab'
+  [ ! -s "$case_dir/decoy.signals" ] || fail "the lab teardown signalled a process outside the lab: $(tr '\n' ' ' < "$case_dir/decoy.signals")"
+  assert_absent "$socket" 'the lab teardown kept the private socket directory after a complete reap'
+  LAB_PRIMARY_SOCKET=
+  pass 'lab teardown ends the lab primary and what it started after kill-server, and nothing outside the lab'
+
+  # A primary whose session cannot be recorded never runs its command, and its session is stopped.
+  lab=$("$LAB_HOME_HELPER" create "$case_dir/unrecordable-lab") || fail 'cannot create the unrecordable lab'
+  socket=$("$LAB_HOME_HELPER" tmux-dir "$lab") || fail 'cannot create the unrecordable lab socket'
+  LAB_PRIMARY_HOME=$lab LAB_PRIMARY_SOCKET=$socket
+  : > "$lab/state/.fm-lab-launches"
+  chmod 400 "$lab/state/.fm-lab-launches"
+  printf '#!/bin/sh\n: > %s/ran\nexec /bin/sleep 600\n' "$case_dir" > "$case_dir/unrecorded"
+  chmod +x "$case_dir/unrecorded"
+  out=$(cd "$case_dir" && "$LAB_HOME_HELPER" primary "$lab" "$case_dir/unrecorded" 2>&1)
+  rc=$?
+  expect_code 1 "$rc" "a primary whose session cannot be recorded must not start: $out"
+  assert_contains "$out" 'refusing to start the lab primary' 'the unrecorded primary must say why it refused'
+  /bin/sleep 0.5
+  assert_absent "$case_dir/ran" 'a primary whose session could not be recorded ran its command'
+  ! TMUX_TMPDIR="$socket" "$REAL_TMUX" -L fm-lab has-session -t primary 2>/dev/null || fail 'the refused primary left its session running'
+  chmod 600 "$lab/state/.fm-lab-launches"
+  TMUX_TMPDIR="$socket" "$REAL_TMUX" -L fm-lab kill-server 2>/dev/null || true
+  "$LAB_HOME_HELPER" teardown "$lab" >/dev/null || fail 'cannot tear down the unrecordable lab'
+  LAB_PRIMARY_SOCKET=
+  pass 'a lab primary whose session cannot be recorded never runs its command'
+}
 LAB_CASE_HOME=
 LAB_CASE_SOCKET=
+LAB_PRIMARY_HOME=
+LAB_PRIMARY_SOCKET=
 if [ "$BACKEND" = tmux ] && case "${FM_TEST_ACQUISITION_CASES:-all}" in all|lab-teardown) true ;; *) false ;; esac; then
   run_lab_teardown_case
   [ "${FM_TEST_ACQUISITION_CASES:-all}" != lab-teardown ] || exit 0
+fi
+if [ "$BACKEND" = tmux ] && case "${FM_TEST_ACQUISITION_CASES:-all}" in all|lab-primary) true ;; *) false ;; esac; then
+  run_lab_primary_case
+  [ "${FM_TEST_ACQUISITION_CASES:-all}" != lab-primary ] || exit 0
 fi
 
 if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then

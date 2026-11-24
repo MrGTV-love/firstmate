@@ -5036,7 +5036,7 @@
       "invariant": "Lab home operations target only a directory carrying the lab marker and state directory.",
       "layer": "runtime-block",
       "source": "the lab marker, canonical Git containment and the recorded tmux directory's mode, uid and socket liveness; existing decision points: site:bin/fm-lab-home.sh:d4d6d85d91",
-      "trigger": "tmux-dir, record-launch or teardown on a directory that lacks the .fm-lab-home marker and state/",
+      "trigger": "tmux-dir, primary, record-launch or teardown on a directory that lacks the .fm-lab-home marker and state/",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Create a fresh disposable home with bash bin/fm-lab-home.sh env; for an existing lab preserve its socket directory until its owner confirms private servers stopped, then retry bash bin/fm-lab-home.sh teardown <lab-home>.",
@@ -5056,7 +5056,7 @@
         {
           "file": "bin/fm-lab-home.sh",
           "match": "|| { fm_lab_home_error \"refusing '$dir': not a marked lab home\"; exit 1; }",
-          "count": 3
+          "count": 4
         }
       ]
     },
@@ -5226,11 +5226,11 @@
       "id": "lab-home-launch-recorded",
       "version": "1",
       "owner": "bin/fm-lab-home.sh",
-      "invariant": "A tmux worker launches in a lab home only after its endpoint session leader is recorded for teardown.",
+      "invariant": "A tmux worker or lab primary launches in a lab home only after its endpoint session leader is recorded for teardown.",
       "layer": "runtime-block",
-      "source": "the endpoint pane shell pid that bin/fm-spawn.sh reads from tmux, its fm_pid_identity, and an append to state/.fm-lab-launches",
-      "trigger": "record-launch with an unreadable or invalid pane shell pid, an unreadable identity, or an unwritable launch record",
-      "remedy": "Keep the endpoint unlaunched; make its tmux pane shell readable and the lab state directory writable, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> in the lab home.",
+      "source": "the endpoint pane pid that bin/fm-spawn.sh or fm-lab-home.sh primary reads from tmux, its start time, and an append to state/.fm-lab-launches",
+      "trigger": "record-launch, or primary through it, with an unreadable or invalid pane pid, an unreadable start time, or an unwritable launch record",
+      "remedy": "Keep the endpoint unlaunched; make its tmux pane readable and the lab state directory writable, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> or bash bin/fm-lab-home.sh primary <lab-home> <command> in the lab home.",
       "decision": "deny",
       "fail_direction": "closed",
       "budget": 1,
@@ -5250,6 +5250,10 @@
           "file": "bin/fm-lab-home.sh",
           "match": "fm_lab_home_error \"refusing to launch task $id in lab '$dir':",
           "count": 3
+        },
+        {
+          "file": "bin/fm-lab-home.sh",
+          "match": "fm_lab_home_error \"refusing to start the lab primary: its session could not be recorded, so its command was not run\""
         }
       ]
     },

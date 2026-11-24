@@ -14,8 +14,10 @@
 #   fm-lab-home.sh create <dir>       make a marked lab home and print its
 #                                    canonical path
 #   fm-lab-home.sh tmux-dir <dir>     create or print its private tmux socket dir
+#   fm-lab-home.sh primary <dir> <command> [<arg>...]
+#                                    start the lab primary on the private socket
 #   fm-lab-home.sh record-launch <dir> <task-id> <pid>
-#                                    record the shell that leads a lab worker
+#                                    record the process that leads a lab
 #                                    endpoint's session
 #   fm-lab-home.sh teardown <dir>     end every process in a recorded session,
 #                                    then remove its private tmux socket dir
@@ -48,14 +50,23 @@
 # kept running with parent pid 1 and no terminal). What still ties them to the
 # lab is their session: every process started in a pane keeps the session id of
 # the pane's shell. record-launch is the single writer of state/.fm-lab-launches,
-# one `launch<TAB><task-id><TAB><pid><TAB><sha256 of fm_pid_identity>` line for
-# the shell that leads an endpoint's session. bin/fm-spawn.sh calls it for every
-# tmux endpoint in a marked lab home before it types anything there, and refuses
-# the launch when the record cannot be written.
+# one `launch<TAB><task-id><TAB><pid><TAB><start time>` line for the process
+# that leads an endpoint's session, the start time as `ps -o lstart=` prints it,
+# which an exec does not change. bin/fm-spawn.sh calls it for every tmux
+# endpoint in a marked lab home before it types anything there, and refuses the
+# launch when the record cannot be written.
+# primary is the single entry point for the lab primary: it runs
+# `tmux -L fm-lab new-session -d -s primary` on the lab's private socket in the
+# caller's directory, with FM_HOME set to the lab and with NO_MISTAKES_GATE,
+# FM_GATE_REFUSE_BYPASS, TMUX and every FM_*_OVERRIDE removed so all paths
+# resolve inside the lab. The pane first runs a holding shell; primary records
+# that shell as task `primary`, and only then lets it exec <command>, so the
+# command never runs unrecorded. When the record fails, primary stops the
+# session and the holding shell and exits 1.
 # teardown keeps the stopped-server proof above, then ends the lab's processes:
 # every live process whose session id is a recorded pid, plus each live
 # descendant of one. A recorded pid that a live process now holds with another
-# identity is a reused pid, so that session is skipped. A recorded leader that
+# start time is a reused pid, so that session is skipped. A recorded leader that
 # is gone is taken to have left its session behind; this assumes the kernel
 # never hands out a pid that is still a live session id (unverified here), and a
 # record that outlives every member of its session could match a later session
@@ -97,30 +108,33 @@ fm_lab_home_wake_lib() {
   # shellcheck source=bin/fm-wake-lib.sh
   FM_STATE_OVERRIDE="$1/state" . "$SCRIPT_DIR/fm-wake-lib.sh"
 }
-# fm_lab_home_identity <pid>: the sha256 of the process's fm_pid_identity.
-fm_lab_home_identity() {
-  local identity
-  identity=$(fm_pid_identity "$1" 2>/dev/null) || return 1
-  [ -n "$identity" ] || return 1
-  if command -v shasum >/dev/null 2>&1; then
-    printf '%s\n' "$identity" | shasum -a 256 | awk '{print $1}'
-  else
-    printf '%s\n' "$identity" | sha256sum | awk '{print $1}'
+# fm_lab_home_start <pid>: the process's start time, as `ps -o lstart=` prints it.
+fm_lab_home_start() {
+  local start rc
+  start=$(LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null)
+  rc=$?
+  if [ "$rc" -eq 126 ]; then
+    start=$(python3 "$SCRIPT_DIR/fm-proc-info.py" lstart "$1" 2>/dev/null) || return 1
+  elif [ "$rc" -ne 0 ]; then
+    return 1
   fi
+  start=$(printf '%s\n' "$start" | awk '{$1=$1; print}')
+  [ -n "$start" ] || return 1
+  printf '%s\n' "$start"
 }
 
 # fm_lab_home_sessions <dir>: print the recorded session ids the lab still owns.
 fm_lab_home_sessions() {
-  local record tag id pid digest current seen=' '
+  local record tag id pid start current seen=' '
   record=$(fm_lab_home_launch_record "$1")
   [ -f "$record" ] || return 0
-  while IFS=$'\t' read -r tag id pid digest; do
-    [ "$tag" = launch ] && [ -n "$id" ] && [ -n "$digest" ] || return 1
+  while IFS=$'\t' read -r tag id pid start; do
+    [ "$tag" = launch ] && [ -n "$id" ] && [ -n "$start" ] || return 1
     case "$pid" in ''|*[!0-9]*|0|1) return 1 ;; esac
     case "$seen" in *" $pid "*) continue ;; esac
     seen="$seen$pid "
-    if current=$(fm_lab_home_identity "$pid"); then
-      [ "$current" = "$digest" ] || continue
+    if current=$(fm_lab_home_start "$pid"); then
+      [ "$current" = "$start" ] || continue
     fi
     printf '%s\n' "$pid"
   done < "$record"
@@ -328,6 +342,32 @@ case "${1:-}" in
     fi
     printf '%s\n' "$socket_dir"
     ;;
+  primary)
+    dir=${2:-}
+    [ "$#" -ge 3 ] && [ -n "$dir" ] && [ -n "$3" ] || { fm_lab_home_error "primary requires a marked lab home and a command"; exit 2; }
+    shift 2
+    fm_lab_home_marked "$dir" || { fm_lab_home_error "refusing '$dir': not a marked lab home"; exit 1; }
+    dir=$(cd -P -- "$dir" && pwd -P) || exit 1
+    socket_dir=$("$SCRIPT_DIR/fm-lab-home.sh" tmux-dir "$dir") || exit 1
+    go="$dir/state/.fm-lab-primary-go.$$"
+    rm -f "$go"
+    # The holding shell waits while this process lives and execs the command
+    # only once the go file exists, which this process writes after the record.
+    # shellcheck disable=SC2016 # The holding shell expands its own arguments.
+    env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
+      -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u TMUX TMUX_TMPDIR="$socket_dir" \
+      tmux -L fm-lab new-session -d -s primary -c "$PWD" -e FM_HOME="$dir" \
+      /bin/sh -c 'while [ ! -e "$2" ] && kill -0 "$1" 2>/dev/null; do sleep 0.05; done; [ -e "$2" ] || exit 1; rm -f "$2"; shift 2; exec "$@"' \
+      fm-lab-primary "$$" "$go" "$@" || { fm_lab_home_error "cannot start the lab primary session"; exit 1; }
+    pid=$(TMUX_TMPDIR="$socket_dir" tmux -L fm-lab display-message -p -t primary '#{pane_pid}' 2>/dev/null) || pid=
+    if ! "$SCRIPT_DIR/fm-lab-home.sh" record-launch "$dir" primary "$pid"; then
+      TMUX_TMPDIR="$socket_dir" tmux -L fm-lab kill-session -t primary 2>/dev/null || true
+      fm_lab_home_error "refusing to start the lab primary: its session could not be recorded, so its command was not run"
+      exit 1
+    fi
+    : > "$go" || { fm_lab_home_error "cannot release the recorded lab primary (pane pid $pid)"; exit 1; }
+    printf 'lab primary started: pane pid %s, session primary on %s\n' "$pid" "$socket_dir/tmux-$(id -u)/fm-lab"
+    ;;
   record-launch)
     dir=${2:-} id=${3:-} pid=${4:-}
     { [ -n "$dir" ] && [ -n "$id" ]; } || { fm_lab_home_error "record-launch requires a marked lab home, a task id and a pid"; exit 2; }
@@ -339,12 +379,11 @@ case "${1:-}" in
         exit 1
         ;;
     esac
-    fm_lab_home_wake_lib "$dir" || exit 1
-    digest=$(fm_lab_home_identity "$pid") || {
-      fm_lab_home_error "refusing to launch task $id in lab '$dir': the identity of its endpoint shell (pid $pid) is unreadable, so teardown could not reap what it starts"
+    start=$(fm_lab_home_start "$pid") || {
+      fm_lab_home_error "refusing to launch task $id in lab '$dir': the start time of its endpoint shell (pid $pid) is unreadable, so teardown could not reap what it starts"
       exit 1
     }
-    printf 'launch\t%s\t%s\t%s\n' "$id" "$pid" "$digest" >> "$(fm_lab_home_launch_record "$dir")" || {
+    printf 'launch\t%s\t%s\t%s\n' "$id" "$pid" "$start" >> "$(fm_lab_home_launch_record "$dir")" || {
       fm_lab_home_error "refusing to launch task $id in lab '$dir': cannot write $(fm_lab_home_launch_record "$dir")"
       exit 1
     }
@@ -384,7 +423,7 @@ case "${1:-}" in
     rm -rf "$socket_dir" && rm -f "$record"
     ;;
   *)
-    fm_lab_home_error "usage: fm-lab-home.sh env | create <dir> | tmux-dir <dir> | record-launch <dir> <task-id> <pid> | teardown <dir>"
+    fm_lab_home_error "usage: fm-lab-home.sh env | create <dir> | tmux-dir <dir> | primary <dir> <command> [<arg>...] | record-launch <dir> <task-id> <pid> | teardown <dir>"
     exit 2
     ;;
 esac
