@@ -3164,22 +3164,29 @@ relaunch_successor_admission() {  # <project> <copy>
 
 # The branch fm-spawn.sh will give the relaunched task must not be one another task
 # records as its successor: fm-spawn.sh refuses it, so the check runs here before
-# anything is stopped. A ship takes its branch= or fm/<id>; a slot-governed scout takes
-# its branch= or fm/<id>; any other launch takes no branch and is not checked.
+# anything is stopped. A ship takes its branch= or fm/<id>; a slot-governed scout always
+# takes fm/<id>; any other launch takes no branch and is not checked. Only a ship can
+# leave the claimed ref by reassociation, which sets branch= for a ship alone.
 relaunch_claimed_branch_admission() {  # <slot-governed 0|1>
-  local branch claimant
-  branch=$(fm_meta_get "$META" branch)
+  local branch claimant remedy
   case "$KIND" in
-    ship) ;;
-    scout) [ "$1" = 1 ] || return 0 ;;
+    ship)
+      branch=$(fm_meta_get "$META" branch)
+      [ -n "$branch" ] || branch="fm/$ID"
+      ;;
+    scout)
+      [ "$1" = 1 ] || return 0
+      branch="fm/$ID"
+      ;;
     *) return 0 ;;
   esac
-  [ -n "$branch" ] || branch="fm/$ID"
   fm_local_firstmate_state_dirs "$STATE" tolerant
   claimant=$(fm_successor_claimant "$branch" "$META" "${FM_LOCAL_FIRSTMATE_STATES[@]}") || return 0
   "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule relaunch --task "$ID" \
     --source-ok true --successor "$branch" 2>/dev/null || true
-  die "relaunch refused: task $claimant records refs/heads/$branch as its successor branch, and the relaunch of task $ID would take that branch; refused before stopping the running agent, so nothing was changed. Ask Main to end task $claimant's succession, or reassociate task $ID onto another branch, before relaunching it"
+  remedy="Ask Main to end task $claimant's succession before relaunching task $ID"
+  [ "$KIND" != ship ] || remedy="Ask Main to end task $claimant's succession, or reassociate task $ID onto another branch, before relaunching it"
+  die "relaunch refused: task $claimant records refs/heads/$branch as its successor branch, and the relaunch of task $ID would take that branch; refused before stopping the running agent, so nothing was changed. $remedy"
 }
 
 relaunch_successor_refuse() {  # <successor> <message>

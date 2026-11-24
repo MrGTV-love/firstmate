@@ -1267,22 +1267,25 @@ expect_relaunch_refused_before_stop() {  # <case-dir> <task-id> <claimant> <ref>
   cp -p "$dir/home/state/$tid.meta" "$dir/relaunch.before"
   : > "$FM_GUARD_EVENT_LOG"
   rc=0; out=$(NM_HOME="$dir/nm" run_control "$dir" "$tid" relaunch "$@") || rc=$?
-  expect_code 1 "$rc" "the relaunch of $tid onto another task's recorded successor must refuse"$'\n'"$out"
-  assert_contains "$out" "task $claimant records refs/heads/$ref as its successor branch" "the refusal must name the recording task and the ref"
-  assert_contains "$out" "refused before stopping the running agent" "the refusal must come before the stop"
   [ ! -s "$dir/fake/literal" ] && [ ! -s "$dir/fake/keys" ] || fail "the refused relaunch sent lifecycle input to the running agent: $(cat "$dir/fake/literal" "$dir/fake/keys")"
   assert_equals claude "$(cat "$dir/fake/command")" "the running agent must still run"
   cmp -s "$dir/relaunch.before" "$dir/home/state/$tid.meta" || fail "the refused relaunch changed the task record"
   [ ! -e "$dir/home/state/$tid.control-relaunch" ] || fail "the refused relaunch opened a relaunch transaction"
+  expect_code 1 "$rc" "the relaunch of $tid onto another task's recorded successor must refuse"$'\n'"$out"
   [ -n "$(jq -c --arg b "$ref" 'select(.guard == "successor-branch-admission" and .rule == "relaunch" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
     || fail "the refused relaunch wrote no successor-branch-admission deny event naming the ref"
+  assert_contains "$out" "task $claimant records refs/heads/$ref as its successor branch" "the refusal must name the recording task and the ref"
+  assert_contains "$out" "refused before stopping the running agent" "the refusal must come before the stop"
+  assert_contains "$out" "Ask Main to end task $claimant's succession" "the refusal must name the step that frees the ref"
+  RELAUNCH_REFUSAL=$out
 }
 
 # review-1: fm-control.sh relaunch checks the branch the launch will take before it
 # stops the running agent. A live scout that a relaunch brings under slot governance
 # would take fm/<id>, which task X records as its successor; a ship whose record names
 # no branch would take its default fm/<id>, which another task records. Both refuse
-# before the stop. The ship case's claimant record is written by hand: the real verb
+# before the stop, and each refusal names only the steps that work for its kind: a
+# scout cannot leave fm/<id> by reassociation. The ship case's claimant record is written by hand: the real verb
 # admits a successor only in its own task's name family, and the relaunch reads only
 # that record's successor_branch= line.
 test_successor_fm_control_relaunch_refuses_a_claimed_branch_before_stopping() {
@@ -1293,10 +1296,14 @@ test_successor_fm_control_relaunch_refuses_a_claimed_branch_before_stopping() {
   make_relaunch_scout "$dir" "$id-v2"
   printf 'claude' > "$dir/fake/command"
   expect_relaunch_refused_before_stop "$dir" "$id-v2" "$id" "fm/$id-v2" --owned-path scripts --note "apply the slot scope"
+  case "$RELAUNCH_REFUSAL" in
+    *reassociate*) fail "a scout's refusal offered reassociation, which sets branch= for a ship only: $RELAUNCH_REFUSAL" ;;
+  esac
   dir=$(new_case prestop-ship "$sid")
   add_ship_task "$dir" "$sid" claude
   printf 'kind=ship\nbranch=fm/owner-%s\nsuccessor_branch=fm/%s\n' "$sid" "$sid" > "$dir/home/state/owner-$sid.meta"
   expect_relaunch_refused_before_stop "$dir" "$sid" "owner-$sid" "fm/$sid" --note "a plain relaunch"
+  assert_contains "$RELAUNCH_REFUSAL" "reassociate task $sid onto another branch" "a ship's refusal must offer reassociation onto another branch"
   pass "successor: fm-control relaunch refuses a scout or ship branch another task records as its successor before it stops the running agent"
 }
 

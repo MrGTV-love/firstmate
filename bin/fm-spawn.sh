@@ -2373,7 +2373,10 @@ spawn_refuse_claimed_branch() {  # <branch>
   "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule spawn --task "$ID" \
     --source-ok true --successor "$branch" 2>/dev/null || true
   remedy="Spawn this task under another id or --branch-prefix, or let Main end task $claimant's succession first"
-  [ "$RELAUNCH" -eq 0 ] || remedy="Ask Main to end task $claimant's succession, or reassociate task $ID onto another branch, before relaunching it"
+  if [ "$RELAUNCH" -eq 1 ]; then
+    remedy="Ask Main to end task $claimant's succession before relaunching task $ID"
+    [ "$KIND" != ship ] || remedy="Ask Main to end task $claimant's succession, or reassociate task $ID onto another branch, before relaunching it"
+  fi
   echo "error: spawn refused: task $claimant records refs/heads/$branch as its successor branch, so task $ID may not take that branch; this launch wrote no task record, no refs/heads/$branch and no write profile. $remedy" >&2
   exit 1
 }
