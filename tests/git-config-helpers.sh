@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # tests/git-config-helpers.sh - fixture Git isolation from the host's global and
 # system configuration, from an inherited GIT_CONFIG_COUNT core.hooksPath entry
-# (a launcher-injected hooks directory), and from an inherited repository
-# location.
+# or GIT_CONFIG_PARAMETERS hook rows (a launcher-injected task hook carrier),
+# and from an inherited repository location.
 #
 # Source this before a fixture's first Git operation:
 #   # shellcheck source=tests/git-config-helpers.sh
@@ -67,3 +67,23 @@ else
   unset GIT_CONFIG_COUNT
 fi
 unset __fm_git_env_i __fm_git_env_n __fm_git_env_keys __fm_git_env_values __fm_git_env_k __fm_git_env_v
+
+# A launcher on the config carrier injects the same task hooks as git
+# config-based hook rows in GIT_CONFIG_PARAMETERS instead, and records the exact
+# rows in FM_GIT_HOOK_ROWS. Remove exactly those rows and keep every other
+# parameter, so a caller's own `git -c` rows survive.
+if [ -n "${FM_GIT_HOOK_ROWS-}" ] && [ -n "${GIT_CONFIG_PARAMETERS-}" ]; then
+  __fm_git_env_p=$GIT_CONFIG_PARAMETERS
+  while [[ "$__fm_git_env_p" == *"$FM_GIT_HOOK_ROWS"* ]]; do
+    __fm_git_env_p="${__fm_git_env_p%%"$FM_GIT_HOOK_ROWS"*}${__fm_git_env_p#*"$FM_GIT_HOOK_ROWS"}"
+  done
+  __fm_git_env_p="${__fm_git_env_p#"${__fm_git_env_p%%[! ]*}"}"
+  __fm_git_env_p="${__fm_git_env_p%"${__fm_git_env_p##*[! ]}"}"
+  if [ -n "$__fm_git_env_p" ]; then
+    export GIT_CONFIG_PARAMETERS="$__fm_git_env_p"
+  else
+    unset GIT_CONFIG_PARAMETERS
+  fi
+  unset __fm_git_env_p
+fi
+unset FM_GIT_HOOK_ROWS FM_GIT_HOOK_MODE

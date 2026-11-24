@@ -1976,6 +1976,7 @@ RELAUNCH_REPLACEMENT_WT=
 CONFIG_INHERIT_LOCK=
 CONFIG_INHERIT_LOCK_HELD=0
 GIT_HOOKS_DIR=
+GIT_HOOKS_ROWS=
 SPAWN_LAUNCH_SENT=0
 SPAWN_BRIEF_DELIVERED=0
 SPAWN_BRIEF_FAILURE_REASON=
@@ -7718,6 +7719,10 @@ GIT_HOOKS_DIR="$STATE_REAL/$ID.git-hooks"
   echo "error: could not install the task Git hooks for $ID" >&2
   exit 1
 }
+GIT_HOOKS_ROWS=$("$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" rows "$GIT_HOOKS_DIR" "$KEEP_AI_TRAILERS") || {
+  echo "error: could not compose the task Git hook rows for $ID" >&2
+  exit 1
+}
 
 # Delivery posture recorded in meta so fm-teardown's safety check and the
 # validate/merge stages can branch on it. A ship task carries the explicit
@@ -8274,16 +8279,46 @@ if [ "$KIND" = secondmate ]; then
   # injected carrier and this on/off snapshot are guaranteed to agree.
   LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE FM_SUPERVISION_MODEL=$supervision_model $LAUNCH"
 fi
-# Reconcile before the allowlist boundary: a child cannot unset stale exports
-# in the persistent destination shell. Repeat inside the filtered child so
-# credential checks survive env -i; the header owns the reconciliation contract.
-# Use assignments rather than local declarations: destination shells include ksh.
+# Select the task Git hook carrier inside every shell that launches the worker:
+# the persistent destination shell (a child cannot unset its stale exports) and
+# again inside the filtered launch shell after env -i, with the pane's own PATH,
+# so the git that is probed is the git the worker gets. The header owns the
+# carrier contract. Use assignments rather than local declarations: destination
+# shells include ksh and zsh.
 # shellcheck disable=SC2016 # The destination shell expands this function.
-IFS= read -r -d '' GIT_HOOKS_LAUNCH_PREFIX <<'SH' || true
+IFS= read -r -d '' GIT_HOOKS_LAUNCH_FUNCTION <<'SH' || true
 fm_launch_git_hooks() {
-  fm_hooks=$1 fm_count=${GIT_CONFIG_COUNT-0}
-  fm_i=0 fm_out=0 fm_key= fm_value=
-  case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac
+  fm_hooks=$1 fm_rows=$2 fm_carrier=$3
+  if ! command -v git >/dev/null 2>&1; then
+    echo "fm-spawn: git does not resolve on this pane's PATH; refusing to launch a worker without the task Git hooks" >&2
+    return 1
+  fi
+  fm_gcp=${GIT_CONFIG_PARAMETERS-}
+  for fm_old in "${FM_GIT_HOOK_ROWS-}" "$fm_rows"; do
+    [ -n "$fm_old" ] || continue
+    while :; do
+      case "$fm_gcp" in
+        *"$fm_old"*) fm_gcp="${fm_gcp%%"$fm_old"*}${fm_gcp#*"$fm_old"}" ;;
+        *) break ;;
+      esac
+    done
+  done
+  while :; do
+    case "$fm_gcp" in
+      ' '*) fm_gcp=${fm_gcp# } ;;
+      *' ') fm_gcp=${fm_gcp% } ;;
+      *) break ;;
+    esac
+  done
+  fm_count=${GIT_CONFIG_COUNT-0}
+  case "$fm_count" in
+    '') fm_count=0 ;;
+    *[!0-9]*)
+      echo "fm-spawn: this pane's GIT_CONFIG_COUNT is not a number; refusing to launch a worker without the task Git hooks" >&2
+      return 1
+      ;;
+  esac
+  fm_i=0 fm_out=0
   while [ "$fm_i" -lt "$fm_count" ]; do
     eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
     if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
@@ -8299,13 +8334,54 @@ fm_launch_git_hooks() {
     unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
     fm_i=$((fm_i + 1))
   done
+  if [ "$fm_out" -gt 0 ]; then export GIT_CONFIG_COUNT=$fm_out; else unset GIT_CONFIG_COUNT; fi
+  if [ -n "$fm_gcp" ] && ! GIT_CONFIG_PARAMETERS=$fm_gcp git config --list >/dev/null 2>&1; then
+    echo "fm-spawn: this pane's GIT_CONFIG_PARAMETERS is malformed; refusing to launch a worker without the task Git hooks" >&2
+    return 1
+  fi
+  if [ "$fm_carrier" = config ]; then
+    fm_new="${fm_gcp:+$fm_gcp }$fm_rows"
+    fm_cm=$(GIT_CONFIG_PARAMETERS=$fm_new git hook list commit-msg 2>/dev/null) || fm_cm=
+    fm_pp=$(GIT_CONFIG_PARAMETERS=$fm_new git hook list pre-push 2>/dev/null) || fm_pp=
+    fm_ok=1
+    printf '%s\n' "$fm_cm" | grep -qx fm-scan-commit || fm_ok=0
+    printf '%s\n' "$fm_pp" | grep -qx fm-scan-push || fm_ok=0
+    case "$fm_rows" in
+      *"'hook.fm-strip.event'"*) printf '%s\n' "$fm_cm" | grep -qx fm-strip || fm_ok=0 ;;
+    esac
+    if [ "$fm_ok" = 1 ]; then
+      export GIT_CONFIG_PARAMETERS="$fm_new" FM_GIT_HOOK_ROWS="$fm_rows" FM_GIT_HOOK_MODE=config
+      return 0
+    fi
+  fi
+  if [ -n "$fm_gcp" ]; then export GIT_CONFIG_PARAMETERS="$fm_gcp"; else unset GIT_CONFIG_PARAMETERS; fi
+  unset FM_GIT_HOOK_ROWS
   export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
-  fm_out=$((fm_out + 1))
-  export GIT_CONFIG_COUNT=$fm_out
+  export GIT_CONFIG_COUNT=$((fm_out + 1))
+  if [ "$(git config --get core.hooksPath 2>/dev/null)" != "$fm_hooks" ]; then
+    echo "fm-spawn: this pane's git honours neither task Git hook carrier; refusing to launch a worker without the task Git hooks" >&2
+    return 1
+  fi
+  export FM_GIT_HOOK_MODE=legacy
+  return 0
 }
 SH
-GIT_HOOKS_LAUNCH_PREFIX="$GIT_HOOKS_LAUNCH_PREFIX
-fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR"); unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks;"
+# Harnesses whose worker tool shell is proven to keep GIT_CONFIG_PARAMETERS
+# (the in-pane case recorded in docs/verification/runtime-backends.md). Only
+# these may run on the config carrier; every other launch keeps the legacy one.
+GIT_HOOKS_CONFIG_HARNESSES="claude"
+GIT_HOOKS_CARRIER=legacy
+case " $GIT_HOOKS_CONFIG_HARNESSES " in
+  *" $HARNESS "*) GIT_HOOKS_CARRIER=config ;;
+esac
+# git_hooks_guard <launch text>: the launch text run only after the selector
+# chose a carrier; on refusal the selector's reason is printed and nothing runs.
+git_hooks_guard() {
+  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok; unset -f fm_launch_git_hooks'
+  printf '%s\nif fm_launch_git_hooks %s %s %s; then\n%s\n%s\nelse\n%s\nfalse\nfi\n' \
+    "$GIT_HOOKS_LAUNCH_FUNCTION" "$(shell_quote "$GIT_HOOKS_DIR")" "$(shell_quote "$GIT_HOOKS_ROWS")" \
+    "$GIT_HOOKS_CARRIER" "$unset_vars" "$1" "$unset_vars"
+}
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
@@ -8465,7 +8541,7 @@ LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_S
 # shellcheck disable=SC2016 # The destination pane expands this selector.
 LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
+  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$(git_hooks_guard "$LAUNCH")")"
 else
   # Numbered entries are destination-owned, so collect their values only there.
   IFS= read -r -d '' LAUNCH_GIT_CONFIG_ARGS <<'SH' || true
@@ -8482,7 +8558,7 @@ SH
   # Select the pane's absolute shell before clearing the environment. zsh -f
   # avoids reloading its .zshenv; noninteractive Bash/sh do not load startup
   # files when BASH_ENV/ENV are absent from the explicit keep set.
-  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH") )"
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$(git_hooks_guard "$LAUNCH")") )"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the
@@ -8497,7 +8573,7 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   LAUNCH="( $LAUNCH_SHELL_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
 fi
 # The persistent pane shell, not only the confined child, keeps the task hooks.
-LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
+LAUNCH=$(git_hooks_guard "$LAUNCH")
 # Implement the launch-delivery contract in this script's header. The full
 # home-identity hash isolates equal task ids across homes, and the spawn token in
 # the final filename keeps a buffered source line bound to this incarnation.
