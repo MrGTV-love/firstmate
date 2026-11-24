@@ -84,7 +84,7 @@ Both relaunch only the recovery-grade `dead` and `missing` verdicts through the 
 [`bin/fm-secondmate-liveness-lib.sh`'s header](../bin/fm-secondmate-liveness-lib.sh) owns the additional per-home serialization across different mates, its measured wait ceiling, and the cold-calibration fallback; `tests/fm-secondmate-liveness.test.sh` covers concurrent recovery and lock-wait expiry without endpoint mutation or an attempt entry.
 Each automatic relaunch surfaces as exactly one `check` wake plus a durable line in `state/.secondmate-relaunch-<id>`, and a mate that exceeds `FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS` ledgered attempts inside `FM_SECONDMATE_LIVENESS_WINDOW_SECS` is parked behind a bound marker and escalated once until a live probe rearms it with a full attempt budget.
 An in-flight ship or scout whose busy record is `event=session-end` and whose recovery-grade endpoint reads `dead` is eligible for relaunch by the watcher's session-end tick through `bin/fm-control.sh relaunch`, which keeps the recorded worktree and applies the [transactional relaunch contract](agent-control.md#transactional-relaunch).
-`bin/fm-session-end-relaunch-lib.sh` owns eligibility, the deliberate-exit skip, the pause and hold skip, and the attempt caps.
+`bin/fm-session-end-relaunch-lib.sh` owns eligibility, the deliberate-exit skip, the pause and hold skip, the attempt caps, and the refusal memory that keeps an unchanged refusal from being retried.
 One `check` wake reports each relaunch, failure, or cap.
 The dead-record stale report above does not relaunch, and this tick never discards uncommitted work.
 `tests/fm-session-end-relaunch.test.sh` pins the relaunch, the caps, the deliberate-exit and pause or hold skips, and the opt-in debug flag.
