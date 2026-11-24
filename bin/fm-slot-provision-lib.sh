@@ -487,7 +487,7 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
     grep -q -e '_same_owner_outcome' "$script" 2>/dev/null || mpath=$(fm_slot_record_collision "$project" "$copy") || mpath=
     fm_slot_export_drop
     [ -z "$mpath" ] || {
-      echo "error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it; \"manifest_path\": \"$mpath\"" >&2
+      echo "error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it; \"manifest_path\": \"$mpath\"; compatibility limit: this early refusal assumes a provisioner with neither --check-manifest-only nor the text _same_owner_outcome refuses every existing record, so a provisioner with same-owner logic under another name is refused here too" >&2
       return 1
     }
     return 0
